@@ -1125,6 +1125,54 @@ export class NotificationService {
   }
 
   /**
+   * Sipariş iptali e-postaları: alıcıya `order-cancelled-buyer`, satıcıya
+   * `order-cancelled-seller`. Stokout oto-iptal ve ödeme-süresi-doldu
+   * senaryolarında çağrılır (in-app/push bildirimler ayrıca gönderilir; bu
+   * metod yalnız e-posta fan-out'u yapar). Bu senaryolarda alıcıdan ücret
+   * tahsil edilmediği için refundAmount geçilmez. Asla throw etmez.
+   */
+  async sendOrderCancelledEmails(orderId: string): Promise<void> {
+    try {
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        select: {
+          id: true,
+          orderNumber: true,
+          cancelReason: true,
+          buyerId: true,
+          sellerId: true,
+          product: { select: { title: true } },
+          buyer: { select: { displayName: true } },
+          seller: { select: { displayName: true } },
+        },
+      });
+      if (!order) return;
+      const reason = order.cancelReason ?? undefined;
+      const productTitle = order.product?.title ?? '';
+
+      await this.sendTemplateEmailToUser(order.buyerId, 'order-cancelled-buyer', {
+        buyerName: order.buyer?.displayName ?? '',
+        orderNumber: order.orderNumber,
+        orderId: order.id,
+        productTitle,
+        reason,
+      });
+
+      if (order.sellerId) {
+        await this.sendTemplateEmailToUser(order.sellerId, 'order-cancelled-seller', {
+          sellerName: order.seller?.displayName ?? '',
+          orderNumber: order.orderNumber,
+          orderId: order.id,
+          productTitle,
+          reason,
+        });
+      }
+    } catch (err: any) {
+      this.logger.warn(`sendOrderCancelledEmails failed for order ${orderId}: ${err?.message}`);
+    }
+  }
+
+  /**
    * Fan-out helper: send BACK_IN_STOCK to wishlist users ∪ stockout-cancelled
    * buyers (last 7 days). 24h per (user, product) debounce.
    *
@@ -1207,11 +1255,18 @@ export class NotificationService {
     // bell can render a thumbnail and the click-through can land on the
     // unavailable-page back-in-stock variant without an extra fetch.
     const data = await this.buildStockoutData(productId);
-    return this.send({
+    const result = await this.send({
       userId,
       type: NotificationType.BACK_IN_STOCK,
       data,
     });
+    // "Stoğa geri geldi" e-postası — in-app/push'un yanında markalı mail.
+    const frontendUrl = this.configService.get('FRONTEND_URL') || 'https://tarodan.com';
+    await this.sendTemplateEmailToUser(userId, 'back-in-stock', {
+      productTitle: data.productTitle,
+      productUrl: `${frontendUrl}/products/${productId}`,
+    });
+    return result;
   }
 
   /**
@@ -1402,7 +1457,7 @@ export class NotificationService {
     return { success: true };
   }
 
-  private async sendTemplateEmailToUser(userId: string, templateKey: string, templateData: Record<string, any>): Promise<void> {
+  async sendTemplateEmailToUser(userId: string, templateKey: string, templateData: Record<string, any>): Promise<void> {
     try {
       const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
       if (!user) return;

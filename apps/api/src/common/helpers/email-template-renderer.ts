@@ -55,6 +55,18 @@ export function getEmailTemplateSubject(template: string, data: Record<string, a
     'guest-checkout-otp': 'Misafir Sipariş Doğrulama Kodu',
     'invoice-buyer': `Faturanız - ${data?.invoiceNumber || ''}`,
     'invoice-seller': `Satış Faturası - ${data?.invoiceNumber || ''}`,
+    'order-cancelled-buyer': `Siparişiniz İptal Edildi - ${data?.orderNumber || ''}`,
+    'order-cancelled-seller': `Sipariş İptal Edildi - ${data?.orderNumber || ''}`,
+    'refund-requested-seller': `İade Talebi - ${data?.orderNumber || ''}`,
+    'refund-approved-buyer': `İade Talebiniz Onaylandı - ${data?.orderNumber || ''}`,
+    'refund-rejected-buyer': `İade Talebiniz Hakkında - ${data?.orderNumber || ''}`,
+    'refund-return-label-buyer': `İade Kargo Bilgileri - ${data?.orderNumber || ''}`,
+    'review-received-seller': 'Yeni Değerlendirme Aldınız',
+    'listing-expiring': `İlanınızın Süresi Doluyor${data?.productTitle ? ` - ${data.productTitle}` : ''}`,
+    'listing-expired': `İlanınızın Süresi Doldu${data?.productTitle ? ` - ${data.productTitle}` : ''}`,
+    'new-follower': `${data?.followerName || 'Yeni bir kullanıcı'} sizi takip etmeye başladı`,
+    'back-in-stock': `Stoğa Geri Geldi: ${data?.productTitle || 'Takip Ettiğiniz Ürün'}`,
+    'payout-released-seller': `Ödemeniz Aktarıldı - ${formatEmailPrice(data?.payoutAmount || 0)} TL`,
   };
   return data?.subject || subjects[template] || 'Tarodan Bildirim';
 }
@@ -669,6 +681,198 @@ export function renderEmailTemplate(
       </div>
       <p style="font-size: 13px; color: #9ca3af; margin: 16px 0 0 0;">Fatura bilgileriniz yasal yükümlülükler gereği saklanmaktadır.</p>
     `, 'Satış Faturanız Hazır'),
+
+    'order-cancelled-buyer': wrapEmail(`
+      ${titleBlock('Siparişiniz İptal Edildi', '❌')}
+      ${greeting(data?.buyerName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Aşağıdaki siparişiniz iptal edildi.</p>
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow('Sipariş No', '#' + (data?.orderNumber || ''))}
+          ${data?.productTitle ? detailRow('Ürün', data.productTitle) : ''}
+          ${data?.refundAmount ? detailRow('İade Tutarı', formatEmailPrice(data.refundAmount) + ' TL', true) : ''}
+        </table>
+      `)}
+      ${data?.reason ? warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;"><strong>İptal nedeni:</strong> ${data.reason}</p>`) : ''}
+      ${data?.refundAmount ? infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">💳 İade tutarı ödeme yönteminize 3–5 iş günü içinde yansıyacaktır.</p>`) : ''}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton('Alışverişe Devam Et', `${frontendUrl}/listings`)}
+      </div>
+    `, 'Siparişiniz İptal Edildi'),
+
+    'order-cancelled-seller': wrapEmail(`
+      ${titleBlock('Sipariş İptal Edildi', '❌')}
+      ${greeting(data?.sellerName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Ürününüze ait bir sipariş iptal edildi. Bu ürün için ayırdığınız stok serbest bırakıldı.</p>
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow('Sipariş No', '#' + (data?.orderNumber || ''))}
+          ${data?.productTitle ? detailRow('Ürün', data.productTitle) : ''}
+        </table>
+      `)}
+      ${data?.reason ? warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;"><strong>İptal nedeni:</strong> ${data.reason}</p>`) : ''}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton('Satıcı Paneline Git', `${frontendUrl}/seller/orders`)}
+      </div>
+    `, 'Sipariş İptal Edildi'),
+
+    'refund-requested-seller': wrapEmail(`
+      ${titleBlock('İade Talebi Aldınız', '🔄')}
+      ${greeting(data?.sellerName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Bir siparişiniz için alıcı iade talebinde bulundu. Lütfen talebi inceleyerek onaylayın veya itiraz edin.</p>
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow('Sipariş No', '#' + (data?.orderNumber || ''))}
+          ${data?.productTitle ? detailRow('Ürün', data.productTitle) : ''}
+          ${data?.buyerName ? detailRow('Alıcı', data.buyerName) : ''}
+          ${data?.refundAmount ? detailRow('Talep Edilen İade', formatEmailPrice(data.refundAmount) + ' TL', true) : ''}
+        </table>
+      `)}
+      ${data?.refundReason ? warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;"><strong>İade nedeni:</strong> ${data.refundReason}</p>`) : ''}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">⏰ Belirlenen süre içinde yanıt vermezseniz talep otomatik olarak işleme alınabilir.</p>`)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton('İade Talebini İncele', `${frontendUrl}/seller/orders/${data?.orderId || ''}`)}
+      </div>
+    `, 'İade Talebi Aldınız'),
+
+    'refund-approved-buyer': wrapEmail(`
+      ${titleBlock('İade Talebiniz Onaylandı', '✅')}
+      ${greeting(data?.buyerName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">İade talebiniz onaylandı.</p>
+      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">✓ İadeniz işleme alındı</p>`)}
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow('Sipariş No', '#' + (data?.orderNumber || ''))}
+          ${data?.productTitle ? detailRow('Ürün', data.productTitle) : ''}
+          ${detailRow('İade Tutarı', formatEmailPrice(data?.refundAmount || 0) + ' TL', true)}
+        </table>
+      `)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">💳 İade tutarı ödeme yönteminize 3–5 iş günü içinde yansıyacaktır.</p>`)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton('Siparişi Görüntüle', `${frontendUrl}/orders/${data?.orderId || ''}`)}
+      </div>
+    `, 'İade Talebiniz Onaylandı'),
+
+    'refund-rejected-buyer': wrapEmail(`
+      ${titleBlock('İade Talebiniz Hakkında', 'ℹ️')}
+      ${greeting(data?.buyerName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">İade talebiniz incelendi. Üzgünüz, talebiniz şu an için onaylanamadı.</p>
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow('Sipariş No', '#' + (data?.orderNumber || ''))}
+          ${data?.productTitle ? detailRow('Ürün', data.productTitle) : ''}
+        </table>
+      `)}
+      ${data?.reason ? warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;"><strong>Red nedeni:</strong> ${data.reason}</p>`) : ''}
+      <p style="font-size: 14px; color: #6b7280; margin: 16px 0;">Karara itiraz etmek veya daha fazla bilgi almak için destek ekibimizle iletişime geçebilirsiniz.</p>
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton('Siparişi Görüntüle', `${frontendUrl}/orders/${data?.orderId || ''}`)}
+      </div>
+      <p style="font-size: 14px; color: #6b7280; margin: 0;">Sorularınız için: <a href="mailto:destek@tarodan.com" style="color: #f97316;">destek@tarodan.com</a></p>
+    `, 'İade Talebiniz Hakkında'),
+
+    'refund-return-label-buyer': wrapEmail(`
+      ${titleBlock('İade Kargo Bilgileri', '📦')}
+      ${greeting(data?.buyerName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">İade talebiniz onaylandı. Ürünü aşağıdaki bilgilerle kargoya verebilirsiniz.</p>
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow('Sipariş No', '#' + (data?.orderNumber || ''))}
+          ${data?.productTitle ? detailRow('Ürün', data.productTitle) : ''}
+          ${data?.returnTrackingNumber ? detailRow('İade Takip No', data.returnTrackingNumber, true) : ''}
+          ${data?.cargoCompany ? detailRow('Kargo Firması', data.cargoCompany) : ''}
+        </table>
+      `)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">ℹ️ Ürünü orijinal ambalajında, eksiksiz şekilde gönderdiğinizden emin olun. İadeniz, ürün satıcıya ulaştıktan sonra tamamlanacaktır.</p>`)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton(data?.returnUrl ? 'İade Etiketini Görüntüle' : 'Siparişi Görüntüle', data?.returnUrl || `${frontendUrl}/orders/${data?.orderId || ''}`)}
+      </div>
+    `, 'İade Kargo Bilgileri'),
+
+    'review-received-seller': wrapEmail(`
+      ${titleBlock('Yeni Değerlendirme Aldınız', '⭐')}
+      ${greeting(data?.sellerName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;"><strong style="color: #111827;">${data?.reviewerName || 'Bir alıcı'}</strong> sizi değerlendirdi.</p>
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${data?.rating != null ? detailRow('Puan', '★'.repeat(Math.max(0, Math.min(5, Math.round(Number(data.rating))))) + '☆'.repeat(Math.max(0, 5 - Math.min(5, Math.round(Number(data.rating))))) + `  (${data.rating}/5)`, true) : ''}
+          ${data?.productTitle ? detailRow('Ürün', data.productTitle) : ''}
+        </table>
+        ${data?.comment ? `<p style="margin: 16px 0 0 0; font-size: 15px; color: #374151; font-style: italic;">"${data.comment}"</p>` : ''}
+      `)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton('Değerlendirmeyi Görüntüle', data?.reviewUrl || `${frontendUrl}/seller/reviews`)}
+      </div>
+    `, 'Yeni Değerlendirme Aldınız'),
+
+    'listing-expiring': wrapEmail(`
+      ${titleBlock('İlanınızın Süresi Doluyor', '⏰')}
+      ${greeting(data?.sellerName || data?.userName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;"><strong style="color: #111827;">${data?.productTitle || 'İlanınızın'}</strong> ilanının süresi ${data?.daysRemaining ? `${data.daysRemaining} gün içinde ` : 'yakında '}dolacak. Yenileyerek görünürlüğünü koruyabilirsiniz.</p>
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow('İlan', data?.productTitle || '')}
+          ${data?.expirationDate ? detailRow('Bitiş Tarihi', String(data.expirationDate), true) : ''}
+        </table>
+      `)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton('İlanı Yenile', data?.listingUrl || `${frontendUrl}/seller/listings`)}
+      </div>
+    `, 'İlanınızın Süresi Doluyor'),
+
+    'listing-expired': wrapEmail(`
+      ${titleBlock('İlanınızın Süresi Doldu', '📭')}
+      ${greeting(data?.sellerName || data?.userName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;"><strong style="color: #111827;">${data?.productTitle || 'İlanınızın'}</strong> ilanının süresi doldu ve yayından kaldırıldı. Tekrar yayınlayarak alıcılarla buluşmaya devam edebilirsiniz.</p>
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">🔄 İlanınızı birkaç tıklamayla yeniden yayınlayabilirsiniz.</p>`)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton('İlanı Yeniden Yayınla', data?.listingUrl || `${frontendUrl}/seller/listings`)}
+      </div>
+    `, 'İlanınızın Süresi Doldu'),
+
+    'new-follower': wrapEmail(`
+      ${titleBlock('Yeni Takipçiniz Var', '👥')}
+      ${greeting(data?.name || data?.userName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;"><strong style="color: #111827;">${data?.followerName || 'Yeni bir kullanıcı'}</strong> sizi takip etmeye başladı. Profilinizdeki yeni ilanlar takipçilerinize bildirilir.</p>
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton('Takipçiyi Görüntüle', data?.followerUrl || `${frontendUrl}/profile/followers`)}
+      </div>
+    `, 'Yeni Takipçiniz Var'),
+
+    'back-in-stock': wrapEmail(`
+      ${titleBlock('Stoğa Geri Geldi!', '🔔')}
+      ${greeting(data?.userName || data?.name)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Takip ettiğiniz <strong style="color: #111827;">${data?.productTitle || 'ürün'}</strong> yeniden stokta! Tükenmeden hemen inceleyin.</p>
+      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">✓ Ürün tekrar satışta</p>`)}
+      ${data?.price ? detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow('Ürün', data?.productTitle || '')}
+          ${detailRow('Fiyat', formatEmailPrice(data.price) + ' TL', true)}
+        </table>
+      `) : ''}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton('Ürünü İncele', data?.productUrl || frontendUrl)}
+      </div>
+    `, 'Stoğa Geri Geldi!'),
+
+    'payout-released-seller': wrapEmail(`
+      ${titleBlock('Ödemeniz Aktarıldı', '💸')}
+      ${greeting(data?.sellerName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Tebrikler! Bir satışınıza ait ödeme banka hesabınıza aktarıldı.</p>
+      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">✓ Ödeme aktarımı tamamlandı</p>`)}
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${data?.orderNumber ? detailRow('Sipariş No', '#' + data.orderNumber) : ''}
+          ${detailRow('Aktarılan Tutar', formatEmailPrice(data?.payoutAmount || 0) + ' TL', true)}
+          ${data?.bankAccountLast4 ? detailRow('Hesap', '•••• ' + data.bankAccountLast4) : ''}
+          ${data?.payoutDate ? detailRow('Aktarım Tarihi', String(data.payoutDate)) : ''}
+        </table>
+      `)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">ℹ️ Tutarın hesabınıza geçmesi bankanıza bağlı olarak 1–2 iş günü sürebilir.</p>`)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton('Kazançlarımı Görüntüle', `${frontendUrl}/seller/earnings`)}
+      </div>
+    `, 'Ödemeniz Aktarıldı'),
   };
 
   const rendered = templates[template];

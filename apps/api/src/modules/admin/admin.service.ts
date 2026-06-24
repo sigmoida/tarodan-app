@@ -7753,6 +7753,24 @@ export class AdminService {
     // Fatura
     { key: 'invoice-buyer',               name: 'Fatura (alıcı)',                       group: 'Fatura' },
     { key: 'invoice-seller',              name: 'Satış faturası (satıcı)',               group: 'Fatura' },
+    // Sipariş iptali
+    { key: 'order-cancelled-buyer',       name: 'Sipariş iptal edildi (alıcı)',         group: 'Sipariş' },
+    { key: 'order-cancelled-seller',      name: 'Sipariş iptal edildi (satıcı)',        group: 'Sipariş' },
+    // İade akışı
+    { key: 'refund-requested-seller',     name: 'İade talebi alındı (satıcı)',          group: 'İade' },
+    { key: 'refund-approved-buyer',       name: 'İade onaylandı (alıcı)',               group: 'İade' },
+    { key: 'refund-rejected-buyer',       name: 'İade reddedildi (alıcı)',              group: 'İade' },
+    { key: 'refund-return-label-buyer',   name: 'İade kargo bilgileri (alıcı)',         group: 'İade' },
+    // Değerlendirme
+    { key: 'review-received-seller',      name: 'Değerlendirme alındı (satıcı)',        group: 'Değerlendirme' },
+    // İlan & Stok
+    { key: 'listing-expiring',            name: 'İlan süresi doluyor',                  group: 'İlan' },
+    { key: 'listing-expired',             name: 'İlan süresi doldu',                    group: 'İlan' },
+    { key: 'back-in-stock',               name: 'Stoğa geri geldi',                     group: 'İlan' },
+    // Sosyal
+    { key: 'new-follower',                name: 'Yeni takipçi',                         group: 'Sosyal' },
+    // Ödeme aktarımı
+    { key: 'payout-released-seller',      name: 'Ödeme aktarıldı (satıcı)',             group: 'Ödeme' },
   ];
 
   substituteVariables(text: string, data: Record<string, any>): string {

@@ -114,6 +114,54 @@ export class RefundService {
     }
   }
 
+  /**
+   * İade akışı e-postaları. refundRequestId'den order/ürün/taraf bilgilerini
+   * tazeden çeker ve ilgili tarafa (alıcı veya satıcı) markalı şablonu gönderir.
+   * Asla throw etmez; in-app bildirimlerin yanında çalışır.
+   */
+  private async sendRefundEmail(
+    refundRequestId: string,
+    recipient: 'buyer' | 'seller',
+    templateKey: string,
+    extra?: Record<string, any>,
+  ): Promise<void> {
+    try {
+      const rr = await this.prisma.refundRequest.findUnique({
+        where: { id: refundRequestId },
+        select: {
+          amount: true,
+          orderId: true,
+          requesterId: true,
+          order: {
+            select: {
+              orderNumber: true,
+              sellerId: true,
+              buyer: { select: { displayName: true } },
+              seller: { select: { displayName: true } },
+              product: { select: { title: true } },
+            },
+          },
+        },
+      });
+      if (!rr) return;
+      const recipientId = recipient === 'buyer' ? rr.requesterId : rr.order?.sellerId;
+      if (!recipientId) return;
+      await this.notificationService.sendTemplateEmailToUser(recipientId, templateKey, {
+        buyerName: rr.order?.buyer?.displayName ?? '',
+        sellerName: rr.order?.seller?.displayName ?? '',
+        orderNumber: rr.order?.orderNumber,
+        orderId: rr.orderId,
+        productTitle: rr.order?.product?.title ?? '',
+        refundAmount: Number(rr.amount),
+        ...extra,
+      });
+    } catch (err: any) {
+      this.logger.error(
+        `Refund email ${templateKey} failed for ${refundRequestId}: ${err?.message}`,
+      );
+    }
+  }
+
   async createRefundRequest(orderId: string, requesterId: string, dto: CreateRefundRequestDto) {
     // Senaryo D kaldırıldı (Faz 5 sonrası karar): keyfi vazgeçme talebi
     // kabul edilmiyor. Alıcı sadece somut bir sorun bildirebilir (hasar,
@@ -291,6 +339,7 @@ export class RefundService {
       refundNumber: rr.refundNumber,
       orderId: rr.orderId,
     });
+    await this.sendRefundEmail(rr.id, 'buyer', 'refund-approved-buyer');
     return updated;
   }
 
@@ -325,6 +374,9 @@ export class RefundService {
     await this.safeNotify(rr.requesterId, NotificationType.REFUND_REJECTED, {
       refundNumber: rr.refundNumber,
       orderId: rr.orderId,
+      reason: dto.response,
+    });
+    await this.sendRefundEmail(rr.id, 'buyer', 'refund-rejected-buyer', {
       reason: dto.response,
     });
     // Admin role'üne dispute incelemesi sinyali — basit fan-out: aktif admin
@@ -459,6 +511,9 @@ export class RefundService {
         orderId: rr.orderId,
         trackingNumber: rr.refundNumber,
       });
+      await this.sendRefundEmail(rr.id, 'buyer', 'refund-return-label-buyer', {
+        returnTrackingNumber: rr.refundNumber,
+      });
       return updated;
     }
 
@@ -512,6 +567,10 @@ export class RefundService {
       refundNumber: rr.refundNumber,
       orderId: rr.orderId,
       trackingNumber: rr.refundNumber,
+    });
+    await this.sendRefundEmail(rr.id, 'buyer', 'refund-return-label-buyer', {
+      returnTrackingNumber: rr.refundNumber,
+      cargoCompany: 'Sürat Kargo',
     });
     return updated;
   }
@@ -800,7 +859,7 @@ export class RefundService {
     const refundNumber = await this.generateRefundNumber();
     const amount = Number(order.totalAmount);
 
-    return this.prisma.refundRequest.create({
+    const created = await this.prisma.refundRequest.create({
       data: {
         refundNumber,
         orderId: order.id,
@@ -812,6 +871,12 @@ export class RefundService {
         status: RefundRequestStatus.pending_review,
       },
     });
+    // Satıcıya "iade talebi alındı, incele" e-postası (pending_review →
+    // satıcı kararı bekleniyor). In-app eşdeğeri henüz yok; mail bilgilendirir.
+    await this.sendRefundEmail(created.id, 'seller', 'refund-requested-seller', {
+      refundReason: dto.description ?? undefined,
+    });
+    return created;
   }
 
   private fallbackAddressFromOrderJson(json: Prisma.JsonValue | null) {

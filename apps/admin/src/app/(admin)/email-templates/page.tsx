@@ -93,6 +93,24 @@ const SAMPLE_DATA: Record<string, Record<string, unknown>> = {
   // İş Başvurusu
   'seller-application-approved': { name: 'Ahmet Yılmaz', companyName: 'Örnek Ticaret A.Ş.' },
   'seller-application-rejected':  { name: 'Ahmet Yılmaz', reason: 'Sağlanan belgeler eksik veya okunamaz durumda. Lütfen şirket kaşesi ve imzalı güncel vergi levhanızı yükleyerek tekrar başvurun.' },
+  // Sipariş iptali
+  'order-cancelled-buyer':    { buyerName: 'Alıcı', orderNumber: 'TRD-12345', orderId: 'sample-id', productTitle: 'Hot Wheels Ferrari 458', refundAmount: 199.99, reason: 'Satıcı ürünü stoktan kaldırdı' },
+  'order-cancelled-seller':   { sellerName: 'Satıcı', orderNumber: 'TRD-12345', orderId: 'sample-id', productTitle: 'Hot Wheels Ferrari 458', reason: 'Alıcı talebi' },
+  // İade akışı
+  'refund-requested-seller':  { sellerName: 'Satıcı', orderNumber: 'TRD-12345', orderId: 'sample-id', productTitle: 'Hot Wheels Ferrari 458', buyerName: 'Alıcı', refundAmount: 199.99, refundReason: 'Ürün açıklamayla uyuşmuyor' },
+  'refund-approved-buyer':    { buyerName: 'Alıcı', orderNumber: 'TRD-12345', orderId: 'sample-id', productTitle: 'Hot Wheels Ferrari 458', refundAmount: 199.99 },
+  'refund-rejected-buyer':    { buyerName: 'Alıcı', orderNumber: 'TRD-12345', orderId: 'sample-id', productTitle: 'Hot Wheels Ferrari 458', reason: 'Ürün kullanılmış olarak iade edilmek isteniyor' },
+  'refund-return-label-buyer': { buyerName: 'Alıcı', orderNumber: 'TRD-12345', orderId: 'sample-id', productTitle: 'Hot Wheels Ferrari 458', returnTrackingNumber: '9876543210', cargoCompany: 'Sürat Kargo', returnUrl: 'https://tarodan.com/orders/sample-id/return' },
+  // Değerlendirme
+  'review-received-seller':   { sellerName: 'Satıcı', reviewerName: 'Alıcı', rating: 5, productTitle: 'Hot Wheels Ferrari 458', comment: 'Hızlı kargo, ürün birebir açıklandığı gibi. Teşekkürler!', reviewUrl: 'https://tarodan.com/seller/reviews' },
+  // İlan & Stok
+  'listing-expiring':         { sellerName: 'Satıcı', productTitle: 'Hot Wheels Ferrari 458', daysRemaining: 3, expirationDate: '2024-12-31', listingUrl: 'https://tarodan.com/seller/listings' },
+  'listing-expired':          { sellerName: 'Satıcı', productTitle: 'Hot Wheels Ferrari 458', listingUrl: 'https://tarodan.com/seller/listings' },
+  'back-in-stock':            { userName: 'Kullanıcı', productTitle: 'Hot Wheels Ferrari 458', price: 199.99, productUrl: 'https://tarodan.com/products/sample' },
+  // Sosyal
+  'new-follower':             { name: 'Kullanıcı', followerName: 'Ayşe D.', followerUrl: 'https://tarodan.com/profile/followers' },
+  // Ödeme aktarımı
+  'payout-released-seller':   { sellerName: 'Satıcı', orderNumber: 'TRD-12345', payoutAmount: 179.99, bankAccountLast4: '4242', payoutDate: '2024-12-20' },
 };
 
 export default function AdminEmailTemplatesPage() {

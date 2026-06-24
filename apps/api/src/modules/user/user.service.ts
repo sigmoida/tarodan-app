@@ -959,6 +959,14 @@ export class UserService {
           followerName: follower?.displayName || 'Bir kullanıcı',
         },
       );
+      await this.notificationService.sendTemplateEmailToUser(
+        targetUserId,
+        'new-follower',
+        {
+          followerName: follower?.displayName || 'Bir kullanıcı',
+          followerId: currentUserId,
+        },
+      );
     } catch (error) {
       this.logger.error('Failed to send follow notification:', error);
     }

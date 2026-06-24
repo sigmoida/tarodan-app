@@ -1328,6 +1328,7 @@ export class PaymentService {
     }
 
     const cancelledOrders: {
+      orderId: string;
       buyerId: string;
       productId: string;
       productTitle: string;
@@ -1588,6 +1589,7 @@ export class PaymentService {
           );
           cancelledOrders.push(
             ...orderResult.cancelledOrders.map((o) => ({
+              orderId: o.orderId,
               buyerId: o.buyerId,
               productId: o.productId,
               productTitle: o.productTitle,
@@ -1708,6 +1710,15 @@ export class PaymentService {
       await notify.catch((err) =>
         this.logger.warn(`stockout-notify (${isUnpaidOffer ? 'offer' : 'order'}) failed for ${o.buyerId}: ${err.message}`),
       );
+    }
+    // Sipariş iptali e-postaları (alıcı+satıcı) — sipariş bazlı; teklif
+    // iptallerini (isUnpaidOffer) ve mükerrer order'ları atla.
+    const emailedCancelledOrders = new Set<string>();
+    for (const o of cancelledOrders) {
+      if (o.offerId !== null && !o.hadPayment) continue;
+      if (emailedCancelledOrders.has(o.orderId)) continue;
+      emailedCancelledOrders.add(o.orderId);
+      await this.notificationService.sendOrderCancelledEmails(o.orderId);
     }
     for (const o of cancelledOffers) {
       if (notifiedBuyers.has(o.buyerId)) continue;
@@ -1835,6 +1846,7 @@ export class PaymentService {
    */
   private async processSuccessfulGroupPayment(payment: any, transactionId?: string): Promise<boolean> {
     const cancelledOrders: {
+      orderId: string;
       buyerId: string;
       productId: string;
       productTitle: string;
@@ -1939,6 +1951,7 @@ export class PaymentService {
             );
             cancelledOrders.push(
               ...orderResult.cancelledOrders.map((o) => ({
+                orderId: o.orderId,
                 buyerId: o.buyerId,
                 productId: o.productId,
                 productTitle: o.productTitle,
@@ -2022,6 +2035,15 @@ export class PaymentService {
       await notify.catch((err) =>
         this.logger.warn(`stockout-notify failed for ${o.buyerId}: ${err.message}`),
       );
+    }
+    // Sipariş iptali e-postaları (alıcı+satıcı) — sipariş bazlı; teklif
+    // iptallerini (isUnpaidOffer) ve mükerrer order'ları atla.
+    const emailedCancelledOrders = new Set<string>();
+    for (const o of cancelledOrders) {
+      if (o.offerId !== null && !o.hadPayment) continue;
+      if (emailedCancelledOrders.has(o.orderId)) continue;
+      emailedCancelledOrders.add(o.orderId);
+      await this.notificationService.sendOrderCancelledEmails(o.orderId);
     }
     for (const o of cancelledOffers) {
       if (notifiedBuyers.has(o.buyerId)) continue;
@@ -4361,6 +4383,8 @@ export class PaymentService {
         .catch((err) =>
           this.logger.warn(`order-expired notify failed for ${d.buyerId}: ${err.message}`),
         );
+      // Sipariş iptali e-postaları (alıcı+satıcı). Asla throw etmez.
+      await this.notificationService.sendOrderCancelledEmails(d.orderId);
     }
 
     return { count: cancelled };
