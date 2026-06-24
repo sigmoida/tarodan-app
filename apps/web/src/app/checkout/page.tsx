@@ -437,11 +437,17 @@ export default function CheckoutPage() {
       return;
     }
 
-    setGuestOtpModalOpen(true);
-    if (guestOtpSentForEmail !== em) {
-      const sent = await requestGuestCheckoutOtp(em);
-      if (sent) toast.success(t("checkout.guestEmailCodeSent"));
+    // Kod ekranını AÇMADAN önce kodu iste: e-posta zaten kayıtlıysa (409)
+    // requestGuestCheckoutOtp false döner + giriş'e yönlendirir → kod ekranı
+    // hiç açılmaz. Kod daha önce bu e-posta için gönderildiyse tekrar isteme.
+    if (guestOtpSentForEmail === em) {
+      setGuestOtpModalOpen(true);
+      return;
     }
+    const sent = await requestGuestCheckoutOtp(em);
+    if (!sent) return;
+    toast.success(t("checkout.guestEmailCodeSent"));
+    setGuestOtpModalOpen(true);
   };
 
   const confirmGuestOtpModal = () => {
