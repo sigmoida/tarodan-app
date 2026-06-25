@@ -221,8 +221,10 @@ export default function NewListingPage() {
 
   // Commission preview when price/category change (for seller: estimated fee and net)
   useEffect(() => {
+    // Boş string Number("") = 0 olur (NaN değil); fiyat girilmeden istek atıp
+    // ?amount= ile 400 almayalım diye boş/0/negatifte preview'i atla.
     const amount = Number(formData.price);
-    if (Number.isNaN(amount) || amount < 0) {
+    if (!formData.price || Number.isNaN(amount) || amount <= 0) {
       setCommissionPreview(null);
       return;
     }

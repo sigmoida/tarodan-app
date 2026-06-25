@@ -52,6 +52,11 @@ async function bootstrap() {
           : new QuietRouteNestLogger(),
     });
 
+    // Reverse proxy (Coolify/nginx) arkasında gerçek istemci IP'sini X-Forwarded-For'dan
+    // al; yoksa rate-limit (ThrottlerGuard) tüm kullanıcıları tek proxy IP'sinde
+    // toplayıp birbirini kilitler. İlk hop'a güven.
+    app.set('trust proxy', 1);
+
     // Custom Body Parsers (e.g. PayTR form-urlencoded callbacks)
     app.use(json({ limit: '50mb' }));
     app.use(urlencoded({ extended: true, limit: '50mb' }));

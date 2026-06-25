@@ -203,11 +203,24 @@ export class HealthService {
   private async checkElasticsearch(): Promise<ServiceHealth> {
     const start = Date.now();
     try {
-      const esUrl = this.configService.get('ELASTICSEARCH_URL', 'http://localhost:9200');
-      
+      // Node çözümü + auth, SearchService'in ES client'ı ile birebir aynı olmalı;
+      // aksi halde prod'da (yalnızca ELASTICSEARCH_NODE + auth set) raw fetch
+      // localhost:9200'e auth'suz gidip yanlış-negatif "unhealthy" verir.
+      const esUrl =
+        this.configService.get('ELASTICSEARCH_URL') ||
+        this.configService.get('ELASTICSEARCH_NODE', 'http://localhost:9200');
+      const username = this.configService.get('ELASTICSEARCH_USERNAME', 'elastic');
+      const password = this.configService.get('ELASTICSEARCH_PASSWORD', 'changeme');
+
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (username && password) {
+        headers.Authorization =
+          'Basic ' + Buffer.from(`${username}:${password}`).toString('base64');
+      }
+
       const response = await fetch(`${esUrl}/_cluster/health`, {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         signal: AbortSignal.timeout(5000),
       });
 

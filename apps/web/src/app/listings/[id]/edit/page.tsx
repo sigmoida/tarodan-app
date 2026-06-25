@@ -303,8 +303,10 @@ export default function EditListingPage() {
 
   // Commission preview when price/category change
   useEffect(() => {
+    // Boş string Number("") = 0 (NaN değil); fiyat girilmeden ?amount= ile 400
+    // almayalım diye boş/0/negatifte preview'i atla.
     const amount = Number(formData.price);
-    if (Number.isNaN(amount) || amount < 0) {
+    if (!formData.price || Number.isNaN(amount) || amount <= 0) {
       setCommissionPreview(null);
       return;
     }

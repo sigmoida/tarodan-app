@@ -9,6 +9,7 @@ import {
   Res,
 } from '@nestjs/common';
 import { Response } from 'express';
+import { Throttle } from '@nestjs/throttler';
 import {
   ApiTags,
   ApiOperation,
@@ -43,6 +44,7 @@ export class AuthController {
    */
   @Post('register')
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiOperation({ summary: 'Yeni kullanıcı kaydı' })
   @ApiResponse({
     status: 201,
@@ -79,6 +81,8 @@ export class AuthController {
    */
   @Post('login')
   @Public()
+  // Brute-force koruması: IP başına dakikada 5 deneme
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Kullanıcı girişi' })
   @ApiResponse({
@@ -184,6 +188,8 @@ export class AuthController {
    */
   @Post('forgot-password')
   @Public()
+  // E-posta gönderdiği için daha sıkı: IP başına dakikada 3
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Şifre sıfırlama isteği' })
   @ApiResponse({ status: 200, description: 'Şifre sıfırlama linki gönderildi' })
@@ -197,6 +203,7 @@ export class AuthController {
    */
   @Post('reset-password')
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Şifre sıfırla' })
   @ApiResponse({ status: 200, description: 'Şifre başarıyla sıfırlandı' })
@@ -225,6 +232,8 @@ export class AuthController {
    */
   @Post('resend-verification')
   @Public()
+  // E-posta gönderdiği için daha sıkı: IP başına dakikada 3
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Doğrulama e-postasını tekrar gönder' })
   @ApiResponse({ status: 200, description: 'Doğrulama e-postası gönderildi' })

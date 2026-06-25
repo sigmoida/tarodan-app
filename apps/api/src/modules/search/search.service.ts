@@ -1274,6 +1274,18 @@ export class SearchService implements OnModuleInit {
     }
   }
 
+  /**
+   * Sayı bazlı 5-dk kontrol yalnızca |DB-ES| > 2 olunca deltaSync çağırıyor; ama
+   * eşit sayıda eksik + yetim doküman olduğunda sayılar tutar (delta=0) ve ID
+   * bazlı drift hiç yakalanmaz. Bu yüzden sayıdan bağımsız, saatlik tam reconcile
+   * çalıştırıp yetim/eksik dokümanları her durumda eşitliyoruz.
+   */
+  @Cron(CronExpression.EVERY_HOUR)
+  async handleHourlyReconcile() {
+    if (!this.esAvailable) return;
+    await this.deltaSync();
+  }
+
   private async deltaSync(): Promise<void> {
     try {
       const indexableProducts = await this.prisma.product.findMany({
