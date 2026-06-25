@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
 import { PaymentService } from '../payment/payment.service';
+import { NotificationService } from '../notification/notification.service';
 import { CreateShipmentDto, CalculateShippingDto, UpdateTrackingDto, ShippingProvider } from './dto';
 import { resolveShippingDestinationCity } from './shipping-destination.util';
 import { ShipmentStatus, OrderStatus } from '@prisma/client';
@@ -30,6 +31,7 @@ export class ShippingService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly paymentService: PaymentService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   /**
@@ -261,7 +263,7 @@ export class ShippingService {
       (this.trackingUrls[shipment.provider as ShippingProvider] ??
         this.trackingUrls[ShippingProvider.surat]) + dto.trackingNumber;
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // Update shipment
       const updatedShipment = await tx.shipment.update({
         where: { id: shipmentId },
@@ -295,6 +297,19 @@ export class ShippingService {
 
       return this.formatShipmentResponse(updatedShipment);
     });
+
+    // tx commit sonrası: alıcıya "kargoya verildi" bildirimi (push + in_app).
+    try {
+      await this.notificationService.notifyOrderShipped(
+        shipment.order.buyerId,
+        shipment.orderId,
+        dto.trackingNumber,
+      );
+    } catch (e: any) {
+      this.logger.warn(`notifyOrderShipped failed for ${shipment.orderId}: ${e?.message}`);
+    }
+
+    return result;
   }
 
   /**

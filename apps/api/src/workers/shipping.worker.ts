@@ -76,6 +76,14 @@ export class ShippingWorker {
         data: { status: OrderStatus.shipped },
       });
 
+      // Alıcıya "kargoya verildi" bildirimi (push + in_app). Önceden notifyOrderShipped
+      // hiçbir yerden çağrılmıyordu → kargolanma sessizdi.
+      try {
+        await this.notificationService.notifyOrderShipped(order.buyerId, orderId, trackingNumber);
+      } catch (e: any) {
+        this.logger.warn(`notifyOrderShipped failed for ${orderId}: ${e?.message}`);
+      }
+
       this.logger.log(`Shipment created: ${shipment.id}, tracking: ${trackingNumber}`);
 
       return {

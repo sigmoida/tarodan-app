@@ -30,7 +30,7 @@ import {
 import { CreateRefundRequestDto } from './dto/create-refund-request.dto';
 import { RejectRefundRequestDto } from './dto/reject-refund-request.dto';
 import { NotificationService } from '../notification/notification.service';
-import { NotificationType, NotificationChannel } from '../notification/dto/notification.dto';
+import { NotificationType } from '../notification/dto/notification.dto';
 import { StorageService } from '../storage/storage.service';
 
 const COOLING_OFF_DAYS = 14;
@@ -101,9 +101,9 @@ export class RefundService {
 
   /**
    * Best-effort notification dispatch — failures are logged, never thrown.
-   * in_app (+ canlı websocket) için createInAppNotification; aynı anda PUSH
-   * kanalını da gönderir (data'da orderId olduğundan mobil deep-link /orders'a
-   * gider). Email ayrı: markalı şablonlar için sendRefundEmail kullanılır.
+   * createInAppNotification artık in_app + canlı websocket + PUSH'u birlikte
+   * yapıyor (notification.service), o yüzden burada tek çağrı yeterli.
+   * Email ayrı: markalı şablonlar için sendRefundEmail kullanılır.
    */
   private async safeNotify(
     userId: string,
@@ -114,21 +114,7 @@ export class RefundService {
       await this.notificationService.createInAppNotification(userId, type, data);
     } catch (err: any) {
       this.logger.error(
-        `In-app notification ${type} → ${userId} failed: ${err?.message}`,
-      );
-    }
-    // Push'u ayrı try/catch'te gönder ki in_app başarısız olsa bile denensin
-    // (ve tersi). send([PUSH]) in_app yazmaz → mükerrer zil olmaz.
-    try {
-      await this.notificationService.send({
-        userId,
-        type,
-        channels: [NotificationChannel.PUSH],
-        data,
-      });
-    } catch (err: any) {
-      this.logger.error(
-        `Push notification ${type} → ${userId} failed: ${err?.message}`,
+        `Notification ${type} → ${userId} failed: ${err?.message}`,
       );
     }
   }
@@ -605,6 +591,7 @@ export class RefundService {
     const refundResult = await this.paymentService.processRefund(
       rr.orderId,
       Number(rr.amount),
+      { skipRefundEvent: true }, // REFUND_COMPLETED'ı aşağıda kendimiz gönderiyoruz
     );
 
     const updated = await this.prisma.refundRequest.update({
@@ -802,7 +789,9 @@ export class RefundService {
 
     let refundResult: { providerRefundId: string };
     try {
-      refundResult = await this.paymentService.processRefund(order.id, amount);
+      refundResult = await this.paymentService.processRefund(order.id, amount, {
+        skipRefundEvent: true, // REFUND_COMPLETED'ı aşağıda kendimiz gönderiyoruz
+      });
     } catch (err) {
       // Roll back the RefundRequest so the buyer can retry without hitting
       // the "active duplicate" guard. Sürat cancel is idempotent on retry.

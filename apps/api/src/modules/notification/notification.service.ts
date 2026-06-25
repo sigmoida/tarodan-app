@@ -757,6 +757,18 @@ export class NotificationService {
       }
     }
 
+    // Push: her in-app bildirimi aynı zamanda cihaza push olarak da gönder.
+    // Bu tek nokta sayesinde createInAppNotification kullanan TÜM akışlar (mesaj,
+    // teklif, takas, sipariş, rating, takip, beğeni, wishlist, iade...) push kazanır.
+    // event.service ayrı pushQueue yolunu kullandığından çift-push olmaz.
+    // type'ı data'ya ekliyoruz → mobil deep-link routing doğru ekrana gider.
+    // Best-effort: push hatası in-app bildirimi etkilemez.
+    try {
+      await this.sendPushReal(userId, title, message, { ...data, type });
+    } catch (e) {
+      this.logger.warn(`[createInAppNotification] push failed: ${e}`);
+    }
+
     return !!notificationId;
   }
 

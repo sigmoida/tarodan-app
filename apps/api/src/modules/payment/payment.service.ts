@@ -2763,7 +2763,11 @@ export class PaymentService {
    * Process refund
    * Requirement: Refund handling (project.md)
    */
-  async processRefund(orderId: string, refundAmount?: number) {
+  async processRefund(
+    orderId: string,
+    refundAmount?: number,
+    opts?: { skipRefundEvent?: boolean },
+  ) {
     let payment = await this.prisma.payment.findFirst({
       where: {
         orderId,
@@ -3030,7 +3034,10 @@ export class PaymentService {
             },
           });
 
-          if (order) {
+          // refund.service akışı kendi REFUND_COMPLETED (push+mail) bildirimini
+          // gönderiyor; oradan çağrıldığında payment_refunded'ı atla ki alıcı
+          // çift push almasın. Diğer caller'lar (admin/direct/surat) için aynen gider.
+          if (order && !opts?.skipRefundEvent) {
             await this.eventService.emitPaymentRefunded({
               paymentId: payment.id,
               orderId: orderId,
