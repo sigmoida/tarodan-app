@@ -522,7 +522,15 @@ export class NotificationService {
           break;
 
         case NotificationChannel.PUSH:
-          results.push = await this.sendPushReal(dto.userId, title, message, dto.data);
+          // `type`'ı push payload'ına ekle: mobil deep-link routing (push.ts
+          // routeFromNotification) önce type'a bakıyor; yoksa tüm push'lar genel
+          // bildirim sekmesine düşüyordu. dto.data zaten ilgili id'leri içeriyor.
+          results.push = await this.sendPushReal(
+            dto.userId,
+            title,
+            message,
+            { ...dto.data, type: dto.type },
+          );
           await this.logNotification(dto.userId, 'push', dto.type, title, message, results.push);
           break;
 
@@ -790,6 +798,13 @@ export class NotificationService {
    */
   async registerPushToken(userId: string, dto: RegisterPushTokenDto) {
     try {
+      // Logout path: the device asks us to deactivate its token instead of
+      // registering it, so the user stops receiving push on a signed-out device.
+      if (dto.revoke) {
+        await this.expoPushProvider.deactivateToken(dto.token);
+        return { success: true, userId, revoked: true };
+      }
+
       await this.expoPushProvider.registerToken(
         userId,
         dto.token,

@@ -7,3 +7,13 @@ expo-env.d.ts
 
 # Expo cache
 .expo/
+
+# Push/FCM secrets — repoya commit'lenmemeli
+# NOT: google-services.json BİLEREK ignore edilmiyor — EAS git-modu build'inde
+# yüklenmesi gerekiyor (bare Android FCM config). Android client config'i düşük
+# hassasiyetlidir (APK içinde zaten gömülü). Asıl gizli olan service-account key
+# ve APNs .p8 aşağıda ignore'da kalıyor.
+GoogleService-Info.plist
+*.p8
+fcm-service-account*.json
+*-firebase-adminsdk-*.json

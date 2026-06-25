@@ -931,7 +931,13 @@ export class EventService {
 
       const users = await this.prisma.user.findMany({
         where: { id: { in: chunkIds }, isBanned: false },
-        select: { id: true, email: true, fcmToken: true },
+        select: {
+          id: true,
+          email: true,
+          // Only need to know whether the user has at least one active device
+          // token (push_tokens table) to decide whether to queue a push job.
+          pushTokens: { where: { isActive: true }, select: { id: true }, take: 1 },
+        },
       });
 
       for (const user of users) {
@@ -951,8 +957,8 @@ export class EventService {
           });
         }
 
-        // Send push if requested and token exists
-        if (payload.channels.includes('push') && user.fcmToken) {
+        // Send push if requested and the user has at least one active device token
+        if (payload.channels.includes('push') && user.pushTokens.length > 0) {
           await this.pushQueue.add('send-notification', {
             userId: user.id,
             title: payload.title,

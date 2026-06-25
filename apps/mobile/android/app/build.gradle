@@ -1,6 +1,9 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
+// FCM (push): google-services.json'ı (android/app/) işler. android/build.gradle'daki
+// classpath ile birlikte çalışır. Olmadan expo-notifications Android token üretemez.
+apply plugin: "com.google.gms.google-services"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 

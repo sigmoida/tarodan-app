@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsOptional, IsUUID, IsObject } from 'class-validator';
+import { IsString, IsEnum, IsOptional, IsUUID, IsObject, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum NotificationType {
@@ -192,4 +192,12 @@ export class RegisterPushTokenDto {
   @IsOptional()
   @IsString()
   deviceId?: string;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'When true, deactivate this token instead of registering it (used on logout)',
+  })
+  @IsOptional()
+  @IsBoolean()
+  revoke?: boolean;
 }

@@ -330,6 +330,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   // Web ile aynı endpoint: POST /auth/logout
   logout: async () => {
+    // Bu cihazın push token'ını sunucuda deaktive et (çıkış sonrası bu cihaza
+    // bildirim gitmesin). Token hâlâ geçerliyken, logout çağrısından önce yap.
+    // Lazy require: push → api → authStore import zinciriyle döngü oluşmasın.
+    try {
+      const { unregisterPushNotifications } = require('../services/push');
+      await unregisterPushNotifications();
+    } catch {
+      /* best-effort — Expo Go'da no-op, hata oturumu engellemesin */
+    }
     try {
       await authApi.logout();
     } catch (error) {
