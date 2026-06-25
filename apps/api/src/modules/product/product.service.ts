@@ -1437,6 +1437,9 @@ export class ProductService implements OnModuleInit {
             {
               productId,
               productTitle,
+              // PRICE_DROP şablonu "{{oldPrice}} TL'den {{newPrice}} TL'ye" kullanıyor;
+              // oldPrice eksikti → kullanıcı ham "{{oldPrice}}" görüyordu.
+              oldPrice,
               newPrice,
             },
           );

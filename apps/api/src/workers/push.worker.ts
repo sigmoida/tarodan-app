@@ -106,7 +106,7 @@ export class PushWorker {
 
     // Build Expo push messages
     const messages: ExpoPushMessage[] = pushTokens
-      .filter((token) => token.startsWith('ExponentPushToken'))
+      .filter((token) => /^Expo(nent)?PushToken\[.+\]$/.test(token))
       .map((token) => ({
         to: token,
         title,
@@ -218,7 +218,7 @@ export class PushWorker {
 
       // Build Expo push messages directly
       const messages: ExpoPushMessage[] = pushTokens
-        .filter((token) => token.startsWith('ExponentPushToken'))
+        .filter((token) => /^Expo(nent)?PushToken\[.+\]$/.test(token))
         .map((token) => ({
           to: token,
           title,
@@ -249,6 +249,27 @@ export class PushWorker {
       const responseData = await response.json();
       const results: ExpoPushTicket[] = responseData.data || [];
       const successCount = results.filter((r) => r.status === 'ok').length;
+
+      // Ölü token temizliği: Expo bir cihaz için 'DeviceNotRegistered' dönerse
+      // (uygulama silinmiş / token geçersiz) o token'ı deaktive et ki bir daha
+      // denenmesin ve push_tokens şişmesin. results, messages ile aynı sıradadır.
+      const deadTokens = results
+        .map((ticket, i) =>
+          ticket.status === 'error' &&
+          ticket.details?.error === 'DeviceNotRegistered'
+            ? messages[i]?.to
+            : null,
+        )
+        .filter((t): t is string => !!t);
+      if (deadTokens.length > 0) {
+        await this.prisma.pushToken.updateMany({
+          where: { token: { in: deadTokens } },
+          data: { isActive: false },
+        });
+        this.logger.log(
+          `Deactivated ${deadTokens.length} dead push token(s) for user ${userId}`,
+        );
+      }
 
       return {
         success: true,
