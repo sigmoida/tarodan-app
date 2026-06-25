@@ -442,6 +442,48 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     icon: '💰',
     link: '/orders/{{orderId}}',
   },
+  [NotificationType.REFUND_REQUEST_RECEIVED]: {
+    title: 'İade Talebiniz Alındı',
+    message: '{{refundNumber}} numaralı iade talebiniz alındı, satıcı yanıtı bekleniyor.',
+    icon: '📨',
+    link: '/orders/{{orderId}}',
+  },
+  [NotificationType.REFUND_RETURN_SHIPPED_SELLER]: {
+    title: 'İade Kargosu Yola Çıktı',
+    message: 'Alıcı {{refundNumber}} numaralı iade için ürünü kargoya verdi; ürün size geliyor.',
+    icon: '📦',
+    link: '/sales/{{orderId}}',
+  },
+  [NotificationType.REFUND_RETURN_IN_TRANSIT]: {
+    title: 'İade Kargonuz Yolda',
+    message: '{{refundNumber}} numaralı iade ürününüz satıcıya doğru yolda.',
+    icon: '🚚',
+    link: '/orders/{{orderId}}',
+  },
+  [NotificationType.REFUND_RETURN_DELIVERED_BUYER]: {
+    title: 'İadeniz Satıcıya Ulaştı',
+    message: '{{refundNumber}} numaralı iade ürününüz satıcıya teslim edildi; para iadeniz kısa sürede yapılacak.',
+    icon: '✅',
+    link: '/orders/{{orderId}}',
+  },
+  [NotificationType.REFUND_RETURN_DELIVERED_SELLER]: {
+    title: 'İade Ürünü Size Ulaştı',
+    message: '{{refundNumber}} numaralı iade ürünü size teslim edildi.',
+    icon: '📥',
+    link: '/sales/{{orderId}}',
+  },
+  [NotificationType.REFUND_COMPLETED_SELLER]: {
+    title: 'İade Tamamlandı',
+    message: '{{refundNumber}} numaralı sipariş için iade tamamlandı; tutar alıcıya iade edildi.',
+    icon: '↩️',
+    link: '/sales/{{orderId}}',
+  },
+  [NotificationType.REFUND_AUTO_ACCEPTED_SELLER]: {
+    title: 'İade Talebi Otomatik Onaylandı',
+    message: '{{refundNumber}} numaralı iade talebine 48 saat içinde yanıt verilmediği için otomatik onaylandı.',
+    icon: '⏰',
+    link: '/sales/{{orderId}}',
+  },
 
   // Seller application notifications
   [NotificationType.SELLER_APPLICATION_APPROVED]: {

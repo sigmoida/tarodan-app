@@ -614,6 +614,12 @@ export class RefundService {
     });
     // "Para iadeniz tamamlandı" maili eksikti (sadece zile düşüyordu) — eklendi.
     await this.sendRefundEmail(rr.id, 'buyer', 'refund-completed');
+    // Satıcı tarafı: iade tamamlandı bildirimi + mail.
+    await this.safeNotify(rr.order.sellerId, NotificationType.REFUND_COMPLETED_SELLER, {
+      refundNumber: rr.refundNumber,
+      orderId: rr.orderId,
+    });
+    await this.sendRefundEmail(rr.id, 'seller', 'refund-completed-seller');
     return updated;
   }
 
@@ -691,13 +697,25 @@ export class RefundService {
         },
       });
     }
+
+    // Önceden bu adım sessizdi: satıcı talebinin oto-onaylandığını, alıcı da
+    // talebinin onaylandığını öğrenmiyordu. Her iki tarafa bildir.
+    await this.safeNotify(rr.order.sellerId, NotificationType.REFUND_AUTO_ACCEPTED_SELLER, {
+      refundNumber: rr.refundNumber,
+      orderId: rr.orderId,
+    });
+    await this.sendRefundEmail(rr.id, 'seller', 'refund-auto-accepted-seller');
+    await this.safeNotify(rr.requesterId, NotificationType.REFUND_APPROVED, {
+      refundNumber: rr.refundNumber,
+      orderId: rr.orderId,
+    });
   }
 
   async applyReturnTrackingUpdate(
     refundRequestId: string,
     update: { status: ShipmentStatus; deliveredAt?: Date; shippedAt?: Date },
   ) {
-    return this.prisma.refundRequest.update({
+    const updated = await this.prisma.refundRequest.update({
       where: { id: refundRequestId },
       data: {
         returnStatus: update.status,
@@ -711,7 +729,28 @@ export class RefundService {
               ? RefundRequestStatus.return_in_transit
               : undefined,
       },
+      include: { order: { select: { sellerId: true } } },
     });
+
+    // Kargo takip adımları önceden tamamen sessizdi. Her iki taraf da bilgilendirilsin.
+    // Bell + push (her ping'de mail spam'i olmasın diye mail göndermiyoruz).
+    const notifData = { refundNumber: updated.refundNumber, orderId: updated.orderId };
+    if (
+      update.status === ShipmentStatus.in_transit ||
+      update.status === ShipmentStatus.picked_up
+    ) {
+      await this.safeNotify(updated.requesterId, NotificationType.REFUND_RETURN_IN_TRANSIT, notifData);
+      await this.safeNotify(updated.order.sellerId, NotificationType.REFUND_RETURN_SHIPPED_SELLER, notifData);
+      // Satıcıya bir kez markalı mail: ürün kendisine geliyor.
+      await this.sendRefundEmail(updated.id, 'seller', 'refund-return-incoming-seller', {
+        returnTrackingNumber: updated.returnTrackingNumber ?? updated.refundNumber,
+      });
+    } else if (update.status === ShipmentStatus.delivered) {
+      await this.safeNotify(updated.requesterId, NotificationType.REFUND_RETURN_DELIVERED_BUYER, notifData);
+      await this.safeNotify(updated.order.sellerId, NotificationType.REFUND_RETURN_DELIVERED_SELLER, notifData);
+    }
+
+    return updated;
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -818,6 +857,18 @@ export class RefundService {
       orderId: order.id,
     });
     await this.sendRefundEmail(created.id, 'buyer', 'refund-completed');
+    // Satıcı tarafı: iade tamamlandı bildirimi + mail.
+    const sellerRow = await this.prisma.order.findUnique({
+      where: { id: order.id },
+      select: { sellerId: true },
+    });
+    if (sellerRow?.sellerId) {
+      await this.safeNotify(sellerRow.sellerId, NotificationType.REFUND_COMPLETED_SELLER, {
+        refundNumber,
+        orderId: order.id,
+      });
+    }
+    await this.sendRefundEmail(created.id, 'seller', 'refund-completed-seller');
 
     return updated;
   }
@@ -899,11 +950,26 @@ export class RefundService {
         status: RefundRequestStatus.pending_review,
       },
     });
-    // Satıcıya "iade talebi alındı, incele" e-postası (pending_review →
-    // satıcı kararı bekleniyor). In-app eşdeğeri henüz yok; mail bilgilendirir.
+    // Satıcıya "iade talebi alındı, incele" — mail + bell/push (önceden sadece mail).
+    const disputeSeller = await this.prisma.order.findUnique({
+      where: { id: order.id },
+      select: { sellerId: true },
+    });
+    if (disputeSeller?.sellerId) {
+      await this.safeNotify(disputeSeller.sellerId, NotificationType.REFUND_REQUEST_RECEIVED, {
+        refundNumber,
+        orderId: order.id,
+      });
+    }
     await this.sendRefundEmail(created.id, 'seller', 'refund-requested-seller', {
       refundReason: dto.description ?? undefined,
     });
+    // Alıcıya "talebiniz alındı, satıcı yanıtı bekleniyor" (önceden alıcıya hiç bildirim yoktu).
+    await this.safeNotify(requesterId, NotificationType.REFUND_REQUEST_RECEIVED, {
+      refundNumber,
+      orderId: order.id,
+    });
+    await this.sendRefundEmail(created.id, 'buyer', 'refund-request-received-buyer');
     return created;
   }
 

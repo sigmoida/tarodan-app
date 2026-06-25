@@ -62,6 +62,10 @@ export function getEmailTemplateSubject(template: string, data: Record<string, a
     'refund-rejected-buyer': `İade Talebiniz Hakkında - ${data?.orderNumber || ''}`,
     'refund-return-label-buyer': `İade Kargo Bilgileri - ${data?.orderNumber || ''}`,
     'refund-completed': `İadeniz Tamamlandı - ${data?.orderNumber || ''}`,
+    'refund-request-received-buyer': `İade Talebiniz Alındı - ${data?.orderNumber || ''}`,
+    'refund-return-incoming-seller': `İade Kargosu Yola Çıktı - ${data?.orderNumber || ''}`,
+    'refund-completed-seller': `İade Tamamlandı - ${data?.orderNumber || ''}`,
+    'refund-auto-accepted-seller': `İade Otomatik Onaylandı - ${data?.orderNumber || ''}`,
     'review-received-seller': 'Yeni Değerlendirme Aldınız',
     'listing-expiring': `İlanınızın Süresi Doluyor${data?.productTitle ? ` - ${data.productTitle}` : ''}`,
     'listing-expired': `İlanınızın Süresi Doldu${data?.productTitle ? ` - ${data.productTitle}` : ''}`,
@@ -807,6 +811,70 @@ export function renderEmailTemplate(
         ${primaryButton('Siparişi Görüntüle', `${frontendUrl}/orders/${data?.orderId || ''}`)}
       </div>
     `, 'İadeniz Tamamlandı'),
+
+    'refund-request-received-buyer': wrapEmail(`
+      ${titleBlock('İade Talebiniz Alındı', '📨')}
+      ${greeting(data?.buyerName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">İade talebiniz alındı. Satıcının yanıtı bekleniyor; en geç 48 saat içinde sonuçlanır.</p>
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow('Sipariş No', '#' + (data?.orderNumber || ''))}
+          ${data?.productTitle ? detailRow('Ürün', data.productTitle) : ''}
+          ${detailRow('İade Tutarı', formatEmailPrice(data?.refundAmount || 0) + ' TL', true)}
+        </table>
+      `)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton('Talebi Görüntüle', `${frontendUrl}/orders/${data?.orderId || ''}`)}
+      </div>
+    `, 'İade Talebiniz Alındı'),
+
+    'refund-return-incoming-seller': wrapEmail(`
+      ${titleBlock('İade Kargosu Yola Çıktı', '📦')}
+      ${greeting(data?.sellerName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Alıcı iade ürününü kargoya verdi; ürün size doğru yolda. Ürün elinize ulaştığında iade süreci tamamlanacaktır.</p>
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow('Sipariş No', '#' + (data?.orderNumber || ''))}
+          ${data?.productTitle ? detailRow('Ürün', data.productTitle) : ''}
+          ${data?.returnTrackingNumber ? detailRow('İade Takip No', data.returnTrackingNumber, true) : ''}
+        </table>
+      `)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton('Satışı Görüntüle', `${frontendUrl}/orders/${data?.orderId || ''}`)}
+      </div>
+    `, 'İade Kargosu Yola Çıktı'),
+
+    'refund-completed-seller': wrapEmail(`
+      ${titleBlock('İade Tamamlandı', '↩️')}
+      ${greeting(data?.sellerName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Bu sipariş için iade tamamlandı; tutar alıcıya iade edildi.</p>
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow('Sipariş No', '#' + (data?.orderNumber || ''))}
+          ${data?.productTitle ? detailRow('Ürün', data.productTitle) : ''}
+          ${detailRow('İade Tutarı', formatEmailPrice(data?.refundAmount || 0) + ' TL', true)}
+        </table>
+      `)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton('Satışı Görüntüle', `${frontendUrl}/orders/${data?.orderId || ''}`)}
+      </div>
+    `, 'İade Tamamlandı'),
+
+    'refund-auto-accepted-seller': wrapEmail(`
+      ${titleBlock('İade Otomatik Onaylandı', '⏰')}
+      ${greeting(data?.sellerName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">İade talebine 48 saat içinde yanıt verilmediği için talep otomatik olarak onaylandı.</p>
+      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">İade süreci başlatıldı. Ürün size iade kargosuyla gönderilecektir.</p>`)}
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow('Sipariş No', '#' + (data?.orderNumber || ''))}
+          ${data?.productTitle ? detailRow('Ürün', data.productTitle) : ''}
+        </table>
+      `)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton('Satışı Görüntüle', `${frontendUrl}/orders/${data?.orderId || ''}`)}
+      </div>
+    `, 'İade Otomatik Onaylandı'),
 
     'review-received-seller': wrapEmail(`
       ${titleBlock('Yeni Değerlendirme Aldınız', '⭐')}
