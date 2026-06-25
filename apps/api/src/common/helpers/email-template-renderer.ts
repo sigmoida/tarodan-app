@@ -61,6 +61,7 @@ export function getEmailTemplateSubject(template: string, data: Record<string, a
     'refund-approved-buyer': `İade Talebiniz Onaylandı - ${data?.orderNumber || ''}`,
     'refund-rejected-buyer': `İade Talebiniz Hakkında - ${data?.orderNumber || ''}`,
     'refund-return-label-buyer': `İade Kargo Bilgileri - ${data?.orderNumber || ''}`,
+    'refund-completed': `İadeniz Tamamlandı - ${data?.orderNumber || ''}`,
     'review-received-seller': 'Yeni Değerlendirme Aldınız',
     'listing-expiring': `İlanınızın Süresi Doluyor${data?.productTitle ? ` - ${data.productTitle}` : ''}`,
     'listing-expired': `İlanınızın Süresi Doldu${data?.productTitle ? ` - ${data.productTitle}` : ''}`,
@@ -788,6 +789,24 @@ export function renderEmailTemplate(
         ${primaryButton(data?.returnUrl ? 'İade Etiketini Görüntüle' : 'Siparişi Görüntüle', data?.returnUrl || `${frontendUrl}/orders/${data?.orderId || ''}`)}
       </div>
     `, 'İade Kargo Bilgileri'),
+
+    'refund-completed': wrapEmail(`
+      ${titleBlock('İadeniz Tamamlandı', '💰')}
+      ${greeting(data?.buyerName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">İade tutarınız ödeme yönteminize iade edildi. İşlem tamamlandı.</p>
+      ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">✓ İadeniz tamamlandı</p>`)}
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow('Sipariş No', '#' + (data?.orderNumber || ''))}
+          ${data?.productTitle ? detailRow('Ürün', data.productTitle) : ''}
+          ${detailRow('İade Tutarı', formatEmailPrice(data?.refundAmount || 0) + ' TL', true)}
+        </table>
+      `)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">💳 İade tutarı ödeme yönteminize 3–5 iş günü içinde yansır. Bankanıza bağlı olarak süre değişebilir.</p>`)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton('Siparişi Görüntüle', `${frontendUrl}/orders/${data?.orderId || ''}`)}
+      </div>
+    `, 'İadeniz Tamamlandı'),
 
     'review-received-seller': wrapEmail(`
       ${titleBlock('Yeni Değerlendirme Aldınız', '⭐')}

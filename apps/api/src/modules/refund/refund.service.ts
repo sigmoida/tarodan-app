@@ -30,7 +30,7 @@ import {
 import { CreateRefundRequestDto } from './dto/create-refund-request.dto';
 import { RejectRefundRequestDto } from './dto/reject-refund-request.dto';
 import { NotificationService } from '../notification/notification.service';
-import { NotificationType } from '../notification/dto/notification.dto';
+import { NotificationType, NotificationChannel } from '../notification/dto/notification.dto';
 import { StorageService } from '../storage/storage.service';
 
 const COOLING_OFF_DAYS = 14;
@@ -99,7 +99,12 @@ export class RefundService {
     });
   }
 
-  /** Best-effort notification dispatch — failures are logged, never thrown. */
+  /**
+   * Best-effort notification dispatch — failures are logged, never thrown.
+   * in_app (+ canlı websocket) için createInAppNotification; aynı anda PUSH
+   * kanalını da gönderir (data'da orderId olduğundan mobil deep-link /orders'a
+   * gider). Email ayrı: markalı şablonlar için sendRefundEmail kullanılır.
+   */
   private async safeNotify(
     userId: string,
     type: NotificationType,
@@ -109,7 +114,21 @@ export class RefundService {
       await this.notificationService.createInAppNotification(userId, type, data);
     } catch (err: any) {
       this.logger.error(
-        `Notification ${type} → ${userId} failed: ${err?.message}`,
+        `In-app notification ${type} → ${userId} failed: ${err?.message}`,
+      );
+    }
+    // Push'u ayrı try/catch'te gönder ki in_app başarısız olsa bile denensin
+    // (ve tersi). send([PUSH]) in_app yazmaz → mükerrer zil olmaz.
+    try {
+      await this.notificationService.send({
+        userId,
+        type,
+        channels: [NotificationChannel.PUSH],
+        data,
+      });
+    } catch (err: any) {
+      this.logger.error(
+        `Push notification ${type} → ${userId} failed: ${err?.message}`,
       );
     }
   }
@@ -606,6 +625,8 @@ export class RefundService {
       refundNumber: rr.refundNumber,
       orderId: rr.orderId,
     });
+    // "Para iadeniz tamamlandı" maili eksikti (sadece zile düşüyordu) — eklendi.
+    await this.sendRefundEmail(rr.id, 'buyer', 'refund-completed');
     return updated;
   }
 
@@ -792,7 +813,7 @@ export class RefundService {
       throw err;
     }
 
-    return this.prisma.refundRequest.update({
+    const updated = await this.prisma.refundRequest.update({
       where: { id: created.id },
       data: {
         status: RefundRequestStatus.refunded,
@@ -800,6 +821,16 @@ export class RefundService {
         providerRefundId: refundResult.providerRefundId,
       },
     });
+
+    // Anında iade önceden TAMAMEN sessizdi — alıcı para iadesini hiç öğrenmiyordu.
+    // in_app + push (safeNotify) + markalı mail.
+    await this.safeNotify(requesterId, NotificationType.REFUND_COMPLETED, {
+      refundNumber,
+      orderId: order.id,
+    });
+    await this.sendRefundEmail(created.id, 'buyer', 'refund-completed');
+
+    return updated;
   }
 
   /**
@@ -836,6 +867,14 @@ export class RefundService {
         decidedAt: new Date(),
       },
     });
+
+    // 14 gün cayma hakkı → otomatik onay. Alıcıya talebinin onaylandığını bildir
+    // (önceden talep anında hiç bildirim yoktu). in_app + push + mail.
+    await this.safeNotify(requesterId, NotificationType.REFUND_APPROVED, {
+      refundNumber,
+      orderId: order.id,
+    });
+    await this.sendRefundEmail(created.id, 'buyer', 'refund-approved-buyer');
 
     // Ürün alıcıya ulaşmışsa (delivered/awaiting_buyer_confirmation/completed)
     // iade kargosunu hemen aç; aksi hâlde cron teslimatta açar.
