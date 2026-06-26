@@ -31,22 +31,6 @@ const ADDRESS_DELETE_BLOCKED_ORDER_STATUSES: OrderStatus[] = [
   OrderStatus.refund_requested,
 ];
 
-/**
- * Açık (devam eden) takasların depoya-kargo (to_warehouse) adresi olarak
- * kullandığı adres SİLİNEMEZ/DEĞİŞTİRİLEMEZ. Aksi halde `createInboundTradeShipments`
- * adresi çözemez, kargo etiketi oluşturulamaz ve takas at_warehouse'a geçemeden
- * takılı kalır. Yalnız to_warehouse leg'inin canlı olabileceği aşamalar listelenir;
- * terminal/recipient aşamalarında adres artık inbound kargo için gerekmez.
- */
-const ADDRESS_LOCK_TRADE_STATUSES: TradeStatus[] = [
-  TradeStatus.pending,
-  TradeStatus.accepted,
-  TradeStatus.awaiting_payment,
-  TradeStatus.shipping_to_warehouse,
-  TradeStatus.at_warehouse,
-  TradeStatus.admin_reviewing,
-];
-
 @Injectable()
 export class UserService {
   private readonly logger = new Logger(UserService.name);
@@ -820,23 +804,6 @@ export class UserService {
     if (openOrdersUsingAddress > 0) {
       throw new BadRequestException(
         'Bu teslimat adresine bağlı devam eden siparişleriniz var. Sipariş tamamlanana veya iptal edilene kadar adresi silemezsiniz.',
-      );
-    }
-
-    // Devam eden bir takasta (initiator/receiver) bu adres seçiliyse silme:
-    // depoya-kargo adresi kaybolursa takas at_warehouse'a geçemeden takılır.
-    const openTradesUsingAddress = await this.prisma.trade.count({
-      where: {
-        status: { in: ADDRESS_LOCK_TRADE_STATUSES },
-        OR: [
-          { initiatorId: userId, initiatorAddressId: addressId },
-          { receiverId: userId, receiverAddressId: addressId },
-        ],
-      },
-    });
-    if (openTradesUsingAddress > 0) {
-      throw new BadRequestException(
-        'Bu adrese bağlı devam eden takaslarınız var. Takas tamamlanana veya iptal edilene kadar adresi silemezsiniz.',
       );
     }
 

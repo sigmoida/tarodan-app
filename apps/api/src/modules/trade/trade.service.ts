@@ -278,16 +278,16 @@ export class TradeService {
 
       await this.prisma.$transaction(async (tx) => {
         for (const side of sides) {
+          if (!side.address) {
+            this.logger.warn(
+              `Trade ${trade.tradeNumber} side ${side.suffix} (user=${side.shipperId}) has no address; inbound shipment NOT created — admin must intervene`,
+            );
+            continue;
+          }
+
           // Bu taraf için to_warehouse satırı VARSA yeniden kullan, YOKSA oluştur.
           // (Tek kaynak: artık ayrı bir "warehouse-shipments" helper'ı yok; etiket
           // oluşturma + adres + Sürat sevkiyatı yalnız burada yapılır.)
-          //
-          // ÖNEMLİ: Adres yoksa bile satırı OLUŞTUR (fromAddressId=null). Aksi halde
-          // bu taraf hiç tradeShipment satırı almaz; markWarehouseReceived iki
-          // to_warehouse satırı beklediği için takas at_warehouse'a asla geçemez ve
-          // admin onaylayamaz (takas takılı kalır). Adressiz satır oluşturulur ama
-          // Sürat'a gönderilmez (dispatch yalnız adresli taraflara) → admin görür,
-          // adres tamamlanınca bu fonksiyon idempotent biçimde dispatch eder.
           let row = await tx.tradeShipment.findFirst({
             where: {
               tradeId: trade.id,
@@ -297,8 +297,8 @@ export class TradeService {
           });
 
           if (row) {
-            // Eski/yarım kalmış satır adres içermiyorsa ve şimdi adres çözüldüyse doldur.
-            if (!row.fromAddressId && side.address) {
+            // Eski/yarım kalmış satır adres içermiyorsa şimdi doldur.
+            if (!row.fromAddressId) {
               row = await tx.tradeShipment.update({
                 where: { id: row.id },
                 data: { fromAddressId: side.address.id },
@@ -314,7 +314,7 @@ export class TradeService {
               data: {
                 tradeId: trade.id,
                 shipperId: side.shipperId,
-                fromAddressId: side.address?.id ?? null,
+                fromAddressId: side.address.id,
                 carrier: 'surat',
                 trackingNumber: ozelKargoTakipNo,
                 status: ShipmentStatus.label_created,
@@ -323,15 +323,6 @@ export class TradeService {
                 recipientUserId: null,
               },
             });
-          }
-
-          // Sürat dispatch'i yalnız adres VARSA mümkün. Adressiz taraf için satır
-          // label_created'da kalır; admin müdahalesi (adres tamamlama) beklenir.
-          if (!side.address) {
-            this.logger.warn(
-              `Trade ${trade.tradeNumber} side ${side.suffix} (user=${side.shipperId}) has no address; inbound shipment row created at label_created but NOT dispatched — admin must intervene`,
-            );
-            continue;
           }
 
           const payload = this.buildSuratPayloadForInboundLeg(
@@ -895,6 +886,18 @@ export class TradeService {
       );
 
       tradeInitiatorId = trade.initiatorId;
+
+      // Teklif edenin (initiator) teslimat adresi de kabul anında HÂLÂ var olmalı.
+      // Kargo etiketi adressiz basılamaz; kabulden sonra adres silinmiş olabilir.
+      // Burada (kabul eden beklerken) kontrol edip net hata veriyoruz — aksi halde
+      // kargo aşamasında bir tarafın inbound shipment'ı oluşmaz ve takas
+      // at_warehouse'a geçemeden takılı kalırdı. (resolveTradeShippingAddressId:
+      // seçili adres → varsayılan → en eski; hiçbiri yoksa required:true ile atar.)
+      await this.resolveTradeShippingAddressId(
+        trade.initiatorId,
+        trade.initiatorAddressId ?? undefined,
+        { required: true, db: tx },
+      );
 
       const now = new Date();
       const paymentDeadline = new Date(now);
