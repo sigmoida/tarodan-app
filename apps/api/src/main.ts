@@ -106,29 +106,35 @@ async function bootstrap() {
       exclude: [{ path: 'callback', method: RequestMethod.POST }],
     });
 
-    // Swagger documentation
-    const config = new DocumentBuilder()
-      .setTitle('Tarodan API')
-      .setDescription('Tarodan Koleksiyoner Oyuncak Marketplace API')
-      .setVersion('1.0')
-      .addBearerAuth()
-      .addTag('auth', 'Authentication endpoints')
-      .addTag('users', 'User management')
-      .addTag('products', 'Product catalog')
-      .addTag('offers', 'Offer/negotiation system')
-      .addTag('orders', 'Order management')
-      .addTag('payments', 'Payment processing')
-      .addTag('shipping', 'Shipping integration')
-      .addTag('admin', 'Admin panel endpoints')
-      .build();
-    const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('api/docs', app, document);
+    // Swagger documentation — prod'da KAPALI (tüm endpoint şemasını/payload'larını
+    // herkese açar). Sadece non-production'da; staging gerekiyorsa ENABLE_SWAGGER=true.
+    const swaggerEnabled = isDevelopment || process.env.ENABLE_SWAGGER === 'true';
+    if (swaggerEnabled) {
+      const config = new DocumentBuilder()
+        .setTitle('Tarodan API')
+        .setDescription('Tarodan Koleksiyoner Oyuncak Marketplace API')
+        .setVersion('1.0')
+        .addBearerAuth()
+        .addTag('auth', 'Authentication endpoints')
+        .addTag('users', 'User management')
+        .addTag('products', 'Product catalog')
+        .addTag('offers', 'Offer/negotiation system')
+        .addTag('orders', 'Order management')
+        .addTag('payments', 'Payment processing')
+        .addTag('shipping', 'Shipping integration')
+        .addTag('admin', 'Admin panel endpoints')
+        .build();
+      const document = SwaggerModule.createDocument(app, config);
+      SwaggerModule.setup('api/docs', app, document);
+      logger.log('Swagger docs available at /api/docs');
+    } else {
+      logger.log('Swagger docs disabled (production)');
+    }
 
     const port = process.env.PORT || 3000;
     // 0.0.0.0 — telefonun LAN IP üzerinden erişebilmesi için tüm arayüzleri dinle.
     await app.listen(port, '0.0.0.0');
     logger.log(`Application running on port ${port}`);
-    logger.log(`Swagger docs available at http://localhost:${port}/api/docs`);
   } catch (error) {
     logger.error('Failed to start application:', error);
     process.exit(1);
