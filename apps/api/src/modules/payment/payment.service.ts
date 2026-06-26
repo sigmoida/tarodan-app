@@ -1562,21 +1562,28 @@ export class PaymentService {
           data: updateData,
         });
 
-        // Stockout cascade: if this purchase drained the last available unit,
-        // cancel other open offers/orders for the same product within the same
-        // transaction so no other buyer can complete a payment that would push
-        // stock negative. The order matters: invalidate pending orders FIRST
-        // (so their linked offers chain-cancel atomically), then sweep any
-        // remaining standalone offers. Both helpers are idempotent w.r.t.
-        // already-terminal rows, and the order helper now safely clamps the
-        // reservedQuantity decrement.
+        // Stockout cascade: only when PHYSICAL stock is actually drained
+        // (quantity <= 0), cancel other open offers/orders for the same product
+        // within the same transaction so no other buyer can complete a payment
+        // that would push stock negative. The order matters: invalidate pending
+        // orders FIRST (so their linked offers chain-cancel atomically), then
+        // sweep any remaining standalone offers. Both helpers are idempotent
+        // w.r.t. already-terminal rows, and the order helper now safely clamps
+        // the reservedQuantity decrement.
+        //
+        // NOTE: we intentionally gate on physical `quantity`, NOT on
+        // `quantity - reservedQuantity`. reservedQuantity still includes OTHER
+        // buyers' legitimate pending_payment orders, each of which has a real
+        // physical unit waiting for it. Gating on available-for-new-buyers (q-r)
+        // would wrongly cancel those valid orders whenever stock > 1 and
+        // multiple buyers checked out concurrently (e.g. 2 stock + 2 buyers:
+        // after the first payment q=1,r=1 → available=0 → the still-valid second
+        // order gets cancelled and auto-refunded even though a unit remained).
         const refreshed = await tx.product.findUnique({
           where: { id: payment.order.productId },
           select: { quantity: true, reservedQuantity: true, categoryId: true },
         });
-        const available =
-          (refreshed?.quantity ?? 0) - (refreshed?.reservedQuantity ?? 0);
-        if (refreshed && refreshed.quantity !== null && available <= 0) {
+        if (refreshed && refreshed.quantity !== null && refreshed.quantity <= 0) {
           stockoutCategoryId = refreshed.categoryId ?? null;
           const orderResult = await this.productLockService.invalidatePendingOrdersForProduct(
             tx,
@@ -1937,8 +1944,13 @@ export class PaymentService {
             where: { id: order.productId },
             select: { quantity: true, reservedQuantity: true, categoryId: true },
           });
-          const available = (refreshed?.quantity ?? 0) - (refreshed?.reservedQuantity ?? 0);
-          if (refreshed && refreshed.quantity !== null && available <= 0) {
+          // Gate on PHYSICAL stock (quantity <= 0), not available-for-new-buyers
+          // (quantity - reservedQuantity). reservedQuantity still includes other
+          // buyers' valid pending_payment orders, each with a real unit waiting;
+          // gating on (q-r) would wrongly cancel + auto-refund them whenever
+          // stock > 1 and buyers checked out concurrently. See the direct-buy
+          // branch above for the detailed 2-stock/2-buyer walkthrough.
+          if (refreshed && refreshed.quantity !== null && refreshed.quantity <= 0) {
             stockoutCategoryId = refreshed.categoryId ?? null;
             const orderResult = await this.productLockService.invalidatePendingOrdersForProduct(
               tx,
