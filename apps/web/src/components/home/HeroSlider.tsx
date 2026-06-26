@@ -206,7 +206,10 @@ export default function HeroSlider() {
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.5 }}
                 className="relative hidden md:block aspect-[4/3] w-full max-w-3xl overflow-hidden border border-border bg-surface-elevated"
-                style={{ borderRadius: '4px', touchAction: 'pan-y' }}
+                // position:relative inline — CSS yüklenmeden (FOUC) önce de geçerli
+                // olsun ki içteki next/image `fill` viewport'a şişmesin (.relative
+                // class'ı CSS gelene kadar uygulanmıyordu).
+                style={{ position: 'relative', borderRadius: '4px', touchAction: 'pan-y' }}
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
@@ -233,7 +236,10 @@ export default function HeroSlider() {
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.5 }}
                 className="relative hidden md:block aspect-[4/3] w-full max-w-3xl overflow-hidden border border-border bg-surface-elevated"
-                style={{ borderRadius: '4px', touchAction: 'pan-y' }}
+                // position:relative inline — CSS yüklenmeden (FOUC) önce de geçerli
+                // olsun ki içteki next/image `fill` viewport'a şişmesin (.relative
+                // class'ı CSS gelene kadar uygulanmıyordu).
+                style={{ position: 'relative', borderRadius: '4px', touchAction: 'pan-y' }}
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
