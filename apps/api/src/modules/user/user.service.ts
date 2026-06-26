@@ -7,6 +7,11 @@ import { StorageService } from '../storage/storage.service';
 import { RatingService } from '../rating/rating.service';
 import { ModerationAiClient } from '../moderation/moderation-ai.client';
 import { computeTrustScore } from './helpers/trust-score';
+import {
+  DEFAULT_NOTIFICATION_SETTINGS,
+  NotificationSettings,
+  UpdateNotificationSettingsDto,
+} from './dto';
 
 // In-memory storage for user blocks until schema is updated
 interface UserBlock {
@@ -24,6 +29,22 @@ const ADDRESS_DELETE_BLOCKED_ORDER_STATUSES: OrderStatus[] = [
   OrderStatus.shipped,
   OrderStatus.delivered,
   OrderStatus.refund_requested,
+];
+
+/**
+ * Açık (devam eden) takasların depoya-kargo (to_warehouse) adresi olarak
+ * kullandığı adres SİLİNEMEZ/DEĞİŞTİRİLEMEZ. Aksi halde `createInboundTradeShipments`
+ * adresi çözemez, kargo etiketi oluşturulamaz ve takas at_warehouse'a geçemeden
+ * takılı kalır. Yalnız to_warehouse leg'inin canlı olabileceği aşamalar listelenir;
+ * terminal/recipient aşamalarında adres artık inbound kargo için gerekmez.
+ */
+const ADDRESS_LOCK_TRADE_STATUSES: TradeStatus[] = [
+  TradeStatus.pending,
+  TradeStatus.accepted,
+  TradeStatus.awaiting_payment,
+  TradeStatus.shipping_to_warehouse,
+  TradeStatus.at_warehouse,
+  TradeStatus.admin_reviewing,
 ];
 
 @Injectable()
@@ -344,6 +365,50 @@ export class UserService {
 
     // Return updated user in the same format as findByIdWithAddresses
     return this.findByIdWithAddresses(userId);
+  }
+
+  /**
+   * Bildirim tercihlerini getir. Kayıt yoksa varsayılanlar döner; kısmi
+   * kayıtlar varsayılanların üzerine birleştirilir.
+   */
+  async getNotificationSettings(userId: string): Promise<NotificationSettings> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { notificationSettings: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Kullanıcı bulunamadı');
+    }
+
+    const stored = (user.notificationSettings as Partial<NotificationSettings> | null) ?? {};
+    return { ...DEFAULT_NOTIFICATION_SETTINGS, ...stored };
+  }
+
+  /**
+   * Bildirim tercihlerini kısmen güncelle (gelen anahtarları mevcut değerlerin
+   * üzerine birleştirir) ve güncel tam nesneyi döner.
+   */
+  async updateNotificationSettings(
+    userId: string,
+    dto: UpdateNotificationSettingsDto,
+  ): Promise<NotificationSettings> {
+    const current = await this.getNotificationSettings(userId);
+    // Yalnızca tanımlı (undefined olmayan) anahtarları uygula.
+    const patch: Partial<NotificationSettings> = {};
+    for (const [key, value] of Object.entries(dto)) {
+      if (value !== undefined) {
+        (patch as any)[key] = value;
+      }
+    }
+    const merged: NotificationSettings = { ...current, ...patch };
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { notificationSettings: merged as unknown as Prisma.InputJsonValue },
+    });
+
+    return merged;
   }
 
   /**
@@ -755,6 +820,23 @@ export class UserService {
     if (openOrdersUsingAddress > 0) {
       throw new BadRequestException(
         'Bu teslimat adresine bağlı devam eden siparişleriniz var. Sipariş tamamlanana veya iptal edilene kadar adresi silemezsiniz.',
+      );
+    }
+
+    // Devam eden bir takasta (initiator/receiver) bu adres seçiliyse silme:
+    // depoya-kargo adresi kaybolursa takas at_warehouse'a geçemeden takılır.
+    const openTradesUsingAddress = await this.prisma.trade.count({
+      where: {
+        status: { in: ADDRESS_LOCK_TRADE_STATUSES },
+        OR: [
+          { initiatorId: userId, initiatorAddressId: addressId },
+          { receiverId: userId, receiverAddressId: addressId },
+        ],
+      },
+    });
+    if (openTradesUsingAddress > 0) {
+      throw new BadRequestException(
+        'Bu adrese bağlı devam eden takaslarınız var. Takas tamamlanana veya iptal edilene kadar adresi silemezsiniz.',
       );
     }
 
@@ -1187,7 +1269,20 @@ export class UserService {
         where: { sellerId: userId },
         _sum: { likeCount: true },
       }),
-      this.prisma.order.count({ where: { buyerId: userId } }),
+      // "Siparişlerim" sayacı, listeyle (order.service.ts findUserOrders) tutarlı
+      // olmalı: üyelik/boost sanal siparişleri liste DIŞLADIĞI için sayaç da hariç
+      // tutmalı. Aksi halde şirket üyelik alınca sayaç 1, liste boş görünür.
+      this.prisma.order.count({
+        where: {
+          buyerId: userId,
+          NOT: {
+            OR: [
+              { productId: { startsWith: 'membership-' } },
+              { productId: { startsWith: 'boost-' } },
+            ],
+          },
+        },
+      }),
       this.prisma.order.count({
         where: { buyerId: userId, status: { in: ['delivered', 'completed'] } },
       }),

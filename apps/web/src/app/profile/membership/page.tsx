@@ -15,7 +15,7 @@ import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { api } from '@/lib/api';
+import { api, membershipApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
 import { Button } from '@tarodan/ui';
 
@@ -56,44 +56,42 @@ export default function MembershipPage() {
   const [autoRenewSaving, setAutoRenewSaving] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
-  // Fetch listing limits and membership prices from platform settings
+  // Fiyat ve limitler TEK KAYNAKTAN: DB MembershipTier (checkout + backend ödeme
+  // ile birebir aynı). Eskiden /admin/settings/public + hardcoded fallback'ler
+  // checkout ile uyumsuz fiyat gösteriyordu (UI 500 / charge 250).
   useEffect(() => {
-    const fetchSettings = async () => {
+    const fetchTierData = async () => {
       try {
-        const response = await api.get('/admin/settings/public');
-        const settings = response.data || {};
+        const r = await membershipApi.getTiers();
+        const list: any[] = r.data?.data ?? r.data ?? [];
+        const by = (type: string) => list.find((x) => x.type === type);
+        const free = by('free'), basic = by('basic'), premium = by('premium'), business = by('business');
+        // yıllık indirim % — tier fiyatlarından türet (monthly*12 vs yearly).
+        const pct = (m?: number, y?: number) =>
+          m && y && m * 12 > 0 ? Math.round((1 - y / (m * 12)) * 100) : undefined;
         setListingLimits({
-          free_listing_limit: settings.free_listing_limit,
-          basic_listing_limit: settings.basic_listing_limit,
-          premium_listing_limit: settings.premium_listing_limit,
-          business_listing_limit: settings.business_listing_limit,
+          free_listing_limit: free?.maxTotalListings,
+          basic_listing_limit: basic?.maxTotalListings,
+          premium_listing_limit: premium?.maxTotalListings,
+          business_listing_limit: business?.maxTotalListings,
         });
         setMembershipPrices({
-          basic_monthly_price: settings.basic_monthly_price,
-          basic_yearly_price: settings.basic_yearly_price,
-          premium_monthly_price: settings.premium_monthly_price,
-          premium_yearly_price: settings.premium_yearly_price,
-          business_monthly_price: settings.business_monthly_price,
-          business_yearly_price: settings.business_yearly_price,
-          yearly_discount_percentage: settings.yearly_discount_percentage,
+          basic_monthly_price: basic ? Number(basic.monthlyPrice) : undefined,
+          basic_yearly_price: basic ? Number(basic.yearlyPrice) : undefined,
+          premium_monthly_price: premium ? Number(premium.monthlyPrice) : undefined,
+          premium_yearly_price: premium ? Number(premium.yearlyPrice) : undefined,
+          business_monthly_price: business ? Number(business.monthlyPrice) : undefined,
+          business_yearly_price: business ? Number(business.yearlyPrice) : undefined,
+          yearly_discount_percentage:
+            pct(premium ? Number(premium.monthlyPrice) : undefined, premium ? Number(premium.yearlyPrice) : undefined) ?? 20,
         });
       } catch (error) {
-        if (process.env.NODE_ENV === 'development') console.error('Failed to fetch settings:', error);
-        // Use defaults if API fails
-        setListingLimits({
-          free_listing_limit: 5,
-          premium_listing_limit: -1,
-          business_listing_limit: 1000,
-        });
-        setMembershipPrices({
-          premium_monthly_price: 99,
-          premium_yearly_price: 960,
-          business_monthly_price: 499,
-          business_yearly_price: 4790,
-        });
+        if (process.env.NODE_ENV === 'development') console.error('Failed to fetch tiers:', error);
+        // Tier'lar çekilemezse boş bırak — getListingLimitText/MEMBERSHIP_TIERS
+        // kendi ?? fallback'lerini kullanır.
       }
     };
-    fetchSettings();
+    fetchTierData();
   }, []);
 
   // Fetch membership details and payment methods for premium/business users

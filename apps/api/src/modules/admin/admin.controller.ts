@@ -909,15 +909,9 @@ export class AdminController {
     return this.adminService.getPayments(query);
   }
 
-  @Get('payments/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Get payment details by ID' })
-  @ApiParam({ name: 'id', description: 'Payment ID' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Payment details' })
-  async getPaymentById(@Param('id') id: string) {
-    return this.adminService.getPaymentById(id);
-  }
-
+  // NOTE: Literal sub-routes (statistics, failed) MUST be declared before the
+  // parameterized `payments/:id` route. NestJS/Express match sequentially, so
+  // otherwise `:id` would capture "statistics"/"failed" and these would 404.
   @Get('payments/statistics')
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get payment statistics' })
@@ -932,6 +926,15 @@ export class AdminController {
   @ApiResponse({ status: HttpStatus.OK, description: 'List of failed payments' })
   async getFailedPayments(@Query() query: AdminPaymentQueryDto) {
     return this.adminService.getFailedPayments(query);
+  }
+
+  @Get('payments/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Get payment details by ID' })
+  @ApiParam({ name: 'id', description: 'Payment ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Payment details' })
+  async getPaymentById(@Param('id') id: string) {
+    return this.adminService.getPaymentById(id);
   }
 
   @Post('payments/:id/manual-refund')

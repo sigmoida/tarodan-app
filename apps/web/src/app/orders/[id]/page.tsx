@@ -1041,7 +1041,14 @@ export default function OrderDetailPage() {
               let s = order.shipment.status;
               const isReturnFlow =
                 s === "return_in_progress" || s === "returned";
-              if (orderDelivered && s !== "delivered" && !isReturnFlow) {
+              // İptal/iade edilen siparişlerde kargo durumu (örn. eski bir
+              // 'delivered' kaydı) yanıltıcı olmasın diye sipariş durumunu
+              // gerçeğin kaynağı kabul edip kargoyu 'cancelled' olarak göster.
+              const orderCancelled =
+                order.status === "cancelled" || order.status === "refunded";
+              if (orderCancelled && !isReturnFlow) {
+                s = "cancelled";
+              } else if (orderDelivered && s !== "delivered" && !isReturnFlow) {
                 s = "delivered";
               } else if (
                 orderShipped &&

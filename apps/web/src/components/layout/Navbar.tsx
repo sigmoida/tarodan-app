@@ -89,7 +89,7 @@ export default function Navbar() {
   const router = useRouter();
   const { t, locale } = useTranslation();
   const { isAuthenticated, user, logout, checkAuth } = useAuthStore();
-  const { itemCount: cartCount } = useCartStore();
+  const { itemCount: cartCount, fetchCart } = useCartStore();
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [pendingOffersCount, setPendingOffersCount] = useState(0);
@@ -302,6 +302,9 @@ export default function Navbar() {
 
   useEffect(() => {
     if (isAuthenticated) {
+      // Sepeti uygulama açılışında yükle ki navbar rozeti ürün sayısını
+      // göstersin ve ürün detayında "Sepetten Çıkar" doğru görünsün.
+      fetchCart();
       fetchUnreadMessageCount();
       fetchPendingCounts();
       // Poll for new messages and pending counts every 30 seconds

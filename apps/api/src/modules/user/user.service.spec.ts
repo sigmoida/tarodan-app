@@ -24,12 +24,16 @@ describe('UserService deleteAddress (edge case 1.11)', () => {
     order: {
       count: jest.fn(),
     },
+    trade: {
+      count: jest.fn(),
+    },
   };
 
   beforeEach(async () => {
     jest.clearAllMocks();
     mockPrisma.address.findFirst.mockResolvedValue(mockAddress);
     mockPrisma.order.count.mockResolvedValue(0);
+    mockPrisma.trade.count.mockResolvedValue(0);
     mockPrisma.address.delete.mockResolvedValue(mockAddress);
 
     const module: TestingModule = await Test.createTestingModule({
@@ -71,6 +75,17 @@ describe('UserService deleteAddress (edge case 1.11)', () => {
     });
     expect(mockPrisma.address.delete).toHaveBeenCalledWith({ where: { id: 'addr-1' } });
     expect(result.message).toBe('Adres silindi');
+  });
+
+  it('throws BadRequestException when an open trade references this address', async () => {
+    mockPrisma.order.count.mockResolvedValue(0);
+    mockPrisma.trade.count.mockResolvedValue(1);
+
+    await expect(service.deleteAddress('user-1', 'addr-1')).rejects.toThrow(BadRequestException);
+    await expect(service.deleteAddress('user-1', 'addr-1')).rejects.toThrow(
+      /devam eden takaslarınız var/i,
+    );
+    expect(mockPrisma.address.delete).not.toHaveBeenCalled();
   });
 
   it('throws NotFoundException when address not owned by user', async () => {

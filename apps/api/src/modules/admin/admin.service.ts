@@ -4220,10 +4220,13 @@ export class AdminService {
     ]);
 
     return {
+      // Payment.order nullable: checkoutGroup / tradeCashPayment tipindeki
+      // ödemelerde order=null olabilir. Null-safe erişim — aksi halde TÜM liste
+      // TypeError ile 500 döner.
       data: payments.map((p) => ({
         id: p.id,
         orderId: p.orderId,
-        orderNumber: p.order.orderNumber,
+        orderNumber: p.order?.orderNumber ?? null,
         amount: Number(p.amount),
         currency: p.currency,
         provider: p.provider,
@@ -4231,9 +4234,9 @@ export class AdminService {
         failureReason: p.failureReason,
         providerPaymentId: p.providerPaymentId,
         providerConversationId: p.providerConversationId,
-        buyer: p.order.buyer,
-        seller: p.order.seller,
-        product: p.order.product,
+        buyer: p.order?.buyer ?? null,
+        seller: p.order?.seller ?? null,
+        product: p.order?.product ?? null,
         createdAt: p.createdAt,
         updatedAt: p.updatedAt,
         paidAt: p.paidAt,
@@ -4269,10 +4272,12 @@ export class AdminService {
       throw new NotFoundException('Ödeme bulunamadı');
     }
 
+    // Payment.order nullable: checkoutGroup / tradeCashPayment tipindeki
+    // ödemelerde order=null olabilir. Null-safe erişim — aksi halde 500.
     return {
       id: payment.id,
       orderId: payment.orderId,
-      orderNumber: payment.order.orderNumber,
+      orderNumber: payment.order?.orderNumber ?? null,
       amount: Number(payment.amount),
       currency: payment.currency,
       provider: payment.provider,
@@ -4281,17 +4286,19 @@ export class AdminService {
       providerPaymentId: payment.providerPaymentId,
       providerConversationId: payment.providerConversationId,
       metadata: payment.metadata,
-      order: {
-        id: payment.order.id,
-        orderNumber: payment.order.orderNumber,
-        status: payment.order.status,
-        totalAmount: Number(payment.order.totalAmount),
-        commissionAmount: Number(payment.order.commissionAmount),
-        buyer: payment.order.buyer,
-        seller: payment.order.seller,
-        product: payment.order.product,
-        shippingAddress: payment.order.shippingAddress,
-      },
+      order: payment.order
+        ? {
+            id: payment.order.id,
+            orderNumber: payment.order.orderNumber,
+            status: payment.order.status,
+            totalAmount: Number(payment.order.totalAmount),
+            commissionAmount: Number(payment.order.commissionAmount),
+            buyer: payment.order.buyer,
+            seller: payment.order.seller,
+            product: payment.order.product,
+            shippingAddress: payment.order.shippingAddress,
+          }
+        : null,
       paymentHold: payment.paymentHolds[0] ? {
         id: payment.paymentHolds[0].id,
         amount: Number(payment.paymentHolds[0].amount),

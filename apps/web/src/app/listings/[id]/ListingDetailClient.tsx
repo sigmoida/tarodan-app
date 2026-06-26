@@ -167,8 +167,16 @@ export default function ListingDetailClient() {
     offlineItems,
     removeFromCart,
     removeFromOfflineCart,
+    fetchCart,
   } = useCartStore();
   const { isAuthenticated, user, limits } = useAuthStore();
+
+  // Ürün detayına doğrudan (hard reload) girildiğinde sepet store'u henüz
+  // dolmamış olabilir; "Sepete Ekle"/"Sepetten Çıkar" butonunun doğru
+  // görünmesi için sepeti bir kez yükle.
+  useEffect(() => {
+    fetchCart();
+  }, [fetchCart]);
 
   // Free üyeler takas yapamaz - Premium veya Business üyeler trade yapabilir
   const canTrade =

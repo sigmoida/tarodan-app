@@ -83,11 +83,26 @@ export class PaymentService {
       });
       if (!shipment) return;
 
-      // Skip if shipment is already in a terminal state
-      const terminalStatuses = ['delivered', 'returned', 'cancelled', 'failed'];
-      if (terminalStatuses.includes(shipment.status)) {
+      // Halihazırda 'cancelled' ise yapacak bir şey yok.
+      if (shipment.status === 'cancelled') {
         this.logger.log(
-          `Skip Surat cancel: shipment ${shipment.id} already ${shipment.status}`,
+          `Skip Surat cancel: shipment ${shipment.id} already cancelled`,
+        );
+        return;
+      }
+
+      // 'delivered'/'returned'/'failed' gibi terminal durumlarda Sürat'a iptal
+      // çağrısı atmanın anlamı yok; ancak sipariş iptal edildiği için yerel
+      // kargo kaydını yine de 'cancelled' yaparak veriyi tutarlı tutuyoruz
+      // (aksi halde iptal edilen siparişte kargo "Teslim Edildi" görünüyordu).
+      const terminalStatuses = ['delivered', 'returned', 'failed'];
+      if (terminalStatuses.includes(shipment.status)) {
+        await this.prisma.shipment.update({
+          where: { id: shipment.id },
+          data: { status: 'cancelled' as any },
+        });
+        this.logger.log(
+          `Surat shipment locally marked cancelled (was ${shipment.status}) for order ${orderNumber}`,
         );
         return;
       }
