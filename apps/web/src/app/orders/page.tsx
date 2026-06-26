@@ -626,7 +626,7 @@ export default function OrdersPage() {
         {/* Review Modal */}
         {showReviewModal && reviewingOrder && (
           <div className="fixed inset-0 bg-heading/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-            <div className="bg-surface-elevated rounded-2xl max-w-lg w-full p-6 my-8">
+            <div className="bg-surface-elevated rounded-2xl max-w-lg w-full p-6 my-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
               <h2 className="text-xl font-bold text-heading mb-4">{t('review.reviewOrder')}</h2>
 
               {/* Product Section */}
