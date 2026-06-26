@@ -768,7 +768,10 @@ export default function Home() {
               >
                 <div
                   className="w-24 h-14 sm:w-28 sm:h-16 bg-surface-elevated border border-border hover:border-primary-300 flex items-center justify-center p-2.5 transition-all hover:shadow-sm relative"
-                  style={{ borderRadius: "4px" }}
+                  // position:relative inline — FOUC anında (CSS yüklenmeden) içteki
+                  // next/image `fill` viewport'a şişmesin; .relative class'ı CSS
+                  // gelene kadar uygulanmıyordu.
+                  style={{ position: "relative", borderRadius: "4px" }}
                 >
                   {brand.logoUrl ? (
                     <OptimizedImage
