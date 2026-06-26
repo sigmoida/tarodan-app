@@ -483,7 +483,7 @@
     "statusCancelled": "Cancelled",
     "statusRefunded": "Refunded",
     "statusPaid": "Paid",
-    "statusProcessing": "Processing",
+    "statusProcessing": "Preparing",
     "noOrders": "No orders yet",
     "viewOrder": "View Order",
     "orderCancelled": "Order cancelled",

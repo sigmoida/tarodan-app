@@ -17,6 +17,7 @@ import { AdminTabs } from '@/components/AdminTabs';
 import { DataTable } from '@/components/DataTable';
 import { Pagination } from '@/components/Pagination';
 import { useAdminResource } from '@/hooks/useAdminResource';
+import { describeHoldReason, type EscrowHoldReason } from '@/lib/escrow';
 
 // ─── Tipler ────────────────────────────────────────────────────────────────
 
@@ -80,6 +81,46 @@ function formatDate(s: string | null) {
     dateStyle: 'short',
     timeZone: 'Europe/Istanbul',
   });
+}
+
+// ─── Hold bekleme nedeni ─────────────────────────────────────────────────────
+// Payout satırları frozenByRefundId taşımadığından çıkarımla:
+//  - releaseAt yok            → teslim bekleniyor (escrow saati başlamadı)
+//  - releaseAt gelecekte      → teslim+14 (+1 grace) dolmadı
+//  - releaseAt geçmişte+held  → açık iade/kilit (cron normalde serbest bırakırdı)
+function holdReasonForRow(args: {
+  status: string;
+  releaseAt: string | null;
+}): EscrowHoldReason | null {
+  if (args.status !== 'held') return null;
+  const overdue =
+    args.releaseAt != null && new Date(args.releaseAt).getTime() <= Date.now();
+  return describeHoldReason({
+    hasOpenRefund: overdue,
+    releaseAt: args.releaseAt,
+    deliveredAt: args.releaseAt ? new Date().toISOString() : null,
+  });
+}
+
+const reasonToneClass: Record<string, string> = {
+  danger: 'bg-danger-50 text-danger-700 border-danger-200',
+  warning: 'bg-warning-50 text-warning-700 border-warning-200',
+  info: 'bg-info-50 text-info-700 border-info-200',
+  success: 'bg-success-50 text-success-700 border-success-200',
+};
+
+function HoldReasonBadge({ reason }: { reason: EscrowHoldReason | null }) {
+  if (!reason) return <span className="text-xs text-muted">—</span>;
+  return (
+    <span
+      title={reason.detail}
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${
+        reasonToneClass[reason.tone] ?? reasonToneClass.info
+      }`}
+    >
+      {reason.label}
+    </span>
+  );
 }
 
 // ─── Sekmeler ──────────────────────────────────────────────────────────────
@@ -241,10 +282,25 @@ export default function PayoutsPage() {
       },
     },
     {
+      header: 'Bekleme Nedeni',
+      cell: ({ row }) => {
+        const t = row.original as PayoutTransaction;
+        return (
+          <HoldReasonBadge
+            reason={holdReasonForRow({ status: t.status, releaseAt: t.releaseAt })}
+          />
+        );
+      },
+    },
+    {
       id: 'actions',
       header: 'İşlem',
       cell: ({ row }) => {
         const t = row.original as PayoutTransaction;
+        const reason = holdReasonForRow({ status: t.status, releaseAt: t.releaseAt });
+        // Frozen / açık iade varken serbest bırakma engellenir (backend de reddeder).
+        const blocked =
+          reason?.code === 'frozen' || reason?.code === 'open_refund';
         return (
           <ActionButtons>
             {t.status === 'held' && (
@@ -252,7 +308,12 @@ export default function PayoutsPage() {
                 variant="secondary"
                 type="button"
                 onClick={() => handleRelease(t.orderId)}
-                disabled={releasingOrderId === t.orderId}
+                disabled={releasingOrderId === t.orderId || blocked}
+                title={
+                  blocked
+                    ? 'Açık iade / kilit nedeniyle serbest bırakılamaz'
+                    : undefined
+                }
                 className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-400 disabled:opacity-50"
               >
                 <CheckCircleIcon className="h-4 w-4" />
@@ -298,6 +359,17 @@ export default function PayoutsPage() {
           {formatDate((row.original as ScheduleItem).releaseAt)}
         </span>
       ),
+    },
+    {
+      header: 'Bekleme Nedeni',
+      cell: ({ row }) => {
+        const s = row.original as ScheduleItem;
+        return (
+          <HoldReasonBadge
+            reason={holdReasonForRow({ status: 'held', releaseAt: s.releaseAt })}
+          />
+        );
+      },
     },
   ];
 

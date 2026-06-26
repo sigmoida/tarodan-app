@@ -407,7 +407,12 @@ export type RefundReason =
 export const refundsApi = {
   create: (
     orderId: string,
-    body: { reason: RefundReason; description?: string; evidencePhotoUrls?: string[] },
+    body: {
+      reason: RefundReason;
+      description?: string;
+      evidencePhotoUrls?: string[];
+      refundQuantity?: number;
+    },
   ) => api.post(`/orders/${orderId}/refund-requests`, body),
   myRequests: () => api.get('/refund-requests/me'),
   sellerRequests: () => api.get('/refund-requests/seller'),

@@ -482,7 +482,7 @@
     "statusCancelled": "İptal Edildi",
     "statusRefunded": "İade Edildi",
     "statusPaid": "Ödendi",
-    "statusProcessing": "İşleniyor",
+    "statusProcessing": "Hazırlanıyor",
     "noOrders": "Henüz siparişiniz yok",
     "viewOrder": "Siparişi Gör",
     "orderCancelled": "Sipariş iptal edildi",

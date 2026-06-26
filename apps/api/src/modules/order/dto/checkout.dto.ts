@@ -9,6 +9,9 @@ import {
   ArrayMinSize,
   ArrayMaxSize,
   Matches,
+  IsInt,
+  Min,
+  Max,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type, Transform } from 'class-transformer';
@@ -43,6 +46,13 @@ export class CheckoutItemDto {
   @ApiProperty({ description: 'Satın alınacak ürün ID' })
   @IsUUID('4', { message: 'Geçerli bir ürün ID giriniz' })
   productId: string;
+
+  @ApiPropertyOptional({ description: 'Adet (varsayılan 1)', default: 1, minimum: 1 })
+  @IsOptional()
+  @IsInt({ message: 'Adet tam sayı olmalıdır' })
+  @Min(1, { message: 'Adet en az 1 olmalıdır' })
+  @Max(20, { message: 'Tek üründen en fazla 20 adet alınabilir' })
+  quantity?: number;
 }
 
 /**

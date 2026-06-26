@@ -22,11 +22,12 @@ export class UpdateOrderStatusDto {
 }
 
 export class CancelOrderDto {
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'Kullanıcı talebi ile iptal',
-    description: 'Cancellation reason',
+    description: 'Cancellation reason (optional; defaults to a generic reason)',
   })
-  @IsString({ message: 'İptal nedeni zorunludur' })
+  @IsOptional()
+  @IsString()
   @MaxLength(500, { message: 'İptal nedeni en fazla 500 karakter olabilir' })
-  reason: string;
+  reason?: string;
 }

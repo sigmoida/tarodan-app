@@ -84,6 +84,13 @@ export class PayoutService {
       const payment = hold.payment;
       if (!payment?.order) continue;
 
+      // Adet bazlı kısmi iade: satıcıya yalnız iade EDİLMEYEN kısım ödenir.
+      const netPayout = Number(hold.amount) - Number(hold.refundedAmount ?? 0);
+      if (netPayout <= 0.01) {
+        // Tamamı iade edilmiş → ödeme yapma (hold zaten cancelled olmalı; emniyet).
+        continue;
+      }
+
       const merchantOid =
         payment.providerConversationId?.trim() ||
         payment.order.orderNumber.replace(/-/g, '');
@@ -97,7 +104,7 @@ export class PayoutService {
           sellerId: hold.sellerId,
           amount: payment.order.totalAmount,
           commission: payment.order.commissionAmount,
-          netAmount: hold.amount,
+          netAmount: netPayout,
           merchantOid,
           transId,
           transferIban: bankAccount?.iban || '',

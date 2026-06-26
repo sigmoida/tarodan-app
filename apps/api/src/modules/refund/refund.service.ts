@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import {
   OrderStatus,
+  PaymentHoldStatus,
   PaymentStatus,
   Prisma,
   RefundReason,
@@ -168,16 +169,10 @@ export class RefundService {
   }
 
   async createRefundRequest(orderId: string, requesterId: string, dto: CreateRefundRequestDto) {
-    // Senaryo D kaldırıldı (Faz 5 sonrası karar): keyfi vazgeçme talebi
-    // kabul edilmiyor. Alıcı sadece somut bir sorun bildirebilir (hasar,
-    // yanlış ürün, eksik, sahte, kargoda kaybolma vb.). Cayma hakkı 14 günlük
-    // pencere içinde "not_as_described" veya "other" + açıklama ile değerlendirilir.
-    if ((dto.reason as any) === 'changed_mind') {
-      throw new BadRequestException(
-        'Keyfi vazgeçme iade gerekçesi olarak kabul edilmiyor. Ürünle ilgili somut bir sorun varsa lütfen uygun bir sebep seçin.',
-      );
-    }
-
+    // KOŞULSUZ 14 GÜN İADE (Mesafeli Satış cayma hakkı): teslimden sonraki 14 gün
+    // içinde sebep belirtmeden (changed_mind dahil) ve kanıt fotoğrafı olmadan iade
+    // edilebilir. changed_mind reddi KALDIRILDI; sebep/foto zorunluluğu yalnızca
+    // 14 gün GEÇTİKTEN sonra (past_cooling_off) uygulanır.
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -228,37 +223,29 @@ export class RefundService {
       throw new BadRequestException('Bu sipariş için zaten aktif bir iade talebi var');
     }
 
+    // Adet bazlı kısmi iade: istenen adet (verilmezse tümü), sipariş adediyle sınırlı.
+    const orderQty = (order as any).quantity ?? 1;
+    const reqQty = Math.min(Math.max(dto.refundQuantity ?? orderQty, 1), orderQty);
+
     const phase = this.classifyOrderPhase(order);
 
     if (phase === 'preparing' || phase === 'paid') {
-      return this.createInstantRefund(order, requesterId, dto);
+      return this.createInstantRefund(order, requesterId, dto, reqQty);
     }
 
     if (phase === 'in_cooling_off') {
-      const evidenceMissing =
-        REASONS_REQUIRING_EVIDENCE.includes(dto.reason) &&
-        (!dto.evidencePhotoUrls || dto.evidencePhotoUrls.length === 0);
-      if (evidenceMissing) {
-        throw new BadRequestException(
-          'Hasarlı / yanlış ürün talebi için en az bir kanıt fotoğrafı gereklidir',
-        );
-      }
-      return this.createCoolingOffRefund(order, requesterId, dto);
+      // KOŞULSUZ: 14 gün içinde kanıt fotoğrafı ZORUNLU DEĞİL (cayma hakkı).
+      // İsteyen yine de foto/açıklama ekleyebilir; otomatik onaylanır.
+      return this.createCoolingOffRefund(order, requesterId, dto, reqQty);
     }
 
     if (phase === 'past_cooling_off') {
-      if (!dto.description || dto.description.trim().length < 20) {
-        throw new BadRequestException(
-          '14 günlük cayma süresi dolmuştur. Açıklama (en az 20 karakter) zorunludur',
-        );
-      }
-      if (
-        REASONS_REQUIRING_EVIDENCE.includes(dto.reason) &&
-        (!dto.evidencePhotoUrls || dto.evidencePhotoUrls.length === 0)
-      ) {
-        throw new BadRequestException('Hasar/yanlış ürün talebi için kanıt fotoğrafı gereklidir');
-      }
-      return this.createDisputedRefund(order, requesterId, dto);
+      // 14 GÜNDEN SONRA İADE YOK: cayma penceresi kapandıktan sonra alıcı iade
+      // talebi oluşturamaz. (Escrow de gün 15'te payout ettiği için bu kural
+      // sayesinde payout anında asla açık/açılabilir iade kalmaz.)
+      throw new BadRequestException(
+        '14 günlük iade süresi dolmuştur; bu sipariş için artık iade talebi oluşturulamaz.',
+      );
     }
 
     throw new BadRequestException('Bu sipariş durumunda iade talebi oluşturulamaz');
@@ -289,6 +276,8 @@ export class RefundService {
         decidedBy: requesterId,
       },
     });
+    // İade iptal edildi → hold kilidini kaldır, normal escrow akışına dönsün.
+    await this.unfreezeHoldForRefund(rr.order.id);
     await this.appendHistory(refundRequestId, {
       action: 'cancelled_by_buyer',
       by: requesterId,
@@ -473,8 +462,9 @@ export class RefundService {
       include: {
         order: {
           include: {
-            buyer: { include: { addresses: { where: { isDefault: true }, take: 1 } } },
-            seller: { include: { addresses: { where: { isDefault: true }, take: 1 } } },
+            // Default adres yoksa default-olmayan adresi de kullan (default önce).
+            buyer: { include: { addresses: { orderBy: { isDefault: 'desc' }, take: 1 } } },
+            seller: { include: { addresses: { orderBy: { isDefault: 'desc' }, take: 1 } } },
           },
         },
       },
@@ -485,13 +475,21 @@ export class RefundService {
       return rr;
     }
 
+    // Alıcı (iade alım noktası): önce siparişin TESLİMAT adresi (ürün oraya gitti →
+    // iade oradan alınır), yoksa alıcının kayıtlı adresi.
     const buyerAddr =
-      rr.order.buyer.addresses[0] ?? this.fallbackAddressFromOrderJson(rr.order.shippingAddress);
-    const sellerAddr = rr.order.seller.addresses[0];
+      this.fallbackAddressFromOrderJson(rr.order.shippingAddress) ??
+      rr.order.buyer.addresses[0];
+    // Satıcı (iade teslim noktası): satıcının kayıtlı adresi; YOKSA Tarodan deposu
+    // (çoğu satıcı/platform mağazası kayıtlı adres tutmaz → iade bloke olmasın/askıda
+    // kalmasın). Depo adresi env'den (varsayılanlarla) gelir, takas akışıyla aynı kaynak.
+    const sellerAddr =
+      rr.order.seller.addresses[0] ?? this.warehouseReturnAddress();
 
-    if (!buyerAddr || !sellerAddr) {
+    // Yalnız alıcı adresi gerçekten bulunamazsa iade kargosu açılamaz.
+    if (!buyerAddr) {
       throw new BadRequestException(
-        'Alıcı veya satıcı adresi bulunamadı, iade kargosu oluşturulamaz',
+        'Alıcının teslimat/kayıtlı adresi bulunamadı, iade kargosu oluşturulamaz. Alıcı bir adres eklemeli.',
       );
     }
 
@@ -591,7 +589,7 @@ export class RefundService {
     const refundResult = await this.paymentService.processRefund(
       rr.orderId,
       Number(rr.amount),
-      { skipRefundEvent: true }, // REFUND_COMPLETED'ı aşağıda kendimiz gönderiyoruz
+      { skipRefundEvent: true, refundQuantity: rr.refundQuantity }, // REFUND_COMPLETED'ı aşağıda kendimiz gönderiyoruz
     );
 
     const updated = await this.prisma.refundRequest.update({
@@ -603,6 +601,13 @@ export class RefundService {
         returnDeliveredAt: rr.returnDeliveredAt ?? new Date(),
       },
     });
+
+    // Hold (adet bazlı) tüketimi processRefund içinde tek otoriteden yapıldı.
+    // Kargo sonrası gerçek İADE → raporlama ayrımı.
+    await this.prisma.order.update({
+      where: { id: rr.orderId },
+      data: { cancellationType: 'iade' },
+    }).catch(() => undefined);
     await this.appendHistory(rr.id, {
       action: 'refund_completed',
       by: 'system',
@@ -805,13 +810,51 @@ export class RefundService {
     return 'unknown';
   }
 
+  /**
+   * Adet bazlı iade tutarı: tam siparişte (refundQuantity >= orderQuantity)
+   * totalAmount'ın tamamı; kısmi adette orantılı (totalAmount * adet / siparişAdedi).
+   */
+  private computeRefundAmount(
+    order: { totalAmount: Prisma.Decimal; quantity?: number },
+    refundQuantity: number,
+  ): number {
+    const total = Number(order.totalAmount);
+    const orderQty = order.quantity ?? 1;
+    if (refundQuantity >= orderQty || orderQty <= 1) return total;
+    return Math.round(((total * refundQuantity) / orderQty) * 100) / 100;
+  }
+
+  // ── PaymentHold kilit yardımcıları (escrow ↔ iade çakışmasını önler) ──
+
+  /**
+   * İade açıldığında satıcı PaymentHold'unu kilitle: hiçbir release yolu
+   * frozenByRefundId dolu bir hold'u serbest bırakamaz (releaseHoldsDue hem
+   * dueHolds filtresinde hem atomik updateMany guard'ında kontrol eder). Bu,
+   * "14. günün son saniyesinde iade + payout çoktan gitti" yarışını kapatır.
+   */
+  private async freezeHoldForRefund(orderId: string, refundRequestId: string): Promise<void> {
+    await this.prisma.paymentHold.updateMany({
+      where: { orderId, status: PaymentHoldStatus.held },
+      data: { frozenByRefundId: refundRequestId },
+    });
+  }
+
+  /** İade reddedilir/iptal edilirse hold kilidini kaldır → normal escrow akışına döner. */
+  private async unfreezeHoldForRefund(orderId: string): Promise<void> {
+    await this.prisma.paymentHold.updateMany({
+      where: { orderId, status: PaymentHoldStatus.held, NOT: { frozenByRefundId: null } },
+      data: { frozenByRefundId: null },
+    });
+  }
+
   private async createInstantRefund(
-    order: { id: string; totalAmount: Prisma.Decimal; orderNumber: string },
+    order: { id: string; totalAmount: Prisma.Decimal; orderNumber: string; quantity?: number },
     requesterId: string,
     dto: CreateRefundRequestDto,
+    refundQuantity = 1,
   ) {
     const refundNumber = await this.generateRefundNumber();
-    const amount = Number(order.totalAmount);
+    const amount = this.computeRefundAmount(order, refundQuantity);
 
     const created = await this.prisma.refundRequest.create({
       data: {
@@ -822,6 +865,7 @@ export class RefundService {
         description: dto.description ?? null,
         evidencePhotoUrls: dto.evidencePhotoUrls ?? [],
         amount,
+        refundQuantity,
         status: RefundRequestStatus.approved,
       },
     });
@@ -830,6 +874,7 @@ export class RefundService {
     try {
       refundResult = await this.paymentService.processRefund(order.id, amount, {
         skipRefundEvent: true, // REFUND_COMPLETED'ı aşağıda kendimiz gönderiyoruz
+        refundQuantity,
       });
     } catch (err) {
       // Roll back the RefundRequest so the buyer can retry without hitting
@@ -840,6 +885,13 @@ export class RefundService {
       );
       throw err;
     }
+
+    // Hold tüketimi processRefund içinde yapıldı (tek otorite).
+    // Kargo öncesi → İPTAL olarak işaretle (raporlama ayrımı).
+    await this.prisma.order.update({
+      where: { id: order.id },
+      data: { cancellationType: 'iptal' },
+    }).catch(() => undefined);
 
     const updated = await this.prisma.refundRequest.update({
       where: { id: created.id },
@@ -886,12 +938,14 @@ export class RefundService {
       totalAmount: Prisma.Decimal;
       status: OrderStatus;
       shipment: { status: ShipmentStatus } | null;
+      quantity?: number;
     },
     requesterId: string,
     dto: CreateRefundRequestDto,
+    refundQuantity = 1,
   ) {
     const refundNumber = await this.generateRefundNumber();
-    const amount = Number(order.totalAmount);
+    const amount = this.computeRefundAmount(order, refundQuantity);
 
     const created = await this.prisma.refundRequest.create({
       data: {
@@ -902,11 +956,15 @@ export class RefundService {
         description: dto.description ?? null,
         evidencePhotoUrls: dto.evidencePhotoUrls ?? [],
         amount,
+        refundQuantity,
         status: RefundRequestStatus.wait_for_delivery,
         decidedBy: 'system',
         decidedAt: new Date(),
       },
     });
+
+    // İade açıldı → satıcı hold'unu kilitle (payout bu iade kapanana kadar bloke).
+    await this.freezeHoldForRefund(order.id, created.id);
 
     // 14 gün cayma hakkı → otomatik onay. Alıcıya talebinin onaylandığını bildir
     // (önceden talep anında hiç bildirim yoktu). in_app + push + mail.
@@ -931,12 +989,13 @@ export class RefundService {
   }
 
   private async createDisputedRefund(
-    order: { id: string; totalAmount: Prisma.Decimal },
+    order: { id: string; totalAmount: Prisma.Decimal; quantity?: number },
     requesterId: string,
     dto: CreateRefundRequestDto,
+    refundQuantity = 1,
   ) {
     const refundNumber = await this.generateRefundNumber();
-    const amount = Number(order.totalAmount);
+    const amount = this.computeRefundAmount(order, refundQuantity);
 
     const created = await this.prisma.refundRequest.create({
       data: {
@@ -947,9 +1006,14 @@ export class RefundService {
         description: dto.description ?? null,
         evidencePhotoUrls: dto.evidencePhotoUrls ?? [],
         amount,
+        refundQuantity,
         status: RefundRequestStatus.pending_review,
       },
     });
+
+    // İade açıldı → satıcı hold'unu kilitle (payout bu iade kapanana kadar bloke).
+    await this.freezeHoldForRefund(order.id, created.id);
+
     // Satıcıya "iade talebi alındı, incele" — mail + bell/push (önceden sadece mail).
     const disputeSeller = await this.prisma.order.findUnique({
       where: { id: order.id },
@@ -983,6 +1047,23 @@ export class RefundService {
       city: String(j.city),
       district: String(j.district),
       phone: String(j.phone),
+    };
+  }
+
+  /**
+   * Satıcının kayıtlı adresi olmadığında iade kargosunun gideceği Tarodan deposu
+   * adresi. Takas akışıyla (trade.service) aynı env kaynağını kullanır; env yoksa
+   * mantıklı varsayılanlara düşer (asla null dönmez) → adressiz satıcı iadeyi bloke etmez.
+   */
+  private warehouseReturnAddress() {
+    return {
+      fullName: process.env.TARODAN_WAREHOUSE_NAME?.trim() || 'Tarodan Depo',
+      address:
+        process.env.TARODAN_WAREHOUSE_ADDRESS?.trim() ||
+        'Tarodan Merkez Depo Adresi',
+      city: process.env.TARODAN_WAREHOUSE_CITY?.trim() || 'Istanbul',
+      district: process.env.TARODAN_WAREHOUSE_DISTRICT?.trim() || 'Maltepe',
+      phone: process.env.TARODAN_WAREHOUSE_PHONE?.trim() || '05000000000',
     };
   }
 

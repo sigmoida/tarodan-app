@@ -80,6 +80,7 @@ describe('PaymentService group payment (checkout group)', () => {
   };
   const mockEvents = {
     emitOrderPaid: jest.fn(),
+    emitGroupBuyerOrderPaid: jest.fn(),
     emitPaymentFailed: jest.fn(),
   };
 
@@ -184,9 +185,20 @@ describe('PaymentService group payment (checkout group)', () => {
     // Ledger sipariş başına
     expect(mockCommissionLedger.upsertPending).toHaveBeenCalledTimes(2);
 
-    // Tx sonrası: sipariş başına order.paid + shipment
+    // Tx sonrası: sipariş başına order.paid (SATICI tarafı) + shipment
     expect(mockEvents.emitOrderPaid).toHaveBeenCalledTimes(2);
     expect(mockPrisma.shipment.create).toHaveBeenCalledTimes(2);
+
+    // ALICI tarafı: grup başına TEK onay maili (ürün başına değil)
+    expect(mockEvents.emitGroupBuyerOrderPaid).toHaveBeenCalledTimes(1);
+    const groupBuyerArg = mockEvents.emitGroupBuyerOrderPaid.mock.calls[0][0];
+    expect(groupBuyerArg.items).toHaveLength(2);
+    expect(groupBuyerArg.buyerId).toBe('buyer-1');
+
+    // Sipariş başına emitOrderPaid alıcıyı atlamalı (skipBuyer:true)
+    for (const call of mockEvents.emitOrderPaid.mock.calls) {
+      expect(call[0].skipBuyer).toBe(true);
+    }
   });
 
   it('does NOT cascade-cancel siblings when physical stock remains (q=1, r=1 → available=0)', async () => {

@@ -45,7 +45,7 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
   },
   [NotificationType.ORDER_DELIVERED]: {
     title: 'Siparişiniz Teslim Edildi',
-    message: 'Siparişiniz teslim edildi. Lütfen onaylayın ve değerlendirin.',
+    message: 'Siparişiniz teslim edildi; teslim tarihinden itibaren 14 gün içinde koşulsuz iade hakkınız var.',
     icon: '✅',
     link: '/orders/{{orderId}}',
   },
@@ -89,7 +89,7 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
   // 48h pencere (Faz 3B.1)
   [NotificationType.ORDER_DELIVERED_CONFIRM]: {
     title: 'Siparişin teslim edildi',
-    message: '48 saat içinde sorun varsa bildir veya "Sorun yok" ile onayla. Süre dolunca otomatik tamamlanacak.',
+    message: 'Siparişiniz teslim edildi; teslim tarihinden itibaren 14 gün içinde koşulsuz iade hakkınız var. Süre dolunca sipariş otomatik tamamlanır.',
     icon: '📦',
     link: '/orders/{{orderId}}',
   },
@@ -101,7 +101,7 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
   },
   [NotificationType.ORDER_MANUALLY_CONFIRMED]: {
     title: 'Alıcı siparişini onayladı',
-    message: 'Alıcı siparişi erken onayladı. Ödemen kısa süre içinde hesabına transfer edilecek.',
+    message: 'Alıcı siparişi onayladı. Ödemeniz, teslimden 14 gün sonra (iade süresi dolunca) hesabınıza aktarılır.',
     icon: '💸',
     link: '/orders/{{orderId}}',
   },

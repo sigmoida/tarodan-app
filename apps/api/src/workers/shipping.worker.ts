@@ -158,6 +158,12 @@ export class ShippingWorker {
               confirmationDeadline,
             },
           });
+          // Escrow saatini teslimden başlat: hold release = teslim + return + grace.
+          try {
+            await this.paymentService.scheduleHoldReleaseOnDelivery(shipment.orderId, deliveredAt);
+          } catch (e: any) {
+            this.logger.warn(`scheduleHoldRelease failed (track-update) for ${shipment.orderId}: ${e?.message}`);
+          }
           this.logger.log(
             `Order ${shipment.orderId} entered 48h window (track-update); deadline=${confirmationDeadline.toISOString()}`,
           );
@@ -179,16 +185,17 @@ export class ShippingWorker {
             );
           }
         } else {
-          // Legacy: delivered + immediate hold release
+          // Yeni escrow: teslimde ANINDA release YOK. deliveredAt set edilir ve
+          // hold release = teslim + return + grace olarak zamanlanır.
+          const deliveredAt = new Date();
           await this.prisma.order.update({
             where: { id: shipment.orderId },
-            data: { status: OrderStatus.delivered },
+            data: { status: OrderStatus.delivered, deliveredAt },
           });
           try {
-            const released = await this.paymentService.releasePaymentIfHeld(shipment.orderId);
-            if (released) this.logger.log(`Payment hold released for order ${shipment.orderId} (track-update)`);
+            await this.paymentService.scheduleHoldReleaseOnDelivery(shipment.orderId, deliveredAt);
           } catch (e: any) {
-            this.logger.warn(`Could not release payment for order ${shipment.orderId}: ${e?.message}`);
+            this.logger.warn(`scheduleHoldRelease failed (track-update legacy) for order ${shipment.orderId}: ${e?.message}`);
           }
         }
       }
@@ -278,6 +285,12 @@ export class ShippingWorker {
               confirmationDeadline,
             },
           });
+          // Escrow saatini teslimden başlat: hold release = teslim + return + grace.
+          try {
+            await this.paymentService.scheduleHoldReleaseOnDelivery(shipment.orderId, deliveredAt);
+          } catch (e: any) {
+            this.logger.warn(`scheduleHoldRelease failed (webhook) for ${shipment.orderId}: ${e?.message}`);
+          }
           this.logger.log(
             `Order ${shipment.orderId} entered 48h window (webhook); deadline=${confirmationDeadline.toISOString()}`,
           );
@@ -299,16 +312,18 @@ export class ShippingWorker {
             );
           }
         } else {
-          // Legacy: delivered + immediate hold release
+          // Yeni escrow: teslimde ANINDA release YOK. deliveredAt set edilir ve
+          // hold release = teslim + return + grace olarak zamanlanır; satıcıya
+          // ödeme yalnızca o tarihten sonra + açık iade yokken cron ile yapılır.
+          const deliveredAt = new Date();
           await this.prisma.order.update({
             where: { id: shipment.orderId },
-            data: { status: OrderStatus.delivered },
+            data: { status: OrderStatus.delivered, deliveredAt },
           });
           try {
-            const released = await this.paymentService.releasePaymentIfHeld(shipment.orderId);
-            if (released) this.logger.log(`Payment hold released for order ${shipment.orderId} (webhook)`);
+            await this.paymentService.scheduleHoldReleaseOnDelivery(shipment.orderId, deliveredAt);
           } catch (e: any) {
-            this.logger.warn(`Could not release payment for order ${shipment.orderId}: ${e?.message}`);
+            this.logger.warn(`scheduleHoldRelease failed (legacy) for order ${shipment.orderId}: ${e?.message}`);
           }
         }
       }

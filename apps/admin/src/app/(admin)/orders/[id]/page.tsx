@@ -28,9 +28,7 @@ import {
 } from '@tarodan/ui';
 import { AdminFinancialSummary } from '@/components/AdminFinancialSummary';
 import { colors as dsColors } from '@tarodan/ui';
-import { AwaitingConfirmationCard } from '@/components/orders/AwaitingConfirmationCard';
-import { ExtendConfirmationDialog } from '@/components/orders/ExtendConfirmationDialog';
-import { ForceCompleteDialog } from '@/components/orders/ForceCompleteDialog';
+import { EscrowStatusCard } from '@/components/orders/EscrowStatusCard';
 
 interface OrderDetail {
   id: string;
@@ -91,12 +89,16 @@ interface OrderDetail {
   updatedAt: string;
   cancelReason?: string | null;
   offerId?: string | null;
-  // 48h pencere (Faz 1.2)
+  // Adet (sepet çoklu-adet); çoğu üründe 1. Kısmi iade buna dayanır.
+  quantity?: number | null;
+  // Escrow modeli alanları
   deliveredAt?: string | null;
-  confirmationDeadline?: string | null;
-  buyerConfirmedAt?: string | null;
-  buyerConfirmationType?: string | null;
   completedAt?: string | null;
+  // İptal (kargo öncesi) | İade (kargo sonrası)
+  cancellationType?: string | null;
+  /** Açık iade talebi → rozet "İade Sürecinde" (sipariş 'delivered' kalsa bile).
+   *  API detayda doğrudan vermezse status='refund_requested' fallback kullanılır. */
+  activeRefundRequest?: { id: string; status: string; refundNumber?: string } | null;
 }
 
 const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
@@ -105,7 +107,8 @@ const statusConfig: Record<string, { label: string; color: string; bg: string }>
   preparing: { label: 'Hazırlanıyor', color: 'text-primary-600', bg: 'bg-primary-100' },
   shipped: { label: 'Kargoda', color: 'text-info-600', bg: 'bg-info-100' },
   delivered: { label: 'Teslim Edildi', color: 'text-success-600', bg: 'bg-success-100' },
-  awaiting_buyer_confirmation: { label: 'Alıcı Onayı Bekleniyor (48h)', color: 'text-warning-600', bg: 'bg-warning-100' },
+  awaiting_buyer_confirmation: { label: 'İade Penceresinde (14 gün)', color: 'text-warning-600', bg: 'bg-warning-100' },
+  refund_requested: { label: 'İade Talebi Açık', color: 'text-danger-600', bg: 'bg-danger-100' },
   completed: { label: 'Tamamlandı', color: 'text-success-600', bg: 'bg-success-100' },
   cancelled: { label: 'İptal', color: 'text-danger-600', bg: 'bg-danger-100' },
   refunded: { label: 'İade Edildi', color: 'text-muted', bg: 'bg-surface-alt' },
@@ -121,11 +124,6 @@ export default function OrderDetailPage() {
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [newStatus, setNewStatus] = useState('');
   const [processing, setProcessing] = useState(false);
-  // 48h pencere (Faz 4A.5)
-  const [extendOpen, setExtendOpen] = useState(false);
-  const [forceOpen, setForceOpen] = useState(false);
-  const [extending, setExtending] = useState(false);
-  const [forcing, setForcing] = useState(false);
 
   const invoiceRef = useRef<HTMLDivElement>(null);
 
@@ -150,34 +148,18 @@ export default function OrderDetailPage() {
     }
   };
 
-  // 48h pencere handler'ları (Faz 4A.5)
-  const handleExtend = async (payload: { hours: number; reason?: string }) => {
-    setExtending(true);
-    try {
-      const res = await adminApi.extendOrderConfirmation(orderId, payload);
-      toast.success(
-        `Pencere uzatıldı — yeni son tarih: ${new Date(
-          (res.data as any).newDeadline,
-        ).toLocaleString('tr-TR')}`,
-      );
-      await loadOrder();
-    } finally {
-      setExtending(false);
-    }
-  };
-
-  const handleForceComplete = async (payload: { reason?: string }) => {
-    setForcing(true);
-    try {
-      await adminApi.forceCompleteOrder(orderId, payload.reason);
-      toast.success('Sipariş manuel tamamlandı.');
-      await loadOrder();
-    } finally {
-      setForcing(false);
-    }
-  };
-
   const handleStatusUpdate = async () => {
+    // Kargo sonrası iptal (IPTAL) engellenir — bu aşamada İADE akışı geçerli.
+    if (
+      newStatus === 'cancelled' &&
+      order != null &&
+      ['shipped', 'delivered', 'awaiting_buyer_confirmation', 'completed', 'refund_requested', 'refunded'].includes(
+        order.status,
+      )
+    ) {
+      toast.error('Kargo sonrası iptal yapılamaz — iade akışını kullanın.');
+      return;
+    }
     setProcessing(true);
     try {
       await adminApi.updateOrderStatus(orderId, newStatus);
@@ -305,7 +287,56 @@ export default function OrderDetailPage() {
     );
   }
 
-  const statusInfo = statusConfig[order.status] || statusConfig.pending_payment;
+  // Durum türevleri — liste rozetiyle aynı öncelik: aktif iade > iptal > normal.
+  // Açık iade: API detayda activeRefundRequest verirse onu, vermezse status fallback'i.
+  const hasActiveRefund =
+    !!order.activeRefundRequest || order.status === 'refund_requested';
+  // cancellationType='iptal' (kargo öncesi iptal): status 'refunded'/'cancelled' olsa da
+  // bu bir İADE değil İPTAL'dir. status='cancelled' de iptal sayılır.
+  const isCancelledOrder =
+    order.cancellationType === 'iptal' || order.status === 'cancelled';
+  const isDeliveredOrCompleted = ['delivered', 'completed'].includes(order.status);
+
+  // Ana rozet (öncelik: aktif iade > iptal > normal). Kargo öncesi iptalde status para
+  // akışı için 'refunded' olabilir; 'iptal' ise "İade Edildi" değil "İptal Edildi".
+  const statusInfo = hasActiveRefund
+    ? { label: 'İade Sürecinde', color: 'text-danger-600', bg: 'bg-danger-100' }
+    : order.cancellationType === 'iptal'
+      ? { label: 'İptal Edildi', color: 'text-danger-600', bg: 'bg-danger-100' }
+      : statusConfig[order.status] || statusConfig.pending_payment;
+
+  // GERÇEK gönderi var mı: shipment + trackingNumber dolu + status kargolanmış aşamada,
+  // ve sipariş iptal edilmemiş. Teslim öncesi/iptal placeholder kargosu gösterilmez.
+  const SHIPPED_STATUSES = [
+    'shipped',
+    'delivered',
+    'awaiting_buyer_confirmation',
+    'completed',
+  ];
+  const hasRealShipment =
+    !!order.shipment &&
+    !!order.shipment.trackingNumber &&
+    SHIPPED_STATUSES.includes(order.status) &&
+    !isCancelledOrder;
+
+  // Kargo kartında gösterilecek durum etiketi: sipariş teslim/tamamlanmışsa
+  // shipment.status geride kalsa bile (örn. 'in_transit') "Teslim Edildi" yansıtılır.
+  const shipmentStatusLabel = isDeliveredOrCompleted
+    ? 'Teslim Edildi'
+    : order.shipment?.status
+      ? enumLabel(shipmentStatusConfig, order.shipment.status)
+      : null;
+
+  // Kargo sonrası iptal (IPTAL) yapılamaz — bu noktadan sonra İADE akışı geçerli.
+  // İptal yalnızca kargo öncesi (pending_payment / paid / preparing) mümkündür.
+  const isPostShipping = [
+    'shipped',
+    'delivered',
+    'awaiting_buyer_confirmation',
+    'completed',
+    'refund_requested',
+    'refunded',
+  ].includes(order.status);
 
   return (
       <div className="min-h-screen bg-surface">
@@ -335,8 +366,29 @@ export default function OrderDetailPage() {
             </div>
           </div>
 
-          {/* İptal nedeni + köken (#4): stok bitti / teklif iptali gibi */}
-          {order.status === 'cancelled' && (cancelReasonLabel(order.cancelReason) || order.offerId) && (
+          {/* Açık iade uyarısı/izleyicisi: aktif iade varken (sipariş 'delivered'
+              kalsa bile) öncelikli olarak gösterilir. İptal edilen siparişte gösterilmez. */}
+          {hasActiveRefund && !isCancelledOrder && (
+            <div className="mb-6 rounded-lg border border-danger-200 bg-danger-50 px-4 py-3">
+              <p className="text-sm font-medium text-danger-700">
+                Açık iade talebi — sipariş iade sürecinde
+                {order.activeRefundRequest?.refundNumber
+                  ? ` (${order.activeRefundRequest.refundNumber})`
+                  : ''}
+              </p>
+              <p className="text-xs text-danger-600 mt-0.5">
+                Satıcıya ödeme (payout) iade sonuçlanana kadar bekletilir. Aksiyon için{' '}
+                <Link href="/refunds" className="underline hover:text-danger-700">
+                  İade Talepleri
+                </Link>{' '}
+                sayfasını kullanın.
+              </p>
+            </div>
+          )}
+
+          {/* İptal nedeni + köken (#4): stok bitti / teklif iptali gibi.
+              status='cancelled' veya cancellationType='iptal' (status 'refunded' olsa bile). */}
+          {isCancelledOrder && (cancelReasonLabel(order.cancelReason) || order.offerId) && (
             <div className="mb-6 rounded-lg border border-danger-200 bg-danger-50 px-4 py-3">
               <p className="text-sm font-medium text-danger-700">
                 İptal nedeni: {cancelReasonLabel(order.cancelReason) ?? 'Belirtilmemiş'}
@@ -348,16 +400,17 @@ export default function OrderDetailPage() {
             </div>
           )}
 
-          {/* 48h pencere kartı (Faz 4A.5) */}
-          {(order.status === 'awaiting_buyer_confirmation' || order.buyerConfirmedAt) && (
+          {/* Escrow / satıcı ödemesi durumu (yeni escrow modeli).
+              İptal edilen siparişte EscrowStatusCard kendi içinde "payout oluşmaz" der;
+              ödeme bekleyende hiç gösterilmez. */}
+          {order.status !== 'pending_payment' && (
             <div className="mb-6">
-              <AwaitingConfirmationCard
+              <EscrowStatusCard
+                status={order.status}
                 deliveredAt={order.deliveredAt ?? null}
-                confirmationDeadline={order.confirmationDeadline ?? null}
-                buyerConfirmedAt={order.buyerConfirmedAt ?? null}
-                buyerConfirmationType={order.buyerConfirmationType ?? null}
-                onExtendClick={() => setExtendOpen(true)}
-                onForceCompleteClick={() => setForceOpen(true)}
+                completedAt={order.completedAt ?? null}
+                cancellationType={order.cancellationType ?? null}
+                hasOpenRefund={hasActiveRefund}
               />
             </div>
           )}
@@ -469,30 +522,31 @@ export default function OrderDetailPage() {
                 </div>
               )}
 
-              {/* Shipping Info */}
-              {order.shipment && (
+              {/* Shipping Info — SADECE gerçek gönderi varken (trackingNumber dolu +
+                  kargolanmış aşama) ve sipariş iptal değilken. Teslim öncesi/iptal
+                  placeholder kargosu gösterilmez; teslim/tamamlandıysa durum "Teslim
+                  Edildi" yansıtılır (shipment.status geride kalsa bile). */}
+              {hasRealShipment && order.shipment && (
                 <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
                   <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
                     <TruckIcon className="w-5 h-5" />
                     Kargo Bilgileri
                   </h2>
                   <div className="space-y-2">
-                    {order.shipment.trackingNumber && (
-                      <div className="flex justify-between">
-                        <span className="text-muted">Takip No:</span>
-                        <span className="font-mono text-sm text-heading">{order.shipment.trackingNumber}</span>
-                      </div>
-                    )}
+                    <div className="flex justify-between">
+                      <span className="text-muted">Takip No:</span>
+                      <span className="font-mono text-sm text-heading">{order.shipment.trackingNumber}</span>
+                    </div>
                     {order.shipment.carrier && (
                       <div className="flex justify-between">
                         <span className="text-muted">Kargo Firması:</span>
                         <span className="text-heading">{enumLabel(shipmentProviderConfig, order.shipment.carrier)}</span>
                       </div>
                     )}
-                    {order.shipment.status && (
+                    {shipmentStatusLabel && (
                       <div className="flex justify-between">
                         <span className="text-muted">Durum:</span>
-                        <span className="font-medium text-heading">{enumLabel(shipmentStatusConfig, order.shipment.status)}</span>
+                        <span className="font-medium text-heading">{shipmentStatusLabel}</span>
                       </div>
                     )}
                   </div>
@@ -612,9 +666,17 @@ export default function OrderDetailPage() {
                   <option value="shipped">Kargoda</option>
                   <option value="delivered">Teslim Edildi</option>
                   <option value="completed">Tamamlandı</option>
-                  <option value="cancelled">İptal</option>
+                  <option value="cancelled" disabled={isPostShipping}>
+                    İptal{isPostShipping ? ' (kargo sonrası kapalı)' : ''}
+                  </option>
                   <option value="refunded">İade Edildi</option>
                 </Select>
+                {isPostShipping && (
+                  <p className="mt-2 text-xs text-muted">
+                    Kargo sonrası iptal yapılamaz. Bu aşamada iade için İade Talepleri
+                    akışını kullanın.
+                  </p>
+                )}
               </div>
               <div className="flex gap-3">
                 <Button variant="secondary" onClick={() => setShowStatusModal(false)}
@@ -631,20 +693,6 @@ export default function OrderDetailPage() {
             </div>
           </div>
         )}
-
-        {/* 48h pencere dialog'ları (Faz 4A.5) */}
-        <ExtendConfirmationDialog
-          open={extendOpen}
-          onClose={() => setExtendOpen(false)}
-          onConfirm={handleExtend}
-          loading={extending}
-        />
-        <ForceCompleteDialog
-          open={forceOpen}
-          onClose={() => setForceOpen(false)}
-          onConfirm={handleForceComplete}
-          loading={forcing}
-        />
       </div>
   );
 }

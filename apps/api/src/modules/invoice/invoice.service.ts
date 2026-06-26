@@ -186,6 +186,7 @@ export class InvoiceService {
         seller: true,
         product: { select: { title: true, categoryId: true } },
         payment: true,
+        checkoutGroup: { include: { payment: true } },
       },
     });
 
@@ -222,6 +223,8 @@ export class InvoiceService {
     }
 
     // Build invoice data
+    // Ödeme tek üründe bile checkout group üzerinden bağlanır (order.payment genelde null).
+    const pay = order.payment ?? (order as any).checkoutGroup?.payment ?? null;
     const invoiceData: InvoiceData = {
       invoiceNumber,
       invoiceDate: new Date(),
@@ -245,10 +248,17 @@ export class InvoiceService {
       orderId: order.id,
       orderNumber: order.orderNumber,
 
+      // Adet bazlı: faturada satır adedi + birim fiyat order'dan (1 değil). subtotal
+      // satır toplamıdır (birim * adet); birim fiyat order.unitPrice, yoksa subtotal/adet.
       items: [{
         description: order.product?.title || 'Ürün',
-        quantity: 1,
-        unitPrice: subtotal,
+        quantity: (order as any).quantity ?? 1,
+        unitPrice:
+          (order as any).unitPrice != null
+            ? Number((order as any).unitPrice)
+            : ((order as any).quantity > 1
+                ? subtotal / (order as any).quantity
+                : subtotal),
         total: subtotal,
       }],
 
@@ -259,8 +269,8 @@ export class InvoiceService {
       commission: Number(order.commissionAmount || 0),
       total: Number(order.totalAmount),
 
-      paymentMethod: order.payment?.provider ?? 'paytr',
-      paymentDate: order.payment?.paidAt ?? order.payment?.createdAt,
+      paymentMethod: pay?.provider ?? 'paytr',
+      paymentDate: pay?.paidAt ?? pay?.createdAt,
 
       currency: 'TRY',
     };
@@ -706,7 +716,7 @@ export class InvoiceService {
               <!-- Info Note -->
               <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 4px; margin-bottom: 25px;">
                 <p style="color: #856404; margin: 0; font-size: 14px;">
-                  ⏰ <strong>Hatırlatma:</strong> Ödemeniz, alıcı ürünü teslim aldıktan 7 gün sonra hesabınıza aktarılacaktır.
+                  ⏰ <strong>Hatırlatma:</strong> Ödemeniz, alıcı ürünü teslim aldıktan 14 gün sonra hesabınıza aktarılacaktır.
                 </p>
               </div>
 

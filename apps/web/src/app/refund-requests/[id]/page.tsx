@@ -20,6 +20,8 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
 const reasonLabel: Record<string, { tr: string; en: string }> = {
+  // 14 gün koşulsuz cayma: changed_mind artık geçerli bir sebep.
+  changed_mind: { tr: "Vazgeçtim / Fikrim değişti", en: "Changed my mind" },
   damaged: { tr: "Hasarlı geldi", en: "Damaged" },
   wrong_item: { tr: "Yanlış ürün geldi", en: "Wrong item" },
   not_as_described: { tr: "Açıklamayla uyuşmuyor", en: "Not as described" },
@@ -27,7 +29,6 @@ const reasonLabel: Record<string, { tr: string; en: string }> = {
   counterfeit: { tr: "Sahte ürün", en: "Counterfeit" },
   lost_in_transit: { tr: "Kargoda kayboldu", en: "Lost in transit" },
   other: { tr: "Diğer", en: "Other" },
-  // changed_mind kaldırıldı (Senaryo D)
 };
 
 const statusConfig: Record<

@@ -1004,6 +1004,10 @@ model Order {
   offerId                String?         @unique @map("offer_id")
   checkoutGroupId        String?         @map("checkout_group_id")
   shippingAddressId      String?         @map("shipping_address_id")
+  // Adet (sepet çoklu-adet): çoğu ikinci-el ürün tekildir → default 1. unitPrice
+  // birim fiyatı; subtotal = unitPrice * quantity. Adet bazlı kısmi iade buna dayanır.
+  quantity               Int             @default(1)
+  unitPrice              Decimal?        @map("unit_price") @db.Decimal(10, 2)
   totalAmount            Decimal         @map("total_amount") @db.Decimal(10, 2)
   shippingCost           Decimal         @default(0) @map("shipping_cost") @db.Decimal(10, 2)
   commissionAmount       Decimal         @map("commission_amount") @db.Decimal(10, 2)
@@ -1020,6 +1024,7 @@ model Order {
   subtotal               Decimal?        @db.Decimal(10, 2)
   taxAmount              Decimal         @default(0) @map("tax_amount") @db.Decimal(10, 2)
   cancelReason           String?         @map("cancel_reason")
+  cancellationType       OrderCancellationType? @map("cancellation_type")
   preparingDeadline      DateTime?       @map("preparing_deadline")
   preparingWarningSentAt DateTime?       @map("preparing_warning_sent_at")
   reservationReleasedAt  DateTime?       @map("reservation_released_at")
@@ -1105,6 +1110,13 @@ model PaymentHold {
   status         PaymentHoldStatus @default(held)
   releaseAt      DateTime?         @map("release_at")
   releasedAt     DateTime?         @map("released_at")
+  // Adet bazlı kısmi iadede tüketilen satıcı-payı toplamı. Satıcıya ödenecek
+  // tutar = amount - refundedAmount. refundedAmount >= amount → hold tamamen tükendi.
+  refundedAmount Decimal           @default(0) @map("refunded_amount") @db.Decimal(10, 2)
+  // Açık bir iade talebi varken hold'u atomik olarak kilitler: hiçbir release
+  // yolu frozenByRefundId dolu bir hold'u serbest bırakamaz. İade reddedilir/
+  // iptal edilirse temizlenir; iade tamamlanırsa hold consume edilir.
+  frozenByRefundId String?         @map("frozen_by_refund_id")
   createdAt      DateTime          @default(now()) @map("created_at")
   updatedAt      DateTime          @updatedAt @map("updated_at")
   payment        Payment           @relation(fields: [paymentId], references: [id])
@@ -1273,6 +1285,8 @@ model RefundRequest {
   description       String?
   evidencePhotoUrls String[]            @default([]) @map("evidence_photo_urls")
   amount            Decimal             @db.Decimal(10, 2)
+  /// Adet bazlı kısmi iade: order.quantity'nin kaç adedi iade ediliyor (default = tümü).
+  refundQuantity    Int                 @default(1) @map("refund_quantity")
   status            RefundRequestStatus @default(pending_review)
 
   sellerResponse String?   @map("seller_response")
@@ -1853,6 +1867,13 @@ enum OrderStatus {
   cancelled
   refund_requested
   refunded
+}
+
+/// İPTAL (kargo öncesi) vs İADE (kargo sonrası) ayrımı. status alanı para akışı
+/// için (refund tetikleyici) kullanılırken bu alan raporlama/admin için anlamı taşır.
+enum OrderCancellationType {
+  iptal
+  iade
 }
 
 enum PaymentStatus {

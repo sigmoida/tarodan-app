@@ -1874,13 +1874,50 @@ export class AdminService {
         include: {
           buyer: { select: { id: true, displayName: true, email: true } },
           seller: { select: { id: true, displayName: true, email: true } },
-          product: { select: { id: true, title: true } },
+          product: {
+            select: {
+              id: true,
+              title: true,
+              images: {
+                take: 1,
+                orderBy: { sortOrder: 'asc' },
+                select: { cardKey: true },
+              },
+            },
+          },
+          checkoutGroup: { select: { groupNumber: true } },
+          // Açık (aktif) iade talebi — admin listede "İade Sürecinde" rozeti için.
+          refundRequests: {
+            where: {
+              status: { notIn: ['refunded', 'rejected', 'cancelled'] as any },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: { id: true, status: true, refundNumber: true },
+          },
         },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
       }),
     ]);
+
+    // Çoklu-ürün sepetlerini admin listede gruplu gösterebilmek için her siparişin
+    // ait olduğu CheckoutGroup'taki TOPLAM sipariş adedini ekle (grubun gerçek
+    // boyutu). groupItemCount>1 → "çoklu sipariş" rozeti + görsel gruplama.
+    const groupIds = [
+      ...new Set(orders.map((o) => o.checkoutGroupId).filter((x): x is string => !!x)),
+    ];
+    const groupCounts = groupIds.length
+      ? await this.prisma.order.groupBy({
+          by: ['checkoutGroupId'],
+          where: { checkoutGroupId: { in: groupIds } },
+          _count: { _all: true },
+        })
+      : [];
+    const groupCountMap = new Map(
+      groupCounts.map((g) => [g.checkoutGroupId, g._count._all]),
+    );
 
     return {
       data: orders.map((o) => ({
@@ -1891,6 +1928,20 @@ export class AdminService {
         buyer: this.resolveGuestBuyerForAdmin(o.buyer, o.shippingAddress),
         amount: Number(o.totalAmount),
         commissionAmount: Number(o.commissionAmount),
+        groupNumber: o.checkoutGroup?.groupNumber ?? null,
+        groupItemCount: o.checkoutGroupId
+          ? groupCountMap.get(o.checkoutGroupId) ?? 1
+          : 1,
+        productImageUrl: this.resolveProductImageUrl(
+          (o.product as any)?.images?.[0]?.cardKey,
+        ),
+        activeRefundRequest: (o as any).refundRequests?.[0]
+          ? {
+              id: (o as any).refundRequests[0].id,
+              status: (o as any).refundRequests[0].status,
+              refundNumber: (o as any).refundRequests[0].refundNumber,
+            }
+          : null,
       })),
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
@@ -2406,6 +2457,9 @@ export class AdminService {
         },
         offer: true,
         payment: true,
+        // Ödeme tek üründe bile checkout group üzerinden bağlanır (order.payment genelde
+        // null) → group payment'ı da yükle, yoksa admin'de ödeme kartı hiç görünmez.
+        checkoutGroup: { include: { payment: true } },
         shipment: {
           include: {
             events: { orderBy: { occurredAt: 'desc' } },
@@ -2474,10 +2528,10 @@ export class AdminService {
         ...order.offer,
         amount: Number(order.offer.amount),
       } : null,
-      payment: order.payment ? {
-        ...order.payment,
-        amount: Number(order.payment.amount),
-      } : null,
+      payment: (() => {
+        const p = order.payment ?? (order as any).checkoutGroup?.payment;
+        return p ? { ...p, amount: Number(p.amount) } : null;
+      })(),
       shipment: order.shipment ? {
         ...order.shipment,
         carrier: order.shipment.provider,
@@ -2732,6 +2786,7 @@ export class AdminService {
         seller: { select: { id: true, email: true, displayName: true } },
         product: { select: { id: true, title: true, price: true } },
         payment: true,
+        checkoutGroup: { include: { payment: true } },
         shipment: true,
       },
     });
@@ -2768,10 +2823,10 @@ export class AdminService {
       discountCode: order.discountCode ?? null,
       shippingCost: Number(order.shippingCost || 0),
       total: Number(order.totalAmount),
-      payment: order.payment ? {
-        status: order.payment.status,
-        provider: order.payment.provider,
-      } : null,
+      payment: (() => {
+        const p = order.payment ?? (order as any).checkoutGroup?.payment;
+        return p ? { status: p.status, provider: p.provider } : null;
+      })(),
       shipment: order.shipment ? {
         trackingNumber: order.shipment.trackingNumber,
         carrier: order.shipment.provider,
@@ -6866,6 +6921,12 @@ export class AdminService {
         },
       },
     });
+    // İade reddedildi → satıcı hold kilidini kaldır; escrow normal akışına döner
+    // (teslim+return+grace dolduysa bir sonraki cron turunda payout edilir).
+    await this.prisma.paymentHold.updateMany({
+      where: { orderId: rr.orderId, status: 'held', NOT: { frozenByRefundId: null } },
+      data: { frozenByRefundId: null },
+    });
     await this.createAuditLog(
       adminId,
       'refund_dispute_resolve_reject',
@@ -7724,6 +7785,7 @@ export class AdminService {
     { key: 'order-created-buyer',        name: 'Sipariş oluşturuldu (alıcı)',         group: 'Sipariş' },
     { key: 'order-created-seller',       name: 'Yeni sipariş (satıcı)',               group: 'Sipariş' },
     { key: 'order-paid',                 name: 'Ödeme alındı (alıcı)',                group: 'Sipariş' },
+    { key: 'order-paid-group',           name: 'Ödeme alındı - sepet (alıcı)',        group: 'Sipariş' },
     { key: 'order-paid-seller',          name: 'Ödeme alındı (satıcı)',               group: 'Sipariş' },
     { key: 'order-shipped',              name: 'Kargoya verildi',                     group: 'Sipariş' },
     { key: 'order-delivered',            name: 'Teslim edildi',                       group: 'Sipariş' },

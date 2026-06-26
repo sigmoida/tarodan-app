@@ -2790,55 +2790,6 @@ async function main() {
   console.log(`✅ Created/updated ${discounts.length} discounts`);
 
   // ==========================================================================
-  // 26. Advertisements
-  // ==========================================================================
-  console.log('Creating advertisements...');
-  const ads = [
-    {
-      title: 'Premium Koleksiyon — Yeni Gelenler',
-      imageUrl: 'https://amzn-tarodan.s3.eu-west-1.amazonaws.com/dev/ads/banner-premium.jpg',
-      linkUrl: '/listings?sortBy=created_desc',
-      altText: 'Yeni gelen premium diecast modeller',
-      position: 'header' as const,
-      deviceType: 'all' as const,
-      displayOrder: 1,
-      isActive: true,
-      startDate: discountNow,
-      endDate: inOneYear,
-    },
-    {
-      title: 'Hot Wheels Koleksiyonu',
-      imageUrl: 'https://amzn-tarodan.s3.eu-west-1.amazonaws.com/dev/ads/banner-hotwheels.jpg',
-      linkUrl: '/listings?manufacturer=Hot+Wheels',
-      altText: 'Hot Wheels model araba koleksiyonu',
-      position: 'sidebar' as const,
-      deviceType: 'desktop' as const,
-      displayOrder: 1,
-      isActive: true,
-      startDate: discountNow,
-      endDate: inOneYear,
-    },
-    {
-      title: 'İndirimli Ürünler',
-      content: 'Bu hafta özel fiyatlar — %30\'a varan indirim!',
-      linkUrl: '/listings?discountOnly=true',
-      altText: 'İndirimli model arabalar',
-      position: 'footer' as const,
-      deviceType: 'all' as const,
-      displayOrder: 1,
-      isActive: true,
-      startDate: discountNow,
-      endDate: inOneYear,
-    },
-  ];
-
-  for (const ad of ads) {
-    await prisma.advertisement.create({ data: ad }).catch(() => {/* skip duplicate */});
-  }
-  const adCount = await prisma.advertisement.count();
-  console.log(`✅ Created advertisements (total: ${adCount})`);
-
-  // ==========================================================================
   // 27. Moderation Events (örnek AI denetim kayıtları)
   // ==========================================================================
   console.log('Creating moderation events...');

@@ -11,7 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { InitiatePaymentDto, PaymentProvider, PayTRCallbackDto, DirectPaymentDto } from './dto';
-import { PaymentStatus, PaymentHoldStatus, OrderStatus, ProductStatus, SubscriptionStatus, TradeStatus, OfferStatus, RefundRequestStatus, SavedCardStatus } from '@prisma/client';
+import { Prisma, PaymentStatus, PaymentHoldStatus, OrderStatus, ProductStatus, SubscriptionStatus, TradeStatus, OfferStatus, RefundRequestStatus, SavedCardStatus } from '@prisma/client';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { safeDecrementReserved } from '../product/helpers/product-availability.helper';
 import { computeRelevanceScore, RELEVANCE_PREMIUM_BONUS } from '../product/helpers/relevance-score';
@@ -54,6 +54,13 @@ const TRADE_RESERVATION_HOLDING_STATUSES: TradeStatus[] = [
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
   private readonly holdDays: number;
+  // Escrow yeni model: satıcıya ödeme TESLİMDEN sonra serbest bırakılır.
+  // İade TALEP penceresi = teslim + returnWindowDays (14). Satıcı payout uygunluğu
+  // = teslim + returnWindowDays + payoutGraceDays. Grace, iade penceresi kapandıktan
+  // SONRA payout'u başlatır → "14. günün son saniyesinde iade + payout çoktan gitti"
+  // çakışması imkânsız olur (payout, return cutoff'tan grace kadar SONRA uygundur).
+  private readonly returnWindowDays: number;
+  private readonly payoutGraceDays: number;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -70,6 +77,8 @@ export class PaymentService {
     private readonly moduleRef: ModuleRef,
   ) {
     this.holdDays = parseInt(this.configService.get('PAYMENT_HOLD_DAYS') || '7', 10);
+    this.returnWindowDays = parseInt(this.configService.get('RETURN_WINDOW_DAYS') || '14', 10);
+    this.payoutGraceDays = parseInt(this.configService.get('PAYOUT_GRACE_DAYS') || '1', 10);
   }
 
   /**
@@ -1586,14 +1595,15 @@ export class PaymentService {
           throw new Error('Product not found');
         }
 
+        const orderQty = payment.order?.quantity ?? 1;
         const newQuantity =
-          product.quantity !== null ? product.quantity - 1 : null;
+          product.quantity !== null ? product.quantity - orderQty : null;
         const updateData: any = {
           status: getProductStatusFromQuantity(newQuantity),
-          reservedQuantity: safeDecrementReserved(product.reservedQuantity, 1),
+          reservedQuantity: safeDecrementReserved(product.reservedQuantity, orderQty),
         };
         if (product.quantity !== null) {
-          updateData.quantity = { decrement: 1 };
+          updateData.quantity = { decrement: orderQty };
         }
 
         await tx.product.update({
@@ -1676,10 +1686,9 @@ export class PaymentService {
         // Calculate seller payout (amount - commission)
         const sellerAmount = Number(order.totalAmount) - Number(order.commissionAmount);
 
-        // Create payment hold for seller (escrow)
-        const releaseAt = new Date();
-        releaseAt.setDate(releaseAt.getDate() + this.holdDays);
-
+        // Create payment hold for seller (escrow). releaseAt ödeme anında SET
+        // EDİLMEZ; teslimde (shipping.worker delivered) deliveredAt + return + grace
+        // olarak hesaplanır. Teslim olmadan asla serbest bırakılmaz (releaseAt null).
         await tx.paymentHold.create({
           data: {
             paymentId: payment.id,
@@ -1687,7 +1696,7 @@ export class PaymentService {
             sellerId: order.sellerId,
             amount: sellerAmount,
             status: PaymentHoldStatus.held,
-            releaseAt,
+            releaseAt: null,
           },
         });
 
@@ -1966,13 +1975,16 @@ export class PaymentService {
             throw new Error(`Product not found for group order ${order.id}`);
           }
 
-          const newQuantity = product.quantity !== null ? product.quantity - 1 : null;
+          // Adet bazlı stok düşümü: sipariş adedi kadar quantity-- ve reserved--.
+          const orderQty = order.quantity ?? 1;
+          const newQuantity =
+            product.quantity !== null ? product.quantity - orderQty : null;
           const updateData: any = {
             status: getProductStatusFromQuantity(newQuantity),
-            reservedQuantity: safeDecrementReserved(product.reservedQuantity, 1),
+            reservedQuantity: safeDecrementReserved(product.reservedQuantity, orderQty),
           };
           if (product.quantity !== null) {
-            updateData.quantity = { decrement: 1 };
+            updateData.quantity = { decrement: orderQty };
           }
           await tx.product.update({
             where: { id: order.productId },
@@ -2019,10 +2031,10 @@ export class PaymentService {
             );
           }
 
-          // Satıcı başına escrow hold (tek payment'a sipariş başına bir hold)
+          // Satıcı başına escrow hold (tek payment'a sipariş başına bir hold).
+          // releaseAt teslimde hesaplanır (deliveredAt + return + grace); ödeme
+          // anında null → teslim olmadan asla serbest bırakılmaz.
           const sellerAmount = Number(order.totalAmount) - Number(order.commissionAmount);
-          const releaseAt = new Date();
-          releaseAt.setDate(releaseAt.getDate() + this.holdDays);
           await tx.paymentHold.create({
             data: {
               paymentId: payment.id,
@@ -2030,7 +2042,7 @@ export class PaymentService {
               sellerId: order.sellerId,
               amount: sellerAmount,
               status: PaymentHoldStatus.held,
-              releaseAt,
+              releaseAt: null,
             },
           });
 
@@ -2106,7 +2118,56 @@ export class PaymentService {
         );
     }
 
-    // Sipariş başına: order.paid eventi, fatura, kargo kaydı
+    // ALICI tarafı: çoklu-ürün (sepet) ödemesinde CheckoutGroup başına TEK onay
+    // maili + TEK push. Sipariş başına emitOrderPaid (skipBuyer:true) yalnız satıcı
+    // tarafını işler; alıcı onayı burada bir kez üst seviyeden gönderilir.
+    if (result.aliveOrders.length > 0) {
+      try {
+        const firstOrder = result.aliveOrders[0];
+        const firstAddr = firstOrder.shippingAddress as any;
+        const groupIsGuest =
+          firstOrder.buyer.email === 'guest@tarodan.system' || firstAddr?.isGuestOrder;
+        const groupBuyerEmail = groupIsGuest
+          ? (firstAddr?.guestEmail || firstAddr?.email || firstOrder.buyer.email)
+          : firstOrder.buyer.email;
+        const groupBuyerName = groupIsGuest
+          ? (firstAddr?.guestName || firstAddr?.fullName || 'Misafir Müşteri')
+          : (firstOrder.buyer.displayName || firstOrder.buyer.email);
+        const group = await this.prisma.checkoutGroup.findUnique({
+          where: { id: payment.checkoutGroupId },
+          select: { groupNumber: true },
+        });
+        await this.eventService.emitGroupBuyerOrderPaid({
+          checkoutGroupId: payment.checkoutGroupId,
+          groupNumber: group?.groupNumber || payment.checkoutGroupId,
+          buyerId: firstOrder.buyerId,
+          buyerEmail: groupBuyerEmail,
+          buyerName: groupBuyerName,
+          groupTotal: result.aliveOrders.reduce((sum, o) => sum + Number(o.totalAmount), 0),
+          paymentMethod: payment.provider,
+          transactionId: transactionId || payment.providerPaymentId || payment.id,
+          items: result.aliveOrders.map((o) => ({
+            productTitle: o.product.title,
+            totalAmount: Number(o.totalAmount),
+          })),
+          shippingAddress: {
+            fullName: firstAddr?.fullName || '',
+            phone: firstAddr?.phone || '',
+            address: firstAddr?.address || '',
+            city: firstAddr?.city || '',
+            district: firstAddr?.district || '',
+            zipCode: firstAddr?.zipCode || '',
+          },
+          isGuestOrder: groupIsGuest,
+          buyerSystemEmail: firstOrder.buyer.email || '',
+          representativeOrderNumber: firstOrder.orderNumber,
+        });
+      } catch (error) {
+        this.logger.error(`Failed to emit group buyer order.paid for payment ${payment.id}: ${error}`);
+      }
+    }
+
+    // Sipariş başına: order.paid eventi (SATICI tarafı; alıcı atlanır), fatura, kargo kaydı
     for (const resultOrder of result.aliveOrders) {
       try {
         const shippingAddressData = resultOrder.shippingAddress as any;
@@ -2144,6 +2205,8 @@ export class PaymentService {
           },
           isGuestOrder,
           buyerSystemEmail: resultOrder.buyer.email || '',
+          // Sepet akışı: alıcı onayı grup başına tek kez gönderildi → burada atla.
+          skipBuyer: true,
         });
       } catch (error) {
         this.logger.error(`Failed to emit order.paid event for group order ${resultOrder.id}: ${error}`);
@@ -2195,7 +2258,7 @@ export class PaymentService {
     try {
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
-        select: { status: true, productId: true, offerId: true },
+        select: { status: true, productId: true, offerId: true, quantity: true },
       });
       if (!order || order.status !== OrderStatus.pending_payment || !order.productId) return;
 
@@ -2207,7 +2270,11 @@ export class PaymentService {
 
       const updateData: { reservedQuantity?: number; status?: ProductStatus } = {};
       if (before) {
-        const newReserved = safeDecrementReserved(before.reservedQuantity, 1);
+        // Adet bazlı: rezervasyonu sipariş adedi kadar serbest bırak (1 değil).
+        const newReserved = safeDecrementReserved(
+          before.reservedQuantity,
+          order.quantity ?? 1,
+        );
         updateData.reservedQuantity = newReserved;
         if (before.status === ProductStatus.reserved && newReserved === 0) {
           updateData.status = ProductStatus.active;
@@ -2817,7 +2884,7 @@ export class PaymentService {
   async processRefund(
     orderId: string,
     refundAmount?: number,
-    opts?: { skipRefundEvent?: boolean },
+    opts?: { skipRefundEvent?: boolean; refundQuantity?: number },
   ) {
     let payment = await this.prisma.payment.findFirst({
       where: {
@@ -3017,16 +3084,53 @@ export class PaymentService {
           if (activePayout) {
             throw new BadRequestException('Transfer zaten başlatılmış, iade yapılamaz');
           }
-          await tx.paymentHold.update({
-            where: { id: activeHold.id },
-            data: { status: PaymentHoldStatus.cancelled },
+          // Adet bazlı kısmi iade: hold'un yalnız iade edilen satıcı-payı kadarı
+          // tüketilir (refundedAmount += amount*adet/siparişAdedi). Tam iadede hold
+          // tamamen cancelled; kısmi iadede held/released kalır ve payout sırasında
+          // netAmount = amount - refundedAmount olarak ödenir. Tek otorite buradadır.
+          // GRUP (sepet) ödemesinde payment.order NULL'dur (payment.orderId yok);
+          // bu yüzden iade edilen siparişin adedini doğrudan sorgula — aksi halde
+          // orderQtyForHold=1 olur ve coklu-adet grup siparisinde 1 adet kismi iade
+          // tüm hold'u tüketip satıcıyı 0 öderdi.
+          const orderRowForHold = await tx.order.findUnique({
+            where: { id: orderId },
+            select: { quantity: true },
           });
+          const orderQtyForHold =
+            orderRowForHold?.quantity ?? payment.order?.quantity ?? 1;
+          const refundQty = opts?.refundQuantity ?? orderQtyForHold;
+          const sellerAmount = Number(activeHold.amount);
+          const portion =
+            orderQtyForHold > 0 ? Math.min(refundQty / orderQtyForHold, 1) : 1;
+          const refundedSeller = Math.round(sellerAmount * portion * 100) / 100;
+          const newRefunded = Number(activeHold.refundedAmount ?? 0) + refundedSeller;
+          if (newRefunded >= sellerAmount - 0.01) {
+            await tx.paymentHold.update({
+              where: { id: activeHold.id },
+              data: {
+                status: PaymentHoldStatus.cancelled,
+                refundedAmount: sellerAmount,
+                frozenByRefundId: null,
+              },
+            });
+          } else {
+            await tx.paymentHold.update({
+              where: { id: activeHold.id },
+              data: { refundedAmount: newRefunded, frozenByRefundId: null },
+            });
+          }
         }
 
-        // Ledger: pending/earned → refunded (Faz 3B.6).
-        // markRefunded yalnızca pending/earned satırı varsa update eder; cancel
-        // akışından gelmişse Task 3B.5'te waived olur ve burada noop.
-        await this.commissionLedger.markRefunded(orderId, tx);
+        // Ledger: pending/earned → refunded (Faz 3B.6). Adet bazlı KISMİ iadede
+        // komisyonu tamamen "refunded" işaretleme — platform, alıcıda kalan adetlerin
+        // komisyonunu korur (kısmi komisyon mahsubu Faz 6 ileri iş; cash zaten hold
+        // subdivision ile doğru). Yalnız TAM iadede ledger refunded olur.
+        const ledgerFullThreshold = isGroupPayment
+          ? Number(refundTargetOrder!.totalAmount)
+          : Number(payment.amount);
+        if (amountToRefund >= ledgerFullThreshold) {
+          await this.commissionLedger.markRefunded(orderId, tx);
+        }
 
         // Update order status + restore stock on full refund.
         // Idempotent: skip stock restore if order is already cancelled (e.g.
@@ -3035,33 +3139,41 @@ export class PaymentService {
         const fullOrderRefundThreshold = isGroupPayment
           ? Number(refundTargetOrder!.totalAmount)
           : Number(payment.amount);
-        if (amountToRefund >= fullOrderRefundThreshold) {
+        {
           const orderRow = await tx.order.findUnique({
             where: { id: orderId },
-            select: { status: true, productId: true },
+            select: { status: true, productId: true, quantity: true },
           });
           const alreadyCancelled = orderRow?.status === OrderStatus.cancelled;
+          const isFullRefund = amountToRefund >= fullOrderRefundThreshold;
+          // İade edilen adet kadar stok geri yüklenir (kısmi adet iadesinde de).
+          const restoreQty =
+            opts?.refundQuantity ?? (orderRow?.quantity ?? 1);
 
-          await tx.order.update({
-            where: { id: orderId },
-            data: { status: OrderStatus.cancelled },
-          });
+          // Tam iade → sipariş cancelled. Kısmi adet iadesinde sipariş açık kalır
+          // (kalan adetler hâlâ alıcıda); yalnız stok ve para kısmen geri döner.
+          if (isFullRefund) {
+            await tx.order.update({
+              where: { id: orderId },
+              data: { status: OrderStatus.cancelled },
+            });
+          }
 
-          if (!alreadyCancelled && orderRow?.productId) {
+          if (!alreadyCancelled && orderRow?.productId && restoreQty > 0) {
             const product = await tx.product.findUnique({
               where: { id: orderRow.productId },
               select: { quantity: true },
             });
             if (product?.quantity !== null && product?.quantity !== undefined) {
-              const newQty = product.quantity + 1;
+              const newQty = product.quantity + restoreQty;
               await tx.product.update({
                 where: { id: orderRow.productId },
                 data: {
-                  quantity: { increment: 1 },
+                  quantity: { increment: restoreQty },
                   status: getProductStatusFromQuantity(newQty),
                 },
               });
-              this.logger.log(`Restored stock for product ${orderRow.productId} after refund of order ${orderId}`);
+              this.logger.log(`Restored ${restoreQty} stock for product ${orderRow.productId} after refund of order ${orderId}`);
             }
           }
         }
@@ -3308,14 +3420,43 @@ export class PaymentService {
    * holdReleaseAt has passed.
    * Returns the number of order holds and trade cash payments released.
    */
+  /**
+   * Teslimde çağrılır: ürünün PaymentHold(ler)inin releaseAt'ini
+   * deliveredAt + returnWindowDays + payoutGraceDays olarak ayarlar.
+   * Tek otorite kaynağı: hold serbestliği SADECE bu tarihten sonra (ve açık iade
+   * yokken) olur. Idempotent: held olmayan hold'a dokunmaz.
+   */
+  async scheduleHoldReleaseOnDelivery(
+    orderId: string,
+    deliveredAt: Date,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    const db = tx ?? this.prisma;
+    const releaseAt = new Date(deliveredAt.getTime());
+    releaseAt.setDate(
+      releaseAt.getDate() + this.returnWindowDays + this.payoutGraceDays,
+    );
+    await db.paymentHold.updateMany({
+      where: { orderId, status: PaymentHoldStatus.held },
+      data: { releaseAt },
+    });
+    this.logger.log(
+      `Hold release scheduled for order ${orderId} at ${releaseAt.toISOString()} (teslim+${this.returnWindowDays}+${this.payoutGraceDays}g)`,
+    );
+  }
+
   async releaseHoldsDue(): Promise<{ count: number; tradeCashReleased: number }> {
     const now = new Date();
 
-    // 1) Sipariş ödeme bekletmeleri (PaymentHold) — atomik: sadece held olanları release et
+    // 1) Sipariş ödeme bekletmeleri (PaymentHold) — atomik: sadece held VE
+    // dondurulmamış (frozenByRefundId null) olanları release et. releaseAt artık
+    // teslim + return + grace olduğu için süre dolduğunda iade penceresi zaten
+    // kapanmıştır; açık iade varsa frozen + status guard'ları release'i engeller.
     const dueHolds = await this.prisma.paymentHold.findMany({
       where: {
         status: PaymentHoldStatus.held,
         releaseAt: { lte: now },
+        frozenByRefundId: null,
       },
     });
 
@@ -3361,8 +3502,14 @@ export class PaymentService {
         // Henüz serbest bırakma — bir sonraki cron turunda tekrar denenir.
         continue;
       }
+      // Atomik son guard: frozenByRefundId null kontrolü WHERE içinde — bu cron
+      // turuyla eşzamanlı açılan bir iade (freeze) yarışını kapatır (TOCTOU yok).
       const updated = await this.prisma.paymentHold.updateMany({
-        where: { id: hold.id, status: PaymentHoldStatus.held },
+        where: {
+          id: hold.id,
+          status: PaymentHoldStatus.held,
+          frozenByRefundId: null,
+        },
         data: { status: PaymentHoldStatus.released, releasedAt: now },
       });
       if (updated.count > 0) holdCount++;
@@ -3383,6 +3530,16 @@ export class PaymentService {
     });
 
     for (const tcp of dueTradeCash) {
+      // Takas nakit guard: takas yalnızca COMPLETED ise payout serbest bırakılır.
+      // returning/disputed/cancelled/admin_reviewing'de SERBEST BIRAKMA — aksi halde
+      // iade/iptal sürecindeki takasta satıcıya da para gider (çift-ödeme açığı).
+      const trade = await this.prisma.trade.findUnique({
+        where: { id: tcp.tradeId },
+        select: { status: true },
+      });
+      if (!trade || trade.status !== TradeStatus.completed) {
+        continue;
+      }
       // Atomik guard: sadece hâlâ released/refunded olmamış olanları güncelle
       const updated = await this.prisma.tradeCashPayment.updateMany({
         where: { id: tcp.id, releasedAt: null, refundedAt: null },
@@ -3404,15 +3561,19 @@ export class PaymentService {
    * Try to release payment hold for an order (e.g. on delivery). Idempotent: no-op if already released or not found.
    */
   async releasePaymentIfHeld(orderId: string): Promise<boolean> {
-    const hold = await this.prisma.paymentHold.findFirst({
-      where: { orderId, status: PaymentHoldStatus.held },
-    });
-    if (!hold) return false;
-    await this.prisma.paymentHold.update({
-      where: { id: hold.id },
+    // frozenByRefundId dolu (açık iade) hold ASLA serbest bırakılamaz — defansif:
+    // bu metod artık teslim akışlarında çağrılmıyor (teslim→scheduleHoldReleaseOnDelivery)
+    // ama başka çağıran olursa frozen invaryantı bozulmasın.
+    const updated = await this.prisma.paymentHold.updateMany({
+      where: {
+        orderId,
+        status: PaymentHoldStatus.held,
+        frozenByRefundId: null,
+      },
       data: { status: PaymentHoldStatus.released, releasedAt: new Date() },
     });
-    this.logger.log(`Payment hold ${hold.id} released for order ${orderId}`);
+    if (updated.count === 0) return false;
+    this.logger.log(`Payment hold released for order ${orderId}`);
     return true;
   }
 
@@ -4179,7 +4340,7 @@ export class PaymentService {
           await tx.$queryRaw`SELECT id FROM orders WHERE id = ${order.id} FOR UPDATE`;
           const freshOrder = await tx.order.findUnique({
             where: { id: order.id },
-            select: { status: true, reservationReleasedAt: true },
+            select: { status: true, reservationReleasedAt: true, quantity: true },
           });
           if (
             !freshOrder ||
@@ -4196,7 +4357,11 @@ export class PaymentService {
           });
 
           if (product) {
-            const newReserved = safeDecrementReserved(product.reservedQuantity, 1);
+            // Adet bazlı: rezervasyonu sipariş adedi kadar serbest bırak (1 değil).
+            const newReserved = safeDecrementReserved(
+              product.reservedQuantity,
+              freshOrder.quantity ?? 1,
+            );
             const remaining = (product.quantity ?? 0) - newReserved;
             await tx.product.update({
               where: { id: order.productId },
@@ -4268,13 +4433,16 @@ export class PaymentService {
         // Takaslar checkAndReserve ile reservedQuantity'yi artırır ama Order satırı
         // OLUŞTURMAZ; bu yüzden takas rezervasyonunu ayrıca toplamazsak sayaç drift
         // sanılıp sıfırlanır ve takas-rezerveli ürün yanlışlıkla "stokta" görünür.
-        const orderHeld = await this.prisma.order.count({
+        // Adet bazlı: rezervasyon order ADEDİ değil, order.quantity TOPLAMIdır.
+        const orderHeldAgg = await this.prisma.order.aggregate({
+          _sum: { quantity: true },
           where: {
             productId: id,
             status: OrderStatus.pending_payment,
             reservationReleasedAt: null,
           },
         });
+        const orderHeld = orderHeldAgg._sum.quantity ?? 0;
         const tradeHeldAgg = await this.prisma.tradeItem.aggregate({
           _sum: { quantity: true },
           where: {
@@ -4351,7 +4519,7 @@ export class PaymentService {
           await tx.$queryRaw`SELECT id FROM orders WHERE id = ${order.id} FOR UPDATE`;
           const fresh = await tx.order.findUnique({
             where: { id: order.id },
-            select: { status: true },
+            select: { status: true, quantity: true },
           });
           if (!fresh || fresh.status !== OrderStatus.pending_payment) return;
 
@@ -4363,7 +4531,11 @@ export class PaymentService {
               select: { reservedQuantity: true, quantity: true },
             });
             if (product) {
-              const newReserved = safeDecrementReserved(product.reservedQuantity, 1);
+              // Adet bazlı: rezervasyonu sipariş adedi kadar serbest bırak (1 değil).
+              const newReserved = safeDecrementReserved(
+                product.reservedQuantity,
+                fresh.quantity ?? 1,
+              );
               const remaining = (product.quantity ?? 0) - newReserved;
               await tx.product.update({
                 where: { id: order.productId },
