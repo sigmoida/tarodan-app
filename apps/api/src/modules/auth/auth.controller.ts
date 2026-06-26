@@ -9,7 +9,7 @@ import {
   Res,
 } from '@nestjs/common';
 import { Response } from 'express';
-import { Throttle } from '@nestjs/throttler';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import {
   ApiTags,
   ApiOperation,
@@ -127,6 +127,10 @@ export class AuthController {
    */
   @Post('refresh')
   @Public()
+  // Oturum yenileme brute-force hedefi değil (geçerli refresh token gerektirir) ve
+  // SPA'lar açılışta/periyodik çağırır → global rate-limit'e takılıp 429 dönmemeli
+  // (admin login↔dashboard loop'una yol açıyordu).
+  @SkipThrottle()
   @UseGuards(JwtRefreshGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Token yenileme' })
@@ -160,6 +164,7 @@ export class AuthController {
    */
   @Post('logout')
   @Public()
+  @SkipThrottle()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Çıkış yap' })
   @ApiResponse({ status: 200, description: 'Çıkış yapıldı' })
@@ -173,6 +178,9 @@ export class AuthController {
    * Get current user profile
    */
   @Get('profile')
+  // Oturum doğrulama ucu: SPA her açılışta çağırır, JWT korumalı (brute-force
+  // hedefi değil) → global rate-limit'e takılıp 429 dönmemeli (login loop sebebi).
+  @SkipThrottle()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Kullanıcı profili' })
