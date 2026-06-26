@@ -26,6 +26,30 @@ import { CommissionLedgerService } from '../commission/commission-ledger.service
 import { StorageService } from '../storage/storage.service';
 import { Request } from 'express';
 
+// Takasta reservedQuantity, takas KABUL edildiğinde (checkAndReserve) artar ve
+// ancak tamamlanma / iptal / red / iade-teslim adımlarında geri verilir. Bu
+// statülerdeki bir takas, üründe HÂLÂ canlı bir rezervasyon tutar — sipariş gibi
+// bir Order satırı OLMADAN. reconcileReservedQuantities sayacı sıfırlarken bunları
+// görmezse takas-rezerveli ürünü yanlışlıkla "stokta" yapar. Hariç tutulanlar:
+// pending (henüz rezerve etmedi), rejected/completed/cancelled (rezervasyon geri
+// verildi). 'returning' DAHİL: red sonrası rezervasyon iade teslim alınana kadar
+// (markReturnDelivered) açık kalır.
+const TRADE_RESERVATION_HOLDING_STATUSES: TradeStatus[] = [
+  TradeStatus.accepted,
+  TradeStatus.initiator_shipped,
+  TradeStatus.receiver_shipped,
+  TradeStatus.both_shipped,
+  TradeStatus.initiator_received,
+  TradeStatus.receiver_received,
+  TradeStatus.awaiting_payment,
+  TradeStatus.shipping_to_warehouse,
+  TradeStatus.at_warehouse,
+  TradeStatus.admin_reviewing,
+  TradeStatus.shipping_to_recipients,
+  TradeStatus.returning,
+  TradeStatus.disputed,
+];
+
 @Injectable()
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
@@ -4225,13 +4249,25 @@ export class PaymentService {
     let fixed = 0;
     for (const { id } of candidates) {
       try {
-        const held = await this.prisma.order.count({
+        // Ground-truth = sipariş rezervasyonları + AKTİF takas rezervasyonları.
+        // Takaslar checkAndReserve ile reservedQuantity'yi artırır ama Order satırı
+        // OLUŞTURMAZ; bu yüzden takas rezervasyonunu ayrıca toplamazsak sayaç drift
+        // sanılıp sıfırlanır ve takas-rezerveli ürün yanlışlıkla "stokta" görünür.
+        const orderHeld = await this.prisma.order.count({
           where: {
             productId: id,
             status: OrderStatus.pending_payment,
             reservationReleasedAt: null,
           },
         });
+        const tradeHeldAgg = await this.prisma.tradeItem.aggregate({
+          _sum: { quantity: true },
+          where: {
+            productId: id,
+            trade: { status: { in: TRADE_RESERVATION_HOLDING_STATUSES } },
+          },
+        });
+        const held = orderHeld + (tradeHeldAgg._sum.quantity ?? 0);
         await this.prisma.$transaction(async (tx) => {
           await tx.$queryRaw`SELECT id FROM products WHERE id = ${id} FOR UPDATE`;
           const product = await tx.product.findUnique({
