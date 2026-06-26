@@ -73,10 +73,20 @@ const sentryWebpackPluginOptions = {
   silent: true,
   org: process.env.SENTRY_ORG || 'tarodan',
   project: process.env.SENTRY_PROJECT || 'admin',
+  authToken: process.env.SENTRY_AUTH_TOKEN,
   dryRun: process.env.NODE_ENV !== 'production',
+  // Kaynak harita yükleme / release HATALARI prod build'ini ASLA düşürmesin.
+  // Sentry CLI başarısızlığı (token yok/yanlış, "project not found", ağ) deploy'u
+  // patlatmamalı — sadece uyar, build devam etsin.
+  errorHandler: (err) => {
+    // eslint-disable-next-line no-console
+    console.warn('[sentry] kaynak harita yükleme atlandı:', err && err.message);
+  },
 };
 
-// Export with Sentry if DSN is configured
-module.exports = process.env.NEXT_PUBLIC_SENTRY_DSN
-  ? withSentryConfig(nextConfig, sentryWebpackPluginOptions)
-  : nextConfig;
+// Sentry'yi YALNIZ DSN *ve* auth token birlikte varken devreye al. Token yoksa
+// source-map upload zaten yapılamaz → gereksiz yere prod build'ini riske atma.
+module.exports =
+  process.env.NEXT_PUBLIC_SENTRY_DSN && process.env.SENTRY_AUTH_TOKEN
+    ? withSentryConfig(nextConfig, sentryWebpackPluginOptions)
+    : nextConfig;
