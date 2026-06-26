@@ -168,6 +168,7 @@ export default function ListingDetailClient() {
     removeFromCart,
     removeFromOfflineCart,
     fetchCart,
+    isLoading: cartLoading,
   } = useCartStore();
   const { isAuthenticated, user, limits } = useAuthStore();
 
@@ -2146,7 +2147,9 @@ export default function ListingDetailClient() {
                   <Button
                     variant="secondary"
                     onClick={handleCartToggle}
-                    disabled={isAddingToCart || listing.status !== "active"}
+                    // cartLoading: sepet ilk yüklenirken "Sepete Ekle/Çıkar" etiketi
+                    // henüz kesin değil → o anlık tıklamayı engelle (yanlış aksiyon olmasın).
+                    disabled={isAddingToCart || cartLoading || listing.status !== "active"}
                     className={`gap-1.5 py-2.5 sm:py-3 ${
                       isInCart
                         ? "bg-danger-50 border-danger-200 text-danger-600"

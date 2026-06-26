@@ -176,9 +176,12 @@ function getCancelMessage(
         ? "This order was automatically cancelled because payment wasn't completed within 24 hours."
         : "Ödeme 24 saat içinde tamamlanmadığı için sipariş otomatik iptal edildi.";
     case "seller_no_ship":
+      // İade durumu cümlesi BİLEREK yok: aşağıdaki ayrı iade bloğu (refunded →
+      // "iade edilmiştir", completed → "aktarılacaktır") tek kaynak. Burada da
+      // "iade edilecektir" dersek ikisi yan yana çıkıp çelişiyordu.
       return en
-        ? "The seller didn't ship within the allowed time, so the order was cancelled. Your payment will be refunded."
-        : "Satıcı siparişi süresinde kargoya vermediği için iptal edildi. Ödemeniz iade edilecektir.";
+        ? "The seller didn't ship within the allowed time, so the order was cancelled."
+        : "Satıcı siparişi süresinde kargoya vermediği için iptal edildi.";
     case "stockout":
       return en
         ? "This order was cancelled because the product is out of stock."
