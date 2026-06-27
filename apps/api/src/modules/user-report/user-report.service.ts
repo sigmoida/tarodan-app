@@ -13,29 +13,9 @@ import {
   ReportResponseDto 
 } from './dto';
 
-// In-memory storage for reports until schema is updated
-// In production, this would be stored in the database
-interface StoredReport {
-  id: string;
-  reporterId: string;
-  type: ReportType;
-  targetId: string;
-  reason: ReportReason;
-  description?: string;
-  status: ReportStatus;
-  createdAt: Date;
-  updatedAt: Date;
-  resolvedAt?: Date;
-  resolvedBy?: string;
-  adminNote?: string;
-}
-
 @Injectable()
 export class UserReportService {
   private readonly logger = new Logger(UserReportService.name);
-  
-  // Temporary in-memory storage (will be replaced with database when schema is updated)
-  private reports: Map<string, StoredReport> = new Map();
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -47,31 +27,29 @@ export class UserReportService {
     await this.validateTarget(dto.type, dto.targetId);
 
     // Check for duplicate reports
-    const existingReport = Array.from(this.reports.values()).find(
-      r => r.reporterId === reporterId && 
-           r.targetId === dto.targetId && 
-           r.type === dto.type &&
-           r.status === ReportStatus.PENDING
-    );
+    const existingReport = await this.prisma.report.findFirst({
+      where: {
+        reporterId,
+        targetId: dto.targetId,
+        type: dto.type,
+        status: ReportStatus.PENDING,
+      },
+    });
 
     if (existingReport) {
       throw new BadRequestException('Bu içerik için zaten bekleyen bir raporunuz var');
     }
 
-    // Create report
-    const report: StoredReport = {
-      id: this.generateUUID(),
-      reporterId,
-      type: dto.type,
-      targetId: dto.targetId,
-      reason: dto.reason,
-      description: dto.description,
-      status: ReportStatus.PENDING,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    this.reports.set(report.id, report);
+    const report = await this.prisma.report.create({
+      data: {
+        reporterId,
+        type: dto.type,
+        targetId: dto.targetId,
+        reason: dto.reason,
+        description: dto.description,
+        status: ReportStatus.PENDING,
+      },
+    });
 
     this.logger.log(`Report created: ${report.id} by user ${reporterId} for ${dto.type}:${dto.targetId}`);
 
@@ -82,9 +60,10 @@ export class UserReportService {
    * Get user's reports
    */
   async getUserReports(userId: string): Promise<ReportResponseDto[]> {
-    const userReports = Array.from(this.reports.values())
-      .filter(r => r.reporterId === userId)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const userReports = await this.prisma.report.findMany({
+      where: { reporterId: userId },
+      orderBy: { createdAt: 'desc' },
+    });
 
     return userReports.map(r => this.mapToResponse(r));
   }
@@ -98,25 +77,28 @@ export class UserReportService {
     page: number = 1,
     pageSize: number = 20,
   ): Promise<{ reports: ReportResponseDto[]; total: number; page: number; pageSize: number }> {
-    let filteredReports = Array.from(this.reports.values());
+    const where: { status?: string; type?: string } = {};
+    if (status) where.status = status;
+    if (type) where.type = type;
 
-    if (status) {
-      filteredReports = filteredReports.filter(r => r.status === status);
-    }
-
-    if (type) {
-      filteredReports = filteredReports.filter(r => r.type === type);
-    }
-
-    // Sort by creation date (newest first)
-    filteredReports.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-
-    const total = filteredReports.length;
-    const skip = (page - 1) * pageSize;
-    const paginatedReports = filteredReports.slice(skip, skip + pageSize);
+    const [total, rows] = await this.prisma.$transaction([
+      this.prisma.report.count({ where }),
+      this.prisma.report.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          reporter: { select: { id: true, displayName: true, email: true } },
+        },
+      }),
+    ]);
 
     return {
-      reports: paginatedReports.map(r => this.mapToResponse(r)),
+      reports: rows.map(r => ({
+        ...this.mapToResponse(r),
+        reporter: r.reporter,
+      })),
       total,
       page,
       pageSize,
@@ -127,29 +109,28 @@ export class UserReportService {
    * Get report by ID (admin only)
    */
   async getReportById(reportId: string): Promise<ReportResponseDto & { reporter: any; target: any }> {
-    const report = this.reports.get(reportId);
+    const report = await this.prisma.report.findUnique({
+      where: { id: reportId },
+      include: {
+        reporter: { select: { id: true, displayName: true, email: true } },
+      },
+    });
 
     if (!report) {
       throw new NotFoundException('Rapor bulunamadı');
     }
 
-    // Get reporter info
-    const reporter = await this.prisma.user.findUnique({
-      where: { id: report.reporterId },
-      select: { id: true, displayName: true, email: true },
-    });
-
     // Get target info based on type
     let target: any = null;
     try {
-      target = await this.getTargetInfo(report.type, report.targetId);
+      target = await this.getTargetInfo(report.type as ReportType, report.targetId);
     } catch (e) {
       target = { id: report.targetId, deleted: true };
     }
 
     return {
       ...this.mapToResponse(report),
-      reporter,
+      reporter: report.reporter,
       target,
     };
   }
@@ -158,30 +139,31 @@ export class UserReportService {
    * Update report status (admin only)
    */
   async updateReportStatus(
-    reportId: string, 
-    adminId: string, 
+    reportId: string,
+    adminId: string,
     dto: UpdateReportStatusDto
   ): Promise<ReportResponseDto> {
-    const report = this.reports.get(reportId);
+    const report = await this.prisma.report.findUnique({ where: { id: reportId } });
 
     if (!report) {
       throw new NotFoundException('Rapor bulunamadı');
     }
 
-    report.status = dto.status;
-    report.adminNote = dto.adminNote;
-    report.updatedAt = new Date();
+    const isClosing = dto.status === ReportStatus.RESOLVED || dto.status === ReportStatus.DISMISSED;
 
-    if (dto.status === ReportStatus.RESOLVED || dto.status === ReportStatus.DISMISSED) {
-      report.resolvedAt = new Date();
-      report.resolvedBy = adminId;
-    }
-
-    this.reports.set(reportId, report);
+    const updated = await this.prisma.report.update({
+      where: { id: reportId },
+      data: {
+        status: dto.status,
+        adminNote: dto.adminNote,
+        resolvedAt: isClosing ? new Date() : null,
+        resolvedBy: isClosing ? adminId : null,
+      },
+    });
 
     this.logger.log(`Report ${reportId} status updated to ${dto.status} by admin ${adminId}`);
 
-    return this.mapToResponse(report);
+    return this.mapToResponse(updated);
   }
 
   /**
@@ -196,26 +178,25 @@ export class UserReportService {
     byType: Record<string, number>;
     byReason: Record<string, number>;
   }> {
-    const allReports = Array.from(this.reports.values());
-
-    const byStatus = {
-      pending: allReports.filter(r => r.status === ReportStatus.PENDING).length,
-      underReview: allReports.filter(r => r.status === ReportStatus.UNDER_REVIEW).length,
-      resolved: allReports.filter(r => r.status === ReportStatus.RESOLVED).length,
-      dismissed: allReports.filter(r => r.status === ReportStatus.DISMISSED).length,
-    };
+    const all = await this.prisma.report.findMany({
+      select: { status: true, type: true, reason: true },
+    });
 
     const byType: Record<string, number> = {};
     const byReason: Record<string, number> = {};
-
-    for (const report of allReports) {
-      byType[report.type] = (byType[report.type] || 0) + 1;
-      byReason[report.reason] = (byReason[report.reason] || 0) + 1;
+    const byStatus: Record<string, number> = {};
+    for (const r of all) {
+      byType[r.type] = (byType[r.type] || 0) + 1;
+      byReason[r.reason] = (byReason[r.reason] || 0) + 1;
+      byStatus[r.status] = (byStatus[r.status] || 0) + 1;
     }
 
     return {
-      total: allReports.length,
-      ...byStatus,
+      total: all.length,
+      pending: byStatus[ReportStatus.PENDING] || 0,
+      underReview: byStatus[ReportStatus.UNDER_REVIEW] || 0,
+      resolved: byStatus[ReportStatus.RESOLVED] || 0,
+      dismissed: byStatus[ReportStatus.DISMISSED] || 0,
       byType,
       byReason,
     };
@@ -296,25 +277,27 @@ export class UserReportService {
     }
   }
 
-  private mapToResponse(report: StoredReport): ReportResponseDto {
+  private mapToResponse(report: {
+    id: string;
+    type: string;
+    targetId: string;
+    reason: string;
+    description: string | null;
+    status: string;
+    createdAt: Date;
+    resolvedAt: Date | null;
+    adminNote: string | null;
+  }): ReportResponseDto {
     return {
       id: report.id,
-      type: report.type,
+      type: report.type as ReportType,
       targetId: report.targetId,
-      reason: report.reason,
-      description: report.description,
-      status: report.status,
+      reason: report.reason as ReportReason,
+      description: report.description ?? undefined,
+      status: report.status as ReportStatus,
       createdAt: report.createdAt,
-      resolvedAt: report.resolvedAt,
-      adminNote: report.adminNote,
+      resolvedAt: report.resolvedAt ?? undefined,
+      adminNote: report.adminNote ?? undefined,
     };
-  }
-
-  private generateUUID(): string {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = Math.random() * 16 | 0;
-      const v = c === 'x' ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
-    });
   }
 }

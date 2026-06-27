@@ -301,6 +301,12 @@ export const adminApi = {
   exportReport: (type: string, format: string, params?: any) =>
     api.get(`/admin/reports/${type}`, { params: { ...params, format }, responseType: 'json' }),
 
+  // Kullanıcı şikayetleri (içerik raporları)
+  getUserReports: (params?: { status?: string; type?: string; page?: number; pageSize?: number }) =>
+    api.get('/user-reports/admin', { params }),
+  getUserReportStats: () => api.get('/user-reports/admin/stats'),
+  getUserReportById: (id: string) => api.get(`/user-reports/admin/${id}`),
+
   // Settings
   getSettings: () => api.get('/admin/settings'),
   updateSettings: (data: any) => api.patch('/admin/settings', data),

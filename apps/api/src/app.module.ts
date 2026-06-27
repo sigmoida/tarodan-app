@@ -18,6 +18,7 @@ import { RefundModule } from './modules/refund/refund.module';
 import { PayoutModule } from './modules/payout/payout.module';
 import { ShippingModule } from './modules/shipping';
 import { AdminModule } from './modules/admin';
+import { AdminTestToolsModule } from './modules/admin-test-tools/admin-test-tools.module';
 import { NotificationModule } from './modules/notification';
 
 // PHASE 2 - Core Business Modules (AUDIT REMEDIATION)
@@ -135,6 +136,7 @@ import { ErrorLogInterceptor } from './common/interceptors/error-log.interceptor
     RefundModule,
     ShippingModule,
     AdminModule,
+    AdminTestToolsModule,
     NotificationModule,
 
     // PHASE 2 - Business Modules

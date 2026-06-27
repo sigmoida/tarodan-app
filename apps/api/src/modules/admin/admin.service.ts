@@ -1315,7 +1315,7 @@ export class AdminService {
       throw new BadRequestException('Kullanıcı zaten banlı');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // 1. User'ı banla
       const updatedUser = await tx.user.update({
         where: { id: userId },
@@ -1327,18 +1327,88 @@ export class AdminService {
         } as any,
       });
 
-      // 2. Aktif ürünleri inactive yap
+      // 2. Kargolanmamış aktif takasları iptal et. SINIR: yalnızca fiziksel mal
+      //    hareket etmeden önceki aşamalar (pending / accepted / awaiting_payment).
+      //    Kargo başladıysa (shipping_to_warehouse, eski *_shipped, at_warehouse
+      //    ve sonrası) DOKUNMA — mal yolda/depoda; gerekirse admin müdahale eder.
+      //    Rezervasyonları serbest bırak; serbest kalan ürünler (banlı kullanıcıya
+      //    aitse) bir sonraki adımda suspended olur, karşı tarafınki active kalır.
+      const cancellableTrades = await tx.trade.findMany({
+        where: {
+          OR: [{ initiatorId: userId }, { receiverId: userId }],
+          status: {
+            in: [
+              TradeStatus.pending,
+              TradeStatus.accepted,
+              TradeStatus.awaiting_payment,
+            ],
+          },
+        },
+        select: { id: true, status: true, version: true },
+      });
+      const cancelledTradeIds: string[] = [];
+      const releasedProductIds = new Set<string>();
+      for (const trade of cancellableTrades) {
+        // pending'de rezervasyon yok; accepted/awaiting_payment'ta var.
+        if (trade.status !== TradeStatus.pending) {
+          const items = await tx.tradeItem.findMany({
+            where: { tradeId: trade.id },
+            select: { productId: true, quantity: true },
+          });
+          const byProduct = new Map<string, number>();
+          for (const item of items) {
+            byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
+          }
+          for (const [productId, qty] of byProduct) {
+            await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
+            const prod = await tx.product.findUnique({
+              where: { id: productId },
+              select: { reservedQuantity: true },
+            });
+            if (prod) {
+              const newReserved = safeDecrementReserved(prod.reservedQuantity, qty);
+              await tx.product.update({
+                where: { id: productId },
+                data: {
+                  reservedQuantity: newReserved,
+                  status: newReserved > 0 ? ProductStatus.reserved : ProductStatus.active,
+                },
+              });
+              releasedProductIds.add(productId);
+            }
+          }
+        }
+        await tx.trade.update({
+          where: { id: trade.id, version: trade.version },
+          data: {
+            status: TradeStatus.cancelled,
+            cancelReason: 'Kullanıcı banlandığı için takas iptal edildi',
+            cancelledAt: new Date(),
+            version: { increment: 1 },
+          },
+        });
+        cancelledTradeIds.push(trade.id);
+      }
+
+      // 3. Aktif ürünleri suspended (askıya alındı) yap — kullanıcının kendi
+      //    pasife aldığı (inactive) ilanlardan AYRI bir state. Ban açılınca bu
+      //    ilanlar otomatik active'e döner; yeniden admin onayına GİRMEZ.
+      //    (Yukarıda iptal edilen takaslardan serbest kalan ürünler de buraya dahil.)
+      const toSuspend = await tx.product.findMany({
+        where: { sellerId: userId, status: ProductStatus.active },
+        select: { id: true },
+      });
       await tx.product.updateMany({
         where: {
           sellerId: userId,
           status: ProductStatus.active,
         },
         data: {
-          status: ProductStatus.inactive,
+          status: ProductStatus.suspended,
         },
       });
 
-      // 3. Bekleyen ürünleri rejected yap
+      // 4. Bekleyen ürünleri rejected yap
       await tx.product.updateMany({
         where: {
           sellerId: userId,
@@ -1349,7 +1419,7 @@ export class AdminService {
         },
       });
 
-      // 4. Aktif teklifleri cancelled yap (buyer olarak)
+      // 5. Aktif teklifleri cancelled yap (buyer olarak)
       await tx.offer.updateMany({
         where: {
           buyerId: userId,
@@ -1360,13 +1430,49 @@ export class AdminService {
         },
       });
 
-      // 5. Audit log oluştur
+      // 6. Audit log oluştur
       await this.createAuditLog(adminId, 'user_ban', 'User', userId, user, updatedUser);
 
       this.logger.warn(`User ${userId} banned by admin ${adminId}: ${dto.reason}`);
 
-      return { success: true, userId, reason: dto.reason };
+      return {
+        success: true,
+        userId,
+        reason: dto.reason,
+        suspendedIds: toSuspend.map((p) => p.id),
+        cancelledTradeIds,
+        // Suspended + iptal edilen takaslardan serbest kalan (karşı tarafın da)
+        // ürünleri ES'te güncellemek için birleşik küme.
+        affectedProductIds: Array.from(new Set([...toSuspend.map((p) => p.id), ...releasedProductIds])),
+      };
     });
+
+    // İptal edilen takasların nakit ayağı tamamlandıysa iade et.
+    for (const tradeId of result.cancelledTradeIds) {
+      await this.paymentService
+        .refundTradeCashPaymentIfCompleted(tradeId)
+        .catch((err) =>
+          this.logger.warn(`Ban: trade refund failed for ${tradeId}: ${err?.message}`),
+        );
+    }
+
+    // Etkilenen ilanları arama/listeden senkronla (suspended → düşer, serbest
+    // kalan karşı taraf ürünü → yeniden indekslenir).
+    if (result.affectedProductIds.length > 0) {
+      await this.cache.delPattern('products:list:*');
+      await Promise.all(
+        result.affectedProductIds.map((id) =>
+          this.cache.del(`product:${id}`).catch(() => {}),
+        ),
+      );
+      for (const id of result.affectedProductIds) {
+        this.searchService
+          .syncProduct(id)
+          .catch((err) => this.logger.warn(`ES sync (ban) failed for ${id}: ${err?.message}`));
+      }
+    }
+
+    return { success: true, userId, reason: dto.reason };
   }
 
   // ==================== PRODUCT MANAGEMENT ====================
@@ -2854,7 +2960,7 @@ export class AdminService {
       throw new BadRequestException('Kullanıcı zaten banlı değil');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // 1. User'ı unban yap
       const updatedUser = await tx.user.update({
         where: { id: userId },
@@ -2866,13 +2972,42 @@ export class AdminService {
         } as any,
       });
 
-      // 2. Audit log oluştur
+      // 2. Ban ile askıya alınan (suspended) ilanları otomatik active'e döndür.
+      //    Bunlar ban öncesi zaten yayındaydı → yeniden admin onayına GİRMEZ.
+      //    Kullanıcının kendi pasife aldığı (inactive) ilanlara dokunulmaz.
+      const toRestore = await tx.product.findMany({
+        where: { sellerId: userId, status: ProductStatus.suspended },
+        select: { id: true },
+      });
+      await tx.product.updateMany({
+        where: { sellerId: userId, status: ProductStatus.suspended },
+        data: { status: ProductStatus.active },
+      });
+
+      // 3. Audit log oluştur
       await this.createAuditLog(adminId, 'user_unban', 'User', userId, user, updatedUser);
 
       this.logger.log(`User ${userId} unbanned by admin ${adminId}`);
 
-      return { success: true, userId };
+      return { success: true, userId, restoredIds: toRestore.map((p) => p.id) };
     });
+
+    // Geri açılan ilanları arama/listeye yeniden ekle.
+    if (result.restoredIds.length > 0) {
+      await this.cache.delPattern('products:list:*');
+      await Promise.all(
+        result.restoredIds.map((id) =>
+          this.cache.del(`product:${id}`).catch(() => {}),
+        ),
+      );
+      for (const id of result.restoredIds) {
+        this.searchService
+          .syncProduct(id)
+          .catch((err) => this.logger.warn(`ES sync (unban) failed for ${id}: ${err?.message}`));
+      }
+    }
+
+    return { success: true, userId };
   }
 
   /**

@@ -1742,6 +1742,7 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       ProductStatus.sold,
       ProductStatus.inactive,
       ProductStatus.rejected,
+      ProductStatus.suspended,
     ];
     const isTerminal = (p: { status: ProductStatus }) =>
       TERMINAL_STATUSES.includes(p.status);
