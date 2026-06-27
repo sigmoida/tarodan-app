@@ -412,10 +412,23 @@ export default function MembershipPage() {
             </div>
           )}
           
-          {!membershipDetails?.pendingPayment && currentTier && currentTier !== 'free' && (
+          {!membershipDetails?.pendingPayment && membershipDetails?.status !== 'cancelled' && currentTier && currentTier !== 'free' && (
             <div className="mt-6 bg-info-50 border border-info-200 rounded-xl p-4 max-w-md mx-auto">
               <p className="text-info-800 font-medium">
                 {t('membership.currentPlan')}: {MEMBERSHIP_TIERS.find(tier => tier.id === currentTier)?.name || t('membership.free')}
+              </p>
+            </div>
+          )}
+
+          {/* İptal edildi ama dönem sürüyor: kullanıcı hâlâ premium, dönem sonunda free'ye düşer */}
+          {!membershipDetails?.pendingPayment && membershipDetails?.status === 'cancelled' && currentTier && currentTier !== 'free' && (
+            <div className="mt-6 bg-warning-50 border border-warning-200 rounded-xl p-4 max-w-md mx-auto">
+              <p className="text-warning-800 font-medium">
+                Üyeliğiniz iptal edildi.{' '}
+                {membershipDetails.currentPeriodEnd
+                  ? `${new Date(membershipDetails.currentPeriodEnd).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric' })} tarihine kadar`
+                  : 'Dönem sonuna kadar'}{' '}
+                premium özellikleriniz devam eder, ardından ücretsiz üyeliğe geçersiniz.
               </p>
             </div>
           )}
@@ -450,7 +463,7 @@ export default function MembershipPage() {
                   <CalendarIcon className="w-6 h-6 text-success-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted mb-1">Yenilenme Tarihi</p>
+                  <p className="text-sm text-muted mb-1">{membershipDetails.status === 'cancelled' ? 'Geçerlilik Bitiş Tarihi' : 'Yenilenme Tarihi'}</p>
                   <p className="text-lg font-semibold text-heading">
                     {membershipDetails.currentPeriodEnd 
                       ? new Date(membershipDetails.currentPeriodEnd).toLocaleDateString('tr-TR', { 

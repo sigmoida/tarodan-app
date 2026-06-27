@@ -7,6 +7,7 @@ import { StorageService } from '../storage/storage.service';
 import { RatingService } from '../rating/rating.service';
 import { ModerationAiClient } from '../moderation/moderation-ai.client';
 import { computeTrustScore } from './helpers/trust-score';
+import { isPremiumEntitled } from '../membership/membership.util';
 import {
   DEFAULT_NOTIFICATION_SETTINGS,
   NotificationSettings,
@@ -158,10 +159,7 @@ export class UserService {
         where: { OR: [{ initiatorId: id }, { receiverId: id }], status: 'completed' },
       }),
     ]);
-    const isPremium =
-      !!user.membership &&
-      user.membership.status === 'active' &&
-      user.membership.tier.type !== 'free';
+    const isPremium = isPremiumEntitled(user.membership);
     const trust = computeTrustScore({
       averageRating: ratingAgg._avg?.score || 0,
       totalRatings: ratingAgg._count,
@@ -898,7 +896,7 @@ export class UserService {
       this.prisma.userFollow.count({ where: { followingId: userId } }),
       this.prisma.userMembership.findUnique({
         where: { userId },
-        select: { status: true, tier: { select: { type: true } } },
+        select: { status: true, currentPeriodEnd: true, tier: { select: { type: true } } },
       }),
       this.prisma.collection.count({ where: collectionWhere }),
     ]);
@@ -911,7 +909,7 @@ export class UserService {
 
     // Premium (ücretli, aktif) üyelik mi?
     const membershipTier = membership?.tier.type ?? 'free';
-    const isPremium = membership != null && membership.status === 'active' && membershipTier !== 'free';
+    const isPremium = isPremiumEntitled(membership);
 
     // Güven Skoru (0..100) — premium avantajı
     const trust = computeTrustScore({

@@ -42,8 +42,20 @@ describe('J108 · subscriptionStore saf yardımcılar', () => {
     expect(isSubscriptionActive(past)).toBe(false);
   });
 
-  it('isSubscriptionActive: status cancelled ise false (aktif değil)', () => {
-    expect(isSubscriptionActive(makeSub({ status: 'cancelled' }))).toBe(false);
+  it('isSubscriptionActive: cancelled + dönem sonu gelecekte ise true (süre bitene kadar premium)', () => {
+    expect(isSubscriptionActive(makeSub({ status: 'cancelled' }))).toBe(true);
+  });
+
+  it('isSubscriptionActive: cancelled + dönem sonu geçmişte ise false', () => {
+    const expired = makeSub({
+      status: 'cancelled',
+      currentPeriodEnd: new Date(Date.now() - 86400000).toISOString(),
+    });
+    expect(isSubscriptionActive(expired)).toBe(false);
+  });
+
+  it('isSubscriptionActive: past_due (ödeme onaylanmamış) ise false', () => {
+    expect(isSubscriptionActive(makeSub({ status: 'past_due' }))).toBe(false);
   });
 
   it('getDaysUntilRenewal: kalan gün pozitif yuvarlanır', () => {

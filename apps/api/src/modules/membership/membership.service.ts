@@ -28,6 +28,7 @@ import { Request } from 'express';
 import { MembershipPaymentInitResponseDto } from './dto/membership-payment.dto';
 import { PayTRService } from '../payment-providers/paytr.service';
 import { ConfigService } from '@nestjs/config';
+import { isPremiumEntitled } from './membership.util';
 
 @Injectable()
 export class MembershipService {
@@ -1063,21 +1064,10 @@ export class MembershipService {
         include: { tier: true },
       });
     }
-    // İptal edilen (cancelled) paralı üye, ödenen dönem (currentPeriodEnd) bitene
-    // kadar premium özelliklerini KULLANMAYA devam eder ("süre bitince üyelik gider").
-    // Bu yüzden currentPeriodEnd henüz geçmemişse cancelled da takas yapabilir.
-    // Dönem sonunda cron (checkExpiredMemberships) free'ye düşürür.
-    const now = new Date();
-    const stillInPaidPeriod =
-      membership?.status === SubscriptionStatus.cancelled &&
-      membership?.currentPeriodEnd != null &&
-      membership.currentPeriodEnd > now;
-    const eligibleStatus =
-      membership?.status === SubscriptionStatus.active ||
-      membership?.status === SubscriptionStatus.past_due ||
-      stillInPaidPeriod;
-
-    if (!membership || !membership.tier?.canTrade || !eligibleStatus) {
+    // Premium hakkı tek doğruluk kaynağı isPremiumEntitled: ücretli tier + dönem
+    // bitmemiş + durum∈{active,cancelled}. past_due (ödeme onaylanmamış) takas yapamaz;
+    // ödeme onaylanınca status=active olur. tier.canTrade ayrıca tier yeteneğini doğrular.
+    if (!membership || !isPremiumEntitled(membership) || !membership.tier?.canTrade) {
       return {
         allowed: false,
         reason: 'Takas özelliği üyeliğinizde mevcut değil. Üyeliğinizi yükseltin.',

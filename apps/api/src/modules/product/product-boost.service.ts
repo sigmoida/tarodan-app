@@ -10,6 +10,7 @@ import {
 import { Request } from 'express';
 import { PrismaService } from '../../prisma';
 import { ProductStatus, OrderStatus } from '@prisma/client';
+import { isPremiumEntitled } from '../membership/membership.util';
 import { PaymentService } from '../payment/payment.service';
 import { PaymentProvider } from '../payment/dto';
 import { BOOST_DURATIONS, BoostPricingOption } from './dto/boost.dto';
@@ -132,12 +133,9 @@ export class ProductBoostService {
     if (autoRenew) {
       const membership = await this.prisma.userMembership.findUnique({
         where: { userId },
-        select: { status: true, tier: { select: { type: true } } },
+        select: { status: true, currentPeriodEnd: true, tier: { select: { type: true } } },
       });
-      effectiveAutoRenew =
-        membership != null &&
-        membership.status === 'active' &&
-        membership.tier.type !== 'free';
+      effectiveAutoRenew = isPremiumEntitled(membership);
     }
 
     // ProductBoost kaydı (pending)
