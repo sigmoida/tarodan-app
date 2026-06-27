@@ -173,6 +173,7 @@ export class CollectionService {
                 title: true,
                 price: true,
                 status: true,
+                boostedUntil: true,
               },
             },
           },
@@ -278,6 +279,7 @@ export class CollectionService {
                 title: true,
                 price: true,
                 status: true,
+                boostedUntil: true,
               },
             },
           },
@@ -1420,6 +1422,7 @@ export class CollectionService {
                         id: true,
                         title: true,
                         status: true,
+                        boostedUntil: true,
                         images: {
                           take: 1,
                           select: { cardKey: true },
@@ -1605,6 +1608,11 @@ export class CollectionService {
         }
       }
       
+      const boostedUntil = (product as any).boostedUntil
+        ? new Date((product as any).boostedUntil)
+        : null;
+      const isBoosted = boostedUntil != null && boostedUntil.getTime() > Date.now();
+
       return {
         id: item.id || '',
         productId: product.id || '',
@@ -1614,6 +1622,7 @@ export class CollectionService {
         productStatus: (product as any).status ?? 'active',
         sortOrder: item.sortOrder || 0,
         isFeatured: item.isFeatured || false,
+        isBoosted,
         addedAt: item.addedAt || new Date(),
         isCustom: false,
       };
