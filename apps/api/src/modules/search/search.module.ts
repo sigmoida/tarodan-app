@@ -6,6 +6,7 @@ import { SearchController } from './search.controller';
 import { SearchService } from './search.service';
 import { SearchIndexingService } from './search-indexing.service';
 import { SearchSyncListener } from './search-sync.listener';
+import { SearchScheduledProcessor } from './search-scheduled.processor';
 import { PrismaModule } from '../../prisma';
 import { StorageModule } from '../storage/storage.module';
 import { QUEUE_NAMES } from '../../workers/constants';
@@ -17,9 +18,10 @@ import { QUEUE_NAMES } from '../../workers/constants';
     ConfigModule,
     ScheduleModule.forRoot(),
     BullModule.registerQueue({ name: QUEUE_NAMES.SEARCH }),
+    BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [SearchController],
-  providers: [SearchService, SearchIndexingService, SearchSyncListener],
+  providers: [SearchService, SearchIndexingService, SearchSyncListener, SearchScheduledProcessor],
   exports: [SearchService, SearchIndexingService],
 })
 export class SearchModule {}

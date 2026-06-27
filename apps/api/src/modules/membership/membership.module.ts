@@ -3,6 +3,8 @@ import { BullModule } from '@nestjs/bull';
 import { MembershipController } from './membership.controller';
 import { MembershipService } from './membership.service';
 import { MembershipSchedulerService } from './membership-scheduler.service';
+import { MembershipScheduledProcessor } from './membership-scheduled.processor';
+import { QUEUE_NAMES } from '../../workers/constants';
 import { PrismaModule } from '../../prisma';
 import { PaymentModule } from '../payment/payment.module';
 import { PaymentProvidersModule } from '../payment-providers/payment-providers.module';
@@ -13,9 +15,10 @@ import { PaymentProvidersModule } from '../payment-providers/payment-providers.m
     forwardRef(() => PaymentModule),
     PaymentProvidersModule,
     BullModule.registerQueue({ name: 'email' }),
+    BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [MembershipController],
-  providers: [MembershipService, MembershipSchedulerService],
+  providers: [MembershipService, MembershipSchedulerService, MembershipScheduledProcessor],
   exports: [MembershipService, MembershipSchedulerService],
 })
 export class MembershipModule {}

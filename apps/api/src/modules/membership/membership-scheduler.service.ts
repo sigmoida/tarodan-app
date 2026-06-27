@@ -4,22 +4,35 @@
  * - Monthly premium offer emails to free users
  * - Membership expiration reminders
  */
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { TrackedCron } from '../../monitoring/tracked-cron.decorator';
+import { moneyCronsViaBull, registerRepeatableCron } from '../../monitoring/bull-cron.helper';
+import { QUEUE_NAMES } from '../../workers/constants';
 import { PrismaService } from '../../prisma';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { MembershipService } from './membership.service';
 
 @Injectable()
-export class MembershipSchedulerService {
+export class MembershipSchedulerService implements OnModuleInit {
   private readonly logger = new Logger(MembershipSchedulerService.name);
 
   constructor(
     private readonly prisma: PrismaService,
     @InjectQueue('email') private readonly emailQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
     private readonly membershipService: MembershipService,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    const on = moneyCronsViaBull();
+    await registerRepeatableCron(this.scheduledQueue, 'membership-expired-downgrades', '0 3 * * *', on, this.logger);
+    await registerRepeatableCron(this.scheduledQueue, 'membership-expiration-reminders', '0 9 * * *', on, this.logger);
+    await registerRepeatableCron(this.scheduledQueue, 'membership-monthly-offers', '0 10 1 * *', on, this.logger);
+    // Tier 3: kart çekimi (yalnız PAYTR_RECURRING_ENABLED iken gerçek çekim).
+    // Bull tek-sefer garantisi = çift-çekim kilidi.
+    await registerRepeatableCron(this.scheduledQueue, 'membership-auto-renewals', '0 * * * *', on, this.logger);
+  }
 
   /**
    * Süresi dolan paralı üyelikleri free tier'a düşür (her gün 03:00).
@@ -31,18 +44,30 @@ export class MembershipSchedulerService {
    * tier=premium kalıyordu. canCreateTrade ham tier'ı okuduğu için süresi geçmiş
    * premium kullanıcı hâlâ takas yapabiliyordu. Bu cron o boşluğu kapatır.
    */
-  @Cron('0 3 * * *') // Her gün 03:00
+  @TrackedCron('0 3 * * *') // Her gün 03:00
   async processExpiredDowngrades() {
+    if (moneyCronsViaBull()) {
+      return;
+    }
+    return this.runProcessExpiredDowngrades();
+  }
+
+  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+  async runProcessExpiredDowngrades(log: (msg: string) => void = () => {}) {
     try {
       const count = await this.membershipService.checkExpiredMemberships();
+      log(`${count} süresi dolmuş üyelik free tier'a düşürüldü`);
       if (count > 0) {
         this.logger.log(`Downgraded ${count} expired membership(s) to free tier`);
       }
+      return { summary: `${count} üyelik düşürüldü`, stats: { downgraded: count } };
     } catch (error: any) {
       this.logger.error(
         `Error downgrading expired memberships: ${error.message}`,
         error.stack,
       );
+      log(`HATA: ${error.message}`);
+      return { summary: `Hata: ${error.message}`, stats: { downgraded: 0, errors: 1 } };
     }
   }
 
@@ -50,9 +75,18 @@ export class MembershipSchedulerService {
    * Send monthly premium offer emails to free users
    * Runs on the 1st of every month at 10:00 AM
    */
-  @Cron('0 10 1 * *') // 1st of every month at 10:00 AM
+  @TrackedCron('0 10 1 * *') // 1st of every month at 10:00 AM
   async sendMonthlyPremiumOffers() {
+    if (moneyCronsViaBull()) {
+      return;
+    }
+    return this.runSendMonthlyPremiumOffers();
+  }
+
+  /** Gerçek iş — in-process cron, Bull processor ve manuel tetik buradan çağırır. */
+  async runSendMonthlyPremiumOffers(log: (msg: string) => void = () => {}) {
     this.logger.log('Starting monthly premium offer email campaign...');
+    log('Aylık premium teklif kampanyası başladı');
 
     try {
       // Get users who:
@@ -131,11 +165,17 @@ export class MembershipSchedulerService {
       }
 
       this.logger.log(`Queued ${freeUsers.length} premium offer emails`);
+      log(`${freeUsers.length} kullanıcıya premium teklif maili kuyruğa atıldı`);
 
-      return { sent: freeUsers.length };
+      return {
+        sent: freeUsers.length,
+        summary: `${freeUsers.length} premium teklif maili`,
+        stats: { sent: freeUsers.length },
+      };
     } catch (error: any) {
       this.logger.error(`Error sending premium offer emails: ${error.message}`, error.stack);
-      return { sent: 0, error: error.message };
+      log(`HATA: ${error.message}`);
+      return { sent: 0, error: error.message, summary: `Hata: ${error.message}`, stats: { sent: 0, errors: 1 } };
     }
   }
 
@@ -144,9 +184,18 @@ export class MembershipSchedulerService {
    * Runs every day at 09:00 AM
    * Sends reminders 7 days and 1 day before expiration
    */
-  @Cron('0 9 * * *') // Every day at 09:00 AM
+  @TrackedCron('0 9 * * *') // Every day at 09:00 AM
   async sendExpirationReminders() {
+    if (moneyCronsViaBull()) {
+      return;
+    }
+    return this.runSendExpirationReminders();
+  }
+
+  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+  async runSendExpirationReminders(log: (msg: string) => void = () => {}) {
     this.logger.log('Checking for expiring memberships...');
+    log('Üyelik bitiş hatırlatmaları kontrol ediliyor');
 
     try {
       const now = new Date();
@@ -236,13 +285,17 @@ export class MembershipSchedulerService {
         });
       }
 
+      log(`${expiringIn7Days.length} adet 7-gün, ${expiringTomorrow.length} adet 1-gün hatırlatması gönderildi`);
       return {
         sevenDayReminders: expiringIn7Days.length,
         oneDayReminders: expiringTomorrow.length,
+        summary: `${expiringIn7Days.length} (7g) · ${expiringTomorrow.length} (1g) hatırlatma`,
+        stats: { sevenDay: expiringIn7Days.length, oneDay: expiringTomorrow.length },
       };
     } catch (error: any) {
       this.logger.error(`Error sending expiration reminders: ${error.message}`, error.stack);
-      return { sevenDayReminders: 0, oneDayReminders: 0, error: error.message };
+      log(`HATA: ${error.message}`);
+      return { sevenDayReminders: 0, oneDayReminders: 0, error: error.message, summary: `Hata: ${error.message}`, stats: { errors: 1 } };
     }
   }
 
@@ -251,25 +304,40 @@ export class MembershipSchedulerService {
    * Gerçek çekim YALNIZCA PAYTR_RECURRING_ENABLED=true iken yapılır; aksi halde
    * MembershipService.runAutoRenewals no-op döner (yetki + flag olmadan kör çekim yok).
    */
-  @Cron('0 * * * *') // Her saat
+  @TrackedCron('0 * * * *') // Her saat
   async processAutoRenewals() {
+    if (moneyCronsViaBull()) {
+      return { renewed: 0 };
+    }
+    return this.runProcessAutoRenewals();
+  }
+
+  /** Gerçek iş — in-process cron, Bull processor ve manuel tetik buradan çağırır. */
+  async runProcessAutoRenewals(log: (msg: string) => void = () => {}) {
     try {
       const result = await this.membershipService.runAutoRenewals();
+      log(`Oto-yenileme: ${result.renewed} yenilendi · ${result.failed} başarısız · ${result.attempted} denendi`);
       if (result.attempted > 0) {
         this.logger.log(
           `Oto-yenileme turu: ${result.renewed} yenilendi, ${result.failed} başarısız (${result.attempted} denendi)`,
         );
       }
-      return { renewed: result.renewed };
+      return {
+        renewed: result.renewed,
+        summary: `${result.renewed} yenilendi · ${result.failed} başarısız`,
+        stats: { attempted: result.attempted, renewed: result.renewed, failed: result.failed },
+      };
     } catch (error: any) {
       this.logger.error(`Oto-yenileme cron hatası: ${error.message}`, error.stack);
-      return { renewed: 0 };
+      log(`HATA: ${error.message}`);
+      return { renewed: 0, summary: `Hata: ${error.message}`, stats: { errors: 1 } };
     }
   }
 
   /** Manuel tetikleme (test/admin) */
   async manualProcessAutoRenewals(): Promise<{ renewed: number }> {
-    return this.processAutoRenewals();
+    // run*()'u doğrudan çağırır: flag açıkken bile manuel tetik gerçek çekimi yapsın.
+    return this.runProcessAutoRenewals();
   }
 
   /**
@@ -277,6 +345,8 @@ export class MembershipSchedulerService {
    * Can be called by admin endpoints
    */
   async manualSendPremiumOffers(): Promise<{ sent: number }> {
-    return this.sendMonthlyPremiumOffers();
+    // run*()'u doğrudan çağırır: flag açıkken bile manuel tetik gerçek işi yapsın
+    // (guard'lı sendMonthlyPremiumOffers no-op döner).
+    return this.runSendMonthlyPremiumOffers();
   }
 }

@@ -1,8 +1,11 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
+import { BullModule } from '@nestjs/bull';
 import { OrderController } from './order.controller';
 import { OrderService } from './order.service';
 import { OrderSchedulerService } from './order-scheduler.service';
+import { OrderScheduledProcessor } from './order-scheduled.processor';
+import { QUEUE_NAMES } from '../../workers/constants';
 import { PrismaModule } from '../../prisma';
 import { EventModule } from '../events';
 import { NotificationModule } from '../notification/notification.module';
@@ -25,9 +28,10 @@ import { TaxModule } from '../tax/tax.module';
     ProductModule,
     CommissionModule,
     TaxModule,
+    BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [OrderController],
-  providers: [OrderService, OrderSchedulerService],
+  providers: [OrderService, OrderSchedulerService, OrderScheduledProcessor],
   exports: [OrderService],
 })
 export class OrderModule {}

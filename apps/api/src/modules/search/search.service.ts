@@ -5,7 +5,12 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { CronExpression } from '@nestjs/schedule';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
+import { TrackedCron } from '../../monitoring/tracked-cron.decorator';
+import { cronsViaBull, registerRepeatableCron } from '../../monitoring/bull-cron.helper';
+import { QUEUE_NAMES } from '../../workers/constants';
 import { PrismaService } from '../../prisma';
 import { Client } from '@elastic/elasticsearch';
 import { Prisma, ProductStatus } from '@prisma/client';
@@ -98,6 +103,7 @@ export class SearchService implements OnModuleInit {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
+    @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
   ) {}
 
   async onModuleInit() {
@@ -120,6 +126,15 @@ export class SearchService implements OnModuleInit {
       this.syncIndexIfEmpty();
       this.syncCollectionsIndexIfEmpty();
     });
+
+    // Cron'u Bull repeatable'a senkronla (flag açıksa kaydet, kapalıysa temizle).
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      'search-periodic-sync',
+      '0 */5 * * * *',
+      cronsViaBull(),
+      this.logger,
+    );
   }
 
   /** ES bağlı ama index boş, DB'de ürün varsa reindex çalıştır (db:reset senaryosu) */
@@ -1251,9 +1266,20 @@ export class SearchService implements OnModuleInit {
 
   // ──────────────────────────── Periodic Sync ────────────────────────────
 
-  @Cron(CronExpression.EVERY_5_MINUTES)
+  @TrackedCron(CronExpression.EVERY_5_MINUTES)
   async handlePeriodicSync() {
-    if (!this.esAvailable) return;
+    if (cronsViaBull()) {
+      return;
+    }
+    return this.runHandlePeriodicSync();
+  }
+
+  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+  async runHandlePeriodicSync(log: (msg: string) => void = () => {}) {
+    if (!this.esAvailable) {
+      log('Elasticsearch erişilemez, atlandı');
+      return { summary: 'ES erişilemez, atlandı', stats: { skipped: 1 } };
+    }
 
     try {
       const dbCount = await this.prisma.product.count({
@@ -1262,15 +1288,28 @@ export class SearchService implements OnModuleInit {
 
       const esResponse = await this.client.count({ index: this.PRODUCTS_INDEX });
       const esCount = esResponse.count;
+      const drift = Math.abs(dbCount - esCount);
+      log(`DB=${dbCount}, ES=${esCount}, fark=${drift}`);
 
-      if (Math.abs(dbCount - esCount) > 2) {
+      if (drift > 2) {
         this.logger.warn(
           `ES/DB count mismatch: DB=${dbCount}, ES=${esCount}. Running delta sync...`,
         );
+        log('Fark > 2 → delta sync çalıştırılıyor');
         await this.deltaSync();
+        return {
+          summary: `Senkron yapıldı (DB=${dbCount}, ES=${esCount})`,
+          stats: { dbCount, esCount, drift, synced: 1 },
+        };
       }
-    } catch (error) {
+      return {
+        summary: `Senkron OK (DB=${dbCount}, ES=${esCount})`,
+        stats: { dbCount, esCount, drift, synced: 0 },
+      };
+    } catch (error: any) {
       this.logger.warn('Periodic sync check failed');
+      log(`HATA: ${error?.message ?? error}`);
+      return { summary: `Hata: ${error?.message ?? error}`, stats: { errors: 1 } };
     }
   }
 

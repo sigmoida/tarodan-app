@@ -2,33 +2,60 @@
  * Scheduled Notification Scheduler
  * Processes pending scheduled notifications at their scheduled time
  */
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
+import { TrackedCron } from '../../monitoring/tracked-cron.decorator';
+import { cronsViaBull, registerRepeatableCron } from '../../monitoring/bull-cron.helper';
+import { QUEUE_NAMES } from '../../workers/constants';
 import { PrismaService } from '../../prisma';
 import { AdminService } from './admin.service';
 
 @Injectable()
-export class ScheduledNotificationScheduler {
+export class ScheduledNotificationScheduler implements OnModuleInit {
     private readonly logger = new Logger(ScheduledNotificationScheduler.name);
     private isProcessing = false;
 
     constructor(
         private readonly prisma: PrismaService,
         private readonly adminService: AdminService,
+        @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
     ) { }
+
+    async onModuleInit(): Promise<void> {
+        await registerRepeatableCron(
+            this.scheduledQueue,
+            'process-scheduled-notifications',
+            '0 * * * * *',
+            cronsViaBull(),
+            this.logger,
+        );
+    }
 
     /**
      * Runs every minute to check for due scheduled notifications
      */
-    @Cron('0 * * * * *') // Every minute at second 0
+    @TrackedCron('0 * * * * *') // Every minute at second 0
     async processScheduledNotifications(): Promise<void> {
+        if (cronsViaBull()) {
+            return;
+        }
+        await this.runProcessScheduledNotifications();
+    }
+
+    /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+    async runProcessScheduledNotifications(
+        log: (msg: string) => void = () => { },
+    ): Promise<{ summary: string; stats: Record<string, number> }> {
         // Prevent concurrent execution
         if (this.isProcessing) {
             this.logger.debug('Already processing scheduled notifications, skipping...');
-            return;
+            return { summary: 'Zaten çalışıyor, atlandı', stats: { skipped: 1 } };
         }
 
         this.isProcessing = true;
+        let sent = 0;
+        let failed = 0;
 
         try {
             const now = new Date();
@@ -45,10 +72,12 @@ export class ScheduledNotificationScheduler {
 
             if (dueNotifications.length === 0) {
                 this.logger.debug('No scheduled notifications due');
+                log('0 bekleyen bildirim bulundu');
                 this.isProcessing = false;
-                return;
+                return { summary: '0 bekleyen bildirim', stats: { due: 0, sent: 0, failed: 0 } };
             }
 
+            log(`${dueNotifications.length} bekleyen bildirim bulundu`);
             this.logger.log(`Processing ${dueNotifications.length} scheduled notifications`);
 
             for (const notification of dueNotifications) {
@@ -90,6 +119,8 @@ export class ScheduledNotificationScheduler {
 
                     if (userIds.length === 0) {
                         this.logger.warn(`No target users found for scheduled notification ${notification.id}`);
+                        failed++;
+                        log(`bildirim ${notification.id} → hedef kullanıcı yok, atlandı`);
                         await this.prisma.scheduledNotification.update({
                             where: { id: notification.id },
                             data: {
@@ -124,9 +155,13 @@ export class ScheduledNotificationScheduler {
                         },
                     });
 
+                    sent++;
+                    log(`bildirim ${notification.id} → ${userIds.length} kullanıcıya gönderildi`);
                     this.logger.log(`Scheduled notification ${notification.id} sent to ${userIds.length} users`);
                 } catch (error) {
                     this.logger.error(`Failed to process scheduled notification ${notification.id}:`, error);
+                    failed++;
+                    log(`bildirim ${notification.id} → HATA (gönderilemedi)`);
 
                     await this.prisma.scheduledNotification.update({
                         where: { id: notification.id },
@@ -137,8 +172,12 @@ export class ScheduledNotificationScheduler {
                     });
                 }
             }
+
+            const summary = `${dueNotifications.length} bekleyen · ${sent} gönderildi · ${failed} başarısız`;
+            return { summary, stats: { due: dueNotifications.length, sent, failed } };
         } catch (error) {
             this.logger.error('Error in scheduled notification processor:', error);
+            return { summary: `İşleme hatası (${sent} gönderildi)`, stats: { sent, failed } };
         } finally {
             this.isProcessing = false;
         }

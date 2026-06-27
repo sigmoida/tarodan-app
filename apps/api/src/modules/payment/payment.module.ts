@@ -2,10 +2,13 @@ import { Module, NestModule, MiddlewareConsumer, forwardRef } from '@nestjs/comm
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { ScheduleModule } from '@nestjs/schedule';
+import { BullModule } from '@nestjs/bull';
 import { PaymentController } from './payment.controller';
 import { PaytrCallbackAliasController } from './paytr-callback-alias.controller';
 import { PaymentService } from './payment.service';
 import { PaymentSchedulerService } from './payment-scheduler.service';
+import { PaymentScheduledProcessor } from './payment-scheduled.processor';
+import { QUEUE_NAMES } from '../../workers/constants';
 import { PrismaModule } from '../../prisma';
 import { CacheModule } from '../cache/cache.module';
 import { PaymentProvidersModule } from '../payment-providers';
@@ -34,6 +37,7 @@ import { StorageModule } from '../storage/storage.module';
     CommissionModule,
     StorageModule,
     forwardRef(() => ProductModule),
+    BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -44,7 +48,7 @@ import { StorageModule } from '../storage/storage.module';
     }),
   ],
   controllers: [PaymentController, PaytrCallbackAliasController],
-  providers: [PaymentService, PaymentSchedulerService, RawBodyMiddleware],
+  providers: [PaymentService, PaymentSchedulerService, PaymentScheduledProcessor, RawBodyMiddleware],
   exports: [PaymentService],
 })
 export class PaymentModule implements NestModule {
