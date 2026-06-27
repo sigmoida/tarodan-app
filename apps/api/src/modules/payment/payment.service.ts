@@ -4186,6 +4186,20 @@ export class PaymentService {
             : p.order?.product
               ? [toImageUrls(p.order.product)]
               : [],
+          // Grup (sepet) ödemesinde her siparişin detayı — ödeme geçmişi tablosundaki
+          // "Sepet ödemesi (N ürün)" satırı bunları dropdown ile açar (her ürün ayrı
+          // sipariş: kendi no'su, tutarı, satıcısı, durumu, /orders/:id linki).
+          orders: group
+            ? (group.orders ?? []).map((o: any) => ({
+                id: o.id,
+                orderNumber: o.orderNumber ?? null,
+                title: o.product?.title ?? 'Ürün',
+                image: toImageUrls(o.product)?.images?.[0] ?? null,
+                amount: Number(o.totalAmount ?? 0),
+                sellerName: o.seller?.displayName ?? null,
+                status: o.status,
+              }))
+            : undefined,
           buyer: p.order?.buyer ?? group?.buyer ?? null,
           seller: p.order?.seller ?? firstGroupOrder?.seller ?? null,
           createdAt: p.createdAt,
