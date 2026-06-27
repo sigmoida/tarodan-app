@@ -10,4 +10,6 @@ export const QUEUE_NAMES = {
     SEARCH: 'search',
     ANALYTICS: 'analytics',
     MODERATION: 'moderation',
+    // Cron-tipi zamanlanmış işler (pilot: expireBoosts) — Bull repeatable.
+    SCHEDULED: 'scheduled',
 } as const;

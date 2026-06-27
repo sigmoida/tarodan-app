@@ -1,8 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
+import { BullModule } from '@nestjs/bull';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 import { ScheduledNotificationScheduler } from './scheduled-notification.scheduler';
+import { ScheduledNotificationProcessor } from './scheduled-notification.processor';
+import { QUEUE_NAMES } from '../../workers/constants';
 import { PrismaModule } from '../../prisma';
 import { AuthModule } from '../auth';
 import { PaymentModule } from '../payment';
@@ -43,9 +46,10 @@ import { OrderModule } from '../order/order.module';
     NotificationModule,
     OrderModule,
     ModerationModule,
+    BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [AdminController],
-  providers: [AdminService, ScheduledNotificationScheduler],
+  providers: [AdminService, ScheduledNotificationScheduler, ScheduledNotificationProcessor],
   exports: [AdminService],
 })
 export class AdminModule { }

@@ -18,6 +18,7 @@ import { AppModule } from './app.module';
 
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { json, urlencoded } from 'express';
+import { setupBullBoard } from './bull-board.setup';
 
 /**
  * Hard guard: PAYMENT_BYPASS allows completing payments without going through
@@ -60,6 +61,11 @@ async function bootstrap() {
     // Custom Body Parsers (e.g. PayTR form-urlencoded callbacks)
     app.use(json({ limit: '50mb' }));
     app.use(urlencoded({ extended: true, limit: '50mb' }));
+
+    // Bull Board — kuyruk izleme dashboard'u. helmet'TEN ÖNCE mount edilir
+    // ki CSP UI'ı bozmasın; istek burada yanıtlanıp helmet'e düşmez.
+    // Tamamen opsiyonel + try/catch'li: açılışı asla bloklamaz.
+    setupBullBoard(app, logger);
 
     // Security
     app.use(helmet());

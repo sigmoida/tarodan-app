@@ -171,7 +171,10 @@ export class EventService {
     // buyer gets order-paid + invoice, seller gets the "Yeni Sipariş" email + push.
     // Here we only track analytics for the checkout-initiated funnel.
 
-    // Queue analytics event
+    // DISABLED — analytics 'track-event' kuyrukta handler'sız + tablosuz boşa fail
+    // ediyordu. Üretim durduruldu. (Funnel analitiği için: AnalyticsEvent tablosu +
+    // @Process('track-event') ekle.)
+    /*
     await this.analyticsQueue.add('track-event', {
       event: 'order_created',
       properties: {
@@ -184,6 +187,7 @@ export class EventService {
         timestamp: new Date().toISOString(),
       },
     });
+    */
 
     this.logger.log(`order.created event emitted for order ${payload.orderNumber}`);
   }
@@ -275,6 +279,8 @@ export class EventService {
     // Do NOT auto-create shipment here – order stays "Hazırlanıyor" until seller enters tracking / marks shipped
 
     // Queue analytics event
+    // DISABLED — analytics 'track-event' (handler/tablo yok, boşa fail ediyordu).
+    /*
     await this.analyticsQueue.add('track-event', {
       event: 'order_paid',
       properties: {
@@ -289,6 +295,7 @@ export class EventService {
         timestamp: new Date().toISOString(),
       },
     });
+    */
 
     this.logger.log(`order.paid event emitted for order ${payload.orderNumber}`);
   }
@@ -395,6 +402,8 @@ export class EventService {
     });
 
     // Queue analytics event
+    // DISABLED — analytics 'track-event' (handler/tablo yok, boşa fail ediyordu).
+    /*
     await this.analyticsQueue.add('track-event', {
       event: 'offer_created',
       properties: {
@@ -407,6 +416,7 @@ export class EventService {
         timestamp: new Date().toISOString(),
       },
     });
+    */
 
     this.logger.log(`offer.created event emitted for offer ${payload.offerId}`);
   }
@@ -456,6 +466,8 @@ export class EventService {
     });
 
     // Queue analytics event
+    // DISABLED — analytics 'track-event' (handler/tablo yok, boşa fail ediyordu).
+    /*
     await this.analyticsQueue.add('track-event', {
       event: 'offer_accepted',
       properties: {
@@ -469,6 +481,7 @@ export class EventService {
         timestamp: new Date().toISOString(),
       },
     });
+    */
 
     this.logger.log(`offer.accepted event emitted for offer ${payload.offerId}`);
   }

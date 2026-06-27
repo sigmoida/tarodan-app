@@ -5,30 +5,50 @@
  * - Monthly promotions (1st of every month at 10:00 AM)
  * - Special campaigns (configurable)
  */
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
+import { TrackedCron } from '../../monitoring/tracked-cron.decorator';
+import { cronsViaBull, registerRepeatableCron } from '../../monitoring/bull-cron.helper';
+import { QUEUE_NAMES } from '../../workers/constants';
 import { PrismaService } from '../../prisma';
 import { SmtpProvider } from '../notification/providers/smtp.provider';
 import { StorageService } from '../storage/storage.service';
 import { renderEmailTemplate, getEmailTemplateSubject, substituteEmailVariables } from '../../common/helpers/email-template-renderer';
 
 @Injectable()
-export class MarketingSchedulerService {
+export class MarketingSchedulerService implements OnModuleInit {
   private readonly logger = new Logger(MarketingSchedulerService.name);
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly smtpProvider: SmtpProvider,
     private readonly storageService: StorageService,
+    @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    const on = cronsViaBull();
+    await registerRepeatableCron(this.scheduledQueue, 'marketing-weekly', '0 9 * * 1', on, this.logger);
+    await registerRepeatableCron(this.scheduledQueue, 'marketing-monthly', '0 10 1 * *', on, this.logger);
+  }
 
   /**
    * Send weekly newsletter to users who accept marketing emails
    * Runs every Monday at 9:00 AM
    */
-  @Cron('0 9 * * 1') // Every Monday at 9:00 AM
+  @TrackedCron('0 9 * * 1') // Every Monday at 9:00 AM
   async sendWeeklyNewsletter() {
+    if (cronsViaBull()) {
+      return;
+    }
+    return this.runSendWeeklyNewsletter();
+  }
+
+  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+  async runSendWeeklyNewsletter(log: (msg: string) => void = () => {}) {
     this.logger.log('Starting weekly newsletter email campaign...');
+    log('Haftalık bülten kampanyası başladı');
 
     try {
       // Get users who accept marketing emails and are verified
@@ -103,8 +123,12 @@ export class MarketingSchedulerService {
       }
 
       this.logger.log(`Sent ${filteredUsers.length} weekly newsletter emails`);
+      log(`${filteredUsers.length} kullanıcıya haftalık bülten gönderildi`);
+      return { summary: `${filteredUsers.length} bülten gönderildi`, stats: { sent: filteredUsers.length } };
     } catch (error: any) {
       this.logger.error(`Error sending weekly newsletter: ${error.message}`, error.stack);
+      log(`HATA: ${error.message}`);
+      return { summary: `Hata: ${error.message}`, stats: { sent: 0, errors: 1 } };
     }
   }
 
@@ -112,8 +136,16 @@ export class MarketingSchedulerService {
    * Send monthly promotional emails
    * Runs on the 1st of every month at 10:00 AM
    */
-  @Cron('0 10 1 * *') // 1st of every month at 10:00 AM
+  @TrackedCron('0 10 1 * *') // 1st of every month at 10:00 AM
   async sendMonthlyPromotions() {
+    if (cronsViaBull()) {
+      return;
+    }
+    return this.runSendMonthlyPromotions();
+  }
+
+  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+  async runSendMonthlyPromotions(log: (msg: string) => void = () => {}) {
     this.logger.log('Starting monthly promotional email campaign...');
 
     try {
@@ -193,8 +225,12 @@ export class MarketingSchedulerService {
       }
 
       this.logger.log(`Sent ${filteredUsers.length} monthly promotion emails`);
+      log(`${filteredUsers.length} kullanıcıya aylık kampanya gönderildi`);
+      return { summary: `${filteredUsers.length} kampanya maili gönderildi`, stats: { sent: filteredUsers.length } };
     } catch (error: any) {
       this.logger.error(`Error sending monthly promotions: ${error.message}`, error.stack);
+      log(`HATA: ${error.message}`);
+      return { summary: `Hata: ${error.message}`, stats: { sent: 0, errors: 1 } };
     }
   }
 

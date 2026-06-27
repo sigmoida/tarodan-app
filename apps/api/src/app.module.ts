@@ -61,6 +61,9 @@ import { WebSocketModule } from './modules/websocket';
 // Sentry for error tracking and performance monitoring
 import { SentryModule } from './modules/sentry';
 
+// Cron job monitoring (in-app tracker + Sentry check-ins)
+import { MonitoringModule } from './monitoring/monitoring.module';
+
 // Health check for monitoring
 import { HealthModule } from './modules/health';
 
@@ -168,6 +171,9 @@ import { ErrorLogInterceptor } from './common/interceptors/error-log.interceptor
 
     // Sentry for error tracking
     SentryModule,       // Error tracking & Performance monitoring
+
+    // Cron job monitoring (global) — @TrackedCron + /admin/jobs dashboard
+    MonitoringModule,
 
     // Health check endpoints
     HealthModule,       // /health, /health/detailed, /health/live, /health/ready

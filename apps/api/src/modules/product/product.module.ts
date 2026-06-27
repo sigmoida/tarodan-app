@@ -6,6 +6,7 @@ import { ProductService } from './product.service';
 import { ProductBoostService } from './product-boost.service';
 import { ProductController } from './product.controller';
 import { ProductSchedulerService } from './product-scheduler.service';
+import { BoostScheduledProcessor } from './boost-scheduled.processor';
 import { ProductLockService } from './product-lock.service';
 import { MembershipModule } from '../membership/membership.module';
 import { SearchModule } from '../search/search.module';
@@ -25,10 +26,12 @@ import { PaymentModule } from '../payment';
     StorageModule,
     forwardRef(() => PaymentModule),
     BullModule.registerQueue({ name: QUEUE_NAMES.MODERATION }),
+    // Pilot: cron-tipi işler için 'scheduled' kuyruğu (Bull Board otomatik gösterir).
+    BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
     ModerationModule,
   ],
   controllers: [ProductController],
-  providers: [ProductService, ProductBoostService, ProductSchedulerService, ProductLockService],
+  providers: [ProductService, ProductBoostService, ProductSchedulerService, ProductLockService, BoostScheduledProcessor],
   exports: [ProductService, ProductBoostService, ProductSchedulerService, ProductLockService],
 })
 export class ProductModule {}
