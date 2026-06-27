@@ -77,10 +77,35 @@ model User {
   refundRequests          RefundRequest[]          @relation("UserRefundRequests")
   savedCards              SavedCard[]
   oauthAccounts           OAuthAccount[]
+  reports                 Report[]                 @relation("ReporterReports")
 
   @@index([email])
   @@index([isSeller])
   @@map("users")
+}
+
+/// Kullanıcıların gönderdiği içerik şikayetleri (ürün/kullanıcı/koleksiyon/mesaj).
+/// Hedef polimorfik olduğu için targetId düz string olarak tutulur (FK yok).
+model Report {
+  id          String   @id @default(uuid())
+  reporterId  String   @map("reporter_id")
+  type        String // product | user | collection | message
+  targetId    String   @map("target_id")
+  reason      String
+  description String?
+  status      String   @default("pending") // pending | under_review | resolved | dismissed
+  adminNote   String?  @map("admin_note")
+  resolvedAt  DateTime? @map("resolved_at")
+  resolvedBy  String?  @map("resolved_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  reporter    User     @relation("ReporterReports", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([type])
+  @@index([reporterId])
+  @@index([createdAt])
+  @@map("reports")
 }
 
 model OAuthAccount {
@@ -1829,6 +1854,7 @@ enum ProductStatus {
   inactive
   rejected
   deleted
+  suspended
 }
 
 enum ProductCondition {
