@@ -302,25 +302,30 @@ export default function SupportPage() {
                     const status = STATUS_CONFIG[ticket.status] || STATUS_CONFIG.open;
                     const category = CATEGORIES.find((c) => c.id === ticket.category);
                     return (
-                      <li key={ticket.id} className="py-4 flex items-center gap-4">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-heading truncate">{ticket.subject}</p>
-                          <p className="text-sm text-muted">
-                            {category?.label || ticket.category}
-                            {' · '}
-                            {new Date(ticket.createdAt).toLocaleDateString('tr-TR', {
-                              day: 'numeric',
-                              month: 'long',
-                              year: 'numeric',
-                            })}
-                          </p>
-                        </div>
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${status.className}`}
+                      <li key={ticket.id}>
+                        <Link
+                          href={`/support/${ticket.id}`}
+                          className="py-4 flex items-center gap-4 hover:bg-surface -mx-2 px-2 rounded-lg transition-colors"
                         >
-                          {status.label}
-                        </span>
-                        <ChevronRightIcon className="w-5 h-5 text-subtle flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-heading truncate">{ticket.subject}</p>
+                            <p className="text-sm text-muted">
+                              {category?.label || ticket.category}
+                              {' · '}
+                              {new Date(ticket.createdAt).toLocaleDateString('tr-TR', {
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric',
+                              })}
+                            </p>
+                          </div>
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${status.className}`}
+                          >
+                            {status.label}
+                          </span>
+                          <ChevronRightIcon className="w-5 h-5 text-subtle flex-shrink-0" />
+                        </Link>
                       </li>
                     );
                   })}

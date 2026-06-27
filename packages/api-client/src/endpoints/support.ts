@@ -11,7 +11,7 @@ export class SupportEndpoints {
   constructor(private client: ApiClient) {}
 
   async getMyTickets(query?: { page?: number; limit?: number; status?: string }): Promise<PaginatedResponse<SupportTicket>> {
-    const response = await this.client.get<PaginatedResponse<SupportTicket>>('/support/tickets', { params: query });
+    const response = await this.client.get<PaginatedResponse<SupportTicket>>('/support/tickets/me', { params: query });
     return response.data;
   }
 
@@ -26,7 +26,7 @@ export class SupportEndpoints {
   }
 
   async replyToTicket(id: string, data: ReplyToTicketDto): Promise<void> {
-    await this.client.post(`/support/tickets/${id}/reply`, data);
+    await this.client.post(`/support/tickets/${id}/messages`, data);
   }
 
   async closeTicket(id: string): Promise<SupportTicket> {
