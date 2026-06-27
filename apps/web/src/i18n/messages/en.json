@@ -684,6 +684,7 @@
     "clearSelection": "Clear Selection",
     "productsAddedToCollection": "products added to collection",
     "productsAddFailed": "Failed to add products",
+    "alreadyInCollection": "product(s) already in collection",
     "removeProductConfirm": "Are you sure you want to remove this product from the collection?",
     "productRemoved": "Product removed from collection",
     "productRemoveFailed": "Failed to remove product",

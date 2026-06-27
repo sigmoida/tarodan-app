@@ -47,6 +47,7 @@ interface CollectionItem {
   productStatus?: string;
   sortOrder: number;
   isFeatured: boolean;
+  isBoosted?: boolean;
   addedAt: string;
   isCustom: boolean;
   customTitle?: string;
@@ -257,10 +258,24 @@ export default function CollectionDetailClient() {
   const fetchMyProducts = async () => {
     setLoadingProducts(true);
     try {
-      const response = await userApi.getMyProducts();
-      const products = response.data.data || response.data.products || [];
-      const existingProductIds = collection?.items?.map(item => item.productId) || [];
-      const availableProducts = products.filter((p: UserProduct) => !existingProductIds.includes(p.id));
+      // products/my sayfa başına en fazla 20 (varsayılan) / 100 (maks) döner.
+      // 20'den fazla ilanı olan kullanıcıda eklemek istenen ürün listede hiç
+      // görünmüyordu; tüm sayfaları gezip TÜM ilanları topla.
+      const PAGE_SIZE = 100;
+      const all: UserProduct[] = [];
+      for (let page = 1; page <= 50; page++) {
+        const response = await userApi.getMyProducts({ page, limit: PAGE_SIZE });
+        const products = response.data.data || response.data.products || [];
+        all.push(...products);
+        if (products.length < PAGE_SIZE) break;
+      }
+      // Zaten koleksiyonda olan ürünleri çıkar (custom item'ların productId'si yok).
+      const existingProductIds = new Set(
+        (collection?.items || [])
+          .map(item => item.productId)
+          .filter((id): id is string => !!id),
+      );
+      const availableProducts = all.filter((p: UserProduct) => !existingProductIds.has(p.id));
       setMyProducts(availableProducts);
     } catch (error) {
       if (process.env.NODE_ENV === 'development') console.error('Failed to fetch my products:', error);
@@ -317,12 +332,47 @@ export default function CollectionDetailClient() {
     if (selectedProductIds.length === 0 || !collection) { toast.error(t('collection.selectItems')); return; }
     setAddingItem(true);
     try {
-      const addPromises = selectedProductIds.map(productId => collectionsApi.addItem(collection.id, { productId }));
-      await Promise.all(addPromises);
-      toast.success(`${selectedProductIds.length} ${t('collection.productsAddedToCollection')}`);
-      setShowAddItemModal(false);
-      setSelectedProductIds([]);
+      // Tek bir ürün hata verince Promise.all tüm batch'i iptal ediyordu; başarılı
+      // eklenenler sunucuda eklenmiş olsa bile UI hata gösterip listeyi tazelemiyordu.
+      // allSettled ile her ürünü bağımsız değerlendir; "zaten koleksiyonda"yı başarı say.
+      const results = await Promise.allSettled(
+        selectedProductIds.map(productId => collectionsApi.addItem(collection.id, { productId })),
+      );
+
+      let added = 0;
+      let alreadyIn = 0;
+      let failed = 0;
+      for (const r of results) {
+        if (r.status === 'fulfilled') { added++; continue; }
+        const msg: string = r.reason?.response?.data?.message || '';
+        if (r.reason?.response?.status === 400 && msg.includes('zaten koleksiyonda')) {
+          alreadyIn++;
+        } else {
+          failed++;
+        }
+      }
+
+      // Sunucu durumunu her halükârda yansıt.
       await queryClient.invalidateQueries({ queryKey: ['collection', collectionIdOrSlug] });
+
+      if (added > 0) {
+        toast.success(`${added} ${t('collection.productsAddedToCollection')}`);
+      }
+      if (alreadyIn > 0) {
+        toast(`${alreadyIn} ${t('collection.alreadyInCollection')}`);
+      }
+      if (failed > 0) {
+        toast.error(t('collection.productsAddFailed'));
+      }
+
+      if (failed === 0) {
+        setShowAddItemModal(false);
+        setSelectedProductIds([]);
+      } else {
+        // Başarısızları seçimden düş ve listeyi tazele.
+        setSelectedProductIds([]);
+        await fetchMyProducts();
+      }
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Failed to add items:', error);
       toast.error(error.response?.data?.message || t('collection.productsAddFailed'));
@@ -532,9 +582,9 @@ export default function CollectionDetailClient() {
                   transition={{ delay: index * 0.03 }}
                 >
                   <div className="bg-surface-elevated rounded border border-border overflow-hidden hover:border-primary-300 hover:shadow-md transition-all relative group">
-                    {item.isFeatured && (
+                    {item.isBoosted && item.productStatus !== 'sold' && (
                       <div className="absolute top-1.5 left-1.5 z-10">
-                        <span className="px-1.5 py-0.5 bg-warning-500 text-inverted text-[10px] font-semibold rounded">{t('collection.featured')}</span>
+                        <span className="px-1.5 py-0.5 bg-warning-500 text-inverted text-[10px] font-semibold rounded">{locale === 'en' ? 'Sponsored' : 'Sponsorlu'}</span>
                       </div>
                     )}
                     {item.isCustom && (

@@ -683,6 +683,7 @@
     "clearSelection": "Seçimi Temizle",
     "productsAddedToCollection": "ürün koleksiyona eklendi",
     "productsAddFailed": "Ürünler eklenemedi",
+    "alreadyInCollection": "ürün zaten koleksiyonda",
     "removeProductConfirm": "Bu ürünü koleksiyondan kaldırmak istediğinizden emin misiniz?",
     "productRemoved": "Ürün koleksiyondan kaldırıldı",
     "productRemoveFailed": "Ürün kaldırılamadı",
