@@ -5,7 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { CronExpression } from '@nestjs/schedule';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { TrackedCron } from '../../monitoring/tracked-cron.decorator';
