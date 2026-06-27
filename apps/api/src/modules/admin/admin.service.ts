@@ -1315,7 +1315,7 @@ export class AdminService {
       throw new BadRequestException('Kullanıcı zaten banlı');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // 1. User'ı banla
       const updatedUser = await tx.user.update({
         where: { id: userId },
@@ -1327,14 +1327,20 @@ export class AdminService {
         } as any,
       });
 
-      // 2. Aktif ürünleri inactive yap
+      // 2. Aktif ürünleri suspended (askıya alındı) yap — kullanıcının kendi
+      //    pasife aldığı (inactive) ilanlardan AYRI bir state. Ban açılınca bu
+      //    ilanlar otomatik active'e döner; yeniden admin onayına GİRMEZ.
+      const toSuspend = await tx.product.findMany({
+        where: { sellerId: userId, status: ProductStatus.active },
+        select: { id: true },
+      });
       await tx.product.updateMany({
         where: {
           sellerId: userId,
           status: ProductStatus.active,
         },
         data: {
-          status: ProductStatus.inactive,
+          status: ProductStatus.suspended,
         },
       });
 
@@ -1365,8 +1371,25 @@ export class AdminService {
 
       this.logger.warn(`User ${userId} banned by admin ${adminId}: ${dto.reason}`);
 
-      return { success: true, userId, reason: dto.reason };
+      return { success: true, userId, reason: dto.reason, suspendedIds: toSuspend.map((p) => p.id) };
     });
+
+    // Askıya alınan ilanları aramadan/listeden düşür (suspended allowlist'te değil).
+    if (result.suspendedIds.length > 0) {
+      await this.cache.delPattern('products:list:*');
+      await Promise.all(
+        result.suspendedIds.map((id) =>
+          this.cache.del(`product:${id}`).catch(() => {}),
+        ),
+      );
+      for (const id of result.suspendedIds) {
+        this.searchService
+          .syncProduct(id)
+          .catch((err) => this.logger.warn(`ES sync (ban) failed for ${id}: ${err?.message}`));
+      }
+    }
+
+    return { success: true, userId, reason: dto.reason };
   }
 
   // ==================== PRODUCT MANAGEMENT ====================
@@ -2854,7 +2877,7 @@ export class AdminService {
       throw new BadRequestException('Kullanıcı zaten banlı değil');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // 1. User'ı unban yap
       const updatedUser = await tx.user.update({
         where: { id: userId },
@@ -2866,13 +2889,42 @@ export class AdminService {
         } as any,
       });
 
-      // 2. Audit log oluştur
+      // 2. Ban ile askıya alınan (suspended) ilanları otomatik active'e döndür.
+      //    Bunlar ban öncesi zaten yayındaydı → yeniden admin onayına GİRMEZ.
+      //    Kullanıcının kendi pasife aldığı (inactive) ilanlara dokunulmaz.
+      const toRestore = await tx.product.findMany({
+        where: { sellerId: userId, status: ProductStatus.suspended },
+        select: { id: true },
+      });
+      await tx.product.updateMany({
+        where: { sellerId: userId, status: ProductStatus.suspended },
+        data: { status: ProductStatus.active },
+      });
+
+      // 3. Audit log oluştur
       await this.createAuditLog(adminId, 'user_unban', 'User', userId, user, updatedUser);
 
       this.logger.log(`User ${userId} unbanned by admin ${adminId}`);
 
-      return { success: true, userId };
+      return { success: true, userId, restoredIds: toRestore.map((p) => p.id) };
     });
+
+    // Geri açılan ilanları arama/listeye yeniden ekle.
+    if (result.restoredIds.length > 0) {
+      await this.cache.delPattern('products:list:*');
+      await Promise.all(
+        result.restoredIds.map((id) =>
+          this.cache.del(`product:${id}`).catch(() => {}),
+        ),
+      );
+      for (const id of result.restoredIds) {
+        this.searchService
+          .syncProduct(id)
+          .catch((err) => this.logger.warn(`ES sync (unban) failed for ${id}: ${err?.message}`));
+      }
+    }
+
+    return { success: true, userId };
   }
 
   /**
