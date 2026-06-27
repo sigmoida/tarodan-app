@@ -334,8 +334,8 @@ export class SupportService {
           _count: { select: { messages: true } },
         },
         orderBy: [
+          { createdAt: 'desc' },
           { priority: 'desc' },
-          { createdAt: 'asc' },
         ],
         skip: (safePage - 1) * safePageSize,
         take: safePageSize,
