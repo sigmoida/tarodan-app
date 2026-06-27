@@ -1063,9 +1063,19 @@ export class MembershipService {
         include: { tier: true },
       });
     }
+    // İptal edilen (cancelled) paralı üye, ödenen dönem (currentPeriodEnd) bitene
+    // kadar premium özelliklerini KULLANMAYA devam eder ("süre bitince üyelik gider").
+    // Bu yüzden currentPeriodEnd henüz geçmemişse cancelled da takas yapabilir.
+    // Dönem sonunda cron (checkExpiredMemberships) free'ye düşürür.
+    const now = new Date();
+    const stillInPaidPeriod =
+      membership?.status === SubscriptionStatus.cancelled &&
+      membership?.currentPeriodEnd != null &&
+      membership.currentPeriodEnd > now;
     const eligibleStatus =
       membership?.status === SubscriptionStatus.active ||
-      membership?.status === SubscriptionStatus.past_due;
+      membership?.status === SubscriptionStatus.past_due ||
+      stillInPaidPeriod;
 
     if (!membership || !membership.tier?.canTrade || !eligibleStatus) {
       return {
