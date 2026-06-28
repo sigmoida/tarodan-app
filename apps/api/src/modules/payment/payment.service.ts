@@ -4316,15 +4316,15 @@ export class PaymentService {
   }
 
   /**
-   * 30-dk rezervasyon serbest bırakma. pending_payment siparişler PAYMENT_TIMEOUT_MINUTES
-   * (varsayılan 30) içinde ödenmediyse stok rezervasyonu kaldırılır, AMA sipariş yaşamaya
+   * Rezervasyon serbest bırakma. pending_payment siparişler PAYMENT_TIMEOUT_MINUTES
+   * (varsayılan 5 dk) içinde ödenmediyse stok rezervasyonu kaldırılır, AMA sipariş yaşamaya
    * devam eder (status pending_payment kalır, reservationReleasedAt set edilir). Alıcı
    * 24 saat içinde tekrar payment-initiate çağırırsa stok varsa yeniden rezerv alınır.
    * 24h kill-switch'i için ayrı method: expireUnpaidOrders.
    */
   async releaseExpiredOrderReservations(): Promise<{ count: number }> {
     const timeoutMinutes = parseInt(
-      this.configService.get('PAYMENT_TIMEOUT_MINUTES') || '30',
+      this.configService.get('PAYMENT_TIMEOUT_MINUTES') || '5',
       10,
     );
     const cutoff = new Date();
@@ -4652,7 +4652,7 @@ export class PaymentService {
    */
   async cancelExpiredPayments() {
     const timeoutMinutes = parseInt(
-      this.configService.get('PAYMENT_TIMEOUT_MINUTES') || '30',
+      this.configService.get('PAYMENT_TIMEOUT_MINUTES') || '5',
       10,
     );
     const timeoutDate = new Date();
