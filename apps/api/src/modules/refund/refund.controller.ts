@@ -13,7 +13,6 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateRefundRequestDto } from './dto/create-refund-request.dto';
-import { RejectRefundRequestDto } from './dto/reject-refund-request.dto';
 import { RefundService } from './refund.service';
 
 @ApiTags('refund-requests')
@@ -63,26 +62,5 @@ export class RefundController {
     @CurrentUser('id') userId: string,
   ) {
     return this.refundService.cancelRefundRequest(id, userId);
-  }
-
-  @Post('refund-requests/:id/accept')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Satıcı iade talebini kabul eder' })
-  async acceptRefundRequest(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @CurrentUser('id') sellerId: string,
-  ) {
-    return this.refundService.sellerAccept(id, sellerId);
-  }
-
-  @Post('refund-requests/:id/reject')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Satıcı iade talebini reddeder (admin müdahalesine gider)' })
-  async rejectRefundRequest(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @CurrentUser('id') sellerId: string,
-    @Body() dto: RejectRefundRequestDto,
-  ) {
-    return this.refundService.sellerReject(id, sellerId, dto);
   }
 }

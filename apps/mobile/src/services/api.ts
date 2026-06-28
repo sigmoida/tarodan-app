@@ -1008,11 +1008,6 @@ export const refundsApi = {
   getSeller: () => api.get('/refund-requests/seller'),
   /** POST /refund-requests/:id/cancel */
   cancel: (id: string) => api.post(`/refund-requests/${id}/cancel`),
-  /** POST /refund-requests/:id/accept — satıcı iadeyi kabul eder */
-  accept: (id: string) => api.post(`/refund-requests/${id}/accept`),
-  /** POST /refund-requests/:id/reject — satıcı iadeyi reddeder (gerekçe) */
-  reject: (id: string, response: string) =>
-    api.post(`/refund-requests/${id}/reject`, { response }),
 };
 
 // =============================================================================

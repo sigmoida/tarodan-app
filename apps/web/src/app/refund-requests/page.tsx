@@ -7,11 +7,9 @@ import { useAuthStore } from "@/stores/authStore";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
-type Role = "buyer" | "seller";
-
-const buyerStatusLabel: Record<string, { tr: string; en: string; tone: string }> = {
+const statusLabel: Record<string, { tr: string; en: string; tone: string }> = {
   pending_review:      { tr: "Satıcı İncelemesinde", en: "Awaiting Seller",      tone: "info"    },
   approved:            { tr: "Onaylandı",             en: "Approved",             tone: "success" },
   wait_for_delivery:   { tr: "Teslim Bekleniyor",     en: "Awaiting Delivery",    tone: "info"    },
@@ -22,19 +20,6 @@ const buyerStatusLabel: Record<string, { tr: string; en: string; tone: string }>
   rejected:            { tr: "Reddedildi",             en: "Rejected",             tone: "danger"  },
   disputed:            { tr: "İtiraz / İnceleme",      en: "Under Dispute",        tone: "warning" },
   cancelled:           { tr: "İptal Edildi",           en: "Cancelled",            tone: "muted"   },
-};
-
-const sellerStatusLabel: Record<string, { tr: string; en: string; tone: string }> = {
-  pending_review:      { tr: "Karar Bekleniyor",      en: "Awaiting Your Decision", tone: "warning" },
-  approved:            { tr: "Onaylandı",             en: "Approved",               tone: "success" },
-  wait_for_delivery:   { tr: "Ürün Teslim Bekleniyor",en: "Awaiting Delivery",      tone: "info"    },
-  return_shipment_open:{ tr: "İade Yolda Gelecek",    en: "Return Coming",          tone: "info"    },
-  return_in_transit:   { tr: "İade Kargoda",          en: "Return In Transit",      tone: "info"    },
-  return_delivered:    { tr: "Ürün Ulaştı",           en: "Product Received",       tone: "success" },
-  refunded:            { tr: "İade Tamamlandı",        en: "Refunded",               tone: "success" },
-  rejected:            { tr: "Reddettiniz",           en: "Rejected",               tone: "danger"  },
-  disputed:            { tr: "İtirazınız İnceleniyor", en: "Dispute Under Review",  tone: "warning" },
-  cancelled:           { tr: "İptal Edildi",           en: "Cancelled",              tone: "muted"   },
 };
 
 const toneClass: Record<string, string> = {
@@ -49,7 +34,6 @@ export default function MyRefundRequestsPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { locale } = useTranslation();
-  const [role, setRole] = useState<Role>("buyer");
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -57,19 +41,10 @@ export default function MyRefundRequestsPage() {
     }
   }, [authLoading, isAuthenticated, router]);
 
-  const { data: buyerData, isLoading: buyerLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["refund-requests-buyer"],
     queryFn: async () => {
       const res = await refundsApi.myRequests();
-      return res.data as Array<any>;
-    },
-    enabled: isAuthenticated,
-  });
-
-  const { data: sellerData, isLoading: sellerLoading } = useQuery({
-    queryKey: ["refund-requests-seller"],
-    queryFn: async () => {
-      const res = await refundsApi.sellerRequests();
       return res.data as Array<any>;
     },
     enabled: isAuthenticated,
@@ -83,53 +58,12 @@ export default function MyRefundRequestsPage() {
     );
   }
 
-  const data = role === "buyer" ? buyerData : sellerData;
-  const isLoading = role === "buyer" ? buyerLoading : sellerLoading;
-  const labelMap = role === "buyer" ? buyerStatusLabel : sellerStatusLabel;
-
-  const tabs: { key: Role; trLabel: string; enLabel: string; count: number }[] = [
-    {
-      key: "buyer",
-      trLabel: "Yaptığım Talepler",
-      enLabel: "My Requests",
-      count: buyerData?.length ?? 0,
-    },
-    {
-      key: "seller",
-      trLabel: "Satışlarımdaki Talepler",
-      enLabel: "Requests on My Sales",
-      count: sellerData?.length ?? 0,
-    },
-  ];
-
   return (
     <div className="min-h-screen bg-surface">
       <main className="max-w-4xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold text-heading mb-6">
-          {locale === "en" ? "Refund Requests" : "İade Talepleri"}
+          {locale === "en" ? "Refund Requests" : "İade Taleplerim"}
         </h1>
-
-        {/* Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-border-default">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setRole(tab.key)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
-                role === tab.key
-                  ? "border-primary-500 text-primary-600"
-                  : "border-transparent text-muted hover:text-body"
-              }`}
-            >
-              {locale === "en" ? tab.enLabel : tab.trLabel}
-              {tab.count > 0 && (
-                <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-xs bg-surface-alt text-muted">
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
 
         {isLoading ? (
           <div className="flex justify-center py-12">
@@ -137,18 +71,14 @@ export default function MyRefundRequestsPage() {
           </div>
         ) : !data || data.length === 0 ? (
           <div className="bg-surface-elevated rounded-xl p-8 text-center text-muted">
-            {role === "buyer"
-              ? locale === "en"
-                ? "You have no refund requests yet."
-                : "Henüz iade talebiniz yok."
-              : locale === "en"
-                ? "No refund requests on your sales."
-                : "Satışlarınızda henüz iade talebi yok."}
+            {locale === "en"
+              ? "You have no refund requests yet."
+              : "Henüz iade talebiniz yok."}
           </div>
         ) : (
           <div className="space-y-3">
             {data.map((rr) => {
-              const cfg = labelMap[rr.status] ?? {
+              const cfg = statusLabel[rr.status] ?? {
                 tr: rr.status,
                 en: rr.status,
                 tone: "muted",
@@ -186,11 +116,6 @@ export default function MyRefundRequestsPage() {
                           minimumFractionDigits: 2,
                         })}
                       </p>
-                      {role === "seller" && rr.requester?.displayName && (
-                        <p className="text-xs text-muted mt-1">
-                          {locale === "en" ? "Buyer" : "Alıcı"}: {rr.requester.displayName}
-                        </p>
-                      )}
                     </div>
                     <span
                       className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border flex-shrink-0 ${toneClass[cfg.tone]}`}

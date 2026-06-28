@@ -418,9 +418,6 @@ export const refundsApi = {
   sellerRequests: () => api.get('/refund-requests/seller'),
   getById: (id: string) => api.get(`/refund-requests/${id}`),
   cancel: (id: string) => api.post(`/refund-requests/${id}/cancel`),
-  accept: (id: string) => api.post(`/refund-requests/${id}/accept`),
-  reject: (id: string, response: string) =>
-    api.post(`/refund-requests/${id}/reject`, { response }),
 };
 
 // Addresses

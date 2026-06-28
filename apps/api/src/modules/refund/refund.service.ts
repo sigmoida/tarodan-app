@@ -29,13 +29,11 @@ import {
   SuratTeslimSekli,
 } from '../surat-cargo/surat-cargo.types';
 import { CreateRefundRequestDto } from './dto/create-refund-request.dto';
-import { RejectRefundRequestDto } from './dto/reject-refund-request.dto';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto/notification.dto';
 import { StorageService } from '../storage/storage.service';
 
 const COOLING_OFF_DAYS = 14;
-const SELLER_RESPONSE_DEADLINE_HOURS = 48;
 
 const REASONS_REQUIRING_EVIDENCE: RefundReason[] = [
   RefundReason.damaged,
@@ -287,111 +285,6 @@ export class RefundService {
       refundNumber: rr.refundNumber,
       orderId: rr.order.id,
     });
-    return updated;
-  }
-
-  async sellerAccept(refundRequestId: string, sellerId: string) {
-    const rr = await this.prisma.refundRequest.findUnique({
-      where: { id: refundRequestId },
-      include: { order: { include: { shipment: true } } },
-    });
-    if (!rr) throw new NotFoundException('İade talebi bulunamadı');
-    if (rr.order.sellerId !== sellerId) {
-      throw new ForbiddenException('Bu talebi sadece satıcı kabul edebilir');
-    }
-    if (rr.status !== RefundRequestStatus.pending_review) {
-      throw new BadRequestException('Bu talep zaten karara bağlanmış');
-    }
-
-    if (rr.order.status === OrderStatus.delivered) {
-      // openReturnShipment notification'ı kendisi gönderir; ayrıca buyer'a
-      // genel "onaylandı" mesajını burada vermek istemiyoruz çünkü return
-      // opened mesajı zaten daha bilgilendirici.
-      await this.openReturnShipment(rr.id);
-      await this.appendHistory(rr.id, {
-        action: 'accepted_by_seller',
-        by: sellerId,
-        details: { autoOpenedReturn: true },
-      });
-      return this.prisma.refundRequest.findUnique({ where: { id: rr.id } });
-    }
-
-    const updated = await this.prisma.refundRequest.update({
-      where: { id: rr.id },
-      data: {
-        status: RefundRequestStatus.wait_for_delivery,
-        decidedBy: sellerId,
-        decidedAt: new Date(),
-      },
-    });
-    await this.appendHistory(rr.id, {
-      action: 'accepted_by_seller',
-      by: sellerId,
-      details: { newStatus: 'wait_for_delivery' },
-    });
-    await this.safeNotify(rr.requesterId, NotificationType.REFUND_APPROVED, {
-      refundNumber: rr.refundNumber,
-      orderId: rr.orderId,
-    });
-    await this.sendRefundEmail(rr.id, 'buyer', 'refund-approved-buyer');
-    return updated;
-  }
-
-  async sellerReject(refundRequestId: string, sellerId: string, dto: RejectRefundRequestDto) {
-    const rr = await this.prisma.refundRequest.findUnique({
-      where: { id: refundRequestId },
-      include: { order: true },
-    });
-    if (!rr) throw new NotFoundException('İade talebi bulunamadı');
-    if (rr.order.sellerId !== sellerId) {
-      throw new ForbiddenException('Bu talebi sadece satıcı reddedebilir');
-    }
-    if (rr.status !== RefundRequestStatus.pending_review) {
-      throw new BadRequestException('Bu talep zaten karara bağlanmış');
-    }
-
-    const updated = await this.prisma.refundRequest.update({
-      where: { id: rr.id },
-      data: {
-        status: RefundRequestStatus.disputed,
-        sellerResponse: dto.response,
-        decidedBy: sellerId,
-        decidedAt: new Date(),
-      },
-    });
-    await this.appendHistory(rr.id, {
-      action: 'rejected_by_seller',
-      by: sellerId,
-      details: { response: dto.response },
-    });
-    // Buyer'a reddedildi haberi
-    await this.safeNotify(rr.requesterId, NotificationType.REFUND_REJECTED, {
-      refundNumber: rr.refundNumber,
-      orderId: rr.orderId,
-      reason: dto.response,
-    });
-    await this.sendRefundEmail(rr.id, 'buyer', 'refund-rejected-buyer', {
-      reason: dto.response,
-    });
-    // Admin role'üne dispute incelemesi sinyali — basit fan-out: aktif admin
-    // kullanıcılarını tarayıp tek tek bildir. Admin sayısı düşük olduğu için
-    // toplu sorgu yeterli.
-    try {
-      const admins = await this.prisma.adminUser.findMany({
-        where: { isActive: true },
-        select: { userId: true },
-      });
-      for (const a of admins) {
-        await this.safeNotify(a.userId, NotificationType.REFUND_DISPUTED, {
-          refundNumber: rr.refundNumber,
-          refundRequestId: rr.id,
-        });
-      }
-    } catch (err: any) {
-      this.logger.error(
-        `REFUND_DISPUTED admin fan-out failed for ${rr.id}: ${err?.message}`,
-      );
-    }
     return updated;
   }
 
@@ -659,61 +552,6 @@ export class RefundService {
       select: { id: true },
     });
     return rows.map((r) => r.id);
-  }
-
-  async findOverdueSellerResponses(): Promise<string[]> {
-    const cutoff = new Date(Date.now() - SELLER_RESPONSE_DEADLINE_HOURS * 3600 * 1000);
-    const overdue = await this.prisma.refundRequest.findMany({
-      where: {
-        status: RefundRequestStatus.pending_review,
-        createdAt: { lt: cutoff },
-      },
-      select: { id: true },
-    });
-    return overdue.map((c) => c.id);
-  }
-
-  async autoAcceptOverdue(refundRequestId: string) {
-    const rr = await this.prisma.refundRequest.findUnique({
-      where: { id: refundRequestId },
-      include: { order: true },
-    });
-    if (!rr) return;
-    if (rr.status !== RefundRequestStatus.pending_review) return;
-
-    if (rr.order.status === OrderStatus.delivered) {
-      await this.prisma.refundRequest.update({
-        where: { id: rr.id },
-        data: {
-          decidedBy: 'system',
-          decidedAt: new Date(),
-          metadata: { ...(rr.metadata as any), autoAccepted: true, autoAcceptedAt: new Date() },
-        },
-      });
-      await this.openReturnShipment(rr.id);
-    } else {
-      await this.prisma.refundRequest.update({
-        where: { id: rr.id },
-        data: {
-          status: RefundRequestStatus.wait_for_delivery,
-          decidedBy: 'system',
-          decidedAt: new Date(),
-          metadata: { ...(rr.metadata as any), autoAccepted: true, autoAcceptedAt: new Date() },
-        },
-      });
-    }
-
-    // Önceden bu adım sessizdi: satıcı talebinin oto-onaylandığını, alıcı da
-    // talebinin onaylandığını öğrenmiyordu. Her iki tarafa bildir.
-    await this.safeNotify(rr.order.sellerId, NotificationType.REFUND_AUTO_ACCEPTED_SELLER, {
-      refundNumber: rr.refundNumber,
-      orderId: rr.orderId,
-    });
-    await this.sendRefundEmail(rr.id, 'seller', 'refund-auto-accepted-seller');
-    await this.safeNotify(rr.requesterId, NotificationType.REFUND_APPROVED, {
-      refundNumber: rr.refundNumber,
-      orderId: rr.orderId,
-    });
   }
 
   async applyReturnTrackingUpdate(
@@ -985,55 +823,6 @@ export class RefundService {
       return this.prisma.refundRequest.findUnique({ where: { id: created.id } });
     }
 
-    return created;
-  }
-
-  private async createDisputedRefund(
-    order: { id: string; totalAmount: Prisma.Decimal; quantity?: number },
-    requesterId: string,
-    dto: CreateRefundRequestDto,
-    refundQuantity = 1,
-  ) {
-    const refundNumber = await this.generateRefundNumber();
-    const amount = this.computeRefundAmount(order, refundQuantity);
-
-    const created = await this.prisma.refundRequest.create({
-      data: {
-        refundNumber,
-        orderId: order.id,
-        requesterId,
-        reason: dto.reason,
-        description: dto.description ?? null,
-        evidencePhotoUrls: dto.evidencePhotoUrls ?? [],
-        amount,
-        refundQuantity,
-        status: RefundRequestStatus.pending_review,
-      },
-    });
-
-    // İade açıldı → satıcı hold'unu kilitle (payout bu iade kapanana kadar bloke).
-    await this.freezeHoldForRefund(order.id, created.id);
-
-    // Satıcıya "iade talebi alındı, incele" — mail + bell/push (önceden sadece mail).
-    const disputeSeller = await this.prisma.order.findUnique({
-      where: { id: order.id },
-      select: { sellerId: true },
-    });
-    if (disputeSeller?.sellerId) {
-      await this.safeNotify(disputeSeller.sellerId, NotificationType.REFUND_REQUEST_RECEIVED, {
-        refundNumber,
-        orderId: order.id,
-      });
-    }
-    await this.sendRefundEmail(created.id, 'seller', 'refund-requested-seller', {
-      refundReason: dto.description ?? undefined,
-    });
-    // Alıcıya "talebiniz alındı, satıcı yanıtı bekleniyor" (önceden alıcıya hiç bildirim yoktu).
-    await this.safeNotify(requesterId, NotificationType.REFUND_REQUEST_RECEIVED, {
-      refundNumber,
-      orderId: order.id,
-    });
-    await this.sendRefundEmail(created.id, 'buyer', 'refund-request-received-buyer');
     return created;
   }
 

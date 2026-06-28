@@ -32,13 +32,11 @@ export class RefundSchedulerService implements OnModuleInit {
   async runRefundCrons(log: (msg: string) => void = () => {}) {
     const opened = await this.openReturnShipmentsForDeliveredOrders();
     log(`${opened} iade kargosu açıldı (teslim edilmiş siparişler)`);
-    const accepted = await this.autoAcceptOverdueRequests();
-    log(`${accepted} süresi geçen iade talebi oto-kabul edildi`);
     const finalized = await this.finalizeReturnedShipments();
     log(`${finalized} iade finalize edildi (kargo döndü)`);
     return {
-      summary: `${opened} açıldı · ${accepted} oto-kabul · ${finalized} finalize`,
-      stats: { opened, accepted, finalized },
+      summary: `${opened} açıldı · ${finalized} finalize`,
+      stats: { opened, finalized },
     };
   }
 
@@ -68,19 +66,5 @@ export class RefundSchedulerService implements OnModuleInit {
       }
     }
     return pending.length;
-  }
-
-  private async autoAcceptOverdueRequests(): Promise<number> {
-    const overdue = await this.refundService.findOverdueSellerResponses();
-    if (overdue.length === 0) return 0;
-    this.logger.log(`Auto-accepting ${overdue.length} overdue refund request(s)`);
-    for (const id of overdue) {
-      try {
-        await this.refundService.autoAcceptOverdue(id);
-      } catch (e) {
-        this.logger.error(`Failed to auto-accept ${id}: ${(e as Error).message}`);
-      }
-    }
-    return overdue.length;
   }
 }

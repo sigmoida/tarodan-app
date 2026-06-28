@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Modal, Spinner, Textarea } from "@tarodan/ui";
+import { Button, Spinner } from "@tarodan/ui";
 import { refundsApi } from "@/lib/api";
 import { useTranslation } from "@/i18n/LanguageContext";
 import { useAuthStore } from "@/stores/authStore";
@@ -16,7 +16,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import toast from "react-hot-toast";
 
 const reasonLabel: Record<string, { tr: string; en: string }> = {
@@ -115,9 +115,6 @@ export default function RefundRequestDetailPage() {
   const { locale } = useTranslation();
   const refundId = (params?.id as string) ?? "";
 
-  const [showRejectModal, setShowRejectModal] = useState(false);
-  const [rejectReason, setRejectReason] = useState("");
-
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.replace(`/login?redirect=/refund-requests/${refundId}`);
@@ -142,25 +139,6 @@ export default function RefundRequestDetailPage() {
     onError: (e: any) => toast.error(e?.response?.data?.message ?? "Hata"),
   });
 
-  const acceptMutation = useMutation({
-    mutationFn: () => refundsApi.accept(refundId),
-    onSuccess: () => {
-      toast.success(locale === "en" ? "Request accepted" : "Talep kabul edildi");
-      queryClient.invalidateQueries({ queryKey: ["refund-request", refundId] });
-    },
-    onError: (e: any) => toast.error(e?.response?.data?.message ?? "Hata"),
-  });
-
-  const rejectMutation = useMutation({
-    mutationFn: () => refundsApi.reject(refundId, rejectReason.trim()),
-    onSuccess: () => {
-      toast.success(locale === "en" ? "Request rejected" : "Talep reddedildi");
-      setShowRejectModal(false);
-      queryClient.invalidateQueries({ queryKey: ["refund-request", refundId] });
-    },
-    onError: (e: any) => toast.error(e?.response?.data?.message ?? "Hata"),
-  });
-
   if (authLoading || isLoading || !rr) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -175,16 +153,13 @@ export default function RefundRequestDetailPage() {
     tone: "muted" as const,
   };
   const isBuyer = user?.id === rr.requesterId;
-  const isSeller = user?.id === rr.order?.seller?.id;
   const reason = reasonLabel[rr.reason] ?? { tr: rr.reason, en: rr.reason };
 
   const isInstantRefund = rr.status === "refunded" && !rr.returnTrackingNumber;
   const isTerminal = ["refunded", "rejected", "cancelled"].includes(rr.status);
   const currentStepIdx = getCurrentStepIndex(rr.status);
 
-  const canCancel =
-    isBuyer && (rr.status === "pending_review" || rr.status === "wait_for_delivery");
-  const canSellerDecide = isSeller && rr.status === "pending_review";
+  const canCancel = isBuyer && rr.status === "wait_for_delivery";
 
   const showReturnShipment = [
     "return_shipment_open",
@@ -577,86 +552,18 @@ export default function RefundRequestDetailPage() {
         {/* Senaryo D banner kaldırıldı — changed_mind reason artık kabul edilmiyor */}
 
         {/* Actions */}
-        {(canCancel || canSellerDecide) && (
+        {canCancel && (
           <div className="bg-surface-elevated rounded-xl shadow-sm p-5">
-            <div className="flex flex-col sm:flex-row gap-2">
-              {canSellerDecide && (
-                <>
-                  <Button
-                    variant="primary"
-                    onClick={() => acceptMutation.mutate()}
-                    disabled={acceptMutation.isPending}
-                    className="flex-1"
-                  >
-                    {locale === "en" ? "Accept Refund" : "İadeyi Kabul Et"}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => setShowRejectModal(true)}
-                    className="flex-1"
-                  >
-                    {locale === "en" ? "Reject" : "Reddet"}
-                  </Button>
-                </>
-              )}
-              {canCancel && (
-                <Button
-                  variant="secondary"
-                  onClick={() => cancelMutation.mutate()}
-                  disabled={cancelMutation.isPending}
-                  className="w-full sm:w-auto"
-                >
-                  {locale === "en" ? "Cancel This Request" : "Talebi İptal Et"}
-                </Button>
-              )}
-            </div>
+            <Button
+              variant="secondary"
+              onClick={() => cancelMutation.mutate()}
+              disabled={cancelMutation.isPending}
+              className="w-full sm:w-auto"
+            >
+              {locale === "en" ? "Cancel This Request" : "Talebi İptal Et"}
+            </Button>
           </div>
         )}
-
-        <Modal
-          isOpen={showRejectModal}
-          onClose={() => setShowRejectModal(false)}
-          title={locale === "en" ? "Reject Refund" : "İadeyi Reddet"}
-          maxWidth="max-w-md"
-        >
-          <div className="space-y-3">
-            <p className="text-sm text-muted">
-              {locale === "en"
-                ? "Provide a clear reason. The case will be reviewed by an admin."
-                : "Net bir gerekçe yazın. İtirazınız admin tarafından incelenecektir."}
-            </p>
-            <Textarea
-              rows={4}
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              placeholder={
-                locale === "en"
-                  ? "Reason (min 10 chars)"
-                  : "Gerekçe (en az 10 karakter)"
-              }
-            />
-            <div className="flex gap-2">
-              <Button
-                variant="secondary"
-                className="flex-1"
-                onClick={() => setShowRejectModal(false)}
-                disabled={rejectMutation.isPending}
-              >
-                {locale === "en" ? "Cancel" : "Vazgeç"}
-              </Button>
-              <Button
-                variant="primary"
-                className="flex-1"
-                disabled={
-                  rejectReason.trim().length < 10 || rejectMutation.isPending
-                }
-                onClick={() => rejectMutation.mutate()}
-              >
-                {locale === "en" ? "Reject" : "Reddet"}
-              </Button>
-            </div>
-          </div>
-        </Modal>
       </main>
     </div>
   );

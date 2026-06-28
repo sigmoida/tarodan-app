@@ -37,8 +37,9 @@ export function toMobileRoute(link: string): string | null {
       if (id === 'earnings') return '/settings/payments';
       return '/(tabs)/profile';
     case 'refund-requests':
-      // mobilde [id] detayı yok → satıcı iade listesi
-      return '/refund-requests/seller';
+      // web /refund-requests/:id → mobil iade detayı (alıcı+satıcı erişebilir);
+      // liste → alıcının kendi iade talepleri
+      return id ? `/refund-requests/${id}` : '/refund-requests';
     // Mobil rotalarla birebir uyumlu — olduğu gibi geçir
     case 'orders':
     case 'product':
