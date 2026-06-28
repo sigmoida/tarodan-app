@@ -297,18 +297,6 @@ export default function ProfilePage() {
     router.push('/');
   };
 
-  // Güven skorunu herkese açık / gizli yap (premium avantajı)
-  const toggleTrustVisibility = async () => {
-    const next = !((profile as any)?.showTrustScore);
-    setProfile((p) => (p ? ({ ...(p as any), showTrustScore: next }) : p));
-    try {
-      await (userApi as any).updateProfile({ showTrustScore: next });
-    } catch {
-      // Hata olursa geri al
-      setProfile((p) => (p ? ({ ...(p as any), showTrustScore: !next }) : p));
-    }
-  };
-
   if (!mounted || authLoading || !isAuthenticated) {
     return (
       <div className="min-h-screen bg-surface">
@@ -436,7 +424,7 @@ export default function ProfilePage() {
                   </div>
                 )}
 
-                {/* Güven Skoru — premium avantajı (sahibi her zaman görür + açık/gizli toggle) */}
+                {/* Güven Skoru — premium avantajı; her zaman herkese açık (gizleme kaldırıldı) */}
                 {(profile as any).isPremium && typeof (profile as any).trustScore === 'number' && (
                   <div className="mb-3 flex items-center gap-2 flex-wrap">
                     <span className="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm rounded-sm font-semibold bg-amber-400/90 text-amber-950 shadow-md">
@@ -445,16 +433,6 @@ export default function ProfilePage() {
                         <span className="font-medium">· {(profile as any).trustLevel}</span>
                       )}
                     </span>
-                    <button
-                      type="button"
-                      onClick={toggleTrustVisibility}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-sm font-medium bg-surface-elevated/25 backdrop-blur-sm text-inverted hover:bg-surface-elevated/35 transition-colors"
-                      title="Güven skorunun herkese açık profilde görünürlüğünü değiştir"
-                    >
-                      {(profile as any).showTrustScore === false
-                        ? '🔒 Gizli — herkese açık yap'
-                        : '👁️ Herkese açık — gizle'}
-                    </button>
                   </div>
                 )}
 

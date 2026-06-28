@@ -954,8 +954,8 @@ export class UserService {
       totalTrades: completedTrades,
       isVerified: user.isVerified,
     });
-    // Herkese açık profilde skoru sadece premium VE kullanıcı görünürlüğü açıksa göster
-    const trustVisible = isPremium && (user as any).showTrustScore !== false;
+    // Güven skoru premium üyelerde HER ZAMAN herkese açık (gizleme özelliği kaldırıldı).
+    const trustVisible = isPremium;
 
     return {
       ...user,
@@ -1884,6 +1884,22 @@ export class UserService {
   }
 
   /**
+   * Featured snapshot satırını (haftanın kazananı) upsert eder. Cron ve okuma
+   * anındaki fallback kullanır; hata durumunda sessizce geçer (best-effort).
+   */
+  private async upsertFeaturedSnapshot(type: string, entityId: string, score: number) {
+    try {
+      await this.prisma.featuredSnapshot.upsert({
+        where: { type },
+        create: { type, entityId, score },
+        update: { entityId, score, computedAt: new Date() },
+      });
+    } catch (e: any) {
+      this.logger.warn(`Featured snapshot upsert failed (${type}): ${e.message}`);
+    }
+  }
+
+  /**
    * En iyi koleksiyonlar (anasayfa). Görüntülenme/beğeniye göre sıralı, cache'li.
    */
   async getTopCollections(limit: number = 20) {
@@ -1957,62 +1973,58 @@ export class UserService {
   }
 
   /**
-   * Haftanın koleksiyoneri (anasayfa). Manuel `isFeatured` önceliği + haftalık
-   * ivmeyi (son 7 gün beğeni) içeren engagement skoru. Cache'li.
+   * Haftanın koleksiyoneri (anasayfa). Haftalık snapshot'tan okur: ağır skorlama
+   * cron'da yapılır, burada sadece kazanan koleksiyon taze veriyle doldurulur
+   * (presigned URL'ler hep güncel kalır). Snapshot yoksa (ilk açılış) ya da
+   * kazanan artık uygun değilse anında hesaplayıp snapshot'ı tazeler.
    */
   async getFeaturedCollector() {
-    return this.cacheFeatured('featured:collector', () =>
-      this.computeFeaturedCollector(),
-    );
+    return this.cacheFeatured('featured:collector', async () => {
+      const snap = await this.prisma.featuredSnapshot.findUnique({
+        where: { type: 'collector' },
+      });
+      if (snap) {
+        const hydrated = await this.hydrateCollectorById(snap.entityId, snap.score);
+        if (hydrated) return hydrated;
+      }
+      // Snapshot yok ya da hedef koleksiyon artık uygun değil → taze hesapla + sakla
+      const selected = await this.selectFeaturedCollector();
+      if (!selected) return null;
+      await this.upsertFeaturedSnapshot('collector', selected.id, selected.score);
+      return this.hydrateCollectorById(selected.id, selected.score, selected.salesCount);
+    });
   }
 
-  private async computeFeaturedCollector() {
+  /**
+   * Aday koleksiyonlar arasından haftalık skoru en yüksek olanı seçer (yalnızca
+   * id + skor döner; ağır kısım budur, cron tarafından çağrılır).
+   * Admin'in `isFeatured` işaretlediği koleksiyonlar önceliklidir.
+   */
+  async selectFeaturedCollector(): Promise<{ id: string; score: number; salesCount: number } | null> {
     const collectionWhere = {
       isPublic: true,
       items: { some: {} }, // Has at least one item
     };
-
-    const includeShape = {
-      user: {
-        select: {
-          id: true,
-          displayName: true,
-          avatarUrl: true,
-          bio: true,
-          isVerified: true,
-        },
-      },
-      items: {
-        include: {
-          product: {
-            select: {
-              id: true,
-              status: true,
-            },
-          },
-        },
-      },
-      _count: {
-        select: { items: true, likes: true },
-      },
+    const candidateInclude = {
+      items: { select: { product: { select: { status: true } } } },
     };
 
     // Prefer admin-featured collections first; fall back to score-based selection
     const collections = await this.prisma.collection.findMany({
       where: { ...collectionWhere, isFeatured: true },
-      include: includeShape,
+      include: candidateInclude,
     }).then(async (featured) => {
       if (featured.length > 0) return featured;
-      return this.prisma.collection.findMany({ where: collectionWhere, include: includeShape });
+      return this.prisma.collection.findMany({ where: collectionWhere, include: candidateInclude });
     });
 
     if (collections.length === 0) {
       return null;
     }
 
-    // "Haftanın koleksiyoneri": skor artık son 7 günün ivmesini de katıyor.
-    // Tüm zamanlar metrikleri taban, son penceredeki beğeniler ise haftalık
-    // bonus olarak ağırlıklanır; böylece liste her hafta tazelenebilir.
+    // "Haftanın koleksiyoneri": skor son 7 günün ivmesini de katar. Tüm zamanlar
+    // metrikleri taban, son penceredeki beğeniler ise haftalık bonus olarak
+    // ağırlıklanır; böylece kazanan her hafta tazelenebilir.
     const windowStart = featuredWindowStart();
     const { weights } = FEATURED_SCORING;
 
@@ -2029,103 +2041,127 @@ export class UserService {
       recentLikeGroups.map((g) => [g.collectionId, g._count._all]),
     );
 
-    const collectionScores = collections.map((collection) => {
-      // Count sold products in this collection
+    const scored = collections.map((collection) => {
       const salesCount = collection.items.filter(
         (item) => item.product && item.product.status === 'sold'
       ).length;
-
-      // Son penceredeki koleksiyon beğenileri (haftalık ivme sinyali)
       const recentLikes = recentLikesByCollection.get(collection.id) ?? 0;
-
       const score =
         collection.viewCount * weights.view +
         collection.likeCount * weights.like +
         salesCount * weights.sale +
         recentLikes * weights.recentLike;
-
-      return {
-        collection,
-        score,
-        salesCount,
-      };
+      return { id: collection.id, score, salesCount };
     });
 
-    // Sort by score (highest first) and get top collection
-    collectionScores.sort((a, b) => b.score - a.score);
-    const topCollectionData = collectionScores[0];
+    scored.sort((a, b) => b.score - a.score);
+    return scored[0] ?? null;
+  }
 
-    if (!topCollectionData) {
+  /**
+   * Verilen koleksiyon id'sini anasayfa DTO'suna doldurur (kullanıcı + aktif
+   * ürünler). Koleksiyon yoksa / public değilse / boşsa null döner — bu durumda
+   * snapshot bayatlamış demektir ve çağıran taraf yeniden hesaplamayı tetikler.
+   */
+  private async hydrateCollectorById(
+    collectionId: string,
+    score: number,
+    salesCount?: number,
+  ) {
+    const collection = await this.prisma.collection.findUnique({
+      where: { id: collectionId },
+      include: {
+        user: {
+          select: { id: true, displayName: true, avatarUrl: true, bio: true, isVerified: true },
+        },
+        items: { select: { product: { select: { status: true } } } },
+        _count: { select: { items: true, likes: true } },
+      },
+    });
+
+    if (!collection || !collection.isPublic || collection._count.items === 0) {
       return null;
     }
 
-    const topCollection = topCollectionData.collection;
+    const resolvedSalesCount =
+      salesCount ??
+      collection.items.filter((item) => item.product && item.product.status === 'sold').length;
 
     // Always show the collector's own active product listings (ensures products match the user)
     const ownProducts = await this.prisma.product.findMany({
-      where: { sellerId: topCollection.user.id, status: 'active' },
+      where: { sellerId: collection.user.id, status: 'active' },
       take: 5,
       include: { images: { take: 1, orderBy: { sortOrder: 'asc' } } },
       orderBy: [{ likeCount: 'desc' }, { viewCount: 'desc' }, { createdAt: 'desc' }],
     });
 
-    const itemsResult = await Promise.all(ownProducts.map(async p => ({
+    const items = ownProducts.map((p) => ({
       id: p.id,
       productId: p.id,
       productTitle: p.title,
       productPrice: Number(p.price),
       productImage: this.resolveProductImageUrl(p.images[0]?.cardKey),
-    })));
+    }));
 
     return {
-      id: topCollection.id,
-      name: topCollection.name,
-      description: topCollection.description,
-      coverImageUrl: topCollection.coverImageKey ? this.storageService.getPublicAssetUrl(topCollection.coverImageKey) : undefined,
-      viewCount: topCollection.viewCount,
-      likeCount: topCollection.likeCount,
-      itemCount: topCollection._count.items,
-      salesCount: topCollectionData.salesCount,
-      score: topCollectionData.score,
+      id: collection.id,
+      name: collection.name,
+      description: collection.description,
+      coverImageUrl: collection.coverImageKey ? this.storageService.getPublicAssetUrl(collection.coverImageKey) : undefined,
+      viewCount: collection.viewCount,
+      likeCount: collection.likeCount,
+      itemCount: collection._count.items,
+      salesCount: resolvedSalesCount,
+      score,
       user: {
-        id: topCollection.user.id,
-        displayName: topCollection.user.displayName,
-        avatarUrl: await this.resolveAvatarUrl(topCollection.user.avatarUrl),
-        bio: topCollection.user.bio,
-        isVerified: topCollection.user.isVerified,
+        id: collection.user.id,
+        displayName: collection.user.displayName,
+        avatarUrl: await this.resolveAvatarUrl(collection.user.avatarUrl),
+        bio: collection.user.bio,
+        isVerified: collection.user.isVerified,
       },
-      items: itemsResult,
+      items,
     };
   }
 
   /**
-   * Get featured business of the week
-   * Business accounts with most engagement (views, likes, sales)
+   * Haftanın şirketi (anasayfa). Haftalık snapshot'tan okur; ağır skorlama
+   * cron'da yapılır, burada kazanan iş hesabı taze veriyle doldurulur. Snapshot
+   * yoksa ya da kazanan artık uygun değilse anında hesaplayıp snapshot'ı tazeler.
    */
   async getFeaturedBusiness() {
-    return this.cacheFeatured('featured:business', () =>
-      this.computeFeaturedBusiness(),
-    );
+    return this.cacheFeatured('featured:business', async () => {
+      const snap = await this.prisma.featuredSnapshot.findUnique({
+        where: { type: 'business' },
+      });
+      if (snap) {
+        const hydrated = await this.hydrateBusinessById(snap.entityId);
+        if (hydrated) return hydrated;
+      }
+      const selected = await this.selectFeaturedBusiness();
+      if (!selected) return null;
+      await this.upsertFeaturedSnapshot('business', selected.id, selected.score);
+      return this.hydrateBusinessById(selected.id);
+    });
   }
 
-  private async computeFeaturedBusiness() {
+  /**
+   * Aday iş hesapları arasından haftalık skoru en yüksek olanı seçer (yalnızca
+   * id + skor döner). Business tier önceliklidir; yoksa en çok ürünü olan
+   * satıcılara düşer. Ağır skorlama burasıdır, cron tarafından çağrılır.
+   */
+  async selectFeaturedBusiness(): Promise<{ id: string; score: number } | null> {
     const sevenDaysAgo = featuredWindowStart();
 
     // Find business users (membership.tier.type = 'business' AND companyName not null)
-    // Use UserMembership to find users with business tier, then get the users
     const businessMemberships = await this.prisma.userMembership.findMany({
       where: {
-        tier: {
-          type: 'business',
-        },
+        tier: { type: 'business' },
         status: 'active',
       },
       include: {
         user: {
           include: {
-            membership: {
-              include: { tier: true },
-            },
             _count: {
               select: {
                 products: { where: { status: 'active' } },
@@ -2152,7 +2188,6 @@ export class UserService {
           products: { some: { status: 'active' } },
         },
         include: {
-          membership: { include: { tier: true } },
           _count: { select: { products: { where: { status: 'active' } } } },
         },
         orderBy: { products: { _count: 'desc' } },
@@ -2164,8 +2199,8 @@ export class UserService {
       }
     }
 
-    // Calculate engagement score for each business
-    // Algorithm: Score = (totalViews * 1) + (totalLikes * 5) + (totalSales * 20) + (recentLikes * 10)
+    // Score = views(1) + likes(5) + recentSales(20) + recentLikes(10) + recentUpdates(5)
+    const { weights } = FEATURED_SCORING;
     const businessScores = await Promise.all(
       businessUsers.map(async (user) => {
         const [productStats, salesCount, recentLikes, recentViews] = await Promise.all([
@@ -2174,38 +2209,21 @@ export class UserService {
             _sum: { viewCount: true, likeCount: true },
           }),
           this.prisma.order.count({
-            where: { 
-              sellerId: user.id, 
-              status: 'completed',
-              createdAt: { gte: sevenDaysAgo },
-            },
+            where: { sellerId: user.id, status: 'completed', createdAt: { gte: sevenDaysAgo } },
           }),
           this.prisma.productLike.count({
             where: {
-              product: { 
-                sellerId: user.id,
-                status: 'active',
-              },
+              product: { sellerId: user.id, status: 'active' },
               createdAt: { gte: sevenDaysAgo },
             },
           }),
           this.prisma.product.count({
-            where: {
-              sellerId: user.id,
-              status: 'active',
-              updatedAt: { gte: sevenDaysAgo },
-            },
+            where: { sellerId: user.id, status: 'active', updatedAt: { gte: sevenDaysAgo } },
           }),
         ]);
 
-        // Enhanced engagement score calculation
-        // Base metrics: views (1x), likes (5x), sales (20x)
-        // Recent activity bonus: recent likes (10x), recent product updates (5x)
         const totalViews = productStats._sum.viewCount || 0;
         const totalLikes = productStats._sum.likeCount || 0;
-
-        // recentViews = son penceredeki güncellenen aktif ürün sayısı (üstteki sorgu)
-        const { weights } = FEATURED_SCORING;
         const score =
           totalViews * weights.view +
           totalLikes * weights.like +
@@ -2213,21 +2231,50 @@ export class UserService {
           recentLikes * weights.recentLike +
           recentViews * weights.recentUpdate;
 
-        return { user, score, productStats, salesCount, totalViews, totalLikes };
+        return { id: user.id, score };
       })
     );
 
-    // Sort by score and get top business
     businessScores.sort((a, b) => b.score - a.score);
-    const topBusiness = businessScores[0];
+    return businessScores[0] ?? null;
+  }
 
-    if (!topBusiness) {
+  /**
+   * Verilen iş hesabı id'sini anasayfa DTO'suna doldurur (istatistikler,
+   * koleksiyonlar, öne çıkan ürünler, puan). Kullanıcı yoksa / aktif ürünü
+   * yoksa null döner — bu durumda snapshot bayatlamıştır ve çağıran taraf
+   * yeniden hesaplamayı tetikler.
+   */
+  private async hydrateBusinessById(userId: string) {
+    const sevenDaysAgo = featuredWindowStart();
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        _count: { select: { products: { where: { status: 'active' } } } },
+      },
+    });
+
+    if (!user || user._count.products === 0) {
       return null;
     }
 
+    // Stats: tüm zamanlar view/like toplamı + son penceredeki tamamlanmış satış
+    const [productStats, salesCount] = await Promise.all([
+      this.prisma.product.aggregate({
+        where: { sellerId: userId, status: 'active' },
+        _sum: { viewCount: true, likeCount: true },
+      }),
+      this.prisma.order.count({
+        where: { sellerId: userId, status: 'completed', createdAt: { gte: sevenDaysAgo } },
+      }),
+    ]);
+    const totalViews = productStats._sum.viewCount || 0;
+    const totalLikes = productStats._sum.likeCount || 0;
+
     // Get business's top collections (by engagement score)
     const allCollections = await this.prisma.collection.findMany({
-      where: { userId: topBusiness.user.id, isPublic: true },
+      where: { userId, isPublic: true },
       include: {
         items: {
           include: {
@@ -2288,7 +2335,7 @@ export class UserService {
     // Get business's featured products (top performing products)
     // Priority: featured products, then by engagement score (views + likes)
     const allProducts = await this.prisma.product.findMany({
-      where: { sellerId: topBusiness.user.id, status: 'active' },
+      where: { sellerId: userId, status: 'active' },
       include: {
         images: { take: 1 },
         _count: {
@@ -2310,23 +2357,23 @@ export class UserService {
 
     // Get ratings
     const ratings = await this.prisma.rating.aggregate({
-      where: { receiverId: topBusiness.user.id },
+      where: { receiverId: userId },
       _avg: { score: true },
       _count: true,
     });
 
     return {
-      id: topBusiness.user.id,
-      displayName: topBusiness.user.displayName,
-      companyName: topBusiness.user.companyName,
-      avatarUrl: await this.resolveAvatarUrl(topBusiness.user.avatarUrl),
-      bio: topBusiness.user.bio,
-      isVerified: topBusiness.user.isVerified,
+      id: user.id,
+      displayName: user.displayName,
+      companyName: user.companyName,
+      avatarUrl: await this.resolveAvatarUrl(user.avatarUrl),
+      bio: user.bio,
+      isVerified: user.isVerified,
       stats: {
-        totalProducts: topBusiness.user._count.products,
-        totalViews: topBusiness.totalViews || 0,
-        totalLikes: topBusiness.totalLikes || 0,
-        totalSales: topBusiness.salesCount,
+        totalProducts: user._count.products,
+        totalViews,
+        totalLikes,
+        totalSales: salesCount,
         averageRating: ratings._avg?.score || 0,
         totalRatings: ratings._count,
       },
@@ -2348,6 +2395,37 @@ export class UserService {
         image: this.resolveProductImageUrl(p.images[0]?.cardKey),
       }))),
     };
+  }
+
+  /**
+   * Haftanın koleksiyoneri ve şirketi snapshot'larını yeniden hesaplar.
+   * Cron job (FeaturedSchedulerService) ve admin değişiklikleri tarafından
+   * çağrılır; ardından okuma cache'lerini düşürerek yeni kazananın anında
+   * yansımasını sağlar. Hesaplama hatası diğer tipi etkilemez (best-effort).
+   */
+  async refreshFeaturedSnapshots(): Promise<void> {
+    try {
+      const collector = await this.selectFeaturedCollector();
+      if (collector) {
+        await this.upsertFeaturedSnapshot('collector', collector.id, collector.score);
+      }
+    } catch (e: any) {
+      this.logger.warn(`refreshFeaturedSnapshots(collector) failed: ${e.message}`);
+    }
+
+    try {
+      const business = await this.selectFeaturedBusiness();
+      if (business) {
+        await this.upsertFeaturedSnapshot('business', business.id, business.score);
+      }
+    } catch (e: any) {
+      this.logger.warn(`refreshFeaturedSnapshots(business) failed: ${e.message}`);
+    }
+
+    if (this.cache) {
+      await this.cache.del('featured:collector').catch(() => {});
+      await this.cache.del('featured:business').catch(() => {});
+    }
   }
 
   /**

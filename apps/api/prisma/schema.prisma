@@ -108,6 +108,19 @@ model Report {
   @@map("reports")
 }
 
+/// Anasayfa öne çıkarma bölümlerinin (haftanın koleksiyoneri / haftanın şirketi)
+/// haftalık kazananını saklayan snapshot. Ağır skorlama her istekte değil, bir
+/// cron job ile periyodik hesaplanır; endpoint'ler bu satırı okuyup kazananı
+/// taze veriyle doldurur. `type` tek kayıt garantisi için primary key'dir.
+model FeaturedSnapshot {
+  type       String   @id // 'collector' | 'business'
+  entityId   String   @map("entity_id") // kazanan koleksiyon / kullanıcı id'si
+  score      Int      @default(0)
+  computedAt DateTime @default(now()) @map("computed_at")
+
+  @@map("featured_snapshots")
+}
+
 model OAuthAccount {
   id             String   @id @default(uuid())
   userId         String   @map("user_id")
