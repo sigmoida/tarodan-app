@@ -25,14 +25,15 @@ export default async function globalSetup(): Promise<void> {
     SEED_SKIP_IMAGES: '1',
   } as NodeJS.ProcessEnv;
 
-  // 1) tarodan_test yoksa oluştur (docker postgres container'ı)
+  // 1) tarodan_test yoksa oluştur. Yerelde docker postgres container'ı üzerinden; CI'da
+  //    servis container'ı DB'yi (POSTGRES_DB) zaten yaratır → bu adımın hata vermesi zararsız.
   try {
     execSync(
       `docker exec tarodan-postgres sh -c "psql -U postgres -tc \\"SELECT 1 FROM pg_database WHERE datname='tarodan_test'\\" | grep -q 1 || createdb -U postgres tarodan_test"`,
       { stdio: 'inherit' },
     );
   } catch (e) {
-    console.warn('[e2e] createdb tarodan_test atlandı (zaten var olabilir):', (e as Error).message);
+    console.warn('[e2e] createdb tarodan_test atlandı (CI servis DB veya zaten var):', (e as Error).message);
   }
 
   // 2) HER KOŞUDA temiz state: şema+veri sıfırla + migration'ları yeniden uygula
@@ -47,29 +48,10 @@ export default async function globalSetup(): Promise<void> {
     console.warn('[e2e] seed non-zero exit (temel veri oluşmuş olmalı):', (e as Error).message);
   }
 
-  // 4) Stokları yüksek tut: tek invocation'da 136 ardışık alım + rezervasyon seed-stoğunu
-  //    tüketmesin (müsait adet hep > 0 kalır). Stok-bitti journey'leri (J12/J13/J61/J102/J127)
-  //    kendi düşük stoğunu dev-hook/backdate ile ayarlar.
-  try {
-    execSync(
-      `docker exec tarodan-postgres psql -U postgres -d tarodan_test -c "UPDATE products SET quantity=100000 WHERE status='active'"`,
-      { stdio: 'inherit' },
-    );
-    console.log('[e2e] ürün stokları yükseltildi (quantity=100000)');
-  } catch (e) {
-    console.warn('[e2e] stok yükseltme atlandı:', (e as Error).message);
-  }
-
-  // 5) Seed snapshot — /dev/reset-state hook'u non-seed ürün/kullanıcıyı bununla ayıklar.
-  try {
-    execSync(
-      `docker exec tarodan-postgres psql -U postgres -d tarodan_test -c "DROP TABLE IF EXISTS _seed_products; CREATE TABLE _seed_products AS SELECT id FROM products; DROP TABLE IF EXISTS _seed_users; CREATE TABLE _seed_users AS SELECT id FROM users; DROP TABLE IF EXISTS _seed_memberships; CREATE TABLE _seed_memberships AS SELECT * FROM user_memberships;"`,
-      { stdio: 'inherit' },
-    );
-    console.log('[e2e] seed snapshot oluşturuldu (_seed_products / _seed_users)');
-  } catch (e) {
-    console.warn('[e2e] seed snapshot atlandı:', (e as Error).message);
-  }
+  // 4+5) Post-seed hazırlık (stok yükseltme + seed snapshot tabloları) — ORTAM BAĞIMSIZ.
+  //    docker-exec yerine prisma client üzerinden çalışır → hem yerel hem CI'da aynı.
+  //    Stok-bitti journey'leri (J12/J13/J61/J102/J127) kendi düşük stoğunu dev-hook ile ayarlar.
+  execSync('pnpm exec ts-node prisma/e2e-prepare.ts', { cwd: apiDir, env, stdio: 'inherit' });
 
   console.log('[e2e] test DB hazır.');
 }
