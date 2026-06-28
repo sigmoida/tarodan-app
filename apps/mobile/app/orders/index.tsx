@@ -102,7 +102,8 @@ const showOrderTracking = (o: Order): boolean =>
 
 export default function OrdersScreen() {
   const { isAuthenticated } = useAuthStore();
-  const [role, setRole] = useState<'buyer' | 'seller'>('buyer');
+  // Bu ekran alıcı-only (Siparişlerim). Satıcı satışları /sales'te.
+  const role: 'buyer' | 'seller' = 'buyer';
   const [filter, setFilter] = useState<FilterType>('all');
   const [refreshing, setRefreshing] = useState(false);
   // Çok ürünlü grup accordion durumu — varsayılan KAPALI (boş Set)
@@ -320,23 +321,11 @@ export default function OrdersScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title={role === 'buyer' ? 'Siparişlerim' : 'Satışlarım'} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
+      <ScreenHeader title="Siparişlerim" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
 
-      {/* Role Toggle */}
-      <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12, gap: 8 }}>
-        <Chip
-          label="Aldıklarım"
-          selected={role === 'buyer'}
-          onPress={() => { setRole('buyer'); setFilter('all'); }}
-          style={{ flex: 1 }}
-        />
-        <Chip
-          label="Sattıklarım"
-          selected={role === 'seller'}
-          onPress={() => { setRole('seller'); setFilter('all'); }}
-          style={{ flex: 1 }}
-        />
-      </View>
+      {/* Bu ekran yalnız ALICI siparişlerini gösterir. Satışlar (satıcı görünümü)
+          tam özellikli /sales ekranındadır (Profil → Satışlarım, Satıcı Paneli).
+          Eski Aldıklarım/Sattıklarım toggle'ı /sales ile mükerrerdi, kaldırıldı. */}
 
       {/* Filter Chips */}
       <View style={styles.filterContainer}>

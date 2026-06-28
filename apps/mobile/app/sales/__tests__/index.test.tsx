@@ -84,14 +84,14 @@ describe('J63 · Satışlarım listesi', () => {
     );
   });
 
-  it('J63.12 ödenmemiş (pending) durumda hazırlanıyor butonu gizli', async () => {
-    getAllMock.mockResolvedValue({ data: { data: [saleFixture({ status: 'pending' })] } });
+  it('J63.12 ödenmemiş (pending_payment) durumda hazırlanıyor butonu gizli', async () => {
+    getAllMock.mockResolvedValue({ data: { data: [saleFixture({ status: 'pending_payment' })] } });
     renderWithProviders(<SalesScreen />);
     await waitFor(() =>
       expect(screen.getByText('#TRD-3001')).toBeOnTheScreen(),
     );
     expect(screen.queryByText('Hazırlanıyor Olarak İşaretle')).toBeNull();
-    // pending → 'Ödeme Bekliyor' rozeti
+    // pending_payment → 'Ödeme Bekliyor' rozeti
     expect(screen.getByText('Ödeme Bekliyor')).toBeOnTheScreen();
   });
 

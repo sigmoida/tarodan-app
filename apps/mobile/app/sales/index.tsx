@@ -23,20 +23,29 @@ import { getOrderProductImageUri } from '../../src/utils/orderProductImage';
 
 const { colors } = theme;
 
+// TÜM OrderStatus enum değerlerini kapsar (eksik durum = StatusBadge ham enum
+// gösterir, örn. "refunded"). Etiketler alıcı orders/[id] uiOrderStatusConfig ile
+// tutarlı; yalnız 'paid' satıcıya aksiyon-odaklı. preparing→processing normalize
+// edildiğinden ikisi de var.
 const salesStatusConfig: Record<string, { label: string; variant: BadgeVariant }> = {
-  pending: { label: 'Ödeme Bekliyor', variant: 'warning' },
+  pending_payment: { label: 'Ödeme Bekliyor', variant: 'warning' },
   paid: { label: 'Ödendi - Hazırla', variant: 'success' },
+  preparing: { label: 'Hazırlanıyor', variant: 'info' },
   processing: { label: 'Hazırlanıyor', variant: 'info' },
   shipped: { label: 'Kargoda', variant: 'primary' },
   delivered: { label: 'Teslim Edildi', variant: 'success' },
+  awaiting_buyer_confirmation: { label: 'Onay Bekleniyor', variant: 'info' },
   completed: { label: 'Tamamlandı', variant: 'success' },
-  cancelled: { label: 'İptal', variant: 'danger' },
+  cancelled: { label: 'İptal Edildi', variant: 'danger' },
+  refund_requested: { label: 'İade Sürecinde', variant: 'danger' },
+  refunded: { label: 'İade Edildi', variant: 'secondary' },
 };
 
 interface Sale {
   id: string;
   orderNumber: string;
-  status: 'pending' | 'paid' | 'processing' | 'shipped' | 'delivered' | 'completed' | 'cancelled';
+  // Backend ham OrderStatus enum'u; sadece preparing→processing normalize edilir.
+  status: string;
   totalAmount: number;
   product: {
     id: string;
@@ -48,11 +57,12 @@ interface Sale {
     id: string;
     displayName: string;
   };
-  shippingAddress: {
+  // Adressiz satış olabilir (örn. eski/eksik kayıt) → opsiyonel, render korumalı.
+  shippingAddress?: {
     fullName: string;
     address: string;
     city: string;
-  };
+  } | null;
   createdAt: string;
 }
 
@@ -293,9 +303,11 @@ export default function SalesScreen() {
                   <Text variant="caption" style={styles.buyerName}>
                     Alıcı: {sale.buyer.displayName}
                   </Text>
-                  <Text variant="caption" style={styles.addressText} numberOfLines={1}>
-                    📍 {sale.shippingAddress.city}
-                  </Text>
+                  {sale.shippingAddress?.city ? (
+                    <Text variant="caption" style={styles.addressText} numberOfLines={1}>
+                      📍 {sale.shippingAddress.city}
+                    </Text>
+                  ) : null}
                 </View>
                 <View style={styles.priceSection}>
                   <Text variant="h3" style={styles.price}>

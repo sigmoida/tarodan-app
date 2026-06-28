@@ -108,10 +108,10 @@ describe('J85 · Kabul/Reddet buton görünürlüğü', () => {
 
   it('J85.2 pending_review olmayan durumda karar butonları gizli', async () => {
     getSellerMock.mockResolvedValue({
-      data: { data: [refundFixture({ status: 'accepted' })] },
+      data: { data: [refundFixture({ status: 'approved' })] },
     });
     renderWithProviders(<SellerRefundRequestsScreen />);
-    await waitFor(() => expect(screen.getByText('Kabul Edildi')).toBeOnTheScreen());
+    await waitFor(() => expect(screen.getByText('Onaylandı')).toBeOnTheScreen());
     expect(screen.queryByText('Kabul Et')).toBeNull();
     expect(screen.queryByText('Reddet')).toBeNull();
   });

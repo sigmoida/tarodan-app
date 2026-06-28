@@ -379,6 +379,8 @@ export default function ProfileScreen() {
   const quickActionItems = [
     { icon: 'pricetag' as const, label: 'İlanlarım', to: '/settings/my-listings' },
     { icon: 'cube' as const, label: 'Siparişlerim', to: '/orders', testID: 'profile-orders-link' },
+    { icon: 'cash' as const, label: 'Satışlarım', to: '/sales', testID: 'profile-sales-link' },
+    { icon: 'arrow-undo' as const, label: 'İadelerim', to: '/refund-requests', testID: 'profile-refunds-link' },
     { icon: 'heart' as const, label: 'Favorilerim', to: '/favorites' },
     { icon: 'chatbubbles' as const, label: 'Mesajlar', to: '/messages' },
     { icon: 'albums' as const, label: 'Beğenilen Koleksiyonlar', to: '/settings/liked-collections' },
@@ -669,7 +671,7 @@ export default function ProfileScreen() {
           />
           <MenuItem
             icon="headset-outline"
-            label="Destek Talebi"
+            label="Destek Taleplerim"
             onPress={() => router.push('/support')}
           />
           <MenuItem

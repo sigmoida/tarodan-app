@@ -22,14 +22,20 @@ import { captureException } from '../../src/services/sentry';
 
 const { colors } = theme;
 
-// Web ile parite — refund-requests/[id]/page.tsx statusConfig karşılığı
+// RefundRequestStatus enum'ının TÜM değerleri (satıcı perspektifi). Eksik durum =
+// StatusBadge ham enum (örn. "return_shipment_open", "approved") gösterir. Gerçek enum:
+// pending_review, approved, wait_for_delivery, return_shipment_open, return_in_transit,
+// return_delivered, refunded, rejected, disputed, cancelled.
 const refundStatusConfig: Record<string, { label: string; variant: BadgeVariant }> = {
   pending_review: { label: 'İnceleme Bekliyor', variant: 'warning' },
+  approved: { label: 'Onaylandı', variant: 'success' },
   wait_for_delivery: { label: 'İade Kargosu Bekleniyor', variant: 'info' },
-  accepted: { label: 'Kabul Edildi', variant: 'success' },
-  in_transit: { label: 'İade Kargoda', variant: 'primary' },
+  return_shipment_open: { label: 'İade Kargosu Açıldı', variant: 'info' },
+  return_in_transit: { label: 'İade Kargoda', variant: 'primary' },
+  return_delivered: { label: 'Ürün Ulaştı', variant: 'success' },
   refunded: { label: 'İade Edildi', variant: 'success' },
   rejected: { label: 'Reddedildi', variant: 'danger' },
+  disputed: { label: 'İncelemede (İtiraz)', variant: 'warning' },
   cancelled: { label: 'İptal Edildi', variant: 'danger' },
 };
 

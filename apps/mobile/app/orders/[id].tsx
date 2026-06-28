@@ -448,6 +448,15 @@ export default function OrderDetailScreen() {
   })();
   const hasActiveRefund = !!order?.activeRefundRequest;
 
+  // Timeline son adımı: sipariş iade/iptal durumundaysa mutlu-yolda bitmesin.
+  const isRefundedOrder = order?.status === 'refunded' || hasActiveRefund;
+  const showRefundCancelStep = isCancelled || isRefundedOrder;
+  const refundCancelLabel: string = isCancelled
+    ? 'İptal Edildi'
+    : order?.activeRefundRequest
+      ? REFUND_STATUS_LABELS[order.activeRefundRequest.status]?.label ?? 'İade Sürecinde'
+      : 'İade Edildi';
+
   // 14 GÜNDEN SONRA İADE YOK: teslimden 14 günden fazla geçtiyse iade penceresi
   // kapalı (backend de reddeder). Teslim edilmemişse pencere henüz başlamadı.
   const isPastRefundWindow = (() => {
@@ -561,8 +570,19 @@ export default function OrderDetailScreen() {
               label="Teslim Edildi"
               date={formatDate(order.deliveredAt)}
               isActive={!!order.deliveredAt}
-              isLast
+              isLast={!showRefundCancelStep}
             />
+            {/* İade/iptal durumunda timeline mutlu-yolda bitmesin; gerçek son
+                durumu (İptal/İade Sürecinde/İade Edildi) ek adım olarak yansıt. */}
+            {showRefundCancelStep && (
+              <TimelineItem
+                icon={isCancelled ? 'close-circle' : 'arrow-undo'}
+                label={refundCancelLabel}
+                date={formatDate(order.refundedAt ?? order.cancelledAt)}
+                isActive
+                isLast
+              />
+            )}
           </View>
         </Card>
 
