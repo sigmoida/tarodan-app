@@ -182,8 +182,8 @@ export default function TradeAddressPicker({ onChange, label }: TradeAddressPick
           <CityDistrictSelector
             city={form.city}
             district={form.district}
-            onCityChange={(c) => setForm({ ...form, city: c, district: '' })}
-            onDistrictChange={(d) => setForm({ ...form, district: d })}
+            onCityChange={(c) => setForm((prev) => ({ ...prev, city: c, district: '' }))}
+            onDistrictChange={(d) => setForm((prev) => ({ ...prev, district: d }))}
           />
           <Textarea
             rows={2}
