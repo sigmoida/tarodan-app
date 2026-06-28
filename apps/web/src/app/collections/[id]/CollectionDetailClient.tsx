@@ -454,7 +454,15 @@ export default function CollectionDetailClient() {
 
   const sortedItems = collection.items
     ? [...collection.items]
-        .filter((item) => item.isCustom || !item.productStatus || item.productStatus === 'active')
+        // Eklenen ürün sonradan satılırsa/rezerve olursa/stoğu biterse koleksiyondan
+        // KAYBOLMASIN (eskiden yalnız 'active' tutuluyordu → "henüz ürün yok" bug'ı).
+        // Yalnız yayında olmayan/silinmiş durumları gizle; satılmış ürün SOLD rozetiyle gösterilir.
+        .filter(
+          (item) =>
+            item.isCustom ||
+            !item.productStatus ||
+            ['active', 'sold', 'reserved', 'inactive'].includes(item.productStatus),
+        )
         .sort((a, b) => {
           if (a.isFeatured && !b.isFeatured) return -1;
           if (!a.isFeatured && b.isFeatured) return 1;
@@ -546,15 +554,19 @@ export default function CollectionDetailClient() {
                   >
                     {t('collection.edit')}
                   </Link>
-                  <Button
-                    variant="primary"
-                    size="md"
-                    onClick={handleOpenAddModal}
-                    className="flex items-center gap-1.5"
-                  >
-                    <PlusIcon className="w-4 h-4" />
-                    {t('collection.addProduct')}
-                  </Button>
+                  {/* Boş koleksiyonda alttaki boş-durum CTA'sı zaten "Ürün Ekle"
+                     gösteriyor; burada da göstermek ÇİFT butona yol açıyordu. */}
+                  {sortedItems.length > 0 && (
+                    <Button
+                      variant="primary"
+                      size="md"
+                      onClick={handleOpenAddModal}
+                      className="flex items-center gap-1.5"
+                    >
+                      <PlusIcon className="w-4 h-4" />
+                      {t('collection.addProduct')}
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
