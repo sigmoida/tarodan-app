@@ -28,9 +28,21 @@ const uiOrderStatusConfig: Record<string, { label: string; variant: BadgeVariant
   delivered: { label: 'Teslim Edildi', variant: 'success' },
   awaiting_confirmation: { label: 'Onayınız Bekleniyor', variant: 'warning' },
   completed: { label: 'Tamamlandı', variant: 'success' },
-  cancelled: { label: 'İptal', variant: 'danger' },
-  refunded: { label: 'İade', variant: 'secondary' },
+  cancelled: { label: 'İptal Edildi', variant: 'danger' },
+  refunded: { label: 'İade Edildi', variant: 'secondary' },
+  refund_requested: { label: 'İade Sürecinde', variant: 'danger' },
   mixed: { label: 'Karışık Durum', variant: 'info' },
+};
+
+// Rozet önceliği (liste/detay ile aynı): aktif iade > iptal > normal durum.
+const badgeStatusOf = (o: {
+  status: string;
+  cancellationType?: 'iptal' | 'iade' | null;
+  activeRefundRequest?: { id: string; status: string } | null;
+}): string => {
+  if (o.activeRefundRequest) return 'refund_requested';
+  if (o.cancellationType === 'iptal') return 'cancelled';
+  return o.status;
 };
 
 interface GroupOrder {
@@ -47,6 +59,8 @@ interface GroupOrder {
   seller: { id: string; displayName: string };
   trackingNumber?: string | null;
   trackingUrl?: string | null;
+  cancellationType?: 'iptal' | 'iade' | null;
+  activeRefundRequest?: { id: string; status: string } | null;
   shipment?: {
     provider?: string;
     trackingNumber?: string | null;
@@ -153,9 +167,51 @@ export default function OrderGroupDetailScreen() {
             </View>
           </Card>
 
-          {/* Ürün satırları — her birinin kendi kargo takibi var */}
+          {/* Çoklu ürün: tek ödeme, her ürün AYRI sipariş + ayrı kargo. İade/iptal de
+              ürün bazında: kargo öncesi "İptal", kargo sonrası "İade" → ürünün kendi
+              detayında yapılır. Sepet başına tek onay maili gönderilir (backend). */}
+          {group.orders.length > 1 && (
+            <Card variant="elevated" padding={12} style={styles.card}>
+              <View style={styles.noteRow}>
+                <Ionicons name="information-circle-outline" size={18} color={colors.info[600]!} />
+                <Text variant="caption" style={styles.noteText}>
+                  İade veya iptal işlemleri ürün bazında yapılır. İlgili ürüne dokunarak
+                  iptal (kargo öncesi) ya da iade (kargo sonrası) talebi açabilirsiniz.
+                </Text>
+              </View>
+            </Card>
+          )}
+
+          {/* Ürün satırları — her birinin kendi kargo takibi + kendi iade/iptal akışı var */}
           {group.orders.map((order) => {
             const tracking = order.trackingNumber || order.shipment?.trackingNumber;
+            // Kargo öncesi = İptal, kargo sonrası = İade. apiStatusToUi paid/preparing'i
+            // 'processing'e indirir; 'pending' ödeme bekleyen sipariştir.
+            const isPreShipment = ['pending', 'processing'].includes(order.status);
+            // İptal (cancellationType='iptal' / cancelled) ya da iade edilmiş → kapalı:
+            // kargo bilgisi ve iptal/iade aksiyonu gösterilmez.
+            const isCancelled =
+              order.status === 'cancelled' || order.cancellationType === 'iptal';
+            const isClosed = isCancelled || order.status === 'refunded';
+            // Teslim edilmiş/tamamlanmış → kargo kartı order.status'a göre "Teslim Edildi".
+            const isDelivered = [
+              'delivered',
+              'awaiting_confirmation',
+              'completed',
+            ].includes(order.status);
+            // Kargo satırı: SADECE gerçek gönderi + kargo sonrası durum + iptal değil.
+            const showTracking =
+              !!tracking &&
+              !isCancelled &&
+              order.status !== 'refunded' &&
+              ['shipped', 'delivered', 'awaiting_confirmation', 'completed'].includes(
+                order.status,
+              );
+            const actionLabel = isClosed
+              ? null
+              : isPreShipment
+                ? 'İptal işlemleri'
+                : 'İade işlemleri';
             return (
               <Card key={order.id} variant="elevated" padding={0} style={styles.card}>
                 <Pressable onPress={() => router.push(`/orders/${order.id}` as any)}>
@@ -164,7 +220,7 @@ export default function OrderGroupDetailScreen() {
                     {/* Tek siparişli grupta öğe rozeti, üstteki grup rozetiyle aynı
                         → tekrarı önlemek için yalnız 2+ siparişte göster. */}
                     {group.orders.length > 1 && (
-                      <StatusBadge status={order.status} config={uiOrderStatusConfig} size="sm" />
+                      <StatusBadge status={badgeStatusOf(order)} config={uiOrderStatusConfig} size="sm" />
                     )}
                   </View>
                   <View style={styles.itemContent}>
@@ -183,20 +239,38 @@ export default function OrderGroupDetailScreen() {
                     </View>
                   </View>
 
-                  {/* Bu ürünün kargo bilgisi */}
-                  <View style={styles.shipmentRow}>
-                    <Ionicons name="cube-outline" size={16} color={colors.primary[600]!} />
-                    {tracking ? (
+                  {/* Bu ürünün kargo bilgisi — yalnız gerçek gönderi + kargo sonrası
+                      durumda. İptal/iade edilen siparişte hiç gösterilmez. Teslim
+                      edilmişse stale shipment.status'a değil order.status'a göre
+                      "Teslim Edildi" yansıtılır. */}
+                  {showTracking && (
+                    <View style={styles.shipmentRow}>
+                      <Ionicons
+                        name={isDelivered ? 'checkmark-circle' : 'cube-outline'}
+                        size={16}
+                        color={isDelivered ? colors.success[600]! : colors.primary[600]!}
+                      />
                       <Text variant="caption" style={styles.shipmentText}>
-                        Kargo Takip: {tracking}
+                        {isDelivered ? 'Teslim Edildi' : 'Kargo Takip'}: {tracking}
                       </Text>
-                    ) : (
-                      <Text variant="caption" style={styles.muted}>
-                        Kargo bilgisi henüz oluşmadı
+                      <Ionicons name="chevron-forward" size={16} color={colors.text.subtle} />
+                    </View>
+                  )}
+
+                  {/* Ürün bazında iade/iptal — detay ekranına götürür */}
+                  {actionLabel && (
+                    <View style={styles.actionRow}>
+                      <Ionicons
+                        name={isPreShipment ? 'close-circle-outline' : 'return-up-back'}
+                        size={16}
+                        color={colors.primary[600]!}
+                      />
+                      <Text variant="caption" style={styles.actionText}>
+                        {actionLabel}
                       </Text>
-                    )}
-                    <Ionicons name="chevron-forward" size={16} color={colors.text.subtle} />
-                  </View>
+                      <Ionicons name="chevron-forward" size={16} color={colors.text.subtle} />
+                    </View>
+                  )}
                 </Pressable>
               </Card>
             );
@@ -283,6 +357,29 @@ const styles = StyleSheet.create({
   shipmentText: {
     flex: 1,
     color: colors.text.heading,
+    fontWeight: '600',
+  },
+  noteRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  noteText: {
+    flex: 1,
+    color: colors.text.muted,
+    lineHeight: 18,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginHorizontal: 12,
+    marginBottom: 12,
+    paddingTop: 4,
+  },
+  actionText: {
+    flex: 1,
+    color: colors.primary[600]!,
     fontWeight: '600',
   },
 });

@@ -10,6 +10,7 @@ import { QUEUE_NAMES } from '../../workers/constants';
 import { PrismaModule } from '../../prisma';
 import { PaymentModule } from '../payment/payment.module';
 import { SuratCargoModule } from '../surat-cargo/surat-cargo.module';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { SuratCargoModule } from '../surat-cargo/surat-cargo.module';
     ScheduleModule.forRoot(),
     PaymentModule,
     SuratCargoModule,
+    NotificationModule,
     // Cron'ların Bull repeatable'a taşınması için paylaşılan kuyruk.
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],

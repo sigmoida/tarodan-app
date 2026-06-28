@@ -203,6 +203,16 @@ export class RatingService {
           tradeId: dto.tradeId,
         },
       );
+      await this.notificationService.sendTemplateEmailToUser(
+        dto.receiverId,
+        'review-received-seller',
+        {
+          sellerName: rating.receiver?.displayName || '',
+          reviewerName: rating.giver?.displayName || 'Bir kullanıcı',
+          rating: dto.score,
+          comment: dto.comment || undefined,
+        },
+      );
     } catch (error) {
       // Don't fail if notification fails
       this.logger.warn('Failed to send review notification');

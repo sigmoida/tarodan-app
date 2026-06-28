@@ -14,15 +14,10 @@ interface Props {
   orderId: string;
   orderNumber: string;
   phase: Phase;
+  /** Siparişteki toplam adet. >1 ise adet bazlı kısmi iade seçici gösterilir. */
+  quantity?: number;
   onSuccess: () => void;
 }
-
-const REASONS_REQUIRING_EVIDENCE: RefundReason[] = [
-  "damaged",
-  "wrong_item",
-  "not_as_described",
-  "missing_parts",
-];
 
 export default function RefundRequestModal({
   isOpen,
@@ -30,6 +25,7 @@ export default function RefundRequestModal({
   orderId,
   orderNumber,
   phase,
+  quantity = 1,
   onSuccess,
 }: Props) {
   const { locale } = useTranslation();
@@ -37,6 +33,7 @@ export default function RefundRequestModal({
   const [description, setDescription] = useState("");
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [evidencePreviews, setEvidencePreviews] = useState<string[]>([]);
+  const [refundQuantity, setRefundQuantity] = useState(1);
   const [submitting, setSubmitting] = useState(false);
 
   const handleEvidenceAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -58,10 +55,25 @@ export default function RefundRequestModal({
     setEvidencePreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const evidenceRequired = REASONS_REQUIRING_EVIDENCE.includes(reason);
-  const descriptionRequired = phase === "past_cooling_off";
+  // 14 gün koşulsuz iade: cayma penceresinde (preparing / in_cooling_off) sebep,
+  // açıklama ve foto opsiyoneldir — backend bu pencerede koşulsuz iade işler.
+  // Sadece 14 gün sonrası (dispute) açıklama + foto zorunludur.
+  const isDispute = phase === "past_cooling_off";
+  const descriptionRequired = isDispute;
+  const evidenceRequired = isDispute;
+  // Hasar/yanlış ürün gibi sebeplerde foto yükleme alanını pencere içinde de
+  // (opsiyonel) göster; zorunluluk yalnızca dispute'ta geçerli.
+  const showEvidenceUpload =
+    evidenceRequired ||
+    ["damaged", "wrong_item", "not_as_described", "missing_parts"].includes(
+      reason,
+    );
 
   const reasonOptions: { value: RefundReason; label: string }[] = [
+    {
+      value: "changed_mind",
+      label: locale === "en" ? "Changed my mind" : "Vazgeçtim / fikrim değişti",
+    },
     {
       value: "damaged",
       label: locale === "en" ? "Damaged" : "Hasarlı geldi",
@@ -122,6 +134,11 @@ export default function RefundRequestModal({
         description: description.trim() || undefined,
         evidencePhotoUrls:
           evidencePhotoUrls.length > 0 ? evidencePhotoUrls : undefined,
+        // Adet bazlı kısmi iade: tüm adet iade ediliyorsa alanı gönderme.
+        refundQuantity:
+          quantity > 1 && refundQuantity < quantity
+            ? refundQuantity
+            : undefined,
       });
       toast.success(
         locale === "en"
@@ -177,6 +194,11 @@ export default function RefundRequestModal({
         <div>
           <label className="block text-sm font-medium text-body mb-2">
             {locale === "en" ? "Reason" : "Sebep"}
+            {!isDispute && (
+              <span className="text-muted font-normal ml-1">
+                ({locale === "en" ? "optional" : "opsiyonel"})
+              </span>
+            )}
           </label>
           <Select
             value={reason}
@@ -190,6 +212,32 @@ export default function RefundRequestModal({
             ))}
           </Select>
         </div>
+
+        {/* Adet bazlı kısmi iade: sipariş birden çok adetse kullanıcı kaç adedini
+            iade edeceğini seçebilir (ör. "3 al 2 iade"). Tek adet siparişte gizli. */}
+        {quantity > 1 && (
+          <div>
+            <label className="block text-sm font-medium text-body mb-2">
+              {locale === "en" ? "Quantity to refund" : "İade edilecek adet"}
+            </label>
+            <Select
+              value={String(refundQuantity)}
+              onChange={(e) => setRefundQuantity(Number(e.target.value))}
+              className="rounded-xl"
+            >
+              {Array.from({ length: quantity }, (_, i) => i + 1).map((q) => (
+                <option key={q} value={q}>
+                  {q} / {quantity}
+                </option>
+              ))}
+            </Select>
+            <p className="text-xs text-muted mt-1">
+              {locale === "en"
+                ? `This order has ${quantity} items. Choose how many to return.`
+                : `Bu siparişte ${quantity} adet var. Kaç adedini iade edeceğinizi seçin.`}
+            </p>
+          </div>
+        )}
 
         <div>
           <label className="block text-sm font-medium text-body mb-2">
@@ -214,13 +262,19 @@ export default function RefundRequestModal({
           />
         </div>
 
-        {evidenceRequired && (
+        {showEvidenceUpload && (
           <div>
             <label className="block text-sm font-medium text-body mb-2">
               {locale === "en"
                 ? "Evidence photos (max 5)"
                 : "Kanıt fotoğrafları (maks 5)"}{" "}
-              <span className="text-danger-500">*</span>
+              {evidenceRequired ? (
+                <span className="text-danger-500">*</span>
+              ) : (
+                <span className="text-muted font-normal">
+                  ({locale === "en" ? "optional" : "opsiyonel"})
+                </span>
+              )}
             </label>
             <div className="flex flex-wrap gap-2">
               {evidencePreviews.map((src, idx) => (

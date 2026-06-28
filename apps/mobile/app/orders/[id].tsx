@@ -24,19 +24,20 @@ import { api, ordersApi, refundsApi, mediaApi, type RNFile } from '../../src/ser
 import { ThemedRefreshControl } from '../../src/components/common';
 import { useRefresh } from '../../src/hooks/useRefresh';
 import RatingModal from '../../src/components/RatingModal';
-import { AwaitingConfirmationBanner } from '../../src/components/AwaitingConfirmationBanner';
 import { captureException } from '../../src/services/sentry';
 import { safeString } from '../../src/utils/safeString';
 import { apiStatusToUi, type UiOrderStatus } from '../../src/utils/orderStatus';
 import { getOrderProductImageUri } from '../../src/utils/orderProductImage';
 
-const { colors, spacing, radius } = theme;
+const { colors, radius } = theme;
 
 interface OrderDetail {
   id: string;
   orderNumber: string;
   isMembership?: boolean;
   status: string;
+  quantity?: number;
+  cancellationType?: 'iptal' | 'iade' | null;
   totalAmount: number;
   shippingCost: number;
   buyerFeeAmount?: number;
@@ -101,7 +102,10 @@ interface OrderDetail {
   } | null;
 }
 
+// 14 gün koşulsuz iade (Mesafeli Satış cayma hakkı): sebep/foto opsiyonel.
+// "changed_mind" (fikrim değişti) artık kabul ediliyor; ilk seçenek.
 const REFUND_REASONS: Array<{ value: string; label: string }> = [
+  { value: 'changed_mind', label: 'Fikrim değişti / vazgeçtim' },
   { value: 'damaged', label: 'Hasarlı geldi' },
   { value: 'not_as_described', label: 'Açıklamayla uyuşmuyor' },
   { value: 'wrong_item', label: 'Yanlış ürün geldi' },
@@ -109,9 +113,9 @@ const REFUND_REASONS: Array<{ value: string; label: string }> = [
   { value: 'other', label: 'Diğer' },
 ];
 
-// Kanıt fotoğrafı gerektiren iade sebepleri — web/backend ile birebir parite.
-const REASONS_REQUIRING_EVIDENCE = ['damaged', 'wrong_item', 'not_as_described', 'missing_parts'];
 const MAX_EVIDENCE_PHOTOS = 5;
+// Saticiya ödeme = teslim + 14 gün cayma penceresi (+1 gün grace). Banner/escrow metni.
+const COOLING_OFF_DAYS = 14;
 
 const REFUND_STATUS_LABELS: Record<string, { label: string; variant: BadgeVariant }> = {
   pending_review: { label: 'Talep İnceleniyor', variant: 'info' },
@@ -135,7 +139,19 @@ const uiOrderStatusConfig: Record<string, { label: string; variant: BadgeVariant
   awaiting_confirmation: { label: 'Onayınız Bekleniyor', variant: 'warning' },
   completed: { label: 'Tamamlandı', variant: 'success' },
   cancelled: { label: 'İptal Edildi', variant: 'danger' },
-  refunded: { label: 'İade', variant: 'secondary' },
+  refunded: { label: 'İade Edildi', variant: 'secondary' },
+  refund_requested: { label: 'İade Sürecinde', variant: 'danger' },
+};
+
+// Rozet önceliği (liste ile aynı mantık): aktif iade > iptal > normal durum.
+// - activeRefundRequest dolu → 'refund_requested' ("İade Sürecinde"), sipariş
+//   'delivered' kalsa bile.
+// - cancellationType === 'iptal' → 'cancelled' ("İptal Edildi"); status 'refunded'
+//   olsa bile "İade Edildi" DEME.
+const badgeStatusOf = (o: any): string => {
+  if (o?.activeRefundRequest) return 'refund_requested';
+  if (o?.cancellationType === 'iptal') return 'cancelled';
+  return o?.status;
 };
 
 export default function OrderDetailScreen() {
@@ -146,11 +162,12 @@ export default function OrderDetailScreen() {
     type: 'product' | 'seller';
   }>({ visible: false, type: 'product' });
   const [refundModalVisible, setRefundModalVisible] = useState(false);
-  const [refundReason, setRefundReason] = useState<string>('damaged');
+  const [refundReason, setRefundReason] = useState<string>('changed_mind');
   const [refundDescription, setRefundDescription] = useState('');
   const [evidenceAssets, setEvidenceAssets] = useState<RNFile[]>([]);
+  // Adet bazlı kısmi iade: kaç adet iade edilecek (quantity>1 olan siparişlerde seçilir).
+  const [refundQuantity, setRefundQuantity] = useState(1);
 
-  const evidenceRequired = REASONS_REQUIRING_EVIDENCE.includes(refundReason);
   const [snackbar, setSnackbar] = useState<{ visible: boolean; message: string; variant: 'success' | 'danger' | 'default' }>({
     visible: false,
     message: '',
@@ -168,6 +185,9 @@ export default function OrderDetailScreen() {
         return {
           ...data,
           status: apiStatusToUi(data.status),
+          // Adet bazlı kısmi iade: backend detayında üst-seviye quantity yoksa
+          // items[0].quantity'ye düş (tek-ürünlü siparişte 1).
+          quantity: data.quantity ?? data.items?.[0]?.quantity ?? 1,
           product: {
             ...(data.product || {}),
             imageUrl: data.product?.imageUrl,
@@ -186,12 +206,22 @@ export default function OrderDetailScreen() {
   // Refund request mutation
   const refundMutation = useMutation({
     mutationFn: async () => {
-      const body: { reason: string; description?: string; evidencePhotoUrls?: string[] } = {
+      const body: {
+        reason: string;
+        description?: string;
+        evidencePhotoUrls?: string[];
+        refundQuantity?: number;
+      } = {
         reason: refundReason,
       };
       const desc = refundDescription.trim();
       if (desc.length > 0) body.description = desc;
-      // Kanıt fotoğraflarını yükle (web ile parite: tek tek /media/upload?folder=reviews)
+      // Adet bazlı kısmi iade: yalnızca çok adetli siparişte ve tüm adetten azsa gönder.
+      const orderQty = order?.quantity ?? 1;
+      if (orderQty > 1 && refundQuantity < orderQty) {
+        body.refundQuantity = refundQuantity;
+      }
+      // Kanıt fotoğrafları opsiyonel (14 gün koşulsuz iade). Eklenmişse yükle.
       if (evidenceAssets.length > 0) {
         const results = await Promise.all(
           evidenceAssets.map((file) => mediaApi.uploadRefundEvidence(file)),
@@ -205,6 +235,7 @@ export default function OrderDetailScreen() {
       setRefundModalVisible(false);
       setRefundDescription('');
       setEvidenceAssets([]);
+      setRefundQuantity(1);
       setSnackbar({ visible: true, message: 'İade talebiniz oluşturuldu.', variant: 'success' });
       queryClient.invalidateQueries({ queryKey: ['order', id] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
@@ -256,16 +287,8 @@ export default function OrderDetailScreen() {
     setEvidenceAssets((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Gönder — kanıt zorunluysa en az bir foto şartını istemci tarafında da doğrula.
+  // Gönder — 14 gün koşulsuz iade: sebep/foto opsiyonel, ek doğrulama yok.
   const submitRefund = () => {
-    if (evidenceRequired && evidenceAssets.length === 0) {
-      setSnackbar({
-        visible: true,
-        message: 'Bu sebep için en az bir kanıt fotoğrafı gereklidir.',
-        variant: 'danger',
-      });
-      return;
-    }
     refundMutation.mutate();
   };
 
@@ -315,30 +338,53 @@ export default function OrderDetailScreen() {
     );
   };
 
-  // Confirm delivery mutation
-  const confirmDeliveryMutation = useMutation({
-    mutationFn: async () => {
-      return ordersApi.confirm(id as string);
-    },
+  // Sipariş iptal mutation (kargo ÖNCESİ — POST /orders/:id/cancel).
+  // Alıcı onay butonu kaldırıldı: teslim+14 gün sonunda satıcıya ödeme otomatik
+  // serbest kalır; alıcının erken onayı artık payout'u tetiklemiyor.
+  const cancelOrderMutation = useMutation({
+    mutationFn: async () => ordersApi.cancel(id as string),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['order', id] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      setSnackbar({ visible: true, message: 'Siparişiniz iptal edildi.', variant: 'success' });
+    },
+    onError: (err: any) => {
+      captureException(err, {
+        level: 'error',
+        tags: { flow: 'order.cancel' },
+        extra: { orderId: String(id ?? '') },
+      });
+      const msg =
+        err?.response?.data?.message ||
+        (Array.isArray(err?.response?.data?.message)
+          ? err.response.data.message.join(', ')
+          : 'Sipariş iptal edilemedi.');
+      setSnackbar({
+        visible: true,
+        message: typeof msg === 'string' ? msg : 'Sipariş iptal edilemedi.',
+        variant: 'danger',
+      });
     },
   });
 
-  // 48h pencere — alıcı erken onay (Faz 4C.4)
-  const confirmReceiptMutation = useMutation({
-    mutationFn: async () => ordersApi.confirmReceipt(id as string),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['order', id] });
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      appAlert('Teşekkürler', 'Sipariş onaylandı. Satıcıya ödeme transferi tetiklendi.');
-    },
-    onError: (err: any) => {
-      const msg = err?.response?.data?.message || err?.message || 'Onay başarısız';
-      appAlert('Hata', msg);
-    },
-  });
+  const handleCancelOrder = () => {
+    // 'pending' = ödeme bekleyen sipariş (henüz ödeme alınmadı) → iade vaadi verme.
+    const isUnpaid = order?.status === 'pending';
+    appAlert(
+      'Siparişi İptal Et',
+      isUnpaid
+        ? 'Sipariş iptal edilecek. Devam edilsin mi?'
+        : 'Sipariş iptal edilecek ve ödemeniz iade edilecek. Devam edilsin mi?',
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'İptal Et',
+          style: 'destructive',
+          onPress: () => cancelOrderMutation.mutate(),
+        },
+      ],
+    );
+  };
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return '-';
@@ -366,6 +412,52 @@ export default function OrderDetailScreen() {
   const canRate =
     order && !isMembershipOrder && ['delivered', 'completed'].includes(order.status);
 
+  // Kargo öncesi = İPTAL, kargo sonrası = İADE (backend cancel endpoint pending/paid/
+  // preparing'de geçerli → UI status pending/processing). apiStatusToUi paid+preparing'i
+  // 'processing'e indirger; 'pending' ödeme bekleyen sipariştir (ayrı ödeme kartı var).
+  const isPreShipment = !!order && ['pending', 'processing'].includes(order.status);
+  const isPostShipment =
+    !!order &&
+    ['shipped', 'delivered', 'awaiting_confirmation', 'completed'].includes(order.status);
+
+  // İptal: kullanıcı kargo öncesi iptal etti (cancellationType='iptal') veya sipariş
+  // 'cancelled'. İptal edilen siparişte kargo/escrow/iade gibi kartlar GEÇERSİZ.
+  const isCancelled =
+    !!order && (order.status === 'cancelled' || order.cancellationType === 'iptal');
+
+  // Kargo/Teslimat kartı: SADECE gerçek gönderi varken. shipment trackingNumber
+  // DOLU + order.status kargo sonrası bir durumda. İptal/iade/teslim öncesi gizli.
+  // Teslim edilmiş/tamamlanmış siparişte kart, stale shipment.status'a değil
+  // order.status'a göre "Teslim Edildi" gösterir.
+  const isDelivered =
+    !!order && ['delivered', 'awaiting_confirmation', 'completed'].includes(order.status);
+  const showTrackingCard =
+    !!order &&
+    !!order.trackingNumber &&
+    isPostShipment &&
+    !isCancelled &&
+    order.status !== 'refunded';
+
+  // Saticiya ödeme = teslim + 14 gün (iade penceresi). Teslim edilmişse tahmini
+  // serbest kalma tarihini göster; açık iade varken hold dondurulur (bekletme rozeti).
+  const payoutReleaseDate = (() => {
+    if (!order?.deliveredAt) return null;
+    const d = new Date(order.deliveredAt);
+    d.setDate(d.getDate() + COOLING_OFF_DAYS);
+    return d;
+  })();
+  const hasActiveRefund = !!order?.activeRefundRequest;
+
+  // 14 GÜNDEN SONRA İADE YOK: teslimden 14 günden fazla geçtiyse iade penceresi
+  // kapalı (backend de reddeder). Teslim edilmemişse pencere henüz başlamadı.
+  const isPastRefundWindow = (() => {
+    if (!order?.deliveredAt) return false;
+    const d = new Date(order.deliveredAt);
+    if (Number.isNaN(d.getTime())) return false;
+    const ageDays = (Date.now() - d.getTime()) / (1000 * 3600 * 24);
+    return ageDays > COOLING_OFF_DAYS;
+  })();
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -392,23 +484,46 @@ export default function OrderDetailScreen() {
         style={styles.content}
         refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {/* 48h pencere banner (Faz 4C.4) */}
-        {order.status === 'awaiting_confirmation' &&
-          order.confirmationDeadline &&
-          (order as any).isBuyer !== false && (
-            <AwaitingConfirmationBanner
-              confirmationDeadline={order.confirmationDeadline}
-              onConfirm={() => confirmReceiptMutation.mutate()}
-              onReportProblem={() =>
-                // Refund request route henüz mobile'da yok; geçici olarak order detay'da kalır.
-                // Faz 4+ kapsamında mobile refund-request flow eklenince burası güncellenecek.
-                appAlert(
-                  'Sorun Bildirme',
-                  'Sorun bildirimi için lütfen profil > Yardım üzerinden iletişime geçin. (Mobile iade akışı yakında eklenecek.)',
-                )
-              }
-              confirming={confirmReceiptMutation.isPending}
-            />
+        {/* Escrow bilgisi — alıcı onay butonu KALDIRILDI. Satıcıya ödeme teslimden
+            14 gün sonra otomatik serbest kalır; alıcının onayı payout'u erkene almaz.
+            Açık iade varken ödeme bekletilir (bekletme rozeti). */}
+        {order.isBuyer !== false &&
+          !isMembershipOrder &&
+          isPostShipment &&
+          !isCancelled &&
+          order.status !== 'refunded' && (
+            <Card variant="elevated" style={styles.card} testID="order-escrow-info">
+              <View style={styles.escrowHeaderRow}>
+                <Ionicons name="shield-checkmark-outline" size={20} color={colors.info[600]!} />
+                <Text variant="label" style={styles.escrowHeaderText}>
+                  Ödeme Güvencesi
+                </Text>
+                {hasActiveRefund && (
+                  <StatusBadge
+                    status="frozen"
+                    config={{ frozen: { label: 'İade nedeniyle bekletiliyor', variant: 'warning' } }}
+                    size="sm"
+                  />
+                )}
+              </View>
+              {hasActiveRefund ? (
+                <Text variant="caption" style={styles.escrowText}>
+                  Açık iade talebiniz olduğu için satıcıya ödeme, iade süreci sonuçlanana
+                  kadar bekletiliyor.
+                </Text>
+              ) : payoutReleaseDate ? (
+                <Text variant="caption" style={styles.escrowText}>
+                  Satıcıya ödeme, teslimden 14 gün sonra otomatik serbest kalır.
+                  Tahmini serbest kalma: {formatDate(payoutReleaseDate.toISOString())}.
+                  Bu süre içinde dilediğiniz zaman iade talep edebilirsiniz.
+                </Text>
+              ) : (
+                <Text variant="caption" style={styles.escrowText}>
+                  Satıcıya ödeme, teslimattan 14 gün sonra otomatik serbest kalır.
+                  Onaylamanıza gerek yoktur; bu süre içinde iade talep edebilirsiniz.
+                </Text>
+              )}
+            </Card>
           )}
 
         {/* Order Status */}
@@ -417,7 +532,7 @@ export default function OrderDetailScreen() {
             <Text variant="caption" style={styles.orderNumber}>
               Sipariş #{order.orderNumber}
             </Text>
-            <StatusBadge status={order.status} config={uiOrderStatusConfig} size="sm" />
+            <StatusBadge status={badgeStatusOf(order)} config={uiOrderStatusConfig} size="sm" />
           </View>
 
           {/* Status Timeline */}
@@ -451,6 +566,24 @@ export default function OrderDetailScreen() {
           </View>
         </Card>
 
+        {/* İptal bilgisi — sipariş iptal edildiğinde (kargo öncesi iptal ya da
+            'cancelled'). İptalde kargo/escrow/iade kartları gizli; yalnız bu bilgi.
+            'refunded' + cancellationType='iptal' de İPTAL sayılır (İade Edildi değil). */}
+        {isCancelled && (
+          <Card variant="elevated" style={styles.card} testID="order-cancelled-info">
+            <View style={styles.cancelledHeaderRow}>
+              <Ionicons name="close-circle-outline" size={20} color={colors.danger[600]!} />
+              <Text variant="label" style={styles.cancelledHeaderText}>
+                Sipariş İptal Edildi
+              </Text>
+            </View>
+            <Text variant="caption" style={styles.escrowText}>
+              Bu sipariş iptal edildi. Ödemeniz iade işlemine alındı; bankanıza yansıması
+              birkaç iş günü sürebilir.
+            </Text>
+          </Card>
+        )}
+
         {/* Ödeme Bekliyor — alıcı ödemeyi tamamlasın (örn. kabul edilen tekliften oluşan sipariş) */}
         {order.status === 'pending' && order.isBuyer !== false && (
           <Card variant="elevated" style={styles.card}>
@@ -474,19 +607,37 @@ export default function OrderDetailScreen() {
           </Card>
         )}
 
-        {/* Tracking Info */}
-        {order.trackingNumber && (
+        {/* Kargo Takip — yalnız gerçek gönderi varken (trackingNumber dolu + kargo
+            sonrası durum). İptal/iade/teslim öncesi gösterilmez. Teslim edilmiş/
+            tamamlanmış siparişte kart, eski shipment.status'a değil order.status'a
+            göre "Teslim Edildi" durumunu yansıtır. */}
+        {showTrackingCard && (
           <Card variant="elevated" style={styles.card} testID="order-tracking-card">
-            <Text variant="label" style={styles.sectionTitle}>Kargo Takip</Text>
+            <View style={styles.trackingHeaderRow}>
+              <Text variant="label" style={styles.sectionTitle}>Kargo Takip</Text>
+              <StatusBadge
+                status={isDelivered ? 'delivered' : 'shipped'}
+                config={uiOrderStatusConfig}
+                size="sm"
+              />
+            </View>
             <View style={styles.trackingRow}>
-              <Ionicons name="location" size={20} color={colors.primary[600]!} />
+              <Ionicons
+                name={isDelivered ? 'checkmark-circle' : 'location'}
+                size={20}
+                color={isDelivered ? colors.success[600]! : colors.primary[600]!}
+              />
               <View style={styles.trackingInfo}>
                 <Text testID="order-tracking-number">{order.trackingNumber}</Text>
-                {order.trackingUrl && (
+                {isDelivered ? (
+                  <Text variant="caption" style={styles.trackingDeliveredText}>
+                    Kargonuz teslim edildi.
+                  </Text>
+                ) : order.trackingUrl ? (
                   <Pressable onPress={() => Linking.openURL(order.trackingUrl!)}>
                     <Text style={styles.trackLink}>Kargo Sitesinde Takip Et</Text>
                   </Pressable>
-                )}
+                ) : null}
               </View>
             </View>
           </Card>
@@ -609,23 +760,34 @@ export default function OrderDetailScreen() {
           </View>
         </Card>
 
-        {/* Actions - Only buyer can confirm delivery */}
-        {order.status === 'delivered' && order.isBuyer && (
-          <Card variant="elevated" style={styles.card}>
-            <Button
-              testID="order-confirm-delivery-button"
-              variant="primary"
-              fullWidth
-              title="Teslimatı Onayla"
-              onPress={() => confirmDeliveryMutation.mutate()}
-              isLoading={confirmDeliveryMutation.isPending}
-              style={{ marginBottom: 12 }}
-            />
-            <Text variant="caption" style={styles.confirmNote}>
-              Ürünü aldığınızı onaylayarak siparişi tamamlayın
-            </Text>
-          </Card>
-        )}
+        {/* İPTAL (kargo öncesi) — alıcı, sipariş henüz kargoya verilmeden iptal eder.
+            Kargo SONRASI iptal yok; o aşamada İade Talep Et akışı kullanılır.
+            Ödeme bekleyen (pending) sipariş için ayrı "Ödeme Yap" kartı var; iptal de
+            mümkün olduğundan onu da kapsar. */}
+        {order.isBuyer &&
+          !isMembershipOrder &&
+          isPreShipment &&
+          !order.activeRefundRequest && (
+            <Card variant="elevated" style={styles.card}>
+              <Text variant="label" style={styles.sectionTitle}>
+                Sipariş İptali
+              </Text>
+              <Text variant="caption" style={styles.confirmNote}>
+                Sipariş henüz kargoya verilmedi. İptal ederseniz ödemeniz iade edilir.
+              </Text>
+              <Button
+                testID="order-cancel-button"
+                variant="outline"
+                icon="close-circle-outline"
+                fullWidth
+                title="Siparişi İptal Et"
+                onPress={handleCancelOrder}
+                isLoading={cancelOrderMutation.isPending}
+                disabled={cancelOrderMutation.isPending}
+                style={{ marginTop: 12, borderColor: colors.danger[600]! }}
+              />
+            </Card>
+          )}
 
         {/* Rating Buttons - Only buyer can rate product and seller */}
         {canRate && order.isBuyer && (
@@ -660,8 +822,9 @@ export default function OrderDetailScreen() {
           </Card>
         )}
 
-        {/* Refund — existing request banner */}
-        {order.activeRefundRequest && (
+        {/* Refund — existing request banner. İptal edilen siparişte gösterilmez
+            (yalnız iptal bilgisi kalır). */}
+        {order.activeRefundRequest && !isCancelled && (
           <Card variant="elevated" style={styles.card} testID="refund-active-banner">
             <View style={styles.refundHeaderRow}>
               <Ionicons name="return-up-back" size={20} color={colors.info[600]!} />
@@ -723,19 +886,34 @@ export default function OrderDetailScreen() {
           </Card>
         )}
 
-        {/* Refund — request button (paid+ orders, buyer only, no active request) */}
-        {/* Üyelik/dijital siparişler genel iade akışına girmez (kendi iptal akışı var) */}
+        {/* İADE (kargo sonrası) — buyer, ödeme tamamlanmış, aktif iade yok, kargolanmış.
+            14 gün koşulsuz cayma: sebep/foto opsiyonel. Üyelik/dijital siparişler hariç
+            (kendi iptal akışı var). Kargo öncesi bu kart yerine "Siparişi İptal Et" çıkar. */}
         {order.isBuyer &&
           !isMembershipOrder &&
+          isPostShipment &&
           !order.activeRefundRequest &&
           order.payment?.status === 'completed' &&
-          !['cancelled', 'refunded'].includes(order.status) && (
+          !isCancelled &&
+          order.status !== 'refunded' &&
+          (isPastRefundWindow ? (
+            // 14 günden sonra iade yok
+            <Card variant="elevated" style={styles.card}>
+              <Text variant="label" style={styles.sectionTitle}>
+                İade Süresi Doldu
+              </Text>
+              <Text variant="caption" style={styles.refundIntro}>
+                14 günlük iade süresi doldu; bu sipariş için artık iade talebi
+                oluşturulamaz.
+              </Text>
+            </Card>
+          ) : (
             <Card variant="elevated" style={styles.card}>
               <Text variant="label" style={styles.sectionTitle}>
                 İade İşlemleri
               </Text>
               <Text variant="caption" style={styles.refundIntro}>
-                Ödeme tamamlandı. Gerekirse iade işlemi başlatabilirsiniz.
+                Teslimattan sonra 14 gün içinde sebep belirtmeden iade talep edebilirsiniz.
               </Text>
               <Button
                 testID="refund-request-button"
@@ -746,7 +924,7 @@ export default function OrderDetailScreen() {
                 style={{ marginTop: 8 }}
               />
             </Card>
-          )}
+          ))}
 
         {/* Help */}
         <Card variant="elevated" style={styles.card}>
@@ -770,16 +948,62 @@ export default function OrderDetailScreen() {
         onClose={() => {
           setRefundModalVisible(false);
           setEvidenceAssets([]);
+          setRefundQuantity(1);
         }}
         title="İade Talebi Oluştur"
       >
         <ScrollView>
           <Text variant="caption" style={styles.refundModalHint}>
-            Lütfen iade nedeninizi seçin ve gerekiyorsa kısa bir açıklama ekleyin.
+            Teslimattan sonra 14 gün içinde sebep belirtmeden iade hakkınız vardır.
+            Sebep, açıklama ve fotoğraf isteğe bağlıdır.
           </Text>
 
+          {/* Adet bazlı kısmi iade — yalnız çok adetli siparişte (örn. 3 al, 2 iade et). */}
+          {(order.quantity ?? 1) > 1 && (
+            <View style={styles.qtySection}>
+              <Text variant="caption" style={styles.refundModalLabel}>
+                İade Edilecek Adet
+              </Text>
+              <Text variant="caption" style={styles.evidenceHint}>
+                Bu siparişte {order.quantity} adet var. Kaç adet iade edeceğinizi seçin.
+              </Text>
+              <View style={styles.qtyRow}>
+                <Pressable
+                  testID="refund-qty-dec"
+                  accessibilityRole="button"
+                  accessibilityLabel="Adet azalt"
+                  onPress={() => setRefundQuantity((q) => Math.max(1, q - 1))}
+                  disabled={refundQuantity <= 1}
+                  style={[styles.qtyBtn, refundQuantity <= 1 && styles.qtyBtnDisabled]}
+                  hitSlop={6}
+                >
+                  <Ionicons name="remove" size={20} color={colors.text.heading} />
+                </Pressable>
+                <Text testID="refund-qty-value" variant="h3" style={styles.qtyValue}>
+                  {refundQuantity}
+                </Text>
+                <Pressable
+                  testID="refund-qty-inc"
+                  accessibilityRole="button"
+                  accessibilityLabel="Adet artır"
+                  onPress={() =>
+                    setRefundQuantity((q) => Math.min(order.quantity ?? 1, q + 1))
+                  }
+                  disabled={refundQuantity >= (order.quantity ?? 1)}
+                  style={[
+                    styles.qtyBtn,
+                    refundQuantity >= (order.quantity ?? 1) && styles.qtyBtnDisabled,
+                  ]}
+                  hitSlop={6}
+                >
+                  <Ionicons name="add" size={20} color={colors.text.heading} />
+                </Pressable>
+              </View>
+            </View>
+          )}
+
           <Text variant="caption" style={styles.refundModalLabel}>
-            İade Nedeni
+            İade Nedeni (isteğe bağlı)
           </Text>
           <RadioGroup
             value={refundReason}
@@ -798,14 +1022,13 @@ export default function OrderDetailScreen() {
             inputStyle={{ minHeight: 80 }}
           />
 
-          {/* Kanıt Fotoğrafı — yalnızca kanıt gerektiren sebeplerde (web ile parite) */}
-          {evidenceRequired ? (
-            <View style={styles.evidenceSection}>
+          {/* Kanıt Fotoğrafı — opsiyonel (14 gün koşulsuz iade). İsteyen ekleyebilir. */}
+          <View style={styles.evidenceSection}>
               <Text variant="caption" style={styles.refundModalLabel}>
-                Kanıt Fotoğrafı <Text style={styles.evidenceRequiredMark}>*</Text>
+                Kanıt Fotoğrafı (isteğe bağlı)
               </Text>
               <Text variant="caption" style={styles.evidenceHint}>
-                Bu sebep için en az bir fotoğraf ekleyin (en fazla {MAX_EVIDENCE_PHOTOS}).
+                Dilerseniz fotoğraf ekleyin (en fazla {MAX_EVIDENCE_PHOTOS}).
               </Text>
               <View style={styles.evidenceGrid}>
                 {evidenceAssets.map((a, i) => (
@@ -834,8 +1057,7 @@ export default function OrderDetailScreen() {
                   </Pressable>
                 ) : null}
               </View>
-            </View>
-          ) : null}
+          </View>
 
           <View style={styles.refundModalActions}>
             <Button
@@ -844,6 +1066,7 @@ export default function OrderDetailScreen() {
               onPress={() => {
                 setRefundModalVisible(false);
                 setEvidenceAssets([]);
+                setRefundQuantity(1);
               }}
               disabled={refundMutation.isPending}
             />
@@ -852,7 +1075,7 @@ export default function OrderDetailScreen() {
               title="Talebi Gönder"
               onPress={submitRefund}
               isLoading={refundMutation.isPending}
-              disabled={refundMutation.isPending || (evidenceRequired && evidenceAssets.length === 0)}
+              disabled={refundMutation.isPending}
             />
           </View>
         </ScrollView>
@@ -1021,6 +1244,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     color: colors.text.heading,
   },
+  trackingHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   trackingRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1032,6 +1260,20 @@ const styles = StyleSheet.create({
   trackLink: {
     color: colors.primary[600]!,
     marginTop: 4,
+  },
+  trackingDeliveredText: {
+    color: colors.text.muted,
+    marginTop: 4,
+  },
+  cancelledHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  cancelledHeaderText: {
+    flex: 1,
+    color: colors.text.heading,
   },
   productCard: {
     flexDirection: 'row',
@@ -1151,12 +1393,50 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 16,
   },
+  escrowHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  escrowHeaderText: {
+    flex: 1,
+    color: colors.text.heading,
+  },
+  escrowText: {
+    color: colors.text.muted,
+    lineHeight: 18,
+  },
+  qtySection: {
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  qtyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginTop: 8,
+  },
+  qtyBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface.alt,
+  },
+  qtyBtnDisabled: {
+    opacity: 0.4,
+  },
+  qtyValue: {
+    minWidth: 32,
+    textAlign: 'center',
+    color: colors.text.heading,
+  },
   evidenceSection: {
     marginTop: 12,
-  },
-  evidenceRequiredMark: {
-    color: colors.danger[600]!,
-    fontWeight: '700',
   },
   evidenceHint: {
     color: colors.text.muted,

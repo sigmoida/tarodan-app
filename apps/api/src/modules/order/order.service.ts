@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
   Optional,
   Logger,
   Inject,
@@ -1312,7 +1313,9 @@ export class OrderService {
             if (!stale.reservationReleasedAt) {
               await tx.product.update({
                 where: { id: stale.productId },
-                data: { reservedQuantity: { decrement: 1 } },
+                // Adet bazlı: rezervasyon stale.quantity kadar açılır (1 değil) →
+                // çoklu-adet terk edilmiş sipariş rezervasyonu sızmasın.
+                data: { reservedQuantity: { decrement: stale.quantity ?? 1 } },
               });
             }
           }
@@ -1325,6 +1328,15 @@ export class OrderService {
           },
         });
         const productMap = new Map(products.map((p) => [p.id, p]));
+
+        // Adet haritası: aynı ürün sepette birden çok kez ise adetleri topla.
+        const qtyByProduct = new Map<string, number>();
+        for (const it of dto.items) {
+          qtyByProduct.set(
+            it.productId,
+            (qtyByProduct.get(it.productId) ?? 0) + (it.quantity ?? 1),
+          );
+        }
 
         // Ürün doğrulamaları — hata gövdesinde productId döner (istemci stok ekranına yönlendirir)
         for (const productId of productIds) {
@@ -1339,9 +1351,10 @@ export class OrderService {
             });
           }
           const available = getAvailableQuantity(product);
-          if (available !== null && available < 1) {
+          const reqQty = qtyByProduct.get(productId) ?? 1;
+          if (available !== null && available < reqQty) {
             throw new BadRequestException({
-              message: `"${product.title}" stokta bulunmamaktadır`,
+              message: `"${product.title}" için yeterli stok yok (istenen ${reqQty}, mevcut ${available})`,
               productId,
             });
           }
@@ -1458,6 +1471,7 @@ export class OrderService {
           return {
             productId,
             product,
+            quantity: qtyByProduct.get(productId) ?? 1,
             productPrice,
             originalPrice,
             productDiscount: isSaleActive ? originalPrice - productPrice : 0,
@@ -1472,7 +1486,13 @@ export class OrderService {
           const validation = await this.discountService.validateCoupon(
             {
               code: dto.couponCode,
-              cartItems: productIds.map((productId) => ({ productId, quantity: 1 })),
+              // Adet bazlı: kupon doğrulama/indirim dağıtımı gerçek adetle yapılmalı
+              // (1 değil) → yoksa yüzde kupon, minCartValue, maxDiscount tek-birim
+              // fiyat üzerinden hesaplanıp çoklu-adet sepette alıcıyı fazla yükler.
+              cartItems: productIds.map((productId) => ({
+                productId,
+                quantity: qtyByProduct.get(productId) ?? 1,
+              })),
             },
             buyerId,
           );
@@ -1483,14 +1503,15 @@ export class OrderService {
             appliedCouponCode = dto.couponCode.toUpperCase();
             appliedDiscountId = validation.discount.id;
             const totalCoupon = validation.discount.estimatedDiscount;
-            const priceSum = pricing.reduce((sum, p) => sum + p.productPrice, 0);
+            // Kupon, satır toplamına (birim fiyat * adet) oranla dağıtılır.
+            const priceSum = pricing.reduce((sum, p) => sum + p.productPrice * p.quantity, 0);
             let allocated = 0;
             pricing.forEach((p, idx) => {
               if (idx === pricing.length - 1) {
                 p.couponDiscount = Math.round((totalCoupon - allocated) * 100) / 100;
               } else {
                 p.couponDiscount =
-                  Math.round(((totalCoupon * p.productPrice) / priceSum) * 100) / 100;
+                  Math.round(((totalCoupon * p.productPrice * p.quantity) / priceSum) * 100) / 100;
                 allocated += p.couponDiscount;
               }
             });
@@ -1516,7 +1537,10 @@ export class OrderService {
         }> = [];
 
         for (const entry of pricing) {
-          const discountedPrice = entry.productPrice - entry.couponDiscount;
+          // Satır toplamı = birim fiyat * adet - (satıra düşen kupon). Komisyon,
+          // kargo ve vergi satır toplamı üzerinden hesaplanır (adet>1 ölçeklenir).
+          const lineSubtotal = entry.productPrice * entry.quantity;
+          const discountedPrice = lineSubtotal - entry.couponDiscount;
           const commissionResult = await this.calculateCommission(
             discountedPrice,
             entry.product.sellerId,
@@ -1623,8 +1647,10 @@ export class OrderService {
               buyerId,
               sellerId: entry.product.sellerId,
               checkoutGroupId: group.id,
+              quantity: entry.quantity,
+              unitPrice: entry.productPrice,
               totalAmount: input.totalAmount,
-              subtotal: entry.originalPrice,
+              subtotal: entry.originalPrice * entry.quantity,
               discountAmount: totalDiscount,
               discountCode: entry.couponDiscount > 0 ? appliedCouponCode : null,
               discountBreakdown:
@@ -1667,7 +1693,7 @@ export class OrderService {
 
           await tx.product.update({
             where: { id: entry.productId },
-            data: { reservedQuantity: { increment: 1 } },
+            data: { reservedQuantity: { increment: entry.quantity } },
           });
 
           createdOrders.push({
@@ -1675,7 +1701,7 @@ export class OrderService {
             orderNumber: order.orderNumber,
             productId: entry.productId,
             totalAmount: input.totalAmount,
-            subtotal: entry.originalPrice,
+            subtotal: entry.originalPrice * entry.quantity,
             discountAmount: totalDiscount,
             productTitle: entry.product.title,
             sellerId: entry.product.sellerId,
@@ -1984,6 +2010,28 @@ export class OrderService {
     return email.trim().toLowerCase();
   }
 
+  /**
+   * Misafir checkout e-postası zaten kayıtlı bir hesaba aitse engelle.
+   * Kullanıcı bu e-postayla giriş yapıp normal (üye) akışı kullanmalı.
+   * case-insensitive: kullanıcı e-postaları DB'de orijinal case ile saklanabiliyor.
+   * Sistem misafir kullanıcısı (guest@tarodan.system) bu kontrole takılmaz —
+   * onun e-postası normalize edilmiş bir kullanıcı e-postasıyla eşleşmez.
+   */
+  private async assertGuestEmailNotRegistered(normEmail: string): Promise<void> {
+    const existing = await this.prisma.user.findFirst({
+      where: { email: { equals: normEmail, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    if (existing) {
+      // ConflictException (409) + makine-okunur kod → frontend giriş'e yönlendirir.
+      throw new ConflictException({
+        code: 'EMAIL_ALREADY_REGISTERED',
+        message:
+          'Bu e-posta adresi zaten kayıtlı. Lütfen giriş yapıp alışverişe devam edin.',
+      });
+    }
+  }
+
   private guestCheckoutOtpKey(normEmail: string): string {
     return `guest:checkout:otp:v1:${normEmail}`;
   }
@@ -2015,6 +2063,12 @@ export class OrderService {
     expiresInSeconds: number;
   }> {
     const normEmail = this.normalizeGuestCheckoutEmail(dto.email);
+
+    // Zaten kayıtlı bir hesabın e-postasıyla misafir alışverişe izin verme:
+    // hiç kod göndermeden "bu e-posta kayıtlı, giriş yapın" de. (case-insensitive:
+    // kullanıcı e-postaları DB'de orijinal case ile saklanıyor olabilir.)
+    await this.assertGuestEmailNotRegistered(normEmail);
+
     const windowSec = parseInt(
       this.configService.get<string>('GUEST_CHECKOUT_OTP_SEND_WINDOW_SEC', '900'),
       10,
@@ -2127,6 +2181,9 @@ export class OrderService {
    */
   async guestCheckout(dto: GuestCheckoutDto) {
     const normEmail = this.normalizeGuestCheckoutEmail(dto.email);
+    // Savunma derinliği: kod gönderildikten sonra bu e-postayla kayıt olunmuş
+    // olabilir → siparişi oluşturmadan önce tekrar kontrol et.
+    await this.assertGuestEmailNotRegistered(normEmail);
     await this.consumeGuestCheckoutOtp(normEmail, dto.emailVerificationCode);
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -2665,6 +2722,8 @@ export class OrderService {
               },
             },
             payment: true,
+            // Grup içi siparişlerde de "Ödeme Yapıldı"/paidAt çözülsün diye group payment.
+            checkoutGroup: { include: { payment: true } },
             refundRequests: { orderBy: { createdAt: 'desc' } },
           },
         },
@@ -2869,17 +2928,13 @@ export class OrderService {
         );
       }
 
-      const holdUpdate = await tx.paymentHold.updateMany({
-        where: { orderId, status: 'held' as any },
-        data: {
-          status: 'released' as any,
-          releasedAt: now,
-          releaseAt: now,
-        },
-      });
-
+      // YENİ ESCROW KURALI: completeOrder artık PaymentHold'u SERBEST BIRAKMAZ.
+      // Satıcı payout'u tek otoriteden (releaseHoldsDue cron) ve yalnızca
+      // teslim + returnWindow + grace dolunca + açık iade yokken yapılır. Alıcı
+      // onayı / 48h auto-timeout payout'u erkene ALMAZ; ledger 'earned' yalnızca
+      // muhasebe işaretidir (fiili ödeme = hold release).
       this.logger.log(
-        `Order ${orderId} completed (type=${type}); ledger=${ledgerResult.updated}, hold=${holdUpdate.count}`,
+        `Order ${orderId} completed (type=${type}); ledger=${ledgerResult.updated}; hold release escrow cron'a bırakıldı`,
       );
       return { completed: true };
     });
@@ -3074,7 +3129,11 @@ export class OrderService {
         ? OrderStatus.cancelled
         : OrderStatus.refunded; // Will trigger refund in payment module
 
-      // Update order
+      // Update order. cancellationType='iptal': kargo öncesi iptal — status para
+      // akışı için (paid/preparing'de 'refunded' tetikler) ama bu alan raporlama/
+      // admin için "İADE değil İPTAL" der. reason opsiyonel; boşsa genel default.
+      const cancelReasonText =
+        dto?.reason?.trim() || 'Alıcı tarafından iptal edildi';
       const cancelledOrder = await tx.order.update({
         where: {
           id: orderId,
@@ -3082,6 +3141,8 @@ export class OrderService {
         },
         data: {
           status: newStatus,
+          cancellationType: 'iptal',
+          cancelReason: cancelReasonText,
           version: { increment: 1 },
         },
         include: {
@@ -3099,11 +3160,11 @@ export class OrderService {
         },
       });
 
-      // Rezervasyonu kaldır (pending_payment ise 1 adet serbest bırak)
+      // Rezervasyonu kaldır (pending_payment ise sipariş adedi kadar serbest bırak)
       if (order.status === OrderStatus.pending_payment) {
         await tx.product.update({
           where: { id: order.productId },
-          data: { reservedQuantity: { decrement: 1 } },
+          data: { reservedQuantity: { decrement: order.quantity ?? 1 } },
         });
       }
 
@@ -3433,7 +3494,7 @@ export class OrderService {
       items: product ? [{
         id: order.id,
         product,
-        quantity: 1,
+        quantity: order.quantity ?? 1,
         price: Number(order.totalAmount),
       }] : [],
       buyer: {
@@ -3475,12 +3536,17 @@ export class OrderService {
       // Mobil sipariş detayı bu alanları üst seviyede okur (kargo kartı + zaman çizelgesi)
       trackingNumber,
       trackingUrl,
-      paidAt: order.payment?.paidAt ?? null,
+      // Ödeme tek üründe bile checkout group üzerinden bağlanır (order.payment genelde
+      // null) → group payment'a düş; yoksa "Ödeme Yapıldı" zaman çizelgesi pasif kalır.
+      paidAt: (order.payment ?? order.checkoutGroup?.payment)?.paidAt ?? null,
       shippedAt: order.shipment?.shippedAt ?? null,
       deliveredAt: order.deliveredAt ?? order.shipment?.deliveredAt ?? null,
       completedAt: order.completedAt ?? null,
       cancelledAt: order.cancelledAt ?? null,
       cancelReason: order.cancelReason ?? null,
+      // 'iptal' (kargo öncesi) | 'iade' (kargo sonrası). status para akışı için
+      // 'refunded' olabilir; UI bu alanla "İade" yerine "İptal" gösterir.
+      cancellationType: order.cancellationType ?? null,
       cancelCategory: this.deriveCancelCategory(order),
       canReactivate: this.computeCanReactivate(order, userId),
       confirmationDeadline: order.confirmationDeadline ?? null,

@@ -4,6 +4,7 @@ export * from './admin-query.dto';
 export * from './admin-action.dto';
 export * from './admin-staff.dto';
 export * from './notifications-admin.dto';
+export * from './admin-membership.dto';
 export {
   AnalyticsGroupBy,
   AnalyticsQueryDto,

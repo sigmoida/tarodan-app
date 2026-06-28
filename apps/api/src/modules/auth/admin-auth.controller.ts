@@ -9,6 +9,7 @@ import {
   Res,
 } from '@nestjs/common';
 import { Response } from 'express';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import {
   ApiTags,
   ApiOperation,
@@ -33,6 +34,8 @@ export class AdminAuthController {
    */
   @Post('login')
   @Public()
+  // Brute-force koruması: IP başına dakikada 5 deneme (web login ile aynı).
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Admin girişi' })
   @ApiResponse({
@@ -60,6 +63,10 @@ export class AdminAuthController {
    */
   @Post('refresh')
   @Public()
+  // Oturum yenileme brute-force hedefi değil (geçerli admin_refresh_token gerekir);
+  // SPA açılışta çağırır → global rate-limit'e takılıp 429 dönmemeli (login↔dashboard
+  // loop'unun sebebiydi).
+  @SkipThrottle()
   @UseGuards(JwtRefreshGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Admin token yenileme' })
@@ -82,6 +89,10 @@ export class AdminAuthController {
    * Get admin profile
    */
   @Get('profile')
+  // Oturum doğrulama ucu: admin paneli HER açılışta çağırır → global rate-limit'e
+  // takılıp 429 dönmemeli (admin login↔dashboard loop'unun ASIL sebebiydi). Admin
+  // JWT korumalı; brute-force hedefi değil.
+  @SkipThrottle()
   // @AdminRoute: global JwtAuthGuard'ı atla (o normal access_token cookie'sini ister;
   // admin oturumunda yalnızca admin_token var → aksi halde "Oturum açmanız gerekiyor" 401).
   // Gerçek doğrulamayı AdminAuthGuard (admin-jwt / admin_token) yapar.
@@ -106,6 +117,7 @@ export class AdminAuthController {
    */
   @Post('logout')
   @Public()
+  @SkipThrottle()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Admin çıkış' })
   @ApiResponse({ status: 200, description: 'Çıkış yapıldı' })

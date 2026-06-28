@@ -42,6 +42,8 @@ import {
   MegaphoneIcon,
   Squares2X2Icon,
   ClipboardDocumentIcon,
+  FlagIcon,
+  BeakerIcon,
 } from '@heroicons/react/24/outline';
 
 type NavItem = {
@@ -107,6 +109,7 @@ const navGroups: NavGroup[] = [
       { name: 'Satıcı Başvuruları', href: '/sellers/applications', icon: ClipboardDocumentCheckIcon, permission: 'seller_applications' },
       { name: 'Satıcı Performansı', href: '/sellers/performance', icon: ChartBarIcon, permission: 'seller_performance' },
       { name: 'Yorumlar', href: '/reviews', icon: StarIcon, permission: 'reviews' },
+      { name: 'Rapor Talepleri', href: '/reports', icon: FlagIcon, keywords: ['rapor', 'şikayet', 'report', 'complaint', 'abuse'], permission: 'reports' },
       { name: 'Rol Yönetimi', href: '/roles', icon: UserCircleIcon, permission: 'staff' },
     ],
   },
@@ -151,6 +154,7 @@ const navGroups: NavGroup[] = [
       { name: 'Üyelik Katmanları', href: '/membership-tiers', icon: StarIcon, keywords: ['üyelik', 'membership', 'tier'], permission: 'membership_tiers' },
       { name: 'Sistem Ayarları', href: '/settings', icon: Cog6ToothIcon, permission: 'settings' },
       { name: 'Loglar', href: '/logs', icon: ClipboardDocumentIcon, keywords: ['log', 'hata', 'error', 'güvenlik', 'e-posta', 'audit', 'denetim', 'iz', 'değişiklik', 'security'], permission: 'logs' },
+      { name: 'Test Araçları', href: '/test-tools', icon: BeakerIcon, keywords: ['test', 'zaman', 'cron', 'süre', 'boost', 'üyelik', 'iade', 'time'], permission: 'test_tools', roles: ['super_admin'] },
     ],
   },
 ];
@@ -167,6 +171,7 @@ const ROUTE_PERMISSIONS: [string, string][] = [
   ['/shipping', 'shipping'],
   ['/refund-requests', 'refund_requests'],
   ['/refunds', 'refund_history'],
+  ['/test-tools', 'test_tools'],
   ['/products', 'products'],
   ['/categories', 'categories'],
   ['/brands', 'brands'],
@@ -176,6 +181,7 @@ const ROUTE_PERMISSIONS: [string, string][] = [
   ['/collections', 'collections'],
   ['/users', 'users'],
   ['/reviews', 'reviews'],
+  ['/reports', 'reports'],
   ['/roles', 'staff'],
   ['/messages', 'messages'],
   ['/support', 'support'],
@@ -218,13 +224,13 @@ const NAV_FALLBACK_PERMS: Record<string, string[]> = {
     'dashboard', 'analytics',
     'orders', 'trades', 'shipping', 'refund_requests', 'refund_history',
     'products', 'categories', 'brands', 'car_models', 'manufacturers', 'attributes', 'collections',
-    'users', 'seller_applications', 'seller_performance', 'reviews',
+    'users', 'seller_applications', 'seller_performance', 'reviews', 'reports',
     'payments', 'commission', 'payouts',
     'messages', 'support', 'discounts', 'ads', 'notifications', 'email_templates', 'pages',
     'ai_moderation',
   ],
   moderator: [
-    'dashboard', 'products', 'users', 'reviews', 'messages', 'support', 'trades', 'ai_moderation',
+    'dashboard', 'products', 'users', 'reviews', 'reports', 'messages', 'support', 'trades', 'ai_moderation',
   ],
 };
 

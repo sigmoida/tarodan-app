@@ -37,14 +37,14 @@ const SPLASH_MID = '#FE6F13';
 const SPLASH_GRADIENT = [SPLASH_TOP, SPLASH_MID, colors.primary[600]!] as const;
 const SPLASH_GRADIENT_LOCATIONS = [0, 0.5, 1] as const;
 
-// tarodan-logo.jpg oranı: 2788 x 688 ≈ 4.05:1
+// tarodan-logo.png oranı: 2788 x 688 ≈ 4.05:1
 const LOGO_ASPECT = 2788 / 688;
 const LOGO_WIDTH_RATIO = 0.72;
 
 // Animasyon en az bu kadar süre görünür (token hızlı yüklense bile kesilmez).
 const MIN_VISIBLE_MS = 1500;
 
-const logoSource = require('../../assets/tarodan-logo.jpg');
+const logoSource = require('../../assets/tarodan-logo.png');
 
 interface AnimatedSplashProps {
   /** Uygulama hazır olduğunda (token yüklendi vb.) true olur. */

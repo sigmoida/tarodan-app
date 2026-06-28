@@ -361,9 +361,11 @@ export default function NewListingPage() {
       const tierName = stats.limits?.tierName || "Free";
       const tierType = stats.limits?.tierType || "free";
       const isPremium = tierType === "premium" || tierType === "business";
-      const maxListings = stats.summary?.max || 10;
-      const currentCount = stats.summary?.used || 0;
-      const remaining = stats.summary?.remaining || 0;
+      // ?? kullan: backend 0 (kota dolu) ve -1 (sınırsız) değerlerini koru;
+      // || ile bunlar yanıltıcı "10"a/0'a dönüşüyordu. max=-1 → "Sınırsız".
+      const maxListings = stats.summary?.max ?? -1;
+      const currentCount = stats.summary?.used ?? 0;
+      const remaining = stats.summary?.remaining ?? -1;
       const canCreate = stats.summary?.canCreate ?? true;
 
       setListingLimits({
@@ -837,7 +839,7 @@ export default function NewListingPage() {
                       </p>
                     )}
                   </div>
-                  {!listingLimits.canCreateListing && (
+                  {!listingLimits.canCreateListing && !listingLimits.isPremium && (
                     <ButtonLink href="/pricing">Premium'a Geç</ButtonLink>
                   )}
                 </div>

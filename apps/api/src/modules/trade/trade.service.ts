@@ -887,6 +887,18 @@ export class TradeService {
 
       tradeInitiatorId = trade.initiatorId;
 
+      // Teklif edenin (initiator) teslimat adresi de kabul anında HÂLÂ var olmalı.
+      // Kargo etiketi adressiz basılamaz; kabulden sonra adres silinmiş olabilir.
+      // Burada (kabul eden beklerken) kontrol edip net hata veriyoruz — aksi halde
+      // kargo aşamasında bir tarafın inbound shipment'ı oluşmaz ve takas
+      // at_warehouse'a geçemeden takılı kalırdı. (resolveTradeShippingAddressId:
+      // seçili adres → varsayılan → en eski; hiçbiri yoksa required:true ile atar.)
+      await this.resolveTradeShippingAddressId(
+        trade.initiatorId,
+        trade.initiatorAddressId ?? undefined,
+        { required: true, db: tx },
+      );
+
       const now = new Date();
       const paymentDeadline = new Date(now);
       paymentDeadline.setHours(paymentDeadline.getHours() + paymentHours);
@@ -1393,16 +1405,21 @@ export class TradeService {
         );
       }
 
-      // Partial warehouse arrival: if any to_warehouse shipment has already
-      // been received, the user can no longer cancel — admin must intervene
-      // (force-cancel-stuck or reject) so the arrived item is handled safely.
-      if (
-        trade.status === TradeStatus.shipping_to_warehouse &&
-        trade.firstWarehouseArrivalAt !== null
-      ) {
-        throw new BadRequestException(
-          'Ürünlerden biri Tarodan deposuna ulaştı; iptal edilemez. Sorun varsa itiraz açın veya destek ile iletişime geçin.',
-        );
+      // Kullanıcı kuralı: ürün KARGOYA VERİLDİKTEN sonra takas iptal edilemez
+      // (ne iptal ne iade). shipping_to_warehouse'da taraflardan biri kendi
+      // to_warehouse gönderisini kargoya verdiyse (shippedAt) ya da depoya
+      // ulaştıysa (firstWarehouseArrivalAt) kullanıcı artık iptal edemez; bu
+      // noktadan sonra yalnızca admin müdahale eder (force-cancel-stuck/reject).
+      if (trade.status === TradeStatus.shipping_to_warehouse) {
+        const handedToCargo = await tx.tradeShipment.findFirst({
+          where: { tradeId, leg: 'to_warehouse', shippedAt: { not: null } },
+          select: { id: true },
+        });
+        if (handedToCargo || trade.firstWarehouseArrivalAt !== null) {
+          throw new BadRequestException(
+            'Ürün kargoya verildikten sonra takas iptal edilemez. Sorun varsa itiraz açın veya destek ile iletişime geçin.',
+          );
+        }
       }
 
       // Restore stock only for accepted+ trades (pending have nothing decremented)
@@ -2558,7 +2575,14 @@ export class TradeService {
   }
 
   private computeCanCancel(trade: any, viewerUserId?: string | null): boolean {
-    return computeTradeCanCancel(trade, viewerUserId);
+    // Kargoya verme sinyalini shipments'tan türet (yüklüyse): to_warehouse
+    // bacaklarından biri shippedAt aldıysa kullanıcı iptali kapanır.
+    const handedToCargo = Array.isArray(trade?.shipments)
+      ? trade.shipments.some(
+          (s: any) => s?.leg === 'to_warehouse' && s?.shippedAt != null,
+        )
+      : false;
+    return computeTradeCanCancel({ ...trade, handedToCargo }, viewerUserId);
   }
 }
 
@@ -2649,6 +2673,8 @@ export function computeTradeCanCancel(
     initiatorId: string;
     receiverId: string;
     firstWarehouseArrivalAt?: Date | string | null;
+    /** to_warehouse bacaklarından en az biri kargoya verildi mi (shippedAt dolu). */
+    handedToCargo?: boolean;
   },
   viewerUserId?: string | null,
 ): boolean {
@@ -2663,9 +2689,11 @@ export function computeTradeCanCancel(
     TradeStatus.shipping_to_warehouse,
   ];
   if (!eligible.includes(trade.status as string)) return false;
+  // Kullanıcı kuralı: ürün kargoya verildikten sonra iptal yok. Kargoya verme
+  // (handedToCargo) ya da depoya varış (firstWarehouseArrivalAt) kilitler.
   if (
     trade.status === TradeStatus.shipping_to_warehouse &&
-    trade.firstWarehouseArrivalAt
+    (trade.handedToCargo || trade.firstWarehouseArrivalAt)
   ) {
     return false;
   }

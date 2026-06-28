@@ -50,6 +50,8 @@ interface OrderDetail {
   orderNumber: string;
   isMembership?: boolean;
   status: string;
+  /** 'iptal' (kargo öncesi) | 'iade' (kargo sonrası). 'iptal' ise UI "İade" yerine "İptal" gösterir. */
+  cancellationType?: string | null;
   totalAmount: number;
   amount: number;
   commissionAmount: number;
@@ -68,6 +70,7 @@ interface OrderDetail {
   };
   createdAt: string;
   updatedAt: string;
+  deliveredAt?: string | null;
   product: {
     id: string;
     title: string;
@@ -176,9 +179,12 @@ function getCancelMessage(
         ? "This order was automatically cancelled because payment wasn't completed within 24 hours."
         : "Ödeme 24 saat içinde tamamlanmadığı için sipariş otomatik iptal edildi.";
     case "seller_no_ship":
+      // İade durumu cümlesi BİLEREK yok: aşağıdaki ayrı iade bloğu (refunded →
+      // "iade edilmiştir", completed → "aktarılacaktır") tek kaynak. Burada da
+      // "iade edilecektir" dersek ikisi yan yana çıkıp çelişiyordu.
       return en
-        ? "The seller didn't ship within the allowed time, so the order was cancelled. Your payment will be refunded."
-        : "Satıcı siparişi süresinde kargoya vermediği için iptal edildi. Ödemeniz iade edilecektir.";
+        ? "The seller didn't ship within the allowed time, so the order was cancelled."
+        : "Satıcı siparişi süresinde kargoya vermediği için iptal edildi.";
     case "stockout":
       return en
         ? "This order was cancelled because the product is out of stock."
@@ -223,6 +229,7 @@ export default function OrderDetailPage() {
   const [downloadingInvoice, setDownloadingInvoice] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [reactivateLoading, setReactivateLoading] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
   const [addressLoading, setAddressLoading] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(
@@ -627,7 +634,76 @@ export default function OrderDetailPage() {
     ) {
       return "preparing";
     }
+    if (isPastRefundWindow(order)) return "past_cooling_off";
     return "in_cooling_off";
+  };
+
+  // Kargo öncesi = iptal (anında geri ödeme), kargo sonrası = iade akışı.
+  // shipment yoksa veya yalnızca pending ise henüz kargolanmamış sayılır.
+  const hasShipped = (o: OrderDetail) => {
+    const shippedStatuses = [
+      "shipped",
+      "delivered",
+      "awaiting_buyer_confirmation",
+      "completed",
+    ];
+    if (shippedStatuses.includes(o.status)) return true;
+    const s = o.shipment?.status;
+    return (
+      !!s &&
+      s !== "pending" &&
+      s !== "cancelled" &&
+      s !== "failed"
+    );
+  };
+
+  // Satıcıya escrow ödeme tarihi: teslim + 14 gün iade penceresi + 1 gün grace.
+  const computePayoutDate = (o: OrderDetail): Date | null => {
+    if (!o.deliveredAt) return null;
+    const d = new Date(o.deliveredAt);
+    if (Number.isNaN(d.getTime())) return null;
+    d.setDate(d.getDate() + 15);
+    return d;
+  };
+
+  // 14 GÜNDEN SONRA İADE YOK: teslimden 14 günden fazla geçtiyse iade penceresi
+  // kapalıdır (backend de reddeder). Teslim edilmemişse pencere henüz başlamadı.
+  const isPastRefundWindow = (o: OrderDetail): boolean => {
+    if (!o.deliveredAt) return false;
+    const d = new Date(o.deliveredAt);
+    if (Number.isNaN(d.getTime())) return false;
+    const ageDays = (Date.now() - d.getTime()) / (1000 * 3600 * 24);
+    return ageDays > 14;
+  };
+
+  const handleCancel = async () => {
+    if (!order) return;
+    if (
+      !window.confirm(
+        locale === "en"
+          ? "Cancel this order? Your payment will be refunded."
+          : "Bu siparişi iptal etmek istediğinize emin misiniz? Ödemeniz iade edilecektir.",
+      )
+    ) {
+      return;
+    }
+    setCancelLoading(true);
+    try {
+      await api.post(`/orders/${order.id}/cancel`, {});
+      toast.success(
+        locale === "en" ? "Order cancelled" : "Sipariş iptal edildi",
+      );
+      await invalidateOrder();
+    } catch (err: any) {
+      toast.error(
+        err.response?.data?.message ||
+          (locale === "en"
+            ? "Could not cancel order"
+            : "Sipariş iptal edilemedi"),
+      );
+    } finally {
+      setCancelLoading(false);
+    }
   };
 
   const handleReactivate = async () => {
@@ -737,7 +813,22 @@ export default function OrderDetailPage() {
     );
   }
 
-  const statusLabel = getOrderStatusLabel(order.status);
+  // Kargo öncesi iptalde status para akışı için 'refunded' olabilir; kullanıcıya
+  // "İade Edildi" değil "İptal Edildi" göster (rozet + kargo bilgisi de gizlenir).
+  const isIptalOrder = order.cancellationType === "iptal";
+  // Durum rozeti önceliği (liste ile aynı): aktif iade > iptal > normal durum.
+  // Açık iade varsa sipariş 'delivered' kalsa bile "İade Sürecinde" göster.
+  const hasActiveRefund = !!order.activeRefundRequest;
+  const displayStatus = hasActiveRefund
+    ? "refund_requested"
+    : isIptalOrder
+      ? "cancelled"
+      : order.status;
+  const statusLabel = hasActiveRefund
+    ? locale === "en"
+      ? "Refund in progress"
+      : "İade Sürecinde"
+    : getOrderStatusLabel(displayStatus);
   const orderAmount = Number(order.totalAmount) || Number(order.amount) || 0;
   const productInfo = order.product || order.items?.[0]?.product;
   const productImage =
@@ -769,7 +860,7 @@ export default function OrderDetailPage() {
             </p>
           </div>
           <StatusBadge
-            status={order.status}
+            status={displayStatus}
             config={orderStatusConfig}
             label={statusLabel}
           />
@@ -1018,10 +1109,21 @@ export default function OrderDetailPage() {
               );
             })()}
 
-            {/* Shipping Info — alıcı için her zaman, satıcı için yalnızca kargo gerçekten
-                yola çıktıktan sonra (pending durumunda satıcının zaten 'Kargo Referans Numarası'
-                kartı var, çift bilgi olmasın) */}
-            {order.shipment && (() => {
+            {/* Shipping Info — SADECE gerçek gönderi varken: shipment + dolu trackingNumber +
+                sipariş durumu kargolanmış/teslim (shipped/delivered/awaiting/completed). İptal
+                (iptal veya cancelled) ya da teslim öncesi (pending_payment/paid/preparing)
+                durumlarda placeholder/eski kargo bilgisi gösterilmez. */}
+            {order.shipment &&
+              !!order.shipment.trackingNumber &&
+              !isIptalOrder &&
+              order.status !== "cancelled" &&
+              [
+                "shipped",
+                "delivered",
+                "awaiting_buyer_confirmation",
+                "completed",
+              ].includes(order.status) &&
+              (() => {
               // Sipariş durumu (order.status) admin tarafından elle ileri alındığında
               // shipment.status geride kalabiliyor. Bu durumda kargo kartının "Satıcı
               // hazırlıyor" gibi yanıltıcı bilgi göstermemesi için sipariş durumunu
@@ -1041,7 +1143,14 @@ export default function OrderDetailPage() {
               let s = order.shipment.status;
               const isReturnFlow =
                 s === "return_in_progress" || s === "returned";
-              if (orderDelivered && s !== "delivered" && !isReturnFlow) {
+              // İptal/iade edilen siparişlerde kargo durumu (örn. eski bir
+              // 'delivered' kaydı) yanıltıcı olmasın diye sipariş durumunu
+              // gerçeğin kaynağı kabul edip kargoyu 'cancelled' olarak göster.
+              const orderCancelled =
+                order.status === "cancelled" || order.status === "refunded";
+              if (orderCancelled && !isReturnFlow) {
+                s = "cancelled";
+              } else if (orderDelivered && s !== "delivered" && !isReturnFlow) {
                 s = "delivered";
               } else if (
                 orderShipped &&
@@ -1149,13 +1258,7 @@ export default function OrderDetailPage() {
                               {locale === "en" ? "Track on Sürat" : "Sürat'ta Takip Et"}
                             </a>
                           )}
-                          <Link
-                            href={`/track-order?orderNumber=${encodeURIComponent(order.orderNumber)}&email=${encodeURIComponent(user?.email || "")}`}
-                            className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-info-600 hover:bg-info-700 text-inverted rounded-lg text-sm font-medium transition-colors"
-                          >
-                            <TruckIcon className="w-4 h-4" />
-                            {locale === "en" ? "Track on Tarodan" : "Tarodan'da Takip Et"}
-                          </Link>
+                          {/* "Tarodan'da Takip Et" butonu kaldırıldı (UI sadeleştirme). */}
                         </div>
                       )}
                     </div>
@@ -1501,24 +1604,57 @@ export default function OrderDetailPage() {
               </div>
             )}
 
-            {/* Actions for Buyer */}
-            {order.isBuyer && order.status === "delivered" && (
-              <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-heading mb-4">
-                  {locale === "en" ? "Delivery Confirmation" : "Teslimat Onayı"}
-                </h2>
-                <Button
-                  variant="success"
-                  size="lg"
-                  className="w-full"
-                  onClick={() => handleUpdateStatus("completed")}
-                >
-                  {locale === "en"
-                    ? "Received - Complete Order"
-                    : "Teslim Aldım - Siparişi Tamamla"}
-                </Button>
-              </div>
-            )}
+            {/* Escrow bilgisi (teslim sonrası) — alıcı onayı artık payout tetiklemez.
+                Satıcıya ödeme: teslim + 14 gün iade penceresi + 1 gün grace ile otomatik. */}
+            {order.isBuyer &&
+              ["delivered", "awaiting_buyer_confirmation"].includes(
+                order.status,
+              ) &&
+              !isMembershipOrder(order) && (
+                <div className="bg-info-50 border border-info-200 rounded-xl shadow-sm p-6">
+                  <h2 className="text-lg font-semibold text-info-800 mb-2 flex items-center gap-2">
+                    <ShieldCheckIcon className="w-5 h-5" />
+                    {locale === "en" ? "Delivered" : "Teslim Edildi"}
+                  </h2>
+                  {(() => {
+                    const payoutDate = computePayoutDate(order);
+                    return (
+                      <>
+                        <p className="text-sm text-info-800">
+                          {payoutDate
+                            ? locale === "en"
+                              ? `Payment to the seller is released 14 days after delivery (on ${payoutDate.toLocaleDateString(
+                                  "en-US",
+                                  {
+                                    year: "numeric",
+                                    month: "long",
+                                    day: "numeric",
+                                  },
+                                )}). You have until then to request a refund.`
+                              : `Satıcıya ödeme teslimden 14 gün sonra serbest bırakılır (${payoutDate.toLocaleDateString(
+                                  "tr-TR",
+                                  {
+                                    year: "numeric",
+                                    month: "long",
+                                    day: "numeric",
+                                  },
+                                )}). O tarihe kadar iade talep edebilirsiniz.`
+                            : locale === "en"
+                              ? "Payment to the seller is released 14 days after delivery. You can request a refund during this window."
+                              : "Satıcıya ödeme teslimden 14 gün sonra serbest bırakılır. Bu süre içinde iade talep edebilirsiniz."}
+                        </p>
+                        {order.activeRefundRequest && (
+                          <p className="text-sm text-info-800 mt-2 font-medium">
+                            {locale === "en"
+                              ? "Payment is on hold until the open refund request is resolved."
+                              : "Açık iade talebiniz sonuçlanana kadar ödeme bekletiliyor."}
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
 
             {/* Yorum Yap - Sadece alınan siparişlerde, teslim/tamamlandıktan sonra */}
             {canReview(order) && (
@@ -1543,35 +1679,88 @@ export default function OrderDetailPage() {
               </div>
             )}
 
-            {/* Refund Button for Completed Payments - Only buyer can request refund */}
-            {/* Üyelik/dijital siparişler genel iade akışına girmez (kendi iptal akışı var) */}
+            {/* İptal / İade — Sadece alıcı. Kargo öncesi "İptal Et" (anında geri ödeme),
+                kargo sonrası "İade Talep Et". Üyelik/dijital siparişler hariç. */}
             {order.payment &&
               order.payment.status === "completed" &&
               order.isBuyer &&
               !isMembershipOrder(order) &&
               order.status !== "cancelled" &&
               order.status !== "refunded" &&
-              !order.activeRefundRequest && (
-                <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
-                  <h2 className="text-lg font-semibold text-heading mb-4">
-                    {locale === "en" ? "Refund" : "İade İşlemi"}
-                  </h2>
-                  <p className="text-sm text-muted mb-4">
-                    {locale === "en"
-                      ? "Payment completed. You can start a refund if needed."
-                      : "Ödeme tamamlandı. Gerekirse iade işlemi başlatabilirsiniz."}
-                  </p>
-                  <Button
-                    variant="secondary"
-                    size="lg"
-                    className="w-full flex items-center justify-center gap-2"
-                    onClick={handleRefund}
-                  >
-                    <ArrowUturnLeftIcon className="w-5 h-5" />
-                    {locale === "en" ? "Request Refund" : "İade Talebi Oluştur"}
-                  </Button>
-                </div>
-              )}
+              !order.activeRefundRequest &&
+              (() => {
+                const shipped = hasShipped(order);
+                const pastWindow = isPastRefundWindow(order);
+                // 14 günden sonra iade yok: kargo sonrası + pencere kapalı ise
+                // iade butonu yerine "süre doldu" bilgisi göster.
+                if (shipped && pastWindow) {
+                  return (
+                    <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                      <h2 className="text-lg font-semibold text-heading mb-2">
+                        {locale === "en" ? "Refund window closed" : "İade Süresi Doldu"}
+                      </h2>
+                      <p className="text-sm text-muted">
+                        {locale === "en"
+                          ? "The 14-day refund window has passed; a refund can no longer be requested for this order."
+                          : "14 günlük iade süresi doldu; bu sipariş için artık iade talebi oluşturulamaz."}
+                      </p>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                    <h2 className="text-lg font-semibold text-heading mb-4">
+                      {shipped
+                        ? locale === "en"
+                          ? "Refund"
+                          : "İade İşlemi"
+                        : locale === "en"
+                          ? "Cancel Order"
+                          : "Siparişi İptal Et"}
+                    </h2>
+                    <p className="text-sm text-muted mb-4">
+                      {shipped
+                        ? locale === "en"
+                          ? "The order has shipped. You can request a refund within 14 days of delivery — no reason or photo required."
+                          : "Sipariş kargoya verildi. Teslimden sonra 14 gün içinde sebep ya da fotoğraf belirtmeden iade talep edebilirsiniz."
+                        : locale === "en"
+                          ? "The order hasn't shipped yet. You can cancel it now and your payment will be refunded."
+                          : "Sipariş henüz kargoya verilmedi. Şimdi iptal edebilirsiniz; ödemeniz iade edilecektir."}
+                    </p>
+                    {shipped ? (
+                      <Button
+                        variant="secondary"
+                        size="lg"
+                        className="w-full flex items-center justify-center gap-2"
+                        onClick={handleRefund}
+                      >
+                        <ArrowUturnLeftIcon className="w-5 h-5" />
+                        {locale === "en"
+                          ? "Request Refund"
+                          : "İade Talebi Oluştur"}
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="danger"
+                        size="lg"
+                        className="w-full flex items-center justify-center gap-2"
+                        onClick={handleCancel}
+                        disabled={cancelLoading}
+                      >
+                        {cancelLoading ? (
+                          <Spinner
+                            size="sm"
+                            color="border-surface-elevated border-t-transparent"
+                          />
+                        ) : (
+                          <XCircleIcon className="w-5 h-5" />
+                        )}
+                        {locale === "en" ? "Cancel Order" : "Siparişi İptal Et"}
+                      </Button>
+                    )}
+                  </div>
+                );
+              })()}
           </div>
 
           {/* Sidebar */}
@@ -2113,6 +2302,7 @@ export default function OrderDetailPage() {
             orderId={order.id}
             orderNumber={order.orderNumber}
             phase={inferRefundPhase()}
+            quantity={order.items?.[0]?.quantity ?? 1}
             onSuccess={() => {
               queryClient.invalidateQueries({ queryKey: ["order", orderId] });
             }}

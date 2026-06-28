@@ -89,7 +89,7 @@ export default function Navbar() {
   const router = useRouter();
   const { t, locale } = useTranslation();
   const { isAuthenticated, user, logout, checkAuth } = useAuthStore();
-  const { itemCount: cartCount } = useCartStore();
+  const { itemCount: cartCount, fetchCart } = useCartStore();
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [pendingOffersCount, setPendingOffersCount] = useState(0);
@@ -302,6 +302,9 @@ export default function Navbar() {
 
   useEffect(() => {
     if (isAuthenticated) {
+      // Sepeti uygulama açılışında yükle ki navbar rozeti ürün sayısını
+      // göstersin ve ürün detayında "Sepetten Çıkar" doğru görünsün.
+      fetchCart();
       fetchUnreadMessageCount();
       fetchPendingCounts();
       // Poll for new messages and pending counts every 30 seconds
@@ -515,7 +518,7 @@ export default function Navbar() {
             {/* Logo */}
             <Link href="/" className="flex-shrink-0 flex items-center hover:opacity-90 transition-opacity h-8">
               <Image
-                src="/tarodan-logo.jpg"
+                src="/tarodan-logo-transparent.png"
                 alt="Tarodan Logo"
                 width={120}
                 height={38}

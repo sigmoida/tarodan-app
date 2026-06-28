@@ -154,6 +154,9 @@ export const adminApi = {
   updateUser: (id: string, data: any) => api.patch(`/admin/users/${id}`, data),
   banUser: (id: string, reason: string) => api.post(`/admin/users/${id}/ban`, { reason }),
   unbanUser: (id: string) => api.post(`/admin/users/${id}/unban`),
+  cancelUserMembership: (id: string) => api.post(`/admin/users/${id}/membership/cancel`),
+  changeUserMembership: (id: string, tierType: string, billingPeriod: 'monthly' | 'yearly' = 'monthly') =>
+    api.patch(`/admin/users/${id}/membership`, { tierType, billingPeriod }),
 
   // Admin Staff (roller & atamalar)
   getStaff: () => api.get('/admin/staff'),
@@ -297,6 +300,12 @@ export const adminApi = {
   getProductReport: (params?: any) => api.get('/admin/reports/products', { params }),
   exportReport: (type: string, format: string, params?: any) =>
     api.get(`/admin/reports/${type}`, { params: { ...params, format }, responseType: 'json' }),
+
+  // Kullanıcı şikayetleri (içerik raporları)
+  getUserReports: (params?: { status?: string; type?: string; page?: number; pageSize?: number }) =>
+    api.get('/user-reports/admin', { params }),
+  getUserReportStats: () => api.get('/user-reports/admin/stats'),
+  getUserReportById: (id: string) => api.get(`/user-reports/admin/${id}`),
 
   // Settings
   getSettings: () => api.get('/admin/settings'),
@@ -470,6 +479,7 @@ export const adminApi = {
     status?: string;
     userId?: string;
     type?: string;
+    search?: string;
     startDate?: string;
     endDate?: string;
   }) => api.get('/admin/notifications/history', { params }),

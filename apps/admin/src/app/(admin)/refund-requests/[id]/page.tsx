@@ -47,6 +47,8 @@ interface RefundRequestDetail {
   refundNumber: string;
   status: string;
   amount: number | string;
+  // Adet bazlı kısmi iade: order.quantity'nin kaç adedi iade ediliyor (default = tümü).
+  refundQuantity?: number | null;
   reason: string;
   description?: string | null;
   evidencePhotoUrls?: string[];
@@ -79,6 +81,9 @@ interface RefundRequestDetail {
     shippingCost?: number | string;
     buyerFeeAmount?: number | string;
     commissionAmount?: number | string;
+    // Sipariş adedi + birim fiyat — adet bazlı kısmi iade kırılımı için.
+    quantity?: number | null;
+    unitPrice?: number | string | null;
     status: string;
     seller: { id: string; displayName: string; email: string; phone?: string | null };
     product: { id: string; title: string; images?: { url: string }[] };
@@ -196,6 +201,17 @@ export default function RefundRequestDetailPage() {
   const history: HistoryEntry[] = Array.isArray(rr.metadata?.history)
     ? (rr.metadata!.history as HistoryEntry[])
     : [];
+
+  // Adet bazlı kısmi iade kırılımı.
+  const orderQty = rr.order.quantity != null ? Number(rr.order.quantity) : 1;
+  const refundQty = rr.refundQuantity != null ? Number(rr.refundQuantity) : orderQty;
+  const isPartialQty = orderQty > 1 && refundQty < orderQty;
+  const unitPrice =
+    rr.order.unitPrice != null
+      ? Number(rr.order.unitPrice)
+      : rr.order.subtotal != null && orderQty > 0
+        ? Number(rr.order.subtotal) / orderQty
+        : null;
 
   const payer = rr.returnShippingPayer ? payerLabels[rr.returnShippingPayer] : null;
   const providerLabel =
@@ -316,7 +332,39 @@ export default function RefundRequestDetailPage() {
           <Field label="İade tutarı">
             <span className="font-semibold">{fmtTry(rr.amount)}</span>
           </Field>
+          <Field label="İade adedi">
+            <span className={isPartialQty ? "font-semibold text-warning-700" : ""}>
+              {refundQty} / {orderQty} adet
+              {isPartialQty && " (kısmi iade)"}
+            </span>
+          </Field>
+          {unitPrice != null && (
+            <Field label="Birim fiyat">{fmtTry(unitPrice)}</Field>
+          )}
         </div>
+
+        {/* Adet bazlı kısmi iade kırılımı — "3 al 2 iade" gibi */}
+        {isPartialQty && unitPrice != null && (
+          <div className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm space-y-1">
+            <div className="font-medium text-warning-800">Kısmi iade kırılımı</div>
+            <div className="flex justify-between text-warning-900">
+              <span>
+                İade edilen ürün bedeli ({refundQty} × {fmtTry(unitPrice)})
+              </span>
+              <span className="font-semibold">{fmtTry(unitPrice * refundQty)}</span>
+            </div>
+            <div className="flex justify-between text-muted">
+              <span>
+                Satıcıda kalan ({orderQty - refundQty} × {fmtTry(unitPrice)})
+              </span>
+              <span>{fmtTry(unitPrice * (orderQty - refundQty))}</span>
+            </div>
+            <p className="text-xs text-warning-700 pt-1">
+              {orderQty} adetlik siparişin {refundQty} adedi iade ediliyor; kalan{" "}
+              {orderQty - refundQty} adet siparişte kalır.
+            </p>
+          </div>
+        )}
 
         {rr.description && (
           <div className="text-sm">

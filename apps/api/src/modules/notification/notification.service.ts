@@ -45,7 +45,7 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
   },
   [NotificationType.ORDER_DELIVERED]: {
     title: 'Siparişiniz Teslim Edildi',
-    message: 'Siparişiniz teslim edildi. Lütfen onaylayın ve değerlendirin.',
+    message: 'Siparişiniz teslim edildi; teslim tarihinden itibaren 14 gün içinde koşulsuz iade hakkınız var.',
     icon: '✅',
     link: '/orders/{{orderId}}',
   },
@@ -89,7 +89,7 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
   // 48h pencere (Faz 3B.1)
   [NotificationType.ORDER_DELIVERED_CONFIRM]: {
     title: 'Siparişin teslim edildi',
-    message: '48 saat içinde sorun varsa bildir veya "Sorun yok" ile onayla. Süre dolunca otomatik tamamlanacak.',
+    message: 'Siparişiniz teslim edildi; teslim tarihinden itibaren 14 gün içinde koşulsuz iade hakkınız var. Süre dolunca sipariş otomatik tamamlanır.',
     icon: '📦',
     link: '/orders/{{orderId}}',
   },
@@ -101,7 +101,7 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
   },
   [NotificationType.ORDER_MANUALLY_CONFIRMED]: {
     title: 'Alıcı siparişini onayladı',
-    message: 'Alıcı siparişi erken onayladı. Ödemen kısa süre içinde hesabına transfer edilecek.',
+    message: 'Alıcı siparişi onayladı. Ödemeniz, teslimden 14 gün sonra (iade süresi dolunca) hesabınıza aktarılır.',
     icon: '💸',
     link: '/orders/{{orderId}}',
   },
@@ -442,6 +442,48 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     icon: '💰',
     link: '/orders/{{orderId}}',
   },
+  [NotificationType.REFUND_REQUEST_RECEIVED]: {
+    title: 'İade Talebiniz Alındı',
+    message: '{{refundNumber}} numaralı iade talebiniz alındı, satıcı yanıtı bekleniyor.',
+    icon: '📨',
+    link: '/orders/{{orderId}}',
+  },
+  [NotificationType.REFUND_RETURN_SHIPPED_SELLER]: {
+    title: 'İade Kargosu Yola Çıktı',
+    message: 'Alıcı {{refundNumber}} numaralı iade için ürünü kargoya verdi; ürün size geliyor.',
+    icon: '📦',
+    link: '/sales/{{orderId}}',
+  },
+  [NotificationType.REFUND_RETURN_IN_TRANSIT]: {
+    title: 'İade Kargonuz Yolda',
+    message: '{{refundNumber}} numaralı iade ürününüz satıcıya doğru yolda.',
+    icon: '🚚',
+    link: '/orders/{{orderId}}',
+  },
+  [NotificationType.REFUND_RETURN_DELIVERED_BUYER]: {
+    title: 'İadeniz Satıcıya Ulaştı',
+    message: '{{refundNumber}} numaralı iade ürününüz satıcıya teslim edildi; para iadeniz kısa sürede yapılacak.',
+    icon: '✅',
+    link: '/orders/{{orderId}}',
+  },
+  [NotificationType.REFUND_RETURN_DELIVERED_SELLER]: {
+    title: 'İade Ürünü Size Ulaştı',
+    message: '{{refundNumber}} numaralı iade ürünü size teslim edildi.',
+    icon: '📥',
+    link: '/sales/{{orderId}}',
+  },
+  [NotificationType.REFUND_COMPLETED_SELLER]: {
+    title: 'İade Tamamlandı',
+    message: '{{refundNumber}} numaralı sipariş için iade tamamlandı; tutar alıcıya iade edildi.',
+    icon: '↩️',
+    link: '/sales/{{orderId}}',
+  },
+  [NotificationType.REFUND_AUTO_ACCEPTED_SELLER]: {
+    title: 'İade Talebi Otomatik Onaylandı',
+    message: '{{refundNumber}} numaralı iade talebine 48 saat içinde yanıt verilmediği için otomatik onaylandı.',
+    icon: '⏰',
+    link: '/sales/{{orderId}}',
+  },
 
   // Seller application notifications
   [NotificationType.SELLER_APPLICATION_APPROVED]: {
@@ -522,7 +564,15 @@ export class NotificationService {
           break;
 
         case NotificationChannel.PUSH:
-          results.push = await this.sendPushReal(dto.userId, title, message, dto.data);
+          // `type`'ı push payload'ına ekle: mobil deep-link routing (push.ts
+          // routeFromNotification) önce type'a bakıyor; yoksa tüm push'lar genel
+          // bildirim sekmesine düşüyordu. dto.data zaten ilgili id'leri içeriyor.
+          results.push = await this.sendPushReal(
+            dto.userId,
+            title,
+            message,
+            { ...dto.data, type: dto.type },
+          );
           await this.logNotification(dto.userId, 'push', dto.type, title, message, results.push);
           break;
 
@@ -749,6 +799,18 @@ export class NotificationService {
       }
     }
 
+    // Push: her in-app bildirimi aynı zamanda cihaza push olarak da gönder.
+    // Bu tek nokta sayesinde createInAppNotification kullanan TÜM akışlar (mesaj,
+    // teklif, takas, sipariş, rating, takip, beğeni, wishlist, iade...) push kazanır.
+    // event.service ayrı pushQueue yolunu kullandığından çift-push olmaz.
+    // type'ı data'ya ekliyoruz → mobil deep-link routing doğru ekrana gider.
+    // Best-effort: push hatası in-app bildirimi etkilemez.
+    try {
+      await this.sendPushReal(userId, title, message, { ...data, type });
+    } catch (e) {
+      this.logger.warn(`[createInAppNotification] push failed: ${e}`);
+    }
+
     return !!notificationId;
   }
 
@@ -790,6 +852,13 @@ export class NotificationService {
    */
   async registerPushToken(userId: string, dto: RegisterPushTokenDto) {
     try {
+      // Logout path: the device asks us to deactivate its token instead of
+      // registering it, so the user stops receiving push on a signed-out device.
+      if (dto.revoke) {
+        await this.expoPushProvider.deactivateToken(dto.token);
+        return { success: true, userId, revoked: true };
+      }
+
       await this.expoPushProvider.registerToken(
         userId,
         dto.token,
@@ -1125,6 +1194,54 @@ export class NotificationService {
   }
 
   /**
+   * Sipariş iptali e-postaları: alıcıya `order-cancelled-buyer`, satıcıya
+   * `order-cancelled-seller`. Stokout oto-iptal ve ödeme-süresi-doldu
+   * senaryolarında çağrılır (in-app/push bildirimler ayrıca gönderilir; bu
+   * metod yalnız e-posta fan-out'u yapar). Bu senaryolarda alıcıdan ücret
+   * tahsil edilmediği için refundAmount geçilmez. Asla throw etmez.
+   */
+  async sendOrderCancelledEmails(orderId: string): Promise<void> {
+    try {
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        select: {
+          id: true,
+          orderNumber: true,
+          cancelReason: true,
+          buyerId: true,
+          sellerId: true,
+          product: { select: { title: true } },
+          buyer: { select: { displayName: true } },
+          seller: { select: { displayName: true } },
+        },
+      });
+      if (!order) return;
+      const reason = order.cancelReason ?? undefined;
+      const productTitle = order.product?.title ?? '';
+
+      await this.sendTemplateEmailToUser(order.buyerId, 'order-cancelled-buyer', {
+        buyerName: order.buyer?.displayName ?? '',
+        orderNumber: order.orderNumber,
+        orderId: order.id,
+        productTitle,
+        reason,
+      });
+
+      if (order.sellerId) {
+        await this.sendTemplateEmailToUser(order.sellerId, 'order-cancelled-seller', {
+          sellerName: order.seller?.displayName ?? '',
+          orderNumber: order.orderNumber,
+          orderId: order.id,
+          productTitle,
+          reason,
+        });
+      }
+    } catch (err: any) {
+      this.logger.warn(`sendOrderCancelledEmails failed for order ${orderId}: ${err?.message}`);
+    }
+  }
+
+  /**
    * Fan-out helper: send BACK_IN_STOCK to wishlist users ∪ stockout-cancelled
    * buyers (last 7 days). 24h per (user, product) debounce.
    *
@@ -1207,11 +1324,18 @@ export class NotificationService {
     // bell can render a thumbnail and the click-through can land on the
     // unavailable-page back-in-stock variant without an extra fetch.
     const data = await this.buildStockoutData(productId);
-    return this.send({
+    const result = await this.send({
       userId,
       type: NotificationType.BACK_IN_STOCK,
       data,
     });
+    // "Stoğa geri geldi" e-postası — in-app/push'un yanında markalı mail.
+    const frontendUrl = this.configService.get('FRONTEND_URL') || 'https://tarodan.com';
+    await this.sendTemplateEmailToUser(userId, 'back-in-stock', {
+      productTitle: data.productTitle,
+      productUrl: `${frontendUrl}/products/${productId}`,
+    });
+    return result;
   }
 
   /**
@@ -1402,7 +1526,7 @@ export class NotificationService {
     return { success: true };
   }
 
-  private async sendTemplateEmailToUser(userId: string, templateKey: string, templateData: Record<string, any>): Promise<void> {
+  async sendTemplateEmailToUser(userId: string, templateKey: string, templateData: Record<string, any>): Promise<void> {
     try {
       const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
       if (!user) return;
@@ -1415,6 +1539,17 @@ export class NotificationService {
   private async sendTemplateEmailToAddress(email: string, templateKey: string, templateData: Record<string, any>): Promise<void> {
     try {
       const frontendUrl = this.configService.get('FRONTEND_URL') || 'https://tarodan.com';
+      // Placeholder takma adları: göndericiler farklı anahtar adları geçebiliyor
+      // (ör. welcome 'name'/'verifyUrl' geçer ama DB şablonu {{displayName}}/{{frontendUrl}}
+      // bekler). Eşdeğer anahtarları doldur ki ham {{...}} kalmasın. Mevcut değerler
+      // ezilmez (yalnız eksikse eklenir).
+      const enriched: Record<string, any> = {
+        frontendUrl,
+        ...templateData,
+      };
+      if (enriched.displayName == null && enriched.name != null) enriched.displayName = enriched.name;
+      if (enriched.name == null && enriched.displayName != null) enriched.name = enriched.displayName;
+      templateData = enriched;
       const dbTemplate = await this.prisma.emailTemplate.findUnique({ where: { key: templateKey } });
       let html: string;
       let subject: string;

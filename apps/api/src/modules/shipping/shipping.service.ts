@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
 import { PaymentService } from '../payment/payment.service';
+import { NotificationService } from '../notification/notification.service';
 import { CreateShipmentDto, CalculateShippingDto, UpdateTrackingDto, ShippingProvider } from './dto';
 import { resolveShippingDestinationCity } from './shipping-destination.util';
 import { ShipmentStatus, OrderStatus } from '@prisma/client';
@@ -30,6 +31,7 @@ export class ShippingService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly paymentService: PaymentService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   /**
@@ -261,7 +263,7 @@ export class ShippingService {
       (this.trackingUrls[shipment.provider as ShippingProvider] ??
         this.trackingUrls[ShippingProvider.surat]) + dto.trackingNumber;
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // Update shipment
       const updatedShipment = await tx.shipment.update({
         where: { id: shipmentId },
@@ -295,6 +297,19 @@ export class ShippingService {
 
       return this.formatShipmentResponse(updatedShipment);
     });
+
+    // tx commit sonrası: alıcıya "kargoya verildi" bildirimi (push + in_app).
+    try {
+      await this.notificationService.notifyOrderShipped(
+        shipment.order.buyerId,
+        shipment.orderId,
+        dto.trackingNumber,
+      );
+    } catch (e: any) {
+      this.logger.warn(`notifyOrderShipped failed for ${shipment.orderId}: ${e?.message}`);
+    }
+
+    return result;
   }
 
   /**
@@ -355,45 +370,35 @@ export class ShippingService {
         },
       });
 
-      // Update order status if delivered
+      // Update order status if delivered. YENİ ESCROW: teslimde ANINDA release YOK
+      // (her iki modda da). deliveredAt set edilir ve hold release = teslim + return
+      // + grace olarak zamanlanır (releaseHoldsDue cron + frozen/açık-iade guard'ları).
       if (newStatus === ShipmentStatus.delivered) {
-        if (use48h) {
-          const deliveredAt = new Date();
-          await tx.order.update({
-            where: { id: shipment.orderId },
-            data: {
-              status: OrderStatus.awaiting_buyer_confirmation,
-              deliveredAt,
-              confirmationDeadline: new Date(deliveredAt.getTime() + 48 * 60 * 60 * 1000),
-              version: { increment: 1 },
-            },
-          });
-        } else {
-          await tx.order.update({
-            where: { id: shipment.orderId },
-            data: {
-              status: OrderStatus.delivered,
-              version: { increment: 1 },
-            },
-          });
-        }
+        const deliveredAt = new Date();
+        await tx.order.update({
+          where: { id: shipment.orderId },
+          data: use48h
+            ? {
+                status: OrderStatus.awaiting_buyer_confirmation,
+                deliveredAt,
+                confirmationDeadline: new Date(deliveredAt.getTime() + 48 * 60 * 60 * 1000),
+                version: { increment: 1 },
+              }
+            : {
+                status: OrderStatus.delivered,
+                deliveredAt,
+                version: { increment: 1 },
+              },
+        });
+        await this.paymentService.scheduleHoldReleaseOnDelivery(
+          shipment.orderId,
+          deliveredAt,
+          tx,
+        );
       }
 
       return { status: 'ok' };
     });
-
-    // Hold'u yalnız LEGACY modda (48h kapalı) teslimatta anında serbest bırak. 48h modda
-    // release, alıcı onayı veya autoConfirmExpiredReceipts (deadline) ile yapılır — burada DEĞİL.
-    if (newStatus === ShipmentStatus.delivered && !use48h) {
-      try {
-        const released = await this.paymentService.releasePaymentIfHeld(shipment.orderId);
-        if (released) {
-          this.logger.log(`Payment hold released for order ${shipment.orderId} (delivered via webhook)`);
-        }
-      } catch (e: any) {
-        this.logger.warn(`Could not release payment for order ${shipment.orderId}: ${e?.message}`);
-      }
-    }
 
     return result;
   }

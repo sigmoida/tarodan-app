@@ -32,7 +32,12 @@ logger = logging.getLogger("ai-moderation")
 
 # Eşikler (0..1) — env ile override edilebilir.
 NSFW_THRESHOLD = float(os.getenv("NSFW_THRESHOLD", "0.7"))
-RELEVANCE_THRESHOLD = float(os.getenv("RELEVANCE_THRESHOLD", "0.20"))
+# 0.20 -> 0.10: ResNet50, küçük diecast/paketli Hot Wheels'lerde araç sınıflarını
+# tanıyor ama olasılıkları çok sayıda sınıfa dağıtıyor (örn. racer/sports car/
+# go-kart hepsi ~%2-7) → toplam ilgililik ~0.10-0.19 bandında kalıp 0.20 eşiğini
+# kıl payı geçemiyordu. Gerçek ürün görselleri (0.11-0.19) ile alakasız içerik
+# (~0.04) arasında net boşluk ölçüldü; 0.10 gerçek ürünleri geçirir, çöpü eler.
+RELEVANCE_THRESHOLD = float(os.getenv("RELEVANCE_THRESHOLD", "0.10"))
 TOXIC_THRESHOLD = float(os.getenv("TOXIC_THRESHOLD", "0.7"))
 DOWNLOAD_TIMEOUT = float(os.getenv("DOWNLOAD_TIMEOUT", "15"))
 MAX_IMAGE_BYTES = int(os.getenv("MAX_IMAGE_BYTES", str(15 * 1024 * 1024)))

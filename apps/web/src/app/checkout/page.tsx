@@ -322,10 +322,32 @@ export default function CheckoutPage() {
         setGuestOtpSentForEmail(em);
         return true;
       } catch (e: any) {
+        const data = e?.response?.data;
+        // E-posta zaten kayıtlı (409) → misafir alışverişe izin verme; net mesaj
+        // ver ve checkout'a geri dönecek şekilde giriş sayfasına yönlendir.
+        if (
+          e?.response?.status === 409 ||
+          data?.code === "EMAIL_ALREADY_REGISTERED"
+        ) {
+          toast.error(
+            typeof data?.message === "string"
+              ? data.message
+              : locale === "en"
+                ? "This email is already registered. Please log in to continue."
+                : "Bu e-posta adresi zaten kayıtlı. Lütfen giriş yapıp alışverişe devam edin.",
+          );
+          try {
+            sessionStorage.setItem("login_redirect", "/checkout");
+          } catch {
+            /* sessionStorage erişilemezse query param yine yönlendirir */
+          }
+          router.push("/login?redirect=/checkout");
+          return false;
+        }
         const msg =
-          e?.response?.data?.message ??
-          (Array.isArray(e?.response?.data?.message)
-            ? e.response.data.message.join(", ")
+          data?.message ??
+          (Array.isArray(data?.message)
+            ? data.message.join(", ")
             : null);
         toast.error(
           typeof msg === "string"
@@ -415,11 +437,17 @@ export default function CheckoutPage() {
       return;
     }
 
-    setGuestOtpModalOpen(true);
-    if (guestOtpSentForEmail !== em) {
-      const sent = await requestGuestCheckoutOtp(em);
-      if (sent) toast.success(t("checkout.guestEmailCodeSent"));
+    // Kod ekranını AÇMADAN önce kodu iste: e-posta zaten kayıtlıysa (409)
+    // requestGuestCheckoutOtp false döner + giriş'e yönlendirir → kod ekranı
+    // hiç açılmaz. Kod daha önce bu e-posta için gönderildiyse tekrar isteme.
+    if (guestOtpSentForEmail === em) {
+      setGuestOtpModalOpen(true);
+      return;
     }
+    const sent = await requestGuestCheckoutOtp(em);
+    if (!sent) return;
+    toast.success(t("checkout.guestEmailCodeSent"));
+    setGuestOtpModalOpen(true);
   };
 
   const confirmGuestOtpModal = () => {

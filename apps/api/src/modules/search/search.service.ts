@@ -90,6 +90,10 @@ export interface RichAutocompleteResult {
   suggestions: string[];
 }
 
+// Sanal/platform sözde-ürünleri (üyelik + öne-çıkarma) aramadan/indeksten hariç tut.
+// Tek kaynak — drift olmasın diye tüm exclusion noktaları bunu kullanır.
+const VIRTUAL_PRODUCT_ID_PREFIXES = ['membership-', 'boost-'] as const;
+
 @Injectable()
 export class SearchService implements OnModuleInit {
   private readonly logger = new Logger(SearchService.name);
@@ -160,11 +164,21 @@ export class SearchService implements OnModuleInit {
     return this.esAvailable;
   }
 
+  /** Prisma: sanal sözde-ürünleri (membership-/boost-) hariç tutan NOT koşulu. */
+  private virtualProductPrismaNot(): Prisma.ProductWhereInput[] {
+    return VIRTUAL_PRODUCT_ID_PREFIXES.map((p) => ({ id: { startsWith: p } }));
+  }
+
+  /** ElasticSearch: sanal sözde-ürünleri hariç tutan must_not prefix koşulları. */
+  private virtualProductEsMustNot(): Array<{ prefix: { id: string } }> {
+    return VIRTUAL_PRODUCT_ID_PREFIXES.map((p) => ({ prefix: { id: p } }));
+  }
+
   /**
    * ES'e indekslenecek ürün kümesi: listelerde görünebilenler.
    * = aktif (stoklu) + otomatik tükenen (inactive + quantity=0) + satıldı.
    * Hariç: elle pasife alınan (inactive + quantity>0), draft/pending/reserved/rejected
-   * ve sanal (membership-) ürünler. Bu küme build-product-where.ts'teki kapsayıcı
+   * ve sanal (membership-/boost-) ürünler. Bu küme build-product-where.ts'teki kapsayıcı
    * listeleme filtresiyle hizalıdır.
    */
   private indexableProductWhere(): Prisma.ProductWhereInput {
@@ -174,7 +188,7 @@ export class SearchService implements OnModuleInit {
         { AND: [{ status: ProductStatus.inactive }, { quantity: 0 }] },
         { status: ProductStatus.sold },
       ],
-      NOT: { id: { startsWith: 'membership-' } },
+      NOT: this.virtualProductPrismaNot(),
     };
   }
 
@@ -473,7 +487,7 @@ export class SearchService implements OnModuleInit {
         },
       });
     }
-    filter.push({ bool: { must_not: { prefix: { id: 'membership-' } } } });
+    filter.push({ bool: { must_not: this.virtualProductEsMustNot() } });
 
     // ID-based filters (keyword exact match)
     if (categoryId) filter.push({ term: { categoryId } });
@@ -882,7 +896,7 @@ export class SearchService implements OnModuleInit {
             minimum_should_match: 1,
             filter: [
               { term: { status: ProductStatus.active } },
-              { bool: { must_not: { prefix: { id: 'membership-' } } } },
+              { bool: { must_not: this.virtualProductEsMustNot() } },
             ],
           },
         },
@@ -908,7 +922,7 @@ export class SearchService implements OnModuleInit {
       where: {
         id: { in: productIds },
         status: ProductStatus.active,
-        NOT: { id: { startsWith: 'membership-' } },
+        NOT: this.virtualProductPrismaNot(),
       },
       select: { title: true },
       take: limit,
@@ -981,7 +995,7 @@ export class SearchService implements OnModuleInit {
               minimum_should_match: 1,
               filter: [
                 { term: { status: ProductStatus.active } },
-                { bool: { must_not: { prefix: { id: 'membership-' } } } },
+                { bool: { must_not: this.virtualProductEsMustNot() } },
               ],
             },
           },
@@ -1010,7 +1024,7 @@ export class SearchService implements OnModuleInit {
           where: {
             id: { in: productIds },
             status: ProductStatus.active,
-            NOT: { id: { startsWith: 'membership-' } },
+            NOT: this.virtualProductPrismaNot(),
           },
           select: {
             id: true,
@@ -1788,7 +1802,7 @@ export class SearchService implements OnModuleInit {
       const dbCount = await this.prisma.product.count({
         where: {
           status: ProductStatus.active,
-          NOT: { id: { startsWith: 'membership-' } },
+          NOT: this.virtualProductPrismaNot(),
         },
       });
 

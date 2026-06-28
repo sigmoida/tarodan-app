@@ -181,8 +181,7 @@ export default function BusinessRegisterPage() {
       <div className="min-h-screen bg-gradient-to-br from-primary-50 via-surface-elevated to-warning-50 flex flex-col">
         <header className="p-6">
           <Link href="/" className="inline-flex items-center gap-2">
-            <Image src="/tarodan-logo.jpg" alt="Tarodan" width={36} height={36} className="rounded-lg object-contain" />
-            <span className="text-xl font-bold text-heading">Tarodan</span>
+            <Image src="/tarodan-logo.jpg" alt="Tarodan" width={162} height={40} className="rounded-lg object-contain" />
           </Link>
         </header>
 
@@ -411,8 +410,7 @@ export default function BusinessRegisterPage() {
         >
           <div className="text-center mb-8">
             <Link href="/" className="inline-flex items-center gap-2 mb-8">
-              <Image src="/tarodan-logo.jpg" alt="Tarodan" width={40} height={40} className="rounded-lg object-contain" />
-              <span className="font-display font-bold text-2xl text-heading">Tarodan</span>
+              <Image src="/tarodan-logo.jpg" alt="Tarodan" width={200} height={49} className="rounded-lg object-contain" />
             </Link>
             <h1 className="text-3xl font-bold text-heading mb-2">
               {locale === "en"

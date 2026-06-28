@@ -69,17 +69,21 @@ export const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
         {/* Content */}
         <div
           className={cn(
-            'relative w-full bg-surface-elevated rounded-xl shadow-elevated px-6 pb-6 pt-5',
+            'relative flex max-h-[90vh] w-full flex-col rounded-xl bg-surface-elevated shadow-elevated',
             maxWidth,
             className,
           )}
         >
+          {/* Sabit başlık — gövde scroll ederken kaybolmasın */}
           {title && (
-            <h3 className="mb-4 text-lg font-semibold leading-tight text-heading">
+            <h3 className="flex-shrink-0 px-6 pb-4 pt-5 text-lg font-semibold leading-tight text-heading">
               {title}
             </h3>
           )}
-          {children}
+          {/* Scroll edilebilir gövde — uzun içerik (ör. değerlendirme formu) taşarsa kaydırılır */}
+          <div className={cn('overflow-y-auto px-6 pb-6', title ? '' : 'pt-5')}>
+            {children}
+          </div>
         </div>
       </div>
     );

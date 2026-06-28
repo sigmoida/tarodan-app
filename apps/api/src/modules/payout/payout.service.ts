@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
 import { PayTRService } from '../payment-providers/paytr.service';
 import { PayoutStatus, PaymentHoldStatus, PaymentStatus } from '@prisma/client';
+import { NotificationService } from '../notification/notification.service';
 
 @Injectable()
 export class PayoutService {
@@ -16,7 +17,33 @@ export class PayoutService {
     private readonly prisma: PrismaService,
     private readonly paytrService: PayTRService,
     private readonly configService: ConfigService,
+    private readonly notificationService: NotificationService,
   ) {}
+
+  /**
+   * "Ödemeniz aktarıldı" e-postası — payout transferi PayTR'de başarıyla
+   * tamamlandığında satıcıya markalı bilgilendirme. Asla throw etmez.
+   */
+  private async sendPayoutReleasedEmail(
+    sellerId: string,
+    netAmount: number,
+    iban: string,
+  ): Promise<void> {
+    try {
+      const seller = await this.prisma.user.findUnique({
+        where: { id: sellerId },
+        select: { displayName: true },
+      });
+      const last4 = (iban || '').replace(/\s/g, '').slice(-4);
+      await this.notificationService.sendTemplateEmailToUser(sellerId, 'payout-released-seller', {
+        sellerName: seller?.displayName ?? '',
+        payoutAmount: netAmount,
+        bankAccountLast4: last4 || undefined,
+      });
+    } catch (err: any) {
+      this.logger.warn(`payout-released email failed for seller ${sellerId}: ${err?.message}`);
+    }
+  }
 
   /**
    * Y4: TR IBAN format + ISO 7064 mod-97 checksum doğrulaması. Yazım hatalı IBAN'ları
@@ -57,6 +84,13 @@ export class PayoutService {
       const payment = hold.payment;
       if (!payment?.order) continue;
 
+      // Adet bazlı kısmi iade: satıcıya yalnız iade EDİLMEYEN kısım ödenir.
+      const netPayout = Number(hold.amount) - Number(hold.refundedAmount ?? 0);
+      if (netPayout <= 0.01) {
+        // Tamamı iade edilmiş → ödeme yapma (hold zaten cancelled olmalı; emniyet).
+        continue;
+      }
+
       const merchantOid =
         payment.providerConversationId?.trim() ||
         payment.order.orderNumber.replace(/-/g, '');
@@ -70,7 +104,7 @@ export class PayoutService {
           sellerId: hold.sellerId,
           amount: payment.order.totalAmount,
           commission: payment.order.commissionAmount,
-          netAmount: hold.amount,
+          netAmount: netPayout,
           merchantOid,
           transId,
           transferIban: bankAccount?.iban || '',
@@ -228,6 +262,11 @@ export class PayoutService {
           });
           // Başarılı transfer = IBAN gerçek ve çalışıyor → otomatik doğrula.
           await this.syncBankAccountVerification(payout.sellerId, payout.transferIban, true);
+          await this.sendPayoutReleasedEmail(
+            payout.sellerId,
+            Number(payout.netAmount),
+            payout.transferIban,
+          );
           processed++;
           this.logger.log(
             `Payout ${payout.transId} completed: ${payout.netAmount} TL → ${payout.transferIban}`,

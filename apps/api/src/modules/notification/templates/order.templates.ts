@@ -165,9 +165,9 @@ export const orderShippedTemplate = (data: OrderData): string => {
     ` : ''}
     
     <div class="highlight">
-      <p style="margin: 0;"><strong>💡 İpucu:</strong> Ürünü teslim aldığınızda, lütfen siparişinizi onaylayın. Bu, satıcının ödemesini almasını sağlayacaktır.</p>
+      <p style="margin: 0;"><strong>💡 İpucu:</strong> Siparişiniz teslim edildikten sonra 14 gün içinde koşulsuz iade hakkınız vardır.</p>
     </div>
-    
+
     <div style="text-align: center; margin: 32px 0;">
       <a href="${data.orderUrl}" class="button">Siparişi Görüntüle</a>
     </div>
@@ -190,25 +190,16 @@ export const orderDeliveredTemplate = (data: OrderData): string => {
     </div>
     
     <div class="divider"></div>
-    
-    <h2>Lütfen Siparişinizi Onaylayın</h2>
-    <p>Ürünü aldıysanız ve memnun kaldıysanız, lütfen siparişinizi onaylayın. Bu işlem:</p>
-    <ul style="color: #51545E; line-height: 1.8;">
-      <li>Satıcının ödemesini almasını sağlar</li>
-      <li>İşlemi tamamlar</li>
-      <li>Satıcıyı değerlendirmenize olanak tanır</li>
-    </ul>
-    
+
+    <h2>14 Gün Koşulsuz İade Hakkınız Var</h2>
+    <p>Siparişiniz teslim edildi. Teslim tarihinden itibaren 14 gün içinde sebep belirtmeden iade talebinde bulunabilirsiniz. Süre dolunca siparişiniz otomatik olarak tamamlanır.</p>
+
     <div style="text-align: center; margin: 32px 0;">
-      <a href="${data.orderUrl}" class="button button--success">Teslim Aldım, Onayla</a>
+      <a href="${data.orderUrl}" class="button button--success">Siparişi Görüntüle</a>
     </div>
-    
-    <p style="color: #9ca3af; font-size: 14px;">
-      Ürünle ilgili bir sorun varsa, 3 gün içinde iade talebinde bulunabilirsiniz.
-    </p>
   `;
 
-  return baseTemplate(content, { previewText: `Siparişiniz teslim edildi - Lütfen onaylayın` });
+  return baseTemplate(content, { previewText: `Siparişiniz teslim edildi` });
 };
 
 /**

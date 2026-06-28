@@ -8,6 +8,7 @@ import type { StatusConfig } from '@tarodan/ui';
 import { type ColumnDef } from '@/components/DataTable';
 import { ResourceListPage } from '@/components/ResourceListPage';
 import { useAdminResource } from '@/hooks/useAdminResource';
+import { useConfirm } from '@/components/ConfirmProvider';
 import {
     CheckCircleIcon,
     XCircleIcon,
@@ -79,8 +80,16 @@ function renderStars(score: number) {
 
 const VALID_REVIEW_TABS = ['product', 'seller'] as const;
 
+// Aksiyon onay diyalogu metinleri (status'a göre).
+const REVIEW_ACTION_CONFIRM: Record<ReviewStatus, { title: string; description: string; confirmLabel: string; destructive?: boolean }> = {
+    approved: { title: 'Yorumu onayla', description: 'Bu yorum onaylanacak ve yayında görünecek.', confirmLabel: 'Onayla' },
+    rejected: { title: 'Yorumu reddet', description: 'Bu yorum reddedilecek ve yayından kaldırılacak.', confirmLabel: 'Reddet', destructive: true },
+    pending: { title: 'Yorumu geri al', description: 'Yorum yeniden "Bekliyor" durumuna alınacak.', confirmLabel: 'Geri Al' },
+};
+
 export default function ReviewsPage() {
     const searchParams = useSearchParams();
+    const confirm = useConfirm();
     // URL'den ilk tab değeri; geçersiz değer 'product'e düşer
     const [activeTab, setActiveTab] = useState<'product' | 'seller'>(() => {
         const t = searchParams.get('tab');
@@ -110,7 +119,7 @@ export default function ReviewsPage() {
         r.setTabUrl(key, {
             defaultTab: 'product',
             resetFilters: true,
-            resetSearch: key !== 'product',
+            resetSearch: true,
         });
     };
 
@@ -122,6 +131,8 @@ export default function ReviewsPage() {
 
     // ── Ürün yorumu aksiyonları ────────────────────────────────────────────────
     const handleStatusUpdate = async (id: string, status: ReviewStatus) => {
+        const ok = await confirm({ ...REVIEW_ACTION_CONFIRM[status], cancelLabel: 'Vazgeç' });
+        if (!ok) return;
         try {
             await adminApi.updateReviewStatus(id, status);
             toast.success(`Yorum ${statusLabels[status]}`);
@@ -133,6 +144,8 @@ export default function ReviewsPage() {
 
     // ── Satıcı yorumu aksiyonları ──────────────────────────────────────────────
     const handleSellerStatusUpdate = async (id: string, status: ReviewStatus) => {
+        const ok = await confirm({ ...REVIEW_ACTION_CONFIRM[status], cancelLabel: 'Vazgeç' });
+        if (!ok) return;
         try {
             await adminApi.updateUserRatingStatus(id, status);
             toast.success(`Satıcı yorumu ${statusLabels[status]}`);
@@ -399,12 +412,12 @@ export default function ReviewsPage() {
                 ]}
                 activeTab={activeTab}
                 onTabChange={handleTabChange}
-                // Satıcı sekmesinde arama; ürün sekmesinde yok (backend desteklemese de dışarıda tutuyoruz —
-                // orijinal davranışı korumak için: ürün sekmesinde arama kutusu yoktu)
-                search={!isProduct ? { placeholder: 'Kullanıcı ara...' } : undefined}
-                searchValue={!isProduct ? r.search : undefined}
-                onSearchChange={!isProduct ? r.setSearch : undefined}
-                onSearchSubmit={!isProduct ? r.onSearchSubmit : undefined}
+                // Her iki sekmede de arama (backend getReviews ve getUserRatings search destekliyor):
+                // ürün sekmesinde ürün/kullanıcı, satıcı sekmesinde kullanıcı araması.
+                search={{ placeholder: isProduct ? 'Ürün veya kullanıcı ara...' : 'Kullanıcı ara...' }}
+                searchValue={r.search}
+                onSearchChange={r.setSearch}
+                onSearchSubmit={r.onSearchSubmit}
                 filters={statusFilter}
                 columns={columns}
                 data={r.rows}

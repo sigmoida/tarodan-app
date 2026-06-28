@@ -234,7 +234,11 @@ export const isPremiumTier = (tier: MembershipTier | null): boolean => {
 
 export const isSubscriptionActive = (subscription: Subscription | null): boolean => {
   if (!subscription) return false;
-  return subscription.status === 'active' && new Date(subscription.currentPeriodEnd) > new Date();
+  // İptal edilmiş (cancelled) üyelik, ödenen dönem (currentPeriodEnd) bitene kadar
+  // premium özelliklerini KULLANMAYA devam eder ("süre bitince üyelik gider").
+  // past_due (ödeme onaylanmamış) premium sayılmaz; backend isPremiumEntitled ile aynı kural.
+  const eligibleStatus = subscription.status === 'active' || subscription.status === 'cancelled';
+  return eligibleStatus && new Date(subscription.currentPeriodEnd) > new Date();
 };
 
 export const getDaysUntilRenewal = (subscription: Subscription | null): number => {

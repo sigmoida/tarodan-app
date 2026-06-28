@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -12,6 +12,8 @@ import {
   CreditCardIcon,
   CalendarIcon,
   FunnelIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
 } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { Button, Input, Select, Spinner, StatusBadge, ConfirmDialog, paymentStatusConfig } from '@tarodan/ui';
@@ -33,6 +35,18 @@ interface Payment {
     title: string;
     images?: string[];
   } | null;
+  /** Sepet (checkout_group) ödemesinde grubun her ürünü (thumbnail dizisi). */
+  products?: { id: string; title: string; images?: string[] }[];
+  /** Sepet ödemesinde her siparişin detayı — dropdown bunları açar. */
+  orders?: {
+    id: string;
+    orderNumber: string | null;
+    title: string;
+    image: string | null;
+    amount: number;
+    sellerName: string | null;
+    status: string;
+  }[];
   buyer: {
     id: string;
     displayName: string;
@@ -86,6 +100,15 @@ export default function PaymentHistoryPage() {
   // Native confirm() yerine özel ConfirmDialog: iptal/tekrar dene onayı
   const [confirmAction, setConfirmAction] = useState<{ type: 'cancel' | 'retry'; paymentId: string } | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
+  // Sepet (checkout_group) ödemelerinde grup siparişlerini açan accordion durumu.
+  const [expandedPayments, setExpandedPayments] = useState<Set<string>>(new Set());
+  const togglePayment = (id: string) =>
+    setExpandedPayments((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   useEffect(() => {
     if (authLoading) return;
@@ -292,105 +315,169 @@ export default function PaymentHistoryPage() {
                     {payments.map((payment) => {
                       const paymentStatusLabel = locale === 'en' ? (paymentStatusEnLabels[payment.status] || payment.status) : (paymentStatusConfig[payment.status]?.label || payment.status);
 
+                      const groupOrders =
+                        payment.type === 'checkout_group' && Array.isArray(payment.orders)
+                          ? payment.orders
+                          : [];
+                      const isGroup = groupOrders.length > 0;
+                      const isExpanded = expandedPayments.has(payment.id);
+
                       return (
-                        <tr key={payment.id} className="hover:bg-surface">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {payment.orderId ? (
-                              <Link
-                                href={`/orders/${payment.orderId}`}
-                                className="text-primary-600 hover:text-primary-700 font-medium"
-                              >
-                                #{payment.orderNumber}
-                              </Link>
-                            ) : (
-                              <span className="text-muted font-medium">
-                                {payment.orderNumber ? `#${payment.orderNumber}` : '—'}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              {payment.product?.images && payment.product.images[0] ? (
-                                <img
-                                  src={payment.product.images[0]}
-                                  alt={payment.product.title}
-                                  className="w-12 h-12 object-cover rounded"
-                                />
-                              ) : (
-                                <div className="w-12 h-12 bg-border-subtle rounded flex items-center justify-center">
-                                  <CreditCardIcon className="w-6 h-6 text-subtle" />
-                                </div>
-                              )}
-                              <div>
-                                <p className="text-sm font-medium text-heading">
-                                  {payment.description || payment.product?.title || (locale === 'en' ? 'Payment' : 'Ödeme')}
-                                </p>
-                                {payment.buyer && payment.seller && (
-                                  <p className="text-xs text-muted">
-                                    {user?.id === payment.buyer.id ? (locale === 'en' ? 'Buyer' : 'Alıcı') : (locale === 'en' ? 'Seller' : 'Satıcı')}:{' '}
-                                    {user?.id === payment.buyer.id
-                                      ? payment.seller.displayName
-                                      : payment.buyer.displayName}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm font-medium text-heading">
-                              {payment.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm text-muted uppercase">{payment.provider}</span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <StatusBadge
-                              status={payment.status}
-                              config={paymentStatusConfig}
-                              label={paymentStatusLabel}
-                            />
-                            {payment.failureReason && (
-                              <p className="text-xs text-danger-600 mt-1">{payment.failureReason}</p>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-muted">
-                            <div className="flex items-center gap-1">
-                              <CalendarIcon className="w-4 h-4" />
-                              {new Date(payment.createdAt).toLocaleDateString('tr-TR', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            <div className="flex items-center gap-2">
-                              {payment.orderId && (
+                        <Fragment key={payment.id}>
+                          <tr
+                            className={`hover:bg-surface ${isGroup ? 'cursor-pointer' : ''}`}
+                            onClick={isGroup ? () => togglePayment(payment.id) : undefined}
+                          >
+                            {/* Sipariş No / Sepet */}
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {isGroup ? (
+                                <span className="inline-flex items-center gap-1 text-primary-600 font-medium">
+                                  {payment.orderNumber ? `#${payment.orderNumber}` : (locale === 'en' ? 'Cart' : 'Sepet')}
+                                  {isExpanded ? <ChevronUpIcon className="w-4 h-4" /> : <ChevronDownIcon className="w-4 h-4" />}
+                                </span>
+                              ) : payment.orderId ? (
                                 <Link
                                   href={`/orders/${payment.orderId}`}
-                                  className="text-primary-600 hover:text-primary-700"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-primary-600 hover:text-primary-700 font-medium"
                                 >
-                                  {t('common.details')}
+                                  #{payment.orderNumber}
                                 </Link>
+                              ) : (
+                                <span className="text-muted font-medium">
+                                  {payment.orderNumber ? `#${payment.orderNumber}` : '—'}
+                                </span>
                               )}
-                              {payment.status === 'pending' && (
-                                <Button variant="secondary" onClick={() => setConfirmAction({ type: 'cancel', paymentId: payment.id })}
-                                  className="text-danger-600 hover:text-danger-700">
-                                  {t('common.cancel')}
-                                </Button>
-                              )}
-                              {payment.status === 'failed' && (
-                                <Button variant="secondary" onClick={() => setConfirmAction({ type: 'retry', paymentId: payment.id })}
-                                  className="text-info-600 hover:text-info-700">
-                                  {t('payment.retry')}
-                                </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
+                            </td>
+                            {/* Ürün / Sepet özeti */}
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                {isGroup ? (
+                                  <div className="flex -space-x-2 flex-shrink-0">
+                                    {groupOrders.slice(0, 3).map((o) =>
+                                      o.image ? (
+                                        <img key={o.id} src={o.image} alt={o.title} className="w-10 h-10 object-cover rounded ring-2 ring-surface-elevated" />
+                                      ) : (
+                                        <div key={o.id} className="w-10 h-10 bg-border-subtle rounded ring-2 ring-surface-elevated flex items-center justify-center">
+                                          <CreditCardIcon className="w-5 h-5 text-subtle" />
+                                        </div>
+                                      ),
+                                    )}
+                                    {groupOrders.length > 3 && (
+                                      <div className="w-10 h-10 rounded bg-primary-50 text-primary-600 text-xs font-semibold ring-2 ring-surface-elevated flex items-center justify-center">
+                                        +{groupOrders.length - 3}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : payment.product?.images && payment.product.images[0] ? (
+                                  <img src={payment.product.images[0]} alt={payment.product.title} className="w-12 h-12 object-cover rounded" />
+                                ) : (
+                                  <div className="w-12 h-12 bg-border-subtle rounded flex items-center justify-center">
+                                    <CreditCardIcon className="w-6 h-6 text-subtle" />
+                                  </div>
+                                )}
+                                <div>
+                                  <p className="text-sm font-medium text-heading">
+                                    {payment.description || payment.product?.title || (locale === 'en' ? 'Payment' : 'Ödeme')}
+                                  </p>
+                                  {isGroup ? (
+                                    <p className="text-xs text-primary-600">
+                                      {isExpanded
+                                        ? (locale === 'en' ? 'Hide items' : 'Ürünleri gizle')
+                                        : (locale === 'en' ? `View ${groupOrders.length} items` : `${groupOrders.length} ürünü gör`)}
+                                    </p>
+                                  ) : payment.buyer && payment.seller ? (
+                                    <p className="text-xs text-muted">
+                                      {user?.id === payment.buyer.id ? (locale === 'en' ? 'Buyer' : 'Alıcı') : (locale === 'en' ? 'Seller' : 'Satıcı')}:{' '}
+                                      {user?.id === payment.buyer.id ? payment.seller.displayName : payment.buyer.displayName}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </td>
+                            {/* Tutar */}
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="text-sm font-medium text-heading">
+                                {payment.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                              </span>
+                            </td>
+                            {/* Sağlayıcı */}
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="text-sm text-muted uppercase">{payment.provider}</span>
+                            </td>
+                            {/* Durum */}
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <StatusBadge status={payment.status} config={paymentStatusConfig} label={paymentStatusLabel} />
+                              {payment.failureReason && (<p className="text-xs text-danger-600 mt-1">{payment.failureReason}</p>)}
+                            </td>
+                            {/* Tarih */}
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-muted">
+                              <div className="flex items-center gap-1">
+                                <CalendarIcon className="w-4 h-4" />
+                                {new Date(payment.createdAt).toLocaleDateString('tr-TR', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            </td>
+                            {/* İşlemler */}
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                {isGroup ? (
+                                  <button onClick={() => togglePayment(payment.id)} className="text-primary-600 hover:text-primary-700">
+                                    {isExpanded ? (locale === 'en' ? 'Hide' : 'Gizle') : t('common.details')}
+                                  </button>
+                                ) : payment.orderId ? (
+                                  <Link href={`/orders/${payment.orderId}`} className="text-primary-600 hover:text-primary-700">
+                                    {t('common.details')}
+                                  </Link>
+                                ) : null}
+                                {payment.status === 'pending' && (
+                                  <Button variant="secondary" onClick={() => setConfirmAction({ type: 'cancel', paymentId: payment.id })} className="text-danger-600 hover:text-danger-700">
+                                    {t('common.cancel')}
+                                  </Button>
+                                )}
+                                {payment.status === 'failed' && (
+                                  <Button variant="secondary" onClick={() => setConfirmAction({ type: 'retry', paymentId: payment.id })} className="text-info-600 hover:text-info-700">
+                                    {t('payment.retry')}
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                          {/* Sepet ödemesi açıldığında: grubun her siparişi ayrı satır (orders'daki dropdown gibi) */}
+                          {isGroup && isExpanded && (
+                            <tr className="bg-surface/40">
+                              <td colSpan={7} className="px-6 py-3">
+                                <div className="space-y-2">
+                                  {groupOrders.map((o) => (
+                                    <div key={o.id} className="flex items-center gap-3 rounded-lg border border-border-subtle bg-surface-elevated p-2">
+                                      {o.image ? (
+                                        <img src={o.image} alt={o.title} className="w-10 h-10 object-cover rounded flex-shrink-0" />
+                                      ) : (
+                                        <div className="w-10 h-10 bg-border-subtle rounded flex items-center justify-center flex-shrink-0">
+                                          <CreditCardIcon className="w-5 h-5 text-subtle" />
+                                        </div>
+                                      )}
+                                      <div className="flex-1 min-w-0">
+                                        <Link href={`/orders/${o.id}`} className="block truncate text-sm font-medium text-heading hover:text-primary-600">
+                                          {o.title}
+                                        </Link>
+                                        <p className="text-xs text-muted">
+                                          {o.orderNumber ? `#${o.orderNumber}` : ''}
+                                          {o.sellerName ? `${o.orderNumber ? ' · ' : ''}${locale === 'en' ? 'Seller' : 'Satıcı'}: ${o.sellerName}` : ''}
+                                        </p>
+                                      </div>
+                                      <span className="whitespace-nowrap text-sm font-medium text-heading">
+                                        {o.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                                      </span>
+                                      <Link href={`/orders/${o.id}`} className="whitespace-nowrap text-sm text-primary-600 hover:underline">
+                                        {t('common.details')}
+                                      </Link>
+                                    </div>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
                       );
                     })}
                   </tbody>

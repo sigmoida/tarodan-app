@@ -36,7 +36,9 @@ export default function SecuritySettingsPage() {
   const [showBackupCodes, setShowBackupCodes] = useState(false);
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const [showDisableConfirm, setShowDisableConfirm] = useState(false);
-  const [disablePassword, setDisablePassword] = useState('');
+  const [disableCode, setDisableCode] = useState('');
+  const [showBackupRegenConfirm, setShowBackupRegenConfirm] = useState(false);
+  const [backupRegenCode, setBackupRegenCode] = useState('');
 
   useEffect(() => {
     fetchTwoFactorStatus();
@@ -44,7 +46,7 @@ export default function SecuritySettingsPage() {
 
   const fetchTwoFactorStatus = async () => {
     try {
-      const response = await api.get('/auth/2fa/status');
+      const response = await api.get('/security/2fa/status');
       setStatus(response.data);
     } catch (err) {
       if (process.env.NODE_ENV === 'development') console.error('Failed to fetch 2FA status:', err);
@@ -58,7 +60,7 @@ export default function SecuritySettingsPage() {
     setIsLoading(true);
     
     try {
-      const response = await api.post('/auth/2fa/setup');
+      const response = await api.post('/security/2fa/enable');
       setSetupData(response.data);
     } catch (err: any) {
       setError(err.response?.data?.message || '2FA kurulumu başlatılamadı');
@@ -77,8 +79,8 @@ export default function SecuritySettingsPage() {
     setError('');
 
     try {
-      const response = await api.post('/auth/2fa/verify', {
-        token: verificationCode,
+      const response = await api.post('/security/2fa/verify', {
+        code: verificationCode,
       });
 
       setBackupCodes(response.data.backupCodes || setupData?.backupCodes || []);
@@ -93,8 +95,8 @@ export default function SecuritySettingsPage() {
   };
 
   const handleDisable2FA = async () => {
-    if (!disablePassword) {
-      setError('Şifrenizi girin');
+    if (disableCode.length !== 6) {
+      setError('Lütfen 6 haneli kodu girin');
       return;
     }
 
@@ -102,13 +104,13 @@ export default function SecuritySettingsPage() {
     setError('');
 
     try {
-      await api.post('/auth/2fa/disable', {
-        password: disablePassword,
+      await api.post('/security/2fa/disable', {
+        code: disableCode,
       });
 
       setStatus({ isEnabled: false });
       setShowDisableConfirm(false);
-      setDisablePassword('');
+      setDisableCode('');
     } catch (err: any) {
       setError(err.response?.data?.message || '2FA devre dışı bırakılamadı');
     } finally {
@@ -117,13 +119,22 @@ export default function SecuritySettingsPage() {
   };
 
   const handleRegenerateBackupCodes = async () => {
+    if (backupRegenCode.length !== 6) {
+      setError('Lütfen 6 haneli kodu girin');
+      return;
+    }
+
     setIsLoading(true);
     setError('');
 
     try {
-      const response = await api.post('/auth/2fa/backup-codes/regenerate');
+      const response = await api.post('/security/2fa/backup-codes', {
+        code: backupRegenCode,
+      });
       setBackupCodes(response.data.backupCodes);
       setShowBackupCodes(true);
+      setShowBackupRegenConfirm(false);
+      setBackupRegenCode('');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Yedek kodlar oluşturulamadı');
     } finally {
@@ -410,15 +421,54 @@ export default function SecuritySettingsPage() {
               <p className="text-sm text-muted mb-4">
                 Telefonunuza erişiminizi kaybederseniz yedek kodları kullanarak giriş yapabilirsiniz.
               </p>
-              <Button
-                variant="secondary"
-                size="lg"
-                className="w-full"
-                onClick={handleRegenerateBackupCodes}
-                disabled={isLoading}
-              >
-                {isLoading ? 'Yükleniyor...' : 'Yeni Yedek Kodlar Oluştur'}
-              </Button>
+              {!showBackupRegenConfirm ? (
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  className="w-full"
+                  onClick={() => setShowBackupRegenConfirm(true)}
+                  disabled={isLoading}
+                >
+                  Yeni Yedek Kodlar Oluştur
+                </Button>
+              ) : (
+                <div>
+                  <p className="text-sm text-muted mb-3">
+                    Onaylamak için doğrulama uygulamanızdaki 6 haneli kodu girin.
+                    Eski yedek kodlarınız geçersiz olacaktır.
+                  </p>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={backupRegenCode}
+                    onChange={(e) => setBackupRegenCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="6 haneli kod"
+                    className="px-4 py-3 mb-4 text-center tracking-widest" />
+                  <div className="flex space-x-4">
+                    <Button
+                      variant="secondary"
+                      size="lg"
+                      className="flex-1"
+                      onClick={() => {
+                        setShowBackupRegenConfirm(false);
+                        setBackupRegenCode('');
+                      }}
+                    >
+                      İptal
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="lg"
+                      className="flex-1"
+                      onClick={handleRegenerateBackupCodes}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? 'Yükleniyor...' : 'Oluştur'}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Disable 2FA */}
@@ -441,14 +491,18 @@ export default function SecuritySettingsPage() {
                 <div>
                   <div className="bg-danger-50 border border-danger-200 rounded-lg p-4 mb-4">
                     <p className="text-sm text-danger-800">
-                      ⚠️ Bu işlem geri alınamaz. Devam etmek için şifrenizi girin.
+                      ⚠️ Bu işlem geri alınamaz. Devam etmek için doğrulama
+                      uygulamanızdaki 6 haneli kodu girin.
                     </p>
                   </div>
-                  <Input type="password"
-                    value={disablePassword}
-                    onChange={(e) => setDisablePassword(e.target.value)}
-                    placeholder="Şifrenizi girin"
-                    className="px-4 py-3 mb-4 focus:ring-danger-500 focus:border-danger-500" />
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={disableCode}
+                    onChange={(e) => setDisableCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="6 haneli kod"
+                    className="px-4 py-3 mb-4 text-center tracking-widest focus:ring-danger-500 focus:border-danger-500" />
                   <div className="flex space-x-4">
                     <Button
                       variant="secondary"
@@ -456,7 +510,7 @@ export default function SecuritySettingsPage() {
                       className="flex-1"
                       onClick={() => {
                         setShowDisableConfirm(false);
-                        setDisablePassword('');
+                        setDisableCode('');
                       }}
                     >
                       İptal

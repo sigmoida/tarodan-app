@@ -15,6 +15,7 @@ import { Button, Checkbox, Spinner } from '@tarodan/ui';
 import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { membershipApi, api, paymentsApi } from '@/lib/api';
+import { tierChangeKind } from '@/lib/membershipTiers';
 
 const TIER_FEATURES: Record<string, string[]> = {
   basic: [
@@ -53,67 +54,27 @@ export default function MembershipCheckoutPage() {
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [agreed, setAgreed] = useState(false);
-  const [membershipPrices, setMembershipPrices] = useState<{
-    basic_monthly_price?: number;
-    basic_yearly_price?: number;
-    premium_monthly_price?: number;
-    premium_yearly_price?: number;
-    business_monthly_price?: number;
-    business_yearly_price?: number;
-    yearly_discount_percentage?: number;
-  }>({});
+  // Mevcut tier (taze /membership/me) — yükseltme/düşürme/değiştirme mesajını seçmek için.
+  const [currentTier, setCurrentTier] = useState<string>(user?.membershipTier ?? 'free');
+  // TEK FİYAT KAYNAĞI: DB MembershipTier (backend ödemede tam bunu çeker). Eski
+  // /admin/settings/public + hardcoded fallback'ler UI ile çekilen tutarı
+  // uyumsuzlaştırıyordu (UI 500, backend 250). getTiers ile birebir aynı.
+  const [tierPrices, setTierPrices] = useState<{ monthlyPrice: number; yearlyPrice: number } | null>(null);
+  const [tiersLoading, setTiersLoading] = useState(true);
 
-  // Fetch membership prices from API
   useEffect(() => {
-    const fetchPrices = async () => {
-      try {
-        const response = await api.get('/admin/settings/public');
-        const settings = response.data || {};
-        
-        // Validate and sanitize prices - if price seems too high, it might be in wrong unit
-        const sanitizePrice = (price: number | undefined, defaultPrice: number): number => {
-          if (!price || isNaN(price)) return defaultPrice;
-          // If price is suspiciously high (> 10000), it might be in wrong unit (kuruş instead of TL)
-          // Check if dividing by 100 makes it reasonable
-          if (price > 10000) {
-            const priceInTL = price / 100;
-            // If divided price is reasonable (between 1 and 10000), use it
-            if (priceInTL >= 1 && priceInTL <= 10000) {
-              return Math.round(priceInTL * 100) / 100;
-            }
-          }
-          // If price is reasonable, use it as is
-          if (price >= 1 && price <= 10000) {
-            return price;
-          }
-          // Otherwise, use default
-          return defaultPrice;
-        };
-        
-        setMembershipPrices({
-          basic_monthly_price: sanitizePrice(settings.basic_monthly_price, 49),
-          basic_yearly_price: sanitizePrice(settings.basic_yearly_price, 490),
-          premium_monthly_price: sanitizePrice(settings.premium_monthly_price, 99),
-          premium_yearly_price: sanitizePrice(settings.premium_yearly_price, 960),
-          business_monthly_price: sanitizePrice(settings.business_monthly_price, 499),
-          business_yearly_price: sanitizePrice(settings.business_yearly_price, 4790),
-          yearly_discount_percentage: settings.yearly_discount_percentage ?? 20,
-        });
-      } catch (error) {
-        if (process.env.NODE_ENV === 'development') console.error('Failed to fetch prices:', error);
-        setMembershipPrices({
-          basic_monthly_price: 49,
-          basic_yearly_price: 490,
-          premium_monthly_price: 99,
-          premium_yearly_price: 960,
-          business_monthly_price: 499,
-          business_yearly_price: 4790,
-          yearly_discount_percentage: 20,
-        });
-      }
-    };
-    fetchPrices();
-  }, []);
+    let cancelled = false;
+    membershipApi.getTiers()
+      .then((r) => {
+        if (cancelled) return;
+        const list: any[] = r.data?.data ?? r.data ?? [];
+        const t = list.find((x) => x.type === tier);
+        if (t) setTierPrices({ monthlyPrice: Number(t.monthlyPrice), yearlyPrice: Number(t.yearlyPrice) });
+      })
+      .catch((e) => { if (process.env.NODE_ENV === 'development') console.error('Failed to fetch tiers:', e); })
+      .finally(() => { if (!cancelled) setTiersLoading(false); });
+    return () => { cancelled = true; };
+  }, [tier]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -122,36 +83,39 @@ export default function MembershipCheckoutPage() {
     }
   }, [authLoading, isAuthenticated, tier, period, router]);
 
-  // Get tier info dynamically
+  // Mevcut tier'ı taze çek (mesaj yön kararı için).
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    api.get('/membership/me')
+      .then((r) => { if (r.data?.tier?.type) setCurrentTier(r.data.tier.type); })
+      .catch(() => { /* fallback: user.membershipTier */ });
+  }, [isAuthenticated]);
+
+  // Yükseltme/düşürme/değiştirme toast mesajı.
+  const changeSuccessMessage = (): string => {
+    const kind = tierChangeKind(currentTier, tier);
+    if (kind === 'upgrade') return 'Üyeliğiniz başarıyla yükseltildi!';
+    return 'Üyeliğiniz başarıyla değiştirildi!';
+  };
+
+  // Get tier info dynamically — fiyat tek kaynak: DB tier (tierPrices).
   const getTierInfo = () => {
     const tierNames: Record<string, string> = {
       basic: 'Temel Üyelik',
       premium: 'Premium Üyelik',
       business: 'İş Üyeliği',
     };
-    
-    let basePrice: number;
-    if (tier === 'basic') {
-      basePrice = period === 'monthly'
-        ? (membershipPrices.basic_monthly_price ?? 49)
-        : (membershipPrices.basic_yearly_price ?? 490);
-    } else if (tier === 'premium') {
-      basePrice = period === 'monthly' 
-        ? (membershipPrices.premium_monthly_price ?? 99)
-        : (membershipPrices.premium_yearly_price ?? 960);
-    } else if (tier === 'business') {
-      basePrice = period === 'monthly'
-        ? (membershipPrices.business_monthly_price ?? 499)
-        : (membershipPrices.business_yearly_price ?? 4790);
-    } else {
+    if (!['basic', 'premium', 'business'].includes(tier) || !tierPrices) {
       return null;
     }
-
+    // Seçilen döneme göre ödenecek tutar (backend ödemede tam bunu çeker).
+    const price = period === 'monthly' ? tierPrices.monthlyPrice : tierPrices.yearlyPrice;
     return {
       name: tierNames[tier],
-      price: basePrice,
+      price,
       features: TIER_FEATURES[tier] || [],
-      basePrice: period === 'monthly' ? basePrice : (tier === 'basic' ? (membershipPrices.basic_monthly_price ?? 49) : tier === 'premium' ? (membershipPrices.premium_monthly_price ?? 99) : (membershipPrices.business_monthly_price ?? 499)),
+      // Aylık referans fiyat (yıllıkta "normal" karşılaştırması için).
+      basePrice: tierPrices.monthlyPrice,
     };
   };
 
@@ -165,6 +129,15 @@ export default function MembershipCheckoutPage() {
       );
     }
   }, [tierInfo]);
+
+  // Fiyatlar yüklenirken (geçerli tier) bekleme göster — "geçersiz plan" deme.
+  if (tiersLoading && ['basic', 'premium', 'business'].includes(tier)) {
+    return (
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <Spinner size="xl" />
+      </div>
+    );
+  }
 
   if (!tierInfo || !['basic', 'premium', 'business'].includes(tier)) {
     return (
@@ -204,12 +177,14 @@ export default function MembershipCheckoutPage() {
       const paymentId = data.paymentId;
       const orderId = data.orderId;
 
+      const kind = tierChangeKind(currentTier, tier);
+
       // Test bypass ortamı: PayTR'ye gitmeden tamamla
       if (data.useBypass === true && paymentId) {
         await paymentsApi.bypassComplete(paymentId).catch(() => {});
-        toast.success('Üyeliğiniz aktifleştirildi!');
+        toast.success(changeSuccessMessage());
         await refreshUserData();
-        router.push('/membership/success?tier=' + tier);
+        router.push(`/membership/success?tier=${tier}&kind=${kind}`);
         return;
       }
 
@@ -218,19 +193,19 @@ export default function MembershipCheckoutPage() {
         const init = await paymentsApi.initiate(orderId, 'paytr');
         const initData: any = init.data?.data ?? init.data ?? {};
         if (initData.paymentId) {
-          router.push(`/payment/${initData.paymentId}?type=membership`);
+          router.push(`/payment/${initData.paymentId}?type=membership&kind=${kind}`);
           return;
         }
       }
 
       // Yedek: subscribe yanıtında doğrudan paymentId döndüyse
       if (paymentId) {
-        router.push(`/payment/${paymentId}?type=membership`);
+        router.push(`/payment/${paymentId}?type=membership&kind=${kind}`);
         return;
       }
-      toast.success('Üyeliğiniz başarıyla yükseltildi!');
+      toast.success(changeSuccessMessage());
       await refreshUserData();
-      router.push('/membership/success?tier=' + tier);
+      router.push(`/membership/success?tier=${tier}&kind=${kind}`);
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Payment error:', error);
       toast.error(error.response?.data?.message || 'Ödeme işlemi başarısız oldu. Lütfen tekrar deneyin.');
@@ -353,7 +328,7 @@ export default function MembershipCheckoutPage() {
                       <span className="line-through">{(basePrice * 12).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                     </div>
                     <div className="flex justify-between text-sm text-success-600">
-                      <span>İndirim (%{membershipPrices.yearly_discount_percentage ?? 20})</span>
+                      <span>İndirim (%{basePrice * 12 > 0 ? Math.round((1 - finalPrice / (basePrice * 12)) * 100) : 0})</span>
                       <span>-{(basePrice * 12 - finalPrice).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                     </div>
                   </>

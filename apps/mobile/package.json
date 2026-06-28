@@ -4,6 +4,7 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
+    "eas-build-post-install": "cd ../.. && pnpm --filter @tarodan/design-tokens --filter @tarodan/core --filter @tarodan/types --filter @tarodan/api-client run build",
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",

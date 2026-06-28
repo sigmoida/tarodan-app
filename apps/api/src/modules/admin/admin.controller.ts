@@ -90,6 +90,7 @@ import {
   TradeShipmentQueryDto,
   ResolveRefundDisputeDto,
   RefundRequestQueryDto,
+  AdminChangeMembershipDto,
 } from './dto';
 
 @ApiTags('admin')
@@ -221,6 +222,30 @@ export class AdminController {
   @ApiParam({ name: 'id', description: 'User ID' })
   async getUserById(@Param('id') id: string) {
     return this.adminService.getUserById(id);
+  }
+
+  @Post('users/:id/membership/cancel')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Cancel a user membership (admin)' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  async adminCancelUserMembership(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.adminCancelUserMembership(adminId, id);
+  }
+
+  @Patch('users/:id/membership')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: "Change a user's membership tier (admin override, no payment)" })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  async adminChangeUserMembership(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: AdminChangeMembershipDto,
+  ) {
+    return this.adminService.adminChangeUserMembership(adminId, id, dto.tierType, dto.billingPeriod);
   }
 
   // ==================== ADMIN STAFF (admin rol yönetimi) ====================
@@ -884,15 +909,9 @@ export class AdminController {
     return this.adminService.getPayments(query);
   }
 
-  @Get('payments/:id')
-  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Get payment details by ID' })
-  @ApiParam({ name: 'id', description: 'Payment ID' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Payment details' })
-  async getPaymentById(@Param('id') id: string) {
-    return this.adminService.getPaymentById(id);
-  }
-
+  // NOTE: Literal sub-routes (statistics, failed) MUST be declared before the
+  // parameterized `payments/:id` route. NestJS/Express match sequentially, so
+  // otherwise `:id` would capture "statistics"/"failed" and these would 404.
   @Get('payments/statistics')
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get payment statistics' })
@@ -907,6 +926,15 @@ export class AdminController {
   @ApiResponse({ status: HttpStatus.OK, description: 'List of failed payments' })
   async getFailedPayments(@Query() query: AdminPaymentQueryDto) {
     return this.adminService.getFailedPayments(query);
+  }
+
+  @Get('payments/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Get payment details by ID' })
+  @ApiParam({ name: 'id', description: 'Payment ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Payment details' })
+  async getPaymentById(@Param('id') id: string) {
+    return this.adminService.getPaymentById(id);
   }
 
   @Post('payments/:id/manual-refund')
@@ -1482,6 +1510,7 @@ export class AdminController {
     @Query('status') status?: string,
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
+    @Query('search') search?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
@@ -1489,6 +1518,7 @@ export class AdminController {
       status: status as any,
       fromDate,
       toDate,
+      search,
       page: page ? parseInt(page, 10) : 1,
       limit: limit ? parseInt(limit, 10) : 20,
     });
@@ -2154,6 +2184,7 @@ export class AdminController {
     @Query('status') status?: string,
     @Query('userId') userId?: string,
     @Query('type') type?: string,
+    @Query('search') search?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
@@ -2164,6 +2195,7 @@ export class AdminController {
       status,
       userId,
       type,
+      search,
       startDate,
       endDate,
     });

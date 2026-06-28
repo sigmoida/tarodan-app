@@ -141,6 +141,8 @@ export class CollectionItemResponseDto {
   productStatus?: string;
   sortOrder: number;
   isFeatured: boolean;
+  // Ürünün KENDİ ilan öne çıkarması (boost) aktif mi — koleksiyon içi öne çıkarma değil.
+  isBoosted?: boolean;
   addedAt: Date;
   isCustom: boolean;
   // Custom product fields

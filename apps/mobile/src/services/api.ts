@@ -989,10 +989,16 @@ export const uploadApi = {
  * not_as_described | missing_parts | other.
  */
 export const refundsApi = {
-  /** POST /orders/:orderId/refund-requests */
+  /** POST /orders/:orderId/refund-requests
+   * refundQuantity: adet bazlı kısmi iade (verilmezse siparişin tüm adedi iade edilir). */
   create: (
     orderId: string,
-    body: { reason: string; description?: string; evidencePhotoUrls?: string[] },
+    body: {
+      reason: string;
+      description?: string;
+      evidencePhotoUrls?: string[];
+      refundQuantity?: number;
+    },
   ) => api.post(`/orders/${orderId}/refund-requests`, body),
   /** GET /refund-requests/:id */
   getById: (id: string) => api.get(`/refund-requests/${id}`),

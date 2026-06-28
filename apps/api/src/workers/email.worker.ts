@@ -218,6 +218,7 @@ export class EmailWorker {
       'order-created-buyer': `Siparişiniz alındı - ${data?.orderNumber || ''}`,
       'order-created-seller': `Yeni sipariş - ${data?.orderNumber || ''}`,
       'order-paid': `Ödeme alındı - ${data?.orderNumber || ''}`,
+      'order-paid-group': `Siparişiniz alındı - ${data?.groupNumber || ''}`,
       'order-paid-seller': `Yeni sipariş - ${data?.orderNumber || ''}`,
       'order-shipped': 'Siparişiniz Kargoya Verildi',
       'order-delivered': 'Siparişiniz Teslim Edildi',
@@ -251,6 +252,11 @@ export class EmailWorker {
     const orderPaidTrackUrl = isGuest && data?.orderNumber
       ? `${frontendUrl}/track-order?orderNumber=${encodeURIComponent(data.orderNumber)}${guestEmail ? `&email=${encodeURIComponent(guestEmail)}` : ''}`
       : `${frontendUrl}/orders/${data?.orderId || ''}`;
+    // Grup (sepet) ödemesinde tek takip linki: üye → sipariş listesi, misafir →
+    // temsilci siparişin track-order sayfası (grup için tekil sipariş sayfası yok).
+    const orderPaidGroupTrackUrl = isGuest && data?.orderNumber
+      ? `${frontendUrl}/track-order?orderNumber=${encodeURIComponent(data.orderNumber)}${guestEmail ? `&email=${encodeURIComponent(guestEmail)}` : ''}`
+      : `${frontendUrl}/orders`;
 
     // Professional email wrapper with logo and footer
     const wrapEmail = (content: string, title: string) => `
@@ -487,6 +493,45 @@ export class EmailWorker {
         </div>
       `, 'Ödeme Alındı'),
 
+      // Çoklu-ürün (sepet) ödemesinde alıcıya ürün başına değil, CheckoutGroup
+      // başına TEK onay maili. Ürünler satır satır listelenir, grup toplamı ve tek
+      // takip linki verilir. Satıcı mailleri/faturalar ÜRÜN BAŞINA kalır.
+      'order-paid-group': wrapEmail(`
+        ${title('Siparişiniz Alındı', '✅')}
+        ${greeting(data?.buyerName)}
+        <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+          Siparişiniz için ödeme başarıyla alındı. Aşağıdaki ürünler ayrı kargolar halinde gönderilecektir.
+        </p>
+        ${successBox(`
+          <p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">
+            ✓ Ödeme başarıyla tamamlandı
+          </p>
+        `)}
+        ${detailsBox(`
+          <table width="100%" cellspacing="0" cellpadding="0">
+            ${data?.groupNumber ? detailRow('Sipariş No', '#' + data.groupNumber) : ''}
+            ${(Array.isArray(data?.items) ? data.items : [])
+              .map((item: any) => detailRow(item?.productTitle || 'Ürün', this.formatPrice(item?.totalAmount || 0) + ' TL'))
+              .join('')}
+            ${detailRow('Toplam Tutar', this.formatPrice(data?.groupTotal || 0) + ' TL', true)}
+            ${detailRow('İşlem No', data?.transactionId || '')}
+            ${detailRow('Ödeme Yöntemi', data?.paymentMethod || 'Kredi Kartı')}
+          </table>
+        `)}
+        ${data?.shippingAddress ? `
+        ${detailsBox(`
+          <p style="margin: 0 0 12px 0; font-weight: 600; color: #111827;">📍 Teslimat Adresi</p>
+          <p style="margin: 4px 0; color: #4b5563; font-size: 14px;">${data.shippingAddress.fullName || ''}</p>
+          <p style="margin: 4px 0; color: #4b5563; font-size: 14px;">${data.shippingAddress.address || ''}</p>
+          <p style="margin: 4px 0; color: #4b5563; font-size: 14px;">${data.shippingAddress.district || ''}, ${data.shippingAddress.city || ''}</p>
+          <p style="margin: 4px 0; color: #4b5563; font-size: 14px;">${data.shippingAddress.zipCode || ''}</p>
+          <p style="margin: 4px 0; color: #4b5563; font-size: 14px;">Tel: ${data.shippingAddress.phone || ''}</p>
+        `)}` : ''}
+        <div style="text-align: center; margin: 32px 0;">
+          ${primaryButton('Siparişleri Takip Et', orderPaidGroupTrackUrl)}
+        </div>
+      `, 'Siparişiniz Alındı'),
+
       'order-paid-seller': wrapEmail(`
         ${title('Yeni Sipariş!', '🎉')}
         ${greeting(data?.sellerName)}
@@ -521,7 +566,7 @@ export class EmailWorker {
         </div>
         ${infoBox(`
           <p style="margin: 0; font-size: 14px; color: #92400e;">
-            ℹ️ Not: Ödemeniz, alıcı ürünü teslim aldıktan 7 gün sonra hesabınıza aktarılacaktır.
+            ℹ️ Not: Ödemeniz, alıcı ürünü teslim aldıktan 14 gün sonra hesabınıza aktarılacaktır.
           </p>
         `)}
       `, 'Yeni Sipariş!'),
@@ -563,14 +608,14 @@ export class EmailWorker {
           </table>
         `)}
         <p style="font-size: 14px; color: #4b5563; margin: 20px 0;">
-          Lütfen ürünü kontrol edin ve sipariş durumunu onaylayın. Onaylamanızın ardından satıcıya ödeme aktarılacaktır.
+          Siparişiniz teslim edildi. Teslim tarihinden itibaren <strong>14 gün içinde koşulsuz iade</strong> hakkınız bulunmaktadır.
         </p>
         <div style="text-align: center; margin: 32px 0;">
-          ${primaryButton('Teslimatı Onayla', `${frontendUrl}/orders/${data?.orderId || ''}`)}
+          ${primaryButton('Siparişi Görüntüle', `${frontendUrl}/orders/${data?.orderId || ''}`)}
         </div>
         ${infoBox(`
           <p style="margin: 0; font-size: 14px; color: #92400e;">
-            ⏰ Not: 7 gün içinde onay vermezseniz, teslimat otomatik olarak onaylanacaktır.
+            ℹ️ Not: 14 günlük iade süresi dolduğunda siparişiniz otomatik olarak tamamlanır.
           </p>
         `)}
       `, 'Siparişiniz Teslim Edildi'),

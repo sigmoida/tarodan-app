@@ -15,9 +15,34 @@ const isExpoGo = Constants.executionEnvironment === 'storeClient';
 if (!isExpoGo) {
   try {
     Notifications = require('expo-notifications');
+    // Uygulama ön planda (açık) iken gelen bildirimin nasıl sunulacağı.
+    // Bu olmadan Expo, foreground bildirimini varsayılan olarak göstermez.
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
+    });
   } catch (e) {
     console.log('⚠️ expo-notifications not available');
   }
+}
+
+/**
+ * EAS projectId çözümü. `eas init` değeri app.json → extra.eas.projectId'ye
+ * yazar; lokalde EXPO_PUBLIC_PROJECT_ID env ile override edilebilir. Placeholder
+ * ("REPLACE_WITH_...") geçersiz sayılır. projectId yoksa Expo push token alınamaz.
+ */
+function resolveProjectId(): string | null {
+  const fromEnv = process.env.EXPO_PUBLIC_PROJECT_ID;
+  const fromConfig = (Constants.expoConfig?.extra as any)?.eas?.projectId;
+  const id = fromEnv || fromConfig;
+  if (!id || typeof id !== 'string' || id.startsWith('REPLACE_WITH')) {
+    return null;
+  }
+  return id;
 }
 
 export async function registerForPushNotifications(): Promise<string | null> {
@@ -58,8 +83,8 @@ export async function registerForPushNotifications(): Promise<string | null> {
   try {
     // Skip push token in Expo Go (development) - it requires projectId
     // Push notifications will work in production builds with EAS
-    const projectId = process.env.EXPO_PUBLIC_PROJECT_ID;
-    
+    const projectId = resolveProjectId();
+
     if (!projectId) {
       console.log('⚠️ Push notifications skipped (no projectId - normal in Expo Go)');
       return null;
@@ -128,10 +153,13 @@ export async function unregisterPushNotifications(): Promise<void> {
     return;
   }
   try {
-    const tokenResponse = await Notifications.getExpoPushTokenAsync();
-    // Backend tarafında push-token kaydı: POST /notifications/push-token
-    // Bir DELETE muadili yok; "boş token" göndererek mevcut kayıt işaretlenebilir,
-    // ya da kullanıcı logout sırasında security/tokens DELETE ile temizleniyor.
+    const projectId = resolveProjectId();
+    if (!projectId) {
+      return;
+    }
+    const tokenResponse = await Notifications.getExpoPushTokenAsync({ projectId });
+    // Aynı endpoint'e revoke:true ile gidiyoruz; backend bu token'ı
+    // push_tokens tablosunda isActive=false yapar (notification.service.ts).
     await api.post('/notifications/push-token', {
       token: tokenResponse.data,
       revoke: true,
@@ -201,11 +229,46 @@ export function routeFromNotification(data: any): void {
         return;
       }
       default:
-        router.push('/(tabs)/notifications' as any);
+        break;
     }
+
+    // Genel id-tabanlı fallback — backend push payload'unda link/type tam
+    // olmasa bile orderId/tradeId/offerId/threadId/productId/collectionId/userId
+    // gönderiyor. app/(tabs)/notifications.tsx routeForNotification ile aynı sıra.
+    const idRoute = routeFromData(data);
+    if (idRoute) {
+      router.push(idRoute as any);
+      return;
+    }
+
+    router.push('/(tabs)/notifications' as any);
   } catch (err) {
     console.log('routeFromNotification failed:', (err as any)?.message);
   }
+}
+
+/**
+ * data içindeki ilgili-varlık id'lerinden mobil rota türetir. Eşleştirme sırası
+ * ve hedefler app/(tabs)/notifications.tsx içindeki routeForNotification ile bire
+ * bir aynı tutulmalı (push tap ile in-app tap aynı yere gitsin).
+ */
+function routeFromData(data: any): string | null {
+  if (!data) return null;
+  const orderId = data.orderId ?? data.order_id;
+  const tradeId = data.tradeId ?? data.trade_id;
+  const offerId = data.offerId ?? data.offer_id;
+  const threadId = data.threadId ?? data.thread_id;
+  const productId = data.productId ?? data.product_id;
+  const collectionId = data.collectionId ?? data.collection_id;
+  const userId = data.userId ?? data.user_id;
+  if (orderId) return `/orders/${orderId}`;
+  if (tradeId) return `/trade/${tradeId}`;
+  if (offerId) return `/offers/${offerId}`;
+  if (threadId) return `/messages/${threadId}`;
+  if (productId) return `/product/${productId}`;
+  if (collectionId) return `/collections/${collectionId}`;
+  if (userId) return `/seller/${userId}`;
+  return null;
 }
 
 /**

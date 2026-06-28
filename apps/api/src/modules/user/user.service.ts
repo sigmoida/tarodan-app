@@ -7,6 +7,12 @@ import { StorageService } from '../storage/storage.service';
 import { RatingService } from '../rating/rating.service';
 import { ModerationAiClient } from '../moderation/moderation-ai.client';
 import { computeTrustScore } from './helpers/trust-score';
+import { isPremiumEntitled } from '../membership/membership.util';
+import {
+  DEFAULT_NOTIFICATION_SETTINGS,
+  NotificationSettings,
+  UpdateNotificationSettingsDto,
+} from './dto';
 
 // In-memory storage for user blocks until schema is updated
 interface UserBlock {
@@ -153,10 +159,7 @@ export class UserService {
         where: { OR: [{ initiatorId: id }, { receiverId: id }], status: 'completed' },
       }),
     ]);
-    const isPremium =
-      !!user.membership &&
-      user.membership.status === 'active' &&
-      user.membership.tier.type !== 'free';
+    const isPremium = isPremiumEntitled(user.membership);
     const trust = computeTrustScore({
       averageRating: ratingAgg._avg?.score || 0,
       totalRatings: ratingAgg._count,
@@ -344,6 +347,50 @@ export class UserService {
 
     // Return updated user in the same format as findByIdWithAddresses
     return this.findByIdWithAddresses(userId);
+  }
+
+  /**
+   * Bildirim tercihlerini getir. Kayıt yoksa varsayılanlar döner; kısmi
+   * kayıtlar varsayılanların üzerine birleştirilir.
+   */
+  async getNotificationSettings(userId: string): Promise<NotificationSettings> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { notificationSettings: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Kullanıcı bulunamadı');
+    }
+
+    const stored = (user.notificationSettings as Partial<NotificationSettings> | null) ?? {};
+    return { ...DEFAULT_NOTIFICATION_SETTINGS, ...stored };
+  }
+
+  /**
+   * Bildirim tercihlerini kısmen güncelle (gelen anahtarları mevcut değerlerin
+   * üzerine birleştirir) ve güncel tam nesneyi döner.
+   */
+  async updateNotificationSettings(
+    userId: string,
+    dto: UpdateNotificationSettingsDto,
+  ): Promise<NotificationSettings> {
+    const current = await this.getNotificationSettings(userId);
+    // Yalnızca tanımlı (undefined olmayan) anahtarları uygula.
+    const patch: Partial<NotificationSettings> = {};
+    for (const [key, value] of Object.entries(dto)) {
+      if (value !== undefined) {
+        (patch as any)[key] = value;
+      }
+    }
+    const merged: NotificationSettings = { ...current, ...patch };
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { notificationSettings: merged as unknown as Prisma.InputJsonValue },
+    });
+
+    return merged;
   }
 
   /**
@@ -849,7 +896,7 @@ export class UserService {
       this.prisma.userFollow.count({ where: { followingId: userId } }),
       this.prisma.userMembership.findUnique({
         where: { userId },
-        select: { status: true, tier: { select: { type: true } } },
+        select: { status: true, currentPeriodEnd: true, tier: { select: { type: true } } },
       }),
       this.prisma.collection.count({ where: collectionWhere }),
     ]);
@@ -862,7 +909,7 @@ export class UserService {
 
     // Premium (ücretli, aktif) üyelik mi?
     const membershipTier = membership?.tier.type ?? 'free';
-    const isPremium = membership != null && membership.status === 'active' && membershipTier !== 'free';
+    const isPremium = isPremiumEntitled(membership);
 
     // Güven Skoru (0..100) — premium avantajı
     const trust = computeTrustScore({
@@ -965,6 +1012,14 @@ export class UserService {
         {
           followerId: currentUserId,
           followerName: follower?.displayName || 'Bir kullanıcı',
+        },
+      );
+      await this.notificationService.sendTemplateEmailToUser(
+        targetUserId,
+        'new-follower',
+        {
+          followerName: follower?.displayName || 'Bir kullanıcı',
+          followerId: currentUserId,
         },
       );
     } catch (error) {
@@ -1179,7 +1234,20 @@ export class UserService {
         where: { sellerId: userId },
         _sum: { likeCount: true },
       }),
-      this.prisma.order.count({ where: { buyerId: userId } }),
+      // "Siparişlerim" sayacı, listeyle (order.service.ts findUserOrders) tutarlı
+      // olmalı: üyelik/boost sanal siparişleri liste DIŞLADIĞI için sayaç da hariç
+      // tutmalı. Aksi halde şirket üyelik alınca sayaç 1, liste boş görünür.
+      this.prisma.order.count({
+        where: {
+          buyerId: userId,
+          NOT: {
+            OR: [
+              { productId: { startsWith: 'membership-' } },
+              { productId: { startsWith: 'boost-' } },
+            ],
+          },
+        },
+      }),
       this.prisma.order.count({
         where: { buyerId: userId, status: { in: ['delivered', 'completed'] } },
       }),

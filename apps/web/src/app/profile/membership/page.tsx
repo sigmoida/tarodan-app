@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -15,7 +15,7 @@ import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { api } from '@/lib/api';
+import { api, membershipApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
 import { Button } from '@tarodan/ui';
 
@@ -46,82 +46,84 @@ export default function MembershipPage() {
     currentPeriodStart?: string;
     currentPeriodEnd?: string;
     tier?: string;
+    status?: string;
+    cancelledAt?: string;
     pendingPayment?: boolean;
     pendingTierName?: string;
     pendingTierType?: string;
     autoRenew?: boolean;
   } | null>(null);
   const [autoRenewSaving, setAutoRenewSaving] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
-  // Fetch listing limits and membership prices from platform settings
+  // Fiyat ve limitler TEK KAYNAKTAN: DB MembershipTier (checkout + backend ödeme
+  // ile birebir aynı). Eskiden /admin/settings/public + hardcoded fallback'ler
+  // checkout ile uyumsuz fiyat gösteriyordu (UI 500 / charge 250).
   useEffect(() => {
-    const fetchSettings = async () => {
+    const fetchTierData = async () => {
       try {
-        const response = await api.get('/admin/settings/public');
-        const settings = response.data || {};
+        const r = await membershipApi.getTiers();
+        const list: any[] = r.data?.data ?? r.data ?? [];
+        const by = (type: string) => list.find((x) => x.type === type);
+        const free = by('free'), basic = by('basic'), premium = by('premium'), business = by('business');
+        // yıllık indirim % — tier fiyatlarından türet (monthly*12 vs yearly).
+        const pct = (m?: number, y?: number) =>
+          m && y && m * 12 > 0 ? Math.round((1 - y / (m * 12)) * 100) : undefined;
         setListingLimits({
-          free_listing_limit: settings.free_listing_limit,
-          basic_listing_limit: settings.basic_listing_limit,
-          premium_listing_limit: settings.premium_listing_limit,
-          business_listing_limit: settings.business_listing_limit,
+          free_listing_limit: free?.maxTotalListings,
+          basic_listing_limit: basic?.maxTotalListings,
+          premium_listing_limit: premium?.maxTotalListings,
+          business_listing_limit: business?.maxTotalListings,
         });
         setMembershipPrices({
-          basic_monthly_price: settings.basic_monthly_price,
-          basic_yearly_price: settings.basic_yearly_price,
-          premium_monthly_price: settings.premium_monthly_price,
-          premium_yearly_price: settings.premium_yearly_price,
-          business_monthly_price: settings.business_monthly_price,
-          business_yearly_price: settings.business_yearly_price,
-          yearly_discount_percentage: settings.yearly_discount_percentage,
+          basic_monthly_price: basic ? Number(basic.monthlyPrice) : undefined,
+          basic_yearly_price: basic ? Number(basic.yearlyPrice) : undefined,
+          premium_monthly_price: premium ? Number(premium.monthlyPrice) : undefined,
+          premium_yearly_price: premium ? Number(premium.yearlyPrice) : undefined,
+          business_monthly_price: business ? Number(business.monthlyPrice) : undefined,
+          business_yearly_price: business ? Number(business.yearlyPrice) : undefined,
+          yearly_discount_percentage:
+            pct(premium ? Number(premium.monthlyPrice) : undefined, premium ? Number(premium.yearlyPrice) : undefined) ?? 20,
         });
       } catch (error) {
-        if (process.env.NODE_ENV === 'development') console.error('Failed to fetch settings:', error);
-        // Use defaults if API fails
-        setListingLimits({
-          free_listing_limit: 5,
-          premium_listing_limit: -1,
-          business_listing_limit: 1000,
-        });
-        setMembershipPrices({
-          premium_monthly_price: 99,
-          premium_yearly_price: 960,
-          business_monthly_price: 499,
-          business_yearly_price: 4790,
-        });
+        if (process.env.NODE_ENV === 'development') console.error('Failed to fetch tiers:', error);
+        // Tier'lar çekilemezse boş bırak — getListingLimitText/MEMBERSHIP_TIERS
+        // kendi ?? fallback'lerini kullanır.
       }
     };
-    fetchSettings();
+    fetchTierData();
   }, []);
 
   // Fetch membership details and payment methods for premium/business users
+  // Üyelik bilgilerini /membership/me'den çek (gerçek/güncel kaynak). Hem ilk
+  // yüklemede hem iptal sonrası yeniden çağrılır.
+  const fetchMembershipDetails = useCallback(async () => {
+    try {
+      const membershipResponse = await api.get('/membership/me');
+      const membership = membershipResponse.data;
+      if (membership) {
+        const pendingPayment = !!membership.pendingPayment;
+        setMembershipDetails({
+          currentPeriodStart: membership.currentPeriodStart,
+          currentPeriodEnd: membership.currentPeriodEnd,
+          tier: membership.tier?.type,
+          status: membership.status,
+          cancelledAt: membership.cancelledAt,
+          pendingPayment: pendingPayment || undefined,
+          pendingTierName: membership.pendingTierName,
+          pendingTierType: membership.pendingTierType,
+          autoRenew: membership.autoRenew,
+        });
+      }
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch membership details:', error);
+    }
+  }, []);
+
   useEffect(() => {
     if (!isAuthenticated || !user) return;
-
-    const fetchMembershipDetails = async () => {
-      try {
-        // Fetch membership info
-        const membershipResponse = await api.get('/membership/me');
-        const membership = membershipResponse.data;
-        
-        if (membership) {
-          const pendingPayment = !!membership.pendingPayment;
-          setMembershipDetails({
-            currentPeriodStart: membership.currentPeriodStart,
-            currentPeriodEnd: membership.currentPeriodEnd,
-            tier: membership.tier?.type,
-            pendingPayment: pendingPayment || undefined,
-            pendingTierName: membership.pendingTierName,
-            pendingTierType: membership.pendingTierType,
-            autoRenew: membership.autoRenew,
-          });
-        }
-      } catch (error) {
-        if (process.env.NODE_ENV === 'development') console.error('Failed to fetch membership details:', error);
-      }
-    };
-
     fetchMembershipDetails();
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, fetchMembershipDetails]);
 
   const getListingLimitText = (tierId: string) => {
     let limit: number;
@@ -215,7 +217,11 @@ export default function MembershipPage() {
 
     // Business hesabı ise sadece business tier göster, değilse free ve premium göster
     // Eğer kullanıcının mevcut üyeliği business ise, sadece business göster
-    const currentTierValue = isAuthenticated ? (user?.membershipTier || 'free') : 'free';
+    // Gerçek tier: önce taze /membership/me (membershipDetails.tier), yoksa
+    // bayat olabilen authStore user.membershipTier'a düş.
+    const currentTierValue = isAuthenticated
+      ? (membershipDetails?.tier ?? user?.membershipTier ?? 'free')
+      : 'free';
     const isCurrentBusinessTier = currentTierValue === 'business';
     
     if (isBusinessAccount || isCurrentBusinessTier) {
@@ -223,7 +229,7 @@ export default function MembershipPage() {
     } else {
       return allTiers.filter(tier => tier.id !== 'business');
     }
-  }, [listingLimits, membershipPrices, t, isBusinessAccount, isAuthenticated, user]);
+  }, [listingLimits, membershipPrices, t, isBusinessAccount, isAuthenticated, user, membershipDetails]);
 
   useEffect(() => {
     const tier = searchParams?.get('tier');
@@ -242,7 +248,9 @@ export default function MembershipPage() {
     }
   }, [searchParams, isBusinessAccount]);
 
-  const currentTier = isAuthenticated ? (user?.membershipTier || 'free') : null;
+  const currentTier = isAuthenticated
+    ? (membershipDetails?.tier ?? user?.membershipTier ?? 'free')
+    : null;
   const isRequired = searchParams?.get('required') === 'true';
 
   // Block navigation if business membership is required
@@ -283,13 +291,35 @@ export default function MembershipPage() {
     }
   };
 
+  const handleCancelMembership = async () => {
+    if (!window.confirm('Üyeliğinizi iptal etmek istediğinizden emin misiniz? Mevcut dönem sonuna kadar özelliklerinizi kullanmaya devam edebilirsiniz.')) {
+      return;
+    }
+    setCancelling(true);
+    try {
+      await api.post('/membership/cancel');
+      toast.success(t('membership.cancelRequested'));
+      await fetchMembershipDetails();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'İptal işlemi başarısız');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   const handleSelectTier = (tierId: string) => {
-    if (tierId === 'free') {
+    // Mevcut tier'a tıklama → zaten aktif.
+    if (tierId === currentTier) {
       toast(t('membership.planAlreadyActive'));
       return;
     }
-    if (tierId === currentTier) {
-      toast(t('membership.planAlreadyActive'));
+    // Paralı üyelikten free'ye geçiş = iptal (dönem sonuna kadar aktif, iade yok).
+    if (tierId === 'free') {
+      if (currentTier && currentTier !== 'free') {
+        handleCancelMembership();
+      } else {
+        toast(t('membership.planAlreadyActive'));
+      }
       return;
     }
     setSelectedTier(tierId);
@@ -382,10 +412,23 @@ export default function MembershipPage() {
             </div>
           )}
           
-          {!membershipDetails?.pendingPayment && currentTier && currentTier !== 'free' && (
+          {!membershipDetails?.pendingPayment && membershipDetails?.status !== 'cancelled' && currentTier && currentTier !== 'free' && (
             <div className="mt-6 bg-info-50 border border-info-200 rounded-xl p-4 max-w-md mx-auto">
               <p className="text-info-800 font-medium">
                 {t('membership.currentPlan')}: {MEMBERSHIP_TIERS.find(tier => tier.id === currentTier)?.name || t('membership.free')}
+              </p>
+            </div>
+          )}
+
+          {/* İptal edildi ama dönem sürüyor: kullanıcı hâlâ premium, dönem sonunda free'ye düşer */}
+          {!membershipDetails?.pendingPayment && membershipDetails?.status === 'cancelled' && currentTier && currentTier !== 'free' && (
+            <div className="mt-6 bg-warning-50 border border-warning-200 rounded-xl p-4 max-w-md mx-auto">
+              <p className="text-warning-800 font-medium">
+                Üyeliğiniz iptal edildi.{' '}
+                {membershipDetails.currentPeriodEnd
+                  ? `${new Date(membershipDetails.currentPeriodEnd).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric' })} tarihine kadar`
+                  : 'Dönem sonuna kadar'}{' '}
+                premium özellikleriniz devam eder, ardından ücretsiz üyeliğe geçersiniz.
               </p>
             </div>
           )}
@@ -420,7 +463,7 @@ export default function MembershipPage() {
                   <CalendarIcon className="w-6 h-6 text-success-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted mb-1">Yenilenme Tarihi</p>
+                  <p className="text-sm text-muted mb-1">{membershipDetails.status === 'cancelled' ? 'Geçerlilik Bitiş Tarihi' : 'Yenilenme Tarihi'}</p>
                   <p className="text-lg font-semibold text-heading">
                     {membershipDetails.currentPeriodEnd 
                       ? new Date(membershipDetails.currentPeriodEnd).toLocaleDateString('tr-TR', { 
@@ -463,6 +506,38 @@ export default function MembershipPage() {
                   />
                 </button>
               </div>
+            </div>
+
+            {/* Üyelik iptali — iptal edilmişse durum rozeti, değilse iptal butonu */}
+            <div className="border-t border-border pt-6">
+              {membershipDetails.status === 'cancelled' ? (
+                <div className="bg-warning-50 border border-warning-200 rounded-lg p-4">
+                  <p className="text-sm font-medium text-warning-800">
+                    Üyeliğiniz iptal edildi — dönem sonuna kadar (
+                    {membershipDetails.currentPeriodEnd
+                      ? new Date(membershipDetails.currentPeriodEnd).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric' })
+                      : '-'}
+                    ) tüm özellikleriniz aktif kalır. Sonrasında otomatik olarak ücretsiz plana geçilir.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-heading">Üyeliği İptal Et</h3>
+                    <p className="text-sm text-muted mt-1">
+                      İptal ettiğinizde mevcut dönem sonuna kadar özelliklerinizi kullanmaya devam edersiniz; sonra ücretsiz plana geçilir. Ücret iadesi yapılmaz.
+                    </p>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    onClick={handleCancelMembership}
+                    disabled={cancelling}
+                    className="flex-shrink-0 px-5 py-2.5 border border-danger-300 text-danger-600 rounded-lg hover:bg-danger-50 disabled:opacity-50"
+                  >
+                    {cancelling ? 'İptal Ediliyor...' : 'Üyeliği İptal Et'}
+                  </Button>
+                </div>
+              )}
             </div>
 
           </div>
@@ -528,21 +603,14 @@ export default function MembershipPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
-                onClick={() => {
-                  if (tier.price === 0) {
-                    return;
-                  }
-                  if (tier.price > 0) {
-                    handleSelectTier(tier.id);
-                  }
-                }}
+                onClick={() => handleSelectTier(tier.id)}
                 className={`relative bg-surface-elevated rounded-xl shadow-lg border-2 overflow-hidden transition-all cursor-pointer ${
                   isSelected
                     ? 'border-primary-500 ring-2 ring-primary-500 scale-105'
                     : tier.popular
                     ? 'border-primary-300 hover:border-primary-400'
                     : 'border-border hover:border-border'
-                } ${tier.price === 0 && isAuthenticated ? 'opacity-60 cursor-not-allowed' : ''}`}
+                } ${tier.price === 0 && currentTier === 'free' && isAuthenticated ? 'opacity-60 cursor-not-allowed' : ''}`}
               >
                 {tier.popular && !isSelected && (
                   <div className="absolute top-0 right-0 bg-primary-500 text-inverted px-4 py-1 text-sm font-semibold rounded-bl-lg">

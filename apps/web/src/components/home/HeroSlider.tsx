@@ -285,16 +285,16 @@ export default function HeroSlider() {
 
       {/* Navigation Arrows */}
       <Button variant="secondary" onClick={prevSlide}
-        className="absolute left-4 top-1/2 -translate-y-1/2 w-9 h-9 bg-surface-elevated/90 hover:bg-surface-elevated shadow-soft flex items-center justify-center transition-all duration-200 z-10 border border-border"
-        style={{borderRadius:'4px'}}
+        className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 sm:w-14 sm:h-14 bg-surface-elevated/90 hover:bg-surface-elevated shadow-soft flex items-center justify-center transition-all duration-200 z-10 border border-border"
+        style={{borderRadius:'9999px'}}
         aria-label="Previous slide">
-        <ChevronLeftIcon className="w-4 h-4 text-heading" />
+        <ChevronLeftIcon className="w-7 h-7 sm:w-8 sm:h-8 text-heading" />
       </Button>
       <Button variant="secondary" onClick={nextSlide}
-        className="absolute right-4 top-1/2 -translate-y-1/2 w-9 h-9 bg-surface-elevated/90 hover:bg-surface-elevated shadow-soft flex items-center justify-center transition-all duration-200 z-10 border border-border"
-        style={{borderRadius:'4px'}}
+        className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 sm:w-14 sm:h-14 bg-surface-elevated/90 hover:bg-surface-elevated shadow-soft flex items-center justify-center transition-all duration-200 z-10 border border-border"
+        style={{borderRadius:'9999px'}}
         aria-label="Next slide">
-        <ChevronRightIcon className="w-4 h-4 text-heading" />
+        <ChevronRightIcon className="w-7 h-7 sm:w-8 sm:h-8 text-heading" />
       </Button>
 
       {/* Slide Indicators */}

@@ -13,6 +13,7 @@ import {
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { MembershipService } from '../membership/membership.service';
+import { isPremiumEntitled } from '../membership/membership.util';
 import { SearchService } from '../search/search.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
@@ -201,12 +202,9 @@ export class ProductService implements OnModuleInit {
     // yeni ilana "ilk 24 saat" görünürlük sağlar (skor 0 değil, createdAt ile kademe üstünde).
     const sellerMembership = await this.prisma.userMembership.findUnique({
       where: { userId: sellerId },
-      select: { status: true, tier: { select: { type: true } } },
+      select: { status: true, currentPeriodEnd: true, tier: { select: { type: true } } },
     });
-    const isPremiumSeller =
-      sellerMembership != null &&
-      sellerMembership.status === 'active' &&
-      sellerMembership.tier.type !== MembershipTierType.free;
+    const isPremiumSeller = isPremiumEntitled(sellerMembership);
     const FRESH_POPULARITY_BASELINE = 10;
 
     try {
@@ -1437,6 +1435,9 @@ export class ProductService implements OnModuleInit {
             {
               productId,
               productTitle,
+              // PRICE_DROP şablonu "{{oldPrice}} TL'den {{newPrice}} TL'ye" kullanıyor;
+              // oldPrice eksikti → kullanıcı ham "{{oldPrice}}" görüyordu.
+              oldPrice,
               newPrice,
             },
           );
@@ -1741,6 +1742,7 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       ProductStatus.sold,
       ProductStatus.inactive,
       ProductStatus.rejected,
+      ProductStatus.suspended,
     ];
     const isTerminal = (p: { status: ProductStatus }) =>
       TERMINAL_STATUSES.includes(p.status);
@@ -1886,13 +1888,9 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
     } else {
       const membership = await this.prisma.userMembership.findUnique({
         where: { userId: product.sellerId },
-        select: { status: true, tier: { select: { type: true } } },
+        select: { status: true, currentPeriodEnd: true, tier: { select: { type: true } } },
       });
-      const isPremiumSeller =
-        membership != null &&
-        membership.status === 'active' &&
-        membership.tier.type !== MembershipTierType.free;
-      rankTier = isPremiumSeller ? 1 : 0;
+      rankTier = isPremiumEntitled(membership) ? 1 : 0;
     }
 
     const relevanceScore = computeRelevanceScore({
@@ -1943,12 +1941,9 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
       // Premium satıcı mı? (aktif, free olmayan üyelik)
       const sellerMembership = await this.prisma.userMembership.findUnique({
         where: { userId: product.seller.id },
-        select: { status: true, tier: { select: { type: true } } },
+        select: { status: true, currentPeriodEnd: true, tier: { select: { type: true } } },
       });
-      sellerIsPremium =
-        sellerMembership != null &&
-        sellerMembership.status === 'active' &&
-        sellerMembership.tier.type !== MembershipTierType.free;
+      sellerIsPremium = isPremiumEntitled(sellerMembership);
     }
 
     // Get product rating stats (use cached columns when available, else aggregate)

@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { adminApi } from '@/lib/api';
 import { Button, Input, Select } from '@tarodan/ui';
 import { DataTable, type ColumnDef } from '@/components/DataTable';
-import { PageHeader, ActionButtons, ActionIconButton } from '@/components/admin-list';
+import { PageHeader, FilterToolbar, ActionButtons, ActionIconButton } from '@/components/admin-list';
 import { PlusIcon, PencilIcon, TrashIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -37,6 +37,7 @@ export default function CarModelsPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [models, setModels] = useState<CarModel[]>([]);
   const [selectedBrandId, setSelectedBrandId] = useState<string>('');
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingModel, setEditingModel] = useState<CarModel | null>(null);
@@ -201,6 +202,17 @@ export default function CarModelsPage() {
     },
   ];
 
+  // Model adı / slug üzerinde istemci-taraflı arama (marka filtresi backend'de
+  // uygulanır; isim araması küçük listede istemcide yeterli).
+  const filteredModels = useMemo(() => {
+    const q = search.trim().toLocaleLowerCase('tr');
+    if (!q) return models;
+    return models.filter((m) =>
+      [m.name, m.slug, m.brand?.name ?? '']
+        .some((f) => f.toLocaleLowerCase('tr').includes(q)),
+    );
+  }, [models, search]);
+
   return (
     <>
       <div className="space-y-6">
@@ -214,8 +226,11 @@ export default function CarModelsPage() {
           </Button>
         </PageHeader>
 
-        <div className="flex gap-4 items-center">
-          <label className="text-sm font-medium text-body shrink-0">Marka:</label>
+        <FilterToolbar
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Model ara (ad, marka)..."
+        >
           <Select
             value={selectedBrandId}
             onChange={(e) => setSelectedBrandId(e.target.value)}
@@ -226,13 +241,13 @@ export default function CarModelsPage() {
               <option key={b.id} value={b.id}>{b.name}</option>
             ))}
           </Select>
-        </div>
+        </FilterToolbar>
 
         <DataTable
           columns={columns}
-          data={models}
+          data={filteredModels}
           loading={loading}
-          emptyText="Bu marka için henüz model eklenmemiş"
+          emptyText={search.trim() ? 'Aramayla eşleşen model yok' : 'Bu marka için henüz model eklenmemiş'}
           emptyAction={<Button onClick={openCreateModal}><PlusIcon className="w-5 h-5 mr-2" />İlk modeli ekle</Button>}
           getRowId={(m) => m.id}
         />

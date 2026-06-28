@@ -80,6 +80,7 @@ describe('PaymentService group payment (checkout group)', () => {
   };
   const mockEvents = {
     emitOrderPaid: jest.fn(),
+    emitGroupBuyerOrderPaid: jest.fn(),
     emitPaymentFailed: jest.fn(),
   };
 
@@ -184,9 +185,67 @@ describe('PaymentService group payment (checkout group)', () => {
     // Ledger sipariş başına
     expect(mockCommissionLedger.upsertPending).toHaveBeenCalledTimes(2);
 
-    // Tx sonrası: sipariş başına order.paid + shipment
+    // Tx sonrası: sipariş başına order.paid (SATICI tarafı) + shipment
     expect(mockEvents.emitOrderPaid).toHaveBeenCalledTimes(2);
     expect(mockPrisma.shipment.create).toHaveBeenCalledTimes(2);
+
+    // ALICI tarafı: grup başına TEK onay maili (ürün başına değil)
+    expect(mockEvents.emitGroupBuyerOrderPaid).toHaveBeenCalledTimes(1);
+    const groupBuyerArg = mockEvents.emitGroupBuyerOrderPaid.mock.calls[0][0];
+    expect(groupBuyerArg.items).toHaveLength(2);
+    expect(groupBuyerArg.buyerId).toBe('buyer-1');
+
+    // Sipariş başına emitOrderPaid alıcıyı atlamalı (skipBuyer:true)
+    for (const call of mockEvents.emitOrderPaid.mock.calls) {
+      expect(call[0].skipBuyer).toBe(true);
+    }
+  });
+
+  it('does NOT cascade-cancel siblings when physical stock remains (q=1, r=1 → available=0)', async () => {
+    // Regression: 2-stock + 2-buyer concurrent checkout. After the first
+    // payment decrements, the product sits at quantity=1, reservedQuantity=1
+    // (the second buyer's still-valid reservation). The old condition gated on
+    // available = quantity - reservedQuantity = 0 and WRONGLY cancelled the
+    // second order, then auto-refunded its payment. The cascade must gate on
+    // PHYSICAL quantity (>0 here) and leave the sibling order alone.
+    mockTx.product.findUnique.mockImplementation(({ where }: any) =>
+      Promise.resolve({
+        id: where.id,
+        quantity: 1,
+        reservedQuantity: 1,
+        categoryId: null,
+        status: ProductStatus.active,
+      }),
+    );
+
+    const did = await (service as any).processSuccessfulGroupPayment(
+      basePayment(),
+      'txn-1',
+    );
+
+    expect(did).toBe(true);
+    expect(mockProductLock.invalidatePendingOrdersForProduct).not.toHaveBeenCalled();
+    expect(mockProductLock.invalidateRelatedOffers).not.toHaveBeenCalled();
+  });
+
+  it('DOES cascade-cancel when physical stock is truly drained (q=0)', async () => {
+    mockTx.product.findUnique.mockImplementation(({ where }: any) =>
+      Promise.resolve({
+        id: where.id,
+        quantity: 0,
+        reservedQuantity: 0,
+        categoryId: null,
+        status: ProductStatus.sold,
+      }),
+    );
+
+    const did = await (service as any).processSuccessfulGroupPayment(
+      basePayment(),
+      'txn-1',
+    );
+
+    expect(did).toBe(true);
+    expect(mockProductLock.invalidatePendingOrdersForProduct).toHaveBeenCalled();
   });
 
   it('is idempotent: second success callback does nothing (CAS claim fails)', async () => {

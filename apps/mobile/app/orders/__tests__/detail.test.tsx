@@ -16,8 +16,9 @@ jest.mock('expo-router', () => ({
 
 jest.mock('../../../src/services/api', () => ({
   api: { get: jest.fn() },
-  ordersApi: { confirm: jest.fn(), confirmReceipt: jest.fn() },
+  ordersApi: { cancel: jest.fn(), confirm: jest.fn(), confirmReceipt: jest.fn() },
   refundsApi: { create: jest.fn(), cancel: jest.fn() },
+  mediaApi: { uploadRefundEvidence: jest.fn() },
 }));
 import { api } from '../../../src/services/api';
 
@@ -67,36 +68,51 @@ describe('J67 · Sipariş detayı render', () => {
   });
 });
 
-describe('J78 · Teslimatı onayla buton görünürlüğü', () => {
+describe('J78 · Alıcı onay butonu KALDIRILDI + escrow bilgisi', () => {
+  // Yeni escrow kuralı: alıcı "Teslim Aldım/Onayla" butonu artık YOK; satıcıya
+  // ödeme teslim+14 gün sonra otomatik serbest kalır. Onay butonu hiçbir durumda
+  // görünmemeli; yerine teslimden sonra escrow bilgi kartı çıkmalı.
   beforeEach(() => {
     getMock.mockReset();
     mockParams = { id: 'order-1' };
   });
 
-  it('J78.1 alıcı + delivered → "Teslimatı Onayla" butonu görünür', async () => {
+  it('J78.1 alıcı + delivered → "Teslimatı Onayla" butonu ARTIK yok, escrow kartı var', async () => {
     getMock.mockResolvedValue({ data: { data: orderFixture({ status: 'delivered', isBuyer: true }) } });
     renderWithProviders(<OrderDetailScreen />);
     await waitFor(() =>
-      expect(screen.getByTestId('order-confirm-delivery-button')).toBeOnTheScreen(),
+      expect(screen.getByTestId('order-escrow-info')).toBeOnTheScreen(),
     );
+    expect(screen.queryByTestId('order-confirm-delivery-button')).toBeNull();
   });
 
-  it('J78.2 alıcı değilse "Teslimatı Onayla" butonu görünmez', async () => {
+  it('J78.2 escrow metni teslim+14 gün der; "onaylayınca para serbest" DEMEZ', async () => {
+    getMock.mockResolvedValue({ data: { data: orderFixture({ status: 'delivered', isBuyer: true }) } });
+    renderWithProviders(<OrderDetailScreen />);
+    await waitFor(() =>
+      expect(screen.getByTestId('order-escrow-info')).toBeOnTheScreen(),
+    );
+    expect(screen.getByText(/14 gün sonra otomatik serbest/)).toBeOnTheScreen();
+  });
+
+  it('J78.3 alıcı değilse escrow kartı görünmez', async () => {
     getMock.mockResolvedValue({ data: { data: orderFixture({ status: 'delivered', isBuyer: false }) } });
     renderWithProviders(<OrderDetailScreen />);
     await waitFor(() =>
       expect(screen.getByText('Sipariş #TRD-1001')).toBeOnTheScreen(),
     );
+    expect(screen.queryByTestId('order-escrow-info')).toBeNull();
     expect(screen.queryByTestId('order-confirm-delivery-button')).toBeNull();
   });
 
-  it('J78.3 durum delivered değilse buton görünmez (shipped)', async () => {
-    getMock.mockResolvedValue({ data: { data: orderFixture({ status: 'shipped', isBuyer: true }) } });
+  it('J78.4 kargo öncesi (processing) alıcıya "Siparişi İptal Et" gösterilir', async () => {
+    getMock.mockResolvedValue({ data: { data: orderFixture({ status: 'processing', isBuyer: true }) } });
     renderWithProviders(<OrderDetailScreen />);
     await waitFor(() =>
-      expect(screen.getByText('Kargoda')).toBeOnTheScreen(),
+      expect(screen.getByTestId('order-cancel-button')).toBeOnTheScreen(),
     );
-    expect(screen.queryByTestId('order-confirm-delivery-button')).toBeNull();
+    // Kargo öncesi iade kartı çıkmaz
+    expect(screen.queryByTestId('refund-request-button')).toBeNull();
   });
 });
 

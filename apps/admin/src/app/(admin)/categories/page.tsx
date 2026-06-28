@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { adminApi } from '@/lib/api';
 import { Button, Checkbox, Input, Textarea } from '@tarodan/ui';
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { DataTable, type ColumnDef } from '@/components/DataTable';
-import { PageHeader, ActionButtons, ActionIconButton } from '@/components/admin-list';
+import { PageHeader, FilterToolbar, ActionButtons, ActionIconButton } from '@/components/admin-list';
 
 interface Category {
   id: string;
@@ -31,6 +31,7 @@ interface CategoryFormData {
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -110,6 +111,17 @@ export default function CategoriesPage() {
     }
   };
 
+  // Kategori adı / slug / açıklama üzerinde istemci-taraflı arama (liste küçük,
+  // tek seferde yükleniyor → backend araması gerekmez).
+  const filteredCategories = useMemo(() => {
+    const q = search.trim().toLocaleLowerCase('tr');
+    if (!q) return categories;
+    return categories.filter((c) =>
+      [c.name, c.slug, c.description ?? '']
+        .some((f) => f.toLocaleLowerCase('tr').includes(q)),
+    );
+  }, [categories, search]);
+
   const columns: ColumnDef<Category, any>[] = [
     {
       header: 'Kategori',
@@ -160,12 +172,18 @@ export default function CategoriesPage() {
           </Button>
         </PageHeader>
 
+        <FilterToolbar
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Kategori ara (ad, slug, açıklama)..."
+        />
+
         {/* Categories List */}
         <DataTable
           columns={columns}
-          data={categories}
+          data={filteredCategories}
           loading={loading}
-          emptyText="Henüz kategori yok"
+          emptyText={search.trim() ? 'Aramayla eşleşen kategori yok' : 'Henüz kategori yok'}
           getRowId={(c) => c.id}
         />
       </div>

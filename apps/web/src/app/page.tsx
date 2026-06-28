@@ -884,7 +884,7 @@ export default function Home() {
                 </ProductBadge>
               }
             />
-            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-2">
               {isLoadingDiscounted ? (
                 [...Array(6)].map((_, i) => <SkeletonCard key={i} />)
               ) : discountedProducts.length === 0 ? (
@@ -1060,7 +1060,7 @@ export default function Home() {
                 viewAllLabel={viewAllLabel}
                 icon={<ArrowsRightLeftIcon className="w-5 h-5 text-success-500" />}
               />
-              <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+              <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-2">
                 {isLoadingTrade ? (
                   [...Array(6)].map((_, i) => <SkeletonCard key={i} />)
                 ) : (
@@ -1153,7 +1153,7 @@ export default function Home() {
               viewAllHref="/listings?sortBy=view_count_desc"
               viewAllLabel={viewAllLabel}
             />
-            <div className="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-8 gap-2">
+            <div className="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-8 xl:grid-cols-10 2xl:grid-cols-12 gap-2">
               {isLoadingBestSellers ? (
                 [...Array(8)].map((_, i) => <SkeletonCard key={i} />)
               ) : bestSellers.length === 0 ? (

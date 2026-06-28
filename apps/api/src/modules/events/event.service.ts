@@ -48,6 +48,43 @@ export interface OrderPaidPayload {
   isGuestOrder?: boolean;
   /** Raw buyer email from order (guest@tarodan.system for guest) - used as fallback for track link */
   buyerSystemEmail?: string;
+  /**
+   * Çoklu-ürün (sepet) ödemesinde alıcı tarafı (onay maili + push) grup başına
+   * TEK kez üst seviyeden gönderilir (emitGroupBuyerOrderPaid). Döngüdeki sipariş
+   * başına emitOrderPaid çağrısında bu true verilir → alıcıya ürün başına onay
+   * maili/push GİTMEZ; yalnız satıcı maili/push'u + analytics çalışır.
+   */
+  skipBuyer?: boolean;
+}
+
+/**
+ * Çoklu-ürün (sepet) ödemesinde alıcıya gönderilen TEK onay payload'ı.
+ * CheckoutGroup başına bir mail + bir push. Ürünler satır satır listelenir.
+ */
+export interface GroupBuyerOrderPaidPayload {
+  checkoutGroupId: string;
+  groupNumber: string;
+  buyerId: string;
+  buyerEmail: string;
+  buyerName: string;
+  groupTotal: number;
+  paymentMethod: string;
+  transactionId: string;
+  items: Array<{ productTitle: string; totalAmount: number }>;
+  shippingAddress: {
+    fullName: string;
+    phone: string;
+    address: string;
+    city: string;
+    district: string;
+    zipCode: string;
+  };
+  /** When true, email link should point to guest order track page */
+  isGuestOrder?: boolean;
+  /** Raw buyer email from order (guest@tarodan.system for guest) - used as fallback for track link */
+  buyerSystemEmail?: string;
+  /** Temsilci sipariş no — misafir takip linki için kullanılır */
+  representativeOrderNumber?: string;
 }
 
 export interface OrderShippedPayload {
@@ -202,29 +239,34 @@ export class EventService {
   async emitOrderPaid(payload: OrderPaidPayload): Promise<void> {
     this.logger.log(`Emitting order.paid event for order ${payload.orderNumber}`);
 
-    // Queue email to buyer - Payment confirmation
-    await this.emailQueue.add('send-template', {
-      to: payload.buyerEmail,
-      template: 'order-paid',
-      subject: `Ödeme alındı - ${payload.orderNumber}`,
-      templateData: {
-        orderNumber: payload.orderNumber,
-        buyerName: payload.buyerName,
-        buyerEmail: payload.buyerEmail,
-        productTitle: payload.productTitle,
-        totalAmount: payload.totalAmount,
-        paymentMethod: payload.paymentMethod,
-        transactionId: payload.transactionId,
-        orderId: payload.orderId,
-        shippingAddress: payload.shippingAddress,
-        isGuestOrder: payload.isGuestOrder ?? false,
-        buyerSystemEmail: payload.buyerSystemEmail ?? '',
-      },
-    }, {
-      priority: 1,
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 2000 },
-    });
+    // Çoklu-ürün (sepet) akışında alıcıya ürün başına onay maili/push GÖNDERME.
+    // Alıcı tarafı grup başına TEK kez emitGroupBuyerOrderPaid ile üst seviyeden
+    // gönderilir; burada yalnız satıcı maili/push'u + analytics çalışır.
+    if (!payload.skipBuyer) {
+      // Queue email to buyer - Payment confirmation
+      await this.emailQueue.add('send-template', {
+        to: payload.buyerEmail,
+        template: 'order-paid',
+        subject: `Ödeme alındı - ${payload.orderNumber}`,
+        templateData: {
+          orderNumber: payload.orderNumber,
+          buyerName: payload.buyerName,
+          buyerEmail: payload.buyerEmail,
+          productTitle: payload.productTitle,
+          totalAmount: payload.totalAmount,
+          paymentMethod: payload.paymentMethod,
+          transactionId: payload.transactionId,
+          orderId: payload.orderId,
+          shippingAddress: payload.shippingAddress,
+          isGuestOrder: payload.isGuestOrder ?? false,
+          buyerSystemEmail: payload.buyerSystemEmail ?? '',
+        },
+      }, {
+        priority: 1,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 2000 },
+      });
+    }
 
     // Queue email to seller - Payment received, prepare shipment
     await this.emailQueue.add('send-template', {
@@ -247,19 +289,21 @@ export class EventService {
       backoff: { type: 'exponential', delay: 2000 },
     });
 
-    // Queue push notification to buyer
-    await this.pushQueue.add('send-notification', {
-      userId: payload.buyerId,
-      title: 'Ödeme Onaylandı',
-      body: `${payload.productTitle} siparişiniz için ödeme alındı`,
-      data: {
-        type: 'payment_confirmed',
-        orderId: payload.orderId,
-        orderNumber: payload.orderNumber,
-      },
-    }, {
-      priority: 1,
-    });
+    // Queue push notification to buyer (sepet akışında atlanır — grup başına tek push)
+    if (!payload.skipBuyer) {
+      await this.pushQueue.add('send-notification', {
+        userId: payload.buyerId,
+        title: 'Ödeme Onaylandı',
+        body: `${payload.productTitle} siparişiniz için ödeme alındı`,
+        data: {
+          type: 'payment_confirmed',
+          orderId: payload.orderId,
+          orderNumber: payload.orderNumber,
+        },
+      }, {
+        priority: 1,
+      });
+    }
 
     // Queue push notification to seller — this is the seller's first ("new order") alert,
     // fired only after payment is confirmed.
@@ -298,6 +342,58 @@ export class EventService {
     */
 
     this.logger.log(`order.paid event emitted for order ${payload.orderNumber}`);
+  }
+
+  /**
+   * Emit group buyer order.paid — çoklu-ürün (sepet) ödemesinde alıcıya
+   * CheckoutGroup başına TEK onay maili + TEK push gönderir. Sipariş başına
+   * emitOrderPaid (skipBuyer:true) yalnız satıcı tarafını işler; alıcı tarafı
+   * bu üst-seviye çağrıyla bir kez kapsanır. Ürünler satır satır 'order-paid-group'
+   * template'inde listelenir.
+   */
+  async emitGroupBuyerOrderPaid(payload: GroupBuyerOrderPaidPayload): Promise<void> {
+    this.logger.log(`Emitting group buyer order.paid for group ${payload.groupNumber}`);
+
+    // Queue tek onay maili — alıcı
+    await this.emailQueue.add('send-template', {
+      to: payload.buyerEmail,
+      template: 'order-paid-group',
+      subject: `Siparişiniz alındı - ${payload.groupNumber}`,
+      templateData: {
+        groupNumber: payload.groupNumber,
+        buyerName: payload.buyerName,
+        buyerEmail: payload.buyerEmail,
+        items: payload.items,
+        groupTotal: payload.groupTotal,
+        paymentMethod: payload.paymentMethod,
+        transactionId: payload.transactionId,
+        shippingAddress: payload.shippingAddress,
+        isGuestOrder: payload.isGuestOrder ?? false,
+        buyerSystemEmail: payload.buyerSystemEmail ?? '',
+        // Misafir takip linki temsilci sipariş no üzerinden çözülür
+        orderNumber: payload.representativeOrderNumber ?? '',
+      },
+    }, {
+      priority: 1,
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 2000 },
+    });
+
+    // Queue tek push — alıcı
+    await this.pushQueue.add('send-notification', {
+      userId: payload.buyerId,
+      title: 'Ödeme Onaylandı',
+      body: `${payload.items.length} ürünlük siparişiniz için ödeme alındı`,
+      data: {
+        type: 'payment_confirmed',
+        checkoutGroupId: payload.checkoutGroupId,
+        groupNumber: payload.groupNumber,
+      },
+    }, {
+      priority: 1,
+    });
+
+    this.logger.log(`group buyer order.paid emitted for group ${payload.groupNumber}`);
   }
 
   /**
@@ -944,7 +1040,13 @@ export class EventService {
 
       const users = await this.prisma.user.findMany({
         where: { id: { in: chunkIds }, isBanned: false },
-        select: { id: true, email: true, fcmToken: true },
+        select: {
+          id: true,
+          email: true,
+          // Only need to know whether the user has at least one active device
+          // token (push_tokens table) to decide whether to queue a push job.
+          pushTokens: { where: { isActive: true }, select: { id: true }, take: 1 },
+        },
       });
 
       for (const user of users) {
@@ -964,8 +1066,8 @@ export class EventService {
           });
         }
 
-        // Send push if requested and token exists
-        if (payload.channels.includes('push') && user.fcmToken) {
+        // Send push if requested and the user has at least one active device token
+        if (payload.channels.includes('push') && user.pushTokens.length > 0) {
           await this.pushQueue.add('send-notification', {
             userId: user.id,
             title: payload.title,

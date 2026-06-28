@@ -38,6 +38,20 @@ VEHICLE_KEYWORDS = (
     "school bus", "tricycle", "model t",
 )
 
+# Oyuncak/diecast bağlam sınıfları. Küçük diecast modeller (özellikle paketli
+# Hot Wheels/Matchbox) ResNet tarafından sıklıkla gerçek araç değil "toyshop"
+# olarak sınıflandırılıyor → araç sinyali eşiğin altında kalıp ürün gereksiz yere
+# "review"e düşüyordu (ölçüm: loose diecast vehicle=0.16 < 0.20 eşiği).
+# Bunu YARDIMCI bir sinyal olarak (araç kadar değil, ağırlıklı) ekliyoruz.
+# DİKKAT: yalnızca oyuncağa-özgü sınıflar — "packet/carton/hard disc" gibi GENEL
+# ambalaj sınıfları KASITLI olarak DIŞARIDA; aksi halde alakasız ürünlerin kutu
+# fotoğrafları da "ilgili" sayılır (relevance sinyalinin amacı tam da onları elemek).
+TOY_CONTEXT_KEYWORDS = (
+    "toyshop", "toy",
+)
+# Oyuncak-bağlam sinyalinin relevance'a katkı ağırlığı (araç = 1.0).
+TOY_CONTEXT_WEIGHT = 0.6
+
 # Tasarruf: ağır importları yalnızca gerektiğinde yap.
 
 
@@ -97,14 +111,27 @@ class ImageModerator:
             probs = logits.softmax(dim=1)[0]
         top_probs, top_idx = probs.topk(top_k)
         top_labels: list[dict[str, Any]] = []
-        relevance_score = 0.0
+        vehicle_score = 0.0
+        toy_score = 0.0
         for p, i in zip(top_probs.tolist(), top_idx.tolist()):
             name = self._resnet_categories[i]
-            is_vehicle = any(kw in name.lower() for kw in VEHICLE_KEYWORDS)
-            top_labels.append({"label": name, "score": round(p, 4), "vehicle": is_vehicle})
+            lname = name.lower()
+            is_vehicle = any(kw in lname for kw in VEHICLE_KEYWORDS)
+            is_toy = any(kw in lname for kw in TOY_CONTEXT_KEYWORDS)
+            top_labels.append(
+                {"label": name, "score": round(p, 4), "vehicle": is_vehicle, "toy": is_toy}
+            )
             if is_vehicle:
-                relevance_score += p
-        relevance_score = round(min(relevance_score, 1.0), 4)
+                vehicle_score += p
+            elif is_toy:
+                # elif: bir sınıf hem araç hem oyuncak sayılırsa çift sayma.
+                toy_score += p
+        # İlgililik = araç (tam ağırlık) + oyuncak-bağlam (yarı ağırlık). Diecast
+        # oyuncaklar "toyshop" olarak sınıflandığında bu sayede eşiği geçebilir;
+        # alakasız ürünlerde her iki sinyal de düşük kalır.
+        relevance_score = round(
+            min(vehicle_score + TOY_CONTEXT_WEIGHT * toy_score, 1.0), 4
+        )
 
         # --- NSFW ---
         nsfw_score = 0.0

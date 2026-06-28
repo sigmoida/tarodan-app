@@ -82,6 +82,16 @@ export default function RootLayout() {
     prepare();
   }, []);
 
+  // Token kaydını isAuthenticated değişimine de bağla: kullanıcı uygulamayı
+  // çıkışlı açıp SONRA login olursa (isAuthenticated mount'tan sonra true olur),
+  // yukarıdaki []-bağımlı prepare() tekrar çalışmaz ve token hiç kaydolmazdı.
+  // registerToken upsert olduğu için açılışta + login'de çift çağrı zararsız.
+  useEffect(() => {
+    if (isAuthenticated && !isExpoGo) {
+      registerForPushNotifications().catch(() => {});
+    }
+  }, [isAuthenticated]);
+
   // Oturum açıkken socket bağlan + global mesaj dinleyicileri; kapanınca kopar.
   useEffect(() => {
     if (!token) { disconnectSocket(); return; }

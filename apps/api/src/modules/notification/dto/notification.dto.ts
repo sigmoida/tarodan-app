@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsOptional, IsUUID, IsObject } from 'class-validator';
+import { IsString, IsEnum, IsOptional, IsUUID, IsObject, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum NotificationType {
@@ -54,6 +54,14 @@ export enum NotificationType {
   REFUND_DISPUTED = 'refund_disputed',
   REFUND_RETURN_OPENED = 'refund_return_opened',
   REFUND_COMPLETED = 'refund_completed',
+  // İade akışı — eksik adımlar (satıcı tarafı + kargo takip + talep onayı)
+  REFUND_REQUEST_RECEIVED = 'refund_request_received',
+  REFUND_RETURN_SHIPPED_SELLER = 'refund_return_shipped_seller',
+  REFUND_RETURN_IN_TRANSIT = 'refund_return_in_transit',
+  REFUND_RETURN_DELIVERED_BUYER = 'refund_return_delivered_buyer',
+  REFUND_RETURN_DELIVERED_SELLER = 'refund_return_delivered_seller',
+  REFUND_COMPLETED_SELLER = 'refund_completed_seller',
+  REFUND_AUTO_ACCEPTED_SELLER = 'refund_auto_accepted_seller',
 
   // Cross-flow auto-rejection
   OFFER_AUTO_REJECTED = 'offer_auto_rejected',
@@ -192,4 +200,12 @@ export class RegisterPushTokenDto {
   @IsOptional()
   @IsString()
   deviceId?: string;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'When true, deactivate this token instead of registering it (used on logout)',
+  })
+  @IsOptional()
+  @IsBoolean()
+  revoke?: boolean;
 }

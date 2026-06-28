@@ -97,12 +97,15 @@ export default function NotificationsPage() {
   // ── useAdminResource — tek çağrı; queryKey + fetcher activeTab'a göre branşlar ──
   // "send" sekmesinde list API çağrısı yapılmaz (fetcher null-safe boş yanıt döner).
   // "scheduled" sekmesinde getScheduledNotifications, "history" sekmesinde getNotificationHistory.
-  // History sekmesinde search desteklenmiyor → search prop'u ResourceListPage'e verilmez.
+  // History sekmesinde başlık/içerik/kullanıcı araması desteklenir (backend search).
   const {
     rows,
     page,
     setPage,
     totalPages,
+    search,
+    setSearch,
+    onSearchSubmit,
     filters,
     setFilter,
     isLoading,
@@ -119,6 +122,7 @@ export default function NotificationsPage() {
           limit: params.limit,
           channel: params.channel || undefined,
           status: params.status || undefined,
+          search: params.search || undefined,
         });
       }
       // "send" sekmesinde liste fetch yapılmaz — boş yanıt
@@ -806,7 +810,12 @@ export default function NotificationsPage() {
       tabs={TABS}
       activeTab={activeTab}
       onTabChange={(k) => setActiveTab(k as TabType)}
-      // Arama yok (backend desteklemiyor); sadece filtreler (history sekmesinde)
+      // Arama yalnız history sekmesinde (backend getNotificationHistory search destekliyor);
+      // scheduled sekmesinde arama yok.
+      search={activeTab === "history" ? { placeholder: "Başlık, içerik veya kullanıcı ara..." } : undefined}
+      searchValue={activeTab === "history" ? search : undefined}
+      onSearchChange={activeTab === "history" ? setSearch : undefined}
+      onSearchSubmit={activeTab === "history" ? onSearchSubmit : undefined}
       filters={historyFilters}
       columns={activeColumns}
       data={rows}

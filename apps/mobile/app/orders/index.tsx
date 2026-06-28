@@ -12,7 +12,7 @@ import {
 } from '@tarodan/ui-native';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import type { BadgeVariant } from '@tarodan/ui-native';
 import { ordersApi } from '../../src/services/api';
@@ -43,6 +43,8 @@ interface Order {
   isBuyer?: boolean;
   hasProductRating?: boolean;
   hasSellerRating?: boolean;
+  cancellationType?: 'iptal' | 'iade' | null;
+  activeRefundRequest?: { id: string; status: string } | null;
 }
 
 /** Çok ürünlü sipariş grubu (tek checkout = tek kart, ürün başına ayrı kargo) */
@@ -70,19 +72,50 @@ const uiOrderStatusConfig: Record<string, { label: string; variant: BadgeVariant
   delivered: { label: 'Teslim Edildi', variant: 'success' },
   awaiting_confirmation: { label: 'Onayınız Bekleniyor', variant: 'warning' },
   completed: { label: 'Tamamlandı', variant: 'success' },
-  cancelled: { label: 'İptal', variant: 'danger' },
-  refunded: { label: 'İade', variant: 'secondary' },
+  cancelled: { label: 'İptal Edildi', variant: 'danger' },
+  refunded: { label: 'İade Edildi', variant: 'secondary' },
+  refund_requested: { label: 'İade Sürecinde', variant: 'danger' },
   mixed: { label: 'Karışık Durum', variant: 'info' },
 };
 
 const getStatusText = (status: UiOrderStatus) =>
   uiOrderStatusConfig[status]?.label ?? String(status);
 
+// Rozet önceliği: aktif iade > iptal > normal durum.
+// - activeRefundRequest dolu → "İade Sürecinde" (sipariş 'delivered' kalsa bile).
+// - cancellationType === 'iptal' → "İptal Edildi" (status 'refunded' olsa bile
+//   "İade Edildi" DEME).
+// - Aksi halde siparişin kendi UI durumu.
+const badgeStatusOf = (o: any): string => {
+  if (o?.activeRefundRequest) return 'refund_requested';
+  if (o?.cancellationType === 'iptal') return 'cancelled';
+  return o?.status;
+};
+
+// Kargo takip satırı: SADECE gerçek gönderi varken (trackingNumber dolu + kargo
+// sonrası durum). İptal (cancellationType='iptal' / status cancelled) veya iade
+// edilmiş siparişte gösterilmez; teslim öncesi placeholder kargo da gözükmez.
+const showOrderTracking = (o: Order): boolean =>
+  !!o.trackingNumber &&
+  o.cancellationType !== 'iptal' &&
+  ['shipped', 'delivered', 'awaiting_confirmation', 'completed'].includes(o.status);
+
 export default function OrdersScreen() {
   const { isAuthenticated } = useAuthStore();
   const [role, setRole] = useState<'buyer' | 'seller'>('buyer');
   const [filter, setFilter] = useState<FilterType>('all');
   const [refreshing, setRefreshing] = useState(false);
+  // Çok ürünlü grup accordion durumu — varsayılan KAPALI (boş Set)
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  const toggleGroup = (groupId: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  };
   const [ratingModal, setRatingModal] = useState<{
     visible: boolean;
     type: 'product' | 'seller';
@@ -190,46 +223,20 @@ export default function OrdersScreen() {
     return order.isBuyer === true && ['delivered', 'completed'].includes(order.status);
   };
 
-  // Alıcı teslimatı listeden onaylayabilir (completed'e taşır → değerlendirme açılır)
-  const canConfirmReceipt = (order: Order) =>
-    order.isBuyer === true && ['delivered', 'awaiting_confirmation'].includes(order.status);
-
-  const confirmMutation = useMutation({
-    mutationFn: async (order: Order) =>
-      order.status === 'awaiting_confirmation'
-        ? ordersApi.confirmReceipt(order.id)
-        : ordersApi.confirm(order.id),
-    onSuccess: () => {
-      refetch();
-      setSnackbar({
-        visible: true,
-        variant: 'success',
-        message: 'Teslimat onaylandı. Artık siparişi değerlendirebilirsiniz.',
-      });
-    },
-    onError: (err: any) => {
-      setSnackbar({
-        visible: true,
-        variant: 'danger',
-        message: err?.response?.data?.message || 'Onay başarısız oldu.',
-      });
-    },
-  });
-
-  const renderOrderCard = (order: Order) => (
+  const renderOrderCard = (order: Order, compact = false) => (
     <Card key={order.id} variant="elevated" padding={0} style={styles.orderCard}>
       <Pressable onPress={() => router.push(`/orders/${order.id}`)}>
         <View style={styles.orderHeader}>
           <Text variant="caption" style={styles.orderNumber}>
             Sipariş #{order.orderNumber}
           </Text>
-          <StatusBadge status={order.status} config={uiOrderStatusConfig} size="sm" />
+          <StatusBadge status={badgeStatusOf(order)} config={uiOrderStatusConfig} size="sm" />
         </View>
 
         <View style={styles.orderContent}>
           <Image
             source={{ uri: getOrderProductImageUri(order.product) }}
-            style={styles.productImage}
+            style={compact ? styles.productImageSm : styles.productImage}
           />
           <View style={styles.productInfo}>
             <Text variant="label" numberOfLines={2}>{order.product.title}</Text>
@@ -260,22 +267,8 @@ export default function OrdersScreen() {
         </View>
       </Pressable>
 
-      {/* Alıcı teslim onayı — completed'e taşır, ardından değerlendirme açılır */}
-      {canConfirmReceipt(order) && (
-        <View style={styles.ratingSection}>
-          <Button
-            variant="primary"
-            size="sm"
-            icon="checkmark-circle"
-            title="Teslim Aldım"
-            onPress={() => confirmMutation.mutate(order)}
-            isLoading={confirmMutation.isPending && confirmMutation.variables?.id === order.id}
-            style={styles.rateButton}
-          />
-        </View>
-      )}
-
-      {/* Rating buttons for completed orders */}
+      {/* Değerlendirme — teslim/tamamlanmış siparişte (yeni escrow: ayrı "Teslim Aldım"
+          onay butonu yok; satıcıya ödeme teslim+14 gün sonra otomatik serbest kalır) */}
       {canRate(order) && (
         <View style={styles.ratingSection}>
           {!order.hasProductRating && (
@@ -395,57 +388,95 @@ export default function OrdersScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary[600]!]} />
           }
         >
-          {entries.map((entry) =>
-            entry.kind === 'order' ? (
-              renderOrderCard(entry.order)
-            ) : (
-              <Card key={entry.group.id} variant="elevated" padding={0} style={styles.orderCard}>
-                <Pressable onPress={() => router.push(`/orders/group/${entry.group.id}` as any)}>
+          {entries.map((entry) => {
+            if (entry.kind === 'order') {
+              return renderOrderCard(entry.order);
+            }
+
+            const group = entry.group;
+            const isExpanded = expandedGroups.has(group.id);
+            const itemCount = group.orders.length;
+            const thumbs = group.orders.slice(0, 4);
+            const extraCount = itemCount - thumbs.length;
+
+            return (
+              <View key={group.id}>
+                {/* Özet kart — tekli sipariş kartıyla AYNI krom; kapalıyken de tek karta benzer. */}
+                <Card variant="elevated" padding={0} style={styles.orderCard}>
+                {/* Özet satırı — tıkla aç/kapa (accordion) */}
+                <Pressable
+                  onPress={() => toggleGroup(group.id)}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: isExpanded }}
+                >
+                  {/* 1. Başlık — tekli karttaki sipariş no / durum hizası */}
                   <View style={styles.orderHeader}>
                     <Text variant="caption" style={styles.orderNumber}>
-                      Sipariş #{entry.group.groupNumber}
+                      Çoklu Sipariş · {itemCount} ürün
                     </Text>
-                    <StatusBadge status={entry.group.status} config={uiOrderStatusConfig} size="sm" />
+                    <StatusBadge status={group.status} config={uiOrderStatusConfig} size="sm" />
                   </View>
 
-                  {/* Ürün satırları — her birinin kendi durumu ve kargosu var */}
-                  {entry.group.orders.map((order) => (
-                    <Pressable
-                      key={order.id}
-                      style={styles.groupItemRow}
-                      onPress={() => router.push(`/orders/${order.id}`)}
-                    >
-                      <Image
-                        source={{ uri: getOrderProductImageUri(order.product) }}
-                        style={styles.groupItemImage}
-                      />
-                      <View style={styles.productInfo}>
-                        <Text variant="label" numberOfLines={1}>{order.product.title}</Text>
-                        <Text variant="caption" style={styles.sellerName}>
-                          Satıcı: {order.seller.displayName}
-                        </Text>
-                        {order.trackingNumber ? (
-                          <Text variant="caption" style={styles.sellerName}>
-                            Kargo: {order.trackingNumber}
+                  {/* 2. İçerik — tekli karttaki ürün görseli hizası (büyük thumbnaillar) */}
+                  <View style={styles.orderContent}>
+                    <View style={styles.thumbRow}>
+                      {thumbs.map((order, idx) => (
+                        <Image
+                          key={order.id}
+                          source={{ uri: getOrderProductImageUri(order.product) }}
+                          style={[styles.thumb, idx > 0 && styles.thumbOverlap]}
+                        />
+                      ))}
+                      {extraCount > 0 && (
+                        <View style={[styles.thumb, styles.thumbOverlap, styles.thumbMore]}>
+                          <Text variant="caption" style={styles.thumbMoreText}>
+                            +{extraCount}
                           </Text>
-                        ) : null}
-                      </View>
-                      <StatusBadge status={order.status} config={uiOrderStatusConfig} size="sm" />
-                    </Pressable>
-                  ))}
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.productInfo}>
+                      <Text variant="label" numberOfLines={1}>
+                        {itemCount} ürünlük sepet
+                      </Text>
+                      <Text variant="caption" style={styles.sellerName}>
+                        Her ürün ayrı kargolanır
+                      </Text>
+                      <Text variant="caption" style={styles.sellerName}>
+                        {formatDate(group.createdAt)}
+                      </Text>
+                    </View>
+                  </View>
 
+                  {/* 3. Alt — tekli karttaki satıcı / toplam hizası + aç-kapa */}
                   <View style={styles.orderFooter}>
                     <Text variant="caption" style={styles.dateText}>
-                      {formatDate(entry.group.createdAt)} · {entry.group.orders.length} ürün
+                      {isExpanded ? 'Ürünleri gizle' : 'Ürünleri gör'}
                     </Text>
-                    <Text variant="h3" style={styles.price}>
-                      {formatPrice(entry.group.totalAmount)}
-                    </Text>
+                    <View style={styles.groupFooterRight}>
+                      <Text variant="h3" style={styles.price}>
+                        {formatPrice(group.totalAmount)}
+                      </Text>
+                      <Ionicons
+                        name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                        size={20}
+                        color={colors.text.muted}
+                      />
+                    </View>
                   </View>
                 </Pressable>
-              </Card>
-            ),
-          )}
+                </Card>
+
+                {/* Açılınca: grubun ürünleri sol-bantlı bir kolonda KOMPAKT kartlar olarak
+                    görünür → hem küçük durur hem de sepete ait olduğu net belli olur. */}
+                {isExpanded && (
+                  <View style={styles.groupItemsBand}>
+                    {group.orders.map((order) => renderOrderCard(order, true))}
+                  </View>
+                )}
+              </View>
+            );
+          })}
 
           <View style={{ height: 100 }} />
         </ScrollView>
@@ -566,6 +597,18 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.surface.alt,
   },
+  productImageSm: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface.alt,
+  },
+  groupItemsBand: {
+    marginLeft: 12,
+    paddingLeft: 12,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.primary[300]!,
+  },
   productInfo: {
     flex: 1,
     marginLeft: 12,
@@ -609,20 +652,34 @@ const styles = StyleSheet.create({
     gap: 8,
     flexWrap: 'wrap',
   },
-  groupItemRow: {
+  thumbRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 4,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border.DEFAULT,
   },
-  groupItemImage: {
-    width: 52,
-    height: 52,
+  thumb: {
+    width: 60,
+    height: 60,
     borderRadius: radius.md,
     backgroundColor: colors.surface.alt,
+    borderWidth: 2,
+    borderColor: colors.surface.DEFAULT,
+  },
+  thumbOverlap: {
+    marginLeft: -18,
+  },
+  thumbMore: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface.alt,
+  },
+  thumbMoreText: {
+    color: colors.text.muted,
+    fontWeight: '700',
+  },
+  groupFooterRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   rateButton: {
     borderColor: colors.primary[600]!,

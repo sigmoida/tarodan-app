@@ -64,7 +64,7 @@ import {
   ApproveWarehouseTradeDto,
   RejectWarehouseTradeDto,
 } from './dto';
-import { ProductStatus, OrderStatus, Prisma, PaymentStatus, PaymentHoldStatus, OfferStatus, TradeStatus, ShipmentStatus, MessageStatus, TicketStatus, TicketPriority, TicketCategory, Brand, AdminRole, BusinessStatus } from '@prisma/client';
+import { ProductStatus, OrderStatus, Prisma, PaymentStatus, PaymentHoldStatus, OfferStatus, TradeStatus, ShipmentStatus, MessageStatus, TicketStatus, TicketPriority, TicketCategory, Brand, AdminRole, BusinessStatus, MembershipTierType, SubscriptionStatus } from '@prisma/client';
 import { safeDecrementReserved } from '../product/helpers/product-availability.helper';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { PaymentService } from '../payment/payment.service';
@@ -805,6 +805,18 @@ export class AdminService {
             tier: true,
           },
         },
+        // Satıcı banka hesabı (IBAN) — admin görüntüleyebilsin. Hassas ama yalnız
+        // admin endpoint'inde döner; maskeleme yok (admin tam görmeli).
+        bankAccount: {
+          select: {
+            accountHolder: true,
+            iban: true,
+            tcKimlikNo: true,
+            taxId: true,
+            isVerified: true,
+            verifiedAt: true,
+          },
+        },
         _count: {
           select: {
             products: true,
@@ -862,8 +874,25 @@ export class AdminService {
       })),
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 10);
 
+    // Üyeliği admin UI'ın beklediği şekle çevir (startDate/endDate alan adları +
+    // status/autoRenew/cancelledAt). Aksi halde tarihler boş görünüyordu.
+    const membershipForUi = (u as any).membership
+      ? {
+          tier: {
+            name: (u as any).membership.tier?.name,
+            type: (u as any).membership.tier?.type,
+          },
+          status: (u as any).membership.status,
+          startDate: (u as any).membership.currentPeriodStart,
+          endDate: (u as any).membership.currentPeriodEnd,
+          autoRenew: (u as any).membership.autoRenew,
+          cancelledAt: (u as any).membership.cancelledAt,
+        }
+      : undefined;
+
     return {
       ...u,
+      membership: membershipForUi,
       lastLoginAt: u.lastLoginAt ?? null,
       lastActivityAt: u.lastActivityAt ?? null,
       averageRating: avgRating ? Math.round(avgRating * 10) / 10 : null,
@@ -894,6 +923,96 @@ export class AdminService {
         receivedRatingsCount: u._count.receivedRatings,
       },
     };
+  }
+
+  // ==================== ADMIN: KULLANICI ÜYELİĞİ ====================
+
+  /**
+   * Admin: kullanıcının üyeliğini iptal eder (membership.service.cancelSubscription
+   * mantığını yansıtır). status=cancelled, cancelledAt=now; tier'a dokunulmaz
+   * (dönem sonuna kadar aktif, sonra cron free'ye düşürür). Free/zaten-iptal engel.
+   */
+  async adminCancelUserMembership(adminId: string, userId: string) {
+    const membership = await this.prisma.userMembership.findUnique({
+      where: { userId },
+      include: { tier: true },
+    });
+    if (!membership) {
+      throw new NotFoundException('Üyelik bulunamadı');
+    }
+    if (membership.tier.type === MembershipTierType.free) {
+      throw new BadRequestException('Ücretsiz üyelik iptal edilemez');
+    }
+    if (membership.status === SubscriptionStatus.cancelled) {
+      throw new BadRequestException('Üyelik zaten iptal edilmiş');
+    }
+    const updated = await this.prisma.userMembership.update({
+      where: { userId },
+      data: {
+        status: SubscriptionStatus.cancelled,
+        cancelledAt: new Date(),
+      },
+      include: { tier: true },
+    });
+    await this.createAuditLog(adminId, 'admin_membership_cancel', 'UserMembership', membership.id, membership, updated);
+    return updated;
+  }
+
+  /**
+   * Admin: kullanıcının üyeliğini herhangi bir kademeye anında geçirir (ödeme YOK,
+   * admin override). subscribe'ın free-aktivasyon dalını yansıtır.
+   * NOT: business için şirket-hesabı (companyName/taxId) kuralı BİLİNÇLİ uygulanmaz —
+   * admin override mutlaktır.
+   */
+  async adminChangeUserMembership(
+    adminId: string,
+    userId: string,
+    tierType: MembershipTierType,
+    billingPeriod: 'monthly' | 'yearly' = 'monthly',
+  ) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!user) {
+      throw new NotFoundException('Kullanıcı bulunamadı');
+    }
+    const tier = await this.prisma.membershipTier.findUnique({ where: { type: tierType } });
+    if (!tier) {
+      throw new NotFoundException(`Üyelik tipi bulunamadı: ${tierType}`);
+    }
+    if (!tier.isActive) {
+      throw new BadRequestException('Bu üyelik kademesi aktif değil');
+    }
+
+    const now = new Date();
+    const periodEnd = new Date(now);
+    if (tierType === MembershipTierType.free) {
+      // Free: uzak tarih (lazy-create deseniyle aynı mantık).
+      periodEnd.setFullYear(periodEnd.getFullYear() + 100);
+    } else if (billingPeriod === 'yearly') {
+      periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+    } else {
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+    }
+
+    const existing = await this.prisma.userMembership.findUnique({
+      where: { userId },
+      include: { tier: true },
+    });
+
+    const data = {
+      tierId: tier.id,
+      status: SubscriptionStatus.active,
+      currentPeriodStart: now,
+      currentPeriodEnd: periodEnd,
+      cancelledAt: null,
+      autoRenew: false,
+    };
+
+    const updated = existing
+      ? await this.prisma.userMembership.update({ where: { userId }, data, include: { tier: true } })
+      : await this.prisma.userMembership.create({ data: { userId, ...data }, include: { tier: true } });
+
+    await this.createAuditLog(adminId, 'admin_membership_change', 'UserMembership', updated.id, existing, updated);
+    return updated;
   }
 
   // ==================== ADMIN STAFF (admin rol yönetimi) ====================
@@ -1196,7 +1315,7 @@ export class AdminService {
       throw new BadRequestException('Kullanıcı zaten banlı');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // 1. User'ı banla
       const updatedUser = await tx.user.update({
         where: { id: userId },
@@ -1208,18 +1327,88 @@ export class AdminService {
         } as any,
       });
 
-      // 2. Aktif ürünleri inactive yap
+      // 2. Kargolanmamış aktif takasları iptal et. SINIR: yalnızca fiziksel mal
+      //    hareket etmeden önceki aşamalar (pending / accepted / awaiting_payment).
+      //    Kargo başladıysa (shipping_to_warehouse, eski *_shipped, at_warehouse
+      //    ve sonrası) DOKUNMA — mal yolda/depoda; gerekirse admin müdahale eder.
+      //    Rezervasyonları serbest bırak; serbest kalan ürünler (banlı kullanıcıya
+      //    aitse) bir sonraki adımda suspended olur, karşı tarafınki active kalır.
+      const cancellableTrades = await tx.trade.findMany({
+        where: {
+          OR: [{ initiatorId: userId }, { receiverId: userId }],
+          status: {
+            in: [
+              TradeStatus.pending,
+              TradeStatus.accepted,
+              TradeStatus.awaiting_payment,
+            ],
+          },
+        },
+        select: { id: true, status: true, version: true },
+      });
+      const cancelledTradeIds: string[] = [];
+      const releasedProductIds = new Set<string>();
+      for (const trade of cancellableTrades) {
+        // pending'de rezervasyon yok; accepted/awaiting_payment'ta var.
+        if (trade.status !== TradeStatus.pending) {
+          const items = await tx.tradeItem.findMany({
+            where: { tradeId: trade.id },
+            select: { productId: true, quantity: true },
+          });
+          const byProduct = new Map<string, number>();
+          for (const item of items) {
+            byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.quantity);
+          }
+          for (const [productId, qty] of byProduct) {
+            await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
+            const prod = await tx.product.findUnique({
+              where: { id: productId },
+              select: { reservedQuantity: true },
+            });
+            if (prod) {
+              const newReserved = safeDecrementReserved(prod.reservedQuantity, qty);
+              await tx.product.update({
+                where: { id: productId },
+                data: {
+                  reservedQuantity: newReserved,
+                  status: newReserved > 0 ? ProductStatus.reserved : ProductStatus.active,
+                },
+              });
+              releasedProductIds.add(productId);
+            }
+          }
+        }
+        await tx.trade.update({
+          where: { id: trade.id, version: trade.version },
+          data: {
+            status: TradeStatus.cancelled,
+            cancelReason: 'Kullanıcı banlandığı için takas iptal edildi',
+            cancelledAt: new Date(),
+            version: { increment: 1 },
+          },
+        });
+        cancelledTradeIds.push(trade.id);
+      }
+
+      // 3. Aktif ürünleri suspended (askıya alındı) yap — kullanıcının kendi
+      //    pasife aldığı (inactive) ilanlardan AYRI bir state. Ban açılınca bu
+      //    ilanlar otomatik active'e döner; yeniden admin onayına GİRMEZ.
+      //    (Yukarıda iptal edilen takaslardan serbest kalan ürünler de buraya dahil.)
+      const toSuspend = await tx.product.findMany({
+        where: { sellerId: userId, status: ProductStatus.active },
+        select: { id: true },
+      });
       await tx.product.updateMany({
         where: {
           sellerId: userId,
           status: ProductStatus.active,
         },
         data: {
-          status: ProductStatus.inactive,
+          status: ProductStatus.suspended,
         },
       });
 
-      // 3. Bekleyen ürünleri rejected yap
+      // 4. Bekleyen ürünleri rejected yap
       await tx.product.updateMany({
         where: {
           sellerId: userId,
@@ -1230,7 +1419,7 @@ export class AdminService {
         },
       });
 
-      // 4. Aktif teklifleri cancelled yap (buyer olarak)
+      // 5. Aktif teklifleri cancelled yap (buyer olarak)
       await tx.offer.updateMany({
         where: {
           buyerId: userId,
@@ -1241,13 +1430,49 @@ export class AdminService {
         },
       });
 
-      // 5. Audit log oluştur
+      // 6. Audit log oluştur
       await this.createAuditLog(adminId, 'user_ban', 'User', userId, user, updatedUser);
 
       this.logger.warn(`User ${userId} banned by admin ${adminId}: ${dto.reason}`);
 
-      return { success: true, userId, reason: dto.reason };
+      return {
+        success: true,
+        userId,
+        reason: dto.reason,
+        suspendedIds: toSuspend.map((p) => p.id),
+        cancelledTradeIds,
+        // Suspended + iptal edilen takaslardan serbest kalan (karşı tarafın da)
+        // ürünleri ES'te güncellemek için birleşik küme.
+        affectedProductIds: Array.from(new Set([...toSuspend.map((p) => p.id), ...releasedProductIds])),
+      };
     });
+
+    // İptal edilen takasların nakit ayağı tamamlandıysa iade et.
+    for (const tradeId of result.cancelledTradeIds) {
+      await this.paymentService
+        .refundTradeCashPaymentIfCompleted(tradeId)
+        .catch((err) =>
+          this.logger.warn(`Ban: trade refund failed for ${tradeId}: ${err?.message}`),
+        );
+    }
+
+    // Etkilenen ilanları arama/listeden senkronla (suspended → düşer, serbest
+    // kalan karşı taraf ürünü → yeniden indekslenir).
+    if (result.affectedProductIds.length > 0) {
+      await this.cache.delPattern('products:list:*');
+      await Promise.all(
+        result.affectedProductIds.map((id) =>
+          this.cache.del(`product:${id}`).catch(() => {}),
+        ),
+      );
+      for (const id of result.affectedProductIds) {
+        this.searchService
+          .syncProduct(id)
+          .catch((err) => this.logger.warn(`ES sync (ban) failed for ${id}: ${err?.message}`));
+      }
+    }
+
+    return { success: true, userId, reason: dto.reason };
   }
 
   // ==================== PRODUCT MANAGEMENT ====================
@@ -1755,7 +1980,27 @@ export class AdminService {
         include: {
           buyer: { select: { id: true, displayName: true, email: true } },
           seller: { select: { id: true, displayName: true, email: true } },
-          product: { select: { id: true, title: true } },
+          product: {
+            select: {
+              id: true,
+              title: true,
+              images: {
+                take: 1,
+                orderBy: { sortOrder: 'asc' },
+                select: { cardKey: true },
+              },
+            },
+          },
+          checkoutGroup: { select: { groupNumber: true } },
+          // Açık (aktif) iade talebi — admin listede "İade Sürecinde" rozeti için.
+          refundRequests: {
+            where: {
+              status: { notIn: ['refunded', 'rejected', 'cancelled'] as any },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: { id: true, status: true, refundNumber: true },
+          },
         },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
@@ -1763,13 +2008,73 @@ export class AdminService {
       }),
     ]);
 
+    // Çoklu-ürün sepetlerini admin listede gruplu gösterebilmek için her siparişin
+    // ait olduğu CheckoutGroup'taki TOPLAM sipariş adedini ekle (grubun gerçek
+    // boyutu). groupItemCount>1 → "çoklu sipariş" rozeti + görsel gruplama.
+    const groupIds = [
+      ...new Set(orders.map((o) => o.checkoutGroupId).filter((x): x is string => !!x)),
+    ];
+    const groupCounts = groupIds.length
+      ? await this.prisma.order.groupBy({
+          by: ['checkoutGroupId'],
+          where: { checkoutGroupId: { in: groupIds } },
+          _count: { _all: true },
+        })
+      : [];
+    const groupCountMap = new Map(
+      groupCounts.map((g) => [g.checkoutGroupId, g._count._all]),
+    );
+
     return {
       data: orders.map((o) => ({
         ...o,
+        // Misafir siparişlerinde alıcı, ortak sistem kullanıcısı (GUEST_SYSTEM /
+        // guest@tarodan.system). Admin listede placeholder yerine gerçek misafir
+        // ad/e-postasını shippingAddress'ten göster.
+        buyer: this.resolveGuestBuyerForAdmin(o.buyer, o.shippingAddress),
         amount: Number(o.totalAmount),
         commissionAmount: Number(o.commissionAmount),
+        groupNumber: o.checkoutGroup?.groupNumber ?? null,
+        groupItemCount: o.checkoutGroupId
+          ? groupCountMap.get(o.checkoutGroupId) ?? 1
+          : 1,
+        productImageUrl: this.resolveProductImageUrl(
+          (o.product as any)?.images?.[0]?.cardKey,
+        ),
+        activeRefundRequest: (o as any).refundRequests?.[0]
+          ? {
+              id: (o as any).refundRequests[0].id,
+              status: (o as any).refundRequests[0].status,
+              refundNumber: (o as any).refundRequests[0].refundNumber,
+            }
+          : null,
       })),
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  /**
+   * Misafir siparişinde admin'e gösterilecek alıcıyı çöz: sistem misafir
+   * kullanıcısı (guest@tarodan.system / displayName GUEST_SYSTEM) ise gerçek
+   * misafir ad/e-postasını shippingAddress'ten al. Değilse alıcıyı aynen döndür.
+   */
+  private resolveGuestBuyerForAdmin(
+    buyer: { id: string; displayName: string | null; email: string | null } | null,
+    shippingAddress: unknown,
+  ): { id: string; displayName: string | null; email: string | null } | null {
+    if (!buyer) return buyer;
+    const sa = (shippingAddress as any) || {};
+    const isGuest =
+      buyer.email === 'guest@tarodan.system' ||
+      buyer.displayName === 'GUEST_SYSTEM' ||
+      sa?.isGuestOrder === true;
+    if (!isGuest) return buyer;
+    const guestEmail = sa?.guestEmail || sa?.email || null;
+    const guestName = sa?.guestName || sa?.fullName || null;
+    return {
+      id: buyer.id,
+      displayName: guestName || guestEmail || 'Misafir',
+      email: guestEmail || buyer.email,
     };
   }
 
@@ -1813,6 +2118,7 @@ export class AdminService {
     return {
       data: orders.map((o) => ({
         ...o,
+        buyer: this.resolveGuestBuyerForAdmin(o.buyer, o.shippingAddress),
         amount: Number(o.totalAmount),
         commissionAmount: Number(o.commissionAmount),
       })),
@@ -2257,6 +2563,9 @@ export class AdminService {
         },
         offer: true,
         payment: true,
+        // Ödeme tek üründe bile checkout group üzerinden bağlanır (order.payment genelde
+        // null) → group payment'ı da yükle, yoksa admin'de ödeme kartı hiç görünmez.
+        checkoutGroup: { include: { payment: true } },
         shipment: {
           include: {
             events: { orderBy: { occurredAt: 'desc' } },
@@ -2277,8 +2586,26 @@ export class AdminService {
     const subtotal = order.subtotal != null ? Number(order.subtotal) : totalAmount - shippingCost - buyerFeeAmount;
     const sellerNetAmount = subtotal - sellerFeeAmount;
 
+    // Misafir siparişinde alıcıyı gerçek misafir ad/e-postasıyla göster
+    // (placeholder GUEST_SYSTEM yerine), diğer alıcı alanlarını koru.
+    const sa = (order.shippingAddress as any) || {};
+    const isGuestOrder =
+      order.buyer?.email === 'guest@tarodan.system' ||
+      order.buyer?.displayName === 'GUEST_SYSTEM' ||
+      sa?.isGuestOrder === true;
+    const displayBuyer = order.buyer
+      ? isGuestOrder
+        ? {
+            ...order.buyer,
+            displayName: sa?.guestName || sa?.fullName || sa?.guestEmail || sa?.email || 'Misafir',
+            email: sa?.guestEmail || sa?.email || order.buyer.email,
+          }
+        : order.buyer
+      : order.buyer;
+
     return {
       ...order,
+      buyer: displayBuyer,
       totalAmount,
       commissionAmount,
       shippingCost,
@@ -2307,10 +2634,10 @@ export class AdminService {
         ...order.offer,
         amount: Number(order.offer.amount),
       } : null,
-      payment: order.payment ? {
-        ...order.payment,
-        amount: Number(order.payment.amount),
-      } : null,
+      payment: (() => {
+        const p = order.payment ?? (order as any).checkoutGroup?.payment;
+        return p ? { ...p, amount: Number(p.amount) } : null;
+      })(),
       shipment: order.shipment ? {
         ...order.shipment,
         carrier: order.shipment.provider,
@@ -2565,6 +2892,7 @@ export class AdminService {
         seller: { select: { id: true, email: true, displayName: true } },
         product: { select: { id: true, title: true, price: true } },
         payment: true,
+        checkoutGroup: { include: { payment: true } },
         shipment: true,
       },
     });
@@ -2601,10 +2929,10 @@ export class AdminService {
       discountCode: order.discountCode ?? null,
       shippingCost: Number(order.shippingCost || 0),
       total: Number(order.totalAmount),
-      payment: order.payment ? {
-        status: order.payment.status,
-        provider: order.payment.provider,
-      } : null,
+      payment: (() => {
+        const p = order.payment ?? (order as any).checkoutGroup?.payment;
+        return p ? { status: p.status, provider: p.provider } : null;
+      })(),
       shipment: order.shipment ? {
         trackingNumber: order.shipment.trackingNumber,
         carrier: order.shipment.provider,
@@ -2632,7 +2960,7 @@ export class AdminService {
       throw new BadRequestException('Kullanıcı zaten banlı değil');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // 1. User'ı unban yap
       const updatedUser = await tx.user.update({
         where: { id: userId },
@@ -2644,13 +2972,42 @@ export class AdminService {
         } as any,
       });
 
-      // 2. Audit log oluştur
+      // 2. Ban ile askıya alınan (suspended) ilanları otomatik active'e döndür.
+      //    Bunlar ban öncesi zaten yayındaydı → yeniden admin onayına GİRMEZ.
+      //    Kullanıcının kendi pasife aldığı (inactive) ilanlara dokunulmaz.
+      const toRestore = await tx.product.findMany({
+        where: { sellerId: userId, status: ProductStatus.suspended },
+        select: { id: true },
+      });
+      await tx.product.updateMany({
+        where: { sellerId: userId, status: ProductStatus.suspended },
+        data: { status: ProductStatus.active },
+      });
+
+      // 3. Audit log oluştur
       await this.createAuditLog(adminId, 'user_unban', 'User', userId, user, updatedUser);
 
       this.logger.log(`User ${userId} unbanned by admin ${adminId}`);
 
-      return { success: true, userId };
+      return { success: true, userId, restoredIds: toRestore.map((p) => p.id) };
     });
+
+    // Geri açılan ilanları arama/listeye yeniden ekle.
+    if (result.restoredIds.length > 0) {
+      await this.cache.delPattern('products:list:*');
+      await Promise.all(
+        result.restoredIds.map((id) =>
+          this.cache.del(`product:${id}`).catch(() => {}),
+        ),
+      );
+      for (const id of result.restoredIds) {
+        this.searchService
+          .syncProduct(id)
+          .catch((err) => this.logger.warn(`ES sync (unban) failed for ${id}: ${err?.message}`));
+      }
+    }
+
+    return { success: true, userId };
   }
 
   /**
@@ -4053,10 +4410,13 @@ export class AdminService {
     ]);
 
     return {
+      // Payment.order nullable: checkoutGroup / tradeCashPayment tipindeki
+      // ödemelerde order=null olabilir. Null-safe erişim — aksi halde TÜM liste
+      // TypeError ile 500 döner.
       data: payments.map((p) => ({
         id: p.id,
         orderId: p.orderId,
-        orderNumber: p.order.orderNumber,
+        orderNumber: p.order?.orderNumber ?? null,
         amount: Number(p.amount),
         currency: p.currency,
         provider: p.provider,
@@ -4064,9 +4424,9 @@ export class AdminService {
         failureReason: p.failureReason,
         providerPaymentId: p.providerPaymentId,
         providerConversationId: p.providerConversationId,
-        buyer: p.order.buyer,
-        seller: p.order.seller,
-        product: p.order.product,
+        buyer: p.order?.buyer ?? null,
+        seller: p.order?.seller ?? null,
+        product: p.order?.product ?? null,
         createdAt: p.createdAt,
         updatedAt: p.updatedAt,
         paidAt: p.paidAt,
@@ -4102,10 +4462,12 @@ export class AdminService {
       throw new NotFoundException('Ödeme bulunamadı');
     }
 
+    // Payment.order nullable: checkoutGroup / tradeCashPayment tipindeki
+    // ödemelerde order=null olabilir. Null-safe erişim — aksi halde 500.
     return {
       id: payment.id,
       orderId: payment.orderId,
-      orderNumber: payment.order.orderNumber,
+      orderNumber: payment.order?.orderNumber ?? null,
       amount: Number(payment.amount),
       currency: payment.currency,
       provider: payment.provider,
@@ -4114,17 +4476,19 @@ export class AdminService {
       providerPaymentId: payment.providerPaymentId,
       providerConversationId: payment.providerConversationId,
       metadata: payment.metadata,
-      order: {
-        id: payment.order.id,
-        orderNumber: payment.order.orderNumber,
-        status: payment.order.status,
-        totalAmount: Number(payment.order.totalAmount),
-        commissionAmount: Number(payment.order.commissionAmount),
-        buyer: payment.order.buyer,
-        seller: payment.order.seller,
-        product: payment.order.product,
-        shippingAddress: payment.order.shippingAddress,
-      },
+      order: payment.order
+        ? {
+            id: payment.order.id,
+            orderNumber: payment.order.orderNumber,
+            status: payment.order.status,
+            totalAmount: Number(payment.order.totalAmount),
+            commissionAmount: Number(payment.order.commissionAmount),
+            buyer: payment.order.buyer,
+            seller: payment.order.seller,
+            product: payment.order.product,
+            shippingAddress: payment.order.shippingAddress,
+          }
+        : null,
       paymentHold: payment.paymentHolds[0] ? {
         id: payment.paymentHolds[0].id,
         amount: Number(payment.paymentHolds[0].amount),
@@ -6692,6 +7056,12 @@ export class AdminService {
         },
       },
     });
+    // İade reddedildi → satıcı hold kilidini kaldır; escrow normal akışına döner
+    // (teslim+return+grace dolduysa bir sonraki cron turunda payout edilir).
+    await this.prisma.paymentHold.updateMany({
+      where: { orderId: rr.orderId, status: 'held', NOT: { frozenByRefundId: null } },
+      data: { frozenByRefundId: null },
+    });
     await this.createAuditLog(
       adminId,
       'refund_dispute_resolve_reject',
@@ -6932,10 +7302,11 @@ export class AdminService {
     status?: MessageStatus;
     fromDate?: string;
     toDate?: string;
+    search?: string;
     page?: number;
     limit?: number;
   }) {
-    const { status, fromDate, toDate, page = 1, limit = 20 } = query;
+    const { status, fromDate, toDate, search, page = 1, limit = 20 } = query;
 
     const where: Prisma.MessageWhereInput = {};
 
@@ -6952,6 +7323,18 @@ export class AdminService {
       if (toDate) {
         where.createdAt.lte = new Date(toDate);
       }
+    }
+
+    // Mesaj içeriği veya gönderen/alıcı ad/e-posta araması (case-insensitive).
+    const trimmedSearch = search?.trim();
+    if (trimmedSearch) {
+      where.OR = [
+        { content: { contains: trimmedSearch, mode: 'insensitive' } },
+        { sender: { displayName: { contains: trimmedSearch, mode: 'insensitive' } } },
+        { sender: { email: { contains: trimmedSearch, mode: 'insensitive' } } },
+        { receiver: { displayName: { contains: trimmedSearch, mode: 'insensitive' } } },
+        { receiver: { email: { contains: trimmedSearch, mode: 'insensitive' } } },
+      ];
     }
 
     const [total, messages] = await Promise.all([
@@ -7537,6 +7920,7 @@ export class AdminService {
     { key: 'order-created-buyer',        name: 'Sipariş oluşturuldu (alıcı)',         group: 'Sipariş' },
     { key: 'order-created-seller',       name: 'Yeni sipariş (satıcı)',               group: 'Sipariş' },
     { key: 'order-paid',                 name: 'Ödeme alındı (alıcı)',                group: 'Sipariş' },
+    { key: 'order-paid-group',           name: 'Ödeme alındı - sepet (alıcı)',        group: 'Sipariş' },
     { key: 'order-paid-seller',          name: 'Ödeme alındı (satıcı)',               group: 'Sipariş' },
     { key: 'order-shipped',              name: 'Kargoya verildi',                     group: 'Sipariş' },
     { key: 'order-delivered',            name: 'Teslim edildi',                       group: 'Sipariş' },
@@ -7573,6 +7957,24 @@ export class AdminService {
     // Fatura
     { key: 'invoice-buyer',               name: 'Fatura (alıcı)',                       group: 'Fatura' },
     { key: 'invoice-seller',              name: 'Satış faturası (satıcı)',               group: 'Fatura' },
+    // Sipariş iptali
+    { key: 'order-cancelled-buyer',       name: 'Sipariş iptal edildi (alıcı)',         group: 'Sipariş' },
+    { key: 'order-cancelled-seller',      name: 'Sipariş iptal edildi (satıcı)',        group: 'Sipariş' },
+    // İade akışı
+    { key: 'refund-requested-seller',     name: 'İade talebi alındı (satıcı)',          group: 'İade' },
+    { key: 'refund-approved-buyer',       name: 'İade onaylandı (alıcı)',               group: 'İade' },
+    { key: 'refund-rejected-buyer',       name: 'İade reddedildi (alıcı)',              group: 'İade' },
+    { key: 'refund-return-label-buyer',   name: 'İade kargo bilgileri (alıcı)',         group: 'İade' },
+    // Değerlendirme
+    { key: 'review-received-seller',      name: 'Değerlendirme alındı (satıcı)',        group: 'Değerlendirme' },
+    // İlan & Stok
+    { key: 'listing-expiring',            name: 'İlan süresi doluyor',                  group: 'İlan' },
+    { key: 'listing-expired',             name: 'İlan süresi doldu',                    group: 'İlan' },
+    { key: 'back-in-stock',               name: 'Stoğa geri geldi',                     group: 'İlan' },
+    // Sosyal
+    { key: 'new-follower',                name: 'Yeni takipçi',                         group: 'Sosyal' },
+    // Ödeme aktarımı
+    { key: 'payout-released-seller',      name: 'Ödeme aktarıldı (satıcı)',             group: 'Ödeme' },
   ];
 
   substituteVariables(text: string, data: Record<string, any>): string {
@@ -8792,6 +9194,7 @@ export class AdminService {
     status?: string;
     userId?: string;
     type?: string;
+    search?: string;
     startDate?: string;
     endDate?: string;
   }) {
@@ -8806,6 +9209,28 @@ export class AdminService {
       where.createdAt = {};
       if (query.startDate) where.createdAt.gte = new Date(query.startDate);
       if (query.endDate) where.createdAt.lte = new Date(query.endDate);
+    }
+
+    // Başlık/içerik veya alıcı kullanıcı ad/e-posta araması (case-insensitive).
+    // userId NotificationLog'da düz alan (ilişki yok) → eşleşen kullanıcıları
+    // ayrı sorgulayıp id'lerini OR'a ekliyoruz.
+    const trimmedSearch = query.search?.trim();
+    if (trimmedSearch) {
+      const matchingUsers = await this.prisma.user.findMany({
+        where: {
+          OR: [
+            { displayName: { contains: trimmedSearch, mode: 'insensitive' } },
+            { email: { contains: trimmedSearch, mode: 'insensitive' } },
+          ],
+        },
+        select: { id: true },
+      });
+      const matchingUserIds = matchingUsers.map((u) => u.id);
+      where.OR = [
+        { title: { contains: trimmedSearch, mode: 'insensitive' } },
+        { body: { contains: trimmedSearch, mode: 'insensitive' } },
+        ...(matchingUserIds.length > 0 ? [{ userId: { in: matchingUserIds } }] : []),
+      ];
     }
 
     const [total, logs] = await Promise.all([

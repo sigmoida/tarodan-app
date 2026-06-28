@@ -365,6 +365,21 @@ export class ProductSchedulerService implements OnModuleInit {
       const expiryDate = new Date();
       expiryDate.setDate(expiryDate.getDate() - this.LISTING_EXPIRY_DAYS);
 
+      // Bu turda dolacak ilanları, satıcıya "ilanınız sona erdi" e-postası
+      // gönderebilmek için updateMany'den ÖNCE topla (updateMany etkilenen
+      // satırları döndürmez). Aynı where ile güncellendiği için tutarlı.
+      const toExpire = await this.prisma.product.findMany({
+        where: {
+          status: ProductStatus.active,
+          createdAt: { lt: expiryDate },
+        },
+        select: {
+          id: true,
+          title: true,
+          seller: { select: { id: true, displayName: true } },
+        },
+      });
+
       // Find and update expired listings
       const result = await this.prisma.product.updateMany({
         where: {
@@ -380,6 +395,21 @@ export class ProductSchedulerService implements OnModuleInit {
         this.logger.log(`Expired ${result.count} listings older than ${this.LISTING_EXPIRY_DAYS} days`);
       } else {
         this.logger.log('No listings to expire');
+      }
+
+      // "İlanınız sona erdi" e-postaları (ilan başına, satıcıya). İlan 60 günü
+      // doldurduğu ilk gün expire olup active'den çıktığı için mükerrer gitmez.
+      const frontendUrl = process.env.FRONTEND_URL || 'https://tarodan.com';
+      for (const listing of toExpire) {
+        try {
+          await this.notificationService.sendTemplateEmailToUser(listing.seller.id, 'listing-expired', {
+            sellerName: listing.seller.displayName ?? '',
+            productTitle: listing.title,
+            listingUrl: `${frontendUrl}/products/${listing.id}`,
+          });
+        } catch (err: any) {
+          this.logger.warn(`listing-expired email failed for ${listing.id}: ${err?.message}`);
+        }
       }
 
       log(`${result.count} eski ilan pasif yapıldı (>${this.LISTING_EXPIRY_DAYS} gün)`);
@@ -442,37 +472,60 @@ export class ProductSchedulerService implements OnModuleInit {
     this.logger.log('Checking for listings expiring soon...');
 
     try {
-      const expiringListings = await this.getExpiringListings(7);
+      // Cron günlük çalışır. 7 günlük pencerenin TAMAMINI seçersek aynı ilana
+      // 7 gün boyunca her gün uyarı gider. Bunun yerine yalnız BUGÜN 53 günü
+      // (60 - 7) dolduran ilanları (1 günlük bant) seç → ilan başına tek uyarı.
+      const WARN_DAYS_BEFORE = 7;
+      const bandEnd = new Date();
+      bandEnd.setDate(bandEnd.getDate() - (this.LISTING_EXPIRY_DAYS - WARN_DAYS_BEFORE));
+      const bandStart = new Date(bandEnd);
+      bandStart.setDate(bandStart.getDate() - 1);
+
+      const expiringListings = await this.prisma.product.findMany({
+        where: {
+          status: ProductStatus.active,
+          createdAt: { gte: bandStart, lt: bandEnd },
+        },
+        select: {
+          id: true,
+          title: true,
+          createdAt: true,
+          seller: { select: { id: true, displayName: true } },
+        },
+      });
 
       if (expiringListings.length === 0) {
-        this.logger.log('No listings expiring soon');
+        this.logger.log('No listings entering the 7-day expiry warning window');
         log('Süresi yaklaşan ilan yok');
         return { summary: '0 yaklaşan ilan', stats: { sellers: 0, listings: 0 } };
       }
 
-      this.logger.log(`Found ${expiringListings.length} listings expiring within 7 days`);
+      this.logger.log(`Warning sellers about ${expiringListings.length} listing(s) expiring in ~7 days`);
       log(`${expiringListings.length} ilan 7 gün içinde sona eriyor`);
 
-      // Group by seller
-      const listingsBySeller = new Map<string, any[]>();
+      // "İlanınızın süresi doluyor" e-postası (ilan başına, satıcıya).
+      const frontendUrl = process.env.FRONTEND_URL || 'https://tarodan.com';
       for (const listing of expiringListings) {
-        const sellerId = listing.seller.id;
-        if (!listingsBySeller.has(sellerId)) {
-          listingsBySeller.set(sellerId, []);
+        const expirationDate = new Date(listing.createdAt);
+        expirationDate.setDate(expirationDate.getDate() + this.LISTING_EXPIRY_DAYS);
+        try {
+          await this.notificationService.sendTemplateEmailToUser(listing.seller.id, 'listing-expiring', {
+            sellerName: listing.seller.displayName ?? '',
+            productTitle: listing.title,
+            daysRemaining: WARN_DAYS_BEFORE,
+            expirationDate: expirationDate.toLocaleDateString('tr-TR'),
+            listingUrl: `${frontendUrl}/products/${listing.id}`,
+          });
+        } catch (err: any) {
+          this.logger.warn(`listing-expiring email failed for ${listing.id}: ${err?.message}`);
         }
-        listingsBySeller.get(sellerId)!.push(listing);
       }
 
-      // TODO: Send email notifications to sellers
-      // This would integrate with the notification/email service
-      for (const [sellerId, listings] of listingsBySeller) {
-        this.logger.log(`Seller ${sellerId} has ${listings.length} listings expiring soon`);
-        log(`satıcı ${sellerId} → ${listings.length} ilan yaklaşıyor`);
-        // await this.notificationService.sendListingExpirationWarning(sellerId, listings);
-      }
+      const sellerCount = new Set(expiringListings.map((l) => l.seller.id)).size;
+      log(`${sellerCount} satıcıya ${expiringListings.length} ilan için süre uyarısı gönderildi`);
       return {
-        summary: `${listingsBySeller.size} satıcı · ${expiringListings.length} ilan`,
-        stats: { sellers: listingsBySeller.size, listings: expiringListings.length },
+        summary: `${sellerCount} satıcı · ${expiringListings.length} ilan`,
+        stats: { sellers: sellerCount, listings: expiringListings.length },
       };
     } catch (error: any) {
       this.logger.error(`Error sending expiration warnings: ${error.message}`, error.stack);

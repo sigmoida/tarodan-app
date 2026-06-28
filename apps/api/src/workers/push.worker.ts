@@ -67,11 +67,31 @@ interface ExpoPushTicket {
 export class PushWorker {
   private readonly logger = new Logger(PushWorker.name);
   private readonly expoPushUrl = 'https://exp.host/--/api/v2/push/send';
+  private readonly expoAccessToken: string;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
-  ) {}
+  ) {
+    this.expoAccessToken = this.configService.get<string>('EXPO_ACCESS_TOKEN', '');
+  }
+
+  /**
+   * Build headers for the Expo Push API. Adds the bearer token when
+   * EXPO_ACCESS_TOKEN is configured (required once "Enhanced Security for
+   * Push Notifications" is enabled in the Expo dashboard).
+   */
+  private buildExpoHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      'Accept-Encoding': 'gzip, deflate',
+      'Content-Type': 'application/json',
+    };
+    if (this.expoAccessToken) {
+      headers['Authorization'] = `Bearer ${this.expoAccessToken}`;
+    }
+    return headers;
+  }
 
   @Process('send')
   async handleSend(job: Job<PushJobData>) {
@@ -86,7 +106,7 @@ export class PushWorker {
 
     // Build Expo push messages
     const messages: ExpoPushMessage[] = pushTokens
-      .filter((token) => token.startsWith('ExponentPushToken'))
+      .filter((token) => /^Expo(nent)?PushToken\[.+\]$/.test(token))
       .map((token) => ({
         to: token,
         title,
@@ -112,11 +132,7 @@ export class PushWorker {
       for (const chunk of chunks) {
         const response = await fetch(this.expoPushUrl, {
           method: 'POST',
-          headers: {
-            'Accept': 'application/json',
-            'Accept-Encoding': 'gzip, deflate',
-            'Content-Type': 'application/json',
-          },
+          headers: this.buildExpoHeaders(),
           body: JSON.stringify(chunk),
         });
 
@@ -171,22 +187,18 @@ export class PushWorker {
 
     // 2. Try to send push notification
     try {
-      // Fetch user's FCM token from database
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-          fcmToken: true,
-        },
+      // Fetch the user's active Expo push tokens. Devices register these via
+      // POST /notifications/push-token (ExpoPushProvider.registerToken), which
+      // writes to the push_tokens table — NOT user.fcmToken. A single user may
+      // have multiple devices, so we send to every active token.
+      const tokens = await this.prisma.pushToken.findMany({
+        where: { userId, isActive: true },
+        select: { token: true },
       });
 
-      if (!user) {
-        this.logger.warn(`User ${userId} not found`);
-        return { success: true, inAppStored: true, pushSent: false, reason: 'User not found' };
-      }
+      // Get push tokens
+      const pushTokens: string[] = tokens.map((t) => t.token);
 
-      // Get push token
-      const pushTokens: string[] = user.fcmToken ? [user.fcmToken] : [];
-      
       if (pushTokens.length === 0) {
         this.logger.warn(`No push tokens for user ${userId}`);
         return { success: true, inAppStored: true, pushSent: false, reason: 'No push tokens' };
@@ -197,6 +209,8 @@ export class PushWorker {
       if (data?.type) {
         if (data.type.includes('order') || data.type.includes('payment')) {
           channelId = 'orders';
+        } else if (data.type.includes('trade')) {
+          channelId = 'trades';
         } else if (data.type.includes('message')) {
           channelId = 'messages';
         }
@@ -204,7 +218,7 @@ export class PushWorker {
 
       // Build Expo push messages directly
       const messages: ExpoPushMessage[] = pushTokens
-        .filter((token) => token.startsWith('ExponentPushToken'))
+        .filter((token) => /^Expo(nent)?PushToken\[.+\]$/.test(token))
         .map((token) => ({
           to: token,
           title,
@@ -224,11 +238,7 @@ export class PushWorker {
       // Send to Expo Push API
       const response = await fetch(this.expoPushUrl, {
         method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Accept-Encoding': 'gzip, deflate',
-          'Content-Type': 'application/json',
-        },
+        headers: this.buildExpoHeaders(),
         body: JSON.stringify(messages),
       });
 
@@ -239,6 +249,27 @@ export class PushWorker {
       const responseData = await response.json();
       const results: ExpoPushTicket[] = responseData.data || [];
       const successCount = results.filter((r) => r.status === 'ok').length;
+
+      // Ölü token temizliği: Expo bir cihaz için 'DeviceNotRegistered' dönerse
+      // (uygulama silinmiş / token geçersiz) o token'ı deaktive et ki bir daha
+      // denenmesin ve push_tokens şişmesin. results, messages ile aynı sıradadır.
+      const deadTokens = results
+        .map((ticket, i) =>
+          ticket.status === 'error' &&
+          ticket.details?.error === 'DeviceNotRegistered'
+            ? messages[i]?.to
+            : null,
+        )
+        .filter((t): t is string => !!t);
+      if (deadTokens.length > 0) {
+        await this.prisma.pushToken.updateMany({
+          where: { token: { in: deadTokens } },
+          data: { isActive: false },
+        });
+        this.logger.log(
+          `Deactivated ${deadTokens.length} dead push token(s) for user ${userId}`,
+        );
+      }
 
       return {
         success: true,

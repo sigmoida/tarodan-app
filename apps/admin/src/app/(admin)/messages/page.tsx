@@ -90,6 +90,9 @@ export default function MessagesPage() {
     page,
     setPage,
     totalPages,
+    search,
+    setSearch,
+    onSearchSubmit,
     filters,
     setFilter,
     isLoading,
@@ -321,6 +324,10 @@ export default function MessagesPage() {
     <ResourceListPage<Message>
       title="Mesaj Moderation"
       description={description}
+      search={{ placeholder: "Mesaj içeriği, gönderen/alıcı ara..." }}
+      searchValue={search}
+      onSearchChange={setSearch}
+      onSearchSubmit={onSearchSubmit}
       filters={filterButtons}
       columns={columns}
       data={messages}

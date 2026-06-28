@@ -595,8 +595,11 @@ export const useCartStore = create<CartState>()(
     {
       name: 'cart-storage',
       // authToken'ı KALICI yapma — hassas olmasa da girişli durumu authStore bootstrap'ı belirler.
+      // itemCount'u kalıcı yap: sayfa yenilemede fetchCart() tamamlanana kadar
+      // rozet "0"/boş görünmesin (son bilinen değer anında gösterilir, sonra senkronlanır).
       partialize: (state) => ({
         offlineItems: state.offlineItems,
+        itemCount: state.itemCount,
       }),
     }
   )

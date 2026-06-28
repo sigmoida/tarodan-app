@@ -85,11 +85,12 @@ export class ExpoPushProvider {
       return { success: false, error: 'No valid Expo push tokens' };
     }
 
-    if (!this.enabled) {
-      this.logger.log(`[PUSH-MOCK] To: ${validTokens.join(', ')}, Title: ${message.title}`);
-      return { success: true, ticketId: `mock-${Date.now()}` };
-    }
-
+    // Not: Expo Push endpoint'i access-token OLMADAN da çalışır (token yalnızca
+    // "Enhanced Security" açıkken gerekir). Eskiden token yoksa mock'lanıp hiç
+    // gönderilmiyordu → refund/admin manuel push'ları sessizce kayboluyordu.
+    // Artık her zaman gerçek gönderiyoruz; auth header sadece token varsa eklenir.
+    // (Token tablosu boşsa zaten yukarıda erken dönülüyor; dev/CI'da Expo'ya
+    // istek gitmez.)
     try {
       const payload = {
         to: validTokens.length === 1 ? validTokens[0] : validTokens,
@@ -154,15 +155,7 @@ export class ExpoPushProvider {
     for (let i = 0; i < messages.length; i += batchSize) {
       const batch = messages.slice(i, i + batchSize);
 
-      if (!this.enabled) {
-        // Mock mode
-        for (const msg of batch) {
-          this.logger.log(`[PUSH-MOCK-BATCH] Title: ${msg.title}`);
-          results.push({ success: true, ticketId: `mock-batch-${Date.now()}-${i}` });
-        }
-        continue;
-      }
-
+      // Access-token olmadan da gerçek gönderiyoruz (bkz. sendPushNotification notu).
       try {
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',

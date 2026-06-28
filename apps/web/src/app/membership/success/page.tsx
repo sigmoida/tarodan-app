@@ -1,10 +1,19 @@
 'use client';
 
+import { Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { CheckCircleIcon, SparklesIcon } from '@heroicons/react/24/solid';
 
-export default function MembershipSuccessPage() {
+function MembershipSuccessContent() {
+  const searchParams = useSearchParams();
+  // kind: upgrade | downgrade | change — checkout/payment akışından gelir.
+  const kind = searchParams.get('kind');
+  const headline =
+    kind === 'upgrade'
+      ? 'Üyeliğiniz başarıyla yükseltildi!'
+      : 'Üyeliğiniz başarıyla değiştirildi!';
 
   return (
     <div className="min-h-screen bg-surface-elevated flex items-center justify-center p-4">
@@ -34,7 +43,7 @@ export default function MembershipSuccessPage() {
             <SparklesIcon className="w-8 h-8 text-warning-500" />
           </h1>
           <p className="text-xl text-muted mb-8">
-            Üyeliğiniz başarıyla yükseltildi!
+            {headline}
           </p>
         </motion.div>
 
@@ -92,5 +101,13 @@ export default function MembershipSuccessPage() {
         </motion.div>
       </motion.div>
     </div>
+  );
+}
+
+export default function MembershipSuccessPage() {
+  return (
+    <Suspense fallback={null}>
+      <MembershipSuccessContent />
+    </Suspense>
   );
 }

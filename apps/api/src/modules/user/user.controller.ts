@@ -21,7 +21,13 @@ import {
 } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { JwtAuthGuard, CurrentUser, Public } from '../auth';
-import { UpdateProfileDto, CreateAddressDto, UpdateAddressDto, UpsertBankAccountDto } from './dto';
+import {
+  UpdateProfileDto,
+  CreateAddressDto,
+  UpdateAddressDto,
+  UpsertBankAccountDto,
+  UpdateNotificationSettingsDto,
+} from './dto';
 
 @ApiTags('users')
 @Controller('users')
@@ -57,6 +63,35 @@ export class UserController {
     @Body() dto: UpdateProfileDto,
   ) {
     return this.userService.updateProfile(userId, dto);
+  }
+
+  /**
+   * GET /users/me/settings
+   * Get current user notification settings
+   */
+  @Get('me/settings')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Bildirim tercihleri' })
+  @ApiResponse({ status: 200, description: 'Bildirim tercihleri' })
+  async getSettings(@CurrentUser('id') userId: string) {
+    return this.userService.getNotificationSettings(userId);
+  }
+
+  /**
+   * PATCH /users/me/settings
+   * Update current user notification settings (partial)
+   */
+  @Patch('me/settings')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Bildirim tercihlerini güncelle' })
+  @ApiResponse({ status: 200, description: 'Bildirim tercihleri güncellendi' })
+  async updateSettings(
+    @CurrentUser('id') userId: string,
+    @Body() dto: UpdateNotificationSettingsDto,
+  ) {
+    return this.userService.updateNotificationSettings(userId, dto);
   }
 
   /**

@@ -36,6 +36,6 @@ import { RefundScheduledProcessor } from './refund-scheduled.processor';
   ],
   controllers: [RefundController],
   providers: [RefundService, RefundSchedulerService, RefundScheduledProcessor],
-  exports: [RefundService],
+  exports: [RefundService, RefundSchedulerService],
 })
 export class RefundModule {}
