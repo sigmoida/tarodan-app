@@ -10173,6 +10173,12 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'collection_featured_change', 'Collection', collectionId, { isFeatured: existing.isFeatured }, { isFeatured });
 
+    // Anasayfa "haftanın koleksiyoneri" cache'ini düşür ki değişiklik anında yansısın
+    if (this.cache) {
+      await this.cache.del('featured:collector').catch(() => {});
+      await this.cache.delPattern('featured:top-collections:*').catch(() => {});
+    }
+
     return { success: true, isFeatured: updated.isFeatured };
   }
 

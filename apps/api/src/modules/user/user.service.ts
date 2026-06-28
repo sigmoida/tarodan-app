@@ -7,6 +7,7 @@ import { StorageService } from '../storage/storage.service';
 import { RatingService } from '../rating/rating.service';
 import { ModerationAiClient } from '../moderation/moderation-ai.client';
 import { computeTrustScore } from './helpers/trust-score';
+import { CacheService } from '../cache/cache.service';
 import { isPremiumEntitled } from '../membership/membership.util';
 import {
   DEFAULT_NOTIFICATION_SETTINGS,
@@ -32,6 +33,38 @@ const ADDRESS_DELETE_BLOCKED_ORDER_STATUSES: OrderStatus[] = [
   OrderStatus.refund_requested,
 ];
 
+/**
+ * Anasayfa öne çıkarma bölümlerinin (haftanın koleksiyoneri / haftanın şirketi /
+ * top koleksiyonlar) ortak skorlama ayarları. Tek kaynak: ağırlıklar üç yerde
+ * tekrar etmesin ve "haftalık" pencere her bölümde aynı olsun.
+ */
+const FEATURED_SCORING = {
+  /** Skorda "yakın zaman" sayılan pencere (gün). */
+  windowDays: 7,
+  weights: {
+    /** Tüm zamanlar görüntülenme. */
+    view: 1,
+    /** Tüm zamanlar beğeni. */
+    like: 5,
+    /** Tamamlanmış satış. */
+    sale: 20,
+    /** Son `windowDays` içindeki beğeni (haftalık ivmeyi öne çıkarır). */
+    recentLike: 10,
+    /** Son `windowDays` içinde güncellenen aktif ürün. */
+    recentUpdate: 5,
+  },
+  /**
+   * Featured yanıtlarının cache süresi (sn). Bu bölümler haftalık değişir ve
+   * hesabı pahalıdır; kısa bir cache her isteğin ağır sorgu çalıştırmasını önler.
+   */
+  cacheTtlSeconds: 600,
+} as const;
+
+/** Skorlama penceresinin başlangıç tarihini döndürür (şimdi - windowDays). */
+function featuredWindowStart(): Date {
+  return new Date(Date.now() - FEATURED_SCORING.windowDays * 24 * 60 * 60 * 1000);
+}
+
 @Injectable()
 export class UserService {
   private readonly logger = new Logger(UserService.name);
@@ -47,6 +80,8 @@ export class UserService {
     private readonly storageService: StorageService,
     private readonly ratingService: RatingService,
     private readonly moderationAi: ModerationAiClient,
+    @Optional()
+    private readonly cache: CacheService,
   ) {}
 
   /**
@@ -1840,11 +1875,24 @@ export class UserService {
   }
 
   /**
-   * Get featured collector of the week
-   * Based on collection engagement score: views + likes + sales
-   * Algorithm: Score = (viewCount * 1) + (likeCount * 5) + (salesCount * 20)
+   * Featured (anasayfa öne çıkarma) yanıtlarını cache-aside ile sarar.
+   * Redis yoksa veya hata verirse otomatik olarak factory'ye düşer (graceful).
+   */
+  private async cacheFeatured<T>(key: string, factory: () => Promise<T>): Promise<T> {
+    if (!this.cache) return factory();
+    return this.cache.getOrSet(key, factory, { ttl: FEATURED_SCORING.cacheTtlSeconds });
+  }
+
+  /**
+   * En iyi koleksiyonlar (anasayfa). Görüntülenme/beğeniye göre sıralı, cache'li.
    */
   async getTopCollections(limit: number = 20) {
+    return this.cacheFeatured(`featured:top-collections:${limit}`, () =>
+      this.computeTopCollections(limit),
+    );
+  }
+
+  private async computeTopCollections(limit: number) {
     const collections = await this.prisma.collection.findMany({
       where: {
         isPublic: true,
@@ -1908,7 +1956,17 @@ export class UserService {
     }));
   }
 
+  /**
+   * Haftanın koleksiyoneri (anasayfa). Manuel `isFeatured` önceliği + haftalık
+   * ivmeyi (son 7 gün beğeni) içeren engagement skoru. Cache'li.
+   */
   async getFeaturedCollector() {
+    return this.cacheFeatured('featured:collector', () =>
+      this.computeFeaturedCollector(),
+    );
+  }
+
+  private async computeFeaturedCollector() {
     const collectionWhere = {
       isPublic: true,
       items: { some: {} }, // Has at least one item
@@ -1952,28 +2010,46 @@ export class UserService {
       return null;
     }
 
-    // Calculate engagement score for each collection
-    const collectionScores = await Promise.all(
-      collections.map(async (collection) => {
-        // Count sold products in this collection
-        const salesCount = collection.items.filter(
-          (item) => item.product && item.product.status === 'sold'
-        ).length;
+    // "Haftanın koleksiyoneri": skor artık son 7 günün ivmesini de katıyor.
+    // Tüm zamanlar metrikleri taban, son penceredeki beğeniler ise haftalık
+    // bonus olarak ağırlıklanır; böylece liste her hafta tazelenebilir.
+    const windowStart = featuredWindowStart();
+    const { weights } = FEATURED_SCORING;
 
-        // Calculate engagement score
-        // Views are weighted 1, likes are weighted 5, sales are weighted 20
-        const score =
-          collection.viewCount * 1 +
-          collection.likeCount * 5 +
-          salesCount * 20;
-
-        return {
-          collection,
-          score,
-          salesCount,
-        };
-      })
+    // Son penceredeki koleksiyon beğenilerini tek sorguda topla (N+1 yerine groupBy)
+    const recentLikeGroups = await this.prisma.collectionLike.groupBy({
+      by: ['collectionId'],
+      where: {
+        collectionId: { in: collections.map((c) => c.id) },
+        createdAt: { gte: windowStart },
+      },
+      _count: { _all: true },
+    });
+    const recentLikesByCollection = new Map(
+      recentLikeGroups.map((g) => [g.collectionId, g._count._all]),
     );
+
+    const collectionScores = collections.map((collection) => {
+      // Count sold products in this collection
+      const salesCount = collection.items.filter(
+        (item) => item.product && item.product.status === 'sold'
+      ).length;
+
+      // Son penceredeki koleksiyon beğenileri (haftalık ivme sinyali)
+      const recentLikes = recentLikesByCollection.get(collection.id) ?? 0;
+
+      const score =
+        collection.viewCount * weights.view +
+        collection.likeCount * weights.like +
+        salesCount * weights.sale +
+        recentLikes * weights.recentLike;
+
+      return {
+        collection,
+        score,
+        salesCount,
+      };
+    });
 
     // Sort by score (highest first) and get top collection
     collectionScores.sort((a, b) => b.score - a.score);
@@ -2027,7 +2103,13 @@ export class UserService {
    * Business accounts with most engagement (views, likes, sales)
    */
   async getFeaturedBusiness() {
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    return this.cacheFeatured('featured:business', () =>
+      this.computeFeaturedBusiness(),
+    );
+  }
+
+  private async computeFeaturedBusiness() {
+    const sevenDaysAgo = featuredWindowStart();
 
     // Find business users (membership.tier.type = 'business' AND companyName not null)
     // Use UserMembership to find users with business tier, then get the users
@@ -2121,13 +2203,15 @@ export class UserService {
         // Recent activity bonus: recent likes (10x), recent product updates (5x)
         const totalViews = productStats._sum.viewCount || 0;
         const totalLikes = productStats._sum.likeCount || 0;
-        
+
+        // recentViews = son penceredeki güncellenen aktif ürün sayısı (üstteki sorgu)
+        const { weights } = FEATURED_SCORING;
         const score =
-          totalViews * 1 +
-          totalLikes * 5 +
-          salesCount * 20 +
-          recentLikes * 10 +
-          recentViews * 5;
+          totalViews * weights.view +
+          totalLikes * weights.like +
+          salesCount * weights.sale +
+          recentLikes * weights.recentLike +
+          recentViews * weights.recentUpdate;
 
         return { user, score, productStats, salesCount, totalViews, totalLikes };
       })
@@ -2167,7 +2251,11 @@ export class UserService {
       const salesCount = collection.items.filter(
         item => item.product && item.product.status === 'sold'
       ).length;
-      const score = collection.viewCount * 1 + collection.likeCount * 5 + salesCount * 20;
+      const { weights } = FEATURED_SCORING;
+      const score =
+        collection.viewCount * weights.view +
+        collection.likeCount * weights.like +
+        salesCount * weights.sale;
       return { collection, score };
     });
 
