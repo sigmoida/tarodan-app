@@ -38,6 +38,32 @@ interface NotificationSettings {
   newListingAlerts: boolean;
 }
 
+/**
+ * Modül seviyesinde (component DIŞINDA) tanımlı — yoksa her render'da yeniden yaratılır,
+ * tüm toggle'lar remount olur ve framer-motion hepsinde enter animasyonunu tekrar oynatır
+ * (birini açınca hepsi oynuyordu). Sade <button> track + ortalanmış knob (UI <Button>'ın
+ * padding'i hizayı bozuyordu).
+ */
+function Toggle({ enabled, onChange }: { enabled: boolean; onChange: () => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={enabled}
+      onClick={onChange}
+      className={`relative inline-flex items-center w-12 h-6 rounded-full transition-colors shrink-0 ${
+        enabled ? 'bg-primary-500' : 'bg-border-strong'
+      }`}
+    >
+      <motion.span
+        animate={{ x: enabled ? 26 : 2 }}
+        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+        className="block w-5 h-5 bg-surface-elevated rounded-full shadow"
+      />
+    </button>
+  );
+}
+
 export default function SettingsPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading, user, logout } = useAuthStore();
@@ -82,7 +108,9 @@ export default function SettingsPage() {
     setSettings(prev => ({ ...prev, [key]: newValue }));
     
     try {
-      await api.patch('/users/me/settings', { [key]: newValue }).catch(() => null);
+      // .catch(() => null) KALDIRILDI: hatayı yutuyordu → istek başarısız olsa bile
+      // her zaman "güncellendi" toast'ı çıkıyordu. Artık gerçek sonucu yansıtır.
+      await api.patch('/users/me/settings', { [key]: newValue });
       toast.success(locale === 'en' ? 'Setting updated' : 'Ayar güncellendi');
     } catch (error) {
       setSettings(prev => ({ ...prev, [key]: !newValue }));
@@ -127,20 +155,6 @@ export default function SettingsPage() {
   if (!isAuthenticated) {
     return null;
   }
-
-  const Toggle = ({ enabled, onChange }: { enabled: boolean; onChange: () => void }) => (
-    <Button variant="secondary" type="button"
-      onClick={onChange}
-      className={`relative w-12 h-6 rounded-full transition-colors ${
-        enabled ? 'bg-primary-500' : 'bg-border-strong'
-      }`}>
-      <motion.div
-        animate={{ x: enabled ? 24 : 2 }}
-        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-        className="absolute top-1 w-4 h-4 bg-surface-elevated rounded-full shadow"
-      />
-    </Button>
-  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-surface via-surface-elevated to-primary-50">
