@@ -32,6 +32,28 @@ export default function PaymentPage() {
   const [payment, setPayment] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [recurringEnabled, setRecurringEnabled] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
+  // Ödemeden vazgeç: bekleyen siparişi iptal et → REZERVE EDİLEN STOK ANINDA
+  // serbest kalır (yoksa 30 dk cron'a kadar "stok bitti" görünüyordu). Cancel ucu
+  // auth gerektirdiğinden misafirde çağrılmaz; misafir rezervi 30 dk cron bırakır.
+  const handleCancel = async () => {
+    setCancelling(true);
+    const hasSession =
+      isAuthenticated ||
+      (typeof window !== "undefined" &&
+        localStorage.getItem("tarodan_authed") === "1");
+    try {
+      if (hasSession) {
+        await paymentsApi.cancel(paymentId);
+        toast.success("Ödeme iptal edildi, ürün tekrar satışa açıldı.");
+      }
+    } catch {
+      // sessiz: yine de geri dön
+    } finally {
+      router.push(isGuestCheckout ? "/" : "/cart");
+    }
+  };
   // fetchPayment mount başına TEK kez (StrictMode çift-effect + auth hidrasyonu koruması).
   const startedRef = useRef(false);
 
@@ -258,6 +280,18 @@ export default function PaymentPage() {
             <Button onClick={fetchPayment}>Tekrar Dene</Button>
           </div>
         )}
+
+        {/* Vazgeç — ödemeden vazgeçince rezerve edilen stoğu anında serbest bırak */}
+        <div className="mt-4 text-center">
+          <button
+            type="button"
+            onClick={handleCancel}
+            disabled={cancelling}
+            className="text-sm text-muted hover:text-danger-600 underline disabled:opacity-50"
+          >
+            {cancelling ? "Vazgeçiliyor…" : "Vazgeç ve geri dön"}
+          </button>
+        </div>
 
         {/* Help Text */}
         <div className="mt-6 bg-info-50 border border-info-200 rounded-xl p-4">
