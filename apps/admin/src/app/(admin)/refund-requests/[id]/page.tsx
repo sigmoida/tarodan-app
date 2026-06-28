@@ -5,11 +5,8 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { adminApi } from "@/lib/api";
 import {
-  Button,
-  Modal,
   Spinner,
   StatusBadge,
-  Textarea,
   enumLabel,
   refundReasonConfig,
   refundRequestStatusConfig,
@@ -20,7 +17,6 @@ import {
 import {
   ArrowLeftIcon,
   CheckCircleIcon,
-  XCircleIcon,
   TruckIcon,
   UserIcon,
   ClockIcon,
@@ -107,11 +103,6 @@ export default function RefundRequestDetailPage() {
 
   const [rr, setRr] = useState<RefundRequestDetail | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const [showResolveModal, setShowResolveModal] = useState(false);
-  const [resolution, setResolution] = useState<"approve" | "reject">("approve");
-  const [notes, setNotes] = useState("");
-  const [processing, setProcessing] = useState(false);
   const [processingFinalize, setProcessingFinalize] = useState(false);
 
   const load = useCallback(async () => {
@@ -131,26 +122,6 @@ export default function RefundRequestDetailPage() {
   useEffect(() => {
     load();
   }, [load]);
-
-  const handleResolve = async () => {
-    const trimmed = notes.trim();
-    if (trimmed.length < 10) {
-      toast.error("Not en az 10 karakter olmalı");
-      return;
-    }
-    setProcessing(true);
-    try {
-      await adminApi.resolveRefundDispute(id, { resolution, notes: trimmed });
-      toast.success(resolution === "approve" ? "İtiraz onaylandı" : "İtiraz reddedildi");
-      setShowResolveModal(false);
-      setNotes("");
-      await load();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "İşlem başarısız");
-    } finally {
-      setProcessing(false);
-    }
-  };
 
   const handleForceFinalize = async () => {
     if (!(await confirm({ description: "Para iadesi manuel olarak tamamlanacak. Onaylıyor musunuz?", destructive: true }))) return;
@@ -196,7 +167,6 @@ export default function RefundRequestDetailPage() {
     return <div className="text-center py-12 text-muted">Talep bulunamadı</div>;
   }
 
-  const isDisputed = rr.status === "disputed";
   const canForceFinalize = rr.status === "return_delivered" && !rr.refundedAt;
   const history: HistoryEntry[] = Array.isArray(rr.metadata?.history)
     ? (rr.metadata!.history as HistoryEntry[])
@@ -247,12 +217,9 @@ export default function RefundRequestDetailPage() {
       <RefundNextActionPanel
         status={rr.status}
         reason={rr.reason}
-        sellerResponse={rr.sellerResponse}
         amount={Number(rr.amount)}
-        isDisputed={isDisputed}
         canForceFinalize={canForceFinalize}
         finalizing={processingFinalize}
-        onResolve={() => setShowResolveModal(true)}
         onFinalize={handleForceFinalize}
       />
 
@@ -518,64 +485,6 @@ export default function RefundRequestDetailPage() {
           )}
         </div>
       </details>
-
-      {/* Resolve modal */}
-      <Modal
-        isOpen={showResolveModal}
-        onClose={() => !processing && setShowResolveModal(false)}
-        title="İtirazı Çöz"
-      >
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              variant={resolution === "approve" ? "primary" : "outline"}
-              onClick={() => setResolution("approve")}
-              disabled={processing}
-            >
-              <CheckCircleIcon className="h-5 w-5 mr-1" />
-              Onayla (İade aç)
-            </Button>
-            <Button
-              variant={resolution === "reject" ? "danger" : "outline"}
-              onClick={() => setResolution("reject")}
-              disabled={processing}
-            >
-              <XCircleIcon className="h-5 w-5 mr-1" />
-              Reddet (Kapat)
-            </Button>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-body mb-2">
-              Karar Notu (en az 10 karakter)
-            </label>
-            <Textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={4}
-              placeholder="Kararın gerekçesini özetleyin..."
-              disabled={processing}
-            />
-          </div>
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => setShowResolveModal(false)}
-              disabled={processing}
-            >
-              İptal
-            </Button>
-            <Button
-              variant="primary"
-              className="flex-1"
-              onClick={handleResolve}
-              isLoading={processing}
-            >
-              Çözümle
-            </Button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }

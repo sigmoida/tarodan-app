@@ -251,10 +251,6 @@ export const adminApi = {
   getRefundRequests: (params?: any) =>
     api.get('/admin/refund-requests', { params }),
   getRefundRequest: (id: string) => api.get(`/admin/refund-requests/${id}`),
-  resolveRefundDispute: (
-    id: string,
-    body: { resolution: 'approve' | 'reject'; notes: string },
-  ) => api.post(`/admin/refund-requests/${id}/resolve-dispute`, body),
   forceFinalizeRefund: (id: string) =>
     api.post(`/admin/refund-requests/${id}/force-finalize`),
   markTradeReturnLost: (

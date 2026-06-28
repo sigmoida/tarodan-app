@@ -7,7 +7,6 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   BanknotesIcon,
-  ScaleIcon,
 } from "@heroicons/react/24/outline";
 import { guidanceForStatus, type GuidanceVariant } from "./refund-guidance";
 
@@ -26,12 +25,9 @@ function fmtTry(n: number): string {
 export interface RefundNextActionPanelProps {
   status: string;
   reason: string;
-  sellerResponse?: string | null;
   amount: number;
-  isDisputed: boolean;
   canForceFinalize: boolean;
   finalizing: boolean;
-  onResolve: () => void;
   onFinalize: () => void;
 }
 
@@ -42,12 +38,9 @@ export interface RefundNextActionPanelProps {
 export function RefundNextActionPanel({
   status,
   reason,
-  sellerResponse,
   amount,
-  isDisputed,
   canForceFinalize,
   finalizing,
-  onResolve,
   onFinalize,
 }: RefundNextActionPanelProps) {
   const guidance = guidanceForStatus(status);
@@ -66,24 +59,6 @@ export function RefundNextActionPanel({
             <p className="font-semibold">
               Alıcıya iade edilen tutar: {fmtTry(amount)}
             </p>
-          )}
-
-          {isDisputed && sellerResponse && (
-            <div className="rounded-lg bg-surface-elevated/60 border border-warning-200 p-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-warning-700">
-                Satıcının yanıtı
-              </div>
-              <p className="mt-1 whitespace-pre-wrap text-body">
-                {sellerResponse}
-              </p>
-            </div>
-          )}
-
-          {isDisputed && (
-            <Button variant="primary" onClick={onResolve}>
-              <ScaleIcon className="mr-1.5 h-5 w-5" />
-              İtirazı Çöz
-            </Button>
           )}
 
           {canForceFinalize && (

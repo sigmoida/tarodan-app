@@ -15,8 +15,6 @@ export const REFUND_LIFECYCLE = [
 
 /** RefundRequestStatus → aktif aşama indeksi (REFUND_LIFECYCLE üzerinde). */
 export const refundStatusPhase: Record<string, number> = {
-  pending_review: 1,
-  disputed: 1,
   approved: 2,
   wait_for_delivery: 2,
   return_shipment_open: 2,
@@ -45,20 +43,6 @@ export interface RefundGuidance {
 
 /** Her durum için "şimdi ne yapmalısınız?" metni. */
 export const statusGuidance: Record<string, RefundGuidance> = {
-  pending_review: {
-    variant: "info",
-    title: "Satıcı yanıtı bekleniyor",
-    description:
-      "Talep satıcıya iletildi. Satıcı 48 saat içinde yanıt vermezse sistem talebi otomatik onaylar. Şu an sizin bir işlem yapmanıza gerek yok.",
-    actionNeeded: false,
-  },
-  disputed: {
-    variant: "warning",
-    title: "Kararı siz vereceksiniz",
-    description:
-      "Satıcı talebi reddetti. Alıcının kanıtlarını ve satıcının yanıtını inceleyip iade kargosunu açın (onayla) ya da talebi kapatın (reddet).",
-    actionNeeded: true,
-  },
   approved: {
     variant: "info",
     title: "Talep onaylandı",

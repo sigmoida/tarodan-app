@@ -88,7 +88,6 @@ import {
   MarkReturnLostDto,
   ForceCancelStuckDto,
   TradeShipmentQueryDto,
-  ResolveRefundDisputeDto,
   RefundRequestQueryDto,
   AdminChangeMembershipDto,
 } from './dto';
@@ -1436,22 +1435,6 @@ export class AdminController {
   @ApiResponse({ status: HttpStatus.OK, description: 'Refund request detail' })
   async getRefundRequestDetail(@Param('id') id: string) {
     return this.adminService.getRefundRequestDetail(id);
-  }
-
-  @Post('refund-requests/:id/resolve-dispute')
-  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Resolve a disputed refund: approve (open return) or reject (close)',
-  })
-  @ApiParam({ name: 'id', description: 'RefundRequest ID' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Dispute resolved' })
-  async resolveRefundDispute(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
-    @Body() body: ResolveRefundDisputeDto,
-  ) {
-    return this.adminService.resolveRefundDispute(adminId, id, body);
   }
 
   @Post('refund-requests/:id/force-finalize')

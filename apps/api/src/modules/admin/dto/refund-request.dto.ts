@@ -1,37 +1,21 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsArray,
   IsEnum,
-  IsIn,
   IsInt,
   IsOptional,
   IsString,
-  MaxLength,
   Max,
   Min,
 } from 'class-validator';
 import { RefundRequestStatus } from '@prisma/client';
 
-export class ResolveRefundDisputeDto {
-  @ApiProperty({ enum: ['approve', 'reject'], example: 'approve' })
-  @IsIn(['approve', 'reject'])
-  resolution: 'approve' | 'reject';
-
-  @ApiProperty({
-    example: 'Alıcı kanıt fotoğraflarına dayanılarak iade onaylandı',
-    description: 'Resolution notes (min 10 characters)',
-  })
-  @IsString()
-  @MaxLength(1000)
-  notes: string;
-}
-
 export class RefundRequestQueryDto {
   @ApiPropertyOptional({
     isArray: true,
     enum: RefundRequestStatus,
-    example: ['pending_review', 'disputed'],
+    example: ['approved', 'return_in_transit'],
   })
   @IsOptional()
   @IsArray()

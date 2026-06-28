@@ -26,15 +26,12 @@ interface ReturnShipmentRow {
 // İade talebi durumları (refund-requests sayfasıyla aynı liste).
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "all", label: "Tüm Durumlar" },
-  { value: "pending_review", label: "İnceleniyor (Satıcı)" },
   { value: "approved", label: "Onaylandı" },
   { value: "wait_for_delivery", label: "Ürün Teslimi Bekleniyor" },
   { value: "return_shipment_open", label: "İade Kargosu Hazır" },
   { value: "return_in_transit", label: "İade Yolda" },
   { value: "return_delivered", label: "İade Ulaştı (Para Bekleniyor)" },
-  { value: "disputed", label: "İtirazlı (Admin Karar)" },
   { value: "refunded", label: "Tamamlandı" },
-  { value: "rejected", label: "Reddedildi" },
   { value: "cancelled", label: "İptal Edildi" },
 ];
 
