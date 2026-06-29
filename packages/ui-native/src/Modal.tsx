@@ -1,10 +1,11 @@
 import React from 'react';
 import {
+  KeyboardAvoidingView,
   Modal as RNModal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
-  View,
 } from 'react-native';
 import { theme } from './theme';
 
@@ -32,20 +33,28 @@ export const Modal: React.FC<ModalProps> = ({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <Pressable
-        style={styles.backdrop}
-        onPress={closeOnBackdrop ? onClose : undefined}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.fill}
       >
-        <Pressable style={styles.sheet}>
-          {title && <Text style={styles.title}>{title}</Text>}
-          {children}
+        <Pressable
+          style={styles.backdrop}
+          onPress={closeOnBackdrop ? onClose : undefined}
+        >
+          <Pressable style={styles.sheet}>
+            {title && <Text style={styles.title}>{title}</Text>}
+            {children}
+          </Pressable>
         </Pressable>
-      </Pressable>
+      </KeyboardAvoidingView>
     </RNModal>
   );
 };
 
 const styles = StyleSheet.create({
+  fill: {
+    flex: 1,
+  },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',

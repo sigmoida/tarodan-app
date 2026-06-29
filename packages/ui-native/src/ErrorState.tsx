@@ -60,5 +60,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing[4],
   },
   message: { marginTop: spacing[2] },
-  button: { marginTop: spacing[5] },
+  // Button varsayılan alignSelf:'flex-start' kullanır; ortalı içeriğe hizala.
+  button: { marginTop: spacing[5], alignSelf: 'center' },
 });
