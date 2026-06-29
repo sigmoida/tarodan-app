@@ -1326,7 +1326,7 @@ model RefundRequest {
   amount            Decimal             @db.Decimal(10, 2)
   /// Adet bazlı kısmi iade: order.quantity'nin kaç adedi iade ediliyor (default = tümü).
   refundQuantity    Int                 @default(1) @map("refund_quantity")
-  status            RefundRequestStatus @default(pending_review)
+  status            RefundRequestStatus @default(approved)
 
   sellerResponse String?   @map("seller_response")
   decidedBy      String?   @map("decided_by")

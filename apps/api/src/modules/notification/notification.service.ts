@@ -431,18 +431,6 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     icon: '✅',
     link: '/orders/{{orderId}}',
   },
-  [NotificationType.REFUND_REJECTED]: {
-    title: 'İade Talebiniz Reddedildi',
-    message: '{{refundNumber}} numaralı iade talebiniz reddedildi: {{reason}}',
-    icon: '❌',
-    link: '/orders/{{orderId}}',
-  },
-  [NotificationType.REFUND_DISPUTED]: {
-    title: 'İade İtirazı İnceleniyor',
-    message: '{{refundNumber}} numaralı iade talebine itiraz edildi; admin incelemesi bekleniyor.',
-    icon: '⚖️',
-    link: '/refund-requests/{{refundRequestId}}',
-  },
   [NotificationType.REFUND_RETURN_OPENED]: {
     title: 'İade Kargosu Hazır',
     message: '{{trackingNumber}} numarasıyla ürünü en yakın Sürat şubesine teslim edebilirsiniz.',

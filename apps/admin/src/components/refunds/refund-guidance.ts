@@ -3,10 +3,13 @@
  * Saf veri — UI yok. page.tsx + RefundStatusStepper + RefundNextActionPanel kullanır.
  */
 
-/** Yaşam döngüsü aşamaları (stepper sırası). */
+/**
+ * Yaşam döngüsü aşamaları (stepper sırası). İade akışı artık tam otomatik —
+ * insan "inceleme/onay" adımı yok; talep oluşur oluşmaz otomatik onaylanır ve
+ * doğrudan iade kargosu aşamasına geçer. ("İnceleme" adımı kaldırıldı.)
+ */
 export const REFUND_LIFECYCLE = [
   "Talep alındı",
-  "İnceleme",
   "İade kargosu",
   "Ürün yolda",
   "Ürün satıcıda",
@@ -15,12 +18,12 @@ export const REFUND_LIFECYCLE = [
 
 /** RefundRequestStatus → aktif aşama indeksi (REFUND_LIFECYCLE üzerinde). */
 export const refundStatusPhase: Record<string, number> = {
-  approved: 2,
-  wait_for_delivery: 2,
-  return_shipment_open: 2,
-  return_in_transit: 3,
-  return_delivered: 4,
-  refunded: 5,
+  approved: 1,
+  wait_for_delivery: 1,
+  return_shipment_open: 1,
+  return_in_transit: 2,
+  return_delivered: 3,
+  refunded: 4,
 };
 
 /** Akış dışı (terminal) durumlar — stepper'da kırmızı uç-kapağı gösterilir. */

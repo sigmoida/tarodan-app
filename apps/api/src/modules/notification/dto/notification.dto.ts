@@ -52,8 +52,8 @@ export enum NotificationType {
   // RefundRequest notifications (sipariş iadesi akışı)
   REFUND_CANCELLED = 'refund_cancelled',
   REFUND_APPROVED = 'refund_approved',
-  REFUND_REJECTED = 'refund_rejected',
-  REFUND_DISPUTED = 'refund_disputed',
+  // REFUND_REJECTED / REFUND_DISPUTED kaldırıldı: satıcı inceleme + itiraz akışı
+  // kaldırıldığından (iade artık tam otomatik) bu bildirim tipleri hiç üretilmiyordu.
   REFUND_RETURN_OPENED = 'refund_return_opened',
   REFUND_COMPLETED = 'refund_completed',
   // İade akışı — eksik adımlar (satıcı tarafı + kargo takip + talep onayı)
