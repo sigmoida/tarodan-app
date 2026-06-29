@@ -111,7 +111,7 @@ describe('Password & Email Verification flows (E2E)', () => {
       const prisma = getPrisma();
 
       // Seed an active refresh token; reset should revoke it
-      await prisma.refreshToken.create({
+      const seededRefresh = await prisma.refreshToken.create({
         data: {
           userId: user.id,
           tokenHash: 'active-refresh-hash-' + Date.now(),
@@ -153,11 +153,13 @@ describe('Password & Email Verification flows (E2E)', () => {
         .send({ email: user.email, password: 'BrandNew789!' })
         .expect(200);
 
-      // Refresh token revoked
-      const refreshTokens = await prisma.refreshToken.findMany({
-        where: { userId: user.id },
+      // Reset, RESET ÖNCESİ var olan refresh token'ları revoke etmeli. (Reset'ten
+      // SONRA yeni şifreyle yapılan login YENİ, revoke EDİLMEMİŞ bir token üretir —
+      // bu yüzden "tüm token'lar revoked" yanlış olur; seed'lenen eski token'a bakarız.)
+      const seededAfter = await prisma.refreshToken.findUnique({
+        where: { id: seededRefresh.id },
       });
-      expect(refreshTokens.every((t) => t.revokedAt !== null)).toBe(true);
+      expect(seededAfter?.revokedAt).not.toBeNull();
 
       // Token marked used
       const usedToken = await prisma.passwordResetToken.findFirst({

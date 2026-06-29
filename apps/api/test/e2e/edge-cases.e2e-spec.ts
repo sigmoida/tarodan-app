@@ -193,9 +193,11 @@ describe('Edge Cases (E2E)', () => {
     });
 
     it('rejects shipment confirm on a trade the user is not part of', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true });
-      const receiver = await createUser(ctx.module, { isSeller: true });
+      // Takas premium üyelik + teslimat adresi gerektiriyor.
+      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
       const intruder = await createUser(ctx.module);
+      await createAddress({ userId: initiator.id });
       const ip = await createProduct({
         sellerId: initiator.id,
         categoryId: baseline.categoryId,

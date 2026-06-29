@@ -33,6 +33,7 @@ describe('48h window core + auto-complete cron (E2E)', () => {
       {} as any, // productLockService
       {} as any, // storageService
       ledger,
+      { resolveTaxRate: async () => null, calculateTaxAmount: () => 0 } as any, // taxService (no-tax stub)
     );
   }
 
@@ -42,7 +43,7 @@ describe('48h window core + auto-complete cron (E2E)', () => {
         k === 'FEATURE_48H_CONFIRMATION_WINDOW' ? flagValue : undefined,
       ),
     };
-    return new OrderSchedulerService(prisma, makeOrderService(), config as any);
+    return new OrderSchedulerService(prisma, makeOrderService(), config as any, {} as any /* scheduledQueue */);
   }
 
   beforeAll(() => {
@@ -61,7 +62,7 @@ describe('48h window core + auto-complete cron (E2E)', () => {
 
   // ---------- completeOrder ----------
 
-  it('completeOrder: awaiting → completed + ledger.earned + hold released', async () => {
+  it('completeOrder: awaiting → completed + ledger.earned; hold HELD kalır (release escrow cron\'una bırakıldı)', async () => {
     const o = await setupOrderInAwaitingConfirmation({
       commissionAmount: 50,
       buyerFeeAmount: 15,
@@ -87,11 +88,14 @@ describe('48h window core + auto-complete cron (E2E)', () => {
     expect(ledgerRow!.status).toBe(CommissionLedgerStatus.earned);
     expect(ledgerRow!.earnedAt).not.toBeNull();
 
-    const hold = await prisma.paymentHold.findUnique({
+    // YENİ ESCROW KURALI (order.service.ts completeOrder): completeOrder artık
+    // PaymentHold'u SERBEST BIRAKMAZ. Satıcı payout'u tek otoriteden
+    // (releaseHoldsDue cron, releaseAt sonrası) yapılır → completion'da hold HELD kalır.
+    const hold = await prisma.paymentHold.findFirst({
       where: { paymentId: o.paymentId },
     });
-    expect(hold!.status).toBe('released');
-    expect(hold!.releasedAt).not.toBeNull();
+    expect(hold!.status).toBe('held');
+    expect(hold!.releasedAt).toBeNull();
   });
 
   it('completeOrder idempotent: ikinci çağrı noop', async () => {
@@ -189,7 +193,7 @@ describe('48h window core + auto-complete cron (E2E)', () => {
   it('cron flag OFF: hiçbir şey yapmaz', async () => {
     const o = await createExpiredAwaitingOrder();
     const s = makeScheduler(undefined);
-    await s.autoCompleteConfirmedOrders();
+    await s.runAutoCompleteConfirmedOrders();
     const updated = await prisma.order.findUnique({ where: { id: o.id } });
     expect(updated!.status).toBe(OrderStatus.awaiting_buyer_confirmation);
   });
@@ -202,7 +206,7 @@ describe('48h window core + auto-complete cron (E2E)', () => {
       buyerFee: 3,
     });
     const s = makeScheduler('true');
-    await s.autoCompleteConfirmedOrders();
+    await s.runAutoCompleteConfirmedOrders();
 
     const updated = await prisma.order.findUnique({ where: { id: o.id } });
     expect(updated!.status).toBe(OrderStatus.completed);
@@ -217,7 +221,7 @@ describe('48h window core + auto-complete cron (E2E)', () => {
   it('cron flag ON: deadline gelecekte → atlanır', async () => {
     const o = await createFutureAwaitingOrder();
     const s = makeScheduler('true');
-    await s.autoCompleteConfirmedOrders();
+    await s.runAutoCompleteConfirmedOrders();
     const updated = await prisma.order.findUnique({ where: { id: o.id } });
     expect(updated!.status).toBe(OrderStatus.awaiting_buyer_confirmation);
   });
@@ -241,7 +245,7 @@ describe('48h window core + auto-complete cron (E2E)', () => {
     });
 
     const s = makeScheduler('true');
-    await s.autoCompleteConfirmedOrders();
+    await s.runAutoCompleteConfirmedOrders();
 
     const updated = await prisma.order.findUnique({ where: { id: o.id } });
     expect(updated!.status).toBe(OrderStatus.awaiting_buyer_confirmation);
