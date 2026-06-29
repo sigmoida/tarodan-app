@@ -80,8 +80,8 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (resendIn <= 0) return;
-    const t = setInterval(() => setResendIn((s) => s - 1), 1000);
-    return () => clearInterval(t);
+    const intervalId = setInterval(() => setResendIn((s) => s - 1), 1000);
+    return () => clearInterval(intervalId);
   }, [resendIn]);
 
   const handleSendPhoneCode = async () => {
@@ -465,7 +465,7 @@ export default function SettingsPage() {
         {/* Phone Verification Modal */}
         <Modal
           isOpen={showPhoneModal}
-          onClose={() => setShowPhoneModal(false)}
+          onClose={() => { setShowPhoneModal(false); setPhoneStep('enter'); setPhoneCode(''); }}
           title={locale === 'en' ? 'Phone Verification' : 'Telefon Doğrulama'}
         >
           {phoneStep === 'enter' ? (
