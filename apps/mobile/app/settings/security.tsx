@@ -22,7 +22,7 @@ const { colors } = theme;
 
 export default function SecuritySettingsScreen() {
   const { t } = useTranslation();
-  const { isAuthenticated, logout } = useAuthStore();
+  const { isAuthenticated, logout, user, refreshUserData } = useAuthStore();
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [showTwoFactorSetup, setShowTwoFactorSetup] = useState(false);
@@ -52,6 +52,51 @@ export default function SecuritySettingsScreen() {
       active = false;
     };
   }, []);
+
+  // Telefon doğrulama
+  const [showPhoneDialog, setShowPhoneDialog] = useState(false);
+  const [phoneInput, setPhoneInput] = useState(user?.phone || '');
+  const [phoneCode, setPhoneCode] = useState('');
+  const [phoneStep, setPhoneStep] = useState<'enter' | 'verify'>('enter');
+  const [phoneVerified, setPhoneVerified] = useState(!!user?.isPhoneVerified);
+  const [resendIn, setResendIn] = useState(0);
+
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const id = setInterval(() => setResendIn((s) => s - 1), 1000);
+    return () => clearInterval(id);
+  }, [resendIn]);
+
+  const handleSendPhoneCode = async () => {
+    setLoading(true);
+    try {
+      await authApi.sendPhoneCode(phoneInput);
+      setPhoneStep('verify');
+      setResendIn(60);
+      appAlert('Bilgi', 'Doğrulama kodu telefonunuza gönderildi');
+    } catch (e: any) {
+      appAlert('Hata', e?.response?.data?.message || 'Kod gönderilemedi');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyPhone = async () => {
+    setLoading(true);
+    try {
+      await authApi.verifyPhone(phoneCode);
+      setPhoneVerified(true);
+      await refreshUserData();
+      setShowPhoneDialog(false);
+      setPhoneStep('enter');
+      setPhoneCode('');
+      appAlert('Başarılı', 'Telefon numaranız doğrulandı');
+    } catch (e: any) {
+      appAlert('Hata', e?.response?.data?.message || 'Kod hatalı');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Password change
   const [currentPassword, setCurrentPassword] = useState('');
@@ -266,6 +311,39 @@ export default function SecuritySettingsScreen() {
           ) : null}
         </Card>
 
+        {/* Phone Verification */}
+        <Text style={styles.sectionTitle}>Telefon Doğrulama</Text>
+        <Card style={styles.card}>
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Ionicons name="call-outline" size={24} color={colors.primary[600]!} />
+              <View style={styles.settingText}>
+                <Text style={styles.settingTitle}>Telefon Doğrulama</Text>
+                <Text style={styles.settingSubtitle}>
+                  {phoneVerified ? 'Telefon numaranız doğrulandı.' : 'SMS ile doğrulayın.'}
+                </Text>
+              </View>
+            </View>
+          </View>
+          {phoneVerified ? (
+            <View style={styles.verifiedBadge}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.success[600]!} />
+              <Text style={styles.verifiedText}>Doğrulandı</Text>
+            </View>
+          ) : (
+            <Button
+              title="Doğrula"
+              onPress={() => {
+                setPhoneInput(user?.phone || '');
+                setPhoneStep('enter');
+                setShowPhoneDialog(true);
+              }}
+              testID="phone-verify-button"
+              style={{ marginTop: 12 }}
+            />
+          )}
+        </Card>
+
         {/* Sessions */}
         <Text style={styles.sectionTitle}>{t('mobile.sessions')}</Text>
         <Card style={styles.card}>
@@ -383,6 +461,43 @@ export default function SecuritySettingsScreen() {
           <Button variant="ghost" title={t('mobile.cancel')} onPress={() => setShowDisableDialog(false)} />
           <Button variant="danger" title="Kapat" onPress={confirmDisableTwoFactor} isLoading={loading} />
         </View>
+      </Modal>
+
+      {/* Phone Verification Dialog */}
+      <Modal isOpen={showPhoneDialog} onClose={() => setShowPhoneDialog(false)} title="Telefon Doğrulama">
+        {phoneStep === 'enter' ? (
+          <View style={{ gap: 12 }}>
+            <Input
+              label="Telefon numarası"
+              value={phoneInput}
+              onChangeText={setPhoneInput}
+              placeholder="+905551234567"
+              keyboardType="phone-pad"
+              testID="phone-input"
+              containerStyle={styles.dialogInput}
+            />
+            <Button title="Kod Gönder" onPress={handleSendPhoneCode} disabled={loading || !phoneInput} isLoading={loading} />
+          </View>
+        ) : (
+          <View style={{ gap: 12 }}>
+            <Input
+              label="Doğrulama kodu"
+              value={phoneCode}
+              onChangeText={setPhoneCode}
+              placeholder="123456"
+              keyboardType="number-pad"
+              maxLength={6}
+              testID="phone-code-input"
+              containerStyle={styles.dialogInput}
+            />
+            <Button title="Doğrula" onPress={handleVerifyPhone} disabled={loading || phoneCode.length !== 6} isLoading={loading} />
+            <TouchableOpacity onPress={handleSendPhoneCode} disabled={resendIn > 0 || loading}>
+              <Text style={{ color: colors.text.muted, textAlign: 'center' }}>
+                {resendIn > 0 ? `Tekrar gönder ${resendIn}s` : 'Kodu tekrar gönder'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </Modal>
 
       {/* 2FA Backup Codes Regenerate Dialog */}
@@ -521,5 +636,15 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: 8,
     marginTop: 8,
+  },
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+  verifiedText: {
+    color: colors.success[600]!,
+    fontWeight: '600',
   },
 });

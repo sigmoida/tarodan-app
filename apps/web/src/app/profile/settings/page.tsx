@@ -18,7 +18,6 @@ import {
   TagIcon,
   MegaphoneIcon,
   KeyIcon,
-  FingerPrintIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { Button, Input, Modal } from '@tarodan/ui';
@@ -66,11 +65,54 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: () => void 
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading, user, logout } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user, logout, refreshUser } = useAuthStore();
   const { t, locale } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
+
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
+  const [phoneInput, setPhoneInput] = useState(user?.phone || '');
+  const [phoneCode, setPhoneCode] = useState('');
+  const [phoneStep, setPhoneStep] = useState<'enter' | 'verify'>('enter');
+  const [phoneLoading, setPhoneLoading] = useState(false);
+  const [resendIn, setResendIn] = useState(0);
+
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const intervalId = setInterval(() => setResendIn((s) => s - 1), 1000);
+    return () => clearInterval(intervalId);
+  }, [resendIn]);
+
+  const handleSendPhoneCode = async () => {
+    setPhoneLoading(true);
+    try {
+      await api.post('/auth/phone/send-code', { phone: phoneInput });
+      toast.success(locale === 'en' ? 'Code sent' : 'Kod gönderildi');
+      setPhoneStep('verify');
+      setResendIn(60);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || (locale === 'en' ? 'Failed' : 'Gönderilemedi'));
+    } finally {
+      setPhoneLoading(false);
+    }
+  };
+
+  const handleVerifyPhone = async () => {
+    setPhoneLoading(true);
+    try {
+      await api.post('/auth/phone/verify', { code: phoneCode });
+      toast.success(locale === 'en' ? 'Phone verified' : 'Telefon doğrulandı');
+      setShowPhoneModal(false);
+      setPhoneStep('enter');
+      setPhoneCode('');
+      await refreshUser();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || (locale === 'en' ? 'Invalid code' : 'Kod hatalı'));
+    } finally {
+      setPhoneLoading(false);
+    }
+  };
   
   const [settings, setSettings] = useState<NotificationSettings>({
     emailNotifications: true,
@@ -346,24 +388,38 @@ export default function SettingsPage() {
               <ArrowLeftIcon className="w-5 h-5 text-subtle rotate-180" />
             </Link>
 
-            <div className="flex items-center justify-between p-5 opacity-60">
+            <button
+              type="button"
+              onClick={() => {
+                setPhoneInput(user?.phone || '');
+                setPhoneStep('enter');
+                setShowPhoneModal(true);
+              }}
+              className="w-full flex items-center justify-between p-5 hover:bg-surface transition-colors text-left"
+            >
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-surface-alt rounded-xl flex items-center justify-center">
-                  <FingerPrintIcon className="w-5 h-5 text-muted" />
+                <div className="w-10 h-10 bg-info-50 rounded-xl flex items-center justify-center">
+                  <DevicePhoneMobileIcon className="w-5 h-5 text-info-600" />
                 </div>
                 <div>
                   <p className="font-medium text-heading">
-                    {locale === 'en' ? 'Two-Factor Authentication' : 'İki Faktörlü Doğrulama'}
+                    {locale === 'en' ? 'Phone Verification' : 'Telefon Doğrulama'}
                   </p>
                   <p className="text-sm text-muted">
-                    {locale === 'en' ? 'Add an extra layer of security' : 'Ekstra güvenlik katmanı ekleyin'}
+                    {user?.isPhoneVerified
+                      ? (locale === 'en' ? 'Your phone is verified' : 'Telefonunuz doğrulandı')
+                      : (locale === 'en' ? 'Verify your phone via SMS' : 'Telefonunuzu SMS ile doğrulayın')}
                   </p>
                 </div>
               </div>
-              <span className="text-xs bg-border-subtle text-muted px-3 py-1 rounded-full font-medium">
-                {locale === 'en' ? 'Coming Soon' : 'Yakında'}
-              </span>
-            </div>
+              {user?.isPhoneVerified ? (
+                <span className="text-xs bg-success-50 text-success-700 px-3 py-1 rounded-full font-medium">
+                  {locale === 'en' ? 'Verified' : 'Doğrulandı'}
+                </span>
+              ) : (
+                <ArrowLeftIcon className="w-5 h-5 text-subtle rotate-180" />
+              )}
+            </button>
           </div>
         </motion.div>
 
@@ -405,6 +461,50 @@ export default function SettingsPage() {
             </div>
           </div>
         </motion.div>
+
+        {/* Phone Verification Modal */}
+        <Modal
+          isOpen={showPhoneModal}
+          onClose={() => { setShowPhoneModal(false); setPhoneStep('enter'); setPhoneCode(''); }}
+          title={locale === 'en' ? 'Phone Verification' : 'Telefon Doğrulama'}
+        >
+          {phoneStep === 'enter' ? (
+            <div className="space-y-4">
+              <Input
+                label={locale === 'en' ? 'Phone number' : 'Telefon numarası'}
+                value={phoneInput}
+                onChange={(e) => setPhoneInput(e.target.value)}
+                placeholder="+905551234567"
+              />
+              <Button onClick={handleSendPhoneCode} disabled={phoneLoading || !phoneInput} className="w-full">
+                {locale === 'en' ? 'Send Code' : 'Kod Gönder'}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <Input
+                label={locale === 'en' ? 'Verification code' : 'Doğrulama kodu'}
+                value={phoneCode}
+                onChange={(e) => setPhoneCode(e.target.value)}
+                placeholder="123456"
+                maxLength={6}
+              />
+              <Button onClick={handleVerifyPhone} disabled={phoneLoading || phoneCode.length !== 6} className="w-full">
+                {locale === 'en' ? 'Verify' : 'Doğrula'}
+              </Button>
+              <button
+                type="button"
+                onClick={handleSendPhoneCode}
+                disabled={resendIn > 0 || phoneLoading}
+                className="w-full text-sm text-muted disabled:opacity-50"
+              >
+                {resendIn > 0
+                  ? `${locale === 'en' ? 'Resend in' : 'Tekrar gönder'} ${resendIn}s`
+                  : (locale === 'en' ? 'Resend code' : 'Kodu tekrar gönder')}
+              </button>
+            </div>
+          )}
+        </Modal>
 
         {/* Delete Confirmation Modal */}
         <Modal isOpen={showDeleteConfirm} onClose={() => { setShowDeleteConfirm(false); setDeleteConfirmText(''); }} title={locale === 'en' ? 'Delete Account?' : 'Hesabı Sil?'} maxWidth="max-w-md">

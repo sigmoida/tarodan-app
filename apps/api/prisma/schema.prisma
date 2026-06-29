@@ -44,7 +44,8 @@ model User {
   collections             Collection[]
   discountUsages          DiscountUsage[]
   discounts               Discount[]
-  emailVerificationTokens EmailVerificationToken[]
+  emailVerificationTokens  EmailVerificationToken[]
+  phoneVerificationTokens  PhoneVerificationToken[]
   buyerInvoices           Invoice[]                @relation("BuyerInvoices")
   sellerInvoices          Invoice[]                @relation("SellerInvoices")
   receivedMessages        Message[]                @relation("MessageReceiver")
@@ -175,6 +176,21 @@ model EmailVerificationToken {
 
   @@index([token])
   @@map("email_verification_tokens")
+}
+
+model PhoneVerificationToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  phone     String
+  codeHash  String    @map("code_hash")
+  expiresAt DateTime  @map("expires_at")
+  attempts  Int       @default(0)
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("phone_verification_tokens")
 }
 
 model NewsletterSubscriber {

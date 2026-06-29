@@ -44,6 +44,9 @@ export class UserResponseDto {
   @ApiProperty({ example: true })
   isVerified: boolean;
 
+  @ApiProperty({ example: false, required: false })
+  isPhoneVerified?: boolean;
+
   @ApiProperty({ example: false })
   isSeller: boolean;
 

@@ -15,6 +15,7 @@ import { SendGridProvider } from './providers/sendgrid.provider';
 import { ExpoPushProvider } from './providers/expo-push.provider';
 import { SmsProvider } from './providers/sms.provider';
 import { SmtpProvider } from './providers/smtp.provider';
+import { NetGsmProvider } from './providers/netgsm.provider';
 
 @Module({
   imports: [PrismaModule, ConfigModule, StorageModule, WebSocketModule],
@@ -25,6 +26,7 @@ import { SmtpProvider } from './providers/smtp.provider';
     ExpoPushProvider,
     SmsProvider,
     SmtpProvider,
+    NetGsmProvider,
   ],
   exports: [
     NotificationService,
@@ -32,6 +34,7 @@ import { SmtpProvider } from './providers/smtp.provider';
     ExpoPushProvider,
     SmsProvider,
     SmtpProvider,
+    NetGsmProvider,
   ],
 })
 export class NotificationModule {}
