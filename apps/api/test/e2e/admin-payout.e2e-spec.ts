@@ -53,8 +53,8 @@ describe('Admin Payout Management (E2E)', () => {
 
   describe('POST /api/admin/payouts/release-trade/:tradeId', () => {
     it('releases trade cash hold early when admin requests', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true });
-      const receiver = await createUser(ctx.module, { isSeller: true });
+      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
       const admin = await createAdminUser(ctx.module);
       const adminAddr = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddr.id);
@@ -142,7 +142,7 @@ describe('Admin Payout Management (E2E)', () => {
     it('retries a failed payout transfer', async () => {
       const prisma = getPrisma();
       const admin = await createAdminUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true });
+      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
 
       // Create a failed payout transfer directly
       const payout = await prisma.payoutTransfer.create({
@@ -182,7 +182,7 @@ describe('Admin Payout Management (E2E)', () => {
     it('lists failed and returned payout transfers', async () => {
       const prisma = getPrisma();
       const admin = await createAdminUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true });
+      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
 
       // Create some payouts with different statuses
       await prisma.payoutTransfer.create({

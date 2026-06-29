@@ -103,7 +103,7 @@ describe('Refund flow (E2E)', () => {
       .expect(201);
 
     expect(res.body.status).toBe(RefundRequestStatus.refunded);
-    expect(res.body.refundNumber).toMatch(/^RFD-\d{4}-\d{6}$/);
+    expect(res.body.refundNumber).toMatch(/^RFD-[A-Z2-9]+$/);
     expect(res.body.refundedAt).toBeTruthy();
 
     const order = await prisma.order.findUnique({ where: { id: orderId } });
@@ -228,7 +228,7 @@ describe('Refund flow (E2E)', () => {
     });
     expect(rr!.status).toBe(RefundRequestStatus.return_shipment_open);
     expect(rr!.returnProvider).toBe('surat');
-    expect(rr!.returnTrackingNumber).toMatch(/^RFD-\d{4}-\d{6}$/);
+    expect(rr!.returnTrackingNumber).toMatch(/^RFD-[A-Z2-9]+$/);
 
     // Stub recorded a return shipment with Iademi=true
     const returnCall = ctx.surat.shipmentCalls.find(
@@ -276,7 +276,7 @@ describe('Refund flow (E2E)', () => {
     // Auto-approved — return shipment opens during create call (no seller step)
     expect(createRes.body.status).toBe(RefundRequestStatus.return_shipment_open);
     expect(createRes.body.returnProvider).toBe('surat');
-    expect(createRes.body.returnTrackingNumber).toMatch(/^RFD-\d{4}-\d{6}$/);
+    expect(createRes.body.returnTrackingNumber).toMatch(/^RFD-[A-Z2-9]+$/);
 
     const returnCall = ctx.surat.shipmentCalls.find(
       (c) => c.OzelKargoTakipNo === createRes.body.returnTrackingNumber,
@@ -285,7 +285,7 @@ describe('Refund flow (E2E)', () => {
     expect(returnCall!.Iademi).toBe(true);
   });
 
-  it('past 14 days requires description ≥20 chars', async () => {
+  it('14 gün (cayma penceresi) GEÇTİKTEN sonra iade talebi oluşturulamaz (açıklama uzunluğundan bağımsız)', async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await createProduct({
@@ -315,14 +315,16 @@ describe('Refund flow (E2E)', () => {
       },
     });
 
-    const tooShort = await request(ctx.app.getHttpServer())
+    // Yeni politika (refund.service.ts COOLING_OFF_DAYS=14): 14 gün GEÇTİKTEN sonra
+    // (past_cooling_off) iade YOK — uzun/kısa açıklama fark etmez, ikisi de reddedilir.
+    const shortDesc = await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/refund-requests`)
       .set(authHeader(buyer))
       .send({ reason: 'damaged', description: 'broken' })
       .expect(400);
-    expect(tooShort.body.message).toMatch(/zorunlu|kanıt|cayma/i);
+    expect(shortDesc.body.message).toMatch(/süresi dolmuştur|artık iade talebi/i);
 
-    const ok = await request(ctx.app.getHttpServer())
+    const longDesc = await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/refund-requests`)
       .set(authHeader(buyer))
       .send({
@@ -330,8 +332,8 @@ describe('Refund flow (E2E)', () => {
         description: 'Ürün ambalajı yırtık geldi, kapısı kırık.',
         evidencePhotoUrls: ['https://example.com/photo1.jpg'],
       })
-      .expect(201);
-    expect(ok.body.status).toBe(RefundRequestStatus.pending_review);
+      .expect(400);
+    expect(longDesc.body.message).toMatch(/süresi dolmuştur|artık iade talebi/i);
   });
 
   it('refuses refund on pending_payment order (must cancel order instead)', async () => {

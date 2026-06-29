@@ -87,7 +87,7 @@ describe('Money Flow Timeline (E2E)', () => {
   describe('Order: pay → hold → confirm → release after window', () => {
     it('PaymentHold is held during fulfillment, released only after the cron fires past releaseAt', async () => {
       const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true });
+      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
       const product = await createProduct({
         sellerId: seller.id,
         categoryId: baseline.categoryId,
@@ -128,7 +128,8 @@ describe('Money Flow Timeline (E2E)', () => {
       expect(hold).toBeTruthy();
       expect(hold?.status).toBe(PaymentHoldStatus.held);
       expect(hold?.releasedAt).toBeNull();
-      expect(hold?.releaseAt).toBeTruthy();
+      // releaseAt ödeme anında NULL — yalnızca TESLİMDE hesaplanır (escrow güvenliği).
+      expect(hold?.releaseAt).toBeNull();
 
       // T+release: confirm delivery (manual delivered transition for test brevity)
       await prisma.order.update({
@@ -178,8 +179,8 @@ describe('Money Flow Timeline (E2E)', () => {
 
   describe('Trade cash: escrowed during fulfilment, recipient paid only after both confirm + window', () => {
     it('completes a cash trade and only releases TradeCashPayment after holdReleaseAt passes', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true });
-      const receiver = await createUser(ctx.module, { isSeller: true });
+      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
       const admin = await createAdminUser(ctx.module);
       const adminAddr = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddr.id);
@@ -327,8 +328,8 @@ describe('Money Flow Timeline (E2E)', () => {
 
   describe('Trade cash refund on cancellation', () => {
     it('refundTradeCashPaymentIfCompleted issues a PayTR refund and stamps refundedAt', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true });
-      const receiver = await createUser(ctx.module, { isSeller: true });
+      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
       const admin = await createAdminUser(ctx.module);
       const adminAddr = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddr.id);
@@ -404,7 +405,7 @@ describe('Money Flow Timeline (E2E)', () => {
   describe('Order refund restores product stock', () => {
     it('processRefund cancels order, cancels hold, and re-stocks the product', async () => {
       const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true });
+      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
       const product = await createProduct({
         sellerId: seller.id,
         categoryId: baseline.categoryId,
@@ -457,8 +458,8 @@ describe('Money Flow Timeline (E2E)', () => {
 
   describe('Trade cash refund after admin warehouse rejection', () => {
     it('admin reject triggers PayTR refund for completed cash payment', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true });
-      const receiver = await createUser(ctx.module, { isSeller: true });
+      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
       const admin = await createAdminUser(ctx.module);
       const adminAddr = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddr.id);
@@ -554,8 +555,8 @@ describe('Money Flow Timeline (E2E)', () => {
 
   describe('Trade cash refund blocks future PayoutTransfer', () => {
     it('no PayoutTransfer is created after refund', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true });
-      const receiver = await createUser(ctx.module, { isSeller: true });
+      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
       const admin = await createAdminUser(ctx.module);
       const adminAddr = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddr.id);

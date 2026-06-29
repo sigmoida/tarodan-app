@@ -28,6 +28,12 @@ export async function createUser(
     isEmailVerified: boolean;
     isVerified: boolean;
     sellerType: 'platform' | 'business' | 'individual';
+    /**
+     * Aktif `basic` (ücretli) üyelik bağlar → isPremiumEntitled=true + tier.canTrade=true.
+     * Takas (trade) artık premium özellik olduğu için trade akışı test eden kullanıcılar
+     * bunu kullanmalı (seedBaseline `basic` tier'ı yaratır). Free kullanıcı takas YAPAMAZ.
+     */
+    premium: boolean;
   }> = {},
 ): Promise<CreatedTestUser> {
   const prisma = getPrisma();
@@ -49,6 +55,29 @@ export async function createUser(
       birthDate: new Date('1990-01-01'),
     },
   });
+
+  if (opts.premium) {
+    const tier = await prisma.membershipTier.findFirst({
+      where: { type: 'basic', isActive: true },
+    });
+    if (!tier) {
+      throw new Error(
+        'createUser({ premium: true }) için `basic` membership tier yok — seedBaseline çağrıldı mı?',
+      );
+    }
+    const now = new Date();
+    const periodEnd = new Date(now);
+    periodEnd.setMonth(periodEnd.getMonth() + 1);
+    await prisma.userMembership.create({
+      data: {
+        userId: user.id,
+        tierId: tier.id,
+        status: 'active',
+        currentPeriodStart: now,
+        currentPeriodEnd: periodEnd,
+      },
+    });
+  }
 
   const accessToken = await signAccessToken(module, {
     sub: user.id,

@@ -410,7 +410,7 @@ describe('Offer Flow (E2E)', () => {
       });
 
       const scheduler = ctx.app.get(OfferSchedulerService);
-      await scheduler.handleExpiredOffers();
+      await scheduler.runHandleExpiredOffers();
 
       const prisma = getPrisma();
       const staleAfter = await prisma.offer.findUnique({ where: { id: stale.id } });

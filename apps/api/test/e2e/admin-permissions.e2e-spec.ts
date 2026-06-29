@@ -106,14 +106,22 @@ describe('Admin role-based permissions (E2E)', () => {
     });
   });
 
-  describe('Settings — super_admin only for write', () => {
-    it('admin can read settings', async () => {
-      const admin = await createAdminUser(ctx.module, { role: AdminRole.admin });
+  describe('Settings — super_admin only (read + write)', () => {
+    it('super_admin can read settings; non-super admin is forbidden', async () => {
+      // Permission matrix (DEFAULT_ROLE_PERMISSIONS): `settings`/`payment_settings`
+      // YALNIZCA super_admin'de var; `admin` rolü hariç. Matrix @Roles'u ezer →
+      // settings okuma da yazma da super_admin-only.
+      const superAdmin = await createAdminUser(ctx.module, { role: AdminRole.super_admin });
+      await request(ctx.app.getHttpServer())
+        .get('/api/admin/settings')
+        .set(authHeader(superAdmin))
+        .expect(200);
 
+      const admin = await createAdminUser(ctx.module, { role: AdminRole.admin });
       await request(ctx.app.getHttpServer())
         .get('/api/admin/settings')
         .set(authHeader(admin))
-        .expect(200);
+        .expect(403);
     });
 
     it('public settings are accessible without admin role', async () => {

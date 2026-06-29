@@ -32,6 +32,7 @@ describe('OrderService.calculateCommission (BUYER + SELLER ayrı lookup) (E2E)',
       {} as any,
       {} as any,
       ledger,
+      { resolveTaxRate: async () => null, calculateTaxAmount: () => 0 } as any, // taxService (no-tax stub)
     );
   }
 

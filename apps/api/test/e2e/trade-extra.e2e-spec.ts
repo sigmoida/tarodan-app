@@ -9,6 +9,7 @@ import {
 } from '../test-utils/db';
 import { createUser, authHeader } from '../factories/user.factory';
 import { createProduct } from '../factories/product.factory';
+import { createAddress } from '../factories/address.factory';
 
 describe('Trade extra endpoints (E2E)', () => {
   let ctx: E2ETestApp;
@@ -29,8 +30,11 @@ describe('Trade extra endpoints (E2E)', () => {
   });
 
   async function createPendingTrade() {
-    const initiator = await createUser(ctx.module, { isSeller: true });
-    const receiver = await createUser(ctx.module, { isSeller: true });
+    // Takas artık premium üyelik + teslimat adresi gerektiriyor (ürün politikası).
+    const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+    const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
+    await createAddress({ userId: initiator.id });
+    await createAddress({ userId: receiver.id });
     const productI = await createProduct({
       sellerId: initiator.id,
       categoryId: baseline.categoryId,

@@ -12,7 +12,7 @@ import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { InitiatePaymentDto, PaymentProvider, PayTRCallbackDto, DirectPaymentDto } from './dto';
 import { Prisma, PaymentStatus, PaymentHoldStatus, OrderStatus, ProductStatus, SubscriptionStatus, TradeStatus, OfferStatus, RefundRequestStatus, SavedCardStatus } from '@prisma/client';
-import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
+import { getProductStatusFromQuantity, getReservedAwareStatus } from '../product/helpers/product-status.helper';
 import { safeDecrementReserved } from '../product/helpers/product-availability.helper';
 import { computeRelevanceScore, RELEVANCE_PREMIUM_BONUS } from '../product/helpers/relevance-score';
 import { PayTRService, PayTRBuyer } from '../payment-providers/paytr.service';
@@ -1652,6 +1652,10 @@ export class PaymentService {
       } else {
         // Regular product order: ödeme başarılı → quantity--, reservedQuantity--
         productIdsToInvalidate.push(payment.order.productId);
+        // Bulgu E: ürün satırını FOR UPDATE ile kilitle. Rezervasyon normalde 1-stoklu
+        // üründe ikinci ödemeyi engeller, ama reservedQuantity drift'i olursa iki eşzamanlı
+        // ödeme quantity'yi negatife itebilir. Kilit + clamp'li mutlak set bunu kapatır.
+        await tx.$queryRaw`SELECT id FROM products WHERE id = ${payment.order.productId} FOR UPDATE`;
         const product = await tx.product.findUnique({
           where: { id: payment.order.productId },
         });
@@ -1662,13 +1666,15 @@ export class PaymentService {
 
         const orderQty = payment.order?.quantity ?? 1;
         const newQuantity =
-          product.quantity !== null ? product.quantity - orderQty : null;
+          product.quantity !== null ? Math.max(0, product.quantity - orderQty) : null;
         const updateData: any = {
           status: getProductStatusFromQuantity(newQuantity),
           reservedQuantity: safeDecrementReserved(product.reservedQuantity, orderQty),
         };
         if (product.quantity !== null) {
-          updateData.quantity = { decrement: orderQty };
+          // Clamp'li mutlak set (FOR UPDATE kilidi altında yarışsız); { decrement } yerine
+          // GREATEST(quantity-orderQty, 0) eşdeğeri — negatif stok imkânsız.
+          updateData.quantity = newQuantity;
         }
 
         await tx.product.update({
@@ -2033,6 +2039,8 @@ export class PaymentService {
         // 2. geçiş: ürün başına stok düşümü + stockout kaskadı + hold + ledger
         for (const order of aliveOrders) {
           productIdsToInvalidate.push(order.productId);
+          // Bulgu E: ürün satırını FOR UPDATE ile kilitle (regular path ile aynı savunma).
+          await tx.$queryRaw`SELECT id FROM products WHERE id = ${order.productId} FOR UPDATE`;
           const product = await tx.product.findUnique({
             where: { id: order.productId },
           });
@@ -2043,13 +2051,14 @@ export class PaymentService {
           // Adet bazlı stok düşümü: sipariş adedi kadar quantity-- ve reserved--.
           const orderQty = order.quantity ?? 1;
           const newQuantity =
-            product.quantity !== null ? product.quantity - orderQty : null;
+            product.quantity !== null ? Math.max(0, product.quantity - orderQty) : null;
           const updateData: any = {
             status: getProductStatusFromQuantity(newQuantity),
             reservedQuantity: safeDecrementReserved(product.reservedQuantity, orderQty),
           };
           if (product.quantity !== null) {
-            updateData.quantity = { decrement: orderQty };
+            // Clamp'li mutlak set (FOR UPDATE altında yarışsız) — negatif stok imkânsız.
+            updateData.quantity = newQuantity;
           }
           await tx.product.update({
             where: { id: order.productId },
@@ -2323,7 +2332,13 @@ export class PaymentService {
     try {
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
-        select: { status: true, productId: true, offerId: true, quantity: true },
+        select: {
+          status: true,
+          productId: true,
+          offerId: true,
+          quantity: true,
+          reservationReleasedAt: true,
+        },
       });
       if (!order || order.status !== OrderStatus.pending_payment || !order.productId) return;
 
@@ -2333,8 +2348,13 @@ export class PaymentService {
       });
       const beforeAvailable = (before?.quantity ?? 0) - (before?.reservedQuantity ?? 0);
 
+      // GUARD (Bulgu I): 5dk cron (releaseExpiredOrderReservations) rezervi ZATEN
+      // bıraktıysa (reservationReleasedAt dolu) burada TEKRAR bırakmayız — yoksa
+      // eşzamanlı başka alıcının canlı rezervini "çalarız". Sipariş/teklif iptali
+      // yine yapılır; yalnız reservedQuantity decrement'i atlanır.
+      const alreadyReleased = order.reservationReleasedAt !== null;
       const updateData: { reservedQuantity?: number; status?: ProductStatus } = {};
-      if (before) {
+      if (before && !alreadyReleased) {
         // Adet bazlı: rezervasyonu sipariş adedi kadar serbest bırak (1 değil).
         const newReserved = safeDecrementReserved(
           before.reservedQuantity,
@@ -2349,7 +2369,11 @@ export class PaymentService {
       await this.prisma.$transaction([
         this.prisma.order.update({
           where: { id: orderId },
-          data: { status: OrderStatus.cancelled },
+          data: {
+            status: OrderStatus.cancelled,
+            // İlk kez burada bırakıyorsak işaretle (idempotency / çift-bırakma koruması).
+            ...(alreadyReleased ? {} : { reservationReleasedAt: new Date() }),
+          },
         }),
         ...(before && Object.keys(updateData).length > 0
           ? [
@@ -4478,17 +4502,12 @@ export class PaymentService {
               product.reservedQuantity,
               freshOrder.quantity ?? 1,
             );
-            const remaining = (product.quantity ?? 0) - newReserved;
             await tx.product.update({
               where: { id: order.productId },
               data: {
                 reservedQuantity: newReserved,
-                status:
-                  newReserved > 0
-                    ? ProductStatus.reserved
-                    : remaining > 0
-                      ? ProductStatus.active
-                      : ProductStatus.reserved,
+                // Bulgu C: rezerv-duyarlı status (quantity=null → active, quantity=0 → inactive).
+                status: getReservedAwareStatus(product.quantity, newReserved),
               },
             });
           }
@@ -4550,15 +4569,35 @@ export class PaymentService {
         // OLUŞTURMAZ; bu yüzden takas rezervasyonunu ayrıca toplamazsak sayaç drift
         // sanılıp sıfırlanır ve takas-rezerveli ürün yanlışlıkla "stokta" görünür.
         // Adet bazlı: rezervasyon order ADEDİ değil, order.quantity TOPLAMIdır.
-        const orderHeldAgg = await this.prisma.order.aggregate({
+        // Bulgu D: rezervasyon kuralıyla AYNI sayım. Bir sipariş rezervasyon tutar iff
+        //   - direct-buy (offerId IS NULL): create'de rezerve edilir → her zaman sayılır
+        //   - teklif (offerId IS NOT NULL): rezerv yalnız ödeme başlatınca (Payment satırı
+        //     oluşunca) alınır → yalnız Payment satırı varsa sayılır.
+        // Eski sürüm ödemesi hiç başlatılmamış teklif siparişlerini de sayıp reservedQuantity'yi
+        // şişiriyordu → ürün yanlışlıkla "Stok bitti" görünüyordu.
+        // (invalidatePendingOrdersForProduct'taki kuralla birebir aynı.)
+        const directBuyHeldAgg = await this.prisma.order.aggregate({
           _sum: { quantity: true },
           where: {
             productId: id,
             status: OrderStatus.pending_payment,
             reservationReleasedAt: null,
+            offerId: null,
           },
         });
-        const orderHeld = orderHeldAgg._sum.quantity ?? 0;
+        const offerWithPaymentHeldAgg = await this.prisma.order.aggregate({
+          _sum: { quantity: true },
+          where: {
+            productId: id,
+            status: OrderStatus.pending_payment,
+            reservationReleasedAt: null,
+            offerId: { not: null },
+            payment: { isNot: null },
+          },
+        });
+        const orderHeld =
+          (directBuyHeldAgg._sum.quantity ?? 0) +
+          (offerWithPaymentHeldAgg._sum.quantity ?? 0);
         const tradeHeldAgg = await this.prisma.tradeItem.aggregate({
           _sum: { quantity: true },
           where: {
@@ -4652,17 +4691,12 @@ export class PaymentService {
                 product.reservedQuantity,
                 fresh.quantity ?? 1,
               );
-              const remaining = (product.quantity ?? 0) - newReserved;
               await tx.product.update({
                 where: { id: order.productId },
                 data: {
                   reservedQuantity: newReserved,
-                  status:
-                    newReserved > 0
-                      ? ProductStatus.reserved
-                      : remaining > 0
-                        ? ProductStatus.active
-                        : ProductStatus.reserved,
+                  // Bulgu C: rezerv-duyarlı status (quantity=null → active, quantity=0 → inactive).
+                  status: getReservedAwareStatus(product.quantity, newReserved),
                 },
               });
             }

@@ -476,11 +476,25 @@ export class ProductService implements OnModuleInit {
    * Popüler ilanlar – sadece view count'a göre, indirim filtresi yok (cache yok)
    * GET /products/popular
    */
+  /**
+   * Bulgu A: rezerv-duyarlı "stokta" koşulu. findAllViaPostgres'teki kanonik
+   * inStockCondition ile birebir aynı — tamamen rezerve edilmiş ürün
+   * (quantity=1, reserved=1, available=0) listeden çıkar. Tek `quantity > 0`
+   * filtresi reserved'ı yok sayıp sold-out ürünü "stokta" gibi sızdırıyordu.
+   */
+  private inStockOrConditions(): Prisma.ProductWhereInput[] {
+    return [
+      { quantity: null },
+      { reservedQuantity: null, quantity: { gt: 0 } },
+      { quantity: { gt: this.prisma.product.fields.reservedQuantity } },
+    ];
+  }
+
   async findPopular(limit: number, page: number) {
     const where: Prisma.ProductWhereInput = {
       status: ProductStatus.active,
       NOT: { id: { startsWith: 'membership-' } },
-      AND: [{ OR: [{ quantity: { gt: 0 } }, { quantity: null }] }],
+      AND: [{ OR: this.inStockOrConditions() }],
     };
     const total = await this.prisma.product.count({ where });
     const products = await this.prisma.product.findMany({
@@ -951,10 +965,10 @@ export class ProductService implements OnModuleInit {
         categoryId: product.categoryId,
         id: { not: productId },
         status: ProductStatus.active,
-        // Match the canonical product-list filter (build-product-where.ts:56):
-        // quantity = null means "sınırsız stok" (digital/preorder) — must be
-        // included, not filtered out by a naive `> 0`.
-        OR: [{ quantity: { gt: 0 } }, { quantity: null }],
+        // Bulgu A: rezerv-duyarlı stok filtresi (kanonik inStockCondition ile aynı).
+        // quantity = null → sınırsız stok (dijital/preorder) dahil; tamamen rezerve
+        // ürün (available=0) "alternatif ürünler"de gösterilmez.
+        OR: this.inStockOrConditions(),
       },
       orderBy: { createdAt: 'desc' },
       take: Math.min(limit, 24),
