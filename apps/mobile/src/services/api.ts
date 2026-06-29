@@ -214,6 +214,10 @@ export const authApi = {
     api.post<{ backupCodes?: string[] } | string[]>('/security/2fa/backup-codes', { code }),
   /** Tüm cihazlardan çıkış — backend: DELETE /security/tokens */
   logoutAll: () => api.delete('/security/tokens'),
+  /** SMS telefon doğrulama kodu gönder */
+  sendPhoneCode: (phone: string) => api.post('/auth/phone/send-code', { phone }),
+  /** SMS doğrulama kodunu doğrula */
+  verifyPhone: (code: string) => api.post('/auth/phone/verify', { code }),
 };
 
 // Products API - Web ile aynı endpoint'ler
