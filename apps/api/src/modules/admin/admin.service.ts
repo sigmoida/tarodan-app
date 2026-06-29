@@ -552,85 +552,91 @@ export class AdminService {
 
         if (dto.key === 'basic_monthly_price' || dto.key === 'yearly_discount_percentage') {
           // Update basic tier
+          const basicTier = await this.prisma.membershipTier.findUnique({
+            where: { type: 'basic' },
+          });
           const basicMonthlySetting = await this.prisma.platformSetting.findUnique({
             where: { settingKey: 'basic_monthly_price' },
           });
+          // Aylık fiyat ayarı yoksa (PlatformSetting satırı seed'lenmemiş olabilir),
+          // tier'ın kayıtlı aylık fiyatına düş — böylece yalnız indirim değişse bile
+          // yıllık fiyat yeniden hesaplanır (eskiden ayar yoksa tier atlanıyor, yıllık
+          // eski indirimde takılı kalıyordu).
           const basicMonthly = basicMonthlySetting
             ? parseFloat(basicMonthlySetting.settingValue)
-            : (dto.key === 'basic_monthly_price' ? parseFloat(dto.value) : null);
+            : (dto.key === 'basic_monthly_price'
+              ? parseFloat(dto.value)
+              : (basicTier ? Number(basicTier.monthlyPrice) : null));
 
-          if (basicMonthly !== null && !isNaN(basicMonthly)) {
-            const basicYearly = basicMonthly * 12 * (1 - finalDiscount / 100);
-            const basicTier = await this.prisma.membershipTier.findUnique({
-              where: { type: 'basic' },
+          if (basicTier && basicMonthly !== null && !isNaN(basicMonthly)) {
+            // 2 ondalığa yuvarla (admin computedYearly ile birebir; 419,916 gibi artığı önler).
+            const basicYearly = Math.round(basicMonthly * 12 * (1 - finalDiscount / 100) * 100) / 100;
+            await this.prisma.membershipTier.update({
+              where: { id: basicTier.id },
+              data: {
+                monthlyPrice: basicMonthly,
+                yearlyPrice: basicYearly,
+              },
             });
-
-            if (basicTier) {
-              await this.prisma.membershipTier.update({
-                where: { id: basicTier.id },
-                data: {
-                  monthlyPrice: basicMonthly,
-                  yearlyPrice: basicYearly,
-                },
-              });
-              this.logger.log(`Updated basic tier: monthly=${basicMonthly}, yearly=${basicYearly} (${finalDiscount}% discount)`);
-            }
+            this.logger.log(`Updated basic tier: monthly=${basicMonthly}, yearly=${basicYearly} (${finalDiscount}% discount)`);
           }
         }
 
         if (dto.key === 'premium_monthly_price' || dto.key === 'yearly_discount_percentage') {
           // Update premium tier
+          const premiumTier = await this.prisma.membershipTier.findUnique({
+            where: { type: 'premium' },
+          });
           const premiumMonthlySetting = await this.prisma.platformSetting.findUnique({
             where: { settingKey: 'premium_monthly_price' },
           });
+          // Aylık fiyat ayarı yoksa tier'ın kayıtlı aylık fiyatına düş (bkz. basic).
           const premiumMonthly = premiumMonthlySetting
             ? parseFloat(premiumMonthlySetting.settingValue)
-            : (dto.key === 'premium_monthly_price' ? parseFloat(dto.value) : null);
+            : (dto.key === 'premium_monthly_price'
+              ? parseFloat(dto.value)
+              : (premiumTier ? Number(premiumTier.monthlyPrice) : null));
 
-          if (premiumMonthly !== null && !isNaN(premiumMonthly)) {
-            const premiumYearly = premiumMonthly * 12 * (1 - finalDiscount / 100);
-            const premiumTier = await this.prisma.membershipTier.findUnique({
-              where: { type: 'premium' },
+          if (premiumTier && premiumMonthly !== null && !isNaN(premiumMonthly)) {
+            // 2 ondalığa yuvarla (admin computedYearly ile birebir; 839,916 gibi artığı önler).
+            const premiumYearly = Math.round(premiumMonthly * 12 * (1 - finalDiscount / 100) * 100) / 100;
+            await this.prisma.membershipTier.update({
+              where: { id: premiumTier.id },
+              data: {
+                monthlyPrice: premiumMonthly,
+                yearlyPrice: premiumYearly,
+              },
             });
-
-            if (premiumTier) {
-              await this.prisma.membershipTier.update({
-                where: { id: premiumTier.id },
-                data: {
-                  monthlyPrice: premiumMonthly,
-                  yearlyPrice: premiumYearly,
-                },
-              });
-              this.logger.log(`Updated premium tier: monthly=${premiumMonthly}, yearly=${premiumYearly} (${finalDiscount}% discount)`);
-            }
+            this.logger.log(`Updated premium tier: monthly=${premiumMonthly}, yearly=${premiumYearly} (${finalDiscount}% discount)`);
           }
         }
 
         if (dto.key === 'business_monthly_price' || dto.key === 'yearly_discount_percentage') {
           // Update business tier
+          const businessTier = await this.prisma.membershipTier.findUnique({
+            where: { type: 'business' },
+          });
           const businessMonthlySetting = await this.prisma.platformSetting.findUnique({
             where: { settingKey: 'business_monthly_price' },
           });
+          // Aylık fiyat ayarı yoksa tier'ın kayıtlı aylık fiyatına düş (bkz. basic).
           const businessMonthly = businessMonthlySetting
             ? parseFloat(businessMonthlySetting.settingValue)
-            : (dto.key === 'business_monthly_price' ? parseFloat(dto.value) : null);
+            : (dto.key === 'business_monthly_price'
+              ? parseFloat(dto.value)
+              : (businessTier ? Number(businessTier.monthlyPrice) : null));
 
-          if (businessMonthly !== null && !isNaN(businessMonthly)) {
-            const businessYearly = businessMonthly * 12 * (1 - finalDiscount / 100);
-            const businessTier = await this.prisma.membershipTier.findUnique({
-              where: { type: 'business' },
+          if (businessTier && businessMonthly !== null && !isNaN(businessMonthly)) {
+            // 2 ondalığa yuvarla (admin computedYearly ile birebir; 2.099,916 gibi artığı önler).
+            const businessYearly = Math.round(businessMonthly * 12 * (1 - finalDiscount / 100) * 100) / 100;
+            await this.prisma.membershipTier.update({
+              where: { id: businessTier.id },
+              data: {
+                monthlyPrice: businessMonthly,
+                yearlyPrice: businessYearly,
+              },
             });
-
-            if (businessTier) {
-              await this.prisma.membershipTier.update({
-                where: { id: businessTier.id },
-                data: {
-                  monthlyPrice: businessMonthly,
-                  yearlyPrice: businessYearly,
-                },
-              });
-              this.logger.log(`Updated business tier: monthly=${businessMonthly}, yearly=${businessYearly} (${finalDiscount}% discount)`);
-            }
+            this.logger.log(`Updated business tier: monthly=${businessMonthly}, yearly=${businessYearly} (${finalDiscount}% discount)`);
           }
         }
       } catch (error) {
@@ -6969,128 +6975,6 @@ export class AdminService {
         .filter((img: any) => img.url);
     }
     return rr;
-  }
-
-  /**
-   * Admin resolves a disputed refund: either approves (opens return shipment)
-   * or rejects (closes the request without refund).
-   */
-  async resolveRefundDispute(
-    adminId: string,
-    refundRequestId: string,
-    dto: { resolution: 'approve' | 'reject'; notes: string },
-  ) {
-    const notes = dto?.notes?.trim();
-    if (!notes || notes.length < 10) {
-      throw new BadRequestException('Çözüm notu en az 10 karakter olmalıdır');
-    }
-
-    const rr = await this.prisma.refundRequest.findUnique({
-      where: { id: refundRequestId },
-      include: { order: true },
-    });
-    if (!rr) throw new NotFoundException('İade talebi bulunamadı');
-    if (rr.status !== 'disputed') {
-      throw new BadRequestException(
-        `Talep durumu '${rr.status}' itiraz çözümü için uygun değil. Beklenen: disputed`,
-      );
-    }
-
-    const previousMetadata = (rr.metadata as Record<string, any>) || {};
-    const history = Array.isArray(previousMetadata.history)
-      ? previousMetadata.history
-      : [];
-
-    if (dto.resolution === 'approve') {
-      // Approve → open return shipment (state geçişi RefundService içinde)
-      await this.refundService.openReturnShipment(rr.id);
-      await this.prisma.refundRequest.update({
-        where: { id: rr.id },
-        data: {
-          decidedBy: adminId,
-          decidedAt: new Date(),
-          metadata: {
-            ...previousMetadata,
-            history: [
-              ...history,
-              {
-                action: 'dispute_resolved_approve',
-                by: adminId,
-                at: new Date().toISOString(),
-                details: { notes },
-              },
-            ],
-          },
-        },
-      });
-      await this.createAuditLog(
-        adminId,
-        'refund_dispute_resolve_approve',
-        'RefundRequest',
-        rr.id,
-        { status: rr.status },
-        { resolution: 'approve', notes },
-      );
-      return { success: true, refundRequestId: rr.id, resolution: 'approve' };
-    }
-
-    // Reject: status → rejected, audit + buyer notification
-    const updated = await this.prisma.refundRequest.update({
-      where: { id: rr.id },
-      data: {
-        status: 'rejected',
-        decidedBy: adminId,
-        decidedAt: new Date(),
-        sellerResponse: rr.sellerResponse ?? notes,
-        metadata: {
-          ...previousMetadata,
-          history: [
-            ...history,
-            {
-              action: 'dispute_resolved_reject',
-              by: adminId,
-              at: new Date().toISOString(),
-              details: { notes },
-            },
-          ],
-        },
-      },
-    });
-    // İade reddedildi → satıcı hold kilidini kaldır; escrow normal akışına döner
-    // (teslim+return+grace dolduysa bir sonraki cron turunda payout edilir).
-    await this.prisma.paymentHold.updateMany({
-      where: { orderId: rr.orderId, status: 'held', NOT: { frozenByRefundId: null } },
-      data: { frozenByRefundId: null },
-    });
-    await this.createAuditLog(
-      adminId,
-      'refund_dispute_resolve_reject',
-      'RefundRequest',
-      rr.id,
-      { status: rr.status },
-      { resolution: 'reject', notes },
-    );
-    try {
-      await this.notificationService.createInAppNotification(
-        rr.requesterId,
-        NotificationType.REFUND_REJECTED,
-        {
-          refundNumber: rr.refundNumber,
-          orderId: rr.orderId,
-          reason: notes,
-        },
-      );
-    } catch (err: any) {
-      this.logger.error(
-        `REFUND_REJECTED notification failed for ${rr.id}: ${err?.message}`,
-      );
-    }
-    return {
-      success: true,
-      refundRequestId: rr.id,
-      resolution: 'reject',
-      status: updated.status,
-    };
   }
 
   /**
