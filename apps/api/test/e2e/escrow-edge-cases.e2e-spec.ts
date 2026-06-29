@@ -84,8 +84,8 @@ describe('Escrow Edge Cases (E2E)', () => {
 
   describe('Auto-confirm expired receipts', () => {
     it('auto-completes a trade when confirmationDeadline passes without user confirmation', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true });
-      const receiver = await createUser(ctx.module, { isSeller: true });
+      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
       const admin = await createAdminUser(ctx.module);
       const adminAddr = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddr.id);
@@ -336,8 +336,8 @@ describe('Escrow Edge Cases (E2E)', () => {
 
   describe('Auto-confirm with cash hold', () => {
     it('auto-confirm on cash trade sets holdReleaseAt after completion', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true });
-      const receiver = await createUser(ctx.module, { isSeller: true });
+      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
       const admin = await createAdminUser(ctx.module);
       const adminAddr = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddr.id);
@@ -690,8 +690,8 @@ describe('Escrow Edge Cases (E2E)', () => {
 
   describe('Admin warehouse — Sürat shipment submission', () => {
     async function setupApprovedTrade() {
-      const initiator = await createUser(ctx.module, { isSeller: true });
-      const receiver = await createUser(ctx.module, { isSeller: true });
+      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
       const admin = await createAdminUser(ctx.module);
       const adminAddr = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddr.id);
@@ -787,8 +787,8 @@ describe('Escrow Edge Cases (E2E)', () => {
 
   describe('Trade cancellation cancels Sürat shipments', () => {
     it('resolveDispute with cancel_trade cancels active Sürat shipments', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true });
-      const receiver = await createUser(ctx.module, { isSeller: true });
+      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
       const admin = await createAdminUser(ctx.module);
       const adminAddr = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddr.id);
@@ -870,8 +870,8 @@ describe('Escrow Edge Cases (E2E)', () => {
       process.env.SURAT_STUB_RESPONSE = 'Adres eksik';
 
       try {
-        const initiator = await createUser(ctx.module, { isSeller: true });
-        const receiver = await createUser(ctx.module, { isSeller: true });
+        const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+        const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
         const admin = await createAdminUser(ctx.module);
         const adminAddr = await createAddress({ userId: admin.id });
         await configureWarehouseAddress(adminAddr.id);
