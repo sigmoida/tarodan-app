@@ -203,6 +203,16 @@ export default function MembershipCheckoutPage() {
         router.push(`/payment/${paymentId}?type=membership&kind=${kind}`);
         return;
       }
+
+      // Ertelemeli downgrade: backend tier'ı HEMEN değiştirmez (scheduledTierType döner),
+      // ödeme istemez. Mevcut (yüksek) plan dönem sonuna kadar sürer. "Tebrikler, yeni
+      // üyelik" demek yanıltıcı olur; kullanıcıya geçişin ileri tarihli olduğunu anlat.
+      if (data.scheduledTierType) {
+        await refreshUserData();
+        router.push(`/membership/success?tier=${tier}&kind=downgrade&scheduled=1`);
+        return;
+      }
+
       toast.success(changeSuccessMessage());
       await refreshUserData();
       router.push(`/membership/success?tier=${tier}&kind=${kind}`);

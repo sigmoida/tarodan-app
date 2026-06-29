@@ -178,6 +178,8 @@ export class UserMembershipResponseDto {
   pendingTierName?: string;
   /** Ödeme bekleniyor – üyelik sayfasında "satın alınmış" gibi gösterme */
   pendingPayment?: boolean;
+  /** Ertelemeli downgrade: dönem sonunda geçilecek tier (null/yoksa bekleyen yok) */
+  scheduledTierType?: MembershipTierType;
   // Computed usage stats
   usedFreeListings: number;
   usedTotalListings: number;

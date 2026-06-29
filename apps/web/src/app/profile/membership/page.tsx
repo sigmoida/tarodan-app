@@ -53,6 +53,7 @@ export default function MembershipPage() {
     pendingPayment?: boolean;
     pendingTierName?: string;
     pendingTierType?: string;
+    scheduledTierType?: string;
     autoRenew?: boolean;
   } | null>(null);
   const [autoRenewSaving, setAutoRenewSaving] = useState(false);
@@ -114,6 +115,7 @@ export default function MembershipPage() {
           pendingPayment: pendingPayment || undefined,
           pendingTierName: membership.pendingTierName,
           pendingTierType: membership.pendingTierType,
+          scheduledTierType: membership.scheduledTierType,
           autoRenew: membership.autoRenew,
         });
       }
@@ -442,6 +444,25 @@ export default function MembershipPage() {
                   ? `${new Date(membershipDetails.currentPeriodEnd).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric' })} tarihine kadar`
                   : 'Dönem sonuna kadar'}{' '}
                 premium özellikleriniz devam eder, ardından ücretsiz üyeliğe geçersiniz.
+              </p>
+            </div>
+          )}
+
+          {/* Ertelemeli downgrade: plan dönem sonunda daha düşük tier'a geçecek.
+              Mevcut (yüksek) plan o tarihe kadar aynen sürer. */}
+          {!membershipDetails?.pendingPayment && membershipDetails?.status !== 'cancelled' && membershipDetails?.scheduledTierType && (
+            <div className="mt-6 bg-warning-50 border border-warning-200 rounded-xl p-4 max-w-md mx-auto">
+              <p className="text-warning-800 font-medium">
+                Üyeliğiniz{' '}
+                {membershipDetails.currentPeriodEnd
+                  ? `${new Date(membershipDetails.currentPeriodEnd).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric' })} tarihinde`
+                  : 'dönem sonunda'}{' '}
+                <span className="font-semibold">
+                  {membershipDetails.scheduledTierType === 'basic' ? 'Temel' :
+                   membershipDetails.scheduledTierType === 'premium' ? 'Premium' :
+                   membershipDetails.scheduledTierType === 'business' ? 'İş' : 'Ücretsiz'}
+                </span>{' '}
+                planına geçecek. O tarihe kadar mevcut üyelik avantajlarınız devam eder.
               </p>
             </div>
           )}
