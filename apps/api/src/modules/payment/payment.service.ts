@@ -3266,23 +3266,41 @@ export class PaymentService {
           // gönderiyor; oradan çağrıldığında payment_refunded'ı atla ki alıcı
           // çift push almasın. Diğer caller'lar (admin/direct/surat) için aynen gider.
           if (order && !opts?.skipRefundEvent) {
-            await this.eventService.emitPaymentRefunded({
-              paymentId: payment.id,
-              orderId: orderId,
-              orderNumber: order.orderNumber,
-              buyerId: order.buyerId,
-              buyerEmail: order.buyer.email,
-              buyerName: order.buyer.displayName || order.buyer.email,
-              sellerId: order.sellerId,
-              sellerEmail: order.seller.email,
-              sellerName: order.seller.displayName || order.seller.email,
-              refundAmount: amountToRefund,
-              totalAmount: Number(payment.amount),
-              provider: payment.provider,
-              providerRefundId: refundResponse.providerRefundId,
-            });
+            if (order.cancellationType === 'iptal') {
+              // Kargo öncesi İPTAL: para iade ediliyor ama kullanıcıya "iade" değil
+              // "iptal" denmeli. Alıcı + satıcıya iptal bildirimi (zil+push) ve
+              // order-cancelled mailleri gönder; payment_refunded'ı ATLA.
+              await this.notificationService.createInAppNotification(
+                order.buyerId,
+                NotificationType.ORDER_CANCELLED,
+                { orderId, orderNumber: order.orderNumber, amount: amountToRefund },
+              );
+              await this.notificationService.createInAppNotification(
+                order.sellerId,
+                NotificationType.ORDER_CANCELLED_SELLER,
+                { orderId, orderNumber: order.orderNumber },
+              );
+              await this.notificationService.sendOrderCancelledEmails(orderId);
+              this.logger.log(`order_cancelled notification sent for order ${orderId} (cancellationType=iptal)`);
+            } else {
+              await this.eventService.emitPaymentRefunded({
+                paymentId: payment.id,
+                orderId: orderId,
+                orderNumber: order.orderNumber,
+                buyerId: order.buyerId,
+                buyerEmail: order.buyer.email,
+                buyerName: order.buyer.displayName || order.buyer.email,
+                sellerId: order.sellerId,
+                sellerEmail: order.seller.email,
+                sellerName: order.seller.displayName || order.seller.email,
+                refundAmount: amountToRefund,
+                totalAmount: Number(payment.amount),
+                provider: payment.provider,
+                providerRefundId: refundResponse.providerRefundId,
+              });
 
-            this.logger.log(`payment.refunded event emitted for payment ${payment.id}`);
+              this.logger.log(`payment.refunded event emitted for payment ${payment.id}`);
+            }
           }
         } catch (error) {
           // Log but don't fail - refund was already processed

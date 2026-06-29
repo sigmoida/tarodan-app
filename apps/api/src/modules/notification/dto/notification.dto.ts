@@ -9,6 +9,7 @@ export enum NotificationType {
   ORDER_DELIVERED = 'order_delivered',
   ORDER_COMPLETED = 'order_completed',
   ORDER_CANCELLED = 'order_cancelled',
+  ORDER_CANCELLED_SELLER = 'order_cancelled_seller',
   ORDER_CANCELLED_OUT_OF_STOCK = 'order_cancelled_out_of_stock',
   ORDER_REFUNDED = 'order_refunded',
   ORDER_PREPARING_DEADLINE_WARNING = 'order_preparing_deadline_warning',

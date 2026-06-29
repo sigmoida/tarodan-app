@@ -63,9 +63,15 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
   },
   [NotificationType.ORDER_CANCELLED]: {
     title: 'Sipariş İptal Edildi',
-    message: 'Siparişiniz iptal edildi.',
+    message: 'Siparişiniz iptal edildi. Ödediğiniz tutar iade edilecek.',
     icon: '❌',
     link: '/orders/{{orderId}}',
+  },
+  [NotificationType.ORDER_CANCELLED_SELLER]: {
+    title: 'Satış İptal Edildi',
+    message: '{{orderNumber}} numaralı siparişiniz iptal edildi.',
+    icon: '❌',
+    link: '/sales/{{orderId}}',
   },
   [NotificationType.ORDER_CANCELLED_OUT_OF_STOCK]: {
     title: 'Siparişiniz iptal edildi: stok tükendi',
