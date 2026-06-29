@@ -2396,11 +2396,18 @@ export class OrderService {
         commissionResult,
       );
 
-      // Adet bazlı rezervasyon: 1 adet rezerve et (invalidation yok — cron halledecek)
-      await tx.product.update({
-        where: { id: dto.productId },
-        data: { reservedQuantity: { increment: 1 } },
-      });
+      // Adet bazlı rezervasyon: 1 adet rezerve et (invalidation yok — cron halledecek).
+      // Bulgu F: yalnız DIRECT-BUY'da (offerId yok) create'de rezerve et. Teklif
+      // siparişlerinde rezerv ödeme başlatınca (payment-initiate, offerId &&
+      // !reservationReleasedAt) alınır — giriş yapmış kullanıcı modeliyle simetrik.
+      // Aksi halde guest+teklif siparişi hem create'de hem initiate'te rezerve edip
+      // ÇİFT rezerve eder (available negatife düşer).
+      if (!dto.offerId) {
+        await tx.product.update({
+          where: { id: dto.productId },
+          data: { reservedQuantity: { increment: 1 } },
+        });
+      }
 
       return {
         ...(await this.formatOrderResponse(order, guestUser.id)),
@@ -3160,12 +3167,21 @@ export class OrderService {
         },
       });
 
-      // Rezervasyonu kaldır (pending_payment ise sipariş adedi kadar serbest bırak)
-      if (order.status === OrderStatus.pending_payment) {
-        await tx.product.update({
-          where: { id: order.productId },
-          data: { reservedQuantity: { decrement: order.quantity ?? 1 } },
-        });
+      // Rezervasyonu kaldır (pending_payment ise sipariş adedi kadar serbest bırak).
+      // GUARD: reservationReleasedAt doluysa rezervasyon 5dk cron (releaseExpiredOrder
+      // Reservations) tarafından ZATEN bırakılmıştır; sipariş pending_payment kalsa da
+      // burada 2. kez düşmemeliyiz — yoksa reservedQuantity negatife düşer (oversell).
+      // CLAMP: GREATEST(...,0) ile atomik + 0'a sabitli (read-modify-write yarışına kapalı),
+      // invalidatePendingOrdersForProduct'taki pattern ile aynı.
+      if (
+        order.status === OrderStatus.pending_payment &&
+        !order.reservationReleasedAt
+      ) {
+        await tx.$executeRaw`
+          UPDATE "products"
+          SET "reserved_quantity" = GREATEST("reserved_quantity" - ${order.quantity ?? 1}, 0)
+          WHERE "id" = ${order.productId}
+        `;
       }
 
       // Re-enable the offer (or mark as cancelled)

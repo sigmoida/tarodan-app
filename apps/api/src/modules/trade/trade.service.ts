@@ -25,7 +25,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { getAvailableQuantity, safeDecrementReserved } from '../product/helpers/product-availability.helper';
-import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
+import { getProductStatusFromQuantity, getReservedAwareStatus } from '../product/helpers/product-status.helper';
 import { ACTIVE_TRADE_STATUSES } from './trade.constants';
 import { PaymentService } from '../payment/payment.service';
 import { ProductLockService } from '../product/product-lock.service';
@@ -1072,13 +1072,15 @@ export class TradeService {
           for (const [productId, qty] of byProduct) {
             const prod = await tx.product.findUnique({
               where: { id: productId },
-              select: { reservedQuantity: true },
+              select: { reservedQuantity: true, quantity: true },
             });
             if (prod) {
               const newReserved = safeDecrementReserved(prod.reservedQuantity, qty);
               await tx.product.update({
                 where: { id: productId },
-                data: { reservedQuantity: newReserved, status: ProductStatus.active },
+                // Bulgu H: koşulsuz "active" yerine rezerv-duyarlı status — üründe BAŞKA
+                // canlı rezervasyon (eşzamanlı takas/sipariş) varsa "reserved" kalır.
+                data: { reservedQuantity: newReserved, status: getReservedAwareStatus(prod.quantity, newReserved) },
               });
             }
           }
@@ -1433,13 +1435,15 @@ export class TradeService {
         for (const [productId, qty] of byProduct) {
           const prod = await tx.product.findUnique({
             where: { id: productId },
-            select: { reservedQuantity: true },
+            select: { reservedQuantity: true, quantity: true },
           });
           if (prod) {
             const newReserved = safeDecrementReserved(prod.reservedQuantity, qty);
             await tx.product.update({
               where: { id: productId },
-              data: { reservedQuantity: newReserved, status: ProductStatus.active },
+              // Bulgu H: koşulsuz "active" yerine rezerv-duyarlı status — üründe BAŞKA
+              // canlı rezervasyon (eşzamanlı takas/sipariş) varsa "reserved" kalır.
+              data: { reservedQuantity: newReserved, status: getReservedAwareStatus(prod.quantity, newReserved) },
             });
           }
         }
@@ -1952,13 +1956,15 @@ export class TradeService {
         for (const [productId, qty] of qtyByProduct) {
           const prod = await tx.product.findUnique({
             where: { id: productId },
-            select: { reservedQuantity: true },
+            select: { reservedQuantity: true, quantity: true },
           });
           if (prod) {
             const newReserved = safeDecrementReserved(prod.reservedQuantity, qty);
             await tx.product.update({
               where: { id: productId },
-              data: { reservedQuantity: newReserved, status: ProductStatus.active },
+              // Bulgu H: koşulsuz "active" yerine rezerv-duyarlı status — üründe BAŞKA
+              // canlı rezervasyon (eşzamanlı takas/sipariş) varsa "reserved" kalır.
+              data: { reservedQuantity: newReserved, status: getReservedAwareStatus(prod.quantity, newReserved) },
             });
           }
         }

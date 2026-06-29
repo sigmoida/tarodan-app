@@ -89,6 +89,8 @@ describe('PaymentService group payment (checkout group)', () => {
     callSequence = [];
 
     mockTx = {
+      // Bulgu E: stok düşümünden önce ürün satırı FOR UPDATE ile kilitleniyor.
+      $queryRaw: jest.fn().mockResolvedValue([]),
       payment: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         update: jest.fn(),
