@@ -36,6 +36,7 @@ model User {
   notificationSettings    Json?                    @map("notification_settings")
   lastActivityAt          DateTime?                @map("last_activity_at")
   lastLoginAt             DateTime?                @map("last_login_at")
+  deletedAt               DateTime?                @map("deleted_at")
   addresses               Address[]
   adminUser               AdminUser?
   cart                    Cart?

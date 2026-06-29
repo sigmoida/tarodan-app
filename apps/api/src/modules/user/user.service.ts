@@ -530,174 +530,57 @@ export class UserService {
       });
     }
 
-    // All checks passed, delete account
-    // Use transaction to ensure atomicity
-    let productIdsToRecalc: string[] = [];
+    // Tüm kontroller geçti → hesabı ANONİMLEŞTİR (hard-delete DEĞİL).
+    // User satırı KORUNUR; böylece sipariş/fatura/ödeme/iade gibi finansal FK'lar bozulmaz
+    // (orders_buyer_id_fkey vb. ihlali engellenir — eski kod tx.user.delete'te patlıyordu).
+    // Silinen: kimlik-doğrulama/oturum, ödeme kimlik bilgileri ve doğrudan iletişim PII'si.
+    // Korunan: pazaryeri/sosyal içerik (ilan, yorum, mesaj, takas) "Silinmiş Kullanıcı"ya
+    // bağlı kalır. deletedAt işaretlenir → auth artık bu hesabı reddeder.
     try {
-      productIdsToRecalc = await this.prisma.$transaction(async (tx) => {
-        // 1. Delete authentication tokens
+      await this.prisma.$transaction(async (tx) => {
+        // 1) Kimlik-doğrulama / oturum verileri (login imkânsız hale gelir)
         await tx.refreshToken.deleteMany({ where: { userId } });
         await tx.passwordResetToken.deleteMany({ where: { userId } });
         await tx.emailVerificationToken.deleteMany({ where: { userId } });
-        
-        // 2. Delete push tokens
         await tx.pushToken.deleteMany({ where: { userId } });
-        
-        // 3. Delete notification logs
-        await tx.notificationLog.deleteMany({ where: { userId } });
-        
-        // 4. Delete user's wishlist items first, then wishlist
-        const wishlist = await tx.wishlist.findUnique({ where: { userId } });
-        if (wishlist) {
-          await tx.wishlistItem.deleteMany({ where: { wishlistId: wishlist.id } });
-          await tx.wishlist.delete({ where: { userId } });
-        }
-        
-        // 5. Delete collection likes by user
-        await tx.collectionLike.deleteMany({ where: { userId } });
-        
-        // 6. Delete user's collections and their items/likes
-        const collections = await tx.collection.findMany({ where: { userId }, select: { id: true } });
-        for (const col of collections) {
-          await tx.collectionLike.deleteMany({ where: { collectionId: col.id } });
-          await tx.collectionItem.deleteMany({ where: { collectionId: col.id } });
-        }
-        await tx.collection.deleteMany({ where: { userId } });
-        
-        // 7. Delete product likes by user
-        await tx.productLike.deleteMany({ where: { userId } });
-        
-        // 8. Delete product ratings by user (productIds collected before delete for recalc)
-        const userProductRatings = await tx.productRating.findMany({
-          where: { userId },
-          select: { productId: true },
-        });
-        const productIdsToRecalc = [...new Set(userProductRatings.map((r) => r.productId))];
-        await tx.productRating.deleteMany({ where: { userId } });
-        
-        // 9. Delete user ratings given and received
-        await tx.rating.deleteMany({ where: { giverId: userId } });
-        await tx.rating.deleteMany({ where: { receiverId: userId } });
-        
-        // 10. Delete messages sent by user
-        await tx.message.deleteMany({ where: { senderId: userId } });
-        
-        // 11. Delete message threads where user is participant
-        await tx.messageThread.deleteMany({
-          where: {
-            OR: [
-              { participant1Id: userId },
-              { participant2Id: userId },
-            ],
-          },
-        });
-        
-        // 12. Cancel/delete trades
-        await tx.trade.deleteMany({
-          where: {
-            OR: [
-              { initiatorId: userId },
-              { receiverId: userId },
-            ],
-          },
-        });
-        
-        // 13. Delete offers (buyer side)
-        await tx.offer.deleteMany({ where: { buyerId: userId } });
-        
-        // 14. Delete user follows
-        await tx.userFollow.deleteMany({ where: { followerId: userId } });
-        await tx.userFollow.deleteMany({ where: { followingId: userId } });
-        
-        // 15. User blocks - skip if model doesn't exist
-        // Blocks are handled via other means in this app
-        
-        // 17. Delete addresses
+        await tx.oAuthAccount.deleteMany({ where: { userId } });
+        await tx.twoFactorSecret.deleteMany({ where: { userId } });
+
+        // 2) Ödeme kimlik bilgileri (kayıtlı kartlar)
+        await tx.savedCard.deleteMany({ where: { userId } });
+
+        // 3) Doğrudan PII / kişisel veriler
         await tx.address.deleteMany({ where: { userId } });
-        
-        // 18. Delete membership
-        await tx.userMembership.deleteMany({ where: { userId } });
-        
-        // 19. Get user's products for cleanup
-        const userProducts = await tx.product.findMany({ 
-          where: { sellerId: userId }, 
-          select: { id: true } 
-        });
-        
-        // 20. Delete related product data
-        for (const product of userProducts) {
-          // Delete offers for this product
-          await tx.offer.deleteMany({ where: { productId: product.id } });
-          // Delete product likes
-          await tx.productLike.deleteMany({ where: { productId: product.id } });
-          // Delete product ratings
-          await tx.productRating.deleteMany({ where: { productId: product.id } });
-          // Delete wishlist items
-          await tx.wishlistItem.deleteMany({ where: { productId: product.id } });
-          // Delete collection items
-          await tx.collectionItem.deleteMany({ where: { productId: product.id } });
-          // Delete product images
-          await tx.productImage.deleteMany({ where: { productId: product.id } });
-        }
-        
-        // 21. Handle orders - anonymize instead of delete to keep financial records
-        await tx.order.updateMany({
-          where: { buyerId: userId },
-          data: { buyerId: userId }, // Keep as is but user will be anonymized
-        });
-        await tx.order.updateMany({
-          where: { sellerId: userId },
-          data: { sellerId: userId }, // Keep as is but user will be anonymized
-        });
-        
-        // 22. Delete user's products (or mark as deleted)
-        await tx.product.deleteMany({ where: { sellerId: userId } });
-        
-        // 23. Finally, delete the user
-        await tx.user.delete({ where: { id: userId } });
+        await tx.notificationLog.deleteMany({ where: { userId } });
 
-        return productIdsToRecalc;
-      }, {
-        timeout: 60000, // 60 second timeout for large deletions
-      });
-
-      // Recalc Product.averageRating/ratingCount for products that had ratings from this user
-      for (const productId of productIdsToRecalc) {
-        try {
-          await this.ratingService.updateProductRatingStats(productId);
-        } catch (e) {
-          this.logger.warn(`Failed to recalc rating stats for product ${productId} after user delete`);
-        }
-      }
-
-      this.logger.log(`User account deleted: ${userId}`);
-
-      return {
-        message: 'Hesabınız başarıyla silindi',
-      };
-    } catch (error: any) {
-      this.logger.error('Delete account failed');
-      
-      // If hard delete fails, try soft delete (anonymize)
-      try {
-        await this.prisma.user.update({
+        // 4) PII'yi anonimleştir + login engelle. Unique alanları (email/phone/companyName)
+        //    serbest bırak ki kullanıcı aynı bilgiyle yeniden kayıt olabilsin.
+        await tx.user.update({
           where: { id: userId },
           data: {
-            email: `deleted_${userId}_${Date.now()}@deleted.tarodan.com`,
+            email: `deleted_${userId}@deleted.local`,
             phone: null,
+            passwordHash: '',
             displayName: 'Silinmiş Kullanıcı',
-            bio: null,
             avatarUrl: null,
-            passwordHash: `deleted_${Date.now()}_${Math.random()}`,
-            isBanned: true,
-            bannedReason: 'Account deleted by user',
+            bio: null,
+            fcmToken: null,
+            companyName: null,
+            taxId: null,
+            acceptsMarketingEmails: false,
+            isSeller: false,
+            deletedAt: new Date(),
           },
         });
-        return { message: 'Hesabınız başarıyla silindi' };
-      } catch (softDeleteError) {
-        this.logger.error('Soft delete also failed');
-        throw new BadRequestException('Hesap silinirken bir hata oluştu. Lütfen destek ile iletişime geçin.');
-      }
+      }, {
+        timeout: 60000,
+      });
+
+      this.logger.log(`User account anonymized (soft-deleted): ${userId}`);
+      return { message: 'Hesabınız başarıyla silindi' };
+    } catch (error: any) {
+      this.logger.error(`Delete account (anonymize) failed for ${userId}: ${error?.message}`);
+      throw new BadRequestException('Hesap silinirken bir hata oluştu. Lütfen destek ile iletişime geçin.');
     }
   }
 
