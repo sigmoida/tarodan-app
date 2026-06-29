@@ -154,14 +154,18 @@ Kapsama etiketleri: ✅ COVERED · 🟡 KISMİ · ❌ BOŞLUK · 🖐 MANUEL/L4
 | J3 | kaldırılan tipler (REJECTED/DISPUTED) üretilmez | hiç | ✅ (kod kaldırıldı) |
 
 ### K. Frontend (web alıcı + admin)
+Web journey suite (apps/web/e2e/journeys, Playwright API-seviyesi, tarodan_test DB).
+**Çalıştırma:** kendi web+api server'larını ayağa kaldırır (:3000/:3001); dev server'lar
+kapalıyken veya CI'da koşulmalı (dev :3001'i tutuyorsa çakışır → bu turda çalıştırılmadı).
 | # | Senaryo | Beklenen | Durum |
 |---|---------|----------|-------|
-| K1 | alıcı sipariş sayfasından iade talep eder | talep oluşur, statü görünür | ❌ web Playwright |
-| K2 | alıcı iade statüsünü/akışını görür | doğru adım | ❌ ekle |
-| K3 | alıcı talebini iptal eder | `cancelled` | ❌ ekle |
-| K4 | admin "İade Takibi" liste/detay render | hatasız | ❌ admin e2e |
-| K5 | admin aksiyon butonları izne göre | yetkisizde görünmez/403 | ❌ ekle |
-| K6 | stepper doğru aşama ("İnceleme" yok) | otomatik akışa uygun | ❌ ekle |
+| K1 | alıcı kargo öncesi/cooling-off iade talep eder | talep oluşur + statü | 🟡 j008/j009/j037 (harness gerekir) |
+| K2 | alıcı iade statüsünü/akışını görür | doğru adım | 🟡 j009 |
+| K3 | alıcı talebini iptal eder | `cancelled` | 🟡 j081/j093 + backend E3/J2 ✅ |
+| K-fix | bayat journey'ler güncellendi | kaldırılmış akış temiz | ✅ j010 yeniden yazıldı (>14g bloke), j084/j085 emekli (describe.skip) |
+| K4 | admin "İade Takibi" liste/detay render | hatasız | ❌ admin Playwright altyapısı YOK (ayrı infra işi) |
+| K5 | admin aksiyon butonları izne göre | yetkisizde görünmez/403 | ✅ backend roles.guard.spec (H); admin UI infra yok |
+| K6 | stepper doğru aşama ("İnceleme" yok) | otomatik akışa uygun | ✅ kod fix'i (RefundStatusStepper, 1c7e4b1d); UI render testi infra yok |
 
 ### L. Gerçek müşteri uçtan uca (manuel / staging) — L4
 | # | Senaryo | Beklenen |

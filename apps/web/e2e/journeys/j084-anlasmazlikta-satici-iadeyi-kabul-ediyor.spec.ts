@@ -107,7 +107,11 @@ async function markDelivered(request: any, orderId: string, deliveredDaysAgo: nu
 // J8 — Kargodan önce iade: para anında geri dönüyor + 2. iade engeli
 // ───────────────────────────────────────────────────────────────────────────
 
-test.describe('J84 — Geç dönem iade: satıcı kabul → return açılır → refunded', () => {
+// SKIP: Bu journey kaldırılmış akışı test ediyor — satıcının iade talebini KABUL
+// etmesi (POST /refund-requests/:id/accept) artık YOK. İade tam otomatik: ≤14 gün
+// cooling-off otomatik onaylanır, >14 gün komple bloke. Satıcının iade akışında
+// aksiyonu kalmadı. Senaryo emekliye ayrıldı (bkz. j009 cooling-off, j010 >14g bloke).
+test.describe.skip('J84 — (KALDIRILDI) satıcı iade kabul akışı emekli', () => {
   test('delivered (20g önce) → pending_review → satıcı accept → return → finalize', async ({ request }) => {
     test.setTimeout(60_000);
 
