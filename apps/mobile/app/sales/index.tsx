@@ -46,6 +46,9 @@ interface Sale {
   orderNumber: string;
   // Backend ham OrderStatus enum'u; sadece preparing→processing normalize edilir.
   status: string;
+  // Kargo öncesi iptalde status 'refunded' olur ama bu 'iptal' der → rozet/filtre
+  // "İptal Edildi" göstersin (alıcı orders/index ile tutarlı).
+  cancellationType?: string | null;
   totalAmount: number;
   product: {
     id: string;
@@ -66,7 +69,13 @@ interface Sale {
   createdAt: string;
 }
 
-type FilterType = 'all' | 'paid' | 'processing' | 'shipped' | 'completed';
+type FilterType = 'all' | 'paid' | 'processing' | 'shipped' | 'completed' | 'cancelled';
+
+// Rozet/filtre durumu: cancellationType='iptal' → 'cancelled' (status 'refunded'
+// olsa bile "İade" deme); aksi halde siparişin kendi durumu. Alıcı orders/index
+// badgeStatusOf ile tutarlı.
+const saleBadgeStatus = (sale: Sale): string =>
+  sale.cancellationType === 'iptal' ? 'cancelled' : sale.status;
 
 export default function SalesScreen() {
   const { isAuthenticated } = useAuthStore();
@@ -87,7 +96,11 @@ export default function SalesScreen() {
         const params: any = { role: 'seller', limit: 100 };
         if (filter !== 'all') {
           // Mobil UI 'processing' adını kullanır; backend enum'u 'preparing'. Sınırda çevir.
-          params.status = filter === 'processing' ? 'preparing' : filter;
+          // 'cancelled' filtresi hem iptal (cancelled) hem para-iadesi (refunded) getirir.
+          params.status =
+            filter === 'processing' ? 'preparing'
+            : filter === 'cancelled' ? 'cancelled,refunded'
+            : filter;
         }
         const response = await ordersApi.getAll(params);
         const raw = (response.data as any)?.data || response.data || [];
@@ -165,6 +178,7 @@ export default function SalesScreen() {
 
   const getStatusLabel = (status: FilterType) => {
     if (status === 'all') return 'Tümü';
+    if (status === 'cancelled') return 'İptal / İade';
     return salesStatusConfig[status]?.label ?? status;
   };
 
@@ -225,7 +239,9 @@ export default function SalesScreen() {
 
   const filteredSales = sales.filter(sale => {
     if (filter === 'all') return true;
-    return sale.status === filter;
+    const ui = saleBadgeStatus(sale);
+    if (filter === 'cancelled') return ui === 'cancelled' || ui === 'refunded';
+    return ui === filter;
   });
 
   return (
@@ -250,7 +266,7 @@ export default function SalesScreen() {
       {/* Filter Chips */}
       <View style={styles.filterContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {(['all', 'paid', 'processing', 'shipped', 'completed'] as FilterType[]).map((f) => (
+          {(['all', 'paid', 'processing', 'shipped', 'completed', 'cancelled'] as FilterType[]).map((f) => (
             <Chip
               key={f}
               label={getStatusLabel(f)}
@@ -290,7 +306,7 @@ export default function SalesScreen() {
                 <Text variant="caption" style={styles.orderNumber}>
                   #{sale.orderNumber}
                 </Text>
-                <StatusBadge status={sale.status} config={salesStatusConfig} size="sm" />
+                <StatusBadge status={saleBadgeStatus(sale)} config={salesStatusConfig} size="sm" />
               </View>
 
               <View style={styles.saleContent}>

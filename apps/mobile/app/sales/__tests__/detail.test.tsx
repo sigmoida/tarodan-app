@@ -90,27 +90,30 @@ describe('J63 · Satıcı sipariş detayı render', () => {
   });
 });
 
-describe('J63 · İptal butonu görünürlüğü', () => {
+describe('J63 · Satıcı iptali yok + iptal etiketi', () => {
   beforeEach(() => {
     getOneMock.mockReset();
     mockParams = { id: 'sale-1' };
   });
 
-  it('J63.5 paid durumda "Siparişi İptal Et" butonu görünür', async () => {
+  it('J63.5 satıcıya "Siparişi İptal Et" butonu GÖSTERİLMEZ (satıcı iptali desteklenmiyor)', async () => {
     getOneMock.mockResolvedValue({ data: { data: saleFixture({ status: 'paid' }) } });
-    renderWithProviders(<SaleDetailScreen />);
-    await waitFor(() =>
-      expect(screen.getByText('Siparişi İptal Et')).toBeOnTheScreen(),
-    );
-  });
-
-  it('J63.6 shipped durumda iptal butonu görünmez', async () => {
-    getOneMock.mockResolvedValue({ data: { data: saleFixture({ status: 'shipped' }) } });
     renderWithProviders(<SaleDetailScreen />);
     await waitFor(() =>
       expect(screen.getByText('Sipariş #TRD-2001')).toBeOnTheScreen(),
     );
     expect(screen.queryByText('Siparişi İptal Et')).toBeNull();
+  });
+
+  it('J63.6 cancellationType="iptal" → "İade Edildi" değil "İptal Edildi" gösterilir', async () => {
+    getOneMock.mockResolvedValue({
+      data: { data: saleFixture({ status: 'refunded', cancellationType: 'iptal' }) },
+    });
+    renderWithProviders(<SaleDetailScreen />);
+    await waitFor(() =>
+      expect(screen.getByText('İptal Edildi')).toBeOnTheScreen(),
+    );
+    expect(screen.queryByText('İade Edildi')).toBeNull();
   });
 
   it('J63.7 sipariş bulunamazsa hata durumu (ErrorState) gösterilir', async () => {

@@ -43,7 +43,7 @@ export function apiStatusToUi(api: string | undefined | null): UiOrderStatus {
  * "Hazırlanıyor" = paid + preparing → status göndermeden çekip istemcide süzülür.
  */
 export function uiFilterToApiStatusParam(
-  filter: 'all' | 'pending' | 'processing' | 'shipped' | 'delivered' | 'completed'
+  filter: 'all' | 'pending' | 'processing' | 'shipped' | 'delivered' | 'completed' | 'cancelled'
 ): string | undefined {
   switch (filter) {
     case 'pending':
@@ -56,6 +56,9 @@ export function uiFilterToApiStatusParam(
       return 'delivered';
     case 'completed':
       return 'completed';
+    case 'cancelled':
+      // İptal/İade: backend çoklu-status (cancelled + refunded) destekler.
+      return 'cancelled,refunded';
     default:
       return undefined;
   }

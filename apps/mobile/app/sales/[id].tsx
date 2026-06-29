@@ -7,11 +7,10 @@ import {
   ErrorState,
   Text,
   theme,
-  appAlert,
 } from '@tarodan/ui-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { ordersApi } from '../../src/services/api';
 import { ScreenHeader, ThemedRefreshControl } from '../../src/components/common';
 import { useRefresh } from '../../src/hooks/useRefresh';
@@ -24,6 +23,8 @@ interface Order {
   id: string;
   orderNumber?: string;
   status: string;
+  // Kargo öncesi iptalde status 'refunded' olur ama 'iptal' → "İptal Edildi" göster.
+  cancellationType?: string | null;
   totalAmount?: number;
   subtotal?: number;
   shippingCost?: number;
@@ -84,7 +85,6 @@ function statusColor(status: string): { bg: string; fg: string } {
 
 export default function SaleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const queryClient = useQueryClient();
 
   const {
     data: order,
@@ -102,23 +102,6 @@ export default function SaleDetailScreen() {
   });
 
   const { refreshing, onRefresh } = useRefresh(refetch);
-
-  /**
-   * Backend ödeme başarısı sonrasında siparişe Sürat Kargo gönderisini OTOMATIK
-   * yaratır (payment.service.ts → auto-create shipment, provider='surat',
-   * trackingNumber=orderNumber). Mobil tarafta artık satıcıdan kargo firması
-   * ya da takip numarası istemiyoruz; sadece okuma-amaçlı gösteriyoruz.
-   */
-  const cancelMutation = useMutation({
-    mutationFn: (reason: string) => ordersApi.cancel(id!, reason),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sale-order', id] });
-      appAlert('Bilgi', 'Sipariş iptal edildi.');
-      router.back();
-    },
-    onError: (e: any) =>
-      appAlert('Hata', e?.response?.data?.message || 'İşlem başarısız.'),
-  });
 
   if (isLoading) {
     return (
@@ -138,8 +121,9 @@ export default function SaleDetailScreen() {
     );
   }
 
-  const sc = statusColor(order.status);
-  const canCancel = ['paid', 'preparing'].includes(order.status);
+  // İptal'de status 'refunded' olsa bile "İptal Edildi" göster (alıcı ile tutarlı).
+  const displayStatus = order.cancellationType === 'iptal' ? 'cancelled' : order.status;
+  const sc = statusColor(displayStatus);
   const shipmentTracking = order.shipment?.trackingNumber;
   const shipmentProvider = order.shipment?.provider ?? order.shipment?.carrier;
   const isSurat = (shipmentProvider ?? '').toLowerCase() === 'surat';
@@ -170,7 +154,7 @@ export default function SaleDetailScreen() {
           <Ionicons name="information-circle" size={20} color={sc.fg} />
           <View style={{ flex: 1 }}>
             <Text style={[styles.statusText, { color: sc.fg }]}>
-              {formatOrderStatus(order.status)}
+              {formatOrderStatus(displayStatus)}
             </Text>
             <Text style={[styles.statusSub, { color: sc.fg }]}>
               {formatRelativeDate(order.createdAt)}
@@ -320,31 +304,6 @@ export default function SaleDetailScreen() {
             </View>
           );
         })()}
-
-        {/* Actions */}
-        {canCancel ? (
-          <Button
-            variant="outline"
-            icon="close-circle-outline"
-            title="Siparişi İptal Et"
-            onPress={() =>
-              appAlert(
-                'Siparişi İptal Et',
-                'Bu siparişi iptal etmek istediğinize emin misiniz? Alıcının ödemesi iade edilecek.',
-                [
-                  { text: 'Vazgeç', style: 'cancel' },
-                  {
-                    text: 'İptal Et',
-                    style: 'destructive',
-                    onPress: () => cancelMutation.mutate('seller_cancelled'),
-                  },
-                ],
-              )
-            }
-            style={{ ...styles.actionBtn, borderColor: colors.danger[600]! }}
-            isLoading={cancelMutation.isPending}
-          />
-        ) : null}
       </ScrollView>
     </View>
   );

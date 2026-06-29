@@ -61,7 +61,7 @@ type OrderListEntry =
   | { kind: 'order'; order: Order }
   | { kind: 'group'; group: OrderGroup };
 
-type FilterType = 'all' | 'pending' | 'processing' | 'shipped' | 'delivered' | 'completed';
+type FilterType = 'all' | 'pending' | 'processing' | 'shipped' | 'delivered' | 'completed' | 'cancelled';
 
 // UI status keys -> StatusBadge config (matches semantic Badge variants)
 const uiOrderStatusConfig: Record<string, { label: string; variant: BadgeVariant }> = {
@@ -335,10 +335,10 @@ export default function OrdersScreen() {
       {/* Filter Chips */}
       <View style={styles.filterContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {(['all', 'pending', 'processing', 'shipped', 'delivered', 'completed'] as FilterType[]).map((f) => (
+          {(['all', 'pending', 'processing', 'shipped', 'delivered', 'completed', 'cancelled'] as FilterType[]).map((f) => (
             <Chip
               key={f}
-              label={f === 'all' ? 'Tümü' : getStatusText(f as UiOrderStatus)}
+              label={f === 'all' ? 'Tümü' : f === 'cancelled' ? 'İptal / İade' : getStatusText(f as UiOrderStatus)}
               selected={filter === f}
               onPress={() => setFilter(f)}
               style={styles.filterChipSpacing}

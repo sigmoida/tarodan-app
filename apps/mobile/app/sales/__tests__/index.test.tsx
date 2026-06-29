@@ -104,12 +104,25 @@ describe('J63 · Satışlarım listesi', () => {
     expect(screen.queryByText('Hazırlanıyor Olarak İşaretle')).toBeNull();
   });
 
-  it('J63.14 filtre chipleri render edilir', async () => {
+  it('J63.14 filtre chipleri render edilir (İptal/İade dahil)', async () => {
     getAllMock.mockResolvedValue({ data: { data: [] } });
     renderWithProviders(<SalesScreen />);
     await waitFor(() =>
       expect(screen.getByText('Tümü')).toBeOnTheScreen(),
     );
     expect(screen.getByText('Kargoda')).toBeOnTheScreen();
+    expect(screen.getByText('İptal / İade')).toBeOnTheScreen();
+  });
+
+  it('J63.15 cancellationType="iptal" satış (status refunded) → "İptal Edildi" rozeti', async () => {
+    getAllMock.mockResolvedValue({
+      data: { data: [saleFixture({ status: 'refunded', cancellationType: 'iptal' })] },
+    });
+    renderWithProviders(<SalesScreen />);
+    await waitFor(() =>
+      expect(screen.getByText('İptal Edildi')).toBeOnTheScreen(),
+    );
+    // "İade Edildi" (refunded ham etiketi) gösterilmemeli
+    expect(screen.queryByText('İade Edildi')).toBeNull();
   });
 });
