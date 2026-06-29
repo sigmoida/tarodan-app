@@ -27,7 +27,6 @@
         "buildType": "apk",
         "autoIncrement": "versionCode"
       },
-      "channel": "preview",
       "env": {
         "EXPO_PUBLIC_ENVIRONMENT": "preview",
         "EXPO_PUBLIC_API_URL": "https://tarodan.shop/api",
