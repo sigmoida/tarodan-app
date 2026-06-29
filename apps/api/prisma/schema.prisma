@@ -313,6 +313,11 @@ model UserMembership {
   createdAt          DateTime            @default(now()) @map("created_at")
   updatedAt          DateTime            @updatedAt @map("updated_at")
   autoRenew          Boolean             @default(false) @map("auto_renew")
+  // Ertelemeli downgrade: kullanıcı daha düşük bir tier'a geçmek istediğinde
+  // (örn. premium→temel) tier HEMEN değişmez; mevcut ödenmiş dönem sonuna kadar
+  // yüksek tier sürer, dönem sonunda bu tip'e geçilir. null = bekleyen downgrade yok.
+  // Upgrade'ler anında uygulanır, bu alanı kullanmaz.
+  scheduledTierType  MembershipTierType? @map("scheduled_tier_type")
   payments           MembershipPayment[]
   tier               MembershipTier      @relation(fields: [tierId], references: [id])
   user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)

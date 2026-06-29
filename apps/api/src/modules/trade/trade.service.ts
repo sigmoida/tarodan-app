@@ -1480,13 +1480,11 @@ export class TradeService {
     userId: string,
     dto: ShipTradeDto,
   ): Promise<TradeResponseDto> {
-    const userCanTrade = await this.membershipService.canCreateTrade(userId);
-    if (!userCanTrade.allowed) {
-      throw new BadRequestException(
-        'Trade işlemlerini yapmak için Temel veya üstü üyelik gereklidir. Üyeliğinizi yenileyin.',
-      );
-    }
-
+    // Üyelik kapısı KASITLI olarak kaldırıldı: takas, kabul edildiği (accepted)
+    // anda her iki tarafın da premium üyeliği vardı (acceptTrade/counterTrade
+    // kapıları bunu garanti eder). Üyelik kabul SONRASI sona erse bile, dönem
+    // içinde başlamış takasın kargo/teslim akışı sıkıntısız tamamlanabilmelidir.
+    // Aksi halde "kabul ettim ama kargolayamıyorum" çıkmazı oluşurdu.
     const address = await this.prisma.address.findFirst({
       where: { id: dto.fromAddressId, userId },
     });
