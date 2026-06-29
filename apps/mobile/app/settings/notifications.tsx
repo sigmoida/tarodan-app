@@ -22,22 +22,22 @@ import { useTranslation } from '../../src/i18n';
 
 const { colors, spacing, radius } = theme;
 
+// Backend sözleşmesiyle (UpdateNotificationSettingsDto / web) birebir aynı anahtarlar.
+// ESKİDEN mobil farklı isimler (pushEnabled, messageNotifications...) gönderiyordu;
+// ValidationPipe whitelist'i eşleşmeyenleri sessizce atıyordu → tercih hiç kaydolmuyordu
+// (Bulgu #9). Artık kanonik anahtarlar kullanılıyor.
 interface NotificationSettings {
-  pushEnabled: boolean;
-  emailEnabled: boolean;
+  // Kanal master anahtarları
+  pushNotifications: boolean;
+  emailNotifications: boolean;
+  smsNotifications: boolean;
 
-  // Push categories
+  // Kategori anahtarları (tüm kanallara uygulanır)
   orderUpdates: boolean;
-  messageNotifications: boolean;
-  priceChanges: boolean;
-  newListingsFromFollowed: boolean;
-  marketingOffers: boolean;
-
-  // Email categories
-  emailOrderUpdates: boolean;
-  emailWeeklyDigest: boolean;
-  emailNewsletter: boolean;
-  emailMarketing: boolean;
+  messageAlerts: boolean;
+  priceDropAlerts: boolean;
+  newListingAlerts: boolean;
+  marketingEmails: boolean;
 }
 
 export default function NotificationSettingsScreen() {
@@ -45,17 +45,15 @@ export default function NotificationSettingsScreen() {
   const { isAuthenticated } = useAuthStore();
   const queryClient = useQueryClient();
   const [settings, setSettings] = useState<NotificationSettings>({
-    pushEnabled: true,
-    emailEnabled: true,
+    // Varsayılanlar API DEFAULT_NOTIFICATION_SETTINGS ile aynı.
+    pushNotifications: true,
+    emailNotifications: true,
+    smsNotifications: false,
     orderUpdates: true,
-    messageNotifications: true,
-    priceChanges: true,
-    newListingsFromFollowed: true,
-    marketingOffers: false,
-    emailOrderUpdates: true,
-    emailWeeklyDigest: false,
-    emailNewsletter: false,
-    emailMarketing: false,
+    messageAlerts: true,
+    priceDropAlerts: true,
+    newListingAlerts: false,
+    marketingEmails: false,
   });
 
   // Fetch notification settings
@@ -90,7 +88,8 @@ export default function NotificationSettingsScreen() {
     }, [isAuthenticated])
   );
 
-  // Save mutation (best-effort; backend tercih ucu yoksa sessizce yutulur, web ile aynı)
+  // Save mutation. Anahtarlar PATCH /users/me/settings (UpdateNotificationSettingsDto)
+  // ile birebir; backend bu tercihleri gönderim yollarında uygular (Bulgu #9 fix).
   const saveMutation = useMutation({
     mutationFn: async (newSettings: NotificationSettings) => {
       return api.patch('/users/me/settings', newSettings).catch(() => null);
@@ -155,111 +154,85 @@ export default function NotificationSettingsScreen() {
 
             <SettingItem
               icon="notifications"
-              label="Bildirimleri Etkinleştir"
-              description="Tüm anlık bildirimleri aç/kapat"
-              value={settings.pushEnabled}
-              onToggle={() => handleToggle('pushEnabled')}
+              label="Anlık Bildirimleri Etkinleştir"
+              description="Cihazınıza gönderilen tüm push bildirimleri aç/kapat"
+              value={settings.pushNotifications}
+              onToggle={() => handleToggle('pushNotifications')}
             />
-
-            {settings.pushEnabled && (
-              <>
-                <Divider style={styles.divider} />
-
-                <SettingItem
-                  icon="cart"
-                  label="Sipariş Güncellemeleri"
-                  description="Sipariş durumu değişikliklerinde bildir"
-                  value={settings.orderUpdates}
-                  onToggle={() => handleToggle('orderUpdates')}
-                />
-
-                <SettingItem
-                  icon="chatbubble"
-                  label="Mesaj Bildirimleri"
-                  description="Yeni mesaj aldığınızda bildir"
-                  value={settings.messageNotifications}
-                  onToggle={() => handleToggle('messageNotifications')}
-                />
-
-                <SettingItem
-                  icon="pricetag"
-                  label="Fiyat Değişiklikleri"
-                  description="Favori ürünlerin fiyatı düştüğünde bildir"
-                  value={settings.priceChanges}
-                  onToggle={() => handleToggle('priceChanges')}
-                />
-
-                <SettingItem
-                  icon="person-add"
-                  label="Takip Ettiklerinden Yeni İlanlar"
-                  description="Takip ettiğiniz satıcılar yeni ilan eklediğinde"
-                  value={settings.newListingsFromFollowed}
-                  onToggle={() => handleToggle('newListingsFromFollowed')}
-                />
-
-                <SettingItem
-                  icon="megaphone"
-                  label="Pazarlama ve Teklifler"
-                  description="Kampanya ve özel tekliflerden haberdar ol"
-                  value={settings.marketingOffers}
-                  onToggle={() => handleToggle('marketingOffers')}
-                />
-              </>
-            )}
           </Card>
 
-          {/* Email Notifications */}
+          {/* Notification Categories (apply to push + in-app + email) */}
+          <Card style={styles.card}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="options" size={24} color={colors.primary[600]!} />
+              <Text variant="h3" style={styles.sectionTitle}>Bildirim Türleri</Text>
+            </View>
+
+            <SettingItem
+              icon="cart"
+              label="Sipariş Güncellemeleri"
+              description="Sipariş, teklif, takas ve iade durumu değişiklikleri"
+              value={settings.orderUpdates}
+              onToggle={() => handleToggle('orderUpdates')}
+            />
+
+            <SettingItem
+              icon="chatbubble"
+              label="Mesaj Bildirimleri"
+              description="Yeni mesaj aldığınızda bildir"
+              value={settings.messageAlerts}
+              onToggle={() => handleToggle('messageAlerts')}
+            />
+
+            <SettingItem
+              icon="pricetag"
+              label="Fiyat Düşüşü Uyarıları"
+              description="Favori/takip ürünlerin fiyatı düştüğünde veya stoğa girdiğinde"
+              value={settings.priceDropAlerts}
+              onToggle={() => handleToggle('priceDropAlerts')}
+            />
+
+            <SettingItem
+              icon="person-add"
+              label="Takip Ettiklerinden Yeni İlanlar"
+              description="Takip ettiğiniz satıcılar yeni ilan eklediğinde"
+              value={settings.newListingAlerts}
+              onToggle={() => handleToggle('newListingAlerts')}
+            />
+
+            <SettingItem
+              icon="megaphone"
+              label="Pazarlama ve Teklifler"
+              description="Kampanya ve özel tekliflerden haberdar ol"
+              value={settings.marketingEmails}
+              onToggle={() => handleToggle('marketingEmails')}
+            />
+          </Card>
+
+          {/* Email & SMS channels */}
           <Card style={styles.card}>
             <View style={styles.sectionHeader}>
               <Ionicons name="mail" size={24} color={colors.primary[600]!} />
-              <Text variant="h3" style={styles.sectionTitle}>E-posta Bildirimleri</Text>
+              <Text variant="h3" style={styles.sectionTitle}>E-posta ve SMS</Text>
             </View>
 
             <SettingItem
               icon="mail"
               label="E-posta Bildirimlerini Etkinleştir"
-              description="Tüm e-posta bildirimlerini aç/kapat"
-              value={settings.emailEnabled}
-              onToggle={() => handleToggle('emailEnabled')}
+              description="Yukarıdaki türler için e-posta gönderilsin"
+              value={settings.emailNotifications}
+              onToggle={() => handleToggle('emailNotifications')}
             />
 
-            {settings.emailEnabled && (
-              <>
-                <Divider style={styles.divider} />
+            <Divider style={styles.divider} />
 
-                <SettingItem
-                  icon="receipt"
-                  label="Sipariş E-postaları"
-                  description="Sipariş onayı ve durum güncellemeleri"
-                  value={settings.emailOrderUpdates}
-                  onToggle={() => handleToggle('emailOrderUpdates')}
-                />
-
-                <SettingItem
-                  icon="calendar"
-                  label="Haftalık Özet"
-                  description="Her hafta aktivite özetinizi alın"
-                  value={settings.emailWeeklyDigest}
-                  onToggle={() => handleToggle('emailWeeklyDigest')}
-                />
-
-                <SettingItem
-                  icon="newspaper"
-                  label="Bülten"
-                  description="Koleksiyonerler için haberler ve ipuçları"
-                  value={settings.emailNewsletter}
-                  onToggle={() => handleToggle('emailNewsletter')}
-                />
-
-                <SettingItem
-                  icon="gift"
-                  label="Pazarlama E-postaları"
-                  description="Özel teklifler ve kampanyalar"
-                  value={settings.emailMarketing}
-                  onToggle={() => handleToggle('emailMarketing')}
-                />
-              </>
-            )}
+            <SettingItem
+              icon="chatbox-ellipses"
+              label="SMS Bildirimleri"
+              description="Önemli güncellemeler için SMS gönderilsin"
+              value={settings.smsNotifications}
+              onToggle={() => handleToggle('smsNotifications')}
+            />
           </Card>
 
           {/* Info */}

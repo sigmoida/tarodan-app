@@ -7,6 +7,10 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma';
+import {
+  resolveSettings,
+  shouldDeliver,
+} from '../modules/notification/notification-preferences';
 
 export interface PushJobData {
   userId: string;
@@ -173,16 +177,49 @@ export class PushWorker {
     this.logger.log(`Processing send-notification job ${job.id} for user ${job.data.userId}`);
 
     const { userId, title, body, data } = job.data;
+    const notificationType = data?.type || 'general';
+
+    // Kullanıcı bildirim tercihleri (Bulgu #9): event.service → pushQueue yolu da
+    // tercihe uymalı. Kategori kapalıysa zil + push birlikte atlanır; kategori
+    // açık ama push master kapalıysa zil kalır, push atlanır.
+    const settings = resolveSettings(
+      (
+        await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { notificationSettings: true },
+        })
+      )?.notificationSettings,
+    );
+    const inAppAllowed = shouldDeliver(settings, notificationType, 'in_app');
 
     // 1. Store as in-app notification — skip for admin_broadcast because
     // admin.service.ts already creates the in_app log before queuing this job.
     if (data?.type !== 'admin_broadcast') {
-      try {
-        await this.saveInAppNotification(userId, title, body, data);
-        this.logger.log(`In-app notification stored for user ${userId}`);
-      } catch (error: any) {
-        this.logger.error(`Failed to store in-app notification: ${error.message}`);
+      if (inAppAllowed) {
+        try {
+          await this.saveInAppNotification(userId, title, body, data);
+          this.logger.log(`In-app notification stored for user ${userId}`);
+        } catch (error: any) {
+          this.logger.error(`Failed to store in-app notification: ${error.message}`);
+        }
+      } else {
+        this.logger.log(
+          `In-app notification suppressed by user preference: user=${userId} type=${notificationType}`,
+        );
       }
+    }
+
+    // 1b. Push tercihe uymuyorsa hiç gönderme (in-app yukarıda ele alındı).
+    if (!shouldDeliver(settings, notificationType, 'push')) {
+      this.logger.log(
+        `Push suppressed by user preference: user=${userId} type=${notificationType}`,
+      );
+      return {
+        success: true,
+        inAppStored: inAppAllowed,
+        pushSent: false,
+        reason: 'Suppressed by user preference',
+      };
     }
 
     // 2. Try to send push notification

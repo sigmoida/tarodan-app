@@ -21,6 +21,12 @@ import { SmtpProvider } from './providers/smtp.provider';
 import { StorageService } from '../storage/storage.service';
 import { RealtimeService } from '../websocket/realtime.service';
 import { renderEmailTemplate, getEmailTemplateSubject } from '../../common/helpers/email-template-renderer';
+import {
+  resolveSettings,
+  shouldDeliver,
+  DeliveryChannel,
+} from './notification-preferences';
+import { NotificationSettings } from '../user/dto/notification-settings.dto';
 
 // Notification templates (Turkish)
 const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message: string; icon?: string; link?: string }> = {
@@ -515,6 +521,18 @@ export class NotificationService {
     private readonly realtime: RealtimeService,
   ) {}
 
+  /**
+   * Kullanıcının bildirim tercihlerini yükle (varsayılanlarla birleştirilmiş).
+   * Gönderim yolları bununla tercihe uyup uymadığını kontrol eder (Bulgu #9).
+   */
+  private async loadNotificationSettings(userId: string): Promise<NotificationSettings> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { notificationSettings: true },
+    });
+    return resolveSettings(user?.notificationSettings);
+  }
+
   private substituteTemplateVariables(text: string, data: Record<string, any>): string {
     return text.replace(/\{\{([\w.]+)\}\}/g, (_, key) => {
       const val = key.includes('.')
@@ -553,10 +571,20 @@ export class NotificationService {
     // Determine channels (default to email + in_app)
     const channels = dto.channels || [NotificationChannel.EMAIL, NotificationChannel.IN_APP];
 
+    // Kullanıcı bildirim tercihleri (Bulgu #9): kapatılan kanal/kategori atlanır.
+    const settings = await this.loadNotificationSettings(dto.userId);
+
     const results: Record<string, boolean> = {};
 
     // Send to each channel using REAL providers
     for (const channel of channels) {
+      if (!shouldDeliver(settings, dto.type, channel as unknown as DeliveryChannel)) {
+        this.logger.log(
+          `Notification suppressed by user preference: user=${dto.userId} type=${dto.type} channel=${channel}`,
+        );
+        results[channel] = false;
+        continue;
+      }
       switch (channel) {
         case NotificationChannel.EMAIL:
           results.email = await this.sendEmailReal(user.email, title, message, dto.data);
@@ -776,9 +804,19 @@ export class NotificationService {
       return false;
     }
 
+    // Bildirim tercihleri (Bulgu #9). Kategori kapalıysa zil + push birlikte
+    // atlanır; kategori açık ama push master kapalıysa yalnız push atlanır.
+    const settings = await this.loadNotificationSettings(userId);
+    if (!shouldDeliver(settings, type, 'in_app')) {
+      this.logger.log(
+        `[createInAppNotification] suppressed by user preference: user=${userId} type=${type}`,
+      );
+      return false;
+    }
+
     const title = this.interpolate(template.title, data);
     const message = this.interpolate(template.message, data);
-    
+
     this.logger.log(`[createInAppNotification] Saving notification: title="${title}", message="${message}"`);
 
     const notificationId = await this.saveInAppNotification(userId, type, title, message, data);
@@ -805,10 +843,17 @@ export class NotificationService {
     // event.service ayrı pushQueue yolunu kullandığından çift-push olmaz.
     // type'ı data'ya ekliyoruz → mobil deep-link routing doğru ekrana gider.
     // Best-effort: push hatası in-app bildirimi etkilemez.
-    try {
-      await this.sendPushReal(userId, title, message, { ...data, type });
-    } catch (e) {
-      this.logger.warn(`[createInAppNotification] push failed: ${e}`);
+    // Push master anahtarı kapalıysa zil kalır ama cihaza push gönderilmez.
+    if (shouldDeliver(settings, type, 'push')) {
+      try {
+        await this.sendPushReal(userId, title, message, { ...data, type });
+      } catch (e) {
+        this.logger.warn(`[createInAppNotification] push failed: ${e}`);
+      }
+    } else {
+      this.logger.log(
+        `[createInAppNotification] push suppressed by user preference: user=${userId} type=${type}`,
+      );
     }
 
     return !!notificationId;
