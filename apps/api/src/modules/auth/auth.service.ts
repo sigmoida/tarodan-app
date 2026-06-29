@@ -468,6 +468,16 @@ export class AuthService {
         throw new UnauthorizedException('Email veya şifre hatalı');
       }
 
+      // Silinmiş (anonimleştirilmiş) hesap: kaynakta reddet, token üretme.
+      if (user.deletedAt) {
+        await this.logSecurityEvent('failed_login', 'medium', {
+          email: dto.email,
+          userId: user.id,
+          reason: 'deleted_account',
+        });
+        throw new UnauthorizedException('Email veya şifre hatalı');
+      }
+
       // Guard: OAuth-only accounts have no passwordHash — avoid bcrypt throwing on null
       if (!user.passwordHash) {
         await this.logSecurityEvent('failed_login', 'medium', {
@@ -1033,6 +1043,14 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Kullanıcı bulunamadı');
     }
+    // Silinmiş/banlı satıra token verme: aksi halde login "başarılı" olur ama
+    // ilk korumalı istekte guard reddeder → kafa karıştırıcı "askıya alındı" ekranı.
+    if (user.deletedAt) {
+      throw new UnauthorizedException('Hesap silinmiş');
+    }
+    if (user.isBanned) {
+      throw new UnauthorizedException('Hesabınız askıya alınmış');
+    }
 
     const tokens = await this.generateTokens(user.id, user.email, user.isSeller);
 
@@ -1084,7 +1102,12 @@ export class AuthService {
     }
 
     // 2) Aynı e-postalı kullanıcı? → oto-bağla
-    const byEmail = await this.prisma.user.findUnique({ where: { email: profile.email } });
+    //    Silinmiş (anonimleştirilmiş) satıra ASLA bağlanma; o satırın email'i zaten
+    //    deleted_<id>@deleted.local'a çevrildiği için normalde eşleşmez, ama eski
+    //    bozuk silme kalıntılarına karşı deletedAt:null ile savunma yapıyoruz.
+    const byEmail = await this.prisma.user.findFirst({
+      where: { email: profile.email, deletedAt: null },
+    });
     if (byEmail) {
       await this.prisma.oAuthAccount.create({
         data: { provider: 'google', providerUserId: profile.sub, email: profile.email, userId: byEmail.id },

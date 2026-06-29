@@ -19,7 +19,7 @@ describe('AuthService.loginWithGoogle', () => {
   };
   const prisma: any = {
     oAuthAccount: { findUnique: jest.fn(), create: jest.fn().mockResolvedValue({ id: 'oa1' }) },
-    user: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn().mockResolvedValue({}) },
+    user: { findUnique: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn().mockResolvedValue({}) },
   };
 
   beforeEach(async () => {
@@ -53,7 +53,8 @@ describe('AuthService.loginWithGoogle', () => {
   it('auto-links to existing user with same email', async () => {
     google.verifyIdToken.mockResolvedValue({ sub: 'g1', email: 'a@b.com', name: 'Ali' });
     prisma.oAuthAccount.findUnique.mockResolvedValue(null);
-    prisma.user.findUnique.mockResolvedValueOnce(baseUser).mockResolvedValueOnce(baseUser);
+    prisma.user.findFirst.mockResolvedValue(baseUser); // step 2: email lookup (deletedAt:null)
+    prisma.user.findUnique.mockResolvedValue(baseUser); // buildUserAuthResponse re-query
     await service.loginWithGoogle('tok');
     expect(prisma.user.create).not.toHaveBeenCalled();
     expect(prisma.oAuthAccount.create).toHaveBeenCalledWith(
@@ -64,12 +65,36 @@ describe('AuthService.loginWithGoogle', () => {
   it('creates a new user when no account/email match', async () => {
     google.verifyIdToken.mockResolvedValue({ sub: 'g1', email: 'new@b.com', name: 'Yeni', picture: 'http://x/y.png' });
     prisma.oAuthAccount.findUnique.mockResolvedValue(null);
-    prisma.user.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({ ...baseUser, id: 'u2', email: 'new@b.com', displayName: 'Yeni' });
+    prisma.user.findFirst.mockResolvedValue(null); // step 2: email lookup → yok
+    prisma.user.findUnique.mockResolvedValue({ ...baseUser, id: 'u2', email: 'new@b.com', displayName: 'Yeni' });
     prisma.user.create.mockResolvedValue({ id: 'u2', email: 'new@b.com', isSeller: false });
     await service.loginWithGoogle('tok');
     expect(prisma.user.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ email: 'new@b.com', passwordHash: null, isEmailVerified: true, isSeller: false }) }),
     );
     expect(prisma.oAuthAccount.create).toHaveBeenCalled();
+  });
+
+  it('silinmiş hesaba email ile oto-bağlanmaz; yeni temiz kullanıcı oluşturur', async () => {
+    // Senaryo: kullanıcı Google hesabını sildi (email serbest, OAuth koptu).
+    // Eski bozuk silme kalıntısı olarak deletedAt'li satır kalmış olsa bile
+    // findFirst({deletedAt:null}) onu görmez → step 3'te temiz yeni kullanıcı.
+    google.verifyIdToken.mockResolvedValue({ sub: 'g1', email: 'a@b.com', name: 'Ali' });
+    prisma.oAuthAccount.findUnique.mockResolvedValue(null);
+    prisma.user.findFirst.mockResolvedValue(null); // deletedAt'li satır filtrelendi
+    prisma.user.findUnique.mockResolvedValue({ ...baseUser, id: 'u3', email: 'a@b.com' });
+    prisma.user.create.mockResolvedValue({ id: 'u3', email: 'a@b.com', isSeller: false });
+    await service.loginWithGoogle('tok');
+    expect(prisma.user.create).toHaveBeenCalled();
+    expect(prisma.user.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ deletedAt: null }) }),
+    );
+  });
+
+  it('silinmiş satıra ait OAuthAccount eşleşse bile token vermez (buildUserAuthResponse reddi)', async () => {
+    google.verifyIdToken.mockResolvedValue({ sub: 'g1', email: 'a@b.com', name: 'Ali' });
+    prisma.oAuthAccount.findUnique.mockResolvedValue({ id: 'oa1', userId: 'u1' });
+    prisma.user.findUnique.mockResolvedValue({ ...baseUser, deletedAt: new Date() });
+    await expect(service.loginWithGoogle('tok')).rejects.toThrow('Hesap silinmiş');
   });
 });
