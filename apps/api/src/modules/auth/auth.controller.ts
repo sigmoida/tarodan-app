@@ -3,12 +3,13 @@ import {
   Post,
   Get,
   Body,
+  Req,
   UseGuards,
   HttpCode,
   HttpStatus,
   Res,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import {
   ApiTags,
@@ -31,7 +32,7 @@ import {
 import { JwtAuthGuard, JwtRefreshGuard } from './guards';
 import { Public, CurrentUser } from './decorators';
 import { RequestUser } from './interfaces';
-import { setAuthCookies, clearAuthCookies } from './utils/auth-cookies';
+import { setAuthCookies, clearAuthCookies, readCookie, COOKIE_NAMES } from './utils/auth-cookies';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -168,9 +169,16 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Çıkış yap' })
   @ApiResponse({ status: 200, description: 'Çıkış yapıldı' })
-  async logout(@Res({ passthrough: true }) res: Response) {
+  async logout(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Body() body?: { refreshToken?: string },
+  ) {
     clearAuthCookies(res, { admin: false });
-    return this.authService.logout('');
+    // Web httpOnly cookie'den, mobil body'den gönderir → ikisini de dene ve iptal et.
+    const refreshToken =
+      readCookie(req, [COOKIE_NAMES.user.refresh]) || body?.refreshToken;
+    return this.authService.logout(refreshToken);
   }
 
   /**

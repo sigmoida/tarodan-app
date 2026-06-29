@@ -3,12 +3,13 @@ import {
   Post,
   Get,
   Body,
+  Req,
   UseGuards,
   HttpCode,
   HttpStatus,
   Res,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import {
   ApiTags,
@@ -21,7 +22,7 @@ import { LoginDto, AdminAuthResponseDto, RefreshTokenDto, TokensDto } from './dt
 import { AdminAuthGuard, JwtRefreshGuard } from './guards';
 import { CurrentUser, Public, AdminRoute } from './decorators';
 import { RequestUser } from './interfaces';
-import { setAuthCookies, clearAuthCookies } from './utils/auth-cookies';
+import { setAuthCookies, clearAuthCookies, readCookie, COOKIE_NAMES } from './utils/auth-cookies';
 
 @ApiTags('admin')
 @Controller('auth/admin')
@@ -121,8 +122,14 @@ export class AdminAuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Admin çıkış' })
   @ApiResponse({ status: 200, description: 'Çıkış yapıldı' })
-  async adminLogout(@Res({ passthrough: true }) res: Response) {
+  async adminLogout(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Body() body?: { refreshToken?: string },
+  ) {
     clearAuthCookies(res, { admin: true });
-    return this.authService.logout('');
+    const refreshToken =
+      readCookie(req, [COOKIE_NAMES.admin.refresh]) || body?.refreshToken;
+    return this.authService.logout(refreshToken);
   }
 }

@@ -648,7 +648,7 @@ export class AuthService {
    */
   async refreshTokens(
     userId: string,
-    _refreshToken: string,
+    refreshToken: string,
     opts?: { isAdmin?: boolean },
   ): Promise<TokensDto> {
     // Find user (admin için adminUser ilişkisiyle güncel rol/aktiflik)
@@ -660,6 +660,11 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Kullanıcı bulunamadı');
     }
+
+    // Sunulan refresh token'ı persist edilmiş duruma karşı doğrula + rotasyon için
+    // iptal et. Logout/önceki rotation ile iptal edilmiş ya da süresi dolmuş token
+    // burada reddedilir (eskiden yalnız JWT imzasına bakılıyordu → iptal yoktu).
+    await this.assertAndRotateRefreshToken(user.id, refreshToken);
 
     // Admin refresh: hesabın hâlâ aktif admin olduğunu doğrula, admin token üret.
     if (opts?.isAdmin) {
@@ -680,9 +685,20 @@ export class AuthService {
    * Note: With JWT, logout is typically handled client-side by removing the token.
    * For enhanced security, we could implement a token blacklist using Redis.
    */
-  async logout(userId: string): Promise<{ message: string }> {
-    // In a production system with Redis, we would add the token to a blacklist
-    // For now, we just return success and client removes the token
+  async logout(refreshToken?: string): Promise<{ message: string }> {
+    // Refresh token'ı DB'de iptal et → çalınan/logout sonrası token bir daha
+    // /auth/refresh'te kullanılamaz. (Eskiden no-op'tu; token, JWT süresi dolana
+    // dek — varsayılan 7 gün — geçerli kalıyordu.)
+    if (refreshToken) {
+      await this.prisma.refreshToken
+        .updateMany({
+          where: { tokenHash: this.hashToken(refreshToken) },
+          data: { revokedAt: new Date() },
+        })
+        .catch(() => {
+          /* iptal best-effort; cookie zaten temizleniyor */
+        });
+    }
     return { message: 'Çıkış yapıldı' };
   }
 
@@ -768,6 +784,7 @@ export class AuthService {
         }),
       ]);
 
+      await this.persistRefreshToken(userId, refreshToken);
       return { accessToken, refreshToken };
     } catch (error) {
       this.logger.error('Token generation failed');
@@ -814,7 +831,85 @@ export class AuthService {
       }),
     ]);
 
+    await this.persistRefreshToken(userId, refreshToken);
     return { accessToken, refreshToken };
+  }
+
+  // ==========================================================================
+  // REFRESH TOKEN PERSISTENCE & ROTATION (GAP-009 — artık auth akışına bağlı)
+  // ==========================================================================
+  // Refresh token'lar refresh_tokens tablosunda hash'li saklanır; logout iptal eder,
+  // refresh eskiyi iptal edip yenisini üretir (rotation). Böylece çalınan ya da
+  // logout sonrası bir refresh token, JWT süresi dolmadan da geçersiz kılınabilir.
+
+  /** Refresh token'ın deterministik SHA-256 özeti (tabloda @unique tokenHash). */
+  private hashToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
+  }
+
+  /** Üretilen refresh token'ı hash'leyip DB'ye yazar. Tracking tablosu auth akışını
+   *  bloke etmemeli → hata yutulur (token yine de geçerli; en kötü ihtimalle bir
+   *  sonraki refresh'te "legacy" muamelesi görür). */
+  private async persistRefreshToken(userId: string, refreshToken: string): Promise<void> {
+    try {
+      const decoded = this.jwtService.decode(refreshToken) as { exp?: number } | null;
+      const expiresAt = decoded?.exp
+        ? new Date(decoded.exp * 1000)
+        : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await this.prisma.refreshToken.create({
+        data: { userId, tokenHash: this.hashToken(refreshToken), expiresAt },
+      });
+    } catch (error) {
+      // Aynı saniyede aynı payload → birebir aynı JWT → tokenHash unique ihlali
+      // olabilir; ya da geçici DB hatası. Auth'u düşürmeyelim, sadece logla.
+      this.logger.warn(
+        `Refresh token persist edilemedi: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /** Sunulan refresh token'ı persist edilmiş duruma karşı doğrular ve rotasyon için
+   *  iptal eder. Bilinen (kayıtlı) token revoked/expired ya da başka kullanıcıya aitse
+   *  reddeder. Kaydı olmayan "legacy" token (persistans öncesi üretilmiş) tek seferlik
+   *  kabul edilir; tekrar kullanımı engellensin diye anında revoked işaretlenir
+   *  (adopt-and-retire). Geçersizse UnauthorizedException fırlatır. */
+  private async assertAndRotateRefreshToken(userId: string, refreshToken: string): Promise<void> {
+    if (!refreshToken) {
+      throw new UnauthorizedException('Geçersiz refresh token');
+    }
+    const tokenHash = this.hashToken(refreshToken);
+    const existing = await this.prisma.refreshToken.findUnique({ where: { tokenHash } });
+
+    if (existing) {
+      if (existing.revokedAt) {
+        throw new UnauthorizedException('Refresh token iptal edilmiş');
+      }
+      if (existing.expiresAt < new Date()) {
+        throw new UnauthorizedException('Refresh token süresi dolmuş');
+      }
+      if (existing.userId !== userId) {
+        throw new UnauthorizedException('Geçersiz refresh token');
+      }
+      // Geçerli → rotasyon: eskiyi iptal et (tekrar kullanılırsa yukarıda reddedilir).
+      await this.prisma.refreshToken.update({
+        where: { tokenHash },
+        data: { revokedAt: new Date() },
+      });
+      return;
+    }
+
+    // Kaydı yok → persistans öncesi üretilmiş legacy token (deploy geçiş penceresi).
+    // Mevcut tüm oturumları topluca düşürmemek için tek seferlik kabul et; ama hemen
+    // "revoked" satır oluştur ki aynı legacy token ikinci kez kullanılamasın.
+    const decoded = this.jwtService.decode(refreshToken) as { exp?: number } | null;
+    const expiresAt = decoded?.exp
+      ? new Date(decoded.exp * 1000)
+      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await this.prisma.refreshToken
+      .create({ data: { userId, tokenHash, expiresAt, revokedAt: new Date() } })
+      .catch(() => {
+        /* yarış/duplicate → yok say; rotasyon yine de bir kez ilerler */
+      });
   }
 
   /**
