@@ -6,20 +6,29 @@ function makeDeps() {
   const users: Record<string, any> = { u1: { id: 'u1', phone: null, isPhoneVerified: false } };
   const prisma: any = {
     user: {
-      findFirst: jest.fn(async ({ where }: any) =>
-        Object.values(users).find(
-          (u: any) => u.phone === where.phone && u.id !== where.id?.not,
-        ) || null,
-      ),
+      findFirst: jest.fn(async ({ where }: any) => {
+        // Match: phone === where.phone AND isPhoneVerified === true AND id !== where.id.not
+        return (
+          Object.values(users).find(
+            (u: any) =>
+              u.phone === where.phone &&
+              u.isPhoneVerified === true &&
+              u.id !== where.id?.not,
+          ) || null
+        );
+      }),
       update: jest.fn(async ({ where, data }: any) => {
         Object.assign(users[where.id], data);
         return users[where.id];
       }),
     },
     phoneVerificationToken: {
-      findFirst: jest.fn(async () =>
-        tokenStore.filter((t) => !t.usedAt).sort((a, b) => b.createdAt - a.createdAt)[0] || null,
-      ),
+      findFirst: jest.fn(async ({ where }: any) => {
+        let filtered = tokenStore;
+        if (where?.userId) filtered = filtered.filter((t) => t.userId === where.userId);
+        if (where?.usedAt === null) filtered = filtered.filter((t) => !t.usedAt);
+        return filtered.sort((a, b) => b.createdAt - a.createdAt)[0] || null;
+      }),
       deleteMany: jest.fn(async () => {
         tokenStore.length = 0;
       }),
@@ -60,17 +69,41 @@ describe('PhoneVerificationService', () => {
     expect(netgsm.sendOtp).toHaveBeenCalled();
   });
 
-  it('başka kullanıcıya kayıtlı numarayı reddeder', async () => {
+  it('sendCode artık user.phone yazMIYOR (I2)', async () => {
+    const { prisma, netgsm, users } = makeDeps();
+    const svc = new PhoneVerificationService(prisma, netgsm);
+    await svc.sendCode('u1', '+905551234567');
+    // user.update çağrılmamış olmalı (telefon veya isPhoneVerified için)
+    expect(prisma.user.update).not.toHaveBeenCalled();
+    // Kullanıcının phone'u hâlâ null
+    expect(users.u1.phone).toBeNull();
+  });
+
+  it('başka kullanıcıya DOĞRULANMIŞ kayıtlı numarayı reddeder (I2)', async () => {
     const { prisma, netgsm, users } = makeDeps();
     users.u2 = { id: 'u2', phone: '+905551234567', isPhoneVerified: true };
     const svc = new PhoneVerificationService(prisma, netgsm);
     await expect(svc.sendCode('u1', '+905551234567')).rejects.toThrow(ConflictException);
   });
 
-  it('doğru kodu doğrular ve isPhoneVerified=true yapar', async () => {
+  it('doğrulanmamış başka kullanıcı aynı numarayı engellemiyor (I2)', async () => {
+    const { prisma, netgsm, users } = makeDeps();
+    users.u2 = { id: 'u2', phone: '+905551234567', isPhoneVerified: false };
+    const svc = new PhoneVerificationService(prisma, netgsm);
+    // Conflict fırlatmamalı; başarıyla devam etmeli
+    await expect(svc.sendCode('u1', '+905551234567')).resolves.toBeTruthy();
+  });
+
+  it('geçersiz numara BadRequestException fırlatır (M5)', async () => {
+    const { prisma, netgsm } = makeDeps();
+    const svc = new PhoneVerificationService(prisma, netgsm);
+    await expect(svc.sendCode('u1', 'abc')).rejects.toThrow(BadRequestException);
+    await expect(svc.sendCode('u1', '+++')).rejects.toThrow(BadRequestException);
+  });
+
+  it('doğru kodu doğrular; user.phone VE isPhoneVerified=true yazar (I2)', async () => {
     const { prisma, netgsm, users } = makeDeps();
     const svc = new PhoneVerificationService(prisma, netgsm);
-    // sendOtp çağrısının aldığı kodu yakala
     let sentCode = '';
     netgsm.sendOtp.mockImplementation(async (_p: string, c: string) => {
       sentCode = c;
@@ -80,6 +113,7 @@ describe('PhoneVerificationService', () => {
     const res = await svc.verify('u1', sentCode);
     expect(res.isPhoneVerified).toBe(true);
     expect(users.u1.isPhoneVerified).toBe(true);
+    expect(users.u1.phone).toBe('+905551234567');
   });
 
   it('yanlış kodda hata fırlatır', async () => {
@@ -98,10 +132,24 @@ describe('PhoneVerificationService', () => {
     expect(prisma.phoneVerificationToken.delete).toHaveBeenCalled();
   });
 
-  it('cooldown: aynı kullanıcı için ikinci sendCode hemen hata fırlatır', async () => {
+  it('cooldown: aynı kullanıcı için ikinci sendCode hemen hata fırlatır (I1)', async () => {
     const { prisma, netgsm } = makeDeps();
     const svc = new PhoneVerificationService(prisma, netgsm);
     await svc.sendCode('u1', '+905551234567');
+    await expect(svc.sendCode('u1', '+905551234567')).rejects.toThrow(BadRequestException);
+  });
+
+  it('cooldown: doğrulama sonrası yeni sendCode 60s içinde hâlâ engellenir (M1)', async () => {
+    const { prisma, netgsm } = makeDeps();
+    const svc = new PhoneVerificationService(prisma, netgsm);
+    let sentCode = '';
+    netgsm.sendOtp.mockImplementation(async (_p: string, c: string) => {
+      sentCode = c;
+      return { success: true };
+    });
+    await svc.sendCode('u1', '+905551234567');
+    await svc.verify('u1', sentCode);
+    // Token kullanıldı; ama createdAt hâlâ yakın → cooldown devrede olmalı
     await expect(svc.sendCode('u1', '+905551234567')).rejects.toThrow(BadRequestException);
   });
 

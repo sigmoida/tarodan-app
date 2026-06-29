@@ -65,7 +65,7 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: () => void 
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading, user, logout } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user, logout, refreshUser } = useAuthStore();
   const { t, locale } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -106,7 +106,7 @@ export default function SettingsPage() {
       setShowPhoneModal(false);
       setPhoneStep('enter');
       setPhoneCode('');
-      window.location.reload();
+      await refreshUser();
     } catch (e: any) {
       toast.error(e?.response?.data?.message || (locale === 'en' ? 'Invalid code' : 'Kod hatalı'));
     } finally {

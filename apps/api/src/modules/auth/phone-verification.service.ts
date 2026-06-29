@@ -31,17 +31,24 @@ export class PhoneVerificationService {
   async sendCode(userId: string, phone: string): Promise<{ message: string }> {
     const normalized = this.netgsm.formatTurkishNumber(phone);
 
-    // Başka kullanıcıya kayıtlı mı?
+    // M5: Geçersiz numarayı erken reddet ('+' veya çöp giriş)
+    if (!/^\+905\d{9}$/.test(normalized)) {
+      throw new BadRequestException('Geçersiz telefon numarası');
+    }
+
+    // I2: Sadece DOĞRULANMIŞ bir sahip çakışma sayılır; doğrulanmamış holder engel değil.
     const taken = await this.prisma.user.findFirst({
-      where: { phone: normalized, id: { not: userId } },
+      where: { phone: normalized, isPhoneVerified: true, id: { not: userId } },
     });
     if (taken) {
       throw new ConflictException('Bu telefon numarası başka bir hesapta kayıtlı');
     }
 
-    // Resend cooldown: son aktif token 60 sn içindeyse engelle
+    // I1 + M1: Cooldown, son token'a göre hesaplanır (usedAt'tan bağımsız).
+    // Bu, yeni SMS flooding'ini hem IP başına @Throttle hem de kullanıcı başına bu 60s
+    // cooldown ile sınırlar; doğrulama sonrası hemen yeniden istek de engellenir.
     const last = await this.prisma.phoneVerificationToken.findFirst({
-      where: { userId, usedAt: null },
+      where: { userId },
       orderBy: { createdAt: 'desc' },
     });
     if (
@@ -51,13 +58,10 @@ export class PhoneVerificationService {
       throw new BadRequestException('Çok sık deneme. Lütfen biraz sonra tekrar deneyin.');
     }
 
-    // Numarayı kullanıcıya yaz (henüz doğrulanmadı)
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { phone: normalized, isPhoneVerified: false },
-    });
+    // I2: user.phone burada YAZILMIYOR; telefon yalnızca başarılı verify'da kalıcı hale gelir.
+    // Token zaten phone: normalized içeriyor; verify bu değeri kullanır.
 
-    // Eski tokenları temizle, yenisini oluştur
+    // Eski tokenları temizle (cooldown kontrolü bundan ÖNCE yapıldı, sıra önemli)
     await this.prisma.phoneVerificationToken.deleteMany({ where: { userId } });
     const code = this.generateCode();
     const created = await this.prisma.phoneVerificationToken.create({
@@ -105,10 +109,28 @@ export class PhoneVerificationService {
       throw new BadRequestException('Kod hatalı');
     }
 
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { isPhoneVerified: true },
+    // I2: Yarış koruması — başka biri bu numarayı verify etmiş mi?
+    const dup = await this.prisma.user.findFirst({
+      where: { phone: token.phone, isPhoneVerified: true, id: { not: userId } },
     });
+    if (dup) {
+      throw new ConflictException('Bu telefon numarası başka bir hesapta kayıtlı');
+    }
+
+    // I2: Telefon numarasını ve doğrulama durumunu atomik olarak yaz.
+    try {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { phone: token.phone, isPhoneVerified: true },
+      });
+    } catch (error: any) {
+      // P2002: unique constraint ihlali (nadir yarış durumu) — ek savunma katmanı
+      if (error?.code === 'P2002') {
+        throw new ConflictException('Bu telefon numarası başka bir hesapta kayıtlı');
+      }
+      throw error;
+    }
+
     await this.prisma.phoneVerificationToken.update({
       where: { id: token.id },
       data: { usedAt: new Date() },
