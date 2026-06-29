@@ -318,6 +318,10 @@ model UserMembership {
   // yüksek tier sürer, dönem sonunda bu tip'e geçilir. null = bekleyen downgrade yok.
   // Upgrade'ler anında uygulanır, bu alanı kullanmaz.
   scheduledTierType  MembershipTierType? @map("scheduled_tier_type")
+  // Ertelemeli period değişimi: dönem sonunda geçilecek faturalama periyodu
+  // ('monthly' | 'yearly'). Örn. yıllık→aylık downgrade'inde aylık olarak işlenir.
+  // null = period değişimi planlı değil.
+  scheduledBillingPeriod String?         @map("scheduled_billing_period")
   payments           MembershipPayment[]
   tier               MembershipTier      @relation(fields: [tierId], references: [id])
   user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)

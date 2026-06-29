@@ -180,6 +180,8 @@ export class UserMembershipResponseDto {
   pendingPayment?: boolean;
   /** Ertelemeli downgrade: dönem sonunda geçilecek tier (null/yoksa bekleyen yok) */
   scheduledTierType?: MembershipTierType;
+  /** Ertelemeli period değişimi: dönem sonunda geçilecek periyot ('monthly'|'yearly') */
+  scheduledBillingPeriod?: string;
   // Computed usage stats
   usedFreeListings: number;
   usedTotalListings: number;

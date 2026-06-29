@@ -603,6 +603,8 @@ export const membershipApi = {
   subscribe: (data: { tierType: string; billingPeriod: 'monthly' | 'yearly' }) =>
     api.post('/membership/subscribe', data),
   cancel: () => api.post('/membership/cancel'),
+  /** Bekleyen plan değişikliğini (ertelemeli downgrade / period) geri al */
+  cancelScheduledChange: () => api.post('/membership/cancel-scheduled-change'),
   /** Oto-yenilemeyi aç/kapat */
   setAutoRenew: (autoRenew: boolean) =>
     api.patch('/membership/auto-renew', { autoRenew }),

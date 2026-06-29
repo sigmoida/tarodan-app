@@ -54,6 +54,7 @@ export default function MembershipPage() {
     pendingTierName?: string;
     pendingTierType?: string;
     scheduledTierType?: string;
+    scheduledBillingPeriod?: string;
     autoRenew?: boolean;
   } | null>(null);
   const [autoRenewSaving, setAutoRenewSaving] = useState(false);
@@ -255,7 +256,31 @@ export default function MembershipPage() {
   const currentTier = isAuthenticated
     ? (membershipDetails?.tier ?? user?.membershipTier ?? 'free')
     : null;
+  // Mevcut faturalama periyodu: dönem uzunluğundan türetilir (>180 gün ≈ yıllık).
+  // Aynı tier'da periyot değişimine (aylık↔yıllık) izin vermek için gerekli.
+  const currentBillingPeriod: 'monthly' | 'yearly' | undefined = (() => {
+    if (!membershipDetails?.currentPeriodStart || !membershipDetails?.currentPeriodEnd) return undefined;
+    const days = Math.round(
+      (new Date(membershipDetails.currentPeriodEnd).getTime() -
+        new Date(membershipDetails.currentPeriodStart).getTime()) / 86_400_000,
+    );
+    return days > 180 ? 'yearly' : 'monthly';
+  })();
+  // Mevcut tier'a tıklarken seçili periyot mevcuttan FARKLIYSA bu bir periyot
+  // değişimidir (geçerli işlem), aynıysa "zaten bu plandasınız".
+  const isExactCurrentPlan = (tierId: string) =>
+    tierId === currentTier && (!currentBillingPeriod || selectedPeriod === currentBillingPeriod);
   const isRequired = searchParams?.get('required') === 'true';
+
+  const handleCancelScheduledChange = async () => {
+    try {
+      await membershipApi.cancelScheduledChange();
+      toast.success(locale === 'en' ? 'Scheduled change cancelled' : 'Bekleyen değişiklik iptal edildi');
+      await fetchMembershipDetails();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'İşlem başarısız');
+    }
+  };
 
   // Block navigation if business membership is required
   useEffect(() => {
@@ -323,8 +348,9 @@ export default function MembershipPage() {
   };
 
   const handleSelectTier = (tierId: string) => {
-    // Mevcut tier'a tıklama → zaten aktif.
-    if (tierId === currentTier) {
+    // Mevcut tier + aynı periyot → zaten aktif. Aynı tier ama farklı periyot
+    // (aylık↔yıllık) ise geçerli bir değişiklik; aşağıda seçime izin verilir.
+    if (isExactCurrentPlan(tierId)) {
       toast(t('membership.planAlreadyActive'));
       return;
     }
@@ -448,24 +474,38 @@ export default function MembershipPage() {
             </div>
           )}
 
-          {/* Ertelemeli downgrade: plan dönem sonunda daha düşük tier'a geçecek.
-              Mevcut (yüksek) plan o tarihe kadar aynen sürer. */}
-          {!membershipDetails?.pendingPayment && membershipDetails?.status !== 'cancelled' && membershipDetails?.scheduledTierType && (
-            <div className="mt-6 bg-warning-50 border border-warning-200 rounded-xl p-4 max-w-md mx-auto">
-              <p className="text-warning-800 font-medium">
-                Üyeliğiniz{' '}
-                {membershipDetails.currentPeriodEnd
-                  ? `${new Date(membershipDetails.currentPeriodEnd).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric' })} tarihinde`
-                  : 'dönem sonunda'}{' '}
-                <span className="font-semibold">
-                  {membershipDetails.scheduledTierType === 'basic' ? 'Temel' :
-                   membershipDetails.scheduledTierType === 'premium' ? 'Premium' :
-                   membershipDetails.scheduledTierType === 'business' ? 'İş' : 'Ücretsiz'}
-                </span>{' '}
-                planına geçecek. O tarihe kadar mevcut üyelik avantajlarınız devam eder.
-              </p>
-            </div>
-          )}
+          {/* Ertelemeli değişiklik: dönem sonunda daha düşük tier'a veya farklı
+              faturalama periyoduna geçilecek. Mevcut plan o tarihe kadar aynen sürer. */}
+          {!membershipDetails?.pendingPayment && membershipDetails?.status !== 'cancelled' &&
+           (membershipDetails?.scheduledTierType || membershipDetails?.scheduledBillingPeriod) && (() => {
+            const dateStr = membershipDetails.currentPeriodEnd
+              ? `${new Date(membershipDetails.currentPeriodEnd).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric' })} tarihinde`
+              : 'dönem sonunda';
+            const isTierChange = !!membershipDetails.scheduledTierType && membershipDetails.scheduledTierType !== currentTier;
+            const tierLabel = membershipDetails.scheduledTierType === 'basic' ? 'Temel' :
+                              membershipDetails.scheduledTierType === 'premium' ? 'Premium' :
+                              membershipDetails.scheduledTierType === 'business' ? 'İş' : 'Ücretsiz';
+            const periodLabel = membershipDetails.scheduledBillingPeriod === 'yearly' ? 'yıllık' : 'aylık';
+            return (
+              <div className="mt-6 bg-warning-50 border border-warning-200 rounded-xl p-4 max-w-md mx-auto">
+                <p className="text-warning-800 font-medium">
+                  Üyeliğiniz {dateStr}{' '}
+                  {isTierChange ? (
+                    <><span className="font-semibold">{tierLabel}</span> planına geçecek.</>
+                  ) : (
+                    <><span className="font-semibold">{periodLabel}</span> faturalamaya geçecek.</>
+                  )}{' '}
+                  O tarihe kadar mevcut üyelik avantajlarınız devam eder.
+                </p>
+                <button
+                  onClick={handleCancelScheduledChange}
+                  className="mt-3 text-sm font-medium text-warning-800 underline hover:text-warning-900"
+                >
+                  Değişikliği iptal et
+                </button>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Membership Details Card — tüm ücretli kademeler (basic dahil) */}
@@ -726,7 +766,7 @@ export default function MembershipPage() {
                       ? 'bg-surface-alt text-subtle'
                       : 'bg-surface-alt text-body group-hover:bg-border-subtle'
                   }`}>
-                    {isCurrent ? t('membership.currentPlan') : tier.price === 0 ? t('membership.free') : isSelected ? t('common.selected') : t('common.select')}
+                    {isExactCurrentPlan(tier.id) ? t('membership.currentPlan') : tier.price === 0 ? t('membership.free') : isSelected ? t('common.selected') : t('common.select')}
                   </div>
                 </div>
               </motion.div>
@@ -735,7 +775,7 @@ export default function MembershipPage() {
           </div>
         </div>
 
-        {selectedTier && selectedTier !== 'free' && selectedTier !== currentTier && (
+        {selectedTier && selectedTier !== 'free' && !isExactCurrentPlan(selectedTier) && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

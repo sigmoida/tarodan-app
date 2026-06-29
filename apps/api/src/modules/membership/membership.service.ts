@@ -261,6 +261,7 @@ export class MembershipService {
       // Ertelemeli downgrade: dönem sonunda geçilecek tier (null = yok). UI
       // "Üyeliğiniz {currentPeriodEnd} tarihinde {scheduledTierType} olacak" gösterebilir.
       ...(membership.scheduledTierType ? { scheduledTierType: membership.scheduledTierType } : {}),
+      ...(membership.scheduledBillingPeriod ? { scheduledBillingPeriod: membership.scheduledBillingPeriod } : {}),
       ...(pendingPayment && pendingTierName ? { pendingTierName, pendingTierType, pendingPayment: true } : {}),
       ...stats,
     };
@@ -382,15 +383,10 @@ export class MembershipService {
       }
     }
 
-    // Check if user already has this tier (past_due = ödeme bekliyor, sayma; sadece aktif plan aynıysa engelle)
     const existingMembership = await this.prisma.userMembership.findUnique({
       where: { userId },
       include: { tier: true },
     });
-
-    if (existingMembership?.tier.type === dto.tierType && existingMembership?.status !== SubscriptionStatus.past_due) {
-      throw new BadRequestException('Zaten bu üyelik tipine sahipsiniz');
-    }
 
     // Calculate period
     const now = new Date();
@@ -403,34 +399,71 @@ export class MembershipService {
 
     const price = dto.billingPeriod === 'monthly' ? tier.monthlyPrice : tier.yearlyPrice;
 
-    // === ERTELEMELİ DOWNGRADE ===
-    // Kullanıcı şu an GEÇERLİ ve ücretli bir tier'a sahipse ve seçtiği tier daha
-    // DÜŞÜK seviyedeyse (sortOrder), bu bir downgrade'dir: tier'ı HEMEN değiştirmeyiz.
-    // İptal mantığıyla aynı şekilde, ödenmiş mevcut dönem sonuna kadar yüksek tier
-    // sürer; dönem sonunda runAutoRenewals (ücretli hedef) veya checkExpiredMemberships
-    // (free hedef / ödenmemiş) seçilen tier'a geçirir. Böylece kalan günler yanmaz ve
-    // ilan limiti / takas / diğer özellikler ancak gerçek geçiş anında değişir (canlı
-    // hesaplandığı için tutarlı). Upgrade'ler (daha yüksek tier) aşağıdaki anında akışta.
-    if (
-      existingMembership &&
-      isPremiumEntitled(existingMembership) &&
-      tier.sortOrder < existingMembership.tier.sortOrder
-    ) {
-      await this.prisma.userMembership.update({
-        where: { userId },
-        data: {
-          scheduledTierType: dto.tierType,
-          // Ücretli hedefe (örn. temel) dönem sonunda oto-yenileme ile geçilebilsin
-          // diye autoRenew açık tutulur. Hedef free ise yenileme denenmez; dönem
-          // sonunda free'ye düşülür (checkExpiredMemberships).
-          autoRenew: dto.tierType !== MembershipTierType.free,
-          // Bekleyen bir iptal varsa, downgrade planı onu geçersiz kılar: üyelik
-          // aktif kalır, dönem sonunda free yerine seçilen tier'a geçer.
-          status: SubscriptionStatus.active,
-          cancelledAt: null,
-        },
-      });
-      return this.getUserMembership(userId);
+    // === GEÇİŞ YÖNÜ KARARI (upgrade anında / downgrade ertelemeli) ===
+    // Kullanıcı şu an GEÇERLİ ve ücretli bir tier'a sahipse, yön hem tier seviyesine
+    // (sortOrder) hem de faturalama periyoduna göre belirlenir:
+    //   - Tier ↑                         → UPGRADE (anında + ödeme)
+    //   - Tier ↓                         → DOWNGRADE (dönem sonuna ertelenir)
+    //   - Aynı tier, aylık→yıllık        → UPGRADE (anında: yıllık ücret şimdi)
+    //   - Aynı tier, yıllık→aylık        → DOWNGRADE (dönem sonunda aylığa geçer)
+    //   - Aynı tier, aynı periyot        → bekleyen değişiklik varsa İPTAL, yoksa hata
+    // Downgrade'de tier HEMEN değişmez; mevcut (yüksek) plan ödenmiş dönem sonuna kadar
+    // sürer. Dönem sonunda runAutoRenewals (ücretli hedef) veya checkExpiredMemberships
+    // (free hedef / ödenmemiş) planlanan tier+periyoda geçirir. İlan limiti/takas/diğer
+    // özellikler canlı hesaplandığı için yalnız gerçek geçiş anında değişir (tutarlı).
+    if (existingMembership && isPremiumEntitled(existingMembership)) {
+      const curPeriodDays = Math.round(
+        (existingMembership.currentPeriodEnd.getTime() -
+          existingMembership.currentPeriodStart.getTime()) / 86_400_000,
+      );
+      const currentIsYearly = curPeriodDays > 180;
+      const targetIsYearly = dto.billingPeriod === 'yearly';
+
+      let direction: 'upgrade' | 'downgrade' | 'same';
+      if (tier.sortOrder > existingMembership.tier.sortOrder) {
+        direction = 'upgrade';
+      } else if (tier.sortOrder < existingMembership.tier.sortOrder) {
+        direction = 'downgrade';
+      } else if (targetIsYearly && !currentIsYearly) {
+        direction = 'upgrade'; // aynı tier, aylık→yıllık
+      } else if (!targetIsYearly && currentIsYearly) {
+        direction = 'downgrade'; // aynı tier, yıllık→aylık
+      } else {
+        direction = 'same'; // aynı tier + aynı periyot
+      }
+
+      if (direction === 'same') {
+        // Bekleyen bir değişiklik (downgrade/period) varsa kullanıcı eski planına
+        // dönmek istiyor demektir → planı iptal et (revert). Yoksa gerçekten aynı plan.
+        if (existingMembership.scheduledTierType || existingMembership.scheduledBillingPeriod) {
+          await this.prisma.userMembership.update({
+            where: { userId },
+            data: { scheduledTierType: null, scheduledBillingPeriod: null },
+          });
+          return this.getUserMembership(userId);
+        }
+        throw new BadRequestException('Zaten bu plandasınız');
+      }
+
+      if (direction === 'downgrade') {
+        await this.prisma.userMembership.update({
+          where: { userId },
+          data: {
+            scheduledTierType: dto.tierType,
+            scheduledBillingPeriod: dto.billingPeriod,
+            // Ücretli hedefe dönem sonunda oto-yenileme ile geçilebilsin diye autoRenew
+            // açık tutulur. Hedef free ise yenileme denenmez; checkExpiredMemberships
+            // dönem sonunda free'ye düşürür.
+            autoRenew: dto.tierType !== MembershipTierType.free,
+            // Bekleyen iptali geçersiz kıl: üyelik aktif kalır, dönem sonunda
+            // free yerine seçilen tier+periyoda geçer.
+            status: SubscriptionStatus.active,
+            cancelledAt: null,
+          },
+        });
+        return this.getUserMembership(userId);
+      }
+      // direction === 'upgrade' → aşağıdaki anında ödeme akışına düşer.
     }
 
     // For free tier, just update
@@ -444,7 +477,8 @@ export class MembershipService {
             currentPeriodStart: now,
             currentPeriodEnd: periodEnd,
             cancelledAt: null,
-            scheduledTierType: null, // anında geçiş: varsa bekleyen downgrade iptal
+            scheduledTierType: null, // anında geçiş: varsa bekleyen değişiklik iptal
+            scheduledBillingPeriod: null,
           },
         });
       } else {
@@ -474,7 +508,8 @@ export class MembershipService {
           currentPeriodEnd: periodEnd,
           cancelledAt: null,
           autoRenew: true, // Ücretli üyelikte oto-yenileme hatırlatması default açık
-          scheduledTierType: null, // anında upgrade: varsa bekleyen downgrade iptal
+          scheduledTierType: null, // anında upgrade: varsa bekleyen değişiklik iptal
+          scheduledBillingPeriod: null,
         },
       });
     } else {
@@ -685,12 +720,38 @@ export class MembershipService {
       data: {
         status: SubscriptionStatus.cancelled,
         cancelledAt: new Date(),
-        // İptal = dönem sonunda free'ye dön. Bekleyen bir downgrade planı varsa
-        // (örn. premium→temel) iptal onu geçersiz kılar; dönem sonunda free olur.
+        // İptal = dönem sonunda free'ye dön. Bekleyen bir değişiklik planı varsa
+        // (downgrade/period) iptal onu geçersiz kılar; dönem sonunda free olur.
         scheduledTierType: null,
+        scheduledBillingPeriod: null,
       },
     });
 
+    return this.getUserMembership(userId);
+  }
+
+  // ==========================================================================
+  // CANCEL SCHEDULED CHANGE (bekleyen downgrade / period değişimini geri al)
+  // ==========================================================================
+  /**
+   * Kullanıcının dönem sonuna planladığı değişikliği (downgrade veya period) iptal
+   * eder; mevcut plan olduğu gibi sürer ve dönem sonunda aynı tier+periyotla yenilenir.
+   * Aktif bir değişiklik planı yoksa hata verir.
+   */
+  async cancelScheduledChange(userId: string): Promise<UserMembershipResponseDto> {
+    const membership = await this.prisma.userMembership.findUnique({
+      where: { userId },
+    });
+    if (!membership) {
+      throw new NotFoundException('Üyelik bulunamadı');
+    }
+    if (!membership.scheduledTierType && !membership.scheduledBillingPeriod) {
+      throw new BadRequestException('Bekleyen bir üyelik değişikliği yok');
+    }
+    await this.prisma.userMembership.update({
+      where: { userId },
+      data: { scheduledTierType: null, scheduledBillingPeriod: null },
+    });
     return this.getUserMembership(userId);
   }
 
@@ -828,13 +889,12 @@ export class MembershipService {
       const card = m.user.savedCards[0];
       if (!card) continue;
       try {
-        // === ERTELEMELİ DOWNGRADE UYGULAMA ===
-        // Dönem sonuna gelen üyelikte bekleyen bir downgrade planı varsa, YENİ
-        // dönem seçilen tier'a göre kurulur ve ücreti o tier'dan çekilir.
-        // - Hedef free ise: yenileme yapmayız; dönem sonunda checkExpiredMemberships
-        //   free'ye düşürür (ücretli yenileme anlamsız).
-        // - Hedef ücretli (örn. temel) ise: effectiveTier'ı o tier yapıp fiyatı/
-        //   tier'ı ona göre işleriz; scheduledTierType başarıda temizlenir.
+        // === ERTELEMELİ DEĞİŞİKLİK UYGULAMA (downgrade / period değişimi) ===
+        // Dönem sonuna gelen üyelikte bekleyen bir değişiklik planı varsa, YENİ dönem
+        // planlanan tier+periyoda göre kurulur ve ücreti ona göre çekilir.
+        // - Hedef free ise: yenileme yapmayız; checkExpiredMemberships free'ye düşürür.
+        // - Hedef ücretli ise: effectiveTier + effectiveIsYearly'i plana göre belirleriz;
+        //   plan başarıda temizlenir (scheduledTierType + scheduledBillingPeriod = null).
         let effectiveTier = m.tier;
         if (m.scheduledTierType) {
           if (m.scheduledTierType === MembershipTierType.free) {
@@ -845,12 +905,19 @@ export class MembershipService {
           });
           if (sched) effectiveTier = sched;
         }
-        const tierChanging = effectiveTier.id !== m.tierId;
 
-        const periodDays = Math.round(
+        const curPeriodDays = Math.round(
           (m.currentPeriodEnd.getTime() - m.currentPeriodStart.getTime()) / 86_400_000,
         );
-        const isYearly = periodDays > 180;
+        // Bekleyen period değişimi varsa onu uygula; yoksa mevcut periyodu sürdür.
+        const isYearly = m.scheduledBillingPeriod
+          ? m.scheduledBillingPeriod === 'yearly'
+          : curPeriodDays > 180;
+
+        // Plan (tier veya period) gerçekten değişiyor mu? Başarıda planı temizlemek için.
+        const hasScheduledChange = !!(m.scheduledTierType || m.scheduledBillingPeriod);
+        const tierChanging = effectiveTier.id !== m.tierId;
+
         const price = Number(isYearly ? effectiveTier.yearlyPrice : effectiveTier.monthlyPrice);
         if (!(price > 0)) continue;
 
@@ -893,9 +960,10 @@ export class MembershipService {
                 status: SubscriptionStatus.active,
                 currentPeriodStart: newStart,
                 currentPeriodEnd: newEnd,
-                // Ertelemeli downgrade uygulandıysa tier'ı yeni (düşük) tier'a geçir
-                // ve planı temizle. Değişmiyorsa olduğu gibi kalır.
-                ...(tierChanging ? { tierId: effectiveTier.id, scheduledTierType: null } : {}),
+                // Bekleyen değişiklik (tier ve/veya period) uygulandı: tier'ı geçir
+                // (değiştiyse) ve planı temizle. Değişiklik yoksa olduğu gibi kalır.
+                ...(tierChanging ? { tierId: effectiveTier.id } : {}),
+                ...(hasScheduledChange ? { scheduledTierType: null, scheduledBillingPeriod: null } : {}),
               },
             });
             await tx.membershipPayment.create({
@@ -1079,6 +1147,7 @@ export class MembershipService {
             // (Ücretli hedef ödenseydi runAutoRenewals dönemi ileri taşırdı ve bu
             // kayıt expired listesine düşmezdi.) Bekleyen planı temizle.
             scheduledTierType: null,
+            scheduledBillingPeriod: null,
           },
         });
         downgradeCount++;

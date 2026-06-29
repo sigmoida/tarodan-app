@@ -207,9 +207,14 @@ export default function MembershipCheckoutPage() {
       // Ertelemeli downgrade: backend tier'ı HEMEN değiştirmez (scheduledTierType döner),
       // ödeme istemez. Mevcut (yüksek) plan dönem sonuna kadar sürer. "Tebrikler, yeni
       // üyelik" demek yanıltıcı olur; kullanıcıya geçişin ileri tarihli olduğunu anlat.
-      if (data.scheduledTierType) {
+      if (data.scheduledTierType || data.scheduledBillingPeriod) {
         await refreshUserData();
-        router.push(`/membership/success?tier=${tier}&kind=downgrade&scheduled=1`);
+        // Tier değişimi mi yoksa sadece periyot değişimi mi: success mesajını ona göre.
+        const isPeriodOnly = tier === currentTier;
+        const q = isPeriodOnly
+          ? `scheduled=1&period=${period}`
+          : `tier=${tier}&kind=downgrade&scheduled=1`;
+        router.push(`/membership/success?${q}`);
         return;
       }
 

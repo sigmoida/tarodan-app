@@ -21,6 +21,9 @@ function MembershipSuccessContent() {
   const scheduled = searchParams.get('scheduled') === '1';
   const tier = searchParams.get('tier') || '';
   const tierLabel = TIER_LABELS[tier] || 'yeni';
+  // Periyot-only ertelemeli değişim (aynı tier, yıllık→aylık): tier yerine periyot bildir.
+  const scheduledPeriod = searchParams.get('period');
+  const periodLabel = scheduledPeriod === 'yearly' ? 'yıllık' : 'aylık';
 
   // Ertelemeli downgrade ekranı: ödeme yok, mevcut plan dönem sonuna kadar sürer.
   if (scheduled) {
@@ -39,7 +42,11 @@ function MembershipSuccessContent() {
             Plan değişikliği talebiniz alındı
           </h1>
           <p className="text-lg text-muted mb-4">
-            Üyeliğiniz mevcut dönem sonunda <span className="font-semibold text-heading">{tierLabel}</span> planına geçecek.
+            {scheduledPeriod ? (
+              <>Üyeliğiniz mevcut dönem sonunda <span className="font-semibold text-heading">{periodLabel}</span> faturalamaya geçecek.</>
+            ) : (
+              <>Üyeliğiniz mevcut dönem sonunda <span className="font-semibold text-heading">{tierLabel}</span> planına geçecek.</>
+            )}
           </p>
           <p className="text-muted mb-8">
             O tarihe kadar mevcut üyelik avantajlarınız aynen devam eder; herhangi bir
