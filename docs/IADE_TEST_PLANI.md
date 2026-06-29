@@ -174,6 +174,47 @@ kapalıyken veya CI'da koşulmalı (dev :3001'i tutuyorsa çakışır → bu tur
 | L2 | prod `PAYTR_TEST_MODE=0` + gerçek merchant | yanlış config sessiz fail etmez |
 | L3 | gerçek küçük ödeme→iade → PayTR panel "tamamlandı" + ekstre | para karta ulaşır |
 
+> **NEDEN OTOMATİK DEĞİL:** L2/L3 gerçek PayTR merchant'ı + gerçek kart/banka
+> gerektirir; e2e PayTR'yi mock'lar (orkestrasyonu kanıtlar, para hareketini DEĞİL).
+> Aşağıdaki runbook (§6) elle bir kez koşulmalı — özellikle **prod'a ilk gerçek
+> iade öncesi**.
+
+---
+
+## 6. Canlı PayTR Doğrulama Runbook'u (L4 — elle)
+
+### L1 — Staging/local tam akış (PAYMENT_BYPASS=true)
+1. `cd apps/api && cp .env.test .env.local-stg` (veya staging env) — `PAYMENT_BYPASS=true`.
+2. Stack: `pnpm docker:up` + API + web ayağa.
+3. Web'den: ürün al → ödeme (bypass-complete) → sipariş `paid`.
+4. İade senaryoları (her biri için DB'de durum doğrula):
+   - Kargo öncesi iptal → `cancelled`, stok serbest, iade yok.
+   - paid iptal → `refunded` → `processRefundedOrders` cron → `cancelled` + payment `refunded`.
+   - Teslim ≤14g → iade talebi → `wait_for_delivery`/`return_shipment_open` → kargo döndür → `refunded`.
+   - Teslim >14g → iade talebi **400 bloke**.
+5. Beklenen: tüm geçişler e2e ile birebir (zaten 72/72 yeşil).
+
+### L2 — Prod config doğrulama (gerçek iade ÖNCESİ zorunlu)
+- [ ] Coolify/prod env: `PAYTR_TEST_MODE=0` (veya unset DEĞİL — `parsePaytrTestMode` boş/undefined'ı **test** sayar! Mutlaka `0` yaz).
+- [ ] `PAYTR_MERCHANT_ID` / `PAYTR_MERCHANT_KEY` / `PAYTR_MERCHANT_SALT` = PayTR panelindeki gerçek değerler.
+- [ ] `PAYMENT_BYPASS` prod'da `false` (veya unset).
+- [ ] Sağlık: API başlangıç loglarında PayTR config uyarısı yok.
+- ⚠️ Risk: yanlış config sessiz fail eder (runtime guard yok) — bu yüzden L3 şart.
+
+### L3 — Gerçek uçtan uca iade (tek seferlik, küçük tutar)
+1. Gerçek bir test kartıyla **küçük tutarlı** (örn. en düşük) bir sipariş öde.
+2. Admin/alıcı akışından iadeyi tetikle (kargo öncesi iptal en hızlısı).
+3. **PayTR merchant paneli** → İşlemler/İade geçmişi → ilgili `merchant_oid` için iade
+   kaydı **"tamamlandı/başarılı"** görünmeli.
+4. Alıcının **banka ekstresinde** iade 1–5 iş günü içinde yansımalı (kartına geri).
+5. DB: `payment.status='refunded'`, `order.status='cancelled'` (veya trade için `tradeCashPayment.refundedAt`).
+6. ❌ Sapma görürsen: `merchant_oid` eşleşmesi (providerConversationId), tutar (ondalık TL),
+   ve PayTR err_msg'i kontrol et (loglar).
+
+### Öneri (canlı güveni artırmak için — opsiyonel kod işi)
+- PayTR iade **callback/webhook**'u işleme (şu an yalnız senkron yanıta güveniliyor).
+- `RefundRequest`/`payment` ↔ PayTR paneli **mutabakat cron'u** (asenkron settlement teyidi).
+
 ---
 
 ## 3. Öncelik & uygulama sırası
