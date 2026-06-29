@@ -9,8 +9,9 @@ import {
   TrashIcon,
   ShoppingCartIcon,
   LockClosedIcon,
-  TagIcon,
-  XMarkIcon,
+  // KUPON UI devre dışı (yoruma alındı) — sadece kupon bloğunda kullanılıyordu
+  // TagIcon,
+  // XMarkIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { useCartStore } from "@/stores/cartStore";
@@ -28,15 +29,17 @@ export default function CartPage() {
     removeFromCart,
     totalDiscount,
     appliedDiscounts,
-    appliedCouponCode,
-    applyCoupon,
-    removeCoupon,
+    // KUPON UI devre dışı (yoruma alındı) — store API'si korunuyor
+    // appliedCouponCode,
+    // applyCoupon,
+    // removeCoupon,
   } = useCartStore();
   const { isAuthenticated } = useAuthStore();
   const { t, locale } = useTranslation();
 
-  const [couponInput, setCouponInput] = useState("");
-  const [couponLoading, setCouponLoading] = useState(false);
+  // KUPON UI devre dışı (yoruma alındı)
+  // const [couponInput, setCouponInput] = useState("");
+  // const [couponLoading, setCouponLoading] = useState(false);
 
   useEffect(() => {
     fetchCart();
@@ -58,6 +61,8 @@ export default function CartPage() {
     toast.success(t("product.removedFromCart"));
   };
 
+  // KUPON UI devre dışı (yoruma alındı) — handler'lar korunuyor
+  /*
   const handleApplyCoupon = async () => {
     const code = couponInput.trim().toUpperCase();
     if (!code) return;
@@ -77,6 +82,7 @@ export default function CartPage() {
     await removeCoupon();
     setCouponLoading(false);
   };
+  */
 
   if (isLoading && items.length === 0) {
     return (
@@ -250,7 +256,8 @@ export default function CartPage() {
                 {t("checkout.orderSummary")}
               </h2>
 
-              {/* Kupon Kodu girişi veya aktif kupon badge'i */}
+              {/* ===== KUPON KODU UI — devre dışı (yoruma alındı, kod korunuyor) =====
+              Kupon Kodu girişi veya aktif kupon badge'i
               {isAuthenticated && (
                 <div className="mb-4">
                   {appliedCouponCode ? (
@@ -297,6 +304,7 @@ export default function CartPage() {
                   )}
                 </div>
               )}
+              ===== KUPON KODU UI sonu ===== */}
 
               {/* Fiyat özeti */}
               <div className="space-y-3 text-sm">

@@ -24,7 +24,8 @@ import {
   UserCircleIcon,
   ChatBubbleLeftRightIcon,
   SwatchIcon,
-  TicketIcon,
+  // KUPON/İndirimler sekmesi devre dışı (yoruma alındı)
+  // TicketIcon,
   CalculatorIcon,
   BanknotesIcon,
   DocumentTextIcon,
@@ -127,7 +128,8 @@ const navGroups: NavGroup[] = [
     name: 'Pazarlama & İçerik',
     icon: MegaphoneIcon,
     items: [
-      { name: 'İndirimler', href: '/discounts', icon: TicketIcon, permission: 'discounts' },
+      // KUPON/İndirimler sekmesi devre dışı (yoruma alındı) — sayfa kodu ve route duruyor
+      // { name: 'İndirimler', href: '/discounts', icon: TicketIcon, permission: 'discounts' },
       { name: 'Reklamlar', href: '/ads', icon: MegaphoneIcon, keywords: ['reklam', 'ad', 'banner'], permission: 'ads' },
       { name: 'Bildirimler', href: '/notifications', icon: BellAlertIcon, permission: 'notifications' },
       { name: 'E-posta Şablonları', href: '/email-templates', icon: ChatBubbleLeftRightIcon, permission: 'email_templates' },

@@ -183,7 +183,11 @@ export default function AdminPaymentDetailPage() {
           </Link>
           <div className="flex-1">
             <h1 className="text-3xl font-bold text-heading">Ödeme Detayı</h1>
-            <p className="text-sm text-muted">Sipariş #{payment.orderNumber}</p>
+            <p className="text-sm text-muted">
+              {payment.orderNumber
+                ? `Sipariş #${payment.orderNumber}`
+                : `Ödeme #${payment.id?.slice(0, 8) ?? ''}`}
+            </p>
           </div>
           <span className={`px-4 py-2 rounded-full font-medium ${statusInfo.color} ${statusInfo.bg}`}>
             {statusInfo.label}
@@ -251,50 +255,60 @@ export default function AdminPaymentDetailPage() {
             {/* Order Info */}
             <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
               <h2 className="text-lg font-semibold text-heading mb-4">Sipariş Bilgileri</h2>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-muted">Sipariş No:</span>
-                  <Link
-                    href={`/orders/${payment.orderId}`}
-                    className="text-primary-600 hover:text-primary-700 font-medium"
-                  >
-                    #{payment.order.orderNumber}
-                  </Link>
+              {payment.order ? (
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-muted">Sipariş No:</span>
+                    <Link
+                      href={`/orders/${payment.orderId}`}
+                      className="text-primary-600 hover:text-primary-700 font-medium"
+                    >
+                      #{payment.order.orderNumber}
+                    </Link>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted">Ürün:</span>
+                    <span>{payment.order.product?.title ?? '—'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted">Sipariş Durumu:</span>
+                    <span>{enumLabel(orderStatusConfig, payment.order.status)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted">Toplam Tutar:</span>
+                    <span>₺{payment.order.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted">Komisyon:</span>
+                    <span>₺{payment.order.commissionAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted">Ürün:</span>
-                  <span>{payment.order.product.title}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted">Sipariş Durumu:</span>
-                  <span>{enumLabel(orderStatusConfig, payment.order.status)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted">Toplam Tutar:</span>
-                  <span>₺{payment.order.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted">Komisyon:</span>
-                  <span>₺{payment.order.commissionAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
-                </div>
-              </div>
+              ) : (
+                <p className="text-sm text-muted">
+                  Bu ödeme bir siparişe bağlı değil (üyelik, grup veya takas-nakit ödemesi olabilir).
+                </p>
+              )}
             </div>
 
             {/* User Info */}
             <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
               <h2 className="text-lg font-semibold text-heading mb-4">Kullanıcı Bilgileri</h2>
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm text-muted mb-1">Alıcı</p>
-                  <p className="font-medium">{payment.order.buyer.displayName}</p>
-                  <p className="text-sm text-muted">{payment.order.buyer.email}</p>
+              {payment.order ? (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-muted mb-1">Alıcı</p>
+                    <p className="font-medium">{payment.order.buyer?.displayName ?? '—'}</p>
+                    <p className="text-sm text-muted">{payment.order.buyer?.email ?? ''}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted mb-1">Satıcı</p>
+                    <p className="font-medium">{payment.order.seller?.displayName ?? '—'}</p>
+                    <p className="text-sm text-muted">{payment.order.seller?.email ?? ''}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted mb-1">Satıcı</p>
-                  <p className="font-medium">{payment.order.seller.displayName}</p>
-                  <p className="text-sm text-muted">{payment.order.seller.email}</p>
-                </div>
-              </div>
+              ) : (
+                <p className="text-sm text-muted">Siparişe bağlı olmayan ödeme — alıcı/satıcı bilgisi yok.</p>
+              )}
             </div>
 
             {/* Payment Holds */}

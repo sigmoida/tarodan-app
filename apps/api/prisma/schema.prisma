@@ -36,6 +36,7 @@ model User {
   notificationSettings    Json?                    @map("notification_settings")
   lastActivityAt          DateTime?                @map("last_activity_at")
   lastLoginAt             DateTime?                @map("last_login_at")
+  deletedAt               DateTime?                @map("deleted_at")
   addresses               Address[]
   adminUser               AdminUser?
   cart                    Cart?
@@ -106,6 +107,19 @@ model Report {
   @@index([reporterId])
   @@index([createdAt])
   @@map("reports")
+}
+
+/// Anasayfa öne çıkarma bölümlerinin (haftanın koleksiyoneri / haftanın şirketi)
+/// haftalık kazananını saklayan snapshot. Ağır skorlama her istekte değil, bir
+/// cron job ile periyodik hesaplanır; endpoint'ler bu satırı okuyup kazananı
+/// taze veriyle doldurur. `type` tek kayıt garantisi için primary key'dir.
+model FeaturedSnapshot {
+  type       String   @id // 'collector' | 'business'
+  entityId   String   @map("entity_id") // kazanan koleksiyon / kullanıcı id'si
+  score      Int      @default(0)
+  computedAt DateTime @default(now()) @map("computed_at")
+
+  @@map("featured_snapshots")
 }
 
 model OAuthAccount {

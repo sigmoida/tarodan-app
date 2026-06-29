@@ -10057,6 +10057,16 @@ export class AdminService {
 
     await this.createAuditLog(adminId, 'collection_featured_change', 'Collection', collectionId, { isFeatured: existing.isFeatured }, { isFeatured });
 
+    // Anasayfa "haftanın koleksiyoneri" snapshot'ını ve cache'ini düşür; sonraki
+    // okuma yeni isFeatured durumuna göre kazananı yeniden hesaplayıp saklar.
+    await this.prisma.featuredSnapshot
+      .deleteMany({ where: { type: 'collector' } })
+      .catch(() => {});
+    if (this.cache) {
+      await this.cache.del('featured:collector').catch(() => {});
+      await this.cache.delPattern('featured:top-collections:*').catch(() => {});
+    }
+
     return { success: true, isFeatured: updated.isFeatured };
   }
 

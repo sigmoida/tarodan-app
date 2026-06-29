@@ -30,6 +30,10 @@ export default function CityDistrictSelector({
   const [districtOpen, setDistrictOpen] = useState(false);
   const [citySearch, setCitySearch] = useState('');
   const [districtSearch, setDistrictSearch] = useState('');
+  // Sayfanın altındayken (ör. takas adres formu) dropdown aşağı açılınca sabit çerez
+  // banner'ının/ekran sınırının arkasında kalıp tıklanamıyordu. Altta yer yoksa yukarı aç.
+  const [cityUp, setCityUp] = useState(false);
+  const [districtUp, setDistrictUp] = useState(false);
   
   const cityDropdownRef = useRef<HTMLDivElement>(null);
   const districtDropdownRef = useRef<HTMLDivElement>(null);
@@ -96,6 +100,13 @@ export default function CityDistrictSelector({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Dropdown ~280px yüksekliğinde; toggle'ın altında o kadar yer yoksa yukarı açılsın.
+  const shouldOpenUp = (wrapper: HTMLElement | null): boolean => {
+    if (!wrapper || typeof window === 'undefined') return false;
+    const rect = wrapper.getBoundingClientRect();
+    return window.innerHeight - rect.bottom < 300;
+  };
+
   const selectCity = useCallback((selectedCity: string) => {
     if (process.env.NODE_ENV === 'development') {
       console.log('🏙️ selectCity called with:', selectedCity, 'current city:', city);
@@ -124,6 +135,7 @@ export default function CityDistrictSelector({
         <Button variant="secondary" type="button"
           onClick={(e) => {
             e.stopPropagation();
+            if (!cityOpen) setCityUp(shouldOpenUp(cityDropdownRef.current));
             setCityOpen(!cityOpen);
             setDistrictOpen(false);
           }}
@@ -135,8 +147,8 @@ export default function CityDistrictSelector({
         </Button>
 
         {cityOpen && (
-          <div 
-            className="absolute z-[9999] w-full mt-1 bg-surface-elevated border border-border rounded-xl shadow-xl overflow-hidden" 
+          <div
+            className={`absolute z-[9999] w-full bg-surface-elevated border border-border rounded-xl shadow-xl overflow-hidden ${cityUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}
             style={{ maxHeight: '280px' }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -193,6 +205,7 @@ export default function CityDistrictSelector({
               setCityOpen(true);
               return;
             }
+            if (!districtOpen) setDistrictUp(shouldOpenUp(districtDropdownRef.current));
             setDistrictOpen(!districtOpen);
             setCityOpen(false);
           }}
@@ -205,8 +218,8 @@ export default function CityDistrictSelector({
         </Button>
 
         {districtOpen && city && (
-          <div 
-            className="absolute z-[9999] w-full mt-1 bg-surface-elevated border border-border rounded-xl shadow-xl overflow-hidden" 
+          <div
+            className={`absolute z-[9999] w-full bg-surface-elevated border border-border rounded-xl shadow-xl overflow-hidden ${districtUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}
             style={{ maxHeight: '280px' }}
             onClick={(e) => e.stopPropagation()}
           >

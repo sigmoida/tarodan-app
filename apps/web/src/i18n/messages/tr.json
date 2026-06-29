@@ -675,6 +675,7 @@
     "noProductsYet": "Bu koleksiyonda henüz ürün yok",
     "addProduct": "Ürün Ekle",
     "addProductToCollection": "Koleksiyona Ürün Ekle",
+    "createNewCollection": "Yeni Koleksiyon Oluştur",
     "productsLoadFailed": "Ürünler yüklenemedi",
     "noProductsToAdd": "Eklenebilecek ürününüz yok. Önce ilan oluşturun veya tüm ürünleriniz zaten bu koleksiyonda.",
     "createNewListing": "Yeni İlan Oluştur",

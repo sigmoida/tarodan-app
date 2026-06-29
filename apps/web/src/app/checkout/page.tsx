@@ -1006,7 +1006,8 @@ export default function CheckoutPage() {
             } = {
               items: checkoutGroupItems,
               idempotencyKey: getCheckoutIdempotencyKey(),
-              ...(appliedCouponCode ? { couponCode: appliedCouponCode } : {}),
+              // KUPON devre dışı (yoruma alındı) — checkout artık kupon kodu göndermiyor
+              // ...(appliedCouponCode ? { couponCode: appliedCouponCode } : {}),
             };
 
             if (validAddressId) {

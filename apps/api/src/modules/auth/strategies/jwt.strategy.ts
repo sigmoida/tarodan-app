@@ -40,6 +40,11 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('Kullanıcı bulunamadı');
     }
 
+    // Silinmiş (anonimleştirilmiş) hesap: satır FK'lar için korunur ama erişim reddedilir.
+    if (user.deletedAt) {
+      throw new UnauthorizedException('Hesap silinmiş');
+    }
+
     return {
       id: user.id,
       email: user.email,

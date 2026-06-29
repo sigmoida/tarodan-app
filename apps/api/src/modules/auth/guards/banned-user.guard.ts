@@ -1,6 +1,8 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../../../prisma';
+import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { IS_ADMIN_ROUTE_KEY } from '../decorators/admin-route.decorator';
 
 /**
  * Guard to prevent banned users from accessing API endpoints
@@ -17,6 +19,30 @@ export class BannedUserGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    // Public route'ları ATLA. Aksi halde: tarayıcıda banlı bir kullanıcının hâlâ
+    // geçerli access_token cookie'si dururken, JwtAuthGuard public route'larda
+    // (login/register/google) opsiyonel auth ile o banlı kullanıcıyı request.user'a
+    // koyuyordu → BAŞKA bir hesapla /auth/login isteği bile USER_BANNED ile
+    // reddediliyordu. Yani banlı cookie varken hiçbir hesapla giriş yapılamıyordu.
+    // Ban, kimliği doğrulanmış aksiyonları kısıtlamalı; public erişimi/giriş yapmayı değil.
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (isPublic) {
+      return true;
+    }
+
+    // Admin route'lar AdminJwtAuthGuard ile ayrı yönetilir; ban kontrolü kullanıcı
+    // oturumuna göredir, admin oturumuna karışma.
+    const isAdminRoute = this.reflector.getAllAndOverride<boolean>(IS_ADMIN_ROUTE_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (isAdminRoute) {
+      return true;
+    }
+
     const request = context.switchToHttp().getRequest();
     const user = request.user;
 
