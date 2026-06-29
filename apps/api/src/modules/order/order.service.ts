@@ -2519,9 +2519,10 @@ export class OrderService {
       where.OR = [{ buyerId: userId }, { sellerId: userId }];
     }
 
-    // Varsayılan listede iptal edilen (ödeme başarısız vb.) siparişleri gösterme
+    // Varsayılan listede iptal edilen (ödeme başarısız vb.) siparişleri gösterme.
+    // status tek değer veya dizi (çoklu: "İptal/İade" filtresi cancelled+refunded ister).
     if (status) {
-      where.status = status;
+      where.status = Array.isArray(status) ? { in: status } : status;
     } else {
       where.status = { not: OrderStatus.cancelled };
     }

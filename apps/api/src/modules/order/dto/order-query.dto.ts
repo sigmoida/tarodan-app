@@ -1,17 +1,23 @@
 import { IsOptional, IsEnum, IsNumber, Min, Max } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import { OrderStatus } from '@prisma/client';
 
 export class OrderQueryDto {
   @ApiPropertyOptional({
     enum: OrderStatus,
     example: 'paid',
-    description: 'Filter by order status',
+    description:
+      'Filter by order status. Tek değer ("paid") veya virgülle çoklu ("cancelled,refunded").',
   })
   @IsOptional()
-  @IsEnum(OrderStatus)
-  status?: OrderStatus;
+  @Transform(({ value }) =>
+    typeof value === 'string'
+      ? value.split(',').map((s) => s.trim()).filter(Boolean)
+      : value,
+  )
+  @IsEnum(OrderStatus, { each: true })
+  status?: OrderStatus | OrderStatus[];
 
   @ApiPropertyOptional({
     example: 'buyer',
