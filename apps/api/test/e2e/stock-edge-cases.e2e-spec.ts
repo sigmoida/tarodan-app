@@ -7,6 +7,7 @@ import { createProduct } from '../factories/product.factory';
 import { createAddress } from '../factories/address.factory';
 import { signCallback } from '../mocks/paytr.mock';
 import { PaymentService } from '../../src/modules/payment/payment.service';
+import { randomUUID } from 'crypto';
 
 /**
  * Kapsamlı stok edge-case'leri: eşzamanlı alımlar, iptal/iade sonrası stok
@@ -231,6 +232,95 @@ describe('Stock edge cases — comprehensive (E2E)', () => {
       const p = await prisma.product.findUnique({ where: { id: product.id } });
       expect(p?.reservedQuantity).toBe(0); // released by order.quantity (3)
       expect(p?.quantity).toBe(5);
+    });
+  });
+
+  // ──────────────── Real multi-quantity checkout (cart → checkout → pay → refund) ────────────────
+  describe('Real multi-quantity purchase (buy 3 of a 5-stock product)', () => {
+    /** Pay a checkout group via initiate(checkoutGroupId) + PayTR callback. */
+    async function payGroup(buyer: any, checkoutGroupId: string) {
+      await request(ctx.app.getHttpServer())
+        .post('/api/payments/initiate')
+        .set(authHeader(buyer))
+        .send({ checkoutGroupId, provider: 'paytr' })
+        .expect(201);
+      const prisma = getPrisma();
+      const payment = await prisma.payment.findFirst({
+        where: { checkoutGroupId },
+        orderBy: { createdAt: 'desc' },
+      });
+      const cb = signCallback({
+        merchantOid: payment!.providerConversationId!,
+        status: 'success',
+        totalAmount: Math.round(Number(payment!.amount) * 100),
+      });
+      await request(ctx.app.getHttpServer())
+        .post('/api/payments/callback/paytr')
+        .send(cb)
+        .expect(200);
+    }
+
+    it('checkout 3 units → reserves 3 (physical stays 5); pay → stock 5→2; refund → stock back to 5', async () => {
+      const prisma = getPrisma();
+      const seller = await createUser(ctx.module, { isSeller: true });
+      const buyer = await createUser(ctx.module);
+      const product = await createProduct({ sellerId: seller.id, categoryId: baseline.categoryId, price: 100, quantity: 5 });
+      const addr = await createAddress({ userId: buyer.id });
+
+      // 1) Checkout 3 units of the same product.
+      const checkoutRes = await request(ctx.app.getHttpServer())
+        .post('/api/orders/checkout')
+        .set(authHeader(buyer))
+        .send({
+          items: [{ productId: product.id, quantity: 3 }],
+          shippingAddressId: addr.id,
+          idempotencyKey: randomUUID(),
+        })
+        .expect(201);
+      const checkoutGroupId = (checkoutRes.body.checkoutGroupId || checkoutRes.body.id || checkoutRes.body.group?.id) as string;
+      expect(checkoutGroupId).toBeTruthy();
+
+      const order = await prisma.order.findFirst({ where: { checkoutGroupId } });
+      expect(order?.quantity).toBe(3); // single order line, 3 units
+      let p = await prisma.product.findUnique({ where: { id: product.id } });
+      expect(p?.reservedQuantity).toBe(3); // reserved by 3
+      expect(p?.quantity).toBe(5); // physical untouched until payment
+      expect((p!.quantity ?? 0) - (p!.reservedQuantity ?? 0)).toBe(2); // available=2
+
+      // 2) Pay → physical stock drops 5 → 2.
+      await payGroup(buyer, checkoutGroupId);
+      p = await prisma.product.findUnique({ where: { id: product.id } });
+      expect(p?.quantity).toBe(2);
+      expect(p?.reservedQuantity).toBe(0);
+
+      // 3) Cancel the (paid) order → refund → physical stock restored 2 → 5.
+      await request(ctx.app.getHttpServer())
+        .post(`/api/orders/${order!.id}/cancel`)
+        .set(authHeader(buyer))
+        .send({ reason: 'iade' })
+        .expect(200);
+      await ctx.app.get(PaymentService).processRefund(order!.id);
+
+      p = await prisma.product.findUnique({ where: { id: product.id } });
+      expect(p?.quantity).toBe(5); // all 3 units restocked → back to 5
+      expect(p?.status).toBe(ProductStatus.active);
+    });
+
+    it('cannot checkout more than stock: 6 units of a 5-stock product is rejected', async () => {
+      const seller = await createUser(ctx.module, { isSeller: true });
+      const buyer = await createUser(ctx.module);
+      const product = await createProduct({ sellerId: seller.id, categoryId: baseline.categoryId, price: 100, quantity: 5 });
+      const addr = await createAddress({ userId: buyer.id });
+
+      await request(ctx.app.getHttpServer())
+        .post('/api/orders/checkout')
+        .set(authHeader(buyer))
+        .send({
+          items: [{ productId: product.id, quantity: 6 }],
+          shippingAddressId: addr.id,
+          idempotencyKey: randomUUID(),
+        })
+        .expect(400); // over-stock rejected
     });
   });
 
