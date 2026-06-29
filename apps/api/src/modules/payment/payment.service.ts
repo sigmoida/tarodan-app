@@ -430,8 +430,48 @@ export class PaymentService {
     }
 
     // Hedefi (sipariş / grup / takas) çöz; ortak Payment + buyer + sepet + merchant_oid hazırlanır.
+    // resolveDirectPaymentContext payment'ı atomik olarak `processing`'e CLAIM eder (H2).
     const { payment, buyer, basketItems, merchantOid, amount, successQueryParams } =
       await this.resolveDirectPaymentContext(userId, dto, req);
+
+    try {
+      return await this.chargeDirectPayment(
+        dto,
+        { payment, buyer, basketItems, merchantOid, amount, successQueryParams },
+        userId,
+      );
+    } finally {
+      // H2: çekim tamamlandı — `processing` claim'ini bırak, `pending`'e döndür ki
+      // async PayTR callback ödemeyi tamamlayabilsin (CAS `pending` bekler). Yalnız
+      // hâlâ `processing` ise dokun: bu sırada hızlı callback completed yaptıysa ezme.
+      await this.prisma.payment
+        .updateMany({
+          where: { id: payment.id, status: PaymentStatus.processing },
+          data: { status: PaymentStatus.pending },
+        })
+        .catch(() => undefined);
+    }
+  }
+
+  /**
+   * processDirectPayment'ın çekim gövdesi. `processing`'e claim edilmiş payment
+   * üzerinde PayTR çekimini yapar (yeni kart 3D / kayıtlı kart recurring).
+   * Claim bırakma (processing→pending) çağıran processDirectPayment'ın finally'sinde.
+   */
+  private async chargeDirectPayment(
+    dto: DirectPaymentDto,
+    ctx: {
+      payment: any;
+      buyer: PayTRBuyer;
+      basketItems: Array<{ id: string; name: string; category: string; price: number; quantity: number }>;
+      merchantOid: string;
+      amount: number;
+      successQueryParams: string;
+    },
+    userId: string | null,
+  ) {
+    const { payment, buyer, basketItems, merchantOid, amount, successQueryParams } = ctx;
+    const recurringEnabled = this.configService.get('PAYTR_RECURRING_ENABLED') === 'true';
 
     // Flow B — KAYITLI KARTLA ÖDEME: PayTR'da kayıtlı kartla ödeme Non3D recurring servisiyle
     // yapılır (chargeRecurring). Kart sahibi kullanıcı olmalı; require_cvv ise CVV zorunlu.
@@ -573,10 +613,19 @@ export class PaymentService {
         this.logger.log(`Re-reserved 1 unit for order ${order.id} after release (direct)`);
       }
       amount = Number(order.totalAmount);
+      // orderId Payment üzerinde UNIQUE — mevcut ödemeyi DURUMDAN BAĞIMSIZ bul
+      // (grup/takas dallarındaki findUnique deseniyle aynı). Önceki `findFirst
+      // status:pending` H2 claim'i payment'ı `processing` yapınca onu KAÇIRIP yeni
+      // create deniyordu → orderId unique → P2002 (500). Artık processing/failed
+      // ödeme de bulunur; eşzamanlı ikinci istek claim'de temiz 400 alır.
+      const existingOrderPayment = await this.prisma.payment.findUnique({
+        where: { orderId: order.id },
+      });
+      if (existingOrderPayment?.status === PaymentStatus.completed) {
+        throw new BadRequestException('Bu sipariş zaten ödendi');
+      }
       payment =
-        (await this.prisma.payment.findFirst({
-          where: { orderId: order.id, status: PaymentStatus.pending },
-        })) ||
+        existingOrderPayment ||
         (await this.prisma.payment.create({
           data: {
             orderId: order.id,
@@ -730,16 +779,32 @@ export class PaymentService {
     ) {
       oidHistory.push(payment.providerConversationId);
     }
-    payment = await this.prisma.payment.update({
-      where: { id: payment.id },
+    // H2: ÇİFT-ÇEKİM YARIŞI KORUMASI. Bu payment satırını PayTR çekiminden ÖNCE
+    // atomik olarak `processing`'e CLAIM et. Eşzamanlı ikinci bir process-direct
+    // (aynı payment satırı, ör. çift tıklama) status'ü `pending`/`failed` BULAMAZ
+    // (zaten `processing`) → claim count===0 → reddedilir, ikinci PayTR çekimi
+    // yapılmaz. Çekim bitince processDirectPayment status'ü tekrar `pending`'e çeker
+    // (callback CAS'ı `pending` bekler). Önceki kod burada koşulsuz `pending` yazıyordu
+    // → guard ile gerçek çekim arasında kilit yoktu, iki eşzamanlı çekim mümkündü.
+    const claimed = await this.prisma.payment.updateMany({
+      where: {
+        id: payment.id,
+        status: { in: [PaymentStatus.pending, PaymentStatus.failed] },
+      },
       data: {
         providerConversationId: merchantOid,
         providerPaymentId: null,
-        status: PaymentStatus.pending,
+        status: PaymentStatus.processing,
         failureReason: null,
         metadata: { ...prevMeta, merchantOidHistory: oidHistory },
       },
     });
+    if (claimed.count === 0) {
+      throw new BadRequestException(
+        'Bu ödeme şu anda işleniyor. Lütfen birkaç saniye bekleyip tekrar deneyin.',
+      );
+    }
+    payment = await this.prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
 
     return { payment, buyer, basketItems, merchantOid, amount, successQueryParams };
   }
@@ -3389,24 +3454,43 @@ export class PaymentService {
    * Called when order is completed
    */
   async releasePayment(orderId: string) {
+    // H4: açık iade ile DONDURULMUŞ (frozenByRefundId dolu) bir hold ASLA serbest
+    // bırakılamaz — aksi halde admin manuel release, açık iadeyle birlikte çift
+    // kayba yol açar (satıcıya öde + alıcıya iade). releaseHoldsDue/releasePaymentIfHeld
+    // ile aynı invaryant. Hem okuma hem güncelleme frozenByRefundId:null ile sınırlı.
     const hold = await this.prisma.paymentHold.findFirst({
       where: {
         orderId,
         status: PaymentHoldStatus.held,
+        frozenByRefundId: null,
       },
     });
 
     if (!hold) {
-      throw new NotFoundException('Bekleyen ödeme bulunamadı');
+      throw new NotFoundException(
+        'Serbest bırakılabilir ödeme bulunamadı (açık iade nedeniyle dondurulmuş olabilir)',
+      );
     }
 
-    await this.prisma.paymentHold.update({
-      where: { id: hold.id },
+    // Atomik son guard: held + frozenByRefundId:null WHERE içinde — eşzamanlı açılan
+    // bir iade (freeze) yarışını kapatır (TOCTOU yok).
+    const released = await this.prisma.paymentHold.updateMany({
+      where: {
+        id: hold.id,
+        status: PaymentHoldStatus.held,
+        frozenByRefundId: null,
+      },
       data: {
         status: PaymentHoldStatus.released,
         releasedAt: new Date(),
       },
     });
+
+    if (released.count === 0) {
+      throw new NotFoundException(
+        'Serbest bırakılabilir ödeme bulunamadı (açık iade nedeniyle dondurulmuş olabilir)',
+      );
+    }
 
     // In production: transfer funds to seller
     this.logger.log(`Payment hold ${hold.id} released to seller ${hold.sellerId}`);
@@ -4651,12 +4735,32 @@ export class PaymentService {
    * Called by scheduler to automatically cancel payments older than timeout period
    */
   async cancelExpiredPayments() {
+    // H1: Ödeme SATIRINI `failed` yapma penceresi, REZERVASYON serbest bırakma
+    // penceresinden (PAYMENT_TIMEOUT_MINUTES=5dk) AYRIDIR ve PayTR 3DS oturumundan
+    // (createDirectPayment timeout_limit=30dk) MUTLAKA UZUN olmalıdır.
+    // Aksi halde: kullanıcı 3DS'i 5-30dk arası tamamlar → PayTR parayı çeker →
+    // callback gelir ama bu cron payment'ı çoktan `failed` yapmıştır → CAS düşer →
+    // çekilen para sipariş'e bağlanmaz, iade yok (orphan capture). Pencereyi
+    // PayTR oturum süresi + grace üstüne çekerek bu yarışı kökten kapatıyoruz.
+    // Stok zaten 5dk'da releaseExpiredOrderReservations ile boşaldığı için bu
+    // gecikme stok'u bağlamaz; sadece terk edilen payment satırı daha geç failed olur.
     const timeoutMinutes = parseInt(
-      this.configService.get('PAYMENT_TIMEOUT_MINUTES') || '5',
+      this.configService.get('PAYMENT_FAIL_TIMEOUT_MINUTES') || '35',
       10,
     );
     const timeoutDate = new Date();
     timeoutDate.setMinutes(timeoutDate.getMinutes() - timeoutMinutes);
+
+    // H2 self-heal: `processing` claim'i normalde çekim süresince (saniyeler) tutulur ve
+    // processDirectPayment finally'sinde `pending`'e döner. Süreç çekim ortasında çökerse
+    // (hard kill) claim `processing`'de takılı kalır. 5dk'dan eski `processing` ödemeleri
+    // `pending`'e döndürerek yeniden denenebilir/işlenebilir hale getir (callback CAS pending bekler).
+    const staleProcessing = new Date();
+    staleProcessing.setMinutes(staleProcessing.getMinutes() - 5);
+    await this.prisma.payment.updateMany({
+      where: { status: PaymentStatus.processing, updatedAt: { lt: staleProcessing } },
+      data: { status: PaymentStatus.pending },
+    });
 
     // Find pending payments older than timeout
     const expiredPayments = await this.prisma.payment.findMany({
@@ -4710,13 +4814,21 @@ export class PaymentService {
               (o) => o.status === OrderStatus.pending_payment && o.paymentExpiresAt > now,
             );
 
-        await this.prisma.payment.update({
-          where: { id: payment.id },
+        // H3: Atomik CAS — yalnızca HÂLÂ `pending` olan ödemeyi `failed` yap.
+        // findMany (snapshot) ile bu update arasında gerçek bir başarı callback'i
+        // ödemeyi `completed` yapmış olabilir; CAS'sız `update` bunu `failed`'a
+        // ezerdi (TOCTOU → ödenmiş sipariş bozulur). count===0 ise ödeme bu turda
+        // tamamlandı/işlendi demektir; stok/iade cleanup'ını ÇALIŞTIRMA, atla.
+        const failedClaim = await this.prisma.payment.updateMany({
+          where: { id: payment.id, status: PaymentStatus.pending },
           data: {
             status: PaymentStatus.failed,
             failureReason: `Ödeme ${timeoutMinutes} dakika içinde tamamlanmadığı için otomatik olarak iptal edildi`,
           },
         });
+        if (failedClaim.count === 0) {
+          continue;
+        }
 
         if (!orderStillAlive) {
           // Order has been cancelled (or 24h passed): release stock + cleanup.

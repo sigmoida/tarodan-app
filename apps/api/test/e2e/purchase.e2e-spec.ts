@@ -220,12 +220,16 @@ describe('Purchase Flow (E2E)', () => {
       });
       expect(paymentAfter?.status).toBe(PaymentStatus.completed);
 
-      const hold = await prisma.paymentHold.findUnique({
+      const hold = await prisma.paymentHold.findFirst({
         where: { paymentId: paymentAfter!.id },
       });
       expect(hold).toBeTruthy();
       expect(hold?.status).toBe(PaymentHoldStatus.held);
-      expect(hold?.releaseAt).toBeTruthy();
+      // releaseAt is intentionally NULL at payment time — escrow is only
+      // scheduled for release on DELIVERY (deliveredAt + return + grace), so
+      // the seller is never paid before the product ships. See
+      // payment.service.ts: "Teslim olmadan asla serbest bırakılmaz".
+      expect(hold?.releaseAt).toBeNull();
 
       // 4) seller marks as preparing (idempotent if already preparing — we
       //    only assert from the `paid` branch). Skip the call when the
@@ -525,6 +529,18 @@ describe('Purchase Flow (E2E)', () => {
       // Hold exists
       const hold = await prisma.paymentHold.findFirst({ where: { orderId } });
       expect(hold?.status).toBe(PaymentHoldStatus.held);
+
+      // Advance the order to completed: releaseHoldsDue only releases escrow
+      // once the order has at least shipped (RELEASABLE_ORDER_STATUSES) and has
+      // no open refund — paying a seller for an unshipped order is unsafe.
+      await prisma.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.delivered, version: { increment: 1 } },
+      });
+      await request(ctx.app.getHttpServer())
+        .post(`/api/orders/${orderId}/confirm`)
+        .set(authHeader(buyer))
+        .expect(200);
 
       // Force release
       await prisma.paymentHold.update({

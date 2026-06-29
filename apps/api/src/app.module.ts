@@ -104,7 +104,14 @@ import { ErrorLogInterceptor } from './common/interceptors/error-log.interceptor
     }),
 
     // Rate limiting
-    ThrottlerModule.forRoot([
+    ThrottlerModule.forRoot({
+      // E2E tests share one in-memory ThrottlerStorage across a whole suite
+      // (single app, all requests from 127.0.0.1); per-endpoint limits like
+      // process-direct's 10/min would otherwise bleed across unrelated tests
+      // and 429 the later ones. Rate-limit logic itself is not exercised by
+      // these functional tests. Production/dev are unaffected.
+      skipIf: () => process.env.NODE_ENV === 'test',
+      throttlers: [
       {
         ttl: 60000, // 1 minute
         // Genel limit yüksek tutulur: admin paneli SPA'sı açılışta tek IP'den çok
@@ -113,7 +120,8 @@ import { ErrorLogInterceptor } from './common/interceptors/error-log.interceptor
         // Brute-force koruması hassas uçlardaki sıkı @Throttle (login 5/dk) ile sağlanır.
         limit: 1000, // 1000 requests per minute
       },
-    ]),
+      ],
+    }),
 
     // Event bus (Prisma → ES sync, etc.)
     EventEmitterModule.forRoot(),

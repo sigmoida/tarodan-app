@@ -95,7 +95,7 @@ describe('Stock Notifications (E2E)', () => {
     });
   });
 
-  it('losing order owner gets ORDER_CANCELLED_OUT_OF_STOCK and NOT a duplicate offer notification', async () => {
+  it('losing accepted-but-unpaid offer owner gets OFFER_CANCELLED_OUT_OF_STOCK (not order) and no duplicate', async () => {
     const seller = await createUser(ctx.module, { isSeller: true });
     const fastBuyer = await createUser(ctx.module);
     const slowBuyer = await createUser(ctx.module);
@@ -156,15 +156,20 @@ describe('Stock Notifications (E2E)', () => {
       )
       .expect(200);
 
-    const orderNotif = await prisma.notificationLog.findFirst({
-      where: { userId: slowBuyer.id, type: 'order_cancelled_out_of_stock' },
-    });
-    expect(orderNotif).not.toBeNull();
-
+    // The slowBuyer's Order was created from an ACCEPTED-BUT-UNPAID offer
+    // (offerId set, no Payment row). When stockout cancels it the buyer never
+    // paid, so it is really a cancelled OFFER → "Teklifiniz iptal edildi"
+    // (offer_cancelled_out_of_stock), NOT the misleading order-cancelled
+    // message. See payment.service.ts processSuccessfulPayment: isUnpaidOffer.
     const offerNotif = await prisma.notificationLog.findFirst({
       where: { userId: slowBuyer.id, type: 'offer_cancelled_out_of_stock' },
     });
-    expect(offerNotif).toBeNull(); // dedup: order-side wins
+    expect(offerNotif).not.toBeNull();
+
+    const orderNotif = await prisma.notificationLog.findFirst({
+      where: { userId: slowBuyer.id, type: 'order_cancelled_out_of_stock' },
+    });
+    expect(orderNotif).toBeNull(); // dedup: one notification per buyer, offer-side wins for unpaid offers
   });
 
   it('payment failure releases reservation and emits BACK_IN_STOCK to wishlist users (debounced 24h)', async () => {
