@@ -824,7 +824,24 @@ describe('Refund flow (E2E)', () => {
     await refundService.finalizeRefundForReturnedShipment(refundId);
     const finalRr = await prisma.refundRequest.findUnique({ where: { id: refundId } });
     expect(finalRr!.status).toBe(RefundRequestStatus.refunded);
+    expect(finalRr!.refundedAt).toBeTruthy();
     expect(ctx.paytr.refundCalls).toHaveLength(1);
+
+    // "İade Sürecinde" → "İade Edildi" geçişi: alıcıya REFUND_COMPLETED bildirimi gider
+    const notif = await prisma.notificationLog.findFirst({
+      where: { userId: buyer.id, type: 'refund_completed' },
+    });
+    expect(notif).toBeTruthy(); // alıcıya iade tamamlandı bildirimi
+
+    // Tam iade tamamlanınca order.status='cancelled' olur (processRefund) → sipariş
+    // varsayılan listeden (cancelled hariç) düşer, "İptal Edilenler" (status=cancelled)
+    // sekmesinde activeRefundRequest.status='refunded' ile görünür → UI "İade Edildi".
+    const cancelledList = await request(ctx.app.getHttpServer())
+      .get('/api/orders?role=buyer&status=cancelled')
+      .set(authHeader(buyer))
+      .expect(200);
+    const row = (cancelledList.body.data as any[]).find((o) => o.id === orderId);
+    expect(row?.activeRefundRequest?.status).toBe(RefundRequestStatus.refunded);
   });
 
   it('B6: satıcının adresi YOKKEN iade kargosu depo adresi fallback ile yine de açılır', async () => {
