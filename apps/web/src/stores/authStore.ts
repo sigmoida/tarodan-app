@@ -12,6 +12,7 @@ interface User {
   displayName: string;
   isVerified: boolean;
   isEmailVerified?: boolean;
+  isPhoneVerified?: boolean;
   isSeller: boolean;
   sellerType?: string;
   createdAt: Date;
@@ -104,6 +105,7 @@ const mapApiUser = (apiUser: any): User => ({
   displayName: apiUser.displayName || apiUser.display_name || '',
   isVerified: apiUser.isVerified || apiUser.is_verified || false,
   isEmailVerified: apiUser.isEmailVerified || apiUser.is_email_verified || false,
+  isPhoneVerified: apiUser.isPhoneVerified || apiUser.is_phone_verified || false,
   isSeller: apiUser.isSeller || apiUser.is_seller || false,
   sellerType: apiUser.sellerType || apiUser.seller_type,
   createdAt: apiUser.createdAt || apiUser.created_at,
