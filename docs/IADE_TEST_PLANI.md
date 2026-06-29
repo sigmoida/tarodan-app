@@ -121,9 +121,9 @@ Kapsama etiketleri: ✅ COVERED · 🟡 KISMİ · ❌ BOŞLUK · 🖐 MANUEL/L4
 ### G. Takas nakit iadesi
 | # | Senaryo | Beklenen | Durum |
 |---|---------|----------|-------|
-| G1 | takas iptal → nakit iade | PayTR iade | 🟡 money-flow |
+| G1 | takas iptal → nakit iade | PayTR iade | ✅ money-flow |
 | G2 | admin depo reddi → iade | iade + dönüş kargosu | ✅ money-flow |
-| G3 | süre aşımı auto-cancel → iade | iade + rezervasyon serbest | 🟡 bileşenler kapsandı (refund+autoCancel ayrı) |
+| G3 | süre aşımı auto-cancel → iade | iade tetiklenir | ✅ money-flow (wiring) |
 | G4 | B3 marker | çift-iade yok | ✅ b3 spec |
 | G5 | idempotency (releasedAt/refundedAt/payout guard) | ikinci çağrı atlanır | ✅ b3 spec |
 
@@ -141,16 +141,16 @@ Kapsama etiketleri: ✅ COVERED · 🟡 KISMİ · ❌ BOŞLUK · 🖐 MANUEL/L4
 ### I. Cron idempotency & dayanıklılık
 | # | Senaryo | Beklenen | Durum |
 |---|---------|----------|-------|
-| I1 | her cron iki kez koşunca yan etki yok | idempotent | ❌ ekle |
-| I2 | `processRefundedOrders` refunded+payment.completed bulur | iade çağrılır | ❌ ekle |
-| I3 | `releaseHoldsDue` frozen hold'u atlar | payout yok | ❌ ekle |
-| I4 | `finalizeReturnedShipments` 30dk fallback | finalize | ❌ ekle |
+| I1 | processRefundedOrders iki kez → yan etki yok | idempotent | ✅ refund-flow |
+| I2 | `processRefundedOrders` refunded bulur | iade çağrılır | ✅ refund-flow (F2/F4) |
+| I3 | `releaseHoldsDue` frozen hold atlar | payout yok | ✅ refund-flow (E2/E4) |
+| I4 | `finalizeReturnedShipments` 30dk fallback | finalize | ✅ refund-flow (B5) |
 
 ### J. Bildirimler
 | # | Senaryo | Beklenen | Durum |
 |---|---------|----------|-------|
-| J1 | `REFUND_APPROVED` gönderilir | alıcıya in-app | ❌ ekle |
-| J2 | `REFUND_CANCELLED` gönderilir | satıcıya | ❌ ekle |
+| J1 | `REFUND_APPROVED` gönderilir | alıcıya in-app | ✅ refund-flow |
+| J2 | `REFUND_CANCELLED` gönderilir | satıcıya | ✅ refund-flow |
 | J3 | kaldırılan tipler (REJECTED/DISPUTED) üretilmez | hiç | ✅ (kod kaldırıldı) |
 
 ### K. Frontend (web alıcı + admin)

@@ -603,6 +603,118 @@ describe('Refund flow (E2E)', () => {
     expect(rr!.returnShippingPayer).toBe('seller');
   });
 
+  // ── I/J. Cron idempotency + bildirimler ────────────────────────────────
+  it('I1: processRefundedOrders idempotent — iade tamamlandıktan sonra ikinci tur PayTR çağırmaz', async () => {
+    const buyer = await createUser(ctx.module);
+    const seller = await createUser(ctx.module, { isSeller: true });
+    const product = await createProduct({
+      sellerId: seller.id,
+      categoryId: baseline.categoryId,
+      price: 110,
+      quantity: 1,
+    });
+    const addr = await createAddress({ userId: buyer.id });
+    await createAddress({ userId: seller.id });
+    const { orderId } = await buyAndPay(ctx, buyer, product.id, addr.id);
+
+    await request(ctx.app.getHttpServer())
+      .post(`/api/orders/${orderId}/cancel`)
+      .set(authHeader(buyer))
+      .send({ reason: 'vazgeçtim' })
+      .expect(200);
+
+    const paymentService = ctx.app.get(PaymentService);
+    await paymentService.processRefundedOrders(); // 1. tur: iade yapılır
+    expect(ctx.paytr.refundCalls).toHaveLength(1);
+
+    // 2. tur: aynı sipariş artık cancelled/refunded — tekrar PayTR ÇAĞRILMAZ
+    const second = await paymentService.processRefundedOrders();
+    expect(second.refunded).toBe(0);
+    expect(ctx.paytr.refundCalls).toHaveLength(1);
+  });
+
+  it('J1: cooling-off iade onaylanınca alıcıya REFUND_APPROVED bildirimi gider', async () => {
+    const buyer = await createUser(ctx.module);
+    const seller = await createUser(ctx.module, { isSeller: true });
+    const product = await createProduct({
+      sellerId: seller.id,
+      categoryId: baseline.categoryId,
+      price: 95,
+      quantity: 1,
+    });
+    const addr = await createAddress({ userId: buyer.id });
+    await createAddress({ userId: seller.id });
+    const { orderId } = await buyAndPay(ctx, buyer, product.id, addr.id);
+    const prisma = getPrisma();
+
+    // Kargoda ama teslim değil → cooling-off wait_for_delivery (REFUND_APPROVED burada gider)
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.shipped },
+    });
+    await prisma.shipment.update({
+      where: { orderId },
+      data: {
+        status: ShipmentStatus.in_transit,
+        trackingNumber: 'TRK-J1',
+        providerTrackingId: 'TRK-J1',
+      },
+    });
+    await request(ctx.app.getHttpServer())
+      .post(`/api/orders/${orderId}/refund-requests`)
+      .set(authHeader(buyer))
+      .send({ reason: 'changed_mind' })
+      .expect(201);
+
+    const notif = await prisma.notificationLog.findFirst({
+      where: { userId: buyer.id, type: 'refund_approved' },
+    });
+    expect(notif).toBeTruthy();
+  });
+
+  it('J2: alıcı iade talebini iptal edince satıcıya REFUND_CANCELLED bildirimi gider', async () => {
+    const buyer = await createUser(ctx.module);
+    const seller = await createUser(ctx.module, { isSeller: true });
+    const product = await createProduct({
+      sellerId: seller.id,
+      categoryId: baseline.categoryId,
+      price: 88,
+      quantity: 1,
+    });
+    const addr = await createAddress({ userId: buyer.id });
+    await createAddress({ userId: seller.id });
+    const { orderId } = await buyAndPay(ctx, buyer, product.id, addr.id);
+    const prisma = getPrisma();
+
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.shipped },
+    });
+    await prisma.shipment.update({
+      where: { orderId },
+      data: {
+        status: ShipmentStatus.in_transit,
+        trackingNumber: 'TRK-J2',
+        providerTrackingId: 'TRK-J2',
+      },
+    });
+    const createRes = await request(ctx.app.getHttpServer())
+      .post(`/api/orders/${orderId}/refund-requests`)
+      .set(authHeader(buyer))
+      .send({ reason: 'changed_mind' })
+      .expect(201);
+
+    await request(ctx.app.getHttpServer())
+      .post(`/api/refund-requests/${createRes.body.id}/cancel`)
+      .set(authHeader(buyer))
+      .expect(200);
+
+    const notif = await prisma.notificationLog.findFirst({
+      where: { userId: seller.id, type: 'refund_cancelled' },
+    });
+    expect(notif).toBeTruthy();
+  });
+
   // ── B. İade kargosu yaşam döngüsü + finalize ───────────────────────────
   it('B3/B5: iade kargo takibi in_transit→delivered ilerler; 30dk sonra finalize cron iadeyi tamamlar', async () => {
     const buyer = await createUser(ctx.module);
