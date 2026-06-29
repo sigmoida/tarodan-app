@@ -60,7 +60,7 @@ export class PhoneVerificationService {
     // Eski tokenları temizle, yenisini oluştur
     await this.prisma.phoneVerificationToken.deleteMany({ where: { userId } });
     const code = this.generateCode();
-    await this.prisma.phoneVerificationToken.create({
+    const created = await this.prisma.phoneVerificationToken.create({
       data: {
         userId,
         phone: normalized,
@@ -71,6 +71,7 @@ export class PhoneVerificationService {
 
     const result = await this.netgsm.sendOtp(normalized, code);
     if (!result.success) {
+      await this.prisma.phoneVerificationToken.delete({ where: { id: created.id } });
       throw new BadRequestException(result.error || 'SMS gönderilemedi');
     }
 

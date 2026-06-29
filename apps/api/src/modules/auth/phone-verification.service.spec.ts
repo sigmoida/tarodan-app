@@ -24,14 +24,22 @@ function makeDeps() {
         tokenStore.length = 0;
       }),
       create: jest.fn(async ({ data }: any) => {
-        const row = { id: `t${tokenStore.length}`, attempts: 0, usedAt: null, ...data };
+        const row = { id: `t${tokenStore.length}`, attempts: 0, usedAt: null, createdAt: new Date(), ...data };
         tokenStore.push(row);
         return row;
       }),
       update: jest.fn(async ({ where, data }: any) => {
         const row = tokenStore.find((t) => t.id === where.id);
-        Object.assign(row, data);
+        if (data.attempts && typeof data.attempts === 'object' && 'increment' in data.attempts) {
+          row.attempts = (row.attempts || 0) + data.attempts.increment;
+        } else {
+          Object.assign(row, data);
+        }
         return row;
+      }),
+      delete: jest.fn(async ({ where }: any) => {
+        const idx = tokenStore.findIndex((t) => t.id === where.id);
+        if (idx !== -1) tokenStore.splice(idx, 1);
       }),
     },
   };
@@ -79,5 +87,31 @@ describe('PhoneVerificationService', () => {
     const svc = new PhoneVerificationService(prisma, netgsm);
     await svc.sendCode('u1', '+905551234567');
     await expect(svc.verify('u1', '000000')).rejects.toThrow(BadRequestException);
+  });
+
+  it('SMS başarısız olursa token silinir ve hata fırlatır', async () => {
+    const { prisma, netgsm, tokenStore } = makeDeps();
+    netgsm.sendOtp.mockResolvedValue({ success: false, error: 'NetGSM hatası' });
+    const svc = new PhoneVerificationService(prisma, netgsm);
+    await expect(svc.sendCode('u1', '+905551234567')).rejects.toThrow(BadRequestException);
+    expect(tokenStore.length).toBe(0);
+    expect(prisma.phoneVerificationToken.delete).toHaveBeenCalled();
+  });
+
+  it('cooldown: aynı kullanıcı için ikinci sendCode hemen hata fırlatır', async () => {
+    const { prisma, netgsm } = makeDeps();
+    const svc = new PhoneVerificationService(prisma, netgsm);
+    await svc.sendCode('u1', '+905551234567');
+    await expect(svc.sendCode('u1', '+905551234567')).rejects.toThrow(BadRequestException);
+  });
+
+  it('MAX_ATTEMPTS: 5 yanlış denemeden sonra lockout hatası fırlatır', async () => {
+    const { prisma, netgsm } = makeDeps();
+    const svc = new PhoneVerificationService(prisma, netgsm);
+    await svc.sendCode('u1', '+905551234567');
+    for (let i = 0; i < PhoneVerificationService.MAX_ATTEMPTS; i++) {
+      await expect(svc.verify('u1', '000000')).rejects.toThrow(BadRequestException);
+    }
+    await expect(svc.verify('u1', '000000')).rejects.toThrow('Çok fazla yanlış deneme');
   });
 });
