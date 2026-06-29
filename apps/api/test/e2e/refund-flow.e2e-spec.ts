@@ -648,6 +648,61 @@ describe('Refund flow (E2E)', () => {
     );
   });
 
+  it('LIST: refundsOnly=true tamamlanmış iadeyi (order cancelled olsa bile) "İadeler" sekmesinde gösterir', async () => {
+    const buyer = await createUser(ctx.module);
+    const seller = await createUser(ctx.module, { isSeller: true });
+    const product = await createProduct({
+      sellerId: seller.id,
+      categoryId: baseline.categoryId,
+      price: 175,
+      quantity: 1,
+    });
+    const addr = await createAddress({ userId: buyer.id });
+    await createAddress({ userId: seller.id });
+    const { orderId } = await buyAndPay(ctx, buyer, product.id, addr.id);
+    const prisma = getPrisma();
+
+    // Teslim → cooling-off iade → finalize → refunded (+ order cancelled)
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.delivered },
+    });
+    await prisma.shipment.update({
+      where: { orderId },
+      data: { status: ShipmentStatus.delivered, deliveredAt: new Date() },
+    });
+    const createRes = await request(ctx.app.getHttpServer())
+      .post(`/api/orders/${orderId}/refund-requests`)
+      .set(authHeader(buyer))
+      .send({ reason: 'changed_mind' })
+      .expect(201);
+    const refundService = ctx.app.get(RefundService);
+    await prisma.refundRequest.update({
+      where: { id: createRes.body.id },
+      data: {
+        status: RefundRequestStatus.return_delivered,
+        returnDeliveredAt: new Date(Date.now() - 31 * 60 * 1000),
+      },
+    });
+    await refundService.finalizeRefundForReturnedShipment(createRes.body.id);
+
+    // Varsayılan liste (cancelled hariç) → sipariş YOK
+    const def = await request(ctx.app.getHttpServer())
+      .get('/api/orders?role=buyer')
+      .set(authHeader(buyer))
+      .expect(200);
+    expect((def.body.data as any[]).find((o) => o.id === orderId)).toBeFalsy();
+
+    // İadeler sekmesi (refundsOnly) → sipariş VAR, "İade Edildi"
+    const refunds = await request(ctx.app.getHttpServer())
+      .get('/api/orders?role=buyer&refundsOnly=true')
+      .set(authHeader(buyer))
+      .expect(200);
+    const row = (refunds.body.data as any[]).find((o) => o.id === orderId);
+    expect(row).toBeTruthy();
+    expect(row.activeRefundRequest?.status).toBe(RefundRequestStatus.refunded);
+  });
+
   // ── I/J. Cron idempotency + bildirimler ────────────────────────────────
   it('I1: processRefundedOrders idempotent — iade tamamlandıktan sonra ikinci tur PayTR çağırmaz', async () => {
     const buyer = await createUser(ctx.module);

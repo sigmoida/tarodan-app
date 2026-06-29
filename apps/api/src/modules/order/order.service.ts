@@ -2505,7 +2505,7 @@ export class OrderService {
    * Get orders for current user
    */
   async findUserOrders(userId: string, query: OrderQueryDto) {
-    const { status, role, page = 1, limit = 20 } = query;
+    const { status, role, refundsOnly, page = 1, limit = 20 } = query;
 
     const where: Prisma.OrderWhereInput = {};
 
@@ -2519,10 +2519,15 @@ export class OrderService {
       where.OR = [{ buyerId: userId }, { sellerId: userId }];
     }
 
-    // Varsayılan listede iptal edilen (ödeme başarısız vb.) siparişleri gösterme
-    if (status) {
+    if (refundsOnly) {
+      // "İadeler" sekmesi: iade talebi olan TÜM siparişler (status'tan bağımsız).
+      // İade tamamlanınca sipariş 'cancelled' olduğu için varsayılan/iptal filtreleri
+      // bunları doğru gruplayamıyordu; burada status filtresi uygulanmaz.
+      where.refundRequests = { some: {} };
+    } else if (status) {
       where.status = status;
     } else {
+      // Varsayılan listede iptal edilen (ödeme başarısız vb.) siparişleri gösterme
       where.status = { not: OrderStatus.cancelled };
     }
 
