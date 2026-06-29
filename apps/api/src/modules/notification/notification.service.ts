@@ -406,6 +406,13 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     icon: '🔄',
     link: '/trades',
   },
+  [NotificationType.TRADE_STUCK_AT_WAREHOUSE]: {
+    title: 'Sıkışmış Takas — Yönetim Gerekli',
+    message:
+      '{{tradeNumber}} takası depoya ulaştı fakat süresi doldu; elle force-cancel-stuck gerekiyor.',
+    icon: '⚠️',
+    link: '/trades',
+  },
   [NotificationType.OFFER_AUTO_REJECTED]: {
     title: 'Teklifiniz Kapatıldı',
     message: '{{cancelReason}}',
@@ -429,18 +436,6 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     message: '{{refundNumber}} numaralı iade talebiniz onaylandı.',
     icon: '✅',
     link: '/orders/{{orderId}}',
-  },
-  [NotificationType.REFUND_REJECTED]: {
-    title: 'İade Talebiniz Reddedildi',
-    message: '{{refundNumber}} numaralı iade talebiniz reddedildi: {{reason}}',
-    icon: '❌',
-    link: '/orders/{{orderId}}',
-  },
-  [NotificationType.REFUND_DISPUTED]: {
-    title: 'İade İtirazı İnceleniyor',
-    message: '{{refundNumber}} numaralı iade talebine itiraz edildi; admin incelemesi bekleniyor.',
-    icon: '⚖️',
-    link: '/refund-requests/{{refundRequestId}}',
   },
   [NotificationType.REFUND_RETURN_OPENED]: {
     title: 'İade Kargosu Hazır',

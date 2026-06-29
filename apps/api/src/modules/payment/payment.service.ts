@@ -3417,13 +3417,49 @@ export class PaymentService {
       payment.tradeCashPayment?.totalAmount ?? payment.amount,
     );
 
+    // B3: Çift-iade koruması. PayTR çağrısı idempotency anahtarı taşımadığından,
+    // PayTR iadesi YAPILIP refundedAt persist edilemezse sonraki çağrı PayTR'yi
+    // tekrar tetikleyebilir. Bunu önlemek için PayTR'den ÖNCE payment.metadata'ya
+    // kalıcı bir "refundInProgressAt" marker'ı yazıyoruz. Marker zaten varsa, önceki
+    // bir denemede PayTR çağrısı yapılmış demektir → PayTR'yi ATLA, doğrudan
+    // persist-recovery'ye geç (yalnız refundedAt'i set et).
+    const existingMeta = (payment.metadata as Record<string, unknown>) || {};
+    const refundAlreadyInitiated = Boolean(existingMeta.refundInProgressAt);
+
     // PAYMENT_BYPASS: dev/test modunda PayTR'a refund çağrısı yapma.
     const bypassEnabled = this.configService.get('PAYMENT_BYPASS') === 'true';
-    if (bypassEnabled) {
+    if (refundAlreadyInitiated) {
+      this.logger.warn(
+        `refundTradeCashPaymentIfCompleted: refundInProgressAt zaten set — PayTR çağrısı atlanıyor, ` +
+          `yalnız persist-recovery denenecek (tradeId=${tradeId}, paymentId=${payment.id}).`,
+      );
+    } else if (bypassEnabled) {
       this.logger.warn(
         `PAYMENT_BYPASS: PayTR trade refund atlandı tradeId=${tradeId} amount=${amount}`,
       );
     } else {
+      // Marker'ı PayTR'den ÖNCE kalıcı yaz. Bu yazım başarısızsa para hareketi
+      // olmadan abort et — çağıran güvenle tekrar deneyebilir.
+      try {
+        await this.prisma.payment.update({
+          where: { id: payment.id },
+          data: {
+            metadata: {
+              ...existingMeta,
+              refundInProgressAt: new Date().toISOString(),
+            },
+          },
+        });
+        existingMeta.refundInProgressAt = new Date().toISOString();
+      } catch (markerErr: any) {
+        this.logger.error(
+          `refundTradeCashPaymentIfCompleted: refundInProgressAt marker yazılamadı, ` +
+            `PayTR çağrısı yapılmadan abort (tradeId=${tradeId}): ${markerErr?.message}`,
+        );
+        throw new BadRequestException(
+          'İade başlatılamadı (geçici hata). Lütfen tekrar deneyin.',
+        );
+      }
       try {
         const refundResult = await this.paytrService.createRefund(oid, amount);
         if (refundResult.status !== 'success') {
@@ -3449,7 +3485,6 @@ export class PaymentService {
     // çağrı (refundedAt hâlâ null) tekrar refund dener (PayTR çağrısı idempotency anahtarı
     // taşımaz). tx-sonrası geçici DB hatasının refundedAt'i set etmeden bırakmasını önlemek
     // için persist'i birkaç kez dene; hepsi başarısızsa yüksek-öncelikli alarm (manuel düzeltme).
-    const existingMeta = (payment.metadata as Record<string, unknown>) || {};
     let persisted = false;
     for (let attempt = 1; attempt <= 3 && !persisted; attempt++) {
       try {

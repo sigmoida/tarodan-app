@@ -94,7 +94,7 @@ export default function OrdersPage() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
   const [filter, setFilter] = useState<'all' | 'buyer' | 'seller'>('buyer');
-  const [statusFilter, setStatusFilter] = useState<'active' | 'cancelled'>('active');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'cancelled' | 'refunds'>('active');
   // Çok ürünlü checkout grupları accordion: varsayılan KAPALI, kullanıcı tek tek açar.
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const toggleGroup = (key: string) => {
@@ -133,9 +133,17 @@ export default function OrdersPage() {
   // ama cancellationType='iptal' → "İptal Edildi". (3) Aksi halde sipariş durumu.
   const displayStatusOf = (order: Order): { status: string; label: string } => {
     if (order.activeRefundRequest) {
+      // İade tamamlandıysa "İade Edildi", aksi halde "İade Sürecinde" (mobil ile tutarlı).
+      const done = order.activeRefundRequest.status === 'refunded';
       return {
-        status: 'refund_requested',
-        label: locale === 'en' ? 'Refund in progress' : 'İade Sürecinde',
+        status: done ? 'refunded' : 'refund_requested',
+        label: done
+          ? locale === 'en'
+            ? 'Refunded'
+            : 'İade Edildi'
+          : locale === 'en'
+            ? 'Refund in progress'
+            : 'İade Sürecinde',
       };
     }
     if (order.cancellationType === 'iptal') {
@@ -190,6 +198,7 @@ export default function OrdersPage() {
         params: {
           role: filter === 'all' ? undefined : filter,
           status: statusFilter === 'cancelled' ? 'cancelled' : undefined,
+          refundsOnly: statusFilter === 'refunds' ? true : undefined,
         },
       });
       return response.data.orders || response.data.data || [];
@@ -585,6 +594,11 @@ export default function OrdersPage() {
               className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${statusFilter === 'cancelled'
                 ? 'bg-heading text-inverted' : 'text-muted hover:bg-surface-alt'}`}>
               {locale === 'en' ? 'Cancelled' : 'İptal edilenler'}
+            </Button>
+            <Button variant="secondary" onClick={() => setStatusFilter('refunds')}
+              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${statusFilter === 'refunds'
+                ? 'bg-heading text-inverted' : 'text-muted hover:bg-surface-alt'}`}>
+              {locale === 'en' ? 'Refunds' : 'İadeler'}
             </Button>
           </div>
         </div>

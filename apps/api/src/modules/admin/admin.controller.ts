@@ -1351,6 +1351,11 @@ export class AdminController {
 
   @Post('trades/:id/retry-refund')
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  // Gerçek PayTR para iadesi tetikler. URL segmenti "trades" olduğundan izin
+  // matrisinde yanlışlıkla 'trades'e düşüyordu; moderator (diğer iade ekranlarına
+  // erişemese de) iadeyi retry edebiliyordu. Tüm iade işlemleriyle tutarlı olsun
+  // diye refund_requests iznine bağlandı (admin + super_admin; moderator hariç).
+  @RequirePermission('refund_requests')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:

@@ -23,6 +23,7 @@ import { createAddress } from '../factories/address.factory';
 import { signCallback } from '../mocks/paytr.mock';
 import { PaymentService } from '../../src/modules/payment/payment.service';
 import { PayoutService } from '../../src/modules/payout/payout.service';
+import { TradeService } from '../../src/modules/trade/trade.service';
 
 /**
  * Wait for the post-accept fire-and-forget inbound dispatch to settle.
@@ -128,7 +129,8 @@ describe('Money Flow Timeline (E2E)', () => {
       expect(hold).toBeTruthy();
       expect(hold?.status).toBe(PaymentHoldStatus.held);
       expect(hold?.releasedAt).toBeNull();
-      // releaseAt ödeme anında NULL — yalnızca TESLİMDE hesaplanır (escrow güvenliği).
+      // releaseAt ödeme anında SET EDİLMEZ; teslimde (deliveredAt + return + grace)
+      // hesaplanır. T0'da null olması beklenir (bkz. payment.service createPaymentHold).
       expect(hold?.releaseAt).toBeNull();
 
       // T+release: confirm delivery (manual delivered transition for test brevity)
@@ -398,6 +400,88 @@ describe('Money Flow Timeline (E2E)', () => {
       expect(cpAfter?.releasedAt).toBeNull();
 
       // Mock PayTR recorded the refund call
+      expect(ctx.paytr.refundCalls.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('G3: süre aşımı auto-cancel ödenmiş nakit takası iptal eder VE nakit iadesini tetikler', async () => {
+      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
+      const admin = await createAdminUser(ctx.module);
+      const adminAddr = await createAddress({ userId: admin.id });
+      await configureWarehouseAddress(adminAddr.id);
+      await createAddress({ userId: initiator.id });
+      await createAddress({ userId: receiver.id });
+
+      const ip = await createProduct({
+        sellerId: initiator.id,
+        categoryId: baseline.categoryId,
+        isTradeEnabled: true,
+      });
+      const rp = await createProduct({
+        sellerId: receiver.id,
+        categoryId: baseline.categoryId,
+        isTradeEnabled: true,
+      });
+      const created = await request(ctx.app.getHttpServer())
+        .post('/api/trades')
+        .set(authHeader(initiator))
+        .send({
+          receiverId: receiver.id,
+          initiatorItems: [{ productId: ip.id, quantity: 1 }],
+          receiverItems: [{ productId: rp.id, quantity: 1 }],
+          cashAmount: 50,
+        })
+        .expect(201);
+      await request(ctx.app.getHttpServer())
+        .post(`/api/trades/${created.body.id}/accept`)
+        .set(authHeader(receiver))
+        .send({})
+        .expect(201);
+
+      const prisma = getPrisma();
+      const cp = await prisma.tradeCashPayment.findUnique({
+        where: { tradeId: created.body.id },
+      });
+      await request(ctx.app.getHttpServer())
+        .post('/api/payments/initiate-trade-cash')
+        .set(authHeader(initiator))
+        .send({ tradeId: created.body.id })
+        .expect(201);
+      const payment = await prisma.payment.findFirst({
+        where: { tradeCashPaymentId: cp!.id },
+      });
+      await request(ctx.app.getHttpServer())
+        .post('/api/payments/callback/paytr')
+        .send(
+          signCallback({
+            merchantOid: payment!.providerConversationId!,
+            status: 'success',
+            totalAmount: Math.round(Number(payment!.amount) * 100),
+          }),
+        )
+        .expect(200);
+
+      // Ödeme sonrası takas shipping_to_warehouse'a geçer; henüz depoya ulaşmadı.
+      const paid = await prisma.trade.findUnique({ where: { id: created.body.id } });
+      expect(paid!.status).toBe(TradeStatus.shipping_to_warehouse);
+
+      // Süreyi geçmişe çek, depoya varış yok → auto-cancel uygun
+      await prisma.trade.update({
+        where: { id: created.body.id },
+        data: {
+          shippingDeadline: new Date(Date.now() - 60 * 60 * 1000),
+          firstWarehouseArrivalAt: null,
+        },
+      });
+
+      const tradeService = ctx.app.get(TradeService);
+      await tradeService.autoCancelExpiredTrades();
+
+      const cancelled = await prisma.trade.findUnique({ where: { id: created.body.id } });
+      expect(cancelled!.status).toBe(TradeStatus.cancelled);
+
+      const cpAfter = await prisma.tradeCashPayment.findUnique({ where: { id: cp!.id } });
+      expect(cpAfter!.refundedAt).toBeTruthy();
       expect(ctx.paytr.refundCalls.length).toBeGreaterThanOrEqual(1);
     });
   });

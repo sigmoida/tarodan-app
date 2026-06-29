@@ -2512,7 +2512,7 @@ export class OrderService {
    * Get orders for current user
    */
   async findUserOrders(userId: string, query: OrderQueryDto) {
-    const { status, role, page = 1, limit = 20 } = query;
+    const { status, role, refundsOnly, page = 1, limit = 20 } = query;
 
     const where: Prisma.OrderWhereInput = {};
 
@@ -2526,11 +2526,17 @@ export class OrderService {
       where.OR = [{ buyerId: userId }, { sellerId: userId }];
     }
 
-    // Varsayılan listede iptal edilen (ödeme başarısız vb.) siparişleri gösterme.
-    // status tek değer veya dizi (çoklu: "İptal/İade" filtresi cancelled+refunded ister).
-    if (status) {
+    if (refundsOnly) {
+      // "İadeler" sekmesi: iade talebi olan TÜM siparişler (status'tan bağımsız).
+      // İade tamamlanınca sipariş 'cancelled' olduğu için varsayılan/iptal filtreleri
+      // bunları doğru gruplayamıyordu; burada status filtresi uygulanmaz.
+      where.refundRequests = { some: {} };
+    } else if (status) {
+      // Varsayılan listede iptal edilen (ödeme başarısız vb.) siparişleri gösterme.
+      // status tek değer veya dizi (çoklu: "İptal/İade" filtresi cancelled+refunded ister).
       where.status = Array.isArray(status) ? { in: status } : status;
     } else {
+      // Varsayılan listede iptal edilen (ödeme başarısız vb.) siparişleri gösterme
       where.status = { not: OrderStatus.cancelled };
     }
 
@@ -2563,6 +2569,13 @@ export class OrderService {
           select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         shipment: true,
+        // Liste yanıtında da aktif iade durumunu gösterebilmek için (detayla tutarlı):
+        // formatOrderResponse → pickActiveRefundRequest order.refundRequests'i okur;
+        // include edilmezse activeRefundRequest null kalır ve liste ham order.status
+        // (örn. "Teslim Edildi") gösterir. (Sadece okuma; başka davranış değişmez.)
+        refundRequests: {
+          orderBy: { createdAt: 'desc' },
+        },
       },
     });
 

@@ -95,4 +95,56 @@ describe('PayTRService', () => {
       }
     });
   });
+
+  describe('createRefund (gerçek PayTR iade çağrısı)', () => {
+    const okResp = () => ({
+      text: async () => JSON.stringify({ status: 'success' }),
+    });
+
+    it('D1: prod iade endpoint\'ine return_amount=ONDALIK TL ile POST eder (KURUŞ DEĞİL)', async () => {
+      fetchSpy.mockResolvedValue(okResp());
+
+      await service.createRefund('ORDER123', 10.5);
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'https://www.paytr.com/odeme/iade',
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        }),
+      );
+      const body = (fetchSpy.mock.calls[0][1] as RequestInit).body as string;
+      // Ondalık TL "10.50" gönderilmeli; "1050" (kuruş) gönderilirse 100× iade = maddi kayıp.
+      expect(body).toContain('return_amount=10.50');
+      expect(body).not.toContain('return_amount=1050');
+      expect(body).toContain('merchant_oid=ORDER123');
+      expect(body).toMatch(/paytr_token=/);
+    });
+
+    it('D4: merchant_oid içindeki tireler temizlenir (ödeme yakalamasıyla eşleşsin)', async () => {
+      fetchSpy.mockResolvedValue(okResp());
+
+      await service.createRefund('a1b2-c3d4-e5f6', 5);
+
+      const body = (fetchSpy.mock.calls[0][1] as RequestInit).body as string;
+      expect(body).toContain('merchant_oid=a1b2c3d4e5f6');
+    });
+
+    it('D2: PayTR status!=success → BadRequest (err_msg ile)', async () => {
+      fetchSpy.mockResolvedValue({
+        text: async () =>
+          JSON.stringify({ status: 'error', err_msg: 'iade limiti aşıldı' }),
+      });
+
+      await expect(service.createRefund('ORDER123', 10)).rejects.toThrow(
+        /iade limiti aşıldı/,
+      );
+    });
+
+    it('D2b: boş/geçersiz PayTR yanıtı → BadRequest', async () => {
+      fetchSpy.mockResolvedValue({ text: async () => '' });
+
+      await expect(service.createRefund('ORDER123', 10)).rejects.toThrow();
+    });
+  });
 });

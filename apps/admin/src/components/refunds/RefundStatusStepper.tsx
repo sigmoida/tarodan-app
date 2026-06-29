@@ -16,7 +16,7 @@ import {
 export function RefundStatusStepper({ status }: { status: string }) {
   if (refundTerminalStatuses.has(status)) {
     const endLabel = status === "rejected" ? "Reddedildi" : "İptal edildi";
-    const steps = ["Talep alındı", "İnceleme", endLabel];
+    const steps = ["Talep alındı", endLabel];
     return (
       <Shell>
         {steps.map((label, i) => {

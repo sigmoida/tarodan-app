@@ -1,4 +1,4 @@
-import { IsOptional, IsEnum, IsNumber, Min, Max } from 'class-validator';
+import { IsOptional, IsEnum, IsNumber, Min, Max, IsBoolean } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type, Transform } from 'class-transformer';
 import { OrderStatus } from '@prisma/client';
@@ -26,6 +26,17 @@ export class OrderQueryDto {
   })
   @IsOptional()
   role?: 'buyer' | 'seller';
+
+  @ApiPropertyOptional({
+    example: true,
+    description:
+      'Yalnız iade talebi olan siparişler (status filtresini geçersiz kılar; ' +
+      'iade tamamlanınca sipariş cancelled olduğu için ayrı "İadeler" sekmesi için)',
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  refundsOnly?: boolean;
 
   @ApiPropertyOptional({
     example: 1,

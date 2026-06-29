@@ -83,7 +83,7 @@ const navGroups: NavGroup[] = [
       { name: 'Siparişler', href: '/orders', icon: ClipboardDocumentListIcon, keywords: ['order'], permission: 'orders' },
       { name: 'Takaslar', href: '/trades', icon: ArrowsRightLeftIcon, keywords: ['takas', 'trade', 'barter', 'değişim'], permission: 'trades' },
       { name: 'Kargo', href: '/shipping', icon: TruckIcon, keywords: ['kargo', 'shipping', 'gönderi', 'etiket', 'takip'], permission: 'shipping' },
-      { name: 'İade Talepleri', href: '/refund-requests', icon: BanknotesIcon, keywords: ['iade', 'refund', 'talep'], permission: 'refund_requests' },
+      { name: 'İade Takibi', href: '/refund-requests', icon: BanknotesIcon, keywords: ['iade', 'refund', 'talep', 'takip'], permission: 'refund_requests' },
       { name: 'İade Geçmişi', href: '/refunds', icon: BanknotesIcon, keywords: ['iade', 'refund', 'geçmiş'], permission: 'refund_history' },
     ],
   },

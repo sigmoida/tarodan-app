@@ -201,7 +201,7 @@ export default function RefundRequestDetailPage() {
         </Link>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-heading">
-            İade Talebi <span className="font-mono text-base text-muted ml-2">{rr.refundNumber}</span>
+            İade Kaydı <span className="font-mono text-base text-muted ml-2">{rr.refundNumber}</span>
           </h1>
           <p className="text-sm text-muted">
             Oluşturma: {fmtDate(rr.createdAt)} — İade tutarı: {fmtTry(rr.amount)}

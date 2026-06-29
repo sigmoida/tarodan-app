@@ -1982,6 +1982,60 @@ export class TradeService {
   // ==========================================================================
   // AUTO-CANCEL EXPIRED TRADES (Scheduled job)
   // ==========================================================================
+  /**
+   * Depoya ulaşıp süresi dolduğu için otomatik iptal edilemeyen ("stuck") takaslar
+   * için aktif admin'lere in-app bildirim gönderir. Her takas için 24s cache dedup
+   * uygular: cron 5 dk'da bir çalıştığından spam olmaz, ama çözülmeyen takas TTL
+   * dolunca tekrar hatırlatılır. Tamamen non-blocking — hata cron'u bozmaz.
+   */
+  private async notifyAdminsOfStuckTrades(
+    stuckTrades: Array<{
+      id: string;
+      tradeNumber: string;
+      shippingDeadline: Date | null;
+      firstWarehouseArrivalAt: Date | null;
+    }>,
+  ): Promise<void> {
+    try {
+      const fresh: typeof stuckTrades = [];
+      for (const t of stuckTrades) {
+        const key = `stuck-trade-alerted:${t.id}`;
+        const already = await this.cache.get<boolean>(key);
+        if (already) continue;
+        fresh.push(t);
+        await this.cache.set(key, true, { ttl: 24 * 60 * 60 });
+      }
+      if (fresh.length === 0) return;
+
+      const admins = await this.prisma.adminUser.findMany({
+        where: { isActive: true },
+        select: { userId: true },
+      });
+      for (const t of fresh) {
+        for (const a of admins) {
+          try {
+            await this.notificationService.createInAppNotification(
+              a.userId,
+              NotificationType.TRADE_STUCK_AT_WAREHOUSE,
+              {
+                tradeId: t.id,
+                tradeNumber: t.tradeNumber,
+                arrivedAt: t.firstWarehouseArrivalAt?.toISOString(),
+                deadline: t.shippingDeadline?.toISOString(),
+              },
+            );
+          } catch (err: any) {
+            this.logger.error(
+              `Stuck-trade admin bildirimi başarısız (trade=${t.id}, admin=${a.userId}): ${err?.message}`,
+            );
+          }
+        }
+      }
+    } catch (err: any) {
+      this.logger.error(`notifyAdminsOfStuckTrades failed: ${err?.message}`);
+    }
+  }
+
   async autoCancelExpiredTrades(): Promise<number> {
     const now = new Date();
 
@@ -2045,6 +2099,10 @@ export class TradeService {
           )
           .join(', ')}`,
       );
+      // Loglar sessiz kalmasın diye admin'lere bildirim de gönder. Cron her 5 dk
+      // çalıştığından her takas için 24s cache dedup ile spam'i engelle; çözülmeyen
+      // takas ertesi gün tekrar hatırlatılır (TTL dolunca). Non-blocking.
+      await this.notifyAdminsOfStuckTrades(stuckTrades);
     }
 
     let cancelledCount = 0;

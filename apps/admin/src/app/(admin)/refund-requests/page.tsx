@@ -190,8 +190,8 @@ export default function RefundRequestsPage() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <ResourceListPage<RefundRequestRow>
-      title="İade Talepleri"
-      description="Aktif iade talepleri — admin müdahalesi gereken durumlar"
+      title="İade Takibi"
+      description="Devam eden iadeler — otomatik akış izlenir; yalnız istisnai durumlarda admin müdahalesi gerekir"
       search={{ placeholder: "Alıcı/satıcı adı, e-posta veya iade numarası" }}
       searchValue={search}
       onSearchChange={setSearch}

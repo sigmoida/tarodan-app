@@ -107,7 +107,10 @@ async function markDelivered(request: any, orderId: string, deliveredDaysAgo: nu
 // J8 — Kargodan önce iade: para anında geri dönüyor + 2. iade engeli
 // ───────────────────────────────────────────────────────────────────────────
 
-test.describe('J85 — Satıcı red gerekçesi çok kısa reddedilir (min 10)', () => {
+// SKIP: Bu journey kaldırılmış akışı test ediyor — satıcının iade talebini REDDETMESİ
+// (POST /refund-requests/:id/reject) ve admin resolve-dispute artık YOK. İade tam
+// otomatik; satıcının iade akışında aksiyonu kalmadı. Senaryo emekliye ayrıldı.
+test.describe.skip('J85 — (KALDIRILDI) satıcı iade reddi akışı emekli', () => {
   test('geç dönem iade → kısa red 400 → uzun red → disputed → destek → admin karar', async ({ request }) => {
     test.setTimeout(60_000);
 

@@ -193,11 +193,12 @@ describe('Edge Cases (E2E)', () => {
     });
 
     it('rejects shipment confirm on a trade the user is not part of', async () => {
-      // Takas premium üyelik + teslimat adresi gerektiriyor.
+      // Takas premium üyelik + teslimat adresi gerektiriyor. intruder de premium
+      // olmalı: aksi halde premium-gate (400) kimlik/rol gate'inden (403) önce patlar.
       const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
       const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
-      const intruder = await createUser(ctx.module);
-      await createAddress({ userId: initiator.id });
+      const intruder = await createUser(ctx.module, { premium: true });
+      await createAddress({ userId: initiator.id }); // takas için teslimat adresi gerekli
       const ip = await createProduct({
         sellerId: initiator.id,
         categoryId: baseline.categoryId,

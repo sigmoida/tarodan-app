@@ -112,14 +112,14 @@ import { ErrorLogInterceptor } from './common/interceptors/error-log.interceptor
       // these functional tests. Production/dev are unaffected.
       skipIf: () => process.env.NODE_ENV === 'test',
       throttlers: [
-      {
-        ttl: 60000, // 1 minute
-        // Genel limit yüksek tutulur: admin paneli SPA'sı açılışta tek IP'den çok
-        // sayıda istek atar; reverse proxy arkasında istemciler aynı kovaya
-        // düşebildiği için 100 çok düşüktü (admin login→dashboard loop'una yol açtı).
-        // Brute-force koruması hassas uçlardaki sıkı @Throttle (login 5/dk) ile sağlanır.
-        limit: 1000, // 1000 requests per minute
-      },
+        {
+          ttl: 60000, // 1 minute
+          // Genel limit yüksek tutulur: admin paneli SPA'sı açılışta tek IP'den çok
+          // sayıda istek atar; reverse proxy arkasında istemciler aynı kovaya
+          // düşebildiği için 100 çok düşüktü (admin login→dashboard loop'una yol açtı).
+          // Brute-force koruması hassas uçlardaki sıkı @Throttle (login 5/dk) ile sağlanır.
+          limit: 1000, // 1000 requests per minute
+        },
       ],
     }),
 

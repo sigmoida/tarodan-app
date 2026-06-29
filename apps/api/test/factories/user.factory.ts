@@ -29,9 +29,10 @@ export async function createUser(
     isVerified: boolean;
     sellerType: 'platform' | 'business' | 'individual';
     /**
-     * Aktif `basic` (ücretli) üyelik bağlar → isPremiumEntitled=true + tier.canTrade=true.
-     * Takas (trade) artık premium özellik olduğu için trade akışı test eden kullanıcılar
-     * bunu kullanmalı (seedBaseline `basic` tier'ı yaratır). Free kullanıcı takas YAPAMAZ.
+     * Aktif premium üyelik seed et (takas kapısı için). createTrade artık
+     * canCreateTrade → isPremiumEntitled gerektiriyor; free tier yetmez.
+     * seedBaseline'ın oluşturduğu ücretli (canTrade) tier'ı active + dönem-gelecekte
+     * ile bağlar. Takas akışı test eden kullanıcılar bunu kullanmalı.
      */
     premium: boolean;
   }> = {},
@@ -57,24 +58,25 @@ export async function createUser(
   });
 
   if (opts.premium) {
-    const tier = await prisma.membershipTier.findFirst({
-      where: { type: 'basic', isActive: true },
+    // seedBaseline ücretli 'basic' tier'ı oluşturur; yoksa anlamlı hata ver.
+    const paidTier = await prisma.membershipTier.findFirst({
+      where: { type: { not: 'free' }, canTrade: true, isActive: true },
+      orderBy: { monthlyPrice: 'asc' },
     });
-    if (!tier) {
+    if (!paidTier) {
       throw new Error(
-        'createUser({ premium: true }) için `basic` membership tier yok — seedBaseline çağrıldı mı?',
+        'createUser({ premium: true }): ücretli (canTrade) tier yok — önce seedBaseline() çağırın.',
       );
     }
     const now = new Date();
-    const periodEnd = new Date(now);
-    periodEnd.setMonth(periodEnd.getMonth() + 1);
     await prisma.userMembership.create({
       data: {
         userId: user.id,
-        tierId: tier.id,
+        tierId: paidTier.id,
         status: 'active',
         currentPeriodStart: now,
-        currentPeriodEnd: periodEnd,
+        currentPeriodEnd: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+        autoRenew: false,
       },
     });
   }

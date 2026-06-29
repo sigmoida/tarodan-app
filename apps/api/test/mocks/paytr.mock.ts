@@ -28,6 +28,8 @@ export class MockPayTRService {
   public readonly queryResults = new Map<string, PayTRStatusInquiryResult>();
   /** Set to true to make next createPlatformTransfer return error */
   public nextTransferFails = false;
+  /** Set to true to make next createRefund throw (gerçek PayTRService gibi) — retry testleri için */
+  public nextRefundFails = false;
 
   // ── CAPI / recurring (kart saklama) mock durumu ──
   public readonly recurringCalls: Array<{ utoken: string; ctoken: string; amount: number; merchantOid: string }> = [];
@@ -111,6 +113,11 @@ export class MockPayTRService {
 
   async createRefund(merchantOid: string, refundAmount: number): Promise<{ status: string; mock: true }> {
     this.refundCalls.push({ merchantOid, refundAmount });
+    if (this.nextRefundFails) {
+      this.nextRefundFails = false;
+      // Gerçek PayTRService non-success'te throw eder; mock da aynısını yapsın.
+      throw new Error('Mock refund failure');
+    }
     return { status: 'success', mock: true };
   }
 
@@ -202,6 +209,7 @@ export class MockPayTRService {
     this.transferCalls.length = 0;
     this.queryResults.clear();
     this.nextTransferFails = false;
+    this.nextRefundFails = false;
     this.recurringCalls.length = 0;
     this.capiDeleteCalls.length = 0;
     this.directPaymentCalls.length = 0;
