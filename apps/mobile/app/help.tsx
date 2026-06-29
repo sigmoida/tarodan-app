@@ -3,7 +3,16 @@ import { View, ScrollView, StyleSheet, TouchableOpacity, Linking } from 'react-n
 import { theme, Text, Input, Textarea, Button, Snackbar, Divider, ScreenHeader } from '@tarodan/ui-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { supportApi } from '../src/services/api';
+import { useAuthStore } from '../src/stores/authStore';
 import { useTranslation } from '../src/i18n';
+import {
+  RETURN_REQUEST_DAYS,
+  COMMISSION_SUMMARY,
+  SUPPORT_EMAIL,
+  SUPPORT_PHONE,
+  SUPPORT_WHATSAPP,
+} from '../src/constants/legalFacts';
 
 const { colors } = theme;
 
@@ -46,7 +55,7 @@ const FAQ_CATEGORIES = [
       },
       {
         q: 'İade politikası nedir?',
-        a: 'Ürün açıklamasına uymuyorsa 7 gün içinde iade talep edebilirsiniz. Detaylar için satıcının iade politikasını kontrol edin.'
+        a: `Ürün açıklamasına uymuyorsa teslim tarihinden itibaren ${RETURN_REQUEST_DAYS} gün içinde iade talep edebilirsiniz. Detaylar için satıcının iade politikasını kontrol edin.`
       },
     ]
   },
@@ -65,7 +74,7 @@ const FAQ_CATEGORIES = [
       },
       {
         q: 'Komisyon oranı nedir?',
-        a: 'Satış gerçekleştiğinde satış tutarı üzerinden %5 komisyon kesilir. Premium üyeler için özel komisyon oranları uygulanabilir.'
+        a: COMMISSION_SUMMARY
       },
       {
         q: 'Ödememi ne zaman alırım?',
@@ -117,21 +126,21 @@ const CONTACT_OPTIONS = [
   {
     id: 'email',
     title: 'E-posta',
-    subtitle: 'destek@tarodan.com',
+    subtitle: SUPPORT_EMAIL,
     icon: 'mail-outline',
-    action: () => Linking.openURL('mailto:destek@tarodan.com'),
+    action: () => Linking.openURL(`mailto:${SUPPORT_EMAIL}`),
   },
   {
     id: 'whatsapp',
     title: 'WhatsApp',
-    subtitle: '+90 555 123 4567',
+    subtitle: SUPPORT_WHATSAPP,
     icon: 'logo-whatsapp',
     action: () => Linking.openURL('https://wa.me/905551234567'),
   },
   {
     id: 'phone',
     title: 'Telefon',
-    subtitle: '0850 123 4567',
+    subtitle: SUPPORT_PHONE,
     icon: 'call-outline',
     action: () => Linking.openURL('tel:08501234567'),
   },
@@ -139,14 +148,23 @@ const CONTACT_OPTIONS = [
 
 export default function HelpScreen() {
   const { t } = useTranslation();
+  const { isAuthenticated } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedCategory, setExpandedCategory] = useState<string | null>('general');
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
   const [contactName, setContactName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [contactMessage, setContactMessage] = useState('');
+  const [contactSubmitting, setContactSubmitting] = useState(false);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarVariant, setSnackbarVariant] = useState<'success' | 'danger'>('danger');
+
+  const showSnack = (message: string, variant: 'success' | 'danger') => {
+    setSnackbarMessage(message);
+    setSnackbarVariant(variant);
+    setSnackbarVisible(true);
+  };
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
@@ -165,24 +183,57 @@ export default function HelpScreen() {
       })).filter(cat => cat.questions.length > 0)
     : FAQ_CATEGORIES;
 
-  const handleSubmitContact = () => {
+  const handleSubmitContact = async () => {
+    if (contactSubmitting) return;
     if (!contactName.trim() || !contactEmail.trim() || !contactMessage.trim()) {
-      setSnackbarMessage('Lütfen tüm alanları doldurun');
-      setSnackbarVisible(true);
+      showSnack('Lütfen tüm alanları doldurun', 'danger');
       return;
     }
-    if (!contactEmail.includes('@')) {
-      setSnackbarMessage('Geçerli bir e-posta adresi girin');
-      setSnackbarVisible(true);
+    // Backend DTO ile parite (GuestContactDto / CreateTicketDto): name @MinLength(2),
+    // message @MinLength(10).
+    if (contactName.trim().length < 2) {
+      showSnack('Adınız en az 2 karakter olmalıdır.', 'danger');
+      return;
+    }
+    if (!/^\S+@\S+\.\S+$/.test(contactEmail.trim())) {
+      showSnack('Geçerli bir e-posta adresi girin', 'danger');
+      return;
+    }
+    if (contactMessage.trim().length < 10) {
+      showSnack('Mesaj en az 10 karakter olmalıdır.', 'danger');
       return;
     }
 
-    // Submit contact form (mock)
-    setContactName('');
-    setContactEmail('');
-    setContactMessage('');
-    setSnackbarMessage('Mesajınız gönderildi! En kısa sürede dönüş yapacağız.');
-    setSnackbarVisible(true);
+    setContactSubmitting(true);
+    try {
+      if (isAuthenticated) {
+        // Giriş yapmış kullanıcı: takip edilebilir bir destek talebi (DB'de creatorId'li)
+        // oluştur → "Destek Taleplerim"de görünür. guestContact yalnız Redis'e yazar
+        // ve kullanıcı bir daha göremez.
+        await supportApi.createTicket({
+          subject: 'Yardım Merkezi mesajı',
+          category: 'other',
+          message: contactMessage.trim(),
+        });
+        setContactMessage('');
+        showSnack('Destek talebiniz oluşturuldu! "Destek Taleplerim"den takip edebilirsiniz.', 'success');
+      } else {
+        // Misafir: kimlik bağlı ticket oluşturulamaz; misafir iletişim formuna düşer.
+        await supportApi.guestContact({
+          name: contactName.trim(),
+          email: contactEmail.trim(),
+          message: contactMessage.trim(),
+        });
+        setContactName('');
+        setContactEmail('');
+        setContactMessage('');
+        showSnack('Mesajınız gönderildi! En kısa sürede dönüş yapacağız.', 'success');
+      }
+    } catch {
+      showSnack('Mesaj gönderilemedi, lütfen tekrar deneyin.', 'danger');
+    } finally {
+      setContactSubmitting(false);
+    }
   };
 
   return (
@@ -340,6 +391,8 @@ export default function HelpScreen() {
               title="Gönder"
               icon="send"
               onPress={handleSubmitContact}
+              isLoading={contactSubmitting}
+              disabled={contactSubmitting}
               style={styles.submitButton}
             />
           </View>
@@ -366,7 +419,7 @@ export default function HelpScreen() {
         visible={snackbarVisible}
         onDismiss={() => setSnackbarVisible(false)}
         duration={3000}
-        variant={snackbarMessage.includes('gönderildi') ? 'success' : 'danger'}
+        variant={snackbarVariant}
       >
         {snackbarMessage}
       </Snackbar>

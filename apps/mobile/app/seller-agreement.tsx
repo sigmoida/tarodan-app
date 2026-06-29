@@ -2,6 +2,7 @@ import { View, ScrollView, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { theme, Text, ScreenHeader } from '@tarodan/ui-native';
 import { useTranslation } from '../src/i18n';
+import { COMMISSION_SUMMARY, SELLER_SUPPORT_EMAIL } from '../src/constants/legalFacts';
 
 const { colors } = theme;
 
@@ -41,11 +42,11 @@ export default function SellerAgreementScreen() {
 
         <Text style={styles.sectionTitle}>5. Komisyon ve Ücretler</Text>
         <Text style={styles.paragraph}>
-          Her başarılı satıştan platform komisyonu kesilir. Standart komisyon oranı %5'tir. Premium üyelik planlarında özel komisyon oranları uygulanabilir.
+          Her başarılı satıştan platform komisyonu kesilir. {COMMISSION_SUMMARY}
         </Text>
-        <Text style={styles.listItem}>• Ücretsiz Üye: Aylık 5 ilan hakkı, %5 komisyon</Text>
-        <Text style={styles.listItem}>• Premium Üye: Sınırsız ilan, %3 komisyon</Text>
-        <Text style={styles.listItem}>• Pro Üye: Sınırsız ilan, %2 komisyon, öncelikli destek</Text>
+        <Text style={styles.listItem}>• Ücretsiz Üye: Aylık 5 ilan hakkı</Text>
+        <Text style={styles.listItem}>• Premium Üye: Sınırsız ilan, düşük komisyon</Text>
+        <Text style={styles.listItem}>• Pro Üye: Sınırsız ilan, en düşük komisyon, öncelikli destek</Text>
 
         <Text style={styles.sectionTitle}>6. Ödeme Koşulları</Text>
         <Text style={styles.paragraph}>
@@ -74,7 +75,7 @@ export default function SellerAgreementScreen() {
           İşbu sözleşmeden doğan uyuşmazlıklarda öncelikle platform dahili çözüm mekanizması uygulanır. Çözüme ulaşılamaması halinde İstanbul Mahkemeleri ve İcra Daireleri yetkilidir.
         </Text>
 
-        <Text style={styles.contactInfo}>İletişim: seller-support@tarodan.com</Text>
+        <Text style={styles.contactInfo}>İletişim: {SELLER_SUPPORT_EMAIL}</Text>
 
         <View style={{ height: 40 }} />
       </ScrollView>

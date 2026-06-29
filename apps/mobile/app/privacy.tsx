@@ -2,6 +2,7 @@ import { View, ScrollView, StyleSheet } from 'react-native';
 import { theme, Text, ScreenHeader } from '@tarodan/ui-native';
 import { router } from 'expo-router';
 import { useTranslation } from '../src/i18n';
+import { PRIVACY_EMAIL } from '../src/constants/legalFacts';
 
 const { colors } = theme;
 
@@ -88,7 +89,7 @@ export default function PrivacyPolicyScreen() {
         <Text style={styles.paragraph}>
           Gizlilik ile ilgili sorularınız için bizimle iletişime geçebilirsiniz:
         </Text>
-        <Text style={styles.contactInfo}>E-posta: privacy@tarodan.com</Text>
+        <Text style={styles.contactInfo}>E-posta: {PRIVACY_EMAIL}</Text>
         <Text style={styles.contactInfo}>Adres: İstanbul, Türkiye</Text>
 
         <View style={{ height: 40 }} />

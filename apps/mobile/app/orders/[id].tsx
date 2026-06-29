@@ -14,6 +14,7 @@ import {
   theme,
   ScreenHeader,
   appAlert,
+  EmptyState,
 } from '@tarodan/ui-native';
 import type { BadgeVariant } from '@tarodan/ui-native';
 import { useState } from 'react';
@@ -82,6 +83,9 @@ interface OrderDetail {
   shippedAt?: string;
   deliveredAt?: string;
   completedAt?: string;
+  // İPTAL akışında set edilir; İADE tamamlanınca backend bunu YAZMAZ (tarih için
+  // activeRefundRequest.refundedAt'a düşülür).
+  cancelledAt?: string | null;
   // 48h pencere (Faz 1.2)
   confirmationDeadline?: string;
   buyerConfirmedAt?: string;
@@ -97,6 +101,7 @@ interface OrderDetail {
     status: string;
     reason?: string;
     createdAt: string;
+    refundedAt?: string | null;
     returnTrackingNumber?: string | null;
     returnProvider?: string | null;
   } | null;
@@ -144,12 +149,17 @@ const uiOrderStatusConfig: Record<string, { label: string; variant: BadgeVariant
 };
 
 // Rozet önceliği (liste ile aynı mantık): aktif iade > iptal > normal durum.
-// - activeRefundRequest dolu → 'refund_requested' ("İade Sürecinde"), sipariş
-//   'delivered' kalsa bile.
+// - activeRefundRequest dolu ama HENÜZ tamamlanmadıysa → 'refund_requested'
+//   ("İade Sürecinde"), sipariş 'delivered' kalsa bile.
+// - İade TAMAMLANDIYSA (status 'refunded') → 'refunded' ("İade Edildi");
+//   pickActiveRefundRequest tamamlanmış talebi de döndürdüğü için bu ayrım şart,
+//   yoksa biten iade "İade Sürecinde" görünür.
 // - cancellationType === 'iptal' → 'cancelled' ("İptal Edildi"); status 'refunded'
 //   olsa bile "İade Edildi" DEME.
 const badgeStatusOf = (o: any): string => {
-  if (o?.activeRefundRequest) return 'refund_requested';
+  if (o?.activeRefundRequest) {
+    return o.activeRefundRequest.status === 'refunded' ? 'refunded' : 'refund_requested';
+  }
   if (o?.cancellationType === 'iptal') return 'cancelled';
   return o?.status;
 };
@@ -456,6 +466,14 @@ export default function OrderDetailScreen() {
     : order?.activeRefundRequest
       ? REFUND_STATUS_LABELS[order.activeRefundRequest.status]?.label ?? 'İade Sürecinde'
       : 'İade Edildi';
+  // Adımın tarihi: İPTAL → order.cancelledAt; İADE → refundedAt (yoksa talebin
+  // açılış tarihi). refundedAt üst seviyede gelmez, activeRefundRequest içinde gelir.
+  const refundCancelDate: string | undefined = isCancelled
+    ? order?.cancelledAt ?? undefined
+    : order?.activeRefundRequest?.refundedAt
+      ?? order?.activeRefundRequest?.createdAt
+      ?? order?.cancelledAt
+      ?? undefined;
 
   // 14 GÜNDEN SONRA İADE YOK: teslimden 14 günden fazla geçtiyse iade penceresi
   // kapalı (backend de reddeder). Teslim edilmemişse pencere henüz başlamadı.
@@ -477,11 +495,13 @@ export default function OrderDetailScreen() {
 
   if (!order) {
     return (
-      <View style={styles.centeredContainer}>
-        <Ionicons name="alert-circle-outline" size={64} color={colors.danger[600]!} />
-        <Text style={{ marginTop: 16 }}>Sipariş bulunamadı</Text>
-        <Button variant="primary" title="Geri Dön" onPress={() => router.back()} style={{ marginTop: 16 }} />
-      </View>
+      <EmptyState
+        fullscreen
+        icon="receipt-outline"
+        title="Sipariş bulunamadı"
+        actionLabel="Geri Dön"
+        onAction={() => router.back()}
+      />
     );
   }
 
@@ -576,9 +596,10 @@ export default function OrderDetailScreen() {
                 durumu (İptal/İade Sürecinde/İade Edildi) ek adım olarak yansıt. */}
             {showRefundCancelStep && (
               <TimelineItem
+                testID="order-refundcancel-timeline"
                 icon={isCancelled ? 'close-circle' : 'arrow-undo'}
                 label={refundCancelLabel}
-                date={formatDate(order.refundedAt ?? order.cancelledAt)}
+                date={formatDate(refundCancelDate)}
                 isActive
                 isLast
               />
@@ -1185,11 +1206,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface.alt,
   },
   loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  centeredContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',

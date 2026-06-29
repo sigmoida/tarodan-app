@@ -212,7 +212,7 @@ export default function NewTradeScreen() {
           </View>
 
           <Button variant="primary" title="Üyelik Planları" onPress={() => router.push('/membership')} style={styles.upgradeButton} />
-          <Button variant="ghost" title="Geri Dön" onPress={() => router.back()} />
+          <Button variant="ghost" title="Geri Dön" onPress={() => router.back()} style={{ alignSelf: 'center' }} />
         </View>
       </View>
     );

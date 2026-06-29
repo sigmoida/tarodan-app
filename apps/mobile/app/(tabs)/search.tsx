@@ -585,7 +585,13 @@ export default function SearchScreen() {
 
           {/* Filter & Sort Row */}
           <View style={styles.filterRow}>
-            <TouchableOpacity style={styles.filterButton} onPress={() => setFilterModalVisible(true)}>
+            <TouchableOpacity
+              style={styles.filterButton}
+              onPress={() => setFilterModalVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Filtrele"
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
               <Ionicons name="filter-outline" size={20} color={colors.text.heading} />
               <Text style={styles.filterButtonText}>Filtrele</Text>
               {activeFiltersCount > 0 && (
@@ -595,7 +601,13 @@ export default function SearchScreen() {
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.filterButton} onPress={() => setSortModalVisible(true)}>
+            <TouchableOpacity
+              style={styles.filterButton}
+              onPress={() => setSortModalVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Sırala"
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
               <Ionicons name="swap-vertical-outline" size={20} color={colors.text.heading} />
               <Text style={styles.filterButtonText}>
                 {SORT_OPTIONS.find((s) => s.value === filters.sortBy)?.label || 'Sırala'}

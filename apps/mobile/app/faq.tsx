@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme, Text, ScreenHeader } from '@tarodan/ui-native';
 import { useTranslation } from '../src/i18n';
+import { RETURN_REQUEST_DAYS, DAMAGE_REPORT_DAYS, COMMISSION_SUMMARY } from '../src/constants/legalFacts';
 
 const { colors } = theme;
 
@@ -38,7 +39,7 @@ const FAQ_ITEMS = [
       },
       {
         q: 'Komisyon oranları nedir?',
-        a: 'Standart üyeler için %5, Premium üyeler için %3, Pro üyeler için %2 komisyon uygulanır. Komisyon yalnızca satış gerçekleştiğinde kesilir.',
+        a: `${COMMISSION_SUMMARY} Komisyon yalnızca satış gerçekleştiğinde kesilir.`,
       },
       {
         q: 'Ödememi ne zaman alırım?',
@@ -89,11 +90,11 @@ const FAQ_ITEMS = [
     questions: [
       {
         q: 'İade süresi ne kadar?',
-        a: 'Ürün teslim tarihinden itibaren 14 gün içinde iade talebi oluşturabilirsiniz.',
+        a: `Ürün teslim tarihinden itibaren ${RETURN_REQUEST_DAYS} gün içinde iade talebi oluşturabilirsiniz.`,
       },
       {
         q: 'Hasarlı ürün geldi, ne yapmalıyım?',
-        a: 'Teslim tarihinden itibaren 3 gün içinde fotoğraflı olarak destek ekibine başvurun. Hasarlı ürün iadeleri satıcı sorumluluğundadır ve tam iade yapılır.',
+        a: `Teslim tarihinden itibaren ${DAMAGE_REPORT_DAYS} gün içinde fotoğraflı olarak destek ekibine başvurun. Hasarlı ürün iadeleri satıcı sorumluluğundadır ve tam iade yapılır.`,
       },
       {
         q: 'Siparişimi iptal edebilir miyim?',

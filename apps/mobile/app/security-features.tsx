@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme, Text, ScreenHeader } from '@tarodan/ui-native';
 import { useTranslation } from '../src/i18n';
+import { SECURITY_EMAIL } from '../src/constants/legalFacts';
 
 const { colors } = theme;
 
@@ -90,7 +91,7 @@ export default function SecurityFeaturesScreen() {
           <Text style={styles.footerText}>
             Güvenlikle ilgili bir sorun fark ederseniz lütfen derhal bize bildirin.
           </Text>
-          <Text style={styles.contactInfo}>E-posta: security@tarodan.com</Text>
+          <Text style={styles.contactInfo}>E-posta: {SECURITY_EMAIL}</Text>
         </View>
 
         <View style={{ height: 40 }} />

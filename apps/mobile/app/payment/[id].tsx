@@ -28,6 +28,8 @@ export default function PaymentScreen() {
     guest?: string;
     /** Üyelik ödemesi: başarı → /membership/success */
     type?: string;
+    /** Üyelik kademesi (basic|premium|business) — success ekranına taşınır. */
+    tier?: string;
     /** Takas nakit farkı ödemesi: başarı → /trade/{tradeId} */
     tradeId?: string;
     tradeCash?: string;
@@ -173,7 +175,10 @@ export default function PaymentScreen() {
 
   const routeToSuccess = (pid: string = paymentId) => {
     if (isMembership) {
-      router.replace({ pathname: '/membership/success', params: { paymentId: pid } } as any);
+      router.replace({
+        pathname: '/membership/success',
+        params: { paymentId: pid, ...(params.tier ? { tier: params.tier } : {}) },
+      } as any);
     } else {
       router.replace({
         pathname: '/payment/success',
@@ -203,7 +208,7 @@ export default function PaymentScreen() {
       ) : state.error ? (
         <View style={styles.errorWrap}>
           <ErrorState message={state.error} onRetry={load} />
-          <Button variant="ghost" title="Geri Dön" onPress={safeBack} />
+          <Button variant="ghost" title="Geri Dön" onPress={safeBack} style={{ alignSelf: 'center' }} />
         </View>
       ) : state.target ? (
         <View style={{ flex: 1 }}>

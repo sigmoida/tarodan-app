@@ -10,6 +10,7 @@ import {
   Text,
   theme,
   appAlert,
+  EmptyState,
 } from '@tarodan/ui-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -251,16 +252,13 @@ export default function ProductDetailScreen() {
   }
   if (!product) {
     return (
-      <View style={styles.loadingContainer}>
-        <Ionicons name="cube-outline" size={64} color={colors.text.muted} />
-        <Text style={styles.loadingText}>Ürün bulunamadı</Text>
-        <Button
-          variant="primary"
-          title="Geri Dön"
-          onPress={() => router.back()}
-          style={{ marginTop: 16 }}
-        />
-      </View>
+      <EmptyState
+        fullscreen
+        icon="cube-outline"
+        title="Ürün bulunamadı"
+        actionLabel="Geri Dön"
+        onAction={() => router.back()}
+      />
     );
   }
 

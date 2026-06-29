@@ -4,26 +4,23 @@ import { theme, Button, Card, Text, ScreenHeader, appAlert } from '@tarodan/ui-n
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/stores/authStore';
-import { api, membershipApi, paymentsApi } from '../../src/services/api';
+import { membershipApi, paymentsApi } from '../../src/services/api';
 import { captureException } from '../../src/services/sentry';
 
 const { colors } = theme;
 
-interface PlatformSettings {
-  basic_monthly_price?: number;
-  basic_yearly_price?: number;
-  premium_monthly_price?: number;
-  premium_yearly_price?: number;
-  business_monthly_price?: number;
-  business_yearly_price?: number;
-  yearly_discount_percentage?: number;
-}
-
+// API erişilemezse son çare fallback — DB MembershipTier seed değerleriyle hizalı
+// (basic 49.99 / premium 99.99 / business 249.99). Normalde fiyat getTiers'tan gelir.
 const DEFAULT_MONTHLY: Record<string, number> = {
-  basic: 49,
-  premium: 99,
-  business: 499,
+  basic: 49.99,
+  premium: 99.99,
+  business: 249.99,
 };
+
+// Fiyatları her zaman 2 ondalıkla göster (admin + membership/index ile aynı biçim);
+// ham hesap artığı 3 ondalığı (örn. 419,916) önler → "419,92".
+const formatTL = (n: number): string =>
+  n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const MEMBERSHIP_TIERS = {
   basic: {
@@ -81,19 +78,25 @@ export default function MembershipCheckoutScreen() {
   const { tier: tierParam, period: periodParam } = useLocalSearchParams<{ tier: string; period?: string }>();
   const { isAuthenticated, refreshUserData } = useAuthStore();
   const [loading, setLoading] = useState(false);
-  const [settings, setSettings] = useState<PlatformSettings>({});
+  const [tierPrices, setTierPrices] = useState<{ monthlyPrice: number; yearlyPrice: number } | null>(null);
 
   const tier = MEMBERSHIP_TIERS[tierParam as keyof typeof MEMBERSHIP_TIERS] || MEMBERSHIP_TIERS.premium;
   const tierType = (tierParam as string) || 'premium';
   const billingPeriod: 'monthly' | 'yearly' = periodParam === 'yearly' ? 'yearly' : 'monthly';
 
-  // Web checkout ile aynı: fiyatlar admin panelden (GET /admin/settings/public) dinamik gelir.
+  // TEK FİYAT KAYNAĞI: DB MembershipTier (GET /membership/tiers) — backend ödemede
+  // tam bunu tahsil eder. Web checkout ile birebir aynı. Eskiden /admin/settings/public
+  // + hardcoded fallback'ler gösterilen tutarı çekilenle uyumsuzlaştırıyordu
+  // (UI ₺499 / charge ₺249.99).
   useEffect(() => {
     let active = true;
-    api
-      .get('/admin/settings/public')
+    membershipApi
+      .getTiers()
       .then((res) => {
-        if (active) setSettings(res.data || {});
+        if (!active) return;
+        const list: any[] = res.data?.data ?? res.data ?? [];
+        const t = list.find((x) => x.type === tierType);
+        if (t) setTierPrices({ monthlyPrice: Number(t.monthlyPrice), yearlyPrice: Number(t.yearlyPrice) });
       })
       .catch(() => {
         // fallback varsayılan fiyatlara düşülür
@@ -101,19 +104,16 @@ export default function MembershipCheckoutScreen() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [tierType]);
 
-  // Ekranda gösterilecek fiyat — seçili periyoda (aylık/yıllık) göre.
+  // Ekranda gösterilecek fiyat (KDV dahil, nihai tahsil tutarı) — seçili periyoda göre.
   const displayPrice: number = (() => {
-    const periodKey = `${tierType}_${billingPeriod}_price` as keyof PlatformSettings;
-    const direct = settings[periodKey];
-    if (typeof direct === 'number' && direct > 0) return direct;
-    const monthlyKey = `${tierType}_monthly_price` as keyof PlatformSettings;
-    const monthly = (settings[monthlyKey] as number | undefined) ?? DEFAULT_MONTHLY[tierType] ?? tier.price;
-    if (billingPeriod === 'yearly') {
-      const discount = settings.yearly_discount_percentage ?? 20;
-      return Math.round(monthly * 12 * (1 - discount / 100));
+    if (tierPrices) {
+      return billingPeriod === 'yearly' ? tierPrices.yearlyPrice : tierPrices.monthlyPrice;
     }
+    // getTiers henüz dönmediyse / başarısızsa son çare fallback.
+    const monthly = DEFAULT_MONTHLY[tierType] ?? tier.price;
+    if (billingPeriod === 'yearly') return Math.round(monthly * 12 * 0.8);
     return monthly;
   })();
 
@@ -171,6 +171,8 @@ export default function MembershipCheckoutScreen() {
             provider: 'paytr',
             guest: '0',
             type: 'membership',
+            // success ekranı doğru kademeyi göstersin diye taşı (yoksa hep "Premium" yazardı).
+            tier: tierType,
             ...(paymentUrl ? { paymentUrl } : {}),
           },
         } as any);
@@ -203,7 +205,7 @@ export default function MembershipCheckoutScreen() {
             <View>
               <Text style={[styles.planName, { color: tier.color }]}>{tier.name}</Text>
               <Text style={styles.planPrice}>
-                ₺{displayPrice.toLocaleString('tr-TR')}<Text style={styles.planPeriod}>/{periodLabel}</Text>
+                ₺{formatTL(displayPrice)}<Text style={styles.planPeriod}>/{periodLabel}</Text>
               </Text>
             </View>
             {'popular' in tier && tier.popular && (
@@ -243,16 +245,13 @@ export default function MembershipCheckoutScreen() {
         <Card style={styles.summaryCard}>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>{tier.name} Üyelik ({periodLabel === 'yıl' ? 'Yıllık' : 'Aylık'})</Text>
-            <Text style={styles.summaryValue}>₺{displayPrice.toLocaleString('tr-TR')}</Text>
+            <Text style={styles.summaryValue}>₺{formatTL(displayPrice)}</Text>
           </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>KDV (%20)</Text>
-            <Text style={styles.summaryValue}>₺{(displayPrice * 0.2).toFixed(2)}</Text>
-          </View>
+          <Text style={styles.vatNote}>KDV dahildir</Text>
           <View style={styles.divider} />
           <View style={styles.summaryRow}>
             <Text style={styles.totalLabel}>Toplam</Text>
-            <Text style={styles.totalValue}>₺{(displayPrice * 1.2).toFixed(2)}</Text>
+            <Text style={styles.totalValue}>₺{formatTL(displayPrice)}</Text>
           </View>
         </Card>
 
@@ -268,7 +267,7 @@ export default function MembershipCheckoutScreen() {
         {/* Pay Button */}
         <Button
           variant="primary"
-          title={loading ? 'İşleniyor...' : `₺${(displayPrice * 1.2).toFixed(2)} Öde`}
+          title={loading ? 'İşleniyor...' : `₺${formatTL(displayPrice)} Öde`}
           onPress={handlePayment}
           isLoading={loading}
           disabled={loading}
@@ -382,6 +381,11 @@ const styles = StyleSheet.create({
   summaryValue: {
     fontSize: 14,
     color: colors.text.heading,
+  },
+  vatNote: {
+    fontSize: 12,
+    color: colors.text.muted,
+    marginTop: 2,
   },
   divider: {
     height: 1,

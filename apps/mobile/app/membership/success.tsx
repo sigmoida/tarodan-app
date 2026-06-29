@@ -9,10 +9,49 @@ import { paymentsApi } from '../../src/services/api';
 
 const { colors } = theme;
 
+type TierKey = 'basic' | 'premium' | 'business';
+
+const TIER_NAMES: Record<TierKey, string> = {
+  basic: 'Temel',
+  premium: 'Premium',
+  business: 'Business',
+};
+
+type TierFeature = { icon: keyof typeof Ionicons.glyphMap; label: string };
+
+// Kademeye özel başarı özellikleri (checkout MEMBERSHIP_TIERS ile hizalı).
+const TIER_FEATURES: Record<TierKey, TierFeature[]> = {
+  basic: [
+    { icon: 'list', label: '15 ücretsiz ilan' },
+    { icon: 'swap-horizontal', label: 'Takas özelliği' },
+    { icon: 'albums', label: 'Koleksiyon oluşturma' },
+    { icon: 'star', label: '2 öne çıkan ilan' },
+  ],
+  premium: [
+    { icon: 'list', label: '50 ücretsiz ilan' },
+    { icon: 'swap-horizontal', label: 'Takas özelliği' },
+    { icon: 'albums', label: 'Koleksiyon oluşturma' },
+    { icon: 'star', label: '10 öne çıkan ilan' },
+    { icon: 'shield-checkmark', label: 'Reklamsız deneyim' },
+  ],
+  business: [
+    { icon: 'list', label: '200 ücretsiz ilan' },
+    { icon: 'swap-horizontal', label: 'Takas özelliği' },
+    { icon: 'star', label: '50 öne çıkan ilan' },
+    { icon: 'code-slash', label: 'API erişimi' },
+    { icon: 'ribbon', label: 'Özel satıcı rozeti' },
+  ],
+};
+
 export default function MembershipSuccessScreen() {
-  const { paymentId } = useLocalSearchParams<{ paymentId?: string }>();
+  const { paymentId, tier } = useLocalSearchParams<{ paymentId?: string; tier?: string }>();
   const { refreshUserData } = useAuthStore();
   const queryClient = useQueryClient();
+
+  // `?tier=` paramına göre içeriği kademeye uyarla; bilinmeyen/eksikse premium'a düş.
+  const tierKey: TierKey = tier === 'basic' || tier === 'business' ? tier : 'premium';
+  const tierName = TIER_NAMES[tierKey];
+  const features = TIER_FEATURES[tierKey];
 
   // PayTR dönüşü sonrası: üyeliği sunucu tarafında KESİNLEŞTİR, sonra yerel
   // kullanıcı + üyelik query'lerini tazele. Callback (ngrok) gecikse/ulaşmasa
@@ -59,27 +98,17 @@ export default function MembershipSuccessScreen() {
 
         {/* Description */}
         <Text style={styles.description}>
-          Premium üyeliğiniz başarıyla aktifleştirildi. Artık tüm özelliklerden yararlanabilirsiniz.
+          {tierName} üyeliğiniz başarıyla aktifleştirildi. Artık tüm özelliklerden yararlanabilirsiniz.
         </Text>
 
         {/* Features */}
         <View style={styles.features}>
-          <View style={styles.featureItem}>
-            <Ionicons name="infinite" size={24} color={colors.primary[600]!} />
-            <Text style={styles.featureText}>Sınırsız İlan</Text>
-          </View>
-          <View style={styles.featureItem}>
-            <Ionicons name="swap-horizontal" size={24} color={colors.primary[600]!} />
-            <Text style={styles.featureText}>Takas Özelliği</Text>
-          </View>
-          <View style={styles.featureItem}>
-            <Ionicons name="car-sport" size={24} color={colors.primary[600]!} />
-            <Text style={styles.featureText}>Digital Garage</Text>
-          </View>
-          <View style={styles.featureItem}>
-            <Ionicons name="star" size={24} color={colors.primary[600]!} />
-            <Text style={styles.featureText}>Öne Çıkan İlanlar</Text>
-          </View>
+          {features.map((feat) => (
+            <View key={feat.label} style={styles.featureItem}>
+              <Ionicons name={feat.icon} size={24} color={colors.primary[600]!} />
+              <Text style={styles.featureText}>{feat.label}</Text>
+            </View>
+          ))}
         </View>
 
         {/* Buttons */}

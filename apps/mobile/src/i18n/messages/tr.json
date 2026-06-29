@@ -953,6 +953,7 @@
   },
   "language": {
     "language": "Dil",
+    "languageInfo": "Uygulama dilini değiştirdiğinizde tüm menü ve bildirimler seçtiğiniz dile geçer.",
     "turkish": "Türkçe",
     "english": "English",
     "selectLanguage": "Dil Seçin"

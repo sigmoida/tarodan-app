@@ -4,7 +4,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme, ScreenHeader, appAlert } from '@tarodan/ui-native';
 import { useAuthStore } from '../../src/stores/authStore';
-import { api, membershipApi } from '../../src/services/api';
+import { membershipApi } from '../../src/services/api';
 import { useTranslation } from '../../src/i18n';
 
 const { colors } = theme;
@@ -40,6 +40,12 @@ const TIER_NAMES: Record<TierType, string> = {
   business: 'Business',
 };
 
+// Fiyatları her zaman 2 ondalıkla göster (admin paneliyle birebir aynı biçim).
+// Ham hesap artığı 3 ondalığı (örn. 419,916) ve kademeler arası ondalık/tam-sayı
+// tutarsızlığını (419,916 vs 832) önler → "419,92", "839,92".
+const formatTL = (n: number): string =>
+  n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 interface MembershipDetails {
   tier?: { type: string; name: string };
   currentPeriodStart?: string;
@@ -65,6 +71,35 @@ interface PlatformSettings {
   business_monthly_price?: number;
   business_yearly_price?: number;
   yearly_discount_percentage?: number;
+}
+
+// GET /membership/tiers (DB MembershipTier) yanıtını ekranın beklediği
+// PlatformSettings şekline çevirir — böylece getPrice/getListingLimit aynen kalır.
+// Web profile/membership ile aynı eşleme.
+function mapTiersToSettings(list: any[]): PlatformSettings {
+  const by = (type: string) => (Array.isArray(list) ? list.find((x) => x?.type === type) : undefined);
+  const num = (v: any): number | undefined => (v === undefined || v === null ? undefined : Number(v));
+  const free = by('free');
+  const basic = by('basic');
+  const premium = by('premium');
+  const business = by('business');
+  // Yıllık indirim %'sini premium tier fiyatından türet (monthly*12 vs yearly).
+  const pm = num(premium?.monthlyPrice);
+  const py = num(premium?.yearlyPrice);
+  const pct = pm && py && pm * 12 > 0 ? Math.round((1 - py / (pm * 12)) * 100) : undefined;
+  return {
+    free_listing_limit: num(free?.maxTotalListings),
+    basic_listing_limit: num(basic?.maxTotalListings),
+    premium_listing_limit: num(premium?.maxTotalListings),
+    business_listing_limit: num(business?.maxTotalListings),
+    basic_monthly_price: num(basic?.monthlyPrice),
+    basic_yearly_price: num(basic?.yearlyPrice),
+    premium_monthly_price: pm,
+    premium_yearly_price: py,
+    business_monthly_price: num(business?.monthlyPrice),
+    business_yearly_price: num(business?.yearlyPrice),
+    yearly_discount_percentage: pct ?? 20,
+  };
 }
 
 export default function MembershipScreen() {
@@ -95,17 +130,21 @@ export default function MembershipScreen() {
     setLoading(true);
     setError(null);
     // allSettled: biri başarısız olsa diğeri (fiyatlar/üyelik) yine yüklensin.
-    const [membershipRes, settingsRes] = await Promise.allSettled([
+    // Fiyat/limit TEK KAYNAĞI: DB MembershipTier (GET /membership/tiers) — backend
+    // tahsilatı + web ile birebir aynı. Eskiden /admin/settings/public okunuyordu;
+    // o anahtarlar seed'de yazılmadığı için fallback ₺499 (DB ₺249.99) gösteriyordu.
+    const [membershipRes, tiersRes] = await Promise.allSettled([
       membershipApi.getCurrentMembership(),
-      api.get('/admin/settings/public'),
+      membershipApi.getTiers(),
     ]);
     if (membershipRes.status === 'fulfilled') {
       setMembership(membershipRes.value.data);
     }
-    if (settingsRes.status === 'fulfilled') {
-      setSettings(settingsRes.value.data || {});
+    if (tiersRes.status === 'fulfilled') {
+      const list = tiersRes.value.data?.data ?? tiersRes.value.data ?? [];
+      setSettings(mapTiersToSettings(list));
     }
-    if (membershipRes.status === 'rejected' && settingsRes.status === 'rejected') {
+    if (membershipRes.status === 'rejected' && tiersRes.status === 'rejected') {
       console.error('Failed to load membership data:', membershipRes.reason);
       setError('Üyelik bilgileri yüklenemedi. Lütfen tekrar deneyin.');
     }
@@ -167,11 +206,15 @@ export default function MembershipScreen() {
     return monthlyPrice;
   };
 
+  // Son çare fallback (yalnız getTiers API'si tamamen erişilemezse) — DB
+  // MembershipTier seed değerleriyle ve checkout.tsx DEFAULT_MONTHLY ile hizalı.
+  // Gerçek fiyat/indirim her zaman canlı getTiers'tan gelir; bu sabitler
+  // yalnız ağ hatasında devreye girer.
   const getDefaultMonthly = (tier: TierType): number => {
     switch (tier) {
-      case 'basic': return 49;
-      case 'premium': return 99;
-      case 'business': return 499;
+      case 'basic': return 49.99;
+      case 'premium': return 99.99;
+      case 'business': return 249.99;
       default: return 0;
     }
   };
@@ -352,7 +395,7 @@ export default function MembershipScreen() {
                     <Text style={styles.tierPriceFree}>Ücretsiz</Text>
                   ) : (
                     <>
-                      <Text style={styles.tierPrice}>{price.toLocaleString('tr-TR')} ₺</Text>
+                      <Text style={styles.tierPrice}>{formatTL(price)} ₺</Text>
                       <Text style={styles.tierPricePeriod}>/{billingPeriod === 'monthly' ? 'ay' : 'yıl'}</Text>
                     </>
                   )}
@@ -399,7 +442,13 @@ export default function MembershipScreen() {
                           : { color: colors.text.subtle },
                     ]}
                   >
-                    {isCurrent ? 'Mevcut Plan' : isUpgrade ? 'Yükselt' : 'Mevcut'}
+                    {isCurrent
+                      ? 'Mevcut Plan'
+                      : tier === 'free'
+                        ? 'Ücretsiz'
+                        : isUpgrade
+                          ? 'Yükselt'
+                          : 'Alt Plan'}
                   </Text>
                 </TouchableOpacity>
               </View>

@@ -3,9 +3,10 @@ import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme, Text, Card, Chip, Snackbar, Input, Textarea, Button, ScreenHeader } from '@tarodan/ui-native';
-import { useAuthStore } from '../src/stores/authStore';
-import { useTranslation } from '../src/i18n';
-import { supportApi } from '../src/services/api';
+import { useAuthStore } from '../../src/stores/authStore';
+import { useTranslation } from '../../src/i18n';
+import { supportApi } from '../../src/services/api';
+import { SUPPORT_EMAIL } from '../../src/constants/legalFacts';
 
 const { colors } = theme;
 
@@ -214,7 +215,7 @@ export default function SupportScreen() {
         {/* Contact Info */}
         <View style={styles.contactInfo}>
           <Text style={styles.contactInfoText}>
-            Acil destek için: <Text style={styles.contactInfoLink}>destek@tarodan.com</Text>
+            Acil destek için: <Text style={styles.contactInfoLink}>{SUPPORT_EMAIL}</Text>
           </Text>
         </View>
 

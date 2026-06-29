@@ -34,6 +34,16 @@ const STATUS_MAP: Record<string, { label: string; color: string; icon: string }>
   completed: { label: 'Tamamlandı', color: colors.success[600]!, icon: 'trophy-outline' },
   cancelled: { label: 'İptal Edildi', color: colors.danger[600]!, icon: 'close-circle-outline' },
   refunded: { label: 'İade Edildi', color: colors.warning[600]!, icon: 'return-down-back-outline' },
+  refund_requested: { label: 'İade Sürecinde', color: colors.danger[600]!, icon: 'return-down-back-outline' },
+};
+
+// Terminal/kapalı durumlar: mutlu-yol (Oluşturuldu→Ödeme→Kargo→Teslim) zaman
+// çizelgesi yanıltıcı olur; bunun yerine net bir son-durum bloğu gösterilir.
+const CLOSED_TRACK_STATUSES = ['cancelled', 'refunded', 'refund_requested'];
+const CLOSED_TRACK_HINTS: Record<string, string> = {
+  cancelled: 'Siparişiniz iptal edildi. Ödemeniz varsa hesabınıza iade edilir.',
+  refunded: 'Siparişinizin iadesi tamamlandı; ödemeniz iade edildi.',
+  refund_requested: 'İade talebiniz işleniyor. Süreç tamamlandığında bilgilendirileceksiniz.',
 };
 
 export default function OrderTrackScreen() {
@@ -218,6 +228,19 @@ export default function OrderTrackScreen() {
             {/* Timeline */}
             <View style={styles.timelineSection}>
               <Text style={styles.sectionTitle}>Sipariş Durumu</Text>
+              {CLOSED_TRACK_STATUSES.includes(order.status) ? (
+                <View style={styles.closedState}>
+                  <View style={[styles.closedIcon, { backgroundColor: getStatusInfo(order.status).color }]}>
+                    <Ionicons
+                      name={getStatusInfo(order.status).icon as any}
+                      size={22}
+                      color={colors.white}
+                    />
+                  </View>
+                  <Text style={styles.closedLabel}>{getStatusInfo(order.status).label}</Text>
+                  <Text style={styles.closedHint}>{CLOSED_TRACK_HINTS[order.status] ?? ''}</Text>
+                </View>
+              ) : (
               <View style={styles.timeline}>
                 {['pending_payment', 'paid', 'preparing', 'shipped', 'delivered'].map((status, index) => {
                   const statusInfo = getStatusInfo(status);
@@ -256,6 +279,7 @@ export default function OrderTrackScreen() {
                   );
                 })}
               </View>
+              )}
             </View>
           </View>
         )}
@@ -512,6 +536,31 @@ const styles = StyleSheet.create({
   timelineLabelCurrent: {
     fontWeight: 'bold',
     color: colors.primary[600]!,
+  },
+  closedState: {
+    alignItems: 'center',
+    marginTop: 16,
+    paddingVertical: 8,
+  },
+  closedIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closedLabel: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: colors.text.heading,
+    marginTop: 10,
+  },
+  closedHint: {
+    fontSize: 12,
+    color: colors.text.muted,
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 17,
   },
   helpSection: {
     flexDirection: 'row',

@@ -35,12 +35,15 @@ const uiOrderStatusConfig: Record<string, { label: string; variant: BadgeVariant
 };
 
 // Rozet önceliği (liste/detay ile aynı): aktif iade > iptal > normal durum.
+// İade tamamlandıysa (status 'refunded') "İade Edildi", aksi halde "İade Sürecinde".
 const badgeStatusOf = (o: {
   status: string;
   cancellationType?: 'iptal' | 'iade' | null;
   activeRefundRequest?: { id: string; status: string } | null;
 }): string => {
-  if (o.activeRefundRequest) return 'refund_requested';
+  if (o.activeRefundRequest) {
+    return o.activeRefundRequest.status === 'refunded' ? 'refunded' : 'refund_requested';
+  }
   if (o.cancellationType === 'iptal') return 'cancelled';
   return o.status;
 };

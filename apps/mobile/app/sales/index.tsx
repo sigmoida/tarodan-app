@@ -326,7 +326,7 @@ export default function SalesScreen() {
                     variant="primary"
                     title="Hazırlanıyor Olarak İşaretle"
                     onPress={() => handleMarkAsProcessing(sale)}
-                    isLoading={updateStatusMutation.isPending}
+                    isLoading={updateStatusMutation.isPending && updateStatusMutation.variables?.orderId === sale.id}
                   />
                 </View>
               )}

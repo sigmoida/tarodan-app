@@ -34,7 +34,7 @@ jest.mock('../../src/i18n', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 
-import SupportScreen from '../support';
+import SupportScreen from '../support/new';
 
 describe('J20 · Destek talebi (support)', () => {
   beforeEach(() => {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Dimensions, Share } from 'react-native';
-import { theme, Avatar, Button, Chip, Divider, Spinner, Text } from '@tarodan/ui-native';
+import { theme, Avatar, Button, Chip, Divider, Spinner, Text, EmptyState } from '@tarodan/ui-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -115,16 +115,13 @@ export default function CollectionDetailScreen() {
 
   if (!collection) {
     return (
-      <View style={styles.loadingContainer}>
-        <Ionicons name="albums-outline" size={64} color={colors.text.muted} />
-        <Text style={styles.loadingText}>Koleksiyon bulunamadı</Text>
-        <Button
-          variant="primary"
-          title="Geri Dön"
-          onPress={() => router.back()}
-          style={{ marginTop: 16 }}
-        />
-      </View>
+      <EmptyState
+        fullscreen
+        icon="albums-outline"
+        title="Koleksiyon bulunamadı"
+        actionLabel="Geri Dön"
+        onAction={() => router.back()}
+      />
     );
   }
 

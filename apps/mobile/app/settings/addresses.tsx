@@ -55,6 +55,8 @@ export default function AddressesScreen() {
     postalCode: '',
     isDefault: false,
   });
+  // Alan-bazlı görünür validasyon — boş/geçersiz alanlar kırmızı çerçeve + alt mesaj alır.
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const maxAddresses = limits?.maxAddresses || 10;
 
@@ -153,6 +155,16 @@ export default function AddressesScreen() {
       isDefault: false,
     });
     setEditingAddress(null);
+    setFieldErrors({});
+  };
+
+  // Kullanıcı bir alanı düzeltmeye başlayınca o alanın hatasını anında kaldır.
+  const clearFieldError = (key: string) => {
+    setFieldErrors((prev) => {
+      if (!prev[key]) return prev;
+      const { [key]: _removed, ...rest } = prev;
+      return rest;
+    });
   };
 
   const openAddDialog = () => {
@@ -200,19 +212,36 @@ export default function AddressesScreen() {
   };
 
   const handleSubmit = () => {
-    if (!formData.title || !formData.fullName || !formData.phone || !formData.address || !formData.city || !formData.district) {
-      appAlert('Hata', 'Lütfen zorunlu alanları doldurun (ilçe dahil)');
+    // Alan-bazlı görünür validasyon — her hatalı alan kırmızı çerçeve + alt mesaj alır.
+    // API DTO kuralları (adres ≥10 karakter, telefon ≥10 hane) client'ta önden uygulanır;
+    // yoksa backend ham 400 "Adres kaydedilemedi" döner.
+    const errors: Record<string, string> = {};
+    if (!formData.title.trim()) errors.title = 'Zorunlu alan';
+    if (!formData.fullName.trim()) errors.fullName = 'Zorunlu alan';
+    if (!formData.phone.trim()) errors.phone = 'Zorunlu alan';
+    else if (formData.phone.replace(/\D/g, '').length < 10) errors.phone = 'En az 10 haneli geçerli numara';
+    if (!formData.address.trim()) errors.address = 'Zorunlu alan';
+    else if (formData.address.trim().length < 10) errors.address = 'En az 10 karakter olmalıdır';
+    if (!formData.city) errors.city = 'Zorunlu alan';
+    if (!formData.district) errors.district = 'Zorunlu alan';
+
+    setFieldErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
+      // Hatalı alan, kaydırmalı modalda ekran dışında kalabilir → kısa özet alert de göster.
+      const hasMissing =
+        !formData.title || !formData.fullName || !formData.phone ||
+        !formData.address || !formData.city || !formData.district;
+      if (hasMissing) {
+        appAlert('Hata', 'Lütfen zorunlu alanları doldurun (ilçe dahil)');
+      } else if (errors.address) {
+        appAlert('Hata', 'Adres en az 10 karakter olmalıdır');
+      } else {
+        appAlert('Hata', 'Geçerli bir telefon numarası giriniz (en az 10 hane)');
+      }
       return;
     }
-    // API DTO kuralları — client-side önden uygula (yoksa ham 400 "Adres kaydedilemedi")
-    if (formData.address.trim().length < 10) {
-      appAlert('Hata', 'Adres en az 10 karakter olmalıdır');
-      return;
-    }
-    if (formData.phone.replace(/\D/g, '').length < 10) {
-      appAlert('Hata', 'Geçerli bir telefon numarası giriniz (en az 10 hane)');
-      return;
-    }
+
     saveMutation.mutate(formData);
   };
 
@@ -298,7 +327,7 @@ export default function AddressesScreen() {
                   size="sm"
                   title="Varsayılan Yap"
                   onPress={() => setDefaultMutation.mutate(address.id)}
-                  isLoading={setDefaultMutation.isPending}
+                  isLoading={setDefaultMutation.isPending && setDefaultMutation.variables === address.id}
                   style={styles.defaultButton}
                 />
               )}
@@ -330,14 +359,22 @@ export default function AddressesScreen() {
             testID="address-title-input"
             label="Adres Başlığı *"
             value={formData.title}
-            onChangeText={(text) => setFormData({ ...formData, title: text })}
+            onChangeText={(text) => {
+              setFormData({ ...formData, title: text });
+              clearFieldError('title');
+            }}
+            error={fieldErrors.title}
             placeholder={t("mobile.addressTitlePlaceholder")}
             containerStyle={styles.input}
           />
           <Input
             label="Ad Soyad *"
             value={formData.fullName}
-            onChangeText={(text) => setFormData({ ...formData, fullName: text })}
+            onChangeText={(text) => {
+              setFormData({ ...formData, fullName: text });
+              clearFieldError('fullName');
+            }}
+            error={fieldErrors.fullName}
             containerStyle={styles.input}
           />
           <PhoneInput
@@ -345,13 +382,21 @@ export default function AddressesScreen() {
             countryCode={formData.phoneCountryCode}
             onCountryCodeChange={(code) => setFormData({ ...formData, phoneCountryCode: code })}
             phone={formData.phone}
-            onPhoneChange={(phone) => setFormData({ ...formData, phone })}
+            onPhoneChange={(phone) => {
+              setFormData({ ...formData, phone });
+              clearFieldError('phone');
+            }}
+            error={fieldErrors.phone}
             containerStyle={styles.input}
           />
           <Input
             label="Adres *"
             value={formData.address}
-            onChangeText={(text) => setFormData({ ...formData, address: text })}
+            onChangeText={(text) => {
+              setFormData({ ...formData, address: text });
+              clearFieldError('address');
+            }}
+            error={fieldErrors.address}
             multiline
             numberOfLines={2}
             containerStyle={styles.input}
@@ -359,11 +404,19 @@ export default function AddressesScreen() {
           <CityDistrictSelector
             city={formData.city}
             district={formData.district}
+            cityError={!!fieldErrors.city}
+            districtError={!!fieldErrors.district}
             // Fonksiyonel güncelleme şart: il seçilince selector aynı anda
             // onChangeCity + onChangeDistrict('') çağırır; stale obje ile
             // yazılırsa ikinci çağrı ilk yazılan şehri ezer.
-            onChangeCity={(city) => setFormData((prev) => ({ ...prev, city }))}
-            onChangeDistrict={(district) => setFormData((prev) => ({ ...prev, district }))}
+            onChangeCity={(city) => {
+              setFormData((prev) => ({ ...prev, city }));
+              clearFieldError('city');
+            }}
+            onChangeDistrict={(district) => {
+              setFormData((prev) => ({ ...prev, district }));
+              clearFieldError('district');
+            }}
           />
           <Input
             label="Posta Kodu"

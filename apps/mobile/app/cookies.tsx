@@ -2,6 +2,7 @@ import { View, ScrollView, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { theme, Text, ScreenHeader } from '@tarodan/ui-native';
 import { useTranslation } from '../src/i18n';
+import { PRIVACY_EMAIL } from '../src/constants/legalFacts';
 
 const { colors } = theme;
 
@@ -70,7 +71,7 @@ export default function CookiePolicyScreen() {
         <Text style={styles.paragraph}>
           Çerez politikamız hakkında sorularınız için bizimle iletişime geçebilirsiniz:
         </Text>
-        <Text style={styles.contactInfo}>E-posta: privacy@tarodan.com</Text>
+        <Text style={styles.contactInfo}>E-posta: {PRIVACY_EMAIL}</Text>
         <Text style={styles.contactInfo}>Adres: İstanbul, Türkiye</Text>
 
         <View style={{ height: 40 }} />

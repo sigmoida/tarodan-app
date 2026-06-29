@@ -209,6 +209,8 @@ export function ProductCard({
             <TouchableOpacity
               style={styles.favBtn}
               onPress={onToggleFavorite}
+              accessibilityRole="button"
+              accessibilityLabel={isFavorite ? 'Favorilerden çıkar' : 'Favorilere ekle'}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
               <Ionicons

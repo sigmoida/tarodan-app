@@ -136,6 +136,9 @@ export default function CategoryScreen() {
           <TouchableOpacity
             style={styles.sortButton}
             onPress={() => setSortMenuVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Sırala"
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           >
             <Ionicons name="swap-vertical" size={18} color={colors.text.muted} />
             <Text style={styles.sortButtonText}>{getSortLabel()}</Text>

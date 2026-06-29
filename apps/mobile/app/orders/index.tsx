@@ -82,12 +82,17 @@ const getStatusText = (status: UiOrderStatus) =>
   uiOrderStatusConfig[status]?.label ?? String(status);
 
 // Rozet önceliği: aktif iade > iptal > normal durum.
-// - activeRefundRequest dolu → "İade Sürecinde" (sipariş 'delivered' kalsa bile).
+// - activeRefundRequest dolu ama tamamlanmadıysa → "İade Sürecinde" (sipariş
+//   'delivered' kalsa bile).
+// - İade TAMAMLANDIYSA (status 'refunded') → "İade Edildi"; aksi halde biten iade
+//   "İade Sürecinde" görünür (pickActiveRefundRequest biten talebi de döndürür).
 // - cancellationType === 'iptal' → "İptal Edildi" (status 'refunded' olsa bile
 //   "İade Edildi" DEME).
 // - Aksi halde siparişin kendi UI durumu.
 const badgeStatusOf = (o: any): string => {
-  if (o?.activeRefundRequest) return 'refund_requested';
+  if (o?.activeRefundRequest) {
+    return o.activeRefundRequest.status === 'refunded' ? 'refunded' : 'refund_requested';
+  }
   if (o?.cancellationType === 'iptal') return 'cancelled';
   return o?.status;
 };

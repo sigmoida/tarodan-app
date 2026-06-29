@@ -2,6 +2,12 @@ import { View, ScrollView, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { theme, Text, ScreenHeader } from '@tarodan/ui-native';
 import { useTranslation } from '../src/i18n';
+import {
+  RETURN_REQUEST_DAYS,
+  SUPPORT_PHONE,
+  COMPANY_INFO_EMAIL,
+  LEGAL_EMAIL,
+} from '../src/constants/legalFacts';
 
 const { colors } = theme;
 
@@ -19,8 +25,8 @@ export default function DistanceSalesScreen() {
         <Text style={styles.paragraph}>
           Unvan: Tarodan Teknoloji A.Ş.{'\n'}
           Adres: İstanbul, Türkiye{'\n'}
-          E-posta: info@tarodan.com{'\n'}
-          Telefon: 0850 123 4567
+          E-posta: {COMPANY_INFO_EMAIL}{'\n'}
+          Telefon: {SUPPORT_PHONE}
         </Text>
         <Text style={styles.subTitle}>ALICI</Text>
         <Text style={styles.paragraph}>
@@ -53,7 +59,7 @@ export default function DistanceSalesScreen() {
 
         <Text style={styles.sectionTitle}>Madde 6 — Cayma Hakkı</Text>
         <Text style={styles.paragraph}>
-          ALICI, ürünün kendisine veya gösterdiği adresteki kişi/kuruluşa teslim tarihinden itibaren 14 gün içinde, herhangi bir gerekçe göstermeksizin ve cezai şart ödemeksizin sözleşmeden cayma hakkına sahiptir.
+          ALICI, ürünün kendisine veya gösterdiği adresteki kişi/kuruluşa teslim tarihinden itibaren {RETURN_REQUEST_DAYS} gün içinde, herhangi bir gerekçe göstermeksizin ve cezai şart ödemeksizin sözleşmeden cayma hakkına sahiptir.
         </Text>
         <Text style={styles.paragraph}>
           Cayma hakkının kullanılması için bu süre içinde SATICI'ya bildirimde bulunulması zorunludur. Ürün, ambalajı açılmamış, kullanılmamış ve orijinal durumunda iade edilmelidir.
@@ -83,7 +89,7 @@ export default function DistanceSalesScreen() {
           ALICI, sipariş onayı ile birlikte işbu sözleşmenin tüm koşullarını kabul etmiş sayılır. SATICI, siparişin gerçekleşmesi ile sözleşme yükümlülüklerini yerine getirmeyi taahhüt eder.
         </Text>
 
-        <Text style={styles.contactInfo}>İletişim: legal@tarodan.com</Text>
+        <Text style={styles.contactInfo}>İletişim: {LEGAL_EMAIL}</Text>
 
         <View style={{ height: 40 }} />
       </ScrollView>

@@ -118,7 +118,7 @@ export default function ReportModal({
 
   return (
     <Modal isOpen={visible} onClose={handleClose} title={title}>
-      <ScrollView style={styles.scrollArea}>
+      <ScrollView style={styles.scrollArea} keyboardShouldPersistTaps="handled">
         <Text style={styles.targetInfo} numberOfLines={2}>{targetName}</Text>
 
         <Text style={styles.sectionTitle}>Raporlama Nedeni</Text>

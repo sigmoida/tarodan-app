@@ -5,7 +5,7 @@
  * Backend onay/iade aktarımı (escrow, transfer, webhook) backend-only.
  */
 import React from 'react';
-import { screen, fireEvent, waitFor } from '@testing-library/react-native';
+import { screen, fireEvent, waitFor, within } from '@testing-library/react-native';
 import { renderWithProviders } from '../../../src/test-utils';
 
 let mockParams: Record<string, string> = { id: 'order-1' };
@@ -226,5 +226,100 @@ describe('Üyelik/dijital sipariş — fiziksel ürün aksiyonları gizlenir', (
     );
     expect(screen.queryByText('Değerlendirme')).toBeNull();
     expect(screen.queryByTestId('refund-request-button')).toBeNull();
+  });
+});
+
+// BULGU #25 · Sipariş timeline'ı iade/iptal durumunu yansıtmalı; mutlu-yolda bitmemeli.
+// Ayrıca biten iade rozeti "İade Sürecinde" DEĞİL "İade Edildi" göstermeli (rozet/timeline
+// tutarlılığı) ve eklenen adımın tarihi '-' olmamalı (refundedAt activeRefundRequest'ten gelir).
+describe('B25 · Timeline iade/iptal yansıtması', () => {
+  beforeEach(() => {
+    getMock.mockReset();
+    mockParams = { id: 'order-1' };
+  });
+
+  it('B25.1 tamamlanmış iade → timeline "İade Tamamlandı" adımı + gerçek tarih (— değil)', async () => {
+    getMock.mockResolvedValue({
+      data: {
+        data: orderFixture({
+          status: 'refunded',
+          cancellationType: 'iade',
+          deliveredAt: new Date('2026-02-10').toISOString(),
+          activeRefundRequest: {
+            id: 'rr-1',
+            status: 'refunded',
+            createdAt: new Date('2026-02-20').toISOString(),
+            refundedAt: new Date('2026-02-25').toISOString(),
+          },
+        }),
+      },
+    });
+    renderWithProviders(<OrderDetailScreen />);
+    const step = await screen.findByTestId('order-refundcancel-timeline');
+    expect(within(step).getByText('İade Tamamlandı')).toBeOnTheScreen();
+    // Tarih bug'ı: refundedAt yanlış alandan okununca '-' görünüyordu.
+    expect(within(step).queryByText('-')).toBeNull();
+  });
+
+  it('B25.2 tamamlanmış iade rozeti "İade Edildi" der, "İade Sürecinde" DEMEZ', async () => {
+    getMock.mockResolvedValue({
+      data: {
+        data: orderFixture({
+          status: 'refunded',
+          cancellationType: 'iade',
+          activeRefundRequest: {
+            id: 'rr-1',
+            status: 'refunded',
+            createdAt: new Date('2026-02-20').toISOString(),
+            refundedAt: new Date('2026-02-25').toISOString(),
+          },
+        }),
+      },
+    });
+    renderWithProviders(<OrderDetailScreen />);
+    await waitFor(() =>
+      expect(screen.getByText('Sipariş #TRD-1001')).toBeOnTheScreen(),
+    );
+    expect(screen.getByText('İade Edildi')).toBeOnTheScreen();
+    expect(screen.queryByText('İade Sürecinde')).toBeNull();
+  });
+
+  it('B25.3 süren iade → rozet "İade Sürecinde" + timeline adımı görünür', async () => {
+    getMock.mockResolvedValue({
+      data: {
+        data: orderFixture({
+          status: 'delivered',
+          activeRefundRequest: {
+            id: 'rr-1',
+            status: 'pending_review',
+            createdAt: new Date('2026-02-20').toISOString(),
+          },
+        }),
+      },
+    });
+    renderWithProviders(<OrderDetailScreen />);
+    await waitFor(() =>
+      expect(screen.getByTestId('order-refundcancel-timeline')).toBeOnTheScreen(),
+    );
+    // Rozet "İade Sürecinde"; timeline adımı talep durumunu yansıtır (— değil).
+    expect(screen.getByText('İade Sürecinde')).toBeOnTheScreen();
+    const step = screen.getByTestId('order-refundcancel-timeline');
+    expect(within(step).queryByText('-')).toBeNull();
+  });
+
+  it('B25.4 iptal edilmiş sipariş → timeline "İptal Edildi" adımı gösterir', async () => {
+    getMock.mockResolvedValue({
+      data: {
+        data: orderFixture({
+          status: 'cancelled',
+          cancellationType: 'iptal',
+          cancelledAt: new Date('2026-02-05').toISOString(),
+        }),
+      },
+    });
+    renderWithProviders(<OrderDetailScreen />);
+    const step = await screen.findByTestId('order-refundcancel-timeline');
+    expect(within(step).getByText('İptal Edildi')).toBeOnTheScreen();
+    expect(within(step).queryByText('-')).toBeNull();
   });
 });

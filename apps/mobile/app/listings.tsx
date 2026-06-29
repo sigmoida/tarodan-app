@@ -183,12 +183,24 @@ export default function ListingsScreen() {
           containerStyle={styles.searchBar}
         />
         <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.sortButton} onPress={() => setSortMenuVisible(true)}>
+          <TouchableOpacity
+            style={styles.sortButton}
+            onPress={() => setSortMenuVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Sırala"
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
             <Ionicons name="swap-vertical" size={18} color={colors.text.muted} />
             <Text style={styles.sortButtonText}>{getSortLabel()}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.filterButton} onPress={() => setFilterModalVisible(true)}>
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={() => setFilterModalVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Filtreler"
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
             <Ionicons name="options-outline" size={18} color={colors.text.muted} />
             <Text style={styles.filterButtonText}>Filtreler</Text>
             {activeFilterCount > 0 && (

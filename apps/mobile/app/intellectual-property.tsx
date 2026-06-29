@@ -2,6 +2,7 @@ import { View, ScrollView, StyleSheet } from 'react-native';
 import { theme, Text, ScreenHeader } from '@tarodan/ui-native';
 import { router } from 'expo-router';
 import { useTranslation } from '../src/i18n';
+import { IP_EMAIL } from '../src/constants/legalFacts';
 
 const { colors } = theme;
 
@@ -70,7 +71,7 @@ export default function IntellectualPropertyScreen() {
         <Text style={styles.paragraph}>
           Fikri mülkiyet bildirimleri için:
         </Text>
-        <Text style={styles.contactInfo}>E-posta: ip@tarodan.com</Text>
+        <Text style={styles.contactInfo}>E-posta: {IP_EMAIL}</Text>
         <Text style={styles.contactInfo}>Adres: İstanbul, Türkiye</Text>
 
         <View style={{ height: 40 }} />

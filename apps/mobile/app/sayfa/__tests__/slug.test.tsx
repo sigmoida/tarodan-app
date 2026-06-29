@@ -1,6 +1,7 @@
 /**
  * J126 · CMS statik sayfa (slug) — mobil UI dilimi.
- * Sayfa başlığı render (ScreenHeader), var olmayan/yüklenemeyen slug → "Sayfa bulunamadı".
+ * Sayfa başlığı render (ScreenHeader), var olmayan slug (404) → "Sayfa bulunamadı.",
+ * diğer yükleme hataları → "Sayfa yüklenirken bir hata oluştu.".
  * İçerik HTML'i WebView içinde render edildiğinden (görsel), backend içerik gövdesi backend-only.
  */
 import React from 'react';
@@ -10,6 +11,7 @@ import { renderWithProviders } from '../../../src/test-utils';
 let mockParams: Record<string, string> = { slug: 'gizlilik' };
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
+  router: { canGoBack: jest.fn(() => false), back: jest.fn(), replace: jest.fn() },
 }));
 
 // WebView görseli text olarak query edilemez; basit stub yeterli.
@@ -42,15 +44,15 @@ describe('J126 · CMS statik sayfa (slug)', () => {
     );
   });
 
-  it('J126.2 var olmayan slug (404) → "Sayfa bulunamadı"', async () => {
+  it('J126.2 var olmayan slug (404) → "Sayfa bulunamadı."', async () => {
     getBySlugMock.mockRejectedValue({ response: { status: 404 } });
     renderWithProviders(<CMSPageScreen />);
-    expect(await screen.findByText('Sayfa bulunamadı')).toBeOnTheScreen();
+    expect(await screen.findByText('Sayfa bulunamadı.')).toBeOnTheScreen();
   });
 
-  it('J126.3 yükleme hatası → "Sayfa bulunamadı" durumu', async () => {
+  it('J126.3 yükleme hatası (404 dışı) → "Sayfa yüklenirken bir hata oluştu."', async () => {
     getBySlugMock.mockRejectedValue(new Error('500'));
     renderWithProviders(<CMSPageScreen />);
-    expect(await screen.findByText('Sayfa bulunamadı')).toBeOnTheScreen();
+    expect(await screen.findByText('Sayfa yüklenirken bir hata oluştu.')).toBeOnTheScreen();
   });
 });

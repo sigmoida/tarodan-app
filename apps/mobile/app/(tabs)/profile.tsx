@@ -632,7 +632,7 @@ export default function ProfileScreen() {
             icon="diamond-outline"
             label="Üyelik Planı"
             onPress={() => router.push('/membership')}
-            rightSlot={isPaidTier ? <Badge variant="primary">PRO</Badge> : null}
+            rightSlot={isPaidTier ? <Badge variant="primary">{tierLabel}</Badge> : null}
           />
           <MenuItem
             icon="notifications-outline"
@@ -678,6 +678,27 @@ export default function ProfileScreen() {
             icon="information-circle-outline"
             label="Hakkında"
             onPress={() => router.push('/about')}
+          />
+        </View>
+
+        <View style={styles.menuSection}>
+          <Text variant="overline" tone="muted" style={{ marginBottom: spacing[3] }}>
+            Bilgi
+          </Text>
+          <MenuItem
+            icon="shield-checkmark-outline"
+            label="Orijinallik Garantisi"
+            onPress={() => router.push('/authenticity')}
+          />
+          <MenuItem
+            icon="book-outline"
+            label="Koleksiyoner Rehberi"
+            onPress={() => router.push('/collectors-guide')}
+          />
+          <MenuItem
+            icon="receipt-outline"
+            label="Platform Hizmet Bedeli"
+            onPress={() => router.push('/platform-hizmet-bedeli')}
           />
         </View>
 

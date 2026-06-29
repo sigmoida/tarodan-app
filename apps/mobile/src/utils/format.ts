@@ -81,6 +81,7 @@ export function formatOrderStatus(status: string | null | undefined, locale: str
     'in_transit': { tr: 'Yolda', en: 'In Transit' },
     'out_for_delivery': { tr: 'Dağıtımda', en: 'Out for Delivery' },
     'delivered': { tr: 'Teslim Edildi', en: 'Delivered' },
+    'awaiting_buyer_confirmation': { tr: 'Alıcı Onayı Bekleniyor', en: 'Awaiting Buyer Confirmation' },
     'completed': { tr: 'Tamamlandı', en: 'Completed' },
     'cancelled': { tr: 'İptal Edildi', en: 'Cancelled' },
     'refund_requested': { tr: 'İade Talep Edildi', en: 'Refund Requested' },

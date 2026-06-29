@@ -23,11 +23,11 @@ jest.mock('../../../src/stores/authStore', () => ({
 
 jest.mock('../../../src/services/api', () => ({
   api: { get: jest.fn() },
-  membershipApi: { getCurrentMembership: jest.fn() },
+  membershipApi: { getCurrentMembership: jest.fn(), getTiers: jest.fn() },
 }));
-import { api, membershipApi } from '../../../src/services/api';
+import { membershipApi } from '../../../src/services/api';
 const mockGetMembership = membershipApi.getCurrentMembership as jest.Mock;
-const mockApiGet = api.get as jest.Mock;
+const mockGetTiers = membershipApi.getTiers as jest.Mock;
 
 import MembershipScreen from '../index';
 
@@ -36,7 +36,7 @@ describe('J108 · üyelik paket görünürlük/erişim', () => {
     resetRouterMocks();
     mockAuthState = { isAuthenticated: true, user: {} };
     mockGetMembership.mockResolvedValue({ data: { tier: { type: 'free', name: 'Ücretsiz' } } });
-    mockApiGet.mockResolvedValue({ data: {} });
+    mockGetTiers.mockResolvedValue({ data: [] });
   });
 
   it('J108.1 bireysel free hesapta Business kartı render edilmez', async () => {

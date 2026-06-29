@@ -2,6 +2,13 @@ import { View, ScrollView, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { theme, Text, ScreenHeader } from '@tarodan/ui-native';
 import { useTranslation } from '../src/i18n';
+import {
+  RETURN_REQUEST_DAYS,
+  REFUND_PAYOUT_DAYS,
+  DAMAGE_REPORT_DAYS,
+  SUPPORT_EMAIL,
+  SUPPORT_PHONE,
+} from '../src/constants/legalFacts';
 
 const { colors } = theme;
 
@@ -16,11 +23,11 @@ export default function RefundPolicyScreen() {
 
         <Text style={styles.sectionTitle}>1. Genel İade Koşulları</Text>
         <Text style={styles.paragraph}>
-          Tarodan platformu üzerinden satın aldığınız ürünleri, teslim tarihinden itibaren 14 gün içinde iade edebilirsiniz. İade hakkınız, 6502 sayılı Tüketicinin Korunması Hakkında Kanun kapsamında güvence altındadır.
+          Tarodan platformu üzerinden satın aldığınız ürünleri, teslim tarihinden itibaren {RETURN_REQUEST_DAYS} gün içinde iade edebilirsiniz. İade hakkınız, 6502 sayılı Tüketicinin Korunması Hakkında Kanun kapsamında güvence altındadır.
         </Text>
 
         <Text style={styles.sectionTitle}>2. İade Şartları</Text>
-        <Text style={styles.listItem}>• Ürün, teslim tarihinden itibaren 14 gün içinde iade talebi oluşturulmalıdır</Text>
+        <Text style={styles.listItem}>• Ürün, teslim tarihinden itibaren {RETURN_REQUEST_DAYS} gün içinde iade talebi oluşturulmalıdır</Text>
         <Text style={styles.listItem}>• Ürün kullanılmamış ve orijinal ambalajında olmalıdır</Text>
         <Text style={styles.listItem}>• Ürün etiketi ve aksesuarları eksiksiz olmalıdır</Text>
         <Text style={styles.listItem}>• Diecast model araçlarda kutu ve iç ambalaj hasar görmemiş olmalıdır</Text>
@@ -37,22 +44,22 @@ export default function RefundPolicyScreen() {
         </Text>
         <Text style={styles.subTitle}>Adım 3: Ürün Gönderimi</Text>
         <Text style={styles.paragraph}>
-          Ürünü orijinal ambalajında, belirtilen kargo kodu ile 3 iş günü içinde gönderin.
+          Ürünü orijinal ambalajında, size iletilen kargo kodu ile en kısa sürede gönderin.
         </Text>
         <Text style={styles.subTitle}>Adım 4: İade Onayı ve Ödeme</Text>
         <Text style={styles.paragraph}>
-          Satıcı ürünü teslim alıp kontrol ettikten sonra iade tutarı 3-5 iş günü içinde ödeme yönteminize iade edilir.
+          Satıcı ürünü teslim alıp kontrol ettikten sonra iade tutarı {REFUND_PAYOUT_DAYS} gün içinde ödeme yönteminize iade edilir.
         </Text>
 
         <Text style={styles.sectionTitle}>4. İade Edilemeyen Ürünler</Text>
         <Text style={styles.listItem}>• Ambalajı açılmış ve hasar görmüş ürünler</Text>
         <Text style={styles.listItem}>• Kişiye özel hazırlanmış (custom) ürünler</Text>
-        <Text style={styles.listItem}>• 14 günlük süreyi aşmış talepler</Text>
+        <Text style={styles.listItem}>• {RETURN_REQUEST_DAYS} günlük süreyi aşmış talepler</Text>
         <Text style={styles.listItem}>• Satıcı tarafından "iade kabul edilmez" olarak işaretlenmiş özel ürünler (detaylar ürün sayfasında belirtilir)</Text>
 
         <Text style={styles.sectionTitle}>5. Hasarlı veya Hatalı Ürün</Text>
         <Text style={styles.paragraph}>
-          Ürünün hasarlı, hatalı veya açıklamaya uygun olmadığını tespit ederseniz, teslim tarihinden itibaren 3 gün içinde fotoğraflı bildirimde bulunun. Bu durumda kargo ücreti satıcıya aittir ve tam iade yapılır.
+          Ürünün hasarlı, hatalı veya açıklamaya uygun olmadığını tespit ederseniz, teslim tarihinden itibaren {DAMAGE_REPORT_DAYS} gün içinde fotoğraflı bildirimde bulunun. Bu durumda kargo ücreti satıcıya aittir ve tam iade yapılır.
         </Text>
 
         <Text style={styles.sectionTitle}>6. Kargo Ücreti</Text>
@@ -70,8 +77,8 @@ export default function RefundPolicyScreen() {
           İade sürecinde satıcı ile anlaşmazlık yaşarsanız, destek ekibimize başvurabilirsiniz. Platform, arabuluculuk yaparak en adil çözümü sağlamaya çalışır.
         </Text>
 
-        <Text style={styles.contactInfo}>E-posta: destek@tarodan.com</Text>
-        <Text style={styles.contactInfo}>Telefon: 0850 123 4567</Text>
+        <Text style={styles.contactInfo}>E-posta: {SUPPORT_EMAIL}</Text>
+        <Text style={styles.contactInfo}>Telefon: {SUPPORT_PHONE}</Text>
 
         <View style={{ height: 40 }} />
       </ScrollView>

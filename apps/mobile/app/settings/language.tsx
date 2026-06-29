@@ -20,13 +20,13 @@ export default function LanguageSettingsScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title={t('settings.language') || 'Dil / Language'} />
+      <ScreenHeader title={t('language.language') || 'Dil / Language'} />
 
       <ScrollView contentContainerStyle={styles.scrollBody}>
         <View style={styles.infoCard}>
           <Ionicons name="language" size={18} color={colors.primary[600]!} />
           <Text style={styles.infoText}>
-            {t('settings.languageInfo') ||
+            {t('language.languageInfo') ||
               'Uygulama dilini değiştirdiğinizde tüm menü ve bildirimler seçtiğiniz dile geçer.'}
           </Text>
         </View>

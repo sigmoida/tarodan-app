@@ -1,24 +1,17 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
+import { Avatar, Badge, Input, Spinner, Text, theme, ScreenHeader } from '@tarodan/ui-native';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import {
-  Avatar,
-  Badge,
-  Input,
-  ScreenHeader,
-  Spinner,
-  Text,
-  theme,
-} from '@tarodan/ui-native';
-import { useMessagesStore } from '../../src/stores/messagesStore';
+import { useMessagesStore, MessageThread } from '../../src/stores/messagesStore';
 import { useAuthStore } from '../../src/stores/authStore';
 import { formatMessagePreview } from '../../src/utils/contentFilter';
-import { TarodanColors } from '../../src/theme';
+import { useTranslation } from '../../src/i18n';
 
 const { colors } = theme;
 
 export default function MessagesTabScreen() {
+  const { t } = useTranslation();
   const { isAuthenticated, user, limits } = useAuthStore();
   const { threads, isLoading, hasLoadedThreads, fetchThreads, getUnreadCount, getOtherParticipant, dailyMessageCount } = useMessagesStore();
   const [refreshing, setRefreshing] = useState(false);
@@ -44,7 +37,7 @@ export default function MessagesTabScreen() {
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    
+
     if (days === 0) {
       return date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
     } else if (days === 1) {
@@ -56,39 +49,50 @@ export default function MessagesTabScreen() {
     }
   };
 
+  // Güvenli participant helper - store'dan gelen null/undefined durumlarını yakala
+  const safeGetOther = (thread: MessageThread) => {
+    try {
+      const result = getOtherParticipant(thread);
+      if (!result) {
+        return { id: '', displayName: 'Kullanıcı', avatarUrl: null };
+      }
+      return {
+        id: result.id || '',
+        displayName: result.displayName || 'Kullanıcı',
+        avatarUrl: result.avatarUrl || null,
+      };
+    } catch {
+      return { id: '', displayName: 'Kullanıcı', avatarUrl: null };
+    }
+  };
+
   const filteredThreads = threads.filter(thread => {
     if (!searchQuery) return true;
-    const other = getOtherParticipant(thread);
-    return (other?.displayName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-           thread.product?.title?.toLowerCase().includes(searchQuery.toLowerCase());
+    const other = safeGetOther(thread);
+    return other.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           (thread.product?.title || '').toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   const unreadCount = getUnreadCount();
   const messageLimit = limits?.maxMessagesPerDay || 50;
   const isUnlimited = messageLimit === -1;
 
-  const handleBack = () => {
-    if (router.canGoBack()) router.back();
-    else router.replace('/(tabs)');
-  };
-
   // Not authenticated
   if (!isAuthenticated) {
     return (
       <View style={styles.container}>
-        <ScreenHeader title="Mesajlar" onBack={handleBack} />
+        <ScreenHeader title={t('mobile.messagesTitle')} showBack={false} />
         <View style={styles.centeredContainer}>
           <Ionicons name="chatbubbles-outline" size={64} color={colors.primary[600]!} />
-          <Text variant="h2" style={styles.title}>
-            Mesajlar
-          </Text>
-          <Text variant="body" tone="muted" align="center" style={styles.subtitle}>
+          <Text variant="h3" style={styles.title}>{t("mobile.messagesTitle")}</Text>
+          <Text variant="body" style={styles.subtitle}>
             Mesajlarınızı görmek için giriş yapın
           </Text>
-          <TouchableOpacity style={styles.loginButton} onPress={() => router.push('/(auth)/login')}>
-            <Text variant="body" tone="inverted" weight="semibold">
-              Giriş Yap
-            </Text>
+          <TouchableOpacity
+            style={styles.loginButton}
+            onPress={() => router.push('/(auth)/login')}
+          >
+            <Text style={styles.loginButtonText}>Giriş Yap</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -97,33 +101,26 @@ export default function MessagesTabScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerSide} />
-        <Text variant="h3" tone="inverted" weight="bold">
-          Mesajlar
-        </Text>
-        <View style={styles.headerSide}>
-          {unreadCount > 0 && (
-            <Badge variant="danger" style={styles.headerBadge}>
-              {unreadCount}
-            </Badge>
-          )}
-        </View>
-      </View>
+      <ScreenHeader
+        title={t('mobile.messagesTitle')}
+        showBack={false}
+        right={
+          unreadCount > 0 ? (
+            <Badge variant="danger" style={styles.headerBadge}>{unreadCount}</Badge>
+          ) : undefined
+        }
+      />
 
       {/* Message Limit Banner */}
       {!isUnlimited && dailyMessageCount >= messageLimit - 10 && (
         <View style={styles.limitBanner}>
           <Ionicons name="information-circle" size={20} color={colors.warning[600]!} />
-          <Text variant="bodySm" tone="warning" style={styles.limitText}>
+          <Text style={styles.limitText}>
             Günlük mesaj: {dailyMessageCount}/{messageLimit}
           </Text>
           {dailyMessageCount >= messageLimit && (
-            <TouchableOpacity onPress={() => router.push('/pricing')}>
-              <Text variant="bodySm" tone="primary" weight="semibold">
-                Premium'a Geç
-              </Text>
+            <TouchableOpacity onPress={() => router.push('/upgrade')}>
+              <Text style={styles.upgradeLink}>Premium'a Geç</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -132,30 +129,25 @@ export default function MessagesTabScreen() {
       {/* Search */}
       <View style={styles.searchContainer}>
         <Input
-          placeholder="Mesajlarda ara..."
+          placeholder={t("mobile.searchInMessages")}
           value={searchQuery}
           onChangeText={setSearchQuery}
           leftIconName="search"
         />
       </View>
 
-      {/* Content — ilk yükleme bitene dek spinner; "Henüz mesaj yok" boş ekranı
-          fetch başlamadan bir an çakıp zıplamaya yol açmasın. */}
+      {/* Content — ilk yükleme bitene dek spinner; boş ekran bir an çakmasın. */}
       {threads.length === 0 && (isLoading || !hasLoadedThreads) ? (
         <View style={styles.loadingContainer}>
           <Spinner size="lg" />
         </View>
       ) : filteredThreads.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons
-            name="chatbubble-ellipses-outline"
-            size={80}
-            color={colors.text.subtle}
-          />
-          <Text variant="h3" align="center" style={styles.emptyTitle}>
+          <Ionicons name="chatbubble-ellipses-outline" size={80} color={colors.text.subtle} />
+          <Text variant="h3" style={styles.emptyTitle}>
             {searchQuery ? 'Sonuç bulunamadı' : 'Henüz mesaj yok'}
           </Text>
-          <Text variant="body" tone="muted" align="center">
+          <Text variant="body" style={styles.emptySubtitle}>
             {searchQuery
               ? 'Farklı bir arama terimi deneyin'
               : 'Bir satıcıyla iletişime geçerek başlayın'}
@@ -165,17 +157,13 @@ export default function MessagesTabScreen() {
         <ScrollView
           style={styles.threadsList}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={[colors.primary[600]!]}
-            />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary[600]!]} />
           }
         >
           {filteredThreads.map((thread) => {
-            const other = getOtherParticipant(thread);
+            const other = safeGetOther(thread);
             const hasUnread = thread.unreadCount > 0;
-            
+
             return (
               <TouchableOpacity
                 key={thread.id}
@@ -184,54 +172,52 @@ export default function MessagesTabScreen() {
               >
                 <View style={styles.avatarContainer}>
                   <Avatar
-                    size="lg"
-                    source={other?.avatarUrl}
-                    name={other?.displayName || 'Kullanıcı'}
+                    size="md"
+                    source={other.avatarUrl || undefined}
+                    name={other.displayName.charAt(0).toUpperCase()}
                   />
-                  {hasUnread && <View style={styles.unreadDot} />}
+                  {hasUnread && (
+                    <View style={styles.unreadDot} />
+                  )}
                 </View>
 
                 <View style={styles.threadContent}>
                   <View style={styles.threadHeader}>
                     <Text
                       variant="label"
-                      weight={hasUnread ? 'bold' : 'semibold'}
+                      style={[styles.participantName, hasUnread && styles.unreadText]}
                       numberOfLines={1}
-                      style={styles.participantName}
                     >
-                      {other?.displayName || 'Kullanıcı'}
+                      {other.displayName}
                     </Text>
-                    <Text variant="caption" tone="muted" style={styles.threadTime}>
-                      {thread.lastMessage
-                        ? formatTime(thread.lastMessage.createdAt)
-                        : formatTime(thread.createdAt)}
+                    <Text variant="caption" style={styles.threadTime}>
+                      {thread.lastMessage ? formatTime(thread.lastMessage.createdAt) : formatTime(thread.createdAt)}
                     </Text>
                   </View>
 
+                  {/* Product reference — ürünsüz (genel) sohbette de bağlam göster
+                      ki aynı kişiyle ürün başına ayrı thread'ler karışmasın. */}
                   {thread.product ? (
                     <View style={styles.productRef}>
                       <Ionicons name="pricetag" size={12} color={colors.primary[600]!} />
-                      <Text variant="caption" tone="primary" numberOfLines={1} style={styles.productRefText}>
+                      <Text variant="caption" style={styles.productRefText} numberOfLines={1}>
                         {thread.product.title}
                       </Text>
                     </View>
                   ) : (
-                    // Ürünsüz (genel) sohbet — aynı kişiyle ürün başına ayrı thread'ler
-                    // olduğunda satırlar ayırt edilebilsin diye her zaman bir bağlam göster.
                     <View style={styles.productRef}>
                       <Ionicons name="chatbubble-ellipses-outline" size={12} color={colors.text.subtle} />
-                      <Text variant="caption" tone="muted" numberOfLines={1} style={styles.productRefText}>
+                      <Text variant="caption" tone="muted" style={styles.productRefText} numberOfLines={1}>
                         Genel mesaj
                       </Text>
                     </View>
                   )}
 
+                  {/* Last message preview */}
                   <Text
-                    variant="bodySm"
-                    tone={hasUnread ? 'heading' : 'muted'}
-                    weight={hasUnread ? 'semibold' : 'regular'}
+                    variant="caption"
+                    style={[styles.lastMessage, hasUnread && styles.unreadText]}
                     numberOfLines={1}
-                    style={styles.lastMessage}
                   >
                     {thread.lastMessage?.senderId === user?.id ? 'Sen: ' : ''}
                     {formatMessagePreview(thread.lastMessage?.content ?? '') || 'Henüz mesaj yok'}
@@ -239,9 +225,7 @@ export default function MessagesTabScreen() {
                 </View>
 
                 {hasUnread && (
-                  <Badge variant="primary" style={styles.unreadBadge}>
-                    {thread.unreadCount}
-                  </Badge>
+                  <Badge variant="primary" style={styles.unreadBadge}>{thread.unreadCount}</Badge>
                 )}
               </TouchableOpacity>
             );
@@ -257,7 +241,7 @@ export default function MessagesTabScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: colors.surface.DEFAULT,
   },
   centeredContainer: {
     flex: 1,
@@ -265,28 +249,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 32,
   },
-  header: {
-    // Ana sayfa header'ı ile aynı turuncu (colors.primary[600]).
-    backgroundColor: colors.primary[600]!,
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: TarodanColors.textOnPrimary,
-  },
-  headerSide: {
-    flex: 1,
-    justifyContent: 'center',
-  },
   headerBadge: {
     marginLeft: 8,
-    backgroundColor: TarodanColors.error,
   },
   title: {
     marginTop: 16,
@@ -295,41 +259,38 @@ const styles = StyleSheet.create({
   subtitle: {
     textAlign: 'center',
     marginBottom: 24,
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   loginButton: {
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     paddingHorizontal: 32,
     paddingVertical: 12,
     borderRadius: 8,
   },
   loginButtonText: {
-    color: TarodanColors.textOnPrimary,
+    color: colors.white,
     fontWeight: '600',
   },
   limitBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.warningLight,
+    backgroundColor: colors.warning[50]!,
     padding: 12,
     gap: 8,
   },
   limitText: {
     flex: 1,
-    color: TarodanColors.warning,
+    color: colors.warning[600]!,
     fontSize: 13,
   },
   upgradeLink: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     fontWeight: '600',
     fontSize: 13,
   },
   searchContainer: {
     padding: 12,
-    backgroundColor: TarodanColors.background,
-  },
-  searchbar: {
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: colors.surface.DEFAULT,
   },
   loadingContainer: {
     flex: 1,
@@ -345,11 +306,11 @@ const styles = StyleSheet.create({
   emptyTitle: {
     marginTop: 16,
     marginBottom: 8,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   emptySubtitle: {
     textAlign: 'center',
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
   },
   threadsList: {
     flex: 1,
@@ -359,11 +320,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: TarodanColors.border,
-    backgroundColor: TarodanColors.background,
+    borderBottomColor: colors.border.DEFAULT,
+    backgroundColor: colors.surface.DEFAULT,
   },
   threadItemUnread: {
-    backgroundColor: TarodanColors.primaryLight + '10',
+    backgroundColor: colors.primary[50]!,
   },
   avatarContainer: {
     position: 'relative',
@@ -375,9 +336,9 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: colors.primary[600]!,
     borderWidth: 2,
-    borderColor: TarodanColors.background,
+    borderColor: colors.surface.DEFAULT,
   },
   threadContent: {
     flex: 1,
@@ -390,10 +351,10 @@ const styles = StyleSheet.create({
   },
   participantName: {
     flex: 1,
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   threadTime: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginLeft: 8,
   },
   productRef: {
@@ -402,20 +363,19 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   productRefText: {
-    color: TarodanColors.primary,
+    color: colors.primary[600]!,
     marginLeft: 4,
     fontSize: 12,
   },
   lastMessage: {
-    color: TarodanColors.textSecondary,
+    color: colors.text.muted,
     marginTop: 4,
   },
   unreadText: {
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: colors.text.heading,
   },
   unreadBadge: {
-    backgroundColor: TarodanColors.primary,
     marginLeft: 8,
   },
 });

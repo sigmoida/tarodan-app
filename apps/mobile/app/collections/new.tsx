@@ -141,7 +141,7 @@ export default function NewCollectionScreen() {
           </View>
 
           <Button variant="primary" title="Premium'a Yükselt" onPress={() => router.push('/upgrade')} style={styles.upgradeButton} />
-          <Button variant="ghost" title="Geri Dön" onPress={() => router.back()} />
+          <Button variant="ghost" title="Geri Dön" onPress={() => router.back()} style={{ alignSelf: 'center' }} />
         </View>
       </View>
     );

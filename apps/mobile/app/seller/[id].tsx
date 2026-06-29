@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Dimensions, Image, Pressable } from 'react-native';
-import { Avatar, Button, Card, Spinner, Text, theme, ScreenHeader } from '@tarodan/ui-native';
+import { Avatar, Button, Card, Spinner, Text, theme, ScreenHeader, EmptyState } from '@tarodan/ui-native';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -118,16 +118,13 @@ export default function SellerProfileScreen() {
 
   if (!seller) {
     return (
-      <View style={styles.loadingContainer}>
-        <Ionicons name="person-outline" size={64} color={colors.text.muted} />
-        <Text style={styles.loadingText}>Satıcı bulunamadı</Text>
-        <Button
-          variant="primary"
-          title="Geri Dön"
-          onPress={() => router.back()}
-          style={{ marginTop: 16 }}
-        />
-      </View>
+      <EmptyState
+        fullscreen
+        icon="person-outline"
+        title="Satıcı bulunamadı"
+        actionLabel="Geri Dön"
+        onAction={() => router.back()}
+      />
     );
   }
 

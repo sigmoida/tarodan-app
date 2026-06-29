@@ -193,7 +193,7 @@ export default function BuyerRefundRequestsScreen() {
                             ],
                           )
                         }
-                        isLoading={cancelMutation.isPending}
+                        isLoading={cancelMutation.isPending && cancelMutation.variables === rr.id}
                         style={styles.actionBtn}
                       />
                     </View>

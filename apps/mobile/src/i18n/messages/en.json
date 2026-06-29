@@ -955,6 +955,7 @@
   },
   "language": {
     "language": "Language",
+    "languageInfo": "When you change the app language, all menus and notifications switch to your selected language.",
     "turkish": "Türkçe",
     "english": "English",
     "selectLanguage": "Select Language"

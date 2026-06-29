@@ -3,14 +3,14 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme, Text, Card, ScreenHeader } from '@tarodan/ui-native';
 import { useTranslation } from '../src/i18n';
+import { RETURN_REQUEST_DAYS, REFUND_PAYOUT_DAYS } from '../src/constants/legalFacts';
 
 const { colors } = theme;
 
 const sections = [
   {
     title: 'İade Politikası',
-    content:
-      'Tarodan üzerinden satın aldığınız ürünleri, teslim tarihinden itibaren 14 gün içinde iade edebilirsiniz. İade edilecek ürünlerin kullanılmamış ve orijinal ambalajında olması gerekmektedir.',
+    content: `Tarodan üzerinden satın aldığınız ürünleri, teslim tarihinden itibaren ${RETURN_REQUEST_DAYS} gün içinde iade edebilirsiniz. İade edilecek ürünlerin kullanılmamış ve orijinal ambalajında olması gerekmektedir.`,
   },
   {
     title: 'İade Süreci',
@@ -19,8 +19,7 @@ const sections = [
   },
   {
     title: 'İade Süreleri',
-    content:
-      'İade talebinizin onaylanmasından sonra ürünü 7 iş günü içinde kargoya vermeniz gerekmektedir. Ürün tarafımıza ulaştıktan sonra iade tutarı 3-5 iş günü içinde hesabınıza aktarılır.',
+    content: `İade talebinizin onaylanmasından sonra ürünü, size iletilen kargo koduyla en kısa sürede kargoya verin. Ürün satıcıya ulaştıktan sonra iade tutarı ${REFUND_PAYOUT_DAYS} gün içinde hesabınıza aktarılır.`,
   },
 ];
 

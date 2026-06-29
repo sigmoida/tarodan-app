@@ -1,9 +1,10 @@
 import { View, ScrollView, StyleSheet } from 'react-native';
-import { Stack, router } from 'expo-router';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TouchableOpacity } from 'react-native';
-import { theme, Text, Card } from '@tarodan/ui-native';
+import { theme, Text, Card, ScreenHeader } from '@tarodan/ui-native';
 import { useTranslation } from '../src/i18n';
+import { SUPPORT_EMAIL } from '../src/constants/legalFacts';
 
 const { colors } = theme;
 
@@ -41,7 +42,7 @@ const sections = [
   {
     title: '7. İletişim',
     icon: 'mail-outline' as const,
-    content: 'destek@tarodan.com – konu: "Alıcı Koruma – Sipariş No"',
+    content: `${SUPPORT_EMAIL} – konu: "Alıcı Koruma – Sipariş No"`,
   },
 ];
 
@@ -49,7 +50,10 @@ export default function BuyerProtectionScreen() {
   const { t } = useTranslation();
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: t('mobile.pageBuyerProtection') }} />
+      <ScreenHeader
+        title={t('mobile.pageBuyerProtection')}
+        onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
+      />
 
       <View style={styles.hero}>
         <Ionicons name="shield-checkmark" size={40} color={colors.white} />

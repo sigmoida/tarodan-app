@@ -1,5 +1,5 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { theme, Button, Switch, Snackbar, IconButton, Spinner, Text, Input, Textarea, appAlert } from '@tarodan/ui-native';
+import { theme, Button, Switch, Snackbar, IconButton, Spinner, Text, Input, Textarea, appAlert, EmptyState } from '@tarodan/ui-native';
 import { useState, useEffect } from 'react';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
@@ -190,20 +190,26 @@ export default function EditCollectionScreen() {
 
   if (!collection) {
     return (
-      <View style={styles.errorContainer}>
-        <Text>Koleksiyon bulunamadı</Text>
-        <Button variant="primary" title="Geri Dön" onPress={() => router.back()} />
-      </View>
+      <EmptyState
+        fullscreen
+        icon="albums-outline"
+        title="Koleksiyon bulunamadı"
+        actionLabel="Geri Dön"
+        onAction={() => router.back()}
+      />
     );
   }
 
   // Check ownership
   if (collection && user && collection.userId !== user.id) {
     return (
-      <View style={styles.errorContainer}>
-        <Text>Bu koleksiyonu düzenleme yetkiniz yok</Text>
-        <Button variant="primary" title="Geri Dön" onPress={() => router.back()} />
-      </View>
+      <EmptyState
+        fullscreen
+        icon="lock-closed-outline"
+        title="Bu koleksiyonu düzenleme yetkiniz yok"
+        actionLabel="Geri Dön"
+        onAction={() => router.back()}
+      />
     );
   }
 
@@ -407,12 +413,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 16,
   },
   content: {
     flex: 1,

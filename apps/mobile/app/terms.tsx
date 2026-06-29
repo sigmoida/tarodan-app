@@ -2,6 +2,7 @@ import { View, ScrollView, StyleSheet } from 'react-native';
 import { theme, Text, ScreenHeader } from '@tarodan/ui-native';
 import { router } from 'expo-router';
 import { useTranslation } from '../src/i18n';
+import { LEGAL_EMAIL } from '../src/constants/legalFacts';
 
 const { colors } = theme;
 
@@ -96,7 +97,7 @@ export default function TermsOfServiceScreen() {
         <Text style={styles.paragraph}>
           Sorularınız için bizimle iletişime geçebilirsiniz:
         </Text>
-        <Text style={styles.contactInfo}>E-posta: legal@tarodan.com</Text>
+        <Text style={styles.contactInfo}>E-posta: {LEGAL_EMAIL}</Text>
         <Text style={styles.contactInfo}>Adres: İstanbul, Türkiye</Text>
 
         <View style={{ height: 40 }} />

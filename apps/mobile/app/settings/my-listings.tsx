@@ -309,7 +309,7 @@ export default function MyListingsScreen() {
           <View>
             <Text variant="h3">İlan Kullanımı</Text>
             <Text variant="bodySm" style={{ color: colors.text.muted }}>
-              {listingLimit === -1 ? 'Sınırsız' : `${currentCount}/${listingLimit} aktif ilan`}
+              {listingLimit === -1 ? 'Sınırsız' : `${currentCount}/${listingLimit} ilan hakkı kullanıldı`}
             </Text>
           </View>
           {listingLimit !== -1 && currentCount >= listingLimit - 2 && (

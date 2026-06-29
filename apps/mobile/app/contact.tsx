@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { theme, Button, Card, Snackbar, Text, Input, Textarea, ScreenHeader } from '@tarodan/ui-native';
 import { supportApi } from '../src/services/api';
 import { useTranslation } from '../src/i18n';
+import { SUPPORT_EMAIL, SUPPORT_PHONE, SUPPORT_WHATSAPP } from '../src/constants/legalFacts';
 
 const { colors } = theme;
 
@@ -55,19 +56,19 @@ export default function ContactScreen() {
     {
       icon: 'mail-outline',
       title: 'E-posta',
-      value: 'destek@tarodan.com',
-      action: () => Linking.openURL('mailto:destek@tarodan.com'),
+      value: SUPPORT_EMAIL,
+      action: () => Linking.openURL(`mailto:${SUPPORT_EMAIL}`),
     },
     {
       icon: 'call-outline',
       title: 'Telefon',
-      value: '+90 212 XXX XX XX',
+      value: SUPPORT_PHONE,
       action: () => Linking.openURL('tel:+902121234567'),
     },
     {
       icon: 'logo-whatsapp',
       title: 'WhatsApp',
-      value: '+90 532 XXX XX XX',
+      value: SUPPORT_WHATSAPP,
       action: () => Linking.openURL('https://wa.me/905321234567'),
     },
     {

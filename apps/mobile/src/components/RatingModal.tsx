@@ -103,7 +103,7 @@ export default function RatingModal({
       onClose={handleClose}
       title={type === 'product' ? 'Ürünü Değerlendir' : 'Satıcıyı Değerlendir'}
     >
-      <ScrollView style={styles.scrollArea}>
+      <ScrollView style={styles.scrollArea} keyboardShouldPersistTaps="handled">
         {/* Target info */}
         <Text style={styles.targetInfo}>
           {type === 'product' ? productTitle : sellerName}

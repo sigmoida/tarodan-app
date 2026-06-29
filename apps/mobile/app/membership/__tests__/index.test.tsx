@@ -22,11 +22,11 @@ jest.mock('../../../src/stores/authStore', () => ({
 
 jest.mock('../../../src/services/api', () => ({
   api: { get: jest.fn() },
-  membershipApi: { getCurrentMembership: jest.fn() },
+  membershipApi: { getCurrentMembership: jest.fn(), getTiers: jest.fn() },
 }));
-import { api, membershipApi } from '../../../src/services/api';
+import { membershipApi } from '../../../src/services/api';
 const mockGetMembership = membershipApi.getCurrentMembership as jest.Mock;
-const mockApiGet = api.get as jest.Mock;
+const mockGetTiers = membershipApi.getTiers as jest.Mock;
 
 import MembershipScreen from '../index';
 
@@ -35,7 +35,7 @@ describe('J14 · üyelik paket listesi (membership/index)', () => {
     resetRouterMocks();
     mockAuthState = { isAuthenticated: true, user: {} };
     mockGetMembership.mockResolvedValue({ data: { tier: { type: 'free', name: 'Ücretsiz' } } });
-    mockApiGet.mockResolvedValue({ data: {} });
+    mockGetTiers.mockResolvedValue({ data: [] });
   });
 
   it('J14.1 yüklendikten sonra paket kartları render edilir (Temel/Premium)', async () => {
@@ -63,7 +63,7 @@ describe('J14 · üyelik paket listesi (membership/index)', () => {
 
   it('J14.4 her iki istek de reddedilirse hata banner gösterilir', async () => {
     mockGetMembership.mockRejectedValue(new Error('net'));
-    mockApiGet.mockRejectedValue(new Error('net'));
+    mockGetTiers.mockRejectedValue(new Error('net'));
     renderWithProviders(<MembershipScreen />);
     await waitFor(() =>
       expect(screen.getByText('Üyelik bilgileri yüklenemedi. Lütfen tekrar deneyin.')).toBeOnTheScreen(),

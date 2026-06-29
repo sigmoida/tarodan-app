@@ -12,6 +12,7 @@ import {
   ScreenHeader,
   tradeStatusConfig,
   appAlert,
+  EmptyState,
 } from '@tarodan/ui-native';
 import { useState, useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -503,10 +504,13 @@ export default function TradeDetailScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.surface.alt }}>
         <ScreenHeader title="Takas Detayı" onBack={handleBack} />
-        <View style={styles.errorContainer}>
-          <Text>Takas bulunamadı</Text>
-          <Button variant="primary" title="Geri Dön" onPress={handleBack} />
-        </View>
+        <EmptyState
+          fullscreen
+          icon="swap-horizontal-outline"
+          title="Takas bulunamadı"
+          actionLabel="Geri Dön"
+          onAction={handleBack}
+        />
       </View>
     );
   }
@@ -1398,12 +1402,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 16,
   },
   content: {
     flex: 1,
