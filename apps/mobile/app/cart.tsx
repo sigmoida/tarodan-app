@@ -3,7 +3,7 @@ import { View, ScrollView, StyleSheet, TouchableOpacity, Image } from 'react-nat
 import { Button, IconButton, Divider, Text, theme, ScreenHeader } from '@tarodan/ui-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useCartStore } from '../src/stores/cartStore';
+import { useCartStore, maxAllowedQty } from '../src/stores/cartStore';
 import { useAuthStore } from '../src/stores/authStore';
 import { transformImageUrl } from '../src/utils/imageUrl';
 import { asLabel } from '../src/utils/format';
@@ -70,7 +70,11 @@ export default function CartScreen() {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Cart Items */}
-        {items.map((item) => (
+        {items.map((item) => {
+          const itemMax = maxAllowedQty(item);
+          const atMax = item.quantity >= itemMax;
+          const stockKnown = item.stock != null;
+          return (
           <View key={item.id} testID="cart-item-row" style={styles.cartItem}>
             <TouchableOpacity onPress={() => router.push(`/product/${item.productId}`)}>
               <Image
@@ -97,20 +101,32 @@ export default function CartScreen() {
                 <TouchableOpacity
                   style={styles.quantityButton}
                   onPress={() => handleQuantityChange(item.id, -1)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Adedi azalt"
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                 >
                   <Ionicons name="remove" size={16} color={colors.text.heading} />
                 </TouchableOpacity>
                 <Text style={styles.quantityText}>{item.quantity}</Text>
                 <TouchableOpacity
-                  style={styles.quantityButton}
+                  style={[styles.quantityButton, atMax && styles.quantityButtonDisabled]}
+                  disabled={atMax}
                   onPress={() => handleQuantityChange(item.id, 1)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Adedi artır"
+                  accessibilityState={{ disabled: atMax }}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                 >
-                  <Ionicons name="add" size={16} color={colors.text.heading} />
+                  <Ionicons name="add" size={16} color={atMax ? colors.text.muted : colors.text.heading} />
                 </TouchableOpacity>
               </View>
+              {stockKnown && atMax ? (
+                <Text style={styles.stockHint}>Son {itemMax} adet</Text>
+              ) : null}
             </View>
           </View>
-        ))}
+          );
+        })}
 
         {/* Order Summary */}
         <View style={styles.summary}>
@@ -264,11 +280,19 @@ const styles = StyleSheet.create({
   quantityButton: {
     padding: 8,
   },
+  quantityButtonDisabled: {
+    opacity: 0.4,
+  },
   quantityText: {
     fontSize: 14,
     fontWeight: '600',
     paddingHorizontal: 12,
     color: colors.text.heading,
+  },
+  stockHint: {
+    fontSize: 11,
+    color: colors.warning[600]!,
+    marginTop: 4,
   },
   summary: {
     backgroundColor: colors.surface.DEFAULT,

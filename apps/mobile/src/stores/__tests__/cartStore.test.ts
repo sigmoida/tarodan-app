@@ -79,6 +79,39 @@ describe('J33 · adet güncelleme (updateQuantity)', () => {
   });
 });
 
+describe('J33b · stok / sipariş-limiti tavanı', () => {
+  beforeEach(reset);
+
+  it('updateQuantity stok adedini aşamaz (stok=3 → 5 istenirse 3)', () => {
+    useCartStore.getState().addItem({ ...baseItem, stock: 3 });
+    const id = useCartStore.getState().items[0]!.id;
+    useCartStore.getState().updateQuantity(id, 5);
+    expect(useCartStore.getState().items[0]!.quantity).toBe(3);
+  });
+
+  it('updateQuantity maxQuantityPerOrder sınırını aşamaz', () => {
+    useCartStore.getState().addItem({ ...baseItem, stock: 50, maxQuantityPerOrder: 2 });
+    const id = useCartStore.getState().items[0]!.id;
+    useCartStore.getState().updateQuantity(id, 9);
+    expect(useCartStore.getState().items[0]!.quantity).toBe(2);
+  });
+
+  it('stok bilgisi yoksa API tavanı 99 uygulanır', () => {
+    useCartStore.getState().addItem(baseItem); // stok yok
+    const id = useCartStore.getState().items[0]!.id;
+    useCartStore.getState().updateQuantity(id, 250);
+    expect(useCartStore.getState().items[0]!.quantity).toBe(99);
+  });
+
+  it('addItem tekrar ekleme stok tavanında durur (stok=2)', () => {
+    const add = useCartStore.getState().addItem;
+    add({ ...baseItem, stock: 2 });
+    add({ ...baseItem, stock: 2 });
+    add({ ...baseItem, stock: 2 }); // 3. kez — 2 de kalmalı
+    expect(useCartStore.getState().items[0]!.quantity).toBe(2);
+  });
+});
+
 describe('J59 · sepetten çıkar (removeItem / removeByProductId)', () => {
   beforeEach(reset);
 
