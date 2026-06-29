@@ -223,31 +223,27 @@ export default function PaymentPage() {
         </div>
 
         {/* Payment Info Card */}
-        <div className="bg-surface-elevated rounded-xl shadow-sm p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-surface-elevated rounded-2xl shadow-sm ring-1 ring-border/60 overflow-hidden mb-6">
+          <div className="flex items-center justify-between gap-4 p-6">
             <div>
-              <p className="text-sm text-muted">Ödeme Tutarı</p>
-              <p className="text-2xl font-bold text-heading">
+              <p className="text-sm text-muted">Ödenecek tutar</p>
+              <p className="mt-1 text-3xl sm:text-4xl font-bold text-heading tracking-tight tabular-nums">
                 {payment.amount?.toLocaleString("tr-TR", {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}{" "}
-                TL
+                <span className="text-2xl font-semibold text-muted">TL</span>
               </p>
             </div>
-            <div className="text-right">
-              <p className="text-sm text-muted">Durum</p>
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-warning-100 text-warning-800">
-                Beklemede
-              </span>
-            </div>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-warning-100 text-warning-800 whitespace-nowrap">
+              <span className="w-1.5 h-1.5 rounded-full bg-warning-500 animate-pulse" />
+              Ödeme bekleniyor
+            </span>
           </div>
 
-          <div className="border-t border-border pt-4">
-            <div className="flex items-center gap-2 text-sm text-muted">
-              <ShieldCheckIcon className="w-5 h-5 text-success-500" />
-              <span>256-bit SSL ile şifrelenmiş güvenli ödeme</span>
-            </div>
+          <div className="flex items-center gap-2 text-sm text-muted bg-success-50 border-t border-success-200/60 px-6 py-3">
+            <ShieldCheckIcon className="w-5 h-5 text-success-500 shrink-0" />
+            <span>256-bit SSL ile şifrelenmiş, PayTR güvenceli güvenli ödeme</span>
           </div>
         </div>
 
