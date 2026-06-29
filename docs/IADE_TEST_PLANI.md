@@ -103,9 +103,9 @@ Kapsama etiketleri: ✅ COVERED · 🟡 KISMİ · ❌ BOŞLUK · 🖐 MANUEL/L4
 ### E. Escrow hold etkileşimi
 | # | Senaryo | Beklenen | Durum |
 |---|---------|----------|-------|
-| E1 | iade açılınca hold dondurulur | `frozenByRefundId` set | ❌ e2e ekle |
+| E1 | iade açılınca hold dondurulur | `frozenByRefundId` set | ✅ refund-flow |
 | E2 | iade açıkken hold release olmaz | payout çıkmaz | 🟡 money-flow |
-| E3 | iade iptal → hold çözülür | `frozenByRefundId` null | ❌ e2e ekle |
+| E3 | iade iptal → hold çözülür | `frozenByRefundId` null | ✅ refund-flow |
 | E4 | 14. gün son saniye iade vs payout yarışı | hold frozen, payout bloke | ❌ e2e ekle |
 | E5 | iade sonrası PayoutTransfer oluşmaz | yok | ✅ money-flow |
 
@@ -114,7 +114,7 @@ Kapsama etiketleri: ✅ COVERED · 🟡 KISMİ · ❌ BOŞLUK · 🖐 MANUEL/L4
 |---|---------|----------|-------|
 | F1 | `pending_payment` iptal | `cancelled`, stok serbest, ledger yok | ✅ edge-cases |
 | F2 | paid/preparing iptal | `refunded` → PayTR iade | 🟡 doğrula |
-| F3 | kargolandıktan sonra iptal | 400 reddedilir | ❌ e2e ekle |
+| F3 | kargolandıktan sonra iptal | 400 reddedilir | ✅ refund-flow |
 | F4 | `processRefundedOrders` cron failed iadeyi retry | iade tamamlanır | ❌ unit/e2e ekle |
 | F5 | iptalde komisyon ledger `waived` | doğru statü | ❌ ekle |
 

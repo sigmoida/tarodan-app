@@ -1,6 +1,7 @@
 import * as request from 'supertest';
 import {
   OrderStatus,
+  PaymentHoldStatus,
   PaymentStatus,
   RefundRequestStatus,
   ShipmentStatus,
@@ -382,5 +383,123 @@ describe('Refund flow (E2E)', () => {
       .set(authHeader(stranger))
       .send({ reason: 'changed_mind' })
       .expect(403);
+  });
+
+  // ── E. Escrow hold ↔ iade etkileşimi ───────────────────────────────────
+  it('E1: cooling-off iade açılınca satıcı PaymentHold dondurulur (frozenByRefundId)', async () => {
+    const buyer = await createUser(ctx.module);
+    const seller = await createUser(ctx.module, { isSeller: true });
+    const product = await createProduct({
+      sellerId: seller.id,
+      categoryId: baseline.categoryId,
+      price: 120,
+      quantity: 1,
+    });
+    const addr = await createAddress({ userId: buyer.id });
+    await createAddress({ userId: seller.id });
+
+    const { orderId } = await buyAndPay(ctx, buyer, product.id, addr.id);
+    const prisma = getPrisma();
+
+    // Ödeme sonrası hold oluşur ve henüz dondurulmamıştır
+    const holdBefore = await prisma.paymentHold.findFirst({ where: { orderId } });
+    expect(holdBefore).toBeTruthy();
+    expect(holdBefore!.status).toBe(PaymentHoldStatus.held);
+    expect(holdBefore!.frozenByRefundId).toBeNull();
+
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.delivered },
+    });
+    await prisma.shipment.update({
+      where: { orderId },
+      data: { status: ShipmentStatus.delivered, deliveredAt: new Date() },
+    });
+
+    const createRes = await request(ctx.app.getHttpServer())
+      .post(`/api/orders/${orderId}/refund-requests`)
+      .set(authHeader(buyer))
+      .send({ reason: 'changed_mind' })
+      .expect(201);
+
+    const holdAfter = await prisma.paymentHold.findFirst({ where: { orderId } });
+    expect(holdAfter!.frozenByRefundId).toBe(createRes.body.id);
+  });
+
+  it('E3: iade iptal edilince hold kilidi çözülür (frozenByRefundId → null)', async () => {
+    const buyer = await createUser(ctx.module);
+    const seller = await createUser(ctx.module, { isSeller: true });
+    const product = await createProduct({
+      sellerId: seller.id,
+      categoryId: baseline.categoryId,
+      price: 140,
+      quantity: 1,
+    });
+    const addr = await createAddress({ userId: buyer.id });
+    await createAddress({ userId: seller.id });
+
+    const { orderId } = await buyAndPay(ctx, buyer, product.id, addr.id);
+    const prisma = getPrisma();
+
+    // Kargoda ama henüz teslim değil → talep wait_for_delivery'de kalır (iptal edilebilir)
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.shipped },
+    });
+    await prisma.shipment.update({
+      where: { orderId },
+      data: {
+        status: ShipmentStatus.in_transit,
+        trackingNumber: 'TRK-E3',
+        providerTrackingId: 'TRK-E3',
+      },
+    });
+
+    const createRes = await request(ctx.app.getHttpServer())
+      .post(`/api/orders/${orderId}/refund-requests`)
+      .set(authHeader(buyer))
+      .send({ reason: 'changed_mind' })
+      .expect(201);
+    expect(createRes.body.status).toBe(RefundRequestStatus.wait_for_delivery);
+
+    const frozen = await prisma.paymentHold.findFirst({ where: { orderId } });
+    expect(frozen!.frozenByRefundId).toBe(createRes.body.id);
+
+    await request(ctx.app.getHttpServer())
+      .post(`/api/refund-requests/${createRes.body.id}/cancel`)
+      .set(authHeader(buyer))
+      .expect(200);
+
+    const unfrozen = await prisma.paymentHold.findFirst({ where: { orderId } });
+    expect(unfrozen!.frozenByRefundId).toBeNull();
+    expect(unfrozen!.status).toBe(PaymentHoldStatus.held);
+  });
+
+  // ── F. Sipariş iptali → iade ────────────────────────────────────────────
+  it('F3: kargoya verildikten (shipped) sonra sipariş iptali reddedilir (400)', async () => {
+    const buyer = await createUser(ctx.module);
+    const seller = await createUser(ctx.module, { isSeller: true });
+    const product = await createProduct({
+      sellerId: seller.id,
+      categoryId: baseline.categoryId,
+      price: 75,
+      quantity: 1,
+    });
+    const addr = await createAddress({ userId: buyer.id });
+    await createAddress({ userId: seller.id });
+
+    const { orderId } = await buyAndPay(ctx, buyer, product.id, addr.id);
+    const prisma = getPrisma();
+
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.shipped },
+    });
+
+    await request(ctx.app.getHttpServer())
+      .post(`/api/orders/${orderId}/cancel`)
+      .set(authHeader(buyer))
+      .send({ reason: 'vazgeçtim' })
+      .expect(400);
   });
 });
