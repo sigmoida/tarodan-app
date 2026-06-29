@@ -22,7 +22,7 @@ const { colors } = theme;
 
 export default function SecuritySettingsScreen() {
   const { t } = useTranslation();
-  const { isAuthenticated, logout, user } = useAuthStore();
+  const { isAuthenticated, logout, user, refreshUserData } = useAuthStore();
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [showTwoFactorSetup, setShowTwoFactorSetup] = useState(false);
@@ -86,6 +86,7 @@ export default function SecuritySettingsScreen() {
     try {
       await authApi.verifyPhone(phoneCode);
       setPhoneVerified(true);
+      await refreshUserData();
       setShowPhoneDialog(false);
       setPhoneStep('enter');
       setPhoneCode('');
@@ -324,11 +325,6 @@ export default function SecuritySettingsScreen() {
               </View>
             </View>
           </View>
-          <Text style={styles.infoText}>
-            {phoneVerified
-              ? 'Telefon numaranız doğrulandı.'
-              : 'Telefon numaranızı SMS ile doğrulayın.'}
-          </Text>
           {phoneVerified ? (
             <View style={styles.verifiedBadge}>
               <Ionicons name="checkmark-circle" size={18} color={colors.success[600]!} />
