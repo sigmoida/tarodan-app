@@ -72,3 +72,76 @@ describe('RolesGuard — refund_requests izin kapısı (retry-refund money-path)
     await expect(guard.canActivate(makeContext('super_admin'))).resolves.toBe(true);
   });
 });
+
+/**
+ * Admin iade yüzeyi — URL-segment tabanlı izin kapısı (explicit @RequirePermission
+ * OLMAYAN endpoint'ler). RolesGuard URL'in ilk admin segmentinden izin türetir
+ * (PERMISSION_MAP). İade işlemleri 'refund_requests'/'refund_history'/'payments'
+ * izni ister; moderator bu izinlere sahip olmadığından TÜM iade yüzeyinden bloke
+ * olmalı, admin/super_admin geçmeli. (H1–H4, H6, H7 karakterizasyonu.)
+ */
+describe('RolesGuard — admin iade yüzeyi URL-segment izin kapısı', () => {
+  const makeGuard = () => {
+    const prisma = {
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
+    } as any;
+    return new RolesGuard(new Reflector(), prisma);
+  };
+
+  const ctx = (role: string, method: string, originalUrl: string): ExecutionContext => {
+    const req = { user: { isAdmin: true, role }, method, originalUrl };
+    const handler = () => undefined;
+    // Tüm bu endpoint'lerde @Roles var ama explicit @RequirePermission YOK.
+    (handler as any)[ROLES_KEY] = ['super_admin', 'admin', 'moderator'];
+    return {
+      getHandler: () => handler,
+      getClass: () => class {},
+      switchToHttp: () => ({ getRequest: () => req }),
+    } as any;
+  };
+
+  const stub = (guard: RolesGuard) => {
+    jest
+      .spyOn((guard as any).reflector as Reflector, 'getAllAndOverride')
+      .mockImplementation((key: any, targets: any[]) => {
+        const h = targets[0];
+        if (key === ROLES_KEY) return h?.[ROLES_KEY];
+        return undefined; // explicit permission / bypass yok
+      });
+  };
+
+  // [açıklama, method, url]
+  const refundSurfaces: Array<[string, string, string]> = [
+    ['iade listesi', 'GET', '/api/admin/refund-requests'],
+    ['iade detayı', 'GET', '/api/admin/refund-requests/abc'],
+    ['force-finalize', 'POST', '/api/admin/refund-requests/abc/force-finalize'],
+    ['override-policy', 'PATCH', '/api/admin/refund-requests/abc/override-policy'],
+    ['set-shipping-payer', 'PATCH', '/api/admin/refund-requests/abc/set-shipping-payer'],
+    ['manual-refund', 'POST', '/api/admin/payments/abc/manual-refund'],
+    ['iade geçmişi', 'GET', '/api/admin/refunds'],
+  ];
+
+  describe('moderator iade yüzeyinin TAMAMINDAN bloke', () => {
+    it.each(refundSurfaces)('moderator → %s → 403', async (_d, method, url) => {
+      const guard = makeGuard();
+      stub(guard);
+      await expect(guard.canActivate(ctx('moderator', method, url))).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+    });
+  });
+
+  describe('admin & super_admin iade yüzeyine erişebilir', () => {
+    it.each(refundSurfaces)('admin → %s → izinli', async (_d, method, url) => {
+      const guard = makeGuard();
+      stub(guard);
+      await expect(guard.canActivate(ctx('admin', method, url))).resolves.toBe(true);
+    });
+
+    it.each(refundSurfaces)('super_admin → %s → izinli', async (_d, method, url) => {
+      const guard = makeGuard();
+      stub(guard);
+      await expect(guard.canActivate(ctx('super_admin', method, url))).resolves.toBe(true);
+    });
+  });
+});
