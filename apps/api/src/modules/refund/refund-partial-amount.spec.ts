@@ -101,4 +101,45 @@ describe('RefundService.computePartialRefundAmount', () => {
     );
     expect(amount).toBe(0);
   });
+
+  it('A9/C5: kurumsal satıcı (KDV dahil) siparişte ürün iadesi KDV dahil döner — alıcı made-whole', () => {
+    // Kurumsal: totalAmount = ürün(100) + kargo(30) + buyerFee(5) + KDV(18) = 153
+    // productAmount = total - shipping - buyerFee = 118 = ürün(100) + KDV(18).
+    // Bu KASITLI: alıcı ürüne KDV dahil ödedi → iade KDV dahil olmalı (satıcı iade
+    // faturasıyla KDV'yi devletten geri alır). Tam iade de toplamı (KDV dahil) döner;
+    // komponent iade bununla tutarlı. (B4 kararı: mevcut davranış doğru.)
+    const order = {
+      totalAmount: D(153),
+      subtotal: null,
+      shippingCost: D(30),
+      buyerFeeAmount: D(5),
+    };
+    const amount = compute(
+      { refundProductAmount: true, refundShippingFee: false, refundBuyerFee: false },
+      order,
+    );
+    expect(amount).toBeCloseTo(118, 2);
+  });
+
+  describe('A10: computeRefundAmount adet sınırlama (clamp)', () => {
+    const refundAmount = (order: any, qty: number): number =>
+      Number((service as any).computeRefundAmount(order, qty));
+
+    it('refundQuantity > orderQuantity → tam tutara clamp (fazla iade yok)', () => {
+      const order = { totalAmount: D(300), quantity: 3 };
+      // 5 adet istense de sipariş 3 adet → en fazla tam tutar (300) iade edilir
+      expect(refundAmount(order, 5)).toBeCloseTo(300, 2);
+    });
+
+    it('kısmi adet → orantılı tutar', () => {
+      const order = { totalAmount: D(300), quantity: 3 };
+      expect(refundAmount(order, 1)).toBeCloseTo(100, 2);
+      expect(refundAmount(order, 2)).toBeCloseTo(200, 2);
+    });
+
+    it('tek adetlik siparişte daima tam tutar', () => {
+      const order = { totalAmount: D(99.9), quantity: 1 };
+      expect(refundAmount(order, 1)).toBeCloseTo(99.9, 2);
+    });
+  });
 });

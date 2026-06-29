@@ -63,31 +63,31 @@ Kapsama etiketleri: ✅ COVERED · 🟡 KISMİ · ❌ BOŞLUK · 🖐 MANUEL/L4
 | A4 | `pending_payment` sipariş | 400 (önce siparişi iptal et) | ✅ refund-flow |
 | A5 | alıcı dışı (satıcı/3.kişi) | 403 | ✅ refund-flow |
 | A6 | aynı siparişte aktif talep varken tekrar | 400 duplicate | ✅ refund-flow |
-| A7 | üyelik siparişi (MEM-*) | 400 (iade edilemez) | 🟡 unit refund-membership-guard → e2e ekle |
-| A8 | adet bazlı kısmi tutar | `total*qty/orderQty` | 🟡 unit refund-partial-amount → e2e ekle |
-| A9 | kurumsal satıcı KDV'li sipariş iade tutarı | ürün+KDV doğru (bkz. B4 kararı) | ❌ ekle |
-| A10 | `refundQuantity > orderQuantity` | reddet/clamp | ❌ ekle |
+| A7 | üyelik siparişi (MEM-*) | 400 (iade edilemez) | ✅ refund-membership-guard |
+| A8 | adet bazlı kısmi tutar | `total*qty/orderQty` | ✅ refund-partial-amount (A10) |
+| A9 | kurumsal satıcı KDV iade tutarı | ürün+KDV (made-whole) | ✅ refund-partial-amount |
+| A10 | `refundQuantity > orderQuantity` | tam tutara clamp | ✅ refund-partial-amount |
 | A11 | olmayan/başkasının siparişi | 404/403 | 🟡 doğrula |
 
 ### B. Cooling-off / iade kargosu yaşam döngüsü (cron'lar)
 | # | Senaryo | Beklenen | Durum |
 |---|---------|----------|-------|
 | B1 | teslim olunca iade kargosu açılır (cron) | `return_shipment_open`, Sürat etiketi `Iademi=true` | ✅ refund-flow |
-| B2 | henüz teslim değilse açılmaz | `wait_for_delivery`'de kalır | 🟡 doğrula |
-| B3 | Sürat webhook tracking güncel (in_transit→delivered) | statü ilerler | ❌ ekle |
-| B4 | `finalizeReturnedShipments` return_delivered'ı bitirir | `refunded`, PayTR iade | 🟡 money-flow → netleştir |
-| B5 | finalize 30dk fallback (Sürat callback gelmezse) | cron yine de finalize eder | ❌ ekle |
-| B6 | satıcının adresi yoksa depo adresine fallback | doğru dönüş adresi | ❌ ekle |
+| B2 | henüz teslim değilse açılmaz | `wait_for_delivery` kalır | ✅ refund-flow |
+| B3 | Sürat webhook tracking (in_transit→delivered) | statü ilerler | ✅ refund-flow |
+| B4 | `finalizeReturnedShipments` return_delivered.ı bitirir | `refunded`, PayTR iade | ✅ refund-flow (B3/B5) |
+| B5 | finalize 30dk fallback | cron finalize eder | ✅ refund-flow |
+| B6 | satıcı adresi yoksa depo fallback | iade yine açılır | ✅ refund-flow |
 
 ### C. İade tutarı & politika
 | # | Senaryo | Beklenen | Durum |
 |---|---------|----------|-------|
 | C1 | tam iade | `totalAmount` | ✅ |
 | C2 | adet bazlı orantı | proporsiyonel | 🟡 unit |
-| C3 | admin override-policy (4 flag) tutar yeniden hesap | doğru parçalı tutar | ❌ e2e ekle |
+| C3 | admin override-policy tutar yeniden hesap | doğru parçalı tutar | ✅ refund-flow |
 | C4 | `subtotal` NULL türetme | `total-shipping-buyerFee` | ✅ unit refund-partial-amount |
-| C5 | KDV davranışı (kurumsal) | mevcut: ürün+KDV iade (tutarlı) | ❌ unit ekle |
-| C6 | iade kargo ödeyeni (buyer/seller/platform) | doğru atanır | ❌ e2e ekle |
+| C5 | KDV davranışı (kurumsal) | ürün+KDV iade (tutarlı) | ✅ refund-partial-amount |
+| C6 | iade kargo ödeyeni (buyer/seller/platform) | doğru atanır | ✅ refund-flow |
 
 ### D. PayTR gerçek iade — `createRefund`
 | # | Senaryo | Beklenen | Durum |
