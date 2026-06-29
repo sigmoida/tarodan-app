@@ -133,9 +133,17 @@ export default function OrdersPage() {
   // ama cancellationType='iptal' → "İptal Edildi". (3) Aksi halde sipariş durumu.
   const displayStatusOf = (order: Order): { status: string; label: string } => {
     if (order.activeRefundRequest) {
+      // İade tamamlandıysa "İade Edildi", aksi halde "İade Sürecinde" (mobil ile tutarlı).
+      const done = order.activeRefundRequest.status === 'refunded';
       return {
-        status: 'refund_requested',
-        label: locale === 'en' ? 'Refund in progress' : 'İade Sürecinde',
+        status: done ? 'refunded' : 'refund_requested',
+        label: done
+          ? locale === 'en'
+            ? 'Refunded'
+            : 'İade Edildi'
+          : locale === 'en'
+            ? 'Refund in progress'
+            : 'İade Sürecinde',
       };
     }
     if (order.cancellationType === 'iptal') {

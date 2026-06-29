@@ -2555,6 +2555,13 @@ export class OrderService {
           select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
         },
         shipment: true,
+        // Liste yanıtında da aktif iade durumunu gösterebilmek için (detayla tutarlı):
+        // formatOrderResponse → pickActiveRefundRequest order.refundRequests'i okur;
+        // include edilmezse activeRefundRequest null kalır ve liste ham order.status
+        // (örn. "Teslim Edildi") gösterir. (Sadece okuma; başka davranış değişmez.)
+        refundRequests: {
+          orderBy: { createdAt: 'desc' },
+        },
       },
     });
 

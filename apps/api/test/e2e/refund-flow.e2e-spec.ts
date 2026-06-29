@@ -603,6 +603,51 @@ describe('Refund flow (E2E)', () => {
     expect(rr!.returnShippingPayer).toBe('seller');
   });
 
+  // ── Liste yanıtı iade durumunu yansıtır (sipariş listesi ↔ detay tutarlılığı) ──
+  it('LIST: teslim edilmiş siparişte aktif iade açıksa GET /orders yanıtı activeRefundRequest döner', async () => {
+    const buyer = await createUser(ctx.module);
+    const seller = await createUser(ctx.module, { isSeller: true });
+    const product = await createProduct({
+      sellerId: seller.id,
+      categoryId: baseline.categoryId,
+      price: 150,
+      quantity: 1,
+    });
+    const addr = await createAddress({ userId: buyer.id });
+    await createAddress({ userId: seller.id });
+    const { orderId } = await buyAndPay(ctx, buyer, product.id, addr.id);
+    const prisma = getPrisma();
+
+    // Teslim edildi + cooling-off iade açıldı (sipariş status'u 'delivered' kalır)
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.delivered },
+    });
+    await prisma.shipment.update({
+      where: { orderId },
+      data: { status: ShipmentStatus.delivered, deliveredAt: new Date() },
+    });
+    await request(ctx.app.getHttpServer())
+      .post(`/api/orders/${orderId}/refund-requests`)
+      .set(authHeader(buyer))
+      .send({ reason: 'changed_mind' })
+      .expect(201);
+
+    // Liste yanıtı: ilgili sipariş activeRefundRequest içermeli (fix öncesi null'dı →
+    // liste "Teslim Edildi" gösteriyordu; detay ise iade gösteriyordu = tutarsızlık)
+    const listRes = await request(ctx.app.getHttpServer())
+      .get('/api/orders?role=buyer')
+      .set(authHeader(buyer))
+      .expect(200);
+
+    const row = (listRes.body.data as any[]).find((o) => o.id === orderId);
+    expect(row).toBeTruthy();
+    expect(row.activeRefundRequest).toBeTruthy();
+    expect(row.activeRefundRequest.status).toBe(
+      RefundRequestStatus.return_shipment_open,
+    );
+  });
+
   // ── I/J. Cron idempotency + bildirimler ────────────────────────────────
   it('I1: processRefundedOrders idempotent — iade tamamlandıktan sonra ikinci tur PayTR çağırmaz', async () => {
     const buyer = await createUser(ctx.module);
