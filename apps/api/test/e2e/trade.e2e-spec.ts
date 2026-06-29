@@ -87,7 +87,7 @@ describe('Trade Flow (Safe-Trade Warehouse Escrow) (E2E)', () => {
 
   describe('POST /api/trades — Create', () => {
     it('rejects self-trade with 400', async () => {
-      const user = await createUser(ctx.module, { isSeller: true });
+      const user = await createUser(ctx.module, { isSeller: true, premium: true });
       const productA = await createProduct({
         sellerId: user.id,
         categoryId: baseline.categoryId,
@@ -105,8 +105,8 @@ describe('Trade Flow (Safe-Trade Warehouse Escrow) (E2E)', () => {
     });
 
     it('rejects when receiver\'s product is not trade-enabled', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true });
-      const receiver = await createUser(ctx.module, { isSeller: true });
+      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
       const initiatorProduct = await createProduct({
         sellerId: initiator.id,
         categoryId: baseline.categoryId,
@@ -130,8 +130,8 @@ describe('Trade Flow (Safe-Trade Warehouse Escrow) (E2E)', () => {
     });
 
     it('creates a pending trade and does NOT reserve stock yet', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true });
-      const receiver = await createUser(ctx.module, { isSeller: true });
+      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
       await createAddress({ userId: initiator.id }); // takas için teslimat adresi gerekli
       const initiatorProduct = await createProduct({
         sellerId: initiator.id,
@@ -169,8 +169,8 @@ describe('Trade Flow (Safe-Trade Warehouse Escrow) (E2E)', () => {
 
   describe('Scenario A — happy path with NO cash difference', () => {
     it('walks the trade pending → shipping_to_warehouse → at_warehouse → shipping_to_recipients → completed', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true });
-      const receiver = await createUser(ctx.module, { isSeller: true });
+      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
       const admin = await createAdminUser(ctx.module);
       const adminAddress = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddress.id);
@@ -299,8 +299,8 @@ describe('Trade Flow (Safe-Trade Warehouse Escrow) (E2E)', () => {
 
   describe('Scenario B — cash difference (initiator pays extra)', () => {
     it('routes through awaiting_payment, escrows cash on PayTR success, and only ships after payment', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true });
-      const receiver = await createUser(ctx.module, { isSeller: true });
+      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
       const admin = await createAdminUser(ctx.module);
       const adminAddress = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddress.id);
@@ -397,8 +397,8 @@ describe('Trade Flow (Safe-Trade Warehouse Escrow) (E2E)', () => {
       // only AFTER the cash payment succeeds. Assert that on awaiting_payment
       // there are no `to_warehouse` rows yet, and that the deprecated
       // endpoint refuses with 410 regardless of trade state.
-      const initiator = await createUser(ctx.module, { isSeller: true });
-      const receiver = await createUser(ctx.module, { isSeller: true });
+      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
       const initiatorShipAddress = await createAddress({ userId: initiator.id });
       await createAddress({ userId: receiver.id });
 
@@ -451,8 +451,8 @@ describe('Trade Flow (Safe-Trade Warehouse Escrow) (E2E)', () => {
 
   describe('Scenario C — admin rejects items at warehouse', () => {
     it('creates return shipments, transitions to returning, marks return delivered → cancelled', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true });
-      const receiver = await createUser(ctx.module, { isSeller: true });
+      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
       const admin = await createAdminUser(ctx.module);
       const adminAddress = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddress.id);
@@ -542,8 +542,8 @@ describe('Trade Flow (Safe-Trade Warehouse Escrow) (E2E)', () => {
 
   describe('Scenario D — responseDeadline expiry via scheduler', () => {
     it('autoCancelExpiredTrades flips a stale pending trade to cancelled', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true });
-      const receiver = await createUser(ctx.module, { isSeller: true });
+      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
       await createAddress({ userId: initiator.id }); // takas için teslimat adresi gerekli
       const ip = await createProduct({
         sellerId: initiator.id,
@@ -574,7 +574,10 @@ describe('Trade Flow (Safe-Trade Warehouse Escrow) (E2E)', () => {
       });
 
       const scheduler = ctx.app.get(TradeSchedulerService);
-      await scheduler.handleExpiredTrades();
+      // runHandleExpiredTrades = gerçek iş metodu. handleExpiredTrades() @TrackedCron
+      // wrapper'ıdır ve cron-modu guard'ı (moneyCronsViaBull) nedeniyle doğrudan
+      // çağrıda iş yapmaz; testler raw metodu çağırmalı.
+      await scheduler.runHandleExpiredTrades();
 
       const after = await prisma.trade.findUnique({ where: { id: created.body.id } });
       expect(after?.status).toBe(TradeStatus.cancelled);
@@ -583,10 +586,12 @@ describe('Trade Flow (Safe-Trade Warehouse Escrow) (E2E)', () => {
 
   describe('Scenario E — auth/role gates', () => {
     it('forbids non-receiver from accepting', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true });
-      const receiver = await createUser(ctx.module, { isSeller: true });
+      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
       await createAddress({ userId: initiator.id }); // takas için teslimat adresi gerekli
-      const intruder = await createUser(ctx.module);
+      // intruder de premium olmalı: aksi halde accept/approve'da premium-gate 400'ü
+      // kimlik/rol gate'inden (403) ÖNCE patlar; bu testler kimlik/rol gate'ini doğrular.
+      const intruder = await createUser(ctx.module, { premium: true });
       const ip = await createProduct({
         sellerId: initiator.id,
         categoryId: baseline.categoryId,
@@ -615,10 +620,12 @@ describe('Trade Flow (Safe-Trade Warehouse Escrow) (E2E)', () => {
     });
 
     it('forbids non-admin from approving the warehouse trade', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true });
-      const receiver = await createUser(ctx.module, { isSeller: true });
+      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
       await createAddress({ userId: initiator.id }); // takas için teslimat adresi gerekli
-      const intruder = await createUser(ctx.module);
+      // intruder de premium olmalı: aksi halde accept/approve'da premium-gate 400'ü
+      // kimlik/rol gate'inden (403) ÖNCE patlar; bu testler kimlik/rol gate'ini doğrular.
+      const intruder = await createUser(ctx.module, { premium: true });
       const ip = await createProduct({
         sellerId: initiator.id,
         categoryId: baseline.categoryId,

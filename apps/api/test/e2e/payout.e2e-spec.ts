@@ -87,7 +87,7 @@ describe('Payout Flow (E2E)', () => {
   describe('Order hold → release → PayoutTransfer', () => {
     it('creates a PayoutTransfer with correct amounts after hold release when seller has IBAN', async () => {
       const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true });
+      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
       const product = await createProduct({
         sellerId: seller.id,
         categoryId: baseline.categoryId,
@@ -186,7 +186,7 @@ describe('Payout Flow (E2E)', () => {
 
     it('creates a failed PayoutTransfer when seller has no IBAN', async () => {
       const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true });
+      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
       // Seller does NOT add bank account
       const product = await createProduct({
         sellerId: seller.id,
@@ -253,7 +253,7 @@ describe('Payout Flow (E2E)', () => {
   describe('PayTR transfer failure → retry', () => {
     it('retries a failed transfer up to 3 times with exponential backoff, then permanently fails', async () => {
       const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true });
+      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
       const product = await createProduct({
         sellerId: seller.id,
         categoryId: baseline.categoryId,
@@ -360,8 +360,8 @@ describe('Payout Flow (E2E)', () => {
 
   describe('Trade cash payout', () => {
     it('creates PayoutTransfer for trade cash recipient after hold release', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true });
-      const receiver = await createUser(ctx.module, { isSeller: true });
+      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
       const admin = await createAdminUser(ctx.module);
       const adminAddr = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddr.id);

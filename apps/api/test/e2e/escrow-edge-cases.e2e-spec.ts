@@ -84,8 +84,8 @@ describe('Escrow Edge Cases (E2E)', () => {
 
   describe('Auto-confirm expired receipts', () => {
     it('auto-completes a trade when confirmationDeadline passes without user confirmation', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true });
-      const receiver = await createUser(ctx.module, { isSeller: true });
+      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
       const admin = await createAdminUser(ctx.module);
       const adminAddr = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddr.id);
@@ -170,7 +170,7 @@ describe('Escrow Edge Cases (E2E)', () => {
 
       // Run the scheduler
       const tradeScheduler = ctx.app.get(TradeSchedulerService);
-      await tradeScheduler.handleExpiredTrades();
+      await tradeScheduler.runHandleExpiredTrades();
 
       // Trade should be auto-completed
       const tradeAfter = await prisma.trade.findUnique({ where: { id: tradeId } });
@@ -190,7 +190,7 @@ describe('Escrow Edge Cases (E2E)', () => {
   describe('Race condition: release + refund', () => {
     it('blocks refund when payout is already in progress', async () => {
       const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true });
+      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
       const product = await createProduct({
         sellerId: seller.id,
         categoryId: baseline.categoryId,
@@ -264,7 +264,7 @@ describe('Escrow Edge Cases (E2E)', () => {
 
     it('does not create duplicate PayoutTransfer when releaseHoldsDue runs twice', async () => {
       const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true });
+      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
       const product = await createProduct({
         sellerId: seller.id,
         categoryId: baseline.categoryId,
@@ -336,8 +336,8 @@ describe('Escrow Edge Cases (E2E)', () => {
 
   describe('Auto-confirm with cash hold', () => {
     it('auto-confirm on cash trade sets holdReleaseAt after completion', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true });
-      const receiver = await createUser(ctx.module, { isSeller: true });
+      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
       const admin = await createAdminUser(ctx.module);
       const adminAddr = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddr.id);
@@ -433,7 +433,7 @@ describe('Escrow Edge Cases (E2E)', () => {
 
       // Run auto-confirm scheduler
       const tradeScheduler = ctx.app.get(TradeSchedulerService);
-      await tradeScheduler.handleExpiredTrades();
+      await tradeScheduler.runHandleExpiredTrades();
 
       // Trade should be completed
       const tradeAfter = await prisma.trade.findUnique({ where: { id: tradeId } });
@@ -449,7 +449,7 @@ describe('Escrow Edge Cases (E2E)', () => {
   describe('Preparing deadline expiry', () => {
     it('auto-cancels order and refunds when preparing deadline passes', async () => {
       const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true });
+      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
       const product = await createProduct({
         sellerId: seller.id,
         categoryId: baseline.categoryId,
@@ -513,7 +513,7 @@ describe('Escrow Edge Cases (E2E)', () => {
   describe('Sürat Kargo cancellation on refund', () => {
     it('cancels Sürat shipment when order is refunded (sets shipment to cancelled)', async () => {
       const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true });
+      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
       const product = await createProduct({
         sellerId: seller.id,
         categoryId: baseline.categoryId,
@@ -562,7 +562,7 @@ describe('Escrow Edge Cases (E2E)', () => {
 
     it('cancels Sürat shipment when payment expires (auto-cancel)', async () => {
       const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true });
+      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
       const product = await createProduct({
         sellerId: seller.id,
         categoryId: baseline.categoryId,
@@ -648,7 +648,7 @@ describe('Escrow Edge Cases (E2E)', () => {
   describe('Sürat shipment cancel call assertions (using stub tracking)', () => {
     it('processRefund calls Sürat cancel with correct order number', async () => {
       const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true });
+      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
       const product = await createProduct({
         sellerId: seller.id,
         categoryId: baseline.categoryId,
@@ -690,8 +690,8 @@ describe('Escrow Edge Cases (E2E)', () => {
 
   describe('Admin warehouse — Sürat shipment submission', () => {
     async function setupApprovedTrade() {
-      const initiator = await createUser(ctx.module, { isSeller: true });
-      const receiver = await createUser(ctx.module, { isSeller: true });
+      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
       const admin = await createAdminUser(ctx.module);
       const adminAddr = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddr.id);
@@ -787,8 +787,8 @@ describe('Escrow Edge Cases (E2E)', () => {
 
   describe('Trade cancellation cancels Sürat shipments', () => {
     it('resolveDispute with cancel_trade cancels active Sürat shipments', async () => {
-      const initiator = await createUser(ctx.module, { isSeller: true });
-      const receiver = await createUser(ctx.module, { isSeller: true });
+      const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+      const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
       const admin = await createAdminUser(ctx.module);
       const adminAddr = await createAddress({ userId: admin.id });
       await configureWarehouseAddress(adminAddr.id);
@@ -870,8 +870,8 @@ describe('Escrow Edge Cases (E2E)', () => {
       process.env.SURAT_STUB_RESPONSE = 'Adres eksik';
 
       try {
-        const initiator = await createUser(ctx.module, { isSeller: true });
-        const receiver = await createUser(ctx.module, { isSeller: true });
+        const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+        const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
         const admin = await createAdminUser(ctx.module);
         const adminAddr = await createAddress({ userId: admin.id });
         await configureWarehouseAddress(adminAddr.id);
@@ -941,7 +941,7 @@ describe('Escrow Edge Cases (E2E)', () => {
   describe('Tracking sync filters out shipments without tracking number', () => {
     it('syncAllActiveShipments skips Shipments with null providerTrackingId', async () => {
       const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true });
+      const seller = await createUser(ctx.module, { isSeller: true, premium: true });
       const product = await createProduct({
         sellerId: seller.id,
         categoryId: baseline.categoryId,

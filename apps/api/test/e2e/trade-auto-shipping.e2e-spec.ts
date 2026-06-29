@@ -97,8 +97,8 @@ describe('Trade Auto-Shipping (E2E)', () => {
    * products fixture used by every test below.
    */
   async function setupBilateralTrade() {
-    const initiator = await createUser(ctx.module, { isSeller: true });
-    const receiver = await createUser(ctx.module, { isSeller: true });
+    const initiator = await createUser(ctx.module, { isSeller: true, premium: true });
+    const receiver = await createUser(ctx.module, { isSeller: true, premium: true });
     await createAddress({ userId: initiator.id });
     await createAddress({ userId: receiver.id });
 
