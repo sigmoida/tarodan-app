@@ -61,7 +61,7 @@ type OrderListEntry =
   | { kind: 'order'; order: Order }
   | { kind: 'group'; group: OrderGroup };
 
-type FilterType = 'all' | 'pending' | 'processing' | 'shipped' | 'delivered' | 'completed';
+type FilterType = 'all' | 'pending' | 'processing' | 'shipped' | 'delivered' | 'completed' | 'refunds';
 
 // UI status keys -> StatusBadge config (matches semantic Badge variants)
 const uiOrderStatusConfig: Record<string, { label: string; variant: BadgeVariant }> = {
@@ -179,8 +179,14 @@ export default function OrdersScreen() {
       }
 
       const params: Record<string, string | number> = { role, limit: 100, page: 1 };
-      const apiStatus = uiFilterToApiStatusParam(filter);
-      if (apiStatus) params.status = apiStatus;
+      if (filter === 'refunds') {
+        // "İadeler" sekmesi: iade talebi olan tüm siparişler (status'tan bağımsız;
+        // iade tamamlanınca sipariş cancelled olduğu için status filtresiyle gelmez).
+        params.refundsOnly = 'true';
+      } else {
+        const apiStatus = uiFilterToApiStatusParam(filter);
+        if (apiStatus) params.status = apiStatus;
+      }
 
       const response = await ordersApi.getAll(params);
       const raw = response.data?.data ?? response.data;
@@ -335,10 +341,10 @@ export default function OrdersScreen() {
       {/* Filter Chips */}
       <View style={styles.filterContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {(['all', 'pending', 'processing', 'shipped', 'delivered', 'completed'] as FilterType[]).map((f) => (
+          {(['all', 'pending', 'processing', 'shipped', 'delivered', 'completed', 'refunds'] as FilterType[]).map((f) => (
             <Chip
               key={f}
-              label={f === 'all' ? 'Tümü' : getStatusText(f as UiOrderStatus)}
+              label={f === 'all' ? 'Tümü' : f === 'refunds' ? 'İadeler' : getStatusText(f as UiOrderStatus)}
               selected={filter === f}
               onPress={() => setFilter(f)}
               style={styles.filterChipSpacing}
@@ -363,7 +369,11 @@ export default function OrdersScreen() {
         <View style={styles.emptyContainer}>
           <Ionicons name="receipt-outline" size={80} color={colors.text.subtle} />
           <Text variant="h3" style={styles.emptyTitle}>
-            {filter === 'all' ? 'Henüz siparişiniz yok' : `${getStatusText(filter as UiOrderStatus)} siparişiniz yok`}
+            {filter === 'all'
+              ? 'Henüz siparişiniz yok'
+              : filter === 'refunds'
+                ? 'İade kaydınız yok'
+                : `${getStatusText(filter as UiOrderStatus)} siparişiniz yok`}
           </Text>
           <Text style={styles.emptySubtitle}>
             Alışverişe başlayın!
