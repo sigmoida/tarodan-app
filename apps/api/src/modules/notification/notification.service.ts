@@ -400,6 +400,13 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
     icon: '🔄',
     link: '/trades',
   },
+  [NotificationType.TRADE_STUCK_AT_WAREHOUSE]: {
+    title: 'Sıkışmış Takas — Yönetim Gerekli',
+    message:
+      '{{tradeNumber}} takası depoya ulaştı fakat süresi doldu; elle force-cancel-stuck gerekiyor.',
+    icon: '⚠️',
+    link: '/trades',
+  },
   [NotificationType.OFFER_AUTO_REJECTED]: {
     title: 'Teklifiniz Kapatıldı',
     message: '{{cancelReason}}',

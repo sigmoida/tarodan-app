@@ -46,6 +46,8 @@ export enum NotificationType {
   TRADE_SHIPPED = 'trade_shipped',
   TRADE_COMPLETED = 'trade_completed',
   TRADE_AUTO_CANCELLED = 'trade_auto_cancelled',
+  // Admin uyarısı: takas depoya ulaştı ama süresi doldu — elle force-cancel-stuck gerekiyor.
+  TRADE_STUCK_AT_WAREHOUSE = 'trade_stuck_at_warehouse',
 
   // RefundRequest notifications (sipariş iadesi akışı)
   REFUND_CANCELLED = 'refund_cancelled',
