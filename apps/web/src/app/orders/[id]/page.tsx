@@ -31,6 +31,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { StarIcon } from "@heroicons/react/24/solid";
 import { useTranslation } from "@/i18n/LanguageContext";
+import { useConfirm } from "@/components/ConfirmProvider";
 import CityDistrictSelector from "@/components/CityDistrictSelector";
 import UserAvatar from "@/components/UserAvatar";
 import {
@@ -217,6 +218,7 @@ export default function OrderDetailPage() {
   const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const { t, locale } = useTranslation();
+  const confirm = useConfirm();
   const getOrderStatusLabel = (s: string) =>
     locale === "en"
       ? orderStatusEnLabels[s] || s
@@ -679,11 +681,16 @@ export default function OrderDetailPage() {
   const handleCancel = async () => {
     if (!order) return;
     if (
-      !window.confirm(
-        locale === "en"
-          ? "Cancel this order? Your payment will be refunded."
-          : "Bu siparişi iptal etmek istediğinize emin misiniz? Ödemeniz iade edilecektir.",
-      )
+      !(await confirm({
+        title: locale === "en" ? "Cancel order" : "Siparişi iptal et",
+        description:
+          locale === "en"
+            ? "Cancel this order? Your payment will be refunded."
+            : "Bu siparişi iptal etmek istediğinize emin misiniz? Ödemeniz iade edilecektir.",
+        confirmLabel: locale === "en" ? "Yes, cancel" : "Evet, iptal et",
+        cancelLabel: locale === "en" ? "No" : "Vazgeç",
+        destructive: true,
+      }))
     ) {
       return;
     }

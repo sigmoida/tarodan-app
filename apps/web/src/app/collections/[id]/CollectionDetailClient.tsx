@@ -21,6 +21,7 @@ import toast from 'react-hot-toast';
 import { Button, Input, Select, Spinner, Textarea } from '@tarodan/ui';
 import { useAuthStore } from '@/stores/authStore';
 import { collectionsApi, userApi, listingsApi, api } from '@/lib/api';
+import { useConfirm } from '@/components/ConfirmProvider';
 import { getProductEffectivePrice } from '@/lib/productPrice';
 import dynamic from 'next/dynamic';
 import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
@@ -87,6 +88,7 @@ export default function CollectionDetailClient() {
   const queryClient = useQueryClient();
   const { user, isAuthenticated } = useAuthStore();
   const { t, locale } = useTranslation();
+  const confirm = useConfirm();
   const collectionIdOrSlug = params.id as string;
 
   const [showAddItemModal, setShowAddItemModal] = useState(false);
@@ -244,7 +246,16 @@ export default function CollectionDetailClient() {
 
   const handleRemoveItem = async (itemId: string) => {
     if (!collection) return;
-    if (!confirm(t('collection.removeProductConfirm'))) return;
+    if (
+      !(await confirm({
+        title: locale === 'en' ? 'Remove product' : 'Ürünü kaldır',
+        description: t('collection.removeProductConfirm'),
+        confirmLabel: locale === 'en' ? 'Remove' : 'Kaldır',
+        cancelLabel: t('common.cancel'),
+        destructive: true,
+      }))
+    )
+      return;
     try {
       await collectionsApi.removeItem(collection.id, itemId);
       toast.success(t('collection.productRemoved'));

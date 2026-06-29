@@ -10,6 +10,7 @@ import { addressesApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import CityDistrictSelector from '@/components/CityDistrictSelector';
+import { useConfirm } from '@/components/ConfirmProvider';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { Button, Checkbox, Input, Textarea } from '@tarodan/ui';
 
@@ -30,6 +31,7 @@ export default function AddressesPage() {
   const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { t, locale } = useTranslation();
+  const confirm = useConfirm();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -134,7 +136,16 @@ export default function AddressesPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm(t('address.deleteConfirm'))) return;
+    if (
+      !(await confirm({
+        title: locale === 'en' ? 'Delete address' : 'Adresi sil',
+        description: t('address.deleteConfirm'),
+        confirmLabel: t('common.delete'),
+        cancelLabel: t('common.cancel'),
+        destructive: true,
+      }))
+    )
+      return;
     try {
       await addressesApi.delete(id);
       toast.success(t('address.deleted'));

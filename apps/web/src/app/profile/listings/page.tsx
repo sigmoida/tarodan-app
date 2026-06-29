@@ -28,6 +28,7 @@ import { Button, Spinner } from "@tarodan/ui";
 import BoostModal from "@/components/BoostModal";
 import { useAuthStore } from "@/stores/authStore";
 import { userApi, api, ordersApi } from "@/lib/api";
+import { useConfirm } from "@/components/ConfirmProvider";
 import {
   getProductEffectivePrice,
   isProductOnSaleDisplay,
@@ -109,6 +110,7 @@ const FILTER_TABS = [
 
 export default function ProfileListingsPage() {
   const router = useRouter();
+  const confirm = useConfirm();
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const queryClient = useQueryClient();
@@ -189,7 +191,15 @@ export default function ProfileListingsPage() {
   };
 
   const handleDelete = async (listingId: string) => {
-    if (!confirm("Bu ilanı silmek istediğinize emin misiniz?")) return;
+    if (
+      !(await confirm({
+        title: "İlanı sil",
+        description: "Bu ilanı silmek istediğinize emin misiniz?",
+        confirmLabel: "Sil",
+        destructive: true,
+      }))
+    )
+      return;
     setDeletingId(listingId);
     try {
       await api.delete(`/products/${listingId}`);

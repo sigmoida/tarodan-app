@@ -7,6 +7,7 @@ import { MagnifyingGlassIcon, TrashIcon, BellIcon, ArrowLeftIcon } from '@heroic
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
+import { useConfirm } from '@/components/ConfirmProvider';
 import { Button } from '@tarodan/ui';
 
 interface SavedSearch {
@@ -27,6 +28,7 @@ const STORAGE_KEY = 'diecast_saved_searches';
 
 export default function SavedSearchesPage() {
   const router = useRouter();
+  const confirm = useConfirm();
   const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -63,8 +65,16 @@ export default function SavedSearchesPage() {
     setSavedSearches(searches);
   };
 
-  const handleDelete = (id: string) => {
-    if (!confirm('Bu aramayı silmek istediğinizden emin misiniz?')) return;
+  const handleDelete = async (id: string) => {
+    if (
+      !(await confirm({
+        title: 'Aramayı sil',
+        description: 'Bu aramayı silmek istediğinizden emin misiniz?',
+        confirmLabel: 'Sil',
+        destructive: true,
+      }))
+    )
+      return;
     const updated = savedSearches.filter(s => s.id !== id);
     saveSearches(updated);
     toast.success('Arama silindi');

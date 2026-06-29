@@ -9,6 +9,7 @@ import UserAvatar from '@/components/UserAvatar';
 import { useAuthStore } from '@/stores/authStore';
 import { Button, Input, Spinner } from '@tarodan/ui';
 import { messagesApi, listingsApi, api, mediaApi } from '@/lib/api';
+import { useConfirm } from '@/components/ConfirmProvider';
 import { useTranslation } from '@/i18n';
 import { useMessagingSocket } from '@/hooks/useMessagingSocket';
 
@@ -159,6 +160,7 @@ export default function MessagesPage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { t, locale } = useTranslation();
+  const confirm = useConfirm();
   const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
   /** Taslak sohbet bazında: sohbet değişince yazı/resim eski sohbette kalır */
@@ -469,12 +471,16 @@ export default function MessagesPage() {
     // Final content filter check (text only)
     const filterResult = text ? checkContentFilter(text, locale) : { passed: true };
     if (!filterResult.passed) {
-      const confirm = window.confirm(
-        locale === 'en'
-          ? `${filterResult.warning}\n\nDo you still want to send it?`
-          : `${filterResult.warning}\n\nYine de göndermek istiyor musunuz?`
-      );
-      if (!confirm) return;
+      const proceed = await confirm({
+        title: locale === 'en' ? 'Content warning' : 'İçerik uyarısı',
+        description:
+          locale === 'en'
+            ? `${filterResult.warning} Do you still want to send it?`
+            : `${filterResult.warning} Yine de göndermek istiyor musunuz?`,
+        confirmLabel: locale === 'en' ? 'Send' : 'Gönder',
+        cancelLabel: locale === 'en' ? 'Cancel' : 'Vazgeç',
+      });
+      if (!proceed) return;
     }
 
     setSending(true);

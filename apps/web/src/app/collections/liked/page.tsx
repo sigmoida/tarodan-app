@@ -9,6 +9,7 @@ import UserAvatar from '@/components/UserAvatar';
 import { BookOpenIcon, ArchiveBoxIcon, ArrowLeftIcon, EyeIcon, HeartIcon } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
 import { api, collectionsApi } from '@/lib/api';
+import toast from 'react-hot-toast';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { motion } from 'framer-motion';
 import { Button } from '@tarodan/ui';
@@ -89,7 +90,7 @@ export default function LikedCollectionsPage() {
       await collectionsApi.unlike(collectionId);
       await queryClient.invalidateQueries({ queryKey: ['collections-liked'] });
     } catch (err: any) {
-      alert(err.response?.data?.message || t('collection.unlikeFailed'));
+      toast.error(err.response?.data?.message || t('collection.unlikeFailed'));
     }
   };
 

@@ -25,6 +25,7 @@ import {
 import { CheckIcon, XMarkIcon } from '@heroicons/react/24/solid';
 import { useAuthStore } from '@/stores/authStore';
 import { api, ordersApi } from '@/lib/api';
+import toast from 'react-hot-toast';
 import { getProductEffectivePrice } from '@/lib/productPrice';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { Button, Input, Spinner, StatusBadge, offerStatusConfig } from '@tarodan/ui';
@@ -168,7 +169,7 @@ function OffersPageContent() {
       await api.post(`/offers/${offerId}/accept`);
       await invalidateOffers();
     } catch (err: any) {
-      alert(err.response?.data?.message || (locale === 'en' ? 'Failed to accept offer' : 'Teklif kabul edilirken hata oluştu'));
+      toast.error(err.response?.data?.message || (locale === 'en' ? 'Failed to accept offer' : 'Teklif kabul edilirken hata oluştu'));
     } finally {
       setActionLoading(null);
     }
@@ -180,7 +181,7 @@ function OffersPageContent() {
       await api.post(`/offers/${offerId}/reject`);
       await invalidateOffers();
     } catch (err: any) {
-      alert(err.response?.data?.message || (locale === 'en' ? 'Failed to reject offer' : 'Teklif reddedilirken hata oluştu'));
+      toast.error(err.response?.data?.message || (locale === 'en' ? 'Failed to reject offer' : 'Teklif reddedilirken hata oluştu'));
     } finally {
       setActionLoading(null);
     }
@@ -192,7 +193,7 @@ function OffersPageContent() {
       await api.post(`/offers/${offerId}/cancel`);
       await invalidateOffers();
     } catch (err: any) {
-      alert(err.response?.data?.message || (locale === 'en' ? 'Failed to cancel offer' : 'Teklif iptal edilirken hata oluştu'));
+      toast.error(err.response?.data?.message || (locale === 'en' ? 'Failed to cancel offer' : 'Teklif iptal edilirken hata oluştu'));
     } finally {
       setActionLoading(null);
     }
@@ -208,11 +209,11 @@ function OffersPageContent() {
     if (!buyerCounterOffer) return;
     const amount = parseFloat(buyerCounterAmt.replace(',', '.'));
     if (Number.isNaN(amount) || amount <= 0) {
-      alert(locale === 'en' ? 'Enter a valid amount' : 'Geçerli bir tutar girin');
+      toast.error(locale === 'en' ? 'Enter a valid amount' : 'Geçerli bir tutar girin');
       return;
     }
     if (amount >= Number(buyerCounterOffer.amount)) {
-      alert(
+      toast.error(
         locale === 'en'
           ? `Your offer must be below the seller's counter (₺${Number(buyerCounterOffer.amount).toLocaleString('tr-TR')}).`
           : `Satıcının karşı teklifinden (₺${Number(buyerCounterOffer.amount).toLocaleString('tr-TR')}) düşük olmalıdır.`,
@@ -226,7 +227,7 @@ function OffersPageContent() {
       setBuyerCounterOffer(null);
       await invalidateOffers();
     } catch (err: any) {
-      alert(err.response?.data?.message || (locale === 'en' ? 'Failed to send counter' : 'Karşı teklif gönderilemedi'));
+      toast.error(err.response?.data?.message || (locale === 'en' ? 'Failed to send counter' : 'Karşı teklif gönderilemedi'));
     } finally {
       setActionLoading(null);
     }
@@ -242,11 +243,11 @@ function OffersPageContent() {
     if (!sellerCounterOffer) return;
     const amount = parseFloat(sellerCounterAmt.replace(',', '.'));
     if (Number.isNaN(amount) || amount <= 0) {
-      alert(locale === 'en' ? 'Enter a valid amount' : 'Geçerli bir tutar girin');
+      toast.error(locale === 'en' ? 'Enter a valid amount' : 'Geçerli bir tutar girin');
       return;
     }
     if (amount <= Number(sellerCounterOffer.amount)) {
-      alert(
+      toast.error(
         locale === 'en'
           ? `Your counter must be above the buyer's offer (₺${Number(sellerCounterOffer.amount).toLocaleString('tr-TR')}).`
           : `Karşı teklifiniz alıcının teklifinden (₺${Number(sellerCounterOffer.amount).toLocaleString('tr-TR')}) yüksek olmalıdır.`,
@@ -260,7 +261,7 @@ function OffersPageContent() {
       setSellerCounterOffer(null);
       await invalidateOffers();
     } catch (err: any) {
-      alert(err.response?.data?.message || (locale === 'en' ? 'Failed to send counter' : 'Karşı teklif gönderilemedi'));
+      toast.error(err.response?.data?.message || (locale === 'en' ? 'Failed to send counter' : 'Karşı teklif gönderilemedi'));
     } finally {
       setActionLoading(null);
     }

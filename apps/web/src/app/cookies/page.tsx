@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import toast from 'react-hot-toast';
 import { useTranslation } from '@/i18n/LanguageContext';import { Button, Checkbox } from '@tarodan/ui';
 
 
@@ -69,7 +70,7 @@ export default function CookiesPage() {
   const savePreferences = () => {
     // In a real app, this would save to localStorage and update consent
     localStorage.setItem('cookie_preferences', JSON.stringify(preferences));
-    alert(t('common.success'));
+    toast.success(t('common.success'));
   };
 
   return (

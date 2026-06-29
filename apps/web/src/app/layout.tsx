@@ -9,6 +9,7 @@ import QueryProvider from './QueryProvider';
 import { RealtimeProvider } from '@/components/realtime/RealtimeProvider';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import BusinessMembershipGuard from '@/components/BusinessMembershipGuard';
+import { ConfirmProvider } from '@/components/ConfirmProvider';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://tarodan.com'),
@@ -58,11 +59,13 @@ export default function RootLayout({
             <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''}>
             <RealtimeProvider />
             <PlatformFeeAnnouncementBanner />
-            <BusinessMembershipGuard>
-              <LayoutShell>
-                {children}
-              </LayoutShell>
-            </BusinessMembershipGuard>
+            <ConfirmProvider>
+              <BusinessMembershipGuard>
+                <LayoutShell>
+                  {children}
+                </LayoutShell>
+              </BusinessMembershipGuard>
+            </ConfirmProvider>
             <CookieConsentBanner />
             <Toaster
               position="bottom-right"

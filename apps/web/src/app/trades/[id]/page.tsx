@@ -30,6 +30,7 @@ import {
 import { getProductEffectivePrice } from "@/lib/productPrice";
 import TradeAddressPicker from "@/components/TradeAddressPicker";
 import { useTranslation } from "@/i18n/LanguageContext";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { ShieldCheckIcon } from "@heroicons/react/24/outline";
 import {
   Button,
@@ -304,6 +305,7 @@ export default function TradeDetailPage() {
   const queryClient = useQueryClient();
   const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { t, locale } = useTranslation();
+  const confirm = useConfirm();
   const tradeId = params.id as string;
   const TRADE_STATUS_META = getTradeStatusMeta(locale);
   const getTradeStatusLabel = (s: string) =>
@@ -687,11 +689,16 @@ export default function TradeDetailPage() {
     if (!trade) return;
 
     if (
-      !confirm(
-        locale === "en"
-          ? "Are you sure you want to cancel this trade?"
-          : "Bu takası iptal etmek istediğinizden emin misiniz?",
-      )
+      !(await confirm({
+        title: locale === "en" ? "Cancel trade" : "Takası iptal et",
+        description:
+          locale === "en"
+            ? "Are you sure you want to cancel this trade?"
+            : "Bu takası iptal etmek istediğinizden emin misiniz?",
+        confirmLabel: locale === "en" ? "Yes, cancel" : "Evet, iptal et",
+        cancelLabel: locale === "en" ? "No" : "Vazgeç",
+        destructive: true,
+      }))
     ) {
       return;
     }

@@ -8,6 +8,7 @@ import { motion } from 'framer-motion';
 import { TrashIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { bankAccountApi } from '@/lib/api';
+import { useConfirm } from '@/components/ConfirmProvider';
 import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { Button, Input } from '@tarodan/ui';
@@ -24,6 +25,7 @@ interface BankAccount {
 
 export default function BankAccountPage() {
   const router = useRouter();
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
 
@@ -96,7 +98,15 @@ export default function BankAccountPage() {
   };
 
   const handleDelete = async () => {
-    if (!confirm('Banka hesabınızı silmek istediğinize emin misiniz?')) return;
+    if (
+      !(await confirm({
+        title: 'Banka hesabını sil',
+        description: 'Banka hesabınızı silmek istediğinize emin misiniz?',
+        confirmLabel: 'Sil',
+        destructive: true,
+      }))
+    )
+      return;
     try {
       await bankAccountApi.delete();
       toast.success('Banka hesabı silindi');

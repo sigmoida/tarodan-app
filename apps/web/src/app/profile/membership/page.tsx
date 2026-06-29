@@ -16,6 +16,7 @@ import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { api, membershipApi } from '@/lib/api';
+import { useConfirm } from '@/components/ConfirmProvider';
 import { useTranslation } from '@/i18n';
 import { Button } from '@tarodan/ui';
 
@@ -24,6 +25,7 @@ export default function MembershipPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { t, locale } = useTranslation();
+  const confirm = useConfirm();
   const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const [selectedPeriod, setSelectedPeriod] = useState<'monthly' | 'yearly'>('monthly');
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
@@ -292,7 +294,18 @@ export default function MembershipPage() {
   };
 
   const handleCancelMembership = async () => {
-    if (!window.confirm('Üyeliğinizi iptal etmek istediğinizden emin misiniz? Mevcut dönem sonuna kadar özelliklerinizi kullanmaya devam edebilirsiniz.')) {
+    if (
+      !(await confirm({
+        title: locale === 'en' ? 'Cancel membership' : 'Üyeliği iptal et',
+        description:
+          locale === 'en'
+            ? 'Are you sure you want to cancel your membership? You can keep using your features until the end of the current period.'
+            : 'Üyeliğinizi iptal etmek istediğinizden emin misiniz? Mevcut dönem sonuna kadar özelliklerinizi kullanmaya devam edebilirsiniz.',
+        confirmLabel: locale === 'en' ? 'Yes, cancel' : 'Evet, iptal et',
+        cancelLabel: locale === 'en' ? 'No' : 'Vazgeç',
+        destructive: true,
+      }))
+    ) {
       return;
     }
     setCancelling(true);

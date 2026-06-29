@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { collectionsApi } from '@/lib/api';
+import toast from 'react-hot-toast';
 import { Button, Checkbox, Input, Select, Textarea } from '@tarodan/ui';
 
 export default function CreateCollectionModal({
@@ -35,7 +36,7 @@ export default function CreateCollectionModal({
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') console.error('Create collection error:', error);
       const errorMessage = error.response?.data?.message || 'Koleksiyon oluşturulamadı';
-      alert(errorMessage);
+      toast.error(errorMessage);
       if (errorMessage.includes('üyeliğiniz') || errorMessage.includes('yetkiniz yok')) {
         setTimeout(() => { window.location.href = '/pricing'; }, 2000);
       }
