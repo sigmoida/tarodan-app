@@ -104,16 +104,22 @@ import { ErrorLogInterceptor } from './common/interceptors/error-log.interceptor
     }),
 
     // Rate limiting
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60000, // 1 minute
-        // Genel limit yüksek tutulur: admin paneli SPA'sı açılışta tek IP'den çok
-        // sayıda istek atar; reverse proxy arkasında istemciler aynı kovaya
-        // düşebildiği için 100 çok düşüktü (admin login→dashboard loop'una yol açtı).
-        // Brute-force koruması hassas uçlardaki sıkı @Throttle (login 5/dk) ile sağlanır.
-        limit: 1000, // 1000 requests per minute
-      },
-    ]),
+    ThrottlerModule.forRoot({
+      throttlers: [
+        {
+          ttl: 60000, // 1 minute
+          // Genel limit yüksek tutulur: admin paneli SPA'sı açılışta tek IP'den çok
+          // sayıda istek atar; reverse proxy arkasında istemciler aynı kovaya
+          // düşebildiği için 100 çok düşüktü (admin login→dashboard loop'una yol açtı).
+          // Brute-force koruması hassas uçlardaki sıkı @Throttle (login 5/dk) ile sağlanır.
+          limit: 1000, // 1000 requests per minute
+        },
+      ],
+      // e2e testlerde rate-limit'i atla: runInBand suite sıkı @Throttle uçlarını
+      // (örn. /payments/initiate 10/dk) çok kez çağırınca 429 flakiness oluyordu.
+      // Yalnız NODE_ENV=test'te aktif — prod (production) asla etkilenmez.
+      skipIf: () => process.env.NODE_ENV === 'test',
+    }),
 
     // Event bus (Prisma → ES sync, etc.)
     EventEmitterModule.forRoot(),

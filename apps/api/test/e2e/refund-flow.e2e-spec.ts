@@ -18,6 +18,7 @@ import { createProduct } from '../factories/product.factory';
 import { createAddress } from '../factories/address.factory';
 import { signCallback } from '../mocks/paytr.mock';
 import { RefundService } from '../../src/modules/refund/refund.service';
+import { PaymentService } from '../../src/modules/payment/payment.service';
 
 /**
  * Helper: full purchase + paid order. No automatic shipping happens
@@ -475,7 +476,139 @@ describe('Refund flow (E2E)', () => {
     expect(unfrozen!.status).toBe(PaymentHoldStatus.held);
   });
 
+  it('E2/E4: iade açıkken releaseAt geçmiş olsa bile hold serbest BIRAKILMAZ (frozen guard)', async () => {
+    const buyer = await createUser(ctx.module);
+    const seller = await createUser(ctx.module, { isSeller: true });
+    const product = await createProduct({
+      sellerId: seller.id,
+      categoryId: baseline.categoryId,
+      price: 160,
+      quantity: 1,
+    });
+    const addr = await createAddress({ userId: buyer.id });
+    await createAddress({ userId: seller.id });
+
+    const { orderId } = await buyAndPay(ctx, buyer, product.id, addr.id);
+    const prisma = getPrisma();
+
+    // Teslim + cooling-off iade → hold dondurulur
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.delivered },
+    });
+    await prisma.shipment.update({
+      where: { orderId },
+      data: { status: ShipmentStatus.delivered, deliveredAt: new Date() },
+    });
+    const createRes = await request(ctx.app.getHttpServer())
+      .post(`/api/orders/${orderId}/refund-requests`)
+      .set(authHeader(buyer))
+      .send({ reason: 'changed_mind' })
+      .expect(201);
+
+    // 14. gün yarışı: releaseAt'i geçmişe çek — ama hold frozen olduğu için cron atlamalı
+    await prisma.paymentHold.updateMany({
+      where: { orderId },
+      data: { releaseAt: new Date(Date.now() - 60_000) },
+    });
+
+    const paymentService = ctx.app.get(PaymentService);
+    await paymentService.releaseHoldsDue();
+
+    const hold = await prisma.paymentHold.findFirst({ where: { orderId } });
+    expect(hold!.status).toBe(PaymentHoldStatus.held); // released DEĞİL
+    expect(hold!.releasedAt).toBeNull();
+    expect(hold!.frozenByRefundId).toBe(createRes.body.id);
+
+    // Donmuş hold için payout oluşmamalı
+    const payouts = await prisma.payoutTransfer.findMany({
+      where: { paymentHold: { orderId } },
+    });
+    expect(payouts).toHaveLength(0);
+  });
+
   // ── F. Sipariş iptali → iade ────────────────────────────────────────────
+  it('F2: paid sipariş iptali → status=refunded; processRefundedOrders cron PayTR iadesi yapar + order=cancelled', async () => {
+    const buyer = await createUser(ctx.module);
+    const seller = await createUser(ctx.module, { isSeller: true });
+    const product = await createProduct({
+      sellerId: seller.id,
+      categoryId: baseline.categoryId,
+      price: 200,
+      quantity: 1,
+    });
+    const addr = await createAddress({ userId: buyer.id });
+    await createAddress({ userId: seller.id });
+
+    const { orderId } = await buyAndPay(ctx, buyer, product.id, addr.id);
+    const prisma = getPrisma();
+
+    // İptal: paid → refunded (PayTR çağrısı henüz YAPILMAZ, cron'a bırakılır)
+    await request(ctx.app.getHttpServer())
+      .post(`/api/orders/${orderId}/cancel`)
+      .set(authHeader(buyer))
+      .send({ reason: 'vazgeçtim' })
+      .expect(200);
+
+    const afterCancel = await prisma.order.findUnique({ where: { id: orderId } });
+    expect(afterCancel!.status).toBe(OrderStatus.refunded);
+    expect(ctx.paytr.refundCalls).toHaveLength(0);
+
+    // Cron: refunded + payment.completed siparişleri bulup PayTR iadesini yapar
+    const paymentService = ctx.app.get(PaymentService);
+    const res = await paymentService.processRefundedOrders();
+    expect(res.refunded).toBeGreaterThanOrEqual(1);
+
+    expect(ctx.paytr.refundCalls).toHaveLength(1);
+    const finalOrder = await prisma.order.findUnique({ where: { id: orderId } });
+    expect(finalOrder!.status).toBe(OrderStatus.cancelled);
+    const payment = await prisma.payment.findFirst({ where: { orderId } });
+    expect(payment!.status).toBe(PaymentStatus.refunded);
+  });
+
+  it('F4: PayTR iadesi başarısızsa sipariş refunded kalır; sonraki cron turu retry edip tamamlar', async () => {
+    const buyer = await createUser(ctx.module);
+    const seller = await createUser(ctx.module, { isSeller: true });
+    const product = await createProduct({
+      sellerId: seller.id,
+      categoryId: baseline.categoryId,
+      price: 180,
+      quantity: 1,
+    });
+    const addr = await createAddress({ userId: buyer.id });
+    await createAddress({ userId: seller.id });
+
+    const { orderId } = await buyAndPay(ctx, buyer, product.id, addr.id);
+    const prisma = getPrisma();
+
+    await request(ctx.app.getHttpServer())
+      .post(`/api/orders/${orderId}/cancel`)
+      .set(authHeader(buyer))
+      .send({ reason: 'vazgeçtim' })
+      .expect(200);
+
+    const paymentService = ctx.app.get(PaymentService);
+
+    // 1. tur: PayTR iadesi başarısız → order refunded'da kalır, payment iade EDİLMEZ
+    ctx.paytr.nextRefundFails = true;
+    const first = await paymentService.processRefundedOrders();
+    expect(first.failed).toBeGreaterThanOrEqual(1);
+
+    const afterFail = await prisma.order.findUnique({ where: { id: orderId } });
+    expect(afterFail!.status).toBe(OrderStatus.refunded); // henüz cancelled değil
+    const payAfterFail = await prisma.payment.findFirst({ where: { orderId } });
+    expect(payAfterFail!.status).not.toBe(PaymentStatus.refunded);
+
+    // 2. tur: retry başarılı → PayTR iade yapılır, order cancelled, payment refunded
+    const second = await paymentService.processRefundedOrders();
+    expect(second.refunded).toBeGreaterThanOrEqual(1);
+
+    const finalOrder = await prisma.order.findUnique({ where: { id: orderId } });
+    expect(finalOrder!.status).toBe(OrderStatus.cancelled);
+    const finalPay = await prisma.payment.findFirst({ where: { orderId } });
+    expect(finalPay!.status).toBe(PaymentStatus.refunded);
+  });
+
   it('F3: kargoya verildikten (shipped) sonra sipariş iptali reddedilir (400)', async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });

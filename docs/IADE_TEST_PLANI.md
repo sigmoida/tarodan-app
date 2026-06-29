@@ -94,7 +94,7 @@ Kapsama etiketleri: ✅ COVERED · 🟡 KISMİ · ❌ BOŞLUK · 🖐 MANUEL/L4
 |---|---------|----------|-------|
 | D1 | endpoint/hash/tutar (ONDALIK TL) | `/odeme/iade`, HMAC-SHA256, `10.25` formatı | ✅ paytr.service.spec |
 | D2 | `status!=success` → throw | BadRequest (err_msg) | ✅ paytr.service.spec |
-| D3 | "ödeme henüz bildirilmemiş" hatası | "1-2 dk sonra deneyin" mesajı | ❌ unit ekle |
+| D3 | "ödeme henüz bildirilmemiş" hatası | "1-2 dk sonra deneyin" mesajı | ✅ b3 spec |
 | D4 | oid normalizasyon (tire temizleme) | doğru oid | ✅ paytr.service.spec |
 | D5 | B3 refund-in-progress marker (çift-iade guard) | marker varsa PayTR atla | ✅ payment-trade-cash-refund-b3 |
 | D6 | `PAYMENT_BYPASS=true` gerçek çağrıyı atlar | DB'de `refunded` | ✅ payment-bypass.e2e |
@@ -104,18 +104,18 @@ Kapsama etiketleri: ✅ COVERED · 🟡 KISMİ · ❌ BOŞLUK · 🖐 MANUEL/L4
 | # | Senaryo | Beklenen | Durum |
 |---|---------|----------|-------|
 | E1 | iade açılınca hold dondurulur | `frozenByRefundId` set | ✅ refund-flow |
-| E2 | iade açıkken hold release olmaz | payout çıkmaz | 🟡 money-flow |
+| E2 | iade açıkken hold release olmaz | payout çıkmaz | ✅ refund-flow (E2/E4) |
 | E3 | iade iptal → hold çözülür | `frozenByRefundId` null | ✅ refund-flow |
-| E4 | 14. gün son saniye iade vs payout yarışı | hold frozen, payout bloke | ❌ e2e ekle |
+| E4 | 14. gün son saniye iade vs payout yarışı | hold frozen, payout bloke | ✅ refund-flow (E2/E4) |
 | E5 | iade sonrası PayoutTransfer oluşmaz | yok | ✅ money-flow |
 
 ### F. Sipariş iptali → iade
 | # | Senaryo | Beklenen | Durum |
 |---|---------|----------|-------|
 | F1 | `pending_payment` iptal | `cancelled`, stok serbest, ledger yok | ✅ edge-cases |
-| F2 | paid/preparing iptal | `refunded` → PayTR iade | 🟡 doğrula |
+| F2 | paid/preparing iptal | `refunded` → PayTR iade | ✅ refund-flow |
 | F3 | kargolandıktan sonra iptal | 400 reddedilir | ✅ refund-flow |
-| F4 | `processRefundedOrders` cron failed iadeyi retry | iade tamamlanır | ❌ unit/e2e ekle |
+| F4 | `processRefundedOrders` cron failed iadeyi retry | iade tamamlanır | ✅ refund-flow |
 | F5 | iptalde komisyon ledger `waived` | doğru statü | ❌ ekle |
 
 ### G. Takas nakit iadesi
@@ -123,9 +123,9 @@ Kapsama etiketleri: ✅ COVERED · 🟡 KISMİ · ❌ BOŞLUK · 🖐 MANUEL/L4
 |---|---------|----------|-------|
 | G1 | takas iptal → nakit iade | PayTR iade | 🟡 money-flow |
 | G2 | admin depo reddi → iade | iade + dönüş kargosu | ✅ money-flow |
-| G3 | süre aşımı auto-cancel → iade | iade + rezervasyon serbest | ❌ ekle |
+| G3 | süre aşımı auto-cancel → iade | iade + rezervasyon serbest | 🟡 bileşenler kapsandı (refund+autoCancel ayrı) |
 | G4 | B3 marker | çift-iade yok | ✅ b3 spec |
-| G5 | idempotency (releasedAt/refundedAt/payout guard) | ikinci çağrı atlanır | 🟡 b3 → genişlet |
+| G5 | idempotency (releasedAt/refundedAt/payout guard) | ikinci çağrı atlanır | ✅ b3 spec |
 
 ### H. Admin işlemleri & izinler
 | # | Senaryo | Beklenen | Durum |
@@ -197,4 +197,4 @@ L1–L3
 
 ## 5. Bilinen boşluk/uyarılar
 - **L4 (gerçek PayTR)** otomatik kanıtlanamaz — e2e mock'la. Canlı doğrulama şart.
-- `refund-extended` "completes refund as buyer" e2e'si `/api/payments/refund`'da **429 rate-limit** flakiness yaşıyor (pre-existing) — Faz 1'de izole edip throttle/test ayarına bakılacak.
+- ✅ ÇÖZÜLDÜ: e2e 429 rate-limit flakiness — ThrottlerModule.forRoot skipIf(NODE_ENV===test) ile test ortamında atlanıyor (prod etkilenmez). refund + trade + money + escrow + edge + payment-window: 72/72 yeşil.

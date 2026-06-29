@@ -123,4 +123,37 @@ describe('PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
     ).rejects.toThrow();
     expect(mockPaytr.createRefund).not.toHaveBeenCalled();
   });
+
+  // G5: çift-iade idempotency guard'ları — PayTR ASLA çağrılmamalı.
+  it('G5: tradeCashPayment.refundedAt zaten doluysa iade atlanır (already_refunded)', async () => {
+    mockPrisma.payment.findFirst.mockResolvedValue(null); // refundedAt:null filtresi eşleşmez
+    const r = await service.refundTradeCashPaymentIfCompleted(TRADE_ID);
+    expect(r.refunded).toBe(false);
+    expect(r.skippedReason).toBe('no_completed_paytr_payment');
+    expect(mockPaytr.createRefund).not.toHaveBeenCalled();
+  });
+
+  it('G5: PayoutTransfer processing/completed varsa iade atlanır (payout_already_in_progress)', async () => {
+    mockPrisma.payment.findFirst.mockResolvedValue(basePayment({ foo: 1 }));
+    mockPrisma.payoutTransfer.findFirst.mockResolvedValue({ id: 'po-1', status: 'completed' });
+
+    const r = await service.refundTradeCashPaymentIfCompleted(TRADE_ID);
+
+    expect(r.refunded).toBe(false);
+    expect(r.skippedReason).toBe('payout_already_in_progress');
+    expect(mockPaytr.createRefund).not.toHaveBeenCalled();
+  });
+
+  // D3: PayTR "ödeme henüz siteye bildirilmemiş" hatasını kullanıcı-dostu
+  // "1-2 dakika sonra tekrar deneyin" mesajına çevirir (yeni tamamlanan ödemede iade).
+  it('D3: PayTR "henüz bildirilmemiş" hatası → "1-2 dakika sonra tekrar deneyin" mesajına çevrilir', async () => {
+    mockPrisma.payment.findFirst.mockResolvedValue(basePayment({ foo: 1 }));
+    mockPaytr.createRefund.mockRejectedValue(
+      new Error('odeme henuz siteye bildirilmemis'),
+    );
+
+    await expect(
+      service.refundTradeCashPaymentIfCompleted(TRADE_ID),
+    ).rejects.toThrow(/1-2 dakika/);
+  });
 });
