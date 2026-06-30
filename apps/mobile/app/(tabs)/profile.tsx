@@ -644,6 +644,12 @@ export default function ProfileScreen() {
             label="Güvenlik"
             onPress={() => router.push('/settings/security')}
           />
+          <MenuItem
+            testID="profile-language-link"
+            icon="language-outline"
+            label="Dil / Language"
+            onPress={() => router.push('/settings/language')}
+          />
           {effectiveTier.toLowerCase() === 'business' && (
             <MenuItem
               icon="business-outline"

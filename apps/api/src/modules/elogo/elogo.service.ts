@@ -138,4 +138,20 @@ export class ElogoService {
       this.client.getDocumentStatus(documentUuid, documentType, sid, this.callOptions),
     );
   }
+
+  /** e-Arşiv faturasını İPTAL et (yalnızca fatura tarihinden ≤8 gün içinde geçerli). */
+  async cancelEArchiveInvoice(uuid: string, elementId?: string): Promise<ElogoSendResult> {
+    return this.withSession((sid) => this.client.cancelEArchive(uuid, elementId, sid, this.callOptions));
+  }
+
+  /**
+   * İade durumunda izlenecek yol (mevzuat): fatura tarihinden **≤8 gün** ise e-Arşiv İPTAL,
+   * **>8 gün** ise iptal yapılamaz → İADE FATURASI (InvoiceTypeCode=IADE, orijinali referans).
+   * Çağıran taraf 'CANCEL' → cancelEArchiveInvoice(), 'RETURN_INVOICE' → sendDocument(IADE UBL) yapar.
+   */
+  refundStrategy(invoiceIssueDate: Date | string, now: Date = new Date()): 'CANCEL' | 'RETURN_INVOICE' {
+    const issued = typeof invoiceIssueDate === 'string' ? new Date(invoiceIssueDate) : invoiceIssueDate;
+    const daysElapsed = Math.floor((now.getTime() - issued.getTime()) / (24 * 60 * 60 * 1000));
+    return daysElapsed <= 8 ? 'CANCEL' : 'RETURN_INVOICE';
+  }
 }

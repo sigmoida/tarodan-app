@@ -21,12 +21,12 @@ import { useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { api, ordersApi, refundsApi, mediaApi, type RNFile } from '../../src/services/api';
+import { api, ordersApi, refundsApi, mediaApi, paymentsApi, type RNFile } from '../../src/services/api';
 import { ThemedRefreshControl } from '../../src/components/common';
 import { useRefresh } from '../../src/hooks/useRefresh';
 import RatingModal from '../../src/components/RatingModal';
 import { captureException } from '../../src/services/sentry';
-import { safeString } from '../../src/utils/safeString';
+import { formatCondition } from '../../src/utils/format';
 import { apiStatusToUi, type UiOrderStatus } from '../../src/utils/orderStatus';
 import { getOrderProductImageUri } from '../../src/utils/orderProductImage';
 
@@ -396,6 +396,50 @@ export default function OrderDetailScreen() {
     );
   };
 
+  // Ödeme bekleyen siparişi öde — web ile parite: ÖNCE POST /payments/initiate ile bir
+  // ödeme (paymentId) oluştur, SONRA ödeme ekranına git. Doğrudan order.id ile gidersek
+  // ödeme ekranı /payments/{orderId}/status'u çağırıp "Ödeme bilgisi yüklenemedi" hatası
+  // veriyordu (ekran paymentId bekler, orderId değil).
+  const initiatePaymentMutation = useMutation({
+    mutationFn: async () => {
+      const res: any = await paymentsApi.initiate(id as string);
+      return res.data?.data ?? res.data ?? {};
+    },
+    onSuccess: (data: any) => {
+      const paymentId = data?.paymentId || data?.id || data?.payment?.id || (id as string);
+      // PAYMENT_BYPASS ortamı: gerçek PayTR token üretilmez → bypass-complete + success
+      // (checkout akışıyla aynı; aksi halde ödeme ekranı boş kart formunda takılır).
+      if (data?.useBypass === true) {
+        paymentsApi.bypassComplete(paymentId).catch((e: any) =>
+          captureException(e, {
+            level: 'error',
+            tags: { flow: 'order.payBypass' },
+            extra: { paymentId, orderId: String(id ?? '') },
+          }),
+        );
+        router.replace({
+          pathname: '/payment/success',
+          params: { paymentId, orderId: String(id) },
+        } as any);
+        return;
+      }
+      router.push({
+        pathname: '/payment/[id]',
+        params: { id: paymentId, orderId: String(id), provider: 'paytr', guest: '0' },
+      } as any);
+    },
+    onError: (err: any) => {
+      captureException(err, {
+        level: 'error',
+        tags: { flow: 'order.payInitiate' },
+        extra: { orderId: String(id ?? '') },
+      });
+      const raw = err?.response?.data?.message;
+      const msg = Array.isArray(raw) ? raw.join(', ') : raw || 'Ödeme başlatılamadı. Lütfen tekrar deneyin.';
+      setSnackbar({ visible: true, message: typeof msg === 'string' ? msg : 'Ödeme başlatılamadı.', variant: 'danger' });
+    },
+  });
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString('tr-TR', {
@@ -441,12 +485,28 @@ export default function OrderDetailScreen() {
   // order.status'a göre "Teslim Edildi" gösterir.
   const isDelivered =
     !!order && ['delivered', 'awaiting_confirmation', 'completed'].includes(order.status);
+  // Kargo takip kartı, gönderi GERÇEKTEN oluşturulduğunda (shippedAt dolu) gösterilir.
+  // Sürat gönderisi/trackingNumber ödeme anında oluşabildiği için yalnız trackingNumber'a
+  // bakmak "kargoya verilmeden takip linki" hatasına yol açıyordu; shippedAt tek doğru sinyal.
   const showTrackingCard =
     !!order &&
     !!order.trackingNumber &&
+    !!order.shippedAt &&
     isPostShipment &&
     !isCancelled &&
     order.status !== 'refunded';
+
+  // Ödeme alındı mı — backend status'u 'pending_payment'ta gecikse bile paidAt /
+  // payment.status / kargo-sonrası durum ödemenin alındığını gösterir (web ile parite:
+  // web "ödendi"yi status !== 'pending_payment' ile belirler). Aksi halde ödenmiş sipariş
+  // "Ödeme Bekliyor" görünüyordu.
+  const isPaid =
+    !!order &&
+    (!!order.paidAt ||
+      order.payment?.status === 'completed' ||
+      ['processing', 'shipped', 'delivered', 'awaiting_confirmation', 'completed'].includes(
+        order.status,
+      ));
 
   // Saticiya ödeme = teslim + 14 gün (iade penceresi). Teslim edilmişse tahmini
   // serbest kalma tarihini göster; açık iade varken hold dondurulur (bekletme rozeti).
@@ -576,7 +636,7 @@ export default function OrderDetailScreen() {
               icon="card"
               label="Ödeme Yapıldı"
               date={formatDate(order.paidAt)}
-              isActive={!!order.paidAt}
+              isActive={isPaid}
             />
             <TimelineItem
               testID="order-shipped-timeline"
@@ -625,8 +685,9 @@ export default function OrderDetailScreen() {
           </Card>
         )}
 
-        {/* Ödeme Bekliyor — alıcı ödemeyi tamamlasın (örn. kabul edilen tekliften oluşan sipariş) */}
-        {order.status === 'pending' && order.isBuyer !== false && (
+        {/* Ödeme Bekliyor — alıcı ödemeyi tamamlasın (örn. kabul edilen tekliften oluşan sipariş).
+            Ödeme alınmışsa (isPaid) gösterilmez; aksi halde ödenmiş sipariş "Ödeme Bekliyor" görünürdü. */}
+        {order.status === 'pending' && !isPaid && order.isBuyer !== false && (
           <Card variant="elevated" style={styles.card}>
             <Text variant="label" style={styles.sectionTitle}>Ödeme Bekliyor</Text>
             <Text variant="caption" style={styles.confirmNote}>
@@ -636,13 +697,9 @@ export default function OrderDetailScreen() {
               testID="order-pay-button"
               variant="primary"
               fullWidth
+              isLoading={initiatePaymentMutation.isPending}
               title={`Ödeme Yap · ${formatPrice(order.totalAmount)}`}
-              onPress={() =>
-                router.push({
-                  pathname: '/payment/[id]',
-                  params: { id: order.id, orderId: order.id, provider: 'paytr', guest: '0' },
-                } as any)
-              }
+              onPress={() => initiatePaymentMutation.mutate()}
               style={{ marginTop: 12 }}
             />
           </Card>
@@ -695,7 +752,7 @@ export default function OrderDetailScreen() {
               <View style={styles.productInfo}>
                 <Text variant="label" numberOfLines={2}>{order.product.title}</Text>
                 <Text variant="caption" style={styles.conditionText}>
-                  Durum: {safeString(order.product?.condition)}
+                  Durum: {formatCondition(order.product?.condition)}
                 </Text>
                 <Text variant="h3" style={styles.productPrice}>
                   {formatPrice(order.product.price)}

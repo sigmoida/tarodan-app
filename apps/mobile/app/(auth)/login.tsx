@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useForm, Controller } from 'react-hook-form';
@@ -16,10 +16,14 @@ import {
   Text,
   VStack,
   appAlert,
+  theme,
 } from '@tarodan/ui-native';
 import { authApi } from '../../src/services/api';
 import { signInWithGoogle, isGoogleConfigured } from '../../src/services/googleSignin';
 import { useAuthStore } from '../../src/stores/authStore';
+import { BrandLogo } from '../../src/components/BrandLogo';
+
+const { colors } = theme;
 
 /**
  * Şifre minimum kuralı web ile aynı: 8+ karakter, küçük + büyük harf + rakam.
@@ -188,7 +192,7 @@ export default function LoginScreen() {
   const errorBannerVisible = errorMessage || loginMutation.isError;
 
   return (
-    <Screen center>
+    <Screen center style={styles.screen}>
       <Pressable
         testID="login-back-button"
         onPress={continueAsGuest}
@@ -197,173 +201,200 @@ export default function LoginScreen() {
         hitSlop={12}
         style={[styles.backButton, { top: insets.top + 8 }]}
       >
-        <Ionicons name="arrow-back" size={26} color="#111827" />
+        <Ionicons name="arrow-back" size={26} color={colors.white} />
       </Pressable>
 
-      <VStack gap={4}>
-        <Text variant="displaySm" tone="primary" align="center">
-          Tarodan
-        </Text>
-        <Text variant="body" tone="muted" align="center">
-          Diecast Model Araba Pazaryeri
-        </Text>
+      <VStack gap={5}>
+        {/* Markalı başlık — turuncu zemin üzerinde Tarodan logosu (logo şeffaf;
+            beyaz "TARO" ancak turuncu arka planda görünür) + slogan */}
+        <View style={styles.brandHeader}>
+          <BrandLogo />
+        </View>
 
-        {unverifiedEmail ? (
-          <UIAlert
-            variant="warning"
-            title="E-posta doğrulanmadı"
-            testID="unverified-email-banner"
-          >
-            <Text variant="bodySm">
-              <Text variant="bodySm" weight="bold">
-                {unverifiedEmail}
-              </Text>{' '}
-              adresi henüz doğrulanmadı. Hesabınızı kullanmak için e-posta adresinize
-              gönderilen bağlantıya tıklayın veya yeni bir bağlantı isteyin.
-            </Text>
-            <HStack gap={2} style={{ marginTop: 8 }}>
-              <Button
-                variant="outline"
-                size="sm"
-                title={resendVerificationMutation.isPending ? 'Gönderiliyor…' : 'Tekrar Gönder'}
-                onPress={() => resendVerificationMutation.mutate()}
-                disabled={resendVerificationMutation.isPending}
-              />
-              <Button
-                variant="ghost"
-                size="sm"
-                title="Kapat"
-                onPress={() => setUnverifiedEmail(null)}
-              />
-            </HStack>
-          </UIAlert>
-        ) : null}
-
-        <Controller
-          control={control}
-          name="email"
-          render={({ field: { onChange, value } }) => (
-            <Input
-              testID="login-email-input"
-              label="E-posta"
-              value={value}
-              onChangeText={onChange}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-              error={errors.email?.message}
-            />
-          )}
-        />
-
-        <Controller
-          control={control}
-          name="password"
-          render={({ field: { onChange, value } }) => (
-            <Input
-              testID="login-password-input"
-              label="Şifre"
-              value={value}
-              onChangeText={onChange}
-              // Maestro iOS secureTextEntry'ye inputText gönderemiyor;
-              // EXPO_PUBLIC_MAESTRO=1 ile maskeyi kapat. Production: daima maskeli.
-              secureTextEntry={process.env.EXPO_PUBLIC_MAESTRO !== '1'}
-              togglePasswordVisibility
-              autoComplete="password"
-              error={errors.password?.message}
-            />
-          )}
-        />
-
-        {errorBannerVisible ? (
-          <Text
-            testID="login-error-banner"
-            variant="bodySm"
-            tone="danger"
-            align="center"
-          >
-            {errorMessage || 'Giriş başarısız.'}
+        {/* Form kartı */}
+        <View style={styles.card}>
+          <Text variant="h3" align="center">
+            Tekrar hoş geldiniz
           </Text>
-        ) : null}
-        {process.env.EXPO_PUBLIC_MAESTRO === '1' && loginMutation.isError && !errorMessage ? (
-          <Text testID="login-error-banner-fallback" style={{ height: 0, opacity: 0 }}>
-            login-error
+          <Text variant="bodySm" tone="muted" align="center" style={{ marginBottom: 16 }}>
+            Hesabınıza giriş yapın
           </Text>
-        ) : null}
 
-        <Button
-          testID="login-submit-button"
-          variant="primary"
-          size="lg"
-          fullWidth
-          title="Giriş Yap"
-          onPress={handleLoginPress}
-          isLoading={loginMutation.isPending}
-          disabled={loginMutation.isPending}
-        />
+          {unverifiedEmail ? (
+            <UIAlert
+              variant="warning"
+              title="E-posta doğrulanmadı"
+              testID="unverified-email-banner"
+            >
+              <Text variant="bodySm">
+                <Text variant="bodySm" weight="bold">
+                  {unverifiedEmail}
+                </Text>{' '}
+                adresi henüz doğrulanmadı. Hesabınızı kullanmak için e-posta adresinize
+                gönderilen bağlantıya tıklayın veya yeni bir bağlantı isteyin.
+              </Text>
+              <HStack gap={2} style={{ marginTop: 8 }}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  title={resendVerificationMutation.isPending ? 'Gönderiliyor…' : 'Tekrar Gönder'}
+                  onPress={() => resendVerificationMutation.mutate()}
+                  disabled={resendVerificationMutation.isPending}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  title="Kapat"
+                  onPress={() => setUnverifiedEmail(null)}
+                />
+              </HStack>
+            </UIAlert>
+          ) : null}
 
-        <Button
-          testID="continue-as-guest-button"
-          variant="outline"
-          size="lg"
-          fullWidth
-          title="Misafir Olarak Devam Et"
-          onPress={continueAsGuest}
-          disabled={loginMutation.isPending}
-        />
-
-        {isGoogleConfigured() && (
-          <Pressable
-            testID="login-google-button"
-            onPress={handleGoogle}
-            accessibilityRole="button"
-            accessibilityLabel="Google ile devam et"
-            disabled={loginMutation.isPending || googleLoading}
-            style={[styles.googleButton, (loginMutation.isPending || googleLoading) && { opacity: 0.6 }]}
-          >
-            {googleLoading ? (
-              <ActivityIndicator size="small" color="#111827" />
-            ) : (
-              <Ionicons name="logo-google" size={18} color="#111827" />
+          <Controller
+            control={control}
+            name="email"
+            render={({ field: { onChange, value } }) => (
+              <Input
+                testID="login-email-input"
+                label="E-posta"
+                leftIconName="mail-outline"
+                placeholder="ornek@eposta.com"
+                value={value}
+                onChangeText={onChange}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                error={errors.email?.message}
+              />
             )}
-            <Text variant="body" weight="semibold">
-              {googleLoading ? 'Giriş yapılıyor…' : 'Google ile devam et'}
+          />
+
+          <Controller
+            control={control}
+            name="password"
+            render={({ field: { onChange, value } }) => (
+              <Input
+                testID="login-password-input"
+                label="Şifre"
+                leftIconName="lock-closed-outline"
+                placeholder="••••••••"
+                value={value}
+                onChangeText={onChange}
+                // Maestro iOS secureTextEntry'ye inputText gönderemiyor;
+                // EXPO_PUBLIC_MAESTRO=1 ile maskeyi kapat. Production: daima maskeli.
+                secureTextEntry={process.env.EXPO_PUBLIC_MAESTRO !== '1'}
+                togglePasswordVisibility
+                autoComplete="password"
+                error={errors.password?.message}
+              />
+            )}
+          />
+
+          <Pressable
+            onPress={() => router.push('/(auth)/forgot-password' as never)}
+            hitSlop={8}
+            style={styles.forgotLink}
+          >
+            <Text variant="bodySm" tone="primary" weight="semibold">
+              Şifremi Unuttum
             </Text>
           </Pressable>
-        )}
 
-        <Button
-          variant="ghost"
-          fullWidth
-          title="Şifremi Unuttum"
-          onPress={() => router.push('/(auth)/forgot-password' as never)}
-        />
+          {errorBannerVisible ? (
+            <Text
+              testID="login-error-banner"
+              variant="bodySm"
+              tone="danger"
+              align="center"
+              style={{ marginBottom: 8 }}
+            >
+              {errorMessage || 'Giriş başarısız.'}
+            </Text>
+          ) : null}
+          {process.env.EXPO_PUBLIC_MAESTRO === '1' && loginMutation.isError && !errorMessage ? (
+            <Text testID="login-error-banner-fallback" style={{ height: 0, opacity: 0 }}>
+              login-error
+            </Text>
+          ) : null}
 
-        <HStack justify="center" wrap gap={2} style={{ marginTop: 20 }}>
-          <Text variant="body" tone="muted">Hesabınız yok mu?</Text>
-          <Text
-            variant="body"
-            tone="primary"
-            weight="semibold"
-            onPress={() => router.push('/(auth)/register' as never)}
-          >
-            Kayıt olun
-          </Text>
-        </HStack>
+          <Button
+            testID="login-submit-button"
+            variant="primary"
+            size="lg"
+            fullWidth
+            title="Giriş Yap"
+            onPress={handleLoginPress}
+            isLoading={loginMutation.isPending}
+            disabled={loginMutation.isPending}
+          />
 
-        <HStack justify="center" wrap gap={2} style={{ marginTop: 8 }}>
-          <Text variant="bodySm" tone="muted">
-            İşletme sahibi misiniz?
-          </Text>
-          <Text
-            variant="bodySm"
-            tone="primary"
-            weight="semibold"
-            onPress={() => router.push('/(auth)/register-business' as never)}
-          >
-            Kurumsal hesap açın
-          </Text>
-        </HStack>
+          {/* Ayraç */}
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text variant="caption" tone="muted">veya</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {isGoogleConfigured() && (
+            <Pressable
+              testID="login-google-button"
+              onPress={handleGoogle}
+              accessibilityRole="button"
+              accessibilityLabel="Google ile devam et"
+              disabled={loginMutation.isPending || googleLoading}
+              style={[styles.googleButton, (loginMutation.isPending || googleLoading) && { opacity: 0.6 }]}
+            >
+              {googleLoading ? (
+                <ActivityIndicator size="small" color={colors.text.heading} />
+              ) : (
+                <Ionicons name="logo-google" size={18} color={colors.text.heading} />
+              )}
+              <Text variant="body" weight="semibold">
+                {googleLoading ? 'Giriş yapılıyor…' : 'Google ile devam et'}
+              </Text>
+            </Pressable>
+          )}
+
+          <Button
+            testID="continue-as-guest-button"
+            variant="outline"
+            size="lg"
+            fullWidth
+            title="Misafir Olarak Devam Et"
+            onPress={continueAsGuest}
+            disabled={loginMutation.isPending}
+            style={{ marginTop: 12 }}
+          />
+        </View>
+
+        <VStack gap={2} style={{ marginTop: 4 }}>
+          <HStack justify="center" wrap gap={2}>
+            <Text variant="body" style={styles.footerText}>Hesabınız yok mu?</Text>
+            <Text
+              variant="body"
+              weight="bold"
+              style={styles.footerLink}
+              onPress={() => router.push('/(auth)/register' as never)}
+            >
+              Kayıt olun
+            </Text>
+          </HStack>
+
+          <HStack justify="center" wrap gap={2}>
+            <Text variant="bodySm" style={styles.footerText}>
+              İşletme sahibi misiniz?
+            </Text>
+            <Text
+              variant="bodySm"
+              weight="bold"
+              style={styles.footerLink}
+              onPress={() => router.push('/(auth)/register-business' as never)}
+            >
+              Kurumsal hesap açın
+            </Text>
+          </HStack>
+        </VStack>
       </VStack>
     </Screen>
   );
@@ -379,6 +410,49 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  screen: {
+    backgroundColor: colors.primary[600]!,
+  },
+  brandHeader: {
+    alignItems: 'center',
+    gap: 10,
+  },
+  footerText: {
+    color: colors.primary[50]!,
+  },
+  footerLink: {
+    color: colors.white,
+    textDecorationLine: 'underline',
+  },
+  card: {
+    width: '100%',
+    backgroundColor: colors.surface.elevated,
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  forgotLink: {
+    alignSelf: 'flex-end',
+    paddingVertical: 4,
+    marginBottom: 12,
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginVertical: 16,
+  },
+  dividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border.DEFAULT,
+  },
   googleButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -386,8 +460,8 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 52,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: colors.border.DEFAULT,
     borderRadius: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
   },
 });

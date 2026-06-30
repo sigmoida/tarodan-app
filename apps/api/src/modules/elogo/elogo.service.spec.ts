@@ -16,6 +16,7 @@ describe('ElogoService', () => {
   let checkUser: jest.Mock;
   let sendDocument: jest.Mock;
   let getDocumentStatus: jest.Mock;
+  let cancelEArchive: jest.Mock;
 
   async function buildService(config: Record<string, string> = {}): Promise<ElogoService> {
     login = jest.fn(
@@ -28,13 +29,14 @@ describe('ElogoService', () => {
     );
     sendDocument = jest.fn(async () => ({ success: true, code: 1, refId: 42 }));
     getDocumentStatus = jest.fn(async () => ({ documentUuid: 'u', status: 2, code: 1300 }));
+    cancelEArchive = jest.fn(async () => ({ success: true, code: 1, documentUuid: 'u1' }));
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
         ElogoService,
         {
           provide: ELOGO_SOAP_CLIENT,
-          useValue: { login, logout, checkUser, sendDocument, getDocumentStatus },
+          useValue: { login, logout, checkUser, sendDocument, getDocumentStatus, cancelEArchive },
         },
         { provide: ConfigService, useValue: fakeConfig(config) },
       ],
@@ -98,6 +100,21 @@ describe('ElogoService', () => {
     expect(res.ok).toBe(false);
     expect(res.error).toContain('Geçersiz');
   });
+
+  it('cancelEArchiveInvoice client.cancelEArchive çağırır', async () => {
+    const service = await buildService();
+    const res = await service.cancelEArchiveInvoice('u1', 'TRD2026000000001');
+    expect(res.success).toBe(true);
+    expect(cancelEArchive).toHaveBeenCalledWith('u1', 'TRD2026000000001', expect.any(String), expect.anything());
+  });
+
+  it('refundStrategy: ≤8 gün CANCEL, >8 gün RETURN_INVOICE', async () => {
+    const service = await buildService();
+    const issued = new Date('2026-06-01T00:00:00Z');
+    expect(service.refundStrategy(issued, new Date('2026-06-05T00:00:00Z'))).toBe('CANCEL'); // 4 gün
+    expect(service.refundStrategy(issued, new Date('2026-06-09T00:00:00Z'))).toBe('CANCEL'); // 8 gün (sınır)
+    expect(service.refundStrategy(issued, new Date('2026-06-12T00:00:00Z'))).toBe('RETURN_INVOICE'); // 11 gün
+  });
 });
 
 describe('StubElogoSoapClient', () => {
@@ -134,5 +151,12 @@ describe('StubElogoSoapClient', () => {
   it('ELOGO_STUB_THROW=TIMEOUT teknik hata fırlatır', async () => {
     const client = stub({ ELOGO_STUB_THROW: 'TIMEOUT' });
     await expect(client.login(opts)).rejects.toThrow('ETIMEDOUT');
+  });
+
+  it('cancelEArchive iptal çağrısını kaydeder', async () => {
+    const client = stub();
+    await client.cancelEArchive('uuid-1', 'TRD1', 's', opts);
+    expect(client.cancelCalls).toHaveLength(1);
+    expect(client.cancelCalls[0].uuid).toBe('uuid-1');
   });
 });

@@ -29,7 +29,7 @@ import ZoomableImage from '../../../src/components/product/ZoomableImage';
 import MakeOfferModal from '../../../src/components/product/MakeOfferModal';
 import AddToCollectionModal from '../../../src/components/product/AddToCollectionModal';
 import { transformImageUrl, getImageUrl as getImageUrlFromUtils, resolveAvatarSource } from '../../../src/utils/imageUrl';
-import { asLabel } from '../../../src/utils/format';
+import { asLabel, formatCondition } from '../../../src/utils/format';
 import { buildShareContent, productShareUrl } from '../../../src/utils/share';
 import { isProductTradeOpen } from '../../../src/utils/isProductTradeOpen';
 import {
@@ -90,13 +90,15 @@ function ActionTile({
   );
 }
 
-// Local condition palette — replaces TarodanColors-driven CONDITIONS
-const CONDITION_LABELS: Record<string, { name: string; color: string }> = {
-  new: { name: 'Sıfır', color: colors.success[600]! },
-  like_new: { name: 'Az Kullanılmış', color: colors.info[400]! },
-  good: { name: 'İyi', color: colors.info[600]! },
-  fair: { name: 'Orta', color: colors.warning[500]! },
-  poor: { name: 'Hasarlı', color: colors.danger[600]! },
+// Durum rozeti renk paleti. Etiket metni TEK KAYNAK formatCondition()'dan gelir
+// (backend enum: new | like_new | very_good | good | fair) — burada yalnız renk var.
+// Eskiden very_good eksikti → "very_good" ham İngilizce enum olarak görünüyordu.
+const CONDITION_COLORS: Record<string, string> = {
+  new: colors.success[600]!,
+  like_new: colors.info[400]!,
+  very_good: colors.info[500]!,
+  good: colors.info[600]!,
+  fair: colors.warning[500]!,
 };
 
 export default function ProductDetailScreen() {
@@ -263,7 +265,10 @@ export default function ProductDetailScreen() {
   }
 
   const getConditionInfo = (condition: string) => {
-    return CONDITION_LABELS[condition] || { name: condition, color: colors.gray[500] };
+    return {
+      name: formatCondition(condition),
+      color: CONDITION_COLORS[condition] ?? colors.gray[500]!,
+    };
   };
 
   // Stokta yok: active dışı statü veya müsait adet 0 (null = sınırsız stok → stokta).
@@ -697,14 +702,19 @@ export default function ProductDetailScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Özellikler</Text>
             <View style={styles.specGrid}>
-              <View style={styles.specItem}>
-                <Text style={styles.specLabel}>Marka</Text>
-                <Text style={styles.specValue}>{asLabel(product.brand)}</Text>
-              </View>
-              <View style={styles.specItem}>
-                <Text style={styles.specLabel}>Ölçek</Text>
-                <Text style={styles.specValue}>{asLabel(product.scale)}</Text>
-              </View>
+              {/* Marka/Ölçek yalnızca değer varsa gösterilir — markasız üründe boş satır basma. */}
+              {asLabel(product.brand) ? (
+                <View style={styles.specItem}>
+                  <Text style={styles.specLabel}>Marka</Text>
+                  <Text style={styles.specValue}>{asLabel(product.brand)}</Text>
+                </View>
+              ) : null}
+              {asLabel(product.scale) ? (
+                <View style={styles.specItem}>
+                  <Text style={styles.specLabel}>Ölçek</Text>
+                  <Text style={styles.specValue}>{asLabel(product.scale)}</Text>
+                </View>
+              ) : null}
               <View style={styles.specItem}>
                 <Text style={styles.specLabel}>Durum</Text>
                 <Text style={[styles.specValue, { color: conditionInfo.color }]}>

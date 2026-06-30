@@ -94,6 +94,19 @@ describe('buildInvoiceXml (UBL-TR)', () => {
     expect(open).toBe(1);
   });
 
+  it('iade faturası: InvoiceTypeCode=IADE + orijinal fatura referansı (BillingReference)', () => {
+    const { xml } = buildInvoiceXml(
+      baseInput({
+        invoiceTypeCode: 'IADE',
+        billingReference: { invoiceId: 'TRD2026000000009', issueDate: '2026-06-01' },
+      }),
+    );
+    expect(xml).toContain('<cbc:InvoiceTypeCode>IADE</cbc:InvoiceTypeCode>');
+    expect(xml).toContain('<cac:BillingReference>');
+    expect(xml).toContain('<cbc:ID>TRD2026000000009</cbc:ID>');
+    expect(xml).toContain('<cac:InvoiceDocumentReference>');
+  });
+
   it('satır yoksa hata', () => {
     expect(() => buildInvoiceXml(baseInput({ lines: [] }))).toThrow();
   });

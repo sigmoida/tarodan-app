@@ -222,6 +222,7 @@ export default function PaymentScreen() {
             target={state.target}
             amount={state.amount}
             recurringEnabled={state.recurringEnabled}
+            isGuest={isGuest}
             onSuccess={(pid) => routeToSuccess(pid)}
             onFail={() => routeToFail()}
           />

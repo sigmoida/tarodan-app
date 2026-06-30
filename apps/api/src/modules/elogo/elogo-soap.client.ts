@@ -42,6 +42,17 @@ export abstract class ElogoSoapClient {
     sessionId: string,
     options: ElogoSoapCallOptions,
   ): Promise<ElogoDocumentStatus>;
+
+  /**
+   * e-Arşiv faturasını İPTAL eder (yalnızca fatura tarihinden ≤8 gün içinde geçerli).
+   * 8 günü aşan iadeler için iptal değil İADE FATURASI (sendDocument + IADE tipli UBL) kullanılır.
+   */
+  abstract cancelEArchive(
+    uuid: string,
+    elementId: string | undefined,
+    sessionId: string,
+    options: ElogoSoapCallOptions,
+  ): Promise<ElogoSendResult>;
 }
 
 // ─── Stub (dev/test) ──────────────────────────────────────────────────────────
@@ -56,11 +67,13 @@ export class StubElogoSoapClient extends ElogoSoapClient {
   private readonly logger = new Logger(StubElogoSoapClient.name);
   public readonly sentDocuments: ElogoSendDocumentParams[] = [];
   public readonly checkUserCalls: string[][] = [];
+  public readonly cancelCalls: Array<{ uuid: string; elementId?: string }> = [];
   private loginCount = 0;
 
   reset(): void {
     this.sentDocuments.length = 0;
     this.checkUserCalls.length = 0;
+    this.cancelCalls.length = 0;
     this.loginCount = 0;
   }
 
@@ -141,6 +154,18 @@ export class StubElogoSoapClient extends ElogoSoapClient {
   ): Promise<ElogoDocumentStatus> {
     this.simulate();
     return { documentUuid, status: 2, code: 1300, description: 'BASARIYLA TAMAMLANDI (stub)', isCancel: false };
+  }
+
+  async cancelEArchive(
+    uuid: string,
+    elementId: string | undefined,
+    _sessionId: string,
+    _options: ElogoSoapCallOptions,
+  ): Promise<ElogoSendResult> {
+    this.simulate();
+    this.cancelCalls.push({ uuid, elementId });
+    this.logger.debug(`Stub eLogo cancelEArchive uuid=${uuid}`);
+    return { success: true, documentUuid: uuid, code: 1, description: 'CANCEL OK (stub)' };
   }
 }
 
@@ -422,6 +447,34 @@ export class LiveElogoSoapClient extends ElogoSoapClient {
       code: Number(extractTag(xml, 'code') ?? NaN) || undefined,
       description: extractTag(xml, 'description') || undefined,
       isCancel: extractTag(xml, 'isCancel') === 'true',
+    };
+  }
+
+  async cancelEArchive(
+    uuid: string,
+    elementId: string | undefined,
+    sessionId: string,
+    options: ElogoSoapCallOptions,
+  ): Promise<ElogoSendResult> {
+    const pl = ['DOCUMENTTYPE=CANCELEARCHIVEINVOICE', `UUID=${uuid}`];
+    if (elementId) pl.push(`ELEMENTID=${elementId}`);
+    // İptalde UBL gönderilmez; boş document. ⚠️ DOĞRULANACAK (test ortamı).
+    const inner =
+      `<tem:SendDocument><tem:sessionID>${escapeXml(sessionId)}</tem:sessionID>` +
+      `<tem:paramList>${paramListXml(pl)}</tem:paramList>` +
+      `<tem:document>` +
+      `<efat:binaryData><efat:Value></efat:Value><efat:contentType>base64</efat:contentType></efat:binaryData>` +
+      `<efat:currentDate>${todayIso()}</efat:currentDate>` +
+      `<efat:fileName>cancel-${escapeXml(uuid)}.zip</efat:fileName>` +
+      `<efat:hash></efat:hash>` +
+      `</tem:document></tem:SendDocument>`;
+    const xml = await this.post('SendDocument', inner, options);
+    const code = Number(extractTag(xml, 'resultCode') ?? NaN);
+    return {
+      success: code === 1,
+      documentUuid: uuid,
+      code: Number.isNaN(code) ? undefined : code,
+      description: extractTag(xml, 'resultMsg') || undefined,
     };
   }
 }

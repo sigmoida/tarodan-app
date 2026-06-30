@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, ScrollView, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { WebView, WebViewNavigation } from 'react-native-webview';
 import { Button, Input, Checkbox, Text, theme, appAlert } from '@tarodan/ui-native';
@@ -33,11 +33,17 @@ interface Props {
   onFail?: () => void;
   /** Kayıtlı kart + "kartımı kaydet" gösterilsin mi (PayTR Non3D yetkisi açık + üye). */
   recurringEnabled?: boolean;
+  /** Misafir ödemesi mi — durum yoklamasında public uç kullanılır (verify atlanır). */
+  isGuest?: boolean;
 }
 
 const NEW_CARD = '__new__';
 
-export default function CardPaymentForm({ target, amount, onSuccess, onFail, recurringEnabled = false }: Props) {
+/** Ödeme kesinleşti mi (light status uçları). load() ile aynı: completed/failed. */
+const isPaidStatus = (s?: string) =>
+  s === 'completed' || s === 'paid' || s === 'success' || s === 'hold_payment';
+
+export default function CardPaymentForm({ target, amount, onSuccess, onFail, recurringEnabled = false, isGuest = false }: Props) {
   const [cards, setCards] = useState<SavedCard[]>([]);
   const [loadingCards, setLoadingCards] = useState(recurringEnabled);
   const [selected, setSelected] = useState<string>(NEW_CARD);
@@ -52,6 +58,59 @@ export default function CardPaymentForm({ target, amount, onSuccess, onFail, rec
   const [cvc, setCvc] = useState('');
   const [saveCard, setSaveCard] = useState(true);
   const [savedCvv, setSavedCvv] = useState('');
+
+  // Sonucu yalnız bir kez bildir (poll + WebView yönlendirmesi yarışabilir).
+  const resolvedRef = useRef(false);
+  const onSuccessRef = useRef(onSuccess);
+  const onFailRef = useRef(onFail);
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+    onFailRef.current = onFail;
+  });
+
+  const resolveSuccess = (pid: string) => {
+    if (resolvedRef.current) return;
+    resolvedRef.current = true;
+    onSuccessRef.current(pid);
+  };
+  const resolveFail = () => {
+    if (resolvedRef.current) return;
+    resolvedRef.current = true;
+    onFailRef.current?.();
+  };
+
+  // 3DS WebView açıkken ödeme durumunu yokla. PayTR'ın dönüş yönlendirmesi
+  // (merchant_ok_url) WebView içinde her zaman /payment/success URL'ine ulaşmayabilir;
+  // bu durumda kullanıcı PayTR'ın "ödeme alınıyor" sayfasında SONSUZA DEK takılıyordu.
+  // Durum terminal olunca (completed/failed) WebView'i kapatıp sonucu bildiriyoruz.
+  useEffect(() => {
+    if (!threeDSHtml || !paymentId) return;
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout>;
+    let tries = 0;
+    const poll = async () => {
+      tries += 1;
+      try {
+        // verify ödemeyi sunucuda aktive eder (idempotent); misafirde 401 verir → atla.
+        if (!isGuest) {
+          try { await paymentsApi.verify(paymentId); } catch { /* best-effort */ }
+        }
+        const res: any = isGuest
+          ? await paymentsApi.getStatusLightGuest(paymentId)
+          : await paymentsApi.getStatusLight(paymentId);
+        const data = res?.data?.data ?? res?.data ?? {};
+        if (!alive) return;
+        if (isPaidStatus(data.status)) { resolveSuccess(paymentId); return; }
+        if (data.status === 'failed') { resolveFail(); return; }
+      } catch { /* yoksay, tekrar dene */ }
+      if (alive && !resolvedRef.current && tries < 40) {
+        timer = setTimeout(poll, 3000);
+      }
+    };
+    timer = setTimeout(poll, 3000);
+    return () => { alive = false; clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threeDSHtml, paymentId, isGuest]);
 
   useEffect(() => {
     // Kayıtlı kart listesi yalnız Non3D yetkisi açıkken (kayıtlı kartla ödeme mümkünken) alınır.
@@ -142,10 +201,10 @@ export default function CardPaymentForm({ target, amount, onSuccess, onFail, rec
       if (data.status === 'failed') {
         appAlert('Ödeme başarısız', data.reason || 'Ödeme tamamlanamadı');
         setProcessing(false);
-        onFail?.();
+        resolveFail();
         return;
       }
-      onSuccess(data.paymentId);
+      resolveSuccess(data.paymentId);
     } catch (e: any) {
       appAlert('Hata', e?.response?.data?.message || 'Ödeme başlatılamadı');
       setProcessing(false);
@@ -156,9 +215,9 @@ export default function CardPaymentForm({ target, amount, onSuccess, onFail, rec
   function onNav(nav: WebViewNavigation) {
     const url = (nav.url || '').toLowerCase();
     if (url.includes('/payment/success')) {
-      if (paymentId) onSuccess(paymentId);
+      if (paymentId) resolveSuccess(paymentId);
     } else if (url.includes('/payment/fail') || url.includes('/payment/failure')) {
-      onFail?.();
+      resolveFail();
     }
   }
 

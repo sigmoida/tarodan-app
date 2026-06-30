@@ -278,12 +278,14 @@ export default function HomeScreen() {
     const isTradeEnabled = item.isTradeEnabled || item.trade_available;
     const viewCount = item.viewCount || item.views || 0;
     // brand/scale backend'den {id,name,slug} obje veya string gelebilir — Text'e gömülmeden önce düzleştir.
+    // Markasız/ölçeksiz üründe placeholder ("Marka"/"1:64") basma; boşsa o değer satıra hiç eklenmez.
     const brandLabel = typeof item.brand === 'object' && item.brand !== null
       ? (item.brand.name ?? '')
-      : (item.brand ?? 'Marka');
+      : (item.brand ?? '');
     const scaleLabel = typeof item.scale === 'object' && item.scale !== null
       ? (item.scale.name ?? '')
-      : (item.scale ?? '1:64');
+      : (item.scale ?? '');
+    const metaLabel = [brandLabel, scaleLabel].filter(Boolean).join(' • ');
 
     return (
       <Pressable
@@ -339,9 +341,11 @@ export default function HomeScreen() {
             <Text variant="bodySm" weight="semibold" numberOfLines={2}>
               {item.title}
             </Text>
-            <Text variant="caption" tone="muted" style={{ marginTop: 2 }}>
-              {brandLabel} • {scaleLabel}
-            </Text>
+            {metaLabel ? (
+              <Text variant="caption" tone="muted" style={{ marginTop: 2 }}>
+                {metaLabel}
+              </Text>
+            ) : null}
             <Text variant="h3" tone="primary" style={{ marginTop: 4 }}>
               ₺{item.price?.toLocaleString('tr-TR') || 0}
             </Text>

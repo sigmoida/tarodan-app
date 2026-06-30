@@ -59,6 +59,11 @@ export interface UblInvoiceInput {
   /** e-Arşiv gönderim şekli. */
   sendType?: 'ELEKTRONIK' | 'KAGIT';
   note?: string;
+  /**
+   * İADE faturasında, iadesi yapılan ORİJİNAL faturanın referansı.
+   * invoiceTypeCode='IADE' ile birlikte kullanılır (>8 gün iade durumunda).
+   */
+  billingReference?: { invoiceId: string; issueDate: string };
 }
 
 export interface UblInvoiceResult {
@@ -204,6 +209,11 @@ export function buildInvoiceXml(input: UblInvoiceInput): UblInvoiceResult {
     ? `<cac:AdditionalDocumentReference>${el('cbc:ID', input.sendType)}${el('cbc:IssueDate', input.issueDate)}${el('cbc:DocumentTypeCode', input.sendType)}</cac:AdditionalDocumentReference>`
     : '';
 
+  // İADE faturasında orijinal faturaya referans (BillingReference)
+  const billingRef = input.billingReference
+    ? `<cac:BillingReference><cac:InvoiceDocumentReference>${el('cbc:ID', input.billingReference.invoiceId)}${el('cbc:IssueDate', input.billingReference.issueDate)}</cac:InvoiceDocumentReference></cac:BillingReference>`
+    : '';
+
   const xml =
     `<?xml version="1.0" encoding="UTF-8"?>` +
     `<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2" ` +
@@ -212,6 +222,8 @@ export function buildInvoiceXml(input: UblInvoiceInput): UblInvoiceResult {
     `xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2">` +
     ublExtensions +
     header +
+    // UBL 2.1 sırası: BillingReference, AdditionalDocumentReference'tan ÖNCE gelmeli.
+    billingRef +
     sendTypeRef +
     `<cac:AccountingSupplierParty>${buildParty(input.supplier, currency)}</cac:AccountingSupplierParty>` +
     `<cac:AccountingCustomerParty>${buildParty(input.customer, currency)}</cac:AccountingCustomerParty>` +

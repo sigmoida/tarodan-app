@@ -37,7 +37,6 @@ import {
   paymentsApi,
   shippingApi,
   addressesApi,
-  discountsApi,
   type OrderAddressInput,
 } from '../../src/services/api';
 import { transformImageUrl } from '../../src/utils/imageUrl';
@@ -149,13 +148,6 @@ export default function CheckoutScreen() {
   const [shippingCost, setShippingCost] = useState(0);
   const [shippingLoading, setShippingLoading] = useState(false);
 
-  // ---------- Kupon / İndirim ----------
-  const [couponCode, setCouponCode] = useState('');
-  const [appliedDiscount, setAppliedDiscount] = useState<{ code: string; amount: number } | null>(
-    null,
-  );
-  const [couponLoading, setCouponLoading] = useState(false);
-
   // ---------- OTP ----------
   const [otpModalOpen, setOtpModalOpen] = useState(false);
   const [otpCode, setOtpCode] = useState('');
@@ -174,7 +166,7 @@ export default function CheckoutScreen() {
     () => items.reduce((sum, it) => sum + it.price * it.quantity, 0),
     [items],
   );
-  const total = subtotal + shippingCost - (appliedDiscount?.amount ?? 0);
+  const total = subtotal + shippingCost;
 
   // ---------- Üye için kayıtlı adresler ----------
   const addressesQuery = useQuery({
@@ -238,34 +230,6 @@ export default function CheckoutScreen() {
       setShippingCost(49.9);
     } finally {
       setShippingLoading(false);
-    }
-  };
-
-  // ---------- Kupon doğrulama ----------
-  const handleApplyCoupon = async () => {
-    if (!couponCode.trim()) return;
-    setCouponLoading(true);
-    try {
-      const response = await discountsApi.validate({
-        code: couponCode.trim(),
-        cartItems: items.map(it => ({
-          productId: it.productId,
-          quantity: it.quantity,
-          price: it.price,
-        })),
-      });
-      const data: any = (response.data as any)?.data ?? response.data;
-      const discountAmount = Number(data?.discountAmount ?? data?.amount ?? 0);
-      if (discountAmount > 0) {
-        setAppliedDiscount({ code: couponCode.trim(), amount: discountAmount });
-        showSnackbar(`Kupon uygulandı: -${formatPrice(discountAmount)}`);
-      } else {
-        showSnackbar(data?.message || 'Kupon geçerli ama indirim hesaplanamadı.');
-      }
-    } catch (e: any) {
-      showSnackbar(e?.response?.data?.message || 'Kupon geçersiz.');
-    } finally {
-      setCouponLoading(false);
     }
   };
 
@@ -925,46 +889,6 @@ export default function CheckoutScreen() {
 
               {/* Provider: sadece PayTR (iyzico kaldırıldı — web ile parite) */}
             </View>
-
-            {/* Kupon */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Ionicons name="pricetag-outline" size={22} color={colors.primary[600]!} />
-                <Text style={styles.sectionTitle}>İndirim Kuponu</Text>
-              </View>
-              {appliedDiscount ? (
-                <View style={styles.appliedCoupon}>
-                  <Ionicons name="checkmark-circle" size={18} color={colors.success[600]!} />
-                  <View style={{ flex: 1, marginLeft: 8 }}>
-                    <Text style={styles.optionTitle}>
-                      {appliedDiscount.code} · -{formatPrice(appliedDiscount.amount)}
-                    </Text>
-                  </View>
-                  <Button
-                    variant="ghost"
-                    title="Kaldır"
-                    onPress={() => setAppliedDiscount(null)}
-                  />
-                </View>
-              ) : (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Input
-                    placeholder="Kupon kodu"
-                    value={couponCode}
-                    onChangeText={(v: string) => setCouponCode(v.toUpperCase())}
-                    autoCapitalize="characters"
-                    containerStyle={{ ...styles.input, flex: 1, marginBottom: 0 }}
-                  />
-                  <Button
-                    variant="primary"
-                    title="Uygula"
-                    onPress={handleApplyCoupon}
-                    isLoading={couponLoading}
-                    disabled={!couponCode.trim() || couponLoading}
-                  />
-                </View>
-              )}
-            </View>
           </>
         ) : null}
 
@@ -1024,14 +948,6 @@ export default function CheckoutScreen() {
               {effectiveShippingCity ? formatPrice(shippingCost) : 'İl seçin'}
             </Text>
           </View>
-          {appliedDiscount ? (
-            <View style={styles.orderSummaryRow}>
-              <Text style={styles.orderSummaryLabel}>Kupon ({appliedDiscount.code})</Text>
-              <Text style={[styles.orderSummaryValue, { color: colors.success[600]! }]}>
-                -{formatPrice(appliedDiscount.amount)}
-              </Text>
-            </View>
-          ) : null}
           <Divider style={{ marginVertical: 12 }} />
           <View style={styles.orderSummaryRow}>
             <Text style={styles.orderTotalLabel}>Toplam</Text>
@@ -1308,13 +1224,6 @@ const styles = StyleSheet.create({
   },
   providerChipTextActive: {
     color: colors.white,
-  },
-  appliedCoupon: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.success[50]!,
-    padding: 12,
-    borderRadius: 10,
   },
   orderItem: {
     flexDirection: 'row',
