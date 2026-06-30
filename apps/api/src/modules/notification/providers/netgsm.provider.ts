@@ -96,6 +96,7 @@ export class NetGsmProvider {
         headers: {
           Authorization: `Basic ${auth}`,
           'Content-Type': 'application/json',
+          Accept: 'application/json',
         },
         body: JSON.stringify({
           msgheader: this.msgheader,
@@ -106,8 +107,24 @@ export class NetGsmProvider {
 
       const result: any = await response.json().catch(() => ({}));
 
+      // NetGSM API hatalarını ÇOĞUNLUKLA HTTP 406 ile döndürür ve asıl sebep
+      // gövdedeki `code` alanındadır (30=kimlik/API erişimi yok, 40=onaysız başlık,
+      // 70=geçersiz parametre vb.). Bu yüzden HTTP hata olsa bile önce gövdedeki
+      // kodu maplemeye çalış; yoksa ham gövdeyi+statüyü logla (teşhis için).
       if (!response.ok) {
-        this.logger.error(`NetGSM HTTP hatası: ${response.status}`);
+        const bodyCode = String(result?.code ?? '');
+        if (bodyCode) {
+          const mapped = this.mapResponseCode(bodyCode);
+          this.logger.error(
+            `NetGSM hatası (HTTP ${response.status}, code=${bodyCode}): ${mapped.error ?? 'bilinmeyen'} | gövde: ${JSON.stringify(result)}`,
+          );
+          return mapped.success
+            ? { success: false, error: `NetGSM HTTP ${response.status}` }
+            : mapped;
+        }
+        this.logger.error(
+          `NetGSM HTTP hatası: ${response.status} | gövde: ${JSON.stringify(result)}`,
+        );
         return { success: false, error: `NetGSM HTTP ${response.status}` };
       }
 
