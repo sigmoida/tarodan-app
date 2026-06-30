@@ -97,6 +97,37 @@ services:
         reservations:
           memory: 1G
 
+  # Adminer — canlı DB görüntüleyici (tarayıcıdan: https://db.${DOMAIN})
+  # İKİ KATMAN koruma: (1) Traefik basic-auth (ADMINER_AUTH) gate'i, (2) Adminer'ın
+  # kendi login formunda DB kullanıcı/şifresi. Postgres internet'e AÇILMAZ; Adminer
+  # ona yalnız iç ağdan (postgres:5432) erişir. DB creds compose'da TUTULMAZ — login'de girilir.
+  adminer:
+    image: adminer:4
+    container_name: tarodan-adminer
+    restart: unless-stopped
+    environment:
+      # Login formunda "Server" alanını önceden doldurur (PostgreSQL container adı).
+      ADMINER_DEFAULT_SERVER: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - tarodan-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.adminer.rule=Host(`db.${DOMAIN}`)"
+      - "traefik.http.routers.adminer.entrypoints=websecure"
+      - "traefik.http.routers.adminer.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.adminer.middlewares=adminer-auth,security-headers,rate-limit"
+      - "traefik.http.middlewares.adminer-auth.basicauth.users=${ADMINER_AUTH}"
+      - "traefik.http.services.adminer.loadbalancer.server.port=8080"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
+
   # Redis Cache & Queue
   redis:
     image: redis:7-alpine
