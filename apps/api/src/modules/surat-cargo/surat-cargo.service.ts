@@ -194,14 +194,13 @@ export class SuratCargoService {
       return { ok: true, suratMessage: 'integration_disabled' };
     }
 
-    // REST modunda Sürat'ın dokümante edilmiş bir iptal (GonderiSil) ucu yok.
-    // Uzak iptal yapılamıyorsa akışı bozmadan iptali YEREL olarak tutarlı say
-    // (çağıran, kargo kaydını 'cancelled' işaretler). Sürat tarafında gönderinin
-    // canlı SOAP iptal ucu/elle kapatılması gerektiğini net logluyoruz.
+    // Uzak iptal desteklemeyen bir client için güvenli davranış: akışı bozmadan
+    // iptali YEREL olarak tutarlı say (çağıran kargoyu 'cancelled' işaretler).
+    // Not: REST client artık GonderiGeriCek, SOAP client GonderiSil ile uzak iptali
+    // destekler; bu dal yalnızca gelecekte cancel'sız bir client için geçerli.
     if (!this.soapClient.supportsRemoteCancel()) {
       this.logger.warn(
-        `Surat uzak iptal desteklenmiyor (REST) — yalnızca yerel iptal ref=${ozelKargoTakipNo}. ` +
-          `Gönderi Sürat tarafında hâlâ aktif olabilir; canlıda SOAP GonderiSil/elle iptal gerekir.`,
+        `Surat uzak iptal desteklenmiyor — yalnızca yerel iptal ref=${ozelKargoTakipNo}.`,
       );
       return { ok: true, suratMessage: 'remote_cancel_unsupported_local_only' };
     }

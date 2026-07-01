@@ -23,6 +23,12 @@ import { SuratSoapClient, type SuratSoapCallOptions } from './surat-soap.client'
 const SURAT_REST_LIVE = 'https://api01.suratkargo.com.tr/api/GonderiyiKargoyaGonder';
 const SURAT_REST_TEST = 'https://api02.suratkargo.com.tr/api/GonderiyiKargoyaGonder';
 
+// GonderiGeriCek = gönderiyi geri çek (iptal). Sürat'ın sağlanan REST dokümanlarında
+// YOK ama api01/api02'de mevcut. Gövde create ile aynı desende:
+// { KullaniciAdi, Sifre, OzelKargoTakipNo }. (Format 2026-07-02 deneyerek doğrulandı.)
+const SURAT_GERICEK_LIVE = 'https://api01.suratkargo.com.tr/api/GonderiGeriCek';
+const SURAT_GERICEK_TEST = 'https://api02.suratkargo.com.tr/api/GonderiGeriCek';
+
 interface SuratRestResult {
   Message?: string | null;
   IsError?: boolean;
@@ -172,28 +178,94 @@ export class RestSuratClient extends SuratSoapClient {
   }
 
   /**
-   * İptal (GonderiSil): Sürat'ın sağlanan REST dokümanlarında karşılığı YOK
-   * (yalnızca create + KargoTakipHareketDetayi belgelendi). Bu yüzden REST modunda
-   * uzak iptal yapılamaz; çağıran akışlar (payment/trade) best-effort olduğundan
-   * ok:false ile net bir uyarı bırakmak güvenli — akışı bozmaz.
+   * İptal = Sürat "GonderiGeriCek" (gönderiyi geri çek). Sağlanan REST dokümanlarında
+   * yok ama api01/api02'de mevcut; gövde create ile aynı desende:
+   * { KullaniciAdi, Sifre, OzelKargoTakipNo }. (Format 2026-07-02 deneyerek bulundu.)
    *
-   * TODO: Sürat'tan REST iptal endpoint'i alınınca burada uygulanacak.
+   * Yanıt: IsError=false → geri çekildi ('Tamam'); "Kayıt Bulunamadı" → geri çekilecek
+   * gönderi yok/zaten pasif → idempotent başarı say ('Pasif Edilecek Gonderi Bulunamadi!'
+   * ile SuratCargoService.cancelShipmentByOrderNumber ok:true döner).
+   *
+   * Not: Sürat test ortamında gönderiler "kabul" aşamasına gelmediği için genelde
+   * "Kayıt Bulunamadı" döner (fiziksel hareket kısıtı); üretimde gerçek geri çekme olur.
    */
-  /**
-   * REST tarafında dokümante edilmiş bir iptal ucu yok → uzak iptal desteklenmez.
-   * SuratCargoService bunu görüp iptali yerel olarak tutarlı tutar.
-   */
-  supportsRemoteCancel(): boolean {
-    return false;
-  }
-
   async callGonderiSil(
     ozelKargoTakipNo: string,
-    _options: SuratSoapCallOptions,
+    options: SuratSoapCallOptions,
   ): Promise<string> {
-    this.logger.warn(
-      `Surat REST GonderiSil desteklenmiyor (dokümanda REST iptal ucu yok) ref=${ozelKargoTakipNo} — iptal atlandı`,
+    const kullaniciAdi = this.configService.get<string>('SURAT_KARGO_CARI_KODU', '');
+    const sifre = this.configService.get<string>('SURAT_KARGO_SIFRE', '');
+    if (!kullaniciAdi || !sifre) {
+      throw new Error('SURAT_KARGO_CARI_KODU or SURAT_KARGO_SIFRE not configured');
+    }
+
+    const url = this.isTestMode() ? SURAT_GERICEK_TEST : SURAT_GERICEK_LIVE;
+    const body = JSON.stringify({
+      KullaniciAdi: kullaniciAdi,
+      Sifre: sifre,
+      OzelKargoTakipNo: ozelKargoTakipNo,
+    });
+
+    this.logger.debug(
+      `Surat REST GonderiGeriCek ref=${ozelKargoTakipNo} test=${this.isTestMode()}`,
     );
-    return 'REST modunda iptal (GonderiSil) desteklenmiyor';
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), options.timeoutMs);
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body,
+        signal: controller.signal,
+      });
+
+      if (response.status >= 500) {
+        const err = new Error(`HTTP ${response.status}`);
+        (err as any).statusCode = response.status;
+        throw err;
+      }
+
+      const text = await response.text();
+      if (!text || text.trim() === '') return '';
+
+      let data: SuratRestResult;
+      try {
+        data = JSON.parse(text) as SuratRestResult;
+      } catch {
+        throw new Error(`Unexpected non-JSON Surat response: ${text.slice(0, 200)}`);
+      }
+
+      const message = String(data.Message ?? '').trim();
+
+      if (data.IsError !== true) {
+        this.logger.log(
+          `Surat REST GonderiGeriCek ok ref=${ozelKargoTakipNo} message="${message}"`,
+        );
+        return 'Tamam';
+      }
+
+      // Geri çekilecek gönderi bulunamadı → zaten yok/pasif → idempotent başarı.
+      if (/bulunamad/i.test(message)) {
+        this.logger.warn(
+          `Surat REST GonderiGeriCek kayıt bulunamadı (idempotent) ref=${ozelKargoTakipNo} message="${message}"`,
+        );
+        return 'Pasif Edilecek Gonderi Bulunamadi!';
+      }
+
+      this.logger.warn(
+        `Surat REST GonderiGeriCek business failure ref=${ozelKargoTakipNo} message="${message}"`,
+      );
+      return message || 'Bilinmeyen Sürat hatası';
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        const err = new Error('ETIMEDOUT');
+        (err as NodeJS.ErrnoException).code = 'ETIMEDOUT';
+        throw err;
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 }
