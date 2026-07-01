@@ -85,6 +85,7 @@ import { OrderService } from '../order/order.service';
 import {
   SuratKargoTuru,
   SuratOdemeTipi,
+  SuratKapidanOdemeTahsilatTipi,
   SuratTasimaSekli,
   SuratTeslimSekli,
   SuratGonderiSekli,
@@ -9365,6 +9366,80 @@ export class AdminService {
         : 'Sürat’tan güncelleme alınamadı (kargo henüz hareket görmemiş ya da takip numarası yok olabilir)',
       shipment: fresh,
     };
+  }
+
+  /**
+   * Sürat REST endpoint testi: sunucudan Sürat'a gerçek bir test gönderisi oluşturur
+   * (GonderiyiKargoyaGonder) ve hemen aynı referansla takibini sorgular
+   * (KargoTakipHareketDetayi). DB'ye/siparişe DOKUNMAZ — sadece iki REST endpoint'inin
+   * canlı çalıştığını ham cevaplarla gösterir. Admin "Sürat Endpoint Testi" paneli kullanır.
+   */
+  async runSuratEndpointTest(): Promise<{
+    ref: string;
+    enabled: boolean;
+    create: { ok: boolean; message: string };
+    track: any;
+  }> {
+    const ref = `ADMIN-TEST-${Date.now()}`;
+
+    if (!this.suratCargoService) {
+      return {
+        ref,
+        enabled: false,
+        create: { ok: false, message: 'Sürat servisi kullanılamıyor' },
+        track: null,
+      };
+    }
+    if (!this.suratCargoService.isIntegrationEnabled()) {
+      return {
+        ref,
+        enabled: false,
+        create: { ok: false, message: 'SURAT_CARGO_ENABLED kapalı (Coolify env kontrol et)' },
+        track: null,
+      };
+    }
+
+    // 1) Gönderi oluştur — Sürat'a gerçek test gönderisi (REST create)
+    const createResult = await this.suratCargoService.submitShipmentWithRetry({
+      idempotencyKey: ref,
+      correlationId: ref,
+      payload: {
+        KisiKurum: 'ADMIN TEST ALICI',
+        SahisBirim: 'Endpoint testi',
+        AliciAdresi: 'Caferağa Mah. Moda Cad. No:14',
+        Il: 'İstanbul',
+        Ilce: 'Kadıköy',
+        TelefonCep: '5321112233',
+        KargoTuru: SuratKargoTuru.Koli,
+        OdemeTipi: SuratOdemeTipi.Pesin,
+        OzelKargoTakipNo: ref,
+        Adet: 1,
+        BirimDesi: 1,
+        BirimKg: 1,
+        KapidanOdemeTahsilatTipi: SuratKapidanOdemeTahsilatTipi.Nakit,
+        TasimaSekli: SuratTasimaSekli.KaraYolu,
+        TeslimSekli: SuratTeslimSekli.AdreseTeslim,
+        GonderiSekli: SuratGonderiSekli.Standart,
+        Pazaryerimi: 0,
+        Iademi: false,
+      },
+    });
+
+    const create = createResult.ok
+      ? { ok: true, message: 'Sürat gönderi oluşturuldu (başarılı)' }
+      : {
+          ok: false,
+          message:
+            (createResult as any).suratMessage ||
+            `teknik hata: ${(createResult as any).code ?? 'bilinmiyor'}`,
+        };
+
+    // 2) Aynı referansla takibi sorgula — Sürat'tan durum oku (REST tracking)
+    const track = this.suratTrackingService
+      ? await this.suratTrackingService.probeTracking(ref)
+      : { ok: false, error: 'Takip servisi kullanılamıyor' };
+
+    return { ref, enabled: true, create, track };
   }
 
   // ==================== NOTIFICATION MANAGEMENT ====================

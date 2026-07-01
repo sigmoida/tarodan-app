@@ -493,6 +493,10 @@ export const adminApi = {
   syncShipmentTracking(id: string) {
     return api.post(`/admin/shipping/shipments/${id}/sync-tracking`);
   },
+  // Sürat REST endpoint testi: gönderi oluştur + takibini sorgula (ham cevapları döner).
+  suratEndpointTest() {
+    return api.post('/admin/shipping/surat/endpoint-test');
+  },
 
   // Notifications
   getNotificationHistory: (params?: {

@@ -31,6 +31,8 @@ interface SuratShipmentRow {
 export function SuratTrackingTab() {
   const router = useRouter();
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<any>(null);
 
   const {
     rows,
@@ -66,6 +68,21 @@ export function SuratTrackingTab() {
       toast.error("Takip senkronu başarısız oldu");
     } finally {
       setSyncingId(null);
+    }
+  }
+
+  async function runEndpointTest() {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await adminApi.suratEndpointTest();
+      setTestResult(res.data);
+    } catch (e: any) {
+      setTestResult({
+        error: e?.response?.data?.message || e?.message || "İstek başarısız oldu",
+      });
+    } finally {
+      setTesting(false);
     }
   }
 
@@ -163,6 +180,67 @@ export function SuratTrackingTab() {
 
   return (
     <div className="space-y-4">
+      {/* ── Sürat Endpoint Testi ─────────────────────────────────────────── */}
+      <div className="admin-card space-y-3 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="font-medium text-heading">Sürat Endpoint Testi</h3>
+            <p className="text-xs text-muted">
+              Sunucudan Sürat&apos;a gerçek bir test gönderisi oluşturur ve hemen takibini
+              sorgular. İki REST endpoint&apos;inin canlı çalıştığını doğrular
+              (siparişe/DB&apos;ye dokunmaz).
+            </p>
+          </div>
+          <Button
+            variant="primary"
+            size="sm"
+            isLoading={testing}
+            onClick={runEndpointTest}
+          >
+            {testing ? "Test ediliyor…" : "Testi Çalıştır"}
+          </Button>
+        </div>
+
+        {testResult && (
+          <div className="space-y-2 rounded-lg bg-surface-alt p-3 font-mono text-xs">
+            {testResult.error ? (
+              <div className="text-danger-600">Hata: {String(testResult.error)}</div>
+            ) : (
+              <>
+                <div>
+                  Referans: <span className="text-body">{testResult.ref}</span>
+                </div>
+                <div>
+                  1) Gönderi oluştur:{" "}
+                  <span
+                    className={
+                      testResult.create?.ok ? "text-success-600" : "text-danger-600"
+                    }
+                  >
+                    {testResult.create?.ok ? "✓ başarılı" : "✗ hata"}
+                  </span>{" "}
+                  — {testResult.create?.message}
+                </div>
+                <div>
+                  2) Takip sorgula:{" "}
+                  {testResult.track?.error ? (
+                    <span className="text-danger-600">✗ {testResult.track.error}</span>
+                  ) : (
+                    <span className="text-body">
+                      HTTP {testResult.track?.httpStatus} · IsError=
+                      {String(testResult.track?.isError)} ·{" "}
+                      {testResult.track?.durum ||
+                        testResult.track?.message ||
+                        "—"}
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
       <p className="text-sm text-muted">
         Sürat Kargo gönderilerinin canlı durumu. Durumlar arka planda her 30 dakikada
         bir otomatik senkronlanır; anlık güncel durum için satırdaki{" "}

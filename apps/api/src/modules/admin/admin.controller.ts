@@ -2253,6 +2253,16 @@ export class AdminController {
     return this.adminService.syncShipmentTracking(id);
   }
 
+  @Post('shipping/surat/endpoint-test')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({
+    summary: 'Sürat REST endpoint testi: gönderi oluştur + takibini sorgula (DB/siparişe dokunmaz)',
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Sürat create + track ham cevapları' })
+  async runSuratEndpointTest() {
+    return this.adminService.runSuratEndpointTest();
+  }
+
   // ==================== NOTIFICATION MANAGEMENT ====================
 
   @Get('notifications/history')

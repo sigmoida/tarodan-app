@@ -82,6 +82,68 @@ export class SuratTrackingService {
   }
 
   /**
+   * Ham takip sorgusu — admin "Sürat Endpoint Testi" paneli için.
+   * fetchTrackingInfo'nun aksine IsError durumunda bile Sürat'ın ham cevabını
+   * (mesaj dahil) döndürür ve DB'ye dokunmaz. Sadece endpoint'in canlı çalıştığını
+   * göstermek için kullanılır.
+   */
+  async probeTracking(webSiparisKodu: string): Promise<{
+    ok: boolean;
+    httpStatus?: number;
+    isError?: boolean;
+    message?: string | null;
+    gonderiCount?: number;
+    durum?: string | null;
+    error?: string;
+  }> {
+    const cariKodu = this.configService.get<string>('SURAT_KARGO_CARI_KODU', '');
+    const sifre = this.configService.get<string>('SURAT_KARGO_SIFRE', '');
+    if (!cariKodu || !sifre) {
+      return { ok: false, error: 'SURAT_KARGO_CARI_KODU / SURAT_KARGO_SIFRE tanımlı değil' };
+    }
+    const isTestMode =
+      this.configService.get<string>('SURAT_KARGO_TEST_MODE', 'true')?.trim() !== 'false';
+    const baseUrl = isTestMode ? SURAT_API_TEST : SURAT_API_LIVE;
+    const url = `${baseUrl}?CariKodu=${encodeURIComponent(cariKodu)}&Sifre=${encodeURIComponent(sifre)}&WebSiparisKodu=${encodeURIComponent(webSiparisKodu)}`;
+
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+      // Sürat (IIS) POST'ta Content-Length ister → boş gövde ile 0 gönderiyoruz.
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { Accept: 'application/json' },
+        body: '',
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+
+      const text = await response.text();
+      let body: SuratTakipResponse | null = null;
+      try {
+        body = JSON.parse(text) as SuratTakipResponse;
+      } catch {
+        return {
+          ok: false,
+          httpStatus: response.status,
+          error: text?.slice(0, 200) || 'JSON olmayan yanıt',
+        };
+      }
+
+      return {
+        ok: response.ok,
+        httpStatus: response.status,
+        isError: body?.IsError,
+        message: body?.errorMessage ?? null,
+        gonderiCount: body?.Gonderiler?.length ?? 0,
+        durum: body?.Gonderiler?.[0]?.KargonunDurumu ?? null,
+      };
+    } catch (error: any) {
+      return { ok: false, error: error?.message || String(error) };
+    }
+  }
+
+  /**
    * Sync a shipment's status from Sürat Kargo tracking API.
    * Updates Shipment record, creates ShipmentEvents, and handles delivery/return logic.
    */
