@@ -153,9 +153,17 @@ export class ElogoInvoicingService {
     if (vknTckn.length === 10) {
       return { ...common, title: name };
     }
-    const parts = name.trim().split(/\s+/);
-    const lastName = parts.length > 1 ? parts.pop()! : '';
-    return { ...common, firstName: parts.join(' ') || name, lastName };
+    // GİB gerçek kişi: cac:Person/cbc:FirstName VE cbc:FamilyName ikisi de zorunlu.
+    // Biri boş kalırsa eLogo "ad-soyad bulunmalıdır" ile reddeder; bu yüzden asla boş bırakma.
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length > 1) {
+      const lastName = parts.pop()!;
+      return { ...common, firstName: parts.join(' '), lastName };
+    }
+    const single = parts[0];
+    return single
+      ? { ...common, firstName: single, lastName: single }
+      : { ...common, firstName: 'Nihai', lastName: 'Tüketici' };
   }
 
   /** Alıcının varsayılan adresini çek (UBL PostalAddress için). */
@@ -537,72 +545,113 @@ export class ElogoInvoicingService {
       billingRef = { invoiceId: inv.billingReference, issueDate: this.ymd(now) };
     }
 
-    const { xml, totals } = buildInvoiceXml({
-      profileId: isEInvoice ? 'TEMELFATURA' : 'EARSIVFATURA',
-      invoiceTypeCode: isReturn ? 'IADE' : 'SATIS',
-      id: inv.invoiceNumber,
-      uuid: inv.ettn,
-      issueDate: this.ymd(now),
-      issueTime: this.hms(now),
-      currency: 'TRY',
-      // Gönderim şekli yalnız e-Arşiv'de gerekli (e-Fatura'da AdditionalDocumentReference yok).
-      sendType: isEInvoice ? undefined : 'ELEKTRONIK',
-      note: desc,
-      supplier: this.supplierParty(),
-      customer: party,
-      lines: [{ name: desc, quantity: 1, unitPrice: net, vatRate: rate }],
-      ...(billingRef ? { billingReference: billingRef } : {}),
-    });
+    const buildXml = (invoiceNumber: string) =>
+      buildInvoiceXml({
+        profileId: isEInvoice ? 'TEMELFATURA' : 'EARSIVFATURA',
+        invoiceTypeCode: isReturn ? 'IADE' : 'SATIS',
+        id: invoiceNumber,
+        uuid: inv.ettn,
+        issueDate: this.ymd(now),
+        issueTime: this.hms(now),
+        currency: 'TRY',
+        // Gönderim şekli yalnız e-Arşiv'de gerekli (e-Fatura'da AdditionalDocumentReference yok).
+        sendType: isEInvoice ? undefined : 'ELEKTRONIK',
+        note: desc,
+        supplier: this.supplierParty(),
+        customer: party,
+        lines: [{ name: desc, quantity: 1, unitPrice: net, vatRate: rate }],
+        ...(billingRef ? { billingReference: billingRef } : {}),
+      });
 
+    // Paylaşımlı eLogo hesabında (özellikle demo) fatura numarası çakışırsa yeni numara
+    // alıp boşluğa kadar atlayarak yeniden dener. Böylece taze bir DB'nin sequence'i,
+    // hesapta zaten kullanılmış numaralarla otomatik hizalanır (elle müdahale gerekmez).
+    let currentNumber = inv.invoiceNumber!;
     try {
-      const res = await this.elogo.sendDocument({
-        documentType: inv.documentType as ElogoDocumentType,
-        documentUuid: inv.ettn,
-        documentNumber: inv.invoiceNumber,
-        ublXml: xml,
-        signed: false,
-        ...(alias ? { alias } : {}),
-        ...(this.xsltUuid ? { xsltUuid: this.xsltUuid } : {}),
-      });
-      await this.prisma.elogoInvoice.update({
-        where: { id: inv.id },
-        data: {
-          netAmount: totals.taxExclusive,
-          taxAmount: totals.tax,
-          total: totals.payable,
-          status: res.success ? 'sent' : 'failed',
-          elogoRefId: res.refId != null ? String(res.refId) : null,
-          elogoResultCode: res.code ?? null,
-          elogoResultMsg: res.description ?? null,
-          attemptCount: { increment: 1 },
-          lastAttemptAt: now,
-          issuedAt: now,
-          sentAt: res.success ? now : null,
-        },
-      });
-      if (res.success) {
-        this.logger.log(`eLogo ${inv.type} faturası gönderildi (${inv.invoiceNumber}, ref=${res.refId})`);
-        // PDF'i eLogo'dan çek → S3'e kaydet → alıcıya KENDİ SMTP'mizden e-postala (best-effort).
-        void this.deliverPdf(
-          {
-            id: inv.id,
-            ettn: inv.ettn,
-            invoiceNumber: inv.invoiceNumber,
-            type: inv.type,
+      for (let attempt = 0; attempt < 12; attempt++) {
+        const { xml, totals } = buildXml(currentNumber);
+        const res = await this.elogo.sendDocument({
+          documentType: inv.documentType as ElogoDocumentType,
+          documentUuid: inv.ettn,
+          documentNumber: currentNumber,
+          ublXml: xml,
+          signed: false,
+          ...(alias ? { alias } : {}),
+          ...(this.xsltUuid ? { xsltUuid: this.xsltUuid } : {}),
+        });
+
+        if (res.success) {
+          await this.prisma.elogoInvoice.update({
+            where: { id: inv.id },
+            data: {
+              invoiceNumber: currentNumber,
+              netAmount: totals.taxExclusive,
+              taxAmount: totals.tax,
+              total: totals.payable,
+              status: 'sent',
+              elogoRefId: res.refId != null ? String(res.refId) : null,
+              elogoResultCode: res.code ?? null,
+              elogoResultMsg: res.description ?? null,
+              attemptCount: { increment: 1 },
+              lastAttemptAt: now,
+              issuedAt: now,
+              sentAt: now,
+            },
+          });
+          this.logger.log(`eLogo ${inv.type} faturası gönderildi (${currentNumber}, ref=${res.refId})`);
+          // PDF'i eLogo'dan çek → S3'e kaydet → alıcıya KENDİ SMTP'mizden e-postala (best-effort).
+          void this.deliverPdf(
+            {
+              id: inv.id,
+              ettn: inv.ettn,
+              invoiceNumber: currentNumber,
+              type: inv.type,
+              total: totals.payable,
+              currentPdfUrl: (inv as any).pdfUrl ?? null,
+              recipientName: inv.recipientName,
+            },
+            recipientUser?.email ?? null,
+          ).catch((e) => this.logger.warn(`eLogo PDF teslim hatası (${currentNumber}): ${e?.message}`));
+          return;
+        }
+
+        // Numara çakışması → ARTAN adımla ileri atla (ardışık dolu numara bloğunu az
+        // denemede geç: 1,2,3,... büyüyen sıçrama; 12 denemede ~78 numaralık blok aşılır).
+        if (attempt < 11 && this.isDuplicateNumberError(res.description)) {
+          const skip = attempt + 1;
+          for (let s = 0; s < skip; s++) {
+            currentNumber = await this.allocateInvoiceNumber(now.getFullYear());
+          }
+          this.logger.warn(
+            `eLogo numara çakışması → +${skip} atlanıp ${currentNumber} ile tekrar (${inv.type})`,
+          );
+          continue;
+        }
+
+        // Başka bir red (veya çakışma denemeleri tükendi) → failed olarak işaretle.
+        await this.prisma.elogoInvoice.update({
+          where: { id: inv.id },
+          data: {
+            invoiceNumber: currentNumber,
+            netAmount: totals.taxExclusive,
+            taxAmount: totals.tax,
             total: totals.payable,
-            currentPdfUrl: (inv as any).pdfUrl ?? null,
-            recipientName: inv.recipientName,
+            status: 'failed',
+            elogoResultCode: res.code ?? null,
+            elogoResultMsg: res.description ?? null,
+            attemptCount: { increment: 1 },
+            lastAttemptAt: now,
           },
-          recipientUser?.email ?? null,
-        ).catch((e) => this.logger.warn(`eLogo PDF teslim hatası (${inv.invoiceNumber}): ${e?.message}`));
-      } else {
-        this.logger.error(`eLogo ${inv.type} faturası reddedildi (${inv.invoiceNumber}): ${res.description}`);
+        });
+        this.logger.error(`eLogo ${inv.type} faturası reddedildi (${currentNumber}): ${res.description}`);
+        return;
       }
     } catch (err: any) {
       await this.prisma.elogoInvoice
         .update({
           where: { id: inv.id },
           data: {
+            invoiceNumber: currentNumber,
             status: 'failed',
             elogoResultMsg: String(err?.message || err).slice(0, 500),
             attemptCount: { increment: 1 },
@@ -610,8 +659,19 @@ export class ElogoInvoicingService {
           },
         })
         .catch(() => undefined);
-      this.logger.error(`eLogo ${inv.type} faturası gönderim hatası (${inv.invoiceNumber}): ${err?.message}`);
+      this.logger.error(`eLogo ${inv.type} faturası gönderim hatası (${currentNumber}): ${err?.message}`);
     }
+  }
+
+  /** eLogo "aynı fatura numarası tekrar kullanılamaz" reddini tanı (paylaşımlı hesapta numara çakışması). */
+  private isDuplicateNumberError(msg?: string | null): boolean {
+    if (!msg) return false;
+    const m = msg.toLocaleLowerCase('tr');
+    return (
+      m.includes('tekrar kullanılamaz') ||
+      m.includes('aynı fatura numarası') ||
+      (m.includes('daha önce') && m.includes('fatura'))
+    );
   }
 
   /**
