@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { adminApi } from "@/lib/api";
-import { Button, Select, StatusBadge } from "@tarodan/ui";
+import { Button, Input, Select, StatusBadge } from "@tarodan/ui";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
 import { Pagination } from "@/components/Pagination";
 import { useAdminResource } from "@/hooks/useAdminResource";
@@ -33,6 +33,9 @@ export function SuratTrackingTab() {
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<any>(null);
+  const [cref, setCref] = useState("");
+  const [opLoading, setOpLoading] = useState<null | "track" | "cancel">(null);
+  const [opResult, setOpResult] = useState<any>(null);
 
   const {
     rows,
@@ -77,12 +80,36 @@ export function SuratTrackingTab() {
     try {
       const res = await adminApi.suratEndpointTest();
       setTestResult(res.data);
+      if (res.data?.ref) setCref(res.data.ref);
     } catch (e: any) {
       setTestResult({
         error: e?.response?.data?.message || e?.message || "İstek başarısız oldu",
       });
     } finally {
       setTesting(false);
+    }
+  }
+
+  async function runOp(op: "track" | "cancel") {
+    const r = cref.trim();
+    if (!r) {
+      toast.error("Önce bir referans gir (veya 'Gönderi Oluştur + Takip' ile üret)");
+      return;
+    }
+    setOpLoading(op);
+    setOpResult(null);
+    try {
+      const res =
+        op === "track"
+          ? await adminApi.suratTestTrack(r)
+          : await adminApi.suratTestCancel(r);
+      setOpResult(res.data);
+    } catch (e: any) {
+      setOpResult({
+        error: e?.response?.data?.message || e?.message || "İstek başarısız oldu",
+      });
+    } finally {
+      setOpLoading(null);
     }
   }
 
@@ -180,24 +207,28 @@ export function SuratTrackingTab() {
 
   return (
     <div className="space-y-4">
-      {/* ── Sürat Endpoint Testi ─────────────────────────────────────────── */}
-      <div className="admin-card space-y-3 p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 className="font-medium text-heading">Sürat Endpoint Testi</h3>
-            <p className="text-xs text-muted">
-              Sunucudan Sürat&apos;a gerçek bir test gönderisi oluşturur ve hemen takibini
-              sorgular. İki REST endpoint&apos;inin canlı çalıştığını doğrular
-              (siparişe/DB&apos;ye dokunmaz).
-            </p>
-          </div>
+      {/* ── Sürat Endpoint Test Konsolu ──────────────────────────────────── */}
+      <div className="admin-card space-y-4 p-4">
+        <div>
+          <h3 className="font-medium text-heading">Sürat Endpoint Test Konsolu</h3>
+          <p className="text-xs text-muted">
+            Elimizdeki Sürat REST endpoint&apos;lerini buradan test et. Sunucu → Sürat
+            gerçek istek atar; DB&apos;ye/siparişe dokunmaz.
+          </p>
+        </div>
+
+        {/* 1) Hızlı test: gönderi oluştur + takip */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <span className="text-xs text-muted">
+            Yeni bir test gönderisi oluşturur, hemen takibini sorgular; referansı aşağı doldurur.
+          </span>
           <Button
             variant="primary"
             size="sm"
             isLoading={testing}
             onClick={runEndpointTest}
           >
-            {testing ? "Test ediliyor…" : "Testi Çalıştır"}
+            {testing ? "Test ediliyor…" : "Gönderi Oluştur + Takip"}
           </Button>
         </div>
 
@@ -239,6 +270,49 @@ export function SuratTrackingTab() {
             )}
           </div>
         )}
+
+        {/* 2) Referansla tekil endpoint testleri (takip / geri-çek) */}
+        <div className="space-y-2 border-t border-border pt-3">
+          <p className="text-xs text-muted">
+            Bir referans (OzelKargoTakipNo) ile tekil endpoint testi:
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              value={cref}
+              onChange={(e) => setCref(e.target.value)}
+              placeholder="Referans (OzelKargoTakipNo)"
+              className="w-full font-mono text-xs sm:w-72"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              isLoading={opLoading === "track"}
+              onClick={() => runOp("track")}
+            >
+              Takip Sorgula
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              isLoading={opLoading === "cancel"}
+              onClick={() => runOp("cancel")}
+            >
+              Geri Çek (İptal)
+            </Button>
+          </div>
+          {opResult && (
+            <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-alt p-3 font-mono text-xs text-body">
+              {JSON.stringify(opResult, null, 2)}
+            </pre>
+          )}
+        </div>
+
+        <p className="text-xs text-subtle">
+          Not: Barkod (OrtakBarkodOlustur) endpoint&apos;i mevcut ama istek şeması
+          Sürat&apos;tan bekleniyor; geldiğinde eklenecek. Ayrıca test ortamında gönderiler
+          fiziksel &quot;kabul&quot; aşamasına gelmediği için takip/iptal genelde
+          &quot;kabul bekleniyor / Kayıt Bulunamadı&quot; döner (üretimde ilerler).
+        </p>
       </div>
 
       <p className="text-sm text-muted">

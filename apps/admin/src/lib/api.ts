@@ -497,6 +497,14 @@ export const adminApi = {
   suratEndpointTest() {
     return api.post('/admin/shipping/surat/endpoint-test');
   },
+  // Test konsolu: referansla Sürat takip sorgusu (KargoTakipHareketDetayi).
+  suratTestTrack(ref: string) {
+    return api.post('/admin/shipping/surat/track', { ref });
+  },
+  // Test konsolu: referansla Sürat iptal/geri-çek (GonderiGeriCek).
+  suratTestCancel(ref: string) {
+    return api.post('/admin/shipping/surat/cancel', { ref });
+  },
 
   // Notifications
   getNotificationHistory: (params?: {

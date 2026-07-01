@@ -2263,6 +2263,22 @@ export class AdminController {
     return this.adminService.runSuratEndpointTest();
   }
 
+  @Post('shipping/surat/track')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Test konsolu: referansla Sürat takip sorgusu (KargoTakipHareketDetayi)' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Ham takip cevabı' })
+  async suratTestTrack(@Body() body: { ref: string }) {
+    return this.adminService.suratTestTrack(body?.ref);
+  }
+
+  @Post('shipping/surat/cancel')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Test konsolu: referansla Sürat iptal/geri-çek (GonderiGeriCek)' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'İptal cevabı' })
+  async suratTestCancel(@Body() body: { ref: string }) {
+    return this.adminService.suratTestCancel(body?.ref);
+  }
+
   // ==================== NOTIFICATION MANAGEMENT ====================
 
   @Get('notifications/history')

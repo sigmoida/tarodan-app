@@ -9442,6 +9442,29 @@ export class AdminService {
     return { ref, enabled: true, create, track };
   }
 
+  /**
+   * Test konsolu: verilen referansla Sürat takip endpoint'ini (KargoTakipHareketDetayi)
+   * ham olarak sorgular. DB'ye dokunmaz.
+   */
+  async suratTestTrack(ref: string): Promise<any> {
+    if (!ref?.trim()) return { ok: false, error: 'Referans (OzelKargoTakipNo) gerekli' };
+    if (!this.suratTrackingService) return { ok: false, error: 'Takip servisi kullanılamıyor' };
+    return this.suratTrackingService.probeTracking(ref.trim());
+  }
+
+  /**
+   * Test konsolu: verilen referansla Sürat iptal/geri-çek endpoint'ini (GonderiGeriCek)
+   * çağırır. Uzak çağrı yapar, DB'ye dokunmaz.
+   */
+  async suratTestCancel(ref: string): Promise<{ ok: boolean; suratMessage?: string; error?: string }> {
+    if (!ref?.trim()) return { ok: false, error: 'Referans (OzelKargoTakipNo) gerekli' };
+    if (!this.suratCargoService) return { ok: false, error: 'Sürat servisi kullanılamıyor' };
+    if (!this.suratCargoService.isIntegrationEnabled()) {
+      return { ok: false, error: 'SURAT_CARGO_ENABLED kapalı (Coolify env kontrol et)' };
+    }
+    return this.suratCargoService.cancelShipmentByOrderNumber(ref.trim());
+  }
+
   // ==================== NOTIFICATION MANAGEMENT ====================
 
   /**
