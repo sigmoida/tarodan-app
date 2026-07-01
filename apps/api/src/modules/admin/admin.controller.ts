@@ -2151,6 +2151,15 @@ export class AdminController {
     });
   }
 
+  @Post('shipping/shipments/:id/sync-tracking')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Bir Sürat kargosunun takip durumunu anında senkronla' })
+  @ApiParam({ name: 'id', description: 'Shipment ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Takip senkronlandı' })
+  async syncShipmentTracking(@Param('id') id: string) {
+    return this.adminService.syncShipmentTracking(id);
+  }
+
   // ==================== NOTIFICATION MANAGEMENT ====================
 
   @Get('notifications/history')

@@ -340,8 +340,14 @@ export class SuratTrackingService {
     if (!data || data.Gonderiler.length === 0) return false;
 
     const gonderi = data.Gonderiler[0];
-    const newStatus = mapSuratStatusToShipmentStatus(gonderi.KargonunDurumuSayi);
-    const isDelivered = isSuratDelivered(gonderi.KargonunDurumuSayi);
+    const suratCode = gonderi.KargonunDurumuSayi;
+    const newStatus = mapSuratStatusToShipmentStatus(suratCode);
+    // İade gönderisinin "geri teslim edildi" durumu, Sürat dokümanına (KargoTakip
+    // HareketDetayi) göre KargonunDurumuSayi = 12 (İade Teslim Edildi). İleri
+    // gönderinin 6/7 kodları bu akışta geçerli değil; yine de tolerans için
+    // ikisini de kabul ediyoruz.
+    const isReturnDelivered =
+      isSuratReturnCompleted(suratCode) || isSuratDelivered(suratCode);
 
     const { RefundService } = await import('../refund/refund.service');
     const refundService = this.moduleRef.get(RefundService, { strict: false });
@@ -352,17 +358,18 @@ export class SuratTrackingService {
 
     await refundService.applyReturnTrackingUpdate(refundRequestId, {
       status: newStatus,
-      deliveredAt:
-        isDelivered && gonderi.TeslimTarihi
+      deliveredAt: isReturnDelivered
+        ? gonderi.TeslimTarihi
           ? this.parseSuratDate(gonderi.TeslimTarihi)
-          : undefined,
+          : new Date()
+        : undefined,
     });
 
-    if (isDelivered) {
+    if (isReturnDelivered) {
       try {
         await refundService.finalizeRefundForReturnedShipment(refundRequestId);
         this.logger.log(
-          `Auto-refunded RefundRequest ${refundRequestId} after Sürat return delivery`,
+          `Auto-refunded RefundRequest ${refundRequestId} after Sürat return delivery (suratCode=${suratCode})`,
         );
       } catch (error: any) {
         this.logger.error(

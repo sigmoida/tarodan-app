@@ -466,6 +466,10 @@ export const adminApi = {
   getShipments(params?: any) {
     return api.get('/admin/shipping/shipments', { params });
   },
+  // Bir Sürat kargosunun takip durumunu 30 dk cron'u beklemeden anında senkronlar.
+  syncShipmentTracking(id: string) {
+    return api.post(`/admin/shipping/shipments/${id}/sync-tracking`);
+  },
 
   // Notifications
   getNotificationHistory: (params?: {

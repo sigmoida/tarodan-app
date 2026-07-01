@@ -79,6 +79,7 @@ import { RefundService } from '../refund/refund.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType, NotificationChannel } from '../notification/dto/notification.dto';
 import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
+import { SuratTrackingService } from '../surat-cargo/surat-tracking.service';
 import { normalizeSuratPhone, normalizeSuratLocation } from '../surat-cargo/surat-address.util';
 import { OrderService } from '../order/order.service';
 import {
@@ -112,6 +113,8 @@ export class AdminService {
     private readonly suratCargoService?: SuratCargoService,
     @Optional()
     private readonly orderService?: OrderService,
+    @Optional()
+    private readonly suratTrackingService?: SuratTrackingService,
   ) { }
 
   // ---------- Order 48h pencere admin müdahaleleri (Faz 3B.4) ----------
@@ -9063,6 +9066,41 @@ export class AdminService {
         limit,
         totalPages: Math.ceil(total / limit),
       },
+    };
+  }
+
+  /**
+   * Admin manuel takip senkronu: bir Sürat kargosunun güncel durumunu 30 dk'lık
+   * cron'u beklemeden anında Sürat takip API'sinden çeker ve DB'ye yazar.
+   * Kargo panelindeki "Takibi Yenile" butonu bunu kullanır.
+   */
+  async syncShipmentTracking(
+    shipmentId: string,
+  ): Promise<{ ok: boolean; message: string; shipment?: any }> {
+    const shipment = await this.prisma.shipment.findUnique({
+      where: { id: shipmentId },
+    });
+    if (!shipment) {
+      return { ok: false, message: 'Gönderi bulunamadı' };
+    }
+    if (shipment.provider !== 'surat') {
+      return { ok: false, message: 'Bu gönderi Sürat kargo değil' };
+    }
+    if (!this.suratTrackingService) {
+      return { ok: false, message: 'Takip servisi kullanılamıyor' };
+    }
+
+    const updated = await this.suratTrackingService.syncShipmentTracking(shipmentId);
+    const fresh = await this.prisma.shipment.findUnique({
+      where: { id: shipmentId },
+    });
+
+    return {
+      ok: updated,
+      message: updated
+        ? 'Takip bilgisi güncellendi'
+        : 'Sürat’tan güncelleme alınamadı (kargo henüz hareket görmemiş ya da takip numarası yok olabilir)',
+      shipment: fresh,
     };
   }
 

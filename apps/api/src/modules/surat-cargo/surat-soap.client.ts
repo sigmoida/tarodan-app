@@ -23,6 +23,16 @@ export abstract class SuratSoapClient {
     ozelKargoTakipNo: string,
     options: SuratSoapCallOptions,
   ): Promise<string>;
+
+  /**
+   * Bu client Sürat tarafında uzaktan iptal (GonderiSil) yapabiliyor mu?
+   * SOAP/stub için true. REST istemcisinde Sürat'ın dokümante edilmiş bir iptal
+   * ucu olmadığı için false döner; o durumda iptal yalnızca YEREL olarak
+   * (kargo kaydı 'cancelled') tutarlı tutulur.
+   */
+  supportsRemoteCancel(): boolean {
+    return true;
+  }
 }
 
 /**
