@@ -123,15 +123,15 @@ function buildParty(p: UblParty, currency: string): string {
       `<cac:PartyTaxScheme><cac:TaxScheme>${el('cbc:Name', p.taxOffice || '')}</cac:TaxScheme></cac:PartyTaxScheme>`,
     );
   }
-  // Gerçek kişi adı
-  if (isTckn && (p.firstName || p.lastName)) {
-    parts.push(`<cac:Person>${el('cbc:FirstName', p.firstName || '')}${el('cbc:FamilyName', p.lastName || '')}</cac:Person>`);
-  }
-  // İletişim
+  // İletişim — UBL Party sırasında Contact, Person'dan ÖNCE gelmeli.
   const contact: string[] = [];
   if (p.phone) contact.push(el('cbc:Telephone', p.phone));
   if (p.email) contact.push(el('cbc:ElectronicMail', p.email));
   if (contact.length) parts.push(`<cac:Contact>${contact.join('')}</cac:Contact>`);
+  // Gerçek kişi adı
+  if (isTckn && (p.firstName || p.lastName)) {
+    parts.push(`<cac:Person>${el('cbc:FirstName', p.firstName || '')}${el('cbc:FamilyName', p.lastName || '')}</cac:Person>`);
+  }
   return `<cac:Party>${parts.join('')}</cac:Party>`;
 }
 
@@ -204,14 +204,17 @@ export function buildInvoiceXml(input: UblInvoiceInput): UblInvoiceResult {
     el('cbc:DocumentCurrencyCode', currency) +
     el('cbc:LineCountNumeric', input.lines.length);
 
-  // e-Arşiv gönderim şekli (opsiyonel ek referans)
+  // e-Arşiv gönderim şekli. eLogo'ya özel marker: cbc:ID="gonderimSekli",
+  // değer cbc:DocumentType'ta (ELEKTRONIK/KAGIT). Canlı demo'da doğrulandı —
+  // ID'ye değeri yazınca eLogo "gönderim şekli belirtilmelidir" hatası veriyordu.
   const sendTypeRef = input.sendType
-    ? `<cac:AdditionalDocumentReference>${el('cbc:ID', input.sendType)}${el('cbc:IssueDate', input.issueDate)}${el('cbc:DocumentTypeCode', input.sendType)}</cac:AdditionalDocumentReference>`
+    ? `<cac:AdditionalDocumentReference>${el('cbc:ID', 'gonderimSekli')}${el('cbc:IssueDate', input.issueDate)}${el('cbc:DocumentType', input.sendType)}</cac:AdditionalDocumentReference>`
     : '';
 
-  // İADE faturasında orijinal faturaya referans (BillingReference)
+  // İADE faturasında orijinal faturaya referans (BillingReference).
+  // GİB UBL-TR: InvoiceDocumentReference'ta cbc:DocumentTypeCode=IADE ZORUNLU (16 haneli orijinal fatura ID + IADE kodu).
   const billingRef = input.billingReference
-    ? `<cac:BillingReference><cac:InvoiceDocumentReference>${el('cbc:ID', input.billingReference.invoiceId)}${el('cbc:IssueDate', input.billingReference.issueDate)}</cac:InvoiceDocumentReference></cac:BillingReference>`
+    ? `<cac:BillingReference><cac:InvoiceDocumentReference>${el('cbc:ID', input.billingReference.invoiceId)}${el('cbc:IssueDate', input.billingReference.issueDate)}${el('cbc:DocumentTypeCode', 'IADE')}</cac:InvoiceDocumentReference></cac:BillingReference>`
     : '';
 
   const xml =

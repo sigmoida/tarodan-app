@@ -313,6 +313,8 @@ export const adminApi = {
   createCommissionRule: (data: any) => api.post('/admin/commission-rules', data),
   updateCommissionRule: (id: string, data: any) => api.patch(`/admin/commission-rules/${id}`, data),
   deleteCommissionRule: (id: string) => api.delete(`/admin/commission-rules/${id}`),
+  getTradeCommissionRate: () => api.get('/admin/trade-commission-rate'),
+  setTradeCommissionRate: (rate: number) => api.patch('/admin/trade-commission-rate', { rate }),
 
   // Membership Tiers
   getMembershipTiers: () => api.get('/admin/membership-tiers'),
@@ -376,6 +378,27 @@ export const adminApi = {
     limit?: number;
   }) => api.get('/admin/payments', { params }),
   getPayment: (id: string) => api.get(`/admin/payments/${id}`),
+  // Faturalar (e-Arşiv/e-Fatura) — kesilen + iade belgeleri
+  getInvoices: (params?: {
+    type?: string;
+    status?: string;
+    documentType?: string;
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }) => api.get('/admin/invoices', { params }),
+  getInvoicePdf: (id: string) => api.get(`/admin/invoices/${id}/pdf`),
+  // Kurumsal satıcıların elle yüklediği ürün faturaları (ayrı sekme)
+  getSellerInvoices: (params?: {
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }) => api.get('/admin/seller-invoices', { params }),
+  getSellerInvoicePdf: (id: string) => api.get(`/admin/seller-invoices/${id}/pdf`),
   getPaymentStatistics: (params?: {
     period?: 'daily' | 'weekly' | 'monthly';
     startDate?: string;

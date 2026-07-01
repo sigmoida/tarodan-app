@@ -2,7 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
-import { ShipmentStatus, OrderStatus, TradeStatus } from '@prisma/client';
+import { ShipmentStatus, OrderStatus, TradeStatus, PaymentStatus } from '@prisma/client';
+import { ElogoInvoicingService } from '../elogo/elogo-invoicing.service';
 import type { SuratTakipResponse, SuratTakipGonderi } from './surat-cargo.types';
 import {
   mapSuratStatusToShipmentStatus,
@@ -527,7 +528,7 @@ export class SuratTrackingService {
    * write a TradeShipmentEvent on each leg recording the auto-transition.
    */
   private async maybeTransitionTradeToAtWarehouse(tradeId: string): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
+    const transitioned = await this.prisma.$transaction(async (tx) => {
       // Lock the trade row to avoid racing with admin manual transition.
       await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tradeId} FOR UPDATE`;
 
@@ -535,8 +536,8 @@ export class SuratTrackingService {
         where: { id: tradeId },
         select: { id: true, status: true },
       });
-      if (!trade) return;
-      if (trade.status === TradeStatus.at_warehouse) return;
+      if (!trade) return false;
+      if (trade.status === TradeStatus.at_warehouse) return false;
 
       const toWarehouseShipments = await tx.tradeShipment.findMany({
         where: { tradeId, leg: 'to_warehouse' },
@@ -550,7 +551,7 @@ export class SuratTrackingService {
             s.deliveredAt !== null || s.status === ShipmentStatus.delivered,
         );
 
-      if (!bothDelivered) return;
+      if (!bothDelivered) return false;
 
       const now = new Date();
       await tx.trade.update({
@@ -573,6 +574,26 @@ export class SuratTrackingService {
       this.logger.log(
         `Trade ${tradeId} auto-transitioned to at_warehouse after Sürat reported both to_warehouse legs delivered`,
       );
+      return true;
     });
+
+    // YENİ MODEL: takas nakit komisyonu e-Arşivi CASH PAYMENT'ta değil, ürünler DEPOYA VARINCA
+    // (at_warehouse) kesilir → iptal penceresi geçmiş olur, iptalde fatura kesilmemiş olur.
+    // Post-commit, non-blocking, idempotent (cut() type+sourceId tekil).
+    if (!transitioned) return;
+    try {
+      const tcp = await this.prisma.tradeCashPayment.findUnique({
+        where: { tradeId },
+        select: { id: true, status: true },
+      });
+      if (tcp && tcp.status === PaymentStatus.completed) {
+        const elogo = this.moduleRef.get(ElogoInvoicingService, { strict: false });
+        await elogo
+          .issueTradeCashCommissionInvoice(tcp.id)
+          .catch((e: any) => this.logger.warn(`eLogo takas komisyonu (depo) tetik hatası ${tradeId}: ${e?.message}`));
+      }
+    } catch (e: any) {
+      this.logger.warn(`at_warehouse takas komisyonu faturası hatası ${tradeId}: ${e?.message}`);
+    }
   }
 }

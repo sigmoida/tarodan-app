@@ -34,6 +34,25 @@ describe('buildInvoiceXml (UBL-TR)', () => {
     expect(xml).toContain('<cbc:TaxExclusiveAmount currencyID="TRY">100.00</cbc:TaxExclusiveAmount>');
   });
 
+  it('e-Arşiv gönderim şekli: cbc:ID="gonderimSekli" + DocumentType=ELEKTRONIK (canlı doğrulandı)', () => {
+    // eLogo marker'ı ID="gonderimSekli"; değer DocumentType'ta. ID'ye ELEKTRONIK yazılırsa
+    // eLogo "Faturanın gönderim şekli belirtilmelidir" hatası verir.
+    const { xml } = buildInvoiceXml(baseInput({ sendType: 'ELEKTRONIK' }));
+    expect(xml).toContain(
+      '<cac:AdditionalDocumentReference><cbc:ID>gonderimSekli</cbc:ID>',
+    );
+    expect(xml).toContain('<cbc:DocumentType>ELEKTRONIK</cbc:DocumentType>');
+  });
+
+  it('UBL Party sırası: Contact (e-posta), Person\'dan ÖNCE gelir', () => {
+    const { xml } = buildInvoiceXml(
+      baseInput({
+        customer: { vknTckn: '11111111111', firstName: 'Ahmet', lastName: 'Yılmaz', email: 'a@b.com' },
+      }),
+    );
+    expect(xml.indexOf('<cac:Contact>')).toBeLessThan(xml.indexOf('<cac:Person>'));
+  });
+
   it('yuvarlama: 3 x 33,33 @ %20 → matrah 99,99 / KDV 20,00 / ödenecek 119,99', () => {
     const { totals, xml } = buildInvoiceXml(
       baseInput({ lines: [{ name: 'Hizmet', quantity: 3, unitPrice: 33.33, vatRate: 20 }] }),

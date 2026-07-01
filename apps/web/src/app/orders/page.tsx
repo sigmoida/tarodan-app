@@ -351,22 +351,21 @@ export default function OrdersPage() {
   const handleDownloadInvoice = async (orderId: string) => {
     setDownloadingInvoiceOrderId(orderId);
     try {
-      const invoiceRes = await api.get(`/invoices/order/${orderId}`);
+      // Yeni eLogo e-Arşiv ucu — siparişe ait gerçek fatura (yoksa null).
+      const invoiceRes = await api.get(`/elogo/invoices/by-order/${orderId}`);
       const invoice = invoiceRes.data;
       if (!invoice?.id) {
-        toast.error(locale === 'en' ? 'Invoice not found' : 'Fatura bulunamadı');
+        toast.error(locale === 'en' ? 'Invoice not ready yet' : 'Fatura henüz hazır değil');
         return;
       }
-      const response = await api.get(`/invoices/download/${invoice.id}`, { responseType: 'blob' });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `fatura-${invoice.invoiceNumber || invoice.id}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      toast.success(locale === 'en' ? 'Invoice downloaded' : 'Fatura indirildi');
+      const res = await api.get(`/elogo/invoices/${invoice.id}/pdf`);
+      const url = res.data?.url;
+      if (url) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+        toast.success(locale === 'en' ? 'Invoice opened' : 'Fatura açıldı');
+      } else {
+        toast.error(locale === 'en' ? 'Invoice not ready yet' : 'Fatura henüz hazır değil');
+      }
     } catch (err: any) {
       if (err.response?.status === 404) {
         toast.error(locale === 'en' ? 'Invoice not ready yet' : 'Fatura henüz hazır değil');

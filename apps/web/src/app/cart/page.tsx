@@ -18,6 +18,7 @@ import { useCartStore } from "@/stores/cartStore";
 import { useAuthStore } from "@/stores/authStore";
 import { useTranslation } from "@/i18n";
 import { IconButton } from "@tarodan/ui";
+import { ordersApi } from "@/lib/api";
 
 export default function CartPage() {
   const {
@@ -44,6 +45,30 @@ export default function CartPage() {
   useEffect(() => {
     fetchCart();
   }, [fetchCart]);
+
+  // Platform hizmet bedeli (komisyon) — backend quote'tan, sepette de net göster.
+  const [buyerFee, setBuyerFee] = useState(0);
+  useEffect(() => {
+    const list = (items ?? []) as Array<{ productId?: string; id?: string; quantity?: number }>;
+    if (list.length === 0) {
+      setBuyerFee(0);
+      return;
+    }
+    let cancelled = false;
+    ordersApi
+      .getQuote({
+        items: list.map((it) => ({ productId: it.productId ?? it.id!, quantity: it.quantity ?? 1 })),
+      })
+      .then((res: any) => {
+        if (!cancelled) setBuyerFee(Number(res.data?.pricing?.buyerFeeAmount ?? res.data?.buyerFeeAmount ?? 0));
+      })
+      .catch(() => {
+        if (!cancelled) setBuyerFee(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [items]);
 
   const handleRemove = async (productId: string) => {
     try {
@@ -125,7 +150,7 @@ export default function CartPage() {
   }
 
   // Kargo sepette gösterilmez; ödeme adımında hesaplanır
-  const displayGrandTotal = Math.max(0, subtotal - (totalDiscount ?? 0));
+  const displayGrandTotal = Math.max(0, subtotal - (totalDiscount ?? 0)) + buyerFee;
 
   return (
     <div className="min-h-screen bg-surface py-8">
@@ -337,6 +362,16 @@ export default function CartPage() {
                         </span>
                       </div>
                     ))}
+                {buyerFee > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted">
+                      {locale === "en" ? "Platform Service Fee" : "Platform Hizmet Bedeli"}
+                    </span>
+                    <span className="font-medium">
+                      {buyerFee.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-muted">{t("checkout.shipping")}</span>
                   <span className="text-subtle">

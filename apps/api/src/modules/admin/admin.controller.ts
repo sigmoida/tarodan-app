@@ -15,6 +15,7 @@ import {
   UploadedFile,
   BadRequestException,
   Res,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -27,6 +28,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
+import { ElogoInvoicingService } from '../elogo/elogo-invoicing.service';
 import { AdvertisementService } from '../advertisement/advertisement.service';
 import { MediaService } from '../media/media.service';
 import { CreateAdvertisementDto, UpdateAdvertisementDto, ReorderAdsDto } from '../advertisement/dto';
@@ -104,6 +106,7 @@ export class AdminController {
     private readonly mediaService: MediaService,
     private readonly discountService: DiscountService,
     private readonly rolesGuard: RolesGuard,
+    private readonly elogoInvoicing: ElogoInvoicingService,
   ) { }
 
   // ==================== COMMISSION RULES ====================
@@ -114,6 +117,23 @@ export class AdminController {
   @ApiResponse({ status: HttpStatus.OK, type: [CommissionRuleResponseDto] })
   async getCommissionRules() {
     return this.adminService.getCommissionRules();
+  }
+
+  @Get('trade-commission-rate')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Takas nakit farkı komisyon oranı (%)' })
+  async getTradeCommissionRate() {
+    return this.adminService.getTradeCommissionRate();
+  }
+
+  @Patch('trade-commission-rate')
+  @Roles(AdminRole.super_admin)
+  @ApiOperation({ summary: 'Takas komisyon oranını güncelle' })
+  async setTradeCommissionRate(
+    @CurrentUser('id') adminId: string,
+    @Body() body: { rate: number },
+  ) {
+    return this.adminService.setTradeCommissionRate(adminId, Number(body.rate));
   }
 
   @Post('commission-rules')
@@ -896,6 +916,79 @@ export class AdminController {
     @Body() body: { reason: string; priority?: string },
   ) {
     return this.adminService.flagModerationItem(adminId, type, id, body.reason, body.priority);
+  }
+
+  // ==================== ELOGO FATURA (e-Arşiv/e-Fatura) ====================
+
+  @Get('invoices')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Kesilen + iade e-Arşiv/e-Fatura belgeleri (sayfalı, filtreli)' })
+  async getElogoInvoices(
+    @Query('type') type?: string,
+    @Query('status') status?: string,
+    @Query('documentType') documentType?: string,
+    @Query('search') search?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.adminService.getElogoInvoices({
+      type,
+      status,
+      documentType,
+      search,
+      startDate,
+      endDate,
+      page: page ? Number(page) : 1,
+      limit: limit ? Number(limit) : 20,
+    });
+  }
+
+  @Get('invoices/:id/pdf')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Fatura PDF (S3 presigned URL veya canlı stream)' })
+  async getElogoInvoicePdf(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res() res: any,
+  ) {
+    const r = await this.elogoInvoicing.getInvoiceDownload(id); // userId yok → admin
+    if (r.url) {
+      res.json({ url: r.url, invoiceNumber: r.invoiceNumber });
+      return;
+    }
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${r.invoiceNumber}.pdf"`,
+      'Content-Length': r.buffer!.length,
+    });
+    res.status(HttpStatus.OK).send(r.buffer);
+  }
+
+  @Get('seller-invoices')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Kurumsal satıcıların elle yüklediği ürün faturaları (sayfalı, filtreli)' })
+  async getSellerUploadedInvoices(
+    @Query('search') search?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.adminService.getSellerUploadedInvoices({
+      search,
+      startDate,
+      endDate,
+      page: page ? Number(page) : 1,
+      limit: limit ? Number(limit) : 20,
+    });
+  }
+
+  @Get('seller-invoices/:id/pdf')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Satıcı faturası PDF (S3 presigned URL)' })
+  async getSellerUploadedInvoicePdf(@Param('id', ParseUUIDPipe) id: string) {
+    return this.adminService.getSellerUploadedInvoicePdf(id);
   }
 
   // ==================== PAYMENT MANAGEMENT ====================

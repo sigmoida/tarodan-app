@@ -166,7 +166,27 @@ export default function CheckoutScreen() {
     () => items.reduce((sum, it) => sum + it.price * it.quantity, 0),
     [items],
   );
-  const total = subtotal + shippingCost;
+
+  // Platform hizmet bedeli (komisyon) + KDV — backend quote'tan (web ile parite).
+  // Aksi halde mobil toplam, fiilen tahsil edilenden (subtotal+kargo+hizmet+KDV) düşük görünüyordu.
+  const quoteQuery = useQuery({
+    queryKey: ['checkout-quote', items.map((it) => `${it.productId}:${it.quantity}`).join(',')],
+    queryFn: async () => {
+      const res: any = await ordersApi.getQuote({
+        items: items.map((it) => ({ productId: it.productId, quantity: it.quantity })),
+      });
+      return (res.data?.pricing ?? res.data ?? {}) as {
+        buyerFeeAmount?: number;
+        taxAmount?: number;
+        totalAmount?: number;
+      };
+    },
+    enabled: items.length > 0,
+    staleTime: 60_000,
+  });
+  const buyerFee = Number(quoteQuery.data?.buyerFeeAmount ?? 0);
+  const taxAmount = Number(quoteQuery.data?.taxAmount ?? 0);
+  const total = subtotal + shippingCost + buyerFee + taxAmount;
 
   // ---------- Üye için kayıtlı adresler ----------
   const addressesQuery = useQuery({
@@ -948,6 +968,18 @@ export default function CheckoutScreen() {
               {effectiveShippingCity ? formatPrice(shippingCost) : 'İl seçin'}
             </Text>
           </View>
+          {buyerFee > 0 ? (
+            <View style={styles.orderSummaryRow}>
+              <Text style={styles.orderSummaryLabel}>Platform Hizmet Bedeli</Text>
+              <Text style={styles.orderSummaryValue}>{formatPrice(buyerFee)}</Text>
+            </View>
+          ) : null}
+          {taxAmount > 0 ? (
+            <View style={styles.orderSummaryRow}>
+              <Text style={styles.orderSummaryLabel}>KDV</Text>
+              <Text style={styles.orderSummaryValue}>{formatPrice(taxAmount)}</Text>
+            </View>
+          ) : null}
           <Divider style={{ marginVertical: 12 }} />
           <View style={styles.orderSummaryRow}>
             <Text style={styles.orderTotalLabel}>Toplam</Text>

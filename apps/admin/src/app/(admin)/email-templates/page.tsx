@@ -103,6 +103,8 @@ const SAMPLE_DATA: Record<string, Record<string, unknown>> = {
   // Misafir
   'guest-checkout-otp':       { code: '482913', expiresInMinutes: 10 },
   // Fatura
+  'elogo-invoice':            { recipientName: 'Değerli Müşterimiz', description: 'Aracılık hizmet (komisyon) bedeli', invoiceNumber: 'TRD2026000000012', total: 450.77, type: 'commission' },
+  'seller-invoice':           { buyerName: 'Alıcı', sellerName: 'ABC Diecast Ltd.', orderNumber: 'TRD-12345', productTitle: 'Hot Wheels Ferrari 458' },
   'invoice-buyer':            { buyerName: 'Alıcı', invoiceNumber: 'FT-2024-001', orderNumber: 'TRD-12345', orderId: 'sample-id', productTitle: 'Hot Wheels Ferrari 458', sellerName: 'Satıcı', totalAmount: 199.99 },
   'invoice-seller':           { sellerName: 'Satıcı', invoiceNumber: 'FT-2024-002', orderNumber: 'TRD-12345', orderId: 'sample-id', productTitle: 'Hot Wheels Ferrari 458', buyerName: 'Alıcı', totalAmount: 199.99, commissionAmount: 20 },
   // Sipariş iptali

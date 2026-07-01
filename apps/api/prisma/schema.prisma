@@ -1107,6 +1107,7 @@ model Order {
   shipment               Shipment?
   refundRequests         RefundRequest[]
   commissionLedger       CommissionLedger?
+  sellerUploadedInvoice  SellerUploadedInvoice?
   checkoutGroup          CheckoutGroup?  @relation(fields: [checkoutGroupId], references: [id])
 
   @@index([buyerId])
@@ -1300,6 +1301,104 @@ model Invoice {
   @@index([sellerId])
   @@index([invoiceNumber])
   @@map("invoices")
+}
+
+/// Tarodan'ın KENDİ gelir e-belgeleri (komisyon / hizmet bedeli / üyelik / boost / iade).
+/// Düzenleyen = platform firması (Serhatlar). Mevcut Invoice (sipariş makbuzu) ile
+/// KARIŞTIRILMAMALI — bu model yalnızca eLogo'ya gönderilen GİB e-Arşiv/e-Fatura'yı izler.
+/// İlişki (User/Order) bilerek eklenmedi (daha az invaziv); kimlikler düz alan olarak tutulur.
+/// Tutarlar olay anındaki KAYITLI snapshot'tan gelir (oran/fiyat sonradan değişse de etkilenmez).
+model ElogoInvoice {
+  id               String             @id @default(uuid())
+  type             ElogoInvoiceType
+  /// Kaynak kaydın id'si (orderId / membershipPaymentId / boostId). type+sourceId tekil → idempotency.
+  sourceId         String             @map("source_id")
+  recipientUserId  String?            @map("recipient_user_id")
+  recipientVknTckn String?            @map("recipient_vkn_tckn")
+  recipientName    String?            @map("recipient_name")
+  documentType     String             @default("EARCHIVE") @map("document_type") // EARCHIVE | EINVOICE
+  sendType         String             @default("ELEKTRONIK") @map("send_type")
+  invoiceNumber    String?            @unique @map("invoice_number")
+  ettn             String?            @unique
+  netAmount        Decimal            @map("net_amount") @db.Decimal(10, 2)
+  taxAmount        Decimal            @map("tax_amount") @db.Decimal(10, 2)
+  total            Decimal            @db.Decimal(10, 2)
+  vatRate          Decimal            @default(20) @map("vat_rate") @db.Decimal(5, 2)
+  status           ElogoInvoiceStatus @default(pending)
+  elogoRefId       String?            @map("elogo_ref_id")
+  elogoResultCode  Int?               @map("elogo_result_code")
+  elogoResultMsg   String?            @map("elogo_result_msg")
+  /// İADE faturasında iadesi yapılan orijinal faturanın numarası.
+  billingReference String?            @map("billing_reference")
+  /// eLogo'dan çekilip S3'e kaydedilen PDF'in S3 anahtarı (documents bucket).
+  pdfUrl           String?            @map("pdf_url")
+  /// PDF alıcıya kendi SMTP'mizden e-postalandığı an.
+  emailSentAt      DateTime?          @map("email_sent_at")
+  attemptCount     Int                @default(0) @map("attempt_count")
+  lastAttemptAt    DateTime?          @map("last_attempt_at")
+  issuedAt         DateTime?          @map("issued_at")
+  sentAt           DateTime?          @map("sent_at")
+  cancelledAt      DateTime?          @map("cancelled_at")
+  cancelReason     String?            @map("cancel_reason")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+
+  @@unique([type, sourceId])
+  @@index([status])
+  @@index([recipientUserId])
+  @@map("elogo_invoices")
+}
+
+/// Gap-free belge numarası sırası (prefix + yıl bazında). GİB zorunluluğu.
+model ElogoDocSequence {
+  id        String @id @default(uuid())
+  prefix    String
+  year      Int
+  lastValue Int    @default(0) @map("last_value")
+
+  @@unique([prefix, year])
+  @@map("elogo_doc_sequences")
+}
+
+/// Kurumsal (şirket) satıcının siparişe elle yüklediği ÜRÜN faturası PDF'i.
+/// Tarodan'ın eLogo gelir e-Arşivlerinden (komisyon/hizmet) AYRI; satıcının kendi
+/// sisteminden kestiği fatura. Sipariş başına TEK (orderId @unique); değiştirilebilir.
+model SellerUploadedInvoice {
+  id          String    @id @default(uuid())
+  orderId     String    @unique @map("order_id")
+  sellerId    String    @map("seller_id")
+  buyerId     String    @map("buyer_id")
+  pdfKey      String    @map("pdf_key") // S3 anahtarı (documents bucket)
+  fileName    String    @map("file_name")
+  fileSize    Int?      @map("file_size")
+  emailSentAt DateTime? @map("email_sent_at")
+  uploadedAt  DateTime  @default(now()) @map("uploaded_at")
+  replacedAt  DateTime? @map("replaced_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId])
+  @@index([buyerId])
+  @@map("seller_uploaded_invoices")
+}
+
+enum ElogoInvoiceType {
+  commission
+  service_fee
+  membership
+  boost
+  trade_commission
+  platform_sale
+  return_invoice
+}
+
+enum ElogoInvoiceStatus {
+  pending
+  sent
+  signed
+  failed
+  cancelled
 }
 
 model Shipment {

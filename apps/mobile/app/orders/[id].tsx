@@ -21,7 +21,7 @@ import { useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { api, ordersApi, refundsApi, mediaApi, paymentsApi, type RNFile } from '../../src/services/api';
+import { api, ordersApi, refundsApi, mediaApi, paymentsApi, elogoInvoicesApi, sellerInvoiceApi, type RNFile } from '../../src/services/api';
 import { ThemedRefreshControl } from '../../src/components/common';
 import { useRefresh } from '../../src/hooks/useRefresh';
 import RatingModal from '../../src/components/RatingModal';
@@ -212,6 +212,80 @@ export default function OrderDetailScreen() {
   });
 
   const { refreshing, onRefresh } = useRefresh(refetch);
+
+  // eLogo e-Arşiv (gerçek yasal fatura) — yalnız HAZIRSA buton çıkar.
+  const orderStatus = order?.status;
+  const { data: elogoInvoice } = useQuery({
+    queryKey: ['elogo-invoice', id],
+    queryFn: async () => {
+      try {
+        const res = await elogoInvoicesApi.byOrder(id as string);
+        return res.data ?? null;
+      } catch {
+        return null;
+      }
+    },
+    enabled:
+      !!id &&
+      !!orderStatus &&
+      orderStatus !== 'pending' &&
+      orderStatus !== 'cancelled' &&
+      orderStatus !== 'refunded',
+  });
+  const [downloadingInvoice, setDownloadingInvoice] = useState(false);
+  const handleViewInvoice = async () => {
+    if (!elogoInvoice?.id) return;
+    setDownloadingInvoice(true);
+    try {
+      const res = await elogoInvoicesApi.pdf(elogoInvoice.id);
+      const url = res.data?.url;
+      if (url) {
+        await Linking.openURL(url);
+      } else {
+        setSnackbar({ visible: true, message: 'Fatura henüz hazır değil', variant: 'danger' });
+      }
+    } catch {
+      setSnackbar({ visible: true, message: 'Fatura açılamadı', variant: 'danger' });
+    } finally {
+      setDownloadingInvoice(false);
+    }
+  };
+
+  // Kurumsal satıcının siparişe yüklediği ürün faturası (varsa alıcı/satıcı indirebilir).
+  const { data: sellerInvoice } = useQuery({
+    queryKey: ['seller-invoice', id],
+    queryFn: async () => {
+      try {
+        const res = await sellerInvoiceApi.status(id as string);
+        return res.data ?? null;
+      } catch {
+        return null;
+      }
+    },
+    enabled:
+      !!id &&
+      !!orderStatus &&
+      orderStatus !== 'pending' &&
+      orderStatus !== 'cancelled' &&
+      orderStatus !== 'refunded',
+  });
+  const [downloadingSellerInvoice, setDownloadingSellerInvoice] = useState(false);
+  const handleViewSellerInvoice = async () => {
+    setDownloadingSellerInvoice(true);
+    try {
+      const res = await sellerInvoiceApi.download(id as string);
+      const url = res.data?.url;
+      if (url) {
+        await Linking.openURL(url);
+      } else {
+        setSnackbar({ visible: true, message: 'Fatura bulunamadı', variant: 'danger' });
+      }
+    } catch {
+      setSnackbar({ visible: true, message: 'Fatura açılamadı', variant: 'danger' });
+    } finally {
+      setDownloadingSellerInvoice(false);
+    }
+  };
 
   // Refund request mutation
   const refundMutation = useMutation({
@@ -857,6 +931,57 @@ export default function OrderDetailScreen() {
             </Text>
           </View>
         </Card>
+
+        {/* Fatura — yalnız gerçek e-Arşiv HAZIRSA çıkar */}
+        {elogoInvoice?.id && (
+          <Card variant="elevated" style={styles.card} testID="order-invoice-card">
+            <Text variant="label" style={styles.sectionTitle}>Fatura</Text>
+            <Text variant="caption" style={{ color: colors.text.muted, marginBottom: 8 }}>
+              Faturanız e-posta adresinize gönderildi
+              {elogoInvoice.invoiceNumber ? ` · No: ${elogoInvoice.invoiceNumber}` : ''}
+            </Text>
+            <Button
+              variant="outline"
+              fullWidth
+              onPress={handleViewInvoice}
+              isLoading={downloadingInvoice}
+              disabled={downloadingInvoice}
+              title="Faturayı Görüntüle / İndir"
+            />
+          </Card>
+        )}
+
+        {/* Kurumsal satıcı faturası (elle yüklenen PDF) — indirme + satıcıya yükleme yönlendirmesi */}
+        {sellerInvoice &&
+          (sellerInvoice.invoice || (sellerInvoice.canUpload && sellerInvoice.isSeller)) && (
+            <Card variant="elevated" style={styles.card} testID="seller-invoice-card">
+              <Text variant="label" style={styles.sectionTitle}>Satıcı Faturası</Text>
+              {sellerInvoice.invoice ? (
+                <>
+                  <Text variant="caption" style={{ color: colors.text.muted, marginBottom: 8 }}>
+                    {sellerInvoice.invoice.fileName}
+                  </Text>
+                  <Button
+                    variant="outline"
+                    fullWidth
+                    onPress={handleViewSellerInvoice}
+                    isLoading={downloadingSellerInvoice}
+                    disabled={downloadingSellerInvoice}
+                    title="Satıcı Faturasını Görüntüle / İndir"
+                  />
+                  {sellerInvoice.canUpload && (
+                    <Text variant="caption" style={{ color: colors.text.muted, marginTop: 8 }}>
+                      Faturayı değiştirmek için tarodan.com sipariş sayfasını kullanın.
+                    </Text>
+                  )}
+                </>
+              ) : (
+                <Text variant="caption" style={{ color: colors.text.muted }}>
+                  Bu sipariş için fatura yüklemek üzere tarodan.com sipariş sayfasını kullanın.
+                </Text>
+              )}
+            </Card>
+          )}
 
         {/* İPTAL (kargo öncesi) — alıcı, sipariş henüz kargoya verilmeden iptal eder.
             Kargo SONRASI iptal yok; o aşamada İade Talep Et akışı kullanılır.

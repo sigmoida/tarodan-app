@@ -59,3 +59,5 @@ apps/web/public/photos/
 PayTR Direkt API/
 # PayTR iFrame API vendor PDF/örnek klasörü — lokal referans, repoya girmez
 PayTR IFrame API/
+# Playwright MCP test artefaktları (snapshot/screenshot/log) — repoya girmez
+.playwright-mcp/
