@@ -7,6 +7,7 @@ import { CacheService } from '../cache/cache.service';
 import { PayTRService } from '../payment-providers/paytr.service';
 import { EventService } from '../events';
 import { InvoiceService } from '../invoice/invoice.service';
+import { ElogoInvoicingService } from '../elogo';
 import { OrderStatus, PaymentStatus } from '@prisma/client';
 
 // TODO: stale unit test — PaymentService dependencies/types drifted; covered by E2E money-flow suite
@@ -38,6 +39,7 @@ describe.skip('PaymentService reconcilePendingPaytrPayments (1.4)', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PaymentService,
+        { provide: ElogoInvoicingService, useValue: { issueCommissionInvoice: jest.fn().mockResolvedValue(undefined), issueServiceFeeInvoice: jest.fn().mockResolvedValue(undefined), issueMembershipInvoice: jest.fn().mockResolvedValue(undefined), issueBoostInvoice: jest.fn().mockResolvedValue(undefined), handleOrderRefund: jest.fn().mockResolvedValue(undefined), issuePlatformSaleInvoice: jest.fn().mockResolvedValue(undefined), handleTradeCashRefund: jest.fn().mockResolvedValue(undefined), issueTradeCashCommissionInvoice: jest.fn().mockResolvedValue(undefined), retryPendingInvoices: jest.fn().mockResolvedValue(undefined) } },
         { provide: PrismaService, useValue: mockPrisma },
         { provide: CacheService, useValue: { del: jest.fn() } },
         { provide: ConfigService, useValue: { get: mockConfigGet } },

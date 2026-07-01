@@ -144,6 +144,11 @@ export class ElogoService {
     return this.withSession((sid) => this.client.cancelEArchive(uuid, elementId, sid, this.callOptions));
   }
 
+  /** Kesilmiş e-Arşiv faturanın PDF'ini çek (S3/mail için). */
+  async getEArchiveInvoicePdf(uuid: string): Promise<Buffer | null> {
+    return this.withSession((sid) => this.client.getEArchiveInvoicePdf(uuid, sid, this.callOptions));
+  }
+
   /**
    * İade durumunda izlenecek yol (mevzuat): fatura tarihinden **≤8 gün** ise e-Arşiv İPTAL,
    * **>8 gün** ise iptal yapılamaz → İADE FATURASI (InvoiceTypeCode=IADE, orijinali referans).

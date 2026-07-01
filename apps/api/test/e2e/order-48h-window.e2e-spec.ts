@@ -34,6 +34,7 @@ describe('48h window core + auto-complete cron (E2E)', () => {
       {} as any, // storageService
       ledger,
       { resolveTaxRate: async () => null, calculateTaxAmount: () => 0 } as any, // taxService (no-tax stub)
+      { issueCommissionInvoice: async () => {}, issueServiceFeeInvoice: async () => {} } as any, // elogoInvoicing (no-op stub)
     );
   }
 

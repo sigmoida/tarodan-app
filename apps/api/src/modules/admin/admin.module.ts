@@ -24,6 +24,7 @@ import { SuratCargoModule } from '../surat-cargo/surat-cargo.module';
 import { RefundModule } from '../refund/refund.module';
 import { NotificationModule } from '../notification/notification.module';
 import { OrderModule } from '../order/order.module';
+import { ElogoModule } from '../elogo/elogo.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { OrderModule } from '../order/order.module';
     NotificationModule,
     OrderModule,
     ModerationModule,
+    ElogoModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [AdminController],

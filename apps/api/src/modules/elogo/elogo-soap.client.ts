@@ -53,6 +53,13 @@ export abstract class ElogoSoapClient {
     sessionId: string,
     options: ElogoSoapCallOptions,
   ): Promise<ElogoSendResult>;
+
+  /** Kesilmiş e-Arşiv faturanın PDF'ini döndürür (yok/başarısızsa null). */
+  abstract getEArchiveInvoicePdf(
+    uuid: string,
+    sessionId: string,
+    options: ElogoSoapCallOptions,
+  ): Promise<Buffer | null>;
 }
 
 // ─── Stub (dev/test) ──────────────────────────────────────────────────────────
@@ -166,6 +173,12 @@ export class StubElogoSoapClient extends ElogoSoapClient {
     this.cancelCalls.push({ uuid, elementId });
     this.logger.debug(`Stub eLogo cancelEArchive uuid=${uuid}`);
     return { success: true, documentUuid: uuid, code: 1, description: 'CANCEL OK (stub)' };
+  }
+
+  async getEArchiveInvoicePdf(uuid: string, _sessionId: string, _options: ElogoSoapCallOptions): Promise<Buffer | null> {
+    this.simulate();
+    this.logger.debug(`Stub eLogo getEArchiveInvoicePdf uuid=${uuid}`);
+    return Buffer.from(`%PDF-1.4 stub e-arsiv ${uuid}`, 'utf8');
   }
 }
 
@@ -405,6 +418,8 @@ export class LiveElogoSoapClient extends ElogoSoapClient {
     const pl: string[] = [`DOCUMENTTYPE=${params.documentType}`, `SIGNED=${params.signed ? 1 : 0}`];
     if (params.alias) pl.push(`ALIAS=${params.alias}`);
     if (params.xsltUuid) pl.push(`XSLTUUID=${params.xsltUuid}`);
+    if (params.extraParams?.length) pl.push(...params.extraParams);
+    if (process.env.ELOGO_DEBUG) this.logger.debug(`paramList: ${JSON.stringify(pl)}`);
 
     const inner =
       `<tem:SendDocument><tem:sessionID>${escapeXml(sessionId)}</tem:sessionID>` +
@@ -476,6 +491,27 @@ export class LiveElogoSoapClient extends ElogoSoapClient {
       code: Number.isNaN(code) ? undefined : code,
       description: extractTag(xml, 'resultMsg') || undefined,
     };
+  }
+
+  async getEArchiveInvoicePdf(
+    uuid: string,
+    sessionId: string,
+    options: ElogoSoapCallOptions,
+  ): Promise<Buffer | null> {
+    const inner =
+      `<tem:getEArchiveInvoicePdfData>` +
+      `<tem:sessionID>${escapeXml(sessionId)}</tem:sessionID>` +
+      `<tem:uuid>${escapeXml(uuid)}</tem:uuid>` +
+      `<tem:allInvoicesOrJustSigned>true</tem:allInvoicesOrJustSigned>` +
+      `<tem:isCanceled>false</tem:isCanceled>` +
+      `</tem:getEArchiveInvoicePdfData>`;
+    const xml = await this.post('getEArchiveInvoicePdfData', inner, options);
+    // Yanıttaki en büyük base64 bloğu = PDF.
+    const blobs = [...xml.matchAll(/>([A-Za-z0-9+/=]{500,})</g)].map((m) => m[1]);
+    if (!blobs.length) return null;
+    const b64 = blobs.sort((a, b) => b.length - a.length)[0];
+    const buf = Buffer.from(b64, 'base64');
+    return buf.slice(0, 5).toString('latin1') === '%PDF-' ? buf : buf; // PDF beklenir; yine de döndür
   }
 }
 

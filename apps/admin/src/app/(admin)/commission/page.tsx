@@ -103,10 +103,41 @@ export default function CommissionPage() {
     byMonth: Array<{ period: string; commission: number; orderCount: number }>;
   } | null>(null);
 
+  // Takas komisyon oranı (ayarlanabilir) — ayrı card
+  const [tradeRate, setTradeRate] = useState<string>("5");
+  const [tradeRateSaving, setTradeRateSaving] = useState(false);
+
   useEffect(() => {
     loadData();
     loadRevenue();
+    loadTradeRate();
   }, []);
+
+  const loadTradeRate = async () => {
+    try {
+      const res = await adminApi.getTradeCommissionRate();
+      setTradeRate(String(res.data?.rate ?? 5));
+    } catch (e) {
+      if (process.env.NODE_ENV === "development") console.error(e);
+    }
+  };
+
+  const saveTradeRate = async () => {
+    const rate = Number(tradeRate);
+    if (!(rate >= 0 && rate <= 100)) {
+      toast.error("Oran 0 ile 100 arasında olmalı");
+      return;
+    }
+    setTradeRateSaving(true);
+    try {
+      await adminApi.setTradeCommissionRate(rate);
+      toast.success("Takas komisyon oranı güncellendi");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Güncellenemedi");
+    } finally {
+      setTradeRateSaving(false);
+    }
+  };
 
   const loadRevenue = async () => {
     try {
@@ -391,6 +422,36 @@ export default function CommissionPage() {
         </div>
       </div>
 
+      {/* Takas Komisyonu — nakit farkı üzerinden ayrı oran (kategori/satıcı tipinden bağımsız) */}
+      <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div className="min-w-0">
+            <h3 className="text-lg font-semibold text-heading">Takas Komisyonu</h3>
+            <p className="text-sm text-muted mt-1">
+              Takasta nakit farkı ödeyen taraftan alınan komisyon oranı. Faturası, ürünler <b>depoya ulaşınca</b> kesilir
+              (ödeme anında değil) — iptal edilirse fatura oluşmaz.
+            </p>
+          </div>
+          <div className="flex items-end gap-2">
+            <div>
+              <label className="block text-xs text-muted mb-1">Oran (%)</label>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                step={0.5}
+                value={tradeRate}
+                onChange={(e) => setTradeRate(e.target.value)}
+                className="w-28"
+              />
+            </div>
+            <Button onClick={saveTradeRate} disabled={tradeRateSaving}>
+              {tradeRateSaving ? "Kaydediliyor..." : "Kaydet"}
+            </Button>
+          </div>
+        </div>
+      </div>
+
       {/* No default rule warning (informational only; checkout/order flow is not blocked) */}
       {!hasDefaultRule && (
         <div className="bg-warning-50 border border-warning-200 rounded-lg p-4">
@@ -470,8 +531,7 @@ export default function CommissionPage() {
                       <span className="text-muted">
                         {SELLER_TYPES.find((t) => t.value === rule.sellerType)
                           ?.label ||
-                          rule.sellerType ||
-                          "-"}
+                          "Tümü"}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

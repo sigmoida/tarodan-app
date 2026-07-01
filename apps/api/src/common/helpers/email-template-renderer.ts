@@ -56,6 +56,8 @@ export function getEmailTemplateSubject(template: string, data: Record<string, a
     'guest-checkout-otp': 'Misafir Sipariş Doğrulama Kodu',
     'invoice-buyer': `Faturanız - ${data?.invoiceNumber || ''}`,
     'invoice-seller': `Satış Faturası - ${data?.invoiceNumber || ''}`,
+    'elogo-invoice': `Tarodan e-Arşiv Faturanız - ${data?.invoiceNumber || ''}`,
+    'seller-invoice': `Satıcı Faturanız - Sipariş #${data?.orderNumber || ''}`,
     'order-cancelled-buyer': `Siparişiniz İptal Edildi - ${data?.orderNumber || ''}`,
     'order-cancelled-seller': `Sipariş İptal Edildi - ${data?.orderNumber || ''}`,
     'refund-requested-seller': `İade Talebi - ${data?.orderNumber || ''}`,
@@ -716,6 +718,43 @@ export function renderEmailTemplate(
       </div>
       <p style="font-size: 13px; color: #9ca3af; margin: 16px 0 0 0;">Fatura bilgileriniz yasal yükümlülükler gereği saklanmaktadır.</p>
     `, 'Satış Faturanız Hazır'),
+
+    // eLogo e-Arşiv / e-Fatura — Tarodan'ın kestiği TÜM gelir belgeleri (komisyon, hizmet
+    // bedeli, üyelik, boost, takas, platform satışı, iade) bu tek şablonu kullanır. PDF ektedir.
+    'elogo-invoice': wrapEmail(`
+      ${titleBlock('e-Arşiv Faturanız Hazır', '🧾')}
+      ${greeting(data?.recipientName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+        <strong>${data?.description || 'İşleminize ait'}</strong> için e-Arşiv faturanız oluşturuldu.
+        Fatura PDF'i bu e-postanın ekindedir.
+      </p>
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow('Belge Türü', data?.description || 'Fatura')}
+          ${detailRow('Fatura No', data?.invoiceNumber || '')}
+          ${detailRow('Tutar (KDV dahil)', formatEmailPrice(data?.total || 0) + ' TL', true)}
+        </table>
+      `)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">📎 Faturanız ektedir. e-Arşiv faturalarınızı <a href="https://ebelgesorgulama.elogo.com.tr/" style="color: #b45309; font-weight: 600;">ebelgesorgulama.elogo.com.tr</a> üzerinden de görüntüleyebilirsiniz.</p>`)}
+      <p style="font-size: 13px; color: #9ca3af; margin: 16px 0 0 0;">Fatura bilgileriniz yasal yükümlülükler gereği saklanmaktadır.</p>
+    `, 'e-Arşiv Faturanız Hazır'),
+
+    // Kurumsal satıcının siparişe yüklediği ÜRÜN faturası → ALICIYA (PDF ektedir).
+    'seller-invoice': wrapEmail(`
+      ${titleBlock('Satıcı Faturanız Hazır', '🧾')}
+      ${greeting(data?.buyerName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+        <strong>${data?.sellerName || 'Satıcı'}</strong>, siparişinize ait faturayı yükledi. Fatura PDF'i bu e-postanın ekindedir.
+      </p>
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow('Sipariş No', '#' + (data?.orderNumber || ''))}
+          ${detailRow('Ürün', data?.productTitle || '')}
+          ${detailRow('Satıcı', data?.sellerName || '')}
+        </table>
+      `)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">📎 Faturanız ektedir. Siparişlerim sayfasından da görüntüleyebilirsiniz.</p>`)}
+    `, 'Satıcı Faturanız Hazır'),
 
     'order-cancelled-buyer': wrapEmail(`
       ${titleBlock('Siparişiniz İptal Edildi', '❌')}

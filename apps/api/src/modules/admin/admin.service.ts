@@ -246,11 +246,13 @@ export class AdminService {
     // If categoryId is empty string, set to null
     const categoryId = dto.categoryId && dto.categoryId.trim() !== '' ? dto.categoryId : null;
 
-    // Check if a rule with the same combination already exists
+    // Check if a rule with the same combination already exists.
+    // appliesTo da eşleşmeli: alıcı ve satıcı kuralı aynı kategori+tip için ayrı taraflara uygulanır.
     const existingRule = await this.prisma.commissionRule.findFirst({
       where: {
         categoryId: categoryId,
         sellerType: dto.sellerType,
+        appliesTo: dto.appliesTo as any,
         isActive: true,
       },
     });
@@ -362,13 +364,16 @@ export class AdminService {
       : existing.categoryId;
     const finalSellerType = dto.sellerType !== undefined ? dto.sellerType : existing.sellerType;
 
-    // Check if changing categoryId or sellerType would conflict with another rule
-    if ((dto.categoryId !== undefined || dto.sellerType !== undefined) &&
-      (finalCategoryId !== existing.categoryId || finalSellerType !== existing.sellerType)) {
+    // Check if changing categoryId or sellerType would conflict with another rule.
+    // NOT: appliesTo (SELLER/BUYER/BOTH) da eşleşmeli — alıcı hizmet bedeli kuralı ile
+    // satıcı komisyon kuralı aynı kategori+satıcı tipinde ayrı taraflara uygulanır, ÇAKIŞMAZ.
+    if ((dto.categoryId !== undefined || dto.sellerType !== undefined || dto.appliesTo !== undefined) &&
+      (finalCategoryId !== existing.categoryId || finalSellerType !== existing.sellerType || appliesTo !== existing.appliesTo)) {
       const conflictingRule = await this.prisma.commissionRule.findFirst({
         where: {
           categoryId: finalCategoryId,
           sellerType: finalSellerType,
+          appliesTo: appliesTo as any,
           isActive: true,
           id: { not: existing.id }, // Exclude current rule
         },
@@ -2739,11 +2744,29 @@ export class AdminService {
       }
     }
 
+    // Admin durumu ELLE ilerlettiğinde deliveredAt/completedAt de set edilmeli — aksi halde
+    // deliveredAt NULL kalıp teslim faturası cron'unu (deliveredAt bazlı tamamlama) ve raporları bozar.
+    const now = new Date();
+    const newStatus = dto.status as OrderStatus;
+    const extra: any = {};
+    if (
+      (newStatus === OrderStatus.delivered ||
+        newStatus === OrderStatus.awaiting_buyer_confirmation ||
+        newStatus === OrderStatus.completed) &&
+      !order.deliveredAt
+    ) {
+      extra.deliveredAt = now;
+    }
+    if (newStatus === OrderStatus.completed && !(order as any).completedAt) {
+      extra.completedAt = now;
+    }
+
     const updated = await this.prisma.order.update({
       where: { id: orderId },
       data: {
-        status: dto.status as OrderStatus,
+        status: newStatus,
         version: { increment: 1 },
+        ...extra,
       },
     });
 
@@ -2751,6 +2774,14 @@ export class AdminService {
       ...updated,
       notes: dto.notes,
     });
+
+    // Teslim/tamamlandıya geçince → Tarodan gelir e-Arşivlerini ANINDA kes (cron'u beklemeden).
+    // Fatura kesilmeden "tamamlandı" kalmasın. Fire-and-forget, idempotent (cut() type+sourceId tekil).
+    if (newStatus === OrderStatus.delivered || newStatus === OrderStatus.completed) {
+      void this.orderService
+        ?.emitDeliveryRevenueInvoices(orderId)
+        .catch((e: any) => this.logger.warn(`admin durum→fatura tetik hatası ${orderId}: ${e?.message}`));
+    }
 
     return {
       success: true,
@@ -4353,6 +4384,236 @@ export class AdminService {
     });
 
     return { success: true, type, id: itemId, action: 'flagged', reason, priority };
+  }
+
+  // ==================== TAKAS KOMİSYONU (ayarlanabilir oran) ====================
+
+  /** Takas nakit farkı komisyon oranı (%). PlatformSetting 'trade_commission_rate', varsayılan %5. */
+  async getTradeCommissionRate(): Promise<{ rate: number }> {
+    const row = await this.prisma.platformSetting.findUnique({ where: { settingKey: 'trade_commission_rate' } });
+    return { rate: Number(row?.settingValue ?? '5') || 5 };
+  }
+
+  async setTradeCommissionRate(adminId: string, rate: number): Promise<{ rate: number }> {
+    if (!(rate >= 0 && rate <= 100)) {
+      throw new BadRequestException('Oran 0 ile 100 arasında olmalı');
+    }
+    await this.prisma.platformSetting.upsert({
+      where: { settingKey: 'trade_commission_rate' },
+      create: {
+        settingKey: 'trade_commission_rate',
+        settingValue: String(rate),
+        settingType: 'number',
+        description: 'Takas nakit farkı komisyon oranı (%)',
+        updatedBy: adminId,
+      },
+      update: { settingValue: String(rate), updatedBy: adminId },
+    });
+    await this.createAuditLog(adminId, 'trade_commission_rate_update', 'PlatformSetting', 'trade_commission_rate', null, { rate });
+    return { rate };
+  }
+
+  // ==================== ELOGO FATURA (e-Arşiv/e-Fatura) ====================
+
+  private static readonly ELOGO_TYPE_LABELS: Record<string, string> = {
+    commission: 'Komisyon',
+    service_fee: 'Hizmet Bedeli',
+    membership: 'Üyelik',
+    boost: 'Öne Çıkarma',
+    trade_commission: 'Takas Komisyonu',
+    platform_sale: 'Platform Satışı',
+    return_invoice: 'İade Faturası',
+  };
+
+  /**
+   * Tarodan'ın kestiği e-Arşiv/e-Fatura gelir belgeleri (komisyon/hizmet/üyelik/boost/takas/
+   * platform satışı) + iade faturaları. Sayfalı + tür/durum/belge/tarih filtreli + arama.
+   */
+  async getElogoInvoices(query: {
+    type?: string;
+    status?: string;
+    documentType?: string;
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.ElogoInvoiceWhereInput = {};
+    if (query.type) where.type = query.type as any;
+    if (query.status) where.status = query.status as any;
+    if (query.documentType) where.documentType = query.documentType;
+    if (query.startDate || query.endDate) {
+      where.createdAt = {};
+      if (query.startDate) where.createdAt.gte = new Date(query.startDate);
+      if (query.endDate) where.createdAt.lte = new Date(query.endDate);
+    }
+    if (query.search?.trim()) {
+      const q = query.search.trim();
+      where.OR = [
+        { invoiceNumber: { contains: q, mode: 'insensitive' } },
+        { recipientName: { contains: q, mode: 'insensitive' } },
+        { recipientVknTckn: { contains: q, mode: 'insensitive' } },
+        { ettn: { contains: q, mode: 'insensitive' } },
+        { billingReference: { contains: q, mode: 'insensitive' } },
+      ];
+    }
+
+    const [rows, total] = await Promise.all([
+      this.prisma.elogoInvoice.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          type: true,
+          status: true,
+          documentType: true,
+          invoiceNumber: true,
+          ettn: true,
+          recipientName: true,
+          recipientVknTckn: true,
+          recipientUserId: true,
+          netAmount: true,
+          taxAmount: true,
+          total: true,
+          vatRate: true,
+          billingReference: true,
+          pdfUrl: true,
+          emailSentAt: true,
+          elogoResultMsg: true,
+          issuedAt: true,
+          cancelledAt: true,
+          cancelReason: true,
+          createdAt: true,
+        },
+      }),
+      this.prisma.elogoInvoice.count({ where }),
+    ]);
+
+    return {
+      data: rows.map((r) => ({
+        id: r.id,
+        type: r.type,
+        typeLabel: AdminService.ELOGO_TYPE_LABELS[r.type] || 'Fatura',
+        isReturn: r.type === 'return_invoice',
+        status: r.status,
+        documentType: r.documentType,
+        documentTypeLabel: r.documentType === 'EINVOICE' ? 'e-Fatura' : 'e-Arşiv',
+        invoiceNumber: r.invoiceNumber,
+        ettn: r.ettn,
+        recipientName: r.recipientName,
+        recipientVknTckn: r.recipientVknTckn,
+        recipientUserId: r.recipientUserId,
+        netAmount: Number(r.netAmount),
+        taxAmount: Number(r.taxAmount),
+        total: Number(r.total),
+        vatRate: Number(r.vatRate),
+        billingReference: r.billingReference,
+        hasPdf: !!r.pdfUrl,
+        emailSentAt: r.emailSentAt,
+        resultMsg: r.elogoResultMsg,
+        issuedAt: r.issuedAt,
+        cancelledAt: r.cancelledAt,
+        cancelReason: r.cancelReason,
+        createdAt: r.createdAt,
+      })),
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  /**
+   * Kurumsal satıcıların siparişe ELLE yüklediği ürün faturaları (eLogo gelir faturasından ayrı).
+   * Admin Faturalar sayfasında "Satıcı Faturaları" sekmesi.
+   */
+  async getSellerUploadedInvoices(query: {
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.SellerUploadedInvoiceWhereInput = {};
+    if (query.startDate || query.endDate) {
+      where.uploadedAt = {};
+      if (query.startDate) where.uploadedAt.gte = new Date(query.startDate);
+      if (query.endDate) where.uploadedAt.lte = new Date(query.endDate);
+    }
+    if (query.search?.trim()) {
+      const q = query.search.trim();
+      where.OR = [
+        { fileName: { contains: q, mode: 'insensitive' } },
+        { order: { is: { orderNumber: { contains: q, mode: 'insensitive' } } } },
+        { order: { is: { seller: { is: { companyName: { contains: q, mode: 'insensitive' } } } } } },
+        { order: { is: { seller: { is: { displayName: { contains: q, mode: 'insensitive' } } } } } },
+        { order: { is: { buyer: { is: { displayName: { contains: q, mode: 'insensitive' } } } } } },
+      ];
+    }
+
+    const [rows, total] = await Promise.all([
+      this.prisma.sellerUploadedInvoice.findMany({
+        where,
+        orderBy: { uploadedAt: 'desc' },
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          fileName: true,
+          fileSize: true,
+          uploadedAt: true,
+          replacedAt: true,
+          emailSentAt: true,
+          order: {
+            select: {
+              id: true,
+              orderNumber: true,
+              totalAmount: true,
+              seller: { select: { displayName: true, companyName: true } },
+              buyer: { select: { displayName: true, email: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.sellerUploadedInvoice.count({ where }),
+    ]);
+
+    return {
+      data: rows.map((r) => ({
+        id: r.id,
+        fileName: r.fileName,
+        fileSize: r.fileSize,
+        uploadedAt: r.uploadedAt,
+        replacedAt: r.replacedAt,
+        emailSentAt: r.emailSentAt,
+        orderId: r.order?.id ?? null,
+        orderNumber: r.order?.orderNumber ?? null,
+        orderTotal: r.order ? Number(r.order.totalAmount) : null,
+        sellerName: r.order?.seller?.companyName || r.order?.seller?.displayName || '—',
+        buyerName: r.order?.buyer?.displayName || '—',
+        buyerEmail: r.order?.buyer?.email ?? null,
+      })),
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  /** Satıcı faturası PDF — admin için presigned indirme URL'i. */
+  async getSellerUploadedInvoicePdf(id: string): Promise<{ url: string; fileName: string }> {
+    const inv = await this.prisma.sellerUploadedInvoice.findUnique({
+      where: { id },
+      select: { pdfKey: true, fileName: true },
+    });
+    if (!inv) throw new NotFoundException('Fatura bulunamadı');
+    const url = await this.storageService.getPresignedDownloadUrl('documents', inv.pdfKey, 3600);
+    return { url, fileName: inv.fileName };
   }
 
   // ==================== PAYMENT MANAGEMENT ====================
@@ -7842,6 +8103,8 @@ export class AdminService {
     // Misafir
     { key: 'guest-checkout-otp',          name: 'Misafir sipariş OTP kodu',             group: 'Misafir' },
     // Fatura
+    { key: 'elogo-invoice',               name: 'e-Arşiv / e-Fatura (Tarodan, PDF ekli)', group: 'Fatura' },
+    { key: 'seller-invoice',              name: 'Satıcı faturası (kurumsal, PDF ekli)',    group: 'Fatura' },
     { key: 'invoice-buyer',               name: 'Fatura (alıcı)',                       group: 'Fatura' },
     { key: 'invoice-seller',              name: 'Satış faturası (satıcı)',               group: 'Fatura' },
     // Sipariş iptali

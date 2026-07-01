@@ -989,7 +989,11 @@ export class TradeService {
       // göndermeyi atlıyordu (her iki tarafın etiketi yine oluşur, BUG B korunur).
 
       if (trade.cashAmount && trade.cashPayerId) {
-        const commission = trade.cashAmount.toNumber() * 0.05;
+        // Takas komisyon oranı admin'den ayarlanabilir (PlatformSetting 'trade_commission_rate', varsayılan %5).
+        // Kabul anında snapshot alınır (tcp.commission); oran sonradan değişse bile bu takas etkilenmez.
+        const rateRow = await tx.platformSetting.findUnique({ where: { settingKey: 'trade_commission_rate' } });
+        const ratePct = Number(rateRow?.settingValue ?? '5') || 5;
+        const commission = Math.round(trade.cashAmount.toNumber() * (ratePct / 100) * 100) / 100;
         await tx.tradeCashPayment.create({
           data: {
             tradeId,

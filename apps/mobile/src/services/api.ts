@@ -398,6 +398,32 @@ export const ordersApi = {
     api.post('/orders/commission-preview-batch', { items }),
 };
 
+// eLogo e-Arşiv (gerçek yasal fatura) API
+export const elogoInvoicesApi = {
+  /** Siparişe ait kullanıcının e-Arşiv faturası (yoksa null) — buton hazırsa çıksın */
+  byOrder: (orderId: string) =>
+    api.get<{ id: string; invoiceNumber: string; label?: string; total?: number } | null>(
+      `/elogo/invoices/by-order/${orderId}`,
+    ),
+  /** Fatura PDF — S3 presigned URL döner ({ url }) */
+  pdf: (id: string) => api.get<{ url?: string; invoiceNumber?: string }>(`/elogo/invoices/${id}/pdf`),
+};
+
+// Kurumsal satıcının siparişe ELLE yüklediği ürün faturası (eLogo gelir faturasından ayrı)
+export const sellerInvoiceApi = {
+  /** Durum: yüklenmiş fatura + geçerli kullanıcının yükleme yetkisi */
+  status: (orderId: string) =>
+    api.get<{
+      invoice: { id: string; fileName: string; uploadedAt: string } | null;
+      canUpload: boolean;
+      isSeller: boolean;
+      isBuyer: boolean;
+    }>(`/orders/${orderId}/seller-invoice`),
+  /** İndirme — S3 presigned URL ({ url, fileName }) */
+  download: (orderId: string) =>
+    api.get<{ url?: string; fileName?: string }>(`/orders/${orderId}/seller-invoice/download`),
+};
+
 // Messages API - Web ile aynı endpoint'ler
 export const messagesApi = {
   getThreads: (params?: Record<string, any>) =>

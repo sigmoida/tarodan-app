@@ -1,7 +1,7 @@
 "use client";
 
 import { ButtonLink } from "@/components/ui/ButtonLink";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
@@ -229,6 +229,22 @@ export default function OrderDetailPage() {
   );
   const [processingRefund, setProcessingRefund] = useState(false);
   const [downloadingInvoice, setDownloadingInvoice] = useState(false);
+  // eLogo e-Arşiv (gerçek yasal fatura) — yalnız HAZIRSA buton çıkar.
+  const [elogoInvoice, setElogoInvoice] = useState<{
+    id: string;
+    invoiceNumber: string;
+    label?: string;
+  } | null>(null);
+  // Kurumsal satıcının siparişe ELLE yüklediği ürün faturası (eLogo gelir faturasından ayrı).
+  const [sellerInvoice, setSellerInvoice] = useState<{
+    invoice: { id: string; fileName: string; uploadedAt: string } | null;
+    canUpload: boolean;
+    isSeller: boolean;
+    isBuyer: boolean;
+  } | null>(null);
+  const [uploadingSellerInvoice, setUploadingSellerInvoice] = useState(false);
+  const [downloadingSellerInvoice, setDownloadingSellerInvoice] = useState(false);
+  const sellerInvoiceInputRef = useRef<HTMLInputElement>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [reactivateLoading, setReactivateLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
@@ -297,6 +313,42 @@ export default function OrderDetailPage() {
       router.push("/orders");
     }
   }, [orderQuery.isError, orderId, locale, router]);
+
+  // eLogo e-Arşiv (gerçek yasal fatura) hazır mı? Hazırsa "Faturayı İndir" çıkar.
+  useEffect(() => {
+    if (!orderId || !order || order.status === "pending_payment" || order.status === "cancelled") {
+      setElogoInvoice(null);
+      return;
+    }
+    let cancelled = false;
+    api
+      .get(`/elogo/invoices/by-order/${orderId}`)
+      .then((res) => {
+        if (!cancelled) setElogoInvoice(res.data || null);
+      })
+      .catch(() => {
+        if (!cancelled) setElogoInvoice(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [orderId, order?.status]);
+
+  // Kurumsal satıcı faturası durumu (yükleme yetkisi + yüklenmiş fatura).
+  const fetchSellerInvoice = () => {
+    if (!orderId || !order || order.status === "pending_payment" || order.status === "cancelled") {
+      setSellerInvoice(null);
+      return;
+    }
+    api
+      .get(`/orders/${orderId}/seller-invoice`)
+      .then((res) => setSellerInvoice(res.data || null))
+      .catch(() => setSellerInvoice(null));
+  };
+  useEffect(() => {
+    fetchSellerInvoice();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId, order?.status]);
 
   const invalidateOrder = () =>
     queryClient
@@ -737,49 +789,90 @@ export default function OrderDetailPage() {
   };
 
   const handleDownloadInvoice = async () => {
-    if (!orderId) return;
+    if (!elogoInvoice?.id) {
+      toast.error(locale === "en" ? "Invoice not ready" : "Fatura henüz hazır değil");
+      return;
+    }
     setDownloadingInvoice(true);
     try {
-      const invoiceRes = await api.get(`/invoices/order/${orderId}`);
-      const invoice = invoiceRes.data;
-      if (!invoice?.id) {
-        toast.error(
-          locale === "en" ? "Invoice not found" : "Fatura bulunamadı",
-        );
-        return;
+      // Yeni eLogo e-Arşiv ucu → S3 presigned URL döner; yeni sekmede aç (görüntüle/indir).
+      const res = await api.get(`/elogo/invoices/${elogoInvoice.id}/pdf`);
+      const url = res.data?.url;
+      if (url) {
+        window.open(url, "_blank", "noopener,noreferrer");
+        toast.success(locale === "en" ? "Invoice opened" : "Fatura açıldı");
+      } else {
+        toast.error(locale === "en" ? "Invoice not ready" : "Fatura henüz hazır değil");
       }
-      const response = await api.get(`/invoices/download/${invoice.id}`, {
-        responseType: "blob",
-      });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute(
-        "download",
-        `fatura-${invoice.invoiceNumber || invoice.id}.pdf`,
-      );
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      toast.success(
-        locale === "en" ? "Invoice downloaded" : "Fatura indirildi",
-      );
     } catch (err: any) {
       const msg = err.response?.data?.message;
       if (err.response?.status === 404) {
-        toast.error(
-          msg || (locale === "en" ? "Invoice not found" : "Fatura bulunamadı"),
-        );
-      } else if (err.response?.status === 400 && msg) {
-        toast.error(msg);
+        toast.error(msg || (locale === "en" ? "Invoice not found" : "Fatura bulunamadı"));
       } else {
-        toast.error(
-          msg || (locale === "en" ? "Download failed" : "İndirme başarısız"),
-        );
+        toast.error(msg || (locale === "en" ? "Download failed" : "İndirme başarısız"));
       }
     } finally {
       setDownloadingInvoice(false);
+    }
+  };
+
+  // Kurumsal satıcı: siparişe fatura PDF yükle/değiştir.
+  const handleSellerInvoiceFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (e.target) e.target.value = "";
+    if (!file) return;
+    if (file.type !== "application/pdf") {
+      toast.error(locale === "en" ? "PDF only" : "Yalnız PDF yükleyebilirsiniz");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error(locale === "en" ? "Max 10 MB" : "PDF en fazla 10 MB olabilir");
+      return;
+    }
+    setUploadingSellerInvoice(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await api.post(`/orders/${orderId}/seller-invoice`, form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      toast.success(
+        res.data?.replaced
+          ? locale === "en"
+            ? "Invoice replaced, buyer notified"
+            : "Fatura değiştirildi, alıcıya mail gönderildi"
+          : locale === "en"
+            ? "Invoice uploaded, buyer notified"
+            : "Fatura yüklendi, alıcıya mail gönderildi",
+      );
+      fetchSellerInvoice();
+    } catch (err: any) {
+      toast.error(
+        err.response?.data?.message ||
+          (locale === "en" ? "Upload failed" : "Yükleme başarısız"),
+      );
+    } finally {
+      setUploadingSellerInvoice(false);
+    }
+  };
+
+  const handleDownloadSellerInvoice = async () => {
+    setDownloadingSellerInvoice(true);
+    try {
+      const res = await api.get(`/orders/${orderId}/seller-invoice/download`);
+      const url = res.data?.url;
+      if (url) {
+        window.open(url, "_blank", "noopener,noreferrer");
+      } else {
+        toast.error(locale === "en" ? "Invoice not found" : "Fatura bulunamadı");
+      }
+    } catch (err: any) {
+      toast.error(
+        err.response?.data?.message ||
+          (locale === "en" ? "Download failed" : "İndirme başarısız"),
+      );
+    } finally {
+      setDownloadingSellerInvoice(false);
     }
   };
 
@@ -1948,9 +2041,8 @@ export default function OrderDetailPage() {
               </Link>
             </div>
 
-            {/* Invoice Section - Show only for paid orders */}
-            {order.status !== "pending_payment" &&
-              order.status !== "cancelled" && (
+            {/* Invoice Section - yalnız gerçek e-Arşiv HAZIRSA çıkar */}
+            {elogoInvoice && (
                 <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
                   <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
                     <svg
@@ -1983,27 +2075,141 @@ export default function OrderDetailPage() {
                       />
                     </svg>
                     <div className="flex-1">
-                      <p className="text-sm text-success-800 mb-2">
+                      <p className="text-sm text-success-800 mb-1">
                         {locale === "en"
-                          ? "Your invoice has been sent to your email address after the payment was completed."
-                          : "Faturanız ödeme tamamlandıktan sonra e-posta adresinize gönderildi."}
+                          ? "Your invoice has been sent to your email address."
+                          : "Faturanız e-posta adresinize gönderildi."}
                       </p>
-                      {order.isBuyer && (
-                        <Button
-                          variant="success"
-                          size="sm"
-                          onClick={handleDownloadInvoice}
-                          disabled={downloadingInvoice}
-                        >
-                          {downloadingInvoice
-                            ? locale === "en"
-                              ? "Downloading..."
-                              : "İndiriliyor..."
-                            : t("order.downloadInvoice")}
-                        </Button>
+                      {elogoInvoice.invoiceNumber && (
+                        <p className="text-xs text-success-700 mb-2">
+                          {(locale === "en" ? "No: " : "No: ") + elogoInvoice.invoiceNumber}
+                        </p>
                       )}
+                      <Button
+                        variant="success"
+                        size="sm"
+                        onClick={handleDownloadInvoice}
+                        disabled={downloadingInvoice}
+                      >
+                        {downloadingInvoice
+                          ? locale === "en"
+                            ? "Opening..."
+                            : "Açılıyor..."
+                          : locale === "en"
+                            ? "View / Download Invoice"
+                            : "Faturayı Görüntüle / İndir"}
+                      </Button>
                     </div>
                   </div>
+                </div>
+              )}
+
+            {/* Kurumsal satıcı faturası (elle yüklenen PDF) */}
+            {sellerInvoice &&
+              (sellerInvoice.canUpload ||
+                (sellerInvoice.invoice && (sellerInvoice.isBuyer || sellerInvoice.isSeller))) && (
+                <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
+                  <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
+                    <svg
+                      className="w-5 h-5 text-brand-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                    {locale === "en" ? "Seller Invoice" : "Satıcı Faturası"}
+                  </h2>
+
+                  {sellerInvoice.invoice ? (
+                    <div className="flex items-start gap-3 p-3 bg-surface rounded-lg border border-default">
+                      <svg
+                        className="w-5 h-5 text-brand-600 mt-0.5 flex-shrink-0"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                        />
+                      </svg>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-body truncate">
+                          {sellerInvoice.invoice.fileName}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleDownloadSellerInvoice}
+                            disabled={downloadingSellerInvoice}
+                          >
+                            {downloadingSellerInvoice
+                              ? locale === "en"
+                                ? "Opening..."
+                                : "Açılıyor..."
+                              : locale === "en"
+                                ? "View / Download"
+                                : "Görüntüle / İndir"}
+                          </Button>
+                          {sellerInvoice.canUpload && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => sellerInvoiceInputRef.current?.click()}
+                              disabled={uploadingSellerInvoice}
+                            >
+                              {uploadingSellerInvoice
+                                ? locale === "en"
+                                  ? "Uploading..."
+                                  : "Yükleniyor..."
+                                : locale === "en"
+                                  ? "Replace"
+                                  : "Değiştir"}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-surface rounded-lg border border-dashed border-default">
+                      <p className="text-sm text-muted mb-3">
+                        {locale === "en"
+                          ? "You can upload the product invoice (PDF) for this order. The buyer will be notified by email."
+                          : "Bu sipariş için ürün faturanızı (PDF) yükleyebilirsiniz. Alıcıya e-posta ile bildirilir."}
+                      </p>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => sellerInvoiceInputRef.current?.click()}
+                        disabled={uploadingSellerInvoice}
+                      >
+                        {uploadingSellerInvoice
+                          ? locale === "en"
+                            ? "Uploading..."
+                            : "Yükleniyor..."
+                          : locale === "en"
+                            ? "Upload Invoice (PDF)"
+                            : "Fatura Yükle (PDF)"}
+                      </Button>
+                    </div>
+                  )}
+
+                  <input
+                    ref={sellerInvoiceInputRef}
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    onChange={handleSellerInvoiceFile}
+                  />
                 </div>
               )}
 

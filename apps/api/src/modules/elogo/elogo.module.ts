@@ -1,6 +1,12 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ElogoService, ELOGO_SOAP_CLIENT } from './elogo.service';
+import { ElogoInvoicingService } from './elogo-invoicing.service';
+import { ElogoSchedulerService } from './elogo-scheduler.service';
+import { ElogoInvoiceController } from './elogo-invoice.controller';
+import { StorageModule } from '../storage/storage.module';
+import { SmtpProvider } from '../notification/providers/smtp.provider';
 import {
   ElogoSoapClient,
   LiveElogoSoapClient,
@@ -13,7 +19,7 @@ import {
  * stub/live arasında seçilir; ElogoService dışarı export edilir.
  */
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, ScheduleModule.forRoot(), StorageModule],
   providers: [
     {
       provide: ELOGO_SOAP_CLIENT,
@@ -25,8 +31,12 @@ import {
       },
       inject: [ConfigService],
     },
+    SmtpProvider,
     ElogoService,
+    ElogoInvoicingService,
+    ElogoSchedulerService,
   ],
-  exports: [ElogoService],
+  controllers: [ElogoInvoiceController],
+  exports: [ElogoService, ElogoInvoicingService],
 })
 export class ElogoModule {}

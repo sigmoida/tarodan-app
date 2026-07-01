@@ -45,6 +45,8 @@ export interface ElogoSendDocumentParams {
   signed?: boolean;
   /** XSLTUUID — portala yüklenen görsel tasarımın UUID'i (opsiyonel). */
   xsltUuid?: string;
+  /** Ek paramList girdileri ("Name=Value"). e-Arşiv gönderim şekli vb. için. */
+  extraParams?: string[];
 }
 
 /** Belge gönderim sonucu (ResultType). */
