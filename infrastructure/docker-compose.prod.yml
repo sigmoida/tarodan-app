@@ -214,6 +214,14 @@ services:
       GOOGLE_CLIENT_ID_WEB: ${GOOGLE_CLIENT_ID_WEB:-243308404313-kdc77bd36flfhv6ujlb5tfd4qjteh94c.apps.googleusercontent.com}
       GOOGLE_CLIENT_ID_IOS: ${GOOGLE_CLIENT_ID_IOS}
       GOOGLE_CLIENT_ID_ANDROID: ${GOOGLE_CLIENT_ID_ANDROID}
+      # Sürat Kargo (değerler Coolify env'inden gelir; güvenli varsayılanlar).
+      # Test için Coolify'da: SURAT_CARGO_ENABLED=true, SURAT_SOAP_MODE=rest,
+      # SURAT_KARGO_TEST_MODE=true, SURAT_KARGO_CARI_KODU=..., SURAT_KARGO_SIFRE=...
+      SURAT_CARGO_ENABLED: ${SURAT_CARGO_ENABLED:-false}
+      SURAT_SOAP_MODE: ${SURAT_SOAP_MODE:-stub}
+      SURAT_KARGO_TEST_MODE: ${SURAT_KARGO_TEST_MODE:-true}
+      SURAT_KARGO_CARI_KODU: ${SURAT_KARGO_CARI_KODU}
+      SURAT_KARGO_SIFRE: ${SURAT_KARGO_SIFRE}
     depends_on:
       postgres:
         condition: service_healthy
