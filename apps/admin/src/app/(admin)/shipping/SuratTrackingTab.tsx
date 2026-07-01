@@ -143,6 +143,7 @@ export function SuratTrackingTab() {
       ),
     },
     {
+      id: "actions",
       header: "",
       cell: ({ row }) => (
         <Button
