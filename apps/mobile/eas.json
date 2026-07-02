@@ -42,7 +42,6 @@
       "android": {
         "autoIncrement": "versionCode"
       },
-      "channel": "production",
       "env": {
         "EXPO_PUBLIC_ENVIRONMENT": "production",
         "EXPO_PUBLIC_API_URL": "https://tarodan.shop/api",
