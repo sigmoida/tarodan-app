@@ -25,6 +25,8 @@ export {
   TaxRuleScopeDto,
   SetWithholdingRateDto,
   WithholdingReportQueryDto,
+  SetDefaultVatDto,
+  SetVatOverrideDto,
 } from './tax.dto';
 export { PayoutTransactionsQueryDto, PayoutExportQueryDto } from './payout.dto';
 export { CreateStaticPageDto, UpdateStaticPageDto } from './page.dto';

@@ -262,3 +262,25 @@ export class WithholdingReportQueryDto {
   @Type(() => Number)
   month: number;
 }
+
+export class SetDefaultVatDto {
+  @ApiProperty({ description: 'Varsayılan KDV oranı (%)', example: 20 })
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  @Type(() => Number)
+  rate: number;
+}
+
+export class SetVatOverrideDto {
+  @ApiProperty({ description: 'Kategori ID' })
+  @IsString()
+  categoryId: string;
+
+  @ApiProperty({ description: 'Bu kategori için KDV oranı (%)', example: 0 })
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  @Type(() => Number)
+  rate: number;
+}

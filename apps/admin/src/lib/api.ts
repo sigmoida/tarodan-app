@@ -438,21 +438,13 @@ export const adminApi = {
   }) => api.get('/admin/payouts/export', { params }),
   releasePayout: (orderId: string) => api.post(`/admin/payouts/release/${orderId}`),
 
-  // Tax Settings
-  getTaxRegions: () => api.get('/admin/tax/regions'),
-  createTaxRegion: (data: any) => api.post('/admin/tax/regions', data),
-  updateTaxRegion: (id: string, data: any) => api.patch(`/admin/tax/regions/${id}`, data),
-  deleteTaxRegion: (id: string) => api.delete(`/admin/tax/regions/${id}`),
-  getTaxRates: (regionId?: string) =>
-    api.get('/admin/tax/rates', regionId ? { params: { regionId } } : {}),
-  createTaxRate: (data: any) => api.post('/admin/tax/rates', data),
-  updateTaxRate: (id: string, data: any) => api.patch(`/admin/tax/rates/${id}`, data),
-  deleteTaxRate: (id: string) => api.delete(`/admin/tax/rates/${id}`),
-  getTaxRules: (regionId?: string) =>
-    api.get('/admin/tax/rules', regionId ? { params: { regionId } } : {}),
-  createTaxRule: (data: any) => api.post('/admin/tax/rules', data),
-  updateTaxRule: (id: string, data: any) => api.patch(`/admin/tax/rules/${id}`, data),
-  deleteTaxRule: (id: string) => api.delete(`/admin/tax/rules/${id}`),
+  // Tax Settings — basit KDV config (eski bölge/oran/kural CRUD'u UI'dan kaldırıldı;
+  // backend uçları duruyor, UI tax/vat cephesini kullanır)
+  getVatConfig: () => api.get('/admin/tax/vat'),
+  setDefaultVat: (rate: number) => api.patch('/admin/tax/vat', { rate }),
+  setVatOverride: (categoryId: string, rate: number) =>
+    api.put('/admin/tax/vat/override', { categoryId, rate }),
+  deleteVatOverride: (id: string) => api.delete(`/admin/tax/vat/override/${id}`),
   getTaxReport: (params?: { fromDate?: string; toDate?: string; groupBy?: string }) =>
     api.get('/admin/tax/report', { params }),
   getWithholdingRate: () => api.get('/admin/tax/withholding'),

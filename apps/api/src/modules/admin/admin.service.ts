@@ -8704,6 +8704,113 @@ export class AdminService {
     };
   }
 
+  // ==================== BASİT KDV CONFIG (tek oran + kategori istisnaları) ====================
+  // Admin UI'daki eski Oranlar/Kurallar sekmeleri tek "KDV" görünümüne indirildi.
+  // Model (TaxRate/TaxRule) aynen durur; bu uçlar onların üzerinde ince bir cephe.
+
+  /** Varsayılan KDV oranı + kategori istisnaları (default TR bölgesi üzerinden). */
+  async getVatConfig() {
+    if (!this.hasTaxModels) return { defaultRate: null, overrides: [] };
+    const regionId = await this.resolveDefaultTaxRegionId();
+    const rules = await this.taxPrisma.taxRule.findMany({
+      where: { taxRegionId: regionId, isActive: true },
+      include: {
+        taxRate: true,
+        category: { select: { id: true, name: true } },
+      },
+      orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
+    });
+    const def = rules.find((r: any) => r.scope === 'default_rate');
+    const overrides = rules
+      .filter((r: any) => r.scope === 'category' && r.categoryId)
+      .map((r: any) => ({
+        ruleId: r.id,
+        categoryId: r.categoryId,
+        categoryName: r.category?.name ?? '—',
+        rate: Number(r.taxRate.rate),
+      }));
+    return { defaultRate: def ? Number(def.taxRate.rate) : null, overrides };
+  }
+
+  /** Bölgede bu yüzdeye denk aktif TaxRate'i bul, yoksa 'KDV %X' adıyla yarat. */
+  private async findOrCreateVatRate(regionId: string, ratePercent: number) {
+    const existing = await this.taxPrisma.taxRate.findFirst({
+      where: { taxRegionId: regionId, rate: ratePercent, isActive: true },
+    });
+    if (existing) return existing;
+    return this.taxPrisma.taxRate.create({
+      data: {
+        taxRegionId: regionId,
+        name: `KDV %${ratePercent}`,
+        rate: ratePercent,
+        isActive: true,
+      },
+    });
+  }
+
+  async setDefaultVat(adminId: string, ratePercent: number) {
+    if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
+    if (!(ratePercent >= 0 && ratePercent <= 100)) {
+      throw new BadRequestException('Oran 0 ile 100 arasında olmalı');
+    }
+    const regionId = await this.resolveDefaultTaxRegionId();
+    const rate = await this.findOrCreateVatRate(regionId, ratePercent);
+    await this.taxPrisma.taxRate.updateMany({
+      where: { taxRegionId: regionId },
+      data: { isDefault: false },
+    });
+    await this.taxPrisma.taxRate.update({ where: { id: rate.id }, data: { isDefault: true } });
+    const rule = await this.taxPrisma.taxRule.findFirst({
+      where: { taxRegionId: regionId, scope: 'default_rate' },
+    });
+    if (rule) {
+      await this.taxPrisma.taxRule.update({
+        where: { id: rule.id },
+        data: { taxRateId: rate.id, isActive: true },
+      });
+    } else {
+      await this.taxPrisma.taxRule.create({
+        data: { taxRegionId: regionId, taxRateId: rate.id, scope: 'default_rate' },
+      });
+    }
+    await this.createAuditLog(adminId, 'vat_default_update', 'TaxRule', regionId, null, { rate: ratePercent });
+    return { defaultRate: ratePercent };
+  }
+
+  /** Kategori istisnası ekle/güncelle: kategori → KDV %. Kategori başına tek kural (upsert). */
+  async setVatOverride(adminId: string, categoryId: string, ratePercent: number) {
+    if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
+    if (!(ratePercent >= 0 && ratePercent <= 100)) {
+      throw new BadRequestException('Oran 0 ile 100 arasında olmalı');
+    }
+    const category = await this.prisma.category.findUnique({ where: { id: categoryId } });
+    if (!category) throw new NotFoundException('Kategori bulunamadı');
+    const regionId = await this.resolveDefaultTaxRegionId();
+    const rate = await this.findOrCreateVatRate(regionId, ratePercent);
+    const existing = await this.taxPrisma.taxRule.findFirst({
+      where: { taxRegionId: regionId, scope: 'category', categoryId },
+    });
+    const rule = existing
+      ? await this.taxPrisma.taxRule.update({
+          where: { id: existing.id },
+          data: { taxRateId: rate.id, isActive: true },
+        })
+      : await this.taxPrisma.taxRule.create({
+          data: { taxRegionId: regionId, taxRateId: rate.id, scope: 'category', categoryId, priority: 10 },
+        });
+    await this.createAuditLog(adminId, 'vat_override_upsert', 'TaxRule', rule.id, existing, { categoryId, rate: ratePercent });
+    return { ruleId: rule.id, categoryId, categoryName: category.name, rate: ratePercent };
+  }
+
+  async deleteVatOverride(adminId: string, ruleId: string) {
+    if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
+    const rule = await this.taxPrisma.taxRule.findUnique({ where: { id: ruleId } });
+    if (!rule || rule.scope !== 'category') throw new NotFoundException('KDV istisnası bulunamadı');
+    await this.taxPrisma.taxRule.delete({ where: { id: ruleId } });
+    await this.createAuditLog(adminId, 'vat_override_delete', 'TaxRule', ruleId, rule, null);
+    return { success: true };
+  }
+
   // ==================== E-TİCARET STOPAJI (GVK 94/19, tevkifat) ====================
 
   /** E-ticaret stopaj oranı (%). PlatformSetting 'withholding_tax_rate', varsayılan %1 (9284 sayılı CK). */

@@ -79,6 +79,8 @@ import {
   TaxReportQueryDto,
   SetWithholdingRateDto,
   WithholdingReportQueryDto,
+  SetDefaultVatDto,
+  SetVatOverrideDto,
   CreateStaticPageDto,
   UpdateStaticPageDto,
   UpdateEmailTemplateDto,
@@ -1917,6 +1919,48 @@ export class AdminController {
   @ApiResponse({ status: HttpStatus.OK, description: 'Tax report summary and breakdown' })
   async getTaxReport(@Query() query: TaxReportQueryDto) {
     return this.adminService.getTaxReport(query);
+  }
+
+  @Get('tax/vat')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Get simplified VAT config (default rate + category overrides)' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Default VAT rate and category overrides' })
+  async getVatConfig() {
+    return this.adminService.getVatConfig();
+  }
+
+  @Patch('tax/vat')
+  @Roles(AdminRole.super_admin)
+  @ApiOperation({ summary: 'Set default VAT rate' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Default VAT rate updated' })
+  async setDefaultVat(
+    @CurrentUser('id') adminId: string,
+    @Body() dto: SetDefaultVatDto,
+  ) {
+    return this.adminService.setDefaultVat(adminId, dto.rate);
+  }
+
+  @Put('tax/vat/override')
+  @Roles(AdminRole.super_admin)
+  @ApiOperation({ summary: 'Add/update a category VAT override' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Category VAT override upserted' })
+  async setVatOverride(
+    @CurrentUser('id') adminId: string,
+    @Body() dto: SetVatOverrideDto,
+  ) {
+    return this.adminService.setVatOverride(adminId, dto.categoryId, dto.rate);
+  }
+
+  @Delete('tax/vat/override/:id')
+  @Roles(AdminRole.super_admin)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a category VAT override' })
+  @ApiParam({ name: 'id', description: 'Tax rule ID' })
+  async deleteVatOverride(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.deleteVatOverride(adminId, id);
   }
 
   @Get('tax/withholding')
