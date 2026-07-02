@@ -119,10 +119,12 @@ export default function SecuritySettingsScreen() {
   const [, setTotpQr] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
 
-  if (!isAuthenticated) {
-    router.replace('/(auth)/login');
-    return null;
-  }
+  // Yönlendirmeyi render sırasında değil effect'te yap; render içinde router.replace
+  // "Cannot update a component while rendering another" uyarısına yol açıyordu.
+  useEffect(() => {
+    if (!isAuthenticated) router.replace('/(auth)/login');
+  }, [isAuthenticated]);
+  if (!isAuthenticated) return null;
 
   const handlePasswordChange = async () => {
     if (newPassword !== confirmPassword) {
