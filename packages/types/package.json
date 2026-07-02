@@ -1,6 +1,7 @@
 {
   "name": "@tarodan/types",
   "private": true,
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -14,9 +15,11 @@
     "build": "tsup src/index.ts --format cjs,esm --dts",
     "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
     "lint": "eslint \"src/**/*.ts\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo"
   },
   "devDependencies": {
+    "@tarodan/eslint-config": "workspace:*",
     "@tarodan/tsconfig": "workspace:*",
     "tsup": "^8.0.1",
     "typescript": "^5.3.2"
