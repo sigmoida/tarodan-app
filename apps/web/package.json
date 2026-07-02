@@ -52,6 +52,7 @@
     "zustand": "^4.4.7"
   },
   "devDependencies": {
+    "@tarodan/eslint-config": "workspace:*",
     "@tarodan/tsconfig": "workspace:*",
     "@playwright/test": "^1.40.0",
     "@types/node": "^20.10.0",
