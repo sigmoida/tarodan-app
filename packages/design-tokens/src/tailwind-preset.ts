@@ -1,20 +1,33 @@
 import type { Config } from 'tailwindcss';
-import {
-  colors,
-  shadows,
-  motion,
-  typography,
-} from '@tarodan/design-tokens';
+import { colors, radius, spacing, shadows, motion, typography } from './index';
 
 /**
- * Tarodan Design System — Shared Tailwind Preset
+ * Tarodan Design System — Shared Tailwind Preset (web adapter)
  *
- * All color/shadow/motion/typography tokens come from @tarodan/design-tokens
- * (the single source of truth shared with packages/ui-native).
+ * The single source of truth for every design decision is this package's raw
+ * tokens (colors, radius, spacing, typography, shadows, motion). This preset
+ * is the *web adapter* that projects those tokens onto a Tailwind theme;
+ * @tarodan/ui-native/lib/theme.ts is the equivalent native adapter.
  *
- * App-specific overrides (e.g. borderRadius scale) are layered in each
- * app's tailwind.config.ts.
+ * Consumed by apps/web and apps/admin via `@tarodan/design-tokens/tailwind`.
+ * Apps should NOT re-declare tokens (colors/radius/spacing) in their own
+ * tailwind.config — only truly app-specific bits (content globs, one-off
+ * animations) belong there.
  */
+
+/** Numeric px tokens → Tailwind length strings (radius stays in px). */
+const toPx = (obj: Record<string, number>): Record<string, string> =>
+  Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, `${v}px`]));
+
+/**
+ * Numeric px tokens → rem (web keeps rem so spacing scales with the user's
+ * root font-size; the native adapter keeps the same values as raw px).
+ */
+const toRem = (obj: Record<string, number>): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(obj).map(([k, v]) => [k, v === 0 ? '0px' : `${v / 16}rem`]),
+  );
+
 const tarodanPreset: Partial<Config> = {
   theme: {
     extend: {
@@ -52,7 +65,7 @@ const tarodanPreset: Partial<Config> = {
         'border-subtle': colors.border.subtle,
       },
       backgroundColor: {
-        'surface': colors.surface.DEFAULT,
+        surface: colors.surface.DEFAULT,
         'surface-alt': colors.surface.alt,
         'surface-elevated': colors.surface.elevated,
       },
@@ -60,6 +73,8 @@ const tarodanPreset: Partial<Config> = {
         sans: [...typography.fontFamily.sans],
         display: [...typography.fontFamily.display],
       },
+      borderRadius: toPx(radius),
+      spacing: toRem(spacing),
       boxShadow: shadows,
       transitionTimingFunction: motion.easing,
       animation: motion.animation,
