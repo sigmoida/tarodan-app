@@ -259,7 +259,7 @@ export default function ProductDetailScreen() {
         icon="cube-outline"
         title="Ürün bulunamadı"
         actionLabel="Geri Dön"
-        onAction={() => router.back()}
+        onAction={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')}
       />
     );
   }

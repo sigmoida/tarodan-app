@@ -225,6 +225,9 @@ export default function CardPaymentForm({ target, amount, onSuccess, onFail, rec
   if (threeDSHtml) {
     return (
       <View style={styles.webviewWrap}>
+        <Pressable onPress={() => { setThreeDSHtml(null); setProcessing(false); }} style={{ padding: 12, alignSelf: 'flex-end' }}>
+          <Text style={{ color: colors.primary[600]!, fontWeight: '600' }}>Vazgeç</Text>
+        </Pressable>
         <WebView
           originWhitelist={['*']}
           source={{ html: threeDSHtml }}
