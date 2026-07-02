@@ -501,6 +501,10 @@ export const adminApi = {
   suratTestCancel(ref: string) {
     return api.post('/admin/shipping/surat/cancel', { ref });
   },
+  // Test konsolu: Sürat barkod/etiket üret (OrtakBarkodOlustur) — KargoTakipNo + ZPL.
+  suratTestBarcode() {
+    return api.post('/admin/shipping/surat/barcode');
+  },
 
   // Notifications
   getNotificationHistory: (params?: {

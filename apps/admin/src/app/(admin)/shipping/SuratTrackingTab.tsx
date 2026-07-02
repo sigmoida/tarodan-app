@@ -36,6 +36,8 @@ export function SuratTrackingTab() {
   const [cref, setCref] = useState("");
   const [opLoading, setOpLoading] = useState<null | "track" | "cancel">(null);
   const [opResult, setOpResult] = useState<any>(null);
+  const [barcoding, setBarcoding] = useState(false);
+  const [barcodeResult, setBarcodeResult] = useState<any>(null);
 
   const {
     rows,
@@ -110,6 +112,22 @@ export function SuratTrackingTab() {
       });
     } finally {
       setOpLoading(null);
+    }
+  }
+
+  async function runBarcode() {
+    setBarcoding(true);
+    setBarcodeResult(null);
+    try {
+      const res = await adminApi.suratTestBarcode();
+      setBarcodeResult(res.data);
+      if (res.data?.ref) setCref(res.data.ref);
+    } catch (e: any) {
+      setBarcodeResult({
+        error: e?.response?.data?.message || e?.message || "İstek başarısız oldu",
+      });
+    } finally {
+      setBarcoding(false);
     }
   }
 
@@ -217,19 +235,29 @@ export function SuratTrackingTab() {
           </p>
         </div>
 
-        {/* 1) Hızlı test: gönderi oluştur + takip */}
+        {/* 1) Hızlı test: gönderi oluştur + takip / barkod */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-xs text-muted">
-            Yeni bir test gönderisi oluşturur, hemen takibini sorgular; referansı aşağı doldurur.
+            Yeni bir test gönderisi oluşturur; referansı aşağı doldurur.
           </span>
-          <Button
-            variant="primary"
-            size="sm"
-            isLoading={testing}
-            onClick={runEndpointTest}
-          >
-            {testing ? "Test ediliyor…" : "Gönderi Oluştur + Takip"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="primary"
+              size="sm"
+              isLoading={testing}
+              onClick={runEndpointTest}
+            >
+              {testing ? "Test ediliyor…" : "Gönderi Oluştur + Takip"}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              isLoading={barcoding}
+              onClick={runBarcode}
+            >
+              {barcoding ? "Üretiliyor…" : "Barkod/Etiket Üret"}
+            </Button>
+          </div>
         </div>
 
         {testResult && (
@@ -266,6 +294,38 @@ export function SuratTrackingTab() {
                     </span>
                   )}
                 </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {barcodeResult && (
+          <div className="space-y-1 rounded-lg bg-surface-alt p-3 font-mono text-xs">
+            {barcodeResult.error ? (
+              <div className="text-danger-600">
+                Barkod hatası: {String(barcodeResult.error)}
+              </div>
+            ) : (
+              <>
+                <div>
+                  Barkod (OrtakBarkodOlustur):{" "}
+                  <span
+                    className={barcodeResult.ok ? "text-success-600" : "text-danger-600"}
+                  >
+                    {barcodeResult.ok ? "✓ üretildi" : "✗ hata"}
+                  </span>{" "}
+                  — {barcodeResult.message}
+                </div>
+                <div>
+                  KargoTakipNo:{" "}
+                  <span className="text-body">{barcodeResult.kargoTakipNo || "—"}</span>
+                </div>
+                {barcodeResult.barcodeSample && (
+                  <div className="text-subtle">
+                    ZPL etiket ({barcodeResult.barcodeCount} parça):{" "}
+                    {barcodeResult.barcodeSample}…
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -308,10 +368,9 @@ export function SuratTrackingTab() {
         </div>
 
         <p className="text-xs text-subtle">
-          Not: Barkod (OrtakBarkodOlustur) endpoint&apos;i mevcut ama istek şeması
-          Sürat&apos;tan bekleniyor; geldiğinde eklenecek. Ayrıca test ortamında gönderiler
-          fiziksel &quot;kabul&quot; aşamasına gelmediği için takip/iptal genelde
-          &quot;kabul bekleniyor / Kayıt Bulunamadı&quot; döner (üretimde ilerler).
+          Not: Test ortamında gönderiler fiziksel &quot;kabul&quot; aşamasına gelmediği için
+          takip/iptal genelde &quot;kabul bekleniyor / Kayıt Bulunamadı&quot; döner; barkod ise
+          gerçek KargoTakipNo + ZPL etiket üretir. Üretimde hepsi tam çalışır.
         </p>
       </div>
 

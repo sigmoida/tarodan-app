@@ -2352,6 +2352,14 @@ export class AdminController {
     return this.adminService.suratTestCancel(body?.ref);
   }
 
+  @Post('shipping/surat/barcode')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Test konsolu: Sürat barkod/etiket üret (OrtakBarkodOlustur)' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'KargoTakipNo + ZPL etiket' })
+  async suratTestBarcode() {
+    return this.adminService.suratTestBarcode();
+  }
+
   // ==================== NOTIFICATION MANAGEMENT ====================
 
   @Get('notifications/history')
