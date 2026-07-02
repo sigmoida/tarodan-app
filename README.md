@@ -36,16 +36,19 @@ Baslamadan once asagidakilerin bilgisayarinizda kurulu oldugundan emin olun:
 
 ### Tek Komutla Baslat
 
-Projeyi sifirdan baslat scripti ile calistirabilirsiniz. Bu script Docker konteynerlerini yukari kaldirir, bagimliliklari yukler, veritabanini sifirlar ve uygulamayi baslatir:
+Projeyi sifirdan baslatmak icin (Docker konteynerlerini kaldirir, bagimliliklari yukler, veritabanini sifirlar ve uygulamayi baslatir):
 
-```powershell
-.\start.ps1
+```bash
+pnpm install
+pnpm docker:up
+pnpm db:reset   # ilk kurulumda: semayi olustur + ornek verileri yukle
+pnpm dev
 ```
 
-Eger PowerShell izin hatasi alirsaniz:
+Sonraki calismalarda tek komut yeterli (docker + dev):
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\start.ps1
+```bash
+pnpm start
 ```
 
 ### Adim Adim Manuel Kurulum
@@ -147,7 +150,6 @@ tarodan-app/
 │   └── mobile/       # React Native - Mobil uygulama (gelistirme asamasinda)
 ├── infrastructure/
 │   └── docker-compose.yml   # PostgreSQL, Redis, Elasticsearch
-├── start.ps1         # Hizli baslat scripti
 └── package.json      # Root workspace yapilandirmasi
 ```
 

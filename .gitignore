@@ -61,3 +61,6 @@ PayTR Direkt API/
 PayTR IFrame API/
 # Playwright MCP test artefaktları (snapshot/screenshot/log) — repoya girmez
 .playwright-mcp/
+
+# Cursor IDE ayar/plan dosyaları — repoya girmez (içerik junk/cursor-plans altına taşındı)
+.cursor/
