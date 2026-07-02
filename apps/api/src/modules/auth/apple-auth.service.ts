@@ -14,15 +14,19 @@ export class AppleAuthService {
 
   constructor(private readonly configService: ConfigService) {}
 
-  private clientId(): string {
-    return this.configService.get<string>('APPLE_CLIENT_ID') || 'com.tarodan.app';
+  private audience(): string[] {
+    const list = [
+      this.configService.get<string>('APPLE_CLIENT_ID'),
+      this.configService.get<string>('APPLE_SERVICES_ID'),
+    ].filter((x): x is string => !!x);
+    return list.length ? list : ['com.tarodan.app'];
   }
 
   async verifyIdentityToken(identityToken: string): Promise<AppleProfile> {
     let payload: any;
     try {
       payload = await appleSignin.verifyIdToken(identityToken, {
-        audience: this.clientId(),
+        audience: this.audience(),
         ignoreExpiration: false,
       });
     } catch (e) {
