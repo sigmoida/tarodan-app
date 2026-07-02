@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay.black50,
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing[4],

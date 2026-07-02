@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   errorText: { color: colors.danger[600]! },
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay.black50,
     justifyContent: 'flex-end',
   },
   sheet: {

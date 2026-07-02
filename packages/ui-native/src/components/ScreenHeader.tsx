@@ -41,7 +41,7 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
   const isPrimary = variant === 'primary';
   const bg = isPrimary ? colors.primary[600]! : colors.surface.DEFAULT;
   const fg = isPrimary ? colors.text.inverted : colors.text.heading;
-  const subFg = isPrimary ? 'rgba(255,255,255,0.85)' : colors.text.muted;
+  const subFg = isPrimary ? colors.overlay.white85 : colors.text.muted;
   const borderColor = isPrimary ? colors.primary[700]! : colors.border.subtle;
 
   const topPad = Math.max(
@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[1],
   },
   titleCenter: { alignItems: 'center' },
-  subtitle: { marginTop: 2 },
+  subtitle: { marginTop: spacing[0.5] },
   rightSlot: {
     minWidth: 40,
     alignItems: 'flex-end',
