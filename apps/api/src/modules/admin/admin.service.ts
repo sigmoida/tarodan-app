@@ -9739,6 +9739,15 @@ export class AdminService {
     return { ref, ...result };
   }
 
+  /**
+   * Test konsolu: GonderiSil ile gönderiyi sil/pasif et (referansla). DB'ye dokunmaz.
+   */
+  async suratTestSil(ref: string): Promise<any> {
+    if (!ref?.trim()) return { ok: false, error: 'Referans (WebSiparisKodu) gerekli' };
+    if (!this.suratTrackingService) return { ok: false, error: 'Takip servisi kullanılamıyor' };
+    return this.suratTrackingService.probeGonderiSil(ref.trim());
+  }
+
   // ==================== NOTIFICATION MANAGEMENT ====================
 
   /**

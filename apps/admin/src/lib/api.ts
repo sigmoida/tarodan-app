@@ -505,6 +505,10 @@ export const adminApi = {
   suratTestBarcode() {
     return api.post('/admin/shipping/surat/barcode');
   },
+  // Test konsolu: referansla Sürat gönderi sil (GonderiSil).
+  suratTestSil(ref: string) {
+    return api.post('/admin/shipping/surat/sil', { ref });
+  },
 
   // Notifications
   getNotificationHistory: (params?: {

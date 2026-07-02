@@ -34,7 +34,7 @@ export function SuratTrackingTab() {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<any>(null);
   const [cref, setCref] = useState("");
-  const [opLoading, setOpLoading] = useState<null | "track" | "cancel">(null);
+  const [opLoading, setOpLoading] = useState<null | "track" | "cancel" | "sil">(null);
   const [opResult, setOpResult] = useState<any>(null);
   const [barcoding, setBarcoding] = useState(false);
   const [barcodeResult, setBarcodeResult] = useState<any>(null);
@@ -92,7 +92,7 @@ export function SuratTrackingTab() {
     }
   }
 
-  async function runOp(op: "track" | "cancel") {
+  async function runOp(op: "track" | "cancel" | "sil") {
     const r = cref.trim();
     if (!r) {
       toast.error("Önce bir referans gir (veya 'Gönderi Oluştur + Takip' ile üret)");
@@ -104,7 +104,9 @@ export function SuratTrackingTab() {
       const res =
         op === "track"
           ? await adminApi.suratTestTrack(r)
-          : await adminApi.suratTestCancel(r);
+          : op === "cancel"
+            ? await adminApi.suratTestCancel(r)
+            : await adminApi.suratTestSil(r);
       setOpResult(res.data);
     } catch (e: any) {
       setOpResult({
@@ -357,7 +359,15 @@ export function SuratTrackingTab() {
               isLoading={opLoading === "cancel"}
               onClick={() => runOp("cancel")}
             >
-              Geri Çek (İptal)
+              Geri Çek (GonderiGeriCek)
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              isLoading={opLoading === "sil"}
+              onClick={() => runOp("sil")}
+            >
+              Sil (GonderiSil)
             </Button>
           </div>
           {opResult && (

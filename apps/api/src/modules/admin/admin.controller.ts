@@ -2360,6 +2360,14 @@ export class AdminController {
     return this.adminService.suratTestBarcode();
   }
 
+  @Post('shipping/surat/sil')
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: 'Test konsolu: referansla Sürat gönderi sil (GonderiSil)' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'GonderiSil cevabı' })
+  async suratTestSil(@Body() body: { ref: string }) {
+    return this.adminService.suratTestSil(body?.ref);
+  }
+
   // ==================== NOTIFICATION MANAGEMENT ====================
 
   @Get('notifications/history')

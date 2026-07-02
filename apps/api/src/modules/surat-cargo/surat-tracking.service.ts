@@ -18,6 +18,9 @@ const SURAT_API_TEST = 'https://api02.suratkargo.com.tr/api/KargoTakipHareketDet
 // OrtakBarkodOlustur = gönderi oluştur + barkod/etiket üret (gerçek KargoTakipNo + ZPL döner).
 const SURAT_BARKOD_LIVE = 'https://api01.suratkargo.com.tr/api/OrtakBarkodOlustur';
 const SURAT_BARKOD_TEST = 'https://api02.suratkargo.com.tr/api/OrtakBarkodOlustur';
+// GonderiSil = gönderiyi sil/pasif et. Query auth (CariKodu/Sifre) + WebSiparisKodu.
+const SURAT_SIL_LIVE = 'https://api01.suratkargo.com.tr/api/GonderiSil';
+const SURAT_SIL_TEST = 'https://api02.suratkargo.com.tr/api/GonderiSil';
 
 @Injectable()
 export class SuratTrackingService {
@@ -203,6 +206,59 @@ export class SuratTrackingService {
         kargoTakipNo: data?.KargoTakipNo ?? null,
         barcodeCount: barcode.length,
         barcodeSample: barcode.length ? String(barcode[0]).slice(0, 200) : null,
+      };
+    } catch (error: any) {
+      return { ok: false, error: error?.message || String(error) };
+    }
+  }
+
+  /**
+   * Test konsolu: GonderiSil = gönderiyi sil/pasif et. Query auth (CariKodu/Sifre) +
+   * WebSiparisKodu. Ham cevabı döner; DB'ye dokunmaz.
+   */
+  async probeGonderiSil(webSiparisKodu: string): Promise<{
+    ok: boolean;
+    httpStatus?: number;
+    isError?: boolean;
+    message?: string | null;
+    error?: string;
+  }> {
+    const cariKodu = this.configService.get<string>('SURAT_KARGO_CARI_KODU', '');
+    const sifre = this.configService.get<string>('SURAT_KARGO_SIFRE', '');
+    if (!cariKodu || !sifre) {
+      return { ok: false, error: 'SURAT_KARGO_CARI_KODU / SURAT_KARGO_SIFRE tanımlı değil' };
+    }
+    const isTestMode =
+      this.configService.get<string>('SURAT_KARGO_TEST_MODE', 'true')?.trim() !== 'false';
+    const baseUrl = isTestMode ? SURAT_SIL_TEST : SURAT_SIL_LIVE;
+    const url = `${baseUrl}?CariKodu=${encodeURIComponent(cariKodu)}&Sifre=${encodeURIComponent(sifre)}&WebSiparisKodu=${encodeURIComponent(webSiparisKodu)}`;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: '{}',
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      const text = await response.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        return {
+          ok: false,
+          httpStatus: response.status,
+          error: text?.slice(0, 200) || 'JSON olmayan yanıt',
+        };
+      }
+      const isError = data?.IsError ?? data?.isError ?? false;
+      return {
+        ok: isError !== true,
+        httpStatus: response.status,
+        isError: isError === true,
+        message: data?.Message ?? data?.GonderiSilResult ?? null,
       };
     } catch (error: any) {
       return { ok: false, error: error?.message || String(error) };
