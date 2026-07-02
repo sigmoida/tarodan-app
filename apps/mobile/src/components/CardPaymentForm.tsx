@@ -196,6 +196,7 @@ export default function CardPaymentForm({ target, amount, onSuccess, onFail, rec
 
       if (data.threeDSHtml) {
         setThreeDSHtml(data.threeDSHtml); // 3D WebView göster
+        setProcessing(false);
         return;
       }
       if (data.status === 'failed') {
