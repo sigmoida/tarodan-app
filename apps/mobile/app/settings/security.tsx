@@ -11,6 +11,9 @@ import {
   theme,
   ScreenHeader,
   appAlert,
+  useModalMessage,
+  ModalMessage,
+  alertAfterClose,
 } from '@tarodan/ui-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -64,6 +67,12 @@ export default function SecuritySettingsScreen() {
   // transparent RNModal üst üste gelir ve dokunuşları kilitler → uygulama donar.
   // Bu yüzden modal içindeki geri bildirimleri alert yerine burada gösteriyoruz.
   const [phoneMsg, setPhoneMsg] = useState<{ type: 'info' | 'error'; text: string } | null>(null);
+
+  // 4 ayrı modal için mesaj örnekleri (şifre / 2FA kurulum / 2FA kapat / yedek kod)
+  const pwMsg = useModalMessage();
+  const twoFaMsg = useModalMessage();
+  const disableMsg = useModalMessage();
+  const regenMsg = useModalMessage();
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -127,16 +136,16 @@ export default function SecuritySettingsScreen() {
   if (!isAuthenticated) return null;
 
   const handlePasswordChange = async () => {
+    pwMsg.clear();
     if (newPassword !== confirmPassword) {
-      appAlert('Hata', 'Şifreler eşleşmiyor');
+      pwMsg.error('Şifreler eşleşmiyor');
       return;
     }
 
     // API ChangePasswordDto ile birebir aynı kural — yoksa ham 400 dönüyordu
     const strongPassword = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
     if (!strongPassword.test(newPassword)) {
-      appAlert(
-        'Hata',
+      pwMsg.error(
         'Şifre en az 8 karakter, bir büyük harf, bir küçük harf, bir rakam ve bir özel karakter (@$!%*?&) içermelidir'
       );
       return;
@@ -145,13 +154,12 @@ export default function SecuritySettingsScreen() {
     setLoading(true);
     try {
       await authApi.changePassword(currentPassword, newPassword);
-      appAlert('Başarılı', 'Şifreniz değiştirildi');
-      setShowPasswordDialog(false);
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
+      alertAfterClose(() => setShowPasswordDialog(false), 'Başarılı', 'Şifreniz değiştirildi');
     } catch (error: any) {
-      appAlert('Hata', error.response?.data?.message || 'Şifre değiştirilemedi');
+      pwMsg.error(error.response?.data?.message || 'Şifre değiştirilemedi');
     } finally {
       setLoading(false);
     }
@@ -164,6 +172,7 @@ export default function SecuritySettingsScreen() {
       const payload = (response.data as any)?.data ?? (response.data as any) ?? {};
       setTotpSecret(payload.secret ?? '');
       setTotpQr(payload.qrCode ?? '');
+      twoFaMsg.clear();
       setShowTwoFactorSetup(true);
     } catch (error: any) {
       appAlert('Hata', error.response?.data?.message || '2FA kurulumu başarısız');
@@ -173,8 +182,9 @@ export default function SecuritySettingsScreen() {
   };
 
   const handleVerifyTwoFactor = async () => {
+    twoFaMsg.clear();
     if (verificationCode.length !== 6) {
-      appAlert('Hata', 'Lütfen 6 haneli doğrulama kodunu girin');
+      twoFaMsg.error('Lütfen 6 haneli doğrulama kodunu girin');
       return;
     }
 
@@ -182,11 +192,10 @@ export default function SecuritySettingsScreen() {
     try {
       await authApi.verifyTwoFactor(verificationCode);
       setTwoFactorEnabled(true);
-      setShowTwoFactorSetup(false);
       setVerificationCode('');
-      appAlert('Başarılı', 'İki faktörlü doğrulama aktifleştirildi');
+      alertAfterClose(() => setShowTwoFactorSetup(false), 'Başarılı', 'İki faktörlü doğrulama aktifleştirildi');
     } catch (error: any) {
-      appAlert('Hata', error.response?.data?.message || 'Doğrulama başarısız');
+      twoFaMsg.error(error.response?.data?.message || 'Doğrulama başarısız');
     } finally {
       setLoading(false);
     }
@@ -195,31 +204,33 @@ export default function SecuritySettingsScreen() {
   const handleDisableTwoFactor = () => {
     // Backend disable için geçerli TOTP kodu ister; kod giriş dialog'unu aç.
     setDisableCode('');
+    disableMsg.clear();
     setShowDisableDialog(true);
   };
 
   const confirmDisableTwoFactor = async () => {
+    disableMsg.clear();
     if (disableCode.length !== 6) {
-      appAlert('Hata', 'Lütfen 6 haneli doğrulama kodunu girin');
+      disableMsg.error('Lütfen 6 haneli doğrulama kodunu girin');
       return;
     }
     setLoading(true);
     try {
       await authApi.disableTwoFactor(disableCode);
       setTwoFactorEnabled(false);
-      setShowDisableDialog(false);
       setDisableCode('');
-      appAlert('Başarılı', 'İki faktörlü doğrulama kapatıldı');
+      alertAfterClose(() => setShowDisableDialog(false), 'Başarılı', 'İki faktörlü doğrulama kapatıldı');
     } catch (error: any) {
-      appAlert('Hata', error.response?.data?.message || 'İşlem başarısız');
+      disableMsg.error(error.response?.data?.message || 'İşlem başarısız');
     } finally {
       setLoading(false);
     }
   };
 
   const handleRegenerateBackupCodes = async () => {
+    regenMsg.clear();
     if (regenerateCode.length !== 6) {
-      appAlert('Hata', 'Lütfen 6 haneli doğrulama kodunu girin');
+      regenMsg.error('Lütfen 6 haneli doğrulama kodunu girin');
       return;
     }
     setLoading(true);
@@ -230,7 +241,7 @@ export default function SecuritySettingsScreen() {
       setNewBackupCodes(codes);
       setRegenerateCode('');
     } catch (error: any) {
-      appAlert('Hata', error.response?.data?.message || 'Yedek kodlar yenilenemedi');
+      regenMsg.error(error.response?.data?.message || 'Yedek kodlar yenilenemedi');
     } finally {
       setLoading(false);
     }
@@ -269,7 +280,7 @@ export default function SecuritySettingsScreen() {
         <Card style={styles.card}>
           <TouchableOpacity
             style={styles.settingRow}
-            onPress={() => setShowPasswordDialog(true)}
+            onPress={() => { pwMsg.clear(); setShowPasswordDialog(true); }}
           >
             <View style={styles.settingInfo}>
               <Ionicons name="lock-closed-outline" size={24} color={colors.primary[600]!} />
@@ -317,6 +328,7 @@ export default function SecuritySettingsScreen() {
               onPress={() => {
                 setNewBackupCodes(null);
                 setRegenerateCode('');
+                regenMsg.clear();
                 setShowRegenerateDialog(true);
               }}
               style={{ marginTop: 12 }}
@@ -405,7 +417,7 @@ export default function SecuritySettingsScreen() {
       </ScrollView>
 
       {/* Password Change Dialog */}
-      <Modal isOpen={showPasswordDialog} onClose={() => setShowPasswordDialog(false)} title="Şifre Değiştir">
+      <Modal isOpen={showPasswordDialog} onClose={() => { setShowPasswordDialog(false); pwMsg.clear(); }} title="Şifre Değiştir">
         <Input
           label="Mevcut Şifre"
           value={currentPassword}
@@ -428,13 +440,14 @@ export default function SecuritySettingsScreen() {
           containerStyle={styles.dialogInput}
         />
         <View style={styles.dialogActions}>
-          <Button variant="ghost" title={t('mobile.cancel')} onPress={() => setShowPasswordDialog(false)} />
+          <Button variant="ghost" title={t('mobile.cancel')} onPress={() => { setShowPasswordDialog(false); pwMsg.clear(); }} />
           <Button variant="primary" title={t('mobile.change')} onPress={handlePasswordChange} isLoading={loading} />
         </View>
+        <ModalMessage state={pwMsg.state} />
       </Modal>
 
       {/* 2FA Setup Dialog */}
-      <Modal isOpen={showTwoFactorSetup} onClose={() => setShowTwoFactorSetup(false)} title="2FA Kurulumu">
+      <Modal isOpen={showTwoFactorSetup} onClose={() => { setShowTwoFactorSetup(false); twoFaMsg.clear(); }} title="2FA Kurulumu">
         <Text style={styles.dialogText}>
           Google Authenticator veya benzeri bir uygulamayı kullanarak aşağıdaki kodu tarayın veya manuel olarak girin:
         </Text>
@@ -454,13 +467,14 @@ export default function SecuritySettingsScreen() {
           containerStyle={styles.dialogInput}
         />
         <View style={styles.dialogActions}>
-          <Button variant="ghost" title={t('mobile.cancel')} onPress={() => setShowTwoFactorSetup(false)} />
+          <Button variant="ghost" title={t('mobile.cancel')} onPress={() => { setShowTwoFactorSetup(false); twoFaMsg.clear(); }} />
           <Button variant="primary" title={t('mobile.verify')} onPress={handleVerifyTwoFactor} isLoading={loading} />
         </View>
+        <ModalMessage state={twoFaMsg.state} />
       </Modal>
 
       {/* 2FA Disable Dialog — backend geçerli TOTP kodu ister */}
-      <Modal isOpen={showDisableDialog} onClose={() => setShowDisableDialog(false)} title="2FA'yı Kapat">
+      <Modal isOpen={showDisableDialog} onClose={() => { setShowDisableDialog(false); disableMsg.clear(); }} title="2FA'yı Kapat">
         <Text style={styles.dialogText}>
           İki faktörlü doğrulamayı kapatmak için uygulamanızdaki 6 haneli kodu girin.
         </Text>
@@ -473,9 +487,10 @@ export default function SecuritySettingsScreen() {
           containerStyle={styles.dialogInput}
         />
         <View style={styles.dialogActions}>
-          <Button variant="ghost" title={t('mobile.cancel')} onPress={() => setShowDisableDialog(false)} />
+          <Button variant="ghost" title={t('mobile.cancel')} onPress={() => { setShowDisableDialog(false); disableMsg.clear(); }} />
           <Button variant="danger" title="Kapat" onPress={confirmDisableTwoFactor} isLoading={loading} />
         </View>
+        <ModalMessage state={disableMsg.state} />
       </Modal>
 
       {/* Phone Verification Dialog */}
@@ -530,7 +545,7 @@ export default function SecuritySettingsScreen() {
       {/* 2FA Backup Codes Regenerate Dialog */}
       <Modal
         isOpen={showRegenerateDialog}
-        onClose={() => setShowRegenerateDialog(false)}
+        onClose={() => { setShowRegenerateDialog(false); regenMsg.clear(); }}
         title="Yedek Kodları Yenile"
       >
         {newBackupCodes ? (
@@ -563,9 +578,10 @@ export default function SecuritySettingsScreen() {
               containerStyle={styles.dialogInput}
             />
             <View style={styles.dialogActions}>
-              <Button variant="ghost" title={t('mobile.cancel')} onPress={() => setShowRegenerateDialog(false)} />
+              <Button variant="ghost" title={t('mobile.cancel')} onPress={() => { setShowRegenerateDialog(false); regenMsg.clear(); }} />
               <Button variant="primary" title="Yenile" onPress={handleRegenerateBackupCodes} isLoading={loading} />
             </View>
+            <ModalMessage state={regenMsg.state} />
           </>
         )}
       </Modal>

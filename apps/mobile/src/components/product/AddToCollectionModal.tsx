@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { theme, Text, Button, Modal, Input, Textarea, Spinner, appAlert } from '@tarodan/ui-native';
+import { theme, Text, Button, Modal, Input, Textarea, Spinner, useModalMessage, ModalMessage } from '@tarodan/ui-native';
 import { collectionsApi } from '../../services/api';
 import { transformImageUrl } from '../../utils/imageUrl';
 
@@ -39,6 +39,11 @@ export default function AddToCollectionModal({
   onSuccess,
 }: AddToCollectionModalProps) {
   const queryClient = useQueryClient();
+  const msg = useModalMessage();
+
+  useEffect(() => {
+    msg.clear();
+  }, [visible]);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDescription, setNewDescription] = useState('');
@@ -82,10 +87,7 @@ export default function AddToCollectionModal({
       onDismiss();
     },
     onError: (e: any) => {
-      appAlert(
-        'Hata',
-        e?.response?.data?.message || 'Ürün koleksiyona eklenemedi.',
-      );
+      msg.error(e?.response?.data?.message || 'Ürün koleksiyona eklenemedi.');
     },
   });
 
@@ -109,14 +111,12 @@ export default function AddToCollectionModal({
       handleClose();
     },
     onError: (e: any) => {
-      appAlert(
-        'Hata',
-        e?.response?.data?.message || 'Koleksiyon oluşturulamadı.',
-      );
+      msg.error(e?.response?.data?.message || 'Koleksiyon oluşturulamadı.');
     },
   });
 
   const handleClose = () => {
+    msg.clear();
     setCreating(false);
     setNewName('');
     setNewDescription('');
@@ -125,8 +125,9 @@ export default function AddToCollectionModal({
   };
 
   const handleCreateSubmit = () => {
+    msg.clear();
     if (!newName.trim()) {
-      appAlert('Eksik', 'Koleksiyon adı girin.');
+      msg.error('Koleksiyon adı girin.');
       return;
     }
     createCollectionMutation.mutate();
@@ -268,6 +269,7 @@ export default function AddToCollectionModal({
           <Button variant="ghost" title="Kapat" onPress={handleClose} />
         )}
       </View>
+      <ModalMessage state={msg.state} />
     </Modal>
   );
 }

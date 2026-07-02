@@ -123,7 +123,7 @@ export default function SellerProfileScreen() {
         icon="person-outline"
         title="Satıcı bulunamadı"
         actionLabel="Geri Dön"
-        onAction={() => router.back()}
+        onAction={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')}
       />
     );
   }

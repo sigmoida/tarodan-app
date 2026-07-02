@@ -225,7 +225,7 @@ export default function MessageThreadScreen() {
             try {
               await userApi.block(other.id);
               appAlert('Engellendi', `${other.displayName} engellendi.`);
-              router.back();
+              router.canGoBack() ? router.back() : router.replace('/(tabs)');
             } catch {
               appAlert('Hata', 'Kullanıcı engellenirken bir sorun oluştu.');
             }
@@ -254,7 +254,7 @@ export default function MessageThreadScreen() {
     >
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
 

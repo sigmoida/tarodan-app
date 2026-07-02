@@ -120,7 +120,7 @@ export default function CollectionDetailScreen() {
         icon="albums-outline"
         title="Koleksiyon bulunamadı"
         actionLabel="Geri Dön"
-        onAction={() => router.back()}
+        onAction={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')}
       />
     );
   }

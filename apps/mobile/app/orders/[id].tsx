@@ -634,7 +634,7 @@ export default function OrderDetailScreen() {
         icon="receipt-outline"
         title="Sipariş bulunamadı"
         actionLabel="Geri Dön"
-        onAction={() => router.back()}
+        onAction={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')}
       />
     );
   }
