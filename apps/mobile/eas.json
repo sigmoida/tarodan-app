@@ -41,7 +41,6 @@
       "android": {
         "autoIncrement": "versionCode"
       },
-      "channel": "production",
       "env": {
         "EXPO_PUBLIC_ENVIRONMENT": "production",
         "EXPO_PUBLIC_API_URL": "https://tarodan.shop/api",
@@ -52,9 +51,9 @@
   "submit": {
     "production": {
       "ios": {
-        "appleId": "REPLACE_WITH_APPLE_ID@example.com",
-        "ascAppId": "REPLACE_WITH_ASC_APP_ID",
-        "appleTeamId": "REPLACE_WITH_APPLE_TEAM_ID"
+        "appleId": "mki19xci@gmail.com",
+        "ascAppId": "6786614139",
+        "appleTeamId": "P2628CQK26"
       },
       "android": {
         "serviceAccountKeyPath": "./google-services.json",
