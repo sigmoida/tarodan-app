@@ -6,7 +6,6 @@ import { Button, Select, Checkbox, Input, Modal } from "@tarodan/ui";
 import {
   PlusIcon,
   ChartBarIcon,
-  MapPinIcon,
   CalculatorIcon,
   DocumentTextIcon,
   ReceiptPercentIcon,
@@ -16,7 +15,9 @@ import toast from "react-hot-toast";
 import { AdminTabs } from "@/components/AdminTabs";
 import { useConfirm } from "@/components/ConfirmProvider";
 
-type TabId = "regions" | "rates" | "rules" | "report" | "withholding";
+// TR-only platform: "Vergi Bölgeleri" sekmesi kaldırıldı — API, oran/kural
+// oluştururken varsayılan TR bölgesini otomatik çözer/yaratır.
+type TabId = "rates" | "rules" | "report" | "withholding";
 
 interface WithholdingReport {
   period: string;
@@ -36,20 +37,6 @@ interface WithholdingReport {
     grossAmount: number;
     withholdingTax: number;
   }>;
-}
-
-interface TaxRegion {
-  id: string;
-  name: string;
-  countryCode: string;
-  regionCode: string | null;
-  isDefault: boolean;
-  sortOrder: number;
-  isActive: boolean;
-  ratesCount: number;
-  rulesCount: number;
-  createdAt: string;
-  updatedAt: string;
 }
 
 interface TaxRate {
@@ -89,16 +76,16 @@ interface Category {
   name: string;
 }
 
+// "product" kapsamı bilinçli olarak yok: TaxRule'da ürün alanı yok ve
+// TaxService ürün bazlı çözümleme yapmıyor — seçilebilir olması ölü kural üretiyordu.
 const SCOPE_LABELS: Record<string, string> = {
   default_rate: "Varsayılan oran",
   category: "Kategori",
-  product: "Ürün",
 };
 
 export default function TaxSettingsPage() {
   const confirm = useConfirm();
-  const [activeTab, setActiveTab] = useState<TabId>("regions");
-  const [regions, setRegions] = useState<TaxRegion[]>([]);
+  const [activeTab, setActiveTab] = useState<TabId>("rates");
   const [rates, setRates] = useState<TaxRate[]>([]);
   const [rules, setRules] = useState<TaxRule[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -119,25 +106,14 @@ export default function TaxSettingsPage() {
     }>;
   } | null>(null);
 
-  const [showRegionModal, setShowRegionModal] = useState(false);
   const [showRateModal, setShowRateModal] = useState(false);
   const [showRuleModal, setShowRuleModal] = useState(false);
-  const [editingRegion, setEditingRegion] = useState<TaxRegion | null>(null);
   const [editingRate, setEditingRate] = useState<TaxRate | null>(null);
   const [editingRule, setEditingRule] = useState<TaxRule | null>(null);
 
-  const [regionForm, setRegionForm] = useState({
-    name: "",
-    countryCode: "TR",
-    regionCode: "",
-    isDefault: false,
-    sortOrder: 0,
-    isActive: true,
-  });
   const [rateForm, setRateForm] = useState({
-    taxRegionId: "",
     name: "",
-    rate: "18",
+    rate: "20",
     isDefault: false,
     effectiveFrom: "",
     effectiveTo: "",
@@ -145,7 +121,6 @@ export default function TaxSettingsPage() {
     isActive: true,
   });
   const [ruleForm, setRuleForm] = useState({
-    taxRegionId: "",
     taxRateId: "",
     scope: "default_rate" as string,
     categoryId: "",
@@ -174,7 +149,7 @@ export default function TaxSettingsPage() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([loadRegions(), loadRates(), loadRules(), loadCategories()]).finally(() =>
+    Promise.all([loadRates(), loadRules(), loadCategories()]).finally(() =>
       setLoading(false),
     );
   }, []);
@@ -188,16 +163,6 @@ export default function TaxSettingsPage() {
     loadWithholdingRate();
     loadWithholdingReport();
   }, [activeTab, whYear, whMonth]);
-
-  const loadRegions = async () => {
-    try {
-      const res = await adminApi.getTaxRegions();
-      setRegions(res.data?.data || []);
-    } catch (e) {
-      if (process.env.NODE_ENV === "development") console.error(e);
-      toast.error("Vergi bölgeleri yüklenemedi");
-    }
-  };
 
   const loadRates = async () => {
     try {
@@ -312,65 +277,11 @@ export default function TaxSettingsPage() {
     URL.revokeObjectURL(url);
   };
 
-  const openCreateRegion = () => {
-    setEditingRegion(null);
-    setRegionForm({
-      name: "",
-      countryCode: "TR",
-      regionCode: "",
-      isDefault: regions.length === 0,
-      sortOrder: regions.length,
-      isActive: true,
-    });
-    setShowRegionModal(true);
-  };
-
-  const openEditRegion = (r: TaxRegion) => {
-    setEditingRegion(r);
-    setRegionForm({
-      name: r.name,
-      countryCode: r.countryCode,
-      regionCode: r.regionCode || "",
-      isDefault: r.isDefault,
-      sortOrder: r.sortOrder,
-      isActive: r.isActive,
-    });
-    setShowRegionModal(true);
-  };
-
-  const saveRegion = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const payload = {
-        name: regionForm.name.trim(),
-        countryCode: regionForm.countryCode.trim().toUpperCase(),
-        regionCode: regionForm.regionCode.trim() || undefined,
-        isDefault: regionForm.isDefault,
-        sortOrder: regionForm.sortOrder,
-        isActive: regionForm.isActive,
-      };
-      if (editingRegion) {
-        await adminApi.updateTaxRegion(editingRegion.id, payload);
-        toast.success("Vergi bölgesi güncellendi");
-      } else {
-        await adminApi.createTaxRegion(payload);
-        toast.success("Vergi bölgesi oluşturuldu");
-      }
-      setShowRegionModal(false);
-      loadRegions();
-      loadRates();
-      loadRules();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Kaydetme başarısız");
-    }
-  };
-
   const openCreateRate = () => {
     setEditingRate(null);
     setRateForm({
-      taxRegionId: regions[0]?.id || "",
       name: "KDV Standart",
-      rate: "18",
+      rate: "20",
       isDefault: true,
       effectiveFrom: "",
       effectiveTo: "",
@@ -383,7 +294,6 @@ export default function TaxSettingsPage() {
   const openEditRate = (r: TaxRate) => {
     setEditingRate(r);
     setRateForm({
-      taxRegionId: r.taxRegionId,
       name: r.name,
       rate: String(r.rate),
       isDefault: r.isDefault,
@@ -401,7 +311,7 @@ export default function TaxSettingsPage() {
     e.preventDefault();
     try {
       const payload = {
-        taxRegionId: rateForm.taxRegionId,
+        // taxRegionId gönderilmez — API varsayılan TR bölgesini çözer/yaratır.
         name: rateForm.name.trim(),
         rate: parseFloat(rateForm.rate) || 0,
         isDefault: rateForm.isDefault,
@@ -428,7 +338,6 @@ export default function TaxSettingsPage() {
   const openCreateRule = () => {
     setEditingRule(null);
     setRuleForm({
-      taxRegionId: regions[0]?.id || "",
       taxRateId: rates[0]?.id || "",
       scope: "default_rate",
       categoryId: "",
@@ -441,7 +350,6 @@ export default function TaxSettingsPage() {
   const openEditRule = (r: TaxRule) => {
     setEditingRule(r);
     setRuleForm({
-      taxRegionId: r.taxRegionId,
       taxRateId: r.taxRateId,
       scope: r.scope,
       categoryId: r.categoryId || "",
@@ -455,7 +363,7 @@ export default function TaxSettingsPage() {
     e.preventDefault();
     try {
       const payload = {
-        taxRegionId: ruleForm.taxRegionId,
+        // taxRegionId gönderilmez — API kuralı oranın bölgesine bağlar.
         taxRateId: ruleForm.taxRateId,
         scope: ruleForm.scope,
         categoryId:
@@ -481,7 +389,6 @@ export default function TaxSettingsPage() {
 
   const handleDelete = async (type: string, id: string) => {
     const labels: Record<string, string> = {
-      region: "Vergi Bölgesi",
       rate: "Vergi Oranı",
       rule: "Vergi Kuralı",
     };
@@ -495,11 +402,9 @@ export default function TaxSettingsPage() {
     )
       return;
     try {
-      if (type === "region") await adminApi.deleteTaxRegion(id);
-      else if (type === "rate") await adminApi.deleteTaxRate(id);
+      if (type === "rate") await adminApi.deleteTaxRate(id);
       else if (type === "rule") await adminApi.deleteTaxRule(id);
       toast.success("Silindi");
-      loadRegions();
       loadRates();
       loadRules();
     } catch (err: any) {
@@ -508,7 +413,6 @@ export default function TaxSettingsPage() {
   };
 
   const tabs = [
-    { key: "regions", label: "Vergi Bölgeleri", icon: MapPinIcon },
     { key: "rates", label: "Vergi Oranları", icon: CalculatorIcon },
     { key: "rules", label: "Vergi Kuralları", icon: DocumentTextIcon },
     { key: "report", label: "Vergi Raporu", icon: ChartBarIcon },
@@ -521,7 +425,7 @@ export default function TaxSettingsPage() {
         <div>
           <h1 className="text-2xl font-bold text-heading">Vergi Ayarları</h1>
           <p className="text-muted mt-1">
-            Bölge bazlı vergi oranları, kurallar ve raporlama
+            KDV oranları, kurallar, stopaj ve raporlama
           </p>
         </div>
 
@@ -531,105 +435,6 @@ export default function TaxSettingsPage() {
           onChange={(k) => setActiveTab(k as TabId)}
         />
 
-        {activeTab === "regions" && (
-          <div className="admin-card overflow-hidden">
-            <div className="flex justify-between items-center gap-3 p-4 border-b border-border">
-              <h2 className="text-lg font-semibold text-heading truncate min-w-0">
-                Vergi Bölgeleri
-              </h2>
-              <Button
-                type="button"
-                onClick={openCreateRegion}
-                className="flex gap-2 shrink-0"
-              >
-                <PlusIcon className="h-5 w-5 shrink-0" />
-                Yeni Bölge
-              </Button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-surface-alt">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
-                      Bölge
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
-                      Ülke / Bölge Kodu
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
-                      Varsayılan
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
-                      Oran / Kural
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
-                      Durum
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">
-                      İşlem
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {regions.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={6}
-                        className="px-6 py-8 text-center text-muted"
-                      >
-                        Henüz vergi bölgesi yok. &quot;Yeni Bölge&quot; ile
-                        ekleyin.
-                      </td>
-                    </tr>
-                  ) : (
-                    regions.map((r) => (
-                      <tr key={r.id} className="hover:bg-surface/50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-heading">
-                          {r.name}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted">
-                          {r.countryCode}
-                          {r.regionCode ? ` / ${r.regionCode}` : ""}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted">
-                          {r.isDefault ? "Evet" : "Hayır"}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted">
-                          {r.ratesCount} oran, {r.rulesCount} kural
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`inline-flex px-2 py-1 text-xs rounded-full ${r.isActive ? "bg-success-50 text-success-700" : "bg-body text-muted"}`}
-                          >
-                            {r.isActive ? "Aktif" : "Pasif"}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                          <Button
-                            variant="secondary"
-                            onClick={() => openEditRegion(r)}
-                            className="text-primary-600 hover:text-primary-400 mr-3"
-                          >
-                            Düzenle
-                          </Button>
-                          {r.ratesCount === 0 && (
-                            <Button
-                              variant="secondary"
-                              onClick={() => handleDelete("region", r.id)}
-                              className="text-danger-600 hover:text-danger-300"
-                            >
-                              Sil
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
 
         {activeTab === "rates" && (
           <div className="admin-card overflow-hidden">
@@ -641,7 +446,6 @@ export default function TaxSettingsPage() {
                 type="button"
                 onClick={openCreateRate}
                 className="flex gap-2 shrink-0"
-                disabled={regions.length === 0}
               >
                 <PlusIcon className="h-5 w-5 shrink-0" />
                 Yeni Oran
@@ -651,9 +455,6 @@ export default function TaxSettingsPage() {
               <table className="w-full">
                 <thead className="bg-surface-alt">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
-                      Bölge
-                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                       Oran Adı
                     </th>
@@ -675,19 +476,16 @@ export default function TaxSettingsPage() {
                   {rates.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={5}
                         className="px-6 py-8 text-center text-muted"
                       >
-                        Henüz vergi oranı yok. Önce bölge ekleyin, sonra
-                        &quot;Yeni Oran&quot; ile ekleyin.
+                        Henüz vergi oranı yok. &quot;Yeni Oran&quot; ile
+                        ekleyin.
                       </td>
                     </tr>
                   ) : (
                     rates.map((r) => (
                       <tr key={r.id} className="hover:bg-surface/50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted">
-                          {r.taxRegionName} ({r.countryCode})
-                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-heading">
                           {r.name}
                         </td>
@@ -737,7 +535,7 @@ export default function TaxSettingsPage() {
                 type="button"
                 onClick={openCreateRule}
                 className="flex gap-2 shrink-0"
-                disabled={regions.length === 0 || rates.length === 0}
+                disabled={rates.length === 0}
               >
                 <PlusIcon className="h-5 w-5 shrink-0" />
                 Yeni Kural
@@ -747,9 +545,6 @@ export default function TaxSettingsPage() {
               <table className="w-full">
                 <thead className="bg-surface-alt">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
-                      Bölge
-                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                       Oran
                     </th>
@@ -771,19 +566,16 @@ export default function TaxSettingsPage() {
                   {rules.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={5}
                         className="px-6 py-8 text-center text-muted"
                       >
-                        Henüz vergi kuralı yok. Önce bölge ve oran ekleyin,
-                        sonra &quot;Yeni Kural&quot; ile ekleyin.
+                        Henüz vergi kuralı yok. Önce oran ekleyin, sonra
+                        &quot;Yeni Kural&quot; ile ekleyin.
                       </td>
                     </tr>
                   ) : (
                     rules.map((r) => (
                       <tr key={r.id} className="hover:bg-surface/50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted">
-                          {r.taxRegionName}
-                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-muted">
                           {r.taxRateName} (%{r.taxRateValue})
                         </td>
@@ -1189,106 +981,6 @@ export default function TaxSettingsPage() {
           </div>
         )}
 
-        {/* Region modal */}
-        {showRegionModal && (
-          <Modal
-            isOpen={showRegionModal}
-            onClose={() => setShowRegionModal(false)}
-            title={
-              editingRegion ? "Vergi Bölgesi Düzenle" : "Yeni Vergi Bölgesi"
-            }
-            maxWidth="max-w-md"
-          >
-            <form onSubmit={saveRegion} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-muted mb-1">
-                    Bölge Adı *
-                  </label>
-                  <Input
-                    type="text"
-                    value={regionForm.name}
-                    onChange={(e) =>
-                      setRegionForm((f) => ({ ...f, name: e.target.value }))
-                    }
-                    placeholder="Örn: Türkiye"
-                    required
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-muted mb-1">
-                      Ülke Kodu *
-                    </label>
-                    <Input
-                      type="text"
-                      value={regionForm.countryCode}
-                      onChange={(e) =>
-                        setRegionForm((f) => ({
-                          ...f,
-                          countryCode: e.target.value.toUpperCase(),
-                        }))
-                      }
-                      placeholder="TR"
-                      maxLength={2}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted mb-1">
-                      Bölge Kodu (opsiyonel)
-                    </label>
-                    <Input
-                      type="text"
-                      value={regionForm.regionCode}
-                      onChange={(e) =>
-                        setRegionForm((f) => ({
-                          ...f,
-                          regionCode: e.target.value,
-                        }))
-                      }
-                      placeholder="34"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Checkbox
-                    id="regionDefault"
-                    checked={regionForm.isDefault}
-                    onChange={(e) =>
-                      setRegionForm((f) => ({
-                        ...f,
-                        isDefault: e.target.checked,
-                      }))
-                    }
-                    label="Varsayılan bölge"
-                  />
-                </div>
-                <div>
-                  <Checkbox
-                    id="regionActive"
-                    checked={regionForm.isActive}
-                    onChange={(e) =>
-                      setRegionForm((f) => ({
-                        ...f,
-                        isActive: e.target.checked,
-                      }))
-                    }
-                    label="Aktif"
-                  />
-                </div>
-                <div className="flex justify-end gap-2 pt-4 border-t border-border">
-                  <Button
-                    variant="secondary"
-                    type="button"
-                    onClick={() => setShowRegionModal(false)}
-                  >
-                    İptal
-                  </Button>
-                  <Button type="submit">Kaydet</Button>
-                </div>
-              </form>
-          </Modal>
-        )}
 
         {/* Rate modal */}
         {showRateModal && (
@@ -1299,29 +991,6 @@ export default function TaxSettingsPage() {
             maxWidth="max-w-md"
           >
             <form onSubmit={saveRate} className="space-y-4">
-                {!editingRate && (
-                  <div>
-                    <label className="block text-sm font-medium text-muted mb-1">
-                      Vergi Bölgesi *
-                    </label>
-                    <Select
-                      value={rateForm.taxRegionId}
-                      onChange={(e) =>
-                        setRateForm((f) => ({
-                          ...f,
-                          taxRegionId: e.target.value,
-                        }))
-                      }
-                      required
-                    >
-                      {regions.map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.name} ({r.countryCode})
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                )}
                 <div>
                   <label className="block text-sm font-medium text-muted mb-1">
                     Oran Adı *
@@ -1394,7 +1063,7 @@ export default function TaxSettingsPage() {
                         isDefault: e.target.checked,
                       }))
                     }
-                    label="Varsayılan oran (bu bölge için)"
+                    label="Varsayılan oran"
                   />
                 </div>
                 <div>
@@ -1432,27 +1101,6 @@ export default function TaxSettingsPage() {
             <form onSubmit={saveRule} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-muted mb-1">
-                    Vergi Bölgesi *
-                  </label>
-                  <Select
-                    value={ruleForm.taxRegionId}
-                    onChange={(e) =>
-                      setRuleForm((f) => ({
-                        ...f,
-                        taxRegionId: e.target.value,
-                      }))
-                    }
-                    required
-                  >
-                    {regions.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.name}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-muted mb-1">
                     Vergi Oranı *
                   </label>
                   <Select
@@ -1462,13 +1110,11 @@ export default function TaxSettingsPage() {
                     }
                     required
                   >
-                    {rates
-                      .filter((r) => r.taxRegionId === ruleForm.taxRegionId)
-                      .map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.name} (%{r.rate})
-                        </option>
-                      ))}
+                    {rates.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name} (%{r.rate})
+                      </option>
+                    ))}
                   </Select>
                 </div>
                 <div>

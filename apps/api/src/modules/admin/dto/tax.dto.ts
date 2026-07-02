@@ -73,9 +73,10 @@ export class UpdateTaxRegionDto {
 }
 
 export class CreateTaxRateDto {
-  @ApiProperty()
+  @ApiPropertyOptional({ description: "Verilmezse varsayılan (TR) bölge kullanılır" })
+  @IsOptional()
   @IsString()
-  taxRegionId: string;
+  taxRegionId?: string;
 
   @ApiProperty({ example: 'KDV Standart' })
   @IsString()
@@ -157,9 +158,10 @@ export class UpdateTaxRateDto {
 }
 
 export class CreateTaxRuleDto {
-  @ApiProperty()
+  @ApiPropertyOptional({ description: "Verilmezse varsayılan (TR) bölge kullanılır" })
+  @IsOptional()
   @IsString()
-  taxRegionId: string;
+  taxRegionId?: string;
 
   @ApiProperty()
   @IsString()

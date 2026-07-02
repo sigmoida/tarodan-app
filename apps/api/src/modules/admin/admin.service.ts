@@ -8389,8 +8389,24 @@ export class AdminService {
     };
   }
 
+  /**
+   * TR-only platform: bölge yönetimi admin UI'dan kaldırıldı. Oran/kural oluştururken
+   * bölge verilmezse varsayılan (yoksa ilk aktif) bölge kullanılır; hiç bölge yoksa
+   * "Türkiye" (TR) otomatik yaratılır — taze kurulumda oran eklemek takılmaz.
+   */
+  private async resolveDefaultTaxRegionId(): Promise<string> {
+    const region =
+      (await this.taxPrisma.taxRegion.findFirst({ where: { isActive: true, isDefault: true } })) ??
+      (await this.taxPrisma.taxRegion.findFirst({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }));
+    if (region) return region.id;
+    const created = await this.taxPrisma.taxRegion.create({
+      data: { name: 'Türkiye', countryCode: 'TR', isDefault: true, isActive: true },
+    });
+    return created.id;
+  }
+
   async createTaxRate(adminId: string, dto: {
-    taxRegionId: string;
+    taxRegionId?: string;
     name: string;
     rate: number;
     isDefault?: boolean;
@@ -8400,17 +8416,22 @@ export class AdminService {
     isActive?: boolean;
   }) {
     if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
-    const region = await this.taxPrisma.taxRegion.findUnique({ where: { id: dto.taxRegionId } });
-    if (!region) throw new NotFoundException('Vergi bölgesi bulunamadı');
+    let taxRegionId = dto.taxRegionId;
+    if (taxRegionId) {
+      const region = await this.taxPrisma.taxRegion.findUnique({ where: { id: taxRegionId } });
+      if (!region) throw new NotFoundException('Vergi bölgesi bulunamadı');
+    } else {
+      taxRegionId = await this.resolveDefaultTaxRegionId();
+    }
     if (dto.isDefault) {
       await this.taxPrisma.taxRate.updateMany({
-        where: { taxRegionId: dto.taxRegionId },
+        where: { taxRegionId },
         data: { isDefault: false },
       });
     }
     const rate = await this.taxPrisma.taxRate.create({
       data: {
-        taxRegionId: dto.taxRegionId,
+        taxRegionId,
         name: dto.name,
         rate: dto.rate,
         isDefault: dto.isDefault ?? false,
@@ -8505,7 +8526,7 @@ export class AdminService {
   }
 
   async createTaxRule(adminId: string, dto: {
-    taxRegionId: string;
+    taxRegionId?: string;
     taxRateId: string;
     scope: string;
     categoryId?: string;
@@ -8513,11 +8534,11 @@ export class AdminService {
     isActive?: boolean;
   }) {
     if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
-    const region = await this.taxPrisma.taxRegion.findUnique({ where: { id: dto.taxRegionId } });
-    if (!region) throw new NotFoundException('Vergi bölgesi bulunamadı');
     const rate = await this.taxPrisma.taxRate.findUnique({ where: { id: dto.taxRateId } });
     if (!rate) throw new NotFoundException('Vergi oranı bulunamadı');
-    if (rate.taxRegionId !== dto.taxRegionId) {
+    // Bölge verilmezse kuralın bölgesi = oranın bölgesi (TR-only sadeleştirme).
+    const taxRegionId = dto.taxRegionId ?? rate.taxRegionId;
+    if (rate.taxRegionId !== taxRegionId) {
       throw new BadRequestException('Vergi oranı bu bölgeye ait değil.');
     }
     if (dto.scope === 'category' && !dto.categoryId) {
@@ -8525,7 +8546,7 @@ export class AdminService {
     }
     const rule = await this.taxPrisma.taxRule.create({
       data: {
-        taxRegionId: dto.taxRegionId,
+        taxRegionId,
         taxRateId: dto.taxRateId,
         scope: dto.scope as 'default_rate' | 'category' | 'product',
         categoryId: dto.categoryId ?? null,
