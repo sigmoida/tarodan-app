@@ -80,7 +80,7 @@ describe('22 — Admin Paneli & Yetkilendirme (ADM)', () => {
   // ──────────────────────────── Yardımcılar ────────────────────────────
 
   /** super_admin oluştur + gerçek admin refresh token'ı için admin-login yap. */
-  async function adminLogin(admin: { email: string; password: string }) {
+  function adminLogin(admin: { email: string; password: string }): request.Test {
     return request(server())
       .post('/api/auth/admin/login')
       .send({ email: admin.email, password: admin.password });

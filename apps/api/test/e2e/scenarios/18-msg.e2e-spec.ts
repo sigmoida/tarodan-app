@@ -46,7 +46,7 @@
  *   - Saf-UI / i18n-parite / XSS-render (MSG-035, 041, 078, 094, 095, 096, 097, 100, 101, 107):
  *     backend'den assert edilecek davranış yok; ilgili backend davranışı aktif senaryolarla kaplı.
  *   - MSG-055: engellemenin API restart'ta kaybı — paylaşılan app restart edilemez.
- *   - MSG-065/066/067/075/076/081: OFFER_RECEIVED (create)/REFUND_*/stockout/order-created e-postası
+ *   - MSG-065/066/067/075/076/081: OFFER_RECEIVED (create) / REFUND / stockout / order-created e-postası
  *     BullMQ event kuyruğu (emailQueue/pushQueue) üzerinden asenkron işlenir; test worker'ı
  *     deterministik koşmaz → NotificationLog senkron doğrulanamaz. (Kanal-gating mantığı MSG-079/080
  *     ve MSG-064 ile fiilen kaplı.)

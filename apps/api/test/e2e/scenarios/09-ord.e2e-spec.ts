@@ -106,18 +106,44 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
       .expect(201);
   }
 
-  /** Siparişin son payment'ına başarılı PayTR callback'i gönder (kuruş = amount*100). */
-  async function successCallback(orderId: string, overrideKurus?: number) {
-    const payment = await lastPayment(orderId);
-    return request(server())
-      .post('/api/payments/callback/paytr')
-      .send(
-        signCallback({
-          merchantOid: payment!.providerConversationId!,
-          status: 'success',
-          totalAmount: overrideKurus ?? Math.round(Number(payment!.amount) * 100),
-        }),
-      );
+  /**
+   * Siparişin son payment'ına başarılı PayTR callback'i gönder (kuruş = amount*100).
+   *
+   * NON-async: gerçek `request.Test` döner ki çağrı yerleri `.expect(200)` (ve
+   * ardından `await`) zincirleyebilsin. Gövde (merchant_oid + tutar) DB'deki son
+   * payment'a bağlı olduğundan, bu async okuma supertest Test'i DISPATCH etmeden
+   * ÖNCE (`.then`/`.end` tetiklenince) tembel olarak yapılıp `.send()` ile
+   * doldurulur. Böylece assertion/response davranışı async sürümle birebir aynı kalır.
+   * (Pattern 10-pay.e2e-spec.ts'ten alındı.)
+   */
+  function successCallback(orderId: string, overrideKurus?: number): request.Test {
+    const req = request(server()).post('/api/payments/callback/paytr');
+
+    // İmzalı gövdeyi tek sefer hazırla (idempotent) ve request'e yükle.
+    let prepared: Promise<void> | undefined;
+    const prepareBody = () =>
+      (prepared ??= lastPayment(orderId).then((payment) => {
+        req.send(
+          signCallback({
+            merchantOid: payment!.providerConversationId!,
+            status: 'success',
+            totalAmount: overrideKurus ?? Math.round(Number(payment!.amount) * 100),
+          }),
+        );
+      }));
+
+    // Dispatch tetikleyicilerini (then/end) sararak gövde hazırlığını öne al.
+    const originalThen = req.then.bind(req);
+    req.then = ((onFulfilled?: any, onRejected?: any) =>
+      prepareBody().then(() => originalThen(onFulfilled, onRejected))) as typeof req.then;
+
+    const originalEnd = req.end.bind(req);
+    req.end = ((callback?: any) => {
+      void prepareBody().then(() => originalEnd(callback), (err) => callback?.(err));
+      return req;
+    }) as typeof req.end;
+
+    return req;
   }
 
   /** buy + initiate + başarılı callback → ödenmiş sipariş (callback sonrası 'preparing'). */
@@ -151,9 +177,11 @@ describe('09 — Sipariş Yaşam Döngüsü (ORD)', () => {
     const config = {
       get: (k: string) => (k === 'FEATURE_48H_CONFIRMATION_WINDOW' ? flag : undefined),
     };
-    // scheduledQueue yalnız onModuleInit'te kullanılır; runAutoCompleteConfirmedOrders
-    // için gerekmez → boş stub yeterli (constructor'a ver, init'i çağırmayız).
-    return new OrderSchedulerService(prisma, orderService, config as any, {} as any);
+    // Constructor 5 argüman ister: (prisma, orderService, configService,
+    // elogoInvoicing, scheduledQueue). elogoInvoicing ve scheduledQueue yalnız
+    // onModuleInit / diğer cron'larda kullanılır; runAutoCompleteConfirmedOrders
+    // için gerekmez → boş stub yeterli (init'i çağırmayız).
+    return new OrderSchedulerService(prisma, orderService, config as any, {} as any, {} as any);
   }
 
   /**

@@ -126,13 +126,43 @@ describe('15 — Stok Bütünlüğü & Rezervasyon (STK)', () => {
       );
   }
 
-  async function successCallbackForOrder(orderId: string, status: 'success' | 'failed' = 'success') {
-    const payment = await lastPaymentByOrder(orderId);
-    return callback(payment!, status);
+  /**
+   * NON-async yardımcılar: çağrı yerleri sonucu doğrudan `.expect(200)` ile
+   * zincirler, yani `request.Test` dönmelidir (Promise değil). Payment'ı bulmak
+   * için gereken asenkron DB okuması, supertest isteği fiilen gönderilmeden
+   * (`.end` çağrılmadan) hemen önce yapılır; böylece fonksiyon senkron kalırken
+   * imza yine ilgili payment'a göre üretilir. Çağrı yerleri değişmez.
+   * (Şablon: 09-ord.e2e-spec.ts successCallback.)
+   */
+  function callbackForPayment(
+    lookup: () => Promise<{ providerConversationId: string | null; amount: any } | null>,
+    status: 'success' | 'failed' = 'success',
+  ): request.Test {
+    const test = request(server()).post('/api/payments/callback/paytr');
+    const originalEnd = test.end.bind(test);
+    (test as any).end = (cb: (err: any, res: any) => void) => {
+      lookup()
+        .then((payment) => {
+          test.send(
+            signCallback({
+              merchantOid: payment!.providerConversationId!,
+              status,
+              totalAmount: Math.round(Number(payment!.amount) * 100),
+            }),
+          );
+          originalEnd(cb);
+        })
+        .catch((err) => cb(err, undefined));
+      return test;
+    };
+    return test;
   }
-  async function successCallbackForGroup(checkoutGroupId: string, status: 'success' | 'failed' = 'success') {
-    const payment = await paymentByGroup(checkoutGroupId);
-    return callback(payment!, status);
+
+  function successCallbackForOrder(orderId: string, status: 'success' | 'failed' = 'success'): request.Test {
+    return callbackForPayment(() => lastPaymentByOrder(orderId), status);
+  }
+  function successCallbackForGroup(checkoutGroupId: string, status: 'success' | 'failed' = 'success'): request.Test {
+    return callbackForPayment(() => paymentByGroup(checkoutGroupId), status);
   }
 
   /** buy + initiate + başarılı callback → ödeme tamamlanmış sipariş (status preparing). */

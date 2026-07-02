@@ -161,11 +161,11 @@ describe('04 — Ürün/İlan & Katalog (PRD)', () => {
   }
 
   /** Admin ile pending ürünü onayla → active. */
-  async function adminApprove(
+  function adminApprove(
     admin: { accessToken: string },
     id: string,
     note = 'onay',
-  ): Promise<request.Response> {
+  ): request.Test {
     return request(server())
       .post(`/api/admin/products/${id}/approve`)
       .set(authHeader(admin))
