@@ -12,6 +12,7 @@ import { useTranslation } from '@/i18n/LanguageContext';
 import { api } from '@/lib/api';
 import { Button, Checkbox, Input } from '@tarodan/ui';
 import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
+import { AppleSignInButton } from '@/components/auth/AppleSignInButton';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -290,6 +291,18 @@ export default function LoginPage() {
                 const target = redirect && redirect.startsWith('/') ? redirect : '/';
                 router.push(target);
               }} />
+              <div className="mt-2">
+                <AppleSignInButton onSuccess={() => {
+                  let redirect: string | null = null;
+                  try {
+                    redirect = sessionStorage.getItem('login_redirect');
+                    if (redirect) sessionStorage.removeItem('login_redirect');
+                  } catch (_) {}
+                  if (!redirect) redirect = new URLSearchParams(window.location.search).get('redirect');
+                  const target = redirect && redirect.startsWith('/') ? redirect : '/';
+                  router.push(target);
+                }} />
+              </div>
             </div>
           </div>
 

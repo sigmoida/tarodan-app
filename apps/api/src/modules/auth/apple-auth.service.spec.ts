@@ -15,7 +15,7 @@ describe('AppleAuthService', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         AppleAuthService,
-        { provide: ConfigService, useValue: { get: (k: string) => (k === 'APPLE_CLIENT_ID' ? 'com.tarodan.app' : undefined) } },
+        { provide: ConfigService, useValue: { get: (k: string) => (k === 'APPLE_CLIENT_ID' ? 'com.tarodan.app' : k === 'APPLE_SERVICES_ID' ? 'shop.tarodan.web' : undefined) } },
       ],
     }).compile();
     service = moduleRef.get(AppleAuthService);
@@ -24,7 +24,7 @@ describe('AppleAuthService', () => {
   it('returns normalized profile for a valid token (real email)', async () => {
     verify.mockResolvedValue({ sub: 'a-1', email: 'a@b.com', email_verified: 'true', is_private_email: 'false' });
     const r = await service.verifyIdentityToken('tok');
-    expect(verify).toHaveBeenCalledWith('tok', expect.objectContaining({ audience: 'com.tarodan.app' }));
+    expect(verify).toHaveBeenCalledWith('tok', expect.objectContaining({ audience: ['com.tarodan.app', 'shop.tarodan.web'] }));
     expect(r).toEqual({ sub: 'a-1', email: 'a@b.com', isPrivateEmail: false });
   });
 
@@ -47,5 +47,12 @@ describe('AppleAuthService', () => {
   it('rejects when verifyIdToken throws (invalid/expired token)', async () => {
     verify.mockRejectedValue(new Error('jwt expired'));
     await expect(service.verifyIdentityToken('tok')).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('passes both native and web audiences (accepts a web Services ID token)', async () => {
+    verify.mockResolvedValue({ sub: 'w-1', email: 'w@b.com', email_verified: true, is_private_email: false });
+    const r = await service.verifyIdentityToken('tok');
+    expect(verify).toHaveBeenCalledWith('tok', expect.objectContaining({ audience: ['com.tarodan.app', 'shop.tarodan.web'] }));
+    expect(r.sub).toBe('w-1');
   });
 });

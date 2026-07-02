@@ -110,6 +110,8 @@ export const authApi = {
     api.post('/auth/login', { email, password }),
   loginWithGoogle: (idToken: string) =>
     api.post('/auth/google', { idToken }),
+  loginWithApple: (idToken: string, fullName?: string) =>
+    api.post('/auth/apple', { identityToken: idToken, fullName }),
   register: (data: { displayName: string; email: string; password: string; phone?: string; birthDate?: string; acceptsMarketingEmails?: boolean }) =>
     api.post('/auth/register', data),
   logout: () => api.post('/auth/logout'),
