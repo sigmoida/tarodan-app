@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@tarodan/tsconfig": "workspace:*",
     "tailwindcss": "^3.4.0",
     "typescript": "^5.3.2"
   }

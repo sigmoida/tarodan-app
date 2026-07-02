@@ -175,6 +175,9 @@ importers:
         specifier: ^4.4.7
         version: 4.5.7(@types/react@18.3.27)(react@18.3.1)
     devDependencies:
+      '@tarodan/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
       '@types/node':
         specifier: ^20.10.0
         version: 20.19.30
@@ -721,6 +724,9 @@ importers:
       '@playwright/test':
         specifier: ^1.40.0
         version: 1.58.1
+      '@tarodan/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
       '@types/node':
         specifier: ^20.10.0
         version: 20.19.30
@@ -751,6 +757,9 @@ importers:
 
   packages/design-tokens:
     devDependencies:
+      '@tarodan/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
       tailwindcss:
         specifier: ^3.4.0
         version: 3.4.19
@@ -760,12 +769,20 @@ importers:
 
   packages/shared:
     devDependencies:
+      '@tarodan/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
       typescript:
         specifier: ^5.3.2
         version: 5.9.3
 
+  packages/tsconfig: {}
+
   packages/types:
     devDependencies:
+      '@tarodan/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
       tsup:
         specifier: ^8.0.1
         version: 8.5.1(typescript@5.9.3)
@@ -803,6 +820,9 @@ importers:
         specifier: ^2.1.0
         version: 2.6.0
     devDependencies:
+      '@tarodan/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
       '@types/react':
         specifier: ^18.2.42
         version: 18.3.27
@@ -828,6 +848,9 @@ importers:
       '@react-native-community/datetimepicker':
         specifier: 8.4.4
         version: 8.4.4(expo@54.0.35)(react-native@0.81.5)(react@19.1.0)
+      '@tarodan/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
       '@types/react':
         specifier: ~19.1.17
         version: 19.1.17

@@ -12,6 +12,7 @@
 		"@tarodan/shared": "workspace:*"
 	},
 	"devDependencies": {
+		"@tarodan/tsconfig": "workspace:*",
 		"@expo/vector-icons": "^15.0.3",
 		"@react-native-community/datetimepicker": "8.4.4",
 		"@types/react": "~19.1.17",
