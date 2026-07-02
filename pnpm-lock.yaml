@@ -108,12 +108,6 @@ importers:
       '@tanstack/react-table':
         specifier: ^8.11.2
         version: 8.21.3(react-dom@18.3.1)(react@18.3.1)
-      '@tarodan/api-client':
-        specifier: workspace:*
-        version: link:../../packages/api-client
-      '@tarodan/core':
-        specifier: workspace:*
-        version: link:../../packages/core
       '@tarodan/design-tokens':
         specifier: workspace:*
         version: link:../../packages/design-tokens
@@ -461,12 +455,6 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.45.0
         version: 5.90.19(react@19.1.0)
-      '@tarodan/api-client':
-        specifier: workspace:*
-        version: link:../../packages/api-client
-      '@tarodan/core':
-        specifier: workspace:*
-        version: link:../../packages/core
       '@tarodan/design-tokens':
         specifier: workspace:*
         version: link:../../packages/design-tokens
@@ -678,12 +666,6 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.17.0
         version: 5.90.19(react@18.3.1)
-      '@tarodan/api-client':
-        specifier: workspace:*
-        version: link:../../packages/api-client
-      '@tarodan/core':
-        specifier: workspace:*
-        version: link:../../packages/core
       '@tarodan/design-tokens':
         specifier: workspace:*
         version: link:../../packages/design-tokens
@@ -763,56 +745,6 @@ importers:
       tailwindcss:
         specifier: ^3.3.6
         version: 3.4.19
-      typescript:
-        specifier: ^5.3.2
-        version: 5.9.3
-
-  packages/api-client:
-    dependencies:
-      '@tarodan/types':
-        specifier: workspace:*
-        version: link:../types
-      axios:
-        specifier: ^1.6.2
-        version: 1.13.2
-    devDependencies:
-      '@types/node':
-        specifier: ^20.10.0
-        version: 20.19.30
-      '@types/react':
-        specifier: ^18.2.42
-        version: 18.3.27
-      react:
-        specifier: ^18.2.0
-        version: 18.3.1
-      tsup:
-        specifier: ^8.0.1
-        version: 8.5.1(postcss@8.5.6)(typescript@5.9.3)
-      typescript:
-        specifier: ^5.3.2
-        version: 5.9.3
-
-  packages/core:
-    dependencies:
-      '@tarodan/types':
-        specifier: workspace:*
-        version: link:../types
-      zustand:
-        specifier: ^4.4.7
-        version: 4.5.7(@types/react@18.3.27)(react@18.3.1)
-    devDependencies:
-      '@types/node':
-        specifier: ^20.10.0
-        version: 20.19.30
-      '@types/react':
-        specifier: ^18.2.42
-        version: 18.3.27
-      react:
-        specifier: ^18.2.0
-        version: 18.3.1
-      tsup:
-        specifier: ^8.0.1
-        version: 8.5.1(postcss@8.5.6)(typescript@5.9.3)
       typescript:
         specifier: ^5.3.2
         version: 5.9.3
@@ -911,22 +843,6 @@ importers:
       react-native-safe-area-context:
         specifier: 5.6.2
         version: 5.6.2(react-native@0.81.5)(react@19.1.0)
-      typescript:
-        specifier: ^5.3.2
-        version: 5.9.3
-
-  packages/validators:
-    dependencies:
-      zod:
-        specifier: ^3.22.4
-        version: 3.25.76
-    devDependencies:
-      '@types/node':
-        specifier: ^20.10.0
-        version: 20.19.30
-      tsup:
-        specifier: ^8.0.1
-        version: 8.5.1(postcss@8.5.6)(typescript@5.9.3)
       typescript:
         specifier: ^5.3.2
         version: 5.9.3

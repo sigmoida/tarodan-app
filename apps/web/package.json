@@ -33,8 +33,6 @@
     "@react-oauth/google": "^0.13.5",
     "@sentry/nextjs": "^7.91.0",
     "@tanstack/react-query": "^5.17.0",
-    "@tarodan/api-client": "workspace:*",
-    "@tarodan/core": "workspace:*",
     "@tarodan/design-tokens": "workspace:*",
     "@tarodan/types": "workspace:*",
     "@tarodan/ui": "workspace:*",
