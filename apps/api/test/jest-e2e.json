@@ -4,7 +4,7 @@
   "testEnvironment": "node",
   "testRegex": "test/e2e/.*\\.e2e-spec\\.ts$",
   "transform": {
-    "^.+\\.(t|j)s$": ["ts-jest", { "tsconfig": "tsconfig.json" }]
+    "^.+\\.(t|j)s$": ["ts-jest", { "tsconfig": "tsconfig.json", "isolatedModules": true }]
   },
   "setupFiles": ["<rootDir>/test/test-utils/load-env.ts"],
   "globalTeardown": "<rootDir>/test/test-utils/global-teardown.ts",
