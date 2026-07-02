@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { useAuthStore } from '@/lib/stores/authStore';
+import { useSession } from '@/lib/session-context';
 
 /** Hareketsizlik süresi (ms). Balanced politika: 1 saat. */
 const IDLE_TIMEOUT_MS = 60 * 60 * 1000;
@@ -16,8 +16,7 @@ const LAST_ACTIVITY_KEY = 'admin_last_activity';
  * timer'ını da tazeler ve oturum gerçekten boştayken kapanır.
  */
 export function useIdleLogout() {
-  const logout = useAuthStore((s) => s.logout);
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const { logout, isAuthenticated } = useSession();
   const lastWriteRef = useRef(0);
 
   useEffect(() => {

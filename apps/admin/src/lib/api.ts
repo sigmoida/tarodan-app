@@ -1,128 +1,31 @@
 import axios from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
+/**
+ * Client API instance. Every call goes to the same-origin BFF proxy
+ * (`/api/*` → src/app/api/[...path]/route.ts), which attaches the Bearer
+ * token server-side and refreshes it on 401. The browser never holds or sees
+ * the API tokens — auth lives in src/lib/server/session.ts.
+ */
 export const api = axios.create({
-  baseURL: `${API_URL}/api`,
-  // Auth artık httpOnly cookie'lerde; her istekte cookie gönderilsin.
-  withCredentials: true,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: '/api',
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// Dev'de istek loglama. Auth localStorage'da DEĞİL; token'a hiç dokunmuyoruz (cookie taşıyor).
-if (process.env.NODE_ENV === 'development') {
-  api.interceptors.request.use((config) => {
-    console.log('API Request:', {
-      method: config.method?.toUpperCase(),
-      url: config.url,
-      fullURL: `${config.baseURL}${config.url}`,
-    });
-    return config;
-  });
-}
-
-// Oturumu sonlandır (refresh de başarısızsa): sunucu cookie'leri silsin, login'e dön.
-let isLoggingOut = false;
-
-/** Aktif refresh girişimlerini iptal et (kullanıcı logout başlatınca çağrılır). */
-export function markLoggingOut() {
-  isLoggingOut = true;
-}
-
-async function forceLogout() {
-  if (typeof window === 'undefined' || isLoggingOut) return;
-  // Zaten /login'deysek yönlendirme yapma — yoksa bootstrap probe'unun 401'i sonsuz reload döngüsü kurar.
-  if (window.location.pathname === '/login') return;
-  isLoggingOut = true;
-  try {
-    await axios.post(`${API_URL}/api/auth/admin/logout`, null, {
-      withCredentials: true,
-    });
-  } catch {
-    // yoksay — yine de login'e gidiyoruz
-  }
-  window.location.href = '/login';
-}
-
-// Eşzamanlı 401'lerde tek refresh yapmak için kuyruk.
-let isRefreshing = false;
-let refreshQueue: Array<(ok: boolean) => void> = [];
-const flushQueue = (ok: boolean) => {
-  refreshQueue.forEach((cb) => cb(ok));
-  refreshQueue = [];
-};
-
-const isAuthUrl = (url: string) =>
-  url.includes('/auth/admin/login') ||
-  url.includes('/auth/login') ||
-  url.includes('/auth/admin/logout') ||
-  url.includes('/auth/logout') ||
-  url.includes('/auth/admin/refresh') ||
-  url.includes('/auth/refresh') ||
-  url.includes('/auth/forgot-password') ||
-  url.includes('/auth/reset-password');
-
-// Response interceptor: 401'de refresh cookie ile sessizce yenile, sonra isteği tekrarla.
+// A 401 that reaches the client means the server-side session is genuinely
+// gone (refresh failed) — send the user to login.
 api.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('API Error:', {
-        url: error.config?.url,
-        method: error.config?.method,
-        status: error.response?.status,
-        message: error.message,
-      });
-    }
-
-    const originalRequest = error.config || {};
-    const status = error.response?.status;
-    const reqUrl: string = originalRequest.url || '';
-
+  (error) => {
     if (
-      status === 401 &&
+      error.response?.status === 401 &&
       typeof window !== 'undefined' &&
-      !isAuthUrl(reqUrl) &&
-      !originalRequest._retry &&
-      !isLoggingOut
+      window.location.pathname !== '/login'
     ) {
-      originalRequest._retry = true;
-
-      // Zaten bir refresh sürüyorsa kuyruğa gir, bitince tekrarla.
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          refreshQueue.push((ok) => {
-            if (ok) resolve(api(originalRequest));
-            else reject(error);
-          });
-        });
-      }
-
-      isRefreshing = true;
-      try {
-        // Refresh token httpOnly cookie'de — body göndermiyoruz. Admin'e özel uçtan yenile
-        // (aynı tarayıcıda kullanıcı oturumu da varsa doğru admin cookie'si yenilensin).
-        await axios.post(`${API_URL}/api/auth/admin/refresh`, null, {
-          withCredentials: true,
-        });
-        flushQueue(true);
-        return api(originalRequest);
-      } catch (refreshErr) {
-        flushQueue(false);
-        await forceLogout();
-        return Promise.reject(refreshErr);
-      } finally {
-        isRefreshing = false;
-      }
+      window.location.href = '/login';
     }
-
     if (!error.response) {
-      error.message =
-        'Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.';
+      error.message = 'Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.';
     }
-
     return Promise.reject(error);
   },
 );

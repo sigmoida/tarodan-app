@@ -20,7 +20,7 @@ import { DataTable, type ColumnDef } from "@/components/DataTable";
 import { PageHeader, ActionButtons, ActionIconButton } from "@/components/admin-list";
 import { AdminTabs } from "@/components/AdminTabs";
 import { adminApi } from "@/lib/api";
-import { useAuthStore } from "@/lib/stores/authStore";
+import { useSession } from "@/lib/session-context";
 import { useConfirm } from "@/components/ConfirmProvider";
 
 // ─── Rol sabitleri ───────────────────────────────────────────────────────────
@@ -189,7 +189,7 @@ function formatDate(v: string | null): string {
 
 export default function RolesPage() {
   const confirm = useConfirm();
-  const { user } = useAuthStore();
+  const { user } = useSession();
   const isSuperAdmin = user?.role === "super_admin";
 
   const [activeTab, setActiveTab] = useState<"matrix" | "users">("matrix");

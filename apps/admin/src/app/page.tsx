@@ -1,27 +1,11 @@
-'use client';
+import { redirect } from 'next/navigation';
+import { getSession } from '@/lib/server/session';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Spinner } from '@tarodan/ui';
-import { useAuthStore } from '@/lib/stores/authStore';
-
-export default function HomePage() {
-  const router = useRouter();
-  const { isAuthenticated, isLoading } = useAuthStore();
-
-  useEffect(() => {
-    if (!isLoading) {
-      if (isAuthenticated) {
-        router.replace('/dashboard');
-      } else {
-        router.replace('/login');
-      }
-    }
-  }, [isAuthenticated, isLoading, router]);
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-surface">
-      <Spinner size="xl" />
-    </div>
-  );
+/**
+ * Root route. Server Component: resolve the session and send the user to the
+ * app or the login page — no client-side auth check or loading spinner.
+ */
+export default async function HomePage() {
+  const session = await getSession();
+  redirect(session ? '/dashboard' : '/login');
 }

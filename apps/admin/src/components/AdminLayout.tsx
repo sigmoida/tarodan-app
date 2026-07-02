@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type ComponentType } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { useAuthStore } from '@/lib/stores/authStore';
+import { useSession } from '@/lib/session-context';
 import { useIdleLogout } from '@/hooks/useIdleLogout';
 import { adminApi } from '@/lib/api';
 import clsx from 'clsx';
@@ -242,7 +242,7 @@ const NAV_FALLBACK_PERMS: Record<string, string[]> = {
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout } = useAuthStore();
+  const { user, logout } = useSession();
   // 1 saat hareketsizlikte otomatik logout (Balanced politika).
   useIdleLogout();
   const [sidebarOpen, setSidebarOpen] = useState(false);
