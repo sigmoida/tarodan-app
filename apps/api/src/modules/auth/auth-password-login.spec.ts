@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { GoogleAuthService } from './google-auth.service';
+import { AppleAuthService } from './apple-auth.service';
 import { PrismaService } from '../../prisma';
 import { NotificationService } from '../notification/notification.service';
 import { CacheService } from '../cache/cache.service';
@@ -30,6 +31,7 @@ describe('AuthService.login - password login edge cases', () => {
         { provide: CacheService, useValue: { del: jest.fn(), set: jest.fn(), get: jest.fn() } },
         { provide: StorageService, useValue: { getPublicAssetUrl: jest.fn().mockReturnValue(null) } },
         { provide: GoogleAuthService, useValue: {} },
+        { provide: AppleAuthService, useValue: { verifyIdentityToken: jest.fn() } },
       ],
     }).compile();
     service = moduleRef.get(AuthService);

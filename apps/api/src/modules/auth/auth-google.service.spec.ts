@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { GoogleAuthService } from './google-auth.service';
+import { AppleAuthService } from './apple-auth.service';
 import { PrismaService } from '../../prisma';
 import { NotificationService } from '../notification/notification.service';
 import { CacheService } from '../cache/cache.service';
@@ -34,6 +35,7 @@ describe('AuthService.loginWithGoogle', () => {
         { provide: CacheService, useValue: { del: jest.fn(), set: jest.fn(), get: jest.fn() } },
         { provide: StorageService, useValue: { getPublicAssetUrl: jest.fn().mockReturnValue(null) } },
         { provide: GoogleAuthService, useValue: google },
+        { provide: AppleAuthService, useValue: { verifyIdentityToken: jest.fn() } },
       ],
     }).compile();
     service = moduleRef.get(AuthService);
