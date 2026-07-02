@@ -29,7 +29,7 @@ const nextConfig = {
   // standalone ile "Starting..."da takılıyor → dev'de devre dışı bırak.
   output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
   reactStrictMode: true,
-  transpilePackages: ['@tarodan/ui', '@tarodan/design-tokens'],
+  transpilePackages: ['@tarodan/ui', '@tarodan/design-tokens', '@tarodan/shared'],
   webpack: (config, { isServer }) => {
     // ESM packages için webpack config
     if (!isServer) {

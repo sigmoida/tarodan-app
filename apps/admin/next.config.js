@@ -8,7 +8,7 @@ const nextConfig = {
   // Dev'de StrictMode effect'leri 2× çalıştırıp her yükleme/hata toast'ını ikiye
   // katlıyordu (örn. "Siparişler/Ayarlar yüklenemedi" 2×). Kapatıyoruz.
   reactStrictMode: false,
-  transpilePackages: ['@tarodan/ui', '@tarodan/design-tokens'],
+  transpilePackages: ['@tarodan/ui', '@tarodan/design-tokens', '@tarodan/shared'],
   experimental: {
     outputFileTracingRoot: path.join(__dirname, '../../'),
     // Next 14.2 strictly requires a Suspense boundary around useSearchParams()

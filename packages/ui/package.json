@@ -2,20 +2,14 @@
   "name": "@tarodan/ui",
   "version": "1.0.0",
   "description": "Shared UI components for Tarodan",
-  "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
-    },
+    ".": "./src/index.ts",
     "./tailwind-preset": "./src/tailwind-preset.ts"
   },
+  "files": ["src"],
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts",
-    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit"
   },
@@ -35,7 +29,6 @@
     "@types/node": "^20.10.0",
     "@types/react": "^18.2.42",
     "tailwindcss": "^3.4.0",
-    "tsup": "^8.0.1",
     "typescript": "^5.3.2",
     "react": "^18.2.0"
   },
