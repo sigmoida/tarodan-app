@@ -1,16 +1,10 @@
 import React from 'react';
 import { StyleSheet, Text, View, type ViewProps } from 'react-native';
+import type { StatusVariant } from '@tarodan/shared';
 import { theme } from './theme';
 
-export type BadgeVariant =
-  | 'default'
-  | 'primary'
-  | 'secondary'
-  | 'success'
-  | 'warning'
-  | 'danger'
-  | 'info'
-  | 'outline';
+/** Native badge variants — the canonical shared semantic vocabulary. */
+export type BadgeVariant = StatusVariant;
 
 export interface BadgeProps extends ViewProps {
   variant?: BadgeVariant;
@@ -29,6 +23,8 @@ const variantStyle: Record<BadgeVariant, { bg: string; text: string; border?: st
   danger: { bg: colors.danger[100]!, text: colors.danger[800]! },
   info: { bg: colors.info[100]!, text: colors.info[800]! },
   outline: { bg: 'transparent', text: colors.text.body, border: colors.gray[300] },
+  // Legacy alias of `danger` (identical styling); kept for cross-platform parity.
+  destructive: { bg: colors.danger[100]!, text: colors.danger[800]! },
 };
 
 const sizePadding = {

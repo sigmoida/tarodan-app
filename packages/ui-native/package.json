@@ -10,7 +10,8 @@
     "lint": "echo 'skip'"
   },
   "dependencies": {
-    "@tarodan/design-tokens": "workspace:*"
+    "@tarodan/design-tokens": "workspace:*",
+    "@tarodan/shared": "workspace:*"
   },
   "peerDependencies": {
     "react": ">=18.0.0",
