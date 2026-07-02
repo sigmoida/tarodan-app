@@ -1,63 +1,63 @@
-export { theme, type Theme } from './theme';
+export { theme, type Theme } from './lib/theme';
 
-export { Button, type ButtonProps, type ButtonVariant, type ButtonSize } from './Button';
+export { Button, type ButtonProps, type ButtonVariant, type ButtonSize } from './components/Button';
 export {
   IconButton,
   type IconButtonProps,
   type IconButtonVariant,
   type IconButtonSize,
-} from './IconButton';
-export { Text, type TextProps, type TextVariant, type TextTone } from './Text';
-export { Stack, VStack, HStack, type StackProps } from './Stack';
-export { Screen, type ScreenProps, type ScreenBackground } from './Screen';
+} from './components/IconButton';
+export { Text, type TextProps, type TextVariant, type TextTone } from './components/Text';
+export { Stack, VStack, HStack, type StackProps } from './components/Stack';
+export { Screen, type ScreenProps, type ScreenBackground } from './components/Screen';
 export {
   ScreenHeader,
   type ScreenHeaderProps,
   type ScreenHeaderVariant,
-} from './ScreenHeader';
-export { EmptyState, type EmptyStateProps } from './EmptyState';
-export { ErrorState, type ErrorStateProps } from './ErrorState';
-export { ScreenLoader, type ScreenLoaderProps } from './ScreenLoader';
-export { Chip, type ChipProps, type ChipVariant, type ChipSize } from './Chip';
-export { Divider, type DividerProps } from './Divider';
-export { Switch, type SwitchProps } from './Switch';
+} from './components/ScreenHeader';
+export { EmptyState, type EmptyStateProps } from './components/EmptyState';
+export { ErrorState, type ErrorStateProps } from './components/ErrorState';
+export { ScreenLoader, type ScreenLoaderProps } from './components/ScreenLoader';
+export { Chip, type ChipProps, type ChipVariant, type ChipSize } from './components/Chip';
+export { Divider, type DividerProps } from './components/Divider';
+export { Switch, type SwitchProps } from './components/Switch';
 export {
   SegmentedButtons,
   type SegmentedButtonsProps,
   type SegmentedOption,
-} from './SegmentedButtons';
-export { ProgressBar, type ProgressBarProps } from './ProgressBar';
-export { FAB, type FABProps, type FABVariant, type FABSize } from './FAB';
-export { Snackbar, type SnackbarProps, type SnackbarVariant } from './Snackbar';
-export { Input, type InputProps } from './Input';
-export { DateField, type DateFieldProps } from './DateField';
-export { Textarea, type TextareaProps } from './Textarea';
+} from './components/SegmentedButtons';
+export { ProgressBar, type ProgressBarProps } from './components/ProgressBar';
+export { FAB, type FABProps, type FABVariant, type FABSize } from './components/FAB';
+export { Snackbar, type SnackbarProps, type SnackbarVariant } from './components/Snackbar';
+export { Input, type InputProps } from './components/Input';
+export { DateField, type DateFieldProps } from './components/DateField';
+export { Textarea, type TextareaProps } from './components/Textarea';
 export {
   Select,
   type SelectProps,
   type SelectOption,
-} from './Select';
-export { Checkbox, type CheckboxProps } from './Checkbox';
+} from './components/Select';
+export { Checkbox, type CheckboxProps } from './components/Checkbox';
 export {
   Radio,
   RadioGroup,
   type RadioProps,
   type RadioGroupProps,
   type RadioGroupOption,
-} from './Radio';
-export { Card, type CardProps } from './Card';
-export { Badge, type BadgeProps, type BadgeVariant } from './Badge';
-export { Alert, type AlertProps, type AlertVariant } from './Alert';
-export { Modal, type ModalProps } from './Modal';
+} from './components/Radio';
+export { Card, type CardProps } from './components/Card';
+export { Badge, type BadgeProps, type BadgeVariant } from './components/Badge';
+export { Alert, type AlertProps, type AlertVariant } from './components/Alert';
+export { Modal, type ModalProps } from './components/Modal';
 export {
   appAlert,
   AlertDialogHost,
   type AlertDialogButton,
   type AlertDialogOptions,
-} from './AlertDialog';
-export { Spinner, type SpinnerProps } from './Spinner';
-export { Avatar, type AvatarProps } from './Avatar';
-export { StatusBadge, type StatusBadgeProps } from './StatusBadge';
+} from './components/AlertDialog';
+export { Spinner, type SpinnerProps } from './components/Spinner';
+export { Avatar, type AvatarProps } from './components/Avatar';
+export { StatusBadge, type StatusBadgeProps } from './components/StatusBadge';
 
 // Re-export status configs from shared package for convenience
 export {
@@ -67,4 +67,4 @@ export {
   paymentStatusConfig,
   productStatusConfig,
   type StatusConfig,
-} from './status-configs';
+} from './lib/status-configs';
