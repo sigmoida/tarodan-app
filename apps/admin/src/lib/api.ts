@@ -455,6 +455,10 @@ export const adminApi = {
   deleteTaxRule: (id: string) => api.delete(`/admin/tax/rules/${id}`),
   getTaxReport: (params?: { fromDate?: string; toDate?: string; groupBy?: string }) =>
     api.get('/admin/tax/report', { params }),
+  getWithholdingRate: () => api.get('/admin/tax/withholding'),
+  setWithholdingRate: (rate: number) => api.patch('/admin/tax/withholding', { rate }),
+  getWithholdingReport: (params: { year: number; month: number }) =>
+    api.get('/admin/tax/withholding-report', { params }),
 
   // Static Pages
   getPages: () => api.get('/admin/pages'),

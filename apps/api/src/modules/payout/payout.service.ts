@@ -104,6 +104,10 @@ export class PayoutService {
           sellerId: hold.sellerId,
           amount: payment.order.totalAmount,
           commission: payment.order.commissionAmount,
+          // Sipariş anında kesilen stopaj snapshot'ı (hold.amount zaten stopaj düşülmüş).
+          // Muhtasar raporu completed transferlerin bu alanından beslenir. Kısmi iadede
+          // stopaj yeniden hesaplanmaz (bilinen kenar durum — satıcı beyannamede mahsup eder).
+          withholdingTax: payment.order.withholdingTaxAmount ?? 0,
           netAmount: netPayout,
           merchantOid,
           transId,

@@ -1087,6 +1087,9 @@ model Order {
   discountCode           String?         @map("discount_code")
   subtotal               Decimal?        @db.Decimal(10, 2)
   taxAmount              Decimal         @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  // E-ticaret stopajı (GVK 94/19, varsayılan %1): yalnız vergi mükellefi (kurumsal onaylı)
+  // satıcıda, KDV hariç ürün bedeli üzerinden. Satıcı payout'undan kesilir; alıcı tutarını etkilemez.
+  withholdingTaxAmount   Decimal         @default(0) @map("withholding_tax_amount") @db.Decimal(10, 2)
   cancelReason           String?         @map("cancel_reason")
   cancellationType       OrderCancellationType? @map("cancellation_type")
   preparingDeadline      DateTime?       @map("preparing_deadline")
@@ -1249,6 +1252,8 @@ model PayoutTransfer {
   sellerId           String            @map("seller_id")
   amount             Decimal           @db.Decimal(10, 2)
   commission         Decimal           @db.Decimal(10, 2)
+  // Sipariş anında hesaplanan e-ticaret stopajı snapshot'ı (muhtasar raporu bu alandan beslenir).
+  withholdingTax     Decimal           @default(0) @map("withholding_tax") @db.Decimal(10, 2)
   netAmount          Decimal           @map("net_amount") @db.Decimal(10, 2)
   currency           String            @default("TRY")
   merchantOid        String            @map("merchant_oid")

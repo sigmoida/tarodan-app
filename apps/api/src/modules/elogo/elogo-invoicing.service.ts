@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma';
 import { ElogoService } from './elogo.service';
+import { TaxService } from '../tax/tax.service';
 import { StorageService } from '../storage/storage.service';
 import { SmtpProvider } from '../notification/providers/smtp.provider';
 import { buildInvoiceXml, type UblParty } from './ubl/ubl-invoice.builder';
@@ -44,6 +45,7 @@ export class ElogoInvoicingService {
     private readonly prisma: PrismaService,
     private readonly elogo: ElogoService,
     private readonly config: ConfigService,
+    @Optional() private readonly taxService?: TaxService,
     @Optional() private readonly storage?: StorageService,
     @Optional() private readonly smtp?: SmtpProvider,
   ) {}
@@ -54,6 +56,20 @@ export class ElogoInvoicingService {
   }
   private get vatRate(): number {
     return Number(this.cfg('ELOGO_VAT_RATE', '20')) || 20;
+  }
+  /**
+   * Kesim anındaki KDV oranı: önce admin'in vergi config'i (TaxRegion/TaxRate, TR
+   * varsayılan kuralı), yoksa ELOGO_VAT_RATE env (varsayılan 20). Kayıt snapshot'ı
+   * (ElogoInvoice.vatRate) sonraki retry/iade adımlarında aynen kullanılır.
+   */
+  private async resolveVatRate(): Promise<number> {
+    try {
+      const resolved = await this.taxService?.resolveTaxRate('TR');
+      if (resolved && resolved.rate > 0) return resolved.rate;
+    } catch {
+      // config çözülemedi — env fallback
+    }
+    return this.vatRate;
   }
   private get prefix(): string {
     return this.cfg('ELOGO_INVOICE_PREFIX', 'TRD');
@@ -83,8 +99,8 @@ export class ElogoInvoicingService {
     return Math.round((n + Number.EPSILON) * 100) / 100;
   }
   /** Saklanan tutar → KDV hariç matrah. amountsIncludeVat=false ise tutar zaten matrahtır. */
-  private toNet(amount: number): number {
-    return this.amountsIncludeVat ? this.round2(amount / (1 + this.vatRate / 100)) : this.round2(amount);
+  private toNet(amount: number, vatRate: number): number {
+    return this.amountsIncludeVat ? this.round2(amount / (1 + vatRate / 100)) : this.round2(amount);
   }
   private ymd(d: Date): string {
     return d.toISOString().slice(0, 10);
@@ -475,7 +491,8 @@ export class ElogoInvoicingService {
       const now = new Date();
       const invoiceNumber = await this.allocateInvoiceNumber(now.getFullYear());
       const ettn = randomUUID();
-      const net = this.toNet(grossAmount);
+      const vatRate = await this.resolveVatRate();
+      const net = this.toNet(grossAmount, vatRate);
 
       const record = await this.prisma.elogoInvoice.create({
         data: {
@@ -489,9 +506,9 @@ export class ElogoInvoicingService {
           invoiceNumber,
           ettn,
           netAmount: net,
-          taxAmount: this.round2(net * (this.vatRate / 100)),
-          total: this.round2(net * (1 + this.vatRate / 100)),
-          vatRate: this.vatRate,
+          taxAmount: this.round2(net * (vatRate / 100)),
+          total: this.round2(net * (1 + vatRate / 100)),
+          vatRate,
           status: 'pending',
         },
       });

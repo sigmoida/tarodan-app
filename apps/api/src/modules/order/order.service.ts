@@ -310,14 +310,28 @@ export class OrderService {
     sellerFeeAmount: number;
     buyerFeeAmount: number;
     commissionAmount: number;
+    withholdingTaxAmount: number;
     sellerNetAmount: number;
   }> {
-    const result = await this.calculateCommission(amount, sellerId, categoryId);
-    const sellerNetAmount = Math.max(0, amount - result.sellerFeeAmount);
+    const [result, seller] = await Promise.all([
+      this.calculateCommission(amount, sellerId, categoryId),
+      this.prisma.user.findUnique({
+        where: { id: sellerId },
+        select: { businessStatus: true, taxId: true },
+      }),
+    ]);
+    // Kurumsal satıcıda stopaj da kesileceğinden önizleme neti gerçek payout ile eşleşsin.
+    let withholdingTaxAmount = 0;
+    if (seller?.businessStatus === 'approved' && seller?.taxId) {
+      const rate = await this.getWithholdingTaxRate();
+      withholdingTaxAmount = rate > 0 ? Math.round(amount * rate) / 100 : 0;
+    }
+    const sellerNetAmount = Math.max(0, amount - result.sellerFeeAmount - withholdingTaxAmount);
     return {
       sellerFeeAmount: result.sellerFeeAmount,
       buyerFeeAmount: result.buyerFeeAmount,
       commissionAmount: result.commissionAmount,
+      withholdingTaxAmount,
       sellerNetAmount,
     };
   }
@@ -346,15 +360,40 @@ export class OrderService {
     return createHash('sha256').update(parts.filter((p) => p.length > 0).join('|')).digest('hex');
   }
 
-  /** KDV: satıcı kurumsal (businessStatus=approved + taxId dolu) ise ürün fiyatı üzerinden vergi hesapla. */
-  private async resolveSellerTax(sellerId: string, categoryId: string | null, subtotal: number): Promise<number> {
+  /** E-ticaret stopaj oranı (%) — PlatformSetting 'withholding_tax_rate', varsayılan %1 (9284 sayılı CK). */
+  private async getWithholdingTaxRate(): Promise<number> {
+    const row = await this.prisma.platformSetting.findUnique({
+      where: { settingKey: 'withholding_tax_rate' },
+    });
+    const rate = Number(row?.settingValue ?? '1');
+    return Number.isFinite(rate) && rate >= 0 ? rate : 1;
+  }
+
+  /**
+   * KDV + stopaj: yalnızca kurumsal satıcıda (businessStatus=approved + taxId dolu).
+   * KDV ürün fiyatına eklenir (alıcı öder); stopaj (GVK 94/19) KDV hariç ürün bedeli
+   * üzerinden hesaplanır ve satıcı payout'undan kesilir. Bireysel satıcı ikisinde de
+   * kapsam dışıdır (stopaj: 330 Seri No'lu GV Genel Tebliği — mükellef olmayana tevkifat yok).
+   * Matrah kargo ve alıcı hizmet bedelini içermez (komisyonla aynı baz).
+   */
+  private async resolveSellerTaxes(
+    sellerId: string,
+    categoryId: string | null,
+    subtotal: number,
+  ): Promise<{ taxAmount: number; withholdingTaxAmount: number }> {
     const seller = await this.prisma.user.findUnique({
       where: { id: sellerId },
       select: { businessStatus: true, taxId: true },
     });
-    if (seller?.businessStatus !== 'approved' || !seller?.taxId) return 0;
+    if (seller?.businessStatus !== 'approved' || !seller?.taxId) {
+      return { taxAmount: 0, withholdingTaxAmount: 0 };
+    }
     const resolved = await this.taxService.resolveTaxRate('TR', null, categoryId);
-    return resolved ? this.taxService.calculateTaxAmount(subtotal, resolved) : 0;
+    const taxAmount = resolved ? this.taxService.calculateTaxAmount(subtotal, resolved) : 0;
+    const withholdingRate = await this.getWithholdingTaxRate();
+    const withholdingTaxAmount =
+      withholdingRate > 0 ? Math.round(subtotal * withholdingRate) / 100 : 0;
+    return { taxAmount, withholdingTaxAmount };
   }
 
   /**
@@ -963,9 +1002,9 @@ export class OrderService {
 
       // Calculate shipping cost (free shipping for orders >= 500 TL)
       const shippingCost = await this.calculateShippingCost(discountedPrice);
-      // KDV: kurumsal satıcı ise ürün fiyatı üzerinden
-      const taxAmount = await this.resolveSellerTax(product.sellerId, product.categoryId, discountedPrice);
-      // Buyer fee + KDV eklenir
+      // KDV + stopaj: kurumsal satıcı ise ürün fiyatı üzerinden
+      const { taxAmount, withholdingTaxAmount } = await this.resolveSellerTaxes(product.sellerId, product.categoryId, discountedPrice);
+      // Buyer fee + KDV eklenir (stopaj alıcı tutarını etkilemez; satıcı payout'undan kesilir)
       const totalAmount = discountedPrice + shippingCost + commissionResult.buyerFeeAmount + taxAmount;
 
       // Generate order number
@@ -1059,6 +1098,7 @@ export class OrderService {
           } : undefined,
           shippingCost,
           taxAmount,
+          withholdingTaxAmount,
           commissionAmount: commissionResult.commissionAmount,
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
@@ -1536,6 +1576,7 @@ export class OrderService {
           commissionResult: CommissionResult;
           shippingCost: number;
           taxAmount: number;
+          withholdingTaxAmount: number;
           totalAmount: number;
           suratIdempotencyKey: string;
         }> = [];
@@ -1551,7 +1592,7 @@ export class OrderService {
             entry.product.categoryId,
           );
           const shippingCost = await this.calculateShippingCost(discountedPrice);
-          const taxAmount = await this.resolveSellerTax(entry.product.sellerId, entry.product.categoryId, discountedPrice);
+          const { taxAmount, withholdingTaxAmount } = await this.resolveSellerTaxes(entry.product.sellerId, entry.product.categoryId, discountedPrice);
           const totalAmount =
             discountedPrice + shippingCost + commissionResult.buyerFeeAmount + taxAmount;
           const orderNumber = await this.generateOrderNumber();
@@ -1580,6 +1621,7 @@ export class OrderService {
             commissionResult,
             shippingCost,
             taxAmount,
+            withholdingTaxAmount,
             totalAmount,
             suratIdempotencyKey,
           });
@@ -1668,6 +1710,7 @@ export class OrderService {
                   : undefined,
               shippingCost: input.shippingCost,
               taxAmount: input.taxAmount,
+              withholdingTaxAmount: input.withholdingTaxAmount,
               commissionAmount: input.commissionResult.commissionAmount,
               buyerFeeAmount: input.commissionResult.buyerFeeAmount,
               sellerFeeAmount: input.commissionResult.sellerFeeAmount,
@@ -1873,9 +1916,10 @@ export class OrderService {
         orderNumberPreview: orderNumber,
       });
 
-      // KDV: kurumsal satıcı ise ürün fiyatı üzerinden
-      const offerTaxAmount = await this.resolveSellerTax(offer.sellerId, offer.product.categoryId, Number(offer.amount));
-      // Buyer fee + KDV eklenir
+      // KDV + stopaj: kurumsal satıcı ise ürün fiyatı üzerinden
+      const { taxAmount: offerTaxAmount, withholdingTaxAmount: offerWithholdingAmount } =
+        await this.resolveSellerTaxes(offer.sellerId, offer.product.categoryId, Number(offer.amount));
+      // Buyer fee + KDV eklenir (stopaj satıcı payout'undan kesilir)
       const totalAmount = Number(offer.amount) + commissionResult.buyerFeeAmount + offerTaxAmount;
 
       const offerShippingJson: Record<string, unknown> | undefined = shippingAddress
@@ -1915,6 +1959,7 @@ export class OrderService {
           checkoutGroupId: offerOrderGroup.id,
           totalAmount,
           taxAmount: offerTaxAmount,
+          withholdingTaxAmount: offerWithholdingAmount,
           commissionAmount: commissionResult.commissionAmount,
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
@@ -2290,9 +2335,10 @@ export class OrderService {
 
       // Calculate shipping cost (free shipping for orders >= 500 TL)
       const shippingCost = await this.calculateShippingCost(finalPrice);
-      // KDV: kurumsal satıcı ise ürün fiyatı üzerinden
-      const guestTaxAmount = await this.resolveSellerTax(product.sellerId, product.categoryId, finalPrice);
-      // Buyer fee + KDV eklenir
+      // KDV + stopaj: kurumsal satıcı ise ürün fiyatı üzerinden
+      const { taxAmount: guestTaxAmount, withholdingTaxAmount: guestWithholdingAmount } =
+        await this.resolveSellerTaxes(product.sellerId, product.categoryId, finalPrice);
+      // Buyer fee + KDV eklenir (stopaj satıcı payout'undan kesilir)
       const totalAmount = finalPrice + shippingCost + commissionResult.buyerFeeAmount + guestTaxAmount;
 
       // Generate order number
@@ -2369,6 +2415,7 @@ export class OrderService {
           totalAmount,
           shippingCost,
           taxAmount: guestTaxAmount,
+          withholdingTaxAmount: guestWithholdingAmount,
           commissionAmount: commissionResult.commissionAmount,
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
@@ -3557,12 +3604,13 @@ export class OrderService {
     const sellerFeeAmount = Number(order.sellerFeeAmount ?? 0);
     const commissionAmount = Number(order.commissionAmount ?? 0);
     const taxAmount = Number(order.taxAmount ?? 0);
+    const withholdingTaxAmount = Number(order.withholdingTaxAmount ?? 0);
     // Ürün tutarı KDV HARİÇ gösterilir; KDV ayrı satır olarak surface edilir.
     // (totalAmount = subtotal + kargo + buyerFee + KDV — bkz. createCheckoutQuote)
     const subtotal = totalAmount - shippingCost - buyerFeeAmount - taxAmount;
     // Net kazanç davranışı korunur: KDV gerçekte satıcı payout'una (escrow hold)
-    // dahil edildiğinden net kazanca da dahildir → subtotal + KDV − sellerFee.
-    const sellerNetAmount = Math.max(0, subtotal + taxAmount - sellerFeeAmount);
+    // dahil edildiğinden net kazanca da dahildir → subtotal + KDV − sellerFee − stopaj.
+    const sellerNetAmount = Math.max(0, subtotal + taxAmount - sellerFeeAmount - withholdingTaxAmount);
 
     const pricing = {
       subtotal,
@@ -3571,6 +3619,7 @@ export class OrderService {
       sellerFeeAmount,
       commissionAmount,
       taxAmount,
+      withholdingTaxAmount,
       totalAmount,
       sellerNetAmount,
     };

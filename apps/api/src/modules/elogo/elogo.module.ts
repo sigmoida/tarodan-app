@@ -6,6 +6,7 @@ import { ElogoInvoicingService } from './elogo-invoicing.service';
 import { ElogoSchedulerService } from './elogo-scheduler.service';
 import { ElogoInvoiceController } from './elogo-invoice.controller';
 import { StorageModule } from '../storage/storage.module';
+import { TaxModule } from '../tax/tax.module';
 import { SmtpProvider } from '../notification/providers/smtp.provider';
 import {
   ElogoSoapClient,
@@ -19,7 +20,7 @@ import {
  * stub/live arasında seçilir; ElogoService dışarı export edilir.
  */
 @Module({
-  imports: [ConfigModule, ScheduleModule.forRoot(), StorageModule],
+  imports: [ConfigModule, ScheduleModule.forRoot(), StorageModule, TaxModule],
   providers: [
     {
       provide: ELOGO_SOAP_CLIENT,

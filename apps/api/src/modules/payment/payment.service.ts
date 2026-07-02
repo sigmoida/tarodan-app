@@ -1756,8 +1756,13 @@ export class PaymentService {
 
       // Only create payment hold for regular product orders (not membership/boost orders)
       if (!isMembershipOrder && !isBoostOrder) {
-        // Calculate seller payout (amount - commission)
-        const sellerAmount = Number(order.totalAmount) - Number(order.commissionAmount);
+        // Calculate seller payout (amount - commission - stopaj).
+        // Stopaj (GVK 94/19) yalnız kurumsal satıcı siparişlerinde > 0'dır; platform
+        // muhtasar ile beyan eder, satıcı kendi beyannamesinde mahsup eder.
+        const sellerAmount =
+          Number(order.totalAmount) -
+          Number(order.commissionAmount) -
+          Number(order.withholdingTaxAmount ?? 0);
 
         // Create payment hold for seller (escrow). releaseAt ödeme anında SET
         // EDİLMEZ; teslimde (shipping.worker delivered) deliveredAt + return + grace
@@ -2136,7 +2141,11 @@ export class PaymentService {
           // Satıcı başına escrow hold (tek payment'a sipariş başına bir hold).
           // releaseAt teslimde hesaplanır (deliveredAt + return + grace); ödeme
           // anında null → teslim olmadan asla serbest bırakılmaz.
-          const sellerAmount = Number(order.totalAmount) - Number(order.commissionAmount);
+          // Stopaj (kurumsal satıcı) da hold'dan düşülür — payout'a hiç girmez.
+          const sellerAmount =
+            Number(order.totalAmount) -
+            Number(order.commissionAmount) -
+            Number(order.withholdingTaxAmount ?? 0);
           await tx.paymentHold.create({
             data: {
               paymentId: payment.id,

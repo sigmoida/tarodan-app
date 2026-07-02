@@ -413,4 +413,149 @@ describe('OrderService findOne (response shape for mobile order detail)', () => 
     expect(result.trackingNumber).toBe('TRK123456');
     expect(result.trackingUrl).toBeNull();
   });
+
+  it('surfaces withholding (stopaj) in pricing and subtracts it from sellerNetAmount', async () => {
+    mockPrisma.order.findUnique.mockResolvedValueOnce({
+      ...mockOrder,
+      taxAmount: 0,
+      withholdingTaxAmount: 3,
+    });
+
+    const result: any = await service.findOne(orderId, buyerId);
+
+    // subtotal = 329.99 − 29.99 (kargo) − 10 (buyerFee) − 0 (KDV) = 290
+    // net = 290 + 0 − 8 (sellerFee) − 3 (stopaj) = 279
+    expect(result.pricing.withholdingTaxAmount).toBe(3);
+    expect(result.pricing.sellerNetAmount).toBeCloseTo(279, 2);
+  });
+});
+
+/**
+ * E-ticaret stopajı (GVK 94/19): yalnız kurumsal (approved + taxId) satıcıda,
+ * KDV hariç ürün bedeli üzerinden; oran PlatformSetting 'withholding_tax_rate'
+ * (varsayılan %1). Bireysel satıcı kapsam dışı (330 Seri No'lu GV Tebliği).
+ */
+describe('OrderService getCommissionPreview (stopaj / withholding)', () => {
+  const sellerId = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
+
+  const commissionRule = {
+    id: 'rule-1',
+    name: 'Varsayılan',
+    ruleType: 'default',
+    appliesTo: 'BOTH',
+    sellerRate: 10,
+    sellerMin: null,
+    sellerMax: null,
+    buyerRate: 3,
+    buyerMin: null,
+    buyerMax: null,
+    categoryId: null,
+    sellerType: null,
+    priority: 0,
+    isActive: true,
+    category: null,
+  };
+
+  const mockPrisma = {
+    user: { findUnique: jest.fn() },
+    commissionRule: { findMany: jest.fn().mockResolvedValue([commissionRule]) },
+    platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
+  };
+
+  let service: OrderService;
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    mockPrisma.commissionRule.findMany.mockResolvedValue([commissionRule]);
+    mockPrisma.platformSetting.findUnique.mockResolvedValue(null);
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OrderService,
+        { provide: ElogoInvoicingService, useValue: {} },
+        { provide: PrismaService, useValue: mockPrisma },
+        { provide: EventService, useValue: {} },
+        { provide: CacheService, useValue: {} },
+        { provide: ConfigService, useValue: { get: jest.fn() } },
+        { provide: NotificationService, useValue: {} },
+        { provide: DiscountService, useValue: {} },
+        { provide: DiscountCalculator, useValue: {} },
+        { provide: SuratCargoService, useValue: {} },
+        { provide: ProductLockService, useValue: {} },
+        { provide: CommissionLedgerService, useValue: {} },
+        {
+          provide: TaxService,
+          useValue: {
+            resolveTaxRate: jest.fn().mockResolvedValue(null),
+            calculateTaxAmount: jest.fn().mockReturnValue(0),
+          },
+        },
+      ],
+    }).compile();
+
+    service = module.get(OrderService);
+  });
+
+  it('bireysel satıcıda stopaj kesilmez (net = tutar − komisyon)', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({
+      sellerType: 'individual',
+      membership: null,
+      businessStatus: null,
+      taxId: null,
+    });
+
+    const preview = await service.getCommissionPreview(1000, sellerId, null);
+
+    expect(preview.withholdingTaxAmount).toBe(0);
+    expect(preview.sellerFeeAmount).toBe(100);
+    expect(preview.sellerNetAmount).toBe(900);
+  });
+
+  it('kurumsal satıcıda varsayılan %1 stopaj kesilir', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({
+      sellerType: 'business',
+      membership: null,
+      businessStatus: 'approved',
+      taxId: '1234567890',
+    });
+
+    const preview = await service.getCommissionPreview(1000, sellerId, null);
+
+    expect(preview.withholdingTaxAmount).toBe(10);
+    expect(preview.sellerNetAmount).toBe(890);
+  });
+
+  it('stopaj oranı PlatformSetting withholding_tax_rate ile değişir', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({
+      sellerType: 'business',
+      membership: null,
+      businessStatus: 'approved',
+      taxId: '1234567890',
+    });
+    mockPrisma.platformSetting.findUnique.mockResolvedValue({
+      settingValue: '2',
+    });
+
+    const preview = await service.getCommissionPreview(1000, sellerId, null);
+
+    expect(preview.withholdingTaxAmount).toBe(20);
+    expect(preview.sellerNetAmount).toBe(880);
+  });
+
+  it('oran 0 yapılırsa kurumsal satıcıda da stopaj kesilmez', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({
+      sellerType: 'business',
+      membership: null,
+      businessStatus: 'approved',
+      taxId: '1234567890',
+    });
+    mockPrisma.platformSetting.findUnique.mockResolvedValue({
+      settingValue: '0',
+    });
+
+    const preview = await service.getCommissionPreview(1000, sellerId, null);
+
+    expect(preview.withholdingTaxAmount).toBe(0);
+    expect(preview.sellerNetAmount).toBe(900);
+  });
 });

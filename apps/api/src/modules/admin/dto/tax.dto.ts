@@ -235,3 +235,28 @@ export class TaxReportQueryDto {
   @IsString()
   regionId?: string;
 }
+
+export class SetWithholdingRateDto {
+  @ApiProperty({ description: 'E-ticaret stopaj (tevkifat) oranı %, GVK 94/19', example: 1 })
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  @Type(() => Number)
+  rate: number;
+}
+
+export class WithholdingReportQueryDto {
+  @ApiProperty({ description: 'Yıl (örn. 2026)', example: 2026 })
+  @IsNumber()
+  @Min(2020)
+  @Max(2100)
+  @Type(() => Number)
+  year: number;
+
+  @ApiProperty({ description: 'Ay (1-12)', example: 6 })
+  @IsNumber()
+  @Min(1)
+  @Max(12)
+  @Type(() => Number)
+  month: number;
+}

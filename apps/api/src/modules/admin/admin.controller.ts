@@ -77,6 +77,8 @@ import {
   CreateTaxRuleDto,
   UpdateTaxRuleDto,
   TaxReportQueryDto,
+  SetWithholdingRateDto,
+  WithholdingReportQueryDto,
   CreateStaticPageDto,
   UpdateStaticPageDto,
   UpdateEmailTemplateDto,
@@ -1915,6 +1917,33 @@ export class AdminController {
   @ApiResponse({ status: HttpStatus.OK, description: 'Tax report summary and breakdown' })
   async getTaxReport(@Query() query: TaxReportQueryDto) {
     return this.adminService.getTaxReport(query);
+  }
+
+  @Get('tax/withholding')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Get e-commerce withholding (stopaj) rate' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Current withholding rate (%)' })
+  async getWithholdingRate() {
+    return this.adminService.getWithholdingRate();
+  }
+
+  @Patch('tax/withholding')
+  @Roles(AdminRole.super_admin)
+  @ApiOperation({ summary: 'Set e-commerce withholding (stopaj) rate' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Withholding rate updated' })
+  async setWithholdingRate(
+    @CurrentUser('id') adminId: string,
+    @Body() dto: SetWithholdingRateDto,
+  ) {
+    return this.adminService.setWithholdingRate(adminId, dto.rate);
+  }
+
+  @Get('tax/withholding-report')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Monthly withholding (muhtasar) report per seller' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Withholding totals per seller for the month' })
+  async getWithholdingReport(@Query() query: WithholdingReportQueryDto) {
+    return this.adminService.getWithholdingReport(query);
   }
 
   // ==================== MEMBERSHIP TIER MANAGEMENT ====================

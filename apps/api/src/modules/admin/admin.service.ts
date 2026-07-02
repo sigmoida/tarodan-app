@@ -8683,6 +8683,119 @@ export class AdminService {
     };
   }
 
+  // ==================== E-TİCARET STOPAJI (GVK 94/19, tevkifat) ====================
+
+  /** E-ticaret stopaj oranı (%). PlatformSetting 'withholding_tax_rate', varsayılan %1 (9284 sayılı CK). */
+  async getWithholdingRate(): Promise<{ rate: number }> {
+    const row = await this.prisma.platformSetting.findUnique({
+      where: { settingKey: 'withholding_tax_rate' },
+    });
+    const rate = Number(row?.settingValue ?? '1');
+    return { rate: Number.isFinite(rate) && rate >= 0 ? rate : 1 };
+  }
+
+  async setWithholdingRate(adminId: string, rate: number): Promise<{ rate: number }> {
+    if (!(rate >= 0 && rate <= 100)) {
+      throw new BadRequestException('Oran 0 ile 100 arasında olmalı');
+    }
+    await this.prisma.platformSetting.upsert({
+      where: { settingKey: 'withholding_tax_rate' },
+      create: {
+        settingKey: 'withholding_tax_rate',
+        settingValue: String(rate),
+        settingType: 'number',
+        description: 'E-ticaret stopaj (tevkifat) oranı (%) — GVK 94/19, kurumsal satıcı payout kesintisi',
+        updatedBy: adminId,
+      },
+      update: { settingValue: String(rate), updatedBy: adminId },
+    });
+    await this.createAuditLog(adminId, 'withholding_tax_rate_update', 'PlatformSetting', 'withholding_tax_rate', null, { rate });
+    return { rate };
+  }
+
+  /**
+   * Muhtasar dönemi stopaj raporu: ay içinde TAMAMLANAN payout transferlerinden
+   * satıcı (VKN) bazında kesilen stopaj. Tevkifat satıcıya ödeme anında doğar →
+   * dönem bazı processedAt'tir. Kesilmiş ama henüz ödenmemiş stopaj toplamı
+   * (pending/processing/retry_pending) bilgi amaçlı ayrıca döner.
+   */
+  async getWithholdingReport(query: { year: number; month: number }) {
+    const from = new Date(Date.UTC(query.year, query.month - 1, 1));
+    const to = new Date(Date.UTC(query.year, query.month, 1));
+
+    const transfers = await this.prisma.payoutTransfer.findMany({
+      where: {
+        status: 'completed',
+        processedAt: { gte: from, lt: to },
+        withholdingTax: { gt: 0 },
+      },
+      include: {
+        seller: {
+          select: { id: true, displayName: true, companyName: true, taxId: true, email: true },
+        },
+      },
+      orderBy: { processedAt: 'asc' },
+    });
+
+    const bySeller = new Map<
+      string,
+      {
+        sellerId: string;
+        sellerName: string;
+        taxId: string | null;
+        email: string | null;
+        transferCount: number;
+        grossAmount: number;
+        withholdingTax: number;
+      }
+    >();
+    for (const t of transfers) {
+      const cur = bySeller.get(t.sellerId) || {
+        sellerId: t.sellerId,
+        sellerName: t.seller?.companyName || t.seller?.displayName || '—',
+        taxId: t.seller?.taxId || null,
+        email: t.seller?.email || null,
+        transferCount: 0,
+        grossAmount: 0,
+        withholdingTax: 0,
+      };
+      cur.transferCount += 1;
+      cur.grossAmount += Number(t.amount);
+      cur.withholdingTax += Number(t.withholdingTax);
+      bySeller.set(t.sellerId, cur);
+    }
+    const rows = Array.from(bySeller.values())
+      .map((r) => ({
+        ...r,
+        grossAmount: Math.round(r.grossAmount * 100) / 100,
+        withholdingTax: Math.round(r.withholdingTax * 100) / 100,
+      }))
+      .sort((a, b) => b.withholdingTax - a.withholdingTax);
+
+    const pendingAgg = await this.prisma.payoutTransfer.aggregate({
+      where: {
+        status: { in: ['pending', 'processing', 'retry_pending'] },
+        withholdingTax: { gt: 0 },
+      },
+      _sum: { withholdingTax: true },
+      _count: true,
+    });
+
+    return {
+      period: `${query.year}-${String(query.month).padStart(2, '0')}`,
+      summary: {
+        totalWithholding:
+          Math.round(rows.reduce((s, r) => s + r.withholdingTax, 0) * 100) / 100,
+        sellerCount: rows.length,
+        transferCount: transfers.length,
+        pendingWithholding:
+          Math.round(Number(pendingAgg._sum.withholdingTax ?? 0) * 100) / 100,
+        pendingTransferCount: pendingAgg._count,
+      },
+      rows,
+    };
+  }
+
   // ==================== MEMBERSHIP TIER MANAGEMENT ====================
 
   /**

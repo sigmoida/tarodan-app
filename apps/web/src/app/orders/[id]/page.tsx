@@ -66,6 +66,7 @@ interface OrderDetail {
     sellerFeeAmount: number;
     commissionAmount: number;
     taxAmount?: number;
+    withholdingTaxAmount?: number;
     totalAmount: number;
     sellerNetAmount: number;
   };
@@ -1967,6 +1968,25 @@ export default function OrderDetailPage() {
                           })}
                         </span>
                       </div>
+                      {/* Stopaj: yalnızca kurumsal satıcıda (>0). GVK 94/19 — satıcı beyannamede mahsup eder. */}
+                      {(order.pricing?.withholdingTaxAmount ?? 0) > 0 && (
+                        <div className="flex justify-between text-muted">
+                          <span>
+                            {locale === "en"
+                              ? "Withholding tax"
+                              : "Stopaj (tevkifat)"}
+                          </span>
+                          <span>
+                            ₺
+                            {Number(
+                              order.pricing?.withholdingTaxAmount ?? 0,
+                            ).toLocaleString("tr-TR", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
+                        </div>
+                      )}
                       <div className="flex justify-between text-success-700 font-medium">
                         <span>
                           {locale === "en" ? "Net to you" : "Net kazanç"}
