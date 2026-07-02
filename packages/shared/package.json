@@ -1,14 +1,11 @@
 {
   "name": "@tarodan/shared",
-  "version": "1.0.0",
-  "description": "Platform-agnostic domain metadata (status/enum → label + semantic variant) shared by @tarodan/ui (web) and @tarodan/ui-native (mobile).",
+  "private": true,
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./src/*": "./src/*.ts"
+    ".": "./src/index.ts"
   },
-  "files": ["src"],
   "scripts": {
     "typecheck": "tsc --noEmit"
   },

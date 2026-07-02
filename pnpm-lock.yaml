@@ -766,9 +766,6 @@ importers:
 
   packages/types:
     devDependencies:
-      '@types/node':
-        specifier: ^20.10.0
-        version: 20.19.30
       tsup:
         specifier: ^8.0.1
         version: 8.5.1(typescript@5.9.3)
@@ -778,9 +775,6 @@ importers:
 
   packages/ui:
     dependencies:
-      '@radix-ui/react-dialog':
-        specifier: ^1.0.5
-        version: 1.1.15(@types/react-dom@18.3.7)(@types/react@18.3.27)(react-dom@18.3.1)(react@18.3.1)
       '@radix-ui/react-dropdown-menu':
         specifier: ^2.0.6
         version: 2.1.16(@types/react-dom@18.3.7)(@types/react@18.3.27)(react-dom@18.3.1)(react@18.3.1)
@@ -809,18 +803,12 @@ importers:
         specifier: ^2.1.0
         version: 2.6.0
     devDependencies:
-      '@types/node':
-        specifier: ^20.10.0
-        version: 20.19.30
       '@types/react':
         specifier: ^18.2.42
         version: 18.3.27
       react:
         specifier: ^18.2.0
         version: 18.3.1
-      tailwindcss:
-        specifier: ^3.4.0
-        version: 3.4.19
       typescript:
         specifier: ^5.3.2
         version: 5.9.3
@@ -2291,8 +2279,8 @@ packages:
     resolution: {integrity: sha512-lOoVRwADj8hjf7al89tvQ2a1lf53Z+7tiXMgpZJL3maQPDxh0DgLMN62B2MKUOFcoodBHLMbDM6WAbKgNy5Suw==}
     engines: {node: '>=6.9.0'}
     dependencies:
-      '@babel/parser': 7.28.6
-      '@babel/types': 7.28.6
+      '@babel/parser': 7.29.7
+      '@babel/types': 7.29.7
       '@jridgewell/gen-mapping': 0.3.13
       '@jridgewell/trace-mapping': 0.3.31
       jsesc: 3.1.0
