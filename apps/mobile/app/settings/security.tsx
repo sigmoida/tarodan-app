@@ -60,6 +60,10 @@ export default function SecuritySettingsScreen() {
   const [phoneStep, setPhoneStep] = useState<'enter' | 'verify'>('enter');
   const [phoneVerified, setPhoneVerified] = useState(!!user?.isPhoneVerified);
   const [resendIn, setResendIn] = useState(0);
+  // Modal-içi mesaj (bilgi/hata). appAlert modal AÇIKKEN çağrılırsa iOS'ta iki
+  // transparent RNModal üst üste gelir ve dokunuşları kilitler → uygulama donar.
+  // Bu yüzden modal içindeki geri bildirimleri alert yerine burada gösteriyoruz.
+  const [phoneMsg, setPhoneMsg] = useState<{ type: 'info' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -69,13 +73,15 @@ export default function SecuritySettingsScreen() {
 
   const handleSendPhoneCode = async () => {
     setLoading(true);
+    setPhoneMsg(null);
     try {
       await authApi.sendPhoneCode(phoneInput);
       setPhoneStep('verify');
       setResendIn(60);
-      appAlert('Bilgi', 'Doğrulama kodu telefonunuza gönderildi');
+      // Modal açık: alert yerine modal-içi bilgi mesajı (iç içe modal donmasını önler).
+      setPhoneMsg({ type: 'info', text: 'Doğrulama kodu telefonunuza gönderildi' });
     } catch (e: any) {
-      appAlert('Hata', e?.response?.data?.message || 'Kod gönderilemedi');
+      setPhoneMsg({ type: 'error', text: e?.response?.data?.message || 'Kod gönderilemedi' });
     } finally {
       setLoading(false);
     }
@@ -83,16 +89,21 @@ export default function SecuritySettingsScreen() {
 
   const handleVerifyPhone = async () => {
     setLoading(true);
+    setPhoneMsg(null);
     try {
       await authApi.verifyPhone(phoneCode);
       setPhoneVerified(true);
       await refreshUserData();
+      // Önce modal'ı kapat, başarı alert'ini modal TAMAMEN kapandıktan sonra göster.
+      // Aynı anda kapatıp açmak iOS'ta modal sunum çakışması → donma yapıyordu.
       setShowPhoneDialog(false);
       setPhoneStep('enter');
       setPhoneCode('');
-      appAlert('Başarılı', 'Telefon numaranız doğrulandı');
+      setPhoneMsg(null);
+      setTimeout(() => appAlert('Başarılı', 'Telefon numaranız doğrulandı'), 400);
     } catch (e: any) {
-      appAlert('Hata', e?.response?.data?.message || 'Kod hatalı');
+      // Hata da modal açıkken: alert yerine modal-içi hata mesajı.
+      setPhoneMsg({ type: 'error', text: e?.response?.data?.message || 'Kod hatalı' });
     } finally {
       setLoading(false);
     }
@@ -336,6 +347,8 @@ export default function SecuritySettingsScreen() {
               onPress={() => {
                 setPhoneInput(user?.phone || '');
                 setPhoneStep('enter');
+                setPhoneCode('');
+                setPhoneMsg(null);
                 setShowPhoneDialog(true);
               }}
               testID="phone-verify-button"
@@ -464,7 +477,7 @@ export default function SecuritySettingsScreen() {
       </Modal>
 
       {/* Phone Verification Dialog */}
-      <Modal isOpen={showPhoneDialog} onClose={() => setShowPhoneDialog(false)} title="Telefon Doğrulama">
+      <Modal isOpen={showPhoneDialog} onClose={() => { setShowPhoneDialog(false); setPhoneMsg(null); }} title="Telefon Doğrulama">
         {phoneStep === 'enter' ? (
           <View style={{ gap: 12 }}>
             <Input
@@ -497,6 +510,18 @@ export default function SecuritySettingsScreen() {
               </Text>
             </TouchableOpacity>
           </View>
+        )}
+        {phoneMsg && (
+          <Text
+            testID="phone-message"
+            style={{
+              marginTop: 12,
+              textAlign: 'center',
+              color: phoneMsg.type === 'error' ? colors.danger[600]! : colors.text.muted,
+            }}
+          >
+            {phoneMsg.text}
+          </Text>
         )}
       </Modal>
 
