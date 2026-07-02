@@ -790,10 +790,26 @@ describe('07 — Sepet & Checkout (CRT)', () => {
     expect(pr.totalAmount).toBeCloseTo(pr.subtotal + pr.shippingAmount + pr.buyerFeeAmount + pr.taxAmount, 2);
   });
 
-  scenarioSkip(
-    'CRT-045',
-    'Saf-UI parite: checkout özet kartında "Platform Hizmet Bedeli (%3)" satırının görünürlüğü; API tarafı quote.pricing.buyerFeeAmount CRT-043 ile kapsanır.',
-  );
+  scenario('CRT-045', async () => {
+    // Parite'nin API tarafı: buyerRate=%3 kuralında checkout özetini besleyen
+    // quote.pricing.buyerFeeAmount = subtotal × %3 ve satır kalemindeki buyerFeeAmount.
+    // ("Platform Hizmet Bedeli (%3)" satırının GÖRÜNÜRLÜĞÜ saf-UI'dir → PAR/web tarafında.)
+    await addCommissionRule({ appliesTo: 'BUYER', buyerRate: 3 });
+    const product = await makeProduct({ price: 200, quantity: 5 });
+    const res = await request(server())
+      .post('/api/orders/quote')
+      .send({ items: [{ productId: product.id, quantity: 1 }] })
+      .expect(201);
+    const pr = res.body.pricing;
+    expect(pr.subtotal).toBe(200);
+    // %3 alıcı hizmet bedeli: 200 × 0.03 = 6
+    expect(pr.buyerFeeAmount).toBeCloseTo(6, 2);
+    expect(typeof pr.buyerFeeAmount).toBe('number');
+    // Satır kaleminde de aynı bedel yansır (özet kartındaki satır kaynağı)
+    expect(res.body.items[0].buyerFeeAmount).toBeCloseTo(6, 2);
+    // Toplam = Ara Toplam + Kargo + Hizmet Bedeli + KDV
+    expect(pr.totalAmount).toBeCloseTo(pr.subtotal + pr.shippingAmount + pr.buyerFeeAmount + pr.taxAmount, 2);
+  });
 
   scenario('CRT-046', async () => {
     // Çok-adetli ölçekleme: price=100, quantity=3 → items[0].subtotal=300, itemsSubtotal=300
@@ -1489,10 +1505,32 @@ describe('07 — Sepet & Checkout (CRT)', () => {
   scenarioSkip('CRT-084', 'Saf-UI/i18n: boş sepet ekranı (cart.empty / "İlanlara Gözat" / ikon + CTA).');
   scenarioSkip('CRT-085', 'Saf-UI: sepet yükleniyor animate-pulse skeleton (3 satır).');
   scenarioSkip('CRT-086', 'Saf-UI/i18n: /cart kargo metni "Ödeme adımında hesaplanır" / "Calculated at checkout".');
-  scenarioSkip(
-    'CRT-087',
-    'Saf-UI parite: web/mobile checkout özetinde Ara Toplam/Kargo/Hizmet Bedeli/KDV satır görünümü; tutarlar quote.pricing.* (CRT-043/044) ile kapsanır.',
-  );
+  scenario('CRT-087', async () => {
+    // Parite'nin API tarafı: web+mobile checkout özetini besleyen quote.pricing içinde
+    // hem alıcı hizmet bedeli (%3) hem KDV satırlarının TUTARLARI birlikte doğru üretilir.
+    // (İki platformda satır GÖRÜNÜMÜ saf-UI paritedir → PAR/web tarafında; burada API ucu.)
+    await addCommissionRule({ appliesTo: 'BUYER', buyerRate: 3 });
+    const seller = await createUser(ctx.module, { isSeller: true });
+    await setupCorporateTax(seller.id); // kurumsal satıcı → KDV %20 aktif
+    const product = await makeProduct({ sellerId: seller.id, price: 1000, quantity: 5 });
+
+    const res = await request(server())
+      .post('/api/orders/quote')
+      .send({ items: [{ productId: product.id, quantity: 1 }] })
+      .expect(201);
+    const pr = res.body.pricing;
+    // Ara Toplam
+    expect(pr.subtotal).toBe(1000);
+    // Kargo satırı (subtotal>=500 → ücretsiz) — alan mevcut ve sayısal
+    expect(typeof pr.shippingAmount).toBe('number');
+    // Platform Hizmet Bedeli (%3): 1000 × 0.03 = 30
+    expect(pr.buyerFeeAmount).toBeCloseTo(30, 2);
+    // KDV satırı: kurumsal satıcı → taxAmount > 0 (%20 → 200)
+    expect(pr.taxAmount).toBeGreaterThan(0);
+    expect(pr.taxAmount).toBeCloseTo(200, 2);
+    // Toplam = Ara Toplam + Kargo + Hizmet Bedeli + KDV (her iki platformda aynı tutar)
+    expect(pr.totalAmount).toBeCloseTo(pr.subtotal + pr.shippingAmount + pr.buyerFeeAmount + pr.taxAmount, 2);
+  });
   scenarioSkip('CRT-088', 'Saf-UI: checkout kargo satırı "Adres seçin" / "Hesaplanıyor..." durumları.');
   scenarioSkip(
     'CRT-089',
