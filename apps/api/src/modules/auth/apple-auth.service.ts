@@ -32,6 +32,10 @@ export class AppleAuthService {
     if (!payload?.sub || !payload?.email) {
       throw new UnauthorizedException('Apple oturumu geçersiz');
     }
+    const emailVerified = payload.email_verified === true || payload.email_verified === 'true';
+    if (!emailVerified) {
+      throw new UnauthorizedException('Apple hesabınızın e-postası doğrulanmamış');
+    }
     const isPrivate = payload.is_private_email === true || payload.is_private_email === 'true';
     return {
       sub: String(payload.sub),

@@ -39,6 +39,11 @@ describe('AppleAuthService', () => {
     await expect(service.verifyIdentityToken('tok')).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
+  it('rejects when email is not verified', async () => {
+    verify.mockResolvedValue({ sub: 'a-4', email: 'a@b.com', email_verified: false });
+    await expect(service.verifyIdentityToken('tok')).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
   it('rejects when verifyIdToken throws (invalid/expired token)', async () => {
     verify.mockRejectedValue(new Error('jwt expired'));
     await expect(service.verifyIdentityToken('tok')).rejects.toBeInstanceOf(UnauthorizedException);
