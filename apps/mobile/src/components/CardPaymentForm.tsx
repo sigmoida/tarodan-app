@@ -117,6 +117,11 @@ export default function CardPaymentForm({ target, amount, onSuccess, onFail, rec
       } catch { /* yoksay, tekrar dene */ }
       if (alive && !resolvedRef.current && tries < 40) {
         timer = setTimeout(poll, 3000);
+      } else if (alive && !resolvedRef.current && verifying && !threeDSHtml) {
+        // poll tükendi (terminal duruma ulaşılamadı)
+        setVerifying(false);
+        setProcessing(false);
+        appAlert('Bağlantı sorunu', "Ödemenizin durumunu doğrulayamadık. Ödeme yapıldıysa 'Siparişlerim' bölümünde görünür; aksi halde tekrar deneyebilirsiniz.");
       }
     };
     timer = setTimeout(poll, 3000);

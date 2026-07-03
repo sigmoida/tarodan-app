@@ -6,7 +6,6 @@ import { theme } from '@tarodan/ui-native';
 import { captureException } from '../services/sentry';
 
 const { colors } = theme;
-import { useTranslation } from '../i18n';
 
 interface Props {
   children: ReactNode;
@@ -51,12 +50,11 @@ export class ErrorBoundary extends Component<Props, State> {
 }
 
 function FallbackScreen({ error, onRetry }: { error: Error | null; onRetry: () => void }) {
-  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       <Ionicons name="warning-outline" size={64} color={TarodanColors.error} />
-      <Text style={styles.title}>{t('mobile.errorSomethingWrong')}</Text>
-      <Text style={styles.subtitle}>{t('mobile.errorBoundaryDescription')}</Text>
+      <Text style={styles.title}>Bir şeyler ters gitti</Text>
+      <Text style={styles.subtitle}>Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.</Text>
       {__DEV__ && error && (
         <ScrollView style={styles.errorBox}>
           <Text style={styles.errorText}>
@@ -67,7 +65,7 @@ function FallbackScreen({ error, onRetry }: { error: Error | null; onRetry: () =
         </ScrollView>
       )}
       <TouchableOpacity style={styles.button} onPress={onRetry}>
-        <Text style={styles.buttonText}>{t('mobile.errorRetry')}</Text>
+        <Text style={styles.buttonText}>Tekrar Dene</Text>
       </TouchableOpacity>
     </View>
   );
