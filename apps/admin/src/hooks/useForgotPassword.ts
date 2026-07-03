@@ -4,23 +4,16 @@ import { useState } from 'react';
 import { forgotPasswordAction } from '@/lib/server/auth-actions';
 
 /**
- * Client wrapper around the forgot-password Server Action. Always reports
- * success (the action never leaks whether the email is registered).
+ * Client wrapper around the forgot-password Server Action. The form owns the
+ * pending state (via isSubmitting); this hook just flips to the "sent" view.
  */
 export function useForgotPassword() {
-  const [isLoading, setIsLoading] = useState(false);
   const [sent, setSent] = useState(false);
 
   const submit = async (email: string) => {
-    if (!email) return;
-    setIsLoading(true);
-    try {
-      await forgotPasswordAction(email);
-    } finally {
-      setIsLoading(false);
-      setSent(true);
-    }
+    await forgotPasswordAction(email);
+    setSent(true);
   };
 
-  return { submit, isLoading, sent };
+  return { submit, sent };
 }

@@ -1,13 +1,12 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import {
+  forgotPasswordSchema,
+  loginSchema,
+  type LoginValues,
+} from '@/lib/schemas/auth';
 import { apiBaseUrl, clearTokens, readTokens, writeTokens } from './session';
-
-export interface LoginInput {
-  email: string;
-  password: string;
-  twoFactorCode?: string;
-}
 
 export type LoginResult =
   | { status: 'ok' }
@@ -17,17 +16,24 @@ export type LoginResult =
 /**
  * Server Action: verify credentials against NestJS and, on success, store the
  * tokens in the admin app's httpOnly cookies. The tokens never reach the client.
+ * Input is re-validated with the same schema the client uses.
  */
-export async function loginAction(input: LoginInput): Promise<LoginResult> {
+export async function loginAction(input: LoginValues): Promise<LoginResult> {
+  const parsed = loginSchema.safeParse(input);
+  if (!parsed.success) {
+    return { status: 'error', message: 'Geçersiz giriş bilgileri' };
+  }
+  const { email, password, twoFactorCode } = parsed.data;
+
   let res: Response;
   try {
     res = await fetch(`${apiBaseUrl()}/auth/admin/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: input.email,
-        password: input.password,
-        ...(input.twoFactorCode ? { twoFactorCode: input.twoFactorCode } : {}),
+        email,
+        password,
+        ...(twoFactorCode ? { twoFactorCode } : {}),
       }),
       cache: 'no-store',
     });
@@ -49,7 +55,7 @@ export async function loginAction(input: LoginInput): Promise<LoginResult> {
   if (res.status === 401 || res.status === 400) {
     return {
       status: 'error',
-      message: input.twoFactorCode
+      message: twoFactorCode
         ? 'Doğrulama kodu hatalı'
         : 'E-posta veya şifre hatalı girildi',
     };
@@ -62,11 +68,16 @@ export async function loginAction(input: LoginInput): Promise<LoginResult> {
  * leak whether an email is registered.
  */
 export async function forgotPasswordAction(email: string): Promise<{ ok: true }> {
+  const parsed = forgotPasswordSchema.safeParse({ email });
+  if (!parsed.success) {
+    // Invalid input → report success anyway (never leak).
+    return { ok: true };
+  }
   try {
     await fetch(`${apiBaseUrl()}/auth/forgot-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email: parsed.data.email }),
       cache: 'no-store',
     });
   } catch {

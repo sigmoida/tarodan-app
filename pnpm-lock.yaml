@@ -51,6 +51,9 @@ importers:
       '@heroicons/react':
         specifier: ^2.1.1
         version: 2.2.0(react@18.3.1)
+      '@hookform/resolvers':
+        specifier: ^3.3.4
+        version: 3.10.0(react-hook-form@7.71.1)
       '@sentry/nextjs':
         specifier: ^7.91.0
         version: 7.120.4(next@14.2.35)(react@18.3.1)
@@ -105,6 +108,9 @@ importers:
       tailwindcss-animate:
         specifier: ^1.0.7
         version: 1.0.7(tailwindcss@3.4.19)
+      zod:
+        specifier: ^3.22.4
+        version: 3.25.76
       zustand:
         specifier: ^4.4.7
         version: 4.5.7(@types/react@18.3.27)(react@18.3.1)
@@ -781,6 +787,9 @@ importers:
         specifier: ^2.1.0
         version: 2.6.0
     devDependencies:
+      '@hookform/resolvers':
+        specifier: ^3.3.4
+        version: 3.10.0(react-hook-form@7.71.1)
       '@tarodan/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config
@@ -793,9 +802,15 @@ importers:
       react:
         specifier: ^18.2.0
         version: 18.3.1
+      react-hook-form:
+        specifier: ^7.49.3
+        version: 7.71.1(react@18.3.1)
       typescript:
         specifier: ^5.3.2
         version: 5.9.3
+      zod:
+        specifier: ^3.22.4
+        version: 3.25.76
 
   packages/ui-native:
     dependencies:
@@ -809,6 +824,9 @@ importers:
       '@expo/vector-icons':
         specifier: ^15.0.3
         version: 15.0.3(expo-font@14.0.12)(react-native@0.81.5)(react@19.1.0)
+      '@hookform/resolvers':
+        specifier: ^3.6.0
+        version: 3.10.0(react-hook-form@7.71.1)
       '@react-native-community/datetimepicker':
         specifier: 8.4.4
         version: 8.4.4(expo@54.0.35)(react-native@0.81.5)(react@19.1.0)
@@ -824,6 +842,9 @@ importers:
       react:
         specifier: 19.1.0
         version: 19.1.0
+      react-hook-form:
+        specifier: ^7.52.0
+        version: 7.71.1(react@19.1.0)
       react-native:
         specifier: 0.81.5
         version: 0.81.5(@babel/core@7.28.6)(@types/react@19.1.17)(react@19.1.0)
@@ -833,6 +854,9 @@ importers:
       typescript:
         specifier: ^5.3.2
         version: 5.9.3
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
 
 packages:
 
@@ -4704,8 +4728,7 @@ packages:
     peerDependencies:
       react-hook-form: ^7.0.0
     dependencies:
-      react-hook-form: 7.71.1(react@19.1.0)
-    dev: false
+      react-hook-form: 7.71.1(react@18.3.1)
 
   /@humanwhocodes/config-array@0.13.0:
     resolution: {integrity: sha512-DZLEEqFWQFiyK6h5YIeynKx7JlvCYWL0cImfSRXZ9l4Sg2efkFGTuFf6vzXjK1cq6IYkU+Eg/JizXw+TD2vRNw==}
@@ -18157,7 +18180,6 @@ packages:
       react: ^16.8.0 || ^17 || ^18 || ^19
     dependencies:
       react: 18.3.1
-    dev: false
 
   /react-hook-form@7.71.1(react@19.1.0):
     resolution: {integrity: sha512-9SUJKCGKo8HUSsCO+y0CtqkqI5nNuaDqTxyqPsZPqIwudpj4rCrAz/jZV+jn57bx5gtZKOh3neQu94DXMc+w5w==}
@@ -18166,7 +18188,6 @@ packages:
       react: ^16.8.0 || ^17 || ^18 || ^19
     dependencies:
       react: 19.1.0
-    dev: false
 
   /react-hot-toast@2.6.0(react-dom@18.3.1)(react@18.3.1):
     resolution: {integrity: sha512-bH+2EBMZ4sdyou/DPrfgIouFpcRLCJ+HoCA32UoAYHn6T3Ur5yfcDCeSr5mwldl6pFOsiocmrXMuoCJ1vV8bWg==}
@@ -21354,7 +21375,6 @@ packages:
 
   /zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
-    dev: false
 
   /zod@4.4.3:
     resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
