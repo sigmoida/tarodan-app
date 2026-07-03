@@ -431,13 +431,13 @@ export default function DashboardPage() {
             </div>
             <span className="font-medium text-heading min-w-0 truncate">Siparişler</span>
           </Link>
-          <Link href="/users" className="admin-card hover:border-primary-500/50 transition-colors flex items-center gap-3">
+          <Link href="/accounts/users" className="admin-card hover:border-primary-500/50 transition-colors flex items-center gap-3">
             <div className="p-2 bg-primary-500/20 rounded-lg shrink-0">
               <UsersIcon className="h-6 w-6 text-primary-500" />
             </div>
             <span className="font-medium text-heading min-w-0 truncate">Kullanıcılar</span>
           </Link>
-          <Link href="/messages" className="admin-card hover:border-primary-500/50 transition-colors flex items-center gap-3">
+          <Link href="/messaging/messages" className="admin-card hover:border-primary-500/50 transition-colors flex items-center gap-3">
             <div className="p-2 bg-success-500/20 rounded-lg shrink-0">
               <ArrowsRightLeftIcon className="h-6 w-6 text-success-500" />
             </div>
@@ -487,7 +487,7 @@ export default function DashboardPage() {
                   <p className="text-info-700 font-medium">
                     {pendingActions.pendingMessages} mesaj onay bekliyor
                   </p>
-                  <Link href="/messages" className="text-sm text-info-500 hover:underline">
+                  <Link href="/messaging/messages" className="text-sm text-info-500 hover:underline">
                     İncele →
                   </Link>
                 </div>
@@ -502,7 +502,7 @@ export default function DashboardPage() {
                   <p className="text-info-700 font-medium">
                     {pendingActions.identityVerificationRequests} kimlik doğrulama talebi
                   </p>
-                  <Link href="/users?status=pending_verification" className="text-sm text-info-500 hover:underline">
+                  <Link href="/accounts/users?status=pending_verification" className="text-sm text-info-500 hover:underline">
                     İncele →
                   </Link>
                 </div>

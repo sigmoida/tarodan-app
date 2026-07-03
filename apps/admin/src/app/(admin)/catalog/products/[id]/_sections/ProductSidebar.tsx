@@ -83,7 +83,7 @@ export function ProductSidebar({
 
       <SectionCard title="Hızlı Linkler" bodyClassName="space-y-2">
         <Link
-          href={`/users/${product.seller.id}`}
+          href={`/accounts/users/${product.seller.id}`}
           className="block rounded-lg px-4 py-2 text-body transition-colors hover:bg-surface"
         >
           Satıcıyı Görüntüle

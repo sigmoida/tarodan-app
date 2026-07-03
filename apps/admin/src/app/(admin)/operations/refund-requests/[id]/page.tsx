@@ -107,7 +107,7 @@ export default function RefundRequestDetailPage() {
                 title="Alıcı (Talep Eden)"
                 icon={UserIcon}
                 name={rr.requester.displayName}
-                userHref={`/users/${rr.requester.id}`}
+                userHref={`/accounts/users/${rr.requester.id}`}
                 email={rr.requester.email}
                 phone={rr.requester.phone}
               />
@@ -115,7 +115,7 @@ export default function RefundRequestDetailPage() {
                 title="Satıcı"
                 icon={UserIcon}
                 name={rr.order.seller.displayName}
-                userHref={`/users/${rr.order.seller.id}`}
+                userHref={`/accounts/users/${rr.order.seller.id}`}
                 email={rr.order.seller.email}
                 phone={rr.order.seller.phone}
               />

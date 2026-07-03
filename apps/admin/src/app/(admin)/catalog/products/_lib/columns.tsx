@@ -69,7 +69,7 @@ export function productColumns({ onApprove, onReject, onDelete, onRestore }: Pro
     col.muted<Product>('Kondisyon', (p) => enumLabel(productConditionConfig, p.condition)),
     col.user<Product>('Satıcı', (p) => ({
       name: p.seller.displayName,
-      href: `/users/${p.seller.id}`,
+      href: `/accounts/users/${p.seller.id}`,
     })),
     col.text<Product>('Kategori', (p) => p.category.name),
     col.date<Product>('Tarih', (p) => p.createdAt),

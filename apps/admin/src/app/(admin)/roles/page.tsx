@@ -116,10 +116,10 @@ const PERMISSION_GROUPS: PermGroup[] = [
     id: "accounts",
     group: "Hesaplar",
     permissions: [
-      { key: "users", label: "Kullanıcılar", description: "Kullanıcı listesi, profil, ban/ban kaldırma ve kimlik doğrulama.", pages: ["/users", "/users/:id"] },
-      { key: "seller_applications", label: "Satıcı Başvuruları", description: "Satıcı başvurularını onaylama veya reddetme.", pages: ["/sellers/applications"] },
-      { key: "seller_performance", label: "Satıcı Performansı", description: "Satıcı performans raporları ve istatistikleri.", pages: ["/sellers/performance"] },
-      { key: "reviews", label: "Yorumlar", description: "Kullanıcı yorumlarını görüntüleme, onaylama ve reddetme.", pages: ["/reviews"] },
+      { key: "users", label: "Kullanıcılar", description: "Kullanıcı listesi, profil, ban/ban kaldırma ve kimlik doğrulama.", pages: ["/accounts/users", "/accounts/users/:id"] },
+      { key: "seller_applications", label: "Satıcı Başvuruları", description: "Satıcı başvurularını onaylama veya reddetme.", pages: ["/accounts/seller-applications"] },
+      { key: "seller_performance", label: "Satıcı Performansı", description: "Satıcı performans raporları ve istatistikleri.", pages: ["/accounts/seller-performance"] },
+      { key: "reviews", label: "Yorumlar", description: "Kullanıcı yorumlarını görüntüleme, onaylama ve reddetme.", pages: ["/accounts/reviews"] },
       { key: "staff", label: "Rol Yönetimi", description: "Yönetici hesabı oluşturma, rol atama ve izin matrisi düzenleme.", pages: ["/roles"] },
     ],
   },
@@ -127,8 +127,8 @@ const PERMISSION_GROUPS: PermGroup[] = [
     id: "messaging",
     group: "Mesajlaşma",
     permissions: [
-      { key: "messages", label: "Mesajlar", description: "Kullanıcılar arası mesaj konuşmalarını görüntüleme ve moderasyon.", pages: ["/messages", "/messages/:threadId"] },
-      { key: "support", label: "Destek Talepleri", description: "Kullanıcı destek taleplerini görüntüleme ve yanıtlama.", pages: ["/support", "/support/:id"] },
+      { key: "messages", label: "Mesajlar", description: "Kullanıcılar arası mesaj konuşmalarını görüntüleme ve moderasyon.", pages: ["/messaging/messages", "/messaging/messages/:threadId"] },
+      { key: "support", label: "Destek Talepleri", description: "Kullanıcı destek taleplerini görüntüleme ve yanıtlama.", pages: ["/messaging/support", "/messaging/support/:id"] },
     ],
   },
   {

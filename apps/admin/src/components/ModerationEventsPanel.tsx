@@ -77,7 +77,7 @@ function DecisionBadge({ decision }: { decision: string }) {
 function entityHref(e: ModerationEvent): string | null {
   if (!e.entityId) return null;
   if (e.entityType === 'product') return `/catalog/products/${e.entityId}`;
-  if (e.entityType === 'user') return `/users/${e.entityId}`;
+  if (e.entityType === 'user') return `/accounts/users/${e.entityId}`;
   return null;
 }
 
@@ -138,7 +138,7 @@ function moderationColumns(withEntityCol: boolean): ColumnDef<ModerationEvent, u
     ),
     col.text<ModerationEvent>('Sebep', (e) => e.reason, { grow: 2 }),
     col.user<ModerationEvent>('Kullanıcı', (e) =>
-      e.user ? { name: e.user.displayName || e.user.email, href: `/users/${e.user.id}` } : null,
+      e.user ? { name: e.user.displayName || e.user.email, href: `/accounts/users/${e.user.id}` } : null,
     ),
     col.date<ModerationEvent>('Tarih', (e) => e.createdAt),
   );
@@ -252,6 +252,7 @@ export function ModerationEventsPanel({
         />
       )}
       <ResourceList.Toolbar>
+        <ResourceList.Search placeholder="Kullanıcı veya sebep ara..." />
         <ResourceList.FilterSelect name="decision" options={DECISION_OPTIONS} className="sm:w-56" />
       </ResourceList.Toolbar>
       <ResourceList.Table

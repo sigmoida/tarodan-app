@@ -29,11 +29,11 @@ const columns = [
   ),
   col.user<Trade>('Başlatan', (r) => ({
     name: r.initiator.displayName,
-    href: `/users/${r.initiator.id}`,
+    href: `/accounts/users/${r.initiator.id}`,
   })),
   col.user<Trade>('Alan', (r) => ({
     name: r.receiver.displayName,
-    href: `/users/${r.receiver.id}`,
+    href: `/accounts/users/${r.receiver.id}`,
   })),
   col.money<Trade>('Nakit', (r) => r.cashAmount || null, { tone: 'primary' }),
   col.date<Trade>('Tarih', (r) => r.createdAt),

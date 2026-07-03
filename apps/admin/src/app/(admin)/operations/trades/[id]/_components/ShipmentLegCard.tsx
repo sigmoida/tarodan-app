@@ -63,7 +63,7 @@ export function ShipmentLegCard({
                   {s.sender && (
                     <p>
                       <span className="font-medium text-body">Gönderen:</span>{' '}
-                      <Link href={`/users/${s.sender.id}`} className="text-primary-600 hover:underline">
+                      <Link href={`/accounts/users/${s.sender.id}`} className="text-primary-600 hover:underline">
                         {s.sender.displayName}
                       </Link>
                     </p>
@@ -71,7 +71,7 @@ export function ShipmentLegCard({
                   {s.recipient && (
                     <p>
                       <span className="font-medium text-body">Alıcı:</span>{' '}
-                      <Link href={`/users/${s.recipient.id}`} className="text-primary-600 hover:underline">
+                      <Link href={`/accounts/users/${s.recipient.id}`} className="text-primary-600 hover:underline">
                         {s.recipient.displayName}
                       </Link>
                       {s.recipientType && (

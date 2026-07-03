@@ -87,14 +87,14 @@ export default function OrderDetailPage() {
                 <PartyCard
                   title="Alıcı"
                   name={order.buyer.displayName}
-                  userHref={`/users/${order.buyer.id}`}
+                  userHref={`/accounts/users/${order.buyer.id}`}
                   email={order.buyer.email}
                   phone={order.buyer.phone}
                 />
                 <PartyCard
                   title="Satıcı"
                   name={order.seller.displayName}
-                  userHref={`/users/${order.seller.id}`}
+                  userHref={`/accounts/users/${order.seller.id}`}
                   email={order.seller.email}
                 />
                 <Timeline

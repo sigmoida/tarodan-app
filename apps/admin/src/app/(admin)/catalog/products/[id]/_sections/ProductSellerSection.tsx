@@ -7,7 +7,7 @@ export function ProductSellerSection({ seller }: { seller: ProductDetail['seller
     <SectionCard title="Satıcı Bilgileri" bodyClassName="space-y-2">
       <p>
         <span className="text-muted">İsim:</span>{' '}
-        <Link href={`/users/${seller.id}`} className="font-medium text-primary-600 hover:underline">
+        <Link href={`/accounts/users/${seller.id}`} className="font-medium text-primary-600 hover:underline">
           {seller.displayName}
         </Link>
       </p>

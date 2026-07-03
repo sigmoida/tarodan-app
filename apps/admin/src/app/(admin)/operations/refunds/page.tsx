@@ -24,10 +24,10 @@ const columns = [
   col.code<Refund>("ID", (r) => `${r.id.slice(0, 8)}…`, { grow: 1 }),
   col.money<Refund>("Tutar", (r) => r.amount, { tone: "negative" }),
   col.user<Refund>("Alıcı", (r) =>
-    r.order?.buyer ? { name: r.order.buyer.displayName, href: `/users/${r.order.buyer.id}` } : null,
+    r.order?.buyer ? { name: r.order.buyer.displayName, href: `/accounts/users/${r.order.buyer.id}` } : null,
   ),
   col.user<Refund>("Satıcı", (r) =>
-    r.order?.seller ? { name: r.order.seller.displayName, href: `/users/${r.order.seller.id}` } : null,
+    r.order?.seller ? { name: r.order.seller.displayName, href: `/accounts/users/${r.order.seller.id}` } : null,
   ),
   col.text<Refund>("Ürün", (r) => r.order?.product?.title, { grow: 2 }),
   col.date<Refund>("İade Tarihi", (r) => r.refundedAt),

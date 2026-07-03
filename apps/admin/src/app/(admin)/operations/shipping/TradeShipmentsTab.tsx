@@ -42,7 +42,7 @@ const columns = [
     <StatusBadge status={r.status} config={shipmentStatusConfig} />
   )),
   col.user<TradeShipmentRow>("Gönderici", (r) =>
-    r.shipper ? { name: r.shipper.displayName, href: `/users/${r.shipper.id}` } : null,
+    r.shipper ? { name: r.shipper.displayName, href: `/accounts/users/${r.shipper.id}` } : null,
   ),
   col.muted<TradeShipmentRow>("Güncelleme", (r) => formatRelative(r.updatedAt), { grow: 1, minWidth: 130 }),
 ];

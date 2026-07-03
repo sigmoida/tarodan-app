@@ -176,7 +176,7 @@ export function OrdersTable() {
     ),
     col.user<Order>('Alıcı', (o) => ({
       name: o.buyer.displayName,
-      href: `/users/${o.buyer.id}`,
+      href: `/accounts/users/${o.buyer.id}`,
     })),
     col.custom<Order>('Satıcı', (o) => {
       if (o.isGroupSummary) {
@@ -192,7 +192,7 @@ export function OrdersTable() {
           </span>
         );
       }
-      return <CellUser name={o.seller.displayName} href={`/users/${o.seller.id}`} />;
+      return <CellUser name={o.seller.displayName} href={`/accounts/users/${o.seller.id}`} />;
     }),
     col.custom<Order>(
       'Ürün',

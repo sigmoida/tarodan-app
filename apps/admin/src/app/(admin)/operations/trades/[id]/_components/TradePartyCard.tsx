@@ -20,7 +20,7 @@ export function TradePartyCard({
     <SectionCard title={title} icon={UserIcon}>
       <div className="mb-4 space-y-2">
         <Link
-          href={`/users/${user.id}`}
+          href={`/accounts/users/${user.id}`}
           className="block font-medium text-primary-600 hover:text-primary-700"
         >
           {user.displayName}
