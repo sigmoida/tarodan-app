@@ -260,7 +260,7 @@ export default function AdminPaymentDetailPage() {
                   <div className="flex justify-between">
                     <span className="text-muted">Sipariş No:</span>
                     <Link
-                      href={`/orders/${payment.orderId}`}
+                      href={`/operations/orders/${payment.orderId}`}
                       className="text-primary-600 hover:text-primary-700 font-medium"
                     >
                       #{payment.order.orderNumber}

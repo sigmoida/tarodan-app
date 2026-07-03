@@ -92,11 +92,11 @@ const PERMISSION_GROUPS: PermGroup[] = [
     id: "operations",
     group: "Operasyon",
     permissions: [
-      { key: "orders", label: "Siparişler", description: "Sipariş listesi, detay görüntüleme ve durum değiştirme.", pages: ["/orders", "/orders/:id"] },
-      { key: "trades", label: "Takaslar", description: "Takas listesi, detay, onaylama, reddetme, kargo ve depo işlemleri.", pages: ["/trades", "/trades/:id"] },
-      { key: "shipping", label: "Kargo", description: "Kargo etiketi oluşturma, takip ve depoya gönderim işlemleri.", pages: ["/shipping"] },
-      { key: "refund_requests", label: "İade Talepleri", description: "İade talep listesi, detay görüntüleme, onaylama ve reddetme.", pages: ["/refund-requests", "/refund-requests/:id"] },
-      { key: "refund_history", label: "İade Geçmişi", description: "Tamamlanmış iade kayıtları ve geçmiş liste.", pages: ["/refunds"] },
+      { key: "orders", label: "Siparişler", description: "Sipariş listesi, detay görüntüleme ve durum değiştirme.", pages: ["/operations/orders", "/operations/orders/:id"] },
+      { key: "trades", label: "Takaslar", description: "Takas listesi, detay, onaylama, reddetme, kargo ve depo işlemleri.", pages: ["/operations/trades", "/operations/trades/:id"] },
+      { key: "shipping", label: "Kargo", description: "Kargo etiketi oluşturma, takip ve depoya gönderim işlemleri.", pages: ["/operations/shipping"] },
+      { key: "refund_requests", label: "İade Talepleri", description: "İade talep listesi, detay görüntüleme, onaylama ve reddetme.", pages: ["/operations/refund-requests", "/operations/refund-requests/:id"] },
+      { key: "refund_history", label: "İade Geçmişi", description: "Tamamlanmış iade kayıtları ve geçmiş liste.", pages: ["/operations/refunds"] },
     ],
   },
   {

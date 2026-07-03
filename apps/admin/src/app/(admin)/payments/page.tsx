@@ -96,7 +96,7 @@ export default function AdminPaymentsPage() {
       header: "Sipariş No",
       cell: ({ row }) => (
         <Link
-          href={`/orders/${row.original.orderId}`}
+          href={`/operations/orders/${row.original.orderId}`}
           className="text-primary-600 hover:text-primary-700 font-medium"
         >
           #{row.original.orderNumber}

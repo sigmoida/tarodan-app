@@ -54,6 +54,12 @@ export type NavGroup = {
   name: string;
   icon: ComponentType<{ className?: string }>;
   items: NavItem[];
+  /**
+   * Optional section route. When set, clicking the group header navigates here
+   * (the route redirects to the first child) while the chevron toggles the
+   * accordion. Groups without an href are toggle-only.
+   */
+  href?: string;
 };
 
 export const topLevelNav: NavItem[] = [
@@ -66,12 +72,13 @@ export const navGroups: NavGroup[] = [
     id: 'operations',
     name: 'Operasyon',
     icon: ClipboardDocumentIcon,
+    href: '/operations',
     items: [
-      { name: 'Siparişler', href: '/orders', icon: ClipboardDocumentListIcon, keywords: ['order'], permission: 'orders' },
-      { name: 'Takaslar', href: '/trades', icon: ArrowsRightLeftIcon, keywords: ['takas', 'trade', 'barter', 'değişim'], permission: 'trades' },
-      { name: 'Kargo', href: '/shipping', icon: TruckIcon, keywords: ['kargo', 'shipping', 'gönderi', 'etiket', 'takip'], permission: 'shipping' },
-      { name: 'İade Takibi', href: '/refund-requests', icon: BanknotesIcon, keywords: ['iade', 'refund', 'talep', 'takip'], permission: 'refund_requests' },
-      { name: 'İade Geçmişi', href: '/refunds', icon: BanknotesIcon, keywords: ['iade', 'refund', 'geçmiş'], permission: 'refund_history' },
+      { name: 'Siparişler', href: '/operations/orders', icon: ClipboardDocumentListIcon, keywords: ['order'], permission: 'orders' },
+      { name: 'Takaslar', href: '/operations/trades', icon: ArrowsRightLeftIcon, keywords: ['takas', 'trade', 'barter', 'değişim'], permission: 'trades' },
+      { name: 'Kargo', href: '/operations/shipping', icon: TruckIcon, keywords: ['kargo', 'shipping', 'gönderi', 'etiket', 'takip'], permission: 'shipping' },
+      { name: 'İade Takibi', href: '/operations/refund-requests', icon: BanknotesIcon, keywords: ['iade', 'refund', 'talep', 'takip'], permission: 'refund_requests' },
+      { name: 'İade Geçmişi', href: '/operations/refunds', icon: BanknotesIcon, keywords: ['iade', 'refund', 'geçmiş'], permission: 'refund_history' },
     ],
   },
   {

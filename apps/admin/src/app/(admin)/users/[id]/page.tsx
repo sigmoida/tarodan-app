@@ -663,7 +663,7 @@ export default function UserDetailPage() {
                                 }`}>
                                   {order.role === 'buyer' ? 'Alıcı' : 'Satıcı'}
                                 </span>
-                                <Link href={`/orders/${order.id}`} className="text-heading font-medium hover:text-primary-600">
+                                <Link href={`/operations/orders/${order.id}`} className="text-heading font-medium hover:text-primary-600">
                                   {order.orderNumber || `#${order.id.slice(0, 8)}`}
                                 </Link>
                                 <StatusBadge status={order.status} config={userStatusConfig} />
@@ -680,7 +680,7 @@ export default function UserDetailPage() {
                           </div>
                         ))}
                         <Link
-                          href={`/orders?userId=${user.id}`}
+                          href={`/operations/orders?userId=${user.id}`}
                           className="block text-center text-primary-600 hover:underline py-2"
                         >
                           Tüm siparişleri görüntüle →
@@ -753,7 +753,7 @@ export default function UserDetailPage() {
                                 }`}>
                                   {trade.role === 'initiator' ? 'Başlatan' : 'Alıcı'}
                                 </span>
-                                <Link href={`/trades/${trade.id}`} className="text-heading font-medium hover:text-primary-600">
+                                <Link href={`/operations/trades/${trade.id}`} className="text-heading font-medium hover:text-primary-600">
                                   {trade.tradeNumber || `#${trade.id.slice(0, 8)}`}
                                 </Link>
                                 <StatusBadge status={trade.status} config={userStatusConfig} />
@@ -772,7 +772,7 @@ export default function UserDetailPage() {
                           </div>
                         ))}
                         <Link
-                          href={`/trades?userId=${user.id}`}
+                          href={`/operations/trades?userId=${user.id}`}
                           className="block text-center text-primary-600 hover:underline py-2"
                         >
                           Tüm takasları görüntüle →
@@ -865,7 +865,7 @@ export default function UserDetailPage() {
               <h3 className="text-lg font-semibold text-heading mb-4">Hızlı İşlemler</h3>
               <div className="space-y-2">
                 <Link
-                  href={`/orders?userId=${user.id}`}
+                  href={`/operations/orders?userId=${user.id}`}
                   className="flex items-center gap-3 w-full px-4 py-3 text-muted hover:bg-surface-alt rounded-lg transition-colors"
                 >
                   <ShoppingBagIcon className="w-5 h-5" />
@@ -879,7 +879,7 @@ export default function UserDetailPage() {
                   <span>Tüm Ürünler ({user.stats?.productsCount || 0})</span>
                 </Link>
                 <Link
-                  href={`/trades?userId=${user.id}`}
+                  href={`/operations/trades?userId=${user.id}`}
                   className="flex items-center gap-3 w-full px-4 py-3 text-muted hover:bg-surface-alt rounded-lg transition-colors"
                 >
                   <ArrowPathIcon className="w-5 h-5" />

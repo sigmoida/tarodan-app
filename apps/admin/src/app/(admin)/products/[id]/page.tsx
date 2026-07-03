@@ -492,7 +492,7 @@ export default function ProductDetailPage() {
                       Satıcıyı Görüntüle
                     </Link>
                     <Link
-                      href={`/orders?productId=${product.id}`}
+                      href={`/operations/orders?productId=${product.id}`}
                       className="block w-full px-4 py-2 text-left text-body hover:bg-surface rounded-lg transition-colors"
                     >
                       Siparişleri Görüntüle

@@ -425,7 +425,7 @@ export default function DashboardPage() {
             </div>
             <span className="font-medium text-heading min-w-0 truncate">Ürünler</span>
           </Link>
-          <Link href="/orders" className="admin-card hover:border-primary-500/50 transition-colors flex items-center gap-3">
+          <Link href="/operations/orders" className="admin-card hover:border-primary-500/50 transition-colors flex items-center gap-3">
             <div className="p-2 bg-info-500/20 rounded-lg shrink-0">
               <ChartBarIcon className="h-6 w-6 text-info-500" />
             </div>
@@ -472,7 +472,7 @@ export default function DashboardPage() {
                   <p className="text-primary-700 font-medium">
                     {pendingActions.refundRequests} iade talebi
                   </p>
-                  <Link href="/orders?status=refund_requested" className="text-sm text-primary-500 hover:underline">
+                  <Link href="/operations/orders?status=refund_requested" className="text-sm text-primary-500 hover:underline">
                     İncele →
                   </Link>
                 </div>
@@ -605,7 +605,7 @@ export default function DashboardPage() {
           <div className="admin-card lg:col-span-2">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-heading">Son Siparişler</h3>
-              <Link href="/orders" className="text-sm text-primary-600 hover:underline">
+              <Link href="/operations/orders" className="text-sm text-primary-600 hover:underline">
                 Tümünü Gör →
               </Link>
             </div>
@@ -657,7 +657,7 @@ export default function DashboardPage() {
                 <ArrowsRightLeftIcon className="h-5 w-5 text-primary-600" />
                 Son Takaslar
               </h3>
-              <Link href="/trades" className="text-sm text-primary-600 hover:underline">
+              <Link href="/operations/trades" className="text-sm text-primary-600 hover:underline">
                 Tümünü Gör →
               </Link>
             </div>
