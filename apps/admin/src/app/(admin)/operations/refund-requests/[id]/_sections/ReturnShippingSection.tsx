@@ -1,4 +1,3 @@
-import { TruckIcon } from '@heroicons/react/24/outline';
 import { StatusBadge, enumLabel, shipmentStatusConfig, shipmentProviderConfig } from '@tarodan/ui';
 import { payerLabels } from '@/components/refunds/refund-guidance';
 import { SectionCard } from '@/components/detail/SectionCard';
@@ -14,7 +13,7 @@ export function ReturnShippingSection({ rr }: { rr: RefundRequestDetail }) {
       : enumLabel(shipmentProviderConfig, rr.returnProvider ?? undefined, rr.returnProvider ?? '—');
 
   return (
-    <SectionCard title="İade Kargosu" icon={TruckIcon} bodyClassName="space-y-4">
+    <SectionCard title="İade Kargosu" bodyClassName="space-y-4">
       <p className="text-sm text-muted">
         Alıcı ürünü satıcıya geri gönderir. Ürün satıcıya ulaştığında para iadesi otomatik
         başlatılır.

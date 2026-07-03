@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { CreditCardIcon } from '@heroicons/react/24/outline';
 import { enumLabel, paymentStatusConfig, paymentProviderConfig } from '@tarodan/ui';
 import { SectionCard } from '@/components/detail/SectionCard';
 import { DataList, Field } from '@/components/detail/DataList';
@@ -7,7 +6,7 @@ import type { OrderDetail } from '../types';
 
 export function PaymentSection({ payment }: { payment: NonNullable<OrderDetail['payment']> }) {
   return (
-    <SectionCard title="Ödeme Bilgileri" icon={CreditCardIcon}>
+    <SectionCard title="Ödeme Bilgileri">
       <DataList columns={1}>
         <Field label="Durum">{enumLabel(paymentStatusConfig, payment.status)}</Field>
         <Field label="Tutar">

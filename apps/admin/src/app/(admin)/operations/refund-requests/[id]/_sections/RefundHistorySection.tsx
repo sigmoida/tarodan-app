@@ -1,4 +1,3 @@
-import { ClockIcon } from '@heroicons/react/24/outline';
 import { refundActionLabel } from '@/components/refunds/refund-guidance';
 import { SectionCard } from '@/components/detail/SectionCard';
 import type { HistoryEntry } from '../types';
@@ -8,7 +7,7 @@ export function RefundHistorySection({ history }: { history: HistoryEntry[] }) {
   if (history.length === 0) return null;
 
   return (
-    <SectionCard title="İşlem Geçmişi" icon={ClockIcon}>
+    <SectionCard title="İşlem Geçmişi">
       <ol className="space-y-3">
         {history
           .slice()

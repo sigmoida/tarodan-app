@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { UserIcon } from '@heroicons/react/24/outline';
 import { getProductEffectivePrice } from '@/lib/productPrice';
 import { SectionCard } from '@/components/detail/SectionCard';
 import type { TradeItem } from '../types';
@@ -17,7 +16,7 @@ export function TradePartyCard({
   items: TradeItem[];
 }) {
   return (
-    <SectionCard title={title} icon={UserIcon}>
+    <SectionCard title={title}>
       <div className="mb-4 space-y-2">
         <Link
           href={`/accounts/users/${user.id}`}

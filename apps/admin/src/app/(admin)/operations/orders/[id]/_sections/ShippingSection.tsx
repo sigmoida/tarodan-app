@@ -1,4 +1,3 @@
-import { TruckIcon } from '@heroicons/react/24/outline';
 import { enumLabel, shipmentStatusConfig, shipmentProviderConfig } from '@tarodan/ui';
 import { SectionCard } from '@/components/detail/SectionCard';
 import { DataList, Field } from '@/components/detail/DataList';
@@ -23,7 +22,7 @@ export function ShippingSection({
       : null;
 
   return (
-    <SectionCard title="Kargo Bilgileri" icon={TruckIcon}>
+    <SectionCard title="Kargo Bilgileri">
       <DataList columns={1}>
         <Field label="Takip No">
           <span className="font-mono text-sm">{order.shipment.trackingNumber}</span>

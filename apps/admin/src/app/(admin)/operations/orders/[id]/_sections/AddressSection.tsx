@@ -1,4 +1,3 @@
-import { MapPinIcon } from '@heroicons/react/24/outline';
 import { SectionCard } from '@/components/detail/SectionCard';
 
 export function AddressSection({ address }: { address: any }) {
@@ -6,7 +5,7 @@ export function AddressSection({ address }: { address: any }) {
   const isObj = typeof address === 'object';
 
   return (
-    <SectionCard title="Teslimat Adresi" icon={MapPinIcon} bodyClassName="space-y-1">
+    <SectionCard title="Teslimat Adresi" bodyClassName="space-y-1">
       {isObj ? (
         <>
           {address.fullName && <p className="font-medium text-heading">{address.fullName}</p>}

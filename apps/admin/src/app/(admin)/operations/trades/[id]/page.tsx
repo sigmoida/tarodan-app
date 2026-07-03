@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { ArrowUturnLeftIcon, TruckIcon } from '@heroicons/react/24/outline';
 import { Button, StatusBadge, tradeStatusConfig } from '@tarodan/ui';
 import { adminApi } from '@/lib/api';
 import { useConfirm } from '@/components/ConfirmProvider';
@@ -140,7 +139,6 @@ export default function TradeDetailPage() {
                 {toWarehouse.length > 0 && (
                   <ShipmentLegCard
                     title="Depoya Giden Gönderiler"
-                    icon={<TruckIcon className="h-5 w-5" />}
                     shipments={toWarehouse}
                     actionLabel={canMarkWarehouse ? 'Depoya Ulaştı' : null}
                     onAction={canMarkWarehouse ? handleMarkWarehouse : null}
@@ -150,7 +148,6 @@ export default function TradeDetailPage() {
                 {fromWarehouse.length > 0 && (
                   <ShipmentLegCard
                     title="Depodan Alıcılara Gönderiler"
-                    icon={<TruckIcon className="h-5 w-5" />}
                     shipments={fromWarehouse}
                     actionLabel={null}
                     onAction={null}
@@ -165,7 +162,6 @@ export default function TradeDetailPage() {
                 {returns.length > 0 && (
                   <ShipmentLegCard
                     title="İade Gönderileri"
-                    icon={<ArrowUturnLeftIcon className="h-5 w-5" />}
                     shipments={returns}
                     actionLabel={isReturning ? 'Teslim Edildi' : null}
                     onAction={isReturning ? handleMarkReturnDelivered : null}

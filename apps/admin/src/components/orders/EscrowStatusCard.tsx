@@ -1,6 +1,7 @@
 "use client";
 
-import { BanknotesIcon, LockClosedIcon } from "@heroicons/react/24/outline";
+import { LockClosedIcon } from "@heroicons/react/24/outline";
+import { SectionCard } from "@/components/detail/SectionCard";
 import {
   computeEstimatedReleaseAt,
   computeRefundWindowEnd,
@@ -64,12 +65,7 @@ export function EscrowStatusCard({
   const tone = toneStyles[reason.tone] ?? toneStyles.info;
 
   return (
-    <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
-      <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
-        <BanknotesIcon className="w-5 h-5" />
-        Satıcı Ödemesi (Escrow)
-      </h2>
-
+    <SectionCard title="Satıcı Ödemesi (Escrow)">
       {/* İptal/iade tipi rozeti */}
       {cancelType && (
         <div className="mb-4 flex items-start gap-2">
@@ -160,6 +156,6 @@ export function EscrowStatusCard({
           </p>
         </div>
       )}
-    </div>
+    </SectionCard>
   );
 }

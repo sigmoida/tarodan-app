@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { CheckCircleIcon, UserIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon } from '@heroicons/react/24/outline';
 import { StatusBadge, refundRequestStatusConfig } from '@tarodan/ui';
 import { adminApi } from '@/lib/api';
 import { useAdminMutation } from '@/lib/query/useAdminMutation';
@@ -105,7 +105,6 @@ export default function RefundRequestDetailPage() {
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <PartyCard
                 title="Alıcı (Talep Eden)"
-                icon={UserIcon}
                 name={rr.requester.displayName}
                 userHref={`/accounts/users/${rr.requester.id}`}
                 email={rr.requester.email}
@@ -113,7 +112,6 @@ export default function RefundRequestDetailPage() {
               />
               <PartyCard
                 title="Satıcı"
-                icon={UserIcon}
                 name={rr.order.seller.displayName}
                 userHref={`/accounts/users/${rr.order.seller.id}`}
                 email={rr.order.seller.email}

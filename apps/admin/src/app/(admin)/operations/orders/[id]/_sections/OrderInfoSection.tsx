@@ -1,4 +1,3 @@
-import { ShoppingBagIcon } from '@heroicons/react/24/outline';
 import { AdminFinancialSummary } from '@/components/AdminFinancialSummary';
 import { SectionCard } from '@/components/detail/SectionCard';
 import type { OrderDetail } from '../types';
@@ -12,7 +11,7 @@ export function OrderInfoSection({
   status: OrderStatusView;
 }) {
   return (
-    <SectionCard title="Sipariş Bilgileri" icon={ShoppingBagIcon} bodyClassName="space-y-4">
+    <SectionCard title="Sipariş Bilgileri" bodyClassName="space-y-4">
       <div>
         <span className="text-sm text-muted">Durum:</span>
         <p className="font-medium text-heading">{status.label}</p>

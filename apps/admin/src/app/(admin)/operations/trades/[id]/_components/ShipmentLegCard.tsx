@@ -1,4 +1,3 @@
-import { type ReactNode } from 'react';
 import Link from 'next/link';
 import { Button, cn, enumLabel, shipmentStatusConfig } from '@tarodan/ui';
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
@@ -8,7 +7,6 @@ import { isShipmentDelivered } from '../_lib/trade';
 
 export interface ShipmentLegCardProps {
   title: string;
-  icon: ReactNode;
   shipments: TradeShipment[];
   actionLabel: string | null;
   onAction: ((shipmentId: string) => void) | null;
@@ -22,7 +20,6 @@ export interface ShipmentLegCardProps {
 /** One shipment leg (to-warehouse / from-warehouse / return) with per-shipment actions. */
 export function ShipmentLegCard({
   title,
-  icon,
   shipments,
   actionLabel,
   onAction,
@@ -35,7 +32,6 @@ export function ShipmentLegCard({
     <SectionCard
       title={
         <>
-          {icon}
           {title}
           <span className="text-sm font-normal text-muted">({shipments.length})</span>
         </>

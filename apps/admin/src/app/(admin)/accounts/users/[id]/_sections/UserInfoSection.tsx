@@ -1,4 +1,4 @@
-import { UserIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon } from '@heroicons/react/24/outline';
 import { SectionCard } from '@/components/detail/SectionCard';
 import { type UserDetail } from '../types';
 
@@ -31,7 +31,7 @@ function Item({
 
 export function UserInfoSection({ user }: { user: UserDetail }) {
   return (
-    <SectionCard title="Kullanıcı Bilgileri" icon={UserIcon}>
+    <SectionCard title="Kullanıcı Bilgileri">
       <div className="grid grid-cols-2 gap-6">
         <Item label="Email">
           <p className="font-medium text-heading">{user.email}</p>

@@ -3,7 +3,6 @@ import {
   ShoppingBagIcon,
   CubeIcon,
   ArrowPathIcon,
-  MapPinIcon,
   CheckCircleIcon,
   XCircleIcon,
 } from '@heroicons/react/24/outline';
@@ -72,7 +71,7 @@ export function UserSidebar({ user }: { user: UserDetail }) {
       </SectionCard>
 
       {user.addresses && user.addresses.length > 0 && (
-        <SectionCard title={`Adresler (${user.addresses.length})`} icon={MapPinIcon}>
+        <SectionCard title={`Adresler (${user.addresses.length})`}>
           <div className="space-y-3">
             {user.addresses.map((address) => (
               <div key={address.id} className="rounded-lg bg-surface-alt p-3">

@@ -1,4 +1,4 @@
-import { ExclamationTriangleIcon, XCircleIcon } from '@heroicons/react/24/outline';
+import { XCircleIcon } from '@heroicons/react/24/outline';
 import { enumLabel, refundReasonConfig } from '@tarodan/ui';
 import { cancelReasonLabel } from '@/lib/utils';
 import { SectionCard } from '@/components/detail/SectionCard';
@@ -34,14 +34,7 @@ export function TradeInfoCards({ trade }: { trade: TradeDetail }) {
       )}
 
       {trade.dispute && (
-        <SectionCard
-          title={
-            <>
-              <ExclamationTriangleIcon className="h-5 w-5 text-primary-600" />
-              İtiraz
-            </>
-          }
-        >
+        <SectionCard title="İtiraz">
           <div className="space-y-2">
             <p>
               <span className="font-medium">Neden:</span>{' '}

@@ -1,7 +1,6 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import Image from 'next/image';
 import { StarIcon } from '@heroicons/react/24/outline';
 import { Button } from '@tarodan/ui';
 import { adminApi } from '@/lib/api';
@@ -59,24 +58,7 @@ export default function UserDetailPage() {
       fetcher={(uid) => adminApi.getUser(uid).then((r) => r.data)}
       backHref="/accounts/users"
       emptyTitle="Kullanıcı bulunamadı"
-      title={(u) => (
-        <span className="flex items-center gap-3">
-          {u.avatarUrl ? (
-            <Image
-              src={u.avatarUrl}
-              alt={u.displayName}
-              width={44}
-              height={44}
-              className="rounded-full"
-            />
-          ) : (
-            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary-100 text-lg font-bold text-primary-600">
-              {u.displayName.charAt(0).toUpperCase()}
-            </span>
-          )}
-          {u.displayName}
-        </span>
-      )}
+      title={(u) => u.displayName}
       subtitle={(u) => (
         <span className="flex flex-wrap items-center gap-2">
           {u.email}
