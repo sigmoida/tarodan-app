@@ -50,17 +50,6 @@
   @apply bg-surface-elevated rounded-lg border border-border p-6 shadow-sm;
 }
 
-/* Search inputs with left icon: adds extra left padding so the
- * absolutely-positioned icon doesn't overlap the placeholder text.
- * Use with <Input> / <Select> from @tarodan/ui when an icon is rendered
- * next to the field outside the component. */
-.admin-input-with-icon-left {
-  padding-left: 2.75rem !important;
-}
-.admin-input-with-icon-left-sm {
-  padding-left: 2.5rem !important;
-}
-
 .badge {
   @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
 }
