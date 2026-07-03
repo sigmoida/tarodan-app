@@ -4,7 +4,7 @@
 
 import { type ComponentType, type ReactNode } from 'react';
 import Link from 'next/link';
-import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, ChevronLeftIcon } from '@heroicons/react/24/outline';
 import { Input } from '@tarodan/ui';
 
 /**
@@ -17,24 +17,41 @@ export function PageHeader({
 	title,
 	badge,
 	description,
+	backHref,
+	backLabel = 'Geri',
 	children,
 }: {
 	title: ReactNode;
 	/** Rendered next to the title (e.g. a count/status pill). */
 	badge?: ReactNode;
 	description?: ReactNode;
+	/** When set, a back chevron links here before the title (detail pages). */
+	backHref?: string;
+	backLabel?: string;
 	children?: ReactNode;
 }) {
 	return (
 		<div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
-			<div className='min-w-0 space-y-0.5'>
-				<div className='flex flex-wrap items-center gap-3'>
-					<h1 className='text-2xl font-bold text-heading'>{title}</h1>
-					{badge}
-				</div>
-				{description != null && (
-					<p className='mt-1 text-muted text-sm'>{description}</p>
+			<div className='flex min-w-0 items-start gap-2'>
+				{backHref && (
+					<Link
+						href={backHref}
+						aria-label={backLabel}
+						title={backLabel}
+						// h-8 = text-2xl line box → items-center hizalar chevron'u başlığın dikey ortasına
+						className='-ml-1 flex h-8 items-center rounded-lg px-1 text-muted transition-colors hover:bg-surface-alt hover:text-heading'>
+						<ChevronLeftIcon className='h-7 w-7' />
+					</Link>
 				)}
+				<div className='min-w-0 space-y-0.5'>
+					<div className='flex flex-wrap items-center gap-3'>
+						<h1 className='text-2xl font-bold text-heading'>{title}</h1>
+						{badge}
+					</div>
+					{description != null && (
+						<p className='mt-1 text-muted text-sm'>{description}</p>
+					)}
+				</div>
 			</div>
 			{children && (
 				<div className='flex flex-wrap items-center gap-2'>{children}</div>

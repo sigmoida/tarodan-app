@@ -1,3 +1,5 @@
+/** @format */
+
 import { type ReactNode } from 'react';
 import { cn } from '@tarodan/ui';
 
@@ -6,6 +8,12 @@ import { cn } from '@tarodan/ui';
  * Every page body (and the ResourceList root) renders through this, so changing
  * the spacing here changes it everywhere. Never hardcode `space-y-6` on a page.
  */
-export function AdminPage({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('space-y-6', className)}>{children}</div>;
+export function AdminPage({
+	children,
+	className,
+}: {
+	children: ReactNode;
+	className?: string;
+}) {
+	return <div className={cn('space-y-4', className)}>{children}</div>;
 }
