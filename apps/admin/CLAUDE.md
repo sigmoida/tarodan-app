@@ -118,3 +118,123 @@ The `(auth)` group is the canonical example of these rules:
   `useRedirectIfAuthenticated` — the pages/forms stay thin.
 - **No raw primitives, no palette colors, no inline spinner** (`Button
   isLoading` handles it), links are `next/link`.
+
+---
+
+## 9. Data & pages — the list/detail/mutation recipe
+
+Every page is a client component; **all** server data goes through TanStack
+Query. Never `useState` + `useEffect` + `adminApi` by hand.
+
+### Data layer (`lib/query/`, `hooks/`)
+- **Lists** → `useAdminResource<T>({ queryKey, fetcher, … })` (pagination,
+  debounced search, filters, URL sync). `queryKey` = the resource name.
+- **Single item** → `useAdminItem<T>({ resource, id, fetcher })`.
+- **Writes** → `useAdminMutation(fn, { invalidates: [resource…], successMessage })`
+  — the ONLY way to mutate. Owns the toast + `invalidateQueries`, so lists/details
+  refresh automatically (no manual `refetch()`). Per-row busy:
+  `mut.isPending && mut.variables === id`. Keys: `lib/query/keys.ts`.
+
+### List pages → the `ResourceList` compound (`components/list/`)
+No prop-explosion: the root takes only the data config; sub-parts read state from
+context (`useResourceList` / `useFilter`).
+
+```tsx
+<ResourceList resource="orders" fetcher={(p) => adminApi.getOrders(p)}
+  getRowId={(o) => o.id} syncUrl initialFilters={{ status: 'all' }}>
+  <ResourceList.Header title="Siparişler" description={<OrdersSummary />} actions={…} />
+  <ResourceList.Toolbar>
+    <ResourceList.Search placeholder="…" />
+    <ResourceList.FilterSelect name="status" options={statusOptions} />
+    {/* or <ResourceList.DateRange /> */}
+  </ResourceList.Toolbar>
+  <ResourceList.Table columns={columns} onRowClick={…} />
+  <ResourceList.Pagination />
+</ResourceList>
+```
+- Columns live at **module level** (static). Header bits that need list state
+  (total, active-filter notice) are tiny context-reading components rendered
+  inside `<ResourceList>` (e.g. `OrdersSummary`).
+- Pages that transform rows (accordion, mapping) read `rows` from context in a
+  page-local `…Table` component and render `DataTable` directly (see
+  `orders/_components/OrdersTable`).
+
+### Detail pages → `DetailPage` + section primitives (`components/detail/`)
+`DetailPage` = back link + QueryBoundary + header (title/badge/actions) + children.
+Build the body from `SectionCard`, `PartyCard`, `Timeline`, `DataList`/`Field`.
+Pass header props as `item && …` so they only evaluate once loaded.
+
+```tsx
+const { item, isLoading, error, refetch } = useAdminItem<T>({ resource, id, fetcher });
+return (
+  <DetailPage backHref="/orders" isLoading={isLoading} error={error} isEmpty={!item}
+    onRetry={refetch} title={item && …} badge={item && <StatusBadge …/>} actions={item && …}>
+    {item && <>{/* sections */}</>}
+  </DetailPage>
+);
+```
+
+### Modals & panels are separate components
+Every dialog/modal is its **own** component that owns its form + validation +
+`useAdminMutation` (built on the shared `Modal`). The page only holds the
+open/close state. Action panels that trigger a mutation own it too (see
+`trades/[id]/_sections/CompensationPanel`, `_modals/*`).
+
+### Folder shape per page
+```
+app/(admin)/<resource>/
+  page.tsx                 # thin: <ResourceList> composition (~30 lines)
+  _lib/…                   # types, mappers, static option lists
+  _components/…            # page-local table / summary / header-actions
+  [id]/
+    page.tsx               # thin: useAdminItem + <DetailPage> (~100-280 lines)
+    types.ts  _lib/  _sections/  _components/  _modals/
+```
+
+The `(admin)/orders` and `(admin)/trades` pages are the canonical examples.
+Apply the same recipe to every new admin section.
+
+---
+
+## 10. Table columns — the `col.*` factory (`components/table/`)
+
+Never write raw `ColumnDef` cell JSX. Columns are built with the typed **column
+factory** so alignment, truncation, font/size, formatting, width and the
+empty-value placeholder are locked **inside the cell type** — cross-table
+inconsistency becomes impossible. The page only declares *which field* it shows.
+
+```tsx
+import { col } from '@/components/table';
+
+const columns = [
+  col.link('Sipariş', r => ({ href: `/operations/orders/${r.order.id}`, label: `#${r.order.no}` })),
+  col.user('Alıcı',  r => ({ name: r.buyer.name, secondary: r.buyer.email, href: `/users/${r.buyer.id}` })),
+  col.money('Tutar', r => r.amount, { tone: 'negative' }),   // ₺, right, tabular-nums
+  col.date('Tarih',  r => r.createdAt),                       // short date, hover = full timestamp
+  col.badge('Durum', r => <StatusBadge status={r.status} config={cfg} />),  // never wraps
+  col.actions(r => <RowMenu id={r.id} />, { header: 'İşlemler' }),          // right, nowrap
+];
+```
+
+Generators: `text` · `muted` · `money` (`tone`) · `number` · `date` · `code`
+(mono) · `link` · `user` · `badge` · `actions` · `custom` (escape hatch — free
+JSX but still aligned/sized via meta). Format helpers live in **`lib/format.ts`**
+(`fmtTry`/`fmtNumber`/`fmtDate`/`fmtDateTime`, all null-safe → `—`). Cell
+primitives are in `components/table/cells.tsx`; use them directly only inside
+`col.custom` (e.g. `<CellText>`, `<CellCode>`, `<TruncatedText>`).
+
+### Behaviour the factory guarantees
+- **Text never wraps** — `truncate` + `…`; a native tooltip shows the full value
+  **only when actually clipped** (`TruncatedText` measures overflow).
+- **Responsive width** — each column has a `grow` weight + `minWidth`. On wide
+  screens columns expand proportionally; as the viewport shrinks they narrow and
+  truncate; below `Σ(minWidth)` the table scrolls horizontally (no scroll before
+  that). Tune with `col.x(header, get, { grow, minWidth })`.
+- **Alignment** — header and cell always match (money/number/actions → right),
+  driven by column `meta`; `DataTable` reads it and renders `<colgroup>` +
+  `table-fixed`. This sizing path is **opt-in**: it only activates when columns
+  carry meta (i.e. came from `col.*`), so legacy raw-`ColumnDef` tables are
+  untouched.
+
+Migrate any table you touch to `col.*`. The `(admin)/operations/*` list pages
+are the canonical examples.
