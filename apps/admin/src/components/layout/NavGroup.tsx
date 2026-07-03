@@ -35,7 +35,7 @@ export function NavGroup({
         )}
       >
         <span className="flex items-center min-w-0 whitespace-nowrap">
-          <group.icon className="h-4 w-4 mr-2.5 flex-shrink-0" />
+          <group.icon className="h-5 w-5 mr-3 flex-shrink-0" />
           <span className="truncate">{group.name}</span>
         </span>
         {isOpen ? (
