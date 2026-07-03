@@ -5,4 +5,8 @@
 // and `@hookform/resolvers` into their bundle. Everything else importing
 // `@tarodan/ui` stays form-free.
 export { Form, FormInput, FormError, type FormInputProps } from './components/form/Form';
+export { FormSelect, type FormSelectProps } from './components/form/FormSelect';
+export { FormTextarea, type FormTextareaProps } from './components/form/FormTextarea';
+export { FormCheckbox, type FormCheckboxProps } from './components/form/FormCheckbox';
+export { FormImageUpload, type FormImageUploadProps } from './components/form/FormImageUpload';
 export { useZodForm } from './lib/use-zod-form';
