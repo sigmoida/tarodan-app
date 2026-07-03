@@ -1,10 +1,10 @@
 import { type ComponentType, type ReactNode } from 'react';
-import { cn } from '@tarodan/ui';
+import { Card, cn } from '@tarodan/ui';
 
 /**
- * The card wrapper every detail section uses — replaces the repeated
- * `bg-surface-elevated rounded-xl p-6 shadow-sm` + `<h2>` + icon block (and the
- * legacy `.admin-card` class). Token-fed, no hardcoded colors.
+ * The card wrapper every detail section uses — built on the design-system `Card`
+ * (bordered) + a title/icon/actions header row. Replaces the legacy hand-rolled
+ * `bg-surface-elevated rounded-xl p-6 shadow-sm` block and `.admin-card`.
  */
 export function SectionCard({
   title,
@@ -23,12 +23,7 @@ export function SectionCard({
   bodyClassName?: string;
 }) {
   return (
-    <section
-      className={cn(
-        'rounded-xl border border-border bg-surface-elevated p-6 shadow-sm',
-        className,
-      )}
-    >
+    <Card variant="bordered" className={cn('p-6 shadow-sm', className)}>
       {(title || actions) && (
         <div className="mb-4 flex items-center justify-between gap-3">
           {title && (
@@ -41,6 +36,6 @@ export function SectionCard({
         </div>
       )}
       <div className={bodyClassName}>{children}</div>
-    </section>
+    </Card>
   );
 }
