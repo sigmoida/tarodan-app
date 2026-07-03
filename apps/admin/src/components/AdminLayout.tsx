@@ -5,8 +5,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useSession } from '@/lib/session-context';
+import { usePermissions } from '@/lib/permissions-context';
 import { useIdleLogout } from '@/hooks/useIdleLogout';
-import { adminApi } from '@/lib/api';
 import clsx from 'clsx';
 import { Button, Input } from '@tarodan/ui';
 import { AdminProfileMenu } from '@/components/AdminProfileMenu';
@@ -31,44 +31,16 @@ interface AdminLayoutProps {
   children: React.ReactNode;
 }
 
-/**
- * Yükleme tamamlanana kadar kullanılan varsayılan izinler.
- * Backend DEFAULT_ROLE_PERMISSIONS ile senkron tutulmalı.
- */
-const NAV_FALLBACK_PERMS: Record<string, string[]> = {
-  super_admin: ['dashboard'],
-  admin: [
-    'dashboard', 'analytics',
-    'orders', 'trades', 'shipping', 'refund_requests', 'refund_history',
-    'products', 'categories', 'brands', 'car_models', 'manufacturers', 'attributes', 'collections',
-    'users', 'seller_applications', 'seller_performance', 'reviews', 'reports',
-    'payments', 'commission', 'payouts', 'invoices',
-    'messages', 'support', 'discounts', 'ads', 'notifications', 'email_templates', 'pages',
-    'ai_moderation',
-  ],
-  moderator: [
-    'dashboard', 'products', 'users', 'reviews', 'reports', 'messages', 'support', 'trades', 'ai_moderation',
-  ],
-};
-
-
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useSession();
+  // İzinler sunucuda çözülüp context ile hidre edildi — client fetch yok, flicker yok.
+  const { can, canSee } = usePermissions();
   // 1 saat hareketsizlikte otomatik logout (Balanced politika).
   useIdleLogout();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [navQuery, setNavQuery] = useState('');
-
-  /**
-   * Rol → izin listesi.
-   * Başlangıç değeri NAV_FALLBACK_PERMS: API yanıt verene kadar doğru nav görünür.
-   * API'den gelen veri gelince override edilir.
-   */
-  const [rolePerms, setRolePerms] = useState<Record<string, string[]>>(NAV_FALLBACK_PERMS);
-  // İzinler API'den yüklendi mi? Yüklenmeden route guard çalışmaz (false-redirect önlemi).
-  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
 
   // Aktif route hangi gruptaysa o grup otomatik açılır, son kullanıcı tercihi localStorage'da saklanır
   const activeGroupId = useMemo(() => {
@@ -103,37 +75,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     } catch {}
   }, [openGroups, hydrated]);
 
-  // Her oturumda rol izinlerini API'den taze yükle (cache yok → stale nav olmaz).
+  // Route guard (UX): izin yoksa /dashboard'a yönlendir. İzinler sunucudan otoriter
+  // geldiği için anlık ve yarışsız — gerçek yetki zaten API'de.
   useEffect(() => {
-    if (!user) return;
-    if (user.role === 'super_admin') {
-      setPermissionsLoaded(true);
-      return;
-    }
-
-    adminApi.getRolePermissions()
-      .then((res) => {
-        const data = res.data;
-        if (!data || typeof data !== 'object') return;
-        const merged: Record<string, string[]> = { ...NAV_FALLBACK_PERMS };
-        for (const [r, perms] of Object.entries(data)) {
-          if (Array.isArray(perms) && perms.length > 0) merged[r] = perms;
-        }
-        setRolePerms(merged);
-      })
-      .catch(() => {})
-      .finally(() => setPermissionsLoaded(true));
-  }, [user?.role]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Route guard: izin yoksa /dashboard'a yönlendir.
-  useEffect(() => {
-    if (!user || user.role === 'super_admin' || !permissionsLoaded) return;
-    const currentPerms = rolePerms[user.role] ?? [];
     const required = routePermission(pathname);
-    if (required && !currentPerms.includes(required)) {
+    if (required && !can(required)) {
       router.replace('/dashboard');
     }
-  }, [pathname, user, rolePerms, permissionsLoaded, router]);
+  }, [pathname, can, router]);
 
   const toggleGroup = (id: string) => {
     setOpenGroups((prev) => {
@@ -147,32 +96,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const q = navQuery.trim().toLocaleLowerCase('tr-TR');
   const isSearching = q.length > 0;
 
-  // Menüyü kullanıcının rolüne + yüklenen izin matrisine göre filtrele.
-  const role = user?.role ?? '';
-
-  const canSee = (item: NavItem): boolean => {
-    // Süper admin her şeyi görür.
-    if (role === 'super_admin') return true;
-
-    // İzin matrisi yüklendiyse ve öğenin bir izin anahtarı varsa → matrisi kullan.
-    if (rolePerms && item.permission) {
-      return (rolePerms[role] ?? []).includes(item.permission);
-    }
-
-    // Fallback: hardcode roles dizisine bak (eski davranış / yükleme öncesi).
-    return (item.roles ?? ['super_admin', 'admin']).includes(role);
-  };
-
-  const visibleTopNav = useMemo(
-    () => topLevelNav.filter(canSee),
-    [role, rolePerms], // eslint-disable-line react-hooks/exhaustive-deps
-  );
+  // Menüyü kullanıcının izin setine göre filtrele (canSee context'ten gelir).
+  const visibleTopNav = useMemo(() => topLevelNav.filter(canSee), [canSee]);
   const visibleGroups = useMemo(
     () =>
       navGroups
         .map((g) => ({ ...g, items: g.items.filter(canSee) }))
         .filter((g) => g.items.length > 0),
-    [role, rolePerms], // eslint-disable-line react-hooks/exhaustive-deps
+    [canSee],
   );
 
   // Arama aktifken: grupları yok say, tüm eşleşmeleri düz liste olarak göster

@@ -1,16 +1,18 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/server/session';
+import { getPermissions } from '@/lib/server/permissions';
 import { SessionProvider } from '@/lib/session-context';
+import { PermissionsProvider } from '@/lib/permissions-context';
 import AdminLayout from '@/components/AdminLayout';
 import { ConfirmProvider } from '@/components/ConfirmProvider';
 import { PromptProvider } from '@/components/PromptProvider';
 import { QueryProvider } from '@/components/QueryProvider';
 
 /**
- * Layout for the authenticated app. Server Component: resolves the session
- * server-side and redirects to /login when it's missing/invalid, so gating
- * never depends on client state. The resolved user is provided to client
- * components via SessionProvider.
+ * Layout for the authenticated app. Server Component: resolves the session and
+ * the user's permissions server-side, redirecting to /login when the session is
+ * missing/invalid — gating never depends on client state. Both are provided to
+ * client components via context; the client never fetches them itself.
  */
 export default async function AdminRouteLayout({
   children,
@@ -20,15 +22,19 @@ export default async function AdminRouteLayout({
   const user = await getSession();
   if (!user) redirect('/login');
 
+  const permissions = await getPermissions(user);
+
   return (
     <SessionProvider user={user}>
-      <QueryProvider>
-        <ConfirmProvider>
-          <PromptProvider>
-            <AdminLayout>{children}</AdminLayout>
-          </PromptProvider>
-        </ConfirmProvider>
-      </QueryProvider>
+      <PermissionsProvider permissions={permissions}>
+        <QueryProvider>
+          <ConfirmProvider>
+            <PromptProvider>
+              <AdminLayout>{children}</AdminLayout>
+            </PromptProvider>
+          </ConfirmProvider>
+        </QueryProvider>
+      </PermissionsProvider>
     </SessionProvider>
   );
 }
