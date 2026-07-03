@@ -156,10 +156,10 @@ const PERMISSION_GROUPS: PermGroup[] = [
     id: "system",
     group: "Sistem",
     permissions: [
-      { key: "ai_moderation", label: "AI Denetim", description: "AI moderasyon olayları, skorlar ve eşik ayarları.", pages: ["/ai-moderation"] },
-      { key: "membership_tiers", label: "Üyelik Katmanları", description: "Üyelik katmanı oluşturma ve fiyatlandırma.", pages: ["/membership-tiers"] },
-      { key: "settings", label: "Sistem Ayarları", description: "Platform genel ayarları ve konfigürasyon.", pages: ["/settings"] },
-      { key: "logs", label: "Loglar", description: "Sistem hata logları, güvenlik olayları, e-posta logları ve denetim izi.", pages: ["/logs", "/audit-logs"] },
+      { key: "ai_moderation", label: "AI Denetim", description: "AI moderasyon olayları, skorlar ve eşik ayarları.", pages: ["/system/ai-moderation"] },
+      { key: "membership_tiers", label: "Üyelik Katmanları", description: "Üyelik katmanı oluşturma ve fiyatlandırma.", pages: ["/system/membership-tiers"] },
+      { key: "settings", label: "Sistem Ayarları", description: "Platform genel ayarları ve konfigürasyon.", pages: ["/system/settings"] },
+      { key: "logs", label: "Loglar", description: "Sistem hata logları, güvenlik olayları, e-posta logları ve denetim izi.", pages: ["/system/logs", "/audit-logs"] },
     ],
   },
 ];

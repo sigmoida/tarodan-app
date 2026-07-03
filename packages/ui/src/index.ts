@@ -3,6 +3,7 @@ export { Button, buttonVariants, type ButtonProps } from './components/Button';
 export { IconButton, iconButtonVariants } from './components/IconButton';
 export type { IconButtonProps } from './components/IconButton';
 export { Input, type InputProps } from './components/Input';
+export { Slider, type SliderProps } from './components/Slider';
 export { SearchInput, type SearchInputProps } from './components/SearchInput';
 export { Textarea, type TextareaProps } from './components/Textarea';
 export { Select, type SelectProps, type SelectOption } from './components/Select';

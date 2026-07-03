@@ -151,12 +151,13 @@ export const navGroups: NavGroup[] = [
     id: 'system',
     name: 'Sistem',
     icon: Cog6ToothIcon,
+    href: '/system',
     items: [
-      { name: 'AI Denetim', href: '/ai-moderation', icon: ClipboardDocumentCheckIcon, keywords: ['ai', 'moderasyon', 'nsfw'], permission: 'ai_moderation' },
-      { name: 'Üyelik Katmanları', href: '/membership-tiers', icon: StarIcon, keywords: ['üyelik', 'membership', 'tier'], permission: 'membership_tiers' },
-      { name: 'Sistem Ayarları', href: '/settings', icon: Cog6ToothIcon, permission: 'settings' },
-      { name: 'Loglar', href: '/logs', icon: ClipboardDocumentIcon, keywords: ['log', 'hata', 'error', 'güvenlik', 'e-posta', 'audit', 'denetim', 'iz', 'değişiklik', 'security'], permission: 'logs' },
-      { name: 'Test Araçları', href: '/test-tools', icon: BeakerIcon, keywords: ['test', 'zaman', 'cron', 'süre', 'boost', 'üyelik', 'iade', 'time'], permission: 'test_tools', roles: ['super_admin'] },
+      { name: 'AI Denetim', href: '/system/ai-moderation', icon: ClipboardDocumentCheckIcon, keywords: ['ai', 'moderasyon', 'nsfw'], permission: 'ai_moderation' },
+      { name: 'Üyelik Katmanları', href: '/system/membership-tiers', icon: StarIcon, keywords: ['üyelik', 'membership', 'tier'], permission: 'membership_tiers' },
+      { name: 'Sistem Ayarları', href: '/system/settings', icon: Cog6ToothIcon, permission: 'settings' },
+      { name: 'Loglar', href: '/system/logs', icon: ClipboardDocumentIcon, keywords: ['log', 'hata', 'error', 'güvenlik', 'e-posta', 'audit', 'denetim', 'iz', 'değişiklik', 'security'], permission: 'logs' },
+      { name: 'Test Araçları', href: '/system/test-tools', icon: BeakerIcon, keywords: ['test', 'zaman', 'cron', 'süre', 'boost', 'üyelik', 'iade', 'time'], permission: 'test_tools', roles: ['super_admin'] },
     ],
   },
 ];
