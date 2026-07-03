@@ -138,12 +138,13 @@ export const navGroups: NavGroup[] = [
     id: 'finance',
     name: 'Finans',
     icon: CurrencyDollarIcon,
+    href: '/finance',
     items: [
-      { name: 'Ödemeler', href: '/payments', icon: CreditCardIcon, keywords: ['ödeme', 'payment', 'hold'], permission: 'payments' },
-      { name: 'Komisyon', href: '/commission', icon: CurrencyDollarIcon, permission: 'commission' },
-      { name: 'Satıcı Ödemeleri', href: '/payouts', icon: BanknotesIcon, permission: 'payouts' },
-      { name: 'Faturalar', href: '/invoices', icon: DocumentTextIcon, keywords: ['fatura', 'invoice', 'e-arşiv', 'e-fatura', 'elogo', 'iade faturası'], permission: 'invoices' },
-      { name: 'Vergi Ayarları', href: '/tax', icon: CalculatorIcon, permission: 'tax' },
+      { name: 'Ödemeler', href: '/finance/payments', icon: CreditCardIcon, keywords: ['ödeme', 'payment', 'hold'], permission: 'payments' },
+      { name: 'Komisyon', href: '/finance/commission', icon: CurrencyDollarIcon, permission: 'commission' },
+      { name: 'Satıcı Ödemeleri', href: '/finance/payouts', icon: BanknotesIcon, permission: 'payouts' },
+      { name: 'Faturalar', href: '/finance/invoices', icon: DocumentTextIcon, keywords: ['fatura', 'invoice', 'e-arşiv', 'e-fatura', 'elogo', 'iade faturası'], permission: 'invoices' },
+      { name: 'Vergi Ayarları', href: '/finance/tax', icon: CalculatorIcon, permission: 'tax' },
     ],
   },
   {

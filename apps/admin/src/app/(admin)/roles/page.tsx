@@ -146,10 +146,10 @@ const PERMISSION_GROUPS: PermGroup[] = [
     id: "finance",
     group: "Finans",
     permissions: [
-      { key: "payments", label: "Ödemeler", description: "Ödeme listesi, hold/release geçmişi ve istatistikler.", pages: ["/payments", "/payments/:id", "/payments/statistics"] },
-      { key: "commission", label: "Komisyon", description: "Komisyon kuralları oluşturma, düzenleme ve silme.", pages: ["/commission"] },
-      { key: "payouts", label: "Satıcı Ödemeleri", description: "Bekleyen ödeme transferleri ve payout geçmişi.", pages: ["/payouts"] },
-      { key: "tax", label: "Vergi Ayarları", description: "KDV bölgeleri, vergi oranları ve kural yönetimi.", pages: ["/tax"] },
+      { key: "payments", label: "Ödemeler", description: "Ödeme listesi, hold/release geçmişi ve istatistikler.", pages: ["/finance/payments", "/finance/payments/:id", "/finance/payments/statistics"] },
+      { key: "commission", label: "Komisyon", description: "Komisyon kuralları oluşturma, düzenleme ve silme.", pages: ["/finance/commission"] },
+      { key: "payouts", label: "Satıcı Ödemeleri", description: "Bekleyen ödeme transferleri ve payout geçmişi.", pages: ["/finance/payouts"] },
+      { key: "tax", label: "Vergi Ayarları", description: "KDV bölgeleri, vergi oranları ve kural yönetimi.", pages: ["/finance/tax"] },
     ],
   },
   {

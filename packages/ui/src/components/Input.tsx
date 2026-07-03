@@ -48,7 +48,7 @@ const inputClasses = (error?: string, inputSize: 'sm' | 'md' | 'lg' = 'md') =>
 		sizePaddingX[inputSize],
 		sizePaddingY[inputSize],
 		'placeholder:text-subtle',
-		'focus:outline-none focus:ring-2 focus:ring-offset-0',
+		'focus:outline-none focus:ring-1 focus:ring-offset-0',
 		error
 			? 'border-danger-500 focus:border-danger-500 focus:ring-danger-500'
 			: 'border-border focus:border-primary-500 focus:ring-primary-500',
@@ -173,7 +173,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
 					className={cn(
 						'flex w-full items-center rounded-lg border bg-surface-elevated transition-colors',
 						sizeClasses[inputSize],
-						'focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-0',
+						'focus-within:outline-none focus-within:ring-1 focus-within:ring-offset-0',
 						error
 							? 'border-danger-500 focus-within:border-danger-500 focus-within:ring-danger-500'
 							: 'border-border focus-within:border-primary-500 focus-within:ring-primary-500',

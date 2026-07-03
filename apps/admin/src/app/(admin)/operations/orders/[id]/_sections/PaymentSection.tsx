@@ -15,7 +15,7 @@ export function PaymentSection({ payment }: { payment: NonNullable<OrderDetail['
         <Field label="Sağlayıcı">{enumLabel(paymentProviderConfig, payment.provider)}</Field>
       </DataList>
       <Link
-        href={`/payments/${payment.id}`}
+        href={`/finance/payments/${payment.id}`}
         className="mt-3 block text-sm text-primary-600 hover:text-primary-700"
       >
         Ödeme Detayını Görüntüle →
