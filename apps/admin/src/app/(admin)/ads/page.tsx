@@ -164,7 +164,7 @@ export default function AdsPage() {
 
     setUploadingImage(true);
     try {
-      const res = await adminApi.uploadAdImage(file);
+      const res = await adminApi.uploadMedia(file);
       const url = res.data?.url ?? (res.data as any)?.url;
       if (url) {
         setForm(f => ({ ...f, imageUrl: url }));

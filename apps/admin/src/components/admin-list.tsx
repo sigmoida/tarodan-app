@@ -15,17 +15,23 @@ import { Input } from '@tarodan/ui';
 
 export function PageHeader({
 	title,
+	badge,
 	description,
 	children,
 }: {
-	title: string;
+	title: ReactNode;
+	/** Rendered next to the title (e.g. a count/status pill). */
+	badge?: ReactNode;
 	description?: ReactNode;
 	children?: ReactNode;
 }) {
 	return (
 		<div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
-			<div className='space-y-0.5'>
-				<h1 className='text-2xl font-bold text-heading'>{title}</h1>
+			<div className='min-w-0 space-y-0.5'>
+				<div className='flex flex-wrap items-center gap-3'>
+					<h1 className='text-2xl font-bold text-heading'>{title}</h1>
+					{badge}
+				</div>
 				{description != null && (
 					<p className='mt-1 text-muted text-sm'>{description}</p>
 				)}

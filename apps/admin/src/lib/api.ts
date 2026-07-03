@@ -240,7 +240,8 @@ export const adminApi = {
   createManufacturer: (data: any) => api.post('/admin/manufacturers', data),
   updateManufacturer: (id: string, data: any) => api.patch(`/admin/manufacturers/${id}`, data),
   deleteManufacturer: (id: string) => api.delete(`/admin/manufacturers/${id}`),
-  uploadManufacturerLogo: (file: File) => {
+  /** Single media upload used by all image fields (FormImageUpload). Returns { url, key }. */
+  uploadMedia: (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
     return api.post<{ url: string; key: string }>('/admin/media/upload', formData, {
@@ -259,13 +260,6 @@ export const adminApi = {
   updateAd: (id: string, data: any) => api.patch(`/admin/ads/${id}`, data),
   deleteAd: (id: string) => api.delete(`/admin/ads/${id}`),
   reorderAds: (ids: string[]) => api.patch('/admin/ads/reorder', { ids }),
-  uploadAdImage: (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    return api.post<{ url: string }>('/admin/media/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-  },
 
   // Audit Logs
   getAuditLogs: (params?: any) => api.get('/admin/audit-logs', { params }),

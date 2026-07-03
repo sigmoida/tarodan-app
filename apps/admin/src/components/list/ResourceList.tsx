@@ -4,6 +4,7 @@ import { type ReactNode } from 'react';
 import type { AxiosResponse } from 'axios';
 import { useAdminResource } from '@/hooks/useAdminResource';
 import { SuspenseBoundary } from '@/components/page/SuspenseBoundary';
+import { AdminPage } from '@/components/page/AdminPage';
 import { ResourceListContext, useSelection } from './context';
 
 export interface ResourceListProps<T> {
@@ -66,7 +67,7 @@ function ResourceListInner<T>({
 
   return (
     <ResourceListContext.Provider value={{ ...data, getRowId, selection }}>
-      <div className="space-y-6">{children}</div>
+      <AdminPage>{children}</AdminPage>
     </ResourceListContext.Provider>
   );
 }
