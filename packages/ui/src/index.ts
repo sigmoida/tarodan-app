@@ -17,8 +17,8 @@ export {
 } from './components/Radio';
 export { Label, type LabelProps } from './components/Label';
 export { FormField, type FormFieldProps } from './components/FormField';
-export { Form, FormInput, FormError, type FormInputProps } from './components/form/Form';
-export { useZodForm } from './lib/use-zod-form';
+// The RHF + zod form layer is exposed via the `@tarodan/ui/form` subpath so it
+// only pulls zod/react-hook-form into bundles that actually build forms.
 
 // Display components
 export {

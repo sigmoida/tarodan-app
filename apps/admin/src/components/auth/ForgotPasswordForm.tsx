@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { Button, Form, FormInput, useZodForm } from '@tarodan/ui';
+import { Button } from '@tarodan/ui';
+import { Form, FormInput, useZodForm } from '@tarodan/ui/form';
 import { forgotPasswordSchema } from '@/lib/schemas/auth';
 import { useForgotPassword } from '@/hooks/useForgotPassword';
 import { AuthCard } from './AuthCard';

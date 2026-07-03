@@ -30,8 +30,8 @@ export { ProgressBar, type ProgressBarProps } from './components/ProgressBar';
 export { FAB, type FABProps, type FABVariant, type FABSize } from './components/FAB';
 export { Snackbar, type SnackbarProps, type SnackbarVariant } from './components/Snackbar';
 export { Input, type InputProps } from './components/Input';
-export { Form, FormInput, FormError, type FormInputProps } from './components/form/Form';
-export { useZodForm } from './lib/use-zod-form';
+// The RHF + zod form layer is exposed via the `@tarodan/ui-native/form` subpath
+// so it only pulls zod/react-hook-form into bundles that actually build forms.
 export { DateField, type DateFieldProps } from './components/DateField';
 export { Textarea, type TextareaProps } from './components/Textarea';
 export {
