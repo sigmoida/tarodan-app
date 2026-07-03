@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
+  appAlert,
   Avatar,
   Badge,
   Button,
@@ -180,6 +181,29 @@ export default function ProfileScreen() {
   const handleLogout = async () => {
     await logout();
     router.replace('/(auth)/login');
+  };
+
+  const handleDeleteAccount = () => {
+    appAlert(
+      'Hesabı Sil',
+      'Hesabınız ve tüm verileriniz kalıcı olarak silinecek. Bu işlem geri alınamaz. Devam etmek istiyor musunuz?',
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'Hesabı Sil',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await userApi.deleteAccount();
+              await logout();
+              router.replace('/(auth)/login');
+            } catch (e: any) {
+              appAlert('Hata', e?.response?.data?.message || 'Hesap silinemedi. Lütfen tekrar deneyin.');
+            }
+          },
+        },
+      ],
+    );
   };
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -719,6 +743,16 @@ export default function ProfileScreen() {
           </Text>
         </TouchableOpacity>
 
+        <TouchableOpacity
+          testID="profile-delete-account-button"
+          style={styles.deleteAccountButton}
+          onPress={handleDeleteAccount}
+        >
+          <Text variant="caption" tone="danger" weight="medium">
+            Hesabı Sil
+          </Text>
+        </TouchableOpacity>
+
         <View style={{ height: 100 }} />
       </ScrollView>
     </View>
@@ -1017,5 +1051,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface.DEFAULT,
     borderWidth: 1,
     borderColor: colors.danger[600]!,
+  },
+  deleteAccountButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing[3],
+    padding: spacing[2],
   },
 });
