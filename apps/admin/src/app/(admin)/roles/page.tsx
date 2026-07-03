@@ -136,10 +136,10 @@ const PERMISSION_GROUPS: PermGroup[] = [
     group: "Pazarlama & İçerik",
     permissions: [
       { key: "discounts", label: "İndirimler", description: "İndirim kuponu oluşturma, düzenleme ve silme.", pages: ["/discounts"] },
-      { key: "ads", label: "Reklamlar", description: "Banner ve reklam kampanyaları yönetimi.", pages: ["/ads"] },
-      { key: "notifications", label: "Bildirimler", description: "Push bildirim oluşturma ve gönderme.", pages: ["/notifications"] },
-      { key: "email_templates", label: "E-posta Şablonları", description: "E-posta şablonu oluşturma ve düzenleme.", pages: ["/email-templates"] },
-      { key: "pages", label: "Sayfalar", description: "Statik içerik sayfaları yönetimi.", pages: ["/pages"] },
+      { key: "ads", label: "Reklamlar", description: "Banner ve reklam kampanyaları yönetimi.", pages: ["/marketing/ads"] },
+      { key: "notifications", label: "Bildirimler", description: "Push bildirim oluşturma ve gönderme.", pages: ["/marketing/notifications"] },
+      { key: "email_templates", label: "E-posta Şablonları", description: "E-posta şablonu oluşturma ve düzenleme.", pages: ["/marketing/email-templates"] },
+      { key: "pages", label: "Sayfalar", description: "Statik içerik sayfaları yönetimi.", pages: ["/marketing/pages"] },
     ],
   },
   {

@@ -124,13 +124,14 @@ export const navGroups: NavGroup[] = [
     id: 'marketing',
     name: 'Pazarlama & İçerik',
     icon: MegaphoneIcon,
+    href: '/marketing',
     items: [
       // KUPON/İndirimler sekmesi devre dışı (yoruma alındı) — sayfa kodu ve route duruyor
       // { name: 'İndirimler', href: '/discounts', icon: TicketIcon, permission: 'discounts' },
-      { name: 'Reklamlar', href: '/ads', icon: MegaphoneIcon, keywords: ['reklam', 'ad', 'banner'], permission: 'ads' },
-      { name: 'Bildirimler', href: '/notifications', icon: BellAlertIcon, permission: 'notifications' },
-      { name: 'E-posta Şablonları', href: '/email-templates', icon: ChatBubbleLeftRightIcon, permission: 'email_templates' },
-      { name: 'Sayfalar', href: '/pages', icon: DocumentTextIcon, permission: 'pages' },
+      { name: 'Reklamlar', href: '/marketing/ads', icon: MegaphoneIcon, keywords: ['reklam', 'ad', 'banner'], permission: 'ads' },
+      { name: 'Bildirimler', href: '/marketing/notifications', icon: BellAlertIcon, permission: 'notifications' },
+      { name: 'E-posta Şablonları', href: '/marketing/email-templates', icon: ChatBubbleLeftRightIcon, permission: 'email_templates' },
+      { name: 'Sayfalar', href: '/marketing/pages', icon: DocumentTextIcon, permission: 'pages' },
     ],
   },
   {
