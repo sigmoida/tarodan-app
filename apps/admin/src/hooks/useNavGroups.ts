@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { navGroups } from '@/lib/navigation';
 
 const OPEN_GROUPS_STORAGE_KEY = 'admin-nav-open-groups';
@@ -29,10 +29,18 @@ export function useNavGroups(pathname: string) {
     setHydrated(true);
   }, []);
 
+  // Aktif grubu yalnızca GERÇEK grup değişiminde otomatik aç. Route-redirect
+  // parent'lara (ör. /operations → /operations/orders) tıklamada activeGroupId
+  // "operations → null → operations" diye seğirir; son (null olmayan) aktif grubu
+  // ref'te tutup aynı gruba dönüşte yeniden AÇMIYORUZ — böylece kullanıcının o
+  // grubu elle kapatması korunuyor. Geçici null da yok sayılıyor.
+  const lastActiveRef = useRef<string | null>(null);
   useEffect(() => {
-    if (activeGroupId && !openGroups.has(activeGroupId)) {
-      setOpenGroups((prev) => new Set(prev).add(activeGroupId));
-    }
+    if (!activeGroupId || activeGroupId === lastActiveRef.current) return;
+    lastActiveRef.current = activeGroupId;
+    setOpenGroups((prev) =>
+      prev.has(activeGroupId) ? prev : new Set(prev).add(activeGroupId),
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeGroupId]);
 
