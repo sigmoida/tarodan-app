@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Modal, Button, Textarea } from '@tarodan/ui';
+import { Modal, ModalFooter, Textarea } from '@tarodan/ui';
 import { adminApi } from '@/lib/api';
 import { useAdminMutation } from '@/lib/query/useAdminMutation';
 
@@ -53,20 +53,14 @@ export function RejectTradeModal({
           />
           <p className="mt-1 text-xs text-muted">{reason.trim().length}/10 karakter minimum</p>
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline" className="flex-1" onClick={onClose} disabled={reject.isPending}>
-            İptal
-          </Button>
-          <Button
-            variant="danger"
-            className="flex-1"
-            onClick={() => reject.mutate()}
-            isLoading={reject.isPending}
-            disabled={tooShort}
-          >
-            Reddet
-          </Button>
-        </div>
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={() => reject.mutate()}
+          confirmLabel="Reddet"
+          destructive
+          isLoading={reject.isPending}
+          disabled={tooShort}
+        />
       </div>
     </Modal>
   );

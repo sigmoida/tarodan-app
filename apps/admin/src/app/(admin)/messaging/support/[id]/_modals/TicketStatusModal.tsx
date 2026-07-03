@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Modal, Button, Select } from '@tarodan/ui';
+import { Modal, ModalFooter, Select } from '@tarodan/ui';
 import { adminApi } from '@/lib/api';
 import { useAdminMutation } from '@/lib/query/useAdminMutation';
 import { TICKET_STATUS_CHOICES } from '../../_lib/types';
@@ -36,18 +36,12 @@ export function TicketStatusModal({
           onChange={(e) => setStatus(e.target.value)}
           options={TICKET_STATUS_CHOICES}
         />
-        <div className="flex justify-end gap-3">
-          <Button variant="secondary" onClick={onClose} disabled={update.isPending}>
-            İptal
-          </Button>
-          <Button
-            variant="primary"
-            onClick={() => update.mutate()}
-            isLoading={update.isPending}
-          >
-            Güncelle
-          </Button>
-        </div>
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={() => update.mutate()}
+          confirmLabel="Güncelle"
+          isLoading={update.isPending}
+        />
       </div>
     </Modal>
   );

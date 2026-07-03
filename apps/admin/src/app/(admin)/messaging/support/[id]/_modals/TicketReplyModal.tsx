@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Modal, Button, Checkbox, Textarea } from '@tarodan/ui';
+import { Modal, ModalFooter, Checkbox, Textarea } from '@tarodan/ui';
 import { adminApi } from '@/lib/api';
 import { useAdminMutation } from '@/lib/query/useAdminMutation';
 
@@ -40,19 +40,13 @@ export function TicketReplyModal({
           onChange={(e) => setIsInternal(e.target.checked)}
           label="İç not olarak ekle (kullanıcı göremez)"
         />
-        <div className="flex justify-end gap-3">
-          <Button variant="secondary" onClick={onClose} disabled={reply.isPending}>
-            İptal
-          </Button>
-          <Button
-            variant="primary"
-            onClick={() => reply.mutate()}
-            isLoading={reply.isPending}
-            disabled={!content.trim()}
-          >
-            Gönder
-          </Button>
-        </div>
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={() => reply.mutate()}
+          confirmLabel="Gönder"
+          isLoading={reply.isPending}
+          disabled={!content.trim()}
+        />
       </div>
     </Modal>
   );

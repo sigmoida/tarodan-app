@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Modal, Button, Select } from '@tarodan/ui';
+import { Modal, ModalFooter, Select } from '@tarodan/ui';
 import { adminApi } from '@/lib/api';
 import { useAdminMutation } from '@/lib/query/useAdminMutation';
 import { isPostShipping } from '../_lib/status';
@@ -70,24 +70,12 @@ export function StatusUpdateModal({
           </p>
         )}
       </div>
-      <div className="flex gap-3">
-        <Button
-          variant="secondary"
-          className="flex-1"
-          onClick={onClose}
-          disabled={update.isPending}
-        >
-          İptal
-        </Button>
-        <Button
-          variant="primary"
-          className="flex-1"
-          onClick={submit}
-          isLoading={update.isPending}
-        >
-          Güncelle
-        </Button>
-      </div>
+      <ModalFooter
+        onCancel={onClose}
+        onConfirm={submit}
+        confirmLabel="Güncelle"
+        isLoading={update.isPending}
+      />
     </Modal>
   );
 }

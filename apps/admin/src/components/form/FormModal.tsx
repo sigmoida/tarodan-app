@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from 'react';
 import type { FieldValues, SubmitHandler, UseFormReturn } from 'react-hook-form';
-import { Modal, Button, type ModalProps } from '@tarodan/ui';
+import { Modal, ModalFooter, type ModalProps } from '@tarodan/ui';
 import { Form } from '@tarodan/ui/form';
 
 export interface FormModalProps<T extends FieldValues> {
@@ -61,14 +61,12 @@ export function FormModal<T extends FieldValues>({
     <Modal isOpen={open} onClose={close} title={title} maxWidth={maxWidth}>
       <Form form={form} onSubmit={onSubmit} className="space-y-4">
         {children}
-        <div className="flex justify-end gap-3 pt-2">
-          <Button type="button" variant="secondary" onClick={close} disabled={pending}>
-            {cancelLabel}
-          </Button>
-          <Button type="submit" variant="primary" isLoading={pending}>
-            {submitLabel}
-          </Button>
-        </div>
+        <ModalFooter
+          onCancel={close}
+          cancelLabel={cancelLabel}
+          confirmLabel={submitLabel}
+          isLoading={pending}
+        />
       </Form>
     </Modal>
   );

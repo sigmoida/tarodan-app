@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Modal, Button, Textarea, Checkbox } from '@tarodan/ui';
+import { Modal, ModalFooter, Textarea, Checkbox } from '@tarodan/ui';
 import { adminApi } from '@/lib/api';
 import { useAdminMutation } from '@/lib/query/useAdminMutation';
 
@@ -70,14 +70,13 @@ export function ForceCancelModal({
           disabled={forceCancel.isPending}
           label="Ulaşan ürünü sahibine geri yolla (önerilen)"
         />
-        <div className="flex gap-3">
-          <Button variant="outline" className="flex-1" onClick={onClose} disabled={forceCancel.isPending}>
-            İptal
-          </Button>
-          <Button variant="danger" className="flex-1" onClick={submit} isLoading={forceCancel.isPending}>
-            Sıkışmış Takası Çöz
-          </Button>
-        </div>
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={submit}
+          confirmLabel="Sıkışmış Takası Çöz"
+          destructive
+          isLoading={forceCancel.isPending}
+        />
       </div>
     </Modal>
   );

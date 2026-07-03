@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Modal, Button, Textarea } from '@tarodan/ui';
+import { Modal, ModalFooter, Textarea } from '@tarodan/ui';
 import { adminApi } from '@/lib/api';
 import { useAdminMutation } from '@/lib/query/useAdminMutation';
 
@@ -46,19 +46,13 @@ export function ApproveTradeModal({
             disabled={approve.isPending}
           />
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline" className="flex-1" onClick={onClose} disabled={approve.isPending}>
-            İptal
-          </Button>
-          <Button
-            variant="success"
-            className="flex-1"
-            onClick={() => approve.mutate()}
-            isLoading={approve.isPending}
-          >
-            Onayla
-          </Button>
-        </div>
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={() => approve.mutate()}
+          confirmLabel="Onayla"
+          confirmVariant="success"
+          isLoading={approve.isPending}
+        />
       </div>
     </Modal>
   );

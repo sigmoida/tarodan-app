@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Modal, Button, Select, Textarea } from '@tarodan/ui';
+import { Modal, ModalFooter, Select, Textarea } from '@tarodan/ui';
 import { adminApi } from '@/lib/api';
 import { useAdminMutation } from '@/lib/query/useAdminMutation';
 
@@ -74,14 +74,12 @@ export function ResolveDisputeModal({
             disabled={resolve.isPending}
           />
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline" className="flex-1" onClick={onClose} disabled={resolve.isPending}>
-            İptal
-          </Button>
-          <Button variant="primary" className="flex-1" onClick={submit} isLoading={resolve.isPending}>
-            Çözümle
-          </Button>
-        </div>
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={submit}
+          confirmLabel="Çözümle"
+          isLoading={resolve.isPending}
+        />
       </div>
     </Modal>
   );

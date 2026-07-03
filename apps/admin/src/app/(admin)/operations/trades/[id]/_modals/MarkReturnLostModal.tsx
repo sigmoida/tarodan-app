@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Modal, Button, Textarea } from '@tarodan/ui';
+import { Modal, ModalFooter, Textarea } from '@tarodan/ui';
 import { adminApi } from '@/lib/api';
 import { useAdminMutation } from '@/lib/query/useAdminMutation';
 
@@ -63,14 +63,13 @@ export function MarkReturnLostModal({
             disabled={markLost.isPending}
           />
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline" className="flex-1" onClick={onClose} disabled={markLost.isPending}>
-            İptal
-          </Button>
-          <Button variant="danger" className="flex-1" onClick={submit} isLoading={markLost.isPending}>
-            Kayıp İşaretle
-          </Button>
-        </div>
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={submit}
+          confirmLabel="Kayıp İşaretle"
+          destructive
+          isLoading={markLost.isPending}
+        />
       </div>
     </Modal>
   );

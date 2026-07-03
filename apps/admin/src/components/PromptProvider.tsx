@@ -7,7 +7,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import { Dialog, Button, Textarea, Input, Label, FormField } from "@tarodan/ui";
+import { Dialog, ModalFooter, Textarea, Input, Label, FormField } from "@tarodan/ui";
 
 export interface PromptOptions {
   title?: string;
@@ -146,19 +146,15 @@ function PromptDialog({
           )}
         </FormField>
 
-        {error && <div className="text-sm text-red-600">{error}</div>}
+        {error && <div className="text-sm text-danger-600">{error}</div>}
 
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={onCancel}>
-            {cancelLabel}
-          </Button>
-          <Button
-            variant={destructive ? "danger" : "primary"}
-            onClick={handleSubmit}
-          >
-            {confirmLabel}
-          </Button>
-        </div>
+        <ModalFooter
+          onCancel={onCancel}
+          onConfirm={handleSubmit}
+          cancelLabel={cancelLabel}
+          confirmLabel={confirmLabel}
+          destructive={destructive}
+        />
       </div>
     </Dialog>
   );
