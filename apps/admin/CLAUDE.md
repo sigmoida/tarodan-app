@@ -238,3 +238,55 @@ primitives are in `components/table/cells.tsx`; use them directly only inside
 
 Migrate any table you touch to `col.*`. The `(admin)/operations/*` list pages
 are the canonical examples.
+
+---
+
+## 11. Forms & CRUD — the modal + RHF/zod recipe
+
+Create/edit is a **self-contained modal component** per resource (never inline
+overlays on the page). Delete goes through the shared **`useConfirm`** provider
+(`components/ConfirmProvider`) + a `useAdminMutation` — no bespoke delete modal.
+
+### Form layer (`@tarodan/ui/form` + `components/form/`)
+- **`FormModal`** (`components/form/FormModal.tsx`) = design-system `Modal` + the
+  RHF `Form` + a standard Cancel/Submit footer. The resource modal owns the
+  `form` (from `useZodForm`) and the `useAdminMutation`; FormModal just frames them.
+- **RHF field wrappers** (`@tarodan/ui/form`): `FormInput`, `FormSelect`,
+  `FormTextarea`, `FormCheckbox`, `FormImageUpload`. Each auto-wires value + error
+  from context by `name` — never thread `register`/`error` by hand. `FormImageUpload`
+  takes an injected `upload` fn (`adminApi.uploadMedia`).
+- **Schemas** live in `lib/schemas/catalog/*.ts` (one per resource, `z.infer` types
+  exported). Keep zod **validation-only** — shape string→number/null in the
+  `mutationFn`, so `z.infer` types stay honest (native number/select inputs yield
+  strings).
+
+```tsx
+// _modals/CategoryFormModal.tsx
+const form = useZodForm(categorySchema, { defaultValues: category ?? { name: '', isActive: true } });
+const save = useAdminMutation(
+  (v) => (isEdit ? adminApi.updateCategory(id, v) : adminApi.createCategory(v)),
+  { invalidates: ['categories'], successMessage: '…', onSuccess: onClose },
+);
+return (
+  <FormModal open onClose title={…} form={form} onSubmit={(v) => save.mutate(v)}
+    isSubmitting={save.isPending} submitLabel={isEdit ? 'Güncelle' : 'Oluştur'}>
+    <FormInput name="name" label="Ad" />
+    <FormCheckbox name="isActive" label="Aktif" />
+  </FormModal>
+);
+```
+Page side stays thin: `const [modal, setModal] = useState<{item?}|null>(null)` and
+mount with `key={item?.id ?? 'new'}` so `useZodForm` defaults seed fresh per open.
+
+### Lists over full-load APIs
+Some catalog APIs return the whole list (no server paging/search). Wrap them with
+**`clientListFetcher`** / `paginateClient` (`lib/query/clientList.ts`) so they run
+through the same `ResourceList` pipeline; server-paginated resources pass their
+`adminApi.getX` fetcher directly.
+
+### Shared bits
+`ActiveBadge` / `StatusToggle` (`components/ActiveBadge.tsx`) for `isActive` display
++ one-click toggle. Row edit/delete buttons: `ActionIconButton` inside `col.actions`.
+
+The `(admin)/catalog/*` pages are the canonical CRUD examples (`categories` = the
+simplest, `products` = list+detail+tabs, `brands` = shared `CarModelFormModal`).
