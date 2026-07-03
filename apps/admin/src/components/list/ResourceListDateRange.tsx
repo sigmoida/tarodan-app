@@ -1,7 +1,7 @@
 'use client';
 
 import { Input } from '@tarodan/ui';
-import { useFilter } from './context';
+import { useFilter } from '@/context/ResourceListContext';
 
 /** A from/to date-range filter pair bound to two filter keys. */
 export function ResourceListDateRange({

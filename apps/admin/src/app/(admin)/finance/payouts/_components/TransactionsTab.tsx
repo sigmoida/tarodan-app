@@ -5,8 +5,8 @@ import { CheckCircleIcon } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import { ResourceList } from '@/components/list';
 import { col } from '@/components/table';
-import { ActionButtons } from '@/components/admin-list';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { ActionButtons } from '@/components/AdminList';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { HoldReasonBadge, holdReasonForRow } from '../_lib/holds';
 import { type PayoutTransaction, payoutStatusFilterOptions } from '../_lib/types';
 

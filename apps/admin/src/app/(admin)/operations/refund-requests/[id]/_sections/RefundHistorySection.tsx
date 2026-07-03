@@ -1,4 +1,4 @@
-import { refundActionLabel } from '@/components/refunds/refund-guidance';
+import { refundActionLabel } from '../_lib/refund-guidance';
 import { SectionCard } from '@/components/detail/SectionCard';
 import type { HistoryEntry } from '../types';
 import { fmtDate } from '../_lib/format';

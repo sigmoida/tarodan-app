@@ -5,10 +5,10 @@ import { Badge, enumLabel, membershipTierConfig } from '@tarodan/ui';
 import { NoSymbolIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import { col } from '@/components/table';
-import { ActionButtons, ActionIconButton } from '@/components/admin-list';
+import { ActionButtons, ActionIconButton } from '@/components/AdminList';
 import { ResourceList } from '@/components/list';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
-import { usePrompt } from '@/components/PromptProvider';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
+import { usePrompt } from '@/provider/PromptProvider';
 import { type User } from '../_lib/types';
 
 /**

@@ -20,7 +20,7 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
-import { ActionButtons, ActionIconButton } from "@/components/admin-list";
+import { ActionButtons, ActionIconButton } from "@/components/AdminList";
 import { ResourceListPage } from "@/components/ResourceListPage";
 import { useAdminResource } from "@/hooks/useAdminResource";
 

@@ -255,10 +255,12 @@ overlays on the page). Delete goes through the shared **`useConfirm`** provider
   `FormTextarea`, `FormCheckbox`, `FormImageUpload`. Each auto-wires value + error
   from context by `name` — never thread `register`/`error` by hand. `FormImageUpload`
   takes an injected `upload` fn (`adminApi.uploadMedia`).
-- **Schemas** live in `lib/schemas/catalog/*.ts` (one per resource, `z.infer` types
-  exported). Keep zod **validation-only** — shape string→number/null in the
-  `mutationFn`, so `z.infer` types stay honest (native number/select inputs yield
-  strings).
+- **Schemas** are colocated with the route that owns them — the resource's
+  `_lib/schema.ts` (or inline in `_lib/types.ts` for smaller resources), with
+  `z.infer` types exported. Only genuinely cross-feature schemas live in
+  `lib/schemas/` (e.g. `auth.ts`). Keep zod **validation-only** — shape
+  string→number/null in the `mutationFn`, so `z.infer` types stay honest (native
+  number/select inputs yield strings).
 
 ```tsx
 // _modals/CategoryFormModal.tsx

@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Alert, Badge } from '@tarodan/ui';
 import { adminApi } from '@/lib/api';
 import { AdminPage } from '@/components/page/AdminPage';
-import { PageHeader } from '@/components/admin-list';
+import { PageHeader } from '@/components/AdminList';
 import { CronsCard } from './_components/CronsCard';
 import { TimeAdjustCard } from './_components/TimeAdjustCard';
 import { type TestEnv } from './_lib/types';

@@ -12,11 +12,12 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { adminApi } from '@/lib/api';
+import { downloadBlob } from '@/lib/download';
 import { SectionCard } from '@/components/detail/SectionCard';
 import { MetricCard } from '@/components/MetricCard';
 import { DataTable } from '@/components/DataTable';
 import { col } from '@/components/table';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { fmtTry } from '@/lib/format';
 import { type WithholdingReport, MONTHS } from '../_lib/types';
 
@@ -73,11 +74,7 @@ export function WithholdingTab() {
       .toFixed(2)
       .replace('.', ',')}`;
     const csv = '﻿' + [header, ...lines, total].join('\r\n');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-    a.download = `stopaj-muhtasar-${report.period}.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    downloadBlob(`stopaj-muhtasar-${report.period}.csv`, csv);
   };
 
   const columns = [

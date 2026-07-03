@@ -9,9 +9,9 @@ import { adminApi } from '@/lib/api';
 import { SectionCard } from '@/components/detail/SectionCard';
 import { DataTable } from '@/components/DataTable';
 import { col } from '@/components/table';
-import { ActionButtons, ActionIconButton } from '@/components/admin-list';
-import { useConfirm } from '@/components/ConfirmProvider';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { ActionButtons, ActionIconButton } from '@/components/AdminList';
+import { useConfirm } from '@/provider/ConfirmProvider';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { type VatConfig, type VatOverride, type Category } from '../_lib/types';
 
 const validRate = (v: string) => {

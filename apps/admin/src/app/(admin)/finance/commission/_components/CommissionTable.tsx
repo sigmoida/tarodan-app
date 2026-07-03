@@ -4,7 +4,7 @@ import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { SectionCard } from '@/components/detail/SectionCard';
 import { DataTable } from '@/components/DataTable';
 import { col } from '@/components/table';
-import { ActionButtons, ActionIconButton } from '@/components/admin-list';
+import { ActionButtons, ActionIconButton } from '@/components/AdminList';
 import { StatusToggle } from '@/components/ActiveBadge';
 import {
   type CommissionRule,

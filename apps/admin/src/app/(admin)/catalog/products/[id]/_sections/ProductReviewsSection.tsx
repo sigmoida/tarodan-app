@@ -6,7 +6,7 @@ import { StarIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outl
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { IconButton } from '@tarodan/ui';
 import { adminApi } from '@/lib/api';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { SectionCard } from '@/components/detail/SectionCard';
 import type { Review } from '../_lib/types';
 

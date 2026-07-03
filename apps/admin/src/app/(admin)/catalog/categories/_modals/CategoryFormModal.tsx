@@ -2,9 +2,9 @@
 
 import { FormInput, FormTextarea, FormCheckbox, useZodForm } from '@tarodan/ui/form';
 import { adminApi } from '@/lib/api';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { FormModal } from '@/components/form/FormModal';
-import { categorySchema, type CategoryFormValues } from '@/lib/schemas/catalog/category';
+import { categorySchema, type CategoryFormValues } from '../_lib/schema';
 import type { Category } from '../_lib/types';
 
 /** Create/edit category. Mount with `key={category?.id ?? 'new'}` so defaults seed fresh. */

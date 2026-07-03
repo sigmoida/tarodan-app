@@ -12,7 +12,7 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { adminApi } from '@/lib/api';
-import { useConfirm } from '@/components/ConfirmProvider';
+import { useConfirm } from '@/provider/ConfirmProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { SAMPLE_DATA } from '../_lib/sampleData';
 import { makeSourceData, type TemplateDetail } from '../_lib/types';

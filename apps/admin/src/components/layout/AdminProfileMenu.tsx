@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
 } from '@tarodan/ui';
 import { ArrowRightStartOnRectangleIcon, UserCircleIcon } from '@heroicons/react/24/outline';
-import { useSession } from '@/lib/session-context';
+import { useSession } from '@/context/SessionContext';
 
 /** Tek kaynak: hesap menüsü linkleri burada tanımlanır. */
 const PROFILE_MENU_ITEMS: Array<{ label: string; href: string }> = [];

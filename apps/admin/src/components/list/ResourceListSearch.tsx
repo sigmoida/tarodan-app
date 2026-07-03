@@ -2,7 +2,7 @@
 
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { Input } from '@tarodan/ui';
-import { useResourceList } from './context';
+import { useResourceList } from '@/context/ResourceListContext';
 
 /**
  * Search box wired to the list's debounced search (Enter flushes immediately).

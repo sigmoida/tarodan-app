@@ -13,7 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { adminApi } from '@/lib/api';
-import { useConfirm } from '@/components/ConfirmProvider';
+import { useConfirm } from '@/provider/ConfirmProvider';
 import {
   PREDEFINED_PAGES,
   DEFAULT_CONTENT,

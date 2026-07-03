@@ -6,7 +6,7 @@ import { Button, Input } from '@tarodan/ui';
 import toast from 'react-hot-toast';
 import { adminApi } from '@/lib/api';
 import { SectionCard } from '@/components/detail/SectionCard';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 
 export function TradeRateCard() {
   const [rate, setRate] = useState('5');

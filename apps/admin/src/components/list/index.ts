@@ -35,5 +35,5 @@ export const ResourceList = Object.assign(ResourceListRoot, {
   Total: ResourceListTotal,
 });
 
-export { useResourceList, useFilter } from './context';
+export { useResourceList, useFilter } from '@/context/ResourceListContext';
 export type { ResourceListProps } from './ResourceList';

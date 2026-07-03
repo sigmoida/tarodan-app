@@ -17,11 +17,11 @@ import {
 import toast from "react-hot-toast";
 import { Button, Input, Select } from "@tarodan/ui";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
-import { PageHeader, ActionButtons, ActionIconButton } from "@/components/admin-list";
+import { PageHeader, ActionButtons, ActionIconButton } from "@/components/AdminList";
 import { AdminTabs } from "@/components/AdminTabs";
 import { adminApi } from "@/lib/api";
-import { useSession } from "@/lib/session-context";
-import { useConfirm } from "@/components/ConfirmProvider";
+import { useSession } from "@/context/SessionContext";
+import { useConfirm } from "@/provider/ConfirmProvider";
 
 // ─── Rol sabitleri ───────────────────────────────────────────────────────────
 

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Select, Spinner } from '@tarodan/ui';
 import { AdminPage } from '@/components/page/AdminPage';
-import { PageHeader } from '@/components/admin-list';
+import { PageHeader } from '@/components/AdminList';
 import { AdminTabs } from '@/components/AdminTabs';
 import {
   type DateRange,

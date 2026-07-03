@@ -8,10 +8,10 @@ import {
   refundRequestStatusConfig,
 } from "@tarodan/ui";
 import { AdminPage } from "@/components/page/AdminPage";
-import { PageHeader } from "@/components/admin-list";
+import { PageHeader } from "@/components/AdminList";
 import { ResourceList } from "@/components/list";
 import { col, TruncatedText } from "@/components/table";
-import { fetchRefundRequests, REFUND_STATUS_OPTIONS } from "@/lib/refundRequestQuery";
+import { fetchRefundRequests, REFUND_STATUS_OPTIONS } from "@/lib/refund-request-query";
 
 interface RefundRequestRow {
   id: string;

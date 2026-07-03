@@ -3,7 +3,7 @@
 import { useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AdminPage } from "@/components/page/AdminPage";
-import { PageHeader } from "@/components/admin-list";
+import { PageHeader } from "@/components/AdminList";
 import { AdminTabs } from "@/components/AdminTabs";
 import {
   TruckIcon,

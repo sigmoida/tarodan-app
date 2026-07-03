@@ -3,18 +3,8 @@
 import { Button } from '@tarodan/ui';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
+import { downloadBlob } from '@/lib/download';
 import { type DateRange, getDateRangeParams } from '../_lib/types';
-
-function download(filename: string, blob: Blob) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
 
 /** CSV / JSON report export for the active tab + date range (header actions). */
 export function AnalyticsExport({
@@ -30,18 +20,12 @@ export function AnalyticsExport({
   const onCsv = async () => {
     const res = await adminApi.exportReport(activeTab, 'csv', range);
     const content = (res.data as { content?: string })?.content ?? '';
-    download(
-      `${base}.csv`,
-      new Blob(['﻿' + content], { type: 'text/csv;charset=utf-8;' }),
-    );
+    downloadBlob(`${base}.csv`, '﻿' + content);
   };
 
   const onJson = async () => {
     const res = await adminApi.exportReport(activeTab, 'pdf', range);
-    download(
-      `${base}.json`,
-      new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' }),
-    );
+    downloadBlob(`${base}.json`, JSON.stringify(res.data, null, 2), 'application/json');
   };
 
   return (

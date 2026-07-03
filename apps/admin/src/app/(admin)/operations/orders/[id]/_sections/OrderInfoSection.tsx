@@ -1,4 +1,4 @@
-import { AdminFinancialSummary } from '@/components/AdminFinancialSummary';
+import { AdminFinancialSummary } from '../_components/AdminFinancialSummary';
 import { SectionCard } from '@/components/detail/SectionCard';
 import type { OrderDetail } from '../types';
 import type { OrderStatusView } from '../_lib/status';

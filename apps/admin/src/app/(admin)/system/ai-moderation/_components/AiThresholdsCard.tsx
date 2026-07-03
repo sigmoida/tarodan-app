@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Button, Slider } from '@tarodan/ui';
 import { adminApi } from '@/lib/api';
 import { SectionCard } from '@/components/detail/SectionCard';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { type AiModerationConfig } from '../_lib/types';
 
 /** Relevance auto-accept + NSFW block thresholds (stored 0..1, edited as %). */

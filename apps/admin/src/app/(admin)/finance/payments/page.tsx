@@ -5,7 +5,7 @@ import { Button } from '@tarodan/ui';
 import { ChartBarIcon } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import { AdminPage } from '@/components/page/AdminPage';
-import { PageHeader } from '@/components/admin-list';
+import { PageHeader } from '@/components/AdminList';
 import { ResourceList } from '@/components/list';
 import {
   type Payment,

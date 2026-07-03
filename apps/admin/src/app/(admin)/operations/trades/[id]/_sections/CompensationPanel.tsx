@@ -3,8 +3,8 @@
 import { Button } from '@tarodan/ui';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
-import { usePrompt } from '@/components/PromptProvider';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { usePrompt } from '@/provider/PromptProvider';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import type { TradeDetail } from '../types';
 
 /** Manual-compensation panel — self-contained (owns the resolve mutation + prompt). */

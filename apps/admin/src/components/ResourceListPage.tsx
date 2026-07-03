@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode } from "react";
-import { PageHeader, FilterToolbar, BulkActionBar } from "@/components/admin-list";
+import { PageHeader, FilterToolbar, BulkActionBar } from "@/components/AdminList";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
 import { Pagination } from "@/components/Pagination";
 import { AdminTabs } from "@/components/AdminTabs";

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Modal, ModalFooter, Checkbox, Textarea } from '@tarodan/ui';
 import { adminApi } from '@/lib/api';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 
 /** Reply to a ticket (optionally as an internal note). Owns its own mutation. */
 export function TicketReplyModal({

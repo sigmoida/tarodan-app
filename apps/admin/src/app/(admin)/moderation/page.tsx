@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
-import { getProductEffectivePrice } from '@/lib/productPrice';
+import { getProductEffectivePrice } from '@/lib/product-price';
 import { toast } from 'react-hot-toast';
 import { Button, Select, Spinner, StatusBadge, Textarea } from '@tarodan/ui';
 import type { StatusConfig } from '@tarodan/ui';
@@ -19,7 +19,7 @@ import {
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { AdminTabs } from '@/components/AdminTabs';
-import { PageHeader } from '@/components/admin-list';
+import { PageHeader } from '@/components/AdminList';
 import { Pagination } from '@/components/Pagination';
 import { useAdminResource } from '@/hooks/useAdminResource';
 

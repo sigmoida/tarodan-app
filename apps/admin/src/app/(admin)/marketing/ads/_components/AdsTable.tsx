@@ -13,10 +13,10 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import { col } from '@/components/table';
-import { ActionButtons, ActionIconButton } from '@/components/admin-list';
+import { ActionButtons, ActionIconButton } from '@/components/AdminList';
 import { ResourceList } from '@/components/list';
-import { useConfirm } from '@/components/ConfirmProvider';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { useConfirm } from '@/provider/ConfirmProvider';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { type Ad, positionLabels, deviceLabels } from '../_lib/types';
 
 function DeviceIcon({ type }: { type: string }) {

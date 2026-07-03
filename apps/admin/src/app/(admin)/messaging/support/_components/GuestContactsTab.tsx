@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { adminApi } from '@/lib/api';
 import { ResourceList } from '@/components/list';
-import { clientListFetcher } from '@/lib/query/clientList';
+import { clientListFetcher } from '@/lib/query/client-list';
 import { guestColumns } from '../_lib/columns';
 import { type GuestContact } from '../_lib/types';
 import { GuestContactModal } from './GuestContactModal';

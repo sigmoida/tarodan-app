@@ -16,9 +16,9 @@ import { cancelReasonLabel, orderOriginLabel } from '@/lib/utils';
 import { adminApi } from '@/lib/api';
 import { DataTable } from '@/components/DataTable';
 import { col, CellText, CellUser } from '@/components/table';
-import { ActionIconButton } from '@/components/admin-list';
+import { ActionIconButton } from '@/components/AdminList';
 import { useResourceList } from '@/components/list';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { type Order, mapOrders, useOrderGroups } from '../_lib/orders';
 
 /**

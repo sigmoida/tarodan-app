@@ -4,7 +4,7 @@ import { type ReactNode } from 'react';
 import { EmptyState } from '@tarodan/ui';
 import { SuspenseBoundary } from '@/components/page/SuspenseBoundary';
 import { AdminPage } from '@/components/page/AdminPage';
-import { PageHeader } from '@/components/admin-list';
+import { PageHeader } from '@/components/AdminList';
 import { useAdminItem } from '@/hooks/useAdminItem';
 
 export interface DetailPageProps<T> {

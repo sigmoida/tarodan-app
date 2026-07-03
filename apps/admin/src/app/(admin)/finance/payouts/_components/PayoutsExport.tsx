@@ -6,6 +6,7 @@ import { Button } from '@tarodan/ui';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { adminApi } from '@/lib/api';
+import { downloadBlob } from '@/lib/download';
 
 /** CSV export of the current transaction filters (read from the URL). */
 export function PayoutsExport() {
@@ -21,11 +22,7 @@ export function PayoutsExport() {
         dateTo: sp.get('dateTo') || undefined,
       });
       const { csv, filename } = res.data;
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      downloadBlob(filename, csv);
       toast.success('Dışa aktarıldı');
     } catch {
       toast.error('Dışa aktarma başarısız');

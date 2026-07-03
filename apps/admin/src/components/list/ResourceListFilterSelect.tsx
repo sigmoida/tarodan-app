@@ -1,7 +1,7 @@
 'use client';
 
 import { Select, type SelectOption } from '@tarodan/ui';
-import { useResourceList } from './context';
+import { useResourceList } from '@/context/ResourceListContext';
 
 /** A filter dropdown bound to `filters[name]` — changing it resets the page. */
 export function ResourceListFilterSelect({

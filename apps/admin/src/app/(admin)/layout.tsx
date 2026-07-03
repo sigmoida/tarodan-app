@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/server/session';
 import { getPermissions } from '@/lib/server/permissions';
-import { SessionProvider } from '@/lib/session-context';
-import { PermissionsProvider } from '@/lib/permissions-context';
-import { AdminProviders } from '@/components/layout/AdminProviders';
+import { SessionProvider } from '@/context/SessionContext';
+import { PermissionsProvider } from '@/context/PermissionsContext';
+import { AdminProviders } from '@/provider/AdminProviders';
 import { AppShell } from '@/components/layout/AppShell';
 
 /**

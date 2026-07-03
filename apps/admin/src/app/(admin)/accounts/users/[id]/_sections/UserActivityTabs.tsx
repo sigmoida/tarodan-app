@@ -10,7 +10,7 @@ import { StatusBadge } from '@tarodan/ui';
 import { SectionCard } from '@/components/detail/SectionCard';
 import { AdminTabs } from '@/components/AdminTabs';
 import { ModerationEventsPanel } from '@/components/ModerationEventsPanel';
-import { getProductEffectivePrice } from '@/lib/productPrice';
+import { getProductEffectivePrice } from '@/lib/product-price';
 import {
 	type UserDetail,
 	type UserRatingItem,

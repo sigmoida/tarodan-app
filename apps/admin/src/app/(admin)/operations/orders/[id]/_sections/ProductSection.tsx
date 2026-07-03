@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getProductEffectivePrice } from '@/lib/productPrice';
+import { getProductEffectivePrice } from '@/lib/product-price';
 import { SectionCard } from '@/components/detail/SectionCard';
 import type { OrderDetail } from '../types';
 

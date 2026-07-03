@@ -10,7 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import { AdminPage } from '@/components/page/AdminPage';
-import { PageHeader } from '@/components/admin-list';
+import { PageHeader } from '@/components/AdminList';
 import { SectionCard } from '@/components/detail/SectionCard';
 import {
   PREDEFINED_PAGES,

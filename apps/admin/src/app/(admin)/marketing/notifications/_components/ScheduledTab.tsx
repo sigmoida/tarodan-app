@@ -2,9 +2,9 @@
 
 import { adminApi } from '@/lib/api';
 import { ResourceList } from '@/components/list';
-import { clientListFetcher } from '@/lib/query/clientList';
-import { useConfirm } from '@/components/ConfirmProvider';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { clientListFetcher } from '@/lib/query/client-list';
+import { useConfirm } from '@/provider/ConfirmProvider';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { scheduledColumns } from '../_lib/columns';
 import { type ScheduledNotification } from '../_lib/types';
 

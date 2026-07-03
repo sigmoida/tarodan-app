@@ -1,7 +1,7 @@
 'use client';
 
 import { AdminPage } from '@/components/page/AdminPage';
-import { PageHeader } from '@/components/admin-list';
+import { PageHeader } from '@/components/AdminList';
 import { AdminTabs } from '@/components/AdminTabs';
 import { useTabParam } from '@/hooks/useTabParam';
 import { INVOICE_TABS } from './_lib/types';

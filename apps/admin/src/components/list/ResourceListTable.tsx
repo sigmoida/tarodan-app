@@ -2,7 +2,7 @@
 
 import { type ReactNode } from 'react';
 import { DataTable, type ColumnDef } from '@/components/DataTable';
-import { useResourceList } from './context';
+import { useResourceList } from '@/context/ResourceListContext';
 
 /** The table — reads rows/loading/selection from context; columns are its prop. */
 export function ResourceListTable<T>({

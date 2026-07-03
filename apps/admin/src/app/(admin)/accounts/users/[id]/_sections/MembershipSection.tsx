@@ -12,8 +12,8 @@ import {
 import { adminApi } from '@/lib/api';
 import { SectionCard } from '@/components/detail/SectionCard';
 import { DataList, Field } from '@/components/detail/DataList';
-import { useConfirm } from '@/components/ConfirmProvider';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { useConfirm } from '@/provider/ConfirmProvider';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import {
 	type UserDetail,
 	MEMBERSHIP_TIER_OPTIONS,

@@ -2,12 +2,12 @@
 
 import { FormInput, FormTextarea, FormCheckbox, useZodForm } from '@tarodan/ui/form';
 import { adminApi } from '@/lib/api';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { FormModal } from '@/components/form/FormModal';
 import {
   attributeGroupSchema,
   type AttributeGroupFormValues,
-} from '@/lib/schemas/catalog/attribute';
+} from '../_lib/schema';
 import type { AttributeGroup } from '../_lib/types';
 
 export function AttributeGroupFormModal({

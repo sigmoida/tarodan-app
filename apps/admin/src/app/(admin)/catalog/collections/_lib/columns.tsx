@@ -1,6 +1,6 @@
 import { PencilIcon, TrashIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { col, TruncatedText } from '@/components/table';
-import { ActionIconButton } from '@/components/admin-list';
+import { ActionIconButton } from '@/components/AdminList';
 import type { Collection } from './types';
 
 export interface CollectionRowActions {

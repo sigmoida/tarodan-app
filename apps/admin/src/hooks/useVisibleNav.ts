@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { navGroups, topLevelNav } from '@/lib/navigation';
-import { usePermissions } from '@/lib/permissions-context';
+import { usePermissions } from '@/context/PermissionsContext';
 
 /**
  * Nav items visible to the current admin, filtered by the server-resolved

@@ -2,9 +2,9 @@
 
 import { FormInput, FormTextarea, FormCheckbox, useZodForm } from '@tarodan/ui/form';
 import { adminApi } from '@/lib/api';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { FormModal } from '@/components/form/FormModal';
-import { collectionSchema, type CollectionFormValues } from '@/lib/schemas/catalog/collection';
+import { collectionSchema, type CollectionFormValues } from '../_lib/schema';
 import type { Collection } from '../_lib/types';
 
 export function CollectionFormModal({

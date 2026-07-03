@@ -1,7 +1,7 @@
 'use client';
 
 import { type ReactNode } from 'react';
-import { PageHeader } from '@/components/admin-list';
+import { PageHeader } from '@/components/AdminList';
 import { AdminTabs, type AdminTab } from '@/components/AdminTabs';
 
 /**

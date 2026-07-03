@@ -6,7 +6,7 @@ import { useFormContext } from 'react-hook-form';
 import { Input } from '@tarodan/ui';
 import { FormInput, FormSelect, FormCheckbox, useZodForm } from '@tarodan/ui/form';
 import { adminApi } from '@/lib/api';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { FormModal } from '@/components/form/FormModal';
 import { fmtTry } from '@/lib/format';
 import {

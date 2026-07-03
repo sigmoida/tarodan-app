@@ -3,7 +3,7 @@ import {
   XCircleIcon,
   ArrowUturnLeftIcon,
 } from '@heroicons/react/24/outline';
-import { ActionButtons, ActionIconButton } from '@/components/admin-list';
+import { ActionButtons, ActionIconButton } from '@/components/AdminList';
 import { type ReviewStatus } from '../_lib/types';
 
 /** Approve / reject / revert row actions shared by both review tabs. */

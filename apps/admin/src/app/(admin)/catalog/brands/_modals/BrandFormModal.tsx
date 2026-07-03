@@ -2,9 +2,9 @@
 
 import { FormInput, FormTextarea, FormCheckbox, useZodForm } from '@tarodan/ui/form';
 import { adminApi } from '@/lib/api';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { FormModal } from '@/components/form/FormModal';
-import { brandSchema, type BrandFormValues } from '@/lib/schemas/catalog/brand';
+import { brandSchema, type BrandFormValues } from '../_lib/schema';
 import type { Brand } from '../_lib/types';
 
 export function BrandFormModal({

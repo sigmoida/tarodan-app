@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { useSession } from '@/lib/session-context';
+import { useSession } from '@/context/SessionContext';
 
 /** Hareketsizlik süresi (ms). Balanced politika: 1 saat. */
 const IDLE_TIMEOUT_MS = 60 * 60 * 1000;

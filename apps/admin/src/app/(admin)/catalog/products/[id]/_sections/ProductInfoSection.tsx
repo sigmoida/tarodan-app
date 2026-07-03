@@ -5,7 +5,7 @@ import {
   getProductEffectivePrice,
   isProductOnSaleDisplay,
   getProductOriginalPriceForDisplay,
-} from '@/lib/productPrice';
+} from '@/lib/product-price';
 import { fmtDateTime, fmtTry } from '@/lib/format';
 import { AiBadge } from '../../_components/AiBadge';
 import type { ProductDetail } from '../_lib/types';

@@ -2,7 +2,7 @@
 
 import { FormInput, FormTextarea, FormCheckbox, useZodForm } from '@tarodan/ui/form';
 import { adminApi } from '@/lib/api';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { FormModal } from '@/components/form/FormModal';
 import { fmtTry } from '@/lib/format';
 import {

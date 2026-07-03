@@ -4,8 +4,8 @@ import toast from 'react-hot-toast';
 import { Button } from '@tarodan/ui';
 import { ArrowUturnLeftIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
-import { useConfirm } from '@/components/ConfirmProvider';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { useConfirm } from '@/provider/ConfirmProvider';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import type { TradeDetail } from '../types';
 
 /** PayTR refund-failure panel — self-contained (owns the retry mutation + confirm). */

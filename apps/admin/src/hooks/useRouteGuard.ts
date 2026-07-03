@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { routePermission } from '@/lib/navigation';
-import { usePermissions } from '@/lib/permissions-context';
+import { usePermissions } from '@/context/PermissionsContext';
 
 /**
  * UX route guard: redirect to /dashboard when the current route requires a

@@ -2,7 +2,7 @@
 
 import { adminApi } from '@/lib/api';
 import { AdminPage } from '@/components/page/AdminPage';
-import { PageHeader } from '@/components/admin-list';
+import { PageHeader } from '@/components/AdminList';
 import { AdminTabs } from '@/components/AdminTabs';
 import { ModerationEventsPanel } from '@/components/ModerationEventsPanel';
 import { ResourceList } from '@/components/list';

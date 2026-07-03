@@ -1,5 +1,5 @@
 import { StatusBadge, enumLabel, shipmentStatusConfig, shipmentProviderConfig } from '@tarodan/ui';
-import { payerLabels } from '@/components/refunds/refund-guidance';
+import { payerLabels } from '../_lib/refund-guidance';
 import { SectionCard } from '@/components/detail/SectionCard';
 import type { RefundRequestDetail } from '../types';
 import { fmtDate } from '../_lib/format';

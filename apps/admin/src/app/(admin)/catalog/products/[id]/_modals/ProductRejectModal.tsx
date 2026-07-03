@@ -2,9 +2,9 @@
 
 import { FormTextarea, useZodForm } from '@tarodan/ui/form';
 import { adminApi } from '@/lib/api';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { FormModal } from '@/components/form/FormModal';
-import { productRejectSchema, type ProductRejectValues } from '@/lib/schemas/catalog/product';
+import { productRejectSchema, type ProductRejectValues } from '../_lib/schema';
 
 export function ProductRejectModal({
   open,

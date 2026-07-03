@@ -6,7 +6,7 @@ import { Badge, Input } from '@tarodan/ui';
 import { PencilIcon } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import { AdminPage } from '@/components/page/AdminPage';
-import { PageHeader, ActionButtons, ActionIconButton } from '@/components/admin-list';
+import { PageHeader, ActionButtons, ActionIconButton } from '@/components/AdminList';
 import { SectionCard } from '@/components/detail/SectionCard';
 import { DataTable } from '@/components/DataTable';
 import { col } from '@/components/table';

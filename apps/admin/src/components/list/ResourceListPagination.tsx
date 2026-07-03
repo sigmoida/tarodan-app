@@ -1,7 +1,7 @@
 'use client';
 
 import { Pagination } from '@/components/Pagination';
-import { useResourceList } from './context';
+import { useResourceList } from '@/context/ResourceListContext';
 
 /** Page controls wired to the list's page state. */
 export function ResourceListPagination() {

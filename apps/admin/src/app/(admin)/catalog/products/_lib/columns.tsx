@@ -12,12 +12,12 @@ import {
   ArrowUturnLeftIcon,
 } from '@heroicons/react/24/outline';
 import { col, Empty } from '@/components/table';
-import { ActionIconButton } from '@/components/admin-list';
+import { ActionIconButton } from '@/components/AdminList';
 import {
   getProductEffectivePrice,
   isProductOnSaleDisplay,
   getProductOriginalPriceForDisplay,
-} from '@/lib/productPrice';
+} from '@/lib/product-price';
 import { fmtTry } from '@/lib/format';
 import { AiBadge } from '../_components/AiBadge';
 import type { Product } from './types';

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { StatusBadge } from "@tarodan/ui";
 import { ResourceList } from "@/components/list";
 import { col, Empty } from "@/components/table";
-import { fetchRefundRequests, REFUND_STATUS_OPTIONS } from "@/lib/refundRequestQuery";
+import { fetchRefundRequests, REFUND_STATUS_OPTIONS } from "@/lib/refund-request-query";
 import { shipmentStatusConfig } from "./_shared";
 
 interface ReturnShipmentRow {

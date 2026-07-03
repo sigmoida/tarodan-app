@@ -13,9 +13,9 @@ import {
 import { adminApi } from '@/lib/api';
 import { ResourceList } from '@/components/list';
 import { col } from '@/components/table';
-import { useConfirm } from '@/components/ConfirmProvider';
-import { usePrompt } from '@/components/PromptProvider';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { useConfirm } from '@/provider/ConfirmProvider';
+import { usePrompt } from '@/provider/PromptProvider';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { type Application, businessStatusConfig } from '../_lib/types';
 
 /** The applications list for one status tab — expandable rows + approve/reject. */

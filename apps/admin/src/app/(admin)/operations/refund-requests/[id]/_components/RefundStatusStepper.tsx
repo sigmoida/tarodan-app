@@ -6,7 +6,7 @@ import {
   REFUND_LIFECYCLE,
   refundStatusPhase,
   refundTerminalStatuses,
-} from "./refund-guidance";
+} from "../_lib/refund-guidance";
 
 /**
  * İade sürecinin hangi aşamada olduğunu tek bakışta gösteren yatay çizelge.

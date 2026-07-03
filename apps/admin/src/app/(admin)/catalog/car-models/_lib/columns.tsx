@@ -1,7 +1,7 @@
 import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { col, TruncatedText } from '@/components/table';
 import { StatusToggle } from '@/components/ActiveBadge';
-import { ActionIconButton } from '@/components/admin-list';
+import { ActionIconButton } from '@/components/AdminList';
 import type { CarModel } from './types';
 
 export interface CarModelRowActions {

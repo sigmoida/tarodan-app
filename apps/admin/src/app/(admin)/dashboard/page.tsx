@@ -2,7 +2,7 @@
 
 import { Spinner } from '@tarodan/ui';
 import { AdminPage } from '@/components/page/AdminPage';
-import { PageHeader } from '@/components/admin-list';
+import { PageHeader } from '@/components/AdminList';
 import { useDashboard } from './_lib/useDashboard';
 import { DashboardStats } from './_components/DashboardStats';
 import { QuickActions } from './_components/QuickActions';

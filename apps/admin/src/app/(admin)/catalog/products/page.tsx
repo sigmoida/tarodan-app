@@ -4,14 +4,14 @@
 
 import { adminApi } from '@/lib/api';
 import { AdminPage } from '@/components/page/AdminPage';
-import { PageHeader } from '@/components/admin-list';
+import { PageHeader } from '@/components/AdminList';
 import { AdminTabs } from '@/components/AdminTabs';
 import { ModerationEventsPanel } from '@/components/ModerationEventsPanel';
 import { ResourceList } from '@/components/list';
-import { useConfirm } from '@/components/ConfirmProvider';
-import { usePrompt } from '@/components/PromptProvider';
+import { useConfirm } from '@/provider/ConfirmProvider';
+import { usePrompt } from '@/provider/PromptProvider';
 import { useTabParam } from '@/hooks/useTabParam';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { type Product, PRODUCT_TABS } from './_lib/types';
 import { ProductsCountText } from './_components/ProductsCountText';
 import { ProductsExport } from './_components/ProductsExport';

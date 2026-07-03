@@ -1,7 +1,7 @@
 import { PencilIcon, TrashIcon, GlobeAltIcon } from '@heroicons/react/24/outline';
 import { col, TruncatedText, Empty } from '@/components/table';
 import { StatusToggle } from '@/components/ActiveBadge';
-import { ActionIconButton } from '@/components/admin-list';
+import { ActionIconButton } from '@/components/AdminList';
 import type { Manufacturer } from './types';
 
 export interface ManufacturerRowActions {

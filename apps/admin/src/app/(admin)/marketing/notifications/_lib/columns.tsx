@@ -6,7 +6,7 @@ import {
 } from '@tarodan/ui';
 import { XCircleIcon } from '@heroicons/react/24/outline';
 import { col } from '@/components/table';
-import { ActionButtons, ActionIconButton } from '@/components/admin-list';
+import { ActionButtons, ActionIconButton } from '@/components/AdminList';
 import { type NotificationLog, type ScheduledNotification } from './types';
 
 export const historyColumns = [

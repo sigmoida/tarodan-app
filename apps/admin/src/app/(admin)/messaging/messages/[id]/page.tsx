@@ -13,8 +13,8 @@ import { adminApi } from '@/lib/api';
 import { DetailPage } from '@/components/detail/DetailPage';
 import { SectionCard } from '@/components/detail/SectionCard';
 import { PartyCard } from '@/components/detail/PartyCard';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
-import { usePrompt } from '@/components/PromptProvider';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
+import { usePrompt } from '@/provider/PromptProvider';
 import { messageStatusConfig } from '../_lib/types';
 
 interface MessageDetail {

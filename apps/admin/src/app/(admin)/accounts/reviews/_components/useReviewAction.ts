@@ -1,8 +1,8 @@
 'use client';
 
 import toast from 'react-hot-toast';
-import { useConfirm } from '@/components/ConfirmProvider';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { useConfirm } from '@/provider/ConfirmProvider';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { type ReviewStatus, REVIEW_ACTION_CONFIRM, statusLabels } from '../_lib/types';
 
 /**

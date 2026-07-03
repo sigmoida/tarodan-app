@@ -8,7 +8,7 @@ import { adminApi } from '@/lib/api';
 import { DetailPage } from '@/components/detail/DetailPage';
 import { PartyCard } from '@/components/detail/PartyCard';
 import { Timeline } from '@/components/detail/Timeline';
-import { EscrowStatusCard } from '@/components/orders/EscrowStatusCard';
+import { EscrowStatusCard } from './_sections/EscrowStatusCard';
 import type { OrderDetail } from './types';
 import { getOrderStatusInfo } from './_lib/status';
 import { printOrderInvoice } from './_lib/printInvoice';

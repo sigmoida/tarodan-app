@@ -4,16 +4,16 @@ import { useParams } from 'next/navigation';
 import { CheckCircleIcon } from '@heroicons/react/24/outline';
 import { StatusBadge, refundRequestStatusConfig } from '@tarodan/ui';
 import { adminApi } from '@/lib/api';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
-import { useConfirm } from '@/components/ConfirmProvider';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
+import { useConfirm } from '@/provider/ConfirmProvider';
 import { DetailPage } from '@/components/detail/DetailPage';
 import { PartyCard } from '@/components/detail/PartyCard';
-import { RefundStatusStepper } from '@/components/refunds/RefundStatusStepper';
-import { RefundNextActionPanel } from '@/components/refunds/RefundNextActionPanel';
+import { RefundStatusStepper } from './_components/RefundStatusStepper';
+import { RefundNextActionPanel } from './_components/RefundNextActionPanel';
 import {
   RefundPolicyCard,
   type ReturnShippingPayer,
-} from '@/components/refunds/RefundPolicyCard';
+} from './_components/RefundPolicyCard';
 import type { HistoryEntry, RefundRequestDetail } from './types';
 import { fmtDate, fmtTry } from './_lib/format';
 import { RefundReasonSection } from './_sections/RefundReasonSection';

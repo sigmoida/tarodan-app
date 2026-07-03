@@ -1,6 +1,6 @@
 'use client';
 
-import { useResourceList } from './context';
+import { useResourceList } from '@/context/ResourceListContext';
 
 /** A "Toplam N <unit>" line — handy under tab tables where the total isn't in a header. */
 export function ResourceListTotal({ unit }: { unit: string }) {

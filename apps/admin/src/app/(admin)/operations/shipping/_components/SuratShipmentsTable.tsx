@@ -6,7 +6,7 @@ import { Button, StatusBadge } from '@tarodan/ui';
 import { adminApi } from '@/lib/api';
 import { ResourceList } from '@/components/list';
 import { col, CellCode } from '@/components/table';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { shipmentStatusConfig, formatRelative } from '../_shared';
 
 export interface SuratShipmentRow {

@@ -2,7 +2,7 @@
 
 import { adminApi } from '@/lib/api';
 import { ResourceList } from '@/components/list';
-import { clientListFetcher } from '@/lib/query/clientList';
+import { clientListFetcher } from '@/lib/query/client-list';
 import { scheduleColumns } from '../_lib/columns';
 import { type ScheduleItem } from '../_lib/types';
 

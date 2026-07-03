@@ -6,11 +6,11 @@ import { Button, Input, Spinner } from '@tarodan/ui';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import { AdminPage } from '@/components/page/AdminPage';
-import { PageHeader } from '@/components/admin-list';
+import { PageHeader } from '@/components/AdminList';
 import { AdminTabs } from '@/components/AdminTabs';
 import { SectionCard } from '@/components/detail/SectionCard';
 import { useTabParam } from '@/hooks/useTabParam';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import {
   type Settings,
   type SettingsTab,

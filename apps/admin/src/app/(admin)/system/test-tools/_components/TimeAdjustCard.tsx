@@ -7,7 +7,7 @@ import { adminApi } from '@/lib/api';
 import { SectionCard } from '@/components/detail/SectionCard';
 import { DataTable } from '@/components/DataTable';
 import { col } from '@/components/table';
-import { useConfirm } from '@/components/ConfirmProvider';
+import { useConfirm } from '@/provider/ConfirmProvider';
 import {
   type AdjustAction,
   type SearchItem,

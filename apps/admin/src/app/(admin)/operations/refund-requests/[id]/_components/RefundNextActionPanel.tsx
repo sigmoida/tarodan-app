@@ -8,7 +8,7 @@ import {
   XCircleIcon,
   BanknotesIcon,
 } from "@heroicons/react/24/outline";
-import { guidanceForStatus, type GuidanceVariant } from "./refund-guidance";
+import { guidanceForStatus, type GuidanceVariant } from "../_lib/refund-guidance";
 
 const VARIANT_ICON: Record<GuidanceVariant, React.ReactNode> = {
   info: <InformationCircleIcon className="h-6 w-6" />,

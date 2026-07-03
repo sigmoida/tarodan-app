@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Modal, ModalFooter, Select } from '@tarodan/ui';
 import { adminApi } from '@/lib/api';
-import { useAdminMutation } from '@/lib/query/useAdminMutation';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { TICKET_STATUS_CHOICES } from '../../_lib/types';
 
 /** Change a ticket's status. Owns its own mutation. */

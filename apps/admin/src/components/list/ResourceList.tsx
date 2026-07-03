@@ -5,7 +5,7 @@ import type { AxiosResponse } from 'axios';
 import { useAdminResource } from '@/hooks/useAdminResource';
 import { SuspenseBoundary } from '@/components/page/SuspenseBoundary';
 import { AdminPage } from '@/components/page/AdminPage';
-import { ResourceListContext, useSelection } from './context';
+import { ResourceListContext, useSelection } from '@/context/ResourceListContext';
 
 export interface ResourceListProps<T> {
   /** Resource name — the query key and the invalidation target. */

@@ -23,6 +23,7 @@ export interface StatCardDef {
 
 /** Build the metric cards for a tab from its stats payload + total count. */
 export function statCards(tab: LogTab, stats: any, total: number): StatCardDef[] {
+  if (!stats) return [];
   if (tab === 'errors') {
     return [
       { icon: ExclamationTriangleIcon, tone: 'danger', label: 'Kritik', value: stats.critical ?? 0 },

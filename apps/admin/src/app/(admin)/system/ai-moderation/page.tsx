@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Alert } from '@tarodan/ui';
 import { adminApi } from '@/lib/api';
 import { AdminPage } from '@/components/page/AdminPage';
-import { PageHeader } from '@/components/admin-list';
+import { PageHeader } from '@/components/AdminList';
 import { ModerationEventsPanel } from '@/components/ModerationEventsPanel';
 import { AiThresholdsCard } from './_components/AiThresholdsCard';
 import { ImageTestCard } from './_components/ImageTestCard';
