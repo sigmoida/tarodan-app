@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/admin-list";
 import { AdminTabs } from "@/components/AdminTabs";
 import {
@@ -43,7 +44,7 @@ export default function ShippingPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <AdminPage>
       <PageHeader
         title="Kargo İşlemleri"
         description="Tüm kargo işlemleri — sipariş, takas ve iade gönderilerini tek yerden takip edin"
@@ -60,6 +61,6 @@ export default function ShippingPage() {
       {activeTab === "takas" && <TradeShipmentsTab />}
       {activeTab === "iade" && <ReturnShipmentsTab />}
       {activeTab === "surat" && <SuratTrackingTab />}
-    </div>
+    </AdminPage>
   );
 }

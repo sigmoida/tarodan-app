@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Button } from '@tarodan/ui';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
+import { AdminPage } from '@/components/page/AdminPage';
+import { PageHeader } from '@/components/admin-list';
 import { ResourceList } from '@/components/list';
 import { clientListFetcher } from '@/lib/query/clientList';
 import { useConfirm } from '@/components/ConfirmProvider';
@@ -54,7 +56,16 @@ export default function BrandsPage() {
   });
 
   return (
-    <>
+    <AdminPage>
+      <PageHeader
+        title="Marka Yönetimi"
+        description="Uygulamada gösterilecek markaları buradan yönetebilirsiniz"
+      >
+        <Button variant="primary" leftIcon={<PlusIcon className="h-5 w-5" />} onClick={() => setModal({})}>
+          Yeni Marka Ekle
+        </Button>
+      </PageHeader>
+
       <ResourceList<Brand>
         resource="brands"
         fetcher={clientListFetcher<Brand>(
@@ -71,15 +82,6 @@ export default function BrandsPage() {
         initialFilters={{ status: 'all' }}
         errorMessage="Markalar yüklenemedi"
       >
-        <ResourceList.Header
-          title="Marka Yönetimi"
-          description="Uygulamada gösterilecek markaları buradan yönetebilirsiniz"
-          actions={
-            <Button variant="primary" leftIcon={<PlusIcon className="h-5 w-5" />} onClick={() => setModal({})}>
-              Yeni Marka Ekle
-            </Button>
-          }
-        />
         <ResourceList.Toolbar>
           <ResourceList.Search placeholder="Marka ara..." />
           <ResourceList.FilterSelect name="status" options={STATUS_OPTIONS} className="sm:w-40" />
@@ -102,6 +104,6 @@ export default function BrandsPage() {
           brand={modal.brand}
         />
       )}
-    </>
+    </AdminPage>
   );
 }

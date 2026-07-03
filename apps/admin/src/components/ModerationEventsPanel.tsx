@@ -196,6 +196,12 @@ interface ModerationEventsPanelProps {
   tabs?: AdminTab[];
   activeTab?: string;
   onTabChange?: (key: string) => void;
+  /**
+   * Kendi başlık/sekme çubuğunu render etsin mi (varsayılan: true). Sayfa zaten
+   * kalıcı bir başlık + AdminTabs sağlıyorsa `false` verilir → yalnız içerik
+   * (Suspense'i sadece içerik kaplar; başlık/sekme sayfada sabit kalır).
+   */
+  chrome?: boolean;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -216,6 +222,7 @@ export function ModerationEventsPanel({
   tabs,
   activeTab,
   onTabChange,
+  chrome = true,
 }: ModerationEventsPanelProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const withEntityCol = showEntityColumn ?? !entityType;
@@ -235,13 +242,15 @@ export function ModerationEventsPanel({
       initialFilters={{ decision: '' }}
       errorMessage="AI denetim günlüğü yüklenemedi"
     >
-      <ResourceList.Header
-        title={title}
-        description={description ?? <ModerationCount />}
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabChange={onTabChange}
-      />
+      {chrome && (
+        <ResourceList.Header
+          title={title}
+          description={description ?? <ModerationCount />}
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={onTabChange}
+        />
+      )}
       <ResourceList.Toolbar>
         <ResourceList.FilterSelect name="decision" options={DECISION_OPTIONS} className="sm:w-56" />
       </ResourceList.Toolbar>

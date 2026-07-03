@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { adminApi } from "@/lib/api";
+import { AdminPage } from "@/components/page/AdminPage";
+import { PageHeader } from "@/components/admin-list";
 import { ResourceList } from "@/components/list";
 import { col } from "@/components/table";
 
@@ -34,32 +36,35 @@ const columns = [
 export default function RefundsPage() {
   const router = useRouter();
   return (
-    <ResourceList<Refund>
-      resource="refunds"
-      fetcher={(p) =>
-        adminApi.getRefundHistory({
-          search: p.search,
-          startDate: p.startDate || undefined,
-          endDate: p.endDate || undefined,
-          page: p.page,
-          limit: p.limit,
-        })
-      }
-      getRowId={(r) => r.id}
-      initialFilters={{ startDate: "", endDate: "" }}
-      errorMessage="İade geçmişi yüklenemedi"
-    >
-      <ResourceList.Header title="İade Geçmişi" description="Tamamlanmış iadeler" />
-      <ResourceList.Toolbar>
-        <ResourceList.Search />
-        <ResourceList.DateRange />
-      </ResourceList.Toolbar>
-      <ResourceList.Table
-        columns={columns}
-        emptyText="İade bulunamadı"
-        onRowClick={(r) => r.order && router.push(`/operations/orders/${r.order.id}`)}
-      />
-      <ResourceList.Pagination />
-    </ResourceList>
+    <AdminPage>
+      <PageHeader title="İade Geçmişi" description="Tamamlanmış iadeler" />
+
+      <ResourceList<Refund>
+        resource="refunds"
+        fetcher={(p) =>
+          adminApi.getRefundHistory({
+            search: p.search,
+            startDate: p.startDate || undefined,
+            endDate: p.endDate || undefined,
+            page: p.page,
+            limit: p.limit,
+          })
+        }
+        getRowId={(r) => r.id}
+        initialFilters={{ startDate: "", endDate: "" }}
+        errorMessage="İade geçmişi yüklenemedi"
+      >
+        <ResourceList.Toolbar>
+          <ResourceList.Search />
+          <ResourceList.DateRange />
+        </ResourceList.Toolbar>
+        <ResourceList.Table
+          columns={columns}
+          emptyText="İade bulunamadı"
+          onRowClick={(r) => r.order && router.push(`/operations/orders/${r.order.id}`)}
+        />
+        <ResourceList.Pagination />
+      </ResourceList>
+    </AdminPage>
   );
 }

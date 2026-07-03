@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Button } from '@tarodan/ui';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
+import { AdminPage } from '@/components/page/AdminPage';
+import { PageHeader } from '@/components/admin-list';
 import { ResourceList } from '@/components/list';
 import { clientListFetcher } from '@/lib/query/clientList';
 import { useConfirm } from '@/components/ConfirmProvider';
@@ -44,7 +46,16 @@ export default function ManufacturersPage() {
   });
 
   return (
-    <>
+    <AdminPage>
+      <PageHeader
+        title="Üretici Yönetimi"
+        description="Diecast model üreticilerini (Hot Wheels, Matchbox vb.) buradan yönetebilirsiniz"
+      >
+        <Button variant="primary" leftIcon={<PlusIcon className="h-5 w-5" />} onClick={() => setModal({})}>
+          Yeni Üretici Ekle
+        </Button>
+      </PageHeader>
+
       <ResourceList<Manufacturer>
         resource="manufacturers"
         fetcher={clientListFetcher<Manufacturer>(
@@ -56,15 +67,6 @@ export default function ManufacturersPage() {
         syncUrl
         errorMessage="Üreticiler yüklenemedi"
       >
-        <ResourceList.Header
-          title="Üretici Yönetimi"
-          description="Diecast model üreticilerini (Hot Wheels, Matchbox vb.) buradan yönetebilirsiniz"
-          actions={
-            <Button variant="primary" leftIcon={<PlusIcon className="h-5 w-5" />} onClick={() => setModal({})}>
-              Yeni Üretici Ekle
-            </Button>
-          }
-        />
         <ResourceList.Toolbar>
           <ResourceList.Search placeholder="Üretici ara..." />
         </ResourceList.Toolbar>
@@ -81,6 +83,6 @@ export default function ManufacturersPage() {
           manufacturer={modal.manufacturer}
         />
       )}
-    </>
+    </AdminPage>
   );
 }

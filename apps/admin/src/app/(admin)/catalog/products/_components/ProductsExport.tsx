@@ -1,24 +1,29 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@tarodan/ui';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
-import { useResourceList } from '@/components/list';
 
-/** CSV export of the current product filters (reads status/sellerId from context). */
+/** CSV export of the current product filters (reads status/sellerId from the URL). */
 export function ProductsExport() {
-  const { filters } = useResourceList<any>();
+  const searchParams = useSearchParams();
   const [busy, setBusy] = useState(false);
+
+  const status = searchParams.get('status') ?? 'all';
+  const sellerId = searchParams.get('sellerId') ?? '';
 
   const onExport = async () => {
     setBusy(true);
     try {
       const res = await adminApi.exportProducts({
-        status: filters.status === 'all' ? undefined : filters.status,
-        sellerId: filters.sellerId || undefined,
+        status: status === 'all' ? undefined : status,
+        sellerId: sellerId || undefined,
       });
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
+      const url = window.URL.createObjectURL(
+        new Blob([res.data], { type: 'text/csv' }),
+      );
       const a = document.createElement('a');
       a.href = url;
       a.download = `products_${new Date().toISOString().split('T')[0]}.csv`;
@@ -31,11 +36,9 @@ export function ProductsExport() {
 
   return (
     <Button
-      variant="secondary"
-      leftIcon={<ArrowDownTrayIcon className="h-5 w-5" />}
+      leftIcon={<ArrowDownTrayIcon className='h-5 w-5' />}
       isLoading={busy}
-      onClick={onExport}
-    >
+      onClick={onExport}>
       CSV İndir
     </Button>
   );

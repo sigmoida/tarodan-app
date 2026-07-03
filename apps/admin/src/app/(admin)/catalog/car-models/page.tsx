@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Button } from '@tarodan/ui';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
+import { AdminPage } from '@/components/page/AdminPage';
+import { PageHeader } from '@/components/admin-list';
 import { ResourceList } from '@/components/list';
 import { paginateClient } from '@/lib/query/clientList';
 import { useConfirm } from '@/components/ConfirmProvider';
@@ -45,7 +47,16 @@ export default function CarModelsPage() {
   });
 
   return (
-    <>
+    <AdminPage>
+      <PageHeader
+        title="Model Yönetimi"
+        description="Marka bazlı araç modellerini (örn. BMW M4, Porsche 911) buradan yönetebilirsiniz"
+      >
+        <Button variant="primary" leftIcon={<PlusIcon className="h-5 w-5" />} onClick={() => setModal({})}>
+          Yeni Model Ekle
+        </Button>
+      </PageHeader>
+
       <ResourceList<CarModel>
         resource="car-models"
         fetcher={async (params) => {
@@ -63,15 +74,6 @@ export default function CarModelsPage() {
         initialFilters={{ brandId: '' }}
         errorMessage="Modeller yüklenemedi"
       >
-        <ResourceList.Header
-          title="Model Yönetimi"
-          description="Marka bazlı araç modellerini (örn. BMW M4, Porsche 911) buradan yönetebilirsiniz"
-          actions={
-            <Button variant="primary" leftIcon={<PlusIcon className="h-5 w-5" />} onClick={() => setModal({})}>
-              Yeni Model Ekle
-            </Button>
-          }
-        />
         <ResourceList.Toolbar>
           <ResourceList.Search placeholder="Model ara (ad, marka)..." />
           <CarModelFilters />
@@ -89,6 +91,6 @@ export default function CarModelsPage() {
           model={modal.model}
         />
       )}
-    </>
+    </AdminPage>
   );
 }

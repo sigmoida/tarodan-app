@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Button } from '@tarodan/ui';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
+import { AdminPage } from '@/components/page/AdminPage';
+import { PageHeader } from '@/components/admin-list';
 import { ResourceList } from '@/components/list';
 import { clientListFetcher } from '@/lib/query/clientList';
 import { useConfirm } from '@/components/ConfirmProvider';
@@ -35,7 +37,13 @@ export default function CategoriesPage() {
   const columns = categoryColumns({ onEdit: (c) => setModal({ category: c }), onDelete });
 
   return (
-    <>
+    <AdminPage>
+      <PageHeader title="Kategoriler" description="Kategori listesi ve yönetimi">
+        <Button variant="primary" leftIcon={<PlusIcon className="h-5 w-5" />} onClick={() => setModal({})}>
+          Yeni Kategori
+        </Button>
+      </PageHeader>
+
       <ResourceList<Category>
         resource="categories"
         fetcher={clientListFetcher(
@@ -47,19 +55,6 @@ export default function CategoriesPage() {
         syncUrl
         errorMessage="Kategoriler yüklenemedi"
       >
-        <ResourceList.Header
-          title="Kategoriler"
-          description="Kategori listesi ve yönetimi"
-          actions={
-            <Button
-              variant="primary"
-              leftIcon={<PlusIcon className="h-5 w-5" />}
-              onClick={() => setModal({})}
-            >
-              Yeni Kategori
-            </Button>
-          }
-        />
         <ResourceList.Toolbar>
           <ResourceList.Search placeholder="Kategori ara (ad, slug, açıklama)…" />
         </ResourceList.Toolbar>
@@ -76,6 +71,6 @@ export default function CategoriesPage() {
           category={modal.category}
         />
       )}
-    </>
+    </AdminPage>
   );
 }

@@ -7,6 +7,8 @@ import {
   refundReasonConfig,
   refundRequestStatusConfig,
 } from "@tarodan/ui";
+import { AdminPage } from "@/components/page/AdminPage";
+import { PageHeader } from "@/components/admin-list";
 import { ResourceList } from "@/components/list";
 import { col, TruncatedText } from "@/components/table";
 import { fetchRefundRequests, REFUND_STATUS_OPTIONS } from "@/lib/refundRequestQuery";
@@ -77,28 +79,31 @@ const columns = [
 export default function RefundRequestsPage() {
   const router = useRouter();
   return (
-    <ResourceList<RefundRequestRow>
-      resource="refund-requests"
-      fetcher={fetchRefundRequests}
-      getRowId={(rr) => rr.id}
-      initialFilters={{ status: "all", from: "", to: "" }}
-      errorMessage="İade talepleri yüklenemedi"
-    >
-      <ResourceList.Header
+    <AdminPage>
+      <PageHeader
         title="İade Takibi"
         description="Devam eden iadeler — otomatik akış izlenir; yalnız istisnai durumlarda admin müdahalesi gerekir"
       />
-      <ResourceList.Toolbar>
-        <ResourceList.Search />
-        <ResourceList.FilterSelect name="status" options={REFUND_STATUS_OPTIONS} className="sm:w-56" />
-        <ResourceList.DateRange fromName="from" toName="to" />
-      </ResourceList.Toolbar>
-      <ResourceList.Table
-        columns={columns}
-        emptyText="Bu filtrelerle eşleşen iade talebi yok."
-        onRowClick={(rr) => router.push(`/operations/refund-requests/${rr.id}`)}
-      />
-      <ResourceList.Pagination />
-    </ResourceList>
+
+      <ResourceList<RefundRequestRow>
+        resource="refund-requests"
+        fetcher={fetchRefundRequests}
+        getRowId={(rr) => rr.id}
+        initialFilters={{ status: "all", from: "", to: "" }}
+        errorMessage="İade talepleri yüklenemedi"
+      >
+        <ResourceList.Toolbar>
+          <ResourceList.Search />
+          <ResourceList.FilterSelect name="status" options={REFUND_STATUS_OPTIONS} className="sm:w-56" />
+          <ResourceList.DateRange fromName="from" toName="to" />
+        </ResourceList.Toolbar>
+        <ResourceList.Table
+          columns={columns}
+          emptyText="Bu filtrelerle eşleşen iade talebi yok."
+          onRowClick={(rr) => router.push(`/operations/refund-requests/${rr.id}`)}
+        />
+        <ResourceList.Pagination />
+      </ResourceList>
+    </AdminPage>
   );
 }
