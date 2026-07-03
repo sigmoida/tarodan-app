@@ -30,7 +30,7 @@ export function NavGroup({
         onClick={onToggle}
         aria-expanded={isOpen}
         className={clsx(
-          'w-full justify-between h-auto px-3 py-2 text-xs font-semibold uppercase tracking-wide',
+          'w-full flex justify-between h-auto px-3 py-2 text-sm font-semibold',
           hasActive ? 'text-primary-600' : 'text-muted',
         )}
       >
