@@ -44,7 +44,7 @@ export function AdminTabs({ tabs, value, onChange, className }: AdminTabsProps) 
               {Icon && <Icon className="h-4 w-4" />}
               {tab.label}
               {tab.badge != null && tab.badge !== "" && (
-                <span className="ml-1 rounded-full bg-surface-elevated px-1.5 py-0.5 text-xs group-data-[state=active]:bg-inverted/20">
+                <span className="ml-1 rounded-full bg-surface-alt px-1.5 py-0.5 text-xs text-body group-data-[state=active]:bg-primary-800 group-data-[state=active]:text-inverted">
                   {tab.badge}
                 </span>
               )}
