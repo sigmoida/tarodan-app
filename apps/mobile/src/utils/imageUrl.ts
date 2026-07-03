@@ -32,6 +32,12 @@ const S3_PUBLIC_BASE = (process.env.EXPO_PUBLIC_S3_PUBLIC_BASE_URL || '').replac
  * API :3001, Next.js public assets :3000.
  */
 function webAssetHost(): string {
+  const webUrl = process.env.EXPO_PUBLIC_WEB_URL;
+  if (webUrl) return webUrl.replace(/\/+$/, '');
+  // Standalone/production: hostUri undefined → localhost DEĞİL, prod web host kullan.
+  if (process.env.EXPO_PUBLIC_ENVIRONMENT && process.env.EXPO_PUBLIC_ENVIRONMENT !== 'development') {
+    return 'https://tarodan.shop';
+  }
   const expoHost = Constants.expoConfig?.hostUri?.split(':')[0];
   if (expoHost) return `http://${expoHost}:3000`;
   if (Platform.OS === 'android') return 'http://10.0.2.2:3000';
