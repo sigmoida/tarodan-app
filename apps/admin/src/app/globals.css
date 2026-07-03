@@ -3,6 +3,11 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    /* Reserve the scrollbar gutter so the bar appearing on scroll doesn't shift
+       the layout (and the fixed topbar). No-op on overlay-scrollbar systems. */
+    scrollbar-gutter: stable;
+  }
   body {
     @apply bg-surface text-heading;
   }

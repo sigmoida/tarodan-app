@@ -25,7 +25,7 @@ export function AdminProfileMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <IconButton aria-label="Hesap menüsü">
+        <IconButton aria-label="Hesap menüsü" className="text-inverted hover:bg-inverted/10">
           <UserCircleIcon className="h-6 w-6" />
         </IconButton>
       </DropdownMenuTrigger>

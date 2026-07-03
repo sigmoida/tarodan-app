@@ -26,11 +26,11 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
   return (
     <aside
       className={clsx(
-        'fixed inset-y-0 left-0 z-50 w-64 bg-surface-elevated border-r border-border transform transition-transform duration-300 lg:translate-x-0 flex flex-col shadow-soft',
+        'fixed inset-y-0 left-0 z-50 w-64 bg-surface-elevated transform transition-transform duration-300 lg:translate-x-0 flex flex-col shadow-soft',
         open ? 'translate-x-0' : '-translate-x-full',
       )}
     >
-      <div className="h-16 flex items-center justify-between px-4 border-b border-border">
+      <div className="h-16 flex items-center justify-between px-4 bg-primary-500">
         <Link href="/dashboard" scroll={false} onClick={onClose} className="flex items-center">
           <Image
             src="/tarodan-logo.jpg"
@@ -42,7 +42,11 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
             priority
           />
         </Link>
-        <IconButton aria-label="Menüyü kapat" className="lg:hidden" onClick={onClose}>
+        <IconButton
+          aria-label="Menüyü kapat"
+          className="text-inverted hover:bg-inverted/10 lg:hidden"
+          onClick={onClose}
+        >
           <XMarkIcon className="h-6 w-6" />
         </IconButton>
       </div>
