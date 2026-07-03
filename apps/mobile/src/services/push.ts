@@ -300,6 +300,15 @@ export function setupPushNotificationRouting(): () => void {
     },
   );
 
+  // 3) Cold-start: uygulama KAPALIYKEN bildirime basılıp açıldıysa, yanıt live
+  // listener'a düşmez → son yanıtı bir kez oku ve yönlendir.
+  Notifications.getLastNotificationResponseAsync()
+    .then((response: any) => {
+      const data = response?.notification?.request?.content?.data;
+      if (data) routeFromNotification(data);
+    })
+    .catch(() => { /* sessiz */ });
+
   return () => {
     try {
       responseSub?.remove?.();
