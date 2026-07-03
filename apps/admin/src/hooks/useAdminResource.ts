@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useState, useCallback, useEffect, useRef, useTransition } from "react";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import toast from "react-hot-toast";
 import type { AxiosResponse } from "axios";
+import { adminKeys } from "@/lib/query/keys";
 
 // ─── Tipler ────────────────────────────────────────────────────────────────
 
@@ -181,6 +181,11 @@ export function useAdminResource<T>({
   const [committedSearch, setCommittedSearch] = useState<string>(getInitialSearch);
   const [filters, setFiltersState] = useState<Record<string, string>>(getInitialFilters);
 
+  // Query key'i (page/committedSearch/filters) değiştiren HER güncelleme bir React
+  // transition'ında yapılır; böylece useSuspenseQuery ilk yükleme dışında tekrar
+  // suspend OLMAZ — eski liste görünür kalır, isPending ile tablo soluklaşır.
+  const [isPending, startTransition] = useTransition();
+
   // debounce timer ref'i
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -224,16 +229,18 @@ export function useAdminResource<T>({
       if (v !== null) newFilters[key] = v;
     });
 
-    setPageState(isNaN(urlPage) || urlPage < 1 ? 1 : urlPage);
     setInputSearch(urlQ);
-    setCommittedSearch(urlQ);
-    setFiltersState(newFilters);
+    startTransition(() => {
+      setPageState(isNaN(urlPage) || urlPage < 1 ? 1 : urlPage);
+      setCommittedSearch(urlQ);
+      setFiltersState(newFilters);
+    });
   }, [searchParams, syncUrl, initialFilters]);
 
   // ── Yardımcı setter'lar ────────────────────────────────────────────────────
   const setPage = useCallback(
     (p: number) => {
-      setPageState(p);
+      startTransition(() => setPageState(p));
       syncToUrl(p, committedSearch, filters);
     },
     [committedSearch, filters, syncToUrl],
@@ -242,8 +249,10 @@ export function useAdminResource<T>({
   const setFilter = useCallback(
     (key: string, value: string) => {
       const next = { ...filters, [key]: value };
-      setFiltersState(next);
-      setPageState(1);
+      startTransition(() => {
+        setFiltersState(next);
+        setPageState(1);
+      });
       syncToUrl(1, committedSearch, next);
     },
     [filters, committedSearch, syncToUrl],
@@ -260,18 +269,20 @@ export function useAdminResource<T>({
         clearTimeout(debounceTimerRef.current);
       }
 
-      if (debounceMs === 0) {
-        // Debounce'suz: anında commit
-        setCommittedSearch(value);
-        setPageState(1);
-        syncToUrl(1, value, filters);
-      } else {
-        // debounceMs sonra commit et
-        debounceTimerRef.current = setTimeout(() => {
-          debounceTimerRef.current = null;
+      const commit = () => {
+        startTransition(() => {
           setCommittedSearch(value);
           setPageState(1);
-          syncToUrl(1, value, filters);
+        });
+        syncToUrl(1, value, filters);
+      };
+
+      if (debounceMs === 0) {
+        commit();
+      } else {
+        debounceTimerRef.current = setTimeout(() => {
+          debounceTimerRef.current = null;
+          commit();
         }, debounceMs);
       }
     },
@@ -286,8 +297,10 @@ export function useAdminResource<T>({
       debounceTimerRef.current = null;
     }
     // inputSearch'i anında commit et
-    setCommittedSearch(inputSearch);
-    setPageState(1);
+    startTransition(() => {
+      setCommittedSearch(inputSearch);
+      setPageState(1);
+    });
     syncToUrl(1, inputSearch, filters);
   }, [inputSearch, filters, syncToUrl]);
 
@@ -311,26 +324,20 @@ export function useAdminResource<T>({
     return params;
   }, [page, limit, committedSearch, filters]);
 
-  // ── react-query ────────────────────────────────────────────────────────────
-  const queryResult = useQuery({
-    queryKey: [queryKey, page, committedSearch, filters],
+  // ── react-query (suspense) ─────────────────────────────────────────────────
+  // İlk yükleme suspend eder (üstteki SuspenseBoundary spinner'ı gösterir; hata
+  // orada yakalanır). Sonraki değişimler transition içinde olduğu için tekrar
+  // suspend etmez — eski veri kalır, isFetching/isPending ile tablo soluklaşır.
+  const queryResult = useSuspenseQuery({
+    // [resource, 'list', {...}] — shares the resource prefix with detail keys so
+    // a mutation's invalidateQueries({ queryKey: [resource] }) refreshes lists too.
+    queryKey: adminKeys.list(queryKey, { page, search: committedSearch, filters }),
     queryFn: async () => {
       const response = await fetcher(buildParams());
       return response.data;
     },
-    placeholderData: keepPreviousData, // yazarken liste titremesin (smooth arama)
     refetchOnMount: 'always', // sayfaya her dönüşte (detail→liste navigasyonu) taze veri
   });
-
-  // Hata → toast (queryResult.error değişince)
-  const lastErrorRef = useRef<unknown>(null);
-  useEffect(() => {
-    if (queryResult.error && queryResult.error !== lastErrorRef.current) {
-      lastErrorRef.current = queryResult.error;
-      toast.error(errorMessage);
-    }
-    if (!queryResult.error) lastErrorRef.current = null;
-  }, [queryResult.error, errorMessage]);
 
   // ── Tab URL senkronu ──────────────────────────────────────────────────────
   const setTabUrl = useCallback(
@@ -350,13 +357,9 @@ export function useAdminResource<T>({
       }
       // Sayfa her zaman 1'e sıfırlanır
       params.delete("page");
-      setPageState(1);
-      // Filtre sıfırlama (isteğe bağlı)
       if (resetFilters) {
         Object.keys(initialFilters).forEach((k) => params.delete(k));
-        setFiltersState({ ...initialFilters });
       }
-      // Arama sıfırlama (isteğe bağlı)
       if (resetSearch) {
         params.delete("q");
         if (debounceTimerRef.current !== null) {
@@ -364,18 +367,20 @@ export function useAdminResource<T>({
           debounceTimerRef.current = null;
         }
         setInputSearch("");
-        setCommittedSearch("");
       }
+      startTransition(() => {
+        setPageState(1);
+        if (resetFilters) setFiltersState({ ...initialFilters });
+        if (resetSearch) setCommittedSearch("");
+      });
       const qs = params.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
     [syncUrl, pathname, router, initialFilters],
   );
 
-  // ── Veri çıkarma ─────────────────────────────────────────────────────────
-  const { rows, total } = queryResult.data
-    ? extractData<T>(queryResult.data, queryKey)
-    : { rows: [] as T[], total: 0 };
+  // ── Veri çıkarma (suspense → data her zaman tanımlı) ───────────────────────
+  const { rows, total } = extractData<T>(queryResult.data, queryKey);
   const totalPages = Math.ceil(total / limit) || 1;
 
   return {
@@ -389,7 +394,8 @@ export function useAdminResource<T>({
     onSearchSubmit,
     filters,
     setFilter,
-    isLoading: queryResult.isLoading || queryResult.isFetching,
+    // Transition (filtre/arama/sayfa) veya arka-plan refetch sırasında tabloyu soluklaştır.
+    isLoading: isPending || queryResult.isFetching,
     refetch: queryResult.refetch,
     setTabUrl,
   };
