@@ -15,6 +15,7 @@ import { LanguageProvider } from '../src/i18n';
 import { initSentry } from '../src/services/sentry';
 import AnimatedSplash from '../src/components/AnimatedSplash';
 import BusinessMembershipGuard from '../src/components/BusinessMembershipGuard';
+import { ErrorBoundary } from '../src/components/ErrorBoundary';
 
 const { colors } = theme;
 
@@ -132,28 +133,30 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <LanguageProvider>
-        <StatusBar style="auto" />
-        <Stack
-          screenOptions={{
-            headerStyle: { backgroundColor: colors.primary[600]! },
-            headerTintColor: colors.white,
-            headerTitleStyle: { fontWeight: 'bold' },
-            headerShown: false,
-          }}
-        >
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        </Stack>
-        {/* Kurumsal hesap business üyelik yoksa üyelik sayfasına yönlendirir (web ile aynı). */}
-        <BusinessMembershipGuard />
-        {/* Native Alert.alert yerine temalı dialog — appAlert() bu host'u kullanır. */}
-        <AlertDialogHost />
-        {!splashDone && (
-          <AnimatedSplash appReady={appReady} onFinish={() => setSplashDone(true)} />
-        )}
-      </LanguageProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <LanguageProvider>
+          <StatusBar style="auto" />
+          <Stack
+            screenOptions={{
+              headerStyle: { backgroundColor: colors.primary[600]! },
+              headerTintColor: colors.white,
+              headerTitleStyle: { fontWeight: 'bold' },
+              headerShown: false,
+            }}
+          >
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+          </Stack>
+          {/* Kurumsal hesap business üyelik yoksa üyelik sayfasına yönlendirir (web ile aynı). */}
+          <BusinessMembershipGuard />
+          {/* Native Alert.alert yerine temalı dialog — appAlert() bu host'u kullanır. */}
+          <AlertDialogHost />
+          {!splashDone && (
+            <AnimatedSplash appReady={appReady} onFinish={() => setSplashDone(true)} />
+          )}
+        </LanguageProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
