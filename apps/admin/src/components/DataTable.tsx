@@ -8,9 +8,25 @@ import {
   type ColumnDef,
 } from "@tanstack/react-table";
 import { AnimatePresence, motion } from "framer-motion";
-import { Spinner } from "@tarodan/ui";
+import {
+  Spinner,
+  Checkbox,
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@tarodan/ui";
+import { type CellAlign } from "@/components/table/meta";
 
 export type { ColumnDef };
+
+const ALIGN_CLASS: Record<CellAlign, string> = {
+  left: "text-left",
+  right: "text-right",
+  center: "text-center",
+};
 
 export interface DataTableProps<T> {
   columns: ColumnDef<T, any>[];
@@ -40,8 +56,9 @@ export interface DataTableProps<T> {
 
 /**
  * Admin liste sayfalarının TEK ortak tablosu. @tanstack/react-table motoru +
- * mevcut `admin-table` görünümü. Sütunlar ColumnDef ile tanımlanır; loading/empty,
- * satır-tık ve opsiyonel çoklu-seçim dahili yönetilir.
+ * design-system `Table`/`Checkbox` (legacy `.admin-table`/`.admin-card` yok).
+ * Sütunlar ColumnDef ile tanımlanır; loading/empty, satır-tık ve opsiyonel
+ * çoklu-seçim / genişletilebilir satır dahili yönetilir.
  */
 export function DataTable<T>({
   columns,
@@ -71,40 +88,66 @@ export function DataTable<T>({
     selectable && rowIds.length > 0 && rowIds.every((id) => selectedIds.includes(id));
   const colSpan = columns.length + (selectable ? 1 : 0);
 
-  // İlk yükleme (veri yokken) tam spinner gösterir; arama/filtre refetch'inde
-  // ise mevcut satırlar korunur ve hafifçe soluklaşır (web'deki keepPreviousData davranışı).
+  // Boyut sistemi opt-in: kolonlar `col.*` factory'sinden geldiyse (meta taşırsa)
+  // fixed-layout + colgroup + hizalama devreye girer. Meta yoksa (legacy ham
+  // ColumnDef tüketicileri) tablo aynen eski davranışta kalır.
+  const hasSizing = columns.some(
+    (c) => c.meta && (c.meta.minWidth != null || c.meta.grow != null || c.meta.align != null),
+  );
+  // Genişlik tabanı: her kolon minWidth px alır; tablonun min-width'i bunların
+  // toplamıdır. Konteyner bu eşiğin ÜSTÜNDE ise kolonlar orantılı büyür; ALTINDA
+  // ise tablo min-width'te kalır ve wrapper yatay scroll'a düşer. (min-width'i
+  // `<col>`'a koymak işe yaramaz — tarayıcı yok sayar; bu yüzden `<table>`'a.)
+  const colMin = (c: (typeof columns)[number]) => c.meta?.minWidth ?? 140;
+  const tableMinWidth = hasSizing
+    ? (selectable ? 44 : 0) + columns.reduce((sum, c) => sum + colMin(c), 0)
+    : 0;
+  const alignOf = (align?: CellAlign) => (align ? ALIGN_CLASS[align] : undefined);
+
+  // İlk yükleme (veri yokken) tam spinner; arama/filtre refetch'inde mevcut
+  // satırlar korunur ve hafifçe soluklaşır (keepPreviousData davranışı).
   const isInitialLoad = loading && data.length === 0;
   const isRefetching = loading && data.length > 0;
 
   return (
-    <div className="admin-card overflow-hidden">
+    <div className="overflow-hidden rounded-lg border border-border bg-surface-elevated shadow-sm">
       <div className="overflow-x-auto">
-        <table className="admin-table w-full">
-          <thead>
+        <Table
+          scrollable={false}
+          className={hasSizing ? "table-fixed" : undefined}
+          style={hasSizing ? { minWidth: `${tableMinWidth}px` } : undefined}
+        >
+          {hasSizing && (
+            <colgroup>
+              {selectable && <col style={{ width: "44px" }} />}
+              {columns.map((c, i) => (
+                <col key={c.id ?? i} style={{ width: `${colMin(c)}px` }} />
+              ))}
+            </colgroup>
+          )}
+          <TableHeader>
             {table.getHeaderGroups().map((hg) => (
-              <tr key={hg.id}>
+              <TableRow key={hg.id}>
                 {selectable && (
-                  <th className="w-10">
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 accent-primary-600"
+                  <TableHead className="w-10">
+                    <Checkbox
                       checked={!!allSelected}
                       onChange={() => onToggleAll?.(rowIds)}
                       aria-label="Tümünü seç"
                     />
-                  </th>
+                  </TableHead>
                 )}
                 {hg.headers.map((h) => (
-                  <th key={h.id} className="text-left">
+                  <TableHead key={h.id} className={alignOf(h.column.columnDef.meta?.align)}>
                     {h.isPlaceholder
                       ? null
                       : flexRender(h.column.columnDef.header, h.getContext())}
-                  </th>
+                  </TableHead>
                 ))}
-              </tr>
+              </TableRow>
             ))}
-          </thead>
-          <tbody
+          </TableHeader>
+          <TableBody
             className={
               isRefetching
                 ? "opacity-60 transition-opacity duration-200 pointer-events-none"
@@ -112,95 +155,94 @@ export function DataTable<T>({
             }
           >
             {isInitialLoad ? (
-              <tr>
-                <td colSpan={colSpan} className="p-8 text-center text-muted">
+              <TableRow>
+                <TableCell colSpan={colSpan} className="p-8 text-center text-muted">
                   <Spinner size="md" className="mx-auto" />
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ) : data.length === 0 ? (
-              <tr>
-                <td colSpan={colSpan} className="p-8 text-center text-muted">
+              <TableRow>
+                <TableCell colSpan={colSpan} className="p-8 text-center text-muted">
                   <div className="flex flex-col items-center gap-3">
                     <span>{emptyText}</span>
                     {emptyAction}
                   </div>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ) : (
               table.getRowModel().rows.map((row) => {
                 const id = getRowId ? getRowId(row.original) : row.id;
                 const isExpanded = renderExpanded != null && expandedId === id;
                 return (
                   <Fragment key={row.id}>
-                  <tr
-                    onClick={
-                      onRowClick
-                        ? (e) => {
-                            // Satır içindeki interaktif öğelere (link, buton, input, label)
-                            // tıklama satır tıklamasını tetiklemez — kendi davranışları çalışır.
-                            if (
-                              (e.target as HTMLElement).closest(
-                                "a, button, input, select, textarea, label, [role='button']",
+                    <TableRow
+                      onClick={
+                        onRowClick
+                          ? (e) => {
+                              // Satır içindeki interaktif öğelere tıklama satır
+                              // tıklamasını tetiklemez — kendi davranışları çalışır.
+                              if (
+                                (e.target as HTMLElement).closest(
+                                  "a, button, input, select, textarea, label, [role='button']",
+                                )
                               )
-                            )
-                              return;
-                            onRowClick(row.original);
-                          }
-                        : undefined
-                    }
-                    className={[
-                      onRowClick ? "cursor-pointer hover:bg-surface-alt/50" : "",
-                      selectable && selectedIds.includes(id)
-                        ? "bg-primary-500/5"
-                        : "",
-                      rowClassName?.(row.original) ?? "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                  >
-                    {selectable && (
-                      <td onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          className="w-4 h-4 accent-primary-600"
-                          checked={selectedIds.includes(id)}
-                          onChange={() => onToggleRow?.(id)}
-                          aria-label="Satırı seç"
-                        />
-                      </td>
+                                return;
+                              onRowClick(row.original);
+                            }
+                          : undefined
+                      }
+                      className={[
+                        onRowClick ? "cursor-pointer" : "",
+                        selectable && selectedIds.includes(id) ? "bg-primary-500/5" : "",
+                        rowClassName?.(row.original) ?? "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      {selectable && (
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.includes(id)}
+                            onChange={() => onToggleRow?.(id)}
+                            aria-label="Satırı seç"
+                          />
+                        </TableCell>
+                      )}
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell
+                          key={cell.id}
+                          className={alignOf(cell.column.columnDef.meta?.align)}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                    {renderExpanded && (
+                      <TableRow className="!border-t-0 hover:bg-transparent">
+                        <TableCell colSpan={colSpan} className="!p-0">
+                          <AnimatePresence initial={false}>
+                            {isExpanded && (
+                              <motion.div
+                                key="expanded"
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.25, ease: "easeInOut" }}
+                                className="overflow-hidden"
+                              >
+                                {renderExpanded(row.original)}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </TableCell>
+                      </TableRow>
                     )}
-                    {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
-                    ))}
-                  </tr>
-                  {renderExpanded && (
-                    <tr className="hover:bg-transparent">
-                      <td colSpan={colSpan} className="!p-0 !border-0">
-                        <AnimatePresence initial={false}>
-                          {isExpanded && (
-                            <motion.div
-                              key="expanded"
-                              initial={{ height: 0, opacity: 0 }}
-                              animate={{ height: "auto", opacity: 1 }}
-                              exit={{ height: 0, opacity: 0 }}
-                              transition={{ duration: 0.25, ease: "easeInOut" }}
-                              className="overflow-hidden"
-                            >
-                              {renderExpanded(row.original)}
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </td>
-                    </tr>
-                  )}
                   </Fragment>
                 );
               })
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </div>
   );
