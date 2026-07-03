@@ -3,10 +3,8 @@ import { getSession } from '@/lib/server/session';
 import { getPermissions } from '@/lib/server/permissions';
 import { SessionProvider } from '@/lib/session-context';
 import { PermissionsProvider } from '@/lib/permissions-context';
-import AdminLayout from '@/components/AdminLayout';
-import { ConfirmProvider } from '@/components/ConfirmProvider';
-import { PromptProvider } from '@/components/PromptProvider';
-import { QueryProvider } from '@/components/QueryProvider';
+import { AdminProviders } from '@/components/layout/AdminProviders';
+import { AppShell } from '@/components/layout/AppShell';
 
 /**
  * Layout for the authenticated app. Server Component: resolves the session and
@@ -27,13 +25,9 @@ export default async function AdminRouteLayout({
   return (
     <SessionProvider user={user}>
       <PermissionsProvider permissions={permissions}>
-        <QueryProvider>
-          <ConfirmProvider>
-            <PromptProvider>
-              <AdminLayout>{children}</AdminLayout>
-            </PromptProvider>
-          </ConfirmProvider>
-        </QueryProvider>
+        <AdminProviders>
+          <AppShell>{children}</AppShell>
+        </AdminProviders>
       </PermissionsProvider>
     </SessionProvider>
   );
