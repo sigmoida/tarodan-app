@@ -199,3 +199,57 @@ export function routePermission(pathname: string): string | null {
   }
   return best;
 }
+
+export interface Crumb {
+  label: string;
+  /** Present → the crumb is a link. Absent → plain text (the current page). */
+  href?: string;
+}
+
+/** Turn a URL segment into a readable leaf label; ids collapse to "Detay". */
+function humanizeSegment(segment: string): string {
+  if (/^\d+$/.test(segment) || /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(segment)) return 'Detay';
+  return segment
+    .split('-')
+    .filter(Boolean)
+    .map((word) => word[0].toLocaleUpperCase('tr-TR') + word.slice(1))
+    .join(' ');
+}
+
+/**
+ * The current location as a parent → child trail, derived from the nav config:
+ * `[group?, page, leaf?]`. Every crumb except the current page is a link
+ * (the group points at its first page). Empty when the path matches no nav item.
+ */
+export function breadcrumbsFor(pathname: string): Crumb[] {
+  let bestItem: NavItem | undefined;
+  let bestGroup: NavGroup | undefined;
+  let bestLen = -1;
+  const consider = (item: NavItem, group?: NavGroup) => {
+    if (pathname.startsWith(item.href) && item.href.length > bestLen) {
+      bestItem = item;
+      bestGroup = group;
+      bestLen = item.href.length;
+    }
+  };
+  topLevelNav.forEach((item) => consider(item));
+  navGroups.forEach((group) => group.items.forEach((item) => consider(item, group)));
+
+  const item = bestItem;
+  if (!item) return [];
+  const group = bestGroup;
+
+  const crumbs: Crumb[] = [];
+  if (group) crumbs.push({ label: group.name, href: group.items[0]?.href });
+
+  const isLeaf = pathname === item.href;
+  crumbs.push({ label: item.name, href: isLeaf ? undefined : item.href });
+
+  if (!isLeaf) {
+    const tail = pathname.slice(item.href.length).split('/').filter(Boolean);
+    const last = tail[tail.length - 1];
+    if (last) crumbs.push({ label: humanizeSegment(last) });
+  }
+
+  return crumbs;
+}
