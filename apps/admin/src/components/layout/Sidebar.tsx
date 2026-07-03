@@ -41,7 +41,6 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
             style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '40px' }}
             priority
           />
-          <span className="ml-2 text-xs text-muted font-medium">Admin</span>
         </Link>
         <IconButton aria-label="Menüyü kapat" className="lg:hidden" onClick={onClose}>
           <XMarkIcon className="h-6 w-6" />

@@ -3,15 +3,15 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
-import { Button, IconButton } from '@tarodan/ui';
+import { Button } from '@tarodan/ui';
 import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import type { NavGroup as NavGroupType } from '@/lib/navigation';
 import { NavLink } from './NavLink';
 
 /**
- * A collapsible sidebar section. When the group has an `href` (a section route),
- * the label navigates there and a separate chevron toggles the accordion;
- * otherwise the whole header is the toggle.
+ * A collapsible sidebar section. The whole header is a single clickable item:
+ * when the group has an `href` (a section route) clicking it navigates there AND
+ * toggles the accordion; otherwise it just toggles. Never a separate button.
  */
 export function NavGroup({
   group,
@@ -45,30 +45,26 @@ export function NavGroup({
   if (group.href) {
     return (
       <div>
-        <div className="flex items-center">
-          <Link
-            href={group.href}
-            onClick={onNavigate}
-            className={clsx(
-              'flex flex-1 items-center min-w-0 rounded-lg px-3 py-2 text-sm font-semibold transition-colors',
-              hasActive
-                ? 'text-primary-600'
-                : 'text-muted hover:bg-surface-alt hover:text-heading',
-            )}
-          >
+        <Link
+          href={group.href}
+          aria-expanded={isOpen}
+          onClick={() => {
+            onToggle();
+            onNavigate?.();
+          }}
+          className={clsx(
+            'flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold transition-colors',
+            hasActive
+              ? 'text-primary-600'
+              : 'text-muted hover:bg-surface-alt hover:text-heading',
+          )}
+        >
+          <span className="flex min-w-0 items-center">
             {icon}
             <span className="truncate">{group.name}</span>
-          </Link>
-          <IconButton
-            aria-label={isOpen ? 'Daralt' : 'Genişlet'}
-            variant="ghost"
-            size="sm"
-            aria-expanded={isOpen}
-            onClick={onToggle}
-          >
-            {chevron}
-          </IconButton>
-        </div>
+          </span>
+          {chevron}
+        </Link>
         {nested}
       </div>
     );
