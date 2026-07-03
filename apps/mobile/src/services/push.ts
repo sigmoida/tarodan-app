@@ -99,7 +99,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
     await api.post('/notifications/push-token', {
       token,
       platform: Platform.OS,
-      deviceName: Device.modelName,
+      deviceId: Device.modelName ?? 'unknown',
     }).catch((err: any) => {
       console.log('Failed to register push token with backend:', err.message);
     });

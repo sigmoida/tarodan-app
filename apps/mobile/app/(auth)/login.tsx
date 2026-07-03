@@ -144,8 +144,15 @@ export default function LoginScreen() {
     try {
       const idToken = await signInWithGoogle();
       const response = await authApi.loginWithGoogle(idToken);
-      const { tokens, user } = response.data as any;
-      await login(tokens.accessToken, user, tokens.refreshToken);
+      const data = response.data as any;
+      const accessToken = data.tokens?.accessToken || data.accessToken;
+      const refreshToken = data.tokens?.refreshToken || data.refreshToken;
+      const user = data.user;
+      if (!accessToken) {
+        appAlert('Hata', 'Giriş yanıtı beklenmedik biçimde geldi. Lütfen tekrar deneyin.');
+        return;
+      }
+      await login(accessToken, user, refreshToken);
       router.push('/' as never);
     } catch (e: any) {
       // İptal sessiz geçilir; diğer her hata KULLANICIYA gösterilir (önceden
@@ -167,8 +174,15 @@ export default function LoginScreen() {
     try {
       const { identityToken, fullName } = await signInWithApple();
       const response = await authApi.loginWithApple(identityToken, fullName);
-      const { tokens, user } = response.data as any;
-      await login(tokens.accessToken, user, tokens.refreshToken);
+      const data = response.data as any;
+      const accessToken = data.tokens?.accessToken || data.accessToken;
+      const refreshToken = data.tokens?.refreshToken || data.refreshToken;
+      const user = data.user;
+      if (!accessToken) {
+        appAlert('Hata', 'Giriş yanıtı beklenmedik biçimde geldi. Lütfen tekrar deneyin.');
+        return;
+      }
+      await login(accessToken, user, refreshToken);
       router.push('/' as never);
     } catch (e: any) {
       // Kullanıcı iptali sessiz geçilir.
