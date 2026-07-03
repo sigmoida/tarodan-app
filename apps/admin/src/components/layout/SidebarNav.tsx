@@ -41,8 +41,6 @@ export function SidebarNav({
             <NavLink key={item.href} item={item} onNavigate={onNavigate} />
           ))}
 
-          <div className="h-2" />
-
           {groups.map((group) => (
             <NavGroup
               key={group.id}
