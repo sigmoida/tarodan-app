@@ -1,9 +1,10 @@
 "use client";
 
 import { type ComponentType } from "react";
+import { Tabs, TabsList, TabsTrigger } from "@tarodan/ui";
 
 export interface AdminTab {
-  /** Benzersiz anahtar (activeTab değeri ile eşleşir). */
+  /** Benzersiz anahtar (value ile eşleşir). */
   key: string;
   label: string;
   /** Opsiyonel ikon (heroicon vb.). */
@@ -21,46 +22,36 @@ interface AdminTabsProps {
 }
 
 /**
- * Admin panelindeki buton-tab görünümünün TEK ortak karşılığı.
- * Önceden her sayfa kendi activeTab + buton dizisini elle yazıyordu; bu component
- * o görünümü (pill butonlar + alt çizgi) tekilleştirir.
+ * Admin panelindeki sekme çubuğunun TEK ortak karşılığı — design-system'in Radix
+ * tabanlı `Tabs`/`TabsList`/`TabsTrigger`'ı üzerine kurulu (klavye navigasyonu ve
+ * erişilebilirlik hazır). İçerik sayfada ayrı render edildiği için `TabsContent`
+ * kullanılmaz; bu yalnızca kontrollü sekme çubuğudur.
  */
 export function AdminTabs({ tabs, value, onChange, className }: AdminTabsProps) {
   return (
-    <div
-      role="tablist"
-      className={`flex flex-wrap gap-2 border-b border-border pb-4 ${className ?? ""}`}
-    >
-      {tabs.map((tab) => {
-        const active = value === tab.key;
-        const Icon = tab.icon;
-        return (
-          <button
-            key={tab.key}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => onChange(tab.key)}
-            className={`inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-              active
-                ? "bg-primary-600 text-inverted"
-                : "bg-surface-alt text-muted hover:text-heading hover:bg-border-subtle"
-            }`}
-          >
-            {Icon && <Icon className="h-5 w-5" />}
-            {tab.label}
-            {tab.badge != null && tab.badge !== "" && (
-              <span
-                className={`ml-1 rounded-full px-1.5 py-0.5 text-xs ${
-                  active ? "bg-inverted/20" : "bg-surface"
-                }`}
-              >
-                {tab.badge}
-              </span>
-            )}
-          </button>
-        );
-      })}
-    </div>
+    <Tabs value={value} onValueChange={onChange} className={className}>
+      {/* inline-flex (base) → kapsayıcı içeriği kadar gider, tam genişliğe yayılmaz */}
+      <TabsList className="w-fit max-w-full flex-wrap">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <TabsTrigger
+              key={tab.key}
+              value={tab.key}
+              // rounded-lg = proje token radius'u (buton/input ile aynı); aktif = primary
+              className="group gap-2 rounded-lg data-[state=active]:bg-primary-600 data-[state=active]:text-inverted data-[state=active]:shadow-none"
+            >
+              {Icon && <Icon className="h-4 w-4" />}
+              {tab.label}
+              {tab.badge != null && tab.badge !== "" && (
+                <span className="ml-1 rounded-full bg-surface-elevated px-1.5 py-0.5 text-xs group-data-[state=active]:bg-inverted/20">
+                  {tab.badge}
+                </span>
+              )}
+            </TabsTrigger>
+          );
+        })}
+      </TabsList>
+    </Tabs>
   );
 }
