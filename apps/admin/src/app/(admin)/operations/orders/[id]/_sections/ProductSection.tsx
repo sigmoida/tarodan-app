@@ -19,7 +19,7 @@ export function ProductSection({ order }: { order: OrderDetail }) {
         )}
         <div className="flex-1">
           <Link
-            href={`/products/${order.product.id}`}
+            href={`/catalog/products/${order.product.id}`}
             className="font-medium text-primary-600 hover:text-primary-700"
           >
             {order.product.title}

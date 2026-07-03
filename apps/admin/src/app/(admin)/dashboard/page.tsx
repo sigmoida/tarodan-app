@@ -419,7 +419,7 @@ export default function DashboardPage() {
 
         {/* Quick Actions */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <Link href="/products" className="admin-card hover:border-primary-500/50 transition-colors flex items-center gap-3">
+          <Link href="/catalog/products" className="admin-card hover:border-primary-500/50 transition-colors flex items-center gap-3">
             <div className="p-2 bg-primary-100 rounded-lg shrink-0">
               <ShoppingBagIcon className="h-6 w-6 text-primary-600" />
             </div>
@@ -457,7 +457,7 @@ export default function DashboardPage() {
                   <p className="text-warning-700 font-medium">
                     {pendingActions.pendingProducts} ürün onay bekliyor
                   </p>
-                  <Link href="/products?status=pending" className="text-sm text-warning-500 hover:underline">
+                  <Link href="/catalog/products?status=pending" className="text-sm text-warning-500 hover:underline">
                     İncele →
                   </Link>
                 </div>

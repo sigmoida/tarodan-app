@@ -713,7 +713,7 @@ export default function UserDetailPage() {
                               </div>
                             )}
                             <div className="flex-1">
-                              <Link href={`/products/${product.id}`} className="text-heading font-medium hover:text-primary-600">
+                              <Link href={`/catalog/products/${product.id}`} className="text-heading font-medium hover:text-primary-600">
                                 {product.title}
                               </Link>
                               <div className="flex items-center gap-2 mt-1">
@@ -727,7 +727,7 @@ export default function UserDetailPage() {
                           </div>
                         ))}
                         <Link
-                          href={`/products?sellerId=${user.id}`}
+                          href={`/catalog/products?sellerId=${user.id}`}
                           className="block text-center text-primary-600 hover:underline py-2"
                         >
                           Tüm ürünleri görüntüle →
@@ -872,7 +872,7 @@ export default function UserDetailPage() {
                   <span>Tüm Siparişler ({user.stats?.ordersCount || 0})</span>
                 </Link>
                 <Link
-                  href={`/products?sellerId=${user.id}`}
+                  href={`/catalog/products?sellerId=${user.id}`}
                   className="flex items-center gap-3 w-full px-4 py-3 text-muted hover:bg-surface-alt rounded-lg transition-colors"
                 >
                   <CubeIcon className="w-5 h-5" />

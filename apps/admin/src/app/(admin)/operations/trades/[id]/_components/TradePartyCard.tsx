@@ -43,7 +43,7 @@ export function TradePartyCard({
             )}
             <div className="flex-1">
               <Link
-                href={`/products/${item.product.id}`}
+                href={`/catalog/products/${item.product.id}`}
                 className="text-sm font-medium text-primary-600 hover:text-primary-700"
               >
                 {item.product.title}
