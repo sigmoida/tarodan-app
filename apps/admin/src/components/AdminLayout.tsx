@@ -1,22 +1,19 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname, useRouter } from 'next/navigation';
-import { useSession } from '@/lib/session-context';
-import { usePermissions } from '@/lib/permissions-context';
-import { useIdleLogout } from '@/hooks/useIdleLogout';
+import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
 import { Button, Input } from '@tarodan/ui';
+import { useSession } from '@/lib/session-context';
+import { useIdleLogout } from '@/hooks/useIdleLogout';
+import { useRouteGuard } from '@/hooks/useRouteGuard';
+import { useSidebar } from '@/hooks/useSidebar';
+import { useVisibleNav } from '@/hooks/useVisibleNav';
+import { useNavSearch } from '@/hooks/useNavSearch';
+import { useNavGroups } from '@/hooks/useNavGroups';
 import { AdminProfileMenu } from '@/components/AdminProfileMenu';
-import {
-  navGroups,
-  topLevelNav,
-  matchesQuery,
-  routePermission,
-  type NavItem,
-} from '@/lib/navigation';
+import { type NavItem } from '@/lib/navigation';
 import {
   Bars3Icon,
   XMarkIcon,
@@ -25,94 +22,28 @@ import {
   ChevronRightIcon,
 } from '@heroicons/react/24/outline';
 
-const OPEN_GROUPS_STORAGE_KEY = 'admin-nav-open-groups';
-
 interface AdminLayoutProps {
   children: React.ReactNode;
 }
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const { user, logout } = useSession();
-  // İzinler sunucuda çözülüp context ile hidre edildi — client fetch yok, flicker yok.
-  const { can, canSee } = usePermissions();
+
   // 1 saat hareketsizlikte otomatik logout (Balanced politika).
   useIdleLogout();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [navQuery, setNavQuery] = useState('');
+  // Route guard (UX) — izinler sunucudan otoriter geldiği için anlık ve yarışsız.
+  useRouteGuard();
 
-  // Aktif route hangi gruptaysa o grup otomatik açılır, son kullanıcı tercihi localStorage'da saklanır
-  const activeGroupId = useMemo(() => {
-    for (const g of navGroups) {
-      if (g.items.some((item) => pathname.startsWith(item.href))) return g.id;
-    }
-    return null;
-  }, [pathname]);
-
-  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
-  const [hydrated, setHydrated] = useState(false);
-
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(OPEN_GROUPS_STORAGE_KEY);
-      if (raw) setOpenGroups(new Set(JSON.parse(raw) as string[]));
-    } catch {}
-    setHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (activeGroupId && !openGroups.has(activeGroupId)) {
-      setOpenGroups((prev) => new Set(prev).add(activeGroupId));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeGroupId]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    try {
-      window.localStorage.setItem(OPEN_GROUPS_STORAGE_KEY, JSON.stringify(Array.from(openGroups)));
-    } catch {}
-  }, [openGroups, hydrated]);
-
-  // Route guard (UX): izin yoksa /dashboard'a yönlendir. İzinler sunucudan otoriter
-  // geldiği için anlık ve yarışsız — gerçek yetki zaten API'de.
-  useEffect(() => {
-    const required = routePermission(pathname);
-    if (required && !can(required)) {
-      router.replace('/dashboard');
-    }
-  }, [pathname, can, router]);
-
-  const toggleGroup = (id: string) => {
-    setOpenGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const q = navQuery.trim().toLocaleLowerCase('tr-TR');
-  const isSearching = q.length > 0;
-
-  // Menüyü kullanıcının izin setine göre filtrele (canSee context'ten gelir).
-  const visibleTopNav = useMemo(() => topLevelNav.filter(canSee), [canSee]);
-  const visibleGroups = useMemo(
-    () =>
-      navGroups
-        .map((g) => ({ ...g, items: g.items.filter(canSee) }))
-        .filter((g) => g.items.length > 0),
-    [canSee],
-  );
-
-  // Arama aktifken: grupları yok say, tüm eşleşmeleri düz liste olarak göster
-  const searchResults = useMemo(() => {
-    if (!isSearching) return [] as NavItem[];
-    const all = [...visibleTopNav, ...visibleGroups.flatMap((g) => g.items)];
-    return all.filter((item) => matchesQuery(item, q));
-  }, [isSearching, q, visibleTopNav, visibleGroups]);
-
+  const { open: sidebarOpen, openSidebar, closeSidebar } = useSidebar();
+  const { topNav: visibleTopNav, groups: visibleGroups } = useVisibleNav();
+  const {
+    query: navQuery,
+    setQuery: setNavQuery,
+    isSearching,
+    results: searchResults,
+  } = useNavSearch(visibleTopNav, visibleGroups);
+  const { openGroups, toggleGroup } = useNavGroups(pathname);
 
   const handleLogout = () => {
     // logout() cookie'leri sunucuda temizler ve /login'e yönlendirir.
@@ -133,7 +64,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             ? 'bg-primary-50 text-primary-600'
             : 'text-muted hover:bg-surface-alt hover:text-heading'
         )}
-        onClick={() => setSidebarOpen(false)}
+        onClick={closeSidebar}
       >
         <item.icon className={clsx('h-5 w-5 flex-shrink-0', opts?.nested ? 'mr-2.5' : 'mr-3')} />
         {item.name}
@@ -147,7 +78,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-heading/30 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
+          onClick={closeSidebar}
         />
       )}
 
@@ -173,7 +104,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             <span className="ml-2 text-xs text-muted font-medium">Admin</span>
           </Link>
           <Button variant="secondary" className="lg:hidden text-subtle hover:text-body"
-            onClick={() => setSidebarOpen(false)}>
+            onClick={closeSidebar}>
             <XMarkIcon className="h-6 w-6" />
           </Button>
         </div>
@@ -252,7 +183,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         <header className="sticky top-0 z-30 h-16 bg-surface-elevated/95 backdrop-blur border-b border-border flex items-center justify-between px-4 shadow-sm">
           <div className="flex items-center">
             <Button variant="secondary" className="lg:hidden text-muted hover:text-body mr-4"
-              onClick={() => setSidebarOpen(true)}>
+              onClick={openSidebar}>
               <Bars3Icon className="h-6 w-6" />
             </Button>
           </div>
