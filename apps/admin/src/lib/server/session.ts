@@ -68,7 +68,7 @@ export interface AdminUser {
  * from the `admin_refresh_token` cookie, so we forward it as a Cookie header.
  * Returns the new tokens or null.
  */
-export async function refreshTokens(
+async function doRefresh(
   refresh: string,
 ): Promise<{ access: string; refresh: string } | null> {
   const res = await fetch(`${API}/api/auth/admin/refresh`, {
@@ -80,6 +80,24 @@ export async function refreshTokens(
   const tokens = await res.json().catch(() => null);
   if (!tokens?.accessToken) return null;
   return { access: tokens.accessToken, refresh: tokens.refreshToken ?? refresh };
+}
+
+// Single-flight: a page firing many /api calls at once after the access token
+// expired would otherwise trigger N concurrent refreshes. Since the API ROTATES
+// the refresh token (invalidating the old one), only the first would succeed and
+// the rest would 401 → bounce to /login even though the session is still valid.
+// Sharing one in-flight refresh spends the rotating token exactly once.
+let inflightRefresh: Promise<{ access: string; refresh: string } | null> | null = null;
+
+export function refreshTokens(
+  refresh: string,
+): Promise<{ access: string; refresh: string } | null> {
+  if (!inflightRefresh) {
+    inflightRefresh = doRefresh(refresh).finally(() => {
+      inflightRefresh = null;
+    });
+  }
+  return inflightRefresh;
 }
 
 /**

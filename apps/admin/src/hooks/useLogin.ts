@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { loginAction } from '@/lib/server/auth-actions';
 import type { LoginValues } from '@/lib/schemas/auth';
@@ -12,6 +13,7 @@ import type { LoginValues } from '@/lib/schemas/auth';
  * 2FA step and returns a form-level error message.
  */
 export function useLogin() {
+  const router = useRouter();
   const [requires2FA, setRequires2FA] = useState(false);
 
   /** Returns a form-level error message, or null on success / next step. */
@@ -25,8 +27,11 @@ export function useLogin() {
     if (result.status === 'error') {
       return result.message;
     }
-    // Success: hard-navigate so the (admin) layout re-reads the fresh session.
-    window.location.href = '/dashboard';
+    // Success: client-navigate (not a hard reload) so the transition shows the
+    // root loading spinner while the (admin) layout re-reads the fresh session
+    // server-side, instead of a blank screen. refresh() drops any stale RSC cache.
+    router.replace('/dashboard');
+    router.refresh();
     return null;
   };
 
