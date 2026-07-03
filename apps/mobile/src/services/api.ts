@@ -99,6 +99,36 @@ export const resetBannedRedirect = () => {
   bannedRedirectActive = false;
 };
 
+// Tek-uçuş refresh: eşzamanlı 401'ler tek refresh paylaşır (rotated token + storm önlenir).
+let refreshPromise: Promise<string | null> | null = null;
+
+async function performTokenRefresh(): Promise<string | null> {
+  const refreshToken = await SecureStore.getItemAsync('refreshToken');
+  if (!refreshToken) return null;
+  const response = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
+  const data: any = response.data;
+  const newAccess: string | undefined = data?.tokens?.accessToken ?? data?.accessToken;
+  const newRefresh: string | undefined = data?.tokens?.refreshToken ?? data?.refreshToken;
+  if (!newAccess) return null;
+  await SecureStore.setItemAsync('accessToken', newAccess);
+  // ROTATED refresh token'ı da kaydet (asıl bug buydu).
+  if (newRefresh) await SecureStore.setItemAsync('refreshToken', newRefresh);
+  return newAccess;
+}
+
+async function handleAuthFailure(): Promise<void> {
+  // Merkezi çıkış: SecureStore + Zustand + query cache + socket + push temizlenir.
+  // require ile lazy import → api.ts ↔ authStore döngüsü (cycle) önlenir.
+  try {
+    const { useAuthStore } = require('../stores/authStore');
+    await useAuthStore.getState().logout();
+  } catch {
+    await SecureStore.deleteItemAsync('accessToken');
+    await SecureStore.deleteItemAsync('refreshToken');
+  }
+  router.replace('/(auth)/login');
+}
+
 // Response interceptor - handle token refresh
 api.interceptors.response.use(
   (response) => response,
@@ -122,25 +152,18 @@ api.interceptors.response.use(
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-
       try {
-        const refreshToken = await SecureStore.getItemAsync('refreshToken');
-        if (refreshToken) {
-          const response = await axios.post(`${API_URL}/auth/refresh`, {
-            refreshToken,
-          });
-
-          const { accessToken } = response.data;
-          await SecureStore.setItemAsync('accessToken', accessToken);
-
-          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        if (!refreshPromise) {
+          refreshPromise = performTokenRefresh().finally(() => { refreshPromise = null; });
+        }
+        const newAccess = await refreshPromise;
+        if (newAccess) {
+          originalRequest.headers.Authorization = `Bearer ${newAccess}`;
           return api(originalRequest);
         }
+        await handleAuthFailure();
       } catch (refreshError) {
-        // Refresh failed, logout user
-        await SecureStore.deleteItemAsync('accessToken');
-        await SecureStore.deleteItemAsync('refreshToken');
-        router.replace('/(auth)/login');
+        await handleAuthFailure();
       }
     }
 

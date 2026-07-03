@@ -99,7 +99,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
     await api.post('/notifications/push-token', {
       token,
       platform: Platform.OS,
-      deviceName: Device.modelName,
+      deviceId: Device.modelName ?? 'unknown',
     }).catch((err: any) => {
       console.log('Failed to register push token with backend:', err.message);
     });
@@ -299,6 +299,15 @@ export function setupPushNotificationRouting(): () => void {
       }
     },
   );
+
+  // 3) Cold-start: uygulama KAPALIYKEN bildirime basılıp açıldıysa, yanıt live
+  // listener'a düşmez → son yanıtı bir kez oku ve yönlendir.
+  Notifications.getLastNotificationResponseAsync()
+    .then((response: any) => {
+      const data = response?.notification?.request?.content?.data;
+      if (data) routeFromNotification(data);
+    })
+    .catch(() => { /* sessiz */ });
 
   return () => {
     try {

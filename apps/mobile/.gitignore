@@ -8,6 +8,9 @@ expo-env.d.ts
 # Expo cache
 .expo/
 
+# Committed native ios/ kaldırıldı — prebuild'e bırakıldı (app.json'dan üretilir)
+/ios/
+
 # Push/FCM secrets — repoya commit'lenmemeli
 # NOT: google-services.json BİLEREK ignore edilmiyor — EAS git-modu build'inde
 # yüklenmesi gerekiyor (bare Android FCM config). Android client config'i düşük
