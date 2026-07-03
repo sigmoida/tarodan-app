@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ComponentType } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
@@ -11,208 +11,21 @@ import clsx from 'clsx';
 import { Button, Input } from '@tarodan/ui';
 import { AdminProfileMenu } from '@/components/AdminProfileMenu';
 import {
-  HomeIcon,
-  UsersIcon,
-  ShoppingBagIcon,
-  ClipboardDocumentListIcon,
-  ChartBarIcon,
-  Cog6ToothIcon,
-
+  navGroups,
+  topLevelNav,
+  matchesQuery,
+  routePermission,
+  type NavItem,
+} from '@/lib/navigation';
+import {
   Bars3Icon,
   XMarkIcon,
-  CurrencyDollarIcon,
-  UserCircleIcon,
-  ChatBubbleLeftRightIcon,
-  SwatchIcon,
-  // KUPON/İndirimler sekmesi devre dışı (yoruma alındı)
-  // TicketIcon,
-  CalculatorIcon,
-  BanknotesIcon,
-  DocumentTextIcon,
-  TruckIcon,
-  BellAlertIcon,
-  CubeIcon,
-  BuildingOffice2Icon,
-  ClipboardDocumentCheckIcon,
-  StarIcon,
-  CreditCardIcon,
-  ArrowsRightLeftIcon,
   MagnifyingGlassIcon,
   ChevronDownIcon,
   ChevronRightIcon,
-  MegaphoneIcon,
-  Squares2X2Icon,
-  ClipboardDocumentIcon,
-  FlagIcon,
-  BeakerIcon,
 } from '@heroicons/react/24/outline';
 
-type NavItem = {
-  name: string;
-  href: string;
-  icon: ComponentType<{ className?: string }>;
-  /** Ek arama kelimeleri (ör. İngilizce route, eş anlamlı) */
-  keywords?: string[];
-  /**
-   * Bu öğeyi göstermek için gerekli izin anahtarı (rol izin matrisinden).
-   * Belirtilmezse `roles` dizisine fallback yapılır.
-   */
-  permission?: string;
-  /** Fallback: izin sistemi yüklenemezse bu roller kontrol edilir. Belirtilmezse super_admin + admin. */
-  roles?: string[];
-};
-
-type NavGroup = {
-  id: string;
-  name: string;
-  icon: ComponentType<{ className?: string }>;
-  items: NavItem[];
-};
-
-const topLevelNav: NavItem[] = [
-  { name: 'Dashboard', href: '/dashboard', icon: HomeIcon, keywords: ['ana sayfa', 'home'], permission: 'dashboard' },
-  { name: 'Analizler', href: '/analytics', icon: ChartBarIcon, keywords: ['istatistik', 'rapor'], permission: 'analytics' },
-];
-
-const navGroups: NavGroup[] = [
-  {
-    id: 'operations',
-    name: 'Operasyon',
-    icon: ClipboardDocumentIcon,
-    items: [
-      { name: 'Siparişler', href: '/orders', icon: ClipboardDocumentListIcon, keywords: ['order'], permission: 'orders' },
-      { name: 'Takaslar', href: '/trades', icon: ArrowsRightLeftIcon, keywords: ['takas', 'trade', 'barter', 'değişim'], permission: 'trades' },
-      { name: 'Kargo', href: '/shipping', icon: TruckIcon, keywords: ['kargo', 'shipping', 'gönderi', 'etiket', 'takip'], permission: 'shipping' },
-      { name: 'İade Takibi', href: '/refund-requests', icon: BanknotesIcon, keywords: ['iade', 'refund', 'talep', 'takip'], permission: 'refund_requests' },
-      { name: 'İade Geçmişi', href: '/refunds', icon: BanknotesIcon, keywords: ['iade', 'refund', 'geçmiş'], permission: 'refund_history' },
-    ],
-  },
-  {
-    id: 'catalog',
-    name: 'Katalog',
-    icon: Squares2X2Icon,
-    items: [
-      { name: 'Ürünler', href: '/products', icon: ShoppingBagIcon, permission: 'products' },
-      { name: 'Kategoriler', href: '/categories', icon: CubeIcon, permission: 'categories' },
-      { name: 'Markalar', href: '/brands', icon: SwatchIcon, permission: 'brands' },
-      { name: 'Modeller', href: '/car-models', icon: TruckIcon, permission: 'car_models' },
-      { name: 'Üreticiler', href: '/manufacturers', icon: BuildingOffice2Icon, permission: 'manufacturers' },
-      { name: 'Ürün Özellikleri', href: '/attributes', icon: ClipboardDocumentListIcon, keywords: ['attribute', 'özellik'], permission: 'attributes' },
-      { name: 'Koleksiyonlar', href: '/collections', icon: ClipboardDocumentCheckIcon, permission: 'collections' },
-    ],
-  },
-  {
-    id: 'users',
-    name: 'Hesaplar',
-    icon: UsersIcon,
-    items: [
-      { name: 'Kullanıcılar', href: '/users', icon: UsersIcon, keywords: ['user', 'üye'], permission: 'users' },
-      { name: 'Satıcı Başvuruları', href: '/sellers/applications', icon: ClipboardDocumentCheckIcon, permission: 'seller_applications' },
-      { name: 'Satıcı Performansı', href: '/sellers/performance', icon: ChartBarIcon, permission: 'seller_performance' },
-      { name: 'Yorumlar', href: '/reviews', icon: StarIcon, permission: 'reviews' },
-      { name: 'Rapor Talepleri', href: '/reports', icon: FlagIcon, keywords: ['rapor', 'şikayet', 'report', 'complaint', 'abuse'], permission: 'reports' },
-      { name: 'Rol Yönetimi', href: '/roles', icon: UserCircleIcon, permission: 'staff' },
-    ],
-  },
-  {
-    id: 'messaging',
-    name: 'Mesajlaşma',
-    icon: ChatBubbleLeftRightIcon,
-    items: [
-      { name: 'Mesajlar', href: '/messages', icon: ChatBubbleLeftRightIcon, permission: 'messages' },
-      { name: 'Destek Talepleri', href: '/support', icon: ChatBubbleLeftRightIcon, keywords: ['destek', 'support', 'ticket'], permission: 'support' },
-    ],
-  },
-  {
-    id: 'marketing',
-    name: 'Pazarlama & İçerik',
-    icon: MegaphoneIcon,
-    items: [
-      // KUPON/İndirimler sekmesi devre dışı (yoruma alındı) — sayfa kodu ve route duruyor
-      // { name: 'İndirimler', href: '/discounts', icon: TicketIcon, permission: 'discounts' },
-      { name: 'Reklamlar', href: '/ads', icon: MegaphoneIcon, keywords: ['reklam', 'ad', 'banner'], permission: 'ads' },
-      { name: 'Bildirimler', href: '/notifications', icon: BellAlertIcon, permission: 'notifications' },
-      { name: 'E-posta Şablonları', href: '/email-templates', icon: ChatBubbleLeftRightIcon, permission: 'email_templates' },
-      { name: 'Sayfalar', href: '/pages', icon: DocumentTextIcon, permission: 'pages' },
-    ],
-  },
-  {
-    id: 'finance',
-    name: 'Finans',
-    icon: CurrencyDollarIcon,
-    items: [
-      { name: 'Ödemeler', href: '/payments', icon: CreditCardIcon, keywords: ['ödeme', 'payment', 'hold'], permission: 'payments' },
-      { name: 'Komisyon', href: '/commission', icon: CurrencyDollarIcon, permission: 'commission' },
-      { name: 'Satıcı Ödemeleri', href: '/payouts', icon: BanknotesIcon, permission: 'payouts' },
-      { name: 'Faturalar', href: '/invoices', icon: DocumentTextIcon, keywords: ['fatura', 'invoice', 'e-arşiv', 'e-fatura', 'elogo', 'iade faturası'], permission: 'invoices' },
-      { name: 'Vergi Ayarları', href: '/tax', icon: CalculatorIcon, permission: 'tax' },
-    ],
-  },
-  {
-    id: 'system',
-    name: 'Sistem',
-    icon: Cog6ToothIcon,
-    items: [
-      { name: 'AI Denetim', href: '/ai-moderation', icon: ClipboardDocumentCheckIcon, keywords: ['ai', 'moderasyon', 'nsfw'], permission: 'ai_moderation' },
-      { name: 'Üyelik Katmanları', href: '/membership-tiers', icon: StarIcon, keywords: ['üyelik', 'membership', 'tier'], permission: 'membership_tiers' },
-      { name: 'Sistem Ayarları', href: '/settings', icon: Cog6ToothIcon, permission: 'settings' },
-      { name: 'Loglar', href: '/logs', icon: ClipboardDocumentIcon, keywords: ['log', 'hata', 'error', 'güvenlik', 'e-posta', 'audit', 'denetim', 'iz', 'değişiklik', 'security'], permission: 'logs' },
-      { name: 'Test Araçları', href: '/test-tools', icon: BeakerIcon, keywords: ['test', 'zaman', 'cron', 'süre', 'boost', 'üyelik', 'iade', 'time'], permission: 'test_tools', roles: ['super_admin'] },
-    ],
-  },
-];
-
 const OPEN_GROUPS_STORAGE_KEY = 'admin-nav-open-groups';
-
-/** Sayfa path'i → gerekli izin. Spesifik path'ler önce gelir. */
-const ROUTE_PERMISSIONS: [string, string][] = [
-  ['/sellers/applications', 'seller_applications'],
-  ['/sellers/performance', 'seller_performance'],
-  ['/analytics', 'analytics'],
-  ['/orders', 'orders'],
-  ['/trades', 'trades'],
-  ['/shipping', 'shipping'],
-  ['/refund-requests', 'refund_requests'],
-  ['/refunds', 'refund_history'],
-  ['/test-tools', 'test_tools'],
-  ['/products', 'products'],
-  ['/categories', 'categories'],
-  ['/brands', 'brands'],
-  ['/car-models', 'car_models'],
-  ['/manufacturers', 'manufacturers'],
-  ['/attributes', 'attributes'],
-  ['/collections', 'collections'],
-  ['/users', 'users'],
-  ['/reviews', 'reviews'],
-  ['/reports', 'reports'],
-  ['/roles', 'staff'],
-  ['/messages', 'messages'],
-  ['/support', 'support'],
-  ['/discounts', 'discounts'],
-  ['/ads', 'ads'],
-  ['/notifications', 'notifications'],
-  ['/email-templates', 'email_templates'],
-  ['/pages', 'pages'],
-  ['/payments', 'payments'],
-  ['/commission', 'commission'],
-  ['/payouts', 'payouts'],
-  ['/invoices', 'invoices'],
-  ['/tax', 'tax'],
-  ['/ai-moderation', 'ai_moderation'],
-  ['/moderation', 'ai_moderation'],
-  ['/membership-tiers', 'membership_tiers'],
-  ['/settings', 'settings'],
-  ['/logs', 'logs'],
-  ['/audit-logs', 'audit_logs'],
-];
-
-function matchesQuery(item: NavItem, q: string): boolean {
-  const name = item.name.toLocaleLowerCase('tr-TR');
-  const href = item.href.toLowerCase();
-  if (name.includes(q) || href.includes(q)) return true;
-  return (item.keywords ?? []).some((k) => k.toLocaleLowerCase('tr-TR').includes(q));
-}
-
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -316,8 +129,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   useEffect(() => {
     if (!user || user.role === 'super_admin' || !permissionsLoaded) return;
     const currentPerms = rolePerms[user.role] ?? [];
-    const match = ROUTE_PERMISSIONS.find(([prefix]) => pathname.startsWith(prefix));
-    if (match && !currentPerms.includes(match[1])) {
+    const required = routePermission(pathname);
+    if (required && !currentPerms.includes(required)) {
       router.replace('/dashboard');
     }
   }, [pathname, user, rolePerms, permissionsLoaded, router]);
