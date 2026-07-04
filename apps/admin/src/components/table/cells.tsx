@@ -7,30 +7,30 @@ import { fmtDate, fmtDateTime, fmtNumber, fmtTry } from '@/lib/format';
 import { TruncatedText } from './TruncatedText';
 
 /**
- * Tablo hücre primitive'leri. Her tip; font, boşluk-değeri, truncate ve wrap
- * davranışını KENDİ içinde kilitler — hizalama kolon meta'sından (`td`) gelir,
- * böylece başlık ve hücre daima aynı hizada olur. Sayfalar bunları doğrudan
- * kullanmaz; `col.*` factory'si (columns.tsx) üretir.
+ * Table cell primitives. Each type locks its own font, empty-value placeholder,
+ * truncate and wrap behavior — alignment comes from the column meta (`td`), so
+ * header and cell are always aligned the same way. Pages don't use these directly;
+ * the `col.*` factory (columns.tsx) produces them.
  */
 
-/** Değer yokken tek tip placeholder. */
+/** Uniform placeholder when there's no value. */
 export function Empty() {
   return <span className="text-subtle">—</span>;
 }
 
-/** Serbest metin — tek satır, kesilir, kesilince hover'da tam metin. */
+/** Free text — single line, clipped, full text on hover when clipped. */
 export function CellText({ value, className }: { value?: ReactNode; className?: string }) {
   if (value == null || value === '') return <Empty />;
   return <TruncatedText className={cn('text-body', className)}>{value}</TruncatedText>;
 }
 
-/** İkincil (soluk) metin — açıklama, alt bilgi. */
+/** Secondary (muted) text — description, sub-info. */
 export function CellMuted({ value }: { value?: ReactNode }) {
   if (value == null || value === '') return <Empty />;
   return <TruncatedText className="text-muted">{value}</TruncatedText>;
 }
 
-/** Para tonu — sadece RENK anlam taşır; font/boyut/hiza/format daima aynı. */
+/** Money tone — only COLOR carries meaning; font/size/alignment/format always the same. */
 export type MoneyTone = 'default' | 'positive' | 'negative' | 'primary';
 const MONEY_TONE: Record<MoneyTone, string> = {
   default: 'text-body',
@@ -39,7 +39,7 @@ const MONEY_TONE: Record<MoneyTone, string> = {
   primary: 'text-primary-600',
 };
 
-/** Para — `tabular-nums`, wrap yok (hizalama meta ile sağa). */
+/** Money — `tabular-nums`, no wrap (right-aligned via meta). */
 export function CellMoney({
   value,
   tone = 'default',
@@ -54,14 +54,14 @@ export function CellMoney({
   );
 }
 
-/** Düz sayı — `tabular-nums`, wrap yok. */
+/** Plain number — `tabular-nums`, no wrap. */
 export function CellNumber({ value }: { value?: number | string | null }) {
   const text = fmtNumber(value);
   if (text == null) return <Empty />;
   return <span className="whitespace-nowrap tabular-nums text-body">{text}</span>;
 }
 
-/** Kısa tarih — wrap yok; hover'da tam tarih+saat. */
+/** Short date — no wrap; full date+time on hover. */
 export function CellDate({ value }: { value?: string | number | Date | null }) {
   const text = fmtDate(value);
   if (text == null) return <Empty />;
@@ -72,13 +72,13 @@ export function CellDate({ value }: { value?: string | number | Date | null }) {
   );
 }
 
-/** ID / takip no gibi kod — mono ama diğer hücrelerle AYNI boyut (text-sm), kesilir. */
+/** Code like ID / tracking no — mono but the SAME size as other cells (text-sm), clipped. */
 export function CellCode({ value }: { value?: ReactNode }) {
   if (value == null || value === '') return <Empty />;
   return <TruncatedText className="font-mono text-body">{value}</TruncatedText>;
 }
 
-/** Metin link'i — tek standart link stili, kesilir. */
+/** Text link — single standard link style, clipped. */
 export function CellLink({ href, label }: { href?: string | null; label?: ReactNode }) {
   if (!href || label == null || label === '') return <Empty />;
   return (
@@ -88,7 +88,7 @@ export function CellLink({ href, label }: { href?: string | null; label?: ReactN
   );
 }
 
-/** Kişi/varlık — ad (+ opsiyonel alt satır: e-posta vb.), her satır ayrı kesilir. */
+/** Person/entity — name (+ optional sub-line: email etc.), each line clipped separately. */
 export function CellUser({
   name,
   secondary,
@@ -116,12 +116,12 @@ export function CellUser({
   );
 }
 
-/** Badge/rozet — asla wrap etmez, daralmaz. */
+/** Badge — never wraps, never shrinks. */
 export function CellBadge({ children }: { children: ReactNode }) {
   return <div className="flex whitespace-nowrap">{children}</div>;
 }
 
-/** Aksiyon alanı — sağa yaslı, wrap yok. Satır-tık'ı tetiklemez (DataTable closest kontrolü). */
+/** Action area — right-aligned, no wrap. Doesn't trigger the row click (DataTable closest check). */
 export function CellActions({ children }: { children: ReactNode }) {
   return <div className="flex items-center justify-end gap-2 whitespace-nowrap">{children}</div>;
 }

@@ -25,9 +25,9 @@ import type { PermGroup } from '../_lib/types';
 import { usePermissionsQuery } from '../_lib/usePermissions';
 
 /**
- * "İzin Matrisi" sekmesi: rol × sayfa izin ızgarası. Süper Admin düzenle moduna
- * geçip tek tek veya grup bazında izinleri değiştirir; kaydetme `useAdminMutation`
- * ile yapılır ve sidebar filtresini tazelemek için sayfa yenilenir.
+ * "İzin Matrisi" tab: role × page permission grid. Super Admin enters edit mode
+ * and toggles permissions individually or by group; saving goes through
+ * `useAdminMutation`, and the page reloads to refresh the sidebar filter.
  */
 export function PermissionMatrixTab() {
   const confirm = useConfirm();
@@ -37,7 +37,7 @@ export function PermissionMatrixTab() {
   const permissionsQuery = usePermissionsQuery();
   const matrixLoading = permissionsQuery.isLoading;
 
-  // Düzenlenebilir kopya — server verisinden seed edilir.
+  // Editable copy — seeded from server data.
   const [permissions, setPermissions] = useState<Record<string, string[]>>({});
   const [matrixDirty, setMatrixDirty] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -90,7 +90,7 @@ export function PermissionMatrixTab() {
       onSuccess: () => {
         setMatrixDirty(false);
         setEditMode(false);
-        // Sidebar filtrelemesini güncellemek için sayfayı yenile.
+        // Reload the page to update the sidebar filtering.
         setTimeout(() => window.location.reload(), 800);
       },
     },
@@ -133,7 +133,7 @@ export function PermissionMatrixTab() {
 
   return (
     <div className="space-y-4">
-      {/* Üst kontrol çubuğu */}
+      {/* Top control bar */}
       <div className="admin-card flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <h3 className="text-lg font-semibold text-heading">İzin Matrisi</h3>
@@ -171,7 +171,7 @@ export function PermissionMatrixTab() {
         )}
       </div>
 
-      {/* Değişiklik uyarısı */}
+      {/* Unsaved changes warning */}
       {editMode && matrixDirty && (
         <div className="flex items-center gap-2 rounded-lg border border-warning-200 bg-warning-50 px-4 py-2.5 text-sm text-warning-800">
           <InformationCircleIcon className="h-4 w-4 shrink-0" />
@@ -179,7 +179,7 @@ export function PermissionMatrixTab() {
         </div>
       )}
 
-      {/* Rol açıklama kartları */}
+      {/* Role description cards */}
       {!matrixLoading && (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           {ROLES.map((role) => {
@@ -204,7 +204,7 @@ export function PermissionMatrixTab() {
         </div>
       )}
 
-      {/* Matris tablosu */}
+      {/* Matrix table */}
       {matrixLoading ? (
         <div className="admin-card flex h-40 items-center justify-center text-sm text-muted">
           Yükleniyor…
@@ -235,7 +235,7 @@ export function PermissionMatrixTab() {
                 const isCollapsed = collapsedGroups.has(g.id);
                 return (
                   <React.Fragment key={g.id}>
-                    {/* Grup başlığı satırı */}
+                    {/* Group header row */}
                     <tr className="border-b border-border-subtle bg-surface-alt/60">
                       <td className="sticky left-0 z-10 bg-surface-alt/60 px-3 py-2">
                         <button
@@ -291,7 +291,7 @@ export function PermissionMatrixTab() {
                       })}
                     </tr>
 
-                    {/* İzin satırları */}
+                    {/* Permission rows */}
                     {!isCollapsed &&
                       g.permissions.map((perm) => {
                         const isExpanded = expandedPerm === perm.key;
@@ -386,7 +386,7 @@ export function PermissionMatrixTab() {
         </div>
       )}
 
-      {/* Lejant */}
+      {/* Legend */}
       {!matrixLoading && (
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-1 text-xs text-muted">
           <span className="flex items-center gap-1.5">

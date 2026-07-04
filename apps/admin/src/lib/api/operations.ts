@@ -16,7 +16,7 @@ export const operationsApi = {
   getOrderInvoice: (id: string) => api.get(`/admin/orders/${id}/invoice`),
   applyOrderCoupon: (id: string, code: string | null) =>
     api.post(`/admin/orders/${id}/apply-coupon`, { code }),
-  // 48h pencere (Faz 4A.1)
+  // 48h window (Phase 4A.1)
   forceCompleteOrder: (id: string, reason?: string) =>
     api.post(`/admin/orders/${id}/force-complete`, reason ? { reason } : {}),
   extendOrderConfirmation: (
@@ -24,7 +24,7 @@ export const operationsApi = {
     payload: { hours: number; reason?: string },
   ) => api.post(`/admin/orders/${id}/extend-confirmation`, payload),
 
-  // RefundRequest policy override (Faz 4B.1)
+  // RefundRequest policy override (Phase 4B.1)
   overrideRefundPolicy: (
     id: string,
     payload: {
@@ -88,24 +88,24 @@ export const operationsApi = {
   rejectMessage: (id: string, reason?: string) => api.post(`/admin/messages/${id}/reject`, { reason }),
   revertMessage: (id: string) => api.post(`/admin/messages/${id}/revert`),
 
-  // Shipping (operations) — sipariş gönderilerini görüntüleme/takip (salt-okunur).
-  // Konfig (methods/carriers/zones/rates) ve etiket üretimi kaldırıldı; gerçek kargo Sürat entegrasyonu.
+  // Shipping (operations) — view/track order shipments (read-only).
+  // Config (methods/carriers/zones/rates) and label generation removed; real shipping is the Sürat integration.
   getShipments(params?: any) {
     return api.get('/admin/shipping/shipments', { params });
   },
-  // Bir Sürat kargosunun takip durumunu 30 dk cron'u beklemeden anında senkronlar.
+  // Syncs a Sürat shipment's tracking status instantly, without waiting for the 30-min cron.
   syncShipmentTracking(id: string) {
     return api.post(`/admin/shipping/shipments/${id}/sync-tracking`);
   },
-  // Sürat REST endpoint testi: gönderi oluştur + takibini sorgula (ham cevapları döner).
+  // Sürat REST endpoint test: create a shipment + query its tracking (returns raw responses).
   suratEndpointTest() {
     return api.post('/admin/shipping/surat/endpoint-test');
   },
-  // Test konsolu: referansla Sürat takip sorgusu (KargoTakipHareketDetayi).
+  // Test console: Sürat tracking query by reference (KargoTakipHareketDetayi).
   suratTestTrack(ref: string) {
     return api.post('/admin/shipping/surat/track', { ref });
   },
-  // Test konsolu: referansla Sürat iptal/geri-çek (GonderiGeriCek).
+  // Test console: Sürat cancel/withdraw by reference (GonderiGeriCek).
   suratTestCancel(ref: string) {
     return api.post('/admin/shipping/surat/cancel', { ref });
   },

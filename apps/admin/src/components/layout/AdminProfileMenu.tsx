@@ -12,7 +12,7 @@ import {
 import { ArrowRightStartOnRectangleIcon, UserCircleIcon } from '@heroicons/react/24/outline';
 import { useSession } from '@/context/SessionContext';
 
-/** Tek kaynak: hesap menüsü linkleri burada tanımlanır. */
+/** Single source: account menu links are defined here. */
 const PROFILE_MENU_ITEMS: Array<{ label: string; href: string }> = [];
 
 /**

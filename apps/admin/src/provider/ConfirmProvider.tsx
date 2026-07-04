@@ -14,7 +14,7 @@ export interface ConfirmOptions {
   description?: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
-  /** Yıkıcı (silme vb.) işlemler için kırmızı stil. */
+  /** Red style for destructive actions (delete, etc.). */
   destructive?: boolean;
 }
 
@@ -23,9 +23,9 @@ type ConfirmFn = (options?: ConfirmOptions) => Promise<boolean>;
 const ConfirmContext = createContext<ConfirmFn | null>(null);
 
 /**
- * Native window.confirm yerine kullanılan, ui-uyumlu onay dialog'u.
- * Tek bir dialog global olarak render edilir; `useConfirm()` her yerden
- * `await confirm({...})` ile çağrılır (true=Onayla, false=Vazgeç).
+ * A ui-consistent confirmation dialog used instead of native window.confirm.
+ * A single dialog is rendered globally; `useConfirm()` is called from anywhere
+ * via `await confirm({...})` (true=confirm, false=cancel).
  */
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<{
@@ -61,7 +61,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** Onay dialog'unu açan async fonksiyon. ConfirmProvider altında kullanılmalı. */
+/** Async function that opens the confirm dialog. Must be used under ConfirmProvider. */
 export function useConfirm(): ConfirmFn {
   const ctx = useContext(ConfirmContext);
   if (!ctx) {

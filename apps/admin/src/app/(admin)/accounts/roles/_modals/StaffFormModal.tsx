@@ -13,9 +13,9 @@ import type { StaffItem } from '../_lib/types';
 const roleOptions = ROLES.map((r) => ({ value: r, label: ROLE_META[r].label }));
 
 /**
- * Yönetici atama / rol güncelleme modalı. Kendi formunu (zod) + mutation'ını
- * sahiplenir; sayfa yalnızca aç/kapa durumunu tutar. Yeni hesap oluşturulunca
- * geçici şifreyi `onCreated` ile üst bileşene bildirir (uyarı bandı orada gösterilir).
+ * Staff assignment / role update modal. Owns its own form (zod) + mutation;
+ * the page only holds open/close state. When a new account is created, it reports
+ * the temporary password to the parent via `onCreated` (the notice band is shown there).
  */
 export function StaffFormModal({
   open,

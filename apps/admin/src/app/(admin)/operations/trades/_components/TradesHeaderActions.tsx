@@ -10,7 +10,7 @@ import { useResourceList } from '@/components/list';
 export function TradesHeaderActions() {
   const { rows, filters, setFilter } = useResourceList<any>();
 
-  // İnceleme kuyruğu — geçerli filtreden bağımsız ayrı küçük query.
+  // Review queue — a separate small query independent of the current filter.
   const { data } = useQuery({
     queryKey: ['trades-review-queue-count'],
     queryFn: async () => {

@@ -8,7 +8,7 @@ import { discountColumns } from '../_lib/columns';
 import { discountRowMenu } from '../_lib/rowActions';
 import { type Discount } from '../_lib/types';
 
-/** İndirim tablosu — aktif/pasif toggle + silme burada mutation olarak yaşar. */
+/** Discount table — active/inactive toggle + delete live here as mutations. */
 export function DiscountsTable({ onEdit }: { onEdit: (d: Discount) => void }) {
   const confirm = useConfirm();
 

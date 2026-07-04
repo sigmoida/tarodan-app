@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { Button } from '@tarodan/ui';
 
 /**
- * Segment-level error boundary (root). Route render/veri hatalarını yakalar;
- * `reset()` ile segment yeniden denenebilir. Root layout'un kendi hatası için
- * ayrıca `global-error.tsx` vardır.
+ * Segment-level error boundary (root). Catches route render/data errors;
+ * `reset()` retries the segment. For errors in the root layout itself there
+ * is a separate `global-error.tsx`.
  */
 export default function Error({
   error,

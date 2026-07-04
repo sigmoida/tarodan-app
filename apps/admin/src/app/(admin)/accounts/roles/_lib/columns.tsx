@@ -4,8 +4,8 @@ import { ROLE_META, ROLE_BADGE_VARIANT, type RoleId } from './constants';
 import type { StaffItem } from './types';
 
 /**
- * Yönetici kullanıcı tablosu kolonları. İzin sayısı için canlı `permissions`
- * (rol → izin listesi) haritasını alır; satır menüsü çağırandan gelir.
+ * Staff user table columns. Takes the live `permissions` map (role → permission
+ * list) for the permission count; the row menu comes from the caller.
  */
 export function staffColumns(
   permissions: Record<string, string[]>,

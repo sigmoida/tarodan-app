@@ -121,7 +121,7 @@ export function SendNotificationForm({ onScheduled }: { onScheduled: () => void 
 
   return (
     <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-5">
-      {/* Sol: Form */}
+      {/* Left: form */}
       <div className="space-y-5 xl:col-span-3">
         <SectionCard title="Mesaj" bodyClassName="space-y-5">
           <div>
@@ -262,7 +262,7 @@ export function SendNotificationForm({ onScheduled }: { onScheduled: () => void 
         </div>
       </div>
 
-      {/* Sağ: Önizleme */}
+      {/* Right: preview */}
       <div className="xl:col-span-2">
         <SectionCard title="Canlı Önizleme" className="sticky top-6" bodyClassName="space-y-5">
           {form.channels.includes('push') && (

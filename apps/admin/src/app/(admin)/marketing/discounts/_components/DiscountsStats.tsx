@@ -7,8 +7,8 @@ import { MetricCard } from '@/components/MetricCard';
 import { type Discount } from '../_lib/types';
 
 /**
- * Tüm indirimler üzerinden özet metrikler. `['discounts','stats']` altında —
- * indirim mutasyonları (`invalidates: ['discounts']`) bunu da tazeler.
+ * Summary metrics across all discounts. Keyed under `['discounts','stats']` —
+ * discount mutations (`invalidates: ['discounts']`) refresh this too.
  */
 export function DiscountsStats() {
   const { data } = useQuery({

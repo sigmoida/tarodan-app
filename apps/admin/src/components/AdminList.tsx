@@ -8,9 +8,9 @@ import { MagnifyingGlassIcon, ChevronLeftIcon } from '@heroicons/react/24/outlin
 import { Input } from '@tarodan/ui';
 
 /**
- * Admin liste sayfalarının "aksiyon alanları"nı tekilleştiren ortak component'ler:
- * PageHeader (başlık + ana aksiyon), FilterToolbar (arama + filtreler),
- * BulkActionBar (seçili-X + toplu aksiyon), ActionButtons/ActionIconButton (satır aksiyonları).
+ * Shared components that unify the "action areas" of admin list pages:
+ * PageHeader (title + primary action), FilterToolbar (search + filters),
+ * BulkActionBar (X-selected + bulk action), ActionButtons/ActionIconButton (row actions).
  */
 
 export function PageHeader({
@@ -38,7 +38,7 @@ export function PageHeader({
 						href={backHref}
 						aria-label={backLabel}
 						title={backLabel}
-						// h-8 = text-2xl line box → items-center hizalar chevron'u başlığın dikey ortasına
+						// h-8 = text-2xl line box → items-center aligns the chevron to the title's vertical center
 						className='-ml-1 flex h-8 items-center rounded-lg px-1 text-muted transition-colors hover:bg-surface-alt hover:text-heading'>
 						<ChevronLeftIcon className='h-7 w-7' />
 					</Link>
@@ -71,7 +71,7 @@ export function FilterToolbar({
 	onSearchChange: (v: string) => void;
 	onSearchSubmit?: () => void;
 	searchPlaceholder?: string;
-	/** Sağdaki filtre kontrolleri (Select'ler vb.). */
+	/** Filter controls on the right (Selects, etc.). */
 	children?: ReactNode;
 }) {
 	return (
@@ -128,7 +128,7 @@ const actionColor: Record<ActionVariant, string> = {
 	primary: 'text-primary-600 hover:bg-primary-500/10',
 };
 
-/** Satır aksiyonu için ikon butonu (Gör/Düzenle/Sil/Onayla...). href verilirse Link. */
+/** Icon button for a row action (View/Edit/Delete/Approve...). Renders a Link if href is given. */
 export function ActionIconButton({
 	icon: Icon,
 	onClick,
@@ -169,7 +169,7 @@ export function ActionIconButton({
 	);
 }
 
-/** Satır aksiyon butonlarını gruplayan sarmalayıcı. */
+/** Wrapper that groups row action buttons. */
 export function ActionButtons({ children }: { children: ReactNode }) {
 	return <div className='flex items-center gap-1'>{children}</div>;
 }

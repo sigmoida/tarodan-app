@@ -45,14 +45,14 @@ const POST_SHIPPING = [
   'refunded',
 ];
 
-/** Kargo sonrası: iptal kapalı, iade akışı geçerli. */
+/** Post-shipping: cancellation disabled, refund flow applies. */
 export function isPostShipping(status: string): boolean {
   return POST_SHIPPING.includes(status);
 }
 
 const SHIPPED_STATUSES = ['shipped', 'delivered', 'awaiting_buyer_confirmation', 'completed'];
 
-/** Gerçek gönderi var mı: trackingNumber dolu + kargolanmış aşama + iptal değil. */
+/** Whether a real shipment exists: trackingNumber set + shipped stage + not cancelled. */
 export function hasRealShipment(order: OrderDetail, isCancelledOrder: boolean): boolean {
   return (
     !!order.shipment &&

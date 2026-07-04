@@ -3,11 +3,11 @@
 import { Spinner } from '@tarodan/ui';
 
 /**
- * Ortalanmış yüklenme durumu. Sayfa içi (`py-16`) veya tam ekran (`fullScreen`,
- * root `loading.tsx` için) kullanılır. Tek spinner kaynağı olan `@tarodan/ui`
- * `Spinner`'ı sarar. `@tarodan/ui` barrel'ı (Input vb. useState kullanan
- * client bileşenleri) çektiği için client bileşeni olmak zorunda; Server
- * Component olan `loading.tsx` bunu bir client sınırı olarak render eder.
+ * Centered loading state. Used inline (`py-16`) or full-screen (`fullScreen`,
+ * for the root `loading.tsx`). Wraps the single spinner source, `@tarodan/ui`
+ * `Spinner`. Must be a client component because it pulls in the `@tarodan/ui`
+ * barrel (client components like Input that use useState); the Server Component
+ * `loading.tsx` renders this as a client boundary.
  */
 export function PageLoading({ fullScreen = false }: { fullScreen?: boolean }) {
   return (

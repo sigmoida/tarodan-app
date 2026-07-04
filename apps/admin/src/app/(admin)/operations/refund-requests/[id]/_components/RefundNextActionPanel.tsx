@@ -32,8 +32,8 @@ export interface RefundNextActionPanelProps {
 }
 
 /**
- * "Şimdi ne yapmalısınız?" paneli — her durum için sade durum özeti,
- * işlem gerekip gerekmediği ve (gerekiyorsa) tek birincil aksiyon butonu.
+ * "What should you do now?" panel — a plain status summary per state,
+ * whether action is needed, and (if so) a single primary action button.
  */
 export function RefundNextActionPanel({
   status,

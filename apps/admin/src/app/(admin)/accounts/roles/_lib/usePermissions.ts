@@ -6,9 +6,9 @@ import { adminApi } from '@/lib/api';
 import { FALLBACK_DEFAULTS } from './constants';
 
 /**
- * Rol → izin listesi matrisi (`['role-permissions']`). Hem matris sekmesi (düzenlenebilir
- * kopyayı buradan seed eder) hem de kullanıcı atamaları sekmesi (izin sayısı + rol önizleme)
- * kullanır; tek queryKey olduğu için React Query paylaşır. Yükleme hatasında varsayılana düşer.
+ * Role → permission list matrix (`['role-permissions']`). Used by both the matrix tab
+ * (which seeds its editable copy from here) and the user assignments tab (permission count +
+ * role preview); React Query shares it via the single queryKey. Falls back to defaults on load error.
  */
 export function usePermissionsQuery() {
   return useQuery({

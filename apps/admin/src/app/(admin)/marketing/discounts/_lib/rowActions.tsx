@@ -7,7 +7,7 @@ export interface DiscountRowActions {
   onDelete: (d: Discount) => void;
 }
 
-/** İndirim satırı ⋮ menüsü: aktif/pasif + düzenle + sil. */
+/** Discount row ⋮ menu: active/inactive + edit + delete. */
 export function discountRowMenu({ onToggle, onEdit, onDelete }: DiscountRowActions) {
   return (d: Discount): RowActionItem[] => [
     activeToggleAction(d.isActive, () => onToggle(d)),

@@ -19,10 +19,10 @@ import {
 import { RowActionMenu, type RowActionItem } from './RowActionMenu';
 
 /**
- * Tipli kolon factory. Ham `ColumnDef` yerine `col.text(...)`, `col.money(...)`
- * gibi üreticiler kullanılır; hizalama, truncate, format, genişlik ve boşluk
- * davranışı tipin içinde kilitlidir → tablolar arası tutarsızlık imkânsız.
- * Tek sorumluluk sayfada kalır: hangi alanı gösterdiğin.
+ * Typed column factory. Instead of raw `ColumnDef`, use producers like
+ * `col.text(...)`, `col.money(...)`; alignment, truncate, format, width and
+ * spacing behavior are locked inside the type → cross-table inconsistency is impossible.
+ * The only responsibility left on the page: which field you show.
  *
  *   const columns = [
  *     col.link('Sipariş', r => ({ href: `/orders/${r.id}`, label: `#${r.no}` })),
@@ -36,15 +36,15 @@ import { RowActionMenu, type RowActionItem } from './RowActionMenu';
 
 type Row<T> = { original: T };
 export interface ColOpts extends CellColumnMeta {
-	/** react-table kolon kimliği; başlık string değilse/boşsa gerekir. */
+	/** react-table column id; required when the header isn't a string or is empty. */
 	id?: string;
 }
 
-// minWidth = kolonun taban px genişliği: hem yatay-scroll eşiğinin (Σ minWidth)
-// payı, hem de geniş ekranda orantılı büyüme ağırlığı. `grow` artık genişliği
-// ETKİLEMEZ (tabloyu `<table>` min-width + `table-fixed` yönetir); alanı geriye
-// dönük uyumluluk için bırakıyoruz. Bir kolonu genişletmek/daraltmak için
-// `minWidth` ver.
+// minWidth = the column's base px width: both its share of the horizontal-scroll
+// threshold (Σ minWidth) and its proportional growth weight on wide screens. `grow`
+// NO LONGER affects width (the table is driven by `<table>` min-width + `table-fixed`);
+// we keep the field for backward compatibility. To widen/narrow a column, set
+// `minWidth`.
 const DEFAULTS = {
 	text: { grow: 3, minWidth: 160, align: 'left' },
 	muted: { grow: 2, minWidth: 140, align: 'left' },
@@ -80,15 +80,15 @@ function base<T>(
 }
 
 export const col = {
-	/** Serbest metin (truncate + hover). */
+	/** Free text (truncate + hover). */
 	text<T>(header: ReactNode, get: (r: T) => ReactNode, opts?: ColOpts) {
 		return base<T>('text', header, (r) => <CellText value={get(r)} />, opts);
 	},
-	/** İkincil/soluk metin. */
+	/** Secondary/muted text. */
 	muted<T>(header: ReactNode, get: (r: T) => ReactNode, opts?: ColOpts) {
 		return base<T>('muted', header, (r) => <CellMuted value={get(r)} />, opts);
 	},
-	/** Para (₺, sağa, tabular-nums). `tone` yalnız rengi değiştirir. */
+	/** Money (₺, right, tabular-nums). `tone` only changes the color. */
 	money<T>(
 		header: ReactNode,
 		get: (r: T) => number | string | null | undefined,
@@ -106,7 +106,7 @@ export const col = {
 			opts,
 		);
 	},
-	/** Düz sayı (sağa, tabular-nums). */
+	/** Plain number (right, tabular-nums). */
 	number<T>(
 		header: ReactNode,
 		get: (r: T) => number | string | null | undefined,
@@ -119,7 +119,7 @@ export const col = {
 			opts,
 		);
 	},
-	/** Kısa tarih (hover'da tam zaman). */
+	/** Short date (full time on hover). */
 	date<T>(
 		header: ReactNode,
 		get: (r: T) => string | number | Date | null | undefined,
@@ -127,11 +127,11 @@ export const col = {
 	) {
 		return base<T>('date', header, (r) => <CellDate value={get(r)} />, opts);
 	},
-	/** ID / takip no (mono, kesilir). */
+	/** ID / tracking no (mono, clipped). */
 	code<T>(header: ReactNode, get: (r: T) => ReactNode, opts?: ColOpts) {
 		return base<T>('code', header, (r) => <CellCode value={get(r)} />, opts);
 	},
-	/** Metin link'i. `null` dönerse boş placeholder. */
+	/** Text link. If it returns `null`, empty placeholder. */
 	link<T>(
 		header: ReactNode,
 		get: (
@@ -154,7 +154,7 @@ export const col = {
 			opts,
 		);
 	},
-	/** Kişi/varlık (ad + opsiyonel alt satır). */
+	/** Person/entity (name + optional sub-line). */
 	user<T>(
 		header: ReactNode,
 		get: (
@@ -181,7 +181,7 @@ export const col = {
 			opts,
 		);
 	},
-	/** Badge/rozet (wrap yok). `render` badge JSX'ini döndürür. */
+	/** Badge (no wrap). `render` returns the badge JSX. */
 	badge<T>(header: ReactNode, render: (r: T) => ReactNode, opts?: ColOpts) {
 		return base<T>(
 			'badge',
@@ -190,7 +190,7 @@ export const col = {
 			opts,
 		);
 	},
-	/** Aksiyon alanı (sağa yaslı). Başlık varsayılan boş. */
+	/** Action area (right-aligned). Header defaults to empty. */
 	actions<T>(
 		render: (r: T) => ReactNode,
 		opts?: ColOpts & { header?: ReactNode },
@@ -206,9 +206,9 @@ export const col = {
 		);
 	},
 	/**
-	 * Satır aksiyonları — standart ⋮ menü. Sayfa yalnızca aksiyon listesini döndürür
-	 * (koşullu aksiyonlar `cond && {...}` ile). Satır aksiyonları için tercih edilen
-	 * yol budur; inline ikon kümesi yerine tek, tutarlı mekanizma.
+	 * Row actions — standard ⋮ menu. The page only returns the list of actions
+	 * (conditional actions via `cond && {...}`). This is the preferred way for row
+	 * actions; a single, consistent mechanism instead of an inline icon cluster.
 	 */
 	rowMenu<T>(
 		getItems: (r: T) => RowActionItem[],
@@ -225,7 +225,7 @@ export const col = {
 			{ id: 'actions', minWidth: 72, ...opts },
 		);
 	},
-	/** Kaçış kapısı — serbest JSX ama yine hizalama/genişlik meta'sıyla. */
+	/** Escape hatch — free JSX but still with alignment/width meta. */
 	custom<T>(header: ReactNode, render: (r: T) => ReactNode, opts?: ColOpts) {
 		return base<T>('custom', header, render, opts);
 	},

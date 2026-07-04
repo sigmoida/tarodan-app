@@ -10,7 +10,7 @@ const OPEN_GROUPS_STORAGE_KEY = 'admin-nav-open-groups';
  * group auto-opens, and the user's open/closed choice persists in localStorage.
  */
 export function useNavGroups(pathname: string) {
-  // Aktif route hangi gruptaysa o grup otomatik açılır.
+  // The group containing the active route auto-opens.
   const activeGroupId = useMemo(() => {
     for (const g of navGroups) {
       if (g.items.some((item) => pathname.startsWith(item.href))) return g.id;
@@ -29,11 +29,11 @@ export function useNavGroups(pathname: string) {
     setHydrated(true);
   }, []);
 
-  // Aktif grubu yalnızca GERÇEK grup değişiminde otomatik aç. Route-redirect
-  // parent'lara (ör. /operations → /operations/orders) tıklamada activeGroupId
-  // "operations → null → operations" diye seğirir; son (null olmayan) aktif grubu
-  // ref'te tutup aynı gruba dönüşte yeniden AÇMIYORUZ — böylece kullanıcının o
-  // grubu elle kapatması korunuyor. Geçici null da yok sayılıyor.
+  // Auto-open the active group only on a REAL group change. Clicking route-redirect
+  // parents (e.g. /operations → /operations/orders) makes activeGroupId flicker
+  // "operations → null → operations"; we keep the last (non-null) active group in a
+  // ref and do NOT re-open on returning to the same group — so the user's manual
+  // collapse of that group is preserved. A transient null is also ignored.
   const lastActiveRef = useRef<string | null>(null);
   useEffect(() => {
     if (!activeGroupId || activeGroupId === lastActiveRef.current) return;

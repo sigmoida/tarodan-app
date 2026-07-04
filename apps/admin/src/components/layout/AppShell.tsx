@@ -14,9 +14,9 @@ import { Topbar } from './Topbar';
  * Session and permissions are provided by the (admin) server layout above.
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
-	// 1 saat hareketsizlikte otomatik logout (Balanced politika).
+	// Auto-logout after 1 hour of inactivity (Balanced policy).
 	useIdleLogout();
-	// Route guard (UX) — izinler sunucudan otoriter geldiği için anlık ve yarışsız.
+	// Route guard (UX) — instant and race-free since permissions come authoritatively from the server.
 	useRouteGuard();
 
 	const { open, openSidebar, closeSidebar } = useSidebar();

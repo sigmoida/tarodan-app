@@ -2,9 +2,9 @@ import { Badge, Button } from '@tarodan/ui';
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 
 /**
- * Aktif/Pasif rozeti — artık ortak `Badge` primitive'inin `active` moduna
- * delege eder. Kolonlarda doğrudan `<Badge active={...} />` kullanılır; bu
- * yardımcı yalnızca kolon-dışı (ör. BrandModelsPanel) kısa kullanım içindir.
+ * Active/Passive badge — now delegates to the `active` mode of the shared
+ * `Badge` primitive. Columns use `<Badge active={...} />` directly; this
+ * helper is only for brief non-column usage (e.g. BrandModelsPanel).
  */
 export function ActiveBadge({
   active,
@@ -23,7 +23,7 @@ const passiveCls = 'bg-surface-alt text-muted';
 const pill =
   'inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium';
 
-/** Tıklanabilir Aktif/Pasif toggle — aynı görünüm, tek tıkla durum değiştirir. */
+/** Clickable Active/Passive toggle — same look, flips state on one click. */
 export function StatusToggle({
   active,
   onToggle,

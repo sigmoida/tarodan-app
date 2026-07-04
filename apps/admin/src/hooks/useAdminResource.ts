@@ -6,73 +6,73 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import type { AxiosResponse } from "axios";
 import { adminKeys } from "@/lib/query/keys";
 
-// ─── Tipler ────────────────────────────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────────────────────
 
 export interface UseAdminResourceOptions<T> {
-  /** react-query cache anahtarı — benzersiz kaynak adı, örn. "trades" */
+  /** react-query cache key — unique resource name, e.g. "trades" */
   queryKey: string;
   /**
-   * Veri çekme fonksiyonu. Params: { page, limit, search?, ...initialFilters anahtarları }
-   * AdminApi metodlarının döndürdüğü Axios yanıtını bekliyoruz.
+   * Data-fetching function. Params: { page, limit, search?, ...initialFilters keys }
+   * We expect the Axios response returned by AdminApi methods.
    */
   fetcher: (params: Record<string, any>) => Promise<AxiosResponse<any>>;
-  /** Sayfa başına kayıt sayısı. Varsayılan: 20 */
+  /** Records per page. Default: 20 */
   limit?: number;
   /**
-   * true ise URL'e ?page=&q=&<filtre-anahtarları>= yansıtılır;
-   * sayfa yüklenirken de URL'den okunur. Deep-link ve geri tuşu desteği sağlar.
+   * When true, ?page=&q=&<filter-keys>= is reflected to the URL and read back
+   * on page load. Enables deep-linking and back-button support.
    */
   syncUrl?: boolean;
-  /** Başlangıç filtre değerleri (arama hariç). Örn. { status: "all", userId: "" } */
+  /** Initial filter values (excluding search). E.g. { status: "all", userId: "" } */
   initialFilters?: Record<string, string>;
-  /** Hata durumunda toast mesajı. Varsayılan: "Veriler yüklenemedi" */
+  /** Toast message on error. Default: "Veriler yüklenemedi" */
   errorMessage?: string;
   /**
-   * Arama debounce süresi (ms). Varsayılan: 300.
-   * 0 verilirse debounce olmaksızın anında çalışır.
-   * setSearch çağrıldığında input ANINDA güncellenir; bu süre sonra query tetiklenir.
-   * Enter (onSearchSubmit) hâlâ çalışır ve debounce'u atlayarak anında flush yapar.
+   * Search debounce duration (ms). Default: 300.
+   * If 0, runs immediately without debounce.
+   * On setSearch the input updates INSTANTLY; the query fires after this delay.
+   * Enter (onSearchSubmit) still works, skipping the debounce for an instant flush.
    */
   debounceMs?: number;
 }
 
 export interface UseAdminResourceResult<T> {
-  /** Geçerli sayfanın satırları */
+  /** Rows of the current page */
   rows: T[];
-  /** Toplam kayıt sayısı (backend meta'dan) */
+  /** Total record count (from backend meta) */
   total: number;
-  /** Geçerli sayfa numarası (1 tabanlı) */
+  /** Current page number (1-based) */
   page: number;
   setPage: (p: number) => void;
-  /** Toplam sayfa sayısı */
+  /** Total page count */
   totalPages: number;
-  /** Arama kutusu değeri (kontrollü input için) */
+  /** Search box value (for the controlled input) */
   search: string;
   /**
-   * Arama kutusunu günceller; input ANINDA güncellenir (takılmaz).
-   * debounceMs sonra arama otomatik commit olur → query + page reset.
-   * Boş değere dönünce de fetch tetiklenir.
+   * Updates the search box; the input updates INSTANTLY (no lag).
+   * After debounceMs the search auto-commits → query + page reset.
+   * Returning to an empty value also triggers a fetch.
    */
   setSearch: (v: string) => void;
-  /** Enter/arama butonu: debounce'u atlayarak anında flush yapar ve sayfayı 1'e sıfırlar */
+  /** Enter/search button: skips the debounce for an instant flush and resets page to 1 */
   onSearchSubmit: () => void;
-  /** Filtre değerleri map'i */
+  /** Map of filter values */
   filters: Record<string, string>;
-  /** Tek bir filtre anahtarını günceller ve sayfayı sıfırlar */
+  /** Updates a single filter key and resets the page */
   setFilter: (key: string, value: string) => void;
-  /** Veri yükleniyor (ilk yükleme veya refetch) */
+  /** Data is loading (initial load or refetch) */
   isLoading: boolean;
-  /** Ham backend yanıtı (extract edilmemiş) — meta/stats gibi ek alanlar için. */
+  /** Raw backend response (not extracted) — for extra fields like meta/stats. */
   data: any;
-  /** react-query refetch'ini manuel tetikler */
+  /** Manually triggers react-query refetch */
   refetch: () => void;
   /**
-   * Tab URL senkronu: mevcut arama/filtre parametrelerini koruyarak "tab" param'ını günceller.
-   * Sadece syncUrl=true iken etkindir. Sayfa her zaman 1'e sıfırlanır.
-   * @param key - Yeni tab değeri
-   * @param opts.defaultTab - Varsayılan tab; URL'e yazılmaz (temiz URL). Varsayılan: ""
-   * @param opts.resetFilters - true ise filtreler initialFilters'a sıfırlanır. Varsayılan: false
-   * @param opts.resetSearch - true ise arama kutusu temizlenir. Varsayılan: false
+   * Tab URL sync: updates the "tab" param while preserving current search/filter params.
+   * Only active when syncUrl=true. The page always resets to 1.
+   * @param key - New tab value
+   * @param opts.defaultTab - Default tab; not written to the URL (clean URL). Default: ""
+   * @param opts.resetFilters - When true, filters reset to initialFilters. Default: false
+   * @param opts.resetSearch - When true, the search box is cleared. Default: false
    */
   setTabUrl: (
     key: string,
@@ -80,22 +80,22 @@ export interface UseAdminResourceResult<T> {
   ) => void;
 }
 
-// ─── Yardımcı: backend yanıtından data ve total çıkar ──────────────────────
+// ─── Helper: extract data and total from the backend response ──────────────
 
 function extractData<T>(
   responseData: any,
   queryKey: string,
 ): { rows: T[]; total: number } {
-  // Olası payload yapıları (backend tutarsızlığına karşı savunmacı erişim):
+  // Possible payload shapes (defensive access against backend inconsistency):
   //   { data: [...], meta: { total } }         — getTrades, getOrders, getProducts
   //   { [queryKey]: [...], meta: { total } }   — { users: [...] }
-  //   { data: { data: [...], meta } }          — iç içe sarmalanmış
-  //   { items: [...], total }                  — bazı endpoint'ler
-  //   { data: [], total, page, ... }           — top-level total (arama-boş dalı)
+  //   { data: { data: [...], meta } }          — nested wrapping
+  //   { items: [...], total }                  — some endpoints
+  //   { data: [], total, page, ... }           — top-level total (empty-search branch)
   const root = responseData ?? {};
   const nested = root.data;
 
-  // rows: dizi olan ilk adayı seç (düz veya iç içe).
+  // rows: pick the first array candidate (flat or nested).
   const rows: T[] =
     [
       root.data,
@@ -107,11 +107,11 @@ function extractData<T>(
       Array.isArray(root) ? root : undefined,
     ].find(Array.isArray) ?? [];
 
-  // total: meta.total → top-level total → iç içe total → fallback rows.length.
-  // ÖNEMLİ: { data: [...], meta } yapısında meta, data dizisinin KARDEŞİdir;
-  // bu yüzden meta'yı root'tan okuyoruz (payload'ı diziye indirgemeden). Aksi
-  // halde total, rows.length'e (= sayfa boyutu) düşer ve çok sayfalı listelerde
-  // toplam yanlış görünür.
+  // total: meta.total → top-level total → nested total → fallback rows.length.
+  // IMPORTANT: in { data: [...], meta } the meta is a SIBLING of the data array,
+  // so we read meta from root (without reducing the payload to the array).
+  // Otherwise total falls back to rows.length (= page size) and paginated lists
+  // show a wrong total.
   const meta = root.meta ?? nested?.meta ?? {};
   const total: number =
     meta.total ?? root.total ?? nested?.total ?? rows.length;
@@ -122,10 +122,10 @@ function extractData<T>(
 // ─── Hook ──────────────────────────────────────────────────────────────────
 
 /**
- * Admin liste sayfaları için ortak veri-durum yönetimi.
- * react-query üstünde fetch + pagination + arama + filtreler + URL senkronu.
+ * Shared data-state management for admin list pages.
+ * fetch + pagination + search + filters + URL sync on top of react-query.
  *
- * Kullanım:
+ * Usage:
  * ```ts
  * const { rows, total, page, setPage, totalPages, search, setSearch,
  *         onSearchSubmit, filters, setFilter, isLoading, refetch } =
@@ -135,7 +135,7 @@ function extractData<T>(
  *     limit: 20,
  *     syncUrl: true,
  *     initialFilters: { status: "all" },
- *     debounceMs: 300, // varsayılan; smooth arama
+ *     debounceMs: 300, // default; smooth search
  *   });
  * ```
  */
@@ -151,11 +151,11 @@ export function useAdminResource<T>({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  // Her zaman güncel searchParams'a erişmek için ref; syncToUrl bağımlılığını şişirmez.
+  // ref for always accessing the latest searchParams; keeps syncToUrl deps lean.
   const searchParamsRef = useRef(searchParams);
   useEffect(() => { searchParamsRef.current = searchParams; }, [searchParams]);
 
-  // ── URL'den ilk değerleri oku (syncUrl) ──────────────────────────────────
+  // ── Read initial values from the URL (syncUrl) ────────────────────────────
   const getInitialPage = () => {
     if (!syncUrl) return 1;
     const p = parseInt(searchParams.get("page") ?? "1", 10);
@@ -177,34 +177,34 @@ export function useAdminResource<T>({
 
   // ── State ─────────────────────────────────────────────────────────────────
   const [page, setPageState] = useState<number>(getInitialPage);
-  // inputSearch = input değeri (anlık, kontrollü)
-  // committedSearch = debounce/Enter sonrası onaylanan; query buna göre çalışır
+  // inputSearch = input value (instant, controlled)
+  // committedSearch = committed after debounce/Enter; the query runs against this
   const [inputSearch, setInputSearch] = useState<string>(getInitialSearch);
   const [committedSearch, setCommittedSearch] = useState<string>(getInitialSearch);
   const [filters, setFiltersState] = useState<Record<string, string>>(getInitialFilters);
 
-  // Query key'i (page/committedSearch/filters) değiştiren HER güncelleme bir React
-  // transition'ında yapılır; böylece useSuspenseQuery ilk yükleme dışında tekrar
-  // suspend OLMAZ — eski liste görünür kalır, isPending ile tablo soluklaşır.
+  // EVERY update that changes the query key (page/committedSearch/filters) runs
+  // inside a React transition, so useSuspenseQuery does NOT suspend again after
+  // the initial load — the old list stays visible while isPending dims the table.
   const [isPending, startTransition] = useTransition();
 
-  // debounce timer ref'i
+  // debounce timer ref
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── URL senkronu (yaz) ────────────────────────────────────────────────────
+  // ── URL sync (write) ──────────────────────────────────────────────────────
   const syncToUrl = useCallback(
     (p: number, q: string, f: Record<string, string>) => {
       if (!syncUrl) return;
-      // Mevcut URL'den başla → "tab" gibi hook'un yönetmediği parametreler korunur.
+      // Start from the current URL → params the hook doesn't own (like "tab") are preserved.
       const params = new URLSearchParams(searchParamsRef.current.toString());
-      // Hook'un sahip olduğu anahtarları sıfırla, ardından yeniden yaz.
+      // Reset the keys the hook owns, then rewrite them.
       params.delete("page");
       params.delete("q");
       Object.keys(initialFilters).forEach((key) => params.delete(key));
       if (p > 1) params.set("page", String(p));
       if (q) params.set("q", q);
       Object.entries(f).forEach(([key, val]) => {
-        // initialFilters default değerini URL'e yazmıyoruz (temiz URL)
+        // Don't write the initialFilters default value to the URL (clean URL)
         if (val && val !== (initialFilters[key] ?? "")) params.set(key, val);
       });
       const qs = params.toString();
@@ -214,8 +214,8 @@ export function useAdminResource<T>({
     [syncUrl, pathname, router, initialFilters],
   );
 
-  // URL'den gelen dış değişiklikleri yakala (örn. kullanıcı geri tuşuna basınca)
-  // Sadece syncUrl=true iken çalışır; diğerlerine dokunmaz.
+  // Catch external URL changes (e.g. when the user presses the back button).
+  // Only runs when syncUrl=true; leaves other cases untouched.
   const lastUrlRef = useRef(searchParams.toString());
   useEffect(() => {
     if (!syncUrl) return;
@@ -239,7 +239,7 @@ export function useAdminResource<T>({
     });
   }, [searchParams, syncUrl, initialFilters]);
 
-  // ── Yardımcı setter'lar ────────────────────────────────────────────────────
+  // ── Helper setters ──────────────────────────────────────────────────────────
   const setPage = useCallback(
     (p: number) => {
       startTransition(() => setPageState(p));
@@ -260,13 +260,13 @@ export function useAdminResource<T>({
     [filters, committedSearch, syncToUrl],
   );
 
-  // ── Debounce'lu arama: setSearch input'u anında günceller; debounce sonra commit ──
+  // ── Debounced search: setSearch updates the input instantly; commits after debounce ──
   const setSearch = useCallback(
     (value: string) => {
-      // Input'u ANINDA güncelle (kontrollü input takılmasın)
+      // Update the input INSTANTLY (so the controlled input doesn't lag)
       setInputSearch(value);
 
-      // Önceki zamanlayıcıyı iptal et
+      // Cancel the previous timer
       if (debounceTimerRef.current !== null) {
         clearTimeout(debounceTimerRef.current);
       }
@@ -291,14 +291,14 @@ export function useAdminResource<T>({
     [debounceMs, filters, syncToUrl],
   );
 
-  // ── onSearchSubmit: debounce'u atlayarak anında flush ─────────────────────
+  // ── onSearchSubmit: skip the debounce for an instant flush ────────────────
   const onSearchSubmit = useCallback(() => {
-    // Bekleyen debounce'u iptal et
+    // Cancel the pending debounce
     if (debounceTimerRef.current !== null) {
       clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = null;
     }
-    // inputSearch'i anında commit et
+    // Commit inputSearch immediately
     startTransition(() => {
       setCommittedSearch(inputSearch);
       setPageState(1);
@@ -306,7 +306,7 @@ export function useAdminResource<T>({
     syncToUrl(1, inputSearch, filters);
   }, [inputSearch, filters, syncToUrl]);
 
-  // Unmount'ta zamanlayıcıyı temizle
+  // Clear the timer on unmount
   useEffect(() => {
     return () => {
       if (debounceTimerRef.current !== null) {
@@ -315,8 +315,8 @@ export function useAdminResource<T>({
     };
   }, []);
 
-  // ── Query params (fetch için) ──────────────────────────────────────────────
-  // "all" değerini backend'e gönderme — sadece gerçek filtre değerlerini geçir
+  // ── Query params (for fetch) ────────────────────────────────────────────────
+  // Don't send the "all" value to the backend — pass only real filter values
   const buildParams = useCallback(() => {
     const params: Record<string, any> = { page, limit };
     if (committedSearch) params.search = committedSearch;
@@ -327,9 +327,9 @@ export function useAdminResource<T>({
   }, [page, limit, committedSearch, filters]);
 
   // ── react-query (suspense) ─────────────────────────────────────────────────
-  // İlk yükleme suspend eder (üstteki SuspenseBoundary spinner'ı gösterir; hata
-  // orada yakalanır). Sonraki değişimler transition içinde olduğu için tekrar
-  // suspend etmez — eski veri kalır, isFetching/isPending ile tablo soluklaşır.
+  // The initial load suspends (the SuspenseBoundary above shows a spinner; the
+  // error is caught there). Later changes happen inside a transition, so they
+  // don't suspend again — old data stays while isFetching/isPending dims the table.
   const queryResult = useSuspenseQuery({
     // [resource, 'list', {...}] — shares the resource prefix with detail keys so
     // a mutation's invalidateQueries({ queryKey: [resource] }) refreshes lists too.
@@ -338,10 +338,10 @@ export function useAdminResource<T>({
       const response = await fetcher(buildParams());
       return response.data;
     },
-    refetchOnMount: 'always', // sayfaya her dönüşte (detail→liste navigasyonu) taze veri
+    refetchOnMount: 'always', // fresh data on every return to the page (detail→list navigation)
   });
 
-  // ── Tab URL senkronu ──────────────────────────────────────────────────────
+  // ── Tab URL sync ────────────────────────────────────────────────────────────
   const setTabUrl = useCallback(
     (
       key: string,
@@ -349,7 +349,7 @@ export function useAdminResource<T>({
     ) => {
       if (!syncUrl) return;
       const { defaultTab = "", resetFilters = false, resetSearch = false } = opts;
-      // Mevcut URL'den başla; hook'un yönetmediği parametreler korunur.
+      // Start from the current URL; params the hook doesn't own are preserved.
       const params = new URLSearchParams(searchParamsRef.current.toString());
       // Tab
       if (key && key !== defaultTab) {
@@ -357,7 +357,7 @@ export function useAdminResource<T>({
       } else {
         params.delete("tab");
       }
-      // Sayfa her zaman 1'e sıfırlanır
+      // The page always resets to 1
       params.delete("page");
       if (resetFilters) {
         Object.keys(initialFilters).forEach((k) => params.delete(k));
@@ -381,7 +381,7 @@ export function useAdminResource<T>({
     [syncUrl, pathname, router, initialFilters],
   );
 
-  // ── Veri çıkarma (suspense → data her zaman tanımlı) ───────────────────────
+  // ── Data extraction (suspense → data is always defined) ────────────────────
   const { rows, total } = extractData<T>(queryResult.data, queryKey);
   const totalPages = Math.ceil(total / limit) || 1;
 
@@ -396,7 +396,7 @@ export function useAdminResource<T>({
     onSearchSubmit,
     filters,
     setFilter,
-    // Transition (filtre/arama/sayfa) veya arka-plan refetch sırasında tabloyu soluklaştır.
+    // Dim the table during a transition (filter/search/page) or a background refetch.
     isLoading: isPending || queryResult.isFetching,
     data: queryResult.data,
     refetch: queryResult.refetch,

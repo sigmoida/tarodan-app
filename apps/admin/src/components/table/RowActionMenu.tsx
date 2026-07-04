@@ -24,15 +24,15 @@ export interface RowAction {
 	label: string;
 	icon?: ComponentType<{ className?: string }>;
 	onClick: () => void;
-	/** Kırmızı stil + yıkıcı grubun üstüne otomatik ayraç. */
+	/** Red style + automatic separator above the destructive group. */
 	destructive?: boolean;
 	disabled?: boolean;
 }
 
-/** Koşullu aksiyonların `cond && {...}` ile falsy geçilebilmesi için. */
+/** Lets conditional actions be passed as falsy via `cond && {...}`. */
 export type RowActionItem = RowAction | false | null | undefined;
 
-/** Aktif/pasif durumunu tek tıkla çeviren standart menü aksiyonu. */
+/** Standard menu action that toggles active/inactive state in one click. */
 export function activeToggleAction(
 	active: boolean,
 	onToggle: () => void,
@@ -44,7 +44,7 @@ export function activeToggleAction(
 	};
 }
 
-/** Standart "Düzenle + Sil" satır aksiyon çifti (çoğu CRUD listesinde ortak). */
+/** Standard "Edit + Delete" row action pair (common to most CRUD lists). */
 export function editDeleteActions<T>(
 	row: T,
 	{
@@ -66,10 +66,11 @@ export function editDeleteActions<T>(
 }
 
 /**
- * Satır aksiyonları için TEK mekanizma — bir ⋮ menüsü. Sayfa yalnızca aksiyon
- * LİSTESİNİ bildirir (koşulluları `cond && {...}` ile geçebilir); tetikleyici,
- * hizalama, ikon ve yıkıcı ayracı burada kilitli. Görünür aksiyon yoksa em-dash
- * placeholder basar. Yıkıcı olmayanlar üstte, yıkıcılar ayracın altında gruplanır.
+ * The SINGLE mechanism for row actions — a ⋮ menu. The page only declares the
+ * LIST of actions (conditionals can be passed via `cond && {...}`); the trigger,
+ * alignment, icon and destructive separator are locked here. Renders an em-dash
+ * placeholder when there's no visible action. Non-destructive actions are grouped
+ * on top, destructive ones below the separator.
  */
 export function RowActionMenu({ items }: { items: RowActionItem[] }) {
 	const actions = items.filter(Boolean) as RowAction[];

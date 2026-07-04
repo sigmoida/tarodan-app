@@ -2,7 +2,7 @@ import { ShieldCheckIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import type { BadgeProps } from '@tarodan/ui';
 import type { PermGroup } from './types';
 
-// ─── Roller ──────────────────────────────────────────────────────────────────
+// ─── Roles ───────────────────────────────────────────────────────────────────
 
 export const ROLES = ['super_admin', 'admin', 'moderator'] as const;
 export type RoleId = (typeof ROLES)[number];
@@ -25,14 +25,14 @@ export const ROLE_META: Record<RoleId, { label: string; color: string; descripti
   },
 };
 
-/** Tablodaki rol rozeti için Badge varyantı (ROLE_META rengiyle uyumlu). */
+/** Badge variant for the role badge in the table (matches ROLE_META color). */
 export const ROLE_BADGE_VARIANT: Record<RoleId, BadgeProps['variant']> = {
   super_admin: 'danger',
   admin: 'primary',
   moderator: 'info',
 };
 
-// ─── Varsayılan izinler (backend DEFAULT_ROLE_PERMISSIONS ile senkron olmalı) ─
+// ─── Default permissions (must stay in sync with backend DEFAULT_ROLE_PERMISSIONS) ─
 
 export const FALLBACK_DEFAULTS: Record<RoleId, string[]> = {
   super_admin: [],
@@ -50,7 +50,7 @@ export const FALLBACK_DEFAULTS: Record<RoleId, string[]> = {
   ],
 };
 
-// ─── İzin grupları — sayfa başına tek izin ───────────────────────────────────
+// ─── Permission groups — one permission per page ─────────────────────────────
 
 export const PERMISSION_GROUPS: PermGroup[] = [
   {
@@ -137,7 +137,7 @@ export const PERMISSION_GROUPS: PermGroup[] = [
   },
 ];
 
-/** İki sekme: izin matrisi + kullanıcı atamaları. */
+/** Two tabs: permission matrix + user assignments. */
 export const ROLE_TABS = [
   { key: 'matrix', label: 'İzin Matrisi', icon: ShieldCheckIcon },
   { key: 'users', label: 'Kullanıcı Atamaları', icon: UserGroupIcon },

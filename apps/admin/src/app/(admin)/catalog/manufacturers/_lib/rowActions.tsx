@@ -4,7 +4,7 @@ import type { Manufacturer } from './types';
 export interface ManufacturerRowActions {
   onEdit: (m: Manufacturer) => void;
   onDelete: (m: Manufacturer) => void;
-  /** Inline aktif/pasif toggle — Durum kolonunda (menüde değil). */
+  /** Inline active/inactive toggle — in the Status column (not the menu). */
   onToggle: (m: Manufacturer) => void;
   busyId?: string | null;
 }

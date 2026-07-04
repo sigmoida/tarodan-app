@@ -9,9 +9,9 @@ interface PaginationProps {
 }
 
 /**
- * Admin liste sayfalarının ortak pagination bloğu.
- * 18 sayfada birebir tekrarlanan "Sayfa X / Y + Önceki/Sonraki" bloğunu tekilleştiriyor.
- * Görünüm mevcut sayfalardaki ile birebir aynı.
+ * Shared pagination block for admin list pages.
+ * Deduplicates the "Page X / Y + Previous/Next" block repeated verbatim across 18 pages.
+ * Appearance is identical to the existing pages.
  */
 export function Pagination({ page, totalPages, onPageChange }: PaginationProps) {
   return (

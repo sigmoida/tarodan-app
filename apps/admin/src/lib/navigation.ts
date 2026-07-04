@@ -30,23 +30,23 @@ import {
 } from '@heroicons/react/24/outline';
 
 /**
- * Admin sol menüsünün TEK kaynağı. Nav verisi burada (veri ≠ component); kabuk
- * component'leri bunu tüketir. Route→izin eşlemesi de buradan türetilir
- * (`routePermission`) — ayrı bir liste tutulmaz.
+ * The single source for the admin left menu. The nav data lives here
+ * (data ≠ component); shell components consume it. The route→permission mapping
+ * is also derived from here (`routePermission`) — no separate list is kept.
  */
 
 export type NavItem = {
   name: string;
   href: string;
   icon: ComponentType<{ className?: string }>;
-  /** Ek arama kelimeleri (ör. İngilizce route, eş anlamlı) */
+  /** Extra search terms (e.g. English route, synonyms) */
   keywords?: string[];
   /**
-   * Bu öğeyi göstermek için gerekli izin anahtarı (rol izin matrisinden).
-   * Belirtilmezse `roles` dizisine fallback yapılır.
+   * Permission key required to show this item (from the role permission matrix).
+   * Falls back to the `roles` array when not specified.
    */
   permission?: string;
-  /** Fallback: izin sistemi yüklenemezse bu roller kontrol edilir. Belirtilmezse super_admin + admin. */
+  /** Fallback: these roles are checked if the permission system fails to load. Defaults to super_admin + admin. */
   roles?: string[];
 };
 
@@ -162,7 +162,7 @@ export const navGroups: NavGroup[] = [
   },
 ];
 
-/** Bir nav öğesinin arama sorgusuyla eşleşip eşleşmediği (ad/href/keywords). */
+/** Whether a nav item matches a search query (name/href/keywords). */
 export function matchesQuery(item: NavItem, q: string): boolean {
   const name = item.name.toLocaleLowerCase('tr-TR');
   const href = item.href.toLowerCase();
@@ -171,17 +171,17 @@ export function matchesQuery(item: NavItem, q: string): boolean {
 }
 
 /**
- * Nav'da görünmeyen ama yine de korunması gereken route'lar (alias'lar / devre
- * dışı sekmeler). Nav öğelerinden türetilemeyen istisnalar burada.
+ * Routes that don't appear in the nav but still need guarding (aliases /
+ * disabled tabs). Exceptions that can't be derived from the nav items go here.
  */
 const EXTRA_ROUTE_PERMISSIONS: Record<string, string> = {
-  // Nav'dan türetilemeyen route istisnaları burada. Şu an hepsi nav'da tanımlı.
+  // Route exceptions that can't be derived from the nav go here. Currently all are defined in the nav.
 };
 
 /**
- * Route→izin haritası. Nav öğelerinin `permission` alanından türetilir + yukarıdaki
- * istisnalar. Dashboard bilinçli olarak DIŞARIDA: her zaman erişilebilir (guard'ın
- * redirect hedefi de burası — döngü olmasın).
+ * Route→permission map. Derived from the nav items' `permission` field + the
+ * exceptions above. Dashboard is deliberately EXCLUDED: it's always accessible
+ * (it's also the guard's redirect target — avoid a loop).
  */
 const ROUTE_PERMISSIONS: Record<string, string> = (() => {
   const map: Record<string, string> = {};
@@ -196,8 +196,8 @@ const ROUTE_PERMISSIONS: Record<string, string> = (() => {
 })();
 
 /**
- * Verilen path için gerekli izin anahtarı — en spesifik (en uzun) eşleşen prefix
- * kazanır (sıralamadan bağımsız). Korunmayan route için null.
+ * Required permission key for a given path — the most specific (longest)
+ * matching prefix wins (order-independent). Null for unguarded routes.
  */
 export function routePermission(pathname: string): string | null {
   let best: string | null = null;

@@ -4,9 +4,9 @@ import type { Brand } from './types';
 export interface BrandRowActions {
   onEdit: (b: Brand) => void;
   onDelete: (b: Brand) => void;
-  /** Inline aktif/pasif toggle — Durum kolonunda (menüde değil). */
+  /** Inline active/inactive toggle — in the Status column (not the menu). */
   onToggle: (b: Brand) => void;
-  /** Satır genişletme (modeller paneli) — Modeller kolonunda. */
+  /** Row expansion (models panel) — in the Models column. */
   onToggleExpand: (id: string) => void;
   expandedId: string | null;
   busyId?: string | null;

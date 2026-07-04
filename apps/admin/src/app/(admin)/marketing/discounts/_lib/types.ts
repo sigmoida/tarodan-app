@@ -47,7 +47,7 @@ export const discountStatusConfig: Record<string, StatusConfig> = {
   unknown: { label: 'Belirsiz', variant: 'secondary' },
 };
 
-/** İndirimin anlık durumu (aktiflik + tarih penceresi). */
+/** Current status of a discount (active flag + date window). */
 export function getDiscountStatus(d: Discount): string {
   if (!d.isActive) return 'inactive';
   if (d.isCurrentlyValid) return 'active';
@@ -57,7 +57,7 @@ export function getDiscountStatus(d: Discount): string {
   return 'unknown';
 }
 
-/** İndirim değerini insan-okur etikete çevir (tür bazlı). */
+/** Turn a discount's value into a human-readable label (per type). */
 export function discountValueLabel(d: Discount): string {
   if (d.type === 'percentage') return `%${d.value}`;
   if (d.type === 'fixed_amount') return `${d.value} TL`;
@@ -70,7 +70,7 @@ export function discountValueLabel(d: Discount): string {
   return '—';
 }
 
-// ─── Filtre & form seçenekleri ───────────────────────────────────────────────
+// ─── Filter & form options ───────────────────────────────────────────────────
 
 export const scopeFilterOptions = [
   { value: 'all', label: 'Tüm Kapsamlar' },

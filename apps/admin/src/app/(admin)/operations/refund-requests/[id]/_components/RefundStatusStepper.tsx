@@ -9,9 +9,9 @@ import {
 } from "../_lib/refund-guidance";
 
 /**
- * İade sürecinin hangi aşamada olduğunu tek bakışta gösteren yatay çizelge.
- * Tamamlanan aşamalar ✓, mevcut aşama vurgulu, gelecek aşamalar soluk.
- * rejected/cancelled durumlarında kırmızı uç-kapağı gösterir.
+ * Horizontal stepper showing at a glance which phase the refund process is in.
+ * Completed phases get ✓, the current phase is highlighted, upcoming phases are dimmed.
+ * For rejected/cancelled states, shows a red terminal end-cap.
  */
 export function RefundStatusStepper({ status }: { status: string }) {
   if (refundTerminalStatuses.has(status)) {

@@ -4,33 +4,33 @@ import { type ComponentType } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@tarodan/ui";
 
 export interface AdminTab {
-  /** Benzersiz anahtar (value ile eşleşir). */
+  /** Unique key (matches value). */
   key: string;
   label: string;
-  /** Opsiyonel ikon (heroicon vb.). */
+  /** Optional icon (heroicon, etc.). */
   icon?: ComponentType<{ className?: string }>;
-  /** Opsiyonel sayaç/rozet. */
+  /** Optional counter/badge. */
   badge?: number | string;
 }
 
 interface AdminTabsProps {
   tabs: AdminTab[];
-  /** Aktif sekme anahtarı (controlled). */
+  /** Active tab key (controlled). */
   value: string;
   onChange: (key: string) => void;
   className?: string;
 }
 
 /**
- * Admin panelindeki sekme çubuğunun TEK ortak karşılığı — design-system'in Radix
- * tabanlı `Tabs`/`TabsList`/`TabsTrigger`'ı üzerine kurulu (klavye navigasyonu ve
- * erişilebilirlik hazır). İçerik sayfada ayrı render edildiği için `TabsContent`
- * kullanılmaz; bu yalnızca kontrollü sekme çubuğudur.
+ * The SINGLE shared tab bar for the admin panel — built on the design-system's
+ * Radix-based `Tabs`/`TabsList`/`TabsTrigger` (keyboard navigation and
+ * accessibility built in). `TabsContent` is not used since content is rendered
+ * separately on the page; this is only the controlled tab bar.
  */
 export function AdminTabs({ tabs, value, onChange, className }: AdminTabsProps) {
   return (
     <Tabs value={value} onValueChange={onChange} className={className}>
-      {/* inline-flex (base) → kapsayıcı içeriği kadar gider, tam genişliğe yayılmaz */}
+      {/* inline-flex (base) → sizes to its content, doesn't stretch to full width */}
       <TabsList className="w-fit max-w-full flex-wrap">
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -38,7 +38,7 @@ export function AdminTabs({ tabs, value, onChange, className }: AdminTabsProps) 
             <TabsTrigger
               key={tab.key}
               value={tab.key}
-              // rounded-lg = proje token radius'u (buton/input ile aynı); aktif = primary
+              // rounded-lg = project token radius (same as button/input); active = primary
               className="group gap-2 rounded-lg data-[state=active]:bg-primary-600 data-[state=active]:text-inverted data-[state=active]:shadow-none"
             >
               {Icon && <Icon className="h-4 w-4" />}

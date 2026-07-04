@@ -1,12 +1,12 @@
 /**
- * İade Talebi detay sayfası için sade-Türkçe yönlendirme/etiket haritaları.
- * Saf veri — UI yok. page.tsx + RefundStatusStepper + RefundNextActionPanel kullanır.
+ * Plain-Turkish guidance/label maps for the Refund Request detail page.
+ * Pure data — no UI. Used by page.tsx + RefundStatusStepper + RefundNextActionPanel.
  */
 
 /**
- * Yaşam döngüsü aşamaları (stepper sırası). İade akışı artık tam otomatik —
- * insan "inceleme/onay" adımı yok; talep oluşur oluşmaz otomatik onaylanır ve
- * doğrudan iade kargosu aşamasına geçer. ("İnceleme" adımı kaldırıldı.)
+ * Lifecycle phases (stepper order). The refund flow is now fully automatic —
+ * there is no human "review/approval" step; a request is auto-approved as soon
+ * as it is created and goes straight to the return shipment phase. (The "review" step was removed.)
  */
 export const REFUND_LIFECYCLE = [
   "Talep alındı",
@@ -16,7 +16,7 @@ export const REFUND_LIFECYCLE = [
   "Para iade edildi",
 ] as const;
 
-/** RefundRequestStatus → aktif aşama indeksi (REFUND_LIFECYCLE üzerinde). */
+/** RefundRequestStatus → active phase index (into REFUND_LIFECYCLE). */
 export const refundStatusPhase: Record<string, number> = {
   approved: 1,
   wait_for_delivery: 1,
@@ -26,7 +26,7 @@ export const refundStatusPhase: Record<string, number> = {
   refunded: 4,
 };
 
-/** Akış dışı (terminal) durumlar — stepper'da kırmızı uç-kapağı gösterilir. */
+/** Off-flow (terminal) states — shown as a red end-cap in the stepper. */
 export const refundTerminalStatuses = new Set(["rejected", "cancelled"]);
 
 export type GuidanceVariant =
@@ -40,11 +40,11 @@ export interface RefundGuidance {
   variant: GuidanceVariant;
   title: string;
   description: string;
-  /** true ise adminin elle bir işlem yapması gerekir (aksiyon butonu görünür). */
+  /** If true, the admin must take a manual action (action button is shown). */
   actionNeeded: boolean;
 }
 
-/** Her durum için "şimdi ne yapmalısınız?" metni. */
+/** The "what should you do now?" text for each state. */
 export const statusGuidance: Record<string, RefundGuidance> = {
   approved: {
     variant: "info",
@@ -115,7 +115,7 @@ export function guidanceForStatus(status: string): RefundGuidance {
   return statusGuidance[status] ?? defaultGuidance;
 }
 
-/** İade kargosunu kim öder — sade Türkçe etiket + açıklama. */
+/** Who pays for the return shipping — plain Turkish label + description. */
 export const payerLabels: Record<string, { label: string; helper: string }> = {
   buyer: {
     label: "Alıcı öder",
@@ -133,7 +133,7 @@ export const payerLabels: Record<string, { label: string; helper: string }> = {
   },
 };
 
-/** İşlem geçmişi (audit) action kodu → okunabilir etiket + aktör. */
+/** Audit history action code → readable label + actor. */
 const refundActionLabels: Record<string, { label: string; actor: string }> = {
   cancelled_by_buyer: { label: "Alıcı talebi iptal etti", actor: "Alıcı" },
   accepted_by_seller: { label: "Satıcı talebi kabul etti", actor: "Satıcı" },

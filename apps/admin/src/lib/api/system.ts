@@ -2,7 +2,7 @@ import { api } from './client';
 
 /**
  * System domain: global settings, membership tiers, audit/error/security logs,
- * support tickets, and user content reports (şikayetler).
+ * support tickets, and user content reports (complaints).
  */
 export const systemApi = {
   // Settings
@@ -33,7 +33,7 @@ export const systemApi = {
     api.post(`/support/admin/tickets/${id}/messages`, { content, isInternal }),
   getGuestContacts: () => api.get('/support/admin/guest-contacts'),
 
-  // Kullanıcı şikayetleri (içerik raporları)
+  // User complaints (content reports)
   getUserReports: (params?: { status?: string; type?: string; page?: number; pageSize?: number }) =>
     api.get('/user-reports/admin', { params }),
   getUserReportStats: () => api.get('/user-reports/admin/stats'),

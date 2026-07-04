@@ -1,8 +1,8 @@
 import type { StatusConfig } from "@tarodan/ui";
 
-// ─── ShipmentStatus enum eşlemesi ────────────────────────────────────────────
-// Hem sipariş (Shipment.status) hem takas (TradeShipment.status) hem iade
-// (RefundRequest.returnStatus) aynı `ShipmentStatus` enum'unu kullanır.
+// ─── ShipmentStatus enum mapping ─────────────────────────────────────────────
+// Orders (Shipment.status), trades (TradeShipment.status) and refunds
+// (RefundRequest.returnStatus) all use the same `ShipmentStatus` enum.
 export const shipmentStatusConfig: Record<string, StatusConfig> = {
   pending: { label: "Beklemede", variant: "secondary" },
   label_created: { label: "Etiket Oluşturuldu", variant: "secondary" },
@@ -17,7 +17,7 @@ export const shipmentStatusConfig: Record<string, StatusConfig> = {
   cancelled: { label: "İptal", variant: "danger" },
 };
 
-// Durum filtresi seçenekleri — Sipariş ve Takas sekmeleri ortak kullanır.
+// Status filter options — shared by the Orders and Trades tabs.
 export const statusOptions: { value: string; label: string }[] = [
   { value: "all", label: "Tümü" },
   { value: "pending", label: "Beklemede" },
@@ -33,7 +33,7 @@ export const statusOptions: { value: string; label: string }[] = [
   { value: "cancelled", label: "İptal" },
 ];
 
-// ─── Takas yön (leg) seçenekleri ─────────────────────────────────────────────
+// ─── Trade direction (leg) options ───────────────────────────────────────────
 export const legOptions: { value: string; label: string }[] = [
   { value: "all", label: "Tüm Yönler" },
   { value: "to_warehouse", label: "Depoya" },
@@ -47,9 +47,9 @@ export const legLabels: Record<string, string> = {
   return: "İade",
 };
 
-// ─── Tarih yardımcıları ──────────────────────────────────────────────────────
+// ─── Date helpers ────────────────────────────────────────────────────────────
 
-/** "az önce" / "5 dk önce" / "3 sa önce" / "2 gün önce" / tam tarih */
+/** "just now" / "5 min ago" / "3 hr ago" / "2 days ago" / full date */
 export function formatRelative(iso: string): string {
   const d = new Date(iso);
   const diffMs = Date.now() - d.getTime();
@@ -63,7 +63,7 @@ export function formatRelative(iso: string): string {
   return d.toLocaleDateString("tr-TR");
 }
 
-/** ISO tarihi tr-TR kısa tarih; boş/null ise "—" */
+/** ISO date as tr-TR short date; "—" if empty/null */
 export function formatDate(iso?: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("tr-TR");

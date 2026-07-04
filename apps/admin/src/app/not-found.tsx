@@ -1,8 +1,8 @@
 import Link from 'next/link';
 
 /**
- * Global 404. Eşleşmeyen tüm URL'ler (ve `notFound()` çağrıları) için root
- * seviyesinde render edilir — admin chrome olmadan, tam ekran.
+ * Global 404. Rendered at the root level for all unmatched URLs (and
+ * `notFound()` calls) — full screen, without the admin chrome.
  */
 export default function NotFound() {
   return (

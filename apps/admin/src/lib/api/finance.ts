@@ -37,7 +37,7 @@ export const financeApi = {
     limit?: number;
   }) => api.get('/admin/payments', { params }),
   getPayment: (id: string) => api.get(`/admin/payments/${id}`),
-  // Faturalar (e-Arşiv/e-Fatura) — kesilen + iade belgeleri
+  // Invoices (e-Archive/e-Invoice) — issued + refund documents
   getInvoices: (params?: {
     type?: string;
     status?: string;
@@ -49,7 +49,7 @@ export const financeApi = {
     limit?: number;
   }) => api.get('/admin/invoices', { params }),
   getInvoicePdf: (id: string) => api.get(`/admin/invoices/${id}/pdf`),
-  // Kurumsal satıcıların elle yüklediği ürün faturaları (ayrı sekme)
+  // Product invoices manually uploaded by corporate sellers (separate tab)
   getSellerInvoices: (params?: {
     search?: string;
     startDate?: string;
@@ -97,8 +97,8 @@ export const financeApi = {
   }) => api.get('/admin/payouts/export', { params }),
   releasePayout: (orderId: string) => api.post(`/admin/payouts/release/${orderId}`),
 
-  // Tax Settings — basit KDV config (eski bölge/oran/kural CRUD'u UI'dan kaldırıldı;
-  // backend uçları duruyor, UI tax/vat cephesini kullanır)
+  // Tax Settings — simple VAT config (the old region/rate/rule CRUD was removed
+  // from the UI; the backend endpoints remain, the UI uses the tax/vat surface)
   getVatConfig: () => api.get('/admin/tax/vat'),
   setDefaultVat: (rate: number) => api.patch('/admin/tax/vat', { rate }),
   setVatOverride: (categoryId: string, rate: number) =>

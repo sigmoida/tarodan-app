@@ -17,7 +17,7 @@ import { usePermissionsQuery } from '../_lib/usePermissions';
 import type { StaffItem } from '../_lib/types';
 import { StaffFormModal } from '../_modals/StaffFormModal';
 
-/** "Kullanıcı Atamaları" sekmesi: rol filtreleri + yönetici tablosu + atama modalı. */
+/** "Kullanıcı Atamaları" tab: role filters + staff table + assignment modal. */
 export function StaffAssignmentsTab({ onShowMatrix }: { onShowMatrix: () => void }) {
   const confirm = useConfirm();
   const { user } = useSession();
@@ -48,7 +48,7 @@ export function StaffAssignmentsTab({ onShowMatrix }: { onShowMatrix: () => void
   const staff = staffQuery.data?.items ?? [];
   const roleCounts = staffQuery.data?.roleCounts ?? { super_admin: 0, admin: 0, moderator: 0 };
 
-  // Rol atama ayarı — optimistik toggle, mutation ile kalıcı.
+  // Role-assignment setting — optimistic toggle, persisted via mutation.
   useQuery({
     queryKey: ['staff-settings'],
     queryFn: async () => {
@@ -68,7 +68,7 @@ export function StaffAssignmentsTab({ onShowMatrix }: { onShowMatrix: () => void
   });
   const toggleAllowAdmin = () => {
     const next = !allowAdminAssign;
-    setAllowAdminAssign(next); // optimistik
+    setAllowAdminAssign(next); // optimistic
     settingsMut.mutate(next, { onError: () => setAllowAdminAssign(!next) });
   };
 
@@ -93,7 +93,7 @@ export function StaffAssignmentsTab({ onShowMatrix }: { onShowMatrix: () => void
 
   return (
     <div className="space-y-4">
-      {/* Geçici şifre uyarısı */}
+      {/* Temporary password notice */}
       {createdInfo && (
         <div className="flex items-start justify-between gap-4 rounded-lg border border-warning-200 bg-warning-50 p-4 text-sm text-warning-800">
           <div className="min-w-0">

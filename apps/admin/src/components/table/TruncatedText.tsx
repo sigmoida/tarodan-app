@@ -4,10 +4,10 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 /**
- * Tek satırlık, wrap'lanmayan metin. Hücre daralınca `…` ile kesilir. Tooltip
- * (native `title`) YALNIZCA metin gerçekten kesildiğinde (`scrollWidth >
- * clientWidth`) devreye girer — tam görünen metinde hover'da bir şey çıkmaz.
- * Sadece string children ölçülebildiği için tooltip metni onlar için basılır.
+ * Single-line, non-wrapping text. Clipped with `…` when the cell narrows. The
+ * tooltip (native `title`) kicks in ONLY when the text is actually clipped
+ * (`scrollWidth > clientWidth`) — fully visible text shows nothing on hover.
+ * The tooltip text is only emitted for string children, since only they can be measured.
  */
 export function TruncatedText({
   children,

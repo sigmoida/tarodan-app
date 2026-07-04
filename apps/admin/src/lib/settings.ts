@@ -1,7 +1,7 @@
 /**
- * platform_settings API yanıtını normalize eder. Backend bazen
- * `[{ settingKey, settingValue }]` dizisi, bazen düz `{ key: value }` object
- * döndürüyor; her iki şekli de tek anahtar→değer map'ine indirger.
+ * Normalizes the platform_settings API response. The backend sometimes returns
+ * a `[{ settingKey, settingValue }]` array and sometimes a plain `{ key: value }`
+ * object; both shapes are reduced to a single key→value map.
  */
 export function settingsToMap(raw: unknown): Record<string, string> {
   const map: Record<string, string> = {};
@@ -16,7 +16,7 @@ export function settingsToMap(raw: unknown): Record<string, string> {
   return map;
 }
 
-/** Tek bir ayar anahtarını okur (yoksa `undefined`). */
+/** Reads a single setting key (`undefined` if absent). */
 export function readSetting(raw: unknown, key: string): string | undefined {
   return settingsToMap(raw)[key];
 }

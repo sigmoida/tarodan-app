@@ -56,7 +56,7 @@ export default function ShippingPage() {
         onChange={handleTabChange}
       />
 
-      {/* Yalnızca aktif sekme mount olur → tek fetch; react-query queryKey'e göre cache'ler */}
+      {/* Only the active tab mounts → single fetch; react-query caches by queryKey */}
       {activeTab === "siparisler" && <OrderShipmentsTab />}
       {activeTab === "takas" && <TradeShipmentsTab />}
       {activeTab === "iade" && <ReturnShipmentsTab />}

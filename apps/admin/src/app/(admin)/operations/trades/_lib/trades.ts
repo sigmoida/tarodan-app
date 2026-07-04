@@ -13,7 +13,7 @@ export interface Trade {
   cancelReason?: string;
 }
 
-// Ara/per-side durumlar bilerek gizli (admin için gereksiz detay; badge'de doğru görünürler).
+// Intermediate/per-side statuses are intentionally hidden (needless detail for admins; they still render correctly in the badge).
 const TRADE_FILTER_STATUSES = [
   'pending',
   'accepted',

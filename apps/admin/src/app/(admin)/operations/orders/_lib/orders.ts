@@ -21,7 +21,7 @@ export interface Order {
   groupNumber?: string | null;
   groupItemCount: number;
   productImageUrl?: string | null;
-  // Sentetik grup-özet satırı alanları (gerçek sipariş değil; sepeti temsil eder).
+  // Synthetic group-summary row fields (not a real order; represents the cart).
   isGroupSummary?: boolean;
   groupTotalAmount?: number;
   groupCommission?: number;
@@ -30,7 +30,7 @@ export interface Order {
   groupThumbs?: string[];
 }
 
-/** Filtre seçenekleri orderStatusConfig'ten türetilir → badge'lerle birebir tutarlı. */
+/** Filter options derived from orderStatusConfig → exactly consistent with badges. */
 export const statusOptions = statusFilterOptions(orderStatusConfig);
 
 export function mapOrders(raw: any[]): Order[] {
@@ -57,9 +57,9 @@ export function mapOrders(raw: any[]): Order[] {
 }
 
 /**
- * Çoklu-ürün checkout gruplarını SENTETİK bir "sepet özeti" satırına indirir.
- * Grup açıkken (expandedGroups) özetin altında üye siparişleri bandlı gösterilir;
- * tek-ürünlü siparişler aynen kalır.
+ * Collapses multi-product checkout groups into a SYNTHETIC "cart summary" row.
+ * When a group is expanded (expandedGroups), member orders are shown banded
+ * under the summary; single-product orders stay as-is.
  */
 export function useOrderGroups(orders: Order[], expandedGroups: Set<string>) {
   return useMemo(() => {

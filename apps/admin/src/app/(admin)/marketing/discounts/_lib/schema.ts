@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
 /**
- * İndirim formu — doğrulama-odaklı (validasyon). Sayısal alanlar string tutulur
- * (native number/date input'ları string döndürür); string→number/ISO dönüşümü
- * modalın mutationFn'inde yapılır, böylece z.infer tipleri dürüst kalır.
+ * Discount form — validation-only. Numeric fields are kept as strings (native
+ * number/date inputs return strings); the string→number/ISO conversion happens
+ * in the modal's mutationFn, so the z.infer types stay honest.
  */
 export const discountSchema = z
   .object({

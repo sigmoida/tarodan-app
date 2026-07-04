@@ -4,7 +4,7 @@ import { DataList, Field } from '@/components/detail/DataList';
 import type { OrderDetail } from '../types';
 import { hasRealShipment } from '../_lib/status';
 
-/** Kargo kartı — yalnızca gerçek gönderi varken (trackingNumber + kargolanmış). */
+/** Shipping card — only when a real shipment exists (trackingNumber + shipped). */
 export function ShippingSection({
   order,
   isCancelledOrder,

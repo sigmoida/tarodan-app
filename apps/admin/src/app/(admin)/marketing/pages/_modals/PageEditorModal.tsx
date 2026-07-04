@@ -58,7 +58,7 @@ export function PageEditorModal({
     enabled: !!existing,
   });
 
-  // Formu server verisinden (düzenleme) veya varsayılandan (yeni) doldur.
+  // Fill the form from server data (edit) or defaults (new).
   useEffect(() => {
     let initial: EditorForm;
     if (existing) {
@@ -80,7 +80,7 @@ export function PageEditorModal({
     setPreviewHtml(buildPreviewDoc(initial.content));
   }, [slug, existing, pageQuery.data]);
 
-  // Yükleme hatasında modalı kapat (eski davranış).
+  // Close the modal on load error (legacy behavior).
   useEffect(() => {
     if (pageQuery.isError) {
       toast.error('Sayfa yüklenemedi');
@@ -88,7 +88,7 @@ export function PageEditorModal({
     }
   }, [pageQuery.isError, onClose]);
 
-  // debounce zamanlayıcısını unmount'ta temizle.
+  // Clear the debounce timer on unmount.
   useEffect(() => () => clearTimeout(debounceRef.current), []);
 
   const onContentChange = (v: string) => {

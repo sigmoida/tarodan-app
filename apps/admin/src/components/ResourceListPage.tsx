@@ -9,59 +9,59 @@ import { AdminTabs } from "@/components/AdminTabs";
 // ─── Props ─────────────────────────────────────────────────────────────────
 
 interface SearchConfig {
-  /** FilterToolbar'daki arama kutusu placeholder'ı */
+  /** Search box placeholder in the FilterToolbar */
   placeholder?: string;
 }
 
-/** Sekme tanımı — AdminTabs'ın AdminTab tipine karşılık gelir (icon hariç; o sekme özelinde eklenir) */
+/** Tab definition — maps to AdminTabs' AdminTab type (except icon; that's added per-tab) */
 interface TabConfig {
   key: string;
   label: string;
-  /** Opsiyonel sayaç/rozet */
+  /** Optional counter/badge */
   badge?: number | string;
 }
 
 export interface ResourceListPageProps<T> {
-  // ── Başlık alanı ──────────────────────────────────────────────────────────
+  // ── Header area ──────────────────────────────────────────────────────────
   title: string;
   description?: ReactNode;
   /**
-   * PageHeader'ın sağına yerleşen aksiyon slot'u.
-   * Örn. "N takas inceleme bekliyor" uyarı butonu, badge'ler.
+   * Action slot placed to the right of PageHeader.
+   * E.g. an "N trades awaiting review" warning button, badges.
    */
   headerActions?: ReactNode;
 
-  // ── Sekmeler (opsiyonel) ──────────────────────────────────────────────────
+  // ── Tabs (optional) ──────────────────────────────────────────────────
   /**
-   * Tanımlanırsa FilterToolbar/filtrelerin ÜSTÜNDE AdminTabs ile sekmeler görünür.
-   * Veri değişimi sayfanın sorumluluğundadır; bu prop sadece sekme UI'ını sağlar.
+   * If defined, tabs render ABOVE the FilterToolbar/filters via AdminTabs.
+   * Data changes are the page's responsibility; this prop only provides the tab UI.
    */
   tabs?: TabConfig[];
-  /** Aktif sekme anahtarı (controlled). tabs ile birlikte verilmeli. */
+  /** Active tab key (controlled). Must be provided together with tabs. */
   activeTab?: string;
-  /** Sekme değişince çağrılır. Veri güncelleme sayfanın işi. */
+  /** Called when the tab changes. Updating data is the page's job. */
   onTabChange?: (key: string) => void;
 
-  // ── Arama + Filtreler ─────────────────────────────────────────────────────
+  // ── Search + Filters ─────────────────────────────────────────────────────
   /**
-   * Tanımlanırsa FilterToolbar görünür ve arama kutusu gösterilir.
-   * Tanımlanmazsa sadece `filters` children'ı görünür (arama kutusu olmadan).
+   * If defined, the FilterToolbar renders with a search box.
+   * If not, only the `filters` children render (without a search box).
    */
   search?: SearchConfig;
-  /** Arama kutusu değeri (useAdminResource'tan gelen `search`) */
+  /** Search box value (`search` from useAdminResource) */
   searchValue?: string;
-  /** Arama kutusu onChange (useAdminResource'tan gelen `setSearch`) */
+  /** Search box onChange (`setSearch` from useAdminResource) */
   onSearchChange?: (v: string) => void;
-  /** Enter tetikleyicisi (useAdminResource'tan gelen `onSearchSubmit`) */
+  /** Enter trigger (`onSearchSubmit` from useAdminResource) */
   onSearchSubmit?: () => void;
   /**
-   * FilterToolbar içinde arama kutusunun sağına render edilecek filtre kontrolleri.
-   * Select'ler, date picker'lar vb.
-   * `search` prop yoksa sadece bu filters gösterilir (FilterToolbar yerine doğrudan div).
+   * Filter controls rendered to the right of the search box in the FilterToolbar.
+   * Selects, date pickers, etc.
+   * Without the `search` prop, only these filters render (a plain div instead of FilterToolbar).
    */
   filters?: ReactNode;
 
-  // ── Tablo ─────────────────────────────────────────────────────────────────
+  // ── Table ─────────────────────────────────────────────────────────────────
   columns: ColumnDef<T, any>[];
   data: T[];
   loading?: boolean;
@@ -69,30 +69,30 @@ export interface ResourceListPageProps<T> {
   getRowId: (row: T) => string;
   rowClassName?: (row: T) => string | undefined;
   /**
-   * Satıra tıklanınca çağrılır (örn. detaya git). Verilirse satırlar tıklanabilir
-   * görünür; satır içindeki link/buton/input'lara tıklama bunu tetiklemez.
+   * Called when a row is clicked (e.g. go to detail). If provided, rows appear
+   * clickable; clicking a link/button/input inside a row doesn't trigger it.
    */
   onRowClick?: (row: T) => void;
-  /** Açık satırın altına tam genişlikte render edilecek detay paneli */
+  /** Detail panel rendered full-width below the expanded row */
   renderExpanded?: (row: T) => ReactNode;
-  /** Şu an açık olan satırın id'si (getRowId ile eşleşir) */
+  /** Id of the currently expanded row (matches getRowId) */
   expandedId?: string | null;
 
-  // ── Toplu seçim (opsiyonel) ───────────────────────────────────────────────
-  /** true ise DataTable'da satır başı checkbox gösterilir */
+  // ── Bulk selection (optional) ───────────────────────────────────────────────
+  /** If true, a per-row checkbox is shown in the DataTable */
   selectable?: boolean;
-  /** Seçili satır id'leri (dışarıdan controlled) */
+  /** Selected row ids (controlled from outside) */
   selectedIds?: string[];
-  /** Tek satır seçim/kaldırma callback'i */
+  /** Single-row select/deselect callback */
   onToggleRow?: (id: string) => void;
-  /** Tümünü seç/kaldır callback'i (geçerli sayfadaki id'leri alır) */
+  /** Select/deselect-all callback (receives the current page's ids) */
   onToggleAll?: (ids: string[]) => void;
   /**
-   * Seçili satırlar varken BulkActionBar içinde gösterilecek aksiyon butonları.
-   * Örn. <Button onClick={handleBulkDelete}>Sil</Button>
+   * Action buttons shown in the BulkActionBar when rows are selected.
+   * E.g. <Button onClick={handleBulkDelete}>Sil</Button>
    */
   bulkActions?: ReactNode;
-  /** "Seçimi temizle" callback'i — BulkActionBar'ın onClear'ına aktarılır */
+  /** "Clear selection" callback — passed to BulkActionBar's onClear */
   onClearSelection?: () => void;
 
   // ── Pagination ────────────────────────────────────────────────────────────
@@ -104,36 +104,36 @@ export interface ResourceListPageProps<T> {
 // ─── Component ─────────────────────────────────────────────────────────────
 
 /**
- * Admin liste sayfaları için ortak kabuk:
- * PageHeader + (opsiyonel) AdminTabs + (opsiyonel) BulkActionBar
- * + FilterToolbar (opsiyonel arama + filtreler) + DataTable + Pagination.
+ * Shared shell for admin list pages:
+ * PageHeader + (optional) AdminTabs + (optional) BulkActionBar
+ * + FilterToolbar (optional search + filters) + DataTable + Pagination.
  *
- * Sayfa, sadece kolon/filtre/aksiyon tanımı yapar; layout ve ortak davranış burada.
+ * The page only defines columns/filters/actions; layout and shared behavior live here.
  *
- * Kullanım:
+ * Usage:
  * ```tsx
  * <ResourceListPage
  *   title="Takaslar"
  *   description={`Toplam ${total} takas`}
  *   headerActions={<Button>...</Button>}
- *   // Sekmeler (opsiyonel):
+ *   // Tabs (optional):
  *   tabs={[{ key: "all", label: "Tümü" }, { key: "active", label: "Aktif", badge: 3 }]}
  *   activeTab={activeTab}
  *   onTabChange={setActiveTab}
- *   // Arama:
+ *   // Search:
  *   search={{ placeholder: "Takas no ara..." }}
  *   searchValue={search}
  *   onSearchChange={setSearch}
  *   onSearchSubmit={onSearchSubmit}
  *   filters={<Select .../>}
- *   // Toplu seçim (opsiyonel):
+ *   // Bulk selection (optional):
  *   selectable
  *   selectedIds={selectedIds}
  *   onToggleRow={toggleRow}
  *   onToggleAll={toggleAll}
  *   bulkActions={<Button onClick={handleBulkDelete}>Sil</Button>}
  *   onClearSelection={clearSelection}
- *   // Tablo:
+ *   // Table:
  *   columns={columns}
  *   data={rows}
  *   loading={isLoading}
@@ -149,17 +149,17 @@ export function ResourceListPage<T>({
   title,
   description,
   headerActions,
-  // Sekmeler
+  // Tabs
   tabs,
   activeTab,
   onTabChange,
-  // Arama + filtreler
+  // Search + filters
   search,
   searchValue = "",
   onSearchChange,
   onSearchSubmit,
   filters,
-  // Tablo
+  // Table
   columns,
   data,
   loading,
@@ -169,7 +169,7 @@ export function ResourceListPage<T>({
   onRowClick,
   renderExpanded,
   expandedId,
-  // Toplu seçim
+  // Bulk selection
   selectable,
   selectedIds = [],
   onToggleRow,
@@ -181,7 +181,7 @@ export function ResourceListPage<T>({
   totalPages,
   onPageChange,
 }: ResourceListPageProps<T>) {
-  // Toolbar: arama varsa FilterToolbar, sadece filtreler varsa sade div, ikisi de yoksa null
+  // Toolbar: FilterToolbar if there's search, a plain div if only filters, null if neither
   const hasSearch = !!search;
   const hasFilters = !!filters;
 
@@ -198,7 +198,7 @@ export function ResourceListPage<T>({
     <div className="flex flex-col sm:flex-row gap-4">{filters}</div>
   ) : null;
 
-  // Toplu seçim varsa ve en az 1 satır seçiliyse BulkActionBar göster
+  // Show BulkActionBar when selectable and at least 1 row is selected
   const hasBulkSelection = selectable && selectedIds.length > 0;
 
   return (
@@ -207,7 +207,7 @@ export function ResourceListPage<T>({
         {headerActions}
       </PageHeader>
 
-      {/* Sekmeler — filtrelerden önce gelir */}
+      {/* Tabs — come before the filters */}
       {tabs && tabs.length > 0 && activeTab !== undefined && onTabChange && (
         <AdminTabs
           tabs={tabs}
@@ -218,7 +218,7 @@ export function ResourceListPage<T>({
 
       {toolbar}
 
-      {/* Toplu seçim çubuğu — seçili satır varsa tablonun üstünde görünür */}
+      {/* Bulk selection bar — shown above the table when rows are selected */}
       {hasBulkSelection && (
         <BulkActionBar
           count={selectedIds.length}

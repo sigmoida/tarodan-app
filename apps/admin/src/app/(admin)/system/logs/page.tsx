@@ -61,7 +61,7 @@ export default function LogsPage() {
       tab === 'audit' ? { action: '', entityType: '', adminId: '', fromDate: '', toDate: '' } : {},
   });
 
-  // Stats + toplam, ham backend yanıtından türetilir (render sırasında setState yok).
+  // Stats + total are derived from the raw backend response (no setState during render).
   const stats = (r.data as any)?.stats ?? null;
   const metaTotal = r.total;
 

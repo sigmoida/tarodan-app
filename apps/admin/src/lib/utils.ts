@@ -69,13 +69,14 @@ export function orderOriginLabel(offerId?: string | null): 'Teklif' | 'Doğrudan
 }
 
 /**
- * Bir status config'inden (StatusConfig map'i) liste filtresi için { value, label }
- * seçenekleri türetir; başa "Tümü" (all) eklenir. Etiketler hep config'ten gelir →
- * filtre seçenekleri badge'lerle birebir tutarlı kalır.
+ * Derives { value, label } options for a list filter from a status config
+ * (a StatusConfig map); prepends an "all" (Tümü) entry. Labels always come from
+ * the config → filter options stay perfectly consistent with the badges.
  *
- * - `keys` verilmezse config'teki TÜM durumlar listelenir (enum tam kapsanır).
- * - `keys` verilirse SADECE o durumlar (o sırayla) listelenir — badge config tam kalır
- *   ama filtreden gereksiz/ara durumları (örn. takasta per-side ara durumlar) gizlemek için.
+ * - If `keys` is omitted, ALL statuses in the config are listed (full enum coverage).
+ * - If `keys` is given, ONLY those statuses (in that order) are listed — the badge
+ *   config stays complete, but this hides unnecessary/intermediate statuses from the
+ *   filter (e.g. per-side intermediate statuses in trades).
  */
 export function statusFilterOptions(
   config: Record<string, { label: string }>,

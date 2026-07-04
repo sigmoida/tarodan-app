@@ -1,4 +1,4 @@
-// Roller & izinler — paylaşılan tipler.
+// Roles & permissions — shared types.
 
 export interface StaffItem {
   id: string;
@@ -10,7 +10,7 @@ export interface StaffItem {
   lastLoginAt: string | null;
 }
 
-/** Tek bir izin (sayfa başına tek anahtar, görüntüle/yönet ayrımı yok). */
+/** A single permission (one key per page, no view/manage distinction). */
 export interface PermDef {
   key: string;
   label: string;
@@ -18,7 +18,7 @@ export interface PermDef {
   pages: string[];
 }
 
-/** İzin matrisinde bir bölüm (ör. "Operasyon"). */
+/** A section in the permission matrix (e.g. "Operasyon"). */
 export interface PermGroup {
   id: string;
   group: string;

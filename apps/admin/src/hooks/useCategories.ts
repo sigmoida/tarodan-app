@@ -8,8 +8,8 @@ export interface CategoryOption {
 }
 
 /**
- * Kategori seçimleri için ortak yükleyici. Modal/form select'lerinde tekrar eden
- * `useQuery(['categories-min'])` bloğunu tek yerde toplar.
+ * Shared loader for category options. Collects the repeated
+ * `useQuery(['categories-min'])` block used in modal/form selects in one place.
  */
 export function useCategories() {
   return useQuery({

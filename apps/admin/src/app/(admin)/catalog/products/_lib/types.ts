@@ -1,14 +1,14 @@
 import { productStatusConfig, type StatusConfig } from '@tarodan/ui';
 import { statusFilterOptions } from '@/lib/utils';
 
-/** AI görsel-denetim durumu → rozet. Bilinen değerler dışında "Temiz" sayılır. */
+/** AI image-moderation status → badge. Anything outside known values counts as "Temiz" (clean). */
 export const aiCheckConfig: Record<string, StatusConfig> = {
   flagged: { label: 'Uygunsuz', variant: 'danger' },
   review: { label: 'İnceleme', variant: 'warning' },
   passed: { label: 'Temiz', variant: 'success' },
 };
 
-/** aiCheckStatus'u config anahtarına indirger (flagged/review dışı → passed). */
+/** Reduces aiCheckStatus to a config key (anything but flagged/review → passed). */
 export const aiCheckKey = (s?: string | null) =>
   s === 'flagged' || s === 'review' ? s : 'passed';
 

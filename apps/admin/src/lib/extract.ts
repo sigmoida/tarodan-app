@@ -1,7 +1,7 @@
 /**
- * Bir liste API yanıtından dizi çıkarır. Backend bazen `{ data: [...] }`, bazen
- * düz `[...]` döndürüyor; bu helper her iki şekli de tek yerde normalize eder.
- * `res` axios yanıtı ya da doğrudan `res.data` olabilir.
+ * Extracts an array from a list API response. The backend sometimes returns
+ * `{ data: [...] }` and sometimes a plain `[...]`; this helper normalizes both
+ * shapes in one place. `res` can be an axios response or `res.data` directly.
  */
 export function extractList<T = any>(res: any): T[] {
   const d = res?.data ?? res;

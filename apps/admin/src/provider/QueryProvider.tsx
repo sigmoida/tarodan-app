@@ -4,8 +4,8 @@ import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 /**
- * React-query QueryClient provider'ı — (admin)/layout.tsx'te mount edilir.
- * useState ile her render'da yeni instance oluşturmaktan kaçınıyoruz.
+ * React-query QueryClient provider — mounted in (admin)/layout.tsx.
+ * useState avoids creating a new instance on every render.
  */
 export function QueryProvider({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -13,9 +13,9 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 30_000,          // 30 saniye taze; gereksiz refetch önlenir
-            refetchOnWindowFocus: false, // Admin panelde sekme geçişinde refetch istemiyoruz
-            retry: 1,                    // Hata → 1 deneme daha; sonra toast
+            staleTime: 30_000,          // fresh for 30s; avoids unnecessary refetches
+            refetchOnWindowFocus: false, // no refetch on tab switch in the admin panel
+            retry: 1,                    // error → one more attempt; then toast
           },
         },
       }),

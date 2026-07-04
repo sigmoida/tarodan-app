@@ -32,33 +32,33 @@ export interface DataTableProps<T> {
   columns: ColumnDef<T, any>[];
   data: T[];
   loading?: boolean;
-  /** Veri boşken gösterilecek metin. */
+  /** Text shown when there is no data. */
   emptyText?: string;
-  /** Veri boşken metnin altında gösterilecek aksiyon (örn. "İlk kaydı ekle" butonu). */
+  /** Action shown below the text when there is no data (e.g. an "Add first record" button). */
   emptyAction?: ReactNode;
-  /** Satıra tıklanınca (örn. detaya git). */
+  /** On row click (e.g. go to detail). */
   onRowClick?: (row: T) => void;
-  /** Satıra ek className (örn. seçili/itirazlı satır vurgusu). */
+  /** Extra className per row (e.g. selected/disputed row highlight). */
   rowClassName?: (row: T) => string | undefined;
-  /** Satır kimliği — seçim için gerekli. */
+  /** Row id — required for selection. */
   getRowId?: (row: T) => string;
-  // ── Çoklu seçim (opsiyonel) ──
+  // ── Multi-select (optional) ──
   selectable?: boolean;
   selectedIds?: string[];
   onToggleRow?: (id: string) => void;
   onToggleAll?: (ids: string[]) => void;
-  // ── Genişletilebilir satır (opsiyonel) ──
-  /** Açık satırın altına tam genişlikte render edilecek panel (örn. marka modelleri). */
+  // ── Expandable row (optional) ──
+  /** Panel rendered full-width below the open row (e.g. brand models). */
   renderExpanded?: (row: T) => ReactNode;
-  /** O an açık olan satırın kimliği (getRowId ile eşleşir). Verilince yumuşak açılır/kapanır. */
+  /** Id of the currently open row (matches getRowId). When set, it opens/closes smoothly. */
   expandedId?: string | null;
 }
 
 /**
- * Admin liste sayfalarının TEK ortak tablosu. @tanstack/react-table motoru +
- * design-system `Table`/`Checkbox` (legacy `.admin-table`/`.admin-card` yok).
- * Sütunlar ColumnDef ile tanımlanır; loading/empty, satır-tık ve opsiyonel
- * çoklu-seçim / genişletilebilir satır dahili yönetilir.
+ * The SINGLE shared table for admin list pages. @tanstack/react-table engine +
+ * design-system `Table`/`Checkbox` (no legacy `.admin-table`/`.admin-card`).
+ * Columns are defined with ColumnDef; loading/empty, row-click and optional
+ * multi-select / expandable row are handled internally.
  */
 export function DataTable<T>({
   columns,
@@ -88,24 +88,24 @@ export function DataTable<T>({
     selectable && rowIds.length > 0 && rowIds.every((id) => selectedIds.includes(id));
   const colSpan = columns.length + (selectable ? 1 : 0);
 
-  // Boyut sistemi opt-in: kolonlar `col.*` factory'sinden geldiyse (meta taşırsa)
-  // fixed-layout + colgroup + hizalama devreye girer. Meta yoksa (legacy ham
-  // ColumnDef tüketicileri) tablo aynen eski davranışta kalır.
+  // Sizing system is opt-in: when columns come from the `col.*` factory (carry
+  // meta), fixed-layout + colgroup + alignment kick in. Without meta (legacy raw
+  // ColumnDef consumers) the table keeps its old behavior unchanged.
   const hasSizing = columns.some(
     (c) => c.meta && (c.meta.minWidth != null || c.meta.grow != null || c.meta.align != null),
   );
-  // Genişlik tabanı: her kolon minWidth px alır; tablonun min-width'i bunların
-  // toplamıdır. Konteyner bu eşiğin ÜSTÜNDE ise kolonlar orantılı büyür; ALTINDA
-  // ise tablo min-width'te kalır ve wrapper yatay scroll'a düşer. (min-width'i
-  // `<col>`'a koymak işe yaramaz — tarayıcı yok sayar; bu yüzden `<table>`'a.)
+  // Width basis: each column gets minWidth px; the table's min-width is their
+  // sum. Above that threshold columns grow proportionally; below it the table
+  // stays at min-width and the wrapper falls back to horizontal scroll. (Putting
+  // min-width on `<col>` doesn't work — the browser ignores it; hence on `<table>`.)
   const colMin = (c: (typeof columns)[number]) => c.meta?.minWidth ?? 140;
   const tableMinWidth = hasSizing
     ? (selectable ? 44 : 0) + columns.reduce((sum, c) => sum + colMin(c), 0)
     : 0;
   const alignOf = (align?: CellAlign) => (align ? ALIGN_CLASS[align] : undefined);
 
-  // İlk yükleme (veri yokken) tam spinner; arama/filtre refetch'inde mevcut
-  // satırlar korunur ve hafifçe soluklaşır (keepPreviousData davranışı).
+  // Initial load (no data yet) shows a full spinner; on search/filter refetch the
+  // existing rows are kept and slightly dimmed (keepPreviousData behavior).
   const isInitialLoad = loading && data.length === 0;
   const isRefetching = loading && data.length > 0;
 
@@ -179,8 +179,8 @@ export function DataTable<T>({
                       onClick={
                         onRowClick
                           ? (e) => {
-                              // Satır içindeki interaktif öğelere tıklama satır
-                              // tıklamasını tetiklemez — kendi davranışları çalışır.
+                              // Clicking interactive elements inside the row does
+                              // not trigger the row click — their own behavior runs.
                               if (
                                 (e.target as HTMLElement).closest(
                                   "a, button, input, select, textarea, label, [role='button']",

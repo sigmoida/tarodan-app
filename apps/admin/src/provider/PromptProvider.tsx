@@ -11,37 +11,37 @@ import { Dialog, ModalFooter, Textarea, Input, Label, FormField } from "@tarodan
 
 export interface PromptOptions {
   title?: string;
-  /** Input üstünde gösterilen açıklama. */
+  /** Description shown above the input. */
   description?: ReactNode;
-  /** Input etiketi. */
+  /** Input label. */
   label?: string;
   placeholder?: string;
-  /** Başlangıç değeri. */
+  /** Initial value. */
   defaultValue?: string;
   confirmLabel?: string;
   cancelLabel?: string;
-  /** Boş bırakılamaz (varsayılan: true). */
+  /** Cannot be left empty (default: true). */
   required?: boolean;
-  /** Zorunlu alan boşken gösterilecek hata metni. */
+  /** Error text shown when a required field is empty. */
   requiredMessage?: string;
-  /** Çok satırlı (textarea). Varsayılan: true. */
+  /** Multi-line (textarea). Default: true. */
   multiline?: boolean;
   maxLength?: number;
-  /** Onay butonunu kırmızı (yıkıcı) stille gösterir. */
+  /** Shows the confirm button with the red (destructive) style. */
   destructive?: boolean;
 }
 
-/** Onayla → girilen (trim'lenmiş) metin, Vazgeç → null. */
+/** Confirm → the entered (trimmed) text, Cancel → null. */
 type PromptFn = (options?: PromptOptions) => Promise<string | null>;
 
 const PromptContext = createContext<PromptFn | null>(null);
 
 /**
- * Native window.prompt yerine kullanılan, ui-uyumlu metin giriş dialog'u.
- * Tek bir dialog global olarak render edilir; `usePrompt()` her yerden
- * `await prompt({...})` ile çağrılır.
+ * A ui-consistent text input dialog used instead of native window.prompt.
+ * A single dialog is rendered globally; `usePrompt()` is called from anywhere
+ * via `await prompt({...})`.
  *
- * @see ConfirmProvider — aynı desenin onay (yes/no) karşılığı.
+ * @see ConfirmProvider — the confirm (yes/no) counterpart of the same pattern.
  */
 export function PromptProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<{
@@ -64,7 +64,7 @@ export function PromptProvider({ children }: { children: ReactNode }) {
     <PromptContext.Provider value={prompt}>
       {children}
       {state && (
-        // Her açılışta taze state (value/error) için koşullu render.
+        // Conditional render for fresh state (value/error) on each open.
         <PromptDialog
           options={state.options}
           onCancel={() => settle(null)}
@@ -160,7 +160,7 @@ function PromptDialog({
   );
 }
 
-/** Metin giriş dialog'unu açan async fonksiyon. PromptProvider altında kullanılmalı. */
+/** Async function that opens the text input dialog. Must be used under PromptProvider. */
 export function usePrompt(): PromptFn {
   const ctx = useContext(PromptContext);
   if (!ctx) {

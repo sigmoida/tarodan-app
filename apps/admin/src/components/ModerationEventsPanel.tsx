@@ -11,7 +11,7 @@ import { col, Empty } from '@/components/table';
 import { type ColumnDef } from '@/components/DataTable';
 import { type AdminTab } from '@/components/AdminTabs';
 
-// ─── Tip ─────────────────────────────────────────────────────────────────────
+// ─── Type ────────────────────────────────────────────────────────────────────
 
 export interface ModerationEvent {
 	id: string;
@@ -29,7 +29,7 @@ export interface ModerationEvent {
 	createdAt: string;
 }
 
-// ─── Etiket sözlükleri ───────────────────────────────────────────────────────
+// ─── Label dictionaries ──────────────────────────────────────────────────────
 
 const ENTITY_LABELS: Record<string, string> = {
 	product: 'Ürün',
@@ -62,7 +62,7 @@ const DECISION_OPTIONS = [
 	{ value: 'pass', label: 'Temiz' },
 ];
 
-/** AI moderasyon kararı → rozet. Bilinen değerler dışında "Temiz" sayılır. */
+/** AI moderation decision → badge. Anything outside the known values counts as "pass". */
 const decisionConfig: Record<string, StatusConfig> = {
 	blocked: { label: 'Engellendi', variant: 'danger' },
 	flag: { label: 'Uygunsuz', variant: 'danger' },
@@ -73,7 +73,7 @@ const decisionConfig: Record<string, StatusConfig> = {
 const decisionKey = (d: string) =>
 	d === 'blocked' || d === 'flag' || d === 'review' ? d : 'pass';
 
-/** Varlık türü + id'den admin detay rotası (yoksa null). */
+/** Admin detail route from entity type + id (null if none). */
 function entityHref(e: ModerationEvent): string | null {
 	if (!e.entityId) return null;
 	if (e.entityType === 'product') return `/catalog/products/${e.entityId}`;
@@ -197,26 +197,25 @@ function ExpandedRow({ e }: { e: ModerationEvent }) {
 }
 
 // ─── Props ───────────────────────────────────────────────────────────────────
-
 interface ModerationEventsPanelProps {
-	/** Verilirse yalnızca bu türdeki olaylar (ör. "product", "user", "collection"). */
+	/** If set, only events of this type (e.g. "product", "user", "collection"). */
 	entityType?: string;
-	/** Verilirse tek bir varlığın olayları. */
+	/** If set, events of a single entity. */
 	entityId?: string;
-	/** Verilirse tek bir kullanıcının ürettiği olaylar. */
+	/** If set, events produced by a single user. */
 	userId?: string;
 	title?: string;
 	description?: string;
-	/** Varlık türü sütununu göster. Belirtilmezse: entityType yoksa otomatik açık. */
+	/** Show the entity type column. If unspecified: auto-on when there is no entityType. */
 	showEntityColumn?: boolean;
-	// Sayfa sekmeleri (opsiyonel) — AI tab aktifken de sekme çubuğu görünsün diye iletilir.
+	// Page tabs (optional) — passed so the tab bar stays visible while the AI tab is active.
 	tabs?: AdminTab[];
 	activeTab?: string;
 	onTabChange?: (key: string) => void;
 	/**
-	 * Kendi başlık/sekme çubuğunu render etsin mi (varsayılan: true). Sayfa zaten
-	 * kalıcı bir başlık + AdminTabs sağlıyorsa `false` verilir → yalnız içerik
-	 * (Suspense'i sadece içerik kaplar; başlık/sekme sayfada sabit kalır).
+	 * Whether to render its own header/tab bar (default: true). If the page already
+	 * provides a persistent header + AdminTabs, pass `false` → content only
+	 * (Suspense covers only the content; header/tabs stay fixed on the page).
 	 */
 	chrome?: boolean;
 }
@@ -224,10 +223,10 @@ interface ModerationEventsPanelProps {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 /**
- * AI moderasyon olay günlüğünün TEK ortak görünümü. Her "AI Denetim" sekmesi
- * (Ürünler/Kullanıcılar/Koleksiyonlar) ve Sistem sayfası bunu kullanır; sadece
- * entityType/entityId değişir. Liste sayfalarıyla AYNI stack: ResourceList +
- * col.* + ResourceList.Header — böylece sekme değişince yapı/tablo tutarlı kalır.
+ * The SINGLE shared view of the AI moderation event log. Every "AI Audit" tab
+ * (Products/Users/Collections) and the System page uses it; only entityType/
+ * entityId change. SAME stack as the list pages: ResourceList + col.* +
+ * ResourceList.Header — so the structure/table stays consistent across tabs.
  */
 export function ModerationEventsPanel({
 	entityType,

@@ -12,8 +12,8 @@ import {
 } from "@tarodan/ui";
 
 /**
- * Faz 4B.2 — Admin RefundRequest policy override kartı.
- * 4 boolean + returnShippingPayer radio + anlık kısmi iade tutarı.
+ * Phase 4B.2 — Admin RefundRequest policy override card.
+ * 4 booleans + returnShippingPayer radio + live partial refund amount.
  */
 export type ReturnShippingPayer = "buyer" | "seller" | "platform";
 
@@ -86,7 +86,7 @@ export function RefundPolicyCard({
     if (refundProductAmount && order.subtotal != null) total += Number(order.subtotal);
     if (refundShippingFee) total += Number(order.shippingCost);
     if (refundBuyerFee) total += Number(order.buyerFeeAmount);
-    // refundSellerCommission satıcı tahsilatı — alıcının iade tutarına eklenmez
+    // refundSellerCommission is a seller charge — not added to the buyer's refund amount
     return total;
   }, [
     refundProductAmount,
@@ -133,7 +133,7 @@ export function RefundPolicyCard({
         <CardTitle>İade Politikası</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* 4 boolean */}
+        {/* 4 booleans */}
         <div className="space-y-2">
           <PolicyRow
             label={`Ürün bedeli iade (${fmt(Number(order.subtotal ?? 0))})`}

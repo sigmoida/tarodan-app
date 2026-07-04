@@ -5,8 +5,8 @@ import { Button } from '@tarodan/ui';
 import './globals.css';
 
 /**
- * Root layout'un kendisi hata verdiğinde devreye girer — kendi `<html>`/`<body>`
- * ağacını render eder ve globals.css'i getirir (aksi halde token'lar yüklenmez).
+ * Kicks in when the root layout itself errors — renders its own `<html>`/`<body>`
+ * tree and pulls in globals.css (otherwise tokens won't load).
  */
 export default function GlobalError({
   error,

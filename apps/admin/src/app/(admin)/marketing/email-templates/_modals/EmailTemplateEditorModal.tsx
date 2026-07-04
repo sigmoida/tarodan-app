@@ -64,7 +64,7 @@ export function EmailTemplateEditorModal({
     queryFn: async () => (await adminApi.getEmailTemplate(templateKey)).data as TemplateDetail,
   });
 
-  // Yükleme hatasında modalı kapat (eski davranış).
+  // Close the modal on load error (legacy behavior).
   useEffect(() => {
     if (detailQuery.isError) {
       toast.error('Şablon yüklenemedi');
@@ -72,8 +72,8 @@ export function EmailTemplateEditorModal({
     }
   }, [detailQuery.isError, onClose]);
 
-  // Detay gelince formu doldur + önizlemeyi tetikle. Gövde boşsa kaynak
-  // şablonu (varsayılan) çekip forma seed eder.
+  // When detail arrives, fill the form + trigger preview. If body is empty,
+  // fetch the source (default) template and seed the form.
   useEffect(() => {
     const d = detailQuery.data;
     if (!d) return;
@@ -104,7 +104,7 @@ export function EmailTemplateEditorModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detailQuery.data]);
 
-  // debounce zamanlayıcısını unmount'ta temizle.
+  // Clear the debounce timer on unmount.
   useEffect(() => () => clearTimeout(debounceRef.current), []);
 
   const debouncedPreview = (html?: string, subject?: string) => {

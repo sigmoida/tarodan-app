@@ -12,22 +12,22 @@ import {
 } from "@/lib/escrow";
 
 /**
- * Yeni escrow modeli — sipariş detayında satıcıya ödeme (payout) durumu.
+ * New escrow model — seller payout status on the order detail.
  *
- * Gösterilenler:
- *  - Tahmini serbest bırakma tarihi (teslim + 14 + 1 gün)
- *  - İade penceresi bitişi (teslim + 14 gün)
- *  - "Açık iade nedeniyle bekletiliyor / frozen" rozeti
- *  - Order.cancellationType (iptal | iade) rozeti
+ * Shows:
+ *  - Estimated release date (delivery + 14 + 1 days)
+ *  - Refund window end (delivery + 14 days)
+ *  - "On hold due to open refund / frozen" badge
+ *  - Order.cancellationType (cancel | refund) badge
  *
- * Salt-okunur; aksiyon yok. Aksiyonlar Satıcı Ödemeleri (payouts) sayfasında.
+ * Read-only; no actions. Actions live on the Seller Payouts page.
  */
 export interface EscrowStatusCardProps {
   status: string;
   deliveredAt?: string | null;
   completedAt?: string | null;
   cancellationType?: string | null;
-  /** Sipariş için açık iade var mı (status=refund_requested veya talep listesi). */
+  /** Whether the order has an open refund (status=refund_requested or request list). */
   hasOpenRefund?: boolean;
 }
 
@@ -49,7 +49,7 @@ export function EscrowStatusCard({
   cancellationType,
   hasOpenRefund,
 }: EscrowStatusCardProps) {
-  // İptal edilmiş siparişte escrow yok; sadece iptal/iade tipini gösterelim.
+  // No escrow on a cancelled order; just show the cancel/refund type.
   const isCancelled = status === "cancelled";
   const isRefunded = status === "refunded";
   const openRefund = hasOpenRefund || status === "refund_requested";
@@ -66,7 +66,7 @@ export function EscrowStatusCard({
 
   return (
     <SectionCard title="Satıcı Ödemesi (Escrow)">
-      {/* İptal/iade tipi rozeti */}
+      {/* Cancel/refund type badge */}
       {cancelType && (
         <div className="mb-4 flex items-start gap-2">
           <span
@@ -94,7 +94,7 @@ export function EscrowStatusCard({
         </p>
       ) : (
         <div className="space-y-4">
-          {/* Donduruldu / açık iade rozeti */}
+          {/* Frozen / open refund badge */}
           {openRefund && (
             <div className="flex items-start gap-2 rounded-lg border border-danger-200 bg-danger-50 px-3 py-2">
               <LockClosedIcon className="w-5 h-5 text-danger-600 shrink-0 mt-0.5" />
@@ -109,7 +109,7 @@ export function EscrowStatusCard({
             </div>
           )}
 
-          {/* Hold durumu özeti */}
+          {/* Hold status summary */}
           {!openRefund && (
             <div className={`rounded-lg border px-3 py-2 ${tone.wrap}`}>
               <p className={`text-sm font-medium ${tone.label}`}>{reason.label}</p>
@@ -117,7 +117,7 @@ export function EscrowStatusCard({
             </div>
           )}
 
-          {/* Tarih kırılımı */}
+          {/* Date breakdown */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
             <div>
               <span className="text-muted">Teslim tarihi</span>

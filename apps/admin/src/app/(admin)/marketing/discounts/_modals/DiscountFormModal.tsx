@@ -11,7 +11,7 @@ import { discountTypeOptions, scopeFormOptions, type Discount } from '../_lib/ty
 const isoDate = (offsetDays = 0) =>
   new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-/** Discount → form defaults (sayısallar string'e çevrilir). */
+/** Discount → form defaults (numerics converted to strings). */
 function toDefaults(d?: Discount): DiscountFormValues {
   if (!d) {
     return {
@@ -59,7 +59,7 @@ function toDefaults(d?: Discount): DiscountFormValues {
   };
 }
 
-/** Form değerlerini backend payload'ına çevir (string→number/ISO). */
+/** Convert form values into the backend payload (string→number/ISO). */
 function toPayload(v: DiscountFormValues) {
   return {
     code: v.code.trim() ? v.code.trim().toUpperCase() : null,

@@ -31,8 +31,8 @@ export default function AttributesPage() {
   const [groupModal, setGroupModal] = useState<{ group?: AttributeGroup } | null>(null);
   const [attrModal, setAttrModal] = useState<{ attribute?: Attribute } | null>(null);
 
-  // Gruplar tek seferde (limit 100) yüklenir; arama istemci tarafında anlık
-  // filtreler — her tuşta sunucuya gitmez, performanslı.
+  // Groups load in one shot (limit 100); search filters client-side instantly
+  // — no server round-trip per keystroke, keeps it fast.
   const { data: groups = [], isLoading: loadingGroups } = useQuery<AttributeGroup[]>({
     queryKey: ['attribute-groups'],
     queryFn: async () => (await adminApi.getAttributeGroups({ limit: 100 })).data.data ?? [],

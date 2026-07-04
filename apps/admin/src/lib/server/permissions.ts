@@ -5,7 +5,7 @@ import { apiFetch, type AdminUser } from './session';
 
 /**
  * A user's resolved permission set. `keys` is the flat list of permission
- * anahtarları for the user's role; super_admin bypasses the matrix entirely.
+ * keys for the user's role; super_admin bypasses the matrix entirely.
  */
 export interface Permissions {
   isSuperAdmin: boolean;

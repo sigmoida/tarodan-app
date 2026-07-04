@@ -4,23 +4,23 @@ import toast from 'react-hot-toast';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
 
 interface UseRateSettingOptions {
-  /** react-query anahtarı; mutation da bunu invalidate eder. */
+  /** react-query key; the mutation also invalidates this. */
   queryKey: string;
-  /** Mevcut oranı yükler (0..100 arası sayı). */
+  /** Loads the current rate (a number between 0..100). */
   load: () => Promise<number | null | undefined>;
-  /** Yeni oranı kaydeder. */
+  /** Saves the new rate. */
   save: (rate: number) => Promise<unknown>;
   successMessage: string;
-  /** Yükleme öncesi başlangıç değeri. */
+  /** Initial value before loading. */
   fallback?: string;
   min?: number;
   max?: number;
 }
 
 /**
- * "Tek bir oran/eşiği yükle → düzenle → doğrula (min..max) → kaydet" deseni.
- * TradeRateCard, stopaj oranı gibi kartlardaki tekrar eden useQuery + local
- * state + useAdminMutation bloğunu tek yerde toplar.
+ * The "load a single rate/threshold → edit → validate (min..max) → save" pattern.
+ * Collects the repeated useQuery + local state + useAdminMutation block from
+ * cards like TradeRateCard or the withholding-rate card in one place.
  */
 export function useRateSetting({
   queryKey,

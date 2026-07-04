@@ -2,17 +2,17 @@ import { type RowData } from '@tanstack/react-table';
 
 export type CellAlign = 'left' | 'right' | 'center';
 
-/** Kolonun tablo davranışı — factory (columns.tsx) doldurur, DataTable okur. */
+/** The column's table behavior — the factory (columns.tsx) fills it, DataTable reads it. */
 export interface CellColumnMeta {
-  /** Başlık + hücre hizası (ikisi daima aynı). */
+  /** Header + cell alignment (always the same). */
   align?: CellAlign;
-  /** Kolonun taban px genişliği: yatay-scroll eşiğinin payı + orantılı büyüme ağırlığı. */
+  /** The column's base px width: its share of the horizontal-scroll threshold + proportional growth weight. */
   minWidth?: number;
-  /** @deprecated Genişliği artık etkilemez; kolon genişliğini `minWidth` yönetir. */
+  /** @deprecated No longer affects width; column width is managed by `minWidth`. */
   grow?: number;
 }
 
-// react-table ColumnMeta'yı bizim alanlarımızla genişlet (tip güvenli meta).
+// Extend react-table's ColumnMeta with our fields (type-safe meta).
 declare module '@tanstack/react-table' {
   interface ColumnMeta<TData extends RowData, TValue> extends CellColumnMeta {}
 }

@@ -1,5 +1,5 @@
 /**
- * A + oldPrice: price (A) = her zaman güncel satış fiyatı (web ile uyumlu).
+ * A + oldPrice: price (A) = always the current sale price (consistent with web).
  */
 
 export interface ProductPriceFields {
@@ -10,12 +10,12 @@ export interface ProductPriceFields {
   isOnSale?: boolean;
 }
 
-/** Güncel satış fiyatı (A) */
+/** Current sale price (A) */
 export function getProductEffectivePrice(p: ProductPriceFields): number {
   return Number(p.price);
 }
 
-/** İndirimde mi (eski fiyat üstü çizili gösterilecek mi) */
+/** Is it on sale (should the old price be shown struck through) */
 export function isProductOnSaleDisplay(p: ProductPriceFields): boolean {
   if (p.isOnSale === true) return true;
   const old = p.oldPrice != null ? Number(p.oldPrice) : (p.originalPrice != null ? Number(p.originalPrice) : null);
@@ -23,7 +23,7 @@ export function isProductOnSaleDisplay(p: ProductPriceFields): boolean {
   return old != null && old > price;
 }
 
-/** Gösterilecek eski fiyat (üstü çizili) */
+/** Old price to display (struck through) */
 export function getProductOriginalPriceForDisplay(p: ProductPriceFields): number {
   const old = p.oldPrice != null ? Number(p.oldPrice) : (p.originalPrice != null ? Number(p.originalPrice) : null);
   return old ?? Number(p.price);
