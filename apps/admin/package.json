@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start -p 3002",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:api": "node scripts/check-api-collisions.mjs"
   },
   "dependencies": {
     "@heroicons/react": "^2.1.1",
