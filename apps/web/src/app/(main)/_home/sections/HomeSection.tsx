@@ -1,3 +1,5 @@
+/** @format */
+
 'use client';
 
 import type { ReactNode } from 'react';
@@ -23,8 +25,8 @@ export default function HomeSection({
 	children: ReactNode;
 }) {
 	return (
-		<section className='py-3'>
-			<div className='px-3 sm:px-4 lg:px-6'>
+		<section className='py-4'>
+			<div className='px-4'>
 				<div className='bg-surface-elevated border border-border rounded p-3 md:p-5'>
 					<SectionHeader
 						title={title}

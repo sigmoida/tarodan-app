@@ -7,12 +7,32 @@ import { useCartStore } from '@/stores/cartStore';
 import { messagesApi, api, wishlistApi } from '@/lib/api';
 
 /**
- * Owns the navbar badge counts: unread messages, unread notifications, pending
- * offers/trades (polled every 30s while authenticated), plus the cart count
- * (from the cart store) and the wishlist count (query gated on `showAuthUI`).
+ * The shared header data hook: auth (from the auth store, gated behind hydration
+ * so SSR and first client render match) plus every badge count the header and
+ * its children render — unread messages, unread notifications, pending
+ * offers/trades (polled every 30s while authenticated), the cart count (from
+ * the cart store) and the wishlist count (query gated on `showAuthUI`).
+ *
+ * Called once in `Header` and passed down as props, replacing the old
+ * NavbarContext + useNavbarCounts split (no context layer).
  */
-export function useNavbarCounts(showAuthUI: boolean) {
-  const { isAuthenticated } = useAuthStore();
+export function useHeaderData() {
+  const { isAuthenticated, user, logout, checkAuth } = useAuthStore();
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
+  // Defer auth-dependent UI until after hydration so server and first client
+  // render always match (avoids hydration error).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  const showAuthUI = mounted && isAuthenticated;
+
   const { itemCount: cartCount, fetchCart } = useCartStore();
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
@@ -81,6 +101,10 @@ export function useNavbarCounts(showAuthUI: boolean) {
   }, [isAuthenticated]);
 
   return {
+    isAuthenticated,
+    user,
+    logout,
+    showAuthUI,
     unreadMessageCount,
     unreadNotificationsCount,
     pendingOffersCount,
@@ -89,3 +113,5 @@ export function useNavbarCounts(showAuthUI: boolean) {
     wishlistCount,
   };
 }
+
+export type HeaderData = ReturnType<typeof useHeaderData>;

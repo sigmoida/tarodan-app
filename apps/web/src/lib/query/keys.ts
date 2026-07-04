@@ -35,8 +35,21 @@ export const queryKeys = {
     featuredBusiness: () => ['home', 'featuredBusiness'] as const,
     manufacturers: () => ['home', 'manufacturers'] as const,
   },
+  collections: {
+    /**
+     * Public collections grid key. `search`/`categoryId` are the already-trimmed
+     * values; empty strings normalize to `null` so the server seed and the
+     * client's first-render `useQuery` produce identical keys.
+     */
+    public: (sortBy: string, search: string, categoryId: string) =>
+      ['collections', 'public', sortBy, search || null, categoryId || null] as const,
+    mine: () => ['collections', 'mine'] as const,
+  },
   category: {
     bySlug: (slug: string) => ['categoryBySlug', slug] as const,
+  },
+  categories: {
+    collections: () => ['categories', 'collections'] as const,
   },
   wishlist: {
     check: (id: string | number) => ['wishlist-check', String(id)] as const,

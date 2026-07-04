@@ -3,11 +3,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n/LanguageContext';
-import { categoriesApi, manufacturersApi, listingsApi } from '@/lib/api';import { Button } from '@tarodan/ui';
-
+import { categoriesApi, manufacturersApi, listingsApi } from '@/lib/api';
+import { Button } from '@tarodan/ui';
 
 interface Category {
     id: string;
@@ -78,7 +77,7 @@ function groupManufacturers(manufacturers: Manufacturer[]): Array<{ range: strin
 
 type DropdownType = 'scales' | 'categories' | null;
 
-export default function CategoryNavBar() {
+export default function CategoryNav() {
     const { locale } = useTranslation();
     const [activeDropdown, setActiveDropdown] = useState<DropdownType>(null);
     const navRef = useRef<HTMLDivElement>(null);
@@ -175,19 +174,15 @@ export default function CategoryNavBar() {
     }, [activeDropdown]);
 
     const dropdownPortal = typeof document !== 'undefined' ? createPortal(
-        <AnimatePresence>
+        <>
             {activeDropdown === 'scales' && (
-                <motion.div
-                    initial={{ opacity: 0, y: -5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -5 }}
-                    transition={{ duration: 0.15 }}
+                <div
                     className="fixed left-0 right-0 bg-surface-elevated shadow-xl border-b border-border"
                     style={{ top: navRef.current ? navRef.current.getBoundingClientRect().bottom + 'px' : 'auto', zIndex: 9999 }}
                     onMouseEnter={() => handleMouseEnter('scales')}
                     onMouseLeave={handleMouseLeave}
                 >
-                    <div className="mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6">
+                    <div className="mx-auto w-full max-w-screen-xl px-6 sm:px-8 lg:px-12 xl:px-16 py-6">
                         <h3 className="text-primary-500 font-bold text-sm mb-4 uppercase tracking-wide">
                             {scalesMenu.title}
                         </h3>
@@ -204,21 +199,17 @@ export default function CategoryNavBar() {
                             ))}
                         </div>
                     </div>
-                </motion.div>
+                </div>
             )}
 
             {activeDropdown === 'categories' && (
-                <motion.div
-                    initial={{ opacity: 0, y: -5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -5 }}
-                    transition={{ duration: 0.15 }}
+                <div
                     className="fixed left-0 right-0 bg-surface-elevated shadow-xl border-b border-border"
                     style={{ top: navRef.current ? navRef.current.getBoundingClientRect().bottom + 'px' : 'auto', zIndex: 9999 }}
                     onMouseEnter={() => handleMouseEnter('categories')}
                     onMouseLeave={handleMouseLeave}
                 >
-                    <div className="mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6">
+                    <div className="mx-auto w-full max-w-screen-xl px-6 sm:px-8 lg:px-12 xl:px-16 py-6">
                         <div className="grid grid-cols-2 gap-8">
                             <div>
                                 <h3 className="text-primary-500 font-bold text-sm mb-4 uppercase tracking-wide">
@@ -269,47 +260,43 @@ export default function CategoryNavBar() {
                             </div>
                         </div>
                     </div>
-                </motion.div>
+                </div>
             )}
-        </AnimatePresence>,
+        </>,
         document.body
     ) : null;
 
     return (
         <>
-            <nav ref={navRef} className="bg-primary-500 border-b border-primary-600 relative z-40">
-                <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16">
-                    <div className="flex items-center h-11 gap-0.5 overflow-x-auto scrollbar-hide">
-                        {categoryItems.map((item) => (
-                            <div
-                                key={item.label}
-                                className="relative"
-                                onMouseEnter={() => item.dropdown ? handleMouseEnter(item.dropdown as DropdownType) : null}
-                                onMouseLeave={handleMouseLeave}
+            <div ref={navRef} className="flex items-center h-11 gap-0.5 overflow-x-auto scrollbar-hide">
+                {categoryItems.map((item) => (
+                    <div
+                        key={item.label}
+                        className="relative"
+                        onMouseEnter={() => item.dropdown ? handleMouseEnter(item.dropdown as DropdownType) : null}
+                        onMouseLeave={handleMouseLeave}
+                    >
+                        {item.href ? (
+                            <Link
+                                href={item.href}
+                                className="whitespace-nowrap px-3 py-2 text-sm font-medium text-inverted/90 hover:text-inverted hover:bg-surface-elevated/10 transition-colors rounded"
                             >
-                                {item.href ? (
-                                    <Link
-                                        href={item.href}
-                                        className="whitespace-nowrap px-3 py-2 text-sm font-medium text-inverted/90 hover:text-inverted hover:bg-surface-elevated/10 transition-colors rounded"
-                                    >
-                                        {item.label}
-                                    </Link>
-                                ) : (
-                                    <Button
-                                        variant="nav"
-                                        size="sm"
-                                        aria-expanded={activeDropdown === item.dropdown}
-                                        className="whitespace-nowrap gap-1 rounded"
-                                    >
-                                        {item.label}
-                                        <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform duration-200 ${activeDropdown === item.dropdown ? 'rotate-180' : ''}`} />
-                                    </Button>
-                                )}
-                            </div>
-                        ))}
+                                {item.label}
+                            </Link>
+                        ) : (
+                            <Button
+                                variant="nav"
+                                size="sm"
+                                aria-expanded={activeDropdown === item.dropdown}
+                                className="whitespace-nowrap gap-1 rounded"
+                            >
+                                {item.label}
+                                <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform duration-200 ${activeDropdown === item.dropdown ? 'rotate-180' : ''}`} />
+                            </Button>
+                        )}
                     </div>
-                </div>
-            </nav>
+                ))}
+            </div>
             {dropdownPortal}
         </>
     );

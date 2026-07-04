@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
 import { BellIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { BellIcon as BellSolidIcon } from '@heroicons/react/24/solid';
 import { Button, Spinner } from '@tarodan/ui';
@@ -138,26 +137,15 @@ export default function NotificationBell() {
           <BellIcon className="w-6 h-6" />
         )}
         {unreadCount > 0 && (
-          <motion.span
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="absolute -top-0.5 -right-0.5 min-w-[20px] h-5 px-1 bg-surface-elevated text-primary-500 text-xs font-bold rounded-full flex items-center justify-center"
-          >
+          <span className="absolute -top-0.5 -right-0.5 min-w-[20px] h-5 px-1 bg-surface-elevated text-primary-500 text-xs font-bold rounded-full flex items-center justify-center">
             {unreadCount > 99 ? '99+' : unreadCount}
-          </motion.span>
+          </span>
         )}
       </Button>
 
       {/* Dropdown */}
-      <AnimatePresence>
-        {showDropdown && (
-          <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            transition={{ duration: 0.15 }}
-            className="absolute right-0 mt-2 w-80 sm:w-96 bg-surface-elevated rounded-xl shadow-xl border border-border-subtle overflow-hidden z-50"
-          >
+      {showDropdown && (
+        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-surface-elevated rounded-xl shadow-xl border border-border-subtle overflow-hidden z-50">
             {/* Header */}
             <div className="px-4 py-3 bg-gradient-to-r from-primary-50 to-primary-100 border-b border-primary-100">
               <div className="flex items-center justify-between">
@@ -273,9 +261,8 @@ export default function NotificationBell() {
                 {locale === 'en' ? 'View all notifications' : 'Tüm bildirimleri gör'}
               </Link>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
     </div>
   );
 }

@@ -8,7 +8,9 @@ export default function BrandsMarquee() {
   const { marqueeItemsToShow } = useHome();
 
   return (
-    <section className="py-4">
+    // Full-bleed: break out of the (main) content container to span the whole
+    // viewport width, regardless of the max-w-screen-xl cap.
+    <section className="py-4 mx-[calc(50%-50vw)] w-screen">
       <div className="relative w-full overflow-hidden">
         <div className="brands-marquee-track flex flex-nowrap items-center gap-6 px-2 sm:px-3">
           {[...marqueeItemsToShow, ...marqueeItemsToShow].map((brand, i) => (

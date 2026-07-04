@@ -5,9 +5,9 @@ import { RealtimeProvider } from '@/components/realtime/RealtimeProvider';
 import { PlatformFeeAnnouncementBanner } from '@/components/banners/PlatformFeeAnnouncementBanner';
 import { ConfirmProvider } from '@/components/ConfirmProvider';
 import BusinessMembershipGuard from '@/components/BusinessMembershipGuard';
-import Navbar from '@/components/layout/Navbar';
-import CategoryNavBarWrapper from '@/components/layout/CategoryNavBarWrapper';
+import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
+import { Container } from '@/components/layout/Container';
 
 /**
  * Layout for the public marketplace. Owns the storefront chrome (Navbar +
@@ -27,12 +27,9 @@ export default function MainLayout({
 			<PlatformFeeAnnouncementBanner />
 			<ConfirmProvider>
 				<BusinessMembershipGuard>
-					<Navbar />
-					<CategoryNavBarWrapper />
+					<Header />
 					<main className='flex-1 w-full bg-surface'>
-						{/* Content container: full-bleed until 2xl (1536px), then fixed +
-                centered so it never stretches on ultra-wide screens. */}
-						<div className='mx-auto w-full max-w-screen-2xl'>{children}</div>
+						<Container>{children}</Container>
 					</main>
 					<Footer />
 				</BusinessMembershipGuard>
