@@ -1,10 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
-import { IconButton } from '@tarodan/ui';
+import { IconButton, Logo } from '@tarodan/ui';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useVisibleNav } from '@/hooks/useVisibleNav';
 import { useNavSearch } from '@/hooks/useNavSearch';
@@ -32,15 +31,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
     >
       <div className="h-16 flex items-center justify-between px-4 bg-primary-500">
         <Link href="/dashboard" scroll={false} onClick={onClose} className="flex items-center">
-          <Image
-            src="/tarodan-logo.jpg"
-            alt="Tarodan Logo"
-            width={120}
-            height={40}
-            className="object-contain"
-            style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '40px' }}
-            priority
-          />
+          <Logo alt="Tarodan Logo" style={{ maxHeight: '40px', width: 'auto' }} />
         </Link>
         <IconButton
           aria-label="Menüyü kapat"

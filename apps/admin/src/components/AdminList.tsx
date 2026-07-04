@@ -5,12 +5,12 @@
 import { type ComponentType, type ReactNode } from 'react';
 import Link from 'next/link';
 import { MagnifyingGlassIcon, ChevronLeftIcon } from '@heroicons/react/24/outline';
-import { Input } from '@tarodan/ui';
+import { Button, IconButton, iconButtonVariants, Input } from '@tarodan/ui';
 
 /**
  * Shared components that unify the "action areas" of admin list pages:
  * PageHeader (title + primary action), FilterToolbar (search + filters),
- * BulkActionBar (X-selected + bulk action), ActionButtons/ActionIconButton (row actions).
+ * BulkActionBar (X-selected + bulk action), ActionIconButton (row action).
  */
 
 export function PageHeader({
@@ -108,12 +108,13 @@ export function BulkActionBar({
 			<span className='text-sm font-medium text-body'>{count} seçili</span>
 			<div className='flex flex-wrap items-center gap-2'>{children}</div>
 			{onClear && (
-				<button
-					type='button'
+				<Button
+					variant='ghost'
+					size='sm'
 					onClick={onClear}
-					className='ml-auto text-sm text-muted hover:text-body'>
+					className='ml-auto text-muted hover:text-body'>
 					Seçimi temizle
-				</button>
+				</Button>
 			)}
 		</div>
 	);
@@ -121,14 +122,18 @@ export function BulkActionBar({
 
 type ActionVariant = 'default' | 'danger' | 'success' | 'primary';
 
-const actionColor: Record<ActionVariant, string> = {
-	default: 'text-muted hover:bg-surface-alt',
-	danger: 'text-danger-600 hover:bg-danger-500/10',
-	success: 'text-success-700 hover:bg-success-500/10',
-	primary: 'text-primary-600 hover:bg-primary-500/10',
+/** Row-action variant → shared IconButton variant. */
+const ICON_VARIANT: Record<ActionVariant, 'ghost' | 'danger' | 'success' | 'primary'> = {
+	default: 'ghost',
+	danger: 'danger',
+	success: 'success',
+	primary: 'primary',
 };
 
-/** Icon button for a row action (View/Edit/Delete/Approve...). Renders a Link if href is given. */
+/**
+ * Icon button for a row action (View/Edit/Delete/Approve...). Thin wrapper over the
+ * shared `IconButton`; renders a Link styled the same way when `href` is given.
+ */
 export function ActionIconButton({
 	icon: Icon,
 	onClick,
@@ -144,12 +149,12 @@ export function ActionIconButton({
 	variant?: ActionVariant;
 	disabled?: boolean;
 }) {
-	const cls = `inline-flex rounded-lg p-2 transition-colors ${actionColor[variant]} disabled:cursor-not-allowed disabled:opacity-50`;
+	const v = ICON_VARIANT[variant];
 	if (href) {
 		return (
 			<Link
 				href={href}
-				className={cls}
+				className={iconButtonVariants({ variant: v })}
 				title={title}
 				aria-label={title}>
 				<Icon className='h-5 w-5' />
@@ -157,19 +162,13 @@ export function ActionIconButton({
 		);
 	}
 	return (
-		<button
-			type='button'
+		<IconButton
+			variant={v}
 			onClick={onClick}
 			title={title}
 			aria-label={title}
-			disabled={disabled}
-			className={cls}>
+			disabled={disabled}>
 			<Icon className='h-5 w-5' />
-		</button>
+		</IconButton>
 	);
-}
-
-/** Wrapper that groups row action buttons. */
-export function ActionButtons({ children }: { children: ReactNode }) {
-	return <div className='flex items-center gap-1'>{children}</div>;
 }

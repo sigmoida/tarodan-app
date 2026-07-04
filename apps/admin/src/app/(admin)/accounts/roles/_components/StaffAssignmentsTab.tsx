@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { Button, Checkbox, IconButton } from '@tarodan/ui';
+import { Button, Checkbox, Chip, IconButton } from '@tarodan/ui';
 import toast from 'react-hot-toast';
 import { adminApi } from '@/lib/api';
 import { DataTable } from '@/components/DataTable';
@@ -122,16 +122,14 @@ export function StaffAssignmentsTab({ onShowMatrix }: { onShowMatrix: () => void
               const meta = ROLE_META[r];
               const active = roleFilter === r;
               return (
-                <button
+                <Chip
                   key={r}
-                  type="button"
+                  active={active}
+                  activeClassName={meta.color}
                   onClick={() => setRoleFilter(active ? null : r)}
-                  className={`rounded-full border px-2 py-1 text-xs transition-colors ${
-                    active ? meta.color : 'border-border text-muted hover:bg-surface-alt'
-                  }`}
                 >
                   {meta.label} {roleCounts[r] ?? 0}
-                </button>
+                </Chip>
               );
             })}
           </div>

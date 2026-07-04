@@ -6,11 +6,9 @@ import {
   LockClosedIcon,
   CheckIcon,
   ArrowUturnLeftIcon,
-  ChevronDownIcon,
-  ChevronRightIcon,
   InformationCircleIcon,
 } from '@heroicons/react/24/outline';
-import { Button } from '@tarodan/ui';
+import { Button, CheckToggle, DisclosureButton, IconButton } from '@tarodan/ui';
 import { adminApi } from '@/lib/api';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { useSession } from '@/context/SessionContext';
@@ -238,21 +236,16 @@ export function PermissionMatrixTab() {
                     {/* Group header row */}
                     <tr className="border-b border-border-subtle bg-surface-alt/60">
                       <td className="sticky left-0 z-10 bg-surface-alt/60 px-3 py-2">
-                        <button
-                          type="button"
+                        <DisclosureButton
+                          open={!isCollapsed}
                           onClick={() => toggleGroupCollapse(g.id)}
-                          className="flex w-full items-center gap-2 text-left text-xs font-semibold uppercase tracking-wide text-heading transition-colors hover:text-primary-600"
+                          className="text-xs font-semibold uppercase tracking-wide text-heading transition-colors hover:text-primary-600"
                         >
-                          {isCollapsed ? (
-                            <ChevronRightIcon className="h-3.5 w-3.5 text-muted" />
-                          ) : (
-                            <ChevronDownIcon className="h-3.5 w-3.5 text-muted" />
-                          )}
                           {g.group}
                           <span className="font-normal normal-case tracking-normal text-muted">
                             ({g.permissions.length} izin)
                           </span>
-                        </button>
+                        </DisclosureButton>
                       </td>
 
                       {ROLES.map((role) => {
@@ -263,23 +256,14 @@ export function PermissionMatrixTab() {
                             {locked ? (
                               <span className="text-xs font-medium text-success-600">Tümü</span>
                             ) : editMode && isSuperAdmin ? (
-                              <button
-                                type="button"
+                              <CheckToggle
+                                size="sm"
+                                checked={state === 'all'}
+                                indeterminate={state === 'partial'}
                                 onClick={() => toggleGroup(g, role, state !== 'all')}
                                 title={state === 'all' ? 'Grubu kaldır' : 'Grubu seç'}
-                                className={`mx-auto flex h-5 w-5 items-center justify-center rounded border-2 transition-colors ${
-                                  state === 'all'
-                                    ? 'border-primary-600 bg-primary-600 text-inverted'
-                                    : state === 'partial'
-                                      ? 'border-primary-400 bg-primary-200'
-                                      : 'border-border bg-surface hover:border-primary-400'
-                                }`}
-                              >
-                                {state === 'all' && <CheckIcon className="h-3 w-3" />}
-                                {state === 'partial' && (
-                                  <span className="block h-0.5 w-2 rounded bg-primary-600" />
-                                )}
-                              </button>
+                                className="mx-auto"
+                              />
                             ) : (
                               <span className="text-xs text-muted">
                                 {g.permissions.filter((p) => hasPermission(role, p.key)).length}/
@@ -304,14 +288,14 @@ export function PermissionMatrixTab() {
                           >
                             <td className="sticky left-0 z-10 bg-inherit px-4 py-2.5">
                               <div className="flex items-start gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => setExpandedPerm(isExpanded ? null : perm.key)}
-                                  className="mt-0.5 shrink-0 text-muted hover:text-primary-600"
+                                <IconButton
+                                  aria-label="Açıklama"
                                   title="Açıklama"
+                                  onClick={() => setExpandedPerm(isExpanded ? null : perm.key)}
+                                  className="mt-0.5 h-auto w-auto shrink-0 p-0 text-muted hover:bg-transparent hover:text-primary-600"
                                 >
                                   <InformationCircleIcon className="h-4 w-4" />
-                                </button>
+                                </IconButton>
                                 <div className="min-w-0">
                                   <div className="flex flex-wrap items-center gap-2">
                                     <span className="text-sm font-medium text-heading">{perm.label}</span>
@@ -344,18 +328,12 @@ export function PermissionMatrixTab() {
                               return (
                                 <td key={role} className="px-4 py-2.5 text-center">
                                   {interactive ? (
-                                    <button
-                                      type="button"
+                                    <CheckToggle
+                                      checked={checked}
                                       onClick={() => togglePermission(role, perm.key)}
-                                      className={`mx-auto flex h-6 w-6 items-center justify-center rounded border-2 transition-all hover:scale-110 ${
-                                        checked
-                                          ? 'border-primary-600 bg-primary-600 text-inverted shadow-sm'
-                                          : 'border-border bg-surface hover:border-primary-400 hover:bg-primary-50'
-                                      }`}
                                       title={checked ? 'Kaldır' : 'Ekle'}
-                                    >
-                                      {checked && <CheckIcon className="h-3.5 w-3.5" />}
-                                    </button>
+                                      className="mx-auto"
+                                    />
                                   ) : locked ? (
                                     <span
                                       className="mx-auto inline-flex h-6 w-6 items-center justify-center rounded-full bg-success-500/15"

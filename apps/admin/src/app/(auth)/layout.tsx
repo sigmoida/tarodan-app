@@ -1,7 +1,7 @@
 /** @format */
 
-import Image from 'next/image';
 import { redirect } from 'next/navigation';
+import { Logo } from '@tarodan/ui/logo';
 import { getSession } from '@/lib/server/session';
 
 /**
@@ -20,15 +20,7 @@ export default async function AuthLayout({
 	return (
 		<div className='flex min-h-screen flex-col'>
 			<header className='flex h-16 items-center bg-primary-500 px-6 shadow-sm'>
-				<Image
-					src='/tarodan-logo.jpg'
-					alt='Tarodan'
-					width={120}
-					height={40}
-					priority
-					className='object-contain'
-					style={{ width: 'auto', height: 'auto', maxHeight: '40px' }}
-				/>
+				<Logo style={{ maxHeight: '40px', width: 'auto' }} />
 			</header>
 
 			<main className='flex flex-1 items-center justify-center bg-gradient-to-br from-surface via-surface-elevated to-surface-alt px-4 py-10'>
