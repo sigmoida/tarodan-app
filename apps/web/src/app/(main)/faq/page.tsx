@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { PageContent } from '@/app/sayfa/[slug]/PageContent';
+import { PageContent } from '@/app/(main)/sayfa/[slug]/PageContent';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 

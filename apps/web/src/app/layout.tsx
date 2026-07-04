@@ -1,15 +1,9 @@
 import type { Metadata } from 'next';
 import { Toaster } from 'react-hot-toast';
 import './globals.css';
-import LayoutShell from '@/components/layout/LayoutShell';
 import CookieConsentBanner from '@/components/CookieConsentBanner';
-import { PlatformFeeAnnouncementBanner } from '@/components/banners/PlatformFeeAnnouncementBanner';
 import { LanguageProvider } from '@/i18n/LanguageContext';
-import QueryProvider from './QueryProvider';
-import { RealtimeProvider } from '@/components/realtime/RealtimeProvider';
 import { GoogleOAuthProvider } from '@react-oauth/google';
-import BusinessMembershipGuard from '@/components/BusinessMembershipGuard';
-import { ConfirmProvider } from '@/components/ConfirmProvider';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://tarodan.com'),
@@ -46,6 +40,13 @@ export const metadata: Metadata = {
   },
 };
 
+/**
+ * Root layout — the app-wide shell only: document, global metadata, and the
+ * truly cross-cutting providers (i18n + Google OAuth) plus the global toast and
+ * cookie banner. Visual chrome and route gating live in the route-group layouts
+ * ((main) owns the storefront; (auth) owns the auth frame). Renders {children}
+ * bare — no Navbar/Footer, no marketplace providers.
+ */
 export default function RootLayout({
   children,
 }: {
@@ -55,17 +56,8 @@ export default function RootLayout({
     <html lang="tr" suppressHydrationWarning>
       <body className="min-h-screen flex flex-col" suppressHydrationWarning>
         <LanguageProvider>
-          <QueryProvider>
-            <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''}>
-            <RealtimeProvider />
-            <PlatformFeeAnnouncementBanner />
-            <ConfirmProvider>
-              <BusinessMembershipGuard>
-                <LayoutShell>
-                  {children}
-                </LayoutShell>
-              </BusinessMembershipGuard>
-            </ConfirmProvider>
+          <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''}>
+            {children}
             <CookieConsentBanner />
             <Toaster
               position="bottom-right"
@@ -88,8 +80,7 @@ export default function RootLayout({
                 },
               }}
             />
-            </GoogleOAuthProvider>
-          </QueryProvider>
+          </GoogleOAuthProvider>
         </LanguageProvider>
       </body>
     </html>
