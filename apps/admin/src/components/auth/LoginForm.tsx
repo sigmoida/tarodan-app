@@ -25,20 +25,7 @@ export function LoginForm() {
 
         <FormInput name="email" label="E-posta" type="email" placeholder="admin@tarodan.com" />
 
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <label htmlFor="password" className="text-sm font-medium text-body">
-              Şifre
-            </label>
-            <Link
-              href="/forgot-password"
-              className="text-sm font-medium text-primary-600 hover:text-primary-700"
-            >
-              Şifremi unuttum?
-            </Link>
-          </div>
-          <FormInput id="password" name="password" type="password" placeholder="••••••••" />
-        </div>
+        <FormInput name="password" label="Şifre" type="password" placeholder="••••••••" />
 
         {requires2FA && (
           <FormInput name="twoFactorCode" label="Doğrulama Kodu" placeholder="000000" maxLength={6} />
@@ -52,6 +39,15 @@ export function LoginForm() {
         >
           Giriş Yap
         </Button>
+
+        <p className="text-center">
+          <Link
+            href="/forgot-password"
+            className="text-sm font-medium text-primary-600 hover:text-primary-700"
+          >
+            Şifremi unuttum?
+          </Link>
+        </p>
       </Form>
     </AuthCard>
   );
