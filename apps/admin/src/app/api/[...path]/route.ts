@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { apiFetch } from '@/lib/server/session';
+import { apiFetch, attachSessionCookies } from '@/lib/server/session';
 
 /**
  * BFF proxy. Every client data call goes to same-origin `/api/*` (no CORS) and
@@ -24,7 +24,7 @@ async function proxy(request: NextRequest, path: string[]) {
     body: hasBody ? Buffer.from(await request.arrayBuffer()) : undefined,
   };
 
-  const upstream = await apiFetch(suffix, init);
+  const { res: upstream, refreshed } = await apiFetch(suffix, init);
 
   // Stream the upstream response back, preserving content type/disposition.
   // Never forward upstream Set-Cookie — this app owns its own session cookies.
@@ -34,7 +34,12 @@ async function proxy(request: NextRequest, path: string[]) {
   if (contentType) headers.set('content-type', contentType);
   if (disposition) headers.set('content-disposition', disposition);
 
-  return new NextResponse(upstream.body, { status: upstream.status, headers });
+  const response = new NextResponse(upstream.body, { status: upstream.status, headers });
+  // If the access token was refreshed mid-call, persist the rotated tokens on
+  // THIS response — otherwise the browser keeps the old (now invalid) refresh
+  // token and gets bounced to /login on the next request.
+  if (refreshed) attachSessionCookies(response, refreshed);
+  return response;
 }
 
 type Ctx = { params: { path: string[] } };

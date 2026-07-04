@@ -35,7 +35,7 @@ export const getPermissions = cache(async (user: AdminUser): Promise<Permissions
   }
 
   try {
-    const res = await apiFetch('/admin/staff/role-permissions');
+    const { res } = await apiFetch('/admin/staff/role-permissions');
     if (!res.ok) return { isSuperAdmin: false, keys: [HOME_PERMISSION] };
 
     const matrix = (await res.json().catch(() => null)) as Record<string, string[]> | null;

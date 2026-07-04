@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { cookies } from 'next/headers';
+import type { NextResponse } from 'next/server';
 
 /**
  * Server-only session core for the BFF.
@@ -100,33 +101,65 @@ export function refreshTokens(
   return inflightRefresh;
 }
 
+export interface ApiFetchResult {
+  res: Response;
+  /**
+   * Present when this call refreshed the access token. The caller MUST persist
+   * these onto its outgoing response (`attachSessionCookies`) — writing via the
+   * `cookies()` store alone is unreliable when a Route Handler returns a
+   * hand-built `NextResponse`, which would leave the browser on the old (now
+   * rotated/invalid) refresh token and bounce it to /login on the next call.
+   */
+  refreshed?: { access: string; refresh: string };
+}
+
 /**
  * Call the NestJS API server-side with the current access token. On 401,
- * refreshes once (persisting the new tokens) and retries.
+ * refreshes once and retries; the refreshed tokens are returned so the caller
+ * can persist them on its own response.
  */
-export async function apiFetch(
-  path: string,
-  init: RequestInit = {},
-  allowRetry = true,
-): Promise<Response> {
+export async function apiFetch(path: string, init: RequestInit = {}): Promise<ApiFetchResult> {
   const { access, refresh } = readTokens();
-  const headers = new Headers(init.headers);
-  if (access) headers.set('Authorization', `Bearer ${access}`);
+  const authHeaders = (token?: string) => {
+    const h = new Headers(init.headers);
+    if (token) h.set('Authorization', `Bearer ${token}`);
+    return h;
+  };
 
-  const res = await fetch(`${API}/api${path}`, {
+  let res = await fetch(`${API}/api${path}`, {
     ...init,
-    headers,
+    headers: authHeaders(access),
     cache: 'no-store',
   });
 
-  if (res.status === 401 && allowRetry && refresh) {
+  if (res.status === 401 && refresh) {
     const next = await refreshTokens(refresh);
     if (next) {
-      writeTokens(next.access, next.refresh);
-      return apiFetch(path, init, false);
+      // Best-effort persistence for Server Action contexts; the BFF proxy also
+      // sets these on its own response (the reliable path — see route.ts).
+      try {
+        writeTokens(next.access, next.refresh);
+      } catch {
+        /* Server Component context can't write cookies; the proxy/middleware will. */
+      }
+      res = await fetch(`${API}/api${path}`, {
+        ...init,
+        headers: authHeaders(next.access),
+        cache: 'no-store',
+      });
+      return { res, refreshed: next };
     }
   }
-  return res;
+  return { res };
+}
+
+/** Persist a refreshed session onto an outgoing response (reliable cookie write). */
+export function attachSessionCookies(
+  res: NextResponse,
+  tokens: { access: string; refresh: string },
+) {
+  res.cookies.set(ACCESS_COOKIE, tokens.access, cookieOptions(ACCESS_MAX_AGE));
+  res.cookies.set(REFRESH_COOKIE, tokens.refresh, cookieOptions(REFRESH_MAX_AGE));
 }
 
 /** Base URL for the NestJS API (used by the proxy Route Handler). */
