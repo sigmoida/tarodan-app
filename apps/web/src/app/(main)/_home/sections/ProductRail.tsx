@@ -4,23 +4,28 @@ import type { ReactNode } from 'react';
 import { ProductCard, SkeletonCard } from '@/components/ui';
 import type { Product } from '../lib/types';
 
+/** The default home grid: 2 rows × 6 columns on desktop (12 cards). */
+export const HOME_GRID_CLASS =
+	'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6';
+
 /**
  * The card strip inside a home section — a horizontal `scroll` rail or a
  * responsive `grid`. Frame + header come from `HomeSection`; this only renders
- * the cards / skeletons / empty state.
+ * the cards / skeletons / empty state. Defaults to the shared 2×6 home grid
+ * (12 cards), so every section lays out identically.
  */
 export default function ProductRail({
 	items,
 	isLoading,
-	variant,
-	gridClassName,
-	skeletonCount = 6,
-	limit,
+	variant = 'grid',
+	gridClassName = HOME_GRID_CLASS,
+	skeletonCount = 12,
+	limit = 12,
 	emptyState,
 }: {
 	items: Product[];
 	isLoading: boolean;
-	variant: 'scroll' | 'grid';
+	variant?: 'scroll' | 'grid';
 	gridClassName?: string;
 	skeletonCount?: number;
 	limit?: number;
@@ -39,7 +44,7 @@ export default function ProductRail({
 						))
 					: displayItems.map((product, index) => (
 							<div key={product.id} className='flex-shrink-0 w-40 snap-start'>
-								<ProductCard product={product} index={index} layout='grid' priority={index < 4} />
+								<ProductCard product={product} index={index} layout='grid' priority={index < 4} compact />
 							</div>
 						))}
 			</div>
@@ -54,7 +59,7 @@ export default function ProductRail({
 				<div className='col-span-full'>{emptyState}</div>
 			) : (
 				displayItems.map((product, index) => (
-					<ProductCard key={product.id} product={product} index={index} layout='grid' priority={index < 4} />
+					<ProductCard key={product.id} product={product} index={index} layout='grid' priority={index < 4} compact />
 				))
 			)}
 		</div>

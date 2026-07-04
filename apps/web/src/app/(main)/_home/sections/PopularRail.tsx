@@ -19,10 +19,6 @@ export default function PopularRail() {
 			<ProductRail
 				items={bestSellers}
 				isLoading={isLoadingBestSellers}
-				variant='grid'
-				gridClassName='grid-cols-4 sm:grid-cols-5 lg:grid-cols-8 xl:grid-cols-10 2xl:grid-cols-12'
-				skeletonCount={8}
-				limit={24}
 				emptyState={
 					<EmptyState
 						title={locale === 'en' ? 'No listings yet' : 'Henüz ilan yok'}

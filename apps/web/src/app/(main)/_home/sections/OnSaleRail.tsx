@@ -24,10 +24,6 @@ export default function OnSaleRail() {
 			<ProductRail
 				items={discounted}
 				isLoading={isLoadingDiscounted}
-				variant='grid'
-				gridClassName='grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8'
-				skeletonCount={6}
-				limit={12}
 				emptyState={
 					<EmptyState
 						title={locale === 'en' ? 'No products on sale' : 'İndirimde ürün yok'}

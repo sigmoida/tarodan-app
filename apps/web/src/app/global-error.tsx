@@ -1,8 +1,13 @@
 'use client';
 
-import Link from 'next/link';import { Button } from '@tarodan/ui';
+import { useEffect } from 'react';
+import { Button } from '@tarodan/ui';
+import './globals.css';
 
-
+/**
+ * Kicks in when the root layout itself errors — renders its own `<html>`/`<body>`
+ * tree and pulls in globals.css (otherwise tokens won't load).
+ */
 export default function GlobalError({
   error,
   reset,
@@ -10,28 +15,24 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') console.error(error);
+  }, [error]);
+
   return (
     <html lang="tr">
-      <body className="min-h-screen bg-surface flex flex-col items-center justify-center px-4 py-12 antialiased">
-        <div className="text-center max-w-md">
-          <p className="text-6xl font-bold text-warning-500 mb-4">500</p>
-          <h1 className="text-2xl font-bold text-heading mb-2">Bir hata oluştu</h1>
-          <p className="text-muted mb-8">
-            Beklenmeyen bir sorun oluştu. Lütfen sayfayı yenileyin veya ana sayfaya dönün.
+      <body>
+        <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-surface px-6 text-center">
+          <p className="text-7xl font-bold text-danger-500">500</p>
+          <h1 className="text-2xl font-semibold text-heading">Bir şeyler ters gitti</h1>
+          <p className="max-w-md text-muted">
+            Uygulama beklenmeyen bir hatayla karşılaştı. Yeniden denemeyi deneyin.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button variant="secondary" onClick={reset}
-              className="px-6 py-3 rounded-xl bg-primary-500 text-inverted font-semibold hover:bg-primary-600 transition-colors">
-              Tekrar Dene
-            </Button>
-            <Link
-              href="/"
-              className="px-6 py-3 rounded-xl border-2 text-body font-semibold hover:border-primary-500 hover:text-primary-600 text-center"
-            >
-              Ana Sayfa
-            </Link>
-          </div>
-        </div>
+          {error.digest && <p className="text-xs text-subtle">Hata kodu: {error.digest}</p>}
+          <Button className="mt-2" onClick={reset}>
+            Yeniden dene
+          </Button>
+        </main>
       </body>
     </html>
   );

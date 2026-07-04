@@ -1,20 +1,8 @@
-'use client';
+/** @format */
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Spinner } from '@tarodan/ui';
+import { redirect } from 'next/navigation';
 
+// Membership plans live on the pricing page; this route just forwards there.
 export default function MembershipPage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    // Redirect to pricing page
-    router.replace('/pricing');
-  }, [router]);
-
-  return (
-    <div className="min-h-screen bg-surface flex items-center justify-center">
-      <Spinner size="xl" />
-    </div>
-  );
+	redirect('/pricing');
 }

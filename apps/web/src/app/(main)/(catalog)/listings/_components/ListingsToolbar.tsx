@@ -2,9 +2,10 @@
 
 'use client';
 
+import type { ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FunnelIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { Button, Select } from '@tarodan/ui';
+import { Button, Chip, Select } from '@tarodan/ui';
 import { useTranslation } from '@/i18n';
 import { formatCondition } from '@/lib/format';
 import ProductLayoutSelector from '@/components/ProductLayoutSelector';
@@ -69,9 +70,24 @@ export default function ListingsControls() {
 	);
 }
 
+const MATERIAL_LABELS: Record<string, string> = {
+	diecast: 'Diecast (Metal)',
+	resin: 'Resin (Reçine)',
+	composite: 'Composite',
+	plastic: 'Plastic',
+};
+
+// Per-filter active tint for the removable Chip.
+const CHIP_TINT = {
+	success: 'border-success-200 bg-success-500/10 text-success-600',
+	warning: 'border-warning-200 bg-warning-500/10 text-warning-600',
+	info: 'border-info-200 bg-info-500/10 text-info-600',
+	danger: 'border-danger-200 bg-danger-500/10 text-danger-600',
+} as const;
+
 /**
- * The active-filter chips row rendered above the grid (inside the content
- * column). Kept in the toolbar module since it's part of the filter toolbar UX.
+ * The active-filter chips row rendered above the grid. Every active filter is a
+ * removable `@tarodan/ui` Chip; the whole chip is the remove control.
  */
 export function ActiveFilterChips() {
 	const { t, locale } = useTranslation();
@@ -90,169 +106,122 @@ export function ActiveFilterChips() {
 
 	if (activeFilterCount === 0) return null;
 
+	type ChipDesc = {
+		key: string;
+		label: ReactNode;
+		onRemove: () => void;
+		tint?: keyof typeof CHIP_TINT;
+	};
+	const chips: ChipDesc[] = [];
+
+	if (currentSearch) {
+		chips.push({
+			key: 'search',
+			label: `${locale === 'en' ? 'Search' : 'Arama'}: "${currentSearch}"`,
+			onRemove: () => {
+				setFilters({ ...filters, search: '' });
+				setCurrentPage(1);
+				const params = new URLSearchParams(searchParams.toString());
+				params.delete('search');
+				params.delete('page');
+				router.replace(
+					params.toString() ? `/listings?${params.toString()}` : '/listings',
+				);
+			},
+		});
+	}
+
+	const valueFilters: Array<{ k: string; v?: string }> = [
+		{ k: 'category', v: filtersForSidebar.category },
+		{ k: 'brand', v: filters.brand },
+		{ k: 'carModel', v: filters.carModel },
+		{ k: 'scale', v: filters.scale },
+		{ k: 'material', v: filters.material },
+		{ k: 'condition', v: filters.condition },
+		{ k: 'manufacturer', v: filters.manufacturer },
+	];
+	for (const { k, v } of valueFilters) {
+		if (!v) continue;
+		const label =
+			k === 'condition'
+				? formatCondition(v, locale)
+				: k === 'material'
+					? MATERIAL_LABELS[v] || v
+					: v;
+		chips.push({
+			key: k,
+			label,
+			onRemove: () => {
+				const updates: any = { ...filters, [k]: '' };
+				if (k === 'manufacturer') updates.manufacturerId = '';
+				if (k === 'brand') {
+					updates.brandId = '';
+					updates.carModelId = '';
+					updates.carModel = '';
+				}
+				if (k === 'category') updates.categoryId = '';
+				if (k === 'carModel') updates.carModelId = '';
+				handleFiltersChange(updates);
+			},
+		});
+	}
+
+	if (filters.minPrice || filters.maxPrice) {
+		chips.push({
+			key: 'price',
+			label: `₺${filters.minPrice || '0'} - ₺${filters.maxPrice || '∞'}`,
+			onRemove: () =>
+				handleFiltersChange({ ...filters, minPrice: '', maxPrice: '' }),
+		});
+	}
+
+	const boolFilters: Array<{
+		key: string;
+		on: boolean;
+		label: string;
+		tint?: keyof typeof CHIP_TINT;
+		patch: Record<string, unknown>;
+	}> = [
+		{ key: 'tradeOnly', on: !!filters.tradeOnly, label: t('product.tradeAvailable'), tint: 'success', patch: { tradeOnly: false } },
+		{ key: 'preOrder', on: !!filters.preOrder, label: t('product.preOrder'), patch: { preOrder: false } },
+		{ key: 'limited', on: !!filters.limited, label: t('product.limitedEdition'), tint: 'warning', patch: { limited: false } },
+		{ key: 'set', on: !!filters.set, label: t('product.sets'), tint: 'info', patch: { set: false } },
+		{ key: 'discountOnly', on: !!filters.discountOnly, label: locale === 'en' ? 'On Sale' : 'İndirimli', tint: 'danger', patch: { discountOnly: false } },
+	];
+	for (const b of boolFilters) {
+		if (!b.on) continue;
+		chips.push({
+			key: b.key,
+			label: b.label,
+			tint: b.tint,
+			onRemove: () => handleFiltersChange({ ...filters, ...b.patch }),
+		});
+	}
+
 	return (
 		<div className='flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-border'>
 			<span className='text-xs font-medium text-muted uppercase tracking-wide mr-1'>
 				{locale === 'en' ? 'Filters' : 'Filtreler'}:
 			</span>
-			{currentSearch && (
-				<span className='inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 text-primary-700 text-xs font-medium rounded border border-primary-200'>
-					{locale === 'en' ? 'Search' : 'Arama'}: &quot;{currentSearch}&quot;
-					<Button
-						variant='secondary'
-						onClick={() => {
-							setFilters({ ...filters, search: '' });
-							setCurrentPage(1);
-							const params = new URLSearchParams(searchParams.toString());
-							params.delete('search');
-							params.delete('page');
-							router.replace(
-								params.toString()
-									? `/listings?${params.toString()}`
-									: '/listings',
-							);
-						}}
-						className='hover:text-primary-900 ml-0.5'
-						aria-label={locale === 'en' ? 'Remove search' : 'Aramayı kaldır'}>
-						<XMarkIcon className='w-3.5 h-3.5' />
-					</Button>
-				</span>
-			)}
-			{[
-				{ k: 'category', v: filtersForSidebar.category },
-				{ k: 'brand', v: filters.brand },
-				{ k: 'carModel', v: filters.carModel },
-				{ k: 'scale', v: filters.scale },
-				{ k: 'material', v: filters.material },
-				{ k: 'condition', v: filters.condition },
-				{ k: 'manufacturer', v: filters.manufacturer },
-			].map(
-				(f) =>
-					f.v && (
-						<span
-							key={f.k}
-							className='inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 text-primary-700 text-xs font-medium rounded border border-primary-200'>
-							{f.k === 'condition'
-								? formatCondition(f.v, locale)
-								: f.k === 'material'
-									? {
-											diecast: 'Diecast (Metal)',
-											resin: 'Resin (Reçine)',
-											composite: 'Composite',
-											plastic: 'Plastic',
-										}[f.v] || f.v
-									: f.k === 'vehicleType'
-										? {
-												araba: 'Arabalar',
-												motosiklet: 'Motosikletler',
-												motorsports: 'Motorsports',
-												ticari: 'Ticari Araçlar',
-												insaat: 'İnşaat Araçları',
-												tarim: 'Tarım Araçları',
-												askeri: 'Askeri Araçlar',
-												'acil-durum': 'Acil Durum Araçları',
-												gemi: 'Gemiler',
-												tren: 'Trenler',
-												ucak: 'Uçaklar',
-												set: 'Setler',
-											}[f.v] || f.v
-										: f.v}
-							<Button
-								variant='secondary'
-								onClick={() => {
-									const updates: any = { ...filters, [f.k]: '' };
-									if (f.k === 'manufacturer') updates.manufacturerId = '';
-									if (f.k === 'brand') {
-										updates.brandId = '';
-										updates.carModelId = '';
-										updates.carModel = '';
-									}
-									if (f.k === 'category') updates.categoryId = '';
-									if (f.k === 'carModel') {
-										updates.carModelId = '';
-									}
-									handleFiltersChange(updates);
-								}}
-								className='hover:text-primary-900 ml-0.5'>
-								<XMarkIcon className='w-3.5 h-3.5' />
-							</Button>
-						</span>
-					),
-			)}
-			{(filters.minPrice || filters.maxPrice) && (
-				<span className='inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 text-primary-700 text-xs font-medium rounded border border-primary-200'>
-					₺{filters.minPrice || '0'} - ₺{filters.maxPrice || '∞'}
-					<Button
-						variant='secondary'
-						onClick={() =>
-							handleFiltersChange({ ...filters, minPrice: '', maxPrice: '' })
-						}
-						className='hover:text-primary-900 ml-0.5'>
-						<XMarkIcon className='w-3.5 h-3.5' />
-					</Button>
-				</span>
-			)}
-			{filters.tradeOnly && (
-				<span className='inline-flex items-center gap-1 px-2.5 py-1 bg-success-50 text-success-700 text-xs font-medium rounded border border-success-200'>
-					{t('product.tradeAvailable')}
-					<Button
-						variant='secondary'
-						onClick={() => handleFiltersChange({ ...filters, tradeOnly: false })}
-						className='hover:text-success-900 ml-0.5'>
-						<XMarkIcon className='w-3.5 h-3.5' />
-					</Button>
-				</span>
-			)}
-			{filters.preOrder && (
-				<span className='inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 text-primary-700 text-xs font-medium rounded border border-primary-200'>
-					{t('product.preOrder')}
-					<Button
-						variant='secondary'
-						onClick={() => handleFiltersChange({ ...filters, preOrder: false })}
-						className='hover:text-primary-900 ml-0.5'>
-						<XMarkIcon className='w-3.5 h-3.5' />
-					</Button>
-				</span>
-			)}
-			{filters.limited && (
-				<span className='inline-flex items-center gap-1 px-2.5 py-1 bg-warning-50 text-warning-700 text-xs font-medium rounded border border-warning-200'>
-					{t('product.limitedEdition')}
-					<Button
-						variant='secondary'
-						onClick={() => handleFiltersChange({ ...filters, limited: false })}
-						className='hover:text-warning-900 ml-0.5'>
-						<XMarkIcon className='w-3.5 h-3.5' />
-					</Button>
-				</span>
-			)}
-			{filters.set && (
-				<span className='inline-flex items-center gap-1 px-2.5 py-1 bg-info-50 text-info-700 text-xs font-medium rounded border border-info-200'>
-					{t('product.sets')}
-					<Button
-						variant='secondary'
-						onClick={() => handleFiltersChange({ ...filters, set: false })}
-						className='hover:text-info-900 ml-0.5'>
-						<XMarkIcon className='w-3.5 h-3.5' />
-					</Button>
-				</span>
-			)}
-			{filters.discountOnly && (
-				<span className='inline-flex items-center gap-1 px-2.5 py-1 bg-danger-50 text-danger-700 text-xs font-medium rounded border border-danger-200'>
-					{locale === 'en' ? 'On Sale' : 'İndirimli'}
-					<Button
-						variant='secondary'
-						onClick={() =>
-							handleFiltersChange({ ...filters, discountOnly: false })
-						}
-						className='hover:text-danger-900 ml-0.5'>
-						<XMarkIcon className='w-3.5 h-3.5' />
-					</Button>
-				</span>
-			)}
+			{chips.map((chip) => (
+				<Chip
+					key={chip.key}
+					active
+					activeClassName={chip.tint ? CHIP_TINT[chip.tint] : undefined}
+					onClick={chip.onRemove}
+					aria-label={`${locale === 'en' ? 'Remove' : 'Kaldır'}: ${
+						typeof chip.label === 'string' ? chip.label : chip.key
+					}`}
+					className='inline-flex items-center gap-1 font-medium'>
+					{chip.label}
+					<XMarkIcon className='w-3.5 h-3.5' />
+				</Chip>
+			))}
 			<Button
 				variant='secondary'
+				size='sm'
 				onClick={clearFilters}
-				className='text-xs text-primary-600 hover:text-primary-700 font-medium ml-1'>
+				className='ml-1 text-primary-600 hover:text-primary-700 font-medium'>
 				{t('product.clearFilters')}
 			</Button>
 		</div>

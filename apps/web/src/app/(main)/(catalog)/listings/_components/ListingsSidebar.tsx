@@ -7,15 +7,14 @@ import SidebarFilters from '@/components/SidebarFilters';
 import { useListings } from '../_context/ListingsContext';
 
 /**
- * Desktop sticky sidebar + the mobile drawer overlay. The sticky `top`/`maxHeight`
- * follow `barsHidden` so the panel hugs the top when the nav bars scroll away.
+ * Desktop sidebar card + the mobile drawer overlay. A plain static column — the
+ * filter sections collapse via the shared Accordion, so no sticky positioning.
  */
 export default function ListingsSidebar() {
   const { t } = useTranslation();
   const {
     filtersForSidebar,
     activeFilterCount,
-    barsHidden,
     showMobileSidebar,
     setShowMobileSidebar,
     handleFiltersChange,
@@ -26,13 +25,7 @@ export default function ListingsSidebar() {
     <>
       {/* Sidebar Filters (Desktop) */}
       <div className="hidden lg:block w-56 flex-shrink-0">
-        <div
-          className="sticky overflow-y-auto bg-surface-elevated rounded border border-border transition-[top] duration-300"
-          style={{
-            top: barsHidden ? 8 : 116,
-            maxHeight: `calc(100vh - ${barsHidden ? 16 : 124}px)`,
-          }}
-        >
+        <div className="bg-surface-elevated rounded-lg border border-border overflow-hidden">
           <SidebarFilters
             filters={filtersForSidebar}
             onFilterChange={handleFiltersChange}

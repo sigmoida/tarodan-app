@@ -23,7 +23,7 @@ export default function CollectionsGrid() {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
         {[...Array(12)].map((_, i) => (
-          <div key={i} className="bg-surface-elevated rounded border border-border-subtle overflow-hidden animate-pulse">
+          <div key={i} className="bg-surface-elevated rounded-lg border border-border-subtle overflow-hidden animate-pulse">
             <div className="aspect-[4/3] bg-border-subtle" />
             <div className="p-3 space-y-2">
               <div className="h-3 bg-border-subtle rounded w-3/4" />
@@ -37,8 +37,8 @@ export default function CollectionsGrid() {
 
   if (displayedCollections.length === 0) {
     return (
-      <div className="text-center py-20 bg-surface-elevated rounded border border-border">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-surface rounded mb-4">
+      <div className="text-center py-20 bg-surface-elevated rounded-lg border border-border">
+        <div className="inline-flex items-center justify-center w-16 h-16 bg-surface rounded-lg mb-4">
           <FolderPlusIcon className="w-7 h-7 text-subtle" />
         </div>
         <p className="text-muted text-lg font-medium mb-1">
@@ -72,7 +72,7 @@ export default function CollectionsGrid() {
         >
           <Link
             href={`/collections/${collection.id}`}
-            className="block bg-surface-elevated rounded border border-border overflow-hidden hover:border-primary-300 hover:shadow-md transition-all group h-full"
+            className="block bg-surface-elevated rounded-lg border border-border overflow-hidden hover:border-primary-300 hover:shadow-md transition-all group h-full"
           >
             <div className="aspect-[4/3] bg-surface-alt relative overflow-hidden">
               {collection.coverImageUrl ? (

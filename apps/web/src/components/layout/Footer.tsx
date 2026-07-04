@@ -34,7 +34,7 @@ export default function Footer() {
 
 	return (
 		<footer className='bg-surface-elevated border-t border-border'>
-			<Container className='px-4'>
+			<Container className='px-4 pt-16'>
 				<div className='grid grid-cols-2 md:grid-cols-5 gap-8'>
 					{/* Brand */}
 					<div className='col-span-2 md:col-span-1'>
@@ -150,7 +150,7 @@ export default function Footer() {
 				</div>
 
 				{/* Bottom bar */}
-				<div className='border-t border-border mt-8 pt-6 flex flex-col sm:flex-row justify-between items-center gap-3'>
+				<div className='border-t border-border mt-8 py-6 flex flex-col sm:flex-row justify-between items-center gap-3'>
 					<p className='text-xs text-subtle'>
 						&copy; {new Date().getFullYear()} TARODAN. {t('footer.copyright')}
 					</p>

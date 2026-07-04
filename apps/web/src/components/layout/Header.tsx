@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
@@ -18,12 +18,11 @@ import NotificationBell from '@/components/notifications/NotificationBell';
 import { ButtonLink } from '@/components/ui/ButtonLink';
 import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
 import { useTranslation } from '@/i18n/LanguageContext';
-import { api } from '@/lib/api';
-import { useAuthStore } from '@/stores/authStore';
 import { Container } from './Container';
 import HeaderSearch from './header/HeaderSearch';
 import AccountMenu from './header/AccountMenu';
 import CategoryNav from './header/CategoryNav';
+import TopAdsBar from './header/TopAdsBar';
 import { useHeaderData } from './header/useHeaderData';
 
 const AuthRequiredModal = dynamic(
@@ -56,215 +55,6 @@ const HIDDEN_CATEGORY_PATHS = [
 	'/reset-password',
 	'/verify-email',
 ];
-
-interface TopAd {
-	id: string;
-	title: string;
-	imageUrl: string | null;
-	linkUrl: string | null;
-	content: string | null;
-	altText: string | null;
-	width: number | null;
-	height: number | null;
-	deviceType: string;
-}
-
-/**
- * Owns the top-ads marquee state: fetches active header ads for the current
- * device, records one impression per ad, tracks image-load failures, and
- * derives whether ads should be shown at all (ad-free membership avantajı
- * admin'in tier ayarından gelir, hardcode DEĞİL).
- */
-function useTopAds() {
-	const { isAuthenticated, user } = useAuthStore();
-	const [topAds, setTopAds] = useState<TopAd[]>([]);
-	const recordedImpressions = useRef<Set<string>>(new Set());
-	const [adImageError, setAdImageError] = useState<Set<string>>(new Set());
-	const [isMobile, setIsMobile] = useState(false);
-	// Reklamsız (ad-free) avantajı admin'in tier ayarından gelir (hardcode DEĞİL).
-	const [isAdFree, setIsAdFree] = useState(false);
-
-	// Reklam yalnız üyeliğinde "reklamsız" avantajı OLMAYANLARA gösterilir.
-	// isAdFree değeri admin'in tier ayarından (/membership/me/limits) gelir;
-	// tier ADINI hardcode etmek admin'in reklam-kapatma değişikliğini yok
-	// sayıyordu (bug: reklam kapatılsa bile kullanıcı reklam görüyordu).
-	const shouldShowAd = isAuthenticated ? !isAdFree : true;
-
-	// Gerçek isAdFree'yi üyelik limitlerinden çek (hardcoded tier adı yerine).
-	useEffect(() => {
-		if (!isAuthenticated) {
-			setIsAdFree(false);
-			return;
-		}
-		let cancelled = false;
-		api
-			.get<{ isAdFree?: boolean }>('/membership/me/limits')
-			.then((res) => {
-				if (!cancelled) setIsAdFree(!!res.data?.isAdFree);
-			})
-			.catch(() => {
-				if (!cancelled) setIsAdFree(false);
-			});
-		return () => {
-			cancelled = true;
-		};
-	}, [isAuthenticated, user?.membershipTier]);
-
-	// Detect mobile/desktop for responsive ads
-	useEffect(() => {
-		const checkMobile = () => {
-			setIsMobile(window.innerWidth < 768);
-		};
-		checkMobile();
-		window.addEventListener('resize', checkMobile);
-		return () => window.removeEventListener('resize', checkMobile);
-	}, []);
-
-	// Fetch active top ads (public API, no auth) - with device type
-	useEffect(() => {
-		if (!shouldShowAd) return;
-		const deviceType = isMobile ? 'mobile' : 'desktop';
-		api
-			.get<TopAd[]>('/ads/active', {
-				params: { position: 'header', device: deviceType },
-			})
-			.then((res) => {
-				const list = Array.isArray(res.data) ? res.data : [];
-				setTopAds(list);
-				setAdImageError(new Set());
-			})
-			.catch((err) => {
-				if (process.env.NODE_ENV === 'development')
-					console.error('Failed to fetch ads:', err);
-				setTopAds([]);
-			});
-	}, [shouldShowAd, isMobile]);
-
-	// Record impression once per ad when bar is shown
-	useEffect(() => {
-		if (topAds.length === 0) return;
-		topAds.forEach((ad) => {
-			if (recordedImpressions.current.has(ad.id)) return;
-			recordedImpressions.current.add(ad.id);
-			api.post(`/ads/${ad.id}/impression`).catch(() => {});
-		});
-	}, [topAds]);
-
-	const handleAdClick = (ad: { id: string; linkUrl: string | null }) => {
-		api.post(`/ads/${ad.id}/click`).catch(() => {});
-		if (ad.linkUrl) window.open(ad.linkUrl, '_blank', 'noopener,noreferrer');
-	};
-
-	const handleAdImageError = (adId: string) => {
-		setAdImageError((prev) => new Set(prev).add(adId));
-	};
-
-	return {
-		shouldShowAd,
-		topAds,
-		isMobile,
-		adImageError,
-		handleAdClick,
-		handleAdImageError,
-	};
-}
-
-/**
- * Slim top bar image marquee (50px desktop / 40px mobile). Renders active
- * header ads for non ad-free users. The external ad creatives stay raw `<img>`
- * (not next/image) since they are third-party creative URLs.
- */
-function TopAdsBar() {
-	const {
-		shouldShowAd,
-		topAds,
-		isMobile,
-		adImageError,
-		handleAdClick,
-		handleAdImageError,
-	} = useTopAds();
-
-	if (!shouldShowAd || topAds.length === 0) return null;
-
-	return (
-		<div
-			className='w-full relative flex items-center overflow-hidden border-b border-border-strong bg-heading'
-			style={{
-				height: isMobile ? 40 : 50,
-				maxHeight: 60,
-			}}
-			role='region'
-			aria-label='Reklam alanı'>
-			{/* Marquee: bir set reklam + viewport boşluğu + tekrar aynı set → aynı anda tek logo görünür */}
-			<div className='ad-marquee-track flex flex-nowrap items-center flex-shrink-0 gap-8 h-full pr-8'>
-				{topAds.map((ad, index) => (
-					<Button
-						variant='secondary'
-						key={`a-${ad.id}-${index}`}
-						type='button'
-						onClick={() => handleAdClick(ad)}
-						className='flex items-center justify-center h-full flex-shrink-0 hover:opacity-90 transition-opacity'
-						style={{ height: isMobile ? 40 : 50 }}
-						aria-label={ad.altText || ad.title}>
-						{ad.imageUrl && !adImageError.has(ad.id) ? (
-							<img
-								src={ad.imageUrl}
-								alt={ad.altText || ad.title}
-								loading='lazy'
-								decoding='async'
-								className='h-full w-auto object-contain max-w-[280px] sm:max-w-[400px]'
-								style={{ maxHeight: isMobile ? 40 : 50 }}
-								onError={() => handleAdImageError(ad.id)}
-							/>
-						) : (
-							<span className='text-primary-400 text-xs font-medium px-4 whitespace-nowrap'>
-								{ad.title}
-							</span>
-						)}
-					</Button>
-				))}
-				{/* İki set arasında en az viewport genişliği boşluk → ikinci logo ekranda çıkana kadar birinci kayar */}
-				<div
-					className='flex-shrink-0 h-full'
-					style={{ minWidth: '100vw' }}
-					aria-hidden
-				/>
-				{topAds.map((ad, index) => (
-					<Button
-						variant='secondary'
-						key={`b-${ad.id}-${index}`}
-						type='button'
-						onClick={() => handleAdClick(ad)}
-						className='flex items-center justify-center h-full flex-shrink-0 hover:opacity-90 transition-opacity'
-						style={{ height: isMobile ? 40 : 50 }}
-						aria-label={ad.altText || ad.title}>
-						{ad.imageUrl && !adImageError.has(ad.id) ? (
-							<img
-								src={ad.imageUrl}
-								alt={ad.altText || ad.title}
-								loading='lazy'
-								decoding='async'
-								className='h-full w-auto object-contain max-w-[280px] sm:max-w-[400px]'
-								style={{ maxHeight: isMobile ? 40 : 50 }}
-								onError={() => handleAdImageError(ad.id)}
-							/>
-						) : (
-							<span className='text-primary-400 text-xs font-medium px-4 whitespace-nowrap'>
-								{ad.title}
-							</span>
-						)}
-					</Button>
-				))}
-			</div>
-			{/* Sponsorlu badge - sol üst */}
-			<span
-				className='absolute left-2 top-1/2 -translate-y-1/2 z-10 text-[9px] text-muted opacity-60 select-none pointer-events-none'
-				aria-hidden>
-				Sponsorlu
-			</span>
-		</div>
-	);
-}
 
 /**
  * The whole storefront header as one unit: the top-ads marquee (scrolls away),

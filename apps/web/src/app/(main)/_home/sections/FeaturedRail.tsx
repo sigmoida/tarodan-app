@@ -13,12 +13,7 @@ export default function FeaturedRail() {
 
 	return (
 		<HomeSection title={locale === 'en' ? 'Featured' : 'Öne Çıkan Ürünler'}>
-			<ProductRail
-				items={featured}
-				isLoading={isLoadingFeatured}
-				variant='scroll'
-				skeletonCount={6}
-			/>
+			<ProductRail items={featured} isLoading={isLoadingFeatured} />
 		</HomeSection>
 	);
 }

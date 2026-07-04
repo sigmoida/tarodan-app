@@ -73,6 +73,23 @@ export {
   DropdownMenuRadioGroup,
 } from './components/DropdownMenu';
 export {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from './components/Accordion';
+export {
+  NavigationMenu,
+  NavigationMenuList,
+  NavigationMenuItem,
+  NavigationMenuTrigger,
+  NavigationMenuContent,
+  NavigationMenuLink,
+  NavigationMenuViewport,
+  NavigationMenuIndicator,
+  navigationMenuTriggerStyle,
+} from './components/NavigationMenu';
+export {
   Tooltip,
   TooltipProvider,
   TooltipRoot,

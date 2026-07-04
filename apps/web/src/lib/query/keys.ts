@@ -24,6 +24,8 @@ export const queryKeys = {
       categoryId: string | undefined,
       page: number,
     ) => ['listings', filters, categoryId ?? '', page] as const,
+    /** The listings filter facets (scales, brands, materials, …). */
+    filters: () => ['listings', 'filters'] as const,
   },
   home: {
     featured: () => ['home', 'featured'] as const,
@@ -59,9 +61,21 @@ export const queryKeys = {
     bySlug: (slug: string) => ['categoryBySlug', slug] as const,
   },
   categories: {
+    all: () => ['categories', 'all'] as const,
     collections: () => ['categories', 'collections'] as const,
   },
   wishlist: {
     check: (id: string | number) => ['wishlist-check', String(id)] as const,
+  },
+  profile: {
+    /** The profile overview aggregate (stats + membership + pending counts). */
+    overview: () => ['profile', 'overview'] as const,
+    unreadMessages: () => ['profile-unread-messages'] as const,
+  },
+  membership: {
+    /** All membership tiers with their prices (single source: DB MembershipTier). */
+    tiers: () => ['membership', 'tiers'] as const,
+    /** The current user's membership (tier + status + period). */
+    me: () => ['membership', 'me'] as const,
   },
 } as const;

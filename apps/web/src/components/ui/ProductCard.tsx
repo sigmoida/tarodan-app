@@ -61,6 +61,11 @@ export interface ProductCardProps {
   priority?: boolean;
   /** Drop the brand subline + rating/views/likes rows (reduced-data contexts). */
   hideStats?: boolean;
+  /**
+   * Lean home layout: keep only name / price / views / likes — drop the brand
+   * subline, the rating block and the condition chip.
+   */
+  compact?: boolean;
   /** Click-isolated slot pinned to the top-right of the card (badges, remove). */
   overlay?: React.ReactNode;
   /** Click-isolated slot below the card (e.g. an add-to-cart button). */
@@ -73,6 +78,7 @@ export default function ProductCard({
   index = 0,
   priority,
   hideStats = false,
+  compact = false,
   overlay,
   footer,
 }: ProductCardProps) {
@@ -135,7 +141,9 @@ export default function ProductCard({
             <div className="flex-1 flex items-center justify-between min-w-0">
               <div className="flex-1 min-w-0">
                 <h3 className="font-medium text-heading line-clamp-1 text-sm">{product.title}</h3>
-                {!hideStats && <p className="text-xs text-muted mt-0.5">{subline}</p>}
+                {!hideStats && !compact && (
+                  <p className="text-xs text-muted mt-0.5">{subline}</p>
+                )}
                 <span className="text-[10px] text-subtle bg-surface-alt px-1.5 py-0.5 rounded inline-block mt-1">
                   {formatCondition(product.condition, locale)}
                 </span>
@@ -143,7 +151,7 @@ export default function ProductCard({
               <div className="flex items-center gap-3 ml-4">
                 {!hideStats && (
                   <div className="flex items-center gap-2.5 text-[11px] text-subtle">
-                    {ratingBlock('w-3.5 h-3.5', 'text-subtle')}
+                    {!compact && ratingBlock('w-3.5 h-3.5', 'text-subtle')}
                     <span className="flex items-center gap-0.5">
                       <EyeIcon className="w-3.5 h-3.5" />
                       {product.viewCount ?? 0}
@@ -210,10 +218,12 @@ export default function ProductCard({
             <h3 className="font-medium text-heading line-clamp-2 text-xs leading-tight mb-1 group-hover:text-primary-600 transition-colors">
               {product.title}
             </h3>
-            {!hideStats && <p className="text-[10px] text-subtle mb-1.5">{subline}</p>}
+            {!hideStats && !compact && (
+              <p className="text-[10px] text-subtle mb-1.5">{subline}</p>
+            )}
             {!hideStats && (
               <div className="flex items-center gap-2 mb-1.5 text-[10px] text-subtle">
-                {ratingBlock('w-3 h-3', '')}
+                {!compact && ratingBlock('w-3 h-3', '')}
                 <span className="flex items-center gap-0.5">
                   <EyeIcon className="w-3 h-3" />
                   {product.viewCount ?? 0}
@@ -225,9 +235,11 @@ export default function ProductCard({
               </div>
             )}
             <div className="mt-auto pt-1.5 border-t border-border-subtle">
-              <span className="text-[9px] text-subtle bg-surface px-1 py-0.5 rounded inline-block mb-1">
-                {formatCondition(product.condition, locale)}
-              </span>
+              {!compact && (
+                <span className="text-[9px] text-subtle bg-surface px-1 py-0.5 rounded inline-block mb-1">
+                  {formatCondition(product.condition, locale)}
+                </span>
+              )}
               {onSale && (
                 <span className="text-[10px] text-subtle line-through ml-1.5">{fmtTL(originalPrice)}</span>
               )}

@@ -17,14 +17,7 @@ export default function TradeRail() {
 			title={locale === 'en' ? 'Trade Showcase' : 'Takas Vitrini'}
 			viewAllHref='/takas'
 			viewAllLabel={viewAllLabel}>
-			<ProductRail
-				items={trade}
-				isLoading={isLoadingTrade}
-				variant='grid'
-				gridClassName='grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8'
-				skeletonCount={6}
-				limit={12}
-			/>
+			<ProductRail items={trade} isLoading={isLoadingTrade} />
 		</HomeSection>
 	);
 }
