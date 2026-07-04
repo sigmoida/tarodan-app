@@ -26,6 +26,7 @@ import {
   ClipboardDocumentIcon,
   FlagIcon,
   BeakerIcon,
+  TicketIcon,
 } from '@heroicons/react/24/outline';
 
 /**
@@ -107,7 +108,7 @@ export const navGroups: NavGroup[] = [
       { name: 'Satıcı Performansı', href: '/accounts/seller-performance', icon: ChartBarIcon, permission: 'seller_performance' },
       { name: 'Yorumlar', href: '/accounts/reviews', icon: StarIcon, permission: 'reviews' },
       { name: 'Rapor Talepleri', href: '/accounts/reports', icon: FlagIcon, keywords: ['rapor', 'şikayet', 'report', 'complaint', 'abuse'], permission: 'reports' },
-      { name: 'Rol Yönetimi', href: '/roles', icon: UserCircleIcon, permission: 'staff' },
+      { name: 'Rol Yönetimi', href: '/accounts/roles', icon: UserCircleIcon, permission: 'staff' },
     ],
   },
   {
@@ -126,9 +127,8 @@ export const navGroups: NavGroup[] = [
     icon: MegaphoneIcon,
     href: '/marketing',
     items: [
-      // KUPON/İndirimler sekmesi devre dışı (yoruma alındı) — sayfa kodu ve route duruyor
-      // { name: 'İndirimler', href: '/discounts', icon: TicketIcon, permission: 'discounts' },
       { name: 'Reklamlar', href: '/marketing/ads', icon: MegaphoneIcon, keywords: ['reklam', 'ad', 'banner'], permission: 'ads' },
+      { name: 'İndirimler', href: '/marketing/discounts', icon: TicketIcon, keywords: ['indirim', 'kupon', 'discount', 'coupon', 'kampanya'], permission: 'discounts' },
       { name: 'Bildirimler', href: '/marketing/notifications', icon: BellAlertIcon, permission: 'notifications' },
       { name: 'E-posta Şablonları', href: '/marketing/email-templates', icon: ChatBubbleLeftRightIcon, permission: 'email_templates' },
       { name: 'Sayfalar', href: '/marketing/pages', icon: DocumentTextIcon, permission: 'pages' },
@@ -175,9 +175,7 @@ export function matchesQuery(item: NavItem, q: string): boolean {
  * dışı sekmeler). Nav öğelerinden türetilemeyen istisnalar burada.
  */
 const EXTRA_ROUTE_PERMISSIONS: Record<string, string> = {
-  '/discounts': 'discounts', // nav'da yoruma alınmış ama route + guard duruyor
-  '/moderation': 'ai_moderation', // /ai-moderation alias'ı
-  '/audit-logs': 'audit_logs', // ayrı denetim log route'u
+  // Nav'dan türetilemeyen route istisnaları burada. Şu an hepsi nav'da tanımlı.
 };
 
 /**
