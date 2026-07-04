@@ -45,6 +45,16 @@ export const queryKeys = {
       ['collections', 'public', sortBy, search || null, categoryId || null] as const,
     mine: () => ['collections', 'mine'] as const,
   },
+  manufacturers: {
+    /** The public manufacturers list — seeded by the server, read by the client. */
+    list: () => ['manufacturers', 'list'] as const,
+    /** A single manufacturer resolved by slug. */
+    detail: (slug: string) => ['manufacturers', 'detail', slug] as const,
+    /** Active listings for a manufacturer's detail grid. */
+    products: (slug: string) => ['manufacturers', 'products', slug] as const,
+    /** The 4-item listings teaser inside an accordion card (keyed by id). */
+    preview: (id: string) => ['manufacturers', 'preview', id] as const,
+  },
   category: {
     bySlug: (slug: string) => ['categoryBySlug', slug] as const,
   },

@@ -11,15 +11,14 @@ import ProductLayoutSelector from '@/components/ProductLayoutSelector';
 import { useListings } from '../_context/ListingsContext';
 
 /**
- * The full-width page-header band: result count, mobile "Filtreler" button,
- * product-layout selector and the sort Select.
+ * The page-header controls (rendered in the shared `PageHeader`'s actions slot):
+ * the mobile "Filtreler" button, the product-layout selector and the sort Select.
+ * The title + result count live in the PageHeader itself (see ListingsClient).
  */
-export default function ListingsToolbar() {
+export default function ListingsControls() {
 	const { t, locale } = useTranslation();
 	const {
 		filters,
-		currentSearch,
-		pagination,
 		productLayout,
 		setProductLayout,
 		activeFilterCount,
@@ -28,72 +27,44 @@ export default function ListingsToolbar() {
 	} = useListings();
 
 	return (
-		<div className='bg-surface'>
-			<div className='mx-auto p-4'>
-				<div className='flex flex-row gap-4 items-center justify-between'>
-					<div className='flex items-center justify-between'>
-						<div className='min-w-0'>
-							<h2 className='text-lg sm:text-xl font-bold text-heading flex items-center gap-2 truncate'>
-								<div className='w-1 h-6 bg-primary-500 rounded-sm flex-shrink-0' />
-								<span className='truncate'>
-									{currentSearch
-										? locale === 'en'
-											? `Results for "${currentSearch}"`
-											: `"${currentSearch}" araması`
-										: filters.brand ||
-											filters.category ||
-											(locale === 'en' ? 'All Listings' : 'Tüm İlanlar')}
-								</span>
-							</h2>
-							<p className='text-xs sm:text-sm text-muted mt-0.5'>
-								{pagination.total}{' '}
-								{locale === 'en' ? 'products found' : 'ürün bulundu'}
-							</p>
-						</div>
-						<Button
-							variant='secondary'
-							onClick={() => setShowMobileSidebar(true)}
-							className='lg:hidden flex items-center gap-1.5 px-2.5 py-1.5 bg-surface-elevated border border-border rounded text-xs sm:text-sm font-medium hover:bg-surface transition-colors flex-shrink-0 ml-2'>
-							<FunnelIcon className='w-4 h-4' />
-							<span className='hidden sm:inline'>{t('product.filters')}</span>
-							{activeFilterCount > 0 && (
-								<span className='px-1.5 py-0.5 bg-primary-500 text-inverted text-[10px] font-bold rounded-sm'>
-									{activeFilterCount}
-								</span>
-							)}
-						</Button>
-					</div>
-					<div className='flex items-center gap-2 overflow-x-auto'>
-						<ProductLayoutSelector
-							layout={productLayout}
-							onLayoutChange={setProductLayout}
-							storageKey='listings-product-layout'
-						/>
-						<Select
-							value={filters.sortBy}
-							onChange={(e) =>
-								handleFiltersChange({ ...filters, sortBy: e.target.value })
-							}
-							className='w-auto flex-shrink-0'>
-							<option value='relevance'>
-								{locale === 'en' ? 'Recommended' : 'Önerilen'}
-							</option>
-							<option value='created_desc'>{t('product.sortNewest')}</option>
-							<option value='created_asc'>{t('product.sortOldest')}</option>
-							<option value='view_count_desc'>
-								{t('product.sortPopular')}
-							</option>
-							<option value='price_asc'>{t('product.sortPriceLow')}</option>
-							<option value='price_desc'>{t('product.sortPriceHigh')}</option>
-							<option value='rating_desc'>
-								{locale === 'en' ? 'Highest Rating' : 'En yüksek puan'}
-							</option>
-							<option value='title_asc'>A-Z</option>
-							<option value='title_desc'>Z-A</option>
-						</Select>
-					</div>
-				</div>
-			</div>
+		<div className='flex items-center gap-2 overflow-x-auto'>
+			<Button
+				variant='secondary'
+				onClick={() => setShowMobileSidebar(true)}
+				className='lg:hidden flex items-center gap-1.5 px-2.5 py-1.5 bg-surface-elevated border border-border rounded text-xs sm:text-sm font-medium hover:bg-surface transition-colors flex-shrink-0'>
+				<FunnelIcon className='w-4 h-4' />
+				<span className='hidden sm:inline'>{t('product.filters')}</span>
+				{activeFilterCount > 0 && (
+					<span className='px-1.5 py-0.5 bg-primary-500 text-inverted text-[10px] font-bold rounded-sm'>
+						{activeFilterCount}
+					</span>
+				)}
+			</Button>
+			<ProductLayoutSelector
+				layout={productLayout}
+				onLayoutChange={setProductLayout}
+				storageKey='listings-product-layout'
+			/>
+			<Select
+				value={filters.sortBy}
+				onChange={(e) =>
+					handleFiltersChange({ ...filters, sortBy: e.target.value })
+				}
+				className='w-auto flex-shrink-0'>
+				<option value='relevance'>
+					{locale === 'en' ? 'Recommended' : 'Önerilen'}
+				</option>
+				<option value='created_desc'>{t('product.sortNewest')}</option>
+				<option value='created_asc'>{t('product.sortOldest')}</option>
+				<option value='view_count_desc'>{t('product.sortPopular')}</option>
+				<option value='price_asc'>{t('product.sortPriceLow')}</option>
+				<option value='price_desc'>{t('product.sortPriceHigh')}</option>
+				<option value='rating_desc'>
+					{locale === 'en' ? 'Highest Rating' : 'En yüksek puan'}
+				</option>
+				<option value='title_asc'>A-Z</option>
+				<option value='title_desc'>Z-A</option>
+			</Select>
 		</div>
 	);
 }
@@ -226,9 +197,7 @@ export function ActiveFilterChips() {
 					{t('product.tradeAvailable')}
 					<Button
 						variant='secondary'
-						onClick={() =>
-							handleFiltersChange({ ...filters, tradeOnly: false })
-						}
+						onClick={() => handleFiltersChange({ ...filters, tradeOnly: false })}
 						className='hover:text-success-900 ml-0.5'>
 						<XMarkIcon className='w-3.5 h-3.5' />
 					</Button>

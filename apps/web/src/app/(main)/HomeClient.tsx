@@ -2,6 +2,7 @@
 
 'use client';
 
+import { PageShell } from '@/components/layout/PageShell';
 import HeroSlider from '@/components/home/HeroSlider';
 import TrustBadges from '@/components/home/TrustBadges';
 import { HomeDataProvider } from './_home/context/HomeDataContext';
@@ -17,7 +18,7 @@ import TradeRail from './_home/sections/TradeRail';
 export default function HomeClient() {
 	return (
 		<HomeDataProvider>
-			<div className='min-h-screen bg-surface'>
+			<PageShell>
 				<HeroSlider />
 				<BrandsMarquee />
 				<FeaturedRail />
@@ -28,7 +29,7 @@ export default function HomeClient() {
 				<Spotlights />
 				<TrustBadges />
 				<HomeAuthModal />
-			</div>
+			</PageShell>
 		</HomeDataProvider>
 	);
 }

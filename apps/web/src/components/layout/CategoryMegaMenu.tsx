@@ -147,7 +147,7 @@ export default function CategoryMegaMenu() {
                 {/* Left Sidebar - Menu Sections */}
                 <div className="w-56 bg-surface border-r border-border py-4">
                   <Link
-                    href="/ureticiler"
+                    href="/manufacturers"
                     className="flex items-center justify-between w-full px-4 py-3 text-left text-sm font-medium text-body hover:bg-surface-alt hover:text-primary-600 transition-colors"
                   >
                     <span className="flex items-center gap-2">

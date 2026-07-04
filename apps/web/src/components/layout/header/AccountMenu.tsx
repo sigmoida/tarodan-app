@@ -105,7 +105,7 @@ export default function AccountMenu({
 	const NAV_LINKS = [
 		{ href: '/listings', label: t('nav.listings') },
 		{ href: '/takas', label: t('nav.tradeShowcase') || 'Takas Vitrini' },
-		{ href: '/ureticiler', label: t('nav.brands') || 'Üreticiler' },
+		{ href: '/manufacturers', label: t('nav.brands') || 'Üreticiler' },
 		{ href: '/trades', label: t('nav.trades') },
 		{ href: '/collections', label: t('nav.collections') },
 		{ href: '/pricing', label: t('nav.pricing') },
@@ -175,7 +175,7 @@ export default function AccountMenu({
 							</Link>
 							{NAV_LINKS.filter(
 								(l) =>
-									!['/listings', '/ureticiler', '/collections'].includes(
+									!['/listings', '/manufacturers', '/collections'].includes(
 										l.href,
 									),
 							).map((link) => {
@@ -311,7 +311,7 @@ export default function AccountMenu({
 							</Link>
 							{NAV_LINKS.filter(
 								(l) =>
-									!['/listings', '/ureticiler', '/collections'].includes(
+									!['/listings', '/manufacturers', '/collections'].includes(
 										l.href,
 									),
 							).map((link) => {

@@ -1,10 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { motion } from 'framer-motion';
 import { FolderPlusIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n';
 import { Button } from '@tarodan/ui';
+import { PageShell } from '@/components/layout/PageShell';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Container } from '@/components/layout/Container';
 import CreateCollectionModal from '@/components/CreateCollectionModal';
 import { CollectionsProvider, useCollections } from './_context/CollectionsContext';
 import CollectionsToolbar from './_components/CollectionsToolbar';
@@ -25,48 +27,43 @@ function CollectionsLayout() {
     handleCreated,
   } = useCollections();
 
-  return (
-    <div className="min-h-screen bg-surface">
-      {/* Page Header */}
-      <div className="bg-surface-elevated border-b border-border">
-        <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-5">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div>
-              <h1 className="text-xl font-bold text-heading flex items-center gap-2">
-                <div className="w-1 h-6 bg-primary-500 rounded-sm" />
-                {t('collection.collections')}
-              </h1>
-              <p className="text-sm text-muted mt-0.5">{t('footer.description')}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              {mounted && isAuthenticated && limits?.canCreateCollections && (
-                <Button
-                  variant="primary"
-                  size="md"
-                  onClick={handleCreateClick}
-                  className="flex items-center gap-1.5"
-                >
-                  <FolderPlusIcon className="w-4 h-4" />
-                  {t('collection.createCollection')}
-                </Button>
-              )}
-              {mounted && isAuthenticated && !limits?.canCreateCollections && (
-                <Link
-                  href="/pricing"
-                  className="px-4 py-2 bg-surface-alt text-body hover:bg-border-subtle rounded text-sm font-medium transition-colors"
-                >
-                  {t('membership.upgrade')}
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+  const canCreate = mounted && isAuthenticated && limits?.canCreateCollections;
+  const needsUpgrade = mounted && isAuthenticated && !limits?.canCreateCollections;
 
-      <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-5">
+  return (
+    <PageShell>
+      <PageHeader
+        title={t('collection.collections')}
+        description={t('footer.description')}
+        actions={
+          <>
+            {canCreate && (
+              <Button
+                variant="primary"
+                size="md"
+                onClick={handleCreateClick}
+                className="flex items-center gap-1.5"
+              >
+                <FolderPlusIcon className="w-4 h-4" />
+                {t('collection.createCollection')}
+              </Button>
+            )}
+            {needsUpgrade && (
+              <Link
+                href="/pricing"
+                className="px-4 py-2 bg-surface-alt text-body hover:bg-border-subtle rounded text-sm font-medium transition-colors"
+              >
+                {t('membership.upgrade')}
+              </Link>
+            )}
+          </>
+        }
+      />
+
+      <Container className="px-4 py-5">
         <CollectionsToolbar />
         <CollectionsGrid />
-      </div>
+      </Container>
 
       {/* Create Collection Modal */}
       {showCreateModal && (
@@ -80,11 +77,7 @@ function CollectionsLayout() {
       {/* Premium Required Modal */}
       {showPremiumModal && (
         <div className="fixed inset-0 bg-heading/50 flex items-center justify-center z-50 p-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-surface-elevated rounded max-w-md w-full p-6 text-center"
-          >
+          <div className="bg-surface-elevated rounded max-w-md w-full p-6 text-center">
             <div className="w-14 h-14 bg-primary-50 rounded flex items-center justify-center mx-auto mb-4">
               <FolderPlusIcon className="w-7 h-7 text-primary-500" />
             </div>
@@ -100,10 +93,10 @@ function CollectionsLayout() {
                 Üyeliği Yükselt
               </Link>
             </div>
-          </motion.div>
+          </div>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }
 

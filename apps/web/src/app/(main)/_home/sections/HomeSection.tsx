@@ -3,18 +3,19 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { SectionHeader } from '@/components/ui';
+import Link from 'next/link';
+import { Button } from '@tarodan/ui';
+import { SectionCard } from '@/components/ui';
 
 /**
- * The single frame shared by every carded home section (the product rails and
- * the collections carousel): one consistent surface + border + padding, and one
- * header (title / view-all / badge) managed in one place. Sections only supply
- * their header text and content — no per-section background/class variations.
+ * The home-page section wrapper: the standard `py-4 px-4` rhythm around a shared
+ * `SectionCard`. Sections supply their header text and content; the optional
+ * "view all" link is mapped onto SectionCard's generic `action` slot.
  */
 export default function HomeSection({
 	title,
 	viewAllHref,
-	viewAllLabel,
+	viewAllLabel = 'Tümünü gör',
 	badge,
 	children,
 }: {
@@ -27,15 +28,18 @@ export default function HomeSection({
 	return (
 		<section className='py-4'>
 			<div className='px-4'>
-				<div className='bg-surface-elevated border border-border rounded p-3 md:p-5'>
-					<SectionHeader
-						title={title}
-						viewAllHref={viewAllHref}
-						viewAllLabel={viewAllLabel}
-						badge={badge}
-					/>
+				<SectionCard
+					title={title}
+					badge={badge}
+					action={
+						viewAllHref ? (
+							<Button asChild variant='secondary' size='sm'>
+								<Link href={viewAllHref}>{viewAllLabel}</Link>
+							</Button>
+						) : undefined
+					}>
 					{children}
-				</div>
+				</SectionCard>
 			</div>
 		</section>
 	);

@@ -4,13 +4,10 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import {
-  MapPinIcon,
   PlusIcon,
   CreditCardIcon,
   TruckIcon,
-  CheckCircleIcon,
   ArrowLeftIcon,
   ShieldCheckIcon,
   TagIcon,
@@ -48,6 +45,11 @@ import {
 import { getFullPhoneNumber, normalizePhoneForPayload } from "@/lib/phone";
 import { useTranslation } from "@/i18n";
 import { ButtonLink } from "@/components/ui/ButtonLink";
+import { SectionCard } from "@/components/ui";
+import { PageShell } from "@/components/layout/PageShell";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Container } from "@/components/layout/Container";
+import CheckoutSteps from "./_components/CheckoutSteps";
 
 interface Address {
   id: string;
@@ -75,7 +77,7 @@ interface CheckoutItem {
   };
 }
 
-export default function CheckoutPage() {
+export default function CheckoutClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const {
@@ -1343,19 +1345,19 @@ export default function CheckoutPage() {
   // Wait for client mount before rendering dynamic content
   if (!isMounted) {
     return (
-      <div className="min-h-screen bg-surface flex items-center justify-center">
+      <PageShell className="flex items-center justify-center">
         <div className="text-center">
           <Spinner size="xl" className="mx-auto mb-4" />
           <p className="text-muted">Yükleniyor...</p>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   // orderId ile geldiyse boş sepete atma (sipariş yüklenene kadar bekle); normal checkout’ta sepette ürün yoksa ilanlara yönlendir
   if (checkoutItems.length === 0 && !directProductId && !existingOrderId) {
     return (
-      <div className="min-h-screen bg-surface flex items-center justify-center">
+      <PageShell className="flex items-center justify-center">
         <div className="text-center">
           <TruckIcon className="w-20 h-20 text-border-strong mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-heading mb-2">
@@ -1364,78 +1366,38 @@ export default function CheckoutPage() {
           <p className="text-muted mb-6">{t("cart.emptyDesc")}</p>
           <ButtonLink href="/listings">{t("cart.browseListings")}</ButtonLink>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   return (
     <>
-      <div className="min-h-screen bg-surface py-8">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="flex items-center gap-4 mb-8">
-            <Button
-              variant="secondary"
-              onClick={() => router.back()}
-              className="p-2 hover:bg-surface-alt rounded-sm transition-colors"
-            >
-              <ArrowLeftIcon className="w-6 h-6" />
-            </Button>
-            <h1 className="text-3xl font-bold text-heading">
-              {t("checkout.title")}
-            </h1>
-          </div>
+      <PageShell>
+        <PageHeader title={t("checkout.title")} />
+
+        <Container className="px-4 py-8">
+          {/* Back */}
+          <Button
+            variant="secondary"
+            onClick={() => router.back()}
+            className="inline-flex items-center gap-2 mb-6"
+          >
+            <ArrowLeftIcon className="w-4 h-4" />
+            {locale === "en" ? "Back" : "Geri"}
+          </Button>
 
           {/* Progress Steps */}
-          <div className="flex items-center justify-center gap-4 mb-8">
-            {[
-              { step: 1, label: t("checkout.step1") },
-              { step: 2, label: t("checkout.step2") },
-              { step: 3, label: t("checkout.step3") },
-            ].map((s, index) => (
-              <div key={s.step} className="flex items-center">
-                <div
-                  className={`w-10 h-10 rounded-sm flex items-center justify-center font-semibold transition-colors ${
-                    step >= s.step
-                      ? "bg-primary-500 text-inverted"
-                      : "bg-border-subtle text-muted"
-                  }`}
-                >
-                  {step > s.step ? (
-                    <CheckCircleIcon className="w-6 h-6" />
-                  ) : (
-                    s.step
-                  )}
-                </div>
-                <span
-                  className={`ml-2 ${step >= s.step ? "text-heading" : "text-muted"}`}
-                >
-                  {s.label}
-                </span>
-                {index < 2 && (
-                  <div
-                    className={`w-16 h-1 mx-4 ${step > s.step ? "bg-primary-500" : "bg-border-subtle"}`}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
+          <CheckoutSteps step={step} />
 
           <div className="grid lg:grid-cols-3 gap-8">
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-6">
               {/* Step 1: Address */}
               {step === 1 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="card p-6"
+                <SectionCard
+                  title={t("checkout.shippingAddress")}
+                  className="p-6"
                 >
-                  <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                    <MapPinIcon className="w-6 h-6 text-primary-500" />
-                    {t("checkout.shippingAddress")}
-                  </h2>
-
                   {isAuthenticated ? (
                     <>
                       {/* Saved Addresses */}
@@ -1826,21 +1788,15 @@ export default function CheckoutPage() {
                       Devam Et
                     </Button>
                   </div>
-                </motion.div>
+                </SectionCard>
               )}
 
               {/* Step 2: Payment */}
               {step === 2 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="card p-6"
+                <SectionCard
+                  title={locale === "en" ? "Payment Method" : "Ödeme Yöntemi"}
+                  className="p-6"
                 >
-                  <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                    <CreditCardIcon className="w-6 h-6 text-primary-500" />
-                    {locale === "en" ? "Payment Method" : "Ödeme Yöntemi"}
-                  </h2>
-
                   {/* Carrier — Sürat Kargo sabit */}
                   <div className="mb-6">
                     <h3 className="font-medium text-heading mb-3 flex items-center gap-2">
@@ -1912,21 +1868,15 @@ export default function CheckoutPage() {
                     </Button>
                     <Button onClick={() => setStep(3)}>Devam Et</Button>
                   </div>
-                </motion.div>
+                </SectionCard>
               )}
 
               {/* Step 3: Confirm */}
               {step === 3 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="card p-6"
+                <SectionCard
+                  title={locale === "en" ? "Order Summary" : "Sipariş Özeti"}
+                  className="p-6"
                 >
-                  <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                    <CheckCircleIcon className="w-6 h-6 text-primary-500" />
-                    {locale === "en" ? "Order Summary" : "Sipariş Özeti"}
-                  </h2>
-
                   {/* Order Items */}
                   <div className="space-y-4 mb-6">
                     {checkoutItems.map((item) => (
@@ -2040,17 +1990,16 @@ export default function CheckoutPage() {
                       )}
                     </Button>
                   </div>
-                </motion.div>
+                </SectionCard>
               )}
             </div>
 
             {/* Order Summary Sidebar */}
             <div className="lg:col-span-1">
-              <div className="card p-6 sticky top-24">
-                <h2 className="text-lg font-semibold mb-4">
-                  {locale === "en" ? "Order Summary" : "Sipariş Özeti"}
-                </h2>
-
+              <SectionCard
+                title={locale === "en" ? "Order Summary" : "Sipariş Özeti"}
+                className="p-6 sticky top-24"
+              >
                 {/* Items Preview */}
                 <div className="space-y-3 mb-4">
                   {checkoutItems.slice(0, 3).map((item) => (
@@ -2208,11 +2157,11 @@ export default function CheckoutPage() {
                     </span>
                   </div>
                 </div>
-              </div>
+              </SectionCard>
             </div>
           </div>
-        </div>
-      </div>
+        </Container>
+      </PageShell>
 
       {guestOtpModalOpen && !isAuthenticated ? (
         <div

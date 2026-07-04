@@ -10,7 +10,7 @@ const POPULAR_LINKS = [
   { href: '/listings', label: 'İlanlar' },
   { href: '/trades', label: 'Takaslar' },
   { href: '/collections', label: 'Koleksiyonlar' },
-  { href: '/ureticiler', label: 'Üreticiler' },
+  { href: '/manufacturers', label: 'Üreticiler' },
   { href: '/contact', label: 'İletişim' },
   { href: '/sitemap', label: 'Site Haritası' },
 ];
