@@ -1,43 +1,35 @@
+/** @format */
+
 import Link from 'next/link';
-import { ArrowRightIcon } from '@heroicons/react/24/outline';
+import { Button } from '@tarodan/ui';
 
 interface SectionHeaderProps {
-  title: string;
-  viewAllHref?: string;
-  viewAllLabel?: string;
-  icon?: React.ReactNode;
-  badge?: React.ReactNode;
-  className?: string;
+	title: string;
+	viewAllHref?: string;
+	viewAllLabel?: string;
+	badge?: React.ReactNode;
+	className?: string;
 }
 
 export default function SectionHeader({
-  title,
-  viewAllHref,
-  viewAllLabel = 'Tümünü gör',
-  icon,
-  badge,
-  className = '',
+	title,
+	viewAllHref,
+	viewAllLabel = 'Tümünü gör',
+	badge,
+	className = '',
 }: SectionHeaderProps) {
-  return (
-    <div className={`flex items-center justify-between gap-4 mb-4 ${className}`}>
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="w-1 h-6 bg-primary-500 flex-shrink-0" style={{borderRadius:'1px'}} />
-        <h2 className="text-lg font-bold text-heading tracking-tight flex items-center gap-2">
-          {icon}
-          {title}
-        </h2>
-        {badge}
-      </div>
-      {viewAllHref && (
-        <Link
-          href={viewAllHref}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-primary-600 px-3 py-1.5 border border-border hover:border-primary-300 bg-surface-elevated hover:bg-primary-50 transition-all duration-200 flex-shrink-0"
-          style={{borderRadius:'4px'}}
-        >
-          {viewAllLabel}
-          <ArrowRightIcon className="w-3 h-3" />
-        </Link>
-      )}
-    </div>
-  );
+	return (
+		<div className={`flex items-center justify-between gap-4 mb-4 ${className}`}>
+			<div className='flex items-center gap-3 min-w-0'>
+				<div className='w-1 h-6 bg-primary-500 flex-shrink-0 rounded-sm' />
+				<h2 className='text-lg font-bold text-heading tracking-tight'>{title}</h2>
+				{badge}
+			</div>
+			{viewAllHref && (
+				<Button asChild variant='secondary' size='sm' className='flex-shrink-0'>
+					<Link href={viewAllHref}>{viewAllLabel}</Link>
+				</Button>
+			)}
+		</div>
+	);
 }

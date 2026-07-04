@@ -1,3 +1,5 @@
+/** @format */
+
 import QueryProvider from './QueryProvider';
 import { RealtimeProvider } from '@/components/realtime/RealtimeProvider';
 import { PlatformFeeAnnouncementBanner } from '@/components/banners/PlatformFeeAnnouncementBanner';
@@ -15,22 +17,26 @@ import Footer from '@/components/layout/Footer';
  * so render without any of it. Replaces the old runtime `LayoutShell` path check.
  */
 export default function MainLayout({
-  children,
+	children,
 }: {
-  children: React.ReactNode;
+	children: React.ReactNode;
 }) {
-  return (
-    <QueryProvider>
-      <RealtimeProvider />
-      <PlatformFeeAnnouncementBanner />
-      <ConfirmProvider>
-        <BusinessMembershipGuard>
-          <Navbar />
-          <CategoryNavBarWrapper />
-          <main className="flex-1">{children}</main>
-          <Footer />
-        </BusinessMembershipGuard>
-      </ConfirmProvider>
-    </QueryProvider>
-  );
+	return (
+		<QueryProvider>
+			<RealtimeProvider />
+			<PlatformFeeAnnouncementBanner />
+			<ConfirmProvider>
+				<BusinessMembershipGuard>
+					<Navbar />
+					<CategoryNavBarWrapper />
+					<main className='flex-1 w-full bg-surface'>
+						{/* Content container: full-bleed until 2xl (1536px), then fixed +
+                centered so it never stretches on ultra-wide screens. */}
+						<div className='mx-auto w-full max-w-screen-2xl'>{children}</div>
+					</main>
+					<Footer />
+				</BusinessMembershipGuard>
+			</ConfirmProvider>
+		</QueryProvider>
+	);
 }

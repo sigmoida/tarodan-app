@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { StarIcon, EyeIcon, HeartIcon, ArrowsRightLeftIcon } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
+import { ProductBadge } from '@tarodan/ui';
 import OptimizedImage from '@/components/OptimizedImage';
 import OutOfStockOverlay from '@/components/ui/OutOfStockOverlay';
 import { useTranslation } from '@/i18n';
@@ -186,9 +187,9 @@ export default function ProductCard({
             {outOfStock && <OutOfStockOverlay />}
             <div className="absolute top-1.5 left-1.5 flex flex-col items-start gap-1">
               {product.isBoosted && (
-                <div className="bg-amber-500 text-inverted text-[10px] font-bold px-1.5 py-0.5 rounded">
+                <ProductBadge variant="sponsored" className="text-[10px] px-1.5 py-0.5">
                   {locale === 'en' ? 'Sponsored' : 'Sponsorlu'}
-                </div>
+                </ProductBadge>
               )}
               {isTrade && (
                 <div className="bg-success-500 text-inverted text-[10px] px-1.5 py-0.5 rounded flex items-center gap-0.5">
@@ -198,8 +199,10 @@ export default function ProductCard({
               )}
             </div>
             {onSale && (
-              <div className="absolute top-1.5 right-1.5 bg-danger-500 text-inverted text-[10px] font-bold px-1.5 py-0.5 rounded">
-                %{product.discountPercent ?? 0}
+              <div className="absolute top-1.5 right-1.5">
+                <ProductBadge variant="sale" className="text-[10px] px-1.5 py-0.5">
+                  %{product.discountPercent ?? 0}
+                </ProductBadge>
               </div>
             )}
           </div>
