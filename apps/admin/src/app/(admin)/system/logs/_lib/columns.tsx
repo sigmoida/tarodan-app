@@ -1,13 +1,13 @@
-import { Button, cn, enumLabel, severityConfig } from '@tarodan/ui';
+import { Badge, cn, severityConfig } from '@tarodan/ui';
 import { CheckCircleIcon, ClockIcon, UserIcon } from '@heroicons/react/24/outline';
 import { col } from '@/components/table';
 import { ExpandButton } from '../_components/ExpandButton';
+import { securityRowMenu } from './rowActions';
 import {
   type ErrorLog,
   type SecurityLog,
   type EmailLog,
   type AuditLog,
-  severityColors,
   statusColors,
   eventTypeLabels,
   ACTION_LABELS,
@@ -15,11 +15,7 @@ import {
   formatDate,
 } from './types';
 
-const severityPill = (s: string) => (
-  <span className={cn('rounded-full border px-2 py-1 text-xs', severityColors[s])}>
-    {enumLabel(severityConfig, s)}
-  </span>
-);
+const severityPill = (s: string) => <Badge status={s} config={severityConfig} />;
 
 type Toggle = { expandedId: string | null; setExpandedId: (id: string | null) => void };
 
@@ -82,15 +78,7 @@ export function buildSecurityColumns(onResolve: (id: string) => void) {
       ),
     ),
     col.date<SecurityLog>('Tarih', (r) => r.createdAt),
-    col.actions<SecurityLog>(
-      (r) =>
-        !r.resolved ? (
-          <Button variant="secondary" size="sm" onClick={() => onResolve(r.id)}>
-            Çöz
-          </Button>
-        ) : null,
-      { header: 'İşlem' },
-    ),
+    col.rowMenu<SecurityLog>(securityRowMenu(onResolve)),
   ];
 }
 

@@ -1,5 +1,5 @@
 import { CubeIcon } from '@heroicons/react/24/outline';
-import { productConditionConfig, enumLabel } from '@tarodan/ui';
+import { Badge, productConditionConfig, enumLabel } from '@tarodan/ui';
 import { SectionCard } from '@/components/detail/SectionCard';
 import {
   getProductEffectivePrice,
@@ -7,7 +7,7 @@ import {
   getProductOriginalPriceForDisplay,
 } from '@/lib/product-price';
 import { fmtDateTime, fmtTry } from '@/lib/format';
-import { AiBadge } from '../../_components/AiBadge';
+import { aiCheckConfig, aiCheckKey } from '../../_lib/types';
 import type { ProductDetail } from '../_lib/types';
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -64,7 +64,7 @@ export function ProductInfoSection({ product }: { product: ProductDetail }) {
         <div className="border-t border-border pt-3">
           <span className="text-sm text-muted">AI Görsel Denetimi</span>
           <div className="mt-1 flex flex-wrap items-center gap-2">
-            <AiBadge status={product.aiCheckStatus} />
+            <Badge status={aiCheckKey(product.aiCheckStatus)} config={aiCheckConfig} />
             <span className="text-xs text-muted">
               İlgililik (araç/model): %{Math.round((product.aiRelevanceScore ?? 0) * 100)} ·
               Uygunsuzluk: %{((product.aiNsfwScore ?? 0) * 100).toFixed(2)}

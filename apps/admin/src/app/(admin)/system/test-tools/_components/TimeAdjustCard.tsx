@@ -6,8 +6,8 @@ import toast from 'react-hot-toast';
 import { adminApi } from '@/lib/api';
 import { SectionCard } from '@/components/detail/SectionCard';
 import { DataTable } from '@/components/DataTable';
-import { col } from '@/components/table';
 import { useConfirm } from '@/provider/ConfirmProvider';
+import { timeAdjustColumns } from '../_lib/columns';
 import {
   type AdjustAction,
   type SearchItem,
@@ -86,49 +86,7 @@ export function TimeAdjustCard({ isProd }: { isProd: boolean }) {
     }
   };
 
-  const columns = [
-    col.custom<SearchItem>('Kayıt', (item) => (
-      <div className="min-w-0">
-        <div className="truncate font-medium text-heading">{item.label}</div>
-        <div className="truncate text-xs text-subtle">{item.id}</div>
-      </div>
-    )),
-    col.muted<SearchItem>('Durum', (item) => item.status ?? '—'),
-    col.custom<SearchItem>('Tarihler', (item) => (
-      <div className="space-y-0.5">
-        {Object.entries(item.dates).map(([k, v]) => (
-          <div key={k} className="text-xs">
-            <span className="text-muted">{k}:</span> {fmt(v)}
-          </div>
-        ))}
-      </div>
-    )),
-    col.custom<SearchItem>(
-      'Aksiyon',
-      (item) => (
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" size="sm" onClick={() => askAdjust(item, 'expire_now', 0)}>
-            Şimdi bitir
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => askAdjust(item, 'set_minutes', minutes)}
-          >
-            {minutes} dk sonra
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => askAdjust(item, 'backdate_days', days)}
-          >
-            {days} gün geri
-          </Button>
-        </div>
-      ),
-      { grow: 3, minWidth: 260 },
-    ),
-  ];
+  const columns = timeAdjustColumns({ minutes, days, onAdjust: askAdjust });
 
   return (
     <SectionCard title="Süre Ayarlama" bodyClassName="space-y-4">

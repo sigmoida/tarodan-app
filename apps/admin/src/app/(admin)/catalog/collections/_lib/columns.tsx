@@ -1,15 +1,9 @@
-import { PencilIcon, TrashIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+import { Badge } from '@tarodan/ui';
 import { col, TruncatedText } from '@/components/table';
-import { ActionIconButton } from '@/components/AdminList';
+import { collectionRowMenu, type CollectionRowActions } from './rowActions';
 import type { Collection } from './types';
 
-export interface CollectionRowActions {
-  onToggleVisibility: (c: Collection) => void;
-  onEdit: (c: Collection) => void;
-  onDelete: (c: Collection) => void;
-}
-
-export function collectionColumns({ onToggleVisibility, onEdit, onDelete }: CollectionRowActions) {
+export function collectionColumns(actions: CollectionRowActions) {
   return [
     col.custom<Collection>(
       'Koleksiyon',
@@ -25,7 +19,9 @@ export function collectionColumns({ onToggleVisibility, onEdit, onDelete }: Coll
           )}
           <div className="min-w-0">
             <TruncatedText className="font-medium text-heading">{c.name}</TruncatedText>
-            {c.description && <TruncatedText className="text-xs text-muted">{c.description}</TruncatedText>}
+            {c.description && (
+              <TruncatedText className="text-xs text-muted">{c.description}</TruncatedText>
+            )}
           </div>
         </div>
       ),
@@ -37,13 +33,9 @@ export function collectionColumns({ onToggleVisibility, onEdit, onDelete }: Coll
         <div className="flex min-w-0 items-center gap-2">
           <TruncatedText className="text-body">{c.owner?.displayName}</TruncatedText>
           {(tier === 'premium' || tier === 'business') && (
-            <span
-              className={`whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-semibold ${
-                tier === 'business' ? 'bg-info-50 text-info-700' : 'bg-warning-50 text-warning-700'
-              }`}
-            >
+            <Badge size="sm" variant={tier === 'business' ? 'info' : 'warning'}>
               {tier === 'business' ? 'İş' : 'Premium'}
-            </span>
+            </Badge>
           )}
         </div>
       );
@@ -51,25 +43,9 @@ export function collectionColumns({ onToggleVisibility, onEdit, onDelete }: Coll
     col.number<Collection>('Ürün', (c) => c.itemCount),
     col.number<Collection>('Görüntüleme', (c) => c.viewCount),
     col.number<Collection>('Beğeni', (c) => c.likeCount),
-    col.badge<Collection>('Durum', (c) =>
-      c.isPublic ? (
-        <span className="whitespace-nowrap rounded bg-success-50 px-2 py-1 text-xs text-success-700">
-          Görünür
-        </span>
-      ) : (
-        <span className="whitespace-nowrap rounded bg-surface-alt px-2 py-1 text-xs text-muted">Gizli</span>
-      ),
-    ),
-    col.actions<Collection>((c) => (
-      <>
-        <ActionIconButton
-          icon={c.isPublic ? EyeSlashIcon : EyeIcon}
-          onClick={() => onToggleVisibility(c)}
-          title={c.isPublic ? 'Gizle' : 'Görünür yap'}
-        />
-        <ActionIconButton icon={PencilIcon} onClick={() => onEdit(c)} title="Düzenle" />
-        <ActionIconButton icon={TrashIcon} onClick={() => onDelete(c)} title="Sil" variant="danger" />
-      </>
+    col.badge<Collection>('Durum', (c) => (
+      <Badge active={c.isPublic} activeLabel="Görünür" passiveLabel="Gizli" />
     )),
+    col.rowMenu<Collection>(collectionRowMenu(actions)),
   ];
 }

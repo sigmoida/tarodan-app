@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Button, cn } from '@tarodan/ui';
 import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
@@ -32,39 +32,21 @@ export default function LogsPage() {
   const [expandedErrorId, setExpandedErrorId] = useState<string | null>(null);
   const [expandedAuditId, setExpandedAuditId] = useState<string | null>(null);
 
-  const statsRef = useRef<any>(null);
-  const [stats, setStats] = useState<any>(null);
-  const [metaTotal, setMetaTotal] = useState(0);
-
   const fetcher = useCallback(
     (params: Record<string, any>) => {
-      let call: Promise<any>;
-      if (tab === 'errors') call = adminApi.getErrorLogs(params);
-      else if (tab === 'security') call = adminApi.getSecurityLogs(params);
-      else if (tab === 'emails') call = adminApi.getEmailLogs(params);
-      else
-        call = adminApi.getAuditLogs({
-          page: params.page,
-          limit: params.limit,
-          ...(params.search ? { search: params.search } : {}),
-          action: params.action || undefined,
-          ...(params.entityType ? { entityType: params.entityType } : {}),
-          adminId: params.adminId || undefined,
-          fromDate: params.fromDate || undefined,
-          toDate: params.toDate || undefined,
-        });
-
-      call.then((res) => {
-        const d = res?.data;
-        const newStats = d?.stats ?? null;
-        if (JSON.stringify(newStats) !== JSON.stringify(statsRef.current)) {
-          statsRef.current = newStats;
-          setStats(newStats);
-        }
-        setMetaTotal(d?.meta?.total ?? 0);
+      if (tab === 'errors') return adminApi.getErrorLogs(params);
+      if (tab === 'security') return adminApi.getSecurityLogs(params);
+      if (tab === 'emails') return adminApi.getEmailLogs(params);
+      return adminApi.getAuditLogs({
+        page: params.page,
+        limit: params.limit,
+        ...(params.search ? { search: params.search } : {}),
+        action: params.action || undefined,
+        ...(params.entityType ? { entityType: params.entityType } : {}),
+        adminId: params.adminId || undefined,
+        fromDate: params.fromDate || undefined,
+        toDate: params.toDate || undefined,
       });
-
-      return call;
     },
     [tab],
   );
@@ -79,10 +61,12 @@ export default function LogsPage() {
       tab === 'audit' ? { action: '', entityType: '', adminId: '', fromDate: '', toDate: '' } : {},
   });
 
+  // Stats + toplam, ham backend yanıtından türetilir (render sırasında setState yok).
+  const stats = (r.data as any)?.stats ?? null;
+  const metaTotal = r.total;
+
   const handleTabChange = (key: string) => {
     setTab(key as LogTab);
-    setStats(null);
-    statsRef.current = null;
     setExpandedErrorId(null);
     setExpandedAuditId(null);
   };

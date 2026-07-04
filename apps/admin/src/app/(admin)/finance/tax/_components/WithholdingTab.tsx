@@ -16,12 +16,10 @@ import { downloadBlob } from '@/lib/download';
 import { SectionCard } from '@/components/detail/SectionCard';
 import { MetricCard } from '@/components/MetricCard';
 import { DataTable } from '@/components/DataTable';
-import { col } from '@/components/table';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { fmtTry } from '@/lib/format';
+import { withholdingColumns } from '../_lib/columns';
 import { type WithholdingReport, MONTHS } from '../_lib/types';
-
-type Row = WithholdingReport['rows'][number];
 
 export function WithholdingTab() {
   const now = new Date();
@@ -77,14 +75,7 @@ export function WithholdingTab() {
     downloadBlob(`stopaj-muhtasar-${report.period}.csv`, csv);
   };
 
-  const columns = [
-    col.text<Row>('Satıcı', (r) => r.sellerName),
-    col.muted<Row>('VKN / TCKN', (r) => r.taxId || '–'),
-    col.muted<Row>('E-posta', (r) => r.email || '–'),
-    col.number<Row>('Transfer', (r) => r.transferCount),
-    col.money<Row>('Brüt', (r) => r.grossAmount),
-    col.money<Row>('Stopaj', (r) => r.withholdingTax),
-  ];
+  const columns = withholdingColumns;
 
   return (
     <div className="space-y-6">

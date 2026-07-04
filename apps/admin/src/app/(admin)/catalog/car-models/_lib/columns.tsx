@@ -1,17 +1,9 @@
-import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { Badge } from '@tarodan/ui';
 import { col, TruncatedText } from '@/components/table';
-import { StatusToggle } from '@/components/ActiveBadge';
-import { ActionIconButton } from '@/components/AdminList';
+import { carModelRowMenu, type CarModelRowActions } from './rowActions';
 import type { CarModel } from './types';
 
-export interface CarModelRowActions {
-  onEdit: (m: CarModel) => void;
-  onDelete: (m: CarModel) => void;
-  onToggle: (m: CarModel) => void;
-  busyId?: string | null;
-}
-
-export function carModelColumns({ onEdit, onDelete, onToggle, busyId }: CarModelRowActions) {
+export function carModelColumns(actions: CarModelRowActions) {
   return [
     col.custom<CarModel>(
       'Model',
@@ -29,14 +21,7 @@ export function carModelColumns({ onEdit, onDelete, onToggle, busyId }: CarModel
       (m) => (m.yearStart || m.yearEnd ? `${m.yearStart ?? '?'} - ${m.yearEnd ?? '?'}` : undefined),
       { minWidth: 120 },
     ),
-    col.badge<CarModel>('Durum', (m) => (
-      <StatusToggle active={m.isActive} onToggle={() => onToggle(m)} busy={busyId === m.id} />
-    )),
-    col.actions<CarModel>((m) => (
-      <>
-        <ActionIconButton icon={PencilIcon} onClick={() => onEdit(m)} title="Düzenle" />
-        <ActionIconButton icon={TrashIcon} onClick={() => onDelete(m)} title="Sil" variant="danger" />
-      </>
-    )),
+    col.badge<CarModel>('Durum', (m) => <Badge active={m.isActive} />),
+    col.rowMenu<CarModel>(carModelRowMenu(actions)),
   ];
 }

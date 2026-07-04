@@ -1,6 +1,12 @@
 import './meta';
 
 export { col, type ColOpts } from './columns';
+export {
+  RowActionMenu,
+  activeToggleAction,
+  type RowAction,
+  type RowActionItem,
+} from './RowActionMenu';
 export { TruncatedText } from './TruncatedText';
 export {
   Empty,

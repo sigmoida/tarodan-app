@@ -62,6 +62,8 @@ export interface UseAdminResourceResult<T> {
   setFilter: (key: string, value: string) => void;
   /** Veri yükleniyor (ilk yükleme veya refetch) */
   isLoading: boolean;
+  /** Ham backend yanıtı (extract edilmemiş) — meta/stats gibi ek alanlar için. */
+  data: any;
   /** react-query refetch'ini manuel tetikler */
   refetch: () => void;
   /**
@@ -396,6 +398,7 @@ export function useAdminResource<T>({
     setFilter,
     // Transition (filtre/arama/sayfa) veya arka-plan refetch sırasında tabloyu soluklaştır.
     isLoading: isPending || queryResult.isFetching,
+    data: queryResult.data,
     refetch: queryResult.refetch,
     setTabUrl,
   };

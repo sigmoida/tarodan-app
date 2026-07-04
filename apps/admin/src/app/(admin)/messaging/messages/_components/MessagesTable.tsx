@@ -2,20 +2,13 @@
 
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { Badge, StatusBadge } from '@tarodan/ui';
-import {
-  CheckIcon,
-  XMarkIcon,
-  NoSymbolIcon,
-  ArrowUturnLeftIcon,
-} from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
-import { col } from '@/components/table';
-import { ActionButtons, ActionIconButton } from '@/components/AdminList';
 import { ResourceList } from '@/components/list';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { usePrompt } from '@/provider/PromptProvider';
-import { type Message, messageStatusConfig } from '../_lib/types';
+import { messageColumns } from '../_lib/columns';
+import { messageRowMenu } from '../_lib/rowActions';
+import { type Message } from '../_lib/types';
 
 /**
  * The messages table — moderation row actions (approve / reject / revert / ban
@@ -60,75 +53,15 @@ export function MessagesTable() {
     ban.mutate({ id: m.senderId, reason: reason.trim() || 'Mesaj kuralları ihlali' });
   };
 
-  const columns = [
-    col.user<Message>('Gönderen', (m) => ({
-      name: m.sender.displayName,
-      secondary: m.sender.email,
-    })),
-    col.user<Message>('Alıcı', (m) => ({
-      name: m.receiver.displayName,
-      secondary: m.receiver.email,
-    })),
-    col.text<Message>('Mesaj', (m) => m.originalContent || m.content, {
-      grow: 3,
-      minWidth: 220,
+  const columns = messageColumns(
+    messageRowMenu({
+      onView: (m) => router.push(`/messaging/messages/${m.id}`),
+      onApprove: (m) => approve.mutate(m.id),
+      onReject: (m) => reject.mutate(m.id),
+      onRevert: (m) => revert.mutate(m.id),
+      onBan,
     }),
-    col.badge<Message>('Uyarı', (m) =>
-      m.flaggedReason ? (
-        <Badge variant="warning">{m.flaggedReason}</Badge>
-      ) : (
-        <span className="text-muted">—</span>
-      ),
-    ),
-    col.badge<Message>('Durum', (m) => (
-      <StatusBadge status={m.status} config={messageStatusConfig} />
-    )),
-    col.date<Message>('Tarih', (m) => m.createdAt),
-    col.actions<Message>(
-      (m) => (
-        <ActionButtons>
-          {(m.status === 'pending' || m.status === 'rejected') && (
-            <ActionIconButton
-              icon={CheckIcon}
-              onClick={() => approve.mutate(m.id)}
-              title="Onayla"
-              variant="success"
-            />
-          )}
-          {m.status === 'rejected' ? (
-            <ActionIconButton
-              icon={ArrowUturnLeftIcon}
-              onClick={() => revert.mutate(m.id)}
-              title="Geri Al (Bekleyene çevir)"
-              variant="primary"
-            />
-          ) : (
-            <ActionIconButton
-              icon={XMarkIcon}
-              onClick={() => reject.mutate(m.id)}
-              title="Reddet"
-              variant="danger"
-            />
-          )}
-          {m.senderId && (
-            <ActionIconButton
-              icon={NoSymbolIcon}
-              onClick={() => onBan(m)}
-              title="Göndereni yasakla"
-              variant="primary"
-            />
-          )}
-        </ActionButtons>
-      ),
-      { header: 'İşlemler' },
-    ),
-  ];
-
-  return (
-    <ResourceList.Table
-      columns={columns}
-      onRowClick={(m) => router.push(`/messaging/messages/${m.id}`)}
-      emptyText="Mesaj bulunamadı"
-    />
   );
+
+  return <ResourceList.Table columns={columns} emptyText="Mesaj bulunamadı" />;
 }

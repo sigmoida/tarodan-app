@@ -1,27 +1,11 @@
-import { PencilIcon, TrashIcon, ChevronRightIcon, TruckIcon } from '@heroicons/react/24/outline';
-import { Button } from '@tarodan/ui';
+import { ChevronRightIcon, TruckIcon } from '@heroicons/react/24/outline';
+import { Badge, Button } from '@tarodan/ui';
 import { col, TruncatedText } from '@/components/table';
-import { StatusToggle } from '@/components/ActiveBadge';
-import { ActionIconButton } from '@/components/AdminList';
+import { brandRowMenu, type BrandRowActions } from './rowActions';
 import type { Brand } from './types';
 
-export interface BrandRowActions {
-  onEdit: (b: Brand) => void;
-  onDelete: (b: Brand) => void;
-  onToggle: (b: Brand) => void;
-  onToggleExpand: (id: string) => void;
-  expandedId: string | null;
-  busyId?: string | null;
-}
-
-export function brandColumns({
-  onEdit,
-  onDelete,
-  onToggle,
-  onToggleExpand,
-  expandedId,
-  busyId,
-}: BrandRowActions) {
+export function brandColumns(actions: BrandRowActions) {
+  const { onToggleExpand, expandedId } = actions;
   return [
     col.custom<Brand>(
       'Marka',
@@ -43,9 +27,7 @@ export function brandColumns({
       ),
       { grow: 3, minWidth: 200 },
     ),
-    col.badge<Brand>('Durum', (b) => (
-      <StatusToggle active={b.isActive} onToggle={() => onToggle(b)} busy={busyId === b.id} />
-    )),
+    col.badge<Brand>('Durum', (b) => <Badge active={b.isActive} />),
     col.custom<Brand>(
       'Modeller',
       (b) => {
@@ -65,11 +47,6 @@ export function brandColumns({
       },
       { minWidth: 140 },
     ),
-    col.actions<Brand>((b) => (
-      <>
-        <ActionIconButton icon={PencilIcon} onClick={() => onEdit(b)} title="Düzenle" />
-        <ActionIconButton icon={TrashIcon} onClick={() => onDelete(b)} title="Sil" variant="danger" />
-      </>
-    )),
+    col.rowMenu<Brand>(brandRowMenu(actions)),
   ];
 }

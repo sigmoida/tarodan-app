@@ -1,4 +1,4 @@
-import { StatusBadge } from '@tarodan/ui';
+import { Badge } from '@tarodan/ui';
 import { col } from '@/components/table';
 import {
   type Report,
@@ -25,6 +25,6 @@ export const reportColumns = [
   col.code<Report>('Hedef ID', (r) => r.targetId),
   col.date<Report>('Tarih', (r) => r.createdAt),
   col.badge<Report>('Durum', (r) => (
-    <StatusBadge status={r.status} config={reportStatusConfig} />
+    <Badge status={r.status} config={reportStatusConfig} />
   )),
 ];

@@ -1,17 +1,10 @@
-import { PencilIcon, TrashIcon, GlobeAltIcon } from '@heroicons/react/24/outline';
+import { GlobeAltIcon } from '@heroicons/react/24/outline';
+import { Badge } from '@tarodan/ui';
 import { col, TruncatedText, Empty } from '@/components/table';
-import { StatusToggle } from '@/components/ActiveBadge';
-import { ActionIconButton } from '@/components/AdminList';
+import { manufacturerRowMenu, type ManufacturerRowActions } from './rowActions';
 import type { Manufacturer } from './types';
 
-export interface ManufacturerRowActions {
-  onEdit: (m: Manufacturer) => void;
-  onDelete: (m: Manufacturer) => void;
-  onToggle: (m: Manufacturer) => void;
-  busyId?: string | null;
-}
-
-export function manufacturerColumns({ onEdit, onDelete, onToggle, busyId }: ManufacturerRowActions) {
+export function manufacturerColumns(actions: ManufacturerRowActions) {
   return [
     col.custom<Manufacturer>(
       'Üretici',
@@ -50,14 +43,7 @@ export function manufacturerColumns({ onEdit, onDelete, onToggle, busyId }: Manu
         <Empty />
       ),
     ),
-    col.badge<Manufacturer>('Durum', (m) => (
-      <StatusToggle active={m.isActive} onToggle={() => onToggle(m)} busy={busyId === m.id} />
-    )),
-    col.actions<Manufacturer>((m) => (
-      <>
-        <ActionIconButton icon={PencilIcon} onClick={() => onEdit(m)} title="Düzenle" />
-        <ActionIconButton icon={TrashIcon} onClick={() => onDelete(m)} title="Sil" variant="danger" />
-      </>
-    )),
+    col.badge<Manufacturer>('Durum', (m) => <Badge active={m.isActive} />),
+    col.rowMenu<Manufacturer>(manufacturerRowMenu(actions)),
   ];
 }

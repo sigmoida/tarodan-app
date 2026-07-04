@@ -3,15 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Input, Select } from '@tarodan/ui';
-import { TrashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { adminApi } from '@/lib/api';
 import { SectionCard } from '@/components/detail/SectionCard';
 import { DataTable } from '@/components/DataTable';
-import { col } from '@/components/table';
-import { ActionButtons, ActionIconButton } from '@/components/AdminList';
 import { useConfirm } from '@/provider/ConfirmProvider';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
+import { vatColumns } from '../_lib/columns';
 import { type VatConfig, type VatOverride, type Category } from '../_lib/types';
 
 const validRate = (v: string) => {
@@ -91,18 +89,7 @@ export function VatTab() {
       removeOverride.mutate(o.ruleId);
   };
 
-  const columns = [
-    col.text<VatOverride>('Kategori', (o) => o.categoryName),
-    col.muted<VatOverride>('KDV %', (o) => `%${o.rate}`),
-    col.actions<VatOverride>(
-      (o) => (
-        <ActionButtons>
-          <ActionIconButton icon={TrashIcon} onClick={() => onDelete(o)} title="Sil" variant="danger" />
-        </ActionButtons>
-      ),
-      { header: 'İşlem' },
-    ),
-  ];
+  const columns = vatColumns(onDelete);
 
   return (
     <div className="space-y-6">

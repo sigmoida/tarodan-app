@@ -1,35 +1,25 @@
 import React from 'react';
 import { Badge, type BadgeProps } from './Badge';
 import type { StatusConfig } from '../lib/status-configs';
-import { cn } from '../lib/utils';
 
-export interface StatusBadgeProps extends Omit<BadgeProps, 'variant'> {
+export interface StatusBadgeProps extends Omit<BadgeProps, 'variant' | 'active'> {
   /** The status string (e.g. 'pending_payment', 'completed') */
   status: string;
   /** Status → label+variant mapping. Use pre-built configs from status-configs.ts or provide your own. */
   config: Record<string, StatusConfig>;
   /** Override the label from config */
-  label?: string;
+  label?: React.ReactNode;
 }
 
+/**
+ * Thin alias of {@link Badge}'s config-driven mode, kept for the many existing
+ * `<StatusBadge status config />` call sites. New code can use `<Badge status
+ * config />` directly.
+ */
 export const StatusBadge = React.forwardRef<HTMLSpanElement, StatusBadgeProps>(
-  ({ status, config, label, size, className, ...props }, ref) => {
-    const entry = config[status];
-
-    if (!entry) {
-      return (
-        <Badge ref={ref} variant="default" size={size} className={cn(className)} {...props}>
-          {label || status}
-        </Badge>
-      );
-    }
-
-    return (
-      <Badge ref={ref} variant={entry.variant} size={size} className={cn(className)} {...props}>
-        {label || entry.label}
-      </Badge>
-    );
-  }
+  ({ status, config, label, ...props }, ref) => (
+    <Badge ref={ref} status={status} config={config} label={label} {...props} />
+  ),
 );
 
 StatusBadge.displayName = 'StatusBadge';

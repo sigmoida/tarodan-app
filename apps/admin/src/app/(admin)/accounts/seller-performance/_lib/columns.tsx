@@ -1,11 +1,11 @@
-import { StatusBadge, Badge } from '@tarodan/ui';
+import { Badge } from '@tarodan/ui';
 import { col } from '@/components/table';
 import { type Seller, membershipConfig } from './types';
 
 export const sellerColumns = [
   col.user<Seller>('Satıcı', (s) => ({ name: s.displayName, secondary: s.email })),
   col.badge<Seller>('Üyelik', (s) => (
-    <StatusBadge status={s.membership?.tier?.type ?? 'free'} config={membershipConfig} />
+    <Badge status={s.membership?.tier?.type ?? 'free'} config={membershipConfig} />
   )),
   col.number<Seller>('Ürün', (s) => s._count.products),
   col.number<Seller>('Sipariş', (s) => s._count.sellerOrders),

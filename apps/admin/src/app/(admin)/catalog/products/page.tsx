@@ -47,7 +47,16 @@ export default function ProductsPage() {
 		},
 	);
 
-	const onApprove = (p: Product) => approve.mutate(p.id);
+	const onApprove = async (p: Product) => {
+		if (
+			await confirm({
+				title: 'Ürünü onayla',
+				description: `"${p.title}" onaylanıp yayına alınacak. Emin misiniz?`,
+				confirmLabel: 'Onayla',
+			})
+		)
+			approve.mutate(p.id);
+	};
 	const onReject = async (p: Product) => {
 		const reason = await prompt({
 			title: 'Ürünü Reddet',

@@ -8,11 +8,14 @@ import { mapProducts } from '../_lib/types';
 import { productColumns, type ProductRowActions } from '../_lib/columns';
 
 /** Maps the raw product rows from context and renders the shared DataTable. */
-export function ProductsTable(actions: ProductRowActions) {
+export function ProductsTable(actions: Omit<ProductRowActions, 'onView'>) {
   const router = useRouter();
   const { rows, isLoading, filters, search } = useResourceList<any>();
   const products = useMemo(() => mapProducts(rows), [rows]);
-  const columns = productColumns(actions);
+  const columns = productColumns({
+    ...actions,
+    onView: (p) => router.push(`/catalog/products/${p.id}`),
+  });
 
   const filtered = search || filters.status !== 'all' || filters.brandId || filters.carModelId;
 
@@ -22,7 +25,6 @@ export function ProductsTable(actions: ProductRowActions) {
       data={products}
       loading={isLoading}
       getRowId={(p) => p.id}
-      onRowClick={(p) => router.push(`/catalog/products/${p.id}`)}
       emptyText={filtered ? 'Filtreyle eşleşen ürün yok' : 'Ürün bulunamadı'}
     />
   );

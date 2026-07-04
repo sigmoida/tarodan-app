@@ -12,11 +12,9 @@ import { adminApi } from '@/lib/api';
 import { SectionCard } from '@/components/detail/SectionCard';
 import { MetricCard } from '@/components/MetricCard';
 import { DataTable } from '@/components/DataTable';
-import { col } from '@/components/table';
 import { fmtTry } from '@/lib/format';
+import { taxReportColumns } from '../_lib/columns';
 import { type TaxReport, groupByOptions } from '../_lib/types';
-
-type Row = TaxReport['breakdown'][number];
 
 export function TaxReportTab() {
   const [from, setFrom] = useState(() => {
@@ -33,12 +31,7 @@ export function TaxReportTab() {
       (await adminApi.getTaxReport({ fromDate: from, toDate: to, groupBy })).data as TaxReport,
   });
 
-  const columns = [
-    col.text<Row>('Dönem', (r) => r.period),
-    col.money<Row>('Vergi', (r) => r.taxCollected),
-    col.money<Row>('Ciro', (r) => r.revenue),
-    col.number<Row>('Adet', (r) => r.count),
-  ];
+  const columns = taxReportColumns;
 
   return (
     <div className="space-y-6">
