@@ -4,8 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import OptimizedImage from "@/components/OptimizedImage";
-import { motion } from "framer-motion";
 import {
   HeartIcon,
   TrashIcon,
@@ -17,9 +15,10 @@ import { wishlistApi, listingsApi } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import { useCartStore } from "@/stores/cartStore";
 import { useTranslation } from "@/i18n";
-import { formatCondition } from "@/lib/format";
 import AuthLoadingScreen from "@/components/AuthLoadingScreen";
 import { Button } from "@tarodan/ui";
+import { ProductCard } from "@/components/ui";
+import type { Product } from "@/types/product";
 
 interface WishlistItem {
   id: string;
@@ -155,12 +154,15 @@ export default function FavoritesPage() {
     }
   };
 
-  const getImageUrl = (productImage?: string): string => {
-    if (!productImage) {
-      return "https://placehold.co/400x400/f3f4f6/9ca3af?text=Product";
-    }
-    return productImage;
-  };
+  const wishlistItemToProduct = (item: WishlistItem): Product => ({
+    id: item.productId,
+    title: item.productTitle,
+    price: item.productPrice,
+    images: item.productImage ? [{ url: item.productImage }] : [],
+    condition: item.productCondition,
+    originalPrice: item.productOriginalPrice,
+    status: item.productStatus,
+  });
 
   const showPlaceholder =
     !isSharedView && (!mounted || authLoading || !isAuthenticated);
@@ -239,99 +241,36 @@ export default function FavoritesPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-            {items.map((item, index) => {
-              return (
-                <motion.div
-                  key={item.id || index}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="bg-surface-elevated rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
-                >
-                  <Link href={`/listings/${item.productId}`}>
-                    <div className="relative aspect-square bg-surface-alt">
-                      <OptimizedImage
-                        src={getImageUrl(item.productImage)}
-                        alt={item.productTitle || "Product"}
-                        fill
-                        className="object-cover"
-                        fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Product"
-                        logContext={{ itemId: item.id, page: "favorites" }}
-                      />
-                      {!isSharedView && (
-                        <Button
-                          variant="secondary"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleRemove(item.productId);
-                          }}
-                          className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 p-1.5 sm:p-2 bg-surface-elevated rounded-full shadow-md hover:bg-danger-50 transition-colors z-10"
-                          title={t("favorites.removeFromFavorites")}
-                        >
-                          <TrashIcon className="w-4 h-4 sm:w-5 sm:h-5 text-danger-500" />
-                        </Button>
-                      )}
-                    </div>
-                  </Link>
-                  <div className="p-2.5 sm:p-4">
-                    <Link href={`/listings/${item.productId}`}>
-                      <h3 className="font-semibold text-heading line-clamp-2 mb-1.5 sm:mb-2 text-xs sm:text-sm hover:text-primary-500">
-                        {item.productTitle || "Product"}
-                      </h3>
-                    </Link>
-                    <div className="flex items-center justify-between mb-2 sm:mb-3">
-                      <div className="flex flex-col">
-                        {item.productOriginalPrice &&
-                          item.productOriginalPrice > item.productPrice && (
-                            <div className="flex items-center gap-1 sm:gap-2">
-                              <span className="text-[10px] sm:text-sm text-subtle line-through">
-                                {Number(
-                                  item.productOriginalPrice,
-                                ).toLocaleString("tr-TR", {
-                                  minimumFractionDigits: 0,
-                                  maximumFractionDigits: 0,
-                                })}{" "}
-                                TL
-                              </span>
-                              <span className="text-[10px] sm:text-xs font-semibold text-inverted bg-danger-500 px-1 sm:px-1.5 py-0.5 rounded">
-                                %
-                                {Math.round(
-                                  ((item.productOriginalPrice -
-                                    item.productPrice) /
-                                    item.productOriginalPrice) *
-                                    100,
-                                )}
-                              </span>
-                            </div>
-                          )}
-                        <p className="text-base sm:text-xl font-bold text-primary-500">
-                          {Number(item.productPrice || 0).toLocaleString(
-                            "tr-TR",
-                            {
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 0,
-                            },
-                          )}{" "}
-                          TL
-                        </p>
-                      </div>
-                      {item.productCondition && (
-                        <span className="text-[10px] sm:text-xs text-muted bg-surface-alt px-1.5 sm:px-2 py-0.5 sm:py-1 rounded hidden sm:inline">
-                          {formatCondition(item.productCondition, locale)}
-                        </span>
-                      )}
-                    </div>
+            {items.map((item, index) => (
+              <ProductCard
+                key={item.id || index}
+                product={wishlistItemToProduct(item)}
+                index={index}
+                hideStats
+                overlay={
+                  !isSharedView ? (
                     <Button
-                      onClick={() => handleAddToCart(item)}
-                      className="w-full text-xs sm:text-sm py-1.5 sm:py-2 flex gap-1.5 sm:gap-2"
+                      variant="secondary"
+                      onClick={() => handleRemove(item.productId)}
+                      className="p-1.5 sm:p-2 bg-surface-elevated rounded-full shadow-md hover:bg-danger-50 transition-colors"
+                      title={t("favorites.removeFromFavorites")}
+                      aria-label={t("favorites.removeFromFavorites")}
                     >
-                      <ShoppingCartIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      {t("product.addToCart")}
+                      <TrashIcon className="w-4 h-4 sm:w-5 sm:h-5 text-danger-500" />
                     </Button>
-                  </div>
-                </motion.div>
-              );
-            })}
+                  ) : undefined
+                }
+                footer={
+                  <Button
+                    onClick={() => handleAddToCart(item)}
+                    className="w-full text-xs sm:text-sm py-1.5 sm:py-2 flex gap-1.5 sm:gap-2"
+                  >
+                    <ShoppingCartIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    {t("product.addToCart")}
+                  </Button>
+                }
+              />
+            ))}
           </div>
         )}
       </main>

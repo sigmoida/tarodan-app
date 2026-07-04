@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import OptimizedImage from '@/components/OptimizedImage';
 import UserAvatar from '@/components/UserAvatar';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -20,7 +19,6 @@ import {
   TruckIcon,
   ArrowTrendingUpIcon,
   HeartIcon,
-  EyeIcon,
   SparklesIcon,
 } from '@heroicons/react/24/outline';
 import { 
@@ -29,8 +27,7 @@ import {
 } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
 import { api, listingsApi, ratingsApi } from '@/lib/api';
-import { getProductEffectivePrice, isProductOutOfStock } from '@/lib/productPrice';
-import { OutOfStockOverlay } from '@/components/ui';
+import { ProductCard } from '@/components/ui';
 import { useAuthStore } from '@/stores/authStore';
 import dynamic from 'next/dynamic';
 import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
@@ -245,13 +242,6 @@ export default function SellerProfilePage() {
       return;
     }
     setShowReportModal(true);
-  };
-
-  const getImageUrl = (images: any[]): string => {
-    const placeholder = 'https://placehold.co/400x400/f8fafc/94a3b8?text=' + (locale === 'en' ? 'Product' : 'Ürün');
-    if (!images || images.length === 0) return placeholder;
-    const img = images[0];
-    return (img as any)?.cardUrl ?? (img as any)?.detailUrl ?? (img as any)?.url ?? (typeof img === 'string' ? img : null) ?? placeholder;
   };
 
   const getMembershipDuration = () => {
@@ -499,52 +489,13 @@ export default function SellerProfilePage() {
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                   {products.map((product, index) => (
-                    <motion.div
+                    <ProductCard
                       key={product.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.03 }}
-                    >
-                      <Link 
-                        href={`/listings/${product.id}`} 
-                        className="block bg-surface-elevated rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 group border border-border-subtle"
-                      >
-                        <div className="relative aspect-square bg-surface">
-                          <OptimizedImage
-                            src={getImageUrl(product.images)}
-                            alt={product.title}
-                            fill
-                            className={`object-cover group-hover:scale-105 transition-transform duration-500${isProductOutOfStock(product) ? ' opacity-50' : ''}`}
-                            fallbackSrc="https://placehold.co/400x400/f8fafc/94a3b8?text=Ürün"
-                            logContext={{ productId: product.id, page: 'seller-products' }}
-                          />
-                          {isProductOutOfStock(product) && <OutOfStockOverlay />}
-                          {product.isTradeEnabled && (
-                            <div className="absolute top-2 left-2 bg-success-500 text-inverted text-xs px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-sm">
-                              <ArrowsRightLeftIcon className="w-3.5 h-3.5" />
-                              {locale === 'en' ? 'Trade' : 'Takas'}
-                            </div>
-                          )}
-                          <div className="absolute inset-0 bg-gradient-to-t from-heading/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </div>
-                        <div className="p-3">
-                          <h3 className="font-medium text-heading line-clamp-2 text-sm group-hover:text-primary-600 transition-colors mb-2">
-                            {product.title}
-                          </h3>
-                          <div className="flex items-center justify-between">
-                            <p className="text-primary-600 font-bold">
-                              ₺{getProductEffectivePrice(product).toLocaleString('tr-TR')}
-                            </p>
-                            {(product.viewCount || 0) > 0 && (
-                              <span className="flex items-center gap-1 text-xs text-subtle">
-                                <EyeIcon className="w-3.5 h-3.5" />
-                                {product.viewCount}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </Link>
-                    </motion.div>
+                      product={product}
+                      layout="grid"
+                      index={index}
+                      priority={index < 5}
+                    />
                   ))}
                 </div>
               )}

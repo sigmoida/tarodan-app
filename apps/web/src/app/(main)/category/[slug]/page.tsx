@@ -4,18 +4,13 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import OptimizedImage from '@/components/OptimizedImage';
-import UserAvatar from '@/components/UserAvatar';
 import { listingsApi, categoriesApi } from '@/lib/api';
 import {
   FunnelIcon,
-  ArrowsRightLeftIcon,
-  HeartIcon,
   Squares2X2Icon,
   ListBulletIcon,
 } from '@heroicons/react/24/outline';
-import { getProductEffectivePrice, isProductOutOfStock } from '@/lib/productPrice';
-import { OutOfStockOverlay } from '@/components/ui';
+import { ProductCard } from '@/components/ui';
 import { Button, Checkbox, Input, Select, Spinner } from '@tarodan/ui';
 
 interface Product {
@@ -105,17 +100,6 @@ export default function CategoryPage() {
   const totalPages = productsQuery.data?.totalPages ?? 1;
   const totalItems = productsQuery.data?.totalItems ?? 0;
   const loading = productsQuery.isLoading;
-
-  const getConditionLabel = (condition: string) => {
-    const labels: Record<string, string> = {
-      new: 'Sıfır',
-      like_new: 'Sıfır Gibi',
-      very_good: 'Çok İyi',
-      good: 'İyi',
-      fair: 'Orta',
-    };
-    return labels[condition] || condition;
-  };
 
   if (!category) return null;
 
@@ -287,101 +271,26 @@ export default function CategoryPage() {
               </div>
             ) : viewMode === 'grid' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {products.map((product: Product) => (
-                  <Link
+                {products.map((product: Product, index: number) => (
+                  <ProductCard
                     key={product.id}
-                    href={`/listings/${product.id}`}
-                    className="bg-surface-elevated rounded-lg overflow-hidden hover:ring-2 hover:ring-primary-500 transition-all group shadow-sm border border-border"
-                  >
-                    <div className="aspect-square relative bg-surface-alt">
-                      <OptimizedImage
-                        src={product.images?.[0] || 'https://placehold.co/400x400/1a1a2e/666?text=No+Image'}
-                        alt={product.title}
-                        fill
-                        className={`object-cover group-hover:scale-105 transition-transform${isProductOutOfStock(product) ? ' opacity-50' : ''}`}
-                        fallbackSrc="https://placehold.co/400x400/1a1a2e/666?text=No+Image"
-                        logContext={{ productId: product.id, page: 'category-grid' }}
-                      />
-                      {isProductOutOfStock(product) && <OutOfStockOverlay />}
-                      {product.isTradeEnabled && (
-                        <span className="absolute top-2 left-2 bg-primary-600 text-inverted text-xs font-bold px-2 py-1 rounded flex items-center gap-1">
-                          <ArrowsRightLeftIcon className="h-3 w-3" />
-                          Takas
-                        </span>
-                      )}
-                      <Button variant="secondary" className="absolute top-2 right-2 p-2 bg-surface-elevated/90 backdrop-blur-sm rounded-full hover:bg-surface-elevated transition-colors shadow-sm">
-                        <HeartIcon className="h-5 w-5 text-body" />
-                      </Button>
-                    </div>
-                    <div className="p-4">
-                      <h3 className="text-heading font-medium line-clamp-2 mb-2">
-                        {product.title}
-                      </h3>
-                      <div className="flex items-center justify-between">
-                        <span className="text-primary-500 font-bold text-lg">
-                          {getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
-                        </span>
-                        <span className="text-xs text-muted">
-                          {getConditionLabel(product.condition)}
-                        </span>
-                      </div>
-                    </div>
-                  </Link>
+                    product={product}
+                    layout="grid"
+                    index={index}
+                    priority={index < 4}
+                  />
                 ))}
               </div>
             ) : (
               <div className="space-y-4">
-                {products.map((product: Product) => (
-                  <Link
+                {products.map((product: Product, index: number) => (
+                  <ProductCard
                     key={product.id}
-                    href={`/listings/${product.id}`}
-                    className="bg-surface-elevated rounded-lg overflow-hidden hover:ring-2 hover:ring-primary-500 transition-all flex shadow-sm border border-border"
-                  >
-                    <div className="w-48 h-48 relative flex-shrink-0 bg-surface-alt">
-                      <OptimizedImage
-                        src={product.images?.[0] || 'https://placehold.co/400x400/1a1a2e/666?text=No+Image'}
-                        alt={product.title}
-                        fill
-                        className={`object-cover${isProductOutOfStock(product) ? ' opacity-50' : ''}`}
-                        fallbackSrc="https://placehold.co/400x400/1a1a2e/666?text=No+Image"
-                        logContext={{ productId: product.id, page: 'category-list' }}
-                      />
-                      {isProductOutOfStock(product) && <OutOfStockOverlay />}
-                    </div>
-                    <div className="p-4 flex-1 flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-start justify-between mb-2">
-                          <h3 className="text-heading font-medium text-lg">
-                            {product.title}
-                          </h3>
-                          {product.isTradeEnabled && (
-                            <span className="bg-primary-600 text-inverted text-xs font-bold px-2 py-1 rounded flex items-center gap-1">
-                              <ArrowsRightLeftIcon className="h-3 w-3" />
-                              Takas
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-muted text-sm">
-                          Durum: {getConditionLabel(product.condition)}
-                        </p>
-                        <p className="text-muted text-sm flex items-center gap-1.5">
-                          Satıcı: 
-                          {product.seller && (
-                            <UserAvatar displayName={product.seller.displayName} avatarUrl={product.seller.avatarUrl} size="xs" />
-                          )}
-                          {product.seller?.displayName || 'Bilinmiyor'}
-                        </p>
-                      </div>
-                      <div className="flex items-center justify-between mt-4">
-                        <span className="text-primary-500 font-bold text-xl">
-                          {getProductEffectivePrice(product).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
-                        </span>
-                        <Button variant="secondary" className="p-2 bg-dark-700 rounded-full hover:bg-dark-600 transition-colors">
-                          <HeartIcon className="h-5 w-5 text-inverted" />
-                        </Button>
-                      </div>
-                    </div>
-                  </Link>
+                    product={product}
+                    layout="list"
+                    index={index}
+                    priority={index === 0}
+                  />
                 ))}
               </div>
             )}

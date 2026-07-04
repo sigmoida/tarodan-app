@@ -5,7 +5,6 @@ import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import OptimizedImage from '@/components/OptimizedImage';
-import { motion } from 'framer-motion';
 import {
   HeartIcon,
   EyeIcon,
@@ -23,6 +22,8 @@ import { useAuthStore } from '@/stores/authStore';
 import { collectionsApi, userApi, listingsApi, api } from '@/lib/api';
 import { useConfirm } from '@/components/ConfirmProvider';
 import { getProductEffectivePrice } from '@/lib/productPrice';
+import { ProductCard } from '@/components/ui';
+import type { Product } from '@/types/product';
 import dynamic from 'next/dynamic';
 import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
 import { useTranslation } from '@/i18n/LanguageContext';
@@ -459,9 +460,12 @@ export default function CollectionDetailClient() {
     );
   }
 
-  const getItemImage = (item: CollectionItem) => {
-    return item.productImage || 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün';
-  };
+  const collectionItemToProduct = (item: CollectionItem): Product => ({
+    id: item.productId!,
+    title: item.productTitle,
+    price: item.productPrice ?? 0,
+    images: item.productImage ? [{ url: item.productImage }] : [],
+  });
 
   const sortedItems = collection.items
     ? [...collection.items]
@@ -597,14 +601,34 @@ export default function CollectionDetailClient() {
         ) : (
           <div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {sortedItems.map((item, index) => (
-                <motion.div
-                  key={item.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.03 }}
-                >
-                  <div className="bg-surface-elevated rounded border border-border overflow-hidden hover:border-primary-300 hover:shadow-md transition-all relative group">
+              {sortedItems.map((item, index) =>
+                item.productId ? (
+                  <ProductCard
+                    key={item.id}
+                    product={collectionItemToProduct(item)}
+                    index={index}
+                    hideStats
+                    overlay={
+                      <div className="flex flex-col items-end gap-1">
+                        {item.isBoosted && item.productStatus !== 'sold' && (
+                          <span className="px-1.5 py-0.5 bg-warning-500 text-inverted text-[10px] font-semibold rounded">{locale === 'en' ? 'Sponsored' : 'Sponsorlu'}</span>
+                        )}
+                        {item.productStatus === 'sold' && (
+                          <span className="px-1.5 py-0.5 bg-danger-600 text-inverted text-[10px] font-semibold rounded">
+                            {locale === 'en' ? 'SOLD' : 'SATILDI'}
+                          </span>
+                        )}
+                        {isOwner && (
+                          <Button variant="secondary" onClick={() => handleRemoveItem(item.id)}
+                            className="p-1.5 bg-danger-500/80 hover:bg-danger-600 rounded transition-colors opacity-0 group-hover:opacity-100">
+                            <TrashIcon className="w-3.5 h-3.5 text-inverted" />
+                          </Button>
+                        )}
+                      </div>
+                    }
+                  />
+                ) : (
+                  <div key={item.id} className="bg-surface-elevated rounded border border-border overflow-hidden hover:border-primary-300 hover:shadow-md transition-all relative group">
                     {item.isBoosted && item.productStatus !== 'sold' && (
                       <div className="absolute top-1.5 left-1.5 z-10">
                         <span className="px-1.5 py-0.5 bg-warning-500 text-inverted text-[10px] font-semibold rounded">{locale === 'en' ? 'Sponsored' : 'Sponsorlu'}</span>
@@ -622,50 +646,25 @@ export default function CollectionDetailClient() {
                         </span>
                       </div>
                     )}
-                    {item.productId ? (
-                      <Link href={`/listings/${item.productId}`} className="block">
-                        <div className="aspect-square bg-surface-alt relative overflow-hidden">
-                          <OptimizedImage
-                            src={getItemImage(item)}
-                            alt={item.productTitle}
-                            fill
-                            className="object-cover group-hover:scale-[1.03] transition-transform duration-300"
-                            fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün"
-                            logContext={{ itemId: item.id, page: 'collection-detail-linked' }}
-                          />
-                        </div>
-                        <div className="p-2.5">
-                          <h3 className="font-medium text-sm line-clamp-2 text-heading group-hover:text-primary-600 transition-colors">{item.productTitle}</h3>
-                          {item.productPrice !== undefined && (
-                            <p className="text-primary-600 font-bold text-sm mt-1">
-                              {item.productPrice.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ₺
-                            </p>
-                          )}
-                        </div>
-                      </Link>
-                    ) : (
-                      <>
-                        <div className="aspect-square bg-surface-alt relative overflow-hidden">
-                          <OptimizedImage
-                            src={item.customImageUrl || item.productImage || 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün'}
-                            alt={item.productTitle}
-                            fill
-                            className="object-cover"
-                            fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün"
-                            logContext={{ itemId: item.id, page: 'collection-detail-custom' }}
-                          />
-                        </div>
-                        <div className="p-2.5">
-                          <h3 className="font-medium text-sm line-clamp-2 text-heading">{item.productTitle}</h3>
-                          {item.customBrand && (
-                            <p className="text-muted text-xs mt-0.5">{item.customBrand}{item.customModel && ` · ${item.customModel}`}</p>
-                          )}
-                          {item.customYear && (
-                            <p className="text-subtle text-[10px] mt-0.5">{item.customYear}{item.customScale && ` · ${item.customScale}`}</p>
-                          )}
-                        </div>
-                      </>
-                    )}
+                    <div className="aspect-square bg-surface-alt relative overflow-hidden">
+                      <OptimizedImage
+                        src={item.customImageUrl || item.productImage || 'https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün'}
+                        alt={item.productTitle}
+                        fill
+                        className="object-cover"
+                        fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün"
+                        logContext={{ itemId: item.id, page: 'collection-detail-custom' }}
+                      />
+                    </div>
+                    <div className="p-2.5">
+                      <h3 className="font-medium text-sm line-clamp-2 text-heading">{item.productTitle}</h3>
+                      {item.customBrand && (
+                        <p className="text-muted text-xs mt-0.5">{item.customBrand}{item.customModel && ` · ${item.customModel}`}</p>
+                      )}
+                      {item.customYear && (
+                        <p className="text-subtle text-[10px] mt-0.5">{item.customYear}{item.customScale && ` · ${item.customScale}`}</p>
+                      )}
+                    </div>
                     {isOwner && (
                       <Button variant="secondary" onClick={(e) => { e.preventDefault(); handleRemoveItem(item.id); }}
                         className="absolute top-1.5 right-1.5 p-1.5 bg-danger-500/80 hover:bg-danger-600 rounded transition-colors z-10 opacity-0 group-hover:opacity-100">
@@ -673,8 +672,8 @@ export default function CollectionDetailClient() {
                       </Button>
                     )}
                   </div>
-                </motion.div>
-              ))}
+                )
+              )}
             </div>
           </div>
         )}

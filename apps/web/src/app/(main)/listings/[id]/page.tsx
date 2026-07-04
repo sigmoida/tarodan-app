@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
+import { HydrationBoundary, dehydrate } from '@tanstack/react-query';
+import { getServerQueryClient } from '@/lib/query/server';
+import { queryKeys } from '@/lib/query/keys';
 import ListingDetailClient from './ListingDetailClient';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE = process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -12,13 +15,20 @@ interface ProductForMeta {
   images?: Array<{ detailUrl?: string; cardUrl?: string; url?: string }>;
 }
 
-async function getProduct(id: string): Promise<ProductForMeta | null> {
+/**
+ * Public product fetch (no auth). Next memoizes the fetch, so the same URL used
+ * by generateMetadata and the page body hits the network once. Returns the
+ * product object or null (pending/owner-only products 404 publicly — those fall
+ * back to the client fetch, which carries the user's cookies).
+ */
+async function fetchProduct(id: string): Promise<Record<string, unknown> | null> {
   try {
     const res = await fetch(`${API_BASE}/api/products/${encodeURIComponent(id)}`, {
       next: { revalidate: 60 },
     });
     if (!res.ok) return null;
-    return res.json();
+    const raw = await res.json();
+    return (raw?.product ?? raw) as Record<string, unknown>;
   } catch {
     return null;
   }
@@ -26,7 +36,7 @@ async function getProduct(id: string): Promise<ProductForMeta | null> {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const product = await getProduct(id);
+  const product = (await fetchProduct(id)) as ProductForMeta | null;
   if (!product?.title) return { title: 'İlan Bulunamadı | Tarodan' };
 
   const priceNum = Number(product.price);
@@ -56,6 +66,22 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default function ListingPage() {
-  return <ListingDetailClient />;
+export default async function ListingPage({ params }: Props) {
+  const { id } = await params;
+
+  // Seed the query cache server-side so the detail ships in the first HTML and
+  // the client's `useQuery(['listing', id])` hydrates without a refetch flash.
+  // Only seed when the public fetch succeeds; otherwise leave it to the client
+  // (owner viewing a pending listing needs its cookies).
+  const queryClient = getServerQueryClient();
+  const product = await fetchProduct(id);
+  if (product) {
+    queryClient.setQueryData(queryKeys.product.detail(id), product);
+  }
+
+  return (
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <ListingDetailClient />
+    </HydrationBoundary>
+  );
 }

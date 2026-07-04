@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query/keys";
 import Link from "next/link";
 import OptimizedImage from "@/components/OptimizedImage";
 import UserAvatar from "@/components/UserAvatar";
@@ -233,9 +234,13 @@ export default function ListingDetailClient() {
     viewCountedRef.current = false;
   }, [id]);
 
-  // Listing: React Query (cache + single source of truth)
+  // Listing: React Query (cache + single source of truth). The queryFn is a
+  // PURE fetch so the server can prefetch it into the cache and this hydrates
+  // with no refetch flash. The view count is a side effect, posted from an
+  // effect below (not inside the queryFn) so SSR-hydrated loads still count a
+  // view exactly once and the server prefetch never double-counts.
   const listingQuery = useQuery({
-    queryKey: ["listing", id],
+    queryKey: queryKeys.product.detail(id),
     queryFn: async (): Promise<Listing> => {
       let response;
       try {
@@ -251,22 +256,31 @@ export default function ListingDetailClient() {
           throw err;
         }
       }
-      const productData = response.data.product || response.data;
-      if (!viewCountedRef.current) {
-        viewCountedRef.current = true;
-        try {
-          const viewResponse = await api.post(`/products/${id}/view`);
-          if (viewResponse.data?.viewCount !== undefined)
-            productData.viewCount = viewResponse.data.viewCount;
-        } catch {
-          // ignore
-        }
-      }
-      return productData;
+      return response.data.product || response.data;
     },
     enabled: !!id,
     meta: { page: "listing-detail" },
   });
+
+  // Count a view once per listing, whether the data came from SSR hydration or a
+  // client fetch. Updates the cached viewCount so the UI reflects it immediately.
+  useEffect(() => {
+    if (!id || !listingQuery.data || viewCountedRef.current) return;
+    viewCountedRef.current = true;
+    (async () => {
+      try {
+        const viewResponse = await api.post(`/products/${id}/view`);
+        const newCount = viewResponse.data?.viewCount;
+        if (newCount !== undefined) {
+          queryClient.setQueryData(queryKeys.product.detail(id), (old: Listing | undefined) =>
+            old ? { ...old, viewCount: newCount } : old,
+          );
+        }
+      } catch {
+        // ignore
+      }
+    })();
+  }, [id, listingQuery.data, queryClient]);
   const listing = listingQuery.data ?? null;
   const isLoading = listingQuery.isLoading;
   const effectivePrice = listing ? getProductEffectivePrice(listing) : 0;
