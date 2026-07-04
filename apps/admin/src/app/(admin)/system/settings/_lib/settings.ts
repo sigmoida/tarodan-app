@@ -1,3 +1,5 @@
+import { settingsToMap } from '@/lib/settings';
+
 export interface Settings {
   freeListingLimit: number;
   basicListingLimit: number;
@@ -72,15 +74,7 @@ const DEFAULTS: Settings = {
 
 /** Normalize the API response (array of key/value rows OR plain object) into Settings. */
 export function parseSettings(raw: unknown): Settings {
-  const obj: Record<string, unknown> = {};
-  if (Array.isArray(raw)) {
-    for (const s of raw as Array<Record<string, unknown>>) {
-      const key = (s.settingKey ?? s.key) as string | undefined;
-      if (key) obj[key] = s.settingValue ?? s.value;
-    }
-  } else if (raw && typeof raw === 'object') {
-    Object.assign(obj, raw);
-  }
+  const obj = settingsToMap(raw);
 
   const result = { ...DEFAULTS };
   for (const fields of Object.values(TAB_FIELDS)) {

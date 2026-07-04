@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Input, Spinner } from '@tarodan/ui';
+import { Button, Input } from '@tarodan/ui';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
 import { AdminPage } from '@/components/page/AdminPage';
 import { PageHeader } from '@/components/AdminList';
+import { PageLoading } from '@/components/PageLoading';
 import { AdminTabs } from '@/components/AdminTabs';
 import { SectionCard } from '@/components/detail/SectionCard';
 import { useTabParam } from '@/hooks/useTabParam';
@@ -47,9 +48,7 @@ export default function SettingsPage() {
 
   if (isLoading || !values) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <Spinner size="xl" />
-      </div>
+      <PageLoading />
     );
   }
 

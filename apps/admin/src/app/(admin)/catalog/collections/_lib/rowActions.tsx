@@ -1,5 +1,5 @@
-import { PencilIcon, TrashIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
-import type { RowActionItem } from '@/components/table';
+import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+import { editDeleteActions, type RowActionItem } from '@/components/table';
 import type { Collection } from './types';
 
 export interface CollectionRowActions {
@@ -16,7 +16,6 @@ export function collectionRowMenu({ onToggleVisibility, onEdit, onDelete }: Coll
       icon: c.isPublic ? EyeSlashIcon : EyeIcon,
       onClick: () => onToggleVisibility(c),
     },
-    { label: 'Düzenle', icon: PencilIcon, onClick: () => onEdit(c) },
-    { label: 'Sil', icon: TrashIcon, onClick: () => onDelete(c), destructive: true },
+    ...editDeleteActions(c, { onEdit, onDelete }),
   ];
 }

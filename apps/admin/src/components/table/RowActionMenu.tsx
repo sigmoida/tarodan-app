@@ -15,6 +15,8 @@ import {
 	EllipsisHorizontalIcon,
 	CheckCircleIcon,
 	XCircleIcon,
+	PencilIcon,
+	TrashIcon,
 } from '@heroicons/react/24/outline';
 import { Empty } from './cells';
 
@@ -40,6 +42,27 @@ export function activeToggleAction(
 		icon: active ? XCircleIcon : CheckCircleIcon,
 		onClick: onToggle,
 	};
+}
+
+/** Standart "Düzenle + Sil" satır aksiyon çifti (çoğu CRUD listesinde ortak). */
+export function editDeleteActions<T>(
+	row: T,
+	{
+		onEdit,
+		onDelete,
+		deleteDisabled,
+	}: { onEdit: (r: T) => void; onDelete: (r: T) => void; deleteDisabled?: boolean },
+): RowAction[] {
+	return [
+		{ label: 'Düzenle', icon: PencilIcon, onClick: () => onEdit(row) },
+		{
+			label: 'Sil',
+			icon: TrashIcon,
+			onClick: () => onDelete(row),
+			destructive: true,
+			disabled: deleteDisabled,
+		},
+	];
 }
 
 /**

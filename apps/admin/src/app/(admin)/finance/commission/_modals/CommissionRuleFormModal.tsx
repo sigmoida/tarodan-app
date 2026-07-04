@@ -1,16 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { useFormContext } from 'react-hook-form';
 import { Input } from '@tarodan/ui';
 import { FormInput, FormSelect, FormCheckbox, useZodForm } from '@tarodan/ui/form';
 import { adminApi } from '@/lib/api';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
+import { useCategories } from '@/hooks/useCategories';
 import { FormModal } from '@/components/form/FormModal';
 import { fmtTry } from '@/lib/format';
 import {
-  type Category,
   type CommissionRule,
   type CommissionFormValues,
   commissionSchema,
@@ -99,14 +98,7 @@ export function CommissionRuleFormModal({
   const showSeller = appliesTo === 'SELLER' || appliesTo === 'BOTH';
   const showBuyer = appliesTo === 'BUYER' || appliesTo === 'BOTH';
 
-  const { data: categories = [] } = useQuery({
-    queryKey: ['categories-min'],
-    queryFn: async () => {
-      const res = await adminApi.getCategories();
-      const list = res.data?.data || res.data || [];
-      return (Array.isArray(list) ? list : []) as Category[];
-    },
-  });
+  const { data: categories = [] } = useCategories();
 
   const save = useAdminMutation(
     (v: CommissionFormValues) =>

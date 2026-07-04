@@ -1,7 +1,7 @@
 'use client';
 
-import { Spinner } from '@tarodan/ui';
 import { AdminPage } from '@/components/page/AdminPage';
+import { PageLoading } from '@/components/PageLoading';
 import { PageHeader } from '@/components/AdminList';
 import { useDashboard } from './_lib/useDashboard';
 import { DashboardStats } from './_components/DashboardStats';
@@ -20,9 +20,7 @@ export default function DashboardPage() {
       <PageHeader title="Dashboard" description="Hoş geldiniz! İşte bugünkü genel bakış." />
 
       {loading || !data ? (
-        <div className="flex h-64 items-center justify-center">
-          <Spinner size="xl" />
-        </div>
+        <PageLoading />
       ) : (
         <>
           <DashboardStats stats={stats} />

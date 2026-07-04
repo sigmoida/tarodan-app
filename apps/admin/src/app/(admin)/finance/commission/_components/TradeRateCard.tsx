@@ -1,37 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Button, Input } from '@tarodan/ui';
-import toast from 'react-hot-toast';
 import { adminApi } from '@/lib/api';
 import { SectionCard } from '@/components/detail/SectionCard';
-import { useAdminMutation } from '@/hooks/useAdminMutation';
+import { useRateSetting } from '@/hooks/useRateSetting';
 
 export function TradeRateCard() {
-  const [rate, setRate] = useState('5');
-
-  const { data } = useQuery({
-    queryKey: ['trade-commission-rate'],
-    queryFn: async () => (await adminApi.getTradeCommissionRate()).data?.rate as number | undefined,
-  });
-  useEffect(() => {
-    if (data != null) setRate(String(data));
-  }, [data]);
-
-  const save = useAdminMutation((r: number) => adminApi.setTradeCommissionRate(r), {
-    invalidates: ['trade-commission-rate'],
+  const { value: rate, setValue: setRate, onSave, isPending } = useRateSetting({
+    queryKey: 'trade-commission-rate',
+    load: async () => (await adminApi.getTradeCommissionRate()).data?.rate as number | undefined,
+    save: (r) => adminApi.setTradeCommissionRate(r),
     successMessage: 'Takas komisyon oranı güncellendi',
+    fallback: '5',
   });
-
-  const onSave = () => {
-    const r = Number(rate);
-    if (!(r >= 0 && r <= 100)) {
-      toast.error('Oran 0 ile 100 arasında olmalı');
-      return;
-    }
-    save.mutate(r);
-  };
 
   return (
     <SectionCard title="Takas Komisyonu" bodyClassName="space-y-4">
@@ -50,7 +31,7 @@ export function TradeRateCard() {
           onChange={(e) => setRate(e.target.value)}
           className="w-32"
         />
-        <Button onClick={onSave} isLoading={save.isPending}>
+        <Button onClick={onSave} isLoading={isPending}>
           Kaydet
         </Button>
       </div>

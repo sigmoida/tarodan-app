@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Input, Select } from '@tarodan/ui';
 import {
@@ -10,50 +10,39 @@ import {
   ClockIcon,
   ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
-import toast from 'react-hot-toast';
 import { adminApi } from '@/lib/api';
 import { downloadBlob } from '@/lib/download';
 import { SectionCard } from '@/components/detail/SectionCard';
 import { MetricCard } from '@/components/MetricCard';
 import { DataTable } from '@/components/DataTable';
-import { useAdminMutation } from '@/hooks/useAdminMutation';
+import { useRateSetting } from '@/hooks/useRateSetting';
 import { fmtTry } from '@/lib/format';
 import { withholdingColumns } from '../_lib/columns';
 import { type WithholdingReport, MONTHS } from '../_lib/types';
 
 export function WithholdingTab() {
   const now = new Date();
-  const [whRate, setWhRate] = useState('1');
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
 
-  const { data: rate } = useQuery({
-    queryKey: ['withholding-rate'],
-    queryFn: async () => (await adminApi.getWithholdingRate()).data?.rate as number | undefined,
+  const {
+    value: whRate,
+    setValue: setWhRate,
+    onSave: onSaveRate,
+    isPending: savingRate,
+  } = useRateSetting({
+    queryKey: 'withholding-rate',
+    load: async () => (await adminApi.getWithholdingRate()).data?.rate as number | undefined,
+    save: (r) => adminApi.setWithholdingRate(r),
+    successMessage: 'Stopaj oranı güncellendi',
+    fallback: '1',
   });
-  useEffect(() => {
-    if (rate != null) setWhRate(String(rate));
-  }, [rate]);
 
   const { data: report } = useQuery({
     queryKey: ['withholding-report', year, month],
     queryFn: async () =>
       (await adminApi.getWithholdingReport({ year, month })).data as WithholdingReport | null,
   });
-
-  const saveRate = useAdminMutation((r: number) => adminApi.setWithholdingRate(r), {
-    invalidates: ['withholding-rate'],
-    successMessage: 'Stopaj oranı güncellendi',
-  });
-
-  const onSaveRate = () => {
-    const r = parseFloat(whRate);
-    if (Number.isNaN(r) || r < 0 || r > 100) {
-      toast.error('Oran 0 ile 100 arasında olmalı');
-      return;
-    }
-    saveRate.mutate(r);
-  };
 
   const exportCsv = () => {
     if (!report) return;
@@ -96,7 +85,7 @@ export function WithholdingTab() {
             onChange={(e) => setWhRate(e.target.value)}
             className="w-32"
           />
-          <Button onClick={onSaveRate} isLoading={saveRate.isPending}>
+          <Button onClick={onSaveRate} isLoading={savingRate}>
             Kaydet
           </Button>
         </div>

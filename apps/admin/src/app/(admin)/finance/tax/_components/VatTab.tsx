@@ -10,7 +10,8 @@ import { DataTable } from '@/components/DataTable';
 import { useConfirm } from '@/provider/ConfirmProvider';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { vatColumns } from '../_lib/columns';
-import { type VatConfig, type VatOverride, type Category } from '../_lib/types';
+import { useCategories } from '@/hooks/useCategories';
+import { type VatConfig, type VatOverride } from '../_lib/types';
 
 const validRate = (v: string) => {
   const r = parseFloat(v);
@@ -28,14 +29,7 @@ export function VatTab() {
     queryKey: ['vat-config'],
     queryFn: async () => (await adminApi.getVatConfig()).data as VatConfig,
   });
-  const { data: categories = [] } = useQuery({
-    queryKey: ['categories-min'],
-    queryFn: async () => {
-      const res = await adminApi.getCategories();
-      const list = res.data?.data || res.data || [];
-      return (Array.isArray(list) ? list : []) as Category[];
-    },
-  });
+  const { data: categories = [] } = useCategories();
 
   const [vatDefault, setVatDefault] = useState('20');
   const [ovCategoryId, setOvCategoryId] = useState('');

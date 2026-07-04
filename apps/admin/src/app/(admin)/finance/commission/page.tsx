@@ -2,10 +2,12 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Alert, Button, Spinner } from '@tarodan/ui';
+import { Alert, Button } from '@tarodan/ui';
 import { PlusIcon, InformationCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { adminApi } from '@/lib/api';
+import { extractList } from '@/lib/extract';
 import { AdminPage } from '@/components/page/AdminPage';
+import { PageLoading } from '@/components/PageLoading';
 import { PageHeader } from '@/components/AdminList';
 import { useConfirm } from '@/provider/ConfirmProvider';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
@@ -21,10 +23,7 @@ export default function CommissionPage() {
 
   const { data: rules = [], isLoading } = useQuery<CommissionRule[]>({
     queryKey: ['commission-rules'],
-    queryFn: async () => {
-      const res = await adminApi.getCommissionRules();
-      return res.data?.data || res.data || [];
-    },
+    queryFn: async () => extractList<CommissionRule>(await adminApi.getCommissionRules()),
   });
 
   const toggle = useAdminMutation(
@@ -87,9 +86,7 @@ export default function CommissionPage() {
       )}
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <Spinner size="xl" />
-        </div>
+        <PageLoading />
       ) : (
         <CommissionTable
           rules={rules}

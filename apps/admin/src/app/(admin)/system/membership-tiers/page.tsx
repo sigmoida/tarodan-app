@@ -2,30 +2,24 @@
 
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Input, Spinner } from '@tarodan/ui';
+import { Button, Input } from '@tarodan/ui';
 import { adminApi } from '@/lib/api';
 import { AdminPage } from '@/components/page/AdminPage';
+import { PageLoading } from '@/components/PageLoading';
 import { PageHeader } from '@/components/AdminList';
 import { SectionCard } from '@/components/detail/SectionCard';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
+import { readSetting } from '@/lib/settings';
+import { extractList } from '@/lib/extract';
 import { TierCard } from './_components/TierCard';
 import { TierFormModal } from './_modals/TierFormModal';
 import { type MembershipTier } from './_lib/types';
 
 /** Pull yearly_discount_percentage out of the settings payload (array or object). */
 function parseYearlyDiscount(raw: unknown): number {
-  if (Array.isArray(raw)) {
-    const entry = (raw as Array<Record<string, unknown>>).find(
-      (s) => (s.settingKey ?? s.key) === 'yearly_discount_percentage',
-    );
-    const v = parseFloat(String(entry?.settingValue ?? entry?.value ?? ''));
-    return Number.isNaN(v) ? 20 : v;
-  }
-  if (raw && typeof raw === 'object') {
-    const v = (raw as Record<string, unknown>).yearly_discount_percentage;
-    return v != null ? Number(v) : 20;
-  }
-  return 20;
+  const v = readSetting(raw, 'yearly_discount_percentage');
+  const n = v != null ? parseFloat(v) : NaN;
+  return Number.isNaN(n) ? 20 : n;
 }
 
 export default function MembershipTiersPage() {
@@ -34,10 +28,7 @@ export default function MembershipTiersPage() {
 
   const { data: tiers = [], isLoading } = useQuery<MembershipTier[]>({
     queryKey: ['membership-tiers'],
-    queryFn: async () => {
-      const res = await adminApi.getMembershipTiers();
-      return res.data?.data || res.data || [];
-    },
+    queryFn: async () => extractList<MembershipTier>(await adminApi.getMembershipTiers()),
   });
 
   const { data: yearlyDiscount = 20 } = useQuery({
@@ -85,9 +76,7 @@ export default function MembershipTiersPage() {
       </SectionCard>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <Spinner size="xl" />
-        </div>
+        <PageLoading />
       ) : tiers.length === 0 ? (
         <SectionCard>
           <p className="py-8 text-center text-muted">Henüz üyelik katmanı yok</p>

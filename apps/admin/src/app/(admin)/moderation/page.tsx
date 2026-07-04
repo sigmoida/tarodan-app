@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { adminApi } from '@/lib/api';
 import { getProductEffectivePrice } from '@/lib/product-price';
 import { toast } from 'react-hot-toast';
-import { Button, Select, Spinner, StatusBadge, Textarea } from '@tarodan/ui';
+import { Button, Select, StatusBadge, Textarea } from '@tarodan/ui';
 import type { StatusConfig } from '@tarodan/ui';
 import {
   CheckCircleIcon,
@@ -20,6 +20,7 @@ import {
 import Image from 'next/image';
 import { AdminTabs } from '@/components/AdminTabs';
 import { PageHeader } from '@/components/AdminList';
+import { PageLoading } from '@/components/PageLoading';
 import { Pagination } from '@/components/Pagination';
 import { useAdminResource } from '@/hooks/useAdminResource';
 
@@ -296,9 +297,7 @@ const ModerationPage = () => {
 
           {/* Content */}
           {r.isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Spinner size="xl" />
-            </div>
+            <PageLoading />
           ) : r.rows.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <CheckCircleIcon className="h-12 w-12 text-success-500 mb-4" />

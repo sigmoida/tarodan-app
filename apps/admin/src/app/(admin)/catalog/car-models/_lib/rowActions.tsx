@@ -1,5 +1,4 @@
-import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { activeToggleAction, type RowActionItem } from '@/components/table';
+import { activeToggleAction, editDeleteActions, type RowActionItem } from '@/components/table';
 import type { CarModel } from './types';
 
 export interface CarModelRowActions {
@@ -14,7 +13,6 @@ export interface CarModelRowActions {
 export function carModelRowMenu({ onEdit, onDelete, onToggle }: CarModelRowActions) {
   return (m: CarModel): RowActionItem[] => [
     activeToggleAction(m.isActive, () => onToggle(m)),
-    { label: 'Düzenle', icon: PencilIcon, onClick: () => onEdit(m) },
-    { label: 'Sil', icon: TrashIcon, onClick: () => onDelete(m), destructive: true },
+    ...editDeleteActions(m, { onEdit, onDelete }),
   ];
 }

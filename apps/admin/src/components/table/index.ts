@@ -4,6 +4,7 @@ export { col, type ColOpts } from './columns';
 export {
   RowActionMenu,
   activeToggleAction,
+  editDeleteActions,
   type RowAction,
   type RowActionItem,
 } from './RowActionMenu';

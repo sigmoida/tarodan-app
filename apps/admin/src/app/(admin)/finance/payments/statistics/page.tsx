@@ -6,11 +6,11 @@ import {
   Button,
   Select,
   Input,
-  Spinner,
   enumLabel,
   paymentStatusConfig,
   paymentProviderConfig,
 } from '@tarodan/ui';
+import { PageLoading } from '@/components/PageLoading';
 import {
   CurrencyDollarIcon,
   CreditCardIcon,
@@ -133,9 +133,7 @@ export default function PaymentStatisticsPage() {
       </SectionCard>
 
       {isLoading || !data || !s ? (
-        <div className="flex h-64 items-center justify-center">
-          <Spinner size="xl" />
-        </div>
+        <PageLoading />
       ) : (
         <>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">

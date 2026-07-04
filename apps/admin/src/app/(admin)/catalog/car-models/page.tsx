@@ -10,6 +10,7 @@ import { AdminPage } from '@/components/page/AdminPage';
 import { PageHeader } from '@/components/AdminList';
 import { ResourceList } from '@/components/list';
 import { paginateClient } from '@/lib/query/client-list';
+import { extractList } from '@/lib/extract';
 import { useConfirm } from '@/provider/ConfirmProvider';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
 import type { CarModel } from './_lib/types';
@@ -66,7 +67,7 @@ export default function CarModelsPage() {
 				resource='car-models'
 				fetcher={async (params) => {
 					const res = await adminApi.getCarModels(params.brandId || undefined);
-					const items: CarModel[] = res.data?.data ?? res.data ?? [];
+					const items = extractList<CarModel>(res);
 					return {
 						...res,
 						data: paginateClient(items, params, {

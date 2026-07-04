@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Select, Spinner } from '@tarodan/ui';
+import { Select } from '@tarodan/ui';
 import { AdminPage } from '@/components/page/AdminPage';
+import { PageLoading } from '@/components/PageLoading';
 import { PageHeader } from '@/components/AdminList';
 import { AdminTabs } from '@/components/AdminTabs';
 import {
@@ -42,9 +43,7 @@ export default function AnalyticsPage() {
       </div>
 
       {loading || !data ? (
-        <div className="flex h-64 items-center justify-center">
-          <Spinner size="xl" />
-        </div>
+        <PageLoading />
       ) : (
         <>
           {tab === 'sales' && <SalesTab report={data.salesReport} />}
