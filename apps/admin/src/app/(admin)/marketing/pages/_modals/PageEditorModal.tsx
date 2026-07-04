@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Modal, Button, Input, Textarea, Checkbox, IconButton } from '@tarodan/ui';
 import {
   XMarkIcon,
@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { adminApi } from '@/lib/api';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { useConfirm } from '@/provider/ConfirmProvider';
 import {
   PREDEFINED_PAGES,
@@ -47,46 +48,48 @@ export function PageEditorModal({
 
   const [form, setForm] = useState<EditorForm>(EMPTY);
   const [seoOpen, setSeoOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [previewHtml, setPreviewHtml] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
+  const pageQuery = useQuery({
+    queryKey: ['page-detail', existing?.id],
+    queryFn: async () => (await adminApi.getPageById(existing!.id)).data as StaticPage,
+    enabled: !!existing,
+  });
+
+  // Formu server verisinden (düzenleme) veya varsayılandan (yeni) doldur.
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      let initial: EditorForm;
-      if (existing) {
-        try {
-          const res = await adminApi.getPageById(existing.id);
-          const p: StaticPage = res.data;
-          initial = {
-            title: p.title,
-            content: p.content ?? '',
-            metaTitle: p.metaTitle ?? '',
-            metaDescription: p.metaDescription ?? '',
-            metaKeywords: p.metaKeywords ?? '',
-            isPublished: p.isPublished,
-          };
-        } catch {
-          toast.error('Sayfa yüklenemedi');
-          onClose();
-          return;
-        }
-      } else {
-        const def = DEFAULT_CONTENT[slug];
-        initial = { ...EMPTY, title: def.title, content: def.content };
-      }
-      if (!alive) return;
-      setForm(initial);
-      setPreviewHtml(buildPreviewDoc(initial.content));
-    })();
-    return () => {
-      alive = false;
-      clearTimeout(debounceRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug]);
+    let initial: EditorForm;
+    if (existing) {
+      if (!pageQuery.data) return;
+      const p = pageQuery.data;
+      initial = {
+        title: p.title,
+        content: p.content ?? '',
+        metaTitle: p.metaTitle ?? '',
+        metaDescription: p.metaDescription ?? '',
+        metaKeywords: p.metaKeywords ?? '',
+        isPublished: p.isPublished,
+      };
+    } else {
+      const def = DEFAULT_CONTENT[slug];
+      initial = { ...EMPTY, title: def.title, content: def.content };
+    }
+    setForm(initial);
+    setPreviewHtml(buildPreviewDoc(initial.content));
+  }, [slug, existing, pageQuery.data]);
+
+  // Yükleme hatasında modalı kapat (eski davranış).
+  useEffect(() => {
+    if (pageQuery.isError) {
+      toast.error('Sayfa yüklenemedi');
+      onClose();
+    }
+  }, [pageQuery.isError, onClose]);
+
+  // debounce zamanlayıcısını unmount'ta temizle.
+  useEffect(() => () => clearTimeout(debounceRef.current), []);
 
   const onContentChange = (v: string) => {
     setForm((f) => ({ ...f, content: v }));
@@ -106,19 +109,17 @@ export function PageEditorModal({
     });
   };
 
-  const onSave = async () => {
-    setSaving(true);
-    try {
-      if (existing) await adminApi.updatePage(existing.id, form);
-      else await adminApi.createPage({ slug, ...form });
-      toast.success('Sayfa kaydedildi');
-      qc.invalidateQueries({ queryKey: ['admin', 'pages'] });
-    } catch (e: any) {
-      toast.error(e.response?.data?.message || 'Kaydetme başarısız');
-    } finally {
-      setSaving(false);
-    }
-  };
+  const save = useAdminMutation(
+    (v: EditorForm) =>
+      existing ? adminApi.updatePage(existing.id, v) : adminApi.createPage({ slug, ...v }),
+    {
+      successMessage: 'Sayfa kaydedildi',
+      errorMessage: 'Kaydetme başarısız',
+      onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'pages'] }),
+    },
+  );
+  const saving = save.isPending;
+  const onSave = () => save.mutate(form);
 
   const onReset = async () => {
     const ok = await confirm({

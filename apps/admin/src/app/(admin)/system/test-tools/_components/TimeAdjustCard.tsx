@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { Button, Input, Select } from '@tarodan/ui';
 import toast from 'react-hot-toast';
 import { adminApi } from '@/lib/api';
@@ -22,29 +23,47 @@ export function TimeAdjustCard({ isProd }: { isProd: boolean }) {
   const [type, setType] = useState('boost');
   const [q, setQ] = useState('');
   const [results, setResults] = useState<SearchItem[]>([]);
-  const [searching, setSearching] = useState(false);
   const [minutes, setMinutes] = useState(1);
   const [days, setDays] = useState(1);
 
   const placeholder = useMemo(() => TYPES.find((t) => t.value === type)?.placeholder ?? '', [type]);
 
-  const doSearch = async () => {
+  const searchMut = useMutation({
+    mutationFn: async () =>
+      (await adminApi.get('/admin/test-tools/search', { params: { type, q } })).data as SearchItem[],
+    onSuccess: (data) => {
+      setResults(data);
+      if (!data.length) toast('Sonuç yok', { icon: '🔍' });
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'Arama başarısız'),
+  });
+  const searching = searchMut.isPending;
+
+  const doSearch = () => {
     if (q.trim().length < 2) {
       toast.error('En az 2 karakter girin');
       return;
     }
-    setSearching(true);
     setResults([]);
-    try {
-      const r = await adminApi.get('/admin/test-tools/search', { params: { type, q } });
-      setResults(r.data);
-      if (!r.data.length) toast('Sonuç yok', { icon: '🔍' });
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message || 'Arama başarısız');
-    } finally {
-      setSearching(false);
-    }
+    searchMut.mutate();
   };
+
+  const adjustMut = useMutation({
+    mutationFn: (vars: { item: SearchItem; action: AdjustAction; value: number }) =>
+      adminApi
+        .post('/admin/test-tools/adjust', {
+          type,
+          id: vars.item.id,
+          action: vars.action,
+          value: vars.value,
+        })
+        .then((r) => r.data),
+    onSuccess: (data) => {
+      toast.success(`${data.field}: ${fmt(data.after)}`);
+      doSearch();
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'Değişiklik başarısız'),
+  });
 
   const askAdjust = async (item: SearchItem, action: AdjustAction, value: number) => {
     const field = Object.keys(item.dates)[0] ?? 'tarih';
@@ -71,19 +90,7 @@ export function TimeAdjustCard({ isProd }: { isProd: boolean }) {
       ),
     });
     if (!ok) return;
-
-    try {
-      const r = await adminApi.post('/admin/test-tools/adjust', {
-        type,
-        id: item.id,
-        action,
-        value,
-      });
-      toast.success(`${r.data.field}: ${fmt(r.data.after)}`);
-      await doSearch();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message || 'Değişiklik başarısız');
-    }
+    adjustMut.mutate({ item, action, value });
   };
 
   const columns = timeAdjustColumns({ minutes, days, onAdjust: askAdjust });

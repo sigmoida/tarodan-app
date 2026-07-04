@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { Button, Input } from '@tarodan/ui';
 import toast from 'react-hot-toast';
 import { adminApi } from '@/lib/api';
@@ -12,21 +13,22 @@ import { type ImageTestResult, decisionState } from '../_lib/types';
 export function ImageTestCard() {
   const [url, setUrl] = useState('');
   const [result, setResult] = useState<ImageTestResult | null>(null);
-  const [testing, setTesting] = useState(false);
 
-  const runTest = async (override?: string) => {
+  const testMut = useMutation({
+    mutationFn: (target: string) =>
+      adminApi
+        .post('/admin/moderation/test-image', { imageUrl: target })
+        .then((r) => r.data as ImageTestResult),
+    onMutate: () => setResult(null),
+    onSuccess: (data) => setResult(data),
+    onError: () => toast.error('Test başarısız (görsel indirilemedi olabilir)'),
+  });
+  const testing = testMut.isPending;
+
+  const runTest = (override?: string) => {
     const target = (override ?? url).trim();
     if (!target) return;
-    setTesting(true);
-    setResult(null);
-    try {
-      const res = await adminApi.post('/admin/moderation/test-image', { imageUrl: target });
-      setResult(res.data);
-    } catch {
-      toast.error('Test başarısız (görsel indirilemedi olabilir)');
-    } finally {
-      setTesting(false);
-    }
+    testMut.mutate(target);
   };
 
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {

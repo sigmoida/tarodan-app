@@ -1,7 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Button } from '@tarodan/ui';
 import toast from 'react-hot-toast';
 import { adminApi } from '@/lib/api';
@@ -10,24 +9,17 @@ import { type CronDef } from '../_lib/types';
 
 /** Manually trigger scheduled jobs (harmless: only runs work that would run anyway). */
 export function CronsCard() {
-  const [running, setRunning] = useState<string | null>(null);
-
   const { data: crons = [] } = useQuery<CronDef[]>({
     queryKey: ['test-tools-crons'],
     queryFn: async () => (await adminApi.get('/admin/test-tools/crons')).data,
   });
 
-  const runCron = async (key: string) => {
-    setRunning(key);
-    try {
-      const r = await adminApi.post('/admin/test-tools/run-cron', { key });
-      toast.success(`Çalıştı: ${JSON.stringify(r.data.result)}`);
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message || 'Cron çalıştırılamadı');
-    } finally {
-      setRunning(null);
-    }
-  };
+  const runCronMut = useMutation({
+    mutationFn: (key: string) =>
+      adminApi.post('/admin/test-tools/run-cron', { key }).then((r) => r.data),
+    onSuccess: (data) => toast.success(`Çalıştı: ${JSON.stringify(data.result)}`),
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'Cron çalıştırılamadı'),
+  });
 
   return (
     <SectionCard
@@ -49,8 +41,8 @@ export function CronsCard() {
             </div>
             <Button
               variant="secondary"
-              onClick={() => runCron(c.key)}
-              isLoading={running === c.key}
+              onClick={() => runCronMut.mutate(c.key)}
+              isLoading={runCronMut.isPending && runCronMut.variables === c.key}
             >
               Çalıştır
             </Button>

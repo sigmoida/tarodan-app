@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, type FormEvent } from "react";
+import React, { useState, useEffect, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   ShieldCheckIcon,
   UserGroupIcon,
@@ -20,6 +21,7 @@ import { DataTable, type ColumnDef } from "@/components/DataTable";
 import { PageHeader, ActionButtons, ActionIconButton } from "@/components/AdminList";
 import { AdminTabs } from "@/components/AdminTabs";
 import { adminApi } from "@/lib/api";
+import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useSession } from "@/context/SessionContext";
 import { useConfirm } from "@/provider/ConfirmProvider";
 
@@ -194,69 +196,63 @@ export default function RolesPage() {
 
   const [activeTab, setActiveTab] = useState<"matrix" | "users">("matrix");
 
-  // ── İzin matrisi durumu ──
+  // ── İzin matrisi ──  server veriyi query'den yükler; düzenlenebilir kopya local state'te
   const [permissions, setPermissions] = useState<Record<string, string[]>>({});
-  const [matrixLoading, setMatrixLoading] = useState(true);
   const [matrixDirty, setMatrixDirty] = useState(false);
-  const [matrixSaving, setMatrixSaving] = useState(false);
   const [editMode, setEditMode] = useState(false);
-  // Grup açma/kapama
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
-  // İzin açıklama paneli
   const [expandedPerm, setExpandedPerm] = useState<string | null>(null);
 
-  const fetchPermissions = useCallback(async () => {
-    setMatrixLoading(true);
-    try {
-      const res = await adminApi.getRolePermissions();
-      setPermissions(res.data ?? {});
-    } catch {
-      toast.error("İzin matrisi yüklenemedi");
-      setPermissions(FALLBACK_DEFAULTS);
-    } finally {
-      setMatrixLoading(false);
-    }
-  }, []);
+  const permissionsQuery = useQuery({
+    queryKey: ["role-permissions"],
+    queryFn: async () => {
+      try {
+        return ((await adminApi.getRolePermissions()).data ?? {}) as Record<string, string[]>;
+      } catch {
+        toast.error("İzin matrisi yüklenemedi");
+        return FALLBACK_DEFAULTS;
+      }
+    },
+  });
+  const matrixLoading = permissionsQuery.isLoading;
+  useEffect(() => {
+    if (permissionsQuery.data) setPermissions(permissionsQuery.data);
+  }, [permissionsQuery.data]);
 
-  // ── Personel durumu ──
-  const [staff, setStaff] = useState<StaffItem[]>([]);
-  const [roleCounts, setRoleCounts] = useState<Record<string, number>>({ super_admin: 0, admin: 0, moderator: 0 });
-  const [staffLoading, setStaffLoading] = useState(true);
-  const [allowAdminAssign, setAllowAdminAssign] = useState(false);
+  // ── Personel ──
   const [roleFilter, setRoleFilter] = useState<string | null>(null);
-
-  // Modal
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<StaffItem | null>(null);
   const [form, setForm] = useState({ email: "", role: "moderator", password: "", displayName: "" });
-  const [saving, setSaving] = useState(false);
   const [createdInfo, setCreatedInfo] = useState<{ email: string; password: string } | null>(null);
 
-  const fetchStaff = useCallback(async () => {
-    setStaffLoading(true);
-    try {
+  const staffQuery = useQuery({
+    queryKey: ["staff"],
+    queryFn: async () => {
       const res = await adminApi.getStaff();
-      setStaff(res.data?.items ?? []);
-      setRoleCounts(res.data?.roleCounts ?? { super_admin: 0, admin: 0, moderator: 0 });
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Admin personeli yüklenemedi");
-    } finally {
-      setStaffLoading(false);
-    }
-  }, []);
+      return {
+        items: (res.data?.items ?? []) as StaffItem[],
+        roleCounts: (res.data?.roleCounts ?? {
+          super_admin: 0,
+          admin: 0,
+          moderator: 0,
+        }) as Record<string, number>,
+      };
+    },
+  });
+  const staff = staffQuery.data?.items ?? [];
+  const roleCounts = staffQuery.data?.roleCounts ?? { super_admin: 0, admin: 0, moderator: 0 };
+  const staffLoading = staffQuery.isLoading;
 
-  const fetchSettings = useCallback(async () => {
-    try {
-      const res = await adminApi.getStaffSettings();
-      setAllowAdminAssign(!!res.data?.allowAdminAssign);
-    } catch {}
-  }, []);
-
+  // ── Rol atama ayarı ──  optimistik toggle, mutation ile kalıcı
+  const [allowAdminAssign, setAllowAdminAssign] = useState(false);
+  const settingsQuery = useQuery({
+    queryKey: ["staff-settings"],
+    queryFn: async () => !!(await adminApi.getStaffSettings()).data?.allowAdminAssign,
+  });
   useEffect(() => {
-    fetchPermissions();
-    fetchStaff();
-    fetchSettings();
-  }, [fetchPermissions, fetchStaff, fetchSettings]);
+    if (settingsQuery.data !== undefined) setAllowAdminAssign(settingsQuery.data);
+  }, [settingsQuery.data]);
 
   // ── Matris yardımcıları ──
 
@@ -296,22 +292,21 @@ export default function RolesPage() {
     return "partial";
   };
 
-  const saveMatrix = async () => {
-    setMatrixSaving(true);
-    try {
-      const res = await adminApi.setRolePermissions(permissions);
-      setPermissions(res.data ?? permissions);
-      setMatrixDirty(false);
-      setEditMode(false);
-      toast.success("İzin matrisi kaydedildi");
-      // Sidebar filtrelemesini güncellemek için sayfayı yenile.
-      setTimeout(() => window.location.reload(), 800);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Kaydetme başarısız");
-    } finally {
-      setMatrixSaving(false);
-    }
-  };
+  const saveMatrixMut = useAdminMutation(
+    (perms: Record<string, string[]>) => adminApi.setRolePermissions(perms),
+    {
+      invalidates: ["role-permissions"],
+      successMessage: "İzin matrisi kaydedildi",
+      onSuccess: () => {
+        setMatrixDirty(false);
+        setEditMode(false);
+        // Sidebar filtrelemesini güncellemek için sayfayı yenile.
+        setTimeout(() => window.location.reload(), 800);
+      },
+    },
+  );
+  const matrixSaving = saveMatrixMut.isPending;
+  const saveMatrix = () => saveMatrixMut.mutate(permissions);
 
   const cancelEdit = async () => {
     if (matrixDirty) {
@@ -325,7 +320,7 @@ export default function RolesPage() {
     }
     setEditMode(false);
     setMatrixDirty(false);
-    fetchPermissions();
+    permissionsQuery.refetch();
   };
 
   const resetToDefaults = async () => {
@@ -351,16 +346,18 @@ export default function RolesPage() {
 
   // ── Personel aksiyonları ──
 
-  const toggleAllowAdmin = async () => {
+  const settingsMut = useAdminMutation((next: boolean) => adminApi.setStaffSettings(next), {
+    invalidates: ["staff-settings"],
+    errorMessage: "Ayar değiştirilemedi",
+    onSuccess: (_d, next) =>
+      toast.success(
+        next ? "Yöneticiler artık rol atayabilir" : "Rol atama tekrar yalnızca süper adminde",
+      ),
+  });
+  const toggleAllowAdmin = () => {
     const next = !allowAdminAssign;
-    setAllowAdminAssign(next);
-    try {
-      await adminApi.setStaffSettings(next);
-      toast.success(next ? "Yöneticiler artık rol atayabilir" : "Rol atama tekrar yalnızca süper adminde");
-    } catch (err: any) {
-      setAllowAdminAssign(!next);
-      toast.error(err.response?.data?.message || "Ayar değiştirilemedi");
-    }
+    setAllowAdminAssign(next); // optimistik
+    settingsMut.mutate(next, { onError: () => setAllowAdminAssign(!next) });
   };
 
   const openAssign = () => {
@@ -375,34 +372,41 @@ export default function RolesPage() {
     setShowModal(true);
   };
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      if (editing) {
-        await adminApi.updateStaff(editing.id, { role: form.role });
-        toast.success("Kullanıcı rolü güncellendi");
-      } else {
-        const res = await adminApi.assignStaff({
-          email: form.email,
-          role: form.role,
-          ...(form.password ? { password: form.password } : {}),
-          ...(form.displayName ? { displayName: form.displayName } : {}),
-        });
-        toast.success("Kullanıcıya rol atandı");
-        if (res.data?.tempPassword) {
-          setCreatedInfo({ email: form.email, password: res.data.tempPassword });
+  const saveStaffMut = useAdminMutation(
+    (v: { editing: StaffItem | null; form: typeof form }) =>
+      v.editing
+        ? adminApi.updateStaff(v.editing.id, { role: v.form.role })
+        : adminApi.assignStaff({
+            email: v.form.email,
+            role: v.form.role,
+            ...(v.form.password ? { password: v.form.password } : {}),
+            ...(v.form.displayName ? { displayName: v.form.displayName } : {}),
+          }),
+    {
+      invalidates: ["staff"],
+      onSuccess: (res, v) => {
+        setShowModal(false);
+        if (v.editing) {
+          toast.success("Kullanıcı rolü güncellendi");
+        } else {
+          toast.success("Kullanıcıya rol atandı");
+          const tempPassword = (res as { data?: { tempPassword?: string } })?.data?.tempPassword;
+          if (tempPassword) setCreatedInfo({ email: v.form.email, password: tempPassword });
         }
-      }
-      setShowModal(false);
-      await fetchStaff();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "İşlem başarısız");
-    } finally {
-      setSaving(false);
-    }
+      },
+    },
+  );
+  const saving = saveStaffMut.isPending;
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    saveStaffMut.mutate({ editing, form });
   };
 
+  const revokeMut = useAdminMutation((id: string) => adminApi.removeStaff(id), {
+    invalidates: ["staff"],
+    successMessage: "Admin yetkisi kaldırıldı",
+    errorMessage: "Kaldırma başarısız",
+  });
   const handleRevoke = async (s: StaffItem) => {
     if (
       !(await confirm({
@@ -411,13 +415,7 @@ export default function RolesPage() {
       }))
     )
       return;
-    try {
-      await adminApi.removeStaff(s.id);
-      toast.success("Admin yetkisi kaldırıldı");
-      await fetchStaff();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Kaldırma başarısız");
-    }
+    revokeMut.mutate(s.id);
   };
 
   const visibleStaff = roleFilter ? staff.filter((s) => s.role === roleFilter) : staff;

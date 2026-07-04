@@ -12,8 +12,9 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { adminApi } from '@/lib/api';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { useConfirm } from '@/provider/ConfirmProvider';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { SAMPLE_DATA } from '../_lib/sampleData';
 import { makeSourceData, type TemplateDetail } from '../_lib/types';
 
@@ -29,10 +30,7 @@ export function EmailTemplateEditorModal({
 
   const [detail, setDetail] = useState<TemplateDetail | null>(null);
   const [form, setForm] = useState({ name: '', subject: '', bodyHtml: '' });
-  const [saving, setSaving] = useState(false);
-  const [resetting, setResetting] = useState(false);
   const [testEmail, setTestEmail] = useState('');
-  const [sendingTest, setSendingTest] = useState(false);
 
   const [preview, setPreview] = useState<{ subject: string; html: string } | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -61,38 +59,53 @@ export function EmailTemplateEditorModal({
     [templateKey],
   );
 
+  const detailQuery = useQuery({
+    queryKey: ['email-template', templateKey],
+    queryFn: async () => (await adminApi.getEmailTemplate(templateKey)).data as TemplateDetail,
+  });
+
+  // Yükleme hatasında modalı kapat (eski davranış).
   useEffect(() => {
+    if (detailQuery.isError) {
+      toast.error('Şablon yüklenemedi');
+      onClose();
+    }
+  }, [detailQuery.isError, onClose]);
+
+  // Detay gelince formu doldur + önizlemeyi tetikle. Gövde boşsa kaynak
+  // şablonu (varsayılan) çekip forma seed eder.
+  useEffect(() => {
+    const d = detailQuery.data;
+    if (!d) return;
     let alive = true;
+    setDetail(d);
     (async () => {
-      try {
-        const res = await adminApi.getEmailTemplate(templateKey);
+      if (d.bodyHtml) {
+        setForm({ name: d.name || templateKey, subject: d.subject || '', bodyHtml: d.bodyHtml });
+        loadPreview(d.bodyHtml, d.subject || undefined);
+      } else {
+        const sourceData = makeSourceData(SAMPLE_DATA[templateKey] || {});
+        const sourceRes = await adminApi.previewEmailTemplate(
+          templateKey,
+          sourceData as Record<string, any>,
+        );
         if (!alive) return;
-        const d: TemplateDetail = res.data;
-        setDetail(d);
-        if (d.bodyHtml) {
-          setForm({ name: d.name || templateKey, subject: d.subject || '', bodyHtml: d.bodyHtml });
-          loadPreview(d.bodyHtml, d.subject || undefined);
-        } else {
-          const sourceData = makeSourceData(SAMPLE_DATA[templateKey] || {});
-          const sourceRes = await adminApi.previewEmailTemplate(
-            templateKey,
-            sourceData as Record<string, any>,
-          );
-          if (!alive) return;
-          setForm({ name: d.name || templateKey, subject: d.subject || '', bodyHtml: sourceRes.data?.html || '' });
-          loadPreview();
-        }
-      } catch {
-        toast.error('Şablon yüklenemedi');
-        onClose();
+        setForm({
+          name: d.name || templateKey,
+          subject: d.subject || '',
+          bodyHtml: sourceRes.data?.html || '',
+        });
+        loadPreview();
       }
     })();
     return () => {
       alive = false;
-      clearTimeout(debounceRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [templateKey]);
+  }, [detailQuery.data]);
+
+  // debounce zamanlayıcısını unmount'ta temizle.
+  useEffect(() => () => clearTimeout(debounceRef.current), []);
 
   const debouncedPreview = (html?: string, subject?: string) => {
     clearTimeout(debounceRef.current);
@@ -133,39 +146,50 @@ export function EmailTemplateEditorModal({
     });
   };
 
-  const onSave = async () => {
-    setSaving(true);
-    try {
-      await adminApi.updateEmailTemplate(templateKey, form);
-      toast.success('Şablon kaydedildi');
+  const saveMut = useAdminMutation(() => adminApi.updateEmailTemplate(templateKey, form), {
+    successMessage: 'Şablon kaydedildi',
+    errorMessage: 'Kaydetme başarısız',
+    onSuccess: () => {
       refreshList();
       loadPreview(form.bodyHtml || undefined, form.subject || undefined);
-    } catch (e: any) {
-      toast.error(e.response?.data?.message || 'Kaydetme başarısız');
-    } finally {
-      setSaving(false);
-    }
-  };
+    },
+  });
+  const saving = saveMut.isPending;
+  const onSave = () => saveMut.mutate();
 
-  const onSendTest = async () => {
+  const sendTestMut = useAdminMutation(
+    () =>
+      adminApi.sendTestEmail(templateKey, {
+        to: testEmail.trim(),
+        templateData: (SAMPLE_DATA[templateKey] || {}) as Record<string, any>,
+      }),
+    { successMessage: 'Test e-postası kuyruğa eklendi', errorMessage: 'Gönderilemedi' },
+  );
+  const sendingTest = sendTestMut.isPending;
+  const onSendTest = () => {
     if (!testEmail.trim()) {
       toast.error('E-posta adresi girin');
       return;
     }
-    setSendingTest(true);
-    try {
-      await adminApi.sendTestEmail(templateKey, {
-        to: testEmail.trim(),
-        templateData: (SAMPLE_DATA[templateKey] || {}) as Record<string, any>,
-      });
-      toast.success('Test e-postası kuyruğa eklendi');
-    } catch (e: any) {
-      toast.error(e.response?.data?.message || 'Gönderilemedi');
-    } finally {
-      setSendingTest(false);
-    }
+    sendTestMut.mutate();
   };
 
+  const resetMut = useAdminMutation(() => adminApi.resetEmailTemplate(templateKey), {
+    successMessage: 'Varsayılan şablona sıfırlandı',
+    errorMessage: 'Sıfırlama başarısız',
+    onSuccess: async () => {
+      setDetail((d) => (d ? { ...d, bodyHtml: null, subject: null, isCustom: false } : d));
+      refreshList();
+      const sourceData = makeSourceData(SAMPLE_DATA[templateKey] || {});
+      const sourceRes = await adminApi.previewEmailTemplate(
+        templateKey,
+        sourceData as Record<string, any>,
+      );
+      setForm((f) => ({ ...f, bodyHtml: sourceRes.data?.html || '', subject: '' }));
+      loadPreview();
+    },
+  });
+  const resetting = resetMut.isPending;
   const onReset = async () => {
     const ok = await confirm({
       title: 'Varsayılana sıfırla',
@@ -174,21 +198,7 @@ export function EmailTemplateEditorModal({
       destructive: true,
     });
     if (!ok) return;
-    setResetting(true);
-    try {
-      await adminApi.resetEmailTemplate(templateKey);
-      setDetail((d) => (d ? { ...d, bodyHtml: null, subject: null, isCustom: false } : d));
-      refreshList();
-      const sourceData = makeSourceData(SAMPLE_DATA[templateKey] || {});
-      const sourceRes = await adminApi.previewEmailTemplate(templateKey, sourceData as Record<string, any>);
-      setForm((f) => ({ ...f, bodyHtml: sourceRes.data?.html || '', subject: '' }));
-      loadPreview();
-      toast.success('Varsayılan şablona sıfırlandı');
-    } catch (e: any) {
-      toast.error(e.response?.data?.message || 'Sıfırlama başarısız');
-    } finally {
-      setResetting(false);
-    }
+    resetMut.mutate();
   };
 
   const variables = (() => {
