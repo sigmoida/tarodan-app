@@ -11,8 +11,8 @@ const notoSans = Noto_Sans({
 });
 
 export const metadata: Metadata = {
-	title: 'Tarodan Admin Panel',
-	description: 'Tarodan Marketplace Administration Dashboard',
+	title: 'Tarodan Admin',
+	description: 'Tarodan Marketplace yönetim paneli',
 };
 
 export default function RootLayout({

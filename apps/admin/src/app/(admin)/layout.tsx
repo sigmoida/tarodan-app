@@ -5,6 +5,7 @@ import { SessionProvider } from '@/context/SessionContext';
 import { PermissionsProvider } from '@/context/PermissionsContext';
 import { AdminProviders } from '@/provider/AdminProviders';
 import { AppShell } from '@/components/layout/AppShell';
+import { RouteMetadata } from '@/components/RouteMetadata';
 
 /**
  * Layout for the authenticated app. Server Component: resolves the session and
@@ -26,6 +27,7 @@ export default async function AdminRouteLayout({
     <SessionProvider user={user}>
       <PermissionsProvider permissions={permissions}>
         <AdminProviders>
+          <RouteMetadata />
           <AppShell>{children}</AppShell>
         </AdminProviders>
       </PermissionsProvider>

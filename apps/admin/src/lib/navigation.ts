@@ -39,6 +39,8 @@ export type NavItem = {
   name: string;
   href: string;
   icon: ComponentType<{ className?: string }>;
+  /** One-line page description — used for the document `<meta name="description">`. */
+  description?: string;
   /** Extra search terms (e.g. English route, synonyms) */
   keywords?: string[];
   /**
@@ -64,8 +66,8 @@ export type NavGroup = {
 };
 
 export const topLevelNav: NavItem[] = [
-  { name: 'Dashboard', href: '/dashboard', icon: HomeIcon, keywords: ['ana sayfa', 'home'], permission: 'dashboard' },
-  { name: 'Analizler', href: '/analytics', icon: ChartBarIcon, keywords: ['istatistik', 'rapor'], permission: 'analytics' },
+  { name: 'Dashboard', href: '/dashboard', icon: HomeIcon, description: 'Genel bakış, özet metrikler ve son aktiviteler', keywords: ['ana sayfa', 'home'], permission: 'dashboard' },
+  { name: 'Analizler', href: '/analytics', icon: ChartBarIcon, description: 'Satış, kullanıcı ve platform analiz raporları', keywords: ['istatistik', 'rapor'], permission: 'analytics' },
 ];
 
 export const navGroups: NavGroup[] = [
@@ -75,11 +77,11 @@ export const navGroups: NavGroup[] = [
     icon: ClipboardDocumentIcon,
     href: '/operations',
     items: [
-      { name: 'Siparişler', href: '/operations/orders', icon: ClipboardDocumentListIcon, keywords: ['order'], permission: 'orders' },
-      { name: 'Takaslar', href: '/operations/trades', icon: ArrowsRightLeftIcon, keywords: ['takas', 'trade', 'barter', 'değişim'], permission: 'trades' },
-      { name: 'Kargo', href: '/operations/shipping', icon: TruckIcon, keywords: ['kargo', 'shipping', 'gönderi', 'etiket', 'takip'], permission: 'shipping' },
-      { name: 'İade Takibi', href: '/operations/refund-requests', icon: BanknotesIcon, keywords: ['iade', 'refund', 'talep', 'takip'], permission: 'refund_requests' },
-      { name: 'İade Geçmişi', href: '/operations/refunds', icon: BanknotesIcon, keywords: ['iade', 'refund', 'geçmiş'], permission: 'refund_history' },
+      { name: 'Siparişler', href: '/operations/orders', icon: ClipboardDocumentListIcon, description: 'Tüm siparişleri görüntüleyin ve yönetin', keywords: ['order'], permission: 'orders' },
+      { name: 'Takaslar', href: '/operations/trades', icon: ArrowsRightLeftIcon, description: 'Ürün takas taleplerini takip edin ve yönetin', keywords: ['takas', 'trade', 'barter', 'değişim'], permission: 'trades' },
+      { name: 'Kargo', href: '/operations/shipping', icon: TruckIcon, description: 'Gönderi, kargo etiketi ve takip işlemleri', keywords: ['kargo', 'shipping', 'gönderi', 'etiket', 'takip'], permission: 'shipping' },
+      { name: 'İade Takibi', href: '/operations/refund-requests', icon: BanknotesIcon, description: 'Açık iade taleplerini inceleyin ve sonuçlandırın', keywords: ['iade', 'refund', 'talep', 'takip'], permission: 'refund_requests' },
+      { name: 'İade Geçmişi', href: '/operations/refunds', icon: BanknotesIcon, description: 'Tamamlanmış iade işlemlerinin geçmişi', keywords: ['iade', 'refund', 'geçmiş'], permission: 'refund_history' },
     ],
   },
   {
@@ -88,13 +90,13 @@ export const navGroups: NavGroup[] = [
     icon: Squares2X2Icon,
     href: '/catalog',
     items: [
-      { name: 'Ürünler', href: '/catalog/products', icon: ShoppingBagIcon, permission: 'products' },
-      { name: 'Kategoriler', href: '/catalog/categories', icon: CubeIcon, permission: 'categories' },
-      { name: 'Markalar', href: '/catalog/brands', icon: SwatchIcon, permission: 'brands' },
-      { name: 'Modeller', href: '/catalog/car-models', icon: TruckIcon, permission: 'car_models' },
-      { name: 'Üreticiler', href: '/catalog/manufacturers', icon: BuildingOffice2Icon, permission: 'manufacturers' },
-      { name: 'Ürün Özellikleri', href: '/catalog/attributes', icon: ClipboardDocumentListIcon, keywords: ['attribute', 'özellik'], permission: 'attributes' },
-      { name: 'Koleksiyonlar', href: '/catalog/collections', icon: ClipboardDocumentCheckIcon, permission: 'collections' },
+      { name: 'Ürünler', href: '/catalog/products', icon: ShoppingBagIcon, description: 'Ürün kataloğunu görüntüleyin, onaylayın ve yönetin', permission: 'products' },
+      { name: 'Kategoriler', href: '/catalog/categories', icon: CubeIcon, description: 'Ürün kategorilerini oluşturun ve düzenleyin', permission: 'categories' },
+      { name: 'Markalar', href: '/catalog/brands', icon: SwatchIcon, description: 'Marka listesini yönetin', permission: 'brands' },
+      { name: 'Modeller', href: '/catalog/car-models', icon: TruckIcon, description: 'Araç modellerini yönetin', permission: 'car_models' },
+      { name: 'Üreticiler', href: '/catalog/manufacturers', icon: BuildingOffice2Icon, description: 'Üretici firmaları yönetin', permission: 'manufacturers' },
+      { name: 'Ürün Özellikleri', href: '/catalog/attributes', icon: ClipboardDocumentListIcon, description: 'Ürün özellik gruplarını ve değerlerini yönetin', keywords: ['attribute', 'özellik'], permission: 'attributes' },
+      { name: 'Koleksiyonlar', href: '/catalog/collections', icon: ClipboardDocumentCheckIcon, description: 'Ürün koleksiyonlarını oluşturun ve düzenleyin', permission: 'collections' },
     ],
   },
   {
@@ -103,12 +105,12 @@ export const navGroups: NavGroup[] = [
     icon: UsersIcon,
     href: '/accounts',
     items: [
-      { name: 'Kullanıcılar', href: '/accounts/users', icon: UsersIcon, keywords: ['user', 'üye'], permission: 'users' },
-      { name: 'Satıcı Başvuruları', href: '/accounts/seller-applications', icon: ClipboardDocumentCheckIcon, permission: 'seller_applications' },
-      { name: 'Satıcı Performansı', href: '/accounts/seller-performance', icon: ChartBarIcon, permission: 'seller_performance' },
-      { name: 'Yorumlar', href: '/accounts/reviews', icon: StarIcon, permission: 'reviews' },
-      { name: 'Rapor Talepleri', href: '/accounts/reports', icon: FlagIcon, keywords: ['rapor', 'şikayet', 'report', 'complaint', 'abuse'], permission: 'reports' },
-      { name: 'Rol Yönetimi', href: '/accounts/roles', icon: UserCircleIcon, permission: 'staff' },
+      { name: 'Kullanıcılar', href: '/accounts/users', icon: UsersIcon, description: 'Kullanıcı hesaplarını görüntüleyin ve yönetin', keywords: ['user', 'üye'], permission: 'users' },
+      { name: 'Satıcı Başvuruları', href: '/accounts/seller-applications', icon: ClipboardDocumentCheckIcon, description: 'Satıcı olma başvurularını inceleyin ve onaylayın', permission: 'seller_applications' },
+      { name: 'Satıcı Performansı', href: '/accounts/seller-performance', icon: ChartBarIcon, description: 'Satıcı performans metriklerini izleyin', permission: 'seller_performance' },
+      { name: 'Yorumlar', href: '/accounts/reviews', icon: StarIcon, description: 'Kullanıcı yorumlarını denetleyin ve yönetin', permission: 'reviews' },
+      { name: 'Rapor Talepleri', href: '/accounts/reports', icon: FlagIcon, description: 'Kullanıcı şikayet ve rapor taleplerini yönetin', keywords: ['rapor', 'şikayet', 'report', 'complaint', 'abuse'], permission: 'reports' },
+      { name: 'Rol Yönetimi', href: '/accounts/roles', icon: UserCircleIcon, description: 'Personel rollerini ve yetkilerini yönetin', permission: 'staff' },
     ],
   },
   {
@@ -117,8 +119,8 @@ export const navGroups: NavGroup[] = [
     icon: ChatBubbleLeftRightIcon,
     href: '/messaging',
     items: [
-      { name: 'Mesajlar', href: '/messaging/messages', icon: ChatBubbleLeftRightIcon, permission: 'messages' },
-      { name: 'Destek Talepleri', href: '/messaging/support', icon: ChatBubbleLeftRightIcon, keywords: ['destek', 'support', 'ticket'], permission: 'support' },
+      { name: 'Mesajlar', href: '/messaging/messages', icon: ChatBubbleLeftRightIcon, description: 'Kullanıcı mesajlaşmalarını görüntüleyin', permission: 'messages' },
+      { name: 'Destek Talepleri', href: '/messaging/support', icon: ChatBubbleLeftRightIcon, description: 'Destek taleplerini yanıtlayın ve yönetin', keywords: ['destek', 'support', 'ticket'], permission: 'support' },
     ],
   },
   {
@@ -127,11 +129,11 @@ export const navGroups: NavGroup[] = [
     icon: MegaphoneIcon,
     href: '/marketing',
     items: [
-      { name: 'Reklamlar', href: '/marketing/ads', icon: MegaphoneIcon, keywords: ['reklam', 'ad', 'banner'], permission: 'ads' },
-      { name: 'İndirimler', href: '/marketing/discounts', icon: TicketIcon, keywords: ['indirim', 'kupon', 'discount', 'coupon', 'kampanya'], permission: 'discounts' },
-      { name: 'Bildirimler', href: '/marketing/notifications', icon: BellAlertIcon, permission: 'notifications' },
-      { name: 'E-posta Şablonları', href: '/marketing/email-templates', icon: ChatBubbleLeftRightIcon, permission: 'email_templates' },
-      { name: 'Sayfalar', href: '/marketing/pages', icon: DocumentTextIcon, permission: 'pages' },
+      { name: 'Reklamlar', href: '/marketing/ads', icon: MegaphoneIcon, description: 'Reklam ve banner kampanyalarını yönetin', keywords: ['reklam', 'ad', 'banner'], permission: 'ads' },
+      { name: 'İndirimler', href: '/marketing/discounts', icon: TicketIcon, description: 'İndirim kuponları ve kampanyaları yönetin', keywords: ['indirim', 'kupon', 'discount', 'coupon', 'kampanya'], permission: 'discounts' },
+      { name: 'Bildirimler', href: '/marketing/notifications', icon: BellAlertIcon, description: 'Kullanıcı bildirimlerini oluşturun ve gönderin', permission: 'notifications' },
+      { name: 'E-posta Şablonları', href: '/marketing/email-templates', icon: ChatBubbleLeftRightIcon, description: 'E-posta şablonlarını düzenleyin', permission: 'email_templates' },
+      { name: 'Sayfalar', href: '/marketing/pages', icon: DocumentTextIcon, description: 'İçerik sayfalarını oluşturun ve düzenleyin', permission: 'pages' },
     ],
   },
   {
@@ -140,11 +142,11 @@ export const navGroups: NavGroup[] = [
     icon: CurrencyDollarIcon,
     href: '/finance',
     items: [
-      { name: 'Ödemeler', href: '/finance/payments', icon: CreditCardIcon, keywords: ['ödeme', 'payment', 'hold'], permission: 'payments' },
-      { name: 'Komisyon', href: '/finance/commission', icon: CurrencyDollarIcon, permission: 'commission' },
-      { name: 'Satıcı Ödemeleri', href: '/finance/payouts', icon: BanknotesIcon, permission: 'payouts' },
-      { name: 'Faturalar', href: '/finance/invoices', icon: DocumentTextIcon, keywords: ['fatura', 'invoice', 'e-arşiv', 'e-fatura', 'elogo', 'iade faturası'], permission: 'invoices' },
-      { name: 'Vergi Ayarları', href: '/finance/tax', icon: CalculatorIcon, permission: 'tax' },
+      { name: 'Ödemeler', href: '/finance/payments', icon: CreditCardIcon, description: 'Ödeme işlemlerini görüntüleyin ve yönetin', keywords: ['ödeme', 'payment', 'hold'], permission: 'payments' },
+      { name: 'Komisyon', href: '/finance/commission', icon: CurrencyDollarIcon, description: 'Komisyon oranlarını ve ayarlarını yönetin', permission: 'commission' },
+      { name: 'Satıcı Ödemeleri', href: '/finance/payouts', icon: BanknotesIcon, description: 'Satıcı ödeme ve hakediş işlemleri', permission: 'payouts' },
+      { name: 'Faturalar', href: '/finance/invoices', icon: DocumentTextIcon, description: 'Fatura ve e-fatura işlemlerini yönetin', keywords: ['fatura', 'invoice', 'e-arşiv', 'e-fatura', 'elogo', 'iade faturası'], permission: 'invoices' },
+      { name: 'Vergi Ayarları', href: '/finance/tax', icon: CalculatorIcon, description: 'Vergi oranlarını ve ayarlarını yapılandırın', permission: 'tax' },
     ],
   },
   {
@@ -153,14 +155,47 @@ export const navGroups: NavGroup[] = [
     icon: Cog6ToothIcon,
     href: '/system',
     items: [
-      { name: 'AI Denetim', href: '/system/ai-moderation', icon: ClipboardDocumentCheckIcon, keywords: ['ai', 'moderasyon', 'nsfw'], permission: 'ai_moderation' },
-      { name: 'Üyelik Katmanları', href: '/system/membership-tiers', icon: StarIcon, keywords: ['üyelik', 'membership', 'tier'], permission: 'membership_tiers' },
-      { name: 'Sistem Ayarları', href: '/system/settings', icon: Cog6ToothIcon, permission: 'settings' },
-      { name: 'Loglar', href: '/system/logs', icon: ClipboardDocumentIcon, keywords: ['log', 'hata', 'error', 'güvenlik', 'e-posta', 'audit', 'denetim', 'iz', 'değişiklik', 'security'], permission: 'logs' },
-      { name: 'Test Araçları', href: '/system/test-tools', icon: BeakerIcon, keywords: ['test', 'zaman', 'cron', 'süre', 'boost', 'üyelik', 'iade', 'time'], permission: 'test_tools', roles: ['super_admin'] },
+      { name: 'AI Denetim', href: '/system/ai-moderation', icon: ClipboardDocumentCheckIcon, description: 'Yapay zeka içerik denetim sonuçlarını inceleyin', keywords: ['ai', 'moderasyon', 'nsfw'], permission: 'ai_moderation' },
+      { name: 'Üyelik Katmanları', href: '/system/membership-tiers', icon: StarIcon, description: 'Üyelik paketlerini ve avantajlarını yönetin', keywords: ['üyelik', 'membership', 'tier'], permission: 'membership_tiers' },
+      { name: 'Sistem Ayarları', href: '/system/settings', icon: Cog6ToothIcon, description: 'Genel platform ayarlarını yapılandırın', permission: 'settings' },
+      { name: 'Loglar', href: '/system/logs', icon: ClipboardDocumentIcon, description: 'Sistem, güvenlik ve denetim kayıtlarını görüntüleyin', keywords: ['log', 'hata', 'error', 'güvenlik', 'e-posta', 'audit', 'denetim', 'iz', 'değişiklik', 'security'], permission: 'logs' },
+      { name: 'Test Araçları', href: '/system/test-tools', icon: BeakerIcon, description: 'Geliştirici test ve simülasyon araçları', keywords: ['test', 'zaman', 'cron', 'süre', 'boost', 'üyelik', 'iade', 'time'], permission: 'test_tools', roles: ['super_admin'] },
     ],
   },
 ];
+
+/** Suffix appended to every page title, e.g. "Kullanıcılar - Tarodan Admin". */
+export const APP_NAME = 'Tarodan Admin';
+const DEFAULT_DESCRIPTION = 'Tarodan Marketplace yönetim paneli';
+
+/**
+ * Document title + meta description for a path, derived from the nav config
+ * (same longest-prefix match as `breadcrumbsFor`, so `[id]`/detail routes
+ * inherit their list page's entry). Titles come free from the nav `name`, so
+ * there's no separate title list to drift. Unmatched paths (section redirects,
+ * unknown routes) fall back to the app name + default description.
+ */
+export function pageMetadataFor(pathname: string): { title: string; description: string } {
+  let bestItem: NavItem | undefined;
+  let bestLen = -1;
+  const consider = (item: NavItem) => {
+    if (pathname.startsWith(item.href) && item.href.length > bestLen) {
+      bestItem = item;
+      bestLen = item.href.length;
+    }
+  };
+  topLevelNav.forEach(consider);
+  navGroups.forEach((group) => group.items.forEach(consider));
+
+  if (!bestItem) return { title: APP_NAME, description: DEFAULT_DESCRIPTION };
+
+  const isLeaf = pathname === bestItem.href;
+  const label = isLeaf ? bestItem.name : `${bestItem.name} — Detay`;
+  return {
+    title: `${label} - ${APP_NAME}`,
+    description: bestItem.description ?? DEFAULT_DESCRIPTION,
+  };
+}
 
 /** Whether a nav item matches a search query (name/href/keywords). */
 export function matchesQuery(item: NavItem, q: string): boolean {
