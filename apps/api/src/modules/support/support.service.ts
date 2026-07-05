@@ -24,6 +24,7 @@ import {
   GuestContactResponseDto,
 } from './dto';
 import { CacheService } from '../cache/cache.service';
+import { NotificationService } from '../notification/notification.service';
 
 @Injectable()
 export class SupportService {
@@ -32,6 +33,7 @@ export class SupportService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cacheService: CacheService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   // ==========================================================================
@@ -103,7 +105,21 @@ export class SupportService {
         `Guest contact form submitted: ${referenceNumber} from ${dto.email}`,
       );
 
-      // TODO: Send email notification to admin
+      // Destek ekibine bildirim maili (fire-and-forget): mail hatası mesajın
+      // kaydını bozmamalı — mesaj zaten Redis'e yazıldı ve panelde görünüyor.
+      this.notificationService
+        .sendGuestContactAdminEmail({
+          referenceNumber,
+          name: dto.name,
+          email: dto.email,
+          subject: guestContactData.subject,
+          message: dto.message,
+        })
+        .catch((err) =>
+          this.logger.error(
+            `Guest contact bildirim maili gönderilemedi (${referenceNumber}): ${err?.message ?? err}`,
+          ),
+        );
 
       return {
         success: true,

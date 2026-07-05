@@ -1470,6 +1470,63 @@ export class NotificationService {
   }
 
   /**
+   * Yeni misafir (guest) iletişim formu mesajı geldiğinde destek ekibine bildirim
+   * maili gönderir. Hedef adres SUPPORT_NOTIFICATION_EMAIL env'inden, yoksa
+   * uygulama genelinde standart olan destek@tarodan.com'a gider. Provider seçimi
+   * şifre sıfırlama akışıyla aynı (SendGrid → SMTP fallback). Çağrı fire-and-forget
+   * yapılmalı: mail hatası iletişim mesajının kaydını bozmamalı.
+   */
+  async sendGuestContactAdminEmail(data: {
+    referenceNumber: string;
+    name: string;
+    email: string;
+    subject: string;
+    message: string;
+  }) {
+    const adminEmail =
+      this.configService.get<string>('SUPPORT_NOTIFICATION_EMAIL') ||
+      'destek@tarodan.com';
+    const subject = `Yeni İletişim Mesajı: ${data.subject} (${data.referenceNumber})`;
+    const esc = (s: string) =>
+      String(s ?? '').replace(
+        /[<>&]/g,
+        (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c] as string),
+      );
+    const html = `
+      <h2>Yeni iletişim formu mesajı</h2>
+      <p><strong>Referans:</strong> ${esc(data.referenceNumber)}</p>
+      <p><strong>Ad:</strong> ${esc(data.name)}</p>
+      <p><strong>E-posta:</strong> ${esc(data.email)}</p>
+      <p><strong>Konu:</strong> ${esc(data.subject)}</p>
+      <p><strong>Mesaj:</strong></p>
+      <p style="white-space:pre-wrap">${esc(data.message)}</p>
+    `;
+
+    let result;
+    if (this.sendGridProvider.isConfigured()) {
+      result = await this.sendGridProvider.sendEmail({ to: adminEmail, subject, html });
+    } else if (this.smtpProvider.isConfigured()) {
+      result = await this.smtpProvider.sendEmail({ to: adminEmail, subject, html });
+    } else {
+      this.logger.warn(
+        'Guest contact bildirimi için mail sağlayıcı (SendGrid/SMTP) yapılandırılmamış',
+      );
+      return { success: false, error: 'No email provider configured' };
+    }
+
+    if (result.success) {
+      this.logger.log(
+        `Guest contact bildirim maili gönderildi: ${data.referenceNumber} → ${adminEmail}`,
+      );
+    } else {
+      this.logger.error(
+        `Guest contact bildirim maili başarısız (${data.referenceNumber}): ${result.error}`,
+      );
+    }
+    return result;
+  }
+
+  /**
    * Send password reset email using SendGrid or SMTP
    */
   async sendPasswordResetEmail(userId: string, resetToken: string) {
