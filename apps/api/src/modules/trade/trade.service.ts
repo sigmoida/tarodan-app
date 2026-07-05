@@ -1276,6 +1276,18 @@ export class TradeService {
     const oldItems = await this.prisma.tradeItem.findMany({ where: { tradeId } });
     const oldProductIds = [...new Set(oldItems.map((i) => i.productId))];
 
+    // Rol swap'ı sonrası karşı-teklifçi (originalReceiverId) YENİ initiator olur.
+    // initiatorAddressId eski initiator'ın adresinde kalırsa, karşı teklif kabul
+    // edilirken acceptTrade "adres size ait değil" hatası verir (adres artık
+    // receiver'a ait). createTrade ile aynı kuralla yeni initiator'ın teslimat
+    // adresini çöz (seçili yoksa varsayılanı; hiç adresi yoksa net hata → erken,
+    // doğru kişiye yönelik). CounterTradeDto adres almadığı için providedId yok.
+    const newInitiatorAddressId = await this.resolveTradeShippingAddressId(
+      originalReceiverId,
+      undefined,
+      { required: true },
+    );
+
     // Update trade in transaction
     // Not: Counter offer sadece pending trade'de yapılır. Pending'de quantity
     // düşürülmemiştir, dolayısıyla burada stok manipülasyonu gerekmez.
@@ -1291,6 +1303,7 @@ export class TradeService {
         data: {
           initiatorId: originalReceiverId, // Swapped
           receiverId: originalInitiatorId, // Swapped
+          initiatorAddressId: newInitiatorAddressId, // Yeni initiator'ın adresi (swap ile güncellenmeli)
           cashAmount: dto.cashAmount ? Math.abs(dto.cashAmount) : null,
           cashPayerId,
           initiatorMessage: dto.message, // New initiator's message
