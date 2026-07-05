@@ -34,6 +34,9 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: string
   paid: { label: 'Tamamlandı', color: TarodanColors.success, icon: 'checkmark-circle' },
   failed: { label: 'Başarısız', color: TarodanColors.error, icon: 'close-circle' },
   pending: { label: 'Bekliyor', color: TarodanColors.warning, icon: 'time' },
+  // İade edilen ödeme "Bekliyor" değil, açıkça "İade Edildi" gösterilmeli (web ile tutarlı).
+  refunded: { label: 'İade Edildi', color: TarodanColors.warning, icon: 'arrow-undo' },
+  refund_requested: { label: 'İade Sürecinde', color: TarodanColors.warning, icon: 'time' },
 };
 
 function formatDate(dateStr: string): string {
