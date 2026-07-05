@@ -1117,6 +1117,8 @@ export class UserService {
       successfulTradesCount,
       collectionsCount,
       ratingAgg,
+      followersCount,
+      followingCount,
     ] = await Promise.all([
       this.prisma.user.findUnique({
         where: { id: userId },
@@ -1200,6 +1202,10 @@ export class UserService {
         _avg: { score: true },
         _count: true,
       }),
+      // Takipçi/takip sayıları — getPublicProfile ile birebir aynı sayım (line ~814)
+      // Böylece kullanıcı kendi profilinde de doğru takipçi sayısını görür.
+      this.prisma.userFollow.count({ where: { followingId: userId } }),
+      this.prisma.userFollow.count({ where: { followerId: userId } }),
     ]);
 
     if (!user) {
@@ -1217,6 +1223,8 @@ export class UserService {
       tradesCount,
       successfulTradesCount,
       collectionsCount,
+      followersCount,
+      followingCount,
       totalViews: viewsAgg._sum.viewCount || 0,
       totalFavorites: likesAgg._sum.likeCount || 0,
       rating: ratingAgg._avg?.score || 0,
