@@ -945,17 +945,23 @@ export default function OrderDetailPage() {
                     <p className="text-sm text-danger-700">{cancelMessage}</p>
                   ) : null;
                 })()}
-                {order.payment?.status === "refunded" || (order.status as string) === "refunded" ? (
+                {/* İade metni SADECE payment.status'e göre iki durum: order.status
+                    iptalde de 'refunded' olduğu için ona bakılırsa para hiç hareket
+                    etmemişken "başlatıldı" yalanı çıkar. Asla "edilmiştir" (tamamlandı)
+                    denmez — banka mutabakatını doğrulayan webhook yok. */}
+                {order.payment?.status === "refunded" ? (
+                  // STATE B: PayTR iadeyi kabul etti (payment.status=refunded)
                   <p className="text-sm text-danger-700">
                     {locale === "en"
-                      ? "The payment has been refunded."
-                      : "Ödemeniz iade edilmiştir."}
+                      ? "Your refund has been initiated and submitted to your bank. Depending on your bank, it may take a few business days to appear on your card."
+                      : "İadeniz başlatıldı ve bankanıza iletildi. Tutarın kartınıza yansıması bankanıza bağlı olarak birkaç iş günü sürebilir."}
                   </p>
                 ) : order.payment?.status === "completed" ? (
+                  // STATE A: ödeme alınmış ama iade henüz başlatılmadı (cron bekliyor)
                   <p className="text-sm text-danger-700">
                     {locale === "en"
-                      ? "If a payment was made, the refund will be processed to your original payment method."
-                      : "Ödeme yapıldıysa, iadeniz ödemeyi yaptığınız yönteme aktarılacaktır."}
+                      ? "Your refund request has been received. Your refund will be initiated shortly; you can follow the progress on this screen."
+                      : "İade talebiniz alındı. Ödemenizin iadesi en kısa sürede başlatılacaktır. İşlem başladığında bu ekrandan takip edebilirsiniz."}
                   </p>
                 ) : null}
               </div>
