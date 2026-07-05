@@ -3231,7 +3231,7 @@ export class PaymentService {
         {
           const orderRow = await tx.order.findUnique({
             where: { id: orderId },
-            select: { status: true, productId: true, quantity: true },
+            select: { status: true, productId: true, quantity: true, stockRestoredAt: true },
           });
           const alreadyCancelled = orderRow?.status === OrderStatus.cancelled;
           const isFullRefund = amountToRefund >= fullOrderRefundThreshold;
@@ -3248,7 +3248,16 @@ export class PaymentService {
             });
           }
 
-          if (!alreadyCancelled && orderRow?.productId && restoreQty > 0) {
+          // Stok geri-yükleme YALNIZ BİR KEZ: order.cancel() ödenmiş iptalde stoğu zaten
+          // geri yükleyip stockRestoredAt işaretlemiş olabilir → burada tekrar yükleme
+          // (çift-sayım engeli, tek yazıcı). Kısmi adet iadeleri stockRestoredAt İŞARETLEMEZ:
+          // sipariş açık kalır ve birden çok kısmi iade mümkündür.
+          if (
+            !alreadyCancelled &&
+            !orderRow?.stockRestoredAt &&
+            orderRow?.productId &&
+            restoreQty > 0
+          ) {
             const product = await tx.product.findUnique({
               where: { id: orderRow.productId },
               select: { quantity: true },
@@ -3263,6 +3272,14 @@ export class PaymentService {
                 },
               });
               this.logger.log(`Restored ${restoreQty} stock for product ${orderRow.productId} after refund of order ${orderId}`);
+            }
+            // Tam iadede işaretle → sonraki cron turlarında çift-restore engeli.
+            // Kısmi iadede işaretleme (çoklu kısmi iade desteklenir).
+            if (isFullRefund) {
+              await tx.order.update({
+                where: { id: orderId },
+                data: { stockRestoredAt: new Date() },
+              });
             }
           }
         }
@@ -3763,16 +3780,27 @@ export class PaymentService {
 
     let refunded = 0;
     let failed = 0;
+    const failedIds: string[] = [];
     for (const order of orders) {
       try {
         await this.processRefund(order.id);
         refunded++;
       } catch (error: any) {
         failed++;
+        failedIds.push(order.id);
         this.logger.error(
           `Auto-refund (iptal edilen sipariş ${order.id}) başarısız: ${error.message}`,
         );
       }
+    }
+    // Görünürlük: kalıcı başarısız para iadeleri sessizce sonsuza dek retry edilmesin —
+    // tek satırlık greplenebilir alarm sinyali (ör. log-tabanlı uyarı kuralı buna bağlanır).
+    // NOT: stok geri-yükleme artık OrderService.cancel'da (iptalle senkron) yapıldığından
+    // takılı iade YALNIZ para tarafını etkiler; envanter piyasadan silinmez.
+    if (failed > 0) {
+      this.logger.warn(
+        `REFUND_MANUAL_REVIEW: ${failed} sipariş için otomatik para iadesi hâlâ başarısız — manuel inceleme gerekli: ${failedIds.join(', ')}`,
+      );
     }
     return { refunded, failed };
   }

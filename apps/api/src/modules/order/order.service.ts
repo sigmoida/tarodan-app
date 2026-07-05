@@ -3216,6 +3216,41 @@ export class OrderService {
         `;
       }
 
+      // Ödenmiş sipariş iptali (newStatus=refunded): fiziksel stoğu BURADA, iptalle aynı
+      // transaction'da geri yükle — PayTR para iadesini BEKLEMEDEN. Böylece tekil ürün,
+      // iade PayTR'de sürerken/başarısızken piyasadan silinmez (envanter müsaitliği ≠ para
+      // iadesi). Para iadesi processRefund cron'unda bağımsız yürür. Idempotency: stok bir
+      // kez geri yüklenir, stockRestoredAt işaretlenir; processRefund bu doluysa stok-restore'u
+      // atlar (çift geri-yükleme yok). Adet bazlı → batch-safe. pending_payment'ta quantity hiç
+      // düşmediği için (yalnız reserved rezerve edilir) stok geri-yükleme YALNIZ paid/preparing
+      // içindir; o state'ler zaten pre-shipping (kargolanan iptal edilemez, yukarıda bloklu).
+      if (newStatus === OrderStatus.refunded && !order.stockRestoredAt) {
+        const restoreQty = order.quantity ?? 1;
+        const prod = await tx.product.findUnique({
+          where: { id: order.productId },
+          select: { quantity: true },
+        });
+        if (
+          prod &&
+          prod.quantity !== null &&
+          prod.quantity !== undefined &&
+          restoreQty > 0
+        ) {
+          const newQty = prod.quantity + restoreQty;
+          await tx.product.update({
+            where: { id: order.productId },
+            data: {
+              quantity: { increment: restoreQty },
+              status: getProductStatusFromQuantity(newQty),
+            },
+          });
+        }
+        await tx.order.update({
+          where: { id: orderId },
+          data: { stockRestoredAt: new Date() },
+        });
+      }
+
       // Re-enable the offer (or mark as cancelled)
       if (order.offerId) {
         await tx.offer.update({

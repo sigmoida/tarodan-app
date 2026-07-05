@@ -1083,6 +1083,7 @@ model Order {
   preparingDeadline      DateTime?       @map("preparing_deadline")
   preparingWarningSentAt DateTime?       @map("preparing_warning_sent_at")
   reservationReleasedAt  DateTime?       @map("reservation_released_at")
+  stockRestoredAt        DateTime?       @map("stock_restored_at")
   paymentExpiresAt       DateTime        @map("payment_expires_at")
   deliveredAt            DateTime?       @map("delivered_at")
   confirmationDeadline   DateTime?       @map("confirmation_deadline")
