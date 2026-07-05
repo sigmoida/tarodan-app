@@ -679,6 +679,11 @@ export const supportApi = {
 export const searchApi = {
   products: (q: string, params?: Record<string, any>) =>
     api.get('/search/products', { params: { q, ...params } }),
+  users: (q: string, limit = 8) =>
+    api.get<Array<{ id: string; displayName: string; avatarUrl?: string; isVerified?: boolean; totalListings?: number }>>(
+      '/users/search',
+      { params: { q, limit } },
+    ),
   autocomplete: (q: string) =>
     api.get('/search/autocomplete', { params: { q } }),
   autocompleteRich: (q: string) =>

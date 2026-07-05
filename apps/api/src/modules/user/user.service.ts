@@ -2377,6 +2377,46 @@ export class UserService {
     return sellerScores.slice(0, limit).map(({ score, ...seller }) => seller);
   }
 
+  /**
+   * İsimle satıcı arama (autocomplete). Yalnızca aktif ürünü olan, banlı/silinmemiş
+   * satıcıları döndürür — profili herkese açık olmayanları sızdırmaz.
+   */
+  async searchSellers(query: string, limit: number = 8) {
+    const q = (query || '').trim();
+    if (q.length < 2) {
+      return [];
+    }
+
+    const sellers = await this.prisma.user.findMany({
+      where: {
+        isSeller: true,
+        isBanned: false,
+        deletedAt: null,
+        products: { some: { status: 'active' } },
+        displayName: { contains: q, mode: 'insensitive' },
+      },
+      take: Math.min(20, Math.max(1, Number(limit) || 8)),
+      orderBy: { products: { _count: 'desc' } },
+      select: {
+        id: true,
+        displayName: true,
+        avatarUrl: true,
+        isVerified: true,
+        _count: { select: { products: { where: { status: 'active' } } } },
+      },
+    });
+
+    return Promise.all(
+      sellers.map(async (s) => ({
+        id: s.id,
+        displayName: s.displayName,
+        avatarUrl: await this.resolveAvatarUrl(s.avatarUrl),
+        isVerified: s.isVerified,
+        totalListings: s._count.products,
+      })),
+    );
+  }
+
   // ==========================================================================
   // USER BLOCKING
   // ==========================================================================

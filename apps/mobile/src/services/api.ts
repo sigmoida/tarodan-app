@@ -809,9 +809,12 @@ export const searchApi = {
       suggestions: string[];
     }>('/search/autocomplete-rich', { params: { q: query } }),
 
-  // Kullanıcı arama
+  // İsimle satıcı arama (autocomplete)
   users: (query: string, limit?: number) =>
-    api.get('/users/search', { params: { q: query, limit } }),
+    api.get<Array<{ id: string; displayName: string; avatarUrl?: string; isVerified?: boolean; totalListings?: number }>>(
+      '/users/search',
+      { params: { q: query, limit } },
+    ),
 };
 
 // =============================================================================

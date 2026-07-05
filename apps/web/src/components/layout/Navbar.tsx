@@ -233,10 +233,23 @@ export default function Navbar() {
   });
   const autoResults = richAutoQuery.data;
 
+  // Satıcı arama (isimle) — autocomplete dropdown'ında "Satıcılar" grubu
+  const sellerAutoQuery = useQuery({
+    queryKey: ['autocomplete-sellers', debouncedQuery],
+    queryFn: async () => {
+      const res = await searchApi.users(debouncedQuery, 6);
+      return res.data;
+    },
+    enabled: debouncedQuery.length >= 2,
+    staleTime: 60_000,
+    meta: { page: 'navbar-autocomplete-sellers' },
+  });
+  const sellerResults = sellerAutoQuery.data ?? [];
+
   // Build flat list for keyboard navigation
   const flatItems = (() => {
     if (!autoResults || debouncedQuery.length < 2) return [];
-    const items: Array<{ type: 'product' | 'brand' | 'category' | 'manufacturer' | 'carModel' | 'scale' | 'material' | 'condition' | 'search'; id: string; label: string; href: string }> = [];
+    const items: Array<{ type: 'product' | 'brand' | 'category' | 'manufacturer' | 'carModel' | 'scale' | 'material' | 'condition' | 'seller' | 'search'; id: string; label: string; href: string }> = [];
     autoResults.products?.forEach((p) => items.push({ type: 'product', id: p.id, label: p.title, href: `/listings/${p.id}` }));
     autoResults.brands?.forEach((b) => items.push({ type: 'brand', id: b.id, label: b.name, href: `/listings?brand=${encodeURIComponent(b.name)}&brandId=${b.id}` }));
     autoResults.categories?.forEach((c) => items.push({ type: 'category', id: c.id, label: c.name, href: `/listings?categoryId=${c.id}` }));
@@ -245,6 +258,7 @@ export default function Navbar() {
     autoResults.scales?.forEach((s) => items.push({ type: 'scale', id: s, label: s, href: `/listings?scale=${encodeURIComponent(s)}` }));
     autoResults.materials?.forEach((mat) => items.push({ type: 'material', id: mat.slug, label: mat.label, href: `/listings?material=${encodeURIComponent(mat.slug)}` }));
     autoResults.conditions?.forEach((cond) => items.push({ type: 'condition', id: cond.value, label: cond.label, href: `/listings?condition=${encodeURIComponent(cond.value)}` }));
+    sellerResults.forEach((s) => items.push({ type: 'seller', id: s.id, label: s.displayName, href: `/seller/${s.id}` }));
     items.push({ type: 'search', id: '__search__', label: debouncedQuery, href: `/listings?search=${encodeURIComponent(debouncedQuery)}` });
     return items;
   })();
@@ -871,8 +885,38 @@ export default function Navbar() {
                               </div>
                             )}
 
+                            {/* Satıcılar */}
+                            {sellerResults.length > 0 && (
+                              <div className={(autoResults?.products?.length || autoResults?.brands?.length || autoResults?.categories?.length || autoResults?.manufacturers?.length || autoResults?.carModels?.length || autoResults?.scales?.length || autoResults?.materials?.length || autoResults?.conditions?.length) ? 'border-t border-border-subtle' : ''}>
+                                {sellerResults.map((seller, sIdx) => {
+                                  const itemIdx = (autoResults?.products?.length || 0) + (autoResults?.brands?.length || 0) + (autoResults?.categories?.length || 0) + (autoResults?.manufacturers?.length || 0) + (autoResults?.carModels?.length || 0) + (autoResults?.scales?.length || 0) + (autoResults?.materials?.length || 0) + (autoResults?.conditions?.length || 0) + sIdx;
+                                  return (
+                                    <Link
+                                      key={seller.id}
+                                      href={`/seller/${seller.id}`}
+                                      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? 'bg-primary-50' : 'hover:bg-surface'}`}
+                                      onClick={() => setShowSearchDropdown(false)}
+                                    >
+                                      {seller.avatarUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={seller.avatarUrl} alt={seller.displayName} className="w-10 h-10 rounded-full object-cover flex-shrink-0 border border-border-subtle" />
+                                      ) : (
+                                        <div className="w-10 h-10 rounded-full bg-primary-50 flex-shrink-0 flex items-center justify-center text-primary-600 text-sm font-bold border border-primary-100">
+                                          {seller.displayName?.charAt(0)?.toUpperCase() || 'S'}
+                                        </div>
+                                      )}
+                                      <span className="flex-1 text-sm text-heading font-medium truncate">{seller.displayName}</span>
+                                      <span className="text-[11px] text-primary-600 font-medium px-2 py-0.5 bg-primary-50 rounded-full flex-shrink-0">
+                                        {locale === 'en' ? 'Seller' : 'Satıcı'}
+                                      </span>
+                                    </Link>
+                                  );
+                                })}
+                              </div>
+                            )}
+
                             {/* No results */}
-                            {!autoResults?.products?.length && !autoResults?.brands?.length && !autoResults?.categories?.length && !autoResults?.manufacturers?.length && !autoResults?.carModels?.length && !autoResults?.scales?.length && !autoResults?.materials?.length && !autoResults?.conditions?.length && (
+                            {!autoResults?.products?.length && !autoResults?.brands?.length && !autoResults?.categories?.length && !autoResults?.manufacturers?.length && !autoResults?.carModels?.length && !autoResults?.scales?.length && !autoResults?.materials?.length && !autoResults?.conditions?.length && !sellerResults.length && (
                               <div className="px-4 py-6 text-center text-sm text-muted">
                                 {locale === 'en' ? 'No results found' : 'Sonuç bulunamadı'}
                               </div>
