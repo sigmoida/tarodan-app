@@ -1486,7 +1486,10 @@ export class NotificationService {
     const adminEmail =
       this.configService.get<string>('SUPPORT_NOTIFICATION_EMAIL') ||
       'destek@tarodan.com';
-    const subject = `Yeni İletişim Mesajı: ${data.subject} (${data.referenceNumber})`;
+    // Subject bir mail başlığıdır: guest girdisindeki CR/LF header injection'a
+    // yol açabilir. Satır sonlarını boşluğa çevirip kırp (defense-in-depth).
+    const safeSubject = String(data.subject ?? '').replace(/[\r\n]+/g, ' ').trim();
+    const subject = `Yeni İletişim Mesajı: ${safeSubject} (${data.referenceNumber})`;
     const esc = (s: string) =>
       String(s ?? '').replace(
         /[<>&]/g,

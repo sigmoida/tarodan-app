@@ -887,15 +887,19 @@ export class TradeService {
 
       tradeInitiatorId = trade.initiatorId;
 
-      // Teklif edenin (initiator) teslimat adresi de kabul anında HÂLÂ var olmalı.
-      // Kargo etiketi adressiz basılamaz; kabulden sonra adres silinmiş olabilir.
-      // Burada (kabul eden beklerken) kontrol edip net hata veriyoruz — aksi halde
-      // kargo aşamasında bir tarafın inbound shipment'ı oluşmaz ve takas
-      // at_warehouse'a geçemeden takılı kalırdı. (resolveTradeShippingAddressId:
-      // seçili adres → varsayılan → en eski; hiçbiri yoksa required:true ile atar.)
+      // Teklif edenin (initiator) KULLANILABİLİR bir teslimat adresi olduğunu
+      // doğrula (kargo etiketi adressiz basılamaz; aksi halde inbound shipment
+      // oluşmaz ve takas at_warehouse'a geçemeden takılırdı). providedId olarak
+      // BİLEREK undefined geçiyoruz: saklı initiatorAddressId bayat/foreign olsa
+      // bile (ör. karşı teklif rol swap'ı sonrası) "size ait değil" fırlatmak
+      // YERİNE varsayılan→en eski adrese fallback ederiz — tıpkı gerçek kargo
+      // çözücü (resolveSideAddress) gibi. Yalnızca initiator'ın HİÇ adresi yoksa
+      // required:true ile net hata. Bu sadece bir doğrulamadır; kargonun gideceği
+      // adresi resolveSideAddress bağımsız olarak (saklı id + kendi fallback'i)
+      // belirler, dolayısıyla burada undefined vermek kargo adresini değiştirmez.
       await this.resolveTradeShippingAddressId(
         trade.initiatorId,
-        trade.initiatorAddressId ?? undefined,
+        undefined,
         { required: true, db: tx },
       );
 
@@ -1277,15 +1281,16 @@ export class TradeService {
     const oldProductIds = [...new Set(oldItems.map((i) => i.productId))];
 
     // Rol swap'ı sonrası karşı-teklifçi (originalReceiverId) YENİ initiator olur.
-    // initiatorAddressId eski initiator'ın adresinde kalırsa, karşı teklif kabul
-    // edilirken acceptTrade "adres size ait değil" hatası verir (adres artık
-    // receiver'a ait). createTrade ile aynı kuralla yeni initiator'ın teslimat
-    // adresini çöz (seçili yoksa varsayılanı; hiç adresi yoksa net hata → erken,
-    // doğru kişiye yönelik). CounterTradeDto adres almadığı için providedId yok.
+    // initiatorAddressId eski initiator'ın adresinde kalırsa "bayat" (foreign)
+    // kalır; veri hijyeni için yeni initiator'ın adresini çözüp yazıyoruz. Ancak
+    // required:false — counter modal'ında adres seçici olmadığından, adresi
+    // olmayan karşı-teklifçiyi burada BLOKLAMIYORUZ (çıkmaz olurdu). Adresi varsa
+    // yazılır, yoksa null kalır; eksik adres durumu accept aşamasındaki guard ve
+    // kargo çözücünün fallback'i ile ele alınır. CounterTradeDto adres almaz.
     const newInitiatorAddressId = await this.resolveTradeShippingAddressId(
       originalReceiverId,
       undefined,
-      { required: true },
+      { required: false },
     );
 
     // Update trade in transaction
