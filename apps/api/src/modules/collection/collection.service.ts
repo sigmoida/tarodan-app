@@ -234,14 +234,21 @@ export class CollectionService {
       isLiked = !!like;
     }
 
-    // Increment view count only if viewer is not the owner
-    // If viewerId is provided and matches owner, don't increment
-    // Otherwise increment (anonymous users or different users)
-    if (!viewerId || viewerId !== collection.userId) {
-      await this.prisma.collection.update({
-        where: { id: collectionId },
-        data: { viewCount: { increment: 1 } },
+    // Görüntülenmeyi kullanıcı başına tekil say: aynı kullanıcı tekrar açsa/refresh
+    // etse/beğeni toggle'layıp yeniden fetch etse viewCount artmaz. Sadece giriş
+    // yapmış ve sahibi olmayan bir kullanıcının İLK görüntülemesi sayılır.
+    // Anonim (viewerId yok) ziyaretler sayılmaz.
+    if (viewerId && viewerId !== collection.userId) {
+      const inserted = await this.prisma.collectionView.createMany({
+        data: [{ collectionId: collection.id, userId: viewerId }],
+        skipDuplicates: true,
       });
+      if (inserted.count > 0) {
+        await this.prisma.collection.update({
+          where: { id: collection.id },
+          data: { viewCount: { increment: 1 } },
+        });
+      }
     }
 
     // Generate cover image if not exists
@@ -340,14 +347,19 @@ export class CollectionService {
       isLiked = !!like;
     }
 
-    // Increment view count only if viewer is not the owner
-    // If viewerId is provided and matches owner, don't increment
-    // Otherwise increment (anonymous users or different users)
-    if (!viewerId || viewerId !== collection.userId) {
-      await this.prisma.collection.update({
-        where: { id: collection.id },
-        data: { viewCount: { increment: 1 } },
+    // Görüntülenmeyi kullanıcı başına tekil say (bkz. getCollectionById).
+    // Sadece giriş yapmış, sahibi olmayan kullanıcının ilk görüntülemesi sayılır.
+    if (viewerId && viewerId !== collection.userId) {
+      const inserted = await this.prisma.collectionView.createMany({
+        data: [{ collectionId: collection.id, userId: viewerId }],
+        skipDuplicates: true,
       });
+      if (inserted.count > 0) {
+        await this.prisma.collection.update({
+          where: { id: collection.id },
+          data: { viewCount: { increment: 1 } },
+        });
+      }
     }
 
     // Generate cover image if not exists

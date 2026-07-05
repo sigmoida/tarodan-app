@@ -36,8 +36,8 @@ export default function CollectionDetailScreen() {
     },
   });
 
-  // NOT: GET /collections/:id her çağrıda viewCount'u artırıyor; kullanıcı bilerek
-  // aşağı çekerek yenilediği için görüntülenmenin +1 artması kabul edilebilir.
+  // NOT: viewCount artık backend'de kullanıcı başına tekilleştiriliyor; aynı kullanıcı
+  // refresh'lese/tekrar açsa görüntülenme artmaz. Refetch güvenli.
   const { refreshing, onRefresh } = useRefresh(refetch);
 
   const collection = apiCollection;
@@ -92,8 +92,8 @@ export default function CollectionDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ['liked-collections'] });
       queryClient.invalidateQueries({ queryKey: ['myCollections'] });
       // ['collection', id] cache'ini taze tut ki tekrar girince stale (eski isLiked/likeCount)
-      // gelmesin. GET /collections/:id her çağrıda viewCount'u +1 artırdığı için REFETCH değil,
-      // cache'i elle güncelliyoruz (görüntülenme şişmesin).
+      // gelmesin. Cache'i elle güncelliyoruz (viewCount backend'de tekilleştirildiği için
+      // refetch de güvenli olurdu; yine de gereksiz istekten kaçınıyoruz).
       queryClient.setQueryData(['collection', id], (old: any) =>
         old ? { ...old, isLiked: serverLiked, likeCount: serverCount ?? old.likeCount } : old
       );

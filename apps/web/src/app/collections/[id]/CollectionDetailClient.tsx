@@ -550,7 +550,16 @@ export default function CollectionDetailClient() {
                   <p className="text-muted text-sm mb-3 leading-relaxed">{collection.description}</p>
                 )}
                 <div className="flex flex-wrap items-center gap-4 text-xs text-subtle">
-                  <span className="font-medium text-muted">@{collection.userName}</span>
+                  {collection.userId ? (
+                    <Link
+                      href={`/seller/${collection.userId}`}
+                      className="font-medium text-muted hover:text-primary-500 transition-colors"
+                    >
+                      @{collection.userName}
+                    </Link>
+                  ) : (
+                    <span className="font-medium text-muted">@{collection.userName}</span>
+                  )}
                   <span className="flex items-center gap-1"><EyeIcon className="w-3.5 h-3.5" />{collection.viewCount} {t('collection.views')}</span>
                   <span className="flex items-center gap-1"><HeartIcon className="w-3.5 h-3.5" />{collection.likeCount} {t('collection.likes')}</span>
                   <span className="font-medium">{collection.itemCount} {t('collection.products')}</span>

@@ -41,6 +41,7 @@ model User {
   adminUser               AdminUser?
   cart                    Cart?
   collectionLikes         CollectionLike[]
+  collectionViews         CollectionView[]
   collections             Collection[]
   discountUsages          DiscountUsage[]
   discounts               Discount[]
@@ -850,6 +851,7 @@ model Collection {
   isFeatured    Boolean          @default(false) @map("is_featured")
   items         CollectionItem[]
   likes         CollectionLike[]
+  views         CollectionView[]
   user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   category      Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
@@ -896,6 +898,20 @@ model CollectionLike {
   @@index([collectionId])
   @@index([userId])
   @@map("collection_likes")
+}
+
+model CollectionView {
+  id           String     @id @default(uuid())
+  collectionId String     @map("collection_id")
+  userId       String     @map("user_id")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([collectionId, userId])
+  @@index([collectionId])
+  @@index([userId])
+  @@map("collection_views")
 }
 
 
