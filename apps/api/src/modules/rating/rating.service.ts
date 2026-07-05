@@ -179,7 +179,9 @@ export class RatingService {
         tradeId: dto.tradeId,
         score: dto.score,
         comment: dto.comment,
-        status: RatingStatus.pending, // Admin onayı gerekli; onaylanmadan gösterilmez
+        // Post-moderasyon: değerlendirme anında yayınlanır (profilde hemen görünür),
+        // admin uygunsuzsa panelden kaldırabilir/rejected yapabilir.
+        status: RatingStatus.approved,
       },
       include: {
         giver: { select: { id: true, displayName: true, avatarUrl: true } },
@@ -283,7 +285,8 @@ export class RatingService {
         review: dto.review,
         images: dto.images || [],
         isVerifiedPurchase: true,
-        status: RatingStatus.pending, // Admin onayı gerekli; onaylanmadan gösterilmez
+        // Post-moderasyon: ürün değerlendirmesi anında yayınlanır; admin sonradan kaldırabilir.
+        status: RatingStatus.approved,
       },
       include: {
         product: { select: { id: true, title: true } },

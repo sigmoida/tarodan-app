@@ -584,8 +584,8 @@ export default function StatisticsPage() {
                   <ArrowsRightLeftIcon className="w-5 h-5 text-muted group-hover:text-primary-500" />
                   <span className="text-sm font-medium text-body group-hover:text-primary-600">Takaslarım</span>
                 </Link>
-                <Link 
-                  href="/collections"
+                <Link
+                  href="/profile/collections"
                   className="flex items-center gap-3 p-4 bg-surface rounded-xl hover:bg-primary-50 hover:border-primary-200 border border-transparent transition-all group"
                 >
                   <RectangleStackIcon className="w-5 h-5 text-muted group-hover:text-primary-500" />
