@@ -36,7 +36,7 @@ const HELP_CATEGORIES = [
     color: 'bg-success-500',
     links: [
       { href: '/faq#buying', label: 'Nasıl Alışveriş Yapılır?' },
-      { href: '/faq#shipping', label: 'Kargo Bilgileri' },
+      { href: '/shipping-delivery', label: 'Kargo Bilgileri' },
       { href: '/faq#buying', label: 'Ödeme Yöntemleri' },
     ],
   },
@@ -47,7 +47,7 @@ const HELP_CATEGORIES = [
     color: 'bg-warning-500',
     links: [
       { href: '/guides#selling', label: 'İlan Verme Rehberi' },
-      { href: '/faq#selling', label: 'Komisyon Oranları' },
+      { href: '/platform-hizmet-bedeli', label: 'Komisyon Oranları' },
       { href: '/pricing', label: 'Üyelik Planları' },
     ],
   },
@@ -68,8 +68,8 @@ const HELP_CATEGORIES = [
     icon: TruckIcon,
     color: 'bg-primary-500',
     links: [
-      { href: '/faq#shipping', label: 'Kargo Takibi' },
-      { href: '/faq#shipping', label: 'Teslimat Süreleri' },
+      { href: '/shipping-delivery', label: 'Kargo Takibi' },
+      { href: '/shipping-delivery', label: 'Teslimat Süreleri' },
       { href: '/faq#shipping', label: 'Hasarlı Ürün' },
     ],
   },
