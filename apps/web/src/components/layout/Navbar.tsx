@@ -528,7 +528,7 @@ export default function Navbar() {
             </Link>
 
             {/* Arama - ortada */}
-            <div ref={searchContainerRef} className="hidden md:flex flex-1 justify-center min-w-0 min-h-0 px-4">
+            <div ref={searchContainerRef} className="flex flex-1 justify-center min-w-0 min-h-0 px-1 md:px-4">
               <div className="w-full max-w-xl relative flex-shrink-0">
                 <form onSubmit={handleSearchSubmit} className="relative h-10 block">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center flex-shrink-0 pointer-events-none text-primary-400">

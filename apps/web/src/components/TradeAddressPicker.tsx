@@ -81,7 +81,8 @@ export default function TradeAddressPicker({ onChange, label }: TradeAddressPick
 
   const handleAdd = async () => {
     if (!form.fullName.trim()) return toast.error('Ad soyad girin');
-    if (form.phone.replace(/\D/g, '').length < 10) return toast.error('Geçerli telefon girin');
+    // +905XXXXXXXXX → 12 hane (90 + 10). Kayıtlı adres formuyla aynı doğrulama.
+    if (form.phone.replace(/\D/g, '').length < 12) return toast.error('Geçerli telefon girin');
     if (!form.city) return toast.error('İl seçin');
     if (!form.district) return toast.error('İlçe seçin');
     if (form.address.trim().length < 10) return toast.error('Adres en az 10 karakter olmalı');
@@ -172,13 +173,30 @@ export default function TradeAddressPicker({ onChange, label }: TradeAddressPick
             value={form.fullName}
             onChange={(e) => setForm({ ...form, fullName: e.target.value })}
           />
-          <Input
-            type="text"
-            inputMode="tel"
-            placeholder="Telefon (05XX XXX XX XX)"
-            value={form.phone}
-            onChange={(e) => setForm({ ...form, phone: e.target.value })}
-          />
+          {/* Telefon — kayıtlı adres formundaki (+90 önekli, 10 hane, formatlı)
+              yerleşik pattern. Ham input "sonsuz karakter" alıyordu. */}
+          <div className="flex">
+            <span className="inline-flex items-center px-3 bg-surface-alt border border-r-0 border-border rounded-l text-muted font-medium">
+              +90
+            </span>
+            <Input
+              type="tel"
+              inputMode="tel"
+              value={form.phone
+                .replace('+90', '')
+                .replace(/\s/g, '')
+                .slice(0, 10)
+                .replace(/(\d{3})(\d{3})(\d{2})(\d{2})/, '$1 $2 $3 $4')
+                .trim()}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                setForm({ ...form, phone: '+90' + digits });
+              }}
+              placeholder="5XX XXX XX XX"
+              maxLength={14}
+              className="rounded-l-none"
+            />
+          </div>
           <CityDistrictSelector
             city={form.city}
             district={form.district}

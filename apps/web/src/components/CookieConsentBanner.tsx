@@ -33,22 +33,25 @@ export default function CookieConsentBanner() {
     const [preferences, setPreferences] = useState<CookiePreferences>(defaultPreferences);
 
     useEffect(() => {
-        // Check if user has already given consent
+        // Kayıtlı tercihler VARSA her durumda state'e yükle. Footer'daki "Çerez
+        // Ayarları" yalnızca cookie_consent'i silip banner'ı yeniden açtığından,
+        // tercihleri consent'ten bağımsız okumazsak toggle'lar default'a (hepsi
+        // kapalı) düşer ve kullanıcının gerçek seçimiyle uyuşmaz — "kapattım ama
+        // geri açık" tutarsızlığının kaynağı buydu.
+        const savedPrefs = localStorage.getItem(COOKIE_PREFERENCES_KEY);
+        if (savedPrefs) {
+            try {
+                setPreferences(JSON.parse(savedPrefs));
+            } catch {
+                setPreferences(defaultPreferences);
+            }
+        }
+
+        // Consent yoksa banner'ı (biraz gecikmeyle) göster.
         const consent = localStorage.getItem(COOKIE_CONSENT_KEY);
         if (!consent) {
-            // Don't show immediately - wait a bit for better UX
             const timer = setTimeout(() => setIsVisible(true), 1500);
             return () => clearTimeout(timer);
-        } else {
-            // Load saved preferences
-            const savedPrefs = localStorage.getItem(COOKIE_PREFERENCES_KEY);
-            if (savedPrefs) {
-                try {
-                    setPreferences(JSON.parse(savedPrefs));
-                } catch {
-                    setPreferences(defaultPreferences);
-                }
-            }
         }
     }, []);
 

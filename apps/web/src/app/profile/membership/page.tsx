@@ -730,24 +730,57 @@ export default function MembershipPage() {
         <div className="max-w-3xl mx-auto mt-16">
           <h2 className="text-2xl font-bold text-heading text-center mb-8">{t('nav.faq')}</h2>
           <div className="space-y-4">
-            <div className="bg-surface-elevated rounded-lg p-6 shadow-sm">
-              <h3 className="font-semibold text-heading mb-2">{t('membership.upgrade')}?</h3>
-              <p className="text-muted">
-                {t('membership.subtitle')}
-              </p>
-            </div>
-            <div className="bg-surface-elevated rounded-lg p-6 shadow-sm">
-              <h3 className="font-semibold text-heading mb-2">{t('membership.listingsLimit')}?</h3>
-              <p className="text-muted">
-                {t('membership.features')}
-              </p>
-            </div>
-            <div className="bg-surface-elevated rounded-lg p-6 shadow-sm">
-              <h3 className="font-semibold text-heading mb-2">{t('nav.trades')}?</h3>
-              <p className="text-muted">
-                {t('trade.tradeRequiresLogin')}
-              </p>
-            </div>
+            {(locale === 'en'
+              ? [
+                  {
+                    q: 'What does a premium membership offer?',
+                    a: 'Premium raises your active listing limit, lets you feature (boost) your listings for higher visibility, and adds a badge to your profile. The exact limits depend on the plan you choose above.',
+                  },
+                  {
+                    q: 'Can I cancel my membership anytime?',
+                    a: 'Yes. You can cancel whenever you want. Your premium benefits stay active until the end of the period you already paid for — no early cut-off — and it simply does not renew afterwards.',
+                  },
+                  {
+                    q: 'What happens to my listings when my membership ends?',
+                    a: 'Your listings are not deleted. If you end up over the free plan limit, the extra listings become inactive and you can reactivate them anytime by upgrading again.',
+                  },
+                  {
+                    q: 'How can I change my plan?',
+                    a: 'Select a different plan above and continue. Upgrades take effect immediately; the new limits and benefits apply to your account right away.',
+                  },
+                  {
+                    q: 'Is payment secure?',
+                    a: 'Payments are processed through our secured payment provider. Tarodan never stores your card details.',
+                  },
+                ]
+              : [
+                  {
+                    q: 'Premium üyelik bana ne kazandırır?',
+                    a: 'Premium; aktif ilan hakkınızı artırır, ilanlarınızı öne çıkararak (boost) daha fazla kişiye ulaştırmanızı sağlar ve profilinize üyelik rozeti ekler. Kesin limitler yukarıda seçtiğiniz plana göre değişir.',
+                  },
+                  {
+                    q: 'Üyeliğimi istediğim zaman iptal edebilir miyim?',
+                    a: 'Evet. Dilediğiniz zaman iptal edebilirsiniz. Premium avantajlarınız, önceden ödediğiniz dönemin sonuna kadar aktif kalır — erken kesilmez — ve sonrasında yalnızca yenilenmez.',
+                  },
+                  {
+                    q: 'Üyeliğim bitince ilanlarıma ne olur?',
+                    a: 'İlanlarınız silinmez. Ücretsiz plan limitinin üzerine çıkmışsanız, fazla ilanlar pasife alınır; tekrar yükseltme yaptığınızda bunları istediğiniz zaman yeniden aktif edebilirsiniz.',
+                  },
+                  {
+                    q: 'Planımı nasıl değiştiririm?',
+                    a: 'Yukarıdan farklı bir plan seçip devam edin. Yükseltmeler anında geçerli olur; yeni limit ve avantajlar hesabınıza hemen tanımlanır.',
+                  },
+                  {
+                    q: 'Ödeme güvenli mi?',
+                    a: 'Ödemeler güvenli ödeme altyapımız üzerinden alınır. Tarodan kart bilgilerinizi hiçbir zaman saklamaz.',
+                  },
+                ]
+            ).map((item) => (
+              <div key={item.q} className="bg-surface-elevated rounded-lg p-6 shadow-sm">
+                <h3 className="font-semibold text-heading mb-2">{item.q}</h3>
+                <p className="text-muted">{item.a}</p>
+              </div>
+            ))}
           </div>
         </div>
       </main>
