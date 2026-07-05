@@ -4,7 +4,7 @@ import { Avatar, Button, Card, Spinner, Text, theme, ScreenHeader, EmptyState } 
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { userApi, productsApi, ratingsApi } from '../../src/services/api';
+import { userApi, productsApi, ratingsApi, collectionsApi } from '../../src/services/api';
 import { ThemedRefreshControl } from '../../src/components/common';
 import { useRefresh } from '../../src/hooks/useRefresh';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -26,7 +26,7 @@ const BADGE_INFO: Record<string, { label: string; icon: string; color: string }>
 export default function SellerProfileScreen() {
   const { id } = useLocalSearchParams();
   const { isAuthenticated } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'listings' | 'reviews'>('listings');
+  const [activeTab, setActiveTab] = useState<'listings' | 'reviews' | 'collections'>('listings');
 
   const { data: apiSeller, isLoading, refetch: refetchSeller } = useQuery({
     queryKey: ['seller', id],
@@ -87,17 +87,35 @@ export default function SellerProfileScreen() {
     enabled: !!id,
   });
 
+  // Satıcının herkese açık koleksiyonları (backend başkası bakınca yalnızca public döner)
+  const { data: sellerCollections, refetch: refetchCollections } = useQuery({
+    queryKey: ['seller-collections', id],
+    queryFn: async () => {
+      try {
+        const response = await collectionsApi.getUserCollections(String(id), { pageSize: 50 });
+        const data: any = response.data;
+        const payload = data?.data ?? data;
+        return payload?.collections ?? (Array.isArray(payload) ? payload : []);
+      } catch {
+        return [];
+      }
+    },
+    enabled: !!id,
+  });
+
   const { refreshing, onRefresh } = useRefresh(
     refetchSeller,
     refetchProducts,
     refetchStats,
     refetchRatings,
+    refetchCollections,
   );
 
   const seller = apiSeller;
   const products = Array.isArray(sellerProducts) ? sellerProducts : [];
   // Backend ratings (web ile parite); yoksa boş.
   const reviews = Array.isArray(ratingList) ? ratingList : [];
+  const collections = Array.isArray(sellerCollections) ? sellerCollections : [];
 
   const handleMessage = () => {
     if (!isAuthenticated) {
@@ -262,10 +280,23 @@ export default function SellerProfileScreen() {
               Değerlendirmeler ({reviews.length})
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'collections' && styles.tabActive]}
+            onPress={() => setActiveTab('collections')}
+          >
+            <Ionicons
+              name="albums-outline"
+              size={20}
+              color={activeTab === 'collections' ? colors.primary[600]! : colors.text.muted}
+            />
+            <Text style={[styles.tabText, activeTab === 'collections' && styles.tabTextActive]}>
+              Koleksiyonlar ({collections.length})
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Tab Content */}
-        {activeTab === 'listings' ? (
+        {activeTab === 'listings' && (
           products.length === 0 ? (
             <View style={{ alignItems: 'center', padding: 32 }}>
               <Ionicons name="cube-outline" size={48} color={colors.text.subtle} />
@@ -301,7 +332,8 @@ export default function SellerProfileScreen() {
             ))}
           </View>
           )
-        ) : (
+        )}
+        {activeTab === 'reviews' && (
           <View style={styles.reviewsList}>
             {reviews.length === 0 ? (
               <View style={{ alignItems: 'center', padding: 32 }}>
@@ -353,6 +385,44 @@ export default function SellerProfileScreen() {
               })
             )}
           </View>
+        )}
+        {activeTab === 'collections' && (
+          collections.length === 0 ? (
+            <View style={{ alignItems: 'center', padding: 32 }}>
+              <Ionicons name="albums-outline" size={48} color={colors.text.subtle} />
+              <Text style={{ color: colors.text.muted, marginTop: 8, fontSize: 14 }}>
+                Henüz koleksiyon yok
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.listingsGrid}>
+              {collections.map((collection: any) => (
+                <Pressable
+                  key={collection.id}
+                  onPress={() => router.push(`/collections/${collection.id}`)}
+                  style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
+                >
+                  <Card style={styles.productCard} padding={0}>
+                    {collection.coverImageUrl ? (
+                      <Image
+                        source={{ uri: resolveImageUrl(collection.coverImageUrl) }}
+                        style={styles.productImage}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={[styles.productImage, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface.alt }]}>
+                        <Ionicons name="albums-outline" size={32} color={colors.text.subtle} />
+                      </View>
+                    )}
+                    <View style={styles.productContent}>
+                      <Text style={styles.productTitle} numberOfLines={2}>{collection.name}</Text>
+                      <Text style={styles.productPrice}>{collection.itemCount ?? 0} ürün</Text>
+                    </View>
+                  </Card>
+                </Pressable>
+              ))}
+            </View>
+          )
         )}
 
         <View style={{ height: 40 }} />

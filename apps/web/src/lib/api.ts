@@ -507,6 +507,8 @@ export const collectionsApi = {
     api.get('/collections/liked', { params }),
   getOne: (id: string) => api.get(`/collections/${id}`),
   getBySlug: (slug: string) => api.get(`/collections/slug/${slug}`),
+  getUserCollections: (userId: string, params?: Record<string, any>) =>
+    api.get(`/collections/user/${userId}`, { params }),
   create: (data: { name: string; description?: string; coverImageKey?: string; isPublic?: boolean; categoryId?: string }) =>
     api.post('/collections', data),
   update: (id: string, data: { name?: string; description?: string; coverImageKey?: string; isPublic?: boolean; categoryId?: string | null }) =>
