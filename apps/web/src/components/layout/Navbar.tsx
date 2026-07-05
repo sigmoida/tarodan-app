@@ -949,7 +949,7 @@ export default function Navbar() {
                 onClick={(e) => { if (!showAuthUI) { e.preventDefault(); setShowAuthModal(true); } }}
               >
                 <PlusIcon className="w-4 h-4" />
-                <span className="hidden sm:inline">{t('nav.newListing')}</span>
+                <span className="hidden lg:inline">{t('nav.newListing')}</span>
               </Link>
 
               {/* Mesajlar - bildirim zilinin solunda hızlı erişim */}
@@ -994,7 +994,7 @@ export default function Navbar() {
                   className="gap-1.5 h-9 rounded-md"
                 >
                   <UserCircleIcon className="w-5 h-5" />
-                  <span className="hidden sm:inline">{showAuthUI ? (user?.displayName || t('nav.account')) : t('common.login')}</span>
+                  <span className="hidden lg:inline">{showAuthUI ? (user?.displayName || t('nav.account')) : t('common.login')}</span>
                   <ChevronDownIcon className={`w-4 h-4 transition-transform ${showAccountDropdown ? 'rotate-180' : ''}`} />
                 </Button>
 
@@ -1161,7 +1161,7 @@ export default function Navbar() {
                 title={t('nav.cart')}
               >
                 <ShoppingCartIcon className="w-5 h-5" />
-                <span className="hidden sm:inline">{t('nav.cart')}</span>
+                <span className="hidden lg:inline">{t('nav.cart')}</span>
                 {cartCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-surface-elevated text-primary-500 text-xs rounded-full flex items-center justify-center font-semibold">
                     {cartCount > 9 ? '9+' : cartCount}
