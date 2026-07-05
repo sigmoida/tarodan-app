@@ -210,10 +210,10 @@ export default function AddressesPage() {
             <h1 className="text-3xl font-bold mb-2">{t('address.myAddresses')}</h1>
             <p className="text-muted">{t('address.manageAddresses')}</p>
           </div>
-          {addresses.length >= 10 ? (
+          {addresses.length >= 3 ? (
             <div className="text-right">
               <p className="text-sm text-primary-600 font-medium mb-1">
-                {locale === 'en' ? 'Address limit reached (10/10)' : 'Adres limiti doldu (10/10)'}
+                {locale === 'en' ? 'Address limit reached (3/3)' : 'Adres limiti doldu (3/3)'}
               </p>
               <p className="text-xs text-muted">
                 {locale === 'en' 
@@ -238,7 +238,7 @@ export default function AddressesPage() {
         </div>
 
         {/* Address Limit Warning */}
-        {addresses.length >= 10 && !showForm && (
+        {addresses.length >= 3 && !showForm && (
           <div className="bg-primary-50 border border-primary-200 rounded p-4 mb-6">
             <div className="flex items-center gap-3">
               <span className="text-2xl">📍</span>

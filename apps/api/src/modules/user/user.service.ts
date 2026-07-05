@@ -629,9 +629,9 @@ export class UserService {
       where: { userId },
     });
 
-    // Check address limit (max 10)
-    if (existingAddresses >= 10) {
-      throw new BadRequestException('En fazla 10 adres ekleyebilirsiniz. Yeni adres eklemek için mevcut bir adresi silin.');
+    // Check address limit (max 3)
+    if (existingAddresses >= 3) {
+      throw new BadRequestException('En fazla 3 adres ekleyebilirsiniz. Yeni adres eklemek için mevcut bir adresi silin.');
     }
 
     const title = (data.title?.trim() && data.title.trim()) || `Adres ${existingAddresses + 1}`;
