@@ -457,9 +457,6 @@ export default function BusinessRegisterPage() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder={
-                      locale === "en" ? "example@email.com" : "ornek@email.com"
-                    }
                     className="rounded-[4px] pl-12"
                     required
                   />

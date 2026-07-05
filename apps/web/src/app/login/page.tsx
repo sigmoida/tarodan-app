@@ -208,7 +208,6 @@ export default function LoginPage() {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder={locale === 'en' ? 'example@email.com' : 'ornek@email.com'}
                       className="pl-10 pr-4 bg-surface focus:bg-surface-elevated transition-all duration-200 ease-premium"
                       autoComplete="email"
                     />

@@ -118,7 +118,6 @@ export default function ForgotPasswordPage() {
                         setEmail(e.target.value);
                         setError('');
                       }}
-                      placeholder="ornek@email.com"
                       className={`pl-12 pr-4 h-14 border-2 rounded-xl focus:ring-0 focus:border-primary-500 transition-all duration-200 ease-premium ${
                         error ? 'border-danger-300 bg-danger-50' : 'border-border'
                       }`}

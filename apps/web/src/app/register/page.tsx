@@ -407,7 +407,6 @@ export default function RegisterPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder={locale === 'en' ? 'example@email.com' : 'ornek@email.com'}
                   className={inputClass}
                 />
               </div>
