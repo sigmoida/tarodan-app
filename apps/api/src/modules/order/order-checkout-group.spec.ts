@@ -99,6 +99,10 @@ describe('OrderService checkout group (batch checkout)', () => {
           Promise.resolve({ id: 'group-1', ...data }),
         ),
       },
+      // Sipariş oluşturulunca alıcının sepetindeki sipariş edilen ürünler silinir.
+      cartItem: {
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
     };
 
     mockPrisma.user.findUnique.mockResolvedValue({
@@ -180,6 +184,12 @@ describe('OrderService checkout group (batch checkout)', () => {
     expect(mockTx.product.update).toHaveBeenCalledWith({
       where: { id: productB },
       data: { reservedQuantity: { increment: 1 } },
+    });
+
+    // Sipariş oluşunca alıcının sepetindeki sipariş edilen ürünler server-side silinir
+    // (bayat sepet satırı kalmasın; iptal sonrası "tekrar sipariş" akışı bozulmasın).
+    expect(mockTx.cartItem.deleteMany).toHaveBeenCalledWith({
+      where: { cart: { userId: buyerId }, productId: { in: [productA, productB].sort() } },
     });
   });
 

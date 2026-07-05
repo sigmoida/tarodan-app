@@ -1078,6 +1078,13 @@ export class OrderService {
         },
       });
 
+      // Hızlı Al (buy-now) sepeti atlar ama alıcı ürünü sepetinde de tutuyor olabilir.
+      // Sipariş oluştu → sepetteki bu ürünü server-side kaldır ki iptal sonrası "tekrar
+      // sipariş" akışında bayat sepet satırı kalmasın. Sepette yoksa deleteMany no-op.
+      await tx.cartItem.deleteMany({
+        where: { cart: { userId: buyerId }, productId: dto.productId },
+      });
+
       // Record commission snapshot for analytics (3.3)
       await this.recordCommissionSnapshot(
         order.id,
@@ -1707,6 +1714,17 @@ export class OrderService {
             sellerId: entry.product.sellerId,
             sellerEmail: entry.product.seller?.email ?? null,
             sellerName: entry.product.seller?.displayName ?? null,
+          });
+        }
+
+        // Sipariş(ler) oluşturuldu → alıcının sepetindeki bu ürünleri server-side kaldır.
+        // Sepet eskiden yalnız client-side (ödeme başlatılınca) temizleniyordu; kullanıcı
+        // ödemeye geçmeden iptal edince bayat sepet satırı kalıyor, "tekrar sipariş" akışını
+        // bozuyordu. Misafirde server sepeti yoktur → deleteMany no-op (güvenli). cart.userId
+        // ile kapsamlanır: yalnız BU alıcının satırları, yalnız sipariş edilen ürünler.
+        if (!isGuest) {
+          await tx.cartItem.deleteMany({
+            where: { cart: { userId: buyerId }, productId: { in: productIds } },
           });
         }
 
