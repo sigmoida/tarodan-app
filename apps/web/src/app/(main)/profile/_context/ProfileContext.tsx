@@ -9,7 +9,7 @@ import {
 	useState,
 	type ReactNode,
 } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query/keys';
 import { useAuthStore } from '@/stores/authStore';
@@ -61,6 +61,7 @@ function mapAuthUserToProfile(user: any): UserProfile {
 
 function useProfileValue() {
 	const router = useRouter();
+	const pathname = usePathname();
 	const {
 		isAuthenticated,
 		isLoading: authLoading,
@@ -74,12 +75,13 @@ function useProfileValue() {
 		setMounted(true);
 	}, []);
 
-	// Redirect unauthenticated visitors to login.
+	// Redirect unauthenticated visitors to login, returning them to wherever
+	// under /profile they were headed.
 	useEffect(() => {
 		if (mounted && !authLoading && !isAuthenticated) {
-			router.push('/login?redirect=/profile');
+			router.push(`/login?redirect=${encodeURIComponent(pathname || '/profile')}`);
 		}
-	}, [mounted, authLoading, isAuthenticated, router]);
+	}, [mounted, authLoading, isAuthenticated, pathname, router]);
 
 	const enabled = mounted && !authLoading && !!isAuthenticated;
 

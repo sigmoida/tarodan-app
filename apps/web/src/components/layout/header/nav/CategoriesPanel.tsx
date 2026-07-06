@@ -5,6 +5,7 @@
 import Link from 'next/link';
 import { NavigationMenuLink } from '@tarodan/ui';
 import { groupManufacturers, type ManufacturerRef } from './config';
+import NavPanel from './NavPanel';
 
 interface VehicleType {
 	label: string;
@@ -23,11 +24,11 @@ export default function CategoriesPanel({
 	const groups = groupManufacturers(manufacturers);
 
 	return (
-		<div className='w-3xl max-w-none p-6 bg-surface-elevated border border-border rounded-lg shadow-elevated'>
+		<NavPanel>
 			<div className='grid grid-cols-2 gap-8'>
 				{/* Vehicle types */}
 				<div>
-					<h3 className='text-primary-500 font-bold text-sm mb-4 uppercase tracking-wide'>
+					<h3 className='text-primary-500 font-bold text-base mb-4 tracking-wide'>
 						{locale === 'en' ? 'VEHICLE TYPES' : 'ARAÇ TÜRLERİ'}
 					</h3>
 					<div className='grid grid-cols-2 gap-x-8 gap-y-2'>
@@ -47,13 +48,13 @@ export default function CategoriesPanel({
 
 				{/* Manufacturers */}
 				<div>
-					<h3 className='text-primary-500 font-bold text-sm mb-3 uppercase tracking-wide'>
+					<h3 className='text-primary-500 font-bold text-base mb-4 tracking-wide'>
 						{locale === 'en' ? 'MANUFACTURERS' : 'ÜRETİCİLER'}
 					</h3>
 					<div className='space-y-2.5'>
 						{groups.map((group) => (
 							<div key={group.range}>
-								<p className='text-[10px] font-bold text-subtle uppercase tracking-wider mb-1'>
+								<p className='text-base font-bold text-subtle uppercase tracking-wider mb-1'>
 									{group.range}
 								</p>
 								<div className='flex flex-wrap gap-x-1 gap-y-0.5'>
@@ -64,7 +65,7 @@ export default function CategoriesPanel({
 											<NavigationMenuLink asChild>
 												<Link
 													href={`/listings?manufacturer=${encodeURIComponent(item.name)}&manufacturerId=${encodeURIComponent(item.id)}`}
-													className='text-xs text-muted hover:text-primary-600 transition-colors'>
+													className='text-sm text-muted hover:text-primary-600 transition-colors'>
 													{item.name}
 												</Link>
 											</NavigationMenuLink>
@@ -86,6 +87,6 @@ export default function CategoriesPanel({
 					</div>
 				</div>
 			</div>
-		</div>
+		</NavPanel>
 	);
 }

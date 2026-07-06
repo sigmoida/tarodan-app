@@ -6,19 +6,18 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-	MagnifyingGlassIcon,
 	UserCircleIcon,
 	ChatBubbleLeftRightIcon,
 	HeartIcon,
 	ShoppingBagIcon,
 	TagIcon,
 	ArrowRightOnRectangleIcon,
+	ArrowsRightLeftIcon,
 	CurrencyDollarIcon,
 	ChevronDownIcon,
 	BellIcon,
 } from '@heroicons/react/24/outline';
 import { Button } from '@tarodan/ui';
-import LanguageSwitcher from '@/components/LanguageSwitcher';
 import UserAvatar from '@/components/UserAvatar';
 import { useTranslation } from '@/i18n/LanguageContext';
 import type { HeaderData } from './useHeaderData';
@@ -84,10 +83,12 @@ interface AccountMenuProps {
 	setShowTradesAuthModal: (open: boolean) => void;
 }
 
+const MENU_LINK_CLASS =
+	'flex items-center gap-3 px-4 py-2.5 text-sm text-body hover:bg-primary-50 hover:text-primary-600';
+
 /**
  * The account dropdown: trigger button + panel (authed profile menu or the
- * guest login/register panel). Includes the in-panel LanguageSwitcher and the
- * mobile "search listings" entry.
+ * guest login/register panel).
  */
 export default function AccountMenu({
 	showAuthUI,
@@ -96,12 +97,10 @@ export default function AccountMenu({
 	unreadMessageCount,
 	unreadNotificationsCount,
 	pendingOffersCount,
-	pendingTradesCount,
 	wishlistCount,
-	setShowTradesAuthModal,
 }: AccountMenuProps) {
 	const router = useRouter();
-	const { t, locale } = useTranslation();
+	const { t } = useTranslation();
 	const {
 		accountDropdownRef,
 		showAccountDropdown,
@@ -110,16 +109,8 @@ export default function AccountMenu({
 		handleMouseLeave,
 	} = useAccountDropdown();
 
-	const NAV_LINKS = [
-		{ href: '/listings', label: t('nav.listings') },
-		{ href: '/takas', label: t('nav.tradeShowcase') || 'Takas Vitrini' },
-		{ href: '/manufacturers', label: t('nav.brands') || 'Üreticiler' },
-		{ href: '/trades', label: t('nav.trades') },
-		{ href: '/collections', label: t('nav.collections') },
-		{ href: '/pricing', label: t('nav.pricing') },
-	];
-
 	const membershipTier = user?.membershipTier || 'free';
+	const close = () => setShowAccountDropdown(false);
 
 	return (
 		<div
@@ -147,10 +138,10 @@ export default function AccountMenu({
 				<div className='absolute right-0 mt-1 w-56 bg-surface-elevated rounded-lg shadow-xl border border-border-subtle py-1 z-[100] overflow-y-auto max-h-[calc(100vh-8rem)]'>
 					{showAuthUI ? (
 						<>
-							{/* Profil - en üstte, profesyonel */}
+							{/* İsim / e-posta alanı — profile linkli */}
 							<Link
 								href='/profile'
-								onClick={() => setShowAccountDropdown(false)}
+								onClick={close}
 								className='block px-4 py-3 hover:bg-primary-50/50 transition-colors'>
 								<div className='flex items-center gap-3'>
 									<UserAvatar
@@ -172,48 +163,49 @@ export default function AccountMenu({
 									</div>
 								</div>
 							</Link>
+
 							<div className='border-t border-border-subtle my-1' />
-							<Link
-								href='/listings'
-								onClick={() => setShowAccountDropdown(false)}
-								className='flex items-center gap-3 px-4 py-2.5 text-sm text-body hover:bg-primary-50 hover:text-primary-600'>
-								<MagnifyingGlassIcon className='w-5 h-5' />
-								{locale === 'en' ? 'Search listings' : 'İlanlarda ara'}
+
+							{/* Profil / İlanlarım / Siparişlerim / Takaslarım / Tekliflerim */}
+							<Link href='/profile' onClick={close} className={MENU_LINK_CLASS}>
+								<UserCircleIcon className='w-5 h-5' />
+								{t('profile.myProfile')}
 							</Link>
-							{NAV_LINKS.filter(
-								(l) =>
-									!['/listings', '/manufacturers', '/collections'].includes(
-										l.href,
-									),
-							).map((link) => {
-								const isGuestTrades = link.href === '/trades' && !showAuthUI;
-								const showTradesBadge = false; // Takaslar yanında badge gösterme
-								return (
-									<Link
-										key={link.href}
-										href={link.href}
-										onClick={(e) => {
-											if (isGuestTrades) {
-												e.preventDefault();
-												setShowTradesAuthModal(true);
-											}
-											setShowAccountDropdown(false);
-										}}
-										className='flex items-center gap-3 px-4 py-2.5 text-sm text-body hover:bg-primary-50 hover:text-primary-600'>
-										{link.label}
-										{showTradesBadge && (
-											<span className='ml-auto px-1.5 py-0.5 bg-danger-500 text-inverted text-[10px] font-bold rounded-full'>
-												{pendingTradesCount > 9 ? '9+' : pendingTradesCount}
-											</span>
-										)}
-									</Link>
-								);
-							})}
-							<div className='border-t border-border-subtle my-1' />
 							<Link
-								href='/messages'
-								onClick={() => setShowAccountDropdown(false)}
-								className='flex items-center gap-3 px-4 py-2.5 text-sm text-body hover:bg-primary-50 hover:text-primary-600'>
+								href='/profile/listings'
+								onClick={close}
+								className={MENU_LINK_CLASS}>
+								<ShoppingBagIcon className='w-5 h-5' />
+								{t('nav.myListings')}
+							</Link>
+							<Link href='/profile/orders' onClick={close} className={MENU_LINK_CLASS}>
+								<TagIcon className='w-5 h-5' />
+								{t('order.myOrders')}
+							</Link>
+							<Link
+								href='/profile/trades'
+								onClick={close}
+								className={MENU_LINK_CLASS}>
+								<ArrowsRightLeftIcon className='w-5 h-5' />
+								{t('trade.myTrades')}
+							</Link>
+							<Link href='/profile/offers' onClick={close} className={MENU_LINK_CLASS}>
+								<CurrencyDollarIcon className='w-5 h-5' />
+								{t('offer.myOffers')}
+								{pendingOffersCount > 0 && (
+									<span className='ml-auto text-xs text-danger-600'>
+										{pendingOffersCount}
+									</span>
+								)}
+							</Link>
+
+							<div className='border-t border-border-subtle my-1' />
+
+							{/* Mesajlar / Favoriler / Bildirimler */}
+							<Link
+								href='/profile/messages'
+								onClick={close}
+								className={MENU_LINK_CLASS}>
 								<ChatBubbleLeftRightIcon className='w-5 h-5' />
 								{t('nav.messages')}
 								{unreadMessageCount > 0 && (
@@ -223,9 +215,9 @@ export default function AccountMenu({
 								)}
 							</Link>
 							<Link
-								href='/favorites'
-								onClick={() => setShowAccountDropdown(false)}
-								className='flex items-center gap-3 px-4 py-2.5 text-sm text-body hover:bg-primary-50 hover:text-primary-600'>
+								href='/profile/favorites'
+								onClick={close}
+								className={MENU_LINK_CLASS}>
 								<HeartIcon className='w-5 h-5' />
 								{t('nav.favorites')}
 								{wishlistCount > 0 && (
@@ -235,9 +227,9 @@ export default function AccountMenu({
 								)}
 							</Link>
 							<Link
-								href='/notifications'
-								onClick={() => setShowAccountDropdown(false)}
-								className='flex items-center gap-3 px-4 py-2.5 text-sm text-body hover:bg-primary-50 hover:text-primary-600'>
+								href='/profile/notifications'
+								onClick={close}
+								className={MENU_LINK_CLASS}>
 								<BellIcon className='w-5 h-5' />
 								{t('nav.notifications')}
 								{unreadNotificationsCount > 0 && (
@@ -250,73 +242,29 @@ export default function AccountMenu({
 							</Link>
 
 							<div className='border-t border-border-subtle my-1' />
-							<Link
-								href='/profile'
-								onClick={() => setShowAccountDropdown(false)}
-								className='flex items-center gap-3 px-4 py-2.5 text-sm text-body hover:bg-primary-50 hover:text-primary-600'>
-								<UserCircleIcon className='w-5 h-5' />
-								{t('profile.myProfile')}
-							</Link>
-							<Link
-								href='/profile/listings'
-								onClick={() => setShowAccountDropdown(false)}
-								className='flex items-center gap-3 px-4 py-2.5 text-sm text-body hover:bg-primary-50 hover:text-primary-600'>
-								<ShoppingBagIcon className='w-5 h-5' />
-								{t('nav.myListings')}
-							</Link>
-							<Link
-								href='/orders'
-								onClick={() => setShowAccountDropdown(false)}
-								className='flex items-center gap-3 px-4 py-2.5 text-sm text-body hover:bg-primary-50 hover:text-primary-600'>
-								<TagIcon className='w-5 h-5' />
-								{t('order.myOrders')}
-							</Link>
-							<Link
-								href='/offers'
-								onClick={() => setShowAccountDropdown(false)}
-								className='flex items-center gap-3 px-4 py-2.5 text-sm text-body hover:bg-primary-50 hover:text-primary-600'>
-								<CurrencyDollarIcon className='w-5 h-5' />
-								{t('offer.myOffers')}
-								{pendingOffersCount > 0 && (
-									<span className='ml-auto text-xs text-danger-600'>
-										{pendingOffersCount}
-									</span>
-								)}
-							</Link>
-							<div className='border-t border-border-subtle my-1' />
-							<div className='px-4 py-2'>
-								<LanguageSwitcher variant='minimal' />
-							</div>
+
+							{/* Çıkış Yap */}
 							<Button
-								variant='secondary'
+								variant='ghost'
 								onClick={() => {
 									logout();
 									router.push('/');
-									setShowAccountDropdown(false);
+									close();
 								}}
-								className='flex items-center gap-3 w-full px-4 py-2.5 text-sm text-danger-600 hover:bg-danger-50'>
+								className='flex w-full items-center justify-start gap-3 rounded-none px-4 py-2.5 text-sm font-normal text-danger-600 hover:bg-danger-50 hover:text-danger-600'>
 								<ArrowRightOnRectangleIcon className='w-5 h-5' />
 								{t('common.logout')}
 							</Button>
 						</>
 					) : (
 						<div className='p-4 space-y-2'>
-							<Button
-								asChild
-								className='w-full'>
-								<Link
-									href='/login'
-									onClick={() => setShowAccountDropdown(false)}>
+							<Button asChild className='w-full'>
+								<Link href='/login' onClick={close}>
 									{t('common.login')}
 								</Link>
 							</Button>
-							<Button
-								asChild
-								variant='outline'
-								className='w-full'>
-								<Link
-									href='/register'
-									onClick={() => setShowAccountDropdown(false)}>
+							<Button asChild variant='outline' className='w-full'>
+								<Link href='/register' onClick={close}>
 									{t('common.register')}
 								</Link>
 							</Button>

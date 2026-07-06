@@ -10,23 +10,23 @@ export interface NavBarItem {
 
 export const CATEGORY_BAR_ITEMS: Record<'tr' | 'en', NavBarItem[]> = {
 	tr: [
-		{ label: 'Kategoriler', dropdown: 'categories' },
 		{ label: 'Tüm İlanlar', href: '/listings' },
 		{ label: 'Yeni Gelenler', href: '/listings?sortBy=created_desc' },
 		{ label: 'Çok Satanlar', href: '/listings?sortBy=view_count_desc' },
 		{ label: 'İndirimler', href: '/listings?discountOnly=true' },
 		{ label: 'Koleksiyonlar', href: '/collections' },
 		{ label: 'Üreticiler', href: '/manufacturers' },
+		{ label: 'Kategoriler', dropdown: 'categories' },
 		{ label: 'Ölçek', dropdown: 'scales' },
 	],
 	en: [
-		{ label: 'Categories', dropdown: 'categories' },
 		{ label: 'All Listings', href: '/listings' },
 		{ label: 'New Arrivals', href: '/listings?sortBy=created_desc' },
 		{ label: 'Best Sellers', href: '/listings?sortBy=view_count_desc' },
 		{ label: 'On Sale', href: '/listings?discountOnly=true' },
 		{ label: 'Collections', href: '/collections' },
 		{ label: 'Manufacturers', href: '/manufacturers' },
+		{ label: 'Categories', dropdown: 'categories' },
 		{ label: 'Scale', dropdown: 'scales' },
 	],
 };
