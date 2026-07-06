@@ -18,5 +18,6 @@ export * from './admin-support.service';
 export * from './admin-content.service';
 export * from './admin-tax.service';
 export * from './admin-membership.service';
+export * from './admin-catalog.service';
 export * from './admin.controller';
 export * from './dto';
