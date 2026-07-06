@@ -7,6 +7,7 @@ import { OrderPricingService } from './order-pricing.service';
 import { OrderCheckoutService } from './order-checkout.service';
 import { OrderCommonService } from './order-common.service';
 import { OrderQueryService } from './order-query.service';
+import { OrderLifecycleService } from './order-lifecycle.service';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { EventService } from '../events';
@@ -102,6 +103,7 @@ describe.skip('OrderService createDirectOrder (1.6 idempotent Buy Now)', () => {
         OrderCheckoutService,
         OrderCommonService,
         OrderQueryService,
+        OrderLifecycleService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: CacheService, useValue: { del: jest.fn(), delPattern: jest.fn() } },
         { provide: ConfigService, useValue: { get: jest.fn() } },
@@ -196,6 +198,7 @@ describe.skip('OrderService guest checkout OTP (1.12)', () => {
         OrderCheckoutService,
         OrderCommonService,
         OrderQueryService,
+        OrderLifecycleService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: CacheService, useValue: mockCache },
         { provide: ConfigService, useValue: mockConfig },
@@ -370,6 +373,7 @@ describe('OrderService findOne (response shape for mobile order detail)', () => 
         OrderCheckoutService,
         OrderCommonService,
         OrderQueryService,
+        OrderLifecycleService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: EventService, useValue: {} },
         { provide: CacheService, useValue: {} },
