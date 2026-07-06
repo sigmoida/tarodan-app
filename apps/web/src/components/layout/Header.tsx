@@ -95,7 +95,7 @@ export default function Header() {
 			<div className='sticky top-0 z-50'>
 				{/* Main bar */}
 				<div className='bg-primary-500 border-b border-primary-600 shadow-sm'>
-					<Container className='px-4'>
+					<Container>
 						<div className='flex items-center gap-4 h-14 lg:h-16 max-h-14 lg:max-h-16 min-h-0'>
 							{/* Logo */}
 							<Link

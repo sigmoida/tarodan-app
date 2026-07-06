@@ -4,6 +4,7 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
+import { ChevronRightIcon } from '@heroicons/react/24/outline';
 import { Button } from '@tarodan/ui';
 import { SectionCard } from '@/components/ui';
 
@@ -34,7 +35,12 @@ export default function HomeSection({
 					action={
 						viewAllHref ? (
 							<Button asChild variant='secondary' size='sm'>
-								<Link href={viewAllHref}>{viewAllLabel}</Link>
+								<Link
+									href={viewAllHref}
+									className='inline-flex items-center gap-1'>
+									{viewAllLabel}
+									<ChevronRightIcon className='w-4 h-4' />
+								</Link>
 							</Button>
 						) : undefined
 					}>

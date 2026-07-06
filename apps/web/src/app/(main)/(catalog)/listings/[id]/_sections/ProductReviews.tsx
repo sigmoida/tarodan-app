@@ -8,6 +8,7 @@ import {
 	CheckBadgeIcon,
 } from '@heroicons/react/24/outline';
 import { Button, Select, Spinner } from '@tarodan/ui';
+import { SectionCard } from '@/components/ui';
 import UserAvatar from '@/components/UserAvatar';
 import { useListingDetail } from '../_context/ListingDetailContext';
 
@@ -26,13 +27,11 @@ export default function ProductReviews() {
 
 	return (
 		<div className='max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-6 sm:py-12'>
-			<div className='bg-surface-elevated rounded shadow-sm p-4 sm:p-6 md:p-8'>
-				{/* Header */}
-				<div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6'>
-					<h2 className='text-2xl font-bold text-heading'>
-						{t('product.productReviews')}
-					</h2>
-					{reviewStats && (
+			<SectionCard
+				title={t('product.productReviews')}
+				className='p-4 sm:p-6 md:p-8'
+				action={
+					reviewStats ? (
 						<div className='flex items-center gap-2'>
 							<div className='flex items-center'>
 								{[1, 2, 3, 4, 5].map((star) => (
@@ -53,9 +52,8 @@ export default function ProductReviews() {
 								({reviewStats.totalRatings || 0} {t('review.reviews')})
 							</span>
 						</div>
-					)}
-				</div>
-
+					) : undefined
+				}>
 				{/* Distribution + filters */}
 				{reviewStats &&
 					reviewStats.scoreDistribution &&
@@ -225,7 +223,7 @@ export default function ProductReviews() {
 						))}
 					</div>
 				)}
-			</div>
+			</SectionCard>
 		</div>
 	);
 }

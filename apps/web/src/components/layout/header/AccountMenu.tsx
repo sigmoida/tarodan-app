@@ -31,11 +31,16 @@ import type { HeaderData } from './useHeaderData';
 function useAccountDropdown() {
 	const [showAccountDropdown, setShowAccountDropdown] = useState(false);
 	const accountDropdownRef = useRef<HTMLDivElement>(null);
-	const accountDropdownLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const accountDropdownLeaveTimer = useRef<ReturnType<
+		typeof setTimeout
+	> | null>(null);
 
 	useEffect(() => {
 		const handleClickOutside = (e: MouseEvent) => {
-			if (accountDropdownRef.current && !accountDropdownRef.current.contains(e.target as Node)) {
+			if (
+				accountDropdownRef.current &&
+				!accountDropdownRef.current.contains(e.target as Node)
+			) {
 				setShowAccountDropdown(false);
 			}
 		};
@@ -52,7 +57,10 @@ function useAccountDropdown() {
 	};
 
 	const handleMouseLeave = () => {
-		accountDropdownLeaveTimer.current = setTimeout(() => setShowAccountDropdown(false), 150);
+		accountDropdownLeaveTimer.current = setTimeout(
+			() => setShowAccountDropdown(false),
+			150,
+		);
 	};
 
 	return {
@@ -120,12 +128,11 @@ export default function AccountMenu({
 			onMouseEnter={handleMouseEnter}
 			onMouseLeave={handleMouseLeave}>
 			<Button
-				variant='ghost'
+				variant='nav'
 				size='sm'
 				onClick={() => setShowAccountDropdown(!showAccountDropdown)}
-				aria-expanded={showAccountDropdown}
-				className='gap-1.5 h-9 rounded-md'>
-				<UserCircleIcon className='w-5 h-5' />
+				aria-expanded={showAccountDropdown}>
+				<UserCircleIcon className='w-5 h-5 mr-1' />
 				<span className='hidden sm:inline'>
 					{showAuthUI
 						? user?.displayName || t('nav.account')
@@ -293,61 +300,27 @@ export default function AccountMenu({
 							</Button>
 						</>
 					) : (
-						<>
-							<div className='px-4 py-3 border-b border-border-subtle'>
-								<div className='flex items-center gap-2'>
-									<UserCircleIcon className='w-6 h-6 text-primary-500' />
-									<span className='text-sm font-semibold text-primary-500'>
-										{t('common.login')}
-									</span>
-								</div>
-							</div>
-							<Link
-								href='/listings'
-								onClick={() => setShowAccountDropdown(false)}
-								className='flex items-center gap-3 px-4 py-2.5 text-sm text-body hover:bg-primary-50 hover:text-primary-600'>
-								<MagnifyingGlassIcon className='w-5 h-5' />
-								{locale === 'en' ? 'Search listings' : 'İlanlarda ara'}
-							</Link>
-							{NAV_LINKS.filter(
-								(l) =>
-									!['/listings', '/manufacturers', '/collections'].includes(
-										l.href,
-									),
-							).map((link) => {
-								const isGuestTrades = link.href === '/trades' && !showAuthUI;
-								return (
-									<Link
-										key={link.href}
-										href={link.href}
-										onClick={(e) => {
-											if (isGuestTrades) {
-												e.preventDefault();
-												setShowTradesAuthModal(true);
-											}
-											setShowAccountDropdown(false);
-										}}
-										className='flex items-center gap-3 px-4 py-2.5 text-sm text-body hover:bg-primary-50 hover:text-primary-600'>
-										{link.label}
-									</Link>
-								);
-							})}
-							<div className='border-t border-border-subtle my-1' />
-							<div className='p-4 space-y-2'>
+						<div className='p-4 space-y-2'>
+							<Button
+								asChild
+								className='w-full'>
 								<Link
 									href='/login'
-									onClick={() => setShowAccountDropdown(false)}
-									className='flex items-center justify-center w-full py-2.5 px-4 bg-primary-500 text-inverted text-sm font-medium rounded-lg hover:bg-primary-600 transition-colors'>
+									onClick={() => setShowAccountDropdown(false)}>
 									{t('common.login')}
 								</Link>
+							</Button>
+							<Button
+								asChild
+								variant='outline'
+								className='w-full'>
 								<Link
 									href='/register'
-									onClick={() => setShowAccountDropdown(false)}
-									className='flex items-center justify-center w-full py-2.5 px-4 border border-border-subtle text-body text-sm font-medium rounded-lg hover:bg-surface transition-colors'>
+									onClick={() => setShowAccountDropdown(false)}>
 									{t('common.register')}
 								</Link>
-							</div>
-						</>
+							</Button>
+						</div>
 					)}
 				</div>
 			)}

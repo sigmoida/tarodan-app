@@ -82,8 +82,8 @@ function ListingDetailLayout() {
 			: listing.quantity;
 
 	return (
-		<PageShell className='py-4'>
-			<div className='max-w-7xl mx-auto px-3 sm:px-4 lg:px-8'>
+		<PageShell>
+			<div>
 				<ProductBreadcrumbs />
 
 				{available === 0 && (
@@ -94,7 +94,7 @@ function ListingDetailLayout() {
 					</div>
 				)}
 
-				<div className='grid lg:grid-cols-2 gap-8'>
+				<div className='grid lg:grid-cols-2 gap-4'>
 					<ProductGallery />
 					<ProductInfo />
 				</div>

@@ -29,21 +29,23 @@ function ListingsLayout() {
 
 	return (
 		<PageShell>
-			<PageHeader title={title} description={description} actions={<ListingsControls />} />
+			<PageHeader
+				title={title}
+				description={description}
+				actions={<ListingsControls />}
+			/>
 
-			<Container className='px-4 py-5'>
-				<div className='flex gap-6'>
-					{/* Sidebar Filters (Desktop + Mobile drawer) */}
-					<ListingsSidebar />
+			<div className='flex gap-4'>
+				{/* Sidebar Filters (Desktop + Mobile drawer) */}
+				<ListingsSidebar />
 
-					{/* Content */}
-					<div className='flex-1 min-w-0'>
-						<ActiveFilterChips />
-						<ListingsGrid />
-						<ListingsPagination />
-					</div>
+				{/* Content */}
+				<div className='flex-1 min-w-0 space-y-4'>
+					<ActiveFilterChips />
+					<ListingsGrid />
+					<ListingsPagination />
 				</div>
-			</Container>
+			</div>
 		</PageShell>
 	);
 }

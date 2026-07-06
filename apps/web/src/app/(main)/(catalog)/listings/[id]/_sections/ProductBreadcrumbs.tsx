@@ -13,8 +13,10 @@ export default function ProductBreadcrumbs() {
 	return (
 		<nav
 			aria-label='Breadcrumb'
-			className='flex items-center flex-wrap gap-y-1 text-sm text-muted mb-6 overflow-x-auto whitespace-nowrap pb-2'>
-			<Link href='/' className='hover:text-primary-500 transition-colors text-muted'>
+			className='flex items-center flex-wrap gap-y-1 text-sm text-muted mb-6 overflow-x-auto whitespace-nowrap '>
+			<Link
+				href='/'
+				className='hover:text-primary-500 transition-colors text-muted'>
 				{t('common.home')}
 			</Link>
 			<ChevronRightIcon
@@ -47,7 +49,9 @@ export default function ProductBreadcrumbs() {
 				</>
 			)}
 			<ChevronRightIcon className='w-4 h-4 mx-2 flex-shrink-0' />
-			<span className='text-subtle truncate max-w-[200px]'>{listing.title}</span>
+			<span className='text-subtle truncate max-w-[200px]'>
+				{listing.title}
+			</span>
 		</nav>
 	);
 }

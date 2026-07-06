@@ -1,17 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { FunnelIcon } from '@heroicons/react/24/outline';
 import {
 	Accordion,
 	AccordionItem,
 	AccordionTrigger,
 	AccordionContent,
+	Badge,
 	Button,
 	Checkbox,
 	Input,
 	Radio,
 } from '@tarodan/ui';
+import { queryKeys } from '@/lib/query/keys';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { categoriesApi, manufacturersApi, listingsApi } from '@/lib/api';
 
@@ -34,6 +37,24 @@ interface CustomAttributeGroup {
 	manufacturerSlug: string | null;
 	attributes: Array<{ slug: string; label: string; color?: string | null }>;
 }
+
+interface FiltersData {
+	scales?: string[];
+	materials?: Array<{ slug: string; label: string }>;
+	brands?: Array<string | { id: string; name: string; slug: string }>;
+	carModels?: Array<{ id: string; name: string; slug: string; brandId: string }>;
+}
+
+const STALE = 60 * 60 * 1000;
+
+const SCALE_FALLBACK = ['1:18', '1:24', '1:43', '1:64', '1:87'];
+
+const MATERIAL_FALLBACK = [
+	{ slug: 'diecast', label: 'Diecast (Metal)' },
+	{ slug: 'resin', label: 'Resin (Reçine)' },
+	{ slug: 'composite', label: 'Composite (Kompozit)' },
+	{ slug: 'plastic', label: 'Plastic (Plastik)' },
+];
 
 interface SidebarFiltersProps {
 	filters: {
@@ -93,98 +114,82 @@ export default function SidebarFilters({
 }: SidebarFiltersProps) {
 	const { t, locale } = useTranslation();
 
-	const [categories, setCategories] = useState<Category[]>([]);
-	const [manufacturerList, setManufacturerList] = useState<ManufacturerItem[]>([]);
-	const [brandList, setBrandList] = useState<Array<{ id: string; name: string; slug: string }>>([]);
-	const [scaleList, setScaleList] = useState<string[]>([]);
-	const [materialList, setMaterialList] = useState<Array<{ slug: string; label: string }>>([]);
-	const [carModelList, setCarModelList] = useState<Array<{ id: string; name: string; slug: string; brandId: string }>>([]);
-	const [customAttrGroups, setCustomAttrGroups] = useState<CustomAttributeGroup[]>([]);
 	const [customAttrSearch, setCustomAttrSearch] = useState<Record<string, string>>({});
 
 	// Open accordion sections (controlled so async-loaded custom groups open too).
 	const [openSections, setOpenSections] = useState<string[]>(BASE_SECTIONS);
 
-	useEffect(() => {
-		const fetchCategories = async () => {
-			try {
-				const response = await categoriesApi.findAll();
-				const cats = Array.isArray(response.data) ? response.data : response.data.data || [];
-				setCategories(cats);
-			} catch (error) {
-				console.error('Failed to fetch categories:', error);
-			}
-		};
-		fetchCategories();
+	// Catalog data via TanStack Query — shared cache keys dedupe with the header
+	// nav and across mounts (replaces the old per-mount useEffect fetches).
+	const categoriesQuery = useQuery({
+		queryKey: queryKeys.categories.all(),
+		queryFn: async (): Promise<Category[]> => {
+			const res = await categoriesApi.findAll();
+			return Array.isArray(res.data) ? res.data : (res.data?.data ?? []);
+		},
+		staleTime: STALE,
+	});
+	const categories = categoriesQuery.data ?? [];
 
-		const fetchManufacturers = async () => {
-			try {
-				const response = await manufacturersApi.findAll();
-				const items = Array.isArray(response.data) ? response.data : response.data.data || [];
-				setManufacturerList(items);
-			} catch (error) {
-				console.error('Failed to fetch manufacturers:', error);
-			}
-		};
-		fetchManufacturers();
+	const manufacturersQuery = useQuery({
+		queryKey: queryKeys.manufacturers.list(),
+		queryFn: async (): Promise<ManufacturerItem[]> => {
+			const res = await manufacturersApi.findAll();
+			return Array.isArray(res.data) ? res.data : (res.data?.data ?? []);
+		},
+		staleTime: STALE,
+	});
+	const manufacturerList = useMemo(
+		() => manufacturersQuery.data ?? [],
+		[manufacturersQuery.data],
+	);
 
-		const fetchFilters = async () => {
-			try {
-				const response = await listingsApi.getFilters();
-				const data = response.data as {
-					scales?: string[];
-					materials?: Array<{ slug: string; label: string }>;
-					brands?: string[] | Array<{ id: string; name: string; slug: string }>;
-					carModels?: Array<{ id: string; name: string; slug: string; brandId: string }>;
-				};
-				if (data.scales?.length) setScaleList(data.scales);
-				if (data.materials?.length) setMaterialList(data.materials);
-				if (data.brands?.length) {
-					const normalized = data.brands.map((b: any) =>
-						typeof b === 'string'
-							? { id: '', name: b, slug: b.toLowerCase().replace(/\s+/g, '-') }
-							: b,
-					);
-					setBrandList(normalized);
-				}
-				if (data.carModels?.length) setCarModelList(data.carModels);
-			} catch (error) {
-				console.error('Failed to fetch filters:', error);
-			}
-		};
-		fetchFilters();
-	}, []);
+	const filtersQuery = useQuery({
+		queryKey: queryKeys.listings.filters(),
+		queryFn: async () => (await listingsApi.getFilters()).data as FiltersData,
+		staleTime: STALE,
+	});
+	const scaleList = filtersQuery.data?.scales ?? [];
+	const materialList = filtersQuery.data?.materials ?? [];
+	const carModelList = filtersQuery.data?.carModels ?? [];
+	const brandList = useMemo(
+		() =>
+			(filtersQuery.data?.brands ?? []).map((b) =>
+				typeof b === 'string'
+					? { id: '', name: b, slug: b.toLowerCase().replace(/\s+/g, '-') }
+					: b,
+			),
+		[filtersQuery.data],
+	);
 
-	// Re-fetch manufacturer-scoped attribute groups whenever manufacturer changes.
-	useEffect(() => {
-		let slug: string | undefined;
-		if (filters.manufacturerId) {
-			slug = manufacturerList.find((m) => m.id === filters.manufacturerId)?.slug;
-		} else if (filters.manufacturer) {
-			slug = manufacturerList.find(
+	// The selected manufacturer's slug (DB-authoritative) drives its scoped
+	// attribute groups. No manufacturer selected → no groups.
+	const manufacturerSlug = useMemo(() => {
+		if (filters.manufacturerId)
+			return manufacturerList.find((m) => m.id === filters.manufacturerId)?.slug;
+		if (filters.manufacturer)
+			return manufacturerList.find(
 				(m) => m.name.toLowerCase() === filters.manufacturer!.toLowerCase(),
 			)?.slug;
-		}
-		if (!slug) {
-			setCustomAttrGroups([]);
-			return;
-		}
-		let cancelled = false;
-		(async () => {
-			try {
-				const response = await listingsApi.getFilters({ manufacturer: slug });
-				if (cancelled) return;
-				const data = response.data as { customAttributes?: CustomAttributeGroup[] };
-				setCustomAttrGroups(data.customAttributes ?? []);
-			} catch (error) {
-				console.error('Failed to fetch manufacturer-scoped filters:', error);
-				if (!cancelled) setCustomAttrGroups([]);
-			}
-		})();
-		return () => {
-			cancelled = true;
-		};
-	}, [filters.manufacturer, filters.manufacturerId, manufacturerList]);
+		return undefined;
+	}, [filters.manufacturerId, filters.manufacturer, manufacturerList]);
+
+	const customAttrGroupsQuery = useQuery({
+		queryKey: queryKeys.manufacturers.customAttrs(manufacturerSlug ?? ''),
+		queryFn: async (): Promise<CustomAttributeGroup[]> => {
+			const res = await listingsApi.getFilters({ manufacturer: manufacturerSlug });
+			return (
+				(res.data as { customAttributes?: CustomAttributeGroup[] })
+					.customAttributes ?? []
+			);
+		},
+		enabled: !!manufacturerSlug,
+		staleTime: STALE,
+	});
+	const customAttrGroups = useMemo(
+		() => (manufacturerSlug ? (customAttrGroupsQuery.data ?? []) : []),
+		[manufacturerSlug, customAttrGroupsQuery.data],
+	);
 
 	// Open custom-attribute groups by default once they load.
 	useEffect(() => {
@@ -197,6 +202,9 @@ export default function SidebarFilters({
 	const [brandSearch, setBrandSearch] = useState('');
 	const [manufacturerSearch, setManufacturerSearch] = useState('');
 	const [modelSearch, setModelSearch] = useState('');
+	const [categorySearch, setCategorySearch] = useState('');
+	const [scaleSearch, setScaleSearch] = useState('');
+	const [materialSearch, setMaterialSearch] = useState('');
 
 	const CONDITIONS = [
 		{ value: 'new', label: locale === 'en' ? 'New' : 'Yeni' },
@@ -291,6 +299,41 @@ export default function SidebarFilters({
 				m.toLowerCase().includes(manufacturerSearch.toLowerCase()),
 			).map((name) => ({ id: '', name, slug: name.toLowerCase().replace(/\s+/g, '-') }));
 
+	const filteredCategories = categories.filter((c) =>
+		c.name.toLowerCase().includes(categorySearch.toLowerCase()),
+	);
+	const scaleOptions = scaleList.length > 0 ? scaleList : SCALE_FALLBACK;
+	const filteredScales = scaleOptions.filter((s) =>
+		s.toLowerCase().includes(scaleSearch.toLowerCase()),
+	);
+	const materialOptions = materialList.length > 0 ? materialList : MATERIAL_FALLBACK;
+	const filteredMaterials = materialOptions.filter((m) =>
+		m.label.toLowerCase().includes(materialSearch.toLowerCase()),
+	);
+
+	// Shown when a search filters an option list down to nothing.
+	const noResults = (
+		<p className="px-2 py-3 text-sm text-muted text-center">
+			{locale === 'en' ? 'No results' : 'Bulunamadı'}
+		</p>
+	);
+
+	// A compact search box reused above each searchable option list.
+	const searchBox = (
+		value: string,
+		onChange: (v: string) => void,
+		placeholder: string,
+	) => (
+		<Input
+			type="text"
+			placeholder={placeholder}
+			value={value}
+			onChange={(e) => onChange(e.target.value)}
+			inputSize="sm"
+			className="rounded border-border focus:border-primary-400 mb-2"
+		/>
+	);
+
 	return (
 		<div className="flex flex-col">
 			{/* Header */}
@@ -311,18 +354,29 @@ export default function SidebarFilters({
 				<AccordionItem value="category">
 					<AccordionTrigger>{locale === 'en' ? 'Vehicle Type' : 'Araç Türü'}</AccordionTrigger>
 					<AccordionContent>
-						<div className="space-y-1">
-							{categories.map((cat) => (
-								<Button variant="secondary" key={cat.id}
-									onClick={() => handleCategoryChange(cat.id, cat.name)}
-									className={`flex items-center gap-2 w-full px-2 py-1.5 rounded text-sm transition-colors ${filters.categoryId === cat.id
-										? 'bg-primary-100 text-primary-700'
-										: 'text-body hover:bg-surface'
-										}`}>
-									<span>{cat.name}</span>
-								</Button>
-							))}
-						</div>
+						{searchBox(
+							categorySearch,
+							setCategorySearch,
+							locale === 'en' ? 'Search types...' : 'Tür ara...',
+						)}
+						{filteredCategories.length === 0 ? (
+							noResults
+						) : (
+							<div className="space-y-1">
+								{filteredCategories.map((cat) => {
+									const isSelected = filters.categoryId === cat.id;
+									return (
+										<label key={cat.id} className={rowClass(isSelected)}>
+											<Radio name="category"
+												checked={isSelected}
+												onChange={() => handleCategoryChange(cat.id, cat.name)}
+												className="w-4 h-4 text-primary-500 focus:ring-primary-400" />
+											<span className="text-sm">{cat.name}</span>
+										</label>
+									);
+								})}
+							</div>
+						)}
 					</AccordionContent>
 				</AccordionItem>
 
@@ -339,6 +393,7 @@ export default function SidebarFilters({
 							className="rounded border-border focus:border-primary-400 mb-2"
 						/>
 						<div className="space-y-1">
+							{filteredBrands.length === 0 && noResults}
 							{filteredBrands.map((brand) => {
 								const isSelected = filters.brandId
 									? filters.brandId === brand.id
@@ -370,6 +425,7 @@ export default function SidebarFilters({
 							className="rounded border-border focus:border-primary-400 mb-2"
 						/>
 						<div className="space-y-1 max-h-48 overflow-y-auto">
+							{modelsForBrand.length === 0 && noResults}
 							{modelsForBrand.map((m) => {
 								const isSelected = filters.carModelId === m.id;
 								return (
@@ -390,18 +446,29 @@ export default function SidebarFilters({
 				<AccordionItem value="scale">
 					<AccordionTrigger>{locale === 'en' ? 'Scale' : 'Ölçek'}</AccordionTrigger>
 					<AccordionContent>
-						<div className="grid grid-cols-3 gap-2">
-							{(scaleList.length > 0 ? scaleList : ['1:18', '1:24', '1:43', '1:64', '1:87']).map((scale) => (
-								<Button variant="secondary" key={scale}
-									onClick={() => handleScaleChange(scale)}
-									className={`px-2 py-1.5 text-xs font-medium rounded transition-colors ${filters.scale === scale
-										? 'bg-primary-500 text-inverted'
-										: 'bg-surface-alt text-body hover:bg-border-subtle'
-										}`}>
-									{scale}
-								</Button>
-							))}
-						</div>
+						{searchBox(
+							scaleSearch,
+							setScaleSearch,
+							locale === 'en' ? 'Search scale...' : 'Ölçek ara...',
+						)}
+						{filteredScales.length === 0 ? (
+							noResults
+						) : (
+							<div className="space-y-1">
+								{filteredScales.map((scale) => {
+									const isSelected = filters.scale === scale;
+									return (
+										<label key={scale} className={rowClass(isSelected)}>
+											<Radio name="scale"
+												checked={isSelected}
+												onChange={() => handleScaleChange(scale)}
+												className="w-4 h-4 text-primary-500 focus:ring-primary-400" />
+											<span className="text-sm">{scale}</span>
+										</label>
+									);
+								})}
+							</div>
+						)}
 					</AccordionContent>
 				</AccordionItem>
 
@@ -409,23 +476,29 @@ export default function SidebarFilters({
 				<AccordionItem value="material">
 					<AccordionTrigger>{locale === 'en' ? 'Material' : 'Malzeme'}</AccordionTrigger>
 					<AccordionContent>
-						<div className="space-y-1">
-							{(materialList.length > 0 ? materialList : [
-								{ slug: 'diecast', label: 'Diecast (Metal)' },
-								{ slug: 'resin', label: 'Resin (Reçine)' },
-								{ slug: 'composite', label: 'Composite (Kompozit)' },
-								{ slug: 'plastic', label: 'Plastic (Plastik)' },
-							]).map((m) => (
-								<Button variant="secondary" key={m.slug}
-									onClick={() => handleMaterialChange(m.slug)}
-									className={`flex items-center w-full px-2 py-1.5 text-left text-sm rounded transition-colors ${filters.material === m.slug
-										? 'bg-primary-100 text-primary-700'
-										: 'text-body hover:bg-surface'
-										}`}>
-									{m.label}
-								</Button>
-							))}
-						</div>
+						{searchBox(
+							materialSearch,
+							setMaterialSearch,
+							locale === 'en' ? 'Search material...' : 'Malzeme ara...',
+						)}
+						{filteredMaterials.length === 0 ? (
+							noResults
+						) : (
+							<div className="space-y-1">
+								{filteredMaterials.map((m) => {
+									const isSelected = filters.material === m.slug;
+									return (
+										<label key={m.slug} className={rowClass(isSelected)}>
+											<Radio name="material"
+												checked={isSelected}
+												onChange={() => handleMaterialChange(m.slug)}
+												className="w-4 h-4 text-primary-500 focus:ring-primary-400" />
+											<span className="text-sm">{m.label}</span>
+										</label>
+									);
+								})}
+							</div>
+						)}
 					</AccordionContent>
 				</AccordionItem>
 
@@ -442,6 +515,7 @@ export default function SidebarFilters({
 							className="rounded border-border focus:border-primary-400 mb-2"
 						/>
 						<div className="space-y-1">
+							{displayManufacturers.length === 0 && noResults}
 							{displayManufacturers.map((m) => {
 								const isSelected = m.id
 									? filters.manufacturerId === m.id
@@ -476,9 +550,9 @@ export default function SidebarFilters({
 								<span className="flex items-center">
 									{group.name}
 									{selected.size > 0 && (
-										<span className="ml-2 px-1.5 py-0.5 bg-primary-500 text-inverted text-xs font-bold rounded-sm">
+										<Badge variant="primary" size="sm" className="ml-2">
 											{selected.size}
-										</span>
+										</Badge>
 									)}
 								</span>
 							</AccordionTrigger>

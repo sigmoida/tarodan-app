@@ -42,19 +42,17 @@ export function useNavCatalog() {
 		staleTime: HOUR,
 	});
 
-	const scalesQuery = useQuery({
+	// The full listings filter facets — cached under one key so the sidebar
+	// filters (SidebarFilters) share the same fetch; here we only read `scales`.
+	const filtersQuery = useQuery({
 		queryKey: queryKeys.listings.filters(),
-		queryFn: async (): Promise<string[]> => {
-			const res = await listingsApi.getFilters();
-			const data = res.data as { scales?: string[] };
-			return data.scales ?? [];
-		},
+		queryFn: async () => (await listingsApi.getFilters()).data as { scales?: string[] },
 		staleTime: HOUR,
 	});
 
 	return {
 		categories: categoriesQuery.data ?? [],
 		manufacturers: manufacturersQuery.data ?? [],
-		scales: scalesQuery.data ?? [],
+		scales: filtersQuery.data?.scales ?? [],
 	};
 }

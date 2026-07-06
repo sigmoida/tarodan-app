@@ -56,6 +56,8 @@ export const queryKeys = {
     products: (slug: string) => ['manufacturers', 'products', slug] as const,
     /** The 4-item listings teaser inside an accordion card (keyed by id). */
     preview: (id: string) => ['manufacturers', 'preview', id] as const,
+    /** Manufacturer-scoped custom attribute filter groups (e.g. Hot Wheels). */
+    customAttrs: (slug: string) => ['manufacturers', 'custom-attrs', slug] as const,
   },
   category: {
     bySlug: (slug: string) => ['categoryBySlug', slug] as const,

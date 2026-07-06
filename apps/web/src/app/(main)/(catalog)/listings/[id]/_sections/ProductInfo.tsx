@@ -19,6 +19,7 @@ import {
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
 import { Button } from '@tarodan/ui';
 import { ButtonLink } from '@/components/ui/ButtonLink';
+import { SectionCard } from '@/components/ui';
 import { formatCondition } from '@/lib/format';
 import {
 	isProductOnSaleDisplay,
@@ -249,7 +250,8 @@ export default function ProductInfo() {
 			</div>
 
 			{/* Quick info */}
-			<div className='grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 p-3 sm:gap-4 sm:p-5 bg-surface-elevated rounded shadow-sm border border-border-subtle mb-4 sm:mb-6'>
+			<SectionCard className='mb-4 sm:mb-6'>
+				<div className='grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4'>
 				{listing.brand && (
 					<div className='text-center p-2'>
 						<p className='text-xs font-medium text-muted uppercase tracking-wide mb-1'>
@@ -338,14 +340,11 @@ export default function ProductInfo() {
 						</p>
 					</div>
 				)}
-			</div>
+				</div>
+			</SectionCard>
 
 			{/* Description + technical details */}
-			<div className='bg-surface-elevated rounded p-6 shadow-sm border border-border-subtle mb-6'>
-				<h2 className='text-base font-semibold text-heading mb-3 flex items-center gap-2'>
-					<span className='w-1 h-5 bg-primary-500 rounded-sm' aria-hidden />
-					{t('product.description')}
-				</h2>
+			<SectionCard title={t('product.description')} className='p-6 mb-6'>
 				<div className='prose prose-sm max-w-none text-muted whitespace-pre-line leading-relaxed'>
 					{listing.description || t('product.noDescription')}
 				</div>
@@ -386,7 +385,7 @@ export default function ProductInfo() {
 						</dl>
 					</div>
 				) : null}
-			</div>
+			</SectionCard>
 
 			{/* Seller */}
 			<SellerCard />
@@ -479,10 +478,12 @@ export default function ProductInfo() {
 				{/* Buy now — hidden for owner */}
 				{!isOwner && (
 					<Button
+						variant='primary'
+						size='lg'
 						onClick={handleBuyNow}
 						disabled={listing.status !== 'active' || !hasStock}
-						className='w-full gap-2 py-3 text-base sm:py-4 sm:text-lg'>
-						<BoltIcon className='w-5 h-5 sm:w-6 sm:h-6' />
+						leftIcon={<BoltIcon className='w-5 h-5' />}
+						className='w-full'>
 						{listing.status === 'sold'
 							? t('product.sold')
 							: listing.status === 'reserved'
@@ -498,7 +499,7 @@ export default function ProductInfo() {
 					<div className='grid grid-cols-2 sm:grid-cols-4 gap-2'>
 						{isTradeAvailable && (
 							<Button
-								variant='secondary'
+								variant='success'
 								onClick={() => {
 									if (listing.status !== 'active') {
 										toast.error(t('product.notForSale'));
@@ -521,42 +522,34 @@ export default function ProductInfo() {
 									router.push(`/trades/new?listing=${listing.id}`);
 								}}
 								disabled={listing.status !== 'active'}
-								className={`flex items-center justify-center gap-1.5 py-2.5 sm:py-3 text-sm ${
-									listing.status === 'active'
-										? 'btn-trade'
-										: 'bg-border-subtle text-subtle cursor-not-allowed rounded'
-								}`}>
-								<ArrowsRightLeftIcon className='w-4 h-4 sm:w-5 sm:h-5' />
-								<span className='truncate'>{t('product.trade')}</span>
+								leftIcon={<ArrowsRightLeftIcon className='w-5 h-5' />}
+								className='w-full'>
+								{t('product.trade')}
 							</Button>
 						)}
 						<Button
 							variant='secondary'
 							onClick={handleMakeOffer}
 							disabled={listing.status !== 'active'}
-							className='gap-1.5 py-2.5 sm:py-3'>
-							<BoltIcon className='w-4 h-4 sm:w-5 sm:h-5' />
-							<span className='truncate'>{t('product.makeOffer')}</span>
+							leftIcon={<BoltIcon className='w-5 h-5' />}
+							className='w-full'>
+							{t('product.makeOffer')}
 						</Button>
 						<Button
-							variant='secondary'
+							variant={isInCart ? 'danger' : 'secondary'}
 							onClick={handleCartToggle}
 							// cartLoading: while the cart first loads the Add/Remove label isn't
 							// settled yet → block that click so we don't fire the wrong action.
 							disabled={isAddingToCart || cartLoading || listing.status !== 'active'}
-							className={`gap-1.5 py-2.5 sm:py-3 ${
-								isInCart ? 'bg-danger-50 border-danger-200 text-danger-600' : ''
-							}`}>
-							<ShoppingCartIcon className='w-4 h-4 sm:w-5 sm:h-5' />
-							<span className='truncate'>
-								{isAddingToCart
-									? isInCart
-										? t('product.removing')
-										: t('product.adding')
-									: isInCart
-										? t('product.removeFromCart')
-										: t('product.addToCart')}
-							</span>
+							leftIcon={<ShoppingCartIcon className='w-5 h-5' />}
+							className='w-full'>
+							{isAddingToCart
+								? isInCart
+									? t('product.removing')
+									: t('product.adding')
+								: isInCart
+									? t('product.removeFromCart')
+									: t('product.addToCart')}
 						</Button>
 					</div>
 				)}

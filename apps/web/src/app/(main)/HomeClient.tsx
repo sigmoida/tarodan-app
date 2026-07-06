@@ -12,7 +12,7 @@ import HomeAuthModal from './_home/sections/HomeAuthModal';
 import OnSaleRail from './_home/sections/OnSaleRail';
 import PopularRail from './_home/sections/PopularRail';
 import Spotlights from './_home/sections/Spotlights';
-import TopCollectionsCarousel from './_home/sections/TopCollectionsCarousel';
+import TopCollections from './_home/sections/TopCollections';
 import TradeRail from './_home/sections/TradeRail';
 
 export default function HomeClient() {
@@ -25,7 +25,7 @@ export default function HomeClient() {
 				<OnSaleRail />
 				<TradeRail />
 				<PopularRail />
-				<TopCollectionsCarousel />
+				<TopCollections />
 				<Spotlights />
 				<TrustBadges />
 				<HomeAuthModal />

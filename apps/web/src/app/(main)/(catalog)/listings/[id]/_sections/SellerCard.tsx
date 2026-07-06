@@ -4,11 +4,12 @@
 
 import Link from 'next/link';
 import {
-	StarIcon,
+	StarIcon as StarIconOutline,
 	ChatBubbleLeftRightIcon,
 	UserIcon,
 } from '@heroicons/react/24/outline';
-import { Button } from '@tarodan/ui';
+import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
+import { Badge, Button } from '@tarodan/ui';
 import UserAvatar from '@/components/UserAvatar';
 import { ButtonLink } from '@/components/ui/ButtonLink';
 import { useListingDetail } from '../_context/ListingDetailContext';
@@ -20,111 +21,119 @@ export default function SellerCard() {
 	const seller = listing?.seller;
 	if (!seller) return null;
 
-	const openSellerAuthModal = () =>
-		requireAuth({
-			title: t('product.viewSellerProfile'),
-			message: t('product.viewSellerProfileMsg'),
-			icon: <UserIcon className='w-10 h-10 text-subtle' />,
-		});
-
+	const isPremium = (seller as { isPremium?: boolean }).isPremium;
 	const totalRatings = (seller as { totalRatings?: number }).totalRatings;
+	const rating = seller.rating ?? 0;
+	const listingsCount = seller.listings_count || seller.productsCount || 0;
+	const name = seller.displayName || seller.username || t('product.seller');
+	const profileHref = `/seller/${seller.id}`;
+
+	// Non-auth users get the "sign in to view profile" modal instead of a dead link.
+	const gateProfile = (e: React.MouseEvent) => {
+		if (!isAuthenticated) {
+			e.preventDefault();
+			requireAuth({
+				title: t('product.viewSellerProfile'),
+				message: t('product.viewSellerProfileMsg'),
+				icon: <UserIcon className='w-10 h-10 text-subtle' />,
+			});
+		}
+	};
 
 	return (
-		<div className='bg-surface-elevated rounded p-4 mb-6'>
-			<div className='flex items-center gap-4'>
-				{isAuthenticated ? (
-					<Link href={`/seller/${seller.id}`} className='flex-shrink-0'>
-						<UserAvatar
-							displayName={seller.displayName}
-							avatarUrl={seller.avatarUrl}
-							size='md'
-							className='hover:ring-2 hover:ring-primary-500 transition-all'
-						/>
-					</Link>
-				) : (
-					<Button
-						variant='secondary'
-						onClick={openSellerAuthModal}
-						className='flex-shrink-0'>
-						<UserAvatar
-							displayName={seller.displayName}
-							avatarUrl={seller.avatarUrl}
-							size='md'
-							className='hover:ring-2 hover:ring-primary-500 transition-all cursor-pointer'
-						/>
-					</Button>
-				)}
-				<div className='flex-1'>
-					{isAuthenticated ? (
-						<Link
-							href={`/seller/${seller.id}`}
-							className='font-semibold hover:text-primary-500 transition-colors'>
-							{seller.displayName || seller.username || t('product.seller')}
-						</Link>
-					) : (
-						<Button
-							variant='secondary'
-							onClick={openSellerAuthModal}
-							className='font-semibold hover:text-primary-500 transition-colors text-left cursor-pointer'>
-							{seller.displayName || seller.username || t('product.seller')}
-						</Button>
-					)}
-					{(seller as { isPremium?: boolean }).isPremium && (
-						<span className='inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 rounded text-[11px] font-bold bg-warning-100 text-warning-700 border border-warning-200'>
-							<StarIcon className='w-3 h-3' />
-							Premium
-						</span>
-					)}
-					<div className='flex items-center gap-2 text-sm text-muted'>
-						{seller.rating && seller.rating > 0 ? (
-							<div className='flex items-center'>
-								<StarIcon className='w-4 h-4 text-warning-400 mr-1' />
-								{seller.rating.toFixed(1)}
-								{totalRatings != null && totalRatings > 0 && (
-									<span className='ml-1 text-subtle'>({totalRatings})</span>
-								)}
-							</div>
-						) : (
-							<div className='flex items-center text-subtle'>
-								<StarIcon className='w-4 h-4 mr-1' />
-								<span>
-									{locale === 'en' ? 'No ratings yet' : 'Henüz değerlendirme yok'}
+		<div className='bg-surface-elevated rounded-lg border border-border p-4 mb-6'>
+			<p className='text-xs font-medium text-muted uppercase tracking-wide mb-3'>
+				{t('product.seller')}
+			</p>
+			<div className='flex flex-col sm:flex-row sm:items-center gap-4'>
+				<Link
+					href={profileHref}
+					onClick={gateProfile}
+					className='group flex items-center gap-4 min-w-0 flex-1'>
+					<UserAvatar
+						displayName={seller.displayName}
+						avatarUrl={seller.avatarUrl}
+						size='lg'
+						className='flex-shrink-0 transition-all group-hover:ring-2 group-hover:ring-primary-500'
+					/>
+					<div className='min-w-0'>
+						<div className='flex items-center gap-2 flex-wrap'>
+							<span className='font-semibold text-heading truncate transition-colors group-hover:text-primary-500'>
+								{name}
+							</span>
+							{isPremium && (
+								<Badge variant='warning' size='sm' className='gap-1'>
+									<StarIconSolid className='w-3 h-3' />
+									Premium
+								</Badge>
+							)}
+						</div>
+						<div className='flex items-center gap-2 text-sm text-muted mt-0.5'>
+							{rating > 0 ? (
+								<span className='flex items-center gap-1'>
+									<StarIconSolid className='w-4 h-4 text-warning-400' />
+									<span className='font-medium text-heading'>
+										{rating.toFixed(1)}
+									</span>
+									{totalRatings != null && totalRatings > 0 && (
+										<span className='text-subtle'>({totalRatings})</span>
+									)}
 								</span>
-							</div>
-						)}
-						<span>•</span>
-						<span>
-							{seller.listings_count || seller.productsCount || 0}{' '}
-							{t('product.listings')}
-						</span>
+							) : (
+								<span className='flex items-center gap-1 text-subtle'>
+									<StarIconOutline className='w-4 h-4' />
+									{locale === 'en'
+										? 'No ratings yet'
+										: 'Henüz değerlendirme yok'}
+								</span>
+							)}
+							<span aria-hidden>•</span>
+							<span>
+								{listingsCount} {t('product.listings')}
+							</span>
+						</div>
 					</div>
-				</div>
-				{!isOwner &&
-					(isAuthenticated ? (
+				</Link>
+
+				{!isOwner && (
+					<div className='flex gap-2 flex-shrink-0'>
+						{isAuthenticated ? (
+							<ButtonLink
+								variant='secondary'
+								size='sm'
+								href={`/messages?user=${seller.id}&listing=${listing?.id}`}
+								className='flex-1 gap-1.5 sm:flex-initial'>
+								<ChatBubbleLeftRightIcon className='w-4 h-4' />
+								{t('product.sendMessage')}
+							</ButtonLink>
+						) : (
+							<Button
+								variant='secondary'
+								size='sm'
+								leftIcon={<ChatBubbleLeftRightIcon className='w-4 h-4' />}
+								onClick={() =>
+									requireAuth({
+										title: t('product.sendMessageToSeller'),
+										message: t('product.sendMessageToSellerMsg'),
+										icon: (
+											<ChatBubbleLeftRightIcon className='w-10 h-10 text-primary-500' />
+										),
+									})
+								}
+								className='flex-1 sm:flex-initial'>
+								{t('product.sendMessage')}
+							</Button>
+						)}
 						<ButtonLink
-							variant='secondary'
-							href={`/messages?user=${seller.id}&listing=${listing?.id}`}
-							className='flex gap-2'>
-							<ChatBubbleLeftRightIcon className='w-5 h-5' />
-							{t('product.sendMessage')}
+							variant='outline'
+							size='sm'
+							href={profileHref}
+							onClick={gateProfile}
+							className='flex-1 sm:flex-initial'>
+							{locale === 'en' ? 'View Profile' : 'Profili Gör'}
 						</ButtonLink>
-					) : (
-						<Button
-							variant='secondary'
-							onClick={() =>
-								requireAuth({
-									title: t('product.sendMessageToSeller'),
-									message: t('product.sendMessageToSellerMsg'),
-									icon: (
-										<ChatBubbleLeftRightIcon className='w-10 h-10 text-primary-500' />
-									),
-								})
-							}
-							className='gap-2'>
-							<ChatBubbleLeftRightIcon className='w-5 h-5' />
-							{t('product.sendMessage')}
-						</Button>
-					))}
+					</div>
+				)}
 			</div>
 		</div>
 	);

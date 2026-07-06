@@ -40,7 +40,7 @@ export default function SectionCard({
 	const hasHeader = title != null || action != null || badge != null;
 	const defaultPad = PADDING_RE.test(className) ? '' : 'p-3 md:p-5';
 	const containerClass =
-		`bg-surface-elevated border border-border rounded ${defaultPad} ${className}`
+		`bg-surface-elevated border border-border rounded-md ${defaultPad} ${className}`
 			.replace(/\s+/g, ' ')
 			.trim();
 
@@ -54,7 +54,7 @@ export default function SectionCard({
 							<div className='w-1 h-6 bg-primary-500 flex-shrink-0 rounded-sm' />
 						)}
 						{title != null && (
-							<h2 className='text-lg font-bold text-heading tracking-tight truncate'>
+							<h2 className='text-2xl font-bold text-heading tracking-tight truncate'>
 								{title}
 							</h2>
 						)}
@@ -63,7 +63,11 @@ export default function SectionCard({
 					{action && <div className='flex-shrink-0'>{action}</div>}
 				</div>
 			)}
-			{bodyClassName ? <div className={bodyClassName}>{children}</div> : children}
+			{bodyClassName ? (
+				<div className={bodyClassName}>{children}</div>
+			) : (
+				children
+			)}
 		</div>
 	);
 }
