@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { OrderService } from './order.service';
 import { OrderPricingService } from './order-pricing.service';
+import { OrderCheckoutService } from './order-checkout.service';
+import { OrderCommonService } from './order-common.service';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { EventService } from '../events';
@@ -125,6 +127,8 @@ describe('OrderService checkout group (batch checkout)', () => {
       providers: [
         OrderService,
         OrderPricingService,
+        OrderCheckoutService,
+        OrderCommonService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: CacheService, useValue: { del: jest.fn(), delPattern: jest.fn() } },
         { provide: ConfigService, useValue: { get: jest.fn() } },

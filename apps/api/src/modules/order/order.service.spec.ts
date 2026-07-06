@@ -4,6 +4,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { createHash } from 'crypto';
 import { OrderService } from './order.service';
 import { OrderPricingService } from './order-pricing.service';
+import { OrderCheckoutService } from './order-checkout.service';
+import { OrderCommonService } from './order-common.service';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { EventService } from '../events';
@@ -96,6 +98,8 @@ describe.skip('OrderService createDirectOrder (1.6 idempotent Buy Now)', () => {
       providers: [
         OrderService,
         OrderPricingService,
+        OrderCheckoutService,
+        OrderCommonService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: CacheService, useValue: { del: jest.fn(), delPattern: jest.fn() } },
         { provide: ConfigService, useValue: { get: jest.fn() } },
@@ -187,6 +191,8 @@ describe.skip('OrderService guest checkout OTP (1.12)', () => {
       providers: [
         OrderService,
         OrderPricingService,
+        OrderCheckoutService,
+        OrderCommonService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: CacheService, useValue: mockCache },
         { provide: ConfigService, useValue: mockConfig },
@@ -358,6 +364,8 @@ describe('OrderService findOne (response shape for mobile order detail)', () => 
       providers: [
         OrderService,
         OrderPricingService,
+        OrderCheckoutService,
+        OrderCommonService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: EventService, useValue: {} },
         { provide: CacheService, useValue: {} },

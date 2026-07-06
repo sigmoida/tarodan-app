@@ -4,6 +4,8 @@ import { BullModule } from '@nestjs/bull';
 import { OrderController } from './order.controller';
 import { OrderService } from './order.service';
 import { OrderPricingService } from './order-pricing.service';
+import { OrderCheckoutService } from './order-checkout.service';
+import { OrderCommonService } from './order-common.service';
 import { OrderSchedulerService } from './order-scheduler.service';
 import { OrderScheduledProcessor } from './order-scheduled.processor';
 import { QUEUE_NAMES } from '../../workers/constants';
@@ -32,7 +34,7 @@ import { TaxModule } from '../tax/tax.module';
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [OrderController],
-  providers: [OrderService, OrderPricingService, OrderSchedulerService, OrderScheduledProcessor],
+  providers: [OrderService, OrderPricingService, OrderCheckoutService, OrderCommonService, OrderSchedulerService, OrderScheduledProcessor],
   exports: [OrderService],
 })
 export class OrderModule {}
