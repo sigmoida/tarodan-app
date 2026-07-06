@@ -25,6 +25,7 @@ import { AdminPayoutService } from './admin-payout.service';
 import { AdminTradeService } from './admin-trade.service';
 import { AdminRefundService } from './admin-refund.service';
 import { AdminMessagingService } from './admin-messaging.service';
+import { AdminSupportService } from './admin-support.service';
 import {
   fulltextUserSearch,
   fulltextProductRatingSearch,
@@ -134,6 +135,7 @@ export class AdminService {
     private readonly tradeService: AdminTradeService,
     private readonly adminRefundService: AdminRefundService,
     private readonly adminMessagingService: AdminMessagingService,
+    private readonly adminSupportService: AdminSupportService,
     @Optional()
     private readonly storageService: StorageService,
     @Optional()
@@ -782,10 +784,8 @@ export class AdminService {
   }
 
   // ==================== SUPPORT TICKET MANAGEMENT ====================
+  // Taşındı: admin-support.service.ts — imzalar aynen korunuyor (facade delege).
 
-  /**
-   * Get support tickets with filters for admin
-   */
   async getSupportTickets(query: {
     status?: TicketStatus;
     priority?: TicketPriority;
@@ -797,132 +797,24 @@ export class AdminService {
     page?: number;
     limit?: number;
   }) {
-    const { status, priority, category, assigneeId, creatorId, fromDate, toDate, page = 1, limit = 20 } = query;
-
-    // Use SupportService's getAllTickets method
-    const result = await this.supportService.getAllTickets(
-      page,
-      limit,
-      status,
-      priority,
-      category,
-      assigneeId,
-    );
-
-    // Filter by creatorId and date range if provided
-    let filteredTickets = result.tickets;
-
-    if (creatorId) {
-      filteredTickets = filteredTickets.filter((t) => t.creatorId === creatorId);
-    }
-
-    if (fromDate || toDate) {
-      const from = fromDate ? new Date(fromDate) : null;
-      const to = toDate ? new Date(toDate) : null;
-      filteredTickets = filteredTickets.filter((t) => {
-        const createdAt = new Date(t.createdAt);
-        if (from && createdAt < from) return false;
-        if (to && createdAt > to) return false;
-        return true;
-      });
-    }
-
-    return {
-      data: filteredTickets,
-      meta: {
-        total: filteredTickets.length,
-        page,
-        limit,
-        totalPages: Math.ceil(filteredTickets.length / limit),
-      },
-    };
+    return this.adminSupportService.getSupportTickets(query);
   }
 
-  /**
-   * Get support ticket by ID for admin
-   */
   async getSupportTicketById(ticketId: string) {
-    // Use SupportService's getTicketById with admin flag
-    // Pass empty string for userId since admin can view any ticket
-    return this.supportService.getTicketById(ticketId, '', true);
+    return this.adminSupportService.getSupportTicketById(ticketId);
   }
 
-  /**
-   * Update support ticket
-   */
   async updateSupportTicket(adminId: string, ticketId: string, dto: {
     status?: TicketStatus;
     priority?: TicketPriority;
     assigneeId?: string;
     note?: string;
   }) {
-    const ticket = await this.prisma.supportTicket.findUnique({
-      where: { id: ticketId },
-    });
-
-    if (!ticket) {
-      throw new NotFoundException('Destek talebi bulunamadı');
-    }
-
-    const oldTicket = { ...ticket };
-
-    // Update status if provided
-    if (dto.status) {
-      await this.supportService.updateTicketStatus(ticketId, adminId, {
-        status: dto.status,
-        note: dto.note,
-      });
-    }
-
-    // Update priority if provided
-    if (dto.priority) {
-      await this.supportService.updatePriority(ticketId, dto.priority);
-    }
-
-    // Update assignee if provided
-    if (dto.assigneeId !== undefined) {
-      await this.supportService.assignTicket(ticketId, { assigneeId: dto.assigneeId });
-    }
-
-    const updatedTicket = await this.prisma.supportTicket.findUnique({
-      where: { id: ticketId },
-    });
-
-    // Create audit log
-    await this.createAuditLog(adminId, 'support_ticket_update', 'SupportTicket', ticketId, oldTicket, updatedTicket);
-
-    return this.getSupportTicketById(ticketId);
+    return this.adminSupportService.updateSupportTicket(adminId, ticketId, dto);
   }
 
-  /**
-   * Reply to support ticket
-   */
   async replyToSupportTicket(adminId: string, ticketId: string, message: string) {
-    const ticket = await this.prisma.supportTicket.findUnique({
-      where: { id: ticketId },
-    });
-
-    if (!ticket) {
-      throw new NotFoundException('Destek talebi bulunamadı');
-    }
-
-    // Use SupportService's addMessage with admin flag
-    await this.supportService.addMessage(ticketId, adminId, { content: message }, true);
-
-    // Update status to in_progress if it was waiting_customer
-    if (ticket.status === TicketStatus.waiting_customer) {
-      await this.supportService.updateTicketStatus(ticketId, adminId, {
-        status: TicketStatus.in_progress,
-      });
-    }
-
-    // Create audit log
-    await this.createAuditLog(adminId, 'support_ticket_reply', 'SupportTicket', ticketId, ticket, {
-      ...ticket,
-      message,
-    });
-
-    return this.getSupportTicketById(ticketId);
+    return this.adminSupportService.replyToSupportTicket(adminId, ticketId, message);
   }
 
   // ==================== CATEGORY MANAGEMENT ====================
