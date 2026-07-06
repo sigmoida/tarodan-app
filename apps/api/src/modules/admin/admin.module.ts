@@ -9,6 +9,7 @@ import { AdminSettingsService } from './admin-settings.service';
 import { AdminUserService } from './admin-user.service';
 import { AdminStaffService } from './admin-staff.service';
 import { AdminProductService } from './admin-product.service';
+import { AdminOrderService } from './admin-order.service';
 import { ScheduledNotificationScheduler } from './scheduled-notification.scheduler';
 import { ScheduledNotificationProcessor } from './scheduled-notification.processor';
 import { QUEUE_NAMES } from '../../workers/constants';
@@ -55,7 +56,7 @@ import { OrderModule } from '../order/order.module';
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [AdminController],
-  providers: [AdminService, AdminAuditService, AdminCommissionService, AdminSettingsService, AdminUserService, AdminStaffService, AdminProductService, ScheduledNotificationScheduler, ScheduledNotificationProcessor],
+  providers: [AdminService, AdminAuditService, AdminCommissionService, AdminSettingsService, AdminUserService, AdminStaffService, AdminProductService, AdminOrderService, ScheduledNotificationScheduler, ScheduledNotificationProcessor],
   exports: [AdminService],
 })
 export class AdminModule { }
