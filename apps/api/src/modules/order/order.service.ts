@@ -28,6 +28,11 @@ import {
   GuestCheckoutGroupDto,
 } from './dto';
 import { OrderStatus, OfferStatus, ProductStatus, CommissionRuleType, SellerType, CommissionAppliesTo, CommissionSellerType, MembershipTierType, Prisma } from '@prisma/client';
+import {
+  findMatchingCommissionRule,
+  clampCommissionAmount,
+  mapSellerTypeForCommission,
+} from './order-commission.helper';
 import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
 import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
 import { generateUniqueReference } from '../../common/helpers/generate-reference';
@@ -477,7 +482,7 @@ export class OrderService {
     });
 
     // Map User.sellerType to CommissionSellerType
-    const commissionSellerType = this.mapSellerTypeForCommission(
+    const commissionSellerType = mapSellerTypeForCommission(
       seller?.sellerType ?? null,
       seller?.membership?.tier?.type ?? null,
     );
@@ -496,10 +501,11 @@ export class OrderService {
         r.appliesTo === CommissionAppliesTo.SELLER ||
         r.appliesTo === CommissionAppliesTo.BOTH,
     );
-    const sellerMatch = this.findMatchingRule(
+    const sellerMatch = findMatchingCommissionRule(
       sellerRules,
       categoryId,
       commissionSellerType,
+      this.logger,
     );
 
     // BUYER tarafı: appliesTo IN (BUYER, BOTH)
@@ -508,10 +514,11 @@ export class OrderService {
         r.appliesTo === CommissionAppliesTo.BUYER ||
         r.appliesTo === CommissionAppliesTo.BOTH,
     );
-    const buyerMatch = this.findMatchingRule(
+    const buyerMatch = findMatchingCommissionRule(
       buyerRules,
       categoryId,
       commissionSellerType,
+      this.logger,
     );
 
     if (!sellerMatch && !buyerMatch) {
@@ -533,7 +540,7 @@ export class OrderService {
     let sellerFee = 0;
     if (sellerMatch && sellerMatch.sellerRate) {
       const raw = subtotal * (Number(sellerMatch.sellerRate) / 100);
-      sellerFee = this.clampAmount(
+      sellerFee = clampCommissionAmount(
         raw,
         sellerMatch.sellerMin ? Number(sellerMatch.sellerMin) : null,
         sellerMatch.sellerMax ? Number(sellerMatch.sellerMax) : null,
@@ -544,7 +551,7 @@ export class OrderService {
     let buyerFee = 0;
     if (buyerMatch && buyerMatch.buyerRate) {
       const raw = subtotal * (Number(buyerMatch.buyerRate) / 100);
-      buyerFee = this.clampAmount(
+      buyerFee = clampCommissionAmount(
         raw,
         buyerMatch.buyerMin ? Number(buyerMatch.buyerMin) : null,
         buyerMatch.buyerMax ? Number(buyerMatch.buyerMax) : null,
@@ -572,98 +579,6 @@ export class OrderService {
           ? Number(buyerMatch.buyerRate)
           : 0,
     };
-  }
-
-  /**
-   * Find matching commission rule by specificity
-   * Order: 1) cat+type, 2) cat+ALL (kategori öncelikli), 3) type-only, 4) ALL+NULL
-   * Each level can only have one rule (validated in admin service)
-   */
-  private findMatchingRule(
-    rules: any[],
-    categoryId: string | null | undefined,
-    sellerType: CommissionSellerType
-  ): any | null {
-    // 1. categoryId + sellerType (most specific)
-    if (categoryId) {
-      const exact = rules.find(
-        r => r.categoryId === categoryId && r.sellerType === sellerType
-      );
-      if (exact) {
-        this.logger.debug(`Matched exact rule: category=${categoryId}, sellerType=${sellerType}`);
-        return exact;
-      }
-    }
-
-    // 2. categoryId + ALL (category priority - more specific than seller type)
-    if (categoryId) {
-      const catAll = rules.find(
-        r => r.categoryId === categoryId && r.sellerType === CommissionSellerType.ALL
-      );
-      if (catAll) {
-        this.logger.debug(`Matched category rule: category=${categoryId}, sellerType=ALL`);
-        return catAll;
-      }
-    }
-
-    // 3. categoryId IS NULL + sellerType
-    const typeOnly = rules.find(
-      r => r.categoryId === null && r.sellerType === sellerType
-    );
-    if (typeOnly) {
-      this.logger.debug(`Matched seller type rule: sellerType=${sellerType}`);
-      return typeOnly;
-    }
-
-    // 4. categoryId IS NULL + ALL (default)
-    const defaultRule = rules.find(
-      r => r.categoryId === null && r.sellerType === CommissionSellerType.ALL
-    );
-    
-    if (defaultRule) {
-      this.logger.debug('Using default commission rule (ALL+NULL)');
-      return defaultRule;
-    }
-
-    return null;
-  }
-
-  /**
-   * Clamp amount between min and max
-   */
-  private clampAmount(
-    raw: number,
-    min: number | null,
-    max: number | null
-  ): number {
-    let val = raw;
-    if (min != null && val < min) val = min;
-    if (max != null && val > max) val = max;
-    return Math.round(val * 100) / 100;
-  }
-
-  /**
-   * Map User.sellerType to CommissionSellerType
-   * individual/verified -> FREE
-   * platform -> BUSINESS
-   * Premium/Business membership -> PREMIUM
-   */
-  private mapSellerTypeForCommission(
-    userSellerType: SellerType | null,
-    membershipTier: MembershipTierType | null
-  ): CommissionSellerType {
-    // Premium/Business membership -> PREMIUM
-    if (membershipTier === MembershipTierType.premium || membershipTier === MembershipTierType.business) {
-      return CommissionSellerType.PREMIUM;
-    }
-
-    // Platform sellers -> BUSINESS
-    if (userSellerType === SellerType.platform) {
-      return CommissionSellerType.BUSINESS;
-    }
-
-    // Individual/Verified -> FREE
-    return CommissionSellerType.FREE;
   }
 
   /**
