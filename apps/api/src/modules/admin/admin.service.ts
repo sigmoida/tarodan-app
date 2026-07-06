@@ -24,6 +24,7 @@ import { AdminPaymentService } from './admin-payment.service';
 import { AdminPayoutService } from './admin-payout.service';
 import { AdminTradeService } from './admin-trade.service';
 import { AdminRefundService } from './admin-refund.service';
+import { AdminMessagingService } from './admin-messaging.service';
 import {
   fulltextUserSearch,
   fulltextProductRatingSearch,
@@ -132,6 +133,7 @@ export class AdminService {
     private readonly payoutService: AdminPayoutService,
     private readonly tradeService: AdminTradeService,
     private readonly adminRefundService: AdminRefundService,
+    private readonly adminMessagingService: AdminMessagingService,
     @Optional()
     private readonly storageService: StorageService,
     @Optional()
@@ -750,10 +752,8 @@ export class AdminService {
   }
 
   // ==================== MESSAGE MANAGEMENT ====================
+  // Taşındı: admin-messaging.service.ts — imzalar aynen korunuyor (facade delege).
 
-  /**
-   * Get messages for admin moderation
-   */
   async getMessages(query: {
     status?: MessageStatus;
     fromDate?: string;
@@ -762,157 +762,23 @@ export class AdminService {
     page?: number;
     limit?: number;
   }) {
-    const { status, fromDate, toDate, search, page = 1, limit = 20 } = query;
-
-    const where: Prisma.MessageWhereInput = {};
-
-    // Only filter by status when explicitly provided (e.g. "Tümü" = no status = all messages)
-    if (status != null) {
-      where.status = status;
-    }
-
-    if (fromDate || toDate) {
-      where.createdAt = {};
-      if (fromDate) {
-        where.createdAt.gte = new Date(fromDate);
-      }
-      if (toDate) {
-        where.createdAt.lte = new Date(toDate);
-      }
-    }
-
-    // Mesaj içeriği veya gönderen/alıcı ad/e-posta araması (case-insensitive).
-    const trimmedSearch = search?.trim();
-    if (trimmedSearch) {
-      where.OR = [
-        { content: { contains: trimmedSearch, mode: 'insensitive' } },
-        { sender: { displayName: { contains: trimmedSearch, mode: 'insensitive' } } },
-        { sender: { email: { contains: trimmedSearch, mode: 'insensitive' } } },
-        { receiver: { displayName: { contains: trimmedSearch, mode: 'insensitive' } } },
-        { receiver: { email: { contains: trimmedSearch, mode: 'insensitive' } } },
-      ];
-    }
-
-    const [total, messages] = await Promise.all([
-      this.prisma.message.count({ where }),
-      this.prisma.message.findMany({
-        where,
-        include: {
-          sender: { select: { id: true, displayName: true, email: true } },
-          receiver: { select: { id: true, displayName: true, email: true } },
-          thread: { select: { id: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
-
-    return {
-      data: messages,
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
-    };
+    return this.adminMessagingService.getMessages(query);
   }
 
-  /**
-   * Get message by ID for admin
-   */
   async getMessageById(messageId: string) {
-    const message = await this.prisma.message.findUnique({
-      where: { id: messageId },
-      include: {
-        sender: {
-          select: {
-            id: true,
-            displayName: true,
-            email: true,
-            phone: true,
-          },
-        },
-        receiver: {
-          select: {
-            id: true,
-            displayName: true,
-            email: true,
-            phone: true,
-          },
-        },
-        thread: {
-          include: {
-            messages: {
-              orderBy: { createdAt: 'asc' },
-              take: 50, // Last 50 messages in thread
-            },
-          },
-        },
-      },
-    });
-
-    if (!message) {
-      throw new NotFoundException('Mesaj bulunamadı');
-    }
-
-    return message;
+    return this.adminMessagingService.getMessageById(messageId);
   }
 
-  /**
-   * Approve message
-   */
   async approveMessage(adminId: string, messageId: string, notes?: string) {
-    const message = await this.prisma.message.findUnique({
-      where: { id: messageId },
-    });
-
-    if (!message) {
-      throw new NotFoundException('Mesaj bulunamadı');
-    }
-
-    await this.prisma.message.update({
-      where: { id: messageId },
-      data: { status: MessageStatus.approved, reviewedById: adminId, reviewedAt: new Date() },
-    });
-
-    await this.createAuditLog(adminId, 'message_approve', 'Message', messageId, message, { notes });
-
-    return { success: true, messageId, status: 'approved' };
+    return this.adminMessagingService.approveMessage(adminId, messageId, notes);
   }
 
   async rejectMessage(adminId: string, messageId: string, reason?: string) {
-    const message = await this.prisma.message.findUnique({
-      where: { id: messageId },
-    });
-
-    if (!message) {
-      throw new NotFoundException('Mesaj bulunamadı');
-    }
-
-    await this.prisma.message.update({
-      where: { id: messageId },
-      data: { status: MessageStatus.rejected, reviewedById: adminId, reviewedAt: new Date() },
-    });
-
-    await this.createAuditLog(adminId, 'message_reject', 'Message', messageId, message, { reason });
-
-    return { success: true, messageId, status: 'rejected', reason };
+    return this.adminMessagingService.rejectMessage(adminId, messageId, reason);
   }
 
   async revertMessage(adminId: string, messageId: string) {
-    const message = await this.prisma.message.findUnique({
-      where: { id: messageId },
-    });
-
-    if (!message) {
-      throw new NotFoundException('Mesaj bulunamadı');
-    }
-
-    await this.prisma.message.update({
-      where: { id: messageId },
-      data: { status: MessageStatus.pending_approval, reviewedById: null, reviewedAt: null },
-    });
-
-    await this.createAuditLog(adminId, 'message_revert', 'Message', messageId, message, {});
-
-    return { success: true, messageId, status: 'pending_approval' };
+    return this.adminMessagingService.revertMessage(adminId, messageId);
   }
 
   // ==================== SUPPORT TICKET MANAGEMENT ====================
