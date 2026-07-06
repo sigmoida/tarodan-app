@@ -4,5 +4,6 @@ export * from './admin-audit.service';
 export * from './admin-commission.service';
 export * from './admin-settings.service';
 export * from './admin-user.service';
+export * from './admin-staff.service';
 export * from './admin.controller';
 export * from './dto';
