@@ -30,6 +30,7 @@ import { AdminContentService } from './admin-content.service';
 import { AdminTaxService } from './admin-tax.service';
 import { AdminMembershipService } from './admin-membership.service';
 import { AdminCatalogService } from './admin-catalog.service';
+import { AdminCollectionService } from './admin-collection.service';
 import {
   fulltextUserSearch,
   fulltextProductRatingSearch,
@@ -144,6 +145,7 @@ export class AdminService {
     private readonly taxService: AdminTaxService,
     private readonly membershipService: AdminMembershipService,
     private readonly catalogService: AdminCatalogService,
+    private readonly collectionService: AdminCollectionService,
     @Optional()
     private readonly storageService: StorageService,
     @Optional()
@@ -827,21 +829,6 @@ export class AdminService {
 
   // ==================== CATEGORY MANAGEMENT ====================
   // Taşındı: admin-catalog.service.ts — imzalar aynen korunuyor (facade delege).
-  // Not: private generateSlug'ın ortak gövdesi artık admin-slug.util.ts'te;
-  // COLLECTION bölümü hâlâ kullandığı için delege altındaki kopya şimdilik
-  // facade'da kalıyor.
-
-  /**
-   * Generate slug from name
-   */
-  private generateSlug(name: string): string {
-    return name
-      .toLowerCase()
-      .trim()
-      .replace(/[^\w\s-]/g, '')
-      .replace(/[\s_-]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-  }
 
   async getCategories() {
     return this.catalogService.getCategories();
@@ -1830,10 +1817,8 @@ export class AdminService {
   }
 
   // ==================== COLLECTION MANAGEMENT ====================
+  // Taşındı: admin-collection.service.ts — imzalar aynen korunuyor (facade delege).
 
-  /**
-   * Get collections with filtering and pagination (admin view)
-   */
   async getCollections(query: {
     search?: string;
     userId?: string;
@@ -1844,149 +1829,13 @@ export class AdminService {
     sortBy?: 'createdAt' | 'name' | 'likeCount' | 'viewCount';
     sortOrder?: 'asc' | 'desc';
   }) {
-    const { page = 1, limit = 20, search, userId, isPublic, isFeatured, sortBy = 'createdAt', sortOrder = 'desc' } = query;
-
-    const esSortMap: Record<string, 'popular' | 'recent' | 'name'> = {
-      createdAt: 'recent', viewCount: 'popular', likeCount: 'popular', name: 'name',
-    };
-
-    if (search && this.searchService.isAvailable()) {
-      const esResult = await this.searchService.searchCollections({
-        query: search,
-        isPublic,
-        isFeatured,
-        userId,
-        sortBy: esSortMap[sortBy] ?? 'recent',
-        page,
-        pageSize: limit,
-      });
-
-      if (esResult && esResult.ids.length > 0) {
-        const collections = await this.prisma.collection.findMany({
-          where: { id: { in: esResult.ids } },
-          include: {
-            user: { select: { id: true, displayName: true, avatarUrl: true, membership: { select: { tier: { select: { type: true } } } } } },
-            _count: { select: { items: true } },
-          },
-        });
-        const orderMap = new Map(esResult.ids.map((id, i) => [id, i]));
-        collections.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
-        return {
-          data: collections.map(c => ({
-            id: c.id, name: c.name, slug: c.slug, description: c.description,
-            coverImageUrl: c.coverImageKey ? this.storageService.getPublicAssetUrl(c.coverImageKey) : undefined, isPublic: c.isPublic, isFeatured: c.isFeatured,
-            viewCount: c.viewCount, likeCount: c.likeCount, itemCount: c._count.items,
-            owner: { ...c.user, membershipTier: c.user.membership?.tier?.type ?? null }, createdAt: c.createdAt, updatedAt: c.updatedAt,
-          })),
-          total: esResult.total, page, limit, totalPages: Math.ceil(esResult.total / limit),
-        };
-      }
-      if (esResult && esResult.total === 0) {
-        return { data: [], total: 0, page, limit, totalPages: 0 };
-      }
-    }
-
-    const where: Prisma.CollectionWhereInput = {};
-    if (search) {
-      const ids = await fulltextCollectionSearch(this.prisma, search);
-      if (ids.length === 0) {
-        return { data: [], total: 0, page, limit, totalPages: 0 };
-      }
-      where.id = { in: ids };
-    }
-    if (userId) where.userId = userId;
-    if (isPublic !== undefined) where.isPublic = isPublic;
-    if (isFeatured !== undefined) where.isFeatured = isFeatured;
-
-    const [total, collections] = await Promise.all([
-      this.prisma.collection.count({ where }),
-      this.prisma.collection.findMany({
-        where,
-        include: {
-          user: { select: { id: true, displayName: true, avatarUrl: true, membership: { select: { tier: { select: { type: true } } } } } },
-          _count: { select: { items: true } },
-        },
-        orderBy: { [sortBy]: sortOrder },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
-
-    return {
-      data: collections.map(c => ({
-        id: c.id, name: c.name, slug: c.slug, description: c.description,
-        coverImageUrl: c.coverImageKey ? this.storageService.getPublicAssetUrl(c.coverImageKey) : undefined, isPublic: c.isPublic, isFeatured: c.isFeatured,
-        viewCount: c.viewCount, likeCount: c.likeCount, itemCount: c._count.items,
-        owner: { ...c.user, membershipTier: c.user.membership?.tier?.type ?? null }, createdAt: c.createdAt, updatedAt: c.updatedAt,
-      })),
-      total, page, limit, totalPages: Math.ceil(total / limit),
-    };
+    return this.collectionService.getCollections(query);
   }
 
-  /**
-   * Get collection by ID with items (admin view)
-   */
   async getCollectionById(collectionId: string) {
-    const collection = await this.prisma.collection.findUnique({
-      where: { id: collectionId },
-      include: {
-        user: { select: { id: true, displayName: true, avatarUrl: true } },
-        items: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                title: true,
-                price: true,
-                images: { take: 1, select: { cardKey: true } },
-              },
-            },
-          },
-          orderBy: { sortOrder: 'asc' },
-        },
-      },
-    });
-
-    if (!collection) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
-    }
-
-    return {
-      id: collection.id,
-      name: collection.name,
-      slug: collection.slug,
-      description: collection.description,
-      coverImageUrl: collection.coverImageKey ? this.storageService.getPublicAssetUrl(collection.coverImageKey) : undefined,
-      isPublic: collection.isPublic,
-      isFeatured: collection.isFeatured,
-      viewCount: collection.viewCount,
-      likeCount: collection.likeCount,
-      itemCount: collection.items.length,
-      owner: collection.user,
-      items: await Promise.all(collection.items.map(async item => ({
-        id: item.id,
-        productId: item.productId,
-        sortOrder: item.sortOrder,
-        product: item.product ? {
-          id: item.product.id,
-          title: item.product.title,
-          price: Number(item.product.price),
-          images: await Promise.all((item.product.images || []).map(async (img: any) => ({
-            ...img,
-            url: this.resolveProductImageUrl(img.cardKey),
-          }))),
-        } : null,
-        customTitle: item.customTitle,
-        customImageUrl: item.customImageUrl,
-      }))),
-      createdAt: collection.createdAt,
-      updatedAt: collection.updatedAt,
-    };
+    return this.collectionService.getCollectionById(collectionId);
   }
 
-  /**
-   * Create collection (admin)
-   */
   async createAdminCollection(adminId: string, dto: {
     name: string;
     description?: string;
@@ -1995,43 +1844,9 @@ export class AdminService {
     coverImageKey?: string;
     userId?: string;
   }) {
-    const slug = this.generateSlug(dto.name);
-    const userId = dto.userId || adminId;
-
-    // Check for unique slug within user's collections
-    const existingSlug = await this.prisma.collection.findFirst({
-      where: { userId, slug },
-    });
-
-    const finalSlug = existingSlug ? `${slug}-${Date.now()}` : slug;
-
-    const collection = await this.prisma.collection.create({
-      data: {
-        userId,
-        name: dto.name,
-        slug: finalSlug,
-        description: dto.description,
-        isPublic: dto.isPublic ?? true,
-        isFeatured: dto.isFeatured ?? false,
-        coverImageKey: dto.coverImageKey,
-      },
-      include: {
-        user: { select: { id: true, displayName: true, avatarUrl: true } },
-      },
-    });
-
-    await this.createAuditLog(adminId, 'collection_create', 'Collection', collection.id, null, collection);
-
-    return {
-      ...collection,
-      itemCount: 0,
-      owner: collection.user,
-    };
+    return this.collectionService.createAdminCollection(adminId, dto);
   }
 
-  /**
-   * Update collection (admin)
-   */
   async updateAdminCollection(adminId: string, collectionId: string, dto: {
     name?: string;
     description?: string;
@@ -2039,186 +1854,27 @@ export class AdminService {
     isFeatured?: boolean;
     coverImageKey?: string;
   }) {
-    const existing = await this.prisma.collection.findUnique({
-      where: { id: collectionId },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
-    }
-
-    const updateData: Prisma.CollectionUpdateInput = {};
-    if (dto.name !== undefined) {
-      updateData.name = dto.name;
-      updateData.slug = this.generateSlug(dto.name);
-    }
-    if (dto.description !== undefined) updateData.description = dto.description;
-    if (dto.isPublic !== undefined) updateData.isPublic = dto.isPublic;
-    if (dto.isFeatured !== undefined) updateData.isFeatured = dto.isFeatured;
-    if (dto.coverImageKey !== undefined) updateData.coverImageKey = dto.coverImageKey;
-
-    const updated = await this.prisma.collection.update({
-      where: { id: collectionId },
-      data: updateData,
-      include: {
-        user: { select: { id: true, displayName: true, avatarUrl: true } },
-        _count: { select: { items: true } },
-      },
-    });
-
-    await this.createAuditLog(adminId, 'collection_update', 'Collection', collectionId, existing, updated);
-
-    return {
-      ...updated,
-      itemCount: updated._count.items,
-      owner: updated.user,
-    };
+    return this.collectionService.updateAdminCollection(adminId, collectionId, dto);
   }
 
-  /**
-   * Delete collection (admin)
-   */
   async deleteAdminCollection(adminId: string, collectionId: string) {
-    const existing = await this.prisma.collection.findUnique({
-      where: { id: collectionId },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
-    }
-
-    await this.prisma.collection.delete({
-      where: { id: collectionId },
-    });
-
-    await this.createAuditLog(adminId, 'collection_delete', 'Collection', collectionId, existing, null);
-
-    return { success: true };
+    return this.collectionService.deleteAdminCollection(adminId, collectionId);
   }
 
-  /**
-   * Add products to collection
-   */
   async addItemsToCollection(adminId: string, collectionId: string, productIds: string[]) {
-    const collection = await this.prisma.collection.findUnique({
-      where: { id: collectionId },
-      include: { _count: { select: { items: true } } },
-    });
-
-    if (!collection) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
-    }
-
-    // Get max sort order
-    const maxSortOrder = collection._count.items;
-
-    // Create items
-    const createdItems = await Promise.all(
-      productIds.map((productId, index) =>
-        this.prisma.collectionItem.create({
-          data: {
-            collectionId,
-            productId,
-            sortOrder: maxSortOrder + index,
-          },
-          include: {
-            product: {
-              select: {
-                id: true,
-                title: true,
-                price: true,
-                images: { take: 1, select: { cardKey: true } },
-              },
-            },
-          },
-        }).catch(() => null) // Ignore duplicates
-      )
-    );
-
-    const successfulItems = createdItems.filter(item => item !== null);
-
-    await this.createAuditLog(adminId, 'collection_items_add', 'Collection', collectionId, null, { addedProductIds: productIds });
-
-    return {
-      success: true,
-      addedCount: successfulItems.length,
-      items: successfulItems,
-    };
+    return this.collectionService.addItemsToCollection(adminId, collectionId, productIds);
   }
 
-  /**
-   * Remove item from collection
-   */
   async removeItemFromAdminCollection(adminId: string, collectionId: string, itemId: string) {
-    const item = await this.prisma.collectionItem.findFirst({
-      where: { id: itemId, collectionId },
-    });
-
-    if (!item) {
-      throw new NotFoundException('Koleksiyon öğesi bulunamadı');
-    }
-
-    await this.prisma.collectionItem.delete({
-      where: { id: itemId },
-    });
-
-    await this.createAuditLog(adminId, 'collection_item_remove', 'CollectionItem', itemId, item, null);
-
-    return { success: true };
+    return this.collectionService.removeItemFromAdminCollection(adminId, collectionId, itemId);
   }
 
-  /**
-   * Set collection visibility
-   */
   async setCollectionVisibility(adminId: string, collectionId: string, isPublic: boolean) {
-    const existing = await this.prisma.collection.findUnique({
-      where: { id: collectionId },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
-    }
-
-    const updated = await this.prisma.collection.update({
-      where: { id: collectionId },
-      data: { isPublic },
-    });
-
-    await this.createAuditLog(adminId, 'collection_visibility_change', 'Collection', collectionId, { isPublic: existing.isPublic }, { isPublic });
-
-    return { success: true, isPublic: updated.isPublic };
+    return this.collectionService.setCollectionVisibility(adminId, collectionId, isPublic);
   }
 
-  /**
-   * Set collection featured status
-   */
   async setCollectionFeatured(adminId: string, collectionId: string, isFeatured: boolean) {
-    const existing = await this.prisma.collection.findUnique({
-      where: { id: collectionId },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
-    }
-
-    const updated = await this.prisma.collection.update({
-      where: { id: collectionId },
-      data: { isFeatured },
-    });
-
-    await this.createAuditLog(adminId, 'collection_featured_change', 'Collection', collectionId, { isFeatured: existing.isFeatured }, { isFeatured });
-
-    // Anasayfa "haftanın koleksiyoneri" snapshot'ını ve cache'ini düşür; sonraki
-    // okuma yeni isFeatured durumuna göre kazananı yeniden hesaplayıp saklar.
-    await this.prisma.featuredSnapshot
-      .deleteMany({ where: { type: 'collector' } })
-      .catch(() => {});
-    if (this.cache) {
-      await this.cache.del('featured:collector').catch(() => {});
-      await this.cache.delPattern('featured:top-collections:*').catch(() => {});
-    }
-
-    return { success: true, isFeatured: updated.isFeatured };
+    return this.collectionService.setCollectionFeatured(adminId, collectionId, isFeatured);
   }
 
   // ==================== ATTRIBUTE GROUP MANAGEMENT ====================
