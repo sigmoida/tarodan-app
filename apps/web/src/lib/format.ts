@@ -15,6 +15,10 @@ export function formatPrice(price: number | string | null | undefined): string {
   return `${numPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`;
 }
 
+/** Alias of {@link formatPrice} — "12,30 TL". The single money formatter used
+ * across profile surfaces (my-listings, orders, offers, trades, …). */
+export const formatTL = formatPrice;
+
 /**
  * Format price without TL suffix (for cases where TL is added separately)
  */
