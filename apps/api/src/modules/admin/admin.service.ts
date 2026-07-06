@@ -11,6 +11,8 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma';
 import { StorageService } from '../storage/storage.service';
 import { ModerationAiClient } from '../moderation/moderation-ai.client';
+import { AdminAuditService } from './admin-audit.service';
+import { AdminCommissionService } from './admin-commission.service';
 import {
   fulltextUserSearch,
   fulltextProductRatingSearch,
@@ -106,6 +108,8 @@ export class AdminService {
     private readonly refundService: RefundService,
     private readonly notificationService: NotificationService,
     private readonly moderationAi: ModerationAiClient,
+    private readonly auditService: AdminAuditService,
+    private readonly commissionService: AdminCommissionService,
     @Optional()
     private readonly storageService: StorageService,
     @Optional()
@@ -183,276 +187,22 @@ export class AdminService {
   }
 
   // ==================== COMMISSION RULES ====================
+  // Taşındı: admin-commission.service.ts — imzalar aynen korunuyor (facade delege).
 
-  /**
-   * Get all commission rules
-   */
   async getCommissionRules() {
-    const rules = await this.prisma.commissionRule.findMany({
-      include: { category: { select: { id: true, name: true } } },
-      orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
-    });
-
-    return rules.map((r) => ({
-      id: r.id,
-      name: r.name,
-      categoryId: r.categoryId,
-      categoryName: r.category?.name || null,
-      sellerType: r.sellerType,
-      appliesTo: r.appliesTo || 'SELLER',
-      sellerRate: r.sellerRate ? Number(r.sellerRate) : null,
-      buyerRate: r.buyerRate ? Number(r.buyerRate) : null,
-      sellerMin: r.sellerMin ? Number(r.sellerMin) : null,
-      sellerMax: r.sellerMax ? Number(r.sellerMax) : null,
-      buyerMin: r.buyerMin ? Number(r.buyerMin) : null,
-      buyerMax: r.buyerMax ? Number(r.buyerMax) : null,
-      isActive: r.isActive,
-      createdAt: r.createdAt,
-      updatedAt: r.updatedAt,
-      // Legacy fields for backward compatibility
-      percentage: Number(r.percentage),
-      type: r.ruleType,
-      minAmount: r.minAmount ? Number(r.minAmount) : null,
-    }));
+    return this.commissionService.getCommissionRules();
   }
 
-  /**
-   * Create commission rule
-   * Requirement: Commission configuration via admin (project.md)
-   */
   async createCommissionRule(adminId: string, dto: CreateCommissionRuleDto) {
-    // Validate appliesTo requirements
-    if (dto.appliesTo === 'SELLER' && !dto.sellerRate) {
-      throw new BadRequestException('sellerRate is required when appliesTo is SELLER');
-    }
-    if (dto.appliesTo === 'BUYER' && !dto.buyerRate) {
-      throw new BadRequestException('buyerRate is required when appliesTo is BUYER');
-    }
-    if (dto.appliesTo === 'BOTH' && (!dto.sellerRate || !dto.buyerRate)) {
-      throw new BadRequestException('Both sellerRate and buyerRate are required when appliesTo is BOTH');
-    }
-
-    // Validate min <= max
-    if (dto.sellerMin != null && dto.sellerMax != null && dto.sellerMin > dto.sellerMax) {
-      throw new BadRequestException('sellerMin cannot be greater than sellerMax');
-    }
-    if (dto.buyerMin != null && dto.buyerMax != null && dto.buyerMin > dto.buyerMax) {
-      throw new BadRequestException('buyerMin cannot be greater than buyerMax');
-    }
-
-    // If categoryId is empty string, set to null
-    const categoryId = dto.categoryId && dto.categoryId.trim() !== '' ? dto.categoryId : null;
-
-    // Check if a rule with the same combination already exists
-    const existingRule = await this.prisma.commissionRule.findFirst({
-      where: {
-        categoryId: categoryId,
-        sellerType: dto.sellerType,
-        isActive: true,
-      },
-    });
-
-    if (existingRule) {
-      const categoryName = categoryId
-        ? (await this.prisma.category.findUnique({ where: { id: categoryId }, select: { name: true } }))?.name || 'Kategori'
-        : 'Tüm Kategoriler';
-      const sellerTypeName = dto.sellerType === 'ALL' ? 'Tüm Satıcı Tipleri' : dto.sellerType;
-      throw new BadRequestException(
-        `Bu kombinasyon için zaten bir kural mevcut: ${categoryName} + ${sellerTypeName}. Aynı seviyede sadece bir kural olabilir.`
-      );
-    }
-
-    const rule = await this.prisma.commissionRule.create({
-      data: {
-        name: dto.name,
-        categoryId,
-        sellerType: dto.sellerType,
-        appliesTo: dto.appliesTo,
-        sellerRate: dto.sellerRate != null ? dto.sellerRate : null,
-        buyerRate: dto.buyerRate != null ? dto.buyerRate : null,
-        sellerMin: dto.sellerMin != null ? dto.sellerMin : null,
-        sellerMax: dto.sellerMax != null ? dto.sellerMax : null,
-        buyerMin: dto.buyerMin != null ? dto.buyerMin : null,
-        buyerMax: dto.buyerMax != null ? dto.buyerMax : null,
-        priority: 0, // Priority removed - each combination can only have one rule
-        isActive: dto.isActive ?? true,
-        // Legacy fields (for backward compatibility)
-        percentage: dto.percentage ?? (dto.sellerRate || 0),
-        ruleType: dto.type || 'default',
-        minAmount: dto.minAmount,
-      },
-      include: { category: { select: { id: true, name: true } } },
-    });
-
-    // Log action
-    await this.createAuditLog(adminId, 'commission_rule_create', 'CommissionRule', rule.id, null, rule);
-
-    return {
-      id: rule.id,
-      name: rule.name,
-      categoryId: rule.categoryId,
-      categoryName: rule.category?.name || null,
-      sellerType: rule.sellerType,
-      appliesTo: rule.appliesTo,
-      sellerRate: rule.sellerRate ? Number(rule.sellerRate) : null,
-      buyerRate: rule.buyerRate ? Number(rule.buyerRate) : null,
-      sellerMin: rule.sellerMin ? Number(rule.sellerMin) : null,
-      sellerMax: rule.sellerMax ? Number(rule.sellerMax) : null,
-      buyerMin: rule.buyerMin ? Number(rule.buyerMin) : null,
-      buyerMax: rule.buyerMax ? Number(rule.buyerMax) : null,
-      isActive: rule.isActive,
-      createdAt: rule.createdAt,
-      updatedAt: rule.updatedAt,
-      // Legacy fields
-      percentage: Number(rule.percentage),
-      type: rule.ruleType,
-      minAmount: rule.minAmount ? Number(rule.minAmount) : null,
-    };
+    return this.commissionService.createCommissionRule(adminId, dto);
   }
 
-  /**
-   * Update commission rule
-   */
   async updateCommissionRule(adminId: string, ruleId: string, dto: UpdateCommissionRuleDto) {
-    const existing = await this.prisma.commissionRule.findUnique({
-      where: { id: ruleId },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Komisyon kuralı bulunamadı');
-    }
-
-    // Determine final appliesTo value
-    const appliesTo = dto.appliesTo ?? existing.appliesTo ?? 'SELLER';
-
-    // Validate appliesTo requirements
-    if (appliesTo === 'SELLER' && dto.sellerRate === undefined && !existing.sellerRate) {
-      throw new BadRequestException('sellerRate is required when appliesTo is SELLER');
-    }
-    if (appliesTo === 'BUYER' && dto.buyerRate === undefined && !existing.buyerRate) {
-      throw new BadRequestException('buyerRate is required when appliesTo is BUYER');
-    }
-    if (appliesTo === 'BOTH') {
-      const finalSellerRate = dto.sellerRate !== undefined ? dto.sellerRate : existing.sellerRate;
-      const finalBuyerRate = dto.buyerRate !== undefined ? dto.buyerRate : existing.buyerRate;
-      if (!finalSellerRate || !finalBuyerRate) {
-        throw new BadRequestException('Both sellerRate and buyerRate are required when appliesTo is BOTH');
-      }
-    }
-
-    // Validate min <= max
-    const sellerMin = dto.sellerMin !== undefined ? dto.sellerMin : existing.sellerMin;
-    const sellerMax = dto.sellerMax !== undefined ? dto.sellerMax : existing.sellerMax;
-    if (sellerMin != null && sellerMax != null && sellerMin > sellerMax) {
-      throw new BadRequestException('sellerMin cannot be greater than sellerMax');
-    }
-
-    const buyerMin = dto.buyerMin !== undefined ? dto.buyerMin : existing.buyerMin;
-    const buyerMax = dto.buyerMax !== undefined ? dto.buyerMax : existing.buyerMax;
-    if (buyerMin != null && buyerMax != null && buyerMin > buyerMax) {
-      throw new BadRequestException('buyerMin cannot be greater than buyerMax');
-    }
-
-    // Determine final categoryId and sellerType
-    const finalCategoryId = dto.categoryId !== undefined
-      ? (dto.categoryId && dto.categoryId.trim() !== '' ? dto.categoryId : null)
-      : existing.categoryId;
-    const finalSellerType = dto.sellerType !== undefined ? dto.sellerType : existing.sellerType;
-
-    // Check if changing categoryId or sellerType would conflict with another rule
-    if ((dto.categoryId !== undefined || dto.sellerType !== undefined) &&
-      (finalCategoryId !== existing.categoryId || finalSellerType !== existing.sellerType)) {
-      const conflictingRule = await this.prisma.commissionRule.findFirst({
-        where: {
-          categoryId: finalCategoryId,
-          sellerType: finalSellerType,
-          isActive: true,
-          id: { not: existing.id }, // Exclude current rule
-        },
-      });
-
-      if (conflictingRule) {
-        const categoryName = finalCategoryId
-          ? (await this.prisma.category.findUnique({ where: { id: finalCategoryId }, select: { name: true } }))?.name || 'Kategori'
-          : 'Tüm Kategoriler';
-        const sellerTypeName = finalSellerType === 'ALL' ? 'Tüm Satıcı Tipleri' : finalSellerType;
-        throw new BadRequestException(
-          `Bu kombinasyon başka bir kural tarafından kullanılıyor: ${categoryName} + ${sellerTypeName}. Aynı seviyede sadece bir kural olabilir.`
-        );
-      }
-    }
-
-    // Prepare update data
-    const updateData: any = {};
-    if (dto.name !== undefined) updateData.name = dto.name;
-    if (dto.categoryId !== undefined) {
-      updateData.categoryId = dto.categoryId && dto.categoryId.trim() !== '' ? dto.categoryId : null;
-    }
-    if (dto.sellerType !== undefined) updateData.sellerType = dto.sellerType;
-    if (dto.appliesTo !== undefined) updateData.appliesTo = dto.appliesTo;
-    if (dto.sellerRate !== undefined) updateData.sellerRate = dto.sellerRate;
-    if (dto.buyerRate !== undefined) updateData.buyerRate = dto.buyerRate;
-    if (dto.sellerMin !== undefined) updateData.sellerMin = dto.sellerMin;
-    if (dto.sellerMax !== undefined) updateData.sellerMax = dto.sellerMax;
-    if (dto.buyerMin !== undefined) updateData.buyerMin = dto.buyerMin;
-    if (dto.buyerMax !== undefined) updateData.buyerMax = dto.buyerMax;
-    // Priority removed - not used anymore
-    if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
-    // Legacy fields
-    if (dto.percentage !== undefined) updateData.percentage = dto.percentage;
-    if (dto.type !== undefined) updateData.ruleType = dto.type;
-    if (dto.minAmount !== undefined) updateData.minAmount = dto.minAmount;
-
-    const rule = await this.prisma.commissionRule.update({
-      where: { id: ruleId },
-      data: updateData,
-      include: { category: { select: { id: true, name: true } } },
-    });
-
-    await this.createAuditLog(adminId, 'commission_rule_update', 'CommissionRule', rule.id, existing, rule);
-
-    return {
-      id: rule.id,
-      name: rule.name,
-      categoryId: rule.categoryId,
-      categoryName: rule.category?.name || null,
-      sellerType: rule.sellerType,
-      appliesTo: rule.appliesTo,
-      sellerRate: rule.sellerRate ? Number(rule.sellerRate) : null,
-      buyerRate: rule.buyerRate ? Number(rule.buyerRate) : null,
-      sellerMin: rule.sellerMin ? Number(rule.sellerMin) : null,
-      sellerMax: rule.sellerMax ? Number(rule.sellerMax) : null,
-      buyerMin: rule.buyerMin ? Number(rule.buyerMin) : null,
-      buyerMax: rule.buyerMax ? Number(rule.buyerMax) : null,
-      isActive: rule.isActive,
-      createdAt: rule.createdAt,
-      updatedAt: rule.updatedAt,
-      // Legacy fields
-      percentage: Number(rule.percentage),
-      type: rule.ruleType,
-      minAmount: rule.minAmount ? Number(rule.minAmount) : null,
-    };
+    return this.commissionService.updateCommissionRule(adminId, ruleId, dto);
   }
 
-  /**
-   * Delete commission rule
-   */
   async deleteCommissionRule(adminId: string, ruleId: string) {
-    const existing = await this.prisma.commissionRule.findUnique({
-      where: { id: ruleId },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Komisyon kuralı bulunamadı');
-    }
-
-    await this.prisma.commissionRule.delete({
-      where: { id: ruleId },
-    });
-
-    await this.createAuditLog(adminId, 'commission_rule_delete', 'CommissionRule', ruleId, existing, null);
-
-    return { success: true };
+    return this.commissionService.deleteCommissionRule(adminId, ruleId);
   }
 
   // ==================== PLATFORM SETTINGS ====================
@@ -3777,79 +3527,8 @@ export class AdminService {
     oldValue: any,
     newValue: any,
   ) {
-    try {
-      // Resolve adminUserId: @CurrentUser('id') returns User.id, but AuditLog expects AdminUser.id
-      const adminUser = await this.prisma.adminUser.findFirst({
-        where: { userId: adminUserId, isActive: true },
-        select: { id: true },
-      });
-      if (!adminUser) {
-        this.logger.warn(`Admin user not found for userId ${adminUserId}, skipping audit log`);
-        return Promise.resolve();
-      }
-      const resolvedAdminUserId = adminUser.id;
-
-      // Fields that must never appear in audit logs
-      const SENSITIVE_KEYS = new Set([
-        'password', 'passwordHash', 'passwordConfirm', 'newPassword', 'oldPassword', 'currentPassword',
-        'token', 'accessToken', 'refreshToken', 'resetToken', 'verifyToken', 'confirmToken', 'idToken',
-        'secret', 'apiKey', 'apiSecret', 'clientSecret', 'signingKey',
-        'creditCard', 'cardNumber', 'cvv', 'cvc', 'pin', 'otp',
-      ]);
-
-      const redactSensitive = (obj: any): any => {
-        if (obj === null || obj === undefined || typeof obj !== 'object') return obj;
-        if (Array.isArray(obj)) return obj.map(redactSensitive);
-        return Object.fromEntries(
-          Object.entries(obj).map(([k, v]) => [
-            k,
-            SENSITIVE_KEYS.has(k) ? '[GİZLİ]' : redactSensitive(v),
-          ]),
-        );
-      };
-
-      // Serialize values to ensure they can be stored as JSON
-      const serializeValue = (value: any) => {
-        if (value === null || value === undefined) {
-          return null;
-        }
-        try {
-          // Use JSON.parse/stringify to handle Date, Decimal, etc.
-          const serialized = JSON.parse(JSON.stringify(value, (key, val) => {
-            // Convert Date to ISO string
-            if (val instanceof Date) {
-              return val.toISOString();
-            }
-            // Convert Decimal to number (Prisma Decimal has toNumber method)
-            if (val && typeof val === 'object' && typeof val.toNumber === 'function') {
-              return val.toNumber();
-            }
-            return val;
-          }));
-          return redactSensitive(serialized);
-        } catch (e) {
-          // Fallback: convert to string if serialization fails
-          this.logger.warn(`Failed to serialize audit log value for ${entityType}:${entityId}`, e);
-          return String(value);
-        }
-      };
-
-      return await this.prisma.auditLog.create({
-        data: {
-          adminUserId: resolvedAdminUserId,
-          action,
-          entityType,
-          entityId,
-          oldValue: serializeValue(oldValue),
-          newValue: serializeValue(newValue),
-        },
-      });
-    } catch (error) {
-      // Log error but don't fail the main operation
-      this.logger.error(`Failed to create audit log for ${entityType}:${entityId}`, error);
-      // Return a promise that resolves to avoid breaking the caller
-      return Promise.resolve();
-    }
+    // Taşındı: admin-audit.service.ts — tüm bölüm çağrıları bu delege üzerinden akar.
+    return this.auditService.createAuditLog(adminUserId, action, entityType, entityId, oldValue, newValue);
   }
 
   // ==================== MODERATION QUEUE ====================
