@@ -27,6 +27,7 @@ import { AdminRefundService } from './admin-refund.service';
 import { AdminMessagingService } from './admin-messaging.service';
 import { AdminSupportService } from './admin-support.service';
 import { AdminContentService } from './admin-content.service';
+import { AdminTaxService } from './admin-tax.service';
 import {
   fulltextUserSearch,
   fulltextProductRatingSearch,
@@ -138,6 +139,7 @@ export class AdminService {
     private readonly adminMessagingService: AdminMessagingService,
     private readonly adminSupportService: AdminSupportService,
     private readonly contentService: AdminContentService,
+    private readonly taxService: AdminTaxService,
     @Optional()
     private readonly storageService: StorageService,
     @Optional()
@@ -1104,38 +1106,10 @@ export class AdminService {
   }
 
   // ==================== TAX SETTINGS (Regions, Rates, Rules, Reporting) ====================
-  /** Prisma client with Tax models; at runtime may be missing until prisma generate is run */
-  private get taxPrisma(): any {
-    return this.prisma as any;
-  }
-
-  private get hasTaxModels(): boolean {
-    return !!(this.taxPrisma.taxRegion && this.taxPrisma.taxRate && this.taxPrisma.taxRule);
-  }
+  // Taşındı: admin-tax.service.ts — imzalar aynen korunuyor (facade delege).
 
   async getTaxRegions() {
-    if (!this.hasTaxModels) return { data: [] };
-    const regions = await this.taxPrisma.taxRegion.findMany({
-      include: {
-        _count: { select: { taxRates: true, taxRules: true } },
-      },
-      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-    });
-    return {
-      data: regions.map((r: any) => ({
-        id: r.id,
-        name: r.name,
-        countryCode: r.countryCode,
-        regionCode: r.regionCode,
-        isDefault: r.isDefault,
-        sortOrder: r.sortOrder,
-        isActive: r.isActive,
-        ratesCount: r._count.taxRates,
-        rulesCount: r._count.taxRules,
-        createdAt: r.createdAt,
-        updatedAt: r.updatedAt,
-      })),
-    };
+    return this.taxService.getTaxRegions();
   }
 
   async createTaxRegion(adminId: string, dto: {
@@ -1146,22 +1120,7 @@ export class AdminService {
     sortOrder?: number;
     isActive?: boolean;
   }) {
-    if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
-    if (dto.isDefault) {
-      await this.taxPrisma.taxRegion.updateMany({ data: { isDefault: false } });
-    }
-    const region = await this.taxPrisma.taxRegion.create({
-      data: {
-        name: dto.name,
-        countryCode: dto.countryCode.toUpperCase(),
-        regionCode: dto.regionCode ?? null,
-        isDefault: dto.isDefault ?? false,
-        sortOrder: dto.sortOrder ?? 0,
-        isActive: dto.isActive ?? true,
-      },
-    });
-    await this.createAuditLog(adminId, 'tax_region_create', 'TaxRegion', region.id, null, region);
-    return region;
+    return this.taxService.createTaxRegion(adminId, dto);
   }
 
   async updateTaxRegion(adminId: string, id: string, dto: {
@@ -1172,70 +1131,15 @@ export class AdminService {
     sortOrder?: number;
     isActive?: boolean;
   }) {
-    if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
-    const existing = await this.taxPrisma.taxRegion.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException('Vergi bölgesi bulunamadı');
-    if (dto.isDefault) {
-      await this.taxPrisma.taxRegion.updateMany({ data: { isDefault: false } });
-    }
-    const region = await this.taxPrisma.taxRegion.update({
-      where: { id },
-      data: {
-        ...(dto.name != null && { name: dto.name }),
-        ...(dto.countryCode != null && { countryCode: dto.countryCode.toUpperCase() }),
-        ...(dto.regionCode !== undefined && { regionCode: dto.regionCode || null }),
-        ...(dto.isDefault != null && { isDefault: dto.isDefault }),
-        ...(dto.sortOrder != null && { sortOrder: dto.sortOrder }),
-        ...(dto.isActive != null && { isActive: dto.isActive }),
-      },
-    });
-    await this.createAuditLog(adminId, 'tax_region_update', 'TaxRegion', id, existing, region);
-    return region;
+    return this.taxService.updateTaxRegion(adminId, id, dto);
   }
 
   async deleteTaxRegion(adminId: string, id: string) {
-    if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
-    const region = await this.taxPrisma.taxRegion.findUnique({
-      where: { id },
-      include: { _count: { select: { taxRates: true } } },
-    });
-    if (!region) throw new NotFoundException('Vergi bölgesi bulunamadı');
-    if (region._count.taxRates > 0) {
-      throw new BadRequestException('Bu bölgede vergi oranları tanımlı. Önce oranları silin.');
-    }
-    await this.taxPrisma.taxRule.deleteMany({ where: { taxRegionId: id } });
-    await this.taxPrisma.taxRegion.delete({ where: { id } });
-    await this.createAuditLog(adminId, 'tax_region_delete', 'TaxRegion', id, region, null);
-    return { success: true };
+    return this.taxService.deleteTaxRegion(adminId, id);
   }
 
   async getTaxRates(regionId?: string) {
-    if (!this.hasTaxModels) return { data: [] };
-    const where = regionId ? { taxRegionId: regionId } : {};
-    const rates = await this.taxPrisma.taxRate.findMany({
-      where,
-      include: {
-        taxRegion: { select: { id: true, name: true, countryCode: true } },
-      },
-      orderBy: [{ taxRegionId: 'asc' }, { sortOrder: 'asc' }, { rate: 'asc' }],
-    });
-    return {
-      data: rates.map((r: any) => ({
-        id: r.id,
-        taxRegionId: r.taxRegionId,
-        taxRegionName: r.taxRegion.name,
-        countryCode: r.taxRegion.countryCode,
-        name: r.name,
-        rate: Number(r.rate),
-        isDefault: r.isDefault,
-        effectiveFrom: r.effectiveFrom,
-        effectiveTo: r.effectiveTo,
-        sortOrder: r.sortOrder,
-        isActive: r.isActive,
-        createdAt: r.createdAt,
-        updatedAt: r.updatedAt,
-      })),
-    };
+    return this.taxService.getTaxRates(regionId);
   }
 
   async createTaxRate(adminId: string, dto: {
@@ -1248,29 +1152,7 @@ export class AdminService {
     sortOrder?: number;
     isActive?: boolean;
   }) {
-    if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
-    const region = await this.taxPrisma.taxRegion.findUnique({ where: { id: dto.taxRegionId } });
-    if (!region) throw new NotFoundException('Vergi bölgesi bulunamadı');
-    if (dto.isDefault) {
-      await this.taxPrisma.taxRate.updateMany({
-        where: { taxRegionId: dto.taxRegionId },
-        data: { isDefault: false },
-      });
-    }
-    const rate = await this.taxPrisma.taxRate.create({
-      data: {
-        taxRegionId: dto.taxRegionId,
-        name: dto.name,
-        rate: dto.rate,
-        isDefault: dto.isDefault ?? false,
-        effectiveFrom: dto.effectiveFrom ? new Date(dto.effectiveFrom) : null,
-        effectiveTo: dto.effectiveTo ? new Date(dto.effectiveTo) : null,
-        sortOrder: dto.sortOrder ?? 0,
-        isActive: dto.isActive ?? true,
-      },
-    });
-    await this.createAuditLog(adminId, 'tax_rate_create', 'TaxRate', rate.id, null, rate);
-    return rate;
+    return this.taxService.createTaxRate(adminId, dto);
   }
 
   async updateTaxRate(adminId: string, id: string, dto: {
@@ -1282,75 +1164,15 @@ export class AdminService {
     sortOrder?: number;
     isActive?: boolean;
   }) {
-    if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
-    const existing = await this.taxPrisma.taxRate.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException('Vergi oranı bulunamadı');
-    if (dto.isDefault != null && dto.isDefault) {
-      await this.taxPrisma.taxRate.updateMany({
-        where: { taxRegionId: existing.taxRegionId },
-        data: { isDefault: false },
-      });
-    }
-    const rate = await this.taxPrisma.taxRate.update({
-      where: { id },
-      data: {
-        ...(dto.name != null && { name: dto.name }),
-        ...(dto.rate != null && { rate: dto.rate }),
-        ...(dto.isDefault != null && { isDefault: dto.isDefault }),
-        ...(dto.effectiveFrom !== undefined && { effectiveFrom: dto.effectiveFrom ? new Date(dto.effectiveFrom) : null }),
-        ...(dto.effectiveTo !== undefined && { effectiveTo: dto.effectiveTo ? new Date(dto.effectiveTo) : null }),
-        ...(dto.sortOrder != null && { sortOrder: dto.sortOrder }),
-        ...(dto.isActive != null && { isActive: dto.isActive }),
-      },
-    });
-    await this.createAuditLog(adminId, 'tax_rate_update', 'TaxRate', id, existing, rate);
-    return rate;
+    return this.taxService.updateTaxRate(adminId, id, dto);
   }
 
   async deleteTaxRate(adminId: string, id: string) {
-    if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
-    const rate = await this.taxPrisma.taxRate.findUnique({
-      where: { id },
-      include: { _count: { select: { taxRules: true } } },
-    });
-    if (!rate) throw new NotFoundException('Vergi oranı bulunamadı');
-    if (rate._count.taxRules > 0) {
-      throw new BadRequestException('Bu orana bağlı vergi kuralları var. Önce kuralları silin veya güncelleyin.');
-    }
-    await this.taxPrisma.taxRate.delete({ where: { id } });
-    await this.createAuditLog(adminId, 'tax_rate_delete', 'TaxRate', id, rate, null);
-    return { success: true };
+    return this.taxService.deleteTaxRate(adminId, id);
   }
 
   async getTaxRules(regionId?: string) {
-    if (!this.hasTaxModels) return { data: [] };
-    const where = regionId ? { taxRegionId: regionId } : {};
-    const rules = await this.taxPrisma.taxRule.findMany({
-      where,
-      include: {
-        taxRegion: { select: { id: true, name: true, countryCode: true } },
-        taxRate: { select: { id: true, name: true, rate: true } },
-        category: { select: { id: true, name: true } },
-      },
-      orderBy: [{ taxRegionId: 'asc' }, { priority: 'desc' }, { createdAt: 'asc' }],
-    });
-    return {
-      data: rules.map((r: any) => ({
-        id: r.id,
-        taxRegionId: r.taxRegionId,
-        taxRegionName: r.taxRegion.name,
-        taxRateId: r.taxRateId,
-        taxRateName: r.taxRate.name,
-        taxRateValue: Number(r.taxRate.rate),
-        scope: r.scope,
-        categoryId: r.categoryId,
-        categoryName: r.category?.name ?? null,
-        priority: r.priority,
-        isActive: r.isActive,
-        createdAt: r.createdAt,
-        updatedAt: r.updatedAt,
-      })),
-    };
+    return this.taxService.getTaxRules(regionId);
   }
 
   async createTaxRule(adminId: string, dto: {
@@ -1361,29 +1183,7 @@ export class AdminService {
     priority?: number;
     isActive?: boolean;
   }) {
-    if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
-    const region = await this.taxPrisma.taxRegion.findUnique({ where: { id: dto.taxRegionId } });
-    if (!region) throw new NotFoundException('Vergi bölgesi bulunamadı');
-    const rate = await this.taxPrisma.taxRate.findUnique({ where: { id: dto.taxRateId } });
-    if (!rate) throw new NotFoundException('Vergi oranı bulunamadı');
-    if (rate.taxRegionId !== dto.taxRegionId) {
-      throw new BadRequestException('Vergi oranı bu bölgeye ait değil.');
-    }
-    if (dto.scope === 'category' && !dto.categoryId) {
-      throw new BadRequestException('Kategori kuralı için categoryId gerekli.');
-    }
-    const rule = await this.taxPrisma.taxRule.create({
-      data: {
-        taxRegionId: dto.taxRegionId,
-        taxRateId: dto.taxRateId,
-        scope: dto.scope as 'default_rate' | 'category' | 'product',
-        categoryId: dto.categoryId ?? null,
-        priority: dto.priority ?? 0,
-        isActive: dto.isActive ?? true,
-      },
-    });
-    await this.createAuditLog(adminId, 'tax_rule_create', 'TaxRule', rule.id, null, rule);
-    return rule;
+    return this.taxService.createTaxRule(adminId, dto);
   }
 
   async updateTaxRule(adminId: string, id: string, dto: {
@@ -1393,143 +1193,20 @@ export class AdminService {
     priority?: number;
     isActive?: boolean;
   }) {
-    if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
-    const existing = await this.taxPrisma.taxRule.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException('Vergi kuralı bulunamadı');
-    const rate = await this.taxPrisma.taxRule.update({
-      where: { id },
-      data: {
-        ...(dto.taxRateId != null && { taxRateId: dto.taxRateId }),
-        ...(dto.scope != null && { scope: dto.scope as 'default_rate' | 'category' | 'product' }),
-        ...(dto.categoryId !== undefined && { categoryId: dto.categoryId || null }),
-        ...(dto.priority != null && { priority: dto.priority }),
-        ...(dto.isActive != null && { isActive: dto.isActive }),
-      },
-    });
-    await this.createAuditLog(adminId, 'tax_rule_update', 'TaxRule', id, existing, rate);
-    return rate;
+    return this.taxService.updateTaxRule(adminId, id, dto);
   }
 
   async deleteTaxRule(adminId: string, id: string) {
-    if (!this.hasTaxModels) throw new BadRequestException('Tax models not available. Run: npx prisma generate (in apps/api)');
-    const rule = await this.taxPrisma.taxRule.findUnique({ where: { id } });
-    if (!rule) throw new NotFoundException('Vergi kuralı bulunamadı');
-    await this.taxPrisma.taxRule.delete({ where: { id } });
-    await this.createAuditLog(adminId, 'tax_rule_delete', 'TaxRule', id, rule, null);
-    return { success: true };
+    return this.taxService.deleteTaxRule(adminId, id);
   }
 
-  /**
-   * Tax reporting: aggregate tax from invoices by period and optionally by region.
-   */
   async getTaxReport(query: {
     fromDate?: string;
     toDate?: string;
     groupBy?: 'day' | 'month' | 'year' | 'region';
     regionId?: string;
   }) {
-    const from = query.fromDate ? new Date(query.fromDate) : new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
-    const to = query.toDate ? new Date(query.toDate) : new Date();
-    if (from > to) throw new BadRequestException('fromDate must be before toDate');
-
-    const invoices = await this.prisma.invoice.findMany({
-      where: {
-        issuedAt: { gte: from, lte: to },
-        status: { not: 'cancelled' },
-      },
-      select: {
-        id: true,
-        taxAmount: true,
-        total: true,
-        subtotal: true,
-        issuedAt: true,
-        orderId: true,
-      },
-      orderBy: { issuedAt: 'asc' },
-    });
-
-    const totalTaxCollected = invoices.reduce((sum, inv) => sum + Number(inv.taxAmount), 0);
-    const totalRevenue = invoices.reduce((sum, inv) => sum + Number(inv.total), 0);
-    const invoiceCount = invoices.length;
-
-    const summary = {
-      fromDate: from.toISOString().slice(0, 10),
-      toDate: to.toISOString().slice(0, 10),
-      totalTaxCollected: Math.round(totalTaxCollected * 100) / 100,
-      totalRevenue: Math.round(totalRevenue * 100) / 100,
-      invoiceCount,
-    };
-
-    let breakdown: Array<{ period: string; taxCollected: number; revenue: number; count: number }> = [];
-    const groupBy = query.groupBy || 'month';
-
-    if (groupBy === 'day') {
-      const byDay = new Map<string, { tax: number; revenue: number; count: number }>();
-      for (const inv of invoices) {
-        const key = inv.issuedAt.toISOString().slice(0, 10);
-        const cur = byDay.get(key) || { tax: 0, revenue: 0, count: 0 };
-        cur.tax += Number(inv.taxAmount);
-        cur.revenue += Number(inv.total);
-        cur.count += 1;
-        byDay.set(key, cur);
-      }
-      breakdown = Array.from(byDay.entries())
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([period, v]) => ({
-          period,
-          taxCollected: Math.round(v.tax * 100) / 100,
-          revenue: Math.round(v.revenue * 100) / 100,
-          count: v.count,
-        }));
-    } else if (groupBy === 'month') {
-      const byMonth = new Map<string, { tax: number; revenue: number; count: number }>();
-      for (const inv of invoices) {
-        const key = inv.issuedAt.toISOString().slice(0, 7);
-        const cur = byMonth.get(key) || { tax: 0, revenue: 0, count: 0 };
-        cur.tax += Number(inv.taxAmount);
-        cur.revenue += Number(inv.total);
-        cur.count += 1;
-        byMonth.set(key, cur);
-      }
-      breakdown = Array.from(byMonth.entries())
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([period, v]) => ({
-          period,
-          taxCollected: Math.round(v.tax * 100) / 100,
-          revenue: Math.round(v.revenue * 100) / 100,
-          count: v.count,
-        }));
-    } else if (groupBy === 'year') {
-      const byYear = new Map<string, { tax: number; revenue: number; count: number }>();
-      for (const inv of invoices) {
-        const key = inv.issuedAt.getFullYear().toString();
-        const cur = byYear.get(key) || { tax: 0, revenue: 0, count: 0 };
-        cur.tax += Number(inv.taxAmount);
-        cur.revenue += Number(inv.total);
-        cur.count += 1;
-        byYear.set(key, cur);
-      }
-      breakdown = Array.from(byYear.entries())
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([period, v]) => ({
-          period,
-          taxCollected: Math.round(v.tax * 100) / 100,
-          revenue: Math.round(v.revenue * 100) / 100,
-          count: v.count,
-        }));
-    }
-
-    return {
-      summary,
-      breakdown,
-      data: invoices.map((inv) => ({
-        id: inv.id,
-        orderId: inv.orderId,
-        taxAmount: Number(inv.taxAmount),
-        total: Number(inv.total),
-        issuedAt: inv.issuedAt,
-      })),
-    };
+    return this.taxService.getTaxReport(query);
   }
 
   // ==================== MEMBERSHIP TIER MANAGEMENT ====================
