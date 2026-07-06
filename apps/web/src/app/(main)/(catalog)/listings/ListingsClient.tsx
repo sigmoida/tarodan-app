@@ -5,7 +5,6 @@
 import { useTranslation } from '@/i18n';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { Container } from '@/components/layout/Container';
 import { ListingsProvider, useListings } from './_context/ListingsContext';
 import ListingsControls, {
 	ActiveFilterChips,

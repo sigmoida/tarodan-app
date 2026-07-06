@@ -148,7 +148,7 @@ export default function PaymentSuccessPage() {
 
       // Takas nakit farkı ödemesi: /orders'a değil, ilgili takas sayfasına dön.
       if (paymentData?.tradeId) {
-        router.replace(`/trades/${paymentData.tradeId}?paid=1`);
+        router.replace(`/profile/trades/${paymentData.tradeId}?paid=1`);
         return;
       }
 
@@ -411,7 +411,7 @@ export default function PaymentSuccessPage() {
                   <>
                     Order confirmation email has been sent. You can track your
                     order from the{" "}
-                    <Link href="/orders" className="underline font-medium">
+                    <Link href="/profile/orders" className="underline font-medium">
                       My Orders
                     </Link>{" "}
                     page.
@@ -419,7 +419,7 @@ export default function PaymentSuccessPage() {
                 ) : (
                   <>
                     Sipariş onay e-postası gönderildi. Sipariş durumunuzu{" "}
-                    <Link href="/orders" className="underline font-medium">
+                    <Link href="/profile/orders" className="underline font-medium">
                       Siparişlerim
                     </Link>{" "}
                     sayfasından takip edebilirsiniz.
@@ -454,8 +454,8 @@ export default function PaymentSuccessPage() {
               <ButtonLink
                 href={
                   payment?.orderId || orderIdFromUrl
-                    ? `/orders/${payment?.orderId || orderIdFromUrl}`
-                    : "/orders"
+                    ? `/profile/orders/${payment?.orderId || orderIdFromUrl}`
+                    : "/profile/orders"
                 }
                 className="flex gap-2"
               >

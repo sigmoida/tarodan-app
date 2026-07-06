@@ -12,6 +12,7 @@ import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { Badge, Button } from '@tarodan/ui';
 import UserAvatar from '@/components/UserAvatar';
 import { ButtonLink } from '@/components/ui/ButtonLink';
+import { SectionCard } from '@/components/ui';
 import { useListingDetail } from '../_context/ListingDetailContext';
 
 export default function SellerCard() {
@@ -41,100 +42,92 @@ export default function SellerCard() {
 	};
 
 	return (
-		<div className='bg-surface-elevated rounded-lg border border-border p-4 mb-6'>
-			<p className='text-xs font-medium text-muted uppercase tracking-wide mb-3'>
-				{t('product.seller')}
-			</p>
-			<div className='flex flex-col sm:flex-row sm:items-center gap-4'>
-				<Link
-					href={profileHref}
-					onClick={gateProfile}
-					className='group flex items-center gap-4 min-w-0 flex-1'>
-					<UserAvatar
-						displayName={seller.displayName}
-						avatarUrl={seller.avatarUrl}
-						size='lg'
-						className='flex-shrink-0 transition-all group-hover:ring-2 group-hover:ring-primary-500'
-					/>
-					<div className='min-w-0'>
-						<div className='flex items-center gap-2 flex-wrap'>
-							<span className='font-semibold text-heading truncate transition-colors group-hover:text-primary-500'>
-								{name}
-							</span>
-							{isPremium && (
-								<Badge variant='warning' size='sm' className='gap-1'>
-									<StarIconSolid className='w-3 h-3' />
-									Premium
-								</Badge>
-							)}
-						</div>
-						<div className='flex items-center gap-2 text-sm text-muted mt-0.5'>
-							{rating > 0 ? (
-								<span className='flex items-center gap-1'>
-									<StarIconSolid className='w-4 h-4 text-warning-400' />
-									<span className='font-medium text-heading'>
-										{rating.toFixed(1)}
-									</span>
-									{totalRatings != null && totalRatings > 0 && (
-										<span className='text-subtle'>({totalRatings})</span>
-									)}
-								</span>
-							) : (
-								<span className='flex items-center gap-1 text-subtle'>
-									<StarIconOutline className='w-4 h-4' />
-									{locale === 'en'
-										? 'No ratings yet'
-										: 'Henüz değerlendirme yok'}
-								</span>
-							)}
-							<span aria-hidden>•</span>
-							<span>
-								{listingsCount} {t('product.listings')}
-							</span>
-						</div>
-					</div>
-				</Link>
-
-				{!isOwner && (
-					<div className='flex gap-2 flex-shrink-0'>
-						{isAuthenticated ? (
-							<ButtonLink
-								variant='secondary'
-								size='sm'
-								href={`/messages?user=${seller.id}&listing=${listing?.id}`}
-								className='flex-1 gap-1.5 sm:flex-initial'>
-								<ChatBubbleLeftRightIcon className='w-4 h-4' />
-								{t('product.sendMessage')}
-							</ButtonLink>
-						) : (
-							<Button
-								variant='secondary'
-								size='sm'
-								leftIcon={<ChatBubbleLeftRightIcon className='w-4 h-4' />}
-								onClick={() =>
-									requireAuth({
-										title: t('product.sendMessageToSeller'),
-										message: t('product.sendMessageToSellerMsg'),
-										icon: (
-											<ChatBubbleLeftRightIcon className='w-10 h-10 text-primary-500' />
-										),
-									})
-								}
-								className='flex-1 sm:flex-initial'>
-								{t('product.sendMessage')}
-							</Button>
+		<SectionCard title={t('product.seller')} className='p-6 mb-6'>
+			<Link
+				href={profileHref}
+				onClick={gateProfile}
+				className='group flex items-center gap-4'>
+				<UserAvatar
+					displayName={seller.displayName}
+					avatarUrl={seller.avatarUrl}
+					size='lg'
+					className='flex-shrink-0 transition-all group-hover:ring-2 group-hover:ring-primary-500'
+				/>
+				<div className='min-w-0 flex-1'>
+					<div className='flex items-center gap-2 flex-wrap'>
+						<span className='font-semibold text-heading truncate transition-colors group-hover:text-primary-500'>
+							{name}
+						</span>
+						{isPremium && (
+							<Badge variant='warning' size='sm' className='gap-1'>
+								<StarIconSolid className='w-3 h-3' />
+								Premium
+							</Badge>
 						)}
-						<ButtonLink
-							variant='outline'
-							size='sm'
-							href={profileHref}
-							onClick={gateProfile}
-							className='flex-1 sm:flex-initial'>
-							{locale === 'en' ? 'View Profile' : 'Profili Gör'}
-						</ButtonLink>
 					</div>
-				)}
-			</div>
-		</div>
+					<div className='flex items-center flex-wrap gap-x-2 gap-y-0.5 text-sm text-muted mt-1'>
+						{rating > 0 ? (
+							<span className='flex items-center gap-1'>
+								<StarIconSolid className='w-4 h-4 text-warning-400' />
+								<span className='font-medium text-heading'>
+									{rating.toFixed(1)}
+								</span>
+								{totalRatings != null && totalRatings > 0 && (
+									<span className='text-subtle'>({totalRatings})</span>
+								)}
+							</span>
+						) : (
+							<span className='flex items-center gap-1 text-subtle'>
+								<StarIconOutline className='w-4 h-4' />
+								{locale === 'en' ? 'No ratings yet' : 'Henüz değerlendirme yok'}
+							</span>
+						)}
+						<span aria-hidden className='text-subtle'>
+							•
+						</span>
+						<span>
+							{listingsCount} {t('product.listings')}
+						</span>
+					</div>
+				</div>
+			</Link>
+
+			{!isOwner && (
+				<div className='flex gap-2 mt-4'>
+					{isAuthenticated ? (
+						<ButtonLink
+							variant='secondary'
+							href={`/profile/messages?user=${seller.id}&listing=${listing?.id}`}
+							className='flex-1 gap-1.5'>
+							<ChatBubbleLeftRightIcon className='w-4 h-4' />
+							{t('product.sendMessage')}
+						</ButtonLink>
+					) : (
+						<Button
+							variant='secondary'
+							leftIcon={<ChatBubbleLeftRightIcon className='w-4 h-4' />}
+							onClick={() =>
+								requireAuth({
+									title: t('product.sendMessageToSeller'),
+									message: t('product.sendMessageToSellerMsg'),
+									icon: (
+										<ChatBubbleLeftRightIcon className='w-10 h-10 text-primary-500' />
+									),
+								})
+							}
+							className='flex-1'>
+							{t('product.sendMessage')}
+						</Button>
+					)}
+					<ButtonLink
+						variant='outline'
+						href={profileHref}
+						onClick={gateProfile}
+						className='flex-1'>
+						{locale === 'en' ? 'View Profile' : 'Profili Gör'}
+					</ButtonLink>
+				</div>
+			)}
+		</SectionCard>
 	);
 }

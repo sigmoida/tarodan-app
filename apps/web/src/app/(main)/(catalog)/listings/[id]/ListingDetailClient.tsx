@@ -4,6 +4,7 @@
 
 import dynamic from 'next/dynamic';
 import { PageShell } from '@/components/layout/PageShell';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
 import {
 	ListingDetailProvider,
@@ -83,24 +84,25 @@ function ListingDetailLayout() {
 
 	return (
 		<PageShell>
-			<div>
-				<ProductBreadcrumbs />
+			<PageHeader breadcrumb={<ProductBreadcrumbs />} />
 
-				{available === 0 && (
-					<div className='mb-6 p-4 bg-warning-50 border border-warning-200 rounded-xl'>
-						<p className='text-warning-800 font-medium'>
-							{t('product.stockFinished')}
-						</p>
-					</div>
-				)}
-
-				<div className='grid lg:grid-cols-2 gap-4'>
-					<ProductGallery />
-					<ProductInfo />
+			{available === 0 && (
+				<div className='p-4 bg-warning-50 border border-warning-200 rounded-xl'>
+					<p className='text-warning-800 font-medium'>
+						{t('product.stockFinished')}
+					</p>
 				</div>
-			</div>
+			)}
 
-			<ProductReviews />
+			<div className='grid lg:grid-cols-2 gap-8'>
+				{/* Left: gallery + product reviews under it */}
+				<div className='space-y-6'>
+					<ProductGallery />
+					<ProductReviews />
+				</div>
+				{/* Right: info + spec cards (rendered under the seller card in ProductInfo) */}
+				<ProductInfo />
+			</div>
 
 			{/* Overlays & modals */}
 			<ProductLightbox />

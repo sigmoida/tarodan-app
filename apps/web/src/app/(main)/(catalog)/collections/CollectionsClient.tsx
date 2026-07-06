@@ -64,10 +64,8 @@ function CollectionsLayout() {
 				}
 			/>
 
-			<Container className='px-4 py-5'>
-				<CollectionsToolbar />
-				<CollectionsGrid />
-			</Container>
+			<CollectionsToolbar />
+			<CollectionsGrid />
 
 			{/* Create Collection Modal */}
 			{showCreateModal && (

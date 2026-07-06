@@ -183,7 +183,7 @@ export default function NotificationBell() {
                       }`}
                     >
                       <Link
-                        href={notification.link || notification.data?.link || '/notifications'}
+                        href={notification.link || notification.data?.link || '/profile/notifications'}
                         onClick={() => {
                           if (!notification.isRead) {
                             markAsRead(notification.id);
@@ -254,7 +254,7 @@ export default function NotificationBell() {
             {/* Footer */}
             <div className="px-4 py-3 bg-surface border-t border-border-subtle">
               <Link
-                href="/notifications"
+                href="/profile/notifications"
                 onClick={() => setShowDropdown(false)}
                 className="block text-center text-sm font-medium text-primary-500 hover:text-primary-600"
               >

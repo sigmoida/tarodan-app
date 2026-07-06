@@ -98,7 +98,7 @@ function useListingsValue(): ListingsContextValue {
   // Navbar + CategoryNavBar aşağı kaydırınca gizlenir; filtre kutusunun sticky
   // top değerini buna göre ayarla ki çubuklar gizliyken üstte boşluk kalmasın.
   const [barsHidden, setBarsHidden] = useState(false);
-  const [productLayout, setProductLayout] = useState<ProductLayout>('grid-6');
+  const [productLayout, setProductLayout] = useState<ProductLayout>('grid');
   const [currentPage, setCurrentPage] = useState(() =>
     getListingsPage(new URLSearchParams(searchParams.toString())),
   );

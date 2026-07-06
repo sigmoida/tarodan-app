@@ -13,7 +13,7 @@ export default function ProductBreadcrumbs() {
 	return (
 		<nav
 			aria-label='Breadcrumb'
-			className='flex items-center flex-wrap gap-y-1 text-sm text-muted mb-6 overflow-x-auto whitespace-nowrap '>
+			className='flex items-center flex-wrap gap-y-1 text-sm text-muted overflow-x-auto whitespace-nowrap'>
 			<Link
 				href='/'
 				className='hover:text-primary-500 transition-colors text-muted'>

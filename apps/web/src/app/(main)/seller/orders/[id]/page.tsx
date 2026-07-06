@@ -14,7 +14,7 @@ export default function SellerOrderRedirectPage() {
 
   useEffect(() => {
     if (orderId) {
-      router.replace(`/orders/${orderId}`);
+      router.replace(`/profile/orders/${orderId}`);
     }
   }, [orderId, router]);
 

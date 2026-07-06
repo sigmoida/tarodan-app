@@ -3,21 +3,14 @@
 'use client';
 
 import { useEffect } from 'react';
-import {
-	Squares2X2Icon,
-	Bars3Icon,
-	ViewColumnsIcon,
-	RectangleGroupIcon,
-} from '@heroicons/react/24/outline';
+import { Squares2X2Icon, Bars3Icon } from '@heroicons/react/24/outline';
 import {
 	Squares2X2Icon as GridIconSolid,
 	Bars3Icon as ListIconSolid,
-	ViewColumnsIcon as ViewColumnsIconSolid,
-	RectangleGroupIcon as RectangleGroupIconSolid,
 } from '@heroicons/react/24/solid';
 import { Button } from '@tarodan/ui';
 
-export type ProductLayout = 'grid-3' | 'grid-4' | 'grid-6' | 'list';
+export type ProductLayout = 'grid' | 'list';
 
 type IconType = React.ComponentType<React.SVGProps<SVGSVGElement>>;
 
@@ -27,9 +20,7 @@ const LAYOUTS: Array<{
 	IconActive: IconType;
 	label: string;
 }> = [
-	{ value: 'grid-3', Icon: RectangleGroupIcon, IconActive: RectangleGroupIconSolid, label: "3'lü" },
-	{ value: 'grid-4', Icon: Squares2X2Icon, IconActive: GridIconSolid, label: "4'lü" },
-	{ value: 'grid-6', Icon: ViewColumnsIcon, IconActive: ViewColumnsIconSolid, label: "6'şarlı" },
+	{ value: 'grid', Icon: Squares2X2Icon, IconActive: GridIconSolid, label: 'Izgara' },
 	{ value: 'list', Icon: Bars3Icon, IconActive: ListIconSolid, label: 'Liste' },
 ];
 
@@ -41,8 +32,10 @@ interface ProductLayoutSelectorProps {
 }
 
 /**
- * A segmented icon toggle for the product grid density (3 / 4 / 6 columns or
- * list). Sized `h-10` to line up with the toolbar's Select / Input controls.
+ * A segmented icon toggle for the product view: a responsive grid (up to 4
+ * columns) or a horizontal list. Sized `h-10` to line up with the toolbar's
+ * Select / Input controls. Stale persisted values (old 3/6-column modes) are
+ * ignored on read and overwritten, so they harmlessly fall back to the grid.
  */
 export default function ProductLayoutSelector({
 	layout,

@@ -8,18 +8,13 @@ import { useTranslation } from '@/i18n';
 import { ProductCard } from '@/components/ui';
 import { useListings } from '../_context/ListingsContext';
 
-const getGridClass = (productLayout: string) => {
-	switch (productLayout) {
-		case 'grid-3':
-			return 'grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4';
-		case 'grid-4':
-			return 'grid grid-cols-4 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 sm:gap-4';
-		case 'grid-6':
-			return 'grid grid-cols-4 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-1.5 sm:gap-3';
-		default:
-			return 'space-y-2';
-	}
-};
+// Two views only: a responsive grid (up to 4 columns) or a stacked list. The
+// ProductCard is fluid, so the grid just sets the column count.
+const GRID_CLASS =
+	'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4';
+
+const getGridClass = (productLayout: string) =>
+	productLayout === 'list' ? 'space-y-2' : GRID_CLASS;
 
 /**
  * The ProductCard grid/list, the loading skeleton and the empty state.

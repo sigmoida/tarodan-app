@@ -2,8 +2,6 @@
 
 'use client';
 
-import { Fragment } from 'react';
-import Link from 'next/link';
 import toast from 'react-hot-toast';
 import {
 	ShoppingCartIcon,
@@ -20,13 +18,13 @@ import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
 import { Button } from '@tarodan/ui';
 import { ButtonLink } from '@/components/ui/ButtonLink';
 import { SectionCard } from '@/components/ui';
-import { formatCondition } from '@/lib/format';
 import {
 	isProductOnSaleDisplay,
 	getProductOriginalPriceForDisplay,
 } from '@/lib/productPrice';
 import { useListingDetail } from '../_context/ListingDetailContext';
 import SellerCard from './SellerCard';
+import ProductSpecs from './ProductSpecs';
 
 export default function ProductInfo() {
 	const {
@@ -249,195 +247,15 @@ export default function ProductInfo() {
 				</div>
 			</div>
 
-			{/* Quick info */}
-			<SectionCard className='mb-4 sm:mb-6'>
-				<div className='grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4'>
-				{listing.brand && (
-					<div className='text-center p-2'>
-						<p className='text-xs font-medium text-muted uppercase tracking-wide mb-1'>
-							{t('product.brand')}
-						</p>
-						<Link
-							href={`/brands/${listing.brand.slug}`}
-							className='font-semibold text-heading hover:text-primary-500 transition-colors'>
-							{listing.brand.name}
-						</Link>
-					</div>
-				)}
-				<div className='text-center p-2'>
-					<p className='text-xs font-medium text-muted uppercase tracking-wide mb-1'>
-						{t('product.scale')}
-					</p>
-					<p className='font-semibold text-heading'>
-						{listing.scale ||
-							listing.attributes?.find(
-								(a: any) => a.group === 'Ölçek' || a.label === 'Ölçek',
-							)?.value ||
-							'—'}
-					</p>
-				</div>
-				<div className='text-center p-2'>
-					<p className='text-xs font-medium text-muted uppercase tracking-wide mb-1'>
-						{locale === 'en' ? 'Material' : 'Malzeme'}
-					</p>
-					<p className='font-semibold text-heading'>
-						{listing.material ||
-							listing.attributes?.find(
-								(a) => a.group === 'material' || a.group === 'Malzeme',
-							)?.value ||
-							'—'}
-					</p>
-				</div>
-				{listing.manufacturer && (
-					<div className='text-center p-2'>
-						<p className='text-xs font-medium text-muted uppercase tracking-wide mb-1'>
-							{locale === 'en' ? 'Manufacturer' : 'Üretici'}
-						</p>
-						<p className='font-semibold text-heading'>
-							{listing.manufacturer.name}
-						</p>
-					</div>
-				)}
-				{listing.category && (
-					<div className='text-center p-2'>
-						<p className='text-xs font-medium text-muted uppercase tracking-wide mb-1'>
-							{t('product.category')}
-						</p>
-						<p className='font-semibold text-heading'>{listing.category.name}</p>
-					</div>
-				)}
-				{listing.condition && (
-					<div className='text-center p-2'>
-						<p className='text-xs font-medium text-muted uppercase tracking-wide mb-1'>
-							{locale === 'en' ? 'Condition' : 'Durum'}
-						</p>
-						<p className='font-semibold text-heading'>
-							{formatCondition(listing.condition, locale)}
-						</p>
-					</div>
-				)}
-				<div className='text-center p-2'>
-					<p className='text-xs font-medium text-muted uppercase tracking-wide mb-1'>
-						{locale === 'en' ? 'Year' : 'Yıl'}
-					</p>
-					<p className='font-semibold text-heading'>{listing.year ?? '—'}</p>
-				</div>
-				{((listing.availableQuantity !== undefined &&
-					listing.availableQuantity !== null) ||
-					(listing.quantity !== undefined && listing.quantity !== null)) && (
-					<div className='text-center p-2'>
-						<p className='text-xs font-medium text-muted uppercase tracking-wide mb-1'>
-							{locale === 'en' ? 'Stock' : 'Stok'}
-						</p>
-						<p className='font-semibold text-heading'>
-							{available === null || available === undefined
-								? locale === 'en'
-									? 'Unlimited'
-									: 'Sınırsız'
-								: available > 0
-									? `${available} ${locale === 'en' ? 'available' : 'adet'}`
-									: t('product.stockFinished')}
-						</p>
-					</div>
-				)}
-				</div>
-			</SectionCard>
-
-			{/* Description + technical details */}
+			{/* Description */}
 			<SectionCard title={t('product.description')} className='p-6 mb-6'>
 				<div className='prose prose-sm max-w-none text-muted whitespace-pre-line leading-relaxed'>
 					{listing.description || t('product.noDescription')}
 				</div>
-
-				{(listing.attributes?.filter(
-					(a) =>
-						a.group !== 'scale' && a.group !== 'material' && a.group !== 'Malzeme',
-				)?.length ?? 0) > 0 || listing.carModel ? (
-					<div className='border-t pt-6 mt-6'>
-						<h3 className='text-base font-semibold text-heading mb-3 flex items-center gap-2'>
-							<span className='w-1 h-5 bg-info-500 rounded-sm' aria-hidden />
-							{locale === 'en' ? 'Technical details' : 'Teknik özellikler'}
-						</h3>
-						<dl className='grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3'>
-							{listing.carModel && (
-								<>
-									<dt className='text-sm text-muted'>Model</dt>
-									<dd className='text-sm font-medium text-heading'>
-										{listing.carModel.name}
-									</dd>
-								</>
-							)}
-							{listing.attributes
-								?.filter(
-									(attr) =>
-										attr.group !== 'scale' &&
-										attr.group !== 'material' &&
-										attr.group !== 'Malzeme',
-								)
-								?.map((attr) => (
-									<Fragment key={attr.id}>
-										<dt className='text-sm text-muted'>{attr.label}</dt>
-										<dd className='text-sm font-medium text-heading'>
-											{attr.value}
-										</dd>
-									</Fragment>
-								))}
-						</dl>
-					</div>
-				) : null}
 			</SectionCard>
 
-			{/* Seller */}
-			<SellerCard />
-
-			{/* Status banner */}
-			{listing.status && listing.status !== 'active' && (
-				<div
-					className={`rounded p-4 mb-4 ${
-						listing.status === 'reserved'
-							? 'bg-warning-50 border border-warning-200'
-							: listing.status === 'sold'
-								? 'bg-danger-50 border border-danger-200'
-								: 'bg-surface border border-border'
-					}`}>
-					<div className='flex items-center gap-3'>
-						<ExclamationTriangleIcon
-							className={`w-6 h-6 ${
-								listing.status === 'reserved'
-									? 'text-warning-600'
-									: listing.status === 'sold'
-										? 'text-danger-600'
-										: 'text-muted'
-							}`}
-						/>
-						<div>
-							<p
-								className={`font-semibold ${
-									listing.status === 'reserved'
-										? 'text-warning-800'
-										: listing.status === 'sold'
-											? 'text-danger-800'
-											: 'text-body'
-								}`}>
-								{listing.status === 'reserved' && t('product.statusReserved')}
-								{listing.status === 'sold' && t('product.statusSold')}
-								{listing.status === 'pending' && t('product.statusPending')}
-								{listing.status === 'inactive' && t('product.statusInactive')}
-								{listing.status === 'rejected' && t('product.statusRejected')}
-								{listing.status === 'deleted' &&
-									(locale === 'en' ? 'Removed' : 'Kaldırıldı')}
-							</p>
-							<p className='text-sm text-muted'>
-								{listing.status === 'reserved' && t('product.statusReservedDesc')}
-								{listing.status === 'sold' && t('product.statusSoldDesc')}
-							</p>
-						</div>
-					</div>
-				</div>
-			)}
-
-			{/* Action buttons */}
-			<div className='space-y-3'>
+			{/* Action buttons — right under the description */}
+			<div className='space-y-3 mb-6'>
 				{isOwner && (
 					<div className='bg-info-50 border border-info-200 rounded p-4 text-center'>
 						<p className='text-info-800 font-medium'>
@@ -494,9 +312,11 @@ export default function ProductInfo() {
 					</Button>
 				)}
 
-				{/* Secondary actions — hidden for owner */}
+				{/* Secondary actions — hidden for owner. Columns match the button
+				    count so they span the full "Hemen Al" width. */}
 				{!isOwner && (
-					<div className='grid grid-cols-2 sm:grid-cols-4 gap-2'>
+					<div
+						className={`grid gap-2 ${isTradeAvailable ? 'grid-cols-3' : 'grid-cols-2'}`}>
 						{isTradeAvailable && (
 							<Button
 								variant='success'
@@ -519,7 +339,7 @@ export default function ProductInfo() {
 										setShowTradeModal(true);
 										return;
 									}
-									router.push(`/trades/new?listing=${listing.id}`);
+									router.push(`/profile/trades/new?listing=${listing.id}`);
 								}}
 								disabled={listing.status !== 'active'}
 								leftIcon={<ArrowsRightLeftIcon className='w-5 h-5' />}
@@ -554,6 +374,58 @@ export default function ProductInfo() {
 					</div>
 				)}
 			</div>
+
+			{/* Seller */}
+			<SellerCard />
+
+			{/* Details + technical spec cards, under the seller */}
+			<ProductSpecs />
+
+			{/* Status banner */}
+			{listing.status && listing.status !== 'active' && (
+				<div
+					className={`rounded p-4 mb-4 ${
+						listing.status === 'reserved'
+							? 'bg-warning-50 border border-warning-200'
+							: listing.status === 'sold'
+								? 'bg-danger-50 border border-danger-200'
+								: 'bg-surface border border-border'
+					}`}>
+					<div className='flex items-center gap-3'>
+						<ExclamationTriangleIcon
+							className={`w-6 h-6 ${
+								listing.status === 'reserved'
+									? 'text-warning-600'
+									: listing.status === 'sold'
+										? 'text-danger-600'
+										: 'text-muted'
+							}`}
+						/>
+						<div>
+							<p
+								className={`font-semibold ${
+									listing.status === 'reserved'
+										? 'text-warning-800'
+										: listing.status === 'sold'
+											? 'text-danger-800'
+											: 'text-body'
+								}`}>
+								{listing.status === 'reserved' && t('product.statusReserved')}
+								{listing.status === 'sold' && t('product.statusSold')}
+								{listing.status === 'pending' && t('product.statusPending')}
+								{listing.status === 'inactive' && t('product.statusInactive')}
+								{listing.status === 'rejected' && t('product.statusRejected')}
+								{listing.status === 'deleted' &&
+									(locale === 'en' ? 'Removed' : 'Kaldırıldı')}
+							</p>
+							<p className='text-sm text-muted'>
+								{listing.status === 'reserved' && t('product.statusReservedDesc')}
+								{listing.status === 'sold' && t('product.statusSoldDesc')}
+							</p>
+						</div>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }

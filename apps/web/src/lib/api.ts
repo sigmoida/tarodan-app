@@ -85,7 +85,7 @@ api.interceptors.response.use(
           // Yalnızca gerçekten süresi dolmuş oturumlarda yönlendir; misafir/geçici hatada asla.
           if (refreshRejectedAuth && had) {
             const currentPath = window.location?.pathname || '';
-            const publicPathsNoRedirect = ['/track-order', '/orders/track', '/login', '/register'];
+            const publicPathsNoRedirect = ['/track-order', '/profile/orders/track', '/login', '/register'];
             const isPublicPath = publicPathsNoRedirect.some(p => currentPath === p || currentPath.startsWith(p + '/'));
             if (!isPublicPath) {
               const protectedPaths = ['/profile', '/orders', '/messages', '/favorites', '/cart/checkout'];

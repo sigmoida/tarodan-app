@@ -233,7 +233,7 @@ export default function SellerProfilePage() {
       setShowAuthModal(true);
       return;
     }
-    window.location.href = `/messages?to=${sellerId}`;
+    window.location.href = `/profile/messages?to=${sellerId}`;
   };
 
   const handleReport = () => {

@@ -3,7 +3,7 @@
 'use client';
 
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
-import { Button, Input } from '@tarodan/ui';
+import { Input, Select } from '@tarodan/ui';
 import { useManufacturers } from '../_context/ManufacturersContext';
 
 export default function ManufacturersToolbar() {
@@ -30,31 +30,17 @@ export default function ManufacturersToolbar() {
 			</div>
 
 			{/* Country filter */}
-			<div className='flex items-center gap-1.5 flex-wrap'>
-				{selectedCountry && (
-					<Button
-						variant='secondary'
-						onClick={() => setSelectedCountry(null)}
-						className='px-2 py-1.5 text-xs font-semibold text-danger-500 hover:text-danger-700 transition-colors'>
-						✕
-					</Button>
-				)}
-				{countries.slice(0, 5).map(([country, info]) => (
-					<Button
-						variant='secondary'
-						key={country}
-						onClick={() =>
-							setSelectedCountry(selectedCountry === country ? null : country)
-						}
-						className={`px-2.5 py-1.5 text-xs font-medium border transition-colors rounded ${
-							selectedCountry === country
-								? 'bg-primary-50 text-primary-700 border-primary-300'
-								: 'bg-surface-elevated text-muted border-border hover:border-border'
-						}`}>
+			<Select
+				value={selectedCountry ?? ''}
+				onChange={(e) => setSelectedCountry(e.target.value || null)}
+				className='w-full sm:w-56'>
+				<option value=''>Tüm ülkeler</option>
+				{countries.map(([country, info]) => (
+					<option key={country} value={country}>
 						{info.flag} {country}
-					</Button>
+					</option>
 				))}
-			</div>
+			</Select>
 		</div>
 	);
 }

@@ -57,8 +57,9 @@ function useManufacturersValue() {
 		[brands],
 	);
 
-	const toggleExpanded = (slug: string) =>
-		setExpandedBrand((cur) => (cur === slug ? null : slug));
+	// Drives the Radix Accordion (controlled): its `onValueChange` passes the open
+	// item's value, or '' when all collapse.
+	const setExpanded = (slug: string | null) => setExpandedBrand(slug || null);
 
 	const clearFilters = () => {
 		setSearchQuery('');
@@ -72,7 +73,7 @@ function useManufacturersValue() {
 		selectedCountry,
 		setSelectedCountry,
 		expandedBrand,
-		toggleExpanded,
+		setExpanded,
 		clearFilters,
 		brands,
 		filteredBrands,

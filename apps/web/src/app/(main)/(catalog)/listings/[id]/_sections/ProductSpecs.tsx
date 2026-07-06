@@ -1,0 +1,145 @@
+/** @format */
+
+'use client';
+
+import type { ReactNode } from 'react';
+import Link from 'next/link';
+import { SectionCard } from '@/components/ui';
+import { formatCondition } from '@/lib/format';
+import { useListingDetail } from '../_context/ListingDetailContext';
+
+/**
+ * One label→value row inside the Details / Technical-details cards. Rendered as a
+ * `dt`/`dd` pair so every property reads as its own line.
+ */
+function DetailRow({ label, value }: { label: ReactNode; value: ReactNode }) {
+	return (
+		<div className='flex items-center justify-between gap-4 py-2.5 first:pt-0 last:pb-0'>
+			<dt className='text-sm text-muted'>{label}</dt>
+			<dd className='text-sm font-semibold text-heading text-right'>{value}</dd>
+		</div>
+	);
+}
+
+/**
+ * Product attribute cards shown UNDER the gallery (left column): the "Details"
+ * card (brand / scale / material / …) and, when present, a separate "Technical
+ * details" card. Both read the listing from context.
+ */
+export default function ProductSpecs() {
+	const { t, locale, listing } = useListingDetail();
+	if (!listing) return null;
+
+	const available =
+		listing.availableQuantity !== undefined && listing.availableQuantity !== null
+			? listing.availableQuantity
+			: listing.quantity;
+
+	// Scale/material fall back to a matching attribute when the field is empty.
+	const scaleValue =
+		listing.scale ||
+		listing.attributes?.find(
+			(a: any) => a.group === 'Ölçek' || a.label === 'Ölçek',
+		)?.value ||
+		'—';
+	const materialValue =
+		listing.material ||
+		listing.attributes?.find(
+			(a) => a.group === 'material' || a.group === 'Malzeme',
+		)?.value ||
+		'—';
+	const hasQuantity =
+		(listing.availableQuantity !== undefined &&
+			listing.availableQuantity !== null) ||
+		(listing.quantity !== undefined && listing.quantity !== null);
+	const stockValue =
+		available === null || available === undefined
+			? locale === 'en'
+				? 'Unlimited'
+				: 'Sınırsız'
+			: available > 0
+				? `${available} ${locale === 'en' ? 'available' : 'adet'}`
+				: t('product.stockFinished');
+
+	const infoRows: Array<{ label: string; value: ReactNode }> = [];
+	if (listing.brand) {
+		infoRows.push({
+			label: t('product.brand'),
+			value: (
+				<Link
+					href={`/brands/${listing.brand.slug}`}
+					className='hover:text-primary-500 transition-colors'>
+					{listing.brand.name}
+				</Link>
+			),
+		});
+	}
+	infoRows.push({ label: t('product.scale'), value: scaleValue });
+	infoRows.push({
+		label: locale === 'en' ? 'Material' : 'Malzeme',
+		value: materialValue,
+	});
+	if (listing.manufacturer) {
+		infoRows.push({
+			label: locale === 'en' ? 'Manufacturer' : 'Üretici',
+			value: listing.manufacturer.name,
+		});
+	}
+	if (listing.category) {
+		infoRows.push({
+			label: t('product.category'),
+			value: listing.category.name,
+		});
+	}
+	if (listing.condition) {
+		infoRows.push({
+			label: locale === 'en' ? 'Condition' : 'Durum',
+			value: formatCondition(listing.condition, locale),
+		});
+	}
+	infoRows.push({
+		label: locale === 'en' ? 'Year' : 'Yıl',
+		value: listing.year ?? '—',
+	});
+	if (hasQuantity) {
+		infoRows.push({
+			label: locale === 'en' ? 'Stock' : 'Stok',
+			value: stockValue,
+		});
+	}
+
+	const technicalAttrs =
+		listing.attributes?.filter(
+			(a) =>
+				a.group !== 'scale' && a.group !== 'material' && a.group !== 'Malzeme',
+		) ?? [];
+	const hasTechnical = technicalAttrs.length > 0 || Boolean(listing.carModel);
+
+	return (
+		<div className='space-y-6 mb-6'>
+			{/* Details — brand / scale / material / … row by row */}
+			<SectionCard title={locale === 'en' ? 'Details' : 'Özellikler'}>
+				<dl className='divide-y divide-border'>
+					{infoRows.map((row) => (
+						<DetailRow key={row.label} label={row.label} value={row.value} />
+					))}
+				</dl>
+			</SectionCard>
+
+			{/* Technical details — its own card, row by row */}
+			{hasTechnical && (
+				<SectionCard
+					title={locale === 'en' ? 'Technical details' : 'Teknik özellikler'}>
+					<dl className='divide-y divide-border'>
+						{listing.carModel && (
+							<DetailRow label='Model' value={listing.carModel.name} />
+						)}
+						{technicalAttrs.map((attr) => (
+							<DetailRow key={attr.id} label={attr.label} value={attr.value} />
+						))}
+					</dl>
+				</SectionCard>
+			)}
+		</div>
+	);
+}

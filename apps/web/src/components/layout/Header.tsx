@@ -15,7 +15,6 @@ import {
 } from '@heroicons/react/24/outline';
 import { Button } from '@tarodan/ui';
 import NotificationBell from '@/components/notifications/NotificationBell';
-import { ButtonLink } from '@/components/ui/ButtonLink';
 import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { Container } from './Container';
@@ -119,14 +118,17 @@ export default function Header() {
 								{showAuthUI && (
 									<>
 										{/* İlan Ver */}
-										<ButtonLink
-											href='/listings/new'
-											variant='ghost'>
-											<PlusIcon className='w-4 h-4' />
-											<span className='hidden sm:inline'>
-												{t('nav.newListing')}
-											</span>
-										</ButtonLink>
+										<Button
+											variant='nav'
+											asChild
+											className='gap-1.5'>
+											<Link href='/listings/new'>
+												<PlusIcon className='w-4 h-4' />
+												<span className='hidden sm:inline'>
+													{t('nav.newListing')}
+												</span>
+											</Link>
+										</Button>
 
 										{/* Mesajlar - bildirim zilinin solunda hızlı erişim */}
 										<Button
@@ -136,7 +138,7 @@ export default function Header() {
 											aria-label={t('nav.messages')}
 											title={t('nav.messages')}
 											className='relative h-9 w-9 rounded-md'>
-											<Link href='/messages'>
+											<Link href='/profile/messages'>
 												<ChatBubbleLeftRightIcon className='w-6 h-6' />
 												{unreadMessageCount > 0 && (
 													<span className='absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-danger-500 text-inverted text-[10px] font-semibold rounded-full'>
@@ -213,7 +215,7 @@ export default function Header() {
 				title={t('nav.loginForTrades')}
 				message={t('trade.tradeRequiresLogin')}
 				icon={<ArrowsRightLeftIcon className='w-10 h-10 text-primary-500' />}
-				redirectPath='/trades'
+				redirectPath='/profile/trades'
 			/>
 		</>
 	);

@@ -28,7 +28,7 @@ export default function MainLayout({
 			<ConfirmProvider>
 				<BusinessMembershipGuard>
 					<Header />
-					<main className='flex-1 w-full pt-4'>
+					<main className='flex-1 w-full py-4'>
 						<Container>{children}</Container>
 					</main>
 					<Footer />

@@ -9,7 +9,7 @@ import {
 	ArrowsRightLeftIcon,
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
-import { ProductBadge } from '@tarodan/ui';
+import { Badge, ProductBadge } from '@tarodan/ui';
 import OptimizedImage from '@/components/OptimizedImage';
 import OutOfStockOverlay from '@/components/ui/OutOfStockOverlay';
 import { useTranslation } from '@/i18n';
@@ -23,17 +23,17 @@ import {
 import type { Product, ProductImage } from '@/types/product';
 
 /**
- * The single product/listing card for the whole marketplace (grid + list).
- * Self-deriving: give it a raw `product` and it computes price / sale / stock /
- * image itself via the shared helpers — callers never precompute. Replaces the
- * hand-rolled inline cards that were duplicated across listings, category,
- * favorites, seller, collections, and the home rails.
+ * The single product/listing card for the whole marketplace (grid + list). It is
+ * **fluid**: it fills whatever grid cell it's dropped into, so the same card works
+ * at 4-across or 6-across — the column count is each route's grid, never a card
+ * prop. Self-deriving: give it a raw `product` and it computes price / sale /
+ * stock / image itself via the shared helpers — callers never precompute.
  *
- * For pages with a reduced product shape (wishlist / collection items that lack
- * rating/views/brand) or interactive controls, use `hideStats` to drop the
- * meta rows and the `overlay` / `footer` slots for actions (remove, add-to-cart,
- * SOLD badges). Both slots render OUTSIDE the card's `<Link>`, so their own
- * buttons handle clicks without navigating.
+ * Kept to a minimal API. Title, price and image ALWAYS render. `showMeta` (default
+ * true) is the one toggle for the secondary info (brand · scale · year, rating,
+ * views/likes, condition) — pass `false` for lean rails, dense grids or
+ * reduced-shape items. `overlay` / `footer` are click-isolated slots for actions
+ * (remove, add-to-cart, SOLD badges) rendered OUTSIDE the card's `<Link>`.
  */
 
 const CARD_PLACEHOLDERS = [
@@ -74,17 +74,41 @@ export interface ProductCardProps {
 	/** Position in its list — drives placeholder rotation and eager loading. */
 	index?: number;
 	priority?: boolean;
-	/** Drop the brand subline + rating/views/likes rows (reduced-data contexts). */
-	hideStats?: boolean;
 	/**
-	 * Lean home layout: keep only name / price / views / likes — drop the brand
-	 * subline, the rating block and the condition chip.
+	 * Show the secondary meta — brand · scale · year, rating, views/likes and the
+	 * condition chip. Default `true`; pass `false` for lean rails / dense grids /
+	 * reduced-shape items (title, price and image always stay).
 	 */
-	compact?: boolean;
+	showMeta?: boolean;
 	/** Click-isolated slot pinned to the top-right of the card (badges, remove). */
 	overlay?: React.ReactNode;
 	/** Click-isolated slot below the card (e.g. an add-to-cart button). */
 	footer?: React.ReactNode;
+	/**
+	 * Card link target. Defaults to the listing detail page; pass `null` for a
+	 * non-navigating card (e.g. a collection's custom item that has no listing).
+	 */
+	href?: string | null;
+}
+
+/** Wraps the card body in a `Link` — or a plain `div` when `href` is null. */
+function CardLink({
+	href,
+	className,
+	children,
+}: {
+	href: string | null;
+	className?: string;
+	children: React.ReactNode;
+}) {
+	if (!href) return <div className={className}>{children}</div>;
+	return (
+		<Link
+			href={href}
+			className={className}>
+			{children}
+		</Link>
+	);
 }
 
 export default function ProductCard({
@@ -92,20 +116,20 @@ export default function ProductCard({
 	layout = 'grid',
 	index = 0,
 	priority,
-	hideStats = false,
-	compact = false,
+	showMeta = true,
 	overlay,
 	footer,
+	href,
 }: ProductCardProps) {
 	const { locale } = useTranslation();
+
+	const linkHref = href === undefined ? `/listings/${product.id}` : href;
 
 	const outOfStock = isProductOutOfStock(product);
 	const onSale = isProductOnSaleDisplay(product);
 	const effectivePrice = getProductEffectivePrice(product);
 	const originalPrice = getProductOriginalPriceForDisplay(product);
 	const isTrade = Boolean(product.trade_available || product.isTradeEnabled);
-	const brandName =
-		typeof product.brand === 'object' ? product.brand?.name : product.brand;
 	const firstImage = Array.isArray(product.images)
 		? product.images[0]
 		: undefined;
@@ -114,14 +138,6 @@ export default function ProductCard({
 		product.rating &&
 		product.rating.average !== null &&
 		product.rating.count > 0;
-
-	const subline = (
-		<>
-			{brandName}
-			{product.scale ? ` · ${product.scale}` : ''}
-			{product.year ? ` · ${product.year}` : ''}
-		</>
-	);
 
 	// Rating chip — hidden entirely when the product has no reviews yet.
 	const ratingBlock = (starClass: string) =>
@@ -138,9 +154,9 @@ export default function ProductCard({
 	if (layout === 'list') {
 		return (
 			<div className='relative'>
-				<Link href={`/listings/${product.id}`}>
-					<div className='bg-surface-elevated rounded-lg border border-border hover:border-primary-300 hover:shadow-sm transition-all flex gap-4 p-3'>
-						<div className='relative w-20 h-20 flex-shrink-0 bg-surface-alt rounded overflow-hidden'>
+				<CardLink href={linkHref}>
+					<div className='bg-surface-elevated rounded-lg border border-border hover:border-primary-300 hover:shadow-sm transition-all flex items-center gap-4 p-3'>
+						<div className='relative w-28 h-28 sm:w-32 sm:h-32 flex-shrink-0 bg-surface-alt rounded-lg overflow-hidden'>
 							<OptimizedImage
 								src={imageUrl}
 								alt={product.title}
@@ -154,49 +170,51 @@ export default function ProductCard({
 							/>
 							{outOfStock && <OutOfStockOverlay />}
 							{isTrade && (
-								<div className='absolute top-1 right-1 bg-success-500 text-inverted p-0.5 rounded'>
-									<ArrowsRightLeftIcon className='w-2.5 h-2.5' />
+								<div className='absolute top-1 right-1 bg-success-500 text-inverted p-1 rounded'>
+									<ArrowsRightLeftIcon className='w-3 h-3' />
 								</div>
 							)}
 						</div>
-						<div className='flex-1 flex items-center justify-between min-w-0'>
-							<div className='flex-1 min-w-0'>
-								<h3 className='font-medium text-heading line-clamp-1 text-sm'>
-									{product.title}
-								</h3>
-								{!hideStats && !compact && (
-									<p className='text-xs text-muted mt-0.5'>{subline}</p>
-								)}
-								<span className='text-[10px] text-subtle bg-surface-alt px-1.5 py-0.5 rounded inline-block mt-1'>
-									{formatCondition(product.condition, locale)}
-								</span>
-							</div>
-							<div className='flex items-center gap-3 ml-4'>
-								{!hideStats && (
-									<div className='flex items-center gap-2.5 text-[11px] text-subtle'>
-										{!compact && ratingBlock('w-3.5 h-3.5')}
-										<span className='flex items-center gap-0.5'>
-											<EyeIcon className='w-3.5 h-3.5' />
-											{product.viewCount ?? 0}
-										</span>
-										<span className='flex items-center gap-0.5'>
-											<HeartIcon className='w-3.5 h-3.5' />
-											{product.likeCount ?? 0}
-										</span>
-									</div>
-								)}
-								{onSale && (
-									<span className='text-xs text-danger-500 font-semibold bg-danger-50 px-1.5 py-0.5 rounded'>
-										%{product.discountPercent ?? 0}
+						<div className='flex-1 min-w-0'>
+							<h3 className='font-semibold text-heading line-clamp-2 text-lg sm:text-xl leading-tight'>
+								{product.title}
+							</h3>
+							{showMeta && (
+								<div className='flex items-center gap-4 mt-2 text-xs sm:text-sm text-subtle'>
+									<span className='flex items-center gap-1'>
+										<EyeIcon className='w-4 h-4' />
+										{product.viewCount ?? 0}
 									</span>
-								)}
-								<p className='text-base font-bold text-primary-600 whitespace-nowrap'>
-									{fmtTL(effectivePrice)}
-								</p>
-							</div>
+									<span className='flex items-center gap-1'>
+										<HeartIcon className='w-4 h-4' />
+										{product.likeCount ?? 0}
+									</span>
+									{ratingBlock('w-4 h-4')}
+								</div>
+							)}
+							{showMeta && (
+								<Badge variant='default' size='sm' className='mt-2'>
+									{formatCondition(product.condition, locale)}
+								</Badge>
+							)}
+						</div>
+						<div className='ml-4 flex flex-col items-end text-right flex-shrink-0'>
+							{onSale && (
+								<span className='text-xs text-subtle line-through'>
+									{fmtTL(originalPrice)}
+								</span>
+							)}
+							<p className='text-lg sm:text-xl font-bold text-primary-600 whitespace-nowrap'>
+								{fmtTL(effectivePrice)}
+							</p>
+							{onSale && (
+								<span className='mt-1 text-xs text-danger-500 font-semibold bg-danger-50 px-1.5 py-0.5 rounded'>
+									%{product.discountPercent ?? 0}
+								</span>
+							)}
 						</div>
 					</div>
-				</Link>
+				</CardLink>
 				{overlay && (
 					<div className='absolute top-2 right-2 z-10'>{overlay}</div>
 				)}
@@ -207,8 +225,8 @@ export default function ProductCard({
 
 	return (
 		<div className='relative group h-full flex flex-col'>
-			<Link
-				href={`/listings/${product.id}`}
+			<CardLink
+				href={linkHref}
 				className='flex-1'>
 				<div className='bg-surface-elevated rounded border border-border overflow-hidden hover:border-primary-300 hover:shadow-md transition-all h-full flex flex-col'>
 					<div className='relative aspect-square bg-surface-alt'>
@@ -226,12 +244,12 @@ export default function ProductCard({
 							{product.isBoosted && (
 								<ProductBadge
 									variant='sponsored'
-									className='text-[10px] px-1.5 py-0.5'>
+									className='text-sm px-1.5 py-0.5'>
 									{locale === 'en' ? 'Sponsored' : 'Sponsorlu'}
 								</ProductBadge>
 							)}
 							{isTrade && (
-								<div className='bg-success-500 text-inverted text-[10px] px-1.5 py-0.5 rounded flex items-center gap-0.5'>
+								<div className='bg-success-500 text-inverted text-sm px-1.5 py-0.5 rounded flex items-center gap-0.5'>
 									<ArrowsRightLeftIcon className='w-2.5 h-2.5' />
 									<span className='hidden sm:inline'>
 										{locale === 'en' ? 'Trade' : 'Takas'}
@@ -243,43 +261,46 @@ export default function ProductCard({
 							<div className='absolute top-1.5 right-1.5'>
 								<ProductBadge
 									variant='sale'
-									className='text-[10px] px-1.5 py-0.5'>
+									className='text-sm px-1.5 py-0.5'>
 									%{product.discountPercent ?? 0}
 								</ProductBadge>
 							</div>
 						)}
 					</div>
 					<div className='p-2.5 flex-1 flex flex-col'>
-						<h3 className='font-medium text-heading line-clamp-2 text-xs leading-tight mb-1 group-hover:text-primary-600 transition-colors'>
+						<h3 className='font-medium text-heading line-clamp-2 text-sm sm:text-md leading-tight mb-1 group-hover:text-primary-600 transition-colors'>
 							{product.title}
 						</h3>
-						{!hideStats && !compact && (
-							<div className='flex items-center gap-3 mb-1.5 text-sm text-subtle'>
-								{ratingBlock('w-4 h-4')}
-								<span className='flex items-center gap-0.5'>
-									<HeartIcon className='w-4 h-4' />
-									{product.likeCount ?? 0}
-								</span>
-								<span className='flex items-center gap-0.5'>
-									<EyeIcon className='w-4 h-4' />
-									{product.viewCount ?? 0}
-								</span>
-							</div>
-						)}
-						<div className='mt-auto pt-1.5 border-t border-border-subtle'>
-							{onSale && (
-								<span className='text-[10px] text-subtle line-through ml-1.5'>
-									{fmtTL(originalPrice)}
-								</span>
+						{/* Meta + price pinned to the bottom so views/likes align across
+						    cards regardless of a 1- or 2-line title. */}
+						<div className='mt-auto'>
+							{showMeta && (
+								<div className='flex items-center gap-3 mb-1.5 text-xs sm:text-sm text-subtle'>
+									{ratingBlock('w-4 h-4')}
+									<span className='flex items-center gap-0.5'>
+										<HeartIcon className='w-4 h-4' />
+										{product.likeCount ?? 0}
+									</span>
+									<span className='flex items-center gap-0.5'>
+										<EyeIcon className='w-4 h-4' />
+										{product.viewCount ?? 0}
+									</span>
+								</div>
 							)}
-							<p
-								className={`font-bold text-primary-600 ${compact ? 'text-base' : 'text-sm'}`}>
-								{fmtTL(effectivePrice)}
-							</p>
+							<div className='pt-1.5 border-t border-border-subtle'>
+								{onSale && (
+									<span className='text-sm text-subtle line-through ml-1.5'>
+										{fmtTL(originalPrice)}
+									</span>
+								)}
+								<p className='font-bold text-primary-600 text-md sm:text-lg'>
+									{fmtTL(effectivePrice)}
+								</p>
+							</div>
 						</div>
 					</div>
 				</div>
-			</Link>
+			</CardLink>
 			{overlay && (
 				<div className='absolute top-1.5 right-1.5 z-10'>{overlay}</div>
 			)}

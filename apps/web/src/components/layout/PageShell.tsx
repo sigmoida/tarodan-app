@@ -16,7 +16,7 @@ export function PageShell({
 }) {
 	return (
 		<div
-			className={`space-y-4 min-h-screen bg-surface${className ? ` ${className}` : ''}`}>
+			className={`space-y-4 min-h-screen bg-surface ${className ? ` ${className}` : ''}`}>
 			{children}
 		</div>
 	);

@@ -2,7 +2,6 @@
 
 'use client';
 
-import Link from 'next/link';
 import { LockClosedIcon } from '@heroicons/react/24/outline';
 import { ButtonLink } from '@/components/ui/ButtonLink';
 import { SectionCard } from '@/components/ui';
@@ -40,7 +39,9 @@ export default function CartSummary({
 	const autoDiscounts = (appliedDiscounts ?? []).filter((d) => !d.discountCode);
 
 	return (
-		<SectionCard title={t('checkout.orderSummary')} className='p-6 sticky top-24'>
+		<SectionCard
+			title={t('checkout.orderSummary')}
+			className='sticky top-24'>
 			<div className='space-y-3 text-sm'>
 				<div className='flex justify-between'>
 					<span className='text-muted'>{t('checkout.subtotal')}</span>
@@ -52,14 +53,18 @@ export default function CartSummary({
 						key={d.discountId}
 						className='flex justify-between text-success-600'>
 						<span>{d.discountName}</span>
-						<span className='font-medium'>-{fmtTL(Number(d.appliedAmount))} TL</span>
+						<span className='font-medium'>
+							-{fmtTL(Number(d.appliedAmount))} TL
+						</span>
 					</div>
 				))}
 
 				{buyerFee > 0 && (
 					<div className='flex justify-between'>
 						<span className='text-muted'>
-							{locale === 'en' ? 'Platform Service Fee' : 'Platform Hizmet Bedeli'}
+							{locale === 'en'
+								? 'Platform Service Fee'
+								: 'Platform Hizmet Bedeli'}
 						</span>
 						<span className='font-medium'>{fmtTL(buyerFee)} TL</span>
 					</div>
@@ -84,7 +89,9 @@ export default function CartSummary({
 				</div>
 			</div>
 
-			<ButtonLink href='/checkout' className='w-full mt-6 flex gap-2'>
+			<ButtonLink
+				href='/checkout'
+				className='w-full mt-6 flex gap-2'>
 				{t('cart.proceedToCheckout')}
 			</ButtonLink>
 
@@ -107,11 +114,12 @@ export default function CartSummary({
 				</div>
 			)}
 
-			<Link
+			<ButtonLink
+				variant='ghost'
 				href='/listings'
-				className='block text-center text-sm text-muted hover:text-primary-500 mt-4'>
+				className='w-full mt-4 text-muted'>
 				{t('cart.continueShopping')}
-			</Link>
+			</ButtonLink>
 		</SectionCard>
 	);
 }

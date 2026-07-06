@@ -181,7 +181,7 @@ export default function SellerDashboardPage() {
                 transition={{ delay: 0.15 }}
               >
                 <Link
-                  href="/orders?filter=seller"
+                  href="/profile/orders?filter=seller"
                   className="block bg-surface-elevated rounded-xl shadow-sm border border-border-subtle p-5 hover:border-primary-200 hover:shadow-md transition-all"
                 >
                   <div className="flex items-center justify-between">
@@ -224,7 +224,7 @@ export default function SellerDashboardPage() {
                   </span>
                 </Link>
                 <Link
-                  href="/orders?filter=seller"
+                  href="/profile/orders?filter=seller"
                   className="flex items-center gap-3 bg-surface-elevated rounded-xl shadow-sm border border-border-subtle p-4 hover:border-primary-300 hover:shadow-md transition-all group"
                 >
                   <div className="p-2 bg-info-100 rounded-lg group-hover:bg-info-200">
@@ -246,7 +246,7 @@ export default function SellerDashboardPage() {
                   </span>
                 </Link>
                 <Link
-                  href="/analytics"
+                  href="/profile/analytics"
                   className="flex items-center gap-3 bg-surface-elevated rounded-xl shadow-sm border border-border-subtle p-4 hover:border-primary-300 hover:shadow-md transition-all group"
                 >
                   <div className="p-2 bg-primary-100 rounded-lg group-hover:bg-primary-200">

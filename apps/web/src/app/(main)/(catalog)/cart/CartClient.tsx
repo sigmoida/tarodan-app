@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useCartStore } from '@/stores/cartStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -33,8 +33,20 @@ export default function CartClient() {
 
 	const buyerFee = useBuyerFee(items);
 
+	// `isLoading` starts false in the store, so on a hard reload the very first
+	// render has no items AND isn't "loading" yet → the empty state would flash
+	// before `fetchCart` runs. Gate on a local "fetched once" flag so we show the
+	// skeleton until the initial fetch resolves.
+	const [fetched, setFetched] = useState(false);
+
 	useEffect(() => {
-		fetchCart();
+		let active = true;
+		Promise.resolve(fetchCart()).finally(() => {
+			if (active) setFetched(true);
+		});
+		return () => {
+			active = false;
+		};
 	}, [fetchCart]);
 
 	const handleRemove = async (productId: string) => {
@@ -53,10 +65,14 @@ export default function CartClient() {
 		toast.success(t('product.removedFromCart'));
 	};
 
-	if (isLoading && items.length === 0) return <CartSkeleton />;
-
 	const hasOnlineItems = items.length > 0;
 	const hasOfflineItems = offlineItems.length > 0;
+
+	// Show the skeleton while loading OR before the first fetch settles — but never
+	// when we already have rows to render (client-side nav with a warm store).
+	if ((isLoading || !fetched) && !hasOnlineItems && !hasOfflineItems)
+		return <CartSkeleton />;
+
 	if (!hasOnlineItems && !hasOfflineItems) return <EmptyCart />;
 
 	// One normalized list feeds a single CartItemCard for both authed + guest rows.
@@ -95,25 +111,26 @@ export default function CartClient() {
 				description={`${lines.length} ${locale === 'en' ? 'items' : 'ürün'}`}
 			/>
 
-			<Container className='px-4 py-5'>
-				<div className='grid lg:grid-cols-3 gap-8'>
-					<div className='lg:col-span-2 space-y-4'>
-						{lines.map((line) => (
-							<CartItemCard key={line.key} item={line} />
-						))}
-					</div>
-
-					<div className='lg:col-span-1'>
-						<CartSummary
-							subtotal={subtotal}
-							appliedDiscounts={appliedDiscounts}
-							buyerFee={buyerFee}
-							grandTotal={grandTotal}
-							isAuthenticated={isAuthenticated}
+			<div className='grid lg:grid-cols-3 gap-8'>
+				<div className='lg:col-span-2 space-y-4'>
+					{lines.map((line) => (
+						<CartItemCard
+							key={line.key}
+							item={line}
 						/>
-					</div>
+					))}
 				</div>
-			</Container>
+
+				<div className='lg:col-span-1'>
+					<CartSummary
+						subtotal={subtotal}
+						appliedDiscounts={appliedDiscounts}
+						buyerFee={buyerFee}
+						grandTotal={grandTotal}
+						isAuthenticated={isAuthenticated}
+					/>
+				</div>
+			</div>
 		</PageShell>
 	);
 }

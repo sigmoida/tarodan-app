@@ -146,7 +146,7 @@ export default function PaymentPage() {
           ? "/"
           : isMembershipPayment
             ? "/profile/membership"
-            : "/orders",
+            : "/profile/orders",
       );
     } finally {
       setIsLoading(false);
@@ -179,7 +179,7 @@ export default function PaymentPage() {
           <p className="text-muted mb-4">Ödeme bulunamadı</p>
           <Button
             onClick={() =>
-              router.push(isMembershipPayment ? "/profile/membership" : "/orders")
+              router.push(isMembershipPayment ? "/profile/membership" : "/profile/orders")
             }
           >
             {isMembershipPayment ? "Üyelik Sayfasına Dön" : "Siparişlerime Dön"}
@@ -258,7 +258,7 @@ export default function PaymentPage() {
                 const k = searchParams.get("kind");
                 router.push(k ? `/membership/success?kind=${k}` : "/membership/success");
               } else if (payment.tradeId) {
-                router.push(`/trades/${payment.tradeId}?paid=1`);
+                router.push(`/profile/trades/${payment.tradeId}?paid=1`);
               } else {
                 router.push(
                   `/payment/success?paymentId=${pid}${isGuestCheckout ? "&guest=true" : ""}`,

@@ -18,11 +18,17 @@ export default function HeroSlider() {
 	const count = slides.length;
 
 	const [current, setCurrent] = useState(0);
-	const goTo = useCallback((i: number) => setCurrent((i + count) % count), [count]);
+	const goTo = useCallback(
+		(i: number) => setCurrent((i + count) % count),
+		[count],
+	);
 
 	// Auto-advance.
 	useEffect(() => {
-		const id = setInterval(() => setCurrent((p) => (p + 1) % count), AUTOPLAY_MS);
+		const id = setInterval(
+			() => setCurrent((p) => (p + 1) % count),
+			AUTOPLAY_MS,
+		);
 		return () => clearInterval(id);
 	}, [count]);
 
@@ -34,7 +40,8 @@ export default function HeroSlider() {
 	const onTouchEnd = (e: React.TouchEvent) => {
 		if (swipeStartX.current === null) return;
 		const dx = e.changedTouches[0].clientX - swipeStartX.current;
-		if (Math.abs(dx) > SWIPE_THRESHOLD) setCurrent((p) => (p + (dx < 0 ? 1 : -1) + count) % count);
+		if (Math.abs(dx) > SWIPE_THRESHOLD)
+			setCurrent((p) => (p + (dx < 0 ? 1 : -1) + count) % count);
 		swipeStartX.current = null;
 	};
 
@@ -47,8 +54,10 @@ export default function HeroSlider() {
 				onTouchStart={onTouchStart}
 				onTouchEnd={onTouchEnd}>
 				{slides.map((slide, i) => (
-					<div key={i} className='w-full flex-shrink-0'>
-						<div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 lg:py-32'>
+					<div
+						key={i}
+						className='w-full flex-shrink-0'>
+						<div className='py-24'>
 							<div className='grid md:grid-cols-2 gap-12 items-center'>
 								{/* Text */}
 								<div className={slide.imageRight ? '' : 'md:order-2'}>
@@ -59,17 +68,21 @@ export default function HeroSlider() {
 										{slide.subtitle}
 									</p>
 									<div className='flex flex-col sm:flex-row gap-3'>
-										<ButtonLink variant='primary' href={slide.cta1.href}>
+										<ButtonLink
+											variant='primary'
+											href={slide.cta1.href}>
 											{slide.cta1.label}
 										</ButtonLink>
-										<ButtonLink variant='secondary' href={slide.cta2.href}>
+										<ButtonLink
+											variant='secondary'
+											href={slide.cta2.href}>
 											{slide.cta2.label}
 										</ButtonLink>
 									</div>
 								</div>
 								{/* Image */}
 								<div
-									className={`relative hidden md:block aspect-[4/3] w-full max-w-3xl overflow-hidden rounded border border-border bg-surface-elevated ${
+									className={`relative hidden md:block aspect-[4/3] w-full max-w-3xl overflow-hidden rounded-lg border border-border bg-surface-elevated ${
 										slide.imageRight ? '' : 'md:order-1'
 									}`}>
 									<Image
@@ -81,7 +94,7 @@ export default function HeroSlider() {
 										}
 										fill
 										sizes='(max-width: 768px) 0px, (max-width: 1024px) 400px, 512px'
-										className='object-cover object-center'
+										className='object-cover object-center rounded-lg'
 										priority={i === 0}
 										quality={90}
 										unoptimized={slide.image.startsWith('http')}
@@ -101,7 +114,9 @@ export default function HeroSlider() {
 						key={index}
 						onClick={() => goTo(index)}
 						className={`h-2 rounded-full transition-all duration-300 ease-premium ${
-							index === current ? 'bg-primary-500 w-8' : 'bg-border-strong w-2 hover:bg-subtle'
+							index === current
+								? 'bg-primary-500 w-8'
+								: 'bg-border-strong w-2 hover:bg-subtle'
 						}`}
 						aria-label={`Go to slide ${index + 1}`}
 					/>

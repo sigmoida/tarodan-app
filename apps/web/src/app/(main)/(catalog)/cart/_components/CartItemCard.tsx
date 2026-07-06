@@ -27,12 +27,12 @@ export default function CartItemCard({ item }: { item: CartLineItem }) {
 	return (
 		<SectionCard className='p-4 flex gap-4'>
 			<Link href={href}>
-				<div className='w-24 h-24 rounded-lg overflow-hidden bg-surface-alt flex-shrink-0'>
+				<div className='w-28 h-28 rounded-lg overflow-hidden bg-surface-alt flex-shrink-0'>
 					<Image
 						src={item.image || PLACEHOLDER}
 						alt={item.title}
-						width={96}
-						height={96}
+						width={112}
+						height={112}
 						className='object-cover w-full h-full'
 					/>
 				</div>

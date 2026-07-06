@@ -238,7 +238,7 @@ export default function PaymentFailPage() {
                 </Button>
                 <ButtonLink
                   variant="secondary"
-                  href="/orders"
+                  href="/profile/orders"
                   className="flex gap-2"
                 >
                   <ArrowLeftIcon className="w-5 h-5" />

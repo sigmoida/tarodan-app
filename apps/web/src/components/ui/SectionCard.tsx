@@ -40,7 +40,7 @@ export default function SectionCard({
 	const hasHeader = title != null || action != null || badge != null;
 	const defaultPad = PADDING_RE.test(className) ? '' : 'p-3 md:p-5';
 	const containerClass =
-		`bg-surface-elevated border border-border rounded-md ${defaultPad} ${className}`
+		`bg-surface-elevated border border-border rounded-lg ${defaultPad} ${className}`
 			.replace(/\s+/g, ' ')
 			.trim();
 

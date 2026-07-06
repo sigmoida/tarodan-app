@@ -27,26 +27,27 @@ export default function HomeSection({
 	children: ReactNode;
 }) {
 	return (
-		<section className='py-4'>
-			<div className='px-4'>
-				<SectionCard
-					title={title}
-					badge={badge}
-					action={
-						viewAllHref ? (
-							<Button asChild variant='secondary' size='sm'>
-								<Link
-									href={viewAllHref}
-									className='inline-flex items-center gap-1'>
-									{viewAllLabel}
-									<ChevronRightIcon className='w-4 h-4' />
-								</Link>
-							</Button>
-						) : undefined
-					}>
-					{children}
-				</SectionCard>
-			</div>
+		<section>
+			<SectionCard
+				title={title}
+				badge={badge}
+				action={
+					viewAllHref ? (
+						<Button
+							asChild
+							variant='secondary'
+							size='sm'>
+							<Link
+								href={viewAllHref}
+								className='inline-flex items-center gap-1'>
+								{viewAllLabel}
+								<ChevronRightIcon className='w-4 h-4' />
+							</Link>
+						</Button>
+					) : undefined
+				}>
+				{children}
+			</SectionCard>
 		</section>
 	);
 }

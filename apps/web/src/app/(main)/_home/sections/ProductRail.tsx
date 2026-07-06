@@ -1,3 +1,5 @@
+/** @format */
+
 'use client';
 
 import type { ReactNode } from 'react';
@@ -38,13 +40,23 @@ export default function ProductRail({
 			<div className='flex gap-3 overflow-x-auto pb-2 px-1 snap-x'>
 				{isLoading
 					? [...Array(skeletonCount)].map((_, i) => (
-							<div key={i} className='flex-shrink-0 w-40'>
+							<div
+								key={i}
+								className='flex-shrink-0 w-40'>
 								<SkeletonCard />
 							</div>
 						))
 					: displayItems.map((product, index) => (
-							<div key={product.id} className='flex-shrink-0 w-40 snap-start'>
-								<ProductCard product={product} index={index} layout='grid' priority={index < 4} compact />
+							<div
+								key={product.id}
+								className='flex-shrink-0 w-40 snap-start'>
+								<ProductCard
+									product={product}
+									index={index}
+									layout='grid'
+									priority={index < 4}
+									showMeta={false}
+								/>
 							</div>
 						))}
 			</div>
@@ -59,7 +71,14 @@ export default function ProductRail({
 				<div className='col-span-full'>{emptyState}</div>
 			) : (
 				displayItems.map((product, index) => (
-					<ProductCard key={product.id} product={product} index={index} layout='grid' priority={index < 4} compact />
+					<ProductCard
+						key={product.id}
+						product={product}
+						index={index}
+						layout='grid'
+						priority={index < 4}
+						showMeta={false}
+					/>
 				))
 			)}
 		</div>

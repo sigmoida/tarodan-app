@@ -21,7 +21,7 @@ export function Container({
 }) {
 	return (
 		<div
-			className={`px-4 mx-auto w-full max-w-screen-xl${className ? ` ${className}` : ''}`}>
+			className={`px-4 mx-auto w-full max-w-screen-xl ${className ? ` ${className}` : ''}`}>
 			{children}
 		</div>
 	);

@@ -84,26 +84,24 @@ export default function TrustBadges() {
 	const badges = TRUST_BADGES[locale as 'tr' | 'en'];
 
 	return (
-		<section className='py-4 bg-surface'>
-			<div className='px-4'>
-				<div className='grid grid-cols-3 md:grid-cols-6 gap-2 sm:gap-3'>
-					{badges.map((badge) => {
-						const Icon = badge.icon;
-						return (
-							<div
-								key={badge.label}
-								className='flex flex-col items-center text-center px-2 py-3 bg-surface-elevated border border-border-subtle rounded'>
-								<Icon className='w-5 h-5 text-primary-500 mb-1.5' />
-								<p className='text-[11px] sm:text-xs font-semibold text-heading leading-tight'>
-									{badge.label}
-								</p>
-								<p className='text-[9px] sm:text-[10px] text-muted mt-0.5 hidden md:block'>
-									{badge.description}
-								</p>
-							</div>
-						);
-					})}
-				</div>
+		<section className=' bg-surface'>
+			<div className='grid grid-cols-3 md:grid-cols-6 gap-2 sm:gap-3'>
+				{badges.map((badge) => {
+					const Icon = badge.icon;
+					return (
+						<div
+							key={badge.label}
+							className='flex flex-col items-center text-center px-2 py-3 bg-surface-elevated border border-border-subtle rounded'>
+							<Icon className='w-5 h-5 text-primary-500 mb-1.5' />
+							<p className='text-[11px] sm:text-xs font-semibold text-heading leading-tight'>
+								{badge.label}
+							</p>
+							<p className='text-[9px] sm:text-[10px] text-muted mt-0.5 hidden md:block'>
+								{badge.description}
+							</p>
+						</div>
+					);
+				})}
 			</div>
 		</section>
 	);
