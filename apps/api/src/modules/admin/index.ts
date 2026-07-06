@@ -15,5 +15,6 @@ export * from './admin-trade.service';
 export * from './admin-refund.service';
 export * from './admin-messaging.service';
 export * from './admin-support.service';
+export * from './admin-content.service';
 export * from './admin.controller';
 export * from './dto';
