@@ -3,6 +3,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bull';
 import { TradeController } from './trade.controller';
 import { TradeService } from './trade.service';
+import { TradeShipmentService } from './trade-shipment.service';
 import { TradeSchedulerService } from './trade-scheduler.service';
 import { TradeScheduledProcessor } from './trade-scheduled.processor';
 import { QUEUE_NAMES } from '../../workers/constants';
@@ -19,7 +20,7 @@ import { SuratCargoModule } from '../surat-cargo/surat-cargo.module';
 @Module({
   imports: [ScheduleModule.forRoot(), PrismaModule, CacheModule, MembershipModule, forwardRef(() => NotificationModule), StorageModule, PaymentModule, ProductModule, EventModule, SuratCargoModule, BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED })],
   controllers: [TradeController],
-  providers: [TradeService, TradeSchedulerService, TradeScheduledProcessor],
+  providers: [TradeService, TradeShipmentService, TradeSchedulerService, TradeScheduledProcessor],
   exports: [TradeService],
 })
 export class TradeModule {}
