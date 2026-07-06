@@ -7,5 +7,6 @@ export * from './admin-user.service';
 export * from './admin-staff.service';
 export * from './admin-product.service';
 export * from './admin-order.service';
+export * from './admin-analytics.service';
 export * from './admin.controller';
 export * from './dto';
