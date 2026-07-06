@@ -22,5 +22,6 @@ export * from './admin-catalog.service';
 export * from './admin-collection.service';
 export * from './admin-notification.service';
 export * from './admin-logs.service';
+export * from './admin-shipping.service';
 export * from './admin.controller';
 export * from './dto';

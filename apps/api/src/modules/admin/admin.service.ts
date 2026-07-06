@@ -33,6 +33,7 @@ import { AdminCatalogService } from './admin-catalog.service';
 import { AdminCollectionService } from './admin-collection.service';
 import { AdminNotificationService } from './admin-notification.service';
 import { AdminLogsService } from './admin-logs.service';
+import { AdminShippingService } from './admin-shipping.service';
 import {
   fulltextUserSearch,
   fulltextProductRatingSearch,
@@ -150,6 +151,7 @@ export class AdminService {
     private readonly collectionService: AdminCollectionService,
     private readonly adminNotificationService: AdminNotificationService,
     private readonly logsService: AdminLogsService,
+    private readonly shippingService: AdminShippingService,
     @Optional()
     private readonly storageService: StorageService,
     @Optional()
@@ -1163,49 +1165,15 @@ export class AdminService {
   }
 
   // ==================== SHIPPING (view-only) ====================
+  // Taşındı: admin-shipping.service.ts — imzalar aynen korunuyor (facade delege).
 
-  /**
-   * Get list of shipments
-   */
   async getShipments(query: {
     page?: number;
     limit?: number;
     status?: string;
     carrierId?: string;
   }) {
-    const { page = 1, limit = 10, status, carrierId } = query;
-    const where: Prisma.ShipmentWhereInput = {};
-
-    if (status) where.status = status as any;
-    if (carrierId) where.provider = carrierId;
-
-    const [total, shipments] = await Promise.all([
-      this.prisma.shipment.count({ where }),
-      this.prisma.shipment.findMany({
-        where,
-        include: {
-          order: {
-            include: {
-              buyer: { select: { id: true, displayName: true, email: true } },
-              seller: { select: { id: true, displayName: true, email: true } },
-            },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
-
-    return {
-      data: shipments,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
+    return this.shippingService.getShipments(query);
   }
 
   // ==================== NOTIFICATION MANAGEMENT ====================
