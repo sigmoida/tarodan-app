@@ -450,55 +450,12 @@ export class AdminService {
   }
 
   // ==================== AUDIT LOGS ====================
+  // Taşındı: admin-audit.service.ts — imzalar aynen korunuyor (facade delege).
+  // Not: private createAuditLog delegesi facade'da kalıyor — kalan bölümler
+  // hâlâ this.createAuditLog üzerinden çağırıyor.
 
-  /**
-   * Get audit logs
-   */
   async getAuditLogs(query: AuditLogQueryDto) {
-    const { action, adminId, fromDate, toDate, page = 1, limit = 50 } = query;
-
-    const where: Prisma.AuditLogWhereInput = {};
-
-    if (action) {
-      where.action = action;
-    }
-
-    if (adminId) {
-      where.adminUserId = adminId;
-    }
-
-    if (fromDate || toDate) {
-      where.createdAt = {};
-      if (fromDate) {
-        where.createdAt.gte = new Date(fromDate);
-      }
-      if (toDate) {
-        where.createdAt.lte = new Date(toDate);
-      }
-    }
-
-    const [total, logs] = await Promise.all([
-      this.prisma.auditLog.count({ where }),
-      this.prisma.auditLog.findMany({
-        where,
-        include: {
-          adminUser: { select: { id: true, user: { select: { email: true } } } },
-        },
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
-
-    return {
-      data: logs.map((log) => ({
-        ...log,
-        admin: log.adminUser
-          ? { id: log.adminUser.id, email: log.adminUser.user.email }
-          : null,
-      })),
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
-    };
+    return this.auditService.getAuditLogs(query);
   }
 
   /**

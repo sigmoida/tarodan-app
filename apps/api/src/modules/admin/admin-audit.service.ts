@@ -1,10 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
+import { AuditLogQueryDto } from './dto';
+import { Prisma } from '@prisma/client';
 
 /**
- * Admin audit log yazımı — tüm Admin* alt-servislerinin ortak bağımlılığı.
- * AdminService'ten birebir taşındı; davranış aynı (hata durumunda ana işlemi
- * asla bozmaz, hassas alanları redakte eder).
+ * Admin audit log yazımı + sorgulama — tüm Admin* alt-servislerinin ortak
+ * bağımlılığı. AdminService'ten birebir taşındı; davranış aynı (hata durumunda
+ * ana işlemi asla bozmaz, hassas alanları redakte eder). getAuditLogs,
+ * AdminService'in AUDIT LOGS bölümünden birebir taşındı.
  */
 @Injectable()
 export class AdminAuditService {
@@ -93,5 +96,55 @@ export class AdminAuditService {
       // Return a promise that resolves to avoid breaking the caller
       return Promise.resolve();
     }
+  }
+
+  /**
+   * Get audit logs
+   */
+  async getAuditLogs(query: AuditLogQueryDto) {
+    const { action, adminId, fromDate, toDate, page = 1, limit = 50 } = query;
+
+    const where: Prisma.AuditLogWhereInput = {};
+
+    if (action) {
+      where.action = action;
+    }
+
+    if (adminId) {
+      where.adminUserId = adminId;
+    }
+
+    if (fromDate || toDate) {
+      where.createdAt = {};
+      if (fromDate) {
+        where.createdAt.gte = new Date(fromDate);
+      }
+      if (toDate) {
+        where.createdAt.lte = new Date(toDate);
+      }
+    }
+
+    const [total, logs] = await Promise.all([
+      this.prisma.auditLog.count({ where }),
+      this.prisma.auditLog.findMany({
+        where,
+        include: {
+          adminUser: { select: { id: true, user: { select: { email: true } } } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      data: logs.map((log) => ({
+        ...log,
+        admin: log.adminUser
+          ? { id: log.adminUser.id, email: log.adminUser.user.email }
+          : null,
+      })),
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
   }
 }
