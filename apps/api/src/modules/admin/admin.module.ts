@@ -23,6 +23,7 @@ import { AdminTaxService } from './admin-tax.service';
 import { AdminMembershipService } from './admin-membership.service';
 import { AdminCatalogService } from './admin-catalog.service';
 import { AdminCollectionService } from './admin-collection.service';
+import { AdminNotificationService } from './admin-notification.service';
 import { ScheduledNotificationScheduler } from './scheduled-notification.scheduler';
 import { ScheduledNotificationProcessor } from './scheduled-notification.processor';
 import { QUEUE_NAMES } from '../../workers/constants';
@@ -69,7 +70,7 @@ import { OrderModule } from '../order/order.module';
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [AdminController],
-  providers: [AdminService, AdminAuditService, AdminCommissionService, AdminSettingsService, AdminUserService, AdminStaffService, AdminProductService, AdminOrderService, AdminAnalyticsService, AdminModerationService, AdminPaymentService, AdminPayoutService, AdminTradeService, AdminRefundService, AdminMessagingService, AdminSupportService, AdminContentService, AdminTaxService, AdminMembershipService, AdminCatalogService, AdminCollectionService, ScheduledNotificationScheduler, ScheduledNotificationProcessor],
+  providers: [AdminService, AdminAuditService, AdminCommissionService, AdminSettingsService, AdminUserService, AdminStaffService, AdminProductService, AdminOrderService, AdminAnalyticsService, AdminModerationService, AdminPaymentService, AdminPayoutService, AdminTradeService, AdminRefundService, AdminMessagingService, AdminSupportService, AdminContentService, AdminTaxService, AdminMembershipService, AdminCatalogService, AdminCollectionService, AdminNotificationService, ScheduledNotificationScheduler, ScheduledNotificationProcessor],
   exports: [AdminService],
 })
 export class AdminModule { }
