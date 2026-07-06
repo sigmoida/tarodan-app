@@ -365,7 +365,7 @@ export default function AddressesPage() {
                   id="isDefault"
                   checked={formData.isDefault}
                   onChange={(e) => setFormData({ ...formData, isDefault: e.target.checked })}
-                  label={t('address.setAsDefault')}
+                  label={t('address.setDefault')}
                 />
               </div>
 
