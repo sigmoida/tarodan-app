@@ -14,6 +14,7 @@ const buttonVariants = cva(
         ghost: 'hover:bg-surface-alt hover:text-heading',
         danger: 'bg-danger-600 text-inverted hover:bg-danger-700 focus-visible:ring-danger-600',
         success: 'bg-success-600 text-inverted hover:bg-success-700 focus-visible:ring-success-600',
+        warning: 'bg-warning-500 text-inverted hover:bg-warning-600 focus-visible:ring-warning-500',
         link: 'text-primary-600 underline-offset-4 hover:underline p-0 h-auto',
         nav: 'bg-transparent text-inverted/90 hover:text-inverted hover:bg-surface-elevated/10 focus-visible:ring-inverted/60 aria-expanded:bg-surface-elevated/10 aria-expanded:text-inverted data-[state=open]:bg-surface-elevated/10 data-[state=open]:text-inverted',
       },

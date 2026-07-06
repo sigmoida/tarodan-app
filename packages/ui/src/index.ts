@@ -79,6 +79,12 @@ export {
   AccordionContent,
 } from './components/Accordion';
 export {
+  Stepper,
+  useStepper,
+  type StepperProps,
+  type StepperStep,
+} from './components/Stepper';
+export {
   NavigationMenu,
   NavigationMenuList,
   NavigationMenuItem,

@@ -53,6 +53,8 @@ export interface BadgeProps
 	active?: boolean;
 	activeLabel?: React.ReactNode;
 	passiveLabel?: React.ReactNode;
+	/** Optional leading icon, rendered before the content with a small gap. */
+	icon?: React.ReactNode;
 }
 
 /**
@@ -73,6 +75,7 @@ export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
 			active,
 			activeLabel = 'Aktif',
 			passiveLabel = 'Pasif',
+			icon,
 			children,
 			...props
 		},
@@ -96,9 +99,14 @@ export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
 			<span
 				ref={ref}
 				className={cn(
-					badgeVariants({ variant: resolvedVariant, size, className }),
+					badgeVariants({
+						variant: resolvedVariant,
+						size,
+						className: cn(icon != null && 'gap-1', className),
+					}),
 				)}
 				{...props}>
+				{icon}
 				{content}
 			</span>
 		);
