@@ -11,5 +11,6 @@ export * from './admin-analytics.service';
 export * from './admin-moderation.service';
 export * from './admin-payment.service';
 export * from './admin-payout.service';
+export * from './admin-trade.service';
 export * from './admin.controller';
 export * from './dto';
