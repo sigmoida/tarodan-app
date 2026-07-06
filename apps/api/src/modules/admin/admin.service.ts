@@ -28,6 +28,7 @@ import { AdminMessagingService } from './admin-messaging.service';
 import { AdminSupportService } from './admin-support.service';
 import { AdminContentService } from './admin-content.service';
 import { AdminTaxService } from './admin-tax.service';
+import { AdminMembershipService } from './admin-membership.service';
 import {
   fulltextUserSearch,
   fulltextProductRatingSearch,
@@ -140,6 +141,7 @@ export class AdminService {
     private readonly adminSupportService: AdminSupportService,
     private readonly contentService: AdminContentService,
     private readonly taxService: AdminTaxService,
+    private readonly membershipService: AdminMembershipService,
     @Optional()
     private readonly storageService: StorageService,
     @Optional()
@@ -1210,47 +1212,12 @@ export class AdminService {
   }
 
   // ==================== MEMBERSHIP TIER MANAGEMENT ====================
+  // Taşındı: admin-membership.service.ts — imzalar aynen korunuyor (facade delege).
 
-  /**
-   * Get membership tiers
-   */
   async getMembershipTiers() {
-    const tiers = await this.prisma.membershipTier.findMany({
-      include: {
-        _count: {
-          select: { userMemberships: true },
-        },
-      },
-      orderBy: { sortOrder: 'asc' },
-    });
-
-    return {
-      data: tiers.map((t) => ({
-        id: t.id,
-        type: t.type,
-        name: t.name,
-        description: t.description,
-        monthlyPrice: Number(t.monthlyPrice),
-        yearlyPrice: Number(t.yearlyPrice),
-        maxFreeListings: t.maxFreeListings,
-        maxTotalListings: t.maxTotalListings,
-        maxImagesPerListing: t.maxImagesPerListing,
-        canCreateCollections: t.canCreateCollections,
-        canTrade: t.canTrade,
-        isAdFree: t.isAdFree,
-        featuredListingSlots: t.featuredListingSlots,
-        commissionDiscount: Number(t.commissionDiscount),
-        isActive: t.isActive,
-        sortOrder: t.sortOrder,
-        userCount: t._count.userMemberships,
-        createdAt: t.createdAt,
-      })),
-    };
+    return this.membershipService.getMembershipTiers();
   }
 
-  /**
-   * Update membership tier
-   */
   async updateMembershipTier(adminId: string, tierId: string, dto: {
     name?: string;
     description?: string;
@@ -1267,40 +1234,7 @@ export class AdminService {
     isActive?: boolean;
     sortOrder?: number;
   }) {
-    const tier = await this.prisma.membershipTier.findUnique({
-      where: { id: tierId },
-    });
-
-    if (!tier) {
-      throw new NotFoundException('Üyelik seviyesi bulunamadı');
-    }
-
-    const oldTier = { ...tier };
-
-    const updatedTier = await this.prisma.membershipTier.update({
-      where: { id: tierId },
-      data: {
-        name: dto.name,
-        description: dto.description,
-        monthlyPrice: dto.monthlyPrice !== undefined ? dto.monthlyPrice : undefined,
-        yearlyPrice: dto.yearlyPrice !== undefined ? dto.yearlyPrice : undefined,
-        maxFreeListings: dto.maxFreeListings,
-        maxTotalListings: dto.maxTotalListings,
-        maxImagesPerListing: dto.maxImagesPerListing,
-        canCreateCollections: dto.canCreateCollections,
-        canTrade: dto.canTrade,
-        isAdFree: dto.isAdFree,
-        featuredListingSlots: dto.featuredListingSlots,
-        commissionDiscount: dto.commissionDiscount !== undefined ? dto.commissionDiscount : undefined,
-        isActive: dto.isActive,
-        sortOrder: dto.sortOrder,
-      },
-    });
-
-    // Create audit log
-    await this.createAuditLog(adminId, 'membership_tier_update', 'MembershipTier', tierId, oldTier, updatedTier);
-
-    return updatedTier;
+    return this.membershipService.updateMembershipTier(adminId, tierId, dto);
   }
 
   // ==================== PRODUCT DELETION (ADMIN) ====================
