@@ -9,6 +9,8 @@ import {
   TrashIcon,
   ShoppingCartIcon,
   LockClosedIcon,
+  PlusIcon,
+  MinusIcon,
   // KUPON UI devre dışı (yoruma alındı) — sadece kupon bloğunda kullanılıyordu
   // TagIcon,
   // XMarkIcon,
@@ -27,6 +29,7 @@ export default function CartPage() {
     isLoading,
     fetchCart,
     removeFromCart,
+    updateQuantity,
     totalDiscount,
     appliedDiscounts,
     // KUPON UI devre dışı (yoruma alındı) — store API'si korunuyor
@@ -41,9 +44,15 @@ export default function CartPage() {
   // const [couponInput, setCouponInput] = useState("");
   // const [couponLoading, setCouponLoading] = useState(false);
 
+  // fetchCart'ı hem mount'ta hem de auth HAZIR olunca çalıştır. isAuthenticated mount'ta
+  // her zaman false başlar (hydration mismatch önlemi); checkAuth() cookie'yi doğrulayınca
+  // true'ya döner. Bağımlılığa isAuthenticated eklenmezse, mount'taki fetchCart auth henüz
+  // hazır değilken offline dala düşüp erken dönebiliyor ve items boş kalıyordu (kullanıcı
+  // reload'a kadar ürünleri göremiyordu). Auth true olunca yeniden çekince authed sepet
+  // güvenilir biçimde yüklenir.
   useEffect(() => {
     fetchCart();
-  }, [fetchCart]);
+  }, [fetchCart, isAuthenticated]);
 
   const handleRemove = async (productId: string) => {
     try {
@@ -51,6 +60,26 @@ export default function CartPage() {
       toast.success(t("product.removedFromCart"));
     } catch (error) {
       toast.error(t("product.removeFromCartFailed"));
+    }
+  };
+
+  // Adet artır/azalt. Hangi satır güncelleniyorsa butonları kilitle (çift-tık koruması).
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const handleQuantityChange = async (productId: string, nextQuantity: number) => {
+    if (nextQuantity < 1) return; // 1'in altı → kaldırma ayrı butonda
+    setUpdatingId(productId);
+    try {
+      await updateQuantity(productId, nextQuantity);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : locale === "en"
+            ? "Could not update quantity"
+            : "Adet güncellenemedi",
+      );
+    } finally {
+      setUpdatingId(null);
     }
   };
 
@@ -187,15 +216,50 @@ export default function CartPage() {
                     </p>
                   </div>
                 </div>
-                <IconButton
-                  variant="danger"
-                  size="sm"
-                  onClick={() => handleRemove(item.productId)}
-                  className="self-start"
-                  aria-label={locale === "en" ? "Remove item" : "Ürünü kaldır"}
-                >
-                  <TrashIcon className="w-5 h-5" />
-                </IconButton>
+                <div className="flex flex-col items-end justify-between self-stretch gap-2">
+                  <IconButton
+                    variant="danger"
+                    size="sm"
+                    onClick={() => handleRemove(item.productId)}
+                    aria-label={locale === "en" ? "Remove item" : "Ürünü kaldır"}
+                  >
+                    <TrashIcon className="w-5 h-5" />
+                  </IconButton>
+                  {/* Adet stepper: − mevcut adet, + . Tekil üründe (maxQuantity=1) + devre
+                      dışı olur; çıkarmak için Trash. maxQuantity backend'in kabul ettiği üst
+                      sınırla birebir (fiziksel stok ∧ sipariş-başına-maks). */}
+                  <div className="flex items-center gap-2">
+                    <IconButton
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        handleQuantityChange(item.productId, item.quantity - 1)
+                      }
+                      disabled={item.quantity <= 1 || updatingId === item.productId}
+                      aria-label={locale === "en" ? "Decrease quantity" : "Adet azalt"}
+                    >
+                      <MinusIcon className="w-4 h-4" />
+                    </IconButton>
+                    <span className="min-w-[2ch] text-center font-semibold text-heading tabular-nums">
+                      {item.quantity}
+                    </span>
+                    <IconButton
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        handleQuantityChange(item.productId, item.quantity + 1)
+                      }
+                      disabled={
+                        (item.maxQuantity != null &&
+                          item.quantity >= item.maxQuantity) ||
+                        updatingId === item.productId
+                      }
+                      aria-label={locale === "en" ? "Increase quantity" : "Adet artır"}
+                    >
+                      <PlusIcon className="w-4 h-4" />
+                    </IconButton>
+                  </div>
+                </div>
               </motion.div>
             ))}
             {/* Offline cart items (guest) */}

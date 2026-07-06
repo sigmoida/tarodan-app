@@ -42,6 +42,12 @@ export class CartItemResponseDto {
 
   @ApiPropertyOptional({ description: 'Stok uyarısı (düşük stok, stokta yok vb.)' })
   stockWarning?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Bu satırda sipariş edilebilecek maksimum adet (fiziksel stok ve sipariş-başına-maks birleşimi). Tanımsız = sınırsız stok.',
+  })
+  maxQuantity?: number;
 }
 
 export class AppliedDiscountDto {

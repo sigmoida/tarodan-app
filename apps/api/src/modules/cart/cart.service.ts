@@ -481,6 +481,17 @@ export class CartService {
       // Resolve product image URL (S3 key -> presigned URL)
       const resolvedImage = this.resolveProductImageUrl(product.images?.[0]?.cardKey);
 
+      // Bu satırda sipariş edilebilecek üst sınır = fiziksel stok ∧ sipariş-başına-maks.
+      // updateItem/addItem backend doğrulamasıyla BİREBİR aynı sınır (product.quantity +
+      // maxQuantityPerOrder) → frontend + butonu tam backend'in kabul ettiği yerde durur.
+      // İkisi de null ise (sınırsız stok, per-order limit yok) → undefined (üst sınır yok).
+      const stockCap = product.quantity; // null = sınırsız
+      const perOrderCap = product.maxQuantityPerOrder; // null = limit yok
+      const maxQuantity =
+        stockCap != null || perOrderCap != null
+          ? Math.min(stockCap ?? Infinity, perOrderCap ?? Infinity)
+          : undefined;
+
       items.push({
         id: item.id,
         productId: product.id,
@@ -496,6 +507,7 @@ export class CartService {
         productDiscount: productDiscount > 0 ? productDiscount : undefined,
         isAvailable,
         stockWarning,
+        maxQuantity,
       });
     }
 
