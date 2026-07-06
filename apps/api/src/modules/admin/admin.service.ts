@@ -23,6 +23,7 @@ import { AdminModerationService } from './admin-moderation.service';
 import { AdminPaymentService } from './admin-payment.service';
 import { AdminPayoutService } from './admin-payout.service';
 import { AdminTradeService } from './admin-trade.service';
+import { AdminRefundService } from './admin-refund.service';
 import {
   fulltextUserSearch,
   fulltextProductRatingSearch,
@@ -130,6 +131,7 @@ export class AdminService {
     private readonly adminPaymentService: AdminPaymentService,
     private readonly payoutService: AdminPayoutService,
     private readonly tradeService: AdminTradeService,
+    private readonly adminRefundService: AdminRefundService,
     @Optional()
     private readonly storageService: StorageService,
     @Optional()
@@ -717,15 +719,9 @@ export class AdminService {
     return this.tradeService.markReturnShipmentLost(adminId, tradeId, dto);
   }
 
-  /**
-   * Admin closes a pending compensation flag after settling the user out of
-   * band. Sets `compensationResolvedAt` so the banner disappears in the UI.
-   */
   // ==================== REFUND REQUEST ADMIN ====================
+  // Taşındı: admin-refund.service.ts — imzalar aynen korunuyor (facade delege).
 
-  /**
-   * List refund requests for admin operations queue.
-   */
   async listRefundRequests(query: {
     status?: import('@prisma/client').RefundRequestStatus[];
     userSearch?: string;
@@ -734,298 +730,23 @@ export class AdminService {
     page?: number;
     limit?: number;
   }) {
-    const page = query.page ?? 1;
-    const limit = Math.min(query.limit ?? 20, 100);
-    const where: Prisma.RefundRequestWhereInput = {};
-    if (query.status && query.status.length > 0) {
-      where.status = { in: query.status };
-    }
-    if (query.from || query.to) {
-      where.createdAt = {};
-      if (query.from) where.createdAt.gte = new Date(query.from);
-      if (query.to) where.createdAt.lte = new Date(query.to);
-    }
-    if (query.userSearch && query.userSearch.trim().length > 0) {
-      const term = query.userSearch.trim();
-      where.OR = [
-        { requester: { displayName: { contains: term, mode: 'insensitive' } } },
-        { requester: { email: { contains: term, mode: 'insensitive' } } },
-        { order: { seller: { displayName: { contains: term, mode: 'insensitive' } } } },
-        { order: { seller: { email: { contains: term, mode: 'insensitive' } } } },
-        { refundNumber: { contains: term, mode: 'insensitive' } },
-      ];
-    }
-
-    const [items, total] = await Promise.all([
-      this.prisma.refundRequest.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-        include: {
-          requester: { select: { id: true, displayName: true, email: true } },
-          order: {
-            select: {
-              id: true,
-              orderNumber: true,
-              totalAmount: true,
-              seller: { select: { id: true, displayName: true, email: true } },
-              product: {
-                select: {
-                  id: true,
-                  title: true,
-                  images: {
-                    take: 1,
-                    orderBy: { sortOrder: 'asc' },
-                    select: { cardKey: true },
-                  },
-                },
-              },
-            },
-          },
-        },
-      }),
-      this.prisma.refundRequest.count({ where }),
-    ]);
-    const mapped = items.map((rr: any) => {
-      const product = rr?.order?.product;
-      if (product) {
-        product.images = (product.images ?? [])
-          .map((img: any) => ({ url: this.resolveProductImageUrl(img?.cardKey) }))
-          .filter((img: any) => img.url);
-      }
-      return rr;
-    });
-    return { items: mapped, total, page, limit };
+    return this.adminRefundService.listRefundRequests(query);
   }
 
   async getRefundRequestDetail(refundRequestId: string) {
-    const rr = await this.prisma.refundRequest.findUnique({
-      where: { id: refundRequestId },
-      include: {
-        requester: {
-          select: { id: true, displayName: true, email: true, phone: true },
-        },
-        order: {
-          include: {
-            seller: {
-              select: { id: true, displayName: true, email: true, phone: true },
-            },
-            product: { include: { images: { orderBy: { sortOrder: 'asc' } } } },
-            payment: true,
-            shipment: true,
-          },
-        },
-      },
-    });
-    if (!rr) throw new NotFoundException('İade talebi bulunamadı');
-    const product = (rr as any)?.order?.product;
-    if (product) {
-      product.images = (product.images ?? [])
-        .map((img: any) => ({ url: this.resolveProductImageUrl(img?.cardKey) }))
-        .filter((img: any) => img.url);
-    }
-    return rr;
+    return this.adminRefundService.getRefundRequestDetail(refundRequestId);
   }
 
-  /**
-   * Force-finalize a refund stuck in `return_delivered`: call the existing
-   * finalize logic + audit log. Idempotent (finalizeRefundForReturnedShipment
-   * returns the row unchanged if already refunded).
-   */
   async forceFinalizeRefund(adminId: string, refundRequestId: string) {
-    const rr = await this.prisma.refundRequest.findUnique({
-      where: { id: refundRequestId },
-      select: { id: true, status: true, refundedAt: true },
-    });
-    if (!rr) throw new NotFoundException('İade talebi bulunamadı');
-    if (rr.refundedAt) {
-      throw new BadRequestException('Bu iade zaten tamamlanmış');
-    }
-    if (rr.status !== 'return_delivered') {
-      throw new BadRequestException(
-        `Talep durumu '${rr.status}' force-finalize için uygun değil. Beklenen: return_delivered`,
-      );
-    }
-    const result = await this.refundService.finalizeRefundForReturnedShipment(
-      rr.id,
-    );
-    await this.createAuditLog(
-      adminId,
-      'refund_force_finalize',
-      'RefundRequest',
-      rr.id,
-      { previousStatus: rr.status },
-      { newStatus: result.status, providerRefundId: result.providerRefundId },
-    );
-    return { success: true, refundRequestId: rr.id, status: result.status };
+    return this.adminRefundService.forceFinalizeRefund(adminId, refundRequestId);
   }
 
   async resolveTradeCompensation(adminId: string, tradeId: string, note?: string) {
-    const trade = await this.prisma.trade.findUnique({
-      where: { id: tradeId },
-      select: {
-        id: true,
-        compensationPendingUserId: true,
-        compensationResolvedAt: true,
-      },
-    });
-    if (!trade) {
-      throw new NotFoundException('Takas bulunamadı');
-    }
-    if (!trade.compensationPendingUserId) {
-      throw new BadRequestException('Bu takasta açık tazminat işareti yok');
-    }
-    if (trade.compensationResolvedAt) {
-      throw new BadRequestException('Tazminat zaten kapatılmış');
-    }
-
-    // O13: Gerçek tazminat ödemesi bu akışın DIŞINDA (manuel) yapılır; bu metot yalnız
-    // işareti kapatır. Kazara/kanıtsız kapatmayı önlemek için açıklama/dekont (note) ZORUNLU
-    // — audit izine yazılır.
-    if (!note || !note.trim()) {
-      throw new BadRequestException('Tazminat kapatma için açıklama/dekont (note) zorunludur');
-    }
-
-    const now = new Date();
-    await this.prisma.trade.update({
-      where: { id: tradeId },
-      data: { compensationResolvedAt: now },
-    });
-
-    await this.createAuditLog(
-      adminId,
-      'trade_compensation_resolved',
-      'Trade',
-      tradeId,
-      { compensationPendingUserId: trade.compensationPendingUserId },
-      { resolvedAt: now, note: note ?? null },
-    );
-
-    return { success: true, tradeId, resolvedAt: now };
+    return this.adminRefundService.resolveTradeCompensation(adminId, tradeId, note);
   }
 
-  /**
-   * Admin manually retries a PayTR refund that failed during
-   * `rejectWarehouseTrade` (or a previous retry). On success the failure
-   * markers on the trade are cleared; on repeated failure the marker is
-   * refreshed with the new error message.
-   */
   async retryTradeRefund(adminId: string, tradeId: string) {
-    const trade = await this.prisma.trade.findUnique({
-      where: { id: tradeId },
-      select: {
-        id: true,
-        status: true,
-        refundFailureReason: true,
-        refundFailureAt: true,
-        cashPayment: {
-          select: { id: true, status: true },
-        },
-      },
-    });
-    if (!trade) {
-      throw new NotFoundException('Takas bulunamadı');
-    }
-
-    if (!trade.cashPayment || trade.cashPayment.status !== PaymentStatus.completed) {
-      throw new BadRequestException(
-        'İade edilebilecek tamamlanmış bir nakit ödeme yok',
-      );
-    }
-
-    const eligibleStatuses: TradeStatus[] = [
-      TradeStatus.returning,
-      TradeStatus.cancelled,
-      TradeStatus.disputed,
-    ];
-    if (!eligibleStatuses.includes(trade.status)) {
-      throw new BadRequestException(
-        `Takas durumu '${trade.status}' iade yeniden denemesi için uygun değil`,
-      );
-    }
-
-    if (!trade.refundFailureReason) {
-      throw new BadRequestException(
-        'Bu takasta kayıtlı bir iade hatası yok; yeniden deneme gerekmiyor',
-      );
-    }
-
-    const cashPayment = await this.prisma.tradeCashPayment.findUnique({
-      where: { tradeId },
-      select: { payerId: true },
-    });
-
-    try {
-      const result = await this.paymentService.refundTradeCashPaymentIfCompleted(tradeId);
-      await this.prisma.trade.update({
-        where: { id: tradeId },
-        data: { refundFailureReason: null, refundFailureAt: null },
-      });
-      await this.createAuditLog(
-        adminId,
-        'trade_refund_retry_success',
-        'Trade',
-        tradeId,
-        {
-          previousFailureReason: trade.refundFailureReason,
-          previousFailureAt: trade.refundFailureAt,
-        },
-        result,
-      );
-      try {
-        await this.eventService.emitTradeRefundCompleted({
-          tradeId,
-          cashPayerId: cashPayment?.payerId ?? null,
-        });
-      } catch (emitErr) {
-        this.logger.error(
-          `Failed to emit trade.refund-completed for trade ${tradeId}: ${emitErr}`,
-        );
-      }
-      return { success: true, tradeId, refunded: result.refunded, skippedReason: result.skippedReason };
-    } catch (err: any) {
-      const message = err?.message ?? 'Bilinmeyen hata (PayTR iade başarısız)';
-      this.logger.error(
-        `retryTradeRefund failed for trade ${tradeId}: ${message}`,
-      );
-      try {
-        await this.prisma.trade.update({
-          where: { id: tradeId },
-          data: {
-            refundFailureReason: message.slice(0, 500),
-            refundFailureAt: new Date(),
-          },
-        });
-      } catch (persistErr: any) {
-        this.logger.error(
-          `Failed to persist refund retry failure for trade ${tradeId}: ${persistErr?.message}`,
-        );
-      }
-      await this.createAuditLog(
-        adminId,
-        'trade_refund_retry_failure',
-        'Trade',
-        tradeId,
-        {
-          previousFailureReason: trade.refundFailureReason,
-          previousFailureAt: trade.refundFailureAt,
-        },
-        { message },
-      );
-      try {
-        await this.eventService.emitTradeRefundFailed({
-          tradeId,
-          cashPayerId: cashPayment?.payerId ?? null,
-          reason: message,
-        });
-      } catch (emitErr) {
-        this.logger.error(
-          `Failed to emit trade.refund-failed for trade ${tradeId}: ${emitErr}`,
-        );
-      }
-      throw err;
-    }
+    return this.adminRefundService.retryTradeRefund(adminId, tradeId);
   }
 
   // ==================== MESSAGE MANAGEMENT ====================
