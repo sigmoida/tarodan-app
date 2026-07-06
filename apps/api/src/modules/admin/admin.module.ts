@@ -27,6 +27,7 @@ import { AdminNotificationService } from './admin-notification.service';
 import { AdminLogsService } from './admin-logs.service';
 import { AdminShippingService } from './admin-shipping.service';
 import { AdminReviewService } from './admin-review.service';
+import { AdminSellerApplicationService } from './admin-seller-application.service';
 import { ScheduledNotificationScheduler } from './scheduled-notification.scheduler';
 import { ScheduledNotificationProcessor } from './scheduled-notification.processor';
 import { QUEUE_NAMES } from '../../workers/constants';
@@ -73,7 +74,7 @@ import { OrderModule } from '../order/order.module';
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [AdminController],
-  providers: [AdminService, AdminAuditService, AdminCommissionService, AdminSettingsService, AdminUserService, AdminStaffService, AdminProductService, AdminOrderService, AdminAnalyticsService, AdminModerationService, AdminPaymentService, AdminPayoutService, AdminTradeService, AdminRefundService, AdminMessagingService, AdminSupportService, AdminContentService, AdminTaxService, AdminMembershipService, AdminCatalogService, AdminCollectionService, AdminNotificationService, AdminLogsService, AdminShippingService, AdminReviewService, ScheduledNotificationScheduler, ScheduledNotificationProcessor],
+  providers: [AdminService, AdminAuditService, AdminCommissionService, AdminSettingsService, AdminUserService, AdminStaffService, AdminProductService, AdminOrderService, AdminAnalyticsService, AdminModerationService, AdminPaymentService, AdminPayoutService, AdminTradeService, AdminRefundService, AdminMessagingService, AdminSupportService, AdminContentService, AdminTaxService, AdminMembershipService, AdminCatalogService, AdminCollectionService, AdminNotificationService, AdminLogsService, AdminShippingService, AdminReviewService, AdminSellerApplicationService, ScheduledNotificationScheduler, ScheduledNotificationProcessor],
   exports: [AdminService],
 })
 export class AdminModule { }
