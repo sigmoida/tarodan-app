@@ -13,7 +13,6 @@ import {
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { MembershipService } from '../membership/membership.service';
-import { StorageService } from '../storage/storage.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { EventService } from '../events';
@@ -31,6 +30,8 @@ import { TRADE_VALID_TRANSITIONS, computeTradeCanCancel } from './trade.state-ma
 import { PaymentService } from '../payment/payment.service';
 import { ProductLockService } from '../product/product-lock.service';
 import { TradeShipmentService } from './trade-shipment.service';
+import { TradeCommonService } from './trade-common.service';
+import { TradeQueryService } from './trade-query.service';
 import {
   CreateTradeDto,
   TradeQueryDto,
@@ -46,15 +47,6 @@ import {
   TradeListResponseDto,
 } from './dto';
 
-// Depo-escrow akışındaki "Kargoda" statüleri — trades 'shipping' liste filtresi ve
-// status-counts.shipping tek kaynaktan bunu kullanır (mobil SHIPPING_STATUSES ile birebir).
-const SHIPPING_TRADE_STATUSES: TradeStatus[] = [
-  TradeStatus.shipping_to_warehouse,
-  TradeStatus.at_warehouse,
-  TradeStatus.admin_reviewing,
-  TradeStatus.shipping_to_recipients,
-];
-
 @Injectable()
 export class TradeService {
   private readonly logger = new Logger(TradeService.name);
@@ -68,10 +60,10 @@ export class TradeService {
     private readonly paymentService: PaymentService,
     private readonly productLockService: ProductLockService,
     @Optional()
-    private readonly storageService: StorageService,
-    @Optional()
     private readonly eventService: EventService,
     private readonly tradeShipment: TradeShipmentService,
+    private readonly tradeCommon: TradeCommonService,
+    private readonly tradeQuery: TradeQueryService,
   ) {}
 
   // Taşındı: trade-shipment.service.ts — Sürat kargo orkestrasyonu
@@ -304,149 +296,28 @@ export class TradeService {
     return this.getTradeById(trade.id, initiatorId);
   }
 
-  // ==========================================================================
-  // GET TRADE BY ID
-  // ==========================================================================
+  // Taşındı: trade-query.service.ts — sorgu/listeleme metodları
+  // (facade delege; imzalar aynen korunuyor).
+
   async getTradeById(tradeId: string, userId: string): Promise<TradeResponseDto> {
-    const trade = await this.prisma.trade.findUnique({
-      where: { id: tradeId },
-      include: {
-        initiator: { select: { id: true, displayName: true } },
-        receiver: { select: { id: true, displayName: true } },
-        items: {
-          include: {
-            product: {
-              select: { id: true, title: true, images: { orderBy: { sortOrder: 'asc' }, take: 1 } },
-            },
-          },
-        },
-        shipments: true,
-        cashPayment: true,
-        dispute: true,
-      },
-    });
-
-    if (!trade) {
-      throw new NotFoundException('Takas bulunamadı');
-    }
-
-    // Only participants can view trade details
-    if (trade.initiatorId !== userId && trade.receiverId !== userId) {
-      throw new ForbiddenException('Bu takası görüntüleme yetkiniz yok');
-    }
-
-    return await this.mapToResponseDto(trade, userId);
+    return this.tradeQuery.getTradeById(tradeId, userId);
   }
 
-  // ==========================================================================
-  // PENDING COUNT FOR BADGE
-  // ==========================================================================
   async getPendingCount(userId: string) {
-    const [received, sent] = await Promise.all([
-      this.prisma.trade.count({
-        where: {
-          receiverId: userId,
-          status: TradeStatus.pending,
-        },
-      }),
-      this.prisma.trade.count({
-        where: {
-          initiatorId: userId,
-          status: TradeStatus.pending,
-        },
-      }),
-    ]);
-
-    return {
-      received,
-      sent,
-      total: received + sent,
-    };
+    return this.tradeQuery.getPendingCount(userId);
   }
 
-  // ==========================================================================
-  // LIST USER TRADES
-  // ==========================================================================
   async listUserTrades(
     userId: string,
     query: TradeQueryDto,
   ): Promise<TradeListResponseDto> {
-    const { status, statusGroup, role, page = 1, pageSize = 20, sortBy = 'createdAt', sortOrder = 'desc' } = query;
-
-    const where: Prisma.TradeWhereInput = {};
-
-    // Filter by role
-    if (role === 'initiator') {
-      where.initiatorId = userId;
-    } else if (role === 'receiver') {
-      where.receiverId = userId;
-    } else {
-      where.OR = [{ initiatorId: userId }, { receiverId: userId }];
-    }
-
-    // Filter by status. statusGroup ('shipping') çoklu-statü → tek enum'dan önceliklidir.
-    // Sunucu tarafı filtre: 'Kargoda' artık 20'lik sayfaya takılmadan tüm eşleşenleri döndürür.
-    if (statusGroup === 'shipping') {
-      where.status = { in: SHIPPING_TRADE_STATUSES };
-    } else if (status) {
-      where.status = status;
-    }
-
-    const [trades, total] = await Promise.all([
-      this.prisma.trade.findMany({
-        where,
-        include: {
-          initiator: { select: { id: true, displayName: true } },
-          receiver: { select: { id: true, displayName: true } },
-        items: {
-          include: {
-            product: {
-              select: { id: true, title: true, images: { orderBy: { sortOrder: 'asc' }, take: 1 } },
-            },
-          },
-        },
-        shipments: true,
-        cashPayment: true,
-        dispute: true,
-        },
-        orderBy: { [sortBy]: sortOrder },
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-      }),
-      this.prisma.trade.count({ where }),
-    ]);
-
-    return {
-      trades: await Promise.all(trades.map((t) => this.mapToResponseDto(t, userId))),
-      total,
-      page,
-      pageSize,
-    };
+    return this.tradeQuery.listUserTrades(userId, query);
   }
 
-  /**
-   * Trades sekmesi sayaçları — filtreden ve sayfalamadan bağımsız tek groupBy.
-   * all = profil "Takaslar" tile'ı ile birebir (OR initiator/receiver, statü filtresiz).
-   */
   async getTradeStatusCounts(
     userId: string,
   ): Promise<{ all: number; pending: number; shipping: number; completed: number }> {
-    const rows = await this.prisma.trade.groupBy({
-      by: ['status'],
-      where: { OR: [{ initiatorId: userId }, { receiverId: userId }] },
-      _count: { _all: true },
-    });
-    const by = new Map<TradeStatus, number>(
-      rows.map((r) => [r.status, r._count._all]),
-    );
-    const all = rows.reduce((n, r) => n + r._count._all, 0);
-    const shipping = SHIPPING_TRADE_STATUSES.reduce((n, s) => n + (by.get(s) ?? 0), 0);
-    return {
-      all,
-      pending: by.get(TradeStatus.pending) ?? 0,
-      shipping,
-      completed: by.get(TradeStatus.completed) ?? 0,
-    };
+    return this.tradeQuery.getTradeStatusCounts(userId);
   }
 
   // ==========================================================================
@@ -2022,26 +1893,18 @@ export class TradeService {
   // HELPER METHODS
   // ==========================================================================
 
-  /** Invalidate product detail cache for given product IDs. */
+  // Taşındı: trade-common.service.ts — ürün cache invalidation (facade'de
+  // private delege; kalan lifecycle/reconciliation metodları kullanıyor).
+  // Yanıt formatlama yardımcıları (mapToResponseDto, mapTradeItemToDto,
+  // resolveProductImageUrl, computeCanCancel) da trade-common'a taşındı;
+  // facade'de kullanıcı kalmadığı için delege bırakılmadı.
+
   private async invalidateProductCaches(productIds: string[]): Promise<void> {
-    for (const productId of [...new Set(productIds)]) {
-      await this.cache.del(`products:detail:${productId}`);
-    }
-    // Takas akışı stok/statü değiştirir (tükenme → inactive, geri dönüş → active,
-    // rezerv). Bu, listelerdeki görünürlük ve "stokta yok" sıralamasını etkiler →
-    // ürün listesi cache'ini temizle.
-    if (productIds.length > 0) {
-      await this.cache.delPattern('products:list:*').catch(() => {});
-    }
+    return this.tradeCommon.invalidateProductCaches(productIds);
   }
 
-  /** Invalidate product detail cache for all products in a trade (after reserved/quantity changes). */
   private async invalidateProductCachesForTrade(tradeId: string): Promise<void> {
-    const items = await this.prisma.tradeItem.findMany({
-      where: { tradeId },
-      select: { productId: true },
-    });
-    await this.invalidateProductCaches(items.map((i) => i.productId));
+    return this.tradeCommon.invalidateProductCachesForTrade(tradeId);
   }
 
   /**
@@ -2068,226 +1931,6 @@ export class TradeService {
     return trade;
   }
 
-  /**
-   * Resolve product image URL (S3 key -> public URL). Any non-URL key is treated as S3 key.
-   */
-  private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
-    if (!imageKeyOrUrl) return null;
-    if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
-    return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
-  }
-
-  private mapTradeItemToDto(item: any): {
-    id: string;
-    productId: string;
-    productTitle: string;
-    productImage?: string;
-    productImages?: { cardUrl: string; detailUrl?: string }[];
-    side: string;
-    quantity: number;
-    valueAtTrade: number;
-  } {
-    const firstImg = item.product?.images?.[0];
-    const cardUrl = firstImg?.cardKey ? this.storageService.getPublicAssetUrl(firstImg.cardKey) : undefined;
-    const detailUrl = firstImg?.detailKey ? this.storageService.getPublicAssetUrl(firstImg.detailKey) : undefined;
-    const productImage = this.resolveProductImageUrl(firstImg?.cardKey);
-    const productImages =
-      cardUrl || detailUrl ? [{ cardUrl: cardUrl ?? '', detailUrl }] : undefined;
-    return {
-      id: item.id,
-      productId: item.productId,
-      productTitle: item.product?.title || '',
-      productImage: productImage ?? undefined,
-      productImages,
-      side: item.side,
-      quantity: item.quantity,
-      valueAtTrade: parseFloat(item.valueAtTrade),
-    };
-  }
-
-  private async mapToResponseDto(
-    trade: any,
-    viewerUserId?: string | null,
-  ): Promise<TradeResponseDto> {
-    const initiatorShipment = trade.shipments?.find(
-      (s: any) => s.shipperId === trade.initiatorId,
-    );
-    const receiverShipment = trade.shipments?.find(
-      (s: any) => s.shipperId === trade.receiverId,
-    );
-
-    // ----------------------------------------------------------------------
-    // Shipment privacy (safe-trade escrow leg visibility rules)
-    //
-    // to_warehouse:
-    //   - User sees own tracking always.
-    //   - Counterparty tracking hidden until BOTH parties have shipped.
-    // from_warehouse:
-    //   - Only recipient sees their own incoming shipment.
-    //   - Counterparty's from_warehouse shipment is filtered out entirely.
-    //   - Hidden until BOTH from_warehouse shipments are created.
-    // return:
-    //   - Only recipient sees their own return shipment.
-    //
-    // When viewerUserId is null/undefined (internal / admin context),
-    // no filtering is applied.
-    // ----------------------------------------------------------------------
-    const rawShipments: any[] = trade.shipments || [];
-    const toWarehouseShipments = rawShipments.filter((s) => s.leg === 'to_warehouse');
-    const fromWarehouseShipments = rawShipments.filter((s) => s.leg === 'from_warehouse');
-    const bothToWarehouseShipped =
-      toWarehouseShipments.length >= 2 &&
-      toWarehouseShipments.every((s) => s.shippedAt);
-    const bothFromWarehouseCreated = fromWarehouseShipments.length >= 2;
-
-    const applyShipmentPrivacy = (s: any): any | null => {
-      if (!viewerUserId) return s; // admin/internal view — no filtering
-      const leg = s.leg || 'to_warehouse';
-
-      if (leg === 'to_warehouse') {
-        const isMine = s.shipperId === viewerUserId;
-        if (isMine || bothToWarehouseShipped) return s;
-        // Hide counterparty tracking until both shipped
-        return { ...s, trackingNumber: null };
-      }
-
-      if (leg === 'from_warehouse') {
-        const isForMe = s.recipientUserId === viewerUserId;
-        if (!isForMe) return null; // never see counterparty's incoming leg
-        if (!bothFromWarehouseCreated) return null;
-        return s;
-      }
-
-      if (leg === 'return') {
-        const isForMe = s.recipientUserId === viewerUserId;
-        if (!isForMe) return null;
-        return s;
-      }
-
-      return s;
-    };
-
-    const visibleShipments = rawShipments
-      .map(applyShipmentPrivacy)
-      .filter((s): s is any => s !== null);
-
-    return {
-      id: trade.id,
-      tradeNumber: trade.tradeNumber,
-      initiatorId: trade.initiatorId,
-      initiatorName: trade.initiator?.displayName || '',
-      receiverId: trade.receiverId,
-      receiverName: trade.receiver?.displayName || '',
-      status: trade.status,
-      initiatorItems: (trade.items || [])
-        .filter((item: any) => item.side === 'initiator')
-        .map((item: any) => this.mapTradeItemToDto(item)),
-      receiverItems: (trade.items || [])
-        .filter((item: any) => item.side === 'receiver')
-        .map((item: any) => this.mapTradeItemToDto(item)),
-      cashAmount: trade.cashAmount ? parseFloat(trade.cashAmount) : undefined,
-      cashPayerId: trade.cashPayerId || undefined,
-      cashCommission: trade.cashCommission
-        ? parseFloat(trade.cashCommission)
-        : undefined,
-      initiatorMessage: trade.initiatorMessage || undefined,
-      receiverMessage: trade.receiverMessage || undefined,
-      responseDeadline: trade.responseDeadline,
-      paymentDeadline: trade.paymentDeadline || undefined,
-      shippingDeadline: trade.shippingDeadline || undefined,
-      confirmationDeadline: trade.confirmationDeadline || undefined,
-      initiatorShipment: initiatorShipment
-        ? {
-            id: initiatorShipment.id,
-            shipperId: initiatorShipment.shipperId,
-            shipperName: trade.initiator?.displayName || '',
-            carrier: initiatorShipment.carrier,
-            // Hide counterparty tracking until both to_warehouse shipped
-            trackingNumber:
-              !viewerUserId ||
-              viewerUserId === initiatorShipment.shipperId ||
-              bothToWarehouseShipped
-                ? initiatorShipment.trackingNumber
-                : null,
-            status: initiatorShipment.status,
-            shippedAt: initiatorShipment.shippedAt,
-            deliveredAt: initiatorShipment.deliveredAt,
-            confirmedAt: initiatorShipment.confirmedAt,
-          }
-        : undefined,
-      receiverShipment: receiverShipment
-        ? {
-            id: receiverShipment.id,
-            shipperId: receiverShipment.shipperId,
-            shipperName: trade.receiver?.displayName || '',
-            carrier: receiverShipment.carrier,
-            trackingNumber:
-              !viewerUserId ||
-              viewerUserId === receiverShipment.shipperId ||
-              bothToWarehouseShipped
-                ? receiverShipment.trackingNumber
-                : null,
-            status: receiverShipment.status,
-            shippedAt: receiverShipment.shippedAt,
-            deliveredAt: receiverShipment.deliveredAt,
-            confirmedAt: receiverShipment.confirmedAt,
-          }
-        : undefined,
-      shipments: visibleShipments.map((shipment: any) => ({
-        id: shipment.id,
-        direction: shipment.leg || 'to_warehouse',
-        senderUserId: shipment.shipperId || undefined,
-        recipientUserId: shipment.recipientUserId || undefined,
-        carrier: shipment.carrier || undefined,
-        trackingNumber: shipment.trackingNumber || undefined,
-        status: shipment.status || undefined,
-        shippedAt: shipment.shippedAt || undefined,
-        deliveredAt: shipment.deliveredAt || undefined,
-      })),
-      cashPayment: trade.cashPayment
-        ? {
-            id: trade.cashPayment.id,
-            payerId: trade.cashPayment.payerId,
-            recipientId: trade.cashPayment.recipientId,
-            amount: parseFloat(trade.cashPayment.amount),
-            commission: parseFloat(trade.cashPayment.commission),
-            totalAmount: parseFloat(trade.cashPayment.totalAmount),
-            status: trade.cashPayment.status,
-            paidAt: trade.cashPayment.paidAt,
-          }
-        : undefined,
-      dispute: trade.dispute
-        ? {
-            id: trade.dispute.id,
-            raisedById: trade.dispute.raisedById,
-            reason: trade.dispute.reason,
-            description: trade.dispute.description,
-            resolution: trade.dispute.resolution,
-            resolvedAt: trade.dispute.resolvedAt,
-          }
-        : undefined,
-      acceptedAt: trade.acceptedAt || undefined,
-      completedAt: trade.completedAt || undefined,
-      cancelledAt: trade.cancelledAt || undefined,
-      cancelReason: trade.cancelReason || undefined,
-      firstWarehouseArrivalAt: trade.firstWarehouseArrivalAt ?? null,
-      canCancel: this.computeCanCancel(trade, viewerUserId),
-      version: trade.version || undefined,
-      createdAt: trade.createdAt,
-      updatedAt: trade.updatedAt,
-    };
-  }
-
-  private computeCanCancel(trade: any, viewerUserId?: string | null): boolean {
-    // Kargoya verme sinyalini shipments'tan türet (yüklüyse): to_warehouse
-    // bacaklarından biri shippedAt aldıysa kullanıcı iptali kapanır.
-    const handedToCargo = Array.isArray(trade?.shipments)
-      ? trade.shipments.some(
-          (s: any) => s?.leg === 'to_warehouse' && s?.shippedAt != null,
-        )
-      : false;
-    return computeTradeCanCancel({ ...trade, handedToCargo }, viewerUserId);
-  }
 }
 
 // Geriye dönük uyumluluk: state-machine artık ./trade.state-machine'de yaşıyor;
