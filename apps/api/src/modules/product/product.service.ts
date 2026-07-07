@@ -6,8 +6,6 @@ import {
   BadRequestException,
   ConflictException,
   InternalServerErrorException,
-  Inject,
-  forwardRef,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
@@ -47,7 +45,6 @@ export class ProductService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
-    @Inject(forwardRef(() => MembershipService))
     private readonly membershipService: MembershipService,
     private readonly searchService: SearchService,
     private readonly notificationService: NotificationService,

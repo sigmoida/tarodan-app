@@ -1,7 +1,5 @@
 import {
   Injectable,
-  Inject,
-  forwardRef,
   BadRequestException,
   ForbiddenException,
   NotFoundException,
@@ -36,7 +34,6 @@ export class ProductBoostService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @Inject(forwardRef(() => PaymentService))
     private readonly paymentService: PaymentService,
   ) {}
 

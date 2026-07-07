@@ -1,11 +1,9 @@
 import {
   BadRequestException,
   ForbiddenException,
-  Inject,
   Injectable,
   Logger,
   NotFoundException,
-  forwardRef,
 } from '@nestjs/common';
 import {
   OrderStatus,
@@ -48,7 +46,7 @@ export class RefundService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @Inject(forwardRef(() => PaymentService)) private readonly paymentService: PaymentService,
+    private readonly paymentService: PaymentService,
     private readonly suratCargoService: SuratCargoService,
     private readonly notificationService: NotificationService,
     private readonly storageService: StorageService,
