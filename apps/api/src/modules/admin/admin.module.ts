@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bull';
-import { AdminController } from './admin.controller';
 import { AdminCommissionController } from './admin-commission.controller';
 import { AdminUserController } from './admin-user.controller';
 import { AdminProductController } from './admin-product.controller';
@@ -18,6 +17,11 @@ import { AdminNotificationController } from './admin-notification.controller';
 import { AdminCatalogController } from './admin-catalog.controller';
 import { AdminTaxController } from './admin-tax.controller';
 import { AdminCollectionController } from './admin-collection.controller';
+import { AdminAdvertisementController } from './admin-advertisement.controller';
+import { AdminShippingController } from './admin-shipping.controller';
+import { AdminLogsController } from './admin-logs.controller';
+import { AdminReviewController } from './admin-review.controller';
+import { AdminSellerApplicationController } from './admin-seller-application.controller';
 import { AdminService } from './admin.service';
 import { AdminAuditService } from './admin-audit.service';
 import { AdminCommissionService } from './admin-commission.service';
@@ -89,7 +93,7 @@ import { OrderModule } from '../order/order.module';
     ModerationModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
-  controllers: [AdminController, AdminCommissionController, AdminUserController, AdminProductController, AdminOrderController, AdminAnalyticsController, AdminModerationController, AdminPaymentController, AdminTradeController, AdminRefundController, AdminContentController, AdminMessagingController, AdminSupportController, AdminNotificationController, AdminCatalogController, AdminTaxController, AdminCollectionController],
+  controllers: [AdminCommissionController, AdminUserController, AdminProductController, AdminOrderController, AdminAnalyticsController, AdminModerationController, AdminPaymentController, AdminTradeController, AdminRefundController, AdminContentController, AdminMessagingController, AdminSupportController, AdminNotificationController, AdminCatalogController, AdminTaxController, AdminCollectionController, AdminAdvertisementController, AdminShippingController, AdminLogsController, AdminReviewController, AdminSellerApplicationController],
   providers: [AdminService, AdminAuditService, AdminCommissionService, AdminSettingsService, AdminUserService, AdminStaffService, AdminProductService, AdminOrderService, AdminAnalyticsService, AdminModerationService, AdminPaymentService, AdminPayoutService, AdminTradeService, AdminRefundService, AdminMessagingService, AdminSupportService, AdminContentService, AdminTaxService, AdminMembershipService, AdminCatalogService, AdminCollectionService, AdminNotificationService, AdminLogsService, AdminShippingService, AdminReviewService, AdminSellerApplicationService, ScheduledNotificationScheduler, ScheduledNotificationProcessor],
   exports: [AdminService],
 })
