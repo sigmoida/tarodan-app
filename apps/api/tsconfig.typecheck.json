@@ -1,0 +1,10 @@
+{
+  "//": "Type-check-only config. Unlike tsconfig.json (which scopes to src for build) this ALSO type-checks test/ and scripts/, so signature drift in specs/e2e is caught in CI — not only at ts-jest runtime. Used by the `typecheck` npm script; the build still uses tsconfig.build.json (tests excluded from dist).",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": false
+  },
+  "include": ["src/**/*", "prisma/**/*", "test/**/*", "scripts/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
