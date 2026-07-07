@@ -260,9 +260,9 @@ export class OrderCheckoutDirectService {
 
       // Calculate shipping cost (free shipping for orders >= 500 TL)
       const shippingCost = await this.orderPricing.calculateShippingCost(discountedPrice);
-      // KDV: kurumsal satıcı ise ürün fiyatı üzerinden
-      const taxAmount = await this.checkoutCommon.resolveSellerTax(product.sellerId, product.categoryId, discountedPrice);
-      // Buyer fee + KDV eklenir
+      // KDV + stopaj: kurumsal satıcı ise ürün fiyatı üzerinden
+      const { taxAmount, withholdingTaxAmount } = await this.checkoutCommon.resolveSellerTaxes(product.sellerId, product.categoryId, discountedPrice);
+      // Buyer fee + KDV eklenir (stopaj alıcı tutarını etkilemez; satıcı payout'undan kesilir)
       const totalAmount = discountedPrice + shippingCost + commissionResult.buyerFeeAmount + taxAmount;
 
       // Generate order number
@@ -356,6 +356,7 @@ export class OrderCheckoutDirectService {
           } : undefined,
           shippingCost,
           taxAmount,
+          withholdingTaxAmount,
           commissionAmount: commissionResult.commissionAmount,
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
@@ -571,9 +572,10 @@ export class OrderCheckoutDirectService {
         orderNumberPreview: orderNumber,
       });
 
-      // KDV: kurumsal satıcı ise ürün fiyatı üzerinden
-      const offerTaxAmount = await this.checkoutCommon.resolveSellerTax(offer.sellerId, offer.product.categoryId, Number(offer.amount));
-      // Buyer fee + KDV eklenir
+      // KDV + stopaj: kurumsal satıcı ise ürün fiyatı üzerinden
+      const { taxAmount: offerTaxAmount, withholdingTaxAmount: offerWithholdingAmount } =
+        await this.checkoutCommon.resolveSellerTaxes(offer.sellerId, offer.product.categoryId, Number(offer.amount));
+      // Buyer fee + KDV eklenir (stopaj satıcı payout'undan kesilir)
       const totalAmount = Number(offer.amount) + commissionResult.buyerFeeAmount + offerTaxAmount;
 
       const offerShippingJson: Record<string, unknown> | undefined = shippingAddress
@@ -613,6 +615,7 @@ export class OrderCheckoutDirectService {
           checkoutGroupId: offerOrderGroup.id,
           totalAmount,
           taxAmount: offerTaxAmount,
+          withholdingTaxAmount: offerWithholdingAmount,
           commissionAmount: commissionResult.commissionAmount,
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,

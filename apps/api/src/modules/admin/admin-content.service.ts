@@ -157,6 +157,8 @@ export class AdminContentService {
     // Misafir
     { key: 'guest-checkout-otp',          name: 'Misafir sipariş OTP kodu',             group: 'Misafir' },
     // Fatura
+    { key: 'elogo-invoice',               name: 'e-Arşiv / e-Fatura (Tarodan, PDF ekli)', group: 'Fatura' },
+    { key: 'seller-invoice',              name: 'Satıcı faturası (kurumsal, PDF ekli)',    group: 'Fatura' },
     { key: 'invoice-buyer',               name: 'Fatura (alıcı)',                       group: 'Fatura' },
     { key: 'invoice-seller',              name: 'Satış faturası (satıcı)',               group: 'Fatura' },
     // Sipariş iptali

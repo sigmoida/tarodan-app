@@ -136,12 +136,15 @@ export class OrderCommonService {
     const sellerFeeAmount = Number(order.sellerFeeAmount ?? 0);
     const commissionAmount = Number(order.commissionAmount ?? 0);
     const taxAmount = Number(order.taxAmount ?? 0);
+    // E-ticaret stopajı (GVK 94/19): kurumsal satıcıda KDV hariç bedelden kesilir,
+    // satıcı net kazancından düşülür (order.withholdingTaxAmount olarak persist edilir).
+    const withholdingTaxAmount = Number(order.withholdingTaxAmount ?? 0);
     // Ürün tutarı KDV HARİÇ gösterilir; KDV ayrı satır olarak surface edilir.
     // (totalAmount = subtotal + kargo + buyerFee + KDV — bkz. createCheckoutQuote)
     const subtotal = totalAmount - shippingCost - buyerFeeAmount - taxAmount;
     // Net kazanç davranışı korunur: KDV gerçekte satıcı payout'una (escrow hold)
-    // dahil edildiğinden net kazanca da dahildir → subtotal + KDV − sellerFee.
-    const sellerNetAmount = Math.max(0, subtotal + taxAmount - sellerFeeAmount);
+    // dahil edildiğinden net kazanca da dahildir → subtotal + KDV − sellerFee − stopaj.
+    const sellerNetAmount = Math.max(0, subtotal + taxAmount - sellerFeeAmount - withholdingTaxAmount);
 
     const pricing = {
       subtotal,
@@ -150,6 +153,7 @@ export class OrderCommonService {
       sellerFeeAmount,
       commissionAmount,
       taxAmount,
+      withholdingTaxAmount,
       totalAmount,
       sellerNetAmount,
     };

@@ -194,6 +194,17 @@ export class SuratCargoService {
       return { ok: true, suratMessage: 'integration_disabled' };
     }
 
+    // Uzak iptal desteklemeyen bir client için güvenli davranış: akışı bozmadan
+    // iptali YEREL olarak tutarlı say (çağıran kargoyu 'cancelled' işaretler).
+    // Not: REST client artık GonderiGeriCek, SOAP client GonderiSil ile uzak iptali
+    // destekler; bu dal yalnızca gelecekte cancel'sız bir client için geçerli.
+    if (!this.soapClient.supportsRemoteCancel()) {
+      this.logger.warn(
+        `Surat uzak iptal desteklenmiyor — yalnızca yerel iptal ref=${ozelKargoTakipNo}.`,
+      );
+      return { ok: true, suratMessage: 'remote_cancel_unsupported_local_only' };
+    }
+
     const timeoutMs = Number(this.configService.get('SURAT_SOAP_TIMEOUT_MS', '15000')) || 15000;
 
     try {

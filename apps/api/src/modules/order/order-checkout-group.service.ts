@@ -358,6 +358,7 @@ export class OrderCheckoutGroupService {
           commissionResult: CommissionResult;
           shippingCost: number;
           taxAmount: number;
+          withholdingTaxAmount: number;
           totalAmount: number;
           suratIdempotencyKey: string;
         }> = [];
@@ -373,7 +374,7 @@ export class OrderCheckoutGroupService {
             entry.product.categoryId,
           );
           const shippingCost = await this.orderPricing.calculateShippingCost(discountedPrice);
-          const taxAmount = await this.checkoutCommon.resolveSellerTax(entry.product.sellerId, entry.product.categoryId, discountedPrice);
+          const { taxAmount, withholdingTaxAmount } = await this.checkoutCommon.resolveSellerTaxes(entry.product.sellerId, entry.product.categoryId, discountedPrice);
           const totalAmount =
             discountedPrice + shippingCost + commissionResult.buyerFeeAmount + taxAmount;
           const orderNumber = await this.checkoutCommon.generateOrderNumber();
@@ -402,6 +403,7 @@ export class OrderCheckoutGroupService {
             commissionResult,
             shippingCost,
             taxAmount,
+            withholdingTaxAmount,
             totalAmount,
             suratIdempotencyKey,
           });
@@ -490,6 +492,7 @@ export class OrderCheckoutGroupService {
                   : undefined,
               shippingCost: input.shippingCost,
               taxAmount: input.taxAmount,
+              withholdingTaxAmount: input.withholdingTaxAmount,
               commissionAmount: input.commissionResult.commissionAmount,
               buyerFeeAmount: input.commissionResult.buyerFeeAmount,
               sellerFeeAmount: input.commissionResult.sellerFeeAmount,

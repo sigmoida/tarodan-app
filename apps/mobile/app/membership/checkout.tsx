@@ -119,11 +119,10 @@ export default function MembershipCheckoutScreen() {
 
   const periodLabel = billingPeriod === 'yearly' ? 'yıl' : 'ay';
 
-  // Not authenticated redirect
-  if (!isAuthenticated) {
-    router.replace('/(auth)/login');
-    return null;
-  }
+  useEffect(() => {
+    if (!isAuthenticated) router.replace('/(auth)/login');
+  }, [isAuthenticated]);
+  if (!isAuthenticated) return null;
 
   const handlePayment = async () => {
     setLoading(true);

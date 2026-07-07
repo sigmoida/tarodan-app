@@ -188,6 +188,13 @@ export class MembershipService {
   }
 
   // ==========================================================================
+  // CANCEL SCHEDULED CHANGE (delegate → MembershipSubscriptionService)
+  // ==========================================================================
+  async cancelScheduledChange(userId: string): Promise<UserMembershipResponseDto> {
+    return this.subscription.cancelScheduledChange(userId);
+  }
+
+  // ==========================================================================
   // AUTO-RENEW TOGGLE (delegate → MembershipSubscriptionService)
   // ==========================================================================
   async toggleAutoRenew(

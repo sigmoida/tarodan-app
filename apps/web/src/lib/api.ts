@@ -110,6 +110,8 @@ export const authApi = {
     api.post('/auth/login', { email, password }),
   loginWithGoogle: (idToken: string) =>
     api.post('/auth/google', { idToken }),
+  loginWithApple: (idToken: string, fullName?: string) =>
+    api.post('/auth/apple', { identityToken: idToken, fullName }),
   register: (data: { displayName: string; email: string; password: string; phone?: string; birthDate?: string; acceptsMarketingEmails?: boolean }) =>
     api.post('/auth/register', data),
   logout: () => api.post('/auth/logout'),
@@ -605,6 +607,8 @@ export const membershipApi = {
   subscribe: (data: { tierType: string; billingPeriod: 'monthly' | 'yearly' }) =>
     api.post('/membership/subscribe', data),
   cancel: () => api.post('/membership/cancel'),
+  /** Bekleyen plan değişikliğini (ertelemeli downgrade / period) geri al */
+  cancelScheduledChange: () => api.post('/membership/cancel-scheduled-change'),
   /** Oto-yenilemeyi aç/kapat */
   setAutoRenew: (autoRenew: boolean) =>
     api.patch('/membership/auto-renew', { autoRenew }),

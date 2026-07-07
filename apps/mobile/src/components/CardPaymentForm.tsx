@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, ScrollView, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { WebView, WebViewNavigation } from 'react-native-webview';
 import { Button, Input, Checkbox, Text, theme, appAlert } from '@tarodan/ui-native';
@@ -33,17 +33,33 @@ interface Props {
   onFail?: () => void;
   /** Kayıtlı kart + "kartımı kaydet" gösterilsin mi (PayTR Non3D yetkisi açık + üye). */
   recurringEnabled?: boolean;
+  /** Misafir ödemesi mi — durum yoklamasında public uç kullanılır (verify atlanır). */
+  isGuest?: boolean;
+  /**
+   * Çağıran ekranın (/payment/[id]) zaten bildiği ödeme referansı — form mount olmadan
+   * ÖNCE sipariş/grup/takas için oluşturulmuş paymentId. processDirect ağ/timeout hatası
+   * verirse (sunucu charge'ı işlemiş olabilir) bu referansla mevcut poll/verify güvenlik
+   * ağı devreye alınır; sert "başarısız" gösterilmez.
+   */
+  paymentId?: string;
 }
 
 const NEW_CARD = '__new__';
 
-export default function CardPaymentForm({ target, amount, onSuccess, onFail, recurringEnabled = false }: Props) {
+/** Ödeme kesinleşti mi (light status uçları). load() ile aynı: completed/failed. */
+const isPaidStatus = (s?: string) =>
+  s === 'completed' || s === 'paid' || s === 'success' || s === 'hold_payment';
+
+export default function CardPaymentForm({ target, amount, onSuccess, onFail, recurringEnabled = false, isGuest = false, paymentId: initialPaymentId }: Props) {
   const [cards, setCards] = useState<SavedCard[]>([]);
   const [loadingCards, setLoadingCards] = useState(recurringEnabled);
   const [selected, setSelected] = useState<string>(NEW_CARD);
   const [processing, setProcessing] = useState(false);
   const [threeDSHtml, setThreeDSHtml] = useState<string | null>(null);
   const [paymentId, setPaymentId] = useState<string | null>(null);
+  // processDirect ağ/timeout hatasında (sunucu charge'ı işlemiş olabilir) true olur;
+  // 3DS WebView olmadan da poll useEffect'ini devreye alır.
+  const [verifying, setVerifying] = useState(false);
 
   const [holder, setHolder] = useState('');
   const [number, setNumber] = useState('');
@@ -52,6 +68,66 @@ export default function CardPaymentForm({ target, amount, onSuccess, onFail, rec
   const [cvc, setCvc] = useState('');
   const [saveCard, setSaveCard] = useState(true);
   const [savedCvv, setSavedCvv] = useState('');
+
+  // Sonucu yalnız bir kez bildir (poll + WebView yönlendirmesi yarışabilir).
+  const resolvedRef = useRef(false);
+  const onSuccessRef = useRef(onSuccess);
+  const onFailRef = useRef(onFail);
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+    onFailRef.current = onFail;
+  });
+
+  const resolveSuccess = (pid: string) => {
+    if (resolvedRef.current) return;
+    resolvedRef.current = true;
+    onSuccessRef.current(pid);
+  };
+  const resolveFail = () => {
+    if (resolvedRef.current) return;
+    resolvedRef.current = true;
+    onFailRef.current?.();
+  };
+
+  // 3DS WebView açıkken VEYA processDirect ağ/timeout hatası sonrası (verifying) ödeme
+  // durumunu yokla. PayTR'ın dönüş yönlendirmesi (merchant_ok_url) WebView içinde her zaman
+  // /payment/success URL'ine ulaşmayabilir; bu durumda kullanıcı PayTR'ın "ödeme alınıyor"
+  // sayfasında SONSUZA DEK takılıyordu. Ayrıca timeout durumunda sunucu charge'ı işlemiş
+  // olabilir — aynı poll, bilinen paymentId ile gerçek durumu doğrular. Durum terminal
+  // olunca (completed/failed) sonucu bildiriyoruz.
+  useEffect(() => {
+    if (!paymentId || !(threeDSHtml || verifying)) return;
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout>;
+    let tries = 0;
+    const poll = async () => {
+      tries += 1;
+      try {
+        // verify ödemeyi sunucuda aktive eder (idempotent); misafirde 401 verir → atla.
+        if (!isGuest) {
+          try { await paymentsApi.verify(paymentId); } catch { /* best-effort */ }
+        }
+        const res: any = isGuest
+          ? await paymentsApi.getStatusLightGuest(paymentId)
+          : await paymentsApi.getStatusLight(paymentId);
+        const data = res?.data?.data ?? res?.data ?? {};
+        if (!alive) return;
+        if (isPaidStatus(data.status)) { resolveSuccess(paymentId); return; }
+        if (data.status === 'failed') { resolveFail(); return; }
+      } catch { /* yoksay, tekrar dene */ }
+      if (alive && !resolvedRef.current && tries < 40) {
+        timer = setTimeout(poll, 3000);
+      } else if (alive && !resolvedRef.current && verifying && !threeDSHtml) {
+        // poll tükendi (terminal duruma ulaşılamadı)
+        setVerifying(false);
+        setProcessing(false);
+        appAlert('Bağlantı sorunu', "Ödemenizin durumunu doğrulayamadık. Ödeme yapıldıysa 'Siparişlerim' bölümünde görünür; aksi halde tekrar deneyebilirsiniz.");
+      }
+    };
+    timer = setTimeout(poll, 3000);
+    return () => { alive = false; clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threeDSHtml, verifying, paymentId, isGuest]);
 
   useEffect(() => {
     // Kayıtlı kart listesi yalnız Non3D yetkisi açıkken (kayıtlı kartla ödeme mümkünken) alınır.
@@ -137,16 +213,33 @@ export default function CardPaymentForm({ target, amount, onSuccess, onFail, rec
 
       if (data.threeDSHtml) {
         setThreeDSHtml(data.threeDSHtml); // 3D WebView göster
+        setProcessing(false);
         return;
       }
       if (data.status === 'failed') {
         appAlert('Ödeme başarısız', data.reason || 'Ödeme tamamlanamadı');
         setProcessing(false);
-        onFail?.();
+        resolveFail();
         return;
       }
-      onSuccess(data.paymentId);
+      resolveSuccess(data.paymentId);
     } catch (e: any) {
+      // Ağ/timeout hatası (30sn client-timeout dahil): sunucudan yanıt YOK demek, sunucu
+      // charge'ı işlemiş olabilir. Gerçek API reddi (4xx/5xx yanıtlı) bu değildir.
+      const isNetworkOrTimeout = e?.code === 'ECONNABORTED' || !e?.response;
+      if (isNetworkOrTimeout && initialPaymentId) {
+        // Sert "başarısız" gösterme — çağıran ekranın zaten bildiği paymentId ile mevcut
+        // poll/verify güvenlik ağını devreye al (processing=true kalır, buton spinner'da).
+        setPaymentId(initialPaymentId);
+        setVerifying(true);
+        return;
+      }
+      if (isNetworkOrTimeout) {
+        // Elde ödeme referansı yok (beklenmeyen durum) — sert hata yerine bilgilendirme.
+        appAlert('Bağlantı sorunu', "Ödemeniz işleniyor olabilir. Lütfen 'Siparişlerim' bölümünden kontrol edin.");
+        setProcessing(false);
+        return;
+      }
       appAlert('Hata', e?.response?.data?.message || 'Ödeme başlatılamadı');
       setProcessing(false);
     }
@@ -156,15 +249,18 @@ export default function CardPaymentForm({ target, amount, onSuccess, onFail, rec
   function onNav(nav: WebViewNavigation) {
     const url = (nav.url || '').toLowerCase();
     if (url.includes('/payment/success')) {
-      if (paymentId) onSuccess(paymentId);
+      if (paymentId) resolveSuccess(paymentId);
     } else if (url.includes('/payment/fail') || url.includes('/payment/failure')) {
-      onFail?.();
+      resolveFail();
     }
   }
 
   if (threeDSHtml) {
     return (
       <View style={styles.webviewWrap}>
+        <Pressable onPress={() => { setThreeDSHtml(null); setProcessing(false); }} style={{ padding: 12, alignSelf: 'flex-end' }}>
+          <Text style={{ color: colors.primary[600]!, fontWeight: '600' }}>Vazgeç</Text>
+        </Pressable>
         <WebView
           originWhitelist={['*']}
           source={{ html: threeDSHtml }}

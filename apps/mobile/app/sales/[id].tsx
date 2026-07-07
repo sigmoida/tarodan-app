@@ -49,6 +49,7 @@ interface Order {
     subtotal?: number;
     shippingAmount?: number;
     commissionAmount?: number;
+    withholdingTaxAmount?: number;
     sellerNetAmount?: number;
     totalAmount?: number;
   };
@@ -268,6 +269,8 @@ export default function SaleDetailScreen() {
           const subtotal = p?.subtotal ?? order.subtotal;
           const shipping = p?.shippingAmount ?? order.shippingCost;
           const commission = p?.commissionAmount ?? order.commission;
+          // Stopaj yalnızca kurumsal satıcıda > 0 gelir (GVK 94/19, beyannamede mahsup edilir)
+          const withholding = p?.withholdingTaxAmount ?? 0;
           const net = p?.sellerNetAmount ?? order.netAmount;
           return (
             <View style={styles.card}>
@@ -289,6 +292,14 @@ export default function SaleDetailScreen() {
                   <Text style={styles.kvLabel}>Komisyon</Text>
                   <Text style={[styles.kvValue, { color: colors.danger[600]! }]}>
                     - {formatPrice(commission)}
+                  </Text>
+                </View>
+              ) : null}
+              {withholding > 0 ? (
+                <View style={styles.kvRow}>
+                  <Text style={styles.kvLabel}>Stopaj (tevkifat)</Text>
+                  <Text style={[styles.kvValue, { color: colors.danger[600]! }]}>
+                    - {formatPrice(withholding)}
                   </Text>
                 </View>
               ) : null}

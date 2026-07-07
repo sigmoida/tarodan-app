@@ -191,18 +191,11 @@ export class PaymentReconciliationService {
       take: 50,
     });
 
-    let generated = 0;
-    for (const o of orders) {
-      try {
-        await this.invoiceService.generateAndSendInvoice(o.id);
-        generated++;
-      } catch (e: any) {
-        this.logger.error(
-          `reconcileMissingInvoices: sipariş ${o.orderNumber} faturası üretilemedi: ${e?.message}`,
-        );
-      }
-    }
-    return { generated };
+    // ESKİ makbuz KALDIRILDI + eLogo e-Arşiv faturaları ARTIK TESLİMDE kesiliyor
+    // (order-scheduler.processDeliveredOrders). Bu telafi yolu ARTIK HİÇBİR ŞEY ÜRETMEZ;
+    // eski "generated++" yanıltıcı "N fatura üretildi" logu üretiyordu → 0 döndürüyoruz.
+    void orders;
+    return { generated: 0 };
   }
 
   /**

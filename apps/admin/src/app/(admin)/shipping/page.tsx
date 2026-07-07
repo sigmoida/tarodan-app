@@ -8,17 +8,20 @@ import {
   TruckIcon,
   ArrowsRightLeftIcon,
   ArrowUturnLeftIcon,
+  MapPinIcon,
 } from "@heroicons/react/24/outline";
 import { OrderShipmentsTab } from "./OrderShipmentsTab";
 import { TradeShipmentsTab } from "./TradeShipmentsTab";
 import { ReturnShipmentsTab } from "./ReturnShipmentsTab";
+import { SuratTrackingTab } from "./SuratTrackingTab";
 
-type TabKey = "siparisler" | "takas" | "iade";
+type TabKey = "siparisler" | "takas" | "iade" | "surat";
 
 const TABS = [
   { key: "siparisler", label: "Siparişler", icon: TruckIcon },
   { key: "takas", label: "Takas", icon: ArrowsRightLeftIcon },
   { key: "iade", label: "İade", icon: ArrowUturnLeftIcon },
+  { key: "surat", label: "Sürat Takip", icon: MapPinIcon },
 ] as const;
 
 const VALID_TABS = TABS.map((t) => t.key) as readonly string[];
@@ -56,6 +59,7 @@ export default function ShippingPage() {
       {activeTab === "siparisler" && <OrderShipmentsTab />}
       {activeTab === "takas" && <TradeShipmentsTab />}
       {activeTab === "iade" && <ReturnShipmentsTab />}
+      {activeTab === "surat" && <SuratTrackingTab />}
     </div>
   );
 }

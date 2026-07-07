@@ -562,11 +562,19 @@ export class RefundService {
         returnStatus: update.status,
         returnShippedAt: update.shippedAt ?? undefined,
         returnDeliveredAt: update.deliveredAt ?? undefined,
+        // Sürat kod 12 (İade Teslim Edildi) mapper'da ShipmentStatus.returned'a
+        // maplenir; iade akışında bu "paket satıcıya geri teslim edildi" demektir
+        // → return_delivered (otomatik iade finalize'i buna bağlı).
+        // Doküman kod 9/10/11/13/14/15/16 (İade sürecinde/yolda/şubede/dağıtımda)
+        // → return_in_progress'e maplenir; iade satıcıya geri yolda demektir
+        // → return_in_transit.
         status:
-          update.status === ShipmentStatus.delivered
+          update.status === ShipmentStatus.delivered ||
+          update.status === ShipmentStatus.returned
             ? RefundRequestStatus.return_delivered
             : update.status === ShipmentStatus.in_transit ||
-                update.status === ShipmentStatus.picked_up
+                update.status === ShipmentStatus.picked_up ||
+                update.status === ShipmentStatus.return_in_progress
               ? RefundRequestStatus.return_in_transit
               : undefined,
       },
@@ -586,7 +594,10 @@ export class RefundService {
       await this.sendRefundEmail(updated.id, 'seller', 'refund-return-incoming-seller', {
         returnTrackingNumber: updated.returnTrackingNumber ?? updated.refundNumber,
       });
-    } else if (update.status === ShipmentStatus.delivered) {
+    } else if (
+      update.status === ShipmentStatus.delivered ||
+      update.status === ShipmentStatus.returned
+    ) {
       await this.safeNotify(updated.requesterId, NotificationType.REFUND_RETURN_DELIVERED_BUYER, notifData);
       await this.safeNotify(updated.order.sellerId, NotificationType.REFUND_RETURN_DELIVERED_SELLER, notifData);
     }

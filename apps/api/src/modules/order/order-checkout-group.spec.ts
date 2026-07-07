@@ -21,6 +21,7 @@ import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
 import { ProductLockService } from '../product/product-lock.service';
 import { CommissionLedgerService } from '../commission/commission-ledger.service';
 import { TaxService } from '../tax/tax.service';
+import { ElogoInvoicingService } from '../elogo';
 import { OrderStatus, ProductStatus } from '@prisma/client';
 
 /**
@@ -141,6 +142,7 @@ describe('OrderService checkout group (batch checkout)', () => {
         OrderCommonService,
         OrderQueryService,
         OrderLifecycleService,
+        { provide: ElogoInvoicingService, useValue: { issueCommissionInvoice: jest.fn().mockResolvedValue(undefined), issueServiceFeeInvoice: jest.fn().mockResolvedValue(undefined), issueMembershipInvoice: jest.fn().mockResolvedValue(undefined), issueBoostInvoice: jest.fn().mockResolvedValue(undefined), handleOrderRefund: jest.fn().mockResolvedValue(undefined), issuePlatformSaleInvoice: jest.fn().mockResolvedValue(undefined), handleTradeCashRefund: jest.fn().mockResolvedValue(undefined), issueTradeCashCommissionInvoice: jest.fn().mockResolvedValue(undefined), retryPendingInvoices: jest.fn().mockResolvedValue(undefined) } },
         { provide: PrismaService, useValue: mockPrisma },
         { provide: CacheService, useValue: { del: jest.fn(), delPattern: jest.fn() } },
         { provide: ConfigService, useValue: { get: jest.fn() } },

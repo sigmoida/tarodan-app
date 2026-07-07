@@ -114,6 +114,17 @@ export class MembershipController {
   }
 
   /**
+   * Bekleyen plan değişikliğini (ertelemeli downgrade / period) iptal et
+   * POST /membership/cancel-scheduled-change
+   */
+  @Post('cancel-scheduled-change')
+  async cancelScheduledChange(
+    @Request() req: any,
+  ): Promise<UserMembershipResponseDto> {
+    return this.membershipService.cancelScheduledChange(req.user.id);
+  }
+
+  /**
    * Toggle auto-renew setting
    * PATCH /membership/auto-renew
    */

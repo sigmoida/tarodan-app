@@ -31,15 +31,40 @@ export class OrderCheckoutCommonService {
     return createHash('sha256').update(parts.filter((p) => p.length > 0).join('|')).digest('hex');
   }
 
-  /** KDV: satıcı kurumsal (businessStatus=approved + taxId dolu) ise ürün fiyatı üzerinden vergi hesapla. */
-  async resolveSellerTax(sellerId: string, categoryId: string | null, subtotal: number): Promise<number> {
+  /** E-ticaret stopaj oranı (%) — PlatformSetting 'withholding_tax_rate', varsayılan %1 (9284 sayılı CK). */
+  private async getWithholdingTaxRate(): Promise<number> {
+    const row = await this.prisma.platformSetting.findUnique({
+      where: { settingKey: 'withholding_tax_rate' },
+    });
+    const rate = Number(row?.settingValue ?? '1');
+    return Number.isFinite(rate) && rate >= 0 ? rate : 1;
+  }
+
+  /**
+   * KDV + stopaj: yalnızca kurumsal satıcıda (businessStatus=approved + taxId dolu).
+   * KDV ürün fiyatına eklenir (alıcı öder); stopaj (GVK 94/19) KDV hariç ürün bedeli
+   * üzerinden hesaplanır ve satıcı payout'undan kesilir. Bireysel satıcı ikisinde de
+   * kapsam dışıdır (stopaj: 330 Seri No'lu GV Genel Tebliği — mükellef olmayana tevkifat yok).
+   * Matrah kargo ve alıcı hizmet bedelini içermez (komisyonla aynı baz).
+   */
+  async resolveSellerTaxes(
+    sellerId: string,
+    categoryId: string | null,
+    subtotal: number,
+  ): Promise<{ taxAmount: number; withholdingTaxAmount: number }> {
     const seller = await this.prisma.user.findUnique({
       where: { id: sellerId },
       select: { businessStatus: true, taxId: true },
     });
-    if (seller?.businessStatus !== 'approved' || !seller?.taxId) return 0;
+    if (seller?.businessStatus !== 'approved' || !seller?.taxId) {
+      return { taxAmount: 0, withholdingTaxAmount: 0 };
+    }
     const resolved = await this.taxService.resolveTaxRate('TR', null, categoryId);
-    return resolved ? this.taxService.calculateTaxAmount(subtotal, resolved) : 0;
+    const taxAmount = resolved ? this.taxService.calculateTaxAmount(subtotal, resolved) : 0;
+    const withholdingRate = await this.getWithholdingTaxRate();
+    const withholdingTaxAmount =
+      withholdingRate > 0 ? Math.round(subtotal * withholdingRate) / 100 : 0;
+    return { taxAmount, withholdingTaxAmount };
   }
 
   /**

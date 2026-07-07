@@ -5,6 +5,9 @@ on:
     branches: [development]
   pull_request:
     branches: [development, master, main]
+  schedule:
+    # Her gece 02:00 UTC — tam senaryo paketi (2293) shardlı koşar (e2e-scenarios-full).
+    - cron: '0 2 * * *'
   workflow_dispatch:
     inputs:
       run_integration:
@@ -17,6 +20,14 @@ on:
           - 'true'
       run_web_e2e:
         description: 'Run Playwright web e2e journeys (heavy — manual only)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+      run_scenarios_full:
+        description: 'Run the FULL scenario suite (test/e2e/scenarios, sharded — heavy)'
         required: false
         default: 'false'
         type: choice
@@ -65,7 +76,7 @@ jobs:
 
   e2e-test:
     name: E2E Tests
-    needs: [lint, type-check, build, unit-test]
+    needs: [type-check, build]
     runs-on: ubuntu-latest
 
     services:
@@ -107,20 +118,188 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
+      # Mail testleri (doğrulama/şifre e-postaları) için SMTP yakalayıcı.
+      mailhog:
+        image: mailhog/mailhog:latest
+        ports:
+          - 1025:1025
+          - 8025:8025
+
+    env:
+      MAILHOG_URL: http://localhost:8025
+
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-workspace
         with:
           turbo-cache: 'false'
       - run: pnpm --filter @tarodan/api test:e2e:setup
-      - run: pnpm --filter @tarodan/api test:e2e
+      # Mevcut paket (72 spec). Yeni senaryo paketi (test/e2e/scenarios) burada HARİÇ —
+      # o paket e2e-scenarios-smoke (PR, P0) ve e2e-scenarios-full (nightly, shard) ile koşar.
+      - run: pnpm --filter @tarodan/api exec jest --config ./test/jest-e2e.json --runInBand --testPathIgnorePatterns=/node_modules/ --testPathIgnorePatterns=test/e2e/scenarios/
+
+  e2e-scenarios-smoke:
+    name: E2E Senaryolar — P0 Smoke (PR gate)
+    needs: [type-check, build]
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: tarodan_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: "false"
+          ES_JAVA_OPTS: -Xms512m -Xmx512m
+        ports:
+          - 9200:9200
+        options: >-
+          --health-cmd "curl -f http://localhost:9200/_cluster/health || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      mailhog:
+        image: mailhog/mailhog:latest
+        ports:
+          - 1025:1025
+          - 8025:8025
+
+    env:
+      MAILHOG_URL: http://localhost:8025
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-workspace
+        with:
+          turbo-cache: 'false'
+      - run: pnpm --filter @tarodan/api test:e2e:setup
+      # Yalnız senaryo paketi + yalnız P0 testleri (test adında [P0] geçenler).
+      - run: pnpm --filter @tarodan/api exec jest --config ./test/jest-e2e.json --runInBand --testPathPattern 'test/e2e/scenarios/' -t '\[P0\]'
+
+  e2e-scenarios-full:
+    name: E2E Senaryolar — Tam Paket (nightly/manuel, shardlı)
+    # Otomatik PR/push'ta atlanır; yalnız nightly schedule veya manuel run_scenarios_full=true.
+    if: ${{ github.event_name == 'schedule' || github.event.inputs.run_scenarios_full == 'true' }}
+    needs: [type-check, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: tarodan_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: "false"
+          ES_JAVA_OPTS: -Xms512m -Xmx512m
+        ports:
+          - 9200:9200
+        options: >-
+          --health-cmd "curl -f http://localhost:9200/_cluster/health || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      mailhog:
+        image: mailhog/mailhog:latest
+        ports:
+          - 1025:1025
+          - 8025:8025
+
+    env:
+      MAILHOG_URL: http://localhost:8025
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-workspace
+        with:
+          turbo-cache: 'false'
+      - run: pnpm --filter @tarodan/api test:e2e:setup
+      # Senaryo paketini 10 shard'a böl (her shard kendi job + kendi servis container'ları).
+      - run: pnpm --filter @tarodan/api exec jest --config ./test/jest-e2e.json --runInBand --testPathPattern 'test/e2e/scenarios/' --shard=${{ matrix.shard }}/10
+
+  scenario-coverage:
+    name: Senaryo Kapsam Raporu (gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-workspace
+        with:
+          prisma: 'false'
+          turbo-cache: 'false'
+      # manifest.json'ı HTML konsoldan yeniden üret ve commit'le senkron olduğunu doğrula.
+      # HTML repoya eklenmemişse (untracked) bu adım atlanır; manifest.json zaten committed kaynak.
+      - name: Manifest senkron mu?
+        run: |
+          if [ -f Tarodan-Test-Konsolu.html ]; then
+            node scripts/extract-scenarios.mjs
+            git diff --exit-code apps/api/test/scenarios/manifest.json \
+              || echo '::warning::manifest.json node ile yeniden üretilince farklı (kozmetik) — committed manifest kullanılıyor.'
+          else
+            echo 'Tarodan-Test-Konsolu.html yok — manifest senkron kontrolü atlandı.'
+          fi
+      # Kapsam raporunu üret (rapor-only; suite'i bloke etmez).
+      - name: Kapsam raporu
+        run: node scripts/scenario-coverage.mjs || echo '::warning::kapsam raporu üretilemedi'
+      - name: Raporu arşivle
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: scenario-coverage
+          path: docs/SCENARIO-COVERAGE.md
+          retention-days: 14
 
   web-e2e:
     name: Web E2E (Playwright)
     # Şimdilik SADECE elle: Actions → Run workflow → run_web_e2e=true. Otomatik (push/PR)
     # tetiklerde atlanır (ağır suite her commit'i yavaşlatmasın).
     if: ${{ github.event.inputs.run_web_e2e == 'true' }}
-    needs: [lint, type-check, build, unit-test]
+    needs: [type-check, build]
     runs-on: ubuntu-latest
     # 136 journey sıralı koşuyor (workers=1, retries=2) + trace/video arşivi → uzun sürebilir.
     timeout-minutes: 90
@@ -230,6 +409,7 @@ jobs:
   security-audit:
     name: Dependency Audit
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-workspace

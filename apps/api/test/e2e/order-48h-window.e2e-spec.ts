@@ -35,6 +35,7 @@ describe('48h window core + auto-complete cron (E2E)', () => {
       ledger, // commissionLedger
       {} as any, // orderCommon
       {} as any, // orderQuery
+      { issueCommissionInvoice: async () => {}, issueServiceFeeInvoice: async () => {}, issuePlatformSaleInvoice: async () => {} } as any, // elogoInvoicing (no-op stub)
     );
     return new OrderService(
       {} as any, // orderPricing
@@ -50,7 +51,13 @@ describe('48h window core + auto-complete cron (E2E)', () => {
         k === 'FEATURE_48H_CONFIRMATION_WINDOW' ? flagValue : undefined,
       ),
     };
-    return new OrderSchedulerService(prisma, makeOrderService(), config as any, {} as any /* scheduledQueue */);
+    return new OrderSchedulerService(
+      prisma,
+      makeOrderService(),
+      config as any,
+      { issueCommissionInvoice: async () => {}, issueServiceFeeInvoice: async () => {}, issuePlatformSaleInvoice: async () => {} } as any /* elogoInvoicing (no-op stub) */,
+      {} as any /* scheduledQueue */,
+    );
   }
 
   beforeAll(() => {

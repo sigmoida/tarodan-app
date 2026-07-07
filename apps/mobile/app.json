@@ -14,6 +14,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.tarodan.app",
+      "usesAppleSignIn": true,
       "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "Ürün fotoğrafı çekmek için kamera erişimi gereklidir.",
@@ -75,12 +76,14 @@
       ],
       "expo-secure-store",
       "@react-native-community/datetimepicker",
+      "expo-apple-authentication",
       [
         "@react-native-google-signin/google-signin",
         {
           "iosUrlScheme": "com.googleusercontent.apps.243308404313-92c5475nff3874maoqes02ajakn81hvh"
         }
-      ]
+      ],
+      "./plugins/withGoogleSigninPods.js"
     ],
     "experiments": {
       "typedRoutes": true

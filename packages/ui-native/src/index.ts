@@ -55,6 +55,12 @@ export {
   type AlertDialogButton,
   type AlertDialogOptions,
 } from './AlertDialog';
+export {
+  ModalMessage,
+  useModalMessage,
+  alertAfterClose,
+  type ModalMessageState,
+} from './ModalMessage';
 export { Spinner, type SpinnerProps } from './Spinner';
 export { Avatar, type AvatarProps } from './Avatar';
 export { StatusBadge, type StatusBadgeProps } from './StatusBadge';

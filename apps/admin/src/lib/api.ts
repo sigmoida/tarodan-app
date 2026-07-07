@@ -313,6 +313,8 @@ export const adminApi = {
   createCommissionRule: (data: any) => api.post('/admin/commission-rules', data),
   updateCommissionRule: (id: string, data: any) => api.patch(`/admin/commission-rules/${id}`, data),
   deleteCommissionRule: (id: string) => api.delete(`/admin/commission-rules/${id}`),
+  getTradeCommissionRate: () => api.get('/admin/trade-commission-rate'),
+  setTradeCommissionRate: (rate: number) => api.patch('/admin/trade-commission-rate', { rate }),
 
   // Membership Tiers
   getMembershipTiers: () => api.get('/admin/membership-tiers'),
@@ -376,6 +378,27 @@ export const adminApi = {
     limit?: number;
   }) => api.get('/admin/payments', { params }),
   getPayment: (id: string) => api.get(`/admin/payments/${id}`),
+  // Faturalar (e-Arşiv/e-Fatura) — kesilen + iade belgeleri
+  getInvoices: (params?: {
+    type?: string;
+    status?: string;
+    documentType?: string;
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }) => api.get('/admin/invoices', { params }),
+  getInvoicePdf: (id: string) => api.get(`/admin/invoices/${id}/pdf`),
+  // Kurumsal satıcıların elle yüklediği ürün faturaları (ayrı sekme)
+  getSellerInvoices: (params?: {
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }) => api.get('/admin/seller-invoices', { params }),
+  getSellerInvoicePdf: (id: string) => api.get(`/admin/seller-invoices/${id}/pdf`),
   getPaymentStatistics: (params?: {
     period?: 'daily' | 'weekly' | 'monthly';
     startDate?: string;
@@ -415,23 +438,19 @@ export const adminApi = {
   }) => api.get('/admin/payouts/export', { params }),
   releasePayout: (orderId: string) => api.post(`/admin/payouts/release/${orderId}`),
 
-  // Tax Settings
-  getTaxRegions: () => api.get('/admin/tax/regions'),
-  createTaxRegion: (data: any) => api.post('/admin/tax/regions', data),
-  updateTaxRegion: (id: string, data: any) => api.patch(`/admin/tax/regions/${id}`, data),
-  deleteTaxRegion: (id: string) => api.delete(`/admin/tax/regions/${id}`),
-  getTaxRates: (regionId?: string) =>
-    api.get('/admin/tax/rates', regionId ? { params: { regionId } } : {}),
-  createTaxRate: (data: any) => api.post('/admin/tax/rates', data),
-  updateTaxRate: (id: string, data: any) => api.patch(`/admin/tax/rates/${id}`, data),
-  deleteTaxRate: (id: string) => api.delete(`/admin/tax/rates/${id}`),
-  getTaxRules: (regionId?: string) =>
-    api.get('/admin/tax/rules', regionId ? { params: { regionId } } : {}),
-  createTaxRule: (data: any) => api.post('/admin/tax/rules', data),
-  updateTaxRule: (id: string, data: any) => api.patch(`/admin/tax/rules/${id}`, data),
-  deleteTaxRule: (id: string) => api.delete(`/admin/tax/rules/${id}`),
+  // Tax Settings — basit KDV config (eski bölge/oran/kural CRUD'u UI'dan kaldırıldı;
+  // backend uçları duruyor, UI tax/vat cephesini kullanır)
+  getVatConfig: () => api.get('/admin/tax/vat'),
+  setDefaultVat: (rate: number) => api.patch('/admin/tax/vat', { rate }),
+  setVatOverride: (categoryId: string, rate: number) =>
+    api.put('/admin/tax/vat/override', { categoryId, rate }),
+  deleteVatOverride: (id: string) => api.delete(`/admin/tax/vat/override/${id}`),
   getTaxReport: (params?: { fromDate?: string; toDate?: string; groupBy?: string }) =>
     api.get('/admin/tax/report', { params }),
+  getWithholdingRate: () => api.get('/admin/tax/withholding'),
+  setWithholdingRate: (rate: number) => api.patch('/admin/tax/withholding', { rate }),
+  getWithholdingReport: (params: { year: number; month: number }) =>
+    api.get('/admin/tax/withholding-report', { params }),
 
   // Static Pages
   getPages: () => api.get('/admin/pages'),
@@ -465,6 +484,30 @@ export const adminApi = {
   // Konfig (methods/carriers/zones/rates) ve etiket üretimi kaldırıldı; gerçek kargo Sürat entegrasyonu.
   getShipments(params?: any) {
     return api.get('/admin/shipping/shipments', { params });
+  },
+  // Bir Sürat kargosunun takip durumunu 30 dk cron'u beklemeden anında senkronlar.
+  syncShipmentTracking(id: string) {
+    return api.post(`/admin/shipping/shipments/${id}/sync-tracking`);
+  },
+  // Sürat REST endpoint testi: gönderi oluştur + takibini sorgula (ham cevapları döner).
+  suratEndpointTest() {
+    return api.post('/admin/shipping/surat/endpoint-test');
+  },
+  // Test konsolu: referansla Sürat takip sorgusu (KargoTakipHareketDetayi).
+  suratTestTrack(ref: string) {
+    return api.post('/admin/shipping/surat/track', { ref });
+  },
+  // Test konsolu: referansla Sürat iptal/geri-çek (GonderiGeriCek).
+  suratTestCancel(ref: string) {
+    return api.post('/admin/shipping/surat/cancel', { ref });
+  },
+  // Test konsolu: Sürat barkod/etiket üret (OrtakBarkodOlustur) — KargoTakipNo + ZPL.
+  suratTestBarcode() {
+    return api.post('/admin/shipping/surat/barcode');
+  },
+  // Test konsolu: referansla Sürat gönderi sil (GonderiSil).
+  suratTestSil(ref: string) {
+    return api.post('/admin/shipping/surat/sil', { ref });
   },
 
   // Notifications

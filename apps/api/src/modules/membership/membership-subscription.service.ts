@@ -13,6 +13,7 @@ import {
   OrderStatus,
   PaymentStatus,
   SavedCardStatus,
+  TradeStatus,
 } from '@prisma/client';
 import { SubscribeDto, UserMembershipResponseDto } from './dto';
 import { PaymentService } from '../payment/payment.service';
@@ -22,6 +23,7 @@ import { MembershipPaymentInitResponseDto } from './dto/membership-payment.dto';
 import { PayTRService } from '../payment-providers/paytr.service';
 import { ConfigService } from '@nestjs/config';
 import { MembershipCommonService } from './membership-common.service';
+import { isPremiumEntitled } from './membership.util';
 
 /**
  * MembershipSubscriptionService — abonelik yaşam döngüsü + PayTR/ödeme tarafı:
@@ -69,15 +71,10 @@ export class MembershipSubscriptionService {
       }
     }
 
-    // Check if user already has this tier (past_due = ödeme bekliyor, sayma; sadece aktif plan aynıysa engelle)
     const existingMembership = await this.prisma.userMembership.findUnique({
       where: { userId },
       include: { tier: true },
     });
-
-    if (existingMembership?.tier.type === dto.tierType && existingMembership?.status !== SubscriptionStatus.past_due) {
-      throw new BadRequestException('Zaten bu üyelik tipine sahipsiniz');
-    }
 
     // Calculate period
     const now = new Date();
@@ -90,6 +87,73 @@ export class MembershipSubscriptionService {
 
     const price = dto.billingPeriod === 'monthly' ? tier.monthlyPrice : tier.yearlyPrice;
 
+    // === GEÇİŞ YÖNÜ KARARI (upgrade anında / downgrade ertelemeli) ===
+    // Kullanıcı şu an GEÇERLİ ve ücretli bir tier'a sahipse, yön hem tier seviyesine
+    // (sortOrder) hem de faturalama periyoduna göre belirlenir:
+    //   - Tier ↑                         → UPGRADE (anında + ödeme)
+    //   - Tier ↓                         → DOWNGRADE (dönem sonuna ertelenir)
+    //   - Aynı tier, aylık→yıllık        → UPGRADE (anında: yıllık ücret şimdi)
+    //   - Aynı tier, yıllık→aylık        → DOWNGRADE (dönem sonunda aylığa geçer)
+    //   - Aynı tier, aynı periyot        → bekleyen değişiklik varsa İPTAL, yoksa hata
+    // Downgrade'de tier HEMEN değişmez; mevcut (yüksek) plan ödenmiş dönem sonuna kadar
+    // sürer. Dönem sonunda runAutoRenewals (ücretli hedef) veya checkExpiredMemberships
+    // (free hedef / ödenmemiş) planlanan tier+periyoda geçirir. İlan limiti/takas/diğer
+    // özellikler canlı hesaplandığı için yalnız gerçek geçiş anında değişir (tutarlı).
+    if (existingMembership && isPremiumEntitled(existingMembership)) {
+      const curPeriodDays = Math.round(
+        (existingMembership.currentPeriodEnd.getTime() -
+          existingMembership.currentPeriodStart.getTime()) / 86_400_000,
+      );
+      const currentIsYearly = curPeriodDays > 180;
+      const targetIsYearly = dto.billingPeriod === 'yearly';
+
+      let direction: 'upgrade' | 'downgrade' | 'same';
+      if (tier.sortOrder > existingMembership.tier.sortOrder) {
+        direction = 'upgrade';
+      } else if (tier.sortOrder < existingMembership.tier.sortOrder) {
+        direction = 'downgrade';
+      } else if (targetIsYearly && !currentIsYearly) {
+        direction = 'upgrade'; // aynı tier, aylık→yıllık
+      } else if (!targetIsYearly && currentIsYearly) {
+        direction = 'downgrade'; // aynı tier, yıllık→aylık
+      } else {
+        direction = 'same'; // aynı tier + aynı periyot
+      }
+
+      if (direction === 'same') {
+        // Bekleyen bir değişiklik (downgrade/period) varsa kullanıcı eski planına
+        // dönmek istiyor demektir → planı iptal et (revert). Yoksa gerçekten aynı plan.
+        if (existingMembership.scheduledTierType || existingMembership.scheduledBillingPeriod) {
+          await this.prisma.userMembership.update({
+            where: { userId },
+            data: { scheduledTierType: null, scheduledBillingPeriod: null },
+          });
+          return this.common.getUserMembership(userId);
+        }
+        throw new BadRequestException('Zaten bu plandasınız');
+      }
+
+      if (direction === 'downgrade') {
+        await this.prisma.userMembership.update({
+          where: { userId },
+          data: {
+            scheduledTierType: dto.tierType,
+            scheduledBillingPeriod: dto.billingPeriod,
+            // Ücretli hedefe dönem sonunda oto-yenileme ile geçilebilsin diye autoRenew
+            // açık tutulur. Hedef free ise yenileme denenmez; checkExpiredMemberships
+            // dönem sonunda free'ye düşürür.
+            autoRenew: dto.tierType !== MembershipTierType.free,
+            // Bekleyen iptali geçersiz kıl: üyelik aktif kalır, dönem sonunda
+            // free yerine seçilen tier+periyoda geçer.
+            status: SubscriptionStatus.active,
+            cancelledAt: null,
+          },
+        });
+        return this.common.getUserMembership(userId);
+      }
+      // direction === 'upgrade' → aşağıdaki anında ödeme akışına düşer.
+    }
+
     // For free tier, just update
     if (dto.tierType === MembershipTierType.free || price.toNumber() === 0) {
       if (existingMembership) {
@@ -101,6 +165,8 @@ export class MembershipSubscriptionService {
             currentPeriodStart: now,
             currentPeriodEnd: periodEnd,
             cancelledAt: null,
+            scheduledTierType: null, // anında geçiş: varsa bekleyen değişiklik iptal
+            scheduledBillingPeriod: null,
           },
         });
       } else {
@@ -130,6 +196,8 @@ export class MembershipSubscriptionService {
           currentPeriodEnd: periodEnd,
           cancelledAt: null,
           autoRenew: true, // Ücretli üyelikte oto-yenileme hatırlatması default açık
+          scheduledTierType: null, // anında upgrade: varsa bekleyen değişiklik iptal
+          scheduledBillingPeriod: null,
         },
       });
     } else {
@@ -340,9 +408,38 @@ export class MembershipSubscriptionService {
       data: {
         status: SubscriptionStatus.cancelled,
         cancelledAt: new Date(),
+        // İptal = dönem sonunda free'ye dön. Bekleyen bir değişiklik planı varsa
+        // (downgrade/period) iptal onu geçersiz kılar; dönem sonunda free olur.
+        scheduledTierType: null,
+        scheduledBillingPeriod: null,
       },
     });
 
+    return this.common.getUserMembership(userId);
+  }
+
+  // ==========================================================================
+  // CANCEL SCHEDULED CHANGE (bekleyen downgrade / period değişimini geri al)
+  // ==========================================================================
+  /**
+   * Kullanıcının dönem sonuna planladığı değişikliği (downgrade veya period) iptal
+   * eder; mevcut plan olduğu gibi sürer ve dönem sonunda aynı tier+periyotla yenilenir.
+   * Aktif bir değişiklik planı yoksa hata verir.
+   */
+  async cancelScheduledChange(userId: string): Promise<UserMembershipResponseDto> {
+    const membership = await this.prisma.userMembership.findUnique({
+      where: { userId },
+    });
+    if (!membership) {
+      throw new NotFoundException('Üyelik bulunamadı');
+    }
+    if (!membership.scheduledTierType && !membership.scheduledBillingPeriod) {
+      throw new BadRequestException('Bekleyen bir üyelik değişikliği yok');
+    }
+    await this.prisma.userMembership.update({
+      where: { userId },
+      data: { scheduledTierType: null, scheduledBillingPeriod: null },
+    });
     return this.common.getUserMembership(userId);
   }
 
@@ -423,11 +520,36 @@ export class MembershipSubscriptionService {
       const card = m.user.savedCards[0];
       if (!card) continue;
       try {
-        const periodDays = Math.round(
+        // === ERTELEMELİ DEĞİŞİKLİK UYGULAMA (downgrade / period değişimi) ===
+        // Dönem sonuna gelen üyelikte bekleyen bir değişiklik planı varsa, YENİ dönem
+        // planlanan tier+periyoda göre kurulur ve ücreti ona göre çekilir.
+        // - Hedef free ise: yenileme yapmayız; checkExpiredMemberships free'ye düşürür.
+        // - Hedef ücretli ise: effectiveTier + effectiveIsYearly'i plana göre belirleriz;
+        //   plan başarıda temizlenir (scheduledTierType + scheduledBillingPeriod = null).
+        let effectiveTier = m.tier;
+        if (m.scheduledTierType) {
+          if (m.scheduledTierType === MembershipTierType.free) {
+            continue;
+          }
+          const sched = await this.prisma.membershipTier.findUnique({
+            where: { type: m.scheduledTierType },
+          });
+          if (sched) effectiveTier = sched;
+        }
+
+        const curPeriodDays = Math.round(
           (m.currentPeriodEnd.getTime() - m.currentPeriodStart.getTime()) / 86_400_000,
         );
-        const isYearly = periodDays > 180;
-        const price = Number(isYearly ? m.tier.yearlyPrice : m.tier.monthlyPrice);
+        // Bekleyen period değişimi varsa onu uygula; yoksa mevcut periyodu sürdür.
+        const isYearly = m.scheduledBillingPeriod
+          ? m.scheduledBillingPeriod === 'yearly'
+          : curPeriodDays > 180;
+
+        // Plan (tier veya period) gerçekten değişiyor mu? Başarıda planı temizlemek için.
+        const hasScheduledChange = !!(m.scheduledTierType || m.scheduledBillingPeriod);
+        const tierChanging = effectiveTier.id !== m.tierId;
+
+        const price = Number(isYearly ? effectiveTier.yearlyPrice : effectiveTier.monthlyPrice);
         if (!(price > 0)) continue;
 
         const newStart = now;
@@ -449,7 +571,7 @@ export class MembershipSubscriptionService {
           country: 'Türkiye',
         };
         const basket = [
-          { id: m.tierId, name: `${m.tier.name} Üyelik (yenileme)`, category: 'Üyelik', price, quantity: 1 },
+          { id: effectiveTier.id, name: `${effectiveTier.name} Üyelik (yenileme)`, category: 'Üyelik', price, quantity: 1 },
         ];
 
         const result = await this.paytr.chargeRecurring({
@@ -469,6 +591,10 @@ export class MembershipSubscriptionService {
                 status: SubscriptionStatus.active,
                 currentPeriodStart: newStart,
                 currentPeriodEnd: newEnd,
+                // Bekleyen değişiklik (tier ve/veya period) uygulandı: tier'ı geçir
+                // (değiştiyse) ve planı temizle. Değişiklik yoksa olduğu gibi kalır.
+                ...(tierChanging ? { tierId: effectiveTier.id } : {}),
+                ...(hasScheduledChange ? { scheduledTierType: null, scheduledBillingPeriod: null } : {}),
               },
             });
             await tx.membershipPayment.create({
@@ -647,9 +773,53 @@ export class MembershipSubscriptionService {
             status: SubscriptionStatus.active,
             autoRenew: false,
             cancelledAt: null,
+            // Buraya ulaşan üyelik free'ye düşüyor: ücretli hedefe ertelemeli
+            // downgrade ödenmediği/yenilenemediği için free'ye iniyor demektir.
+            // (Ücretli hedef ödenseydi runAutoRenewals dönemi ileri taşırdı ve bu
+            // kayıt expired listesine düşmezdi.) Bekleyen planı temizle.
+            scheduledTierType: null,
+            scheduledBillingPeriod: null,
           },
         });
         downgradeCount++;
+
+        // Üyelik sona erince, bu kullanıcının AÇTIĞI bekleyen (pending) takas
+        // teklifleri otomatik iptal edilir: artık takas hakkı olmadığı için karşı
+        // taraf kabul etse bile akış (kargo) ilerleyemezdi. Pending takasta
+        // rezervasyon/ödeme/kargo yan etkisi yoktur; bu yüzden sadece durum
+        // güncellemesi yeterli ve güvenlidir (stok geri dönüşü/iade gerekmez).
+        // NOT: Bu kullanıcıya GELEN pending teklifler iptal EDİLMEZ; onları
+        // kabul edemez (acceptTrade kapısı engeller) ve doğal sürede/karşı tarafça
+        // kapanır. Yalnızca üyelik dönemi İÇİNDE accepted olmuş takaslar etkilenmez.
+        //
+        // KRİTİK: İptal SADECE hedef tier'da takas hakkı yoksa yapılır. Hedef
+        // tier takas yapabiliyorsa (örn. premium→temel; temelde de takas var)
+        // pending teklifler korunur — kullanıcı hâlâ takas edebildiği için.
+        if (!freeTier.canTrade) try {
+          const cancelledPending = await this.prisma.trade.updateMany({
+            where: {
+              initiatorId: membership.userId,
+              status: TradeStatus.pending,
+            },
+            data: {
+              status: TradeStatus.cancelled,
+              cancelReason:
+                'Üyelik süresi sona erdiği için bekleyen takas teklifiniz otomatik iptal edildi.',
+              cancelledAt: now,
+              version: { increment: 1 },
+            },
+          });
+          if (cancelledPending.count > 0) {
+            this.logger.log(
+              `Auto-cancelled ${cancelledPending.count} pending trade offer(s) for downgraded user`,
+            );
+          }
+        } catch (tradeErr: any) {
+          // Takas iptali downgrade'i bloklamasın; üyelik düşürme başarılı sayılır.
+          this.logger.warn(
+            `Failed to auto-cancel pending trades after downgrade: ${tradeErr?.message}`,
+          );
+        }
       } catch (error) {
         this.logger.warn('Failed to downgrade membership');
       }

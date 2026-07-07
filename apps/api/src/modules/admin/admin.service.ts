@@ -63,6 +63,7 @@ import {
 import { TradeStatus, ShipmentStatus, MessageStatus, TicketStatus, TicketPriority, TicketCategory, MembershipTierType } from '@prisma/client';
 import { RefundService } from '../refund/refund.service';
 import { OrderService } from '../order/order.service';
+import { SuratTrackingService } from '../surat-cargo/surat-tracking.service';
 
 @Injectable()
 export class AdminService {
@@ -97,6 +98,8 @@ export class AdminService {
     private readonly sellerApplicationService: AdminSellerApplicationService,
     @Optional()
     private readonly orderService?: OrderService,
+    @Optional()
+    private readonly suratTrackingService?: SuratTrackingService,
   ) { }
 
   // ---------- Order 48h pencere admin müdahaleleri (Faz 3B.4) ----------
@@ -164,6 +167,17 @@ export class AdminService {
 
   async deleteCommissionRule(adminId: string, ruleId: string) {
     return this.commissionService.deleteCommissionRule(adminId, ruleId);
+  }
+
+  // ==================== TAKAS KOMİSYONU (ayarlanabilir oran) ====================
+  // Taşındı: admin-commission.service.ts — imzalar aynen korunuyor (facade delege).
+
+  async getTradeCommissionRate() {
+    return this.commissionService.getTradeCommissionRate();
+  }
+
+  async setTradeCommissionRate(adminId: string, rate: number) {
+    return this.commissionService.setTradeCommissionRate(adminId, rate);
   }
 
   // ==================== PLATFORM SETTINGS ====================
@@ -867,7 +881,7 @@ export class AdminService {
   }
 
   async createTaxRate(adminId: string, dto: {
-    taxRegionId: string;
+    taxRegionId?: string;
     name: string;
     rate: number;
     isDefault?: boolean;
@@ -900,7 +914,7 @@ export class AdminService {
   }
 
   async createTaxRule(adminId: string, dto: {
-    taxRegionId: string;
+    taxRegionId?: string;
     taxRateId: string;
     scope: string;
     categoryId?: string;
@@ -931,6 +945,70 @@ export class AdminService {
     regionId?: string;
   }) {
     return this.taxService.getTaxReport(query);
+  }
+
+  // ==================== BASİT KDV CONFIG (tek oran + kategori istisnaları) ====================
+  // Taşındı: admin-tax.service.ts — imzalar aynen korunuyor (facade delege).
+
+  async getVatConfig() {
+    return this.taxService.getVatConfig();
+  }
+
+  async setDefaultVat(adminId: string, ratePercent: number) {
+    return this.taxService.setDefaultVat(adminId, ratePercent);
+  }
+
+  async setVatOverride(adminId: string, categoryId: string, ratePercent: number) {
+    return this.taxService.setVatOverride(adminId, categoryId, ratePercent);
+  }
+
+  async deleteVatOverride(adminId: string, ruleId: string) {
+    return this.taxService.deleteVatOverride(adminId, ruleId);
+  }
+
+  // ==================== E-TİCARET STOPAJI (GVK 94/19, tevkifat) ====================
+  // Taşındı: admin-tax.service.ts — imzalar aynen korunuyor (facade delege).
+
+  async getWithholdingRate() {
+    return this.taxService.getWithholdingRate();
+  }
+
+  async setWithholdingRate(adminId: string, rate: number) {
+    return this.taxService.setWithholdingRate(adminId, rate);
+  }
+
+  async getWithholdingReport(query: { year: number; month: number }) {
+    return this.taxService.getWithholdingReport(query);
+  }
+
+  // ==================== ELOGO FATURA (e-Arşiv/e-Fatura) ====================
+  // Taşındı: admin-tax.service.ts — imzalar aynen korunuyor (facade delege).
+
+  async getElogoInvoices(query: {
+    type?: string;
+    status?: string;
+    documentType?: string;
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    return this.taxService.getElogoInvoices(query);
+  }
+
+  async getSellerUploadedInvoices(query: {
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    return this.taxService.getSellerUploadedInvoices(query);
+  }
+
+  async getSellerUploadedInvoicePdf(id: string) {
+    return this.taxService.getSellerUploadedInvoicePdf(id);
   }
 
   // ==================== MEMBERSHIP TIER MANAGEMENT ====================
@@ -1076,6 +1154,30 @@ export class AdminService {
     carrierId?: string;
   }) {
     return this.shippingService.getShipments(query);
+  }
+
+  async syncShipmentTracking(shipmentId: string) {
+    return this.shippingService.syncShipmentTracking(shipmentId);
+  }
+
+  async runSuratEndpointTest() {
+    return this.shippingService.runSuratEndpointTest();
+  }
+
+  async suratTestTrack(ref: string) {
+    return this.shippingService.suratTestTrack(ref);
+  }
+
+  async suratTestCancel(ref: string) {
+    return this.shippingService.suratTestCancel(ref);
+  }
+
+  async suratTestBarcode() {
+    return this.shippingService.suratTestBarcode();
+  }
+
+  async suratTestSil(ref: string) {
+    return this.shippingService.suratTestSil(ref);
   }
 
   // ==================== NOTIFICATION MANAGEMENT ====================

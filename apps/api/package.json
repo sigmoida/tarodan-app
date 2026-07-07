@@ -90,6 +90,7 @@
     "rxjs": "^7.8.1",
     "sharp": "^0.34.5",
     "google-auth-library": "^10.7.0",
+    "apple-signin-auth": "^1.7.3",
     "uuid": "^9.0.1"
   },
   "devDependencies": {

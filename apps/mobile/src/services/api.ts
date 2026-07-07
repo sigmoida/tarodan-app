@@ -99,6 +99,36 @@ export const resetBannedRedirect = () => {
   bannedRedirectActive = false;
 };
 
+// Tek-uçuş refresh: eşzamanlı 401'ler tek refresh paylaşır (rotated token + storm önlenir).
+let refreshPromise: Promise<string | null> | null = null;
+
+async function performTokenRefresh(): Promise<string | null> {
+  const refreshToken = await SecureStore.getItemAsync('refreshToken');
+  if (!refreshToken) return null;
+  const response = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
+  const data: any = response.data;
+  const newAccess: string | undefined = data?.tokens?.accessToken ?? data?.accessToken;
+  const newRefresh: string | undefined = data?.tokens?.refreshToken ?? data?.refreshToken;
+  if (!newAccess) return null;
+  await SecureStore.setItemAsync('accessToken', newAccess);
+  // ROTATED refresh token'ı da kaydet (asıl bug buydu).
+  if (newRefresh) await SecureStore.setItemAsync('refreshToken', newRefresh);
+  return newAccess;
+}
+
+async function handleAuthFailure(): Promise<void> {
+  // Merkezi çıkış: SecureStore + Zustand + query cache + socket + push temizlenir.
+  // require ile lazy import → api.ts ↔ authStore döngüsü (cycle) önlenir.
+  try {
+    const { useAuthStore } = require('../stores/authStore');
+    await useAuthStore.getState().logout();
+  } catch {
+    await SecureStore.deleteItemAsync('accessToken');
+    await SecureStore.deleteItemAsync('refreshToken');
+  }
+  router.replace('/(auth)/login');
+}
+
 // Response interceptor - handle token refresh
 api.interceptors.response.use(
   (response) => response,
@@ -122,25 +152,18 @@ api.interceptors.response.use(
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-
       try {
-        const refreshToken = await SecureStore.getItemAsync('refreshToken');
-        if (refreshToken) {
-          const response = await axios.post(`${API_URL}/auth/refresh`, {
-            refreshToken,
-          });
-
-          const { accessToken } = response.data;
-          await SecureStore.setItemAsync('accessToken', accessToken);
-
-          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        if (!refreshPromise) {
+          refreshPromise = performTokenRefresh().finally(() => { refreshPromise = null; });
+        }
+        const newAccess = await refreshPromise;
+        if (newAccess) {
+          originalRequest.headers.Authorization = `Bearer ${newAccess}`;
           return api(originalRequest);
         }
+        await handleAuthFailure();
       } catch (refreshError) {
-        // Refresh failed, logout user
-        await SecureStore.deleteItemAsync('accessToken');
-        await SecureStore.deleteItemAsync('refreshToken');
-        router.replace('/(auth)/login');
+        await handleAuthFailure();
       }
     }
 
@@ -163,6 +186,8 @@ export const authApi = {
     api.post('/auth/login', { email, password }),
   loginWithGoogle: (idToken: string) =>
     api.post('/auth/google', { idToken }),
+  loginWithApple: (identityToken: string, fullName?: string) =>
+    api.post('/auth/apple', { identityToken, fullName }),
   register: (data: {
     displayName: string;
     email: string;
@@ -214,6 +239,10 @@ export const authApi = {
     api.post<{ backupCodes?: string[] } | string[]>('/security/2fa/backup-codes', { code }),
   /** Tüm cihazlardan çıkış — backend: DELETE /security/tokens */
   logoutAll: () => api.delete('/security/tokens'),
+  /** SMS telefon doğrulama kodu gönder */
+  sendPhoneCode: (phone: string) => api.post('/auth/phone/send-code', { phone }),
+  /** SMS doğrulama kodunu doğrula */
+  verifyPhone: (code: string) => api.post('/auth/phone/verify', { code }),
 };
 
 // Products API - Web ile aynı endpoint'ler
@@ -392,6 +421,32 @@ export const ordersApi = {
   /** İlanlarım listesi için toplu komisyon önizleme */
   getCommissionPreviewBatch: (items: Array<{ amount: number; categoryId?: string | null }>) =>
     api.post('/orders/commission-preview-batch', { items }),
+};
+
+// eLogo e-Arşiv (gerçek yasal fatura) API
+export const elogoInvoicesApi = {
+  /** Siparişe ait kullanıcının e-Arşiv faturası (yoksa null) — buton hazırsa çıksın */
+  byOrder: (orderId: string) =>
+    api.get<{ id: string; invoiceNumber: string; label?: string; total?: number } | null>(
+      `/elogo/invoices/by-order/${orderId}`,
+    ),
+  /** Fatura PDF — S3 presigned URL döner ({ url }) */
+  pdf: (id: string) => api.get<{ url?: string; invoiceNumber?: string }>(`/elogo/invoices/${id}/pdf`),
+};
+
+// Kurumsal satıcının siparişe ELLE yüklediği ürün faturası (eLogo gelir faturasından ayrı)
+export const sellerInvoiceApi = {
+  /** Durum: yüklenmiş fatura + geçerli kullanıcının yükleme yetkisi */
+  status: (orderId: string) =>
+    api.get<{
+      invoice: { id: string; fileName: string; uploadedAt: string } | null;
+      canUpload: boolean;
+      isSeller: boolean;
+      isBuyer: boolean;
+    }>(`/orders/${orderId}/seller-invoice`),
+  /** İndirme — S3 presigned URL ({ url, fileName }) */
+  download: (orderId: string) =>
+    api.get<{ url?: string; fileName?: string }>(`/orders/${orderId}/seller-invoice/download`),
 };
 
 // Messages API - Web ile aynı endpoint'ler

@@ -51,6 +51,7 @@ export const ADMIN_PERMISSION_KEYS = [
   'payments',
   'commission',
   'payouts',
+  'invoices',
   'tax',
   'payment_settings',
   // Sistem
@@ -71,7 +72,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
     'orders', 'trades', 'shipping', 'refund_requests', 'refund_history',
     'products', 'categories', 'brands', 'car_models', 'manufacturers', 'attributes', 'collections',
     'users', 'seller_applications', 'seller_performance', 'reviews', 'reports',
-    'payments', 'commission', 'payouts',
+    'payments', 'commission', 'payouts', 'invoices',
     'messages', 'support', 'discounts', 'ads', 'notifications', 'email_templates', 'pages',
     'ai_moderation',
   ],

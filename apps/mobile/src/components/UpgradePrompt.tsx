@@ -138,10 +138,6 @@ export default function UpgradePrompt({
         onPress={() => router.push('/upgrade')}
         style={styles.upgradeButton}
       />
-
-      <Text style={styles.priceNote}>
-        Yıllık planda 2 ay bedava!
-      </Text>
     </Card>
   );
 }

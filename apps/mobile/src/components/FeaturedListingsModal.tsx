@@ -3,7 +3,7 @@ import { View, ScrollView, StyleSheet, Image, Pressable } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { api } from '../services/api';
-import { theme, Text, Button, Card, Chip, IconButton, Snackbar, Spinner, Divider, Modal, appAlert } from '@tarodan/ui-native';
+import { theme, Text, Button, Card, Chip, IconButton, Snackbar, Spinner, Divider, Modal, useModalMessage, ModalMessage } from '@tarodan/ui-native';
 import { resolveImageUrl } from '../utils/imageUrl';
 
 const { colors } = theme;
@@ -40,6 +40,8 @@ export const FeaturedListingsModal: React.FC<FeaturedListingsModalProps> = ({
   const queryClient = useQueryClient();
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState({ visible: false, message: '' });
+  const [pendingRemove, setPendingRemove] = useState<{ slotId: string; title: string } | null>(null);
+  const msg = useModalMessage();
 
   // Fetch current featured listings
   const { data: featuredSlots, isLoading: loadingFeatured } = useQuery<FeaturedSlot[]>({
@@ -118,7 +120,7 @@ export const FeaturedListingsModal: React.FC<FeaturedListingsModalProps> = ({
       setSnackbar({ visible: true, message: 'Öne çıkarma kaldırıldı' });
     },
     onError: (error: any) => {
-      setSnackbar({ visible: true, message: error.response?.data?.message || 'İşlem başarısız' });
+      msg.error(error?.response?.data?.message || 'Öne çıkarma kaldırılamadı.');
     },
   });
 
@@ -134,14 +136,7 @@ export const FeaturedListingsModal: React.FC<FeaturedListingsModalProps> = ({
   };
 
   const handleRemoveFeatured = (slotId: string, productTitle: string) => {
-    appAlert(
-      'Öne Çıkarmayı Kaldır',
-      `"${productTitle}" ilanının öne çıkarmasını kaldırmak istediğinize emin misiniz?`,
-      [
-        { text: 'İptal', style: 'cancel' },
-        { text: 'Kaldır', style: 'destructive', onPress: () => removeFeaturedMutation.mutate(slotId) },
-      ]
-    );
+    setPendingRemove({ slotId, title: productTitle });
   };
 
   const formatRemainingTime = (expiresAt: string) => {
@@ -156,7 +151,7 @@ export const FeaturedListingsModal: React.FC<FeaturedListingsModalProps> = ({
   };
 
   return (
-    <Modal isOpen={visible} onClose={onDismiss} title="Öne Çıkan İlanlar">
+    <Modal isOpen={visible} onClose={() => { setPendingRemove(null); msg.clear(); onDismiss(); }} title="Öne Çıkan İlanlar">
       <View style={styles.headerIcon}>
         <MaterialCommunityIcons name="star-circle" size={28} color={colors.primary[600]!} />
       </View>
@@ -183,6 +178,22 @@ export const FeaturedListingsModal: React.FC<FeaturedListingsModalProps> = ({
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {pendingRemove && (
+          <View style={styles.confirmBox}>
+            <Text>{`"${pendingRemove.title}" öne çıkarmasını kaldırmak istiyor musunuz?`}</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Button
+                variant="danger"
+                title="Kaldır"
+                isLoading={removeFeaturedMutation.isPending}
+                onPress={() => { const id = pendingRemove.slotId; setPendingRemove(null); removeFeaturedMutation.mutate(id); }}
+              />
+              <Button variant="ghost" title="Vazgeç" onPress={() => setPendingRemove(null)} />
+            </View>
+          </View>
+        )}
+        <ModalMessage state={msg.state} />
+
         {/* Current Featured Listings */}
         <Text style={styles.sectionTitle}>
           Aktif Öne Çıkan İlanlarınız
@@ -387,6 +398,13 @@ const styles = StyleSheet.create({
   },
   content: {
     maxHeight: 500,
+  },
+  confirmBox: {
+    gap: 8,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: colors.danger[50]!,
+    marginBottom: 12,
   },
   sectionTitle: {
     marginTop: 8,

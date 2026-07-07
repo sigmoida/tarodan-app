@@ -14,6 +14,7 @@ import { EventService } from '../events';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto/notification.dto';
 import { CommissionLedgerService } from '../commission/commission-ledger.service';
+import { ElogoInvoicingService } from '../elogo';
 import { PaymentCommonService } from './payment-common.service';
 
 /**
@@ -41,6 +42,7 @@ export class PaymentRefundService {
     private readonly eventService: EventService,
     private readonly notificationService: NotificationService,
     private readonly commissionLedger: CommissionLedgerService,
+    private readonly elogoInvoicing: ElogoInvoicingService,
     private readonly paymentCommon: PaymentCommonService,
   ) {
     this.holdDays = parseInt(this.configService.get('PAYMENT_HOLD_DAYS') || '7', 10);
@@ -188,7 +190,8 @@ export class PaymentRefundService {
       }
 
       // Update payment status after successful refund
-      return this.prisma.$transaction(async (tx) => {
+      let einvoiceReverse = false; // tam iade → e-Arşiv iptal/iade tetiği (post-commit)
+      const refundCommitResult = await this.prisma.$transaction(async (tx) => {
         const oldStatus = payment.status;
         // O7: Grup iadesinde refundedOrders read-modify-write'ı SERİLEŞTİR. Eşzamanlı
         // kardeş iadeler aynı eski snapshot'ı okuyup birbirini EZMESİN diye payment
@@ -301,6 +304,7 @@ export class PaymentRefundService {
           : Number(payment.amount);
         if (amountToRefund >= ledgerFullThreshold) {
           await this.commissionLedger.markRefunded(orderId, tx);
+          einvoiceReverse = true;
         }
 
         // Update order status + restore stock on full refund.
@@ -446,6 +450,15 @@ export class PaymentRefundService {
         }
         return response;
       });
+
+      // Tam iade → Tarodan'ın komisyon/hizmet bedeli e-Arşivlerini iptal et / iade faturası
+      // kes (refundStrategy: ≤8g iptal, >8g IADE). Post-commit, non-blocking, idempotent.
+      if (einvoiceReverse) {
+        void this.elogoInvoicing
+          .handleOrderRefund(orderId)
+          .catch((e) => this.logger.warn(`eLogo iade tetik hatası ${orderId}: ${e?.message}`));
+      }
+      return refundCommitResult;
     } catch (error: any) {
       this.logger.error(`Refund error for payment ${payment.id}: ${error.message}`);
       throw error;
@@ -622,6 +635,13 @@ export class PaymentRefundService {
     }
 
     this.logger.log(`Trade cash refunded via PayTR tradeId=${tradeId} paymentId=${payment.id}`);
+
+    // Takas komisyon e-Arşivini iptal et / iade faturası kes (post-commit, non-blocking).
+    if (payment.tradeCashPaymentId) {
+      void this.elogoInvoicing
+        .handleTradeCashRefund(payment.tradeCashPaymentId)
+        .catch((e) => this.logger.warn(`eLogo takas iade tetik hatası: ${e?.message}`));
+    }
     return { refunded: true, paymentId: payment.id };
   }
 

@@ -3,6 +3,8 @@ import { View, ScrollView, StyleSheet, TouchableOpacity, Image } from 'react-nat
 import { Button, IconButton, Divider, Text, theme, ScreenHeader } from '@tarodan/ui-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useQuery } from '@tanstack/react-query';
+import { ordersApi } from '../src/services/api';
 import { useCartStore, maxAllowedQty } from '../src/stores/cartStore';
 import { useAuthStore } from '../src/stores/authStore';
 import { transformImageUrl } from '../src/utils/imageUrl';
@@ -20,8 +22,22 @@ export default function CartScreen() {
   }, []);
 
   const subtotal = getSubtotal();
-  const total = subtotal;
   const itemCount = getItemCount();
+
+  // Platform hizmet bedeli (komisyon) — backend quote'tan, sepette de net göster.
+  const quoteQuery = useQuery({
+    queryKey: ['cart-quote', items.map((it) => `${it.productId}:${it.quantity}`).join(',')],
+    queryFn: async () => {
+      const res: any = await ordersApi.getQuote({
+        items: items.map((it) => ({ productId: it.productId, quantity: it.quantity })),
+      });
+      return (res.data?.pricing ?? res.data ?? {}) as { buyerFeeAmount?: number };
+    },
+    enabled: items.length > 0,
+    staleTime: 60_000,
+  });
+  const buyerFee = Number(quoteQuery.data?.buyerFeeAmount ?? 0);
+  const total = subtotal + buyerFee;
 
   const handleRemove = (itemId: string) => {
     removeItem(itemId);
@@ -135,6 +151,12 @@ export default function CartScreen() {
             <Text style={styles.summaryLabel}>Ara Toplam ({itemCount} ürün)</Text>
             <Text style={styles.summaryValue}>₺{subtotal.toLocaleString('tr-TR')}</Text>
           </View>
+          {buyerFee > 0 ? (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Platform Hizmet Bedeli</Text>
+              <Text style={styles.summaryValue}>₺{buyerFee.toLocaleString('tr-TR')}</Text>
+            </View>
+          ) : null}
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Kargo</Text>
             <Text style={styles.summaryValue}>Ödeme adımında hesaplanır</Text>

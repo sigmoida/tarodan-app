@@ -73,10 +73,14 @@ export class SearchProductService {
       set: setFilter,
       sellerId,
       status,
-      page = 1,
-      pageSize = 20,
       sortBy = 'relevance',
     } = options;
+
+    // Sayfalama parametrelerini güvenli tamsayıya indirge: geçersiz/NaN/≤0 girişlerde
+    // (örn. ?page=abc → parseInt→NaN) `from = (page-1)*pageSize` NaN olur ve ES/Prisma
+    // çöker. Varsayılan: page=1, pageSize=20.
+    const page = Number.isFinite(options.page) && (options.page as number) >= 1 ? Math.floor(options.page as number) : 1;
+    const pageSize = Number.isFinite(options.pageSize) && (options.pageSize as number) >= 1 ? Math.floor(options.pageSize as number) : 20;
 
     const must: any[] = [];
     const filter: any[] = [];
@@ -528,8 +532,14 @@ export class SearchProductService {
   private async fallbackSearch(options: SearchOptions): Promise<SearchResponse> {
     const {
       query, discountOnly,
-      page = 1, pageSize = 20, sortBy = 'relevance',
+      sortBy = 'relevance',
     } = options;
+
+    // Sayfalama parametrelerini güvenli tamsayıya indirge: geçersiz/NaN/≤0 girişlerde
+    // `skip = (page-1)*pageSize` NaN olur ve Prisma "Argument skip is missing" ile çöker.
+    // Varsayılan: page=1, pageSize=20.
+    const page = Number.isFinite(options.page) && (options.page as number) >= 1 ? Math.floor(options.page as number) : 1;
+    const pageSize = Number.isFinite(options.pageSize) && (options.pageSize as number) >= 1 ? Math.floor(options.pageSize as number) : 20;
 
     let fulltextIds: string[] | undefined;
     if (query) {

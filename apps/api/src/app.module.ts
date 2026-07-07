@@ -46,6 +46,9 @@ import { ReportsModule } from './modules/reports';
 // Invoice System - requirements.txt: "invoices will be sent to users automatically"
 import { InvoiceModule } from './modules/invoice';
 
+// eLogo e-Belge (e-Arşiv / e-Fatura) entegrasyonu
+import { ElogoModule } from './modules/elogo';
+
 // Marketing Email System
 import { MarketingModule } from './modules/marketing/marketing.module';
 
@@ -171,6 +174,7 @@ import { ErrorLogInterceptor } from './common/interceptors/error-log.interceptor
     // PHASE 5 - Operations Modules
     ReportsModule,      // GAP-019: Report Export (MEDIUM)
     InvoiceModule,      // Invoice Generation & Delivery
+    ElogoModule,        // eLogo e-Belge (e-Arşiv / e-Fatura) entegrasyonu
     MarketingModule,    // Marketing Email Scheduler (weekly newsletter, monthly promotions)
 
     // GAP-L02 & GAP-L03 - GraphQL & i18n

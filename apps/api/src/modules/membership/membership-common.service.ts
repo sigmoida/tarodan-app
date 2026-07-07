@@ -218,6 +218,10 @@ export class MembershipCommonService {
       currentPeriodEnd: membership.currentPeriodEnd,
       cancelledAt: membership.cancelledAt || undefined,
       createdAt: membership.createdAt,
+      // Ertelemeli downgrade: dönem sonunda geçilecek tier (null = yok). UI
+      // "Üyeliğiniz {currentPeriodEnd} tarihinde {scheduledTierType} olacak" gösterebilir.
+      ...(membership.scheduledTierType ? { scheduledTierType: membership.scheduledTierType } : {}),
+      ...(membership.scheduledBillingPeriod ? { scheduledBillingPeriod: membership.scheduledBillingPeriod } : {}),
       ...(pendingPayment && pendingTierName ? { pendingTierName, pendingTierType, pendingPayment: true } : {}),
       ...stats,
     };

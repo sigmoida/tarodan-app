@@ -86,12 +86,12 @@ export default function CheckoutSuccessPage() {
           const orderRes = await api.get(`/orders/${orderId}`);
           setOrder(orderRes.data);
 
-          // Fetch invoice details
+          // YENİ eLogo e-Arşiv faturası (yoksa null → buton çıkmaz; sipariş teslimde kesilir)
           try {
-            const invoiceRes = await api.get(`/invoices/order/${orderId}`);
-            setInvoice(invoiceRes.data);
+            const invoiceRes = await api.get(`/elogo/invoices/by-order/${orderId}`);
+            if (invoiceRes.data?.id) setInvoice(invoiceRes.data);
           } catch {
-            // Invoice might not be ready yet
+            // Fatura henüz hazır değil
           }
         }
       } catch (error) {
@@ -109,18 +109,9 @@ export default function CheckoutSuccessPage() {
 
     setDownloading(true);
     try {
-      const response = await api.get(`/invoices/download/${invoice.id}`, {
-        responseType: 'blob',
-      });
-
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `fatura-${invoice.invoiceNumber}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      const res = await api.get(`/elogo/invoices/${invoice.id}/pdf`);
+      const url = (res.data as any)?.url;
+      if (url) window.open(url, '_blank', 'noopener,noreferrer');
     } catch (error) {
       console.error('Failed to download invoice:', error);
     } finally {

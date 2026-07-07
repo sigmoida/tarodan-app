@@ -25,6 +25,7 @@ import { PayoutModule } from '../payout/payout.module';
 import { SuratCargoModule } from '../surat-cargo/surat-cargo.module';
 import { CommissionModule } from '../commission/commission.module';
 import { StorageModule } from '../storage/storage.module';
+import { ElogoModule } from '../elogo';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { StorageModule } from '../storage/storage.module';
     CommissionModule,
     StorageModule,
     ProductLockModule,
+    ElogoModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

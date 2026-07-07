@@ -227,6 +227,22 @@ export class TradeShipmentService {
       }> = [];
 
       await this.prisma.$transaction(async (tx) => {
+        // ROBUSTNESS: Bu fonksiyon fire-and-forget (accept/payment sonrası) çalışır;
+        // ilk okuma (yukarıda) ile bu tx arasında takas silinmiş/iptal edilmiş olabilir
+        // (ör. eşzamanlı iptal ya da test truncate). tradeShipment.tradeId FK'sını
+        // ihlal edip tüm tx'i patlatmak yerine (trade_shipments_trade_id_fkey), tx içinde
+        // takasın hâlâ var olduğunu doğrula; yoksa sessizce çık.
+        const stillExists = await tx.trade.findUnique({
+          where: { id: trade.id },
+          select: { id: true },
+        });
+        if (!stillExists) {
+          this.logger.warn(
+            `createInboundTradeShipments: trade ${trade.id} vanished before shipment create; skipping`,
+          );
+          return;
+        }
+
         for (const side of sides) {
           if (!side.address) {
             this.logger.warn(

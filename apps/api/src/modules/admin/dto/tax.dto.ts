@@ -73,9 +73,10 @@ export class UpdateTaxRegionDto {
 }
 
 export class CreateTaxRateDto {
-  @ApiProperty()
+  @ApiPropertyOptional({ description: "Verilmezse varsayılan (TR) bölge kullanılır" })
+  @IsOptional()
   @IsString()
-  taxRegionId: string;
+  taxRegionId?: string;
 
   @ApiProperty({ example: 'KDV Standart' })
   @IsString()
@@ -157,9 +158,10 @@ export class UpdateTaxRateDto {
 }
 
 export class CreateTaxRuleDto {
-  @ApiProperty()
+  @ApiPropertyOptional({ description: "Verilmezse varsayılan (TR) bölge kullanılır" })
+  @IsOptional()
   @IsString()
-  taxRegionId: string;
+  taxRegionId?: string;
 
   @ApiProperty()
   @IsString()
@@ -234,4 +236,51 @@ export class TaxReportQueryDto {
   @IsOptional()
   @IsString()
   regionId?: string;
+}
+
+export class SetWithholdingRateDto {
+  @ApiProperty({ description: 'E-ticaret stopaj (tevkifat) oranı %, GVK 94/19', example: 1 })
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  @Type(() => Number)
+  rate: number;
+}
+
+export class WithholdingReportQueryDto {
+  @ApiProperty({ description: 'Yıl (örn. 2026)', example: 2026 })
+  @IsNumber()
+  @Min(2020)
+  @Max(2100)
+  @Type(() => Number)
+  year: number;
+
+  @ApiProperty({ description: 'Ay (1-12)', example: 6 })
+  @IsNumber()
+  @Min(1)
+  @Max(12)
+  @Type(() => Number)
+  month: number;
+}
+
+export class SetDefaultVatDto {
+  @ApiProperty({ description: 'Varsayılan KDV oranı (%)', example: 20 })
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  @Type(() => Number)
+  rate: number;
+}
+
+export class SetVatOverrideDto {
+  @ApiProperty({ description: 'Kategori ID' })
+  @IsString()
+  categoryId: string;
+
+  @ApiProperty({ description: 'Bu kategori için KDV oranı (%)', example: 0 })
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  @Type(() => Number)
+  rate: number;
 }

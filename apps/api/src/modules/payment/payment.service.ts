@@ -18,6 +18,7 @@ import { computeRelevanceScore, RELEVANCE_PREMIUM_BONUS } from '../product/helpe
 import { PayTRService, PayTRBuyer } from '../payment-providers/paytr.service';
 import { EventService } from '../events';
 import { InvoiceService } from '../invoice/invoice.service';
+import { ElogoInvoicingService } from '../elogo';
 import { ProductLockService } from '../product/product-lock.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto/notification.dto';
@@ -41,6 +42,7 @@ export class PaymentService {
     private readonly paytrService: PayTRService,
     private readonly eventService: EventService,
     private readonly invoiceService: InvoiceService,
+    private readonly elogoInvoicing: ElogoInvoicingService,
     private readonly productLockService: ProductLockService,
     private readonly notificationService: NotificationService,
     private readonly suratCargoService: SuratCargoService,
@@ -1612,8 +1614,13 @@ export class PaymentService {
 
       // Only create payment hold for regular product orders (not membership/boost orders)
       if (!isMembershipOrder && !isBoostOrder) {
-        // Calculate seller payout (amount - commission)
-        const sellerAmount = Number(order.totalAmount) - Number(order.commissionAmount);
+        // Calculate seller payout (amount - commission - stopaj).
+        // Stopaj (GVK 94/19) yalnız kurumsal satıcı siparişlerinde > 0'dır; platform
+        // muhtasar ile beyan eder, satıcı kendi beyannamesinde mahsup eder.
+        const sellerAmount =
+          Number(order.totalAmount) -
+          Number(order.commissionAmount) -
+          Number(order.withholdingTaxAmount ?? 0);
 
         // Create payment hold for seller (escrow). releaseAt ödeme anında SET
         // EDİLMEZ; teslimde (shipping.worker delivered) deliveredAt + return + grace
@@ -1632,7 +1639,7 @@ export class PaymentService {
         // CommissionLedger satırı — pending (Faz 3A.2). Spec Bölüm 5.1.
         await this.commissionLedger.upsertPending({
           orderId: payment.orderId,
-          sellerCommission: order.commissionAmount,
+          sellerCommission: order.sellerFeeAmount,
           buyerFee: order.buyerFeeAmount,
           tx,
         });
@@ -1780,12 +1787,38 @@ export class PaymentService {
     // Generate and send invoice to buyer (only for regular product orders, not membership/boost)
     if (!isMembershipOrder && !isBoostOrder) {
       try {
-        await this.invoiceService.generateAndSendInvoice(resultOrder.id);
-        this.logger.log(`Invoice generated and sent for order ${resultOrder.orderNumber}`);
+        // ESKİ PDFKit makbuzu KALDIRILDI — Tarodan artık eLogo e-Arşiv kesiyor (sipariş
+        // tamamlanınca komisyon/hizmet/platform-satış). Ödeme anında eski makbuz gönderilmez.
+        // await this.invoiceService.generateAndSendInvoice(resultOrder.id);
       } catch (error) {
         // Log but don't fail - payment was already successful
         this.logger.error(`Failed to generate invoice for order ${resultOrder.orderNumber}: ${error}`);
       }
+    }
+
+    // Tarodan gelir e-Arşivi: üyelik → üyeye, boost → satıcıya (sanal hizmet, ödeme anında).
+    // Fire-and-forget, idempotent, retry cron'lu — ödemeyi BLOKLAMAZ.
+    if (isMembershipOrder) {
+      void (async () => {
+        const mp = await this.prisma.membershipPayment.findFirst({
+          where: { providerPaymentId: transactionId || payment.providerPaymentId || undefined },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true },
+        });
+        // membershipPayment kaydı varsa ondan; YOKSA (mevcut akış MEM- order + tier upgrade
+        // yapıyor, ayrı membershipPayment üretmiyor) MEM- SİPARİŞTEN kes.
+        if (mp) await this.elogoInvoicing.issueMembershipInvoice(mp.id);
+        else await this.elogoInvoicing.issueMembershipInvoiceForOrder(resultOrder.id);
+      })().catch((e) => this.logger.warn(`eLogo üyelik faturası tetik hatası: ${e?.message}`));
+    }
+    if (isBoostOrder) {
+      void (async () => {
+        const boost = await this.prisma.productBoost.findUnique({
+          where: { orderId: resultOrder.id },
+          select: { id: true },
+        });
+        if (boost) await this.elogoInvoicing.issueBoostInvoice(boost.id);
+      })().catch((e) => this.logger.warn(`eLogo boost faturası tetik hatası: ${e?.message}`));
     }
 
     // Auto-create Shipment record (Sürat Kargo gönderi kaydı oluşturuldu at order creation)
@@ -1966,7 +1999,11 @@ export class PaymentService {
           // Satıcı başına escrow hold (tek payment'a sipariş başına bir hold).
           // releaseAt teslimde hesaplanır (deliveredAt + return + grace); ödeme
           // anında null → teslim olmadan asla serbest bırakılmaz.
-          const sellerAmount = Number(order.totalAmount) - Number(order.commissionAmount);
+          // Stopaj (kurumsal satıcı) da hold'dan düşülür — payout'a hiç girmez.
+          const sellerAmount =
+            Number(order.totalAmount) -
+            Number(order.commissionAmount) -
+            Number(order.withholdingTaxAmount ?? 0);
           await tx.paymentHold.create({
             data: {
               paymentId: payment.id,
@@ -1980,7 +2017,7 @@ export class PaymentService {
 
           await this.commissionLedger.upsertPending({
             orderId: order.id,
-            sellerCommission: order.commissionAmount,
+            sellerCommission: order.sellerFeeAmount,
             buyerFee: order.buyerFeeAmount,
             tx,
           });
@@ -2144,11 +2181,8 @@ export class PaymentService {
         this.logger.error(`Failed to emit order.paid event for group order ${resultOrder.id}: ${error}`);
       }
 
-      try {
-        await this.invoiceService.generateAndSendInvoice(resultOrder.id);
-      } catch (error) {
-        this.logger.error(`Failed to generate invoice for order ${resultOrder.orderNumber}: ${error}`);
-      }
+      // ESKİ PDFKit makbuzu KALDIRILDI (grup akışı) — yasal değil; eLogo e-Arşiv tek belge.
+      // await this.invoiceService.generateAndSendInvoice(resultOrder.id);
 
       try {
         const existingShipment = await this.prisma.shipment.findFirst({
@@ -2467,6 +2501,10 @@ export class PaymentService {
     }
 
     this.logger.log(`Trade cash payment ${payment.id} completed (tradeCashPaymentId=${payment.tradeCashPaymentId})`);
+
+    // NOT: Takas nakit komisyonu e-Arşivi ARTIK BURADA (ödeme anında) DEĞİL, ürünler DEPOYA VARINCA
+    // (at_warehouse) kesilir — surat-tracking.maybeTransitionTradeToAtWarehouse. İptal penceresi
+    // ödeme sonrası/depo öncesi olduğundan, iptalde henüz fatura kesilmemiş olur (iade faturası gerekmez).
 
     // İşlem tamamlandıktan sonra bildirim emit et (her iki tarafa)
     if (result.tradeTransitioned && result.trade && result.shippingDeadline) {

@@ -172,18 +172,21 @@ export default function PaymentSuccessPage() {
     retryCount: number,
   ) => {
     try {
-      // Use public endpoint for better reliability even if auth exists (matches current session)
-      const url = isAuthenticated
-        ? `/invoices/order/${orderId}?paymentId=${paymentId}`
-        : `/invoices/order/${orderId}/public?paymentId=${paymentId}`;
-
-      const invoiceRes = await api.get(url);
-      if (invoiceRes.data) {
+      // YENİ: gerçek eLogo e-Arşiv faturası (boost/üyelik → ödeme anında; sipariş → teslimde).
+      // Guest (misafir sipariş) e-Arşiv ucuna erişemez → o durumda buton gösterilmez.
+      if (!isAuthenticated) {
+        if (retryCount >= 1) setInvoiceError(true);
+        return;
+      }
+      const invoiceRes = await api.get(`/elogo/invoices/by-order/${orderId}`);
+      if (invoiceRes.data?.id) {
         setInvoice(invoiceRes.data);
         setInvoiceError(false);
+        return;
       }
+      throw new Error('invoice-not-ready');
     } catch (error) {
-      // If 404 and we have retries left, try again in 2 seconds
+      // Fatura henüz hazır değil (özellikle sipariş teslimde kesilir) → birkaç kez dene.
       if (retryCount < 5) {
         setTimeout(
           () => attemptFetchInvoice(orderId, paymentId, retryCount + 1),
@@ -196,31 +199,16 @@ export default function PaymentSuccessPage() {
   };
 
   const handleDownloadInvoice = async () => {
-    if (!invoice?.id || !paymentId) return;
+    if (!invoice?.id) return;
 
     setDownloading(true);
     try {
-      const url = isAuthenticated
-        ? `/invoices/download/${invoice.id}?paymentId=${paymentId}`
-        : `/invoices/download/${invoice.id}/public?paymentId=${paymentId}`;
-
-      const response = await api.get(url, {
-        responseType: "blob",
-      });
-
-      const blobUrl = window.URL.createObjectURL(
-        new Blob([response.data], { type: "application/pdf" }),
-      );
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.setAttribute(
-        "download",
-        `fatura-${invoice.invoiceNumber || invoice.id}.pdf`,
-      );
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(blobUrl);
+      // YENİ: eLogo e-Arşiv PDF → S3 presigned URL, yeni sekmede aç (görüntüle/indir).
+      const res = await api.get(`/elogo/invoices/${invoice.id}/pdf`);
+      const url = (res.data as any)?.url;
+      if (url) {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
     } catch (error) {
       console.error("Failed to download invoice:", error);
     } finally {

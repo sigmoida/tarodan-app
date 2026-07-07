@@ -12,6 +12,7 @@ interface User {
   displayName: string;
   isVerified: boolean;
   isEmailVerified?: boolean;
+  isPhoneVerified?: boolean;
   isSeller: boolean;
   sellerType?: string;
   createdAt: Date;
@@ -104,6 +105,7 @@ const mapApiUser = (apiUser: any): User => ({
   displayName: apiUser.displayName || apiUser.display_name || '',
   isVerified: apiUser.isVerified || apiUser.is_verified || false,
   isEmailVerified: apiUser.isEmailVerified || apiUser.is_email_verified || false,
+  isPhoneVerified: apiUser.isPhoneVerified || apiUser.is_phone_verified || false,
   isSeller: apiUser.isSeller || apiUser.is_seller || false,
   sellerType: apiUser.sellerType || apiUser.seller_type,
   createdAt: apiUser.createdAt || apiUser.created_at,
@@ -134,6 +136,7 @@ interface AuthState {
   
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
+  loginWithApple: (idToken: string, fullName?: string) => Promise<void>;
   register: (username: string, email: string, password: string, phone?: string, birthDate?: string, acceptMarketing?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
@@ -196,6 +199,20 @@ export const useAuthStore = create<AuthState>()(
         const { user: apiUser } = response.data;
         // Token'lar httpOnly cookie olarak backend tarafından set edildi; JS'te saklamıyoruz.
         // Sadece hassas olmayan "girişli" işaretçisini bırakırız (interceptor/cart için).
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('tarodan_authed', '1');
+        }
+
+        const user = mapApiUser(apiUser);
+        const limits = TIER_LIMITS[user.membershipTier];
+
+        set({ user, token: null, refreshToken: null, isAuthenticated: true, limits });
+      },
+
+      loginWithApple: async (idToken: string, fullName?: string) => {
+        const response = await authApi.loginWithApple(idToken, fullName);
+        const { user: apiUser } = response.data;
+        // Token'lar httpOnly cookie olarak backend tarafından set edildi; JS'te saklamıyoruz.
         if (typeof window !== 'undefined') {
           localStorage.setItem('tarodan_authed', '1');
         }

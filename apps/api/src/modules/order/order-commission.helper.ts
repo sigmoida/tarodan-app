@@ -33,9 +33,11 @@ export function findMatchingCommissionRule(
   }
 
   // 2. categoryId + ALL (category priority - more specific than seller type)
+  // NOT: sellerType null = "tüm satıcı tipleri" (ALL ile eşdeğer). Alıcı hizmet bedeli
+  // kuralları sellerType'sız oluşturulur; null'ı ALL gibi ele almazsak hiç eşleşmez.
   if (categoryId) {
     const catAll = rules.find(
-      r => r.categoryId === categoryId && r.sellerType === CommissionSellerType.ALL
+      r => r.categoryId === categoryId && (r.sellerType === CommissionSellerType.ALL || r.sellerType == null)
     );
     if (catAll) {
       logger?.debug(`Matched category rule: category=${categoryId}, sellerType=ALL`);
@@ -52,9 +54,9 @@ export function findMatchingCommissionRule(
     return typeOnly;
   }
 
-  // 4. categoryId IS NULL + ALL (default)
+  // 4. categoryId IS NULL + ALL (default) — sellerType null da ALL sayılır (alıcı hizmet bedeli)
   const defaultRule = rules.find(
-    r => r.categoryId === null && r.sellerType === CommissionSellerType.ALL
+    r => r.categoryId === null && (r.sellerType === CommissionSellerType.ALL || r.sellerType == null)
   );
 
   if (defaultRule) {

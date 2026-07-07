@@ -107,7 +107,7 @@ export default function OfferDetailScreen() {
     onSuccess: () => {
       invalidate();
       appAlert('Bilgi', 'Teklif iptal edildi.');
-      router.back();
+      router.canGoBack() ? router.back() : router.replace('/(tabs)');
     },
     onError: (e: any) =>
       appAlert('Hata', e?.response?.data?.message || 'İşlem başarısız.'),

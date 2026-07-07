@@ -14,6 +14,7 @@ import { getAvailableQuantity } from '../product/helpers/product-availability.he
 import { ProductLockService } from '../product/product-lock.service';
 import { NotificationService } from '../notification/notification.service';
 import { CommissionLedgerService } from '../commission/commission-ledger.service';
+import { ElogoInvoicingService } from '../elogo';
 import { OrderCommonService } from './order-common.service';
 import { OrderQueryService } from './order-query.service';
 
@@ -34,6 +35,7 @@ export class OrderLifecycleService {
     private readonly commissionLedger: CommissionLedgerService,
     private readonly orderCommon: OrderCommonService,
     private readonly orderQuery: OrderQueryService,
+    private readonly elogoInvoicing: ElogoInvoicingService,
   ) {}
 
   /**
@@ -257,6 +259,20 @@ export class OrderLifecycleService {
           `completeOrder post-commit notify error for ${orderId}: ${e?.message}`,
         );
       }
+
+      // Tarodan gelir e-Arşivleri (komisyon → satıcı, hizmet bedeli → alıcı).
+      // Sipariş tamamlandı = komisyon "earned"; tutarlar CommissionLedger snapshot'ından.
+      // Fire-and-forget: sipariş tamamlamayı BLOKLAMAZ; servis idempotent + retry cron'lu.
+      void this.elogoInvoicing
+        .issueCommissionInvoice(orderId)
+        .catch((e) => this.logger.warn(`eLogo komisyon faturası tetik hatası ${orderId}: ${e?.message}`));
+      void this.elogoInvoicing
+        .issueServiceFeeInvoice(orderId)
+        .catch((e) => this.logger.warn(`eLogo hizmet bedeli faturası tetik hatası ${orderId}: ${e?.message}`));
+      // Platform kendi ürününü sattıysa → alıcıya ürün e-Arşivi (Tarodan=satıcı).
+      void this.elogoInvoicing
+        .issuePlatformSaleInvoice(orderId)
+        .catch((e) => this.logger.warn(`eLogo platform satış faturası tetik hatası ${orderId}: ${e?.message}`));
     }
 
     return result;
@@ -667,6 +683,63 @@ export class OrderLifecycleService {
 
     // Note: This will trigger seller payout release in PaymentModule
 
+    // Sipariş tamamlandı = komisyon "earned" işaretle (completeOrder ile aynı muhasebe).
+    // confirmDelivery doğrudan `completed`'e geçtiği için completeOrder'ı çağırmaz;
+    // bu yüzden ledger + e-Arşiv tetiğini burada da çalıştırmak ZORUNLU (yoksa fatura/mail çıkmaz).
+    await this.commissionLedger
+      .markEarned(orderId, this.prisma)
+      .catch((e: any) => this.logger.warn(`confirmDelivery markEarned hatası ${orderId}: ${e?.message}`));
+
+    // Tarodan gelir e-Arşivleri (komisyon → satıcı, hizmet bedeli → alıcı, platform satışı → alıcı).
+    // Fire-and-forget: tamamlamayı BLOKLAMAZ; servis idempotent + retry cron'lu.
+    this.logger.log(`confirmDelivery: ${orderId} tamamlandı → e-Arşiv tetikleniyor (komisyon+hizmet+platform)`);
+    void this.elogoInvoicing
+      .issueCommissionInvoice(orderId)
+      .catch((e) => this.logger.warn(`eLogo komisyon faturası tetik hatası ${orderId}: ${e?.message}`));
+    void this.elogoInvoicing
+      .issueServiceFeeInvoice(orderId)
+      .catch((e) => this.logger.warn(`eLogo hizmet bedeli faturası tetik hatası ${orderId}: ${e?.message}`));
+    void this.elogoInvoicing
+      .issuePlatformSaleInvoice(orderId)
+      .catch((e) => this.logger.warn(`eLogo platform satış faturası tetik hatası ${orderId}: ${e?.message}`));
+
     return await this.orderCommon.formatOrderResponse(updatedOrder, buyerId);
+  }
+
+  /**
+   * TESLİMDE Tarodan gelir e-Arşivlerini kes (komisyon→satıcı, hizmet bedeli→alıcı, platform satışı→alıcı)
+   * + komisyonu 'earned' işaretle. YENİ MODEL: fatura teslim anında kesilir (yasal ≤7g); sipariş
+   * "tamamlandı"ya iade penceresi kapanınca (teslim + RETURN_WINDOW_DAYS) geçer (processDeliveredOrders cron).
+   * İdempotent: cut() (type,sourceId) tekil → cron tekrar çağırsa no-op. Fire-and-forget, akışı bloklamaz.
+   */
+  async emitDeliveryRevenueInvoices(orderId: string): Promise<void> {
+    await this.commissionLedger
+      .markEarned(orderId, this.prisma)
+      .catch((e: any) => this.logger.warn(`teslim markEarned hatası ${orderId}: ${e?.message}`));
+    void this.elogoInvoicing
+      .issueCommissionInvoice(orderId)
+      .catch((e) => this.logger.warn(`eLogo komisyon (teslim) tetik hatası ${orderId}: ${e?.message}`));
+    void this.elogoInvoicing
+      .issueServiceFeeInvoice(orderId)
+      .catch((e) => this.logger.warn(`eLogo hizmet bedeli (teslim) tetik hatası ${orderId}: ${e?.message}`));
+    void this.elogoInvoicing
+      .issuePlatformSaleInvoice(orderId)
+      .catch((e) => this.logger.warn(`eLogo platform satış (teslim) tetik hatası ${orderId}: ${e?.message}`));
+  }
+
+  /**
+   * İade penceresi kapanan (teslim + RETURN_WINDOW_DAYS) `delivered` siparişi 'tamamlandı'ya geçirir.
+   * Fatura zaten teslimde kesildi; bu yalnız yaşam döngüsü kapanışı (status). Açık iade varsa cron atlar.
+   */
+  async autoCompleteDeliveredOrder(orderId: string): Promise<{ completed: boolean }> {
+    const updated = await this.prisma.order.updateMany({
+      where: { id: orderId, status: OrderStatus.delivered },
+      data: { status: OrderStatus.completed, completedAt: new Date() },
+    });
+    if (updated.count === 0) return { completed: false };
+    // Emniyet: teslimde kesilmemişse burada da tetikle (idempotent).
+    await this.emitDeliveryRevenueInvoices(orderId);
+    this.logger.log(`Order ${orderId} auto-completed (iade penceresi kapandı: teslim + returnWindow)`);
+    return { completed: true };
   }
 }

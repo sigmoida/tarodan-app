@@ -15,4 +15,11 @@ export class OrderScheduledProcessor {
       this.scheduler.runAutoCompleteConfirmedOrders(log),
     );
   }
+
+  @Process('process-delivered-orders')
+  async handleDelivered(job: Job) {
+    return runTrackedJob(job, 'process-delivered-orders', (log) =>
+      this.scheduler.runProcessDeliveredOrders(log),
+    );
+  }
 }

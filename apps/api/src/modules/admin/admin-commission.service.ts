@@ -73,11 +73,13 @@ export class AdminCommissionService {
     // If categoryId is empty string, set to null
     const categoryId = dto.categoryId && dto.categoryId.trim() !== '' ? dto.categoryId : null;
 
-    // Check if a rule with the same combination already exists
+    // Check if a rule with the same combination already exists.
+    // appliesTo da eşleşmeli: alıcı ve satıcı kuralı aynı kategori+tip için ayrı taraflara uygulanır.
     const existingRule = await this.prisma.commissionRule.findFirst({
       where: {
         categoryId: categoryId,
         sellerType: dto.sellerType,
+        appliesTo: dto.appliesTo as any,
         isActive: true,
       },
     });
@@ -189,13 +191,16 @@ export class AdminCommissionService {
       : existing.categoryId;
     const finalSellerType = dto.sellerType !== undefined ? dto.sellerType : existing.sellerType;
 
-    // Check if changing categoryId or sellerType would conflict with another rule
-    if ((dto.categoryId !== undefined || dto.sellerType !== undefined) &&
-      (finalCategoryId !== existing.categoryId || finalSellerType !== existing.sellerType)) {
+    // Check if changing categoryId or sellerType would conflict with another rule.
+    // NOT: appliesTo (SELLER/BUYER/BOTH) da eşleşmeli — alıcı hizmet bedeli kuralı ile
+    // satıcı komisyon kuralı aynı kategori+satıcı tipinde ayrı taraflara uygulanır, ÇAKIŞMAZ.
+    if ((dto.categoryId !== undefined || dto.sellerType !== undefined || dto.appliesTo !== undefined) &&
+      (finalCategoryId !== existing.categoryId || finalSellerType !== existing.sellerType || appliesTo !== existing.appliesTo)) {
       const conflictingRule = await this.prisma.commissionRule.findFirst({
         where: {
           categoryId: finalCategoryId,
           sellerType: finalSellerType,
+          appliesTo: appliesTo as any,
           isActive: true,
           id: { not: existing.id }, // Exclude current rule
         },
@@ -283,5 +288,32 @@ export class AdminCommissionService {
     await this.audit.createAuditLog(adminId, 'commission_rule_delete', 'CommissionRule', ruleId, existing, null);
 
     return { success: true };
+  }
+
+  // ==================== TAKAS KOMİSYONU (ayarlanabilir oran) ====================
+
+  /** Takas nakit farkı komisyon oranı (%). PlatformSetting 'trade_commission_rate', varsayılan %5. */
+  async getTradeCommissionRate(): Promise<{ rate: number }> {
+    const row = await this.prisma.platformSetting.findUnique({ where: { settingKey: 'trade_commission_rate' } });
+    return { rate: Number(row?.settingValue ?? '5') || 5 };
+  }
+
+  async setTradeCommissionRate(adminId: string, rate: number): Promise<{ rate: number }> {
+    if (!(rate >= 0 && rate <= 100)) {
+      throw new BadRequestException('Oran 0 ile 100 arasında olmalı');
+    }
+    await this.prisma.platformSetting.upsert({
+      where: { settingKey: 'trade_commission_rate' },
+      create: {
+        settingKey: 'trade_commission_rate',
+        settingValue: String(rate),
+        settingType: 'number',
+        description: 'Takas nakit farkı komisyon oranı (%)',
+        updatedBy: adminId,
+      },
+      update: { settingValue: String(rate), updatedBy: adminId },
+    });
+    await this.audit.createAuditLog(adminId, 'trade_commission_rate_update', 'PlatformSetting', 'trade_commission_rate', null, { rate });
+    return { rate };
   }
 }

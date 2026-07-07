@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { AdminAuditService } from './admin-audit.service';
@@ -12,6 +13,7 @@ import { OrderStatus, ProductStatus, ShipmentStatus } from '@prisma/client';
 import { SearchService } from '../search/search.service';
 import { CacheService } from '../cache/cache.service';
 import { AdminAnalyticsCommonService } from './admin-analytics-common.service';
+import { OrderService } from '../order/order.service';
 
 /**
  * Admin sipariş işlemleri (+ unbanUser kullanıcı moderasyonu) — AdminAnalyticsService'ten
@@ -30,6 +32,8 @@ export class AdminAnalyticsOrderService {
     private readonly searchService: SearchService,
     private readonly cache: CacheService,
     private readonly common: AdminAnalyticsCommonService,
+    @Optional()
+    private readonly orderService?: OrderService,
   ) {}
 
   /**
@@ -234,11 +238,29 @@ export class AdminAnalyticsOrderService {
       }
     }
 
+    // Admin durumu ELLE ilerlettiğinde deliveredAt/completedAt de set edilmeli — aksi halde
+    // deliveredAt NULL kalıp teslim faturası cron'unu (deliveredAt bazlı tamamlama) ve raporları bozar.
+    const now = new Date();
+    const newStatus = dto.status as OrderStatus;
+    const extra: any = {};
+    if (
+      (newStatus === OrderStatus.delivered ||
+        newStatus === OrderStatus.awaiting_buyer_confirmation ||
+        newStatus === OrderStatus.completed) &&
+      !order.deliveredAt
+    ) {
+      extra.deliveredAt = now;
+    }
+    if (newStatus === OrderStatus.completed && !(order as any).completedAt) {
+      extra.completedAt = now;
+    }
+
     const updated = await this.prisma.order.update({
       where: { id: orderId },
       data: {
-        status: dto.status as OrderStatus,
+        status: newStatus,
         version: { increment: 1 },
+        ...extra,
       },
     });
 
@@ -246,6 +268,14 @@ export class AdminAnalyticsOrderService {
       ...updated,
       notes: dto.notes,
     });
+
+    // Teslim/tamamlandıya geçince → Tarodan gelir e-Arşivlerini ANINDA kes (cron'u beklemeden).
+    // Fatura kesilmeden "tamamlandı" kalmasın. Fire-and-forget, idempotent (cut() type+sourceId tekil).
+    if (newStatus === OrderStatus.delivered || newStatus === OrderStatus.completed) {
+      void this.orderService
+        ?.emitDeliveryRevenueInvoices(orderId)
+        .catch((e: any) => this.logger.warn(`admin durum→fatura tetik hatası ${orderId}: ${e?.message}`));
+    }
 
     return {
       success: true,

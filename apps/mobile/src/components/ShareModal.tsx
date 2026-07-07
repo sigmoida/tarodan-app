@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Share, Linking, TouchableOpacity, Clipboard } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { theme, Text, Button, Snackbar, Divider, Modal, appAlert } from '@tarodan/ui-native';
+import { theme, Text, Button, Snackbar, Divider, Modal, useModalMessage, ModalMessage } from '@tarodan/ui-native';
 
 const { colors } = theme;
 
@@ -42,6 +42,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 }) => {
   const [snackbar, setSnackbar] = useState({ visible: false, message: '' });
   const [showQR, setShowQR] = useState(false);
+  const msg = useModalMessage();
 
   const fullShareText = shareText || `${title} - Tarodan Diecast Marketplace`;
 
@@ -58,25 +59,28 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   };
 
   const handleCopyLink = async () => {
+    msg.clear();
     try {
       Clipboard.setString(shareUrl);
       setSnackbar({ visible: true, message: 'Link kopyalandı!' });
     } catch (error) {
-      appAlert('Hata', 'Link kopyalanamadı');
+      msg.error('Link kopyalanamadı');
     }
   };
 
   const handleWhatsAppShare = () => {
+    msg.clear();
     const whatsappUrl = `whatsapp://send?text=${encodeURIComponent(`${fullShareText}\n\n${shareUrl}`)}`;
     Linking.openURL(whatsappUrl).catch(() => {
-      appAlert('Hata', 'WhatsApp açılamadı');
+      msg.error('WhatsApp açılamadı');
     });
   };
 
   const handleTelegramShare = () => {
+    msg.clear();
     const telegramUrl = `tg://msg_url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(fullShareText)}`;
     Linking.openURL(telegramUrl).catch(() => {
-      appAlert('Hata', 'Telegram açılamadı');
+      msg.error('Telegram açılamadı');
     });
   };
 
@@ -266,6 +270,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           </Text>
         </TouchableOpacity>
       )}
+
+      <ModalMessage state={msg.state} />
 
       <Snackbar
         visible={snackbar.visible}

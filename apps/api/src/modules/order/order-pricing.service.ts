@@ -257,6 +257,15 @@ export class OrderPricingService {
    * Commission preview for listing create/edit. Given a price amount and optional category, returns estimated fees.
    * Used when product does not exist yet (e.g. seller entering price on create form). Reuses same logic as order/quote.
    */
+  /** E-ticaret stopaj oranı (%) — PlatformSetting 'withholding_tax_rate', varsayılan %1 (9284 sayılı CK). */
+  private async getWithholdingTaxRate(): Promise<number> {
+    const row = await this.prisma.platformSetting.findUnique({
+      where: { settingKey: 'withholding_tax_rate' },
+    });
+    const rate = Number(row?.settingValue ?? '1');
+    return Number.isFinite(rate) && rate >= 0 ? rate : 1;
+  }
+
   async getCommissionPreview(
     amount: number,
     sellerId: string,
@@ -265,14 +274,28 @@ export class OrderPricingService {
     sellerFeeAmount: number;
     buyerFeeAmount: number;
     commissionAmount: number;
+    withholdingTaxAmount: number;
     sellerNetAmount: number;
   }> {
-    const result = await this.calculateCommission(amount, sellerId, categoryId);
-    const sellerNetAmount = Math.max(0, amount - result.sellerFeeAmount);
+    const [result, seller] = await Promise.all([
+      this.calculateCommission(amount, sellerId, categoryId),
+      this.prisma.user.findUnique({
+        where: { id: sellerId },
+        select: { businessStatus: true, taxId: true },
+      }),
+    ]);
+    // Kurumsal satıcıda stopaj da kesileceğinden önizleme neti gerçek payout ile eşleşsin.
+    let withholdingTaxAmount = 0;
+    if (seller?.businessStatus === 'approved' && seller?.taxId) {
+      const rate = await this.getWithholdingTaxRate();
+      withholdingTaxAmount = rate > 0 ? Math.round(amount * rate) / 100 : 0;
+    }
+    const sellerNetAmount = Math.max(0, amount - result.sellerFeeAmount - withholdingTaxAmount);
     return {
       sellerFeeAmount: result.sellerFeeAmount,
       buyerFeeAmount: result.buyerFeeAmount,
       commissionAmount: result.commissionAmount,
+      withholdingTaxAmount,
       sellerNetAmount,
     };
   }

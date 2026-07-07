@@ -27,7 +27,12 @@ export async function createUser(
     isSeller: boolean;
     isEmailVerified: boolean;
     isVerified: boolean;
-    sellerType: 'platform' | 'business' | 'individual';
+    // NOT: 'business' geçerli SellerType DEĞİL (enum: individual|verified|platform).
+    // Kurumsal satıcı alias'ı: verified + businessStatus:approved + taxId olarak seed edilir.
+    sellerType: 'individual' | 'verified' | 'platform' | 'business';
+    businessStatus: 'pending' | 'approved' | 'rejected';
+    taxId: string;
+    companyName: string;
     /**
      * Aktif premium üyelik seed et (takas kapısı için). createTrade artık
      * canCreateTrade → isPremiumEntitled gerektiriyor; free tier yetmez.
@@ -44,6 +49,15 @@ export async function createUser(
   const isSeller = opts.isSeller ?? false;
   const passwordHash = await bcrypt.hash(password, 4); // low cost for fast tests
 
+  const rawSellerType = opts.sellerType ?? 'individual';
+  const isBusiness = rawSellerType === 'business' || opts.businessStatus === 'approved';
+  // 'business' → geçerli enum 'verified'e çevir; kurumsallık businessStatus+taxId ile temsil edilir.
+  const resolvedSellerType = isSeller
+    ? rawSellerType === 'business'
+      ? 'verified'
+      : rawSellerType
+    : null;
+
   const user = await prisma.user.create({
     data: {
       email,
@@ -52,7 +66,12 @@ export async function createUser(
       isSeller,
       isEmailVerified: opts.isEmailVerified ?? true,
       isVerified: opts.isVerified ?? true,
-      sellerType: isSeller ? (opts.sellerType ?? 'individual') as any : null,
+      sellerType: resolvedSellerType as any,
+      businessStatus: (opts.businessStatus ?? (isBusiness ? 'approved' : undefined)) as any,
+      taxId: opts.taxId ?? (isBusiness ? `${Date.now()}${Math.floor(Math.random() * 1000)}` : undefined),
+      companyName:
+        opts.companyName ??
+        (isBusiness ? `Test Co ${Date.now()}-${Math.random().toString(36).slice(2, 7)}` : undefined),
       birthDate: new Date('1990-01-01'),
     },
   });

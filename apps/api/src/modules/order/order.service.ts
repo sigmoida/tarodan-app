@@ -91,6 +91,7 @@ export class OrderService {
     sellerFeeAmount: number;
     buyerFeeAmount: number;
     commissionAmount: number;
+    withholdingTaxAmount: number;
     sellerNetAmount: number;
   }> {
     return this.orderPricing.getCommissionPreview(amount, sellerId, categoryId);
@@ -236,5 +237,13 @@ export class OrderService {
 
   async confirmDelivery(orderId: string, buyerId: string) {
     return this.orderLifecycle.confirmDelivery(orderId, buyerId);
+  }
+
+  async emitDeliveryRevenueInvoices(orderId: string): Promise<void> {
+    return this.orderLifecycle.emitDeliveryRevenueInvoices(orderId);
+  }
+
+  async autoCompleteDeliveredOrder(orderId: string): Promise<{ completed: boolean }> {
+    return this.orderLifecycle.autoCompleteDeliveredOrder(orderId);
   }
 }

@@ -9,6 +9,7 @@ import {
   LiveSuratSoapClient,
   SuratSoapClient,
 } from './surat-soap.client';
+import { RestSuratClient } from './surat-rest.client';
 
 @Module({
   imports: [ConfigModule, CacheModule, PrismaModule],
@@ -16,10 +17,14 @@ import {
     {
       provide: SURAT_SOAP_CLIENT,
       useFactory: (config: ConfigService): SuratSoapClient => {
+        // SURAT_SOAP_MODE:
+        //   'rest' → RestSuratClient  (dokümandaki REST GonderiyiKargoyaGonder — test/canlı SURAT_KARGO_TEST_MODE ile)
+        //   'live' | 'soap' → LiveSuratSoapClient (eski SOAP webservices.asmx)
+        //   diğer/boş → StubSuratSoapClient (gerçek çağrı yok)
         const mode = config.get<string>('SURAT_SOAP_MODE', 'stub')?.trim().toLowerCase();
-        return mode === 'live'
-          ? new LiveSuratSoapClient(config)
-          : new StubSuratSoapClient(config);
+        if (mode === 'rest') return new RestSuratClient(config);
+        if (mode === 'live' || mode === 'soap') return new LiveSuratSoapClient(config);
+        return new StubSuratSoapClient(config);
       },
       inject: [ConfigService],
     },

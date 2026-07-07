@@ -250,9 +250,10 @@ export class OrderGuestCheckoutService {
 
       // Calculate shipping cost (free shipping for orders >= 500 TL)
       const shippingCost = await this.orderPricing.calculateShippingCost(finalPrice);
-      // KDV: kurumsal satıcı ise ürün fiyatı üzerinden
-      const guestTaxAmount = await this.checkoutCommon.resolveSellerTax(product.sellerId, product.categoryId, finalPrice);
-      // Buyer fee + KDV eklenir
+      // KDV + stopaj: kurumsal satıcı ise ürün fiyatı üzerinden
+      const { taxAmount: guestTaxAmount, withholdingTaxAmount: guestWithholdingAmount } =
+        await this.checkoutCommon.resolveSellerTaxes(product.sellerId, product.categoryId, finalPrice);
+      // Buyer fee + KDV eklenir (stopaj satıcı payout'undan kesilir)
       const totalAmount = finalPrice + shippingCost + commissionResult.buyerFeeAmount + guestTaxAmount;
 
       // Generate order number
@@ -329,6 +330,7 @@ export class OrderGuestCheckoutService {
           totalAmount,
           shippingCost,
           taxAmount: guestTaxAmount,
+          withholdingTaxAmount: guestWithholdingAmount,
           commissionAmount: commissionResult.commissionAmount,
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,

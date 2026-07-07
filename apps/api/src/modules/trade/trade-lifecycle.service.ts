@@ -436,7 +436,11 @@ export class TradeLifecycleService {
       // göndermeyi atlıyordu (her iki tarafın etiketi yine oluşur, BUG B korunur).
 
       if (trade.cashAmount && trade.cashPayerId) {
-        const commission = trade.cashAmount.toNumber() * 0.05;
+        // Takas komisyon oranı admin'den ayarlanabilir (PlatformSetting 'trade_commission_rate', varsayılan %5).
+        // Kabul anında snapshot alınır (tcp.commission); oran sonradan değişse bile bu takas etkilenmez.
+        const rateRow = await tx.platformSetting.findUnique({ where: { settingKey: 'trade_commission_rate' } });
+        const ratePct = Number(rateRow?.settingValue ?? '5') || 5;
+        const commission = Math.round(trade.cashAmount.toNumber() * (ratePct / 100) * 100) / 100;
         await tx.tradeCashPayment.create({
           data: {
             tradeId,
@@ -941,13 +945,11 @@ export class TradeLifecycleService {
     userId: string,
     dto: ShipTradeDto,
   ): Promise<TradeResponseDto> {
-    const userCanTrade = await this.membershipService.canCreateTrade(userId);
-    if (!userCanTrade.allowed) {
-      throw new BadRequestException(
-        'Trade işlemlerini yapmak için Temel veya üstü üyelik gereklidir. Üyeliğinizi yenileyin.',
-      );
-    }
-
+    // Üyelik kapısı KASITLI olarak kaldırıldı: takas, kabul edildiği (accepted)
+    // anda her iki tarafın da premium üyeliği vardı (acceptTrade/counterTrade
+    // kapıları bunu garanti eder). Üyelik kabul SONRASI sona erse bile, dönem
+    // içinde başlamış takasın kargo/teslim akışı sıkıntısız tamamlanabilmelidir.
+    // Aksi halde "kabul ettim ama kargolayamıyorum" çıkmazı oluşurdu.
     const address = await this.prisma.address.findFirst({
       where: { id: dto.fromAddressId, userId },
     });

@@ -22,6 +22,7 @@ export interface User {
   role: UserRole;
   membershipTier: MembershipTier;
   isVerified: boolean;
+  isPhoneVerified?: boolean;
   isSeller: boolean;
   rating?: number;
   ratingCount: number;

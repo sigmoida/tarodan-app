@@ -11,7 +11,9 @@ import { CacheModule } from '../cache/cache.module';
 import { StorageModule } from '../storage/storage.module';
 import { BannedUserGuard } from './guards/banned-user.guard';
 import { GoogleAuthService } from './google-auth.service';
+import { AppleAuthService } from './apple-auth.service';
 import { RolesGuard } from './guards/roles.guard';
+import { PhoneVerificationService } from './phone-verification.service';
 
 @Module({
   imports: [
@@ -34,11 +36,13 @@ import { RolesGuard } from './guards/roles.guard';
   providers: [
     AuthService,
     GoogleAuthService,
+    AppleAuthService,
     JwtStrategy,
     JwtRefreshStrategy,
     AdminJwtStrategy,
     BannedUserGuard,
     RolesGuard,
+    PhoneVerificationService,
   ],
   exports: [AuthService, JwtModule, BannedUserGuard, RolesGuard],
 })

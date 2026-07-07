@@ -19,6 +19,7 @@ import { NotificationService } from '../notification/notification.service';
 import { CacheService } from '../cache/cache.service';
 import { StorageService } from '../storage/storage.service';
 import { GoogleAuthService } from './google-auth.service';
+import { AppleAuthService } from './apple-auth.service';
 import { PaymentService } from '../payment/payment.service';
 
 @Injectable()
@@ -33,6 +34,7 @@ export class AuthService {
     private readonly cacheService: CacheService,
     private readonly storageService: StorageService,
     private readonly googleAuthService: GoogleAuthService,
+    private readonly appleAuthService: AppleAuthService,
     private readonly moduleRef: ModuleRef,
   ) { }
 
@@ -741,6 +743,7 @@ export class AuthService {
       phone: user.phone,
       displayName: user.displayName,
       isVerified: user.isVerified,
+      isPhoneVerified: user.isPhoneVerified,
       isSeller: user.isSeller,
       sellerType: user.sellerType,
       isAdmin: !!user.adminUser?.isActive,
@@ -1077,6 +1080,7 @@ export class AuthService {
         displayName: user.displayName,
         avatarUrl: resolvedAvatarUrl,
         isVerified: user.isVerified,
+        isPhoneVerified: user.isPhoneVerified,
         isSeller: user.isSeller,
         sellerType: user.sellerType ?? undefined,
         createdAt: user.createdAt,
@@ -1129,6 +1133,50 @@ export class AuthService {
     });
     await this.prisma.oAuthAccount.create({
       data: { provider: 'google', providerUserId: profile.sub, email: profile.email, userId: created.id },
+    });
+    return this.buildUserAuthResponse(created.id);
+  }
+
+  /**
+   * Apple identity token ile giriş: doğrula → OAuthAccount bul → email ile oto-bağla
+   * → yoksa yeni kullanıcı. Relay email olduğu gibi kaydedilir; kimlik anahtarı sub.
+   * fullName yalnız ilk yetkilendirmede (yeni kullanıcı) gelir.
+   */
+  async loginWithApple(identityToken: string, fullName?: string): Promise<AuthResponseDto> {
+    const profile = await this.appleAuthService.verifyIdentityToken(identityToken);
+
+    // 1) Mevcut OAuthAccount?
+    const existing = await this.prisma.oAuthAccount.findUnique({
+      where: { provider_providerUserId: { provider: 'apple', providerUserId: profile.sub } },
+    });
+    if (existing) {
+      return this.buildUserAuthResponse(existing.userId);
+    }
+
+    // 2) Aynı e-postalı (silinmemiş) kullanıcı? → oto-bağla.
+    const byEmail = await this.prisma.user.findFirst({
+      where: { email: profile.email, deletedAt: null },
+    });
+    if (byEmail) {
+      await this.prisma.oAuthAccount.create({
+        data: { provider: 'apple', providerUserId: profile.sub, email: profile.email, userId: byEmail.id },
+      });
+      return this.buildUserAuthResponse(byEmail.id);
+    }
+
+    // 3) Yeni kullanıcı
+    const displayName = fullName?.trim() || profile.email.split('@')[0];
+    const created = await this.prisma.user.create({
+      data: {
+        email: profile.email,
+        passwordHash: null,
+        displayName,
+        isEmailVerified: true,
+        isSeller: false,
+      },
+    });
+    await this.prisma.oAuthAccount.create({
+      data: { provider: 'apple', providerUserId: profile.sub, email: profile.email, userId: created.id },
     });
     return this.buildUserAuthResponse(created.id);
   }

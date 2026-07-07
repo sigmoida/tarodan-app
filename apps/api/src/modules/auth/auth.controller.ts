@@ -18,6 +18,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
+import { PhoneVerificationService } from './phone-verification.service';
 import {
   RegisterDto,
   BusinessRegisterDto,
@@ -28,6 +29,9 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
   GoogleAuthDto,
+  AppleAuthDto,
+  SendPhoneCodeDto,
+  VerifyPhoneDto,
 } from './dto';
 import { JwtAuthGuard, JwtRefreshGuard } from './guards';
 import { Public, CurrentUser } from './decorators';
@@ -37,7 +41,10 @@ import { setAuthCookies, clearAuthCookies, readCookie, COOKIE_NAMES } from './ut
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly phoneVerificationService: PhoneVerificationService,
+  ) {}
 
   /**
    * POST /auth/register
@@ -116,6 +123,23 @@ export class AuthController {
   ): Promise<AuthResponseDto> {
     const result = await this.authService.loginWithGoogle(dto.idToken);
     // Tarayıcı için httpOnly cookie; mobil yine body'deki token'ı kullanır.
+    if (result?.tokens) {
+      setAuthCookies(res, result.tokens, { admin: false });
+    }
+    return result;
+  }
+
+  /**
+   * POST /auth/apple — Apple identity token ile giriş/kayıt
+   */
+  @Post('apple')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  async apple(
+    @Body() dto: AppleAuthDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthResponseDto> {
+    const result = await this.authService.loginWithApple(dto.identityToken, dto.fullName);
     if (result?.tokens) {
       setAuthCookies(res, result.tokens, { admin: false });
     }
@@ -240,6 +264,38 @@ export class AuthController {
   @ApiResponse({ status: 400, description: 'Geçersiz veya süresi dolmuş token' })
   async verifyEmail(@Body() body: { token: string }) {
     return this.authService.verifyEmail(body.token);
+  }
+
+  /**
+   * POST /auth/phone/send-code
+   * Kullanıcının telefonuna doğrulama kodu gönderir.
+   */
+  @Post('phone/send-code')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @ApiOperation({ summary: 'Telefon doğrulama kodu gönder' })
+  async sendPhoneCode(
+    @CurrentUser() user: RequestUser,
+    @Body() dto: SendPhoneCodeDto,
+  ): Promise<{ message: string }> {
+    return this.phoneVerificationService.sendCode(user.id, dto.phone);
+  }
+
+  /**
+   * POST /auth/phone/verify
+   * Gönderilen kodu doğrular.
+   */
+  @Post('phone/verify')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @ApiOperation({ summary: 'Telefon doğrulama kodunu doğrula' })
+  async verifyPhone(
+    @CurrentUser() user: RequestUser,
+    @Body() dto: VerifyPhoneDto,
+  ): Promise<{ message: string; isPhoneVerified: boolean }> {
+    return this.phoneVerificationService.verify(user.id, dto.code);
   }
 
   /**
