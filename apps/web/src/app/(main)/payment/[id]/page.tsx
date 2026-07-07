@@ -145,7 +145,7 @@ export default function PaymentPage() {
         isGuestCheckout
           ? "/"
           : isMembershipPayment
-            ? "/profile/membership"
+            ? "/membership"
             : "/profile/orders",
       );
     } finally {
@@ -179,7 +179,7 @@ export default function PaymentPage() {
           <p className="text-muted mb-4">Ödeme bulunamadı</p>
           <Button
             onClick={() =>
-              router.push(isMembershipPayment ? "/profile/membership" : "/profile/orders")
+              router.push(isMembershipPayment ? "/membership" : "/profile/orders")
             }
           >
             {isMembershipPayment ? "Üyelik Sayfasına Dön" : "Siparişlerime Dön"}

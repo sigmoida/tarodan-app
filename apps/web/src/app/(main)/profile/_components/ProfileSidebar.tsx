@@ -23,7 +23,6 @@ import {
 	ChartPieIcon,
 	ChatBubbleLeftRightIcon,
 	BellIcon,
-	SparklesIcon,
 	BuildingStorefrontIcon,
 	ShieldCheckIcon,
 	ArrowRightOnRectangleIcon,
@@ -129,7 +128,6 @@ export default function ProfileSidebar() {
 		{
 			title: 'Hesap',
 			links: [
-				{ icon: SparklesIcon, label: t('membership.title'), href: '/profile/membership' },
 				{ icon: BuildingStorefrontIcon, label: 'İşletme', href: '/profile/business' },
 			],
 		},

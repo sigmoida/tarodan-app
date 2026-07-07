@@ -2,14 +2,13 @@
 
 'use client';
 
-import Link from 'next/link';
 import {
 	ShoppingBagIcon,
 	TagIcon,
 	ArrowsRightLeftIcon,
 	HeartIcon,
 } from '@heroicons/react/24/outline';
-import { Badge, Button, type BadgeVariant } from '@tarodan/ui';
+import { Badge, type BadgeVariant } from '@tarodan/ui';
 import UserAvatar from '@/components/UserAvatar';
 import { useProfile } from '../_context/ProfileContext';
 
@@ -82,9 +81,6 @@ export default function MembershipSummary() {
 						)}
 					</div>
 				</div>
-				<Button asChild variant='outline' size='sm'>
-					<Link href='/profile/membership'>Üyeliği Yönet</Link>
-				</Button>
 			</div>
 
 			<div className='mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4'>

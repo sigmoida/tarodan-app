@@ -64,7 +64,7 @@ export default function MembershipSuccessClient() {
 						görebilirsiniz.
 					</p>
 					<div className='space-y-3'>
-						<ButtonLink variant='primary' href='/profile/membership' className='w-full'>
+						<ButtonLink variant='primary' href='/membership' className='w-full'>
 							Üyelik Sayfama Git
 						</ButtonLink>
 						<Link

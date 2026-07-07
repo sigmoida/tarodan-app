@@ -9,9 +9,9 @@ export default function PricingPage() {
 
   useEffect(() => {
     const tier = searchParams?.get('tier');
-    const redirectUrl = tier 
-      ? `/profile/membership?tier=${tier}`
-      : '/profile/membership';
+    const redirectUrl = tier
+      ? `/membership?tier=${tier}`
+      : '/membership';
     router.replace(redirectUrl);
   }, [router, searchParams]);
 

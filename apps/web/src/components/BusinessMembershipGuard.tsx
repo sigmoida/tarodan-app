@@ -35,9 +35,9 @@ export default function BusinessMembershipGuard({ children }: { children: React.
 
     // Approved ama business üyeliği yoksa üyelik sayfasına yönlendir
     const isBusinessTier = user.membershipTier === 'business';
-    const allowedPaths = ['/profile/membership', '/membership'];
+    const allowedPaths = ['/membership'];
     if (!isBusinessTier && !allowedPaths.some((p) => pathname.startsWith(p))) {
-      router.push('/profile/membership?required=true');
+      router.push('/membership?required=true');
     }
   }, [isAuthenticated, user, pathname, router]);
 

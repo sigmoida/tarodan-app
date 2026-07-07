@@ -39,8 +39,8 @@ export default function MembershipCheckoutClient() {
 	} = useMembershipCheckout();
 
 	const backHref = required
-		? '/profile/membership?required=true'
-		: '/profile/membership';
+		? '/membership?required=true'
+		: '/membership';
 
 	if (authLoading) return <AuthLoadingScreen />;
 	if (!isAuthenticated) {

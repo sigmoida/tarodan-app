@@ -64,7 +64,7 @@ export function useLogin() {
           currentUser?.taxId &&
           !isBusinessTier
         ) {
-          router.push('/profile/membership?required=true');
+          router.push('/membership?required=true');
           return;
         }
       } catch (error) {
