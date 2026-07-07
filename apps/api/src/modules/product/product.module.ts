@@ -3,6 +3,14 @@ import { BullModule } from '@nestjs/bull';
 import { QUEUE_NAMES } from '../../workers/constants';
 import { ModerationModule } from '../moderation/moderation.module';
 import { ProductService } from './product.service';
+import { ProductCommonService } from './product-common.service';
+import { ProductCreateService } from './product-create.service';
+import { ProductUpdateService } from './product-update.service';
+import { ProductQueryService } from './product-query.service';
+import { ProductFilterService } from './product-filter.service';
+import { ProductRankingService } from './product-ranking.service';
+import { ProductStatsService } from './product-stats.service';
+import { ProductEngagementService } from './product-engagement.service';
 import { ProductBoostService } from './product-boost.service';
 import { ProductController } from './product.controller';
 import { ProductSchedulerService } from './product-scheduler.service';
@@ -32,7 +40,20 @@ import { PaymentModule } from '../payment';
     ModerationModule,
   ],
   controllers: [ProductController],
-  providers: [ProductService, ProductBoostService, ProductSchedulerService, BoostScheduledProcessor],
+  providers: [
+    ProductService,
+    ProductCommonService,
+    ProductCreateService,
+    ProductUpdateService,
+    ProductQueryService,
+    ProductFilterService,
+    ProductRankingService,
+    ProductStatsService,
+    ProductEngagementService,
+    ProductBoostService,
+    ProductSchedulerService,
+    BoostScheduledProcessor,
+  ],
   // ProductLockModule'ü re-export et: ProductModule'ü import eden order/offer/trade
   // hâlâ ProductLockService'i alsın (davranış korunur).
   exports: [ProductService, ProductBoostService, ProductSchedulerService, ProductLockModule],
