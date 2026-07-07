@@ -5,6 +5,10 @@ import { createHash } from 'crypto';
 import { OrderService } from './order.service';
 import { OrderPricingService } from './order-pricing.service';
 import { OrderCheckoutService } from './order-checkout.service';
+import { OrderCheckoutCommonService } from './order-checkout-common.service';
+import { OrderCheckoutDirectService } from './order-checkout-direct.service';
+import { OrderCheckoutGroupService } from './order-checkout-group.service';
+import { OrderGuestCheckoutService } from './order-guest-checkout.service';
 import { OrderCommonService } from './order-common.service';
 import { OrderQueryService } from './order-query.service';
 import { OrderLifecycleService } from './order-lifecycle.service';
@@ -371,6 +375,10 @@ describe('OrderService findOne (response shape for mobile order detail)', () => 
         OrderService,
         OrderPricingService,
         OrderCheckoutService,
+        OrderCheckoutCommonService,
+        OrderCheckoutDirectService,
+        OrderCheckoutGroupService,
+        OrderGuestCheckoutService,
         OrderCommonService,
         OrderQueryService,
         OrderLifecycleService,
