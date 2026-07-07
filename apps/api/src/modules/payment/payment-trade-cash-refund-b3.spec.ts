@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { ModuleRef } from '@nestjs/core';
 import { PaymentService } from './payment.service';
+import { PaymentQueryService } from './payment-query.service';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { PayTRService } from '../payment-providers/paytr.service';
@@ -47,6 +48,7 @@ describe('PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PaymentService,
+        PaymentQueryService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: CacheService, useValue: { del: jest.fn() } },
         { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue(undefined) } },
