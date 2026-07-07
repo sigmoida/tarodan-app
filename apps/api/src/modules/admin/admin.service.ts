@@ -1,16 +1,8 @@
 import {
   Injectable,
-  NotFoundException,
-  BadRequestException,
-  ForbiddenException,
-  ConflictException,
   Optional,
   Logger,
 } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
-import { PrismaService } from '../../prisma';
-import { StorageService } from '../storage/storage.service';
-import { ModerationAiClient } from '../moderation/moderation-ai.client';
 import { AdminAuditService } from './admin-audit.service';
 import { AdminCommissionService } from './admin-commission.service';
 import { AdminSettingsService } from './admin-settings.service';
@@ -37,22 +29,6 @@ import { AdminShippingService } from './admin-shipping.service';
 import { AdminReviewService } from './admin-review.service';
 import { AdminSellerApplicationService } from './admin-seller-application.service';
 import {
-  fulltextUserSearch,
-  fulltextProductRatingSearch,
-  fulltextUserDisplayNameSearch,
-  fulltextCollectionSearch,
-  fulltextAttributeGroupSearch,
-  fulltextAttributeSearch,
-  fulltextPaymentSearch,
-  fulltextOrderSearch,
-  fulltextDiscountSearch,
-  fulltextErrorLogSearch,
-  fulltextSecurityLogSearch,
-  fulltextEmailLogSearch,
-} from '../../common/helpers/fulltext-search';
-import { fulltextProductSearch } from '../product/helpers/fulltext-search';
-import { renderEmailTemplate, getEmailTemplateSubject } from '../../common/helpers/email-template-renderer';
-import {
   CreateCommissionRuleDto,
   UpdateCommissionRuleDto,
   UpdatePlatformSettingDto,
@@ -67,12 +43,8 @@ import {
   UpdateAdminStaffDto,
   UpdateStaffSettingsDto,
   SetRolePermissionsDto,
-  DEFAULT_ROLE_PERMISSIONS,
-  ADMIN_PERMISSION_KEYS,
-  migrateLegacyPermissions,
   ResolveDisputeDto,
   AnalyticsQueryDto,
-  AnalyticsGroupBy,
   UpdateOrderStatusDto,
   ReportQueryDto,
   AdminPaymentQueryDto,
@@ -84,53 +56,20 @@ import {
   UpdateEmailTemplateDto,
   UpdateProductDto,
   RatingQueryDto,
-  UpdateRatingStatusDto,
   RatingStatus,
   ApproveWarehouseTradeDto,
   RejectWarehouseTradeDto,
 } from './dto';
-import { ProductStatus, OrderStatus, Prisma, PaymentStatus, PaymentHoldStatus, OfferStatus, TradeStatus, ShipmentStatus, MessageStatus, TicketStatus, TicketPriority, TicketCategory, Brand, AdminRole, BusinessStatus, MembershipTierType, SubscriptionStatus } from '@prisma/client';
-import { safeDecrementReserved } from '../product/helpers/product-availability.helper';
-import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
-import { PaymentService } from '../payment/payment.service';
-import { MessagingService } from '../messaging/messaging.service';
-import { SupportService } from '../support/support.service';
-import { SearchService } from '../search/search.service';
-import { CacheService } from '../cache/cache.service';
-import { DiscountService } from '../discount/discount.service';
-import { EventService } from '../events/event.service';
-import { RatingService } from '../rating/rating.service';
+import { TradeStatus, ShipmentStatus, MessageStatus, TicketStatus, TicketPriority, TicketCategory, MembershipTierType } from '@prisma/client';
 import { RefundService } from '../refund/refund.service';
-import { NotificationService } from '../notification/notification.service';
-import { NotificationType, NotificationChannel } from '../notification/dto/notification.dto';
-import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
-import { normalizeSuratPhone, normalizeSuratLocation } from '../surat-cargo/surat-address.util';
 import { OrderService } from '../order/order.service';
-import {
-  SuratKargoTuru,
-  SuratOdemeTipi,
-  SuratTasimaSekli,
-  SuratTeslimSekli,
-  SuratGonderiSekli,
-} from '../surat-cargo/surat-cargo.types';
 
 @Injectable()
 export class AdminService {
   private readonly logger = new Logger(AdminService.name);
 
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly paymentService: PaymentService,
-    private readonly messagingService: MessagingService,
-    private readonly supportService: SupportService,
-    private readonly searchService: SearchService,
-    private readonly cache: CacheService,
-    private readonly discountService: DiscountService,
-    private readonly eventService: EventService,
-    private readonly ratingService: RatingService,
     private readonly refundService: RefundService,
-    private readonly notificationService: NotificationService,
-    private readonly moderationAi: ModerationAiClient,
     private readonly auditService: AdminAuditService,
     private readonly commissionService: AdminCommissionService,
     private readonly settingsService: AdminSettingsService,
@@ -156,10 +95,6 @@ export class AdminService {
     private readonly shippingService: AdminShippingService,
     private readonly reviewService: AdminReviewService,
     private readonly sellerApplicationService: AdminSellerApplicationService,
-    @Optional()
-    private readonly storageService: StorageService,
-    @Optional()
-    private readonly suratCargoService?: SuratCargoService,
     @Optional()
     private readonly orderService?: OrderService,
   ) { }
@@ -465,26 +400,9 @@ export class AdminService {
 
   // ==================== AUDIT LOGS ====================
   // Taşındı: admin-audit.service.ts — imzalar aynen korunuyor (facade delege).
-  // Not: private createAuditLog delegesi facade'da kalıyor — kalan bölümler
-  // hâlâ this.createAuditLog üzerinden çağırıyor.
 
   async getAuditLogs(query: AuditLogQueryDto) {
     return this.auditService.getAuditLogs(query);
-  }
-
-  /**
-   * Create audit log entry
-   */
-  private async createAuditLog(
-    adminUserId: string,
-    action: string,
-    entityType: string,
-    entityId: string,
-    oldValue: any,
-    newValue: any,
-  ) {
-    // Taşındı: admin-audit.service.ts — tüm bölüm çağrıları bu delege üzerinden akar.
-    return this.auditService.createAuditLog(adminUserId, action, entityType, entityId, oldValue, newValue);
   }
 
   // ==================== MODERATION QUEUE ====================
