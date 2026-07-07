@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { MembershipController } from './membership.controller';
 import { MembershipService } from './membership.service';
@@ -12,7 +12,7 @@ import { PaymentProvidersModule } from '../payment-providers/payment-providers.m
 @Module({
   imports: [
     PrismaModule,
-    forwardRef(() => PaymentModule),
+    PaymentModule,
     PaymentProvidersModule,
     BullModule.registerQueue({ name: 'email' }),
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),

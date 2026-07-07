@@ -1,0 +1,20 @@
+import { Module, forwardRef } from '@nestjs/common';
+import { NotificationModule } from '../notification/notification.module';
+import { ProductLockService } from './product-lock.service';
+
+/**
+ * ProductLockService'i barındıran bağımsız leaf modül. Amaç: payment / order /
+ * offer / trade modülleri kilit servisini almak için tüm ProductModule'ü
+ * (dolayısıyla payment→product kenarını) import etmek zorunda kalmasın —
+ * böylece payment ↔ product ↔ membership döngüsü kırılır.
+ *
+ * PrismaModule @Global olduğu için ayrıca import edilmez. ProductLockService
+ * NotificationService'e (forwardRef) bağımlı; Notification bu modüllere geri
+ * bağımlı olmadığından yeni döngü oluşmaz.
+ */
+@Module({
+  imports: [forwardRef(() => NotificationModule)],
+  providers: [ProductLockService],
+  exports: [ProductLockService],
+})
+export class ProductLockModule {}
