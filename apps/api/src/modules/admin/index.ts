@@ -26,4 +26,6 @@ export * from './admin-shipping.service';
 export * from './admin-review.service';
 export * from './admin-seller-application.service';
 export * from './admin.controller';
+export * from './admin-commission.controller';
+export * from './admin-user.controller';
 export * from './dto';
