@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../src/prisma';
 import { OrderService } from '../../src/modules/order/order.service';
+import { OrderPricingService } from '../../src/modules/order/order-pricing.service';
 import { CommissionLedgerService } from '../../src/modules/commission/commission-ledger.service';
 import {
   truncateAll,
@@ -20,20 +21,16 @@ describe('OrderService.calculateCommission (BUYER + SELLER ayrı lookup) (E2E)',
   let categoryId: string;
 
   function makeOrderService(): OrderService {
-    return new OrderService(
-      prisma,
-      {} as any,
-      {} as any,
-      { get: jest.fn() } as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      ledger,
-      { resolveTaxRate: async () => null, calculateTaxAmount: () => 0 } as any, // taxService (no-tax stub)
-    );
+    // Order refactor sonrası: calculateCommission OrderPricingService'e taşındı
+    // (byte-identical), OrderService facade delege ediyor. Aynı davranışı test etmek
+    // için facade'ı gerçek bir OrderPricingService(prisma, taxStub) ile kuruyoruz;
+    // calculateCommission ledger kullanmadığından diğer alt-servisler stub.
+    const taxStub = {
+      resolveTaxRate: async () => null,
+      calculateTaxAmount: () => 0,
+    } as any; // taxService (no-tax stub)
+    const pricing = new OrderPricingService(prisma, taxStub);
+    return new OrderService(pricing, {} as any, {} as any, {} as any);
   }
 
   beforeAll(() => {
