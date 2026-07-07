@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { authApi, userApi } from '@/lib/api';
+import { loginAction, googleLoginAction, logoutAction } from '@/lib/server/bff-auth-actions';
 
 // Membership tier types
 export type MembershipTier = 'free' | 'basic' | 'premium' | 'business';
@@ -126,6 +127,36 @@ const mapApiUser = (apiUser: any): User => ({
   birthDate: apiUser.birthDate || apiUser.birth_date || null,
 });
 
+/**
+ * Non-sensitive profile snapshot for INSTANT header render on hard reload.
+ * Read inside checkAuth (post-mount, so hydration-safe) to show the account
+ * without waiting for the network — the "Giriş yap" flash drops from a round-trip
+ * to a single frame. Never holds tokens; strips the most sensitive PII
+ * (phone / taxId). checkAuth refreshes the full user right after.
+ */
+const USER_SNAPSHOT_KEY = 'tarodan_user_snapshot';
+function readUserSnapshot(): User | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(USER_SNAPSHOT_KEY);
+    return raw ? (JSON.parse(raw) as User) : null;
+  } catch {
+    return null;
+  }
+}
+function writeUserSnapshot(user: User) {
+  if (typeof window === 'undefined') return;
+  try {
+    const safe: User = { ...user, phone: undefined, taxId: undefined };
+    localStorage.setItem(USER_SNAPSHOT_KEY, JSON.stringify(safe));
+  } catch {
+    /* ignore quota / serialization errors */
+  }
+}
+function clearUserSnapshot() {
+  if (typeof window !== 'undefined') localStorage.removeItem(USER_SNAPSHOT_KEY);
+}
+
 interface AuthState {
   user: User | null;
   token: string | null;
@@ -179,33 +210,22 @@ export const useAuthStore = create<AuthState>()(
       limits: null,
       
       login: async (email: string, password: string) => {
-        const response = await authApi.login(email, password);
-        const { user: apiUser } = response.data;
-        // Token'lar httpOnly cookie olarak backend tarafından set edildi; JS'te saklamıyoruz.
-        // Sadece hassas olmayan "girişli" işaretçisini bırakırız (interceptor/cart için).
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('tarodan_authed', '1');
-        }
-
-        const user = mapApiUser(apiUser);
-        const limits = TIER_LIMITS[user.membershipTier];
-
-        set({ user, token: null, refreshToken: null, isAuthenticated: true, limits });
+        // BFF: kimlik doğrulama Server Action'da yapılır, token'lar Next'in httpOnly
+        // cookie'lerine (web_at/web_rt) yazılır — JS token'ı hiç görmez. Zengin
+        // kullanıcı objesi ardından checkAuth (proxy üzerinden /users/me) ile dolar.
+        const result = await loginAction({ email, password });
+        if (result.status === 'error') throw new Error(result.message);
+        if (result.status === '2fa') throw new Error('İki adımlı doğrulama gerekli');
+        if (typeof window !== 'undefined') localStorage.setItem('tarodan_authed', '1');
+        await get().checkAuth();
       },
 
       loginWithGoogle: async (idToken: string) => {
-        const response = await authApi.loginWithGoogle(idToken);
-        const { user: apiUser } = response.data;
-        // Token'lar httpOnly cookie olarak backend tarafından set edildi; JS'te saklamıyoruz.
-        // Sadece hassas olmayan "girişli" işaretçisini bırakırız (interceptor/cart için).
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('tarodan_authed', '1');
-        }
-
-        const user = mapApiUser(apiUser);
-        const limits = TIER_LIMITS[user.membershipTier];
-
-        set({ user, token: null, refreshToken: null, isAuthenticated: true, limits });
+        const result = await googleLoginAction(idToken);
+        if (result.status === 'error') throw new Error(result.message);
+        if (result.status === '2fa') throw new Error('İki adımlı doğrulama gerekli');
+        if (typeof window !== 'undefined') localStorage.setItem('tarodan_authed', '1');
+        await get().checkAuth();
       },
 
       register: async (displayName: string, email: string, password: string, phone?: string, birthDate?: string, acceptMarketing?: boolean) => {
@@ -216,7 +236,7 @@ export const useAuthStore = create<AuthState>()(
       
       logout: async () => {
         try {
-          await authApi.logout(); // sunucu httpOnly cookie'leri temizler
+          await logoutAction(); // Server Action: API'de revoke + web_at/web_rt temizle
         } catch (e) {
           // Ignore logout errors
         }
@@ -227,6 +247,7 @@ export const useAuthStore = create<AuthState>()(
           localStorage.removeItem('auth_token');
           localStorage.removeItem('refresh_token');
         }
+        clearUserSnapshot();
 
         set({ user: null, token: null, refreshToken: null, isAuthenticated: false, limits: null, isLoading: false });
       },
@@ -242,11 +263,26 @@ export const useAuthStore = create<AuthState>()(
           typeof window !== 'undefined' && localStorage.getItem('tarodan_authed') === '1';
 
         if (!maybeAuthed) {
+          clearUserSnapshot();
           set({ user: null, token: null, refreshToken: null, isAuthenticated: false, limits: null, isLoading: false });
           return;
         }
 
-        set({ isLoading: true });
+        // FAST PATH: hydrate the account from the cached snapshot instantly (no
+        // network) so the header renders authed within one frame; the request
+        // below then refreshes the full, live user.
+        const snapshot = readUserSnapshot();
+        if (snapshot) {
+          set({
+            user: snapshot,
+            isAuthenticated: true,
+            limits: TIER_LIMITS[snapshot.membershipTier],
+            isLoading: false,
+          });
+        } else {
+          set({ isLoading: true });
+        }
+
         try {
           // /users/me — 401 olursa api interceptor'ı cookie ile sessiz refresh deneyip tekrarlar.
           const response = await userApi.getProfile();
@@ -254,15 +290,17 @@ export const useAuthStore = create<AuthState>()(
           const user = mapApiUser(apiUser);
           const limits = TIER_LIMITS[user.membershipTier];
           if (typeof window !== 'undefined') localStorage.setItem('tarodan_authed', '1');
+          writeUserSnapshot(user);
           set({ user, token: null, refreshToken: null, isAuthenticated: true, limits });
         } catch (error: unknown) {
           const status = (error as { response?: { status?: number } })?.response?.status;
           const isUnauthorized = status === 401 || status === 403;
           if (isUnauthorized) {
-            // Oturum gerçekten geçersiz → işaretçiyi temizle ve oturumu kapat.
+            // Oturum gerçekten geçersiz → işaretçiyi ve snapshot'ı temizle, oturumu kapat.
             if (typeof window !== 'undefined') {
               localStorage.removeItem('tarodan_authed');
             }
+            clearUserSnapshot();
             set({ user: null, token: null, refreshToken: null, isAuthenticated: false, limits: null });
           } else {
             // Geçici hata (API erişilemez / 5xx / network) — token hâlâ geçerli olabilir.
@@ -278,6 +316,8 @@ export const useAuthStore = create<AuthState>()(
       
       setUser: (user) => {
         const limits = user ? TIER_LIMITS[user.membershipTier] : null;
+        if (user) writeUserSnapshot(user);
+        else clearUserSnapshot();
         set({ user, isAuthenticated: !!user, limits });
       },
       
@@ -288,6 +328,7 @@ export const useAuthStore = create<AuthState>()(
           const apiUser = response.data.user || response.data;
           const user = mapApiUser(apiUser);
           const limits = TIER_LIMITS[user.membershipTier];
+          writeUserSnapshot(user);
           set({ user, limits });
         } catch (error) {
           if (process.env.NODE_ENV === 'development') {
@@ -324,7 +365,11 @@ export const useAuthStore = create<AuthState>()(
     },
     {
       name: 'auth-storage',
-      // Token'lar artık httpOnly cookie'de; localStorage'a hiçbir hassas alan yazılmaz.
+      // Token'lar VE auth durumu persist EDİLMEZ: isAuthenticated/user'ı zustand
+      // persist ile geri yüklersek client ilk-render'da authed olur ama SSR guest
+      // render etti → mounted-gate'i olmayan tüketicilerde hydration mismatch. Bu
+      // yüzden ilk render hep guest kalır; hızlı (ağsız) header render'ı ayrı bir
+      // snapshot'la checkAuth İÇİNDE, post-mount yapılır (aşağı bkz.).
       partialize: () => ({}),
     }
   )

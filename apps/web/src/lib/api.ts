@@ -1,11 +1,12 @@
 import axios from 'axios';
 
-// Tarayıcıda doğrudan API'ye git (3001); proxy bazen 500 veriyor. Sunucu tarafında /api (rewrite) kullanılır.
+// Browser → same-origin BFF proxy (`/bff`): the proxy adds the `Bearer` token
+// server-side from the Next-owned `web_at` cookie and refreshes it on 401, so the
+// browser never holds an API token. Public/guest calls work through the same hop
+// (no cookie → no Bearer). Public SSR fetches use the absolute API directly (not
+// this client); server-side axios (rare) also goes direct.
 const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-const baseURL =
-  typeof window !== 'undefined'
-    ? `${API_ORIGIN}/api`
-    : '/api';
+const baseURL = typeof window !== 'undefined' ? '/bff' : `${API_ORIGIN}/api`;
 
 export const api = axios.create({
   baseURL,
@@ -41,8 +42,6 @@ function shouldPreserveAuthTokenOn401(): boolean {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest = error.config;
-
     // Banlı kullanıcı: backend BannedUserGuard tüm istekleri 403 + USER_BANNED
     // ile bloklar. Kullanıcıyı /banned sayfasına yönlendir (zaten oradaysa dokunma).
     const errData = error.response?.data;
@@ -60,43 +59,24 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      if (typeof window !== 'undefined' && originalRequest.url !== '/auth/refresh') {
-        try {
-          // Refresh token httpOnly cookie'de; body göndermiyoruz. Doğrudan API'ye, cookie ile.
-          // Sunucu yeni cookie'leri set eder → orijinal isteği tekrarla.
-          await axios.post(`${API_ORIGIN}/api/auth/refresh`, null, {
-            withCredentials: true,
-          });
-          return api(originalRequest);
-        } catch (refreshError: any) {
-          // Refresh'in network/5xx ile patlaması (API erişilemez) ≠ geçersiz refresh token.
-          // Sadece refresh GERÇEKTEN 401/403 dönerse oturumu kapat; geçici hatada işareti koru
-          // ki API hıçkırınca (özellikle ödeme dönüşü) kullanıcı login'e atılmasın.
-          const refreshStatus = refreshError?.response?.status;
-          const refreshRejectedAuth = refreshStatus === 401 || refreshStatus === 403;
-          const had = hadSession();
-          if (refreshRejectedAuth && !shouldPreserveAuthTokenOn401()) {
-            clearSessionMarker();
+    // 401 → the BFF proxy already attempted a server-side refresh; reaching the
+    // client means the session is genuinely gone. Clear the marker and, on a
+    // protected page, bounce to login. Guests, temporary errors, and checkout /
+    // payment returns are left alone (shouldPreserveAuthTokenOn401).
+    if (error.response?.status === 401 && typeof window !== 'undefined') {
+      const had = hadSession();
+      if (had && !shouldPreserveAuthTokenOn401()) {
+        const currentPath = window.location?.pathname || '';
+        const publicPathsNoRedirect = ['/track-order', '/profile/orders/track', '/login', '/register'];
+        const isPublicPath = publicPathsNoRedirect.some(
+          (p) => currentPath === p || currentPath.startsWith(p + '/'),
+        );
+        clearSessionMarker();
+        if (!isPublicPath) {
+          const protectedPaths = ['/profile', '/orders', '/messages', '/favorites', '/cart/checkout'];
+          if (protectedPaths.some((path) => currentPath.startsWith(path))) {
+            window.location.href = '/login?expired=true';
           }
-
-          // Yalnızca gerçekten süresi dolmuş oturumlarda yönlendir; misafir/geçici hatada asla.
-          if (refreshRejectedAuth && had) {
-            const currentPath = window.location?.pathname || '';
-            const publicPathsNoRedirect = ['/track-order', '/profile/orders/track', '/login', '/register'];
-            const isPublicPath = publicPathsNoRedirect.some(p => currentPath === p || currentPath.startsWith(p + '/'));
-            if (!isPublicPath) {
-              const protectedPaths = ['/profile', '/orders', '/messages', '/favorites', '/cart/checkout'];
-              const isProtectedPath = protectedPaths.some(path => currentPath.startsWith(path));
-              if (isProtectedPath) {
-                window.location.href = '/login?expired=true';
-              }
-            }
-          }
-
-          return Promise.reject(refreshError);
         }
       }
     }
