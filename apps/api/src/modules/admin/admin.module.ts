@@ -15,6 +15,9 @@ import { AdminContentController } from './admin-content.controller';
 import { AdminMessagingController } from './admin-messaging.controller';
 import { AdminSupportController } from './admin-support.controller';
 import { AdminNotificationController } from './admin-notification.controller';
+import { AdminCatalogController } from './admin-catalog.controller';
+import { AdminTaxController } from './admin-tax.controller';
+import { AdminCollectionController } from './admin-collection.controller';
 import { AdminService } from './admin.service';
 import { AdminAuditService } from './admin-audit.service';
 import { AdminCommissionService } from './admin-commission.service';
@@ -86,7 +89,7 @@ import { OrderModule } from '../order/order.module';
     ModerationModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
-  controllers: [AdminController, AdminCommissionController, AdminUserController, AdminProductController, AdminOrderController, AdminAnalyticsController, AdminModerationController, AdminPaymentController, AdminTradeController, AdminRefundController, AdminContentController, AdminMessagingController, AdminSupportController, AdminNotificationController],
+  controllers: [AdminController, AdminCommissionController, AdminUserController, AdminProductController, AdminOrderController, AdminAnalyticsController, AdminModerationController, AdminPaymentController, AdminTradeController, AdminRefundController, AdminContentController, AdminMessagingController, AdminSupportController, AdminNotificationController, AdminCatalogController, AdminTaxController, AdminCollectionController],
   providers: [AdminService, AdminAuditService, AdminCommissionService, AdminSettingsService, AdminUserService, AdminStaffService, AdminProductService, AdminOrderService, AdminAnalyticsService, AdminModerationService, AdminPaymentService, AdminPayoutService, AdminTradeService, AdminRefundService, AdminMessagingService, AdminSupportService, AdminContentService, AdminTaxService, AdminMembershipService, AdminCatalogService, AdminCollectionService, AdminNotificationService, AdminLogsService, AdminShippingService, AdminReviewService, AdminSellerApplicationService, ScheduledNotificationScheduler, ScheduledNotificationProcessor],
   exports: [AdminService],
 })

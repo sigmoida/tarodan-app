@@ -39,4 +39,7 @@ export * from './admin-content.controller';
 export * from './admin-messaging.controller';
 export * from './admin-support.controller';
 export * from './admin-notification.controller';
+export * from './admin-catalog.controller';
+export * from './admin-tax.controller';
+export * from './admin-collection.controller';
 export * from './dto';
