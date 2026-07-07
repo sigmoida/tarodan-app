@@ -9,7 +9,7 @@ import {
 	ArrowsRightLeftIcon,
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
-import { Badge, ProductBadge } from '@tarodan/ui';
+import { ProductBadge } from '@tarodan/ui';
 import OptimizedImage from '@/components/OptimizedImage';
 import OutOfStockOverlay from '@/components/ui/OutOfStockOverlay';
 import { useTranslation } from '@/i18n';
@@ -170,9 +170,11 @@ export default function ProductCard({
 							/>
 							{outOfStock && <OutOfStockOverlay />}
 							{isTrade && (
-								<div className='absolute top-1 right-1 bg-success-500 text-inverted p-1 rounded'>
-									<ArrowsRightLeftIcon className='w-3 h-3' />
-								</div>
+								<ProductBadge
+									variant='trade'
+									className='absolute top-1 right-1 p-1'
+									icon={<ArrowsRightLeftIcon className='w-3 h-3' />}
+								/>
 							)}
 						</div>
 						<div className='flex-1 min-w-0'>
@@ -193,9 +195,9 @@ export default function ProductCard({
 								</div>
 							)}
 							{showMeta && (
-								<Badge variant='default' size='sm' className='mt-2'>
+								<ProductBadge variant='default' className='mt-2'>
 									{formatCondition(product.condition, locale)}
-								</Badge>
+								</ProductBadge>
 							)}
 						</div>
 						<div className='ml-4 flex flex-col items-end text-right flex-shrink-0'>
@@ -208,9 +210,9 @@ export default function ProductCard({
 								{fmtTL(effectivePrice)}
 							</p>
 							{onSale && (
-								<span className='mt-1 text-xs text-danger-500 font-semibold bg-danger-50 px-1.5 py-0.5 rounded'>
+								<ProductBadge variant='sale' className='mt-1'>
 									%{product.discountPercent ?? 0}
-								</span>
+								</ProductBadge>
 							)}
 						</div>
 					</div>
@@ -249,12 +251,14 @@ export default function ProductCard({
 								</ProductBadge>
 							)}
 							{isTrade && (
-								<div className='bg-success-500 text-inverted text-sm px-1.5 py-0.5 rounded flex items-center gap-0.5'>
-									<ArrowsRightLeftIcon className='w-2.5 h-2.5' />
+								<ProductBadge
+									variant='trade'
+									className='text-sm px-1.5 py-0.5'
+									icon={<ArrowsRightLeftIcon className='w-2.5 h-2.5' />}>
 									<span className='hidden sm:inline'>
 										{locale === 'en' ? 'Trade' : 'Takas'}
 									</span>
-								</div>
+								</ProductBadge>
 							)}
 						</div>
 						{onSale && (

@@ -25,10 +25,29 @@ const badgeVariants = cva(
 				md: 'px-2.5 py-1 text-sm',
 				lg: 'px-3 py-2 text-sm',
 			},
+			/**
+			 * `soft` (default) is the muted 100/800 look; `solid` is the bold,
+			 * high-contrast fill used for merchandising badges over product images
+			 * (see ProductBadge). Per-variant solid fills live in compoundVariants.
+			 */
+			appearance: {
+				soft: '',
+				solid: '',
+			},
 		},
+		compoundVariants: [
+			{ appearance: 'solid', variant: 'primary', class: 'bg-primary-600 text-inverted' },
+			{ appearance: 'solid', variant: 'secondary', class: 'bg-surface text-heading border border-border' },
+			{ appearance: 'solid', variant: 'success', class: 'bg-success-600 text-inverted' },
+			{ appearance: 'solid', variant: 'warning', class: 'bg-warning-500 text-inverted' },
+			{ appearance: 'solid', variant: 'danger', class: 'bg-danger-600 text-inverted' },
+			{ appearance: 'solid', variant: 'destructive', class: 'bg-danger-600 text-inverted' },
+			{ appearance: 'solid', variant: 'info', class: 'bg-info-600 text-inverted' },
+		],
 		defaultVariants: {
 			variant: 'default',
 			size: 'md',
+			appearance: 'soft',
 		},
 	},
 );
@@ -62,6 +81,9 @@ export interface BadgeProps
  *  - plain:   `<Badge variant="success">Metin</Badge>`
  *  - status:  `<Badge status={x} config={cfg} />`   (config → label + variant)
  *  - active:  `<Badge active={isActive} />`          (Aktif / Pasif)
+ *
+ * `appearance="solid"` switches any variant to its bold fill (for badges over
+ * imagery); the default `soft` keeps the muted look.
  */
 export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
 	(
@@ -69,6 +91,7 @@ export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
 			className,
 			variant,
 			size,
+			appearance,
 			status,
 			config,
 			label,
@@ -102,6 +125,7 @@ export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
 					badgeVariants({
 						variant: resolvedVariant,
 						size,
+						appearance,
 						className: cn(icon != null && 'gap-1', className),
 					}),
 				)}
