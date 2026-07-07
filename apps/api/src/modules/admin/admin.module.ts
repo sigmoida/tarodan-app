@@ -35,6 +35,10 @@ import { AdminModerationService } from './admin-moderation.service';
 import { AdminPaymentService } from './admin-payment.service';
 import { AdminPayoutService } from './admin-payout.service';
 import { AdminTradeService } from './admin-trade.service';
+import { AdminTradeCommonService } from './admin-trade-common.service';
+import { AdminTradeQueryService } from './admin-trade-query.service';
+import { AdminTradeWarehouseService } from './admin-trade-warehouse.service';
+import { AdminTradeResolutionService } from './admin-trade-resolution.service';
 import { AdminRefundService } from './admin-refund.service';
 import { AdminMessagingService } from './admin-messaging.service';
 import { AdminSupportService } from './admin-support.service';
@@ -94,7 +98,7 @@ import { OrderModule } from '../order/order.module';
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [AdminCommissionController, AdminUserController, AdminProductController, AdminOrderController, AdminAnalyticsController, AdminModerationController, AdminPaymentController, AdminTradeController, AdminRefundController, AdminContentController, AdminMessagingController, AdminSupportController, AdminNotificationController, AdminCatalogController, AdminTaxController, AdminCollectionController, AdminAdvertisementController, AdminShippingController, AdminLogsController, AdminReviewController, AdminSellerApplicationController],
-  providers: [AdminService, AdminAuditService, AdminCommissionService, AdminSettingsService, AdminUserService, AdminStaffService, AdminProductService, AdminOrderService, AdminAnalyticsService, AdminModerationService, AdminPaymentService, AdminPayoutService, AdminTradeService, AdminRefundService, AdminMessagingService, AdminSupportService, AdminContentService, AdminTaxService, AdminMembershipService, AdminCatalogService, AdminCollectionService, AdminNotificationService, AdminLogsService, AdminShippingService, AdminReviewService, AdminSellerApplicationService, ScheduledNotificationScheduler, ScheduledNotificationProcessor],
+  providers: [AdminService, AdminAuditService, AdminCommissionService, AdminSettingsService, AdminUserService, AdminStaffService, AdminProductService, AdminOrderService, AdminAnalyticsService, AdminModerationService, AdminPaymentService, AdminPayoutService, AdminTradeService, AdminTradeCommonService, AdminTradeQueryService, AdminTradeWarehouseService, AdminTradeResolutionService, AdminRefundService, AdminMessagingService, AdminSupportService, AdminContentService, AdminTaxService, AdminMembershipService, AdminCatalogService, AdminCollectionService, AdminNotificationService, AdminLogsService, AdminShippingService, AdminReviewService, AdminSellerApplicationService, ScheduledNotificationScheduler, ScheduledNotificationProcessor],
   exports: [AdminService],
 })
 export class AdminModule { }
