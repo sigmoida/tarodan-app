@@ -6,6 +6,7 @@ import { PaymentService } from './payment.service';
 import { PaymentQueryService } from './payment-query.service';
 import { PaymentCommonService } from './payment-common.service';
 import { PaymentRefundService } from './payment-refund.service';
+import { PaymentReconciliationService } from './payment-reconciliation.service';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { PayTRService } from '../payment-providers/paytr.service';
@@ -138,6 +139,7 @@ describe('PaymentService group payment (checkout group)', () => {
         PaymentQueryService,
         PaymentCommonService,
         PaymentRefundService,
+        PaymentReconciliationService,
         { provide: PrismaService, useValue: mockPrisma },
         {
           provide: CacheService,

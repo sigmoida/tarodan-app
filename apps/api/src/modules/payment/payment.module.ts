@@ -9,6 +9,7 @@ import { PaymentService } from './payment.service';
 import { PaymentQueryService } from './payment-query.service';
 import { PaymentCommonService } from './payment-common.service';
 import { PaymentRefundService } from './payment-refund.service';
+import { PaymentReconciliationService } from './payment-reconciliation.service';
 import { PaymentSchedulerService } from './payment-scheduler.service';
 import { PaymentScheduledProcessor } from './payment-scheduled.processor';
 import { QUEUE_NAMES } from '../../workers/constants';
@@ -51,7 +52,7 @@ import { StorageModule } from '../storage/storage.module';
     }),
   ],
   controllers: [PaymentController, PaytrCallbackAliasController],
-  providers: [PaymentService, PaymentQueryService, PaymentCommonService, PaymentRefundService, PaymentSchedulerService, PaymentScheduledProcessor, RawBodyMiddleware],
+  providers: [PaymentService, PaymentQueryService, PaymentCommonService, PaymentRefundService, PaymentReconciliationService, PaymentSchedulerService, PaymentScheduledProcessor, RawBodyMiddleware],
   exports: [PaymentService],
 })
 export class PaymentModule implements NestModule {
