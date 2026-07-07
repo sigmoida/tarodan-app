@@ -35,4 +35,8 @@ export * from './admin-moderation.controller';
 export * from './admin-payment.controller';
 export * from './admin-trade.controller';
 export * from './admin-refund.controller';
+export * from './admin-content.controller';
+export * from './admin-messaging.controller';
+export * from './admin-support.controller';
+export * from './admin-notification.controller';
 export * from './dto';
