@@ -32,4 +32,7 @@ export * from './admin-product.controller';
 export * from './admin-order.controller';
 export * from './admin-analytics.controller';
 export * from './admin-moderation.controller';
+export * from './admin-payment.controller';
+export * from './admin-trade.controller';
+export * from './admin-refund.controller';
 export * from './dto';

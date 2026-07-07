@@ -8,6 +8,9 @@ import { AdminProductController } from './admin-product.controller';
 import { AdminOrderController } from './admin-order.controller';
 import { AdminAnalyticsController } from './admin-analytics.controller';
 import { AdminModerationController } from './admin-moderation.controller';
+import { AdminPaymentController } from './admin-payment.controller';
+import { AdminTradeController } from './admin-trade.controller';
+import { AdminRefundController } from './admin-refund.controller';
 import { AdminService } from './admin.service';
 import { AdminAuditService } from './admin-audit.service';
 import { AdminCommissionService } from './admin-commission.service';
@@ -79,7 +82,7 @@ import { OrderModule } from '../order/order.module';
     ModerationModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
-  controllers: [AdminController, AdminCommissionController, AdminUserController, AdminProductController, AdminOrderController, AdminAnalyticsController, AdminModerationController],
+  controllers: [AdminController, AdminCommissionController, AdminUserController, AdminProductController, AdminOrderController, AdminAnalyticsController, AdminModerationController, AdminPaymentController, AdminTradeController, AdminRefundController],
   providers: [AdminService, AdminAuditService, AdminCommissionService, AdminSettingsService, AdminUserService, AdminStaffService, AdminProductService, AdminOrderService, AdminAnalyticsService, AdminModerationService, AdminPaymentService, AdminPayoutService, AdminTradeService, AdminRefundService, AdminMessagingService, AdminSupportService, AdminContentService, AdminTaxService, AdminMembershipService, AdminCatalogService, AdminCollectionService, AdminNotificationService, AdminLogsService, AdminShippingService, AdminReviewService, AdminSellerApplicationService, ScheduledNotificationScheduler, ScheduledNotificationProcessor],
   exports: [AdminService],
 })
