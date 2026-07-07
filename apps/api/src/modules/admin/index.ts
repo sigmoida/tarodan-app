@@ -28,4 +28,8 @@ export * from './admin-seller-application.service';
 export * from './admin.controller';
 export * from './admin-commission.controller';
 export * from './admin-user.controller';
+export * from './admin-product.controller';
+export * from './admin-order.controller';
+export * from './admin-analytics.controller';
+export * from './admin-moderation.controller';
 export * from './dto';
