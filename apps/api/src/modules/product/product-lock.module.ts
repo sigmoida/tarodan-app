@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { NotificationModule } from '../notification/notification.module';
 import { ProductLockService } from './product-lock.service';
 
@@ -9,11 +9,11 @@ import { ProductLockService } from './product-lock.service';
  * böylece payment ↔ product ↔ membership döngüsü kırılır.
  *
  * PrismaModule @Global olduğu için ayrıca import edilmez. ProductLockService
- * NotificationService'e (forwardRef) bağımlı; Notification bu modüllere geri
- * bağımlı olmadığından yeni döngü oluşmaz.
+ * NotificationService'e bağımlı; Notification bu modüllere geri bağımlı
+ * olmadığından yeni döngü oluşmaz.
  */
 @Module({
-  imports: [forwardRef(() => NotificationModule)],
+  imports: [NotificationModule],
   providers: [ProductLockService],
   exports: [ProductLockService],
 })

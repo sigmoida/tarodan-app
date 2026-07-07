@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { UserService } from './user.service';
 import { UserController } from './user.controller';
@@ -9,7 +9,7 @@ import { RatingModule } from '../rating/rating.module';
 import { ModerationModule } from '../moderation/moderation.module';
 
 @Module({
-  imports: [ScheduleModule.forRoot(), forwardRef(() => NotificationModule), StorageModule, RatingModule, ModerationModule],
+  imports: [ScheduleModule.forRoot(), NotificationModule, StorageModule, RatingModule, ModerationModule],
   controllers: [UserController],
   providers: [UserService, FeaturedSchedulerService],
   exports: [UserService],

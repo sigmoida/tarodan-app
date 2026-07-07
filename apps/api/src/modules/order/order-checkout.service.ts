@@ -5,8 +5,6 @@ import {
   BadRequestException,
   ConflictException,
   Logger,
-  Inject,
-  forwardRef,
 } from '@nestjs/common';
 import { createHash, randomInt, randomUUID, timingSafeEqual } from 'crypto';
 import { ConfigService } from '@nestjs/config';
@@ -50,7 +48,6 @@ export class OrderCheckoutService {
     private readonly eventService: EventService,
     private readonly cache: CacheService,
     private readonly configService: ConfigService,
-    @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
     private readonly discountService: DiscountService,
     private readonly suratCargoService: SuratCargoService,

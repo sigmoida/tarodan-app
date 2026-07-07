@@ -4,8 +4,6 @@ import {
   ForbiddenException,
   BadRequestException,
   Logger,
-  Inject,
-  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
@@ -31,7 +29,6 @@ export class OrderLifecycleService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
-    @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
     private readonly productLockService: ProductLockService,
     private readonly commissionLedger: CommissionLedgerService,

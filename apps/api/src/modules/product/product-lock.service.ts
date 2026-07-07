@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import {
   OfferStatus,
   OrderStatus,
@@ -74,7 +74,6 @@ export class ProductLockService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
   ) {}
 

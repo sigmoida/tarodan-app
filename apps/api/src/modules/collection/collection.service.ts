@@ -3,8 +3,6 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
-  Inject,
-  forwardRef,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
@@ -59,7 +57,6 @@ export class CollectionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly membershipService: MembershipService,
-    @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
     private readonly mediaService: MediaService,
     private readonly storageService: StorageService,

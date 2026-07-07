@@ -50,7 +50,6 @@ export class ProductService implements OnModuleInit {
     @Inject(forwardRef(() => MembershipService))
     private readonly membershipService: MembershipService,
     private readonly searchService: SearchService,
-    @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
     private readonly smtpProvider: SmtpProvider,
     private readonly discountService: DiscountService,

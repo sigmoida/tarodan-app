@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bull';
 import { OrderController } from './order.controller';
@@ -26,7 +26,7 @@ import { TaxModule } from '../tax/tax.module';
     ScheduleModule.forRoot(),
     PrismaModule,
     EventModule,
-    forwardRef(() => NotificationModule),
+    NotificationModule,
     DiscountModule,
     StorageModule,
     SuratCargoModule,

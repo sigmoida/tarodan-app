@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { WishlistController } from './wishlist.controller';
 import { WishlistService } from './wishlist.service';
 import { PrismaModule } from '../../prisma';
@@ -8,7 +8,7 @@ import { DiscountModule } from '../discount/discount.module';
 import { StorageModule } from '../storage/storage.module';
 
 @Module({
-  imports: [PrismaModule, CacheModule, forwardRef(() => NotificationModule), DiscountModule, StorageModule],
+  imports: [PrismaModule, CacheModule, NotificationModule, DiscountModule, StorageModule],
   controllers: [WishlistController],
   providers: [WishlistService],
   exports: [WishlistService],

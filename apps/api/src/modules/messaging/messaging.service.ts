@@ -5,8 +5,6 @@ import {
   ForbiddenException,
   Optional,
   Logger,
-  Inject,
-  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { StorageService } from '../storage/storage.service';
@@ -37,7 +35,6 @@ export class MessagingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly contentFilterService: ContentFilterService,
-    @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
     @Optional()
     private readonly storageService: StorageService,

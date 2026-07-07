@@ -1,8 +1,6 @@
 import {
   Injectable,
   Optional,
-  Inject,
-  forwardRef,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
@@ -34,7 +32,6 @@ export class TradeReconciliationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
-    @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
     private readonly paymentService: PaymentService,
     @Optional()

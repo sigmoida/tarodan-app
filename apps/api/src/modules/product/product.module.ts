@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { QUEUE_NAMES } from '../../workers/constants';
 import { ModerationModule } from '../moderation/moderation.module';
@@ -21,7 +21,7 @@ import { PaymentModule } from '../payment';
     MembershipModule,
     SearchModule,
     WishlistModule,
-    forwardRef(() => NotificationModule),
+    NotificationModule,
     DiscountModule,
     StorageModule,
     PaymentModule,

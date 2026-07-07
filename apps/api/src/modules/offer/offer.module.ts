@@ -16,7 +16,7 @@ import { OrderModule } from '../order/order.module';
 import { ProductModule } from '../product/product.module';
 
 @Module({
-  imports: [ScheduleModule.forRoot(), PrismaModule, ConfigModule, CacheModule, EventModule, forwardRef(() => NotificationModule), StorageModule, forwardRef(() => OrderModule), ProductModule, BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED })],
+  imports: [ScheduleModule.forRoot(), PrismaModule, ConfigModule, CacheModule, EventModule, NotificationModule, StorageModule, forwardRef(() => OrderModule), ProductModule, BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED })],
   controllers: [OfferController],
   providers: [OfferService, OfferSchedulerService, OfferScheduledProcessor],
   exports: [OfferService, OfferSchedulerService],

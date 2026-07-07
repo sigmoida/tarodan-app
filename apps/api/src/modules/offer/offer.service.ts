@@ -34,7 +34,6 @@ export class OfferService {
     private readonly cache: CacheService,
     private readonly configService: ConfigService,
     private readonly eventService: EventService,
-    @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
     @Inject(forwardRef(() => OrderService))
     private readonly orderService: OrderService,
