@@ -1,22 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import {
-  BuildingOfficeIcon,
-  EnvelopeIcon,
-  LockClosedIcon,
-  EyeIcon,
-  EyeSlashIcon,
-  MapPinIcon,
-  HashtagIcon,
-} from '@heroicons/react/24/outline';
-import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n/LanguageContext';
-import { Button, Checkbox, Input, Select, Spinner } from '@tarodan/ui';
-import { formatPhoneNumber } from '@/lib/phone';
+import { Button } from '@tarodan/ui';
+import { Form, FormInput, FormSelect, FormCheckbox, FormError, useZodForm } from '@tarodan/ui/form';
+import { businessRegisterSchema, type BusinessRegisterValues } from '@/lib/schemas/auth';
+import { AuthCard } from '@/components/auth/AuthCard';
 import { ButtonLink } from '@/components/ui/ButtonLink';
 import { useRegisterBusiness } from '@/hooks/useRegisterBusiness';
 
@@ -116,509 +106,224 @@ const COMPANY_TYPES = [
 ];
 
 export function RegisterBusinessForm() {
-  const router = useRouter();
   const { t, locale } = useTranslation();
-  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
-  const { isLoading, registrationSuccess, registeredEmail, submit, resendVerification } = useRegisterBusiness();
+  const { registrationSuccess, registeredEmail, submit, resendVerification } = useRegisterBusiness();
 
-  const [companyName, setCompanyName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [companyType, setCompanyType] = useState('');
-  const [taxId, setTaxId] = useState('');
-  const [city, setCity] = useState('');
-  const [district, setDistrict] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [agreeTerms, setAgreeTerms] = useState(false);
+  const form = useZodForm(businessRegisterSchema(locale), {
+    defaultValues: {
+      companyName: '',
+      email: '',
+      phone: '',
+      companyType: '',
+      taxId: '',
+      city: '',
+      district: '',
+      password: '',
+      confirmPassword: '',
+      agreeTerms: false,
+    },
+  });
 
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPhone(formatPhoneNumber(e.target.value));
-  };
-
-  // Redirect if already authenticated
+  // City → district cascade: whenever the selected city changes, clear the
+  // district so a stale value can't outlive its city (matches the original).
+  const city = form.watch('city');
   useEffect(() => {
-    if (isAuthenticated) {
-      router.push('/');
-    }
-  }, [isAuthenticated, router]);
-
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-surface flex items-center justify-center">
-        <Spinner size="xl" />
-      </div>
-    );
-  }
-
-  if (isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-surface flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-muted mb-4">
-            {locale === 'en'
-              ? 'You are already logged in.'
-              : 'Zaten giriş yapmışsınız.'}
-          </p>
-          <ButtonLink href="/">
-            {locale === 'en' ? 'Go to Home' : 'Ana Sayfaya Dön'}
-          </ButtonLink>
-        </div>
-      </div>
-    );
-  }
+    form.setValue('district', '');
+  }, [city, form]);
 
   // Registration success screen
   if (registrationSuccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-surface-elevated to-warning-50 flex flex-col">
-        <header className="p-6">
-          <Link href="/" className="inline-flex items-center gap-2">
-            <Image src="/tarodan-logo.jpg" alt="Tarodan" width={162} height={40} className="rounded-lg object-contain" />
-          </Link>
-        </header>
+      <AuthCard
+        title={locale === 'en' ? 'Check Your Email!' : 'E-postanızı Kontrol Edin!'}
+        description={
+          locale === 'en'
+            ? 'We have sent a verification link to:'
+            : 'Doğrulama linki gönderildi:'
+        }
+      >
+        <p className="font-semibold text-body">{registeredEmail}</p>
 
-        <main className="flex-1 flex items-center justify-center px-4 py-8">
-          <div
-      className="w-full max-w-md bg-surface-elevated rounded-3xl shadow-xl shadow-success-500/10 p-8 md:p-10 border border-border-subtle text-center"
-          >
-            <div className="flex justify-center mb-6">
-              <div
-      className="w-20 h-20 bg-gradient-to-br from-success-100 to-success-100 rounded-full flex items-center justify-center"
-              >
-                <EnvelopeIcon className="w-10 h-10 text-success-600" />
-              </div>
-            </div>
-
-            <h2 className="text-2xl font-bold text-heading mb-3">
-              {locale === 'en'
-                ? "Check Your Email! 📬"
-                : "E-postanızı Kontrol Edin! 📬"}
-            </h2>
-
-            <p className="text-muted mb-2">
-              {locale === 'en'
-                ? "We have sent a verification link to:"
-                : "Doğrulama linki gönderildi:"}
-            </p>
-
-            <p className="font-semibold text-body mb-6">
-              {registeredEmail}
-            </p>
-
-            <div className="bg-info-50 border border-info-200 rounded-xl p-4 mb-6 text-left">
-              <p className="text-sm text-info-800 mb-2">
-                📌 {locale === 'en' ? "Next steps:" : "Sonraki adımlar:"}
-              </p>
-              <ol className="text-sm text-info-700 list-decimal list-inside space-y-1">
-                <li>
-                  {locale === 'en'
-                    ? "Open your email inbox"
-                    : "E-posta kutunuzu açın"}
-                </li>
-                <li>
-                  {locale === 'en'
-                    ? "Find the email from Tarodan"
-                    : "Tarodan'dan gelen e-postayı bulun"}
-                </li>
-                <li>
-                  {locale === 'en'
-                    ? "Click the verification link"
-                    : "Doğrulama linkine tıklayın"}
-                </li>
-                <li>
-                  {locale === 'en'
-                    ? "Login to your account"
-                    : "Hesabınıza giriş yapın"}
-                </li>
-              </ol>
-            </div>
-
-            <div className="space-y-3">
-              <Link
-                href="/login"
-                className="block w-full py-3 bg-gradient-to-r from-primary-500 to-warning-500 text-inverted font-semibold rounded-xl hover:from-primary-600 hover:to-warning-600 transition-all"
-              >
-                {locale === 'en' ? "Go to Login" : "Giriş Sayfasına Git"}
-              </Link>
-
-              <Button
-                variant="secondary"
-                onClick={resendVerification}
-                className="block w-full py-3 bg-surface-alt text-body font-medium rounded-xl hover:bg-border-subtle transition-colors"
-              >
-                {locale === 'en'
-                  ? "Resend Verification Email"
-                  : "Doğrulama E-postasını Tekrar Gönder"}
-              </Button>
-            </div>
-          </div>
-        </main>
-
-        <footer className="p-6 text-center">
-          <p className="text-sm text-subtle">
-            © {new Date().getFullYear()} Tarodan.{" "}
-            {locale === 'en' ? "All rights reserved." : "Tüm hakları saklıdır."}
+        <div className="mt-4 rounded-xl border border-info-200 bg-info-50 p-4">
+          <p className="mb-2 text-sm text-info-800">
+            {locale === 'en' ? 'Next steps:' : 'Sonraki adımlar:'}
           </p>
-        </footer>
-      </div>
+          <ol className="list-inside list-decimal space-y-1 text-sm text-info-700">
+            <li>{locale === 'en' ? 'Open your email inbox' : 'E-posta kutunuzu açın'}</li>
+            <li>
+              {locale === 'en'
+                ? 'Find the email from Tarodan'
+                : "Tarodan'dan gelen e-postayı bulun"}
+            </li>
+            <li>
+              {locale === 'en' ? 'Click the verification link' : 'Doğrulama linkine tıklayın'}
+            </li>
+            <li>{locale === 'en' ? 'Login to your account' : 'Hesabınıza giriş yapın'}</li>
+          </ol>
+        </div>
+
+        <div className="mt-6 space-y-3">
+          <ButtonLink href="/login" className="w-full">
+            {locale === 'en' ? 'Go to Login' : 'Giriş Sayfasına Git'}
+          </ButtonLink>
+
+          <Button variant="secondary" onClick={resendVerification} className="w-full">
+            {locale === 'en'
+              ? 'Resend Verification Email'
+              : 'Doğrulama E-postasını Tekrar Gönder'}
+          </Button>
+        </div>
+      </AuthCard>
     );
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = (values: BusinessRegisterValues) =>
     submit({
-      companyName,
-      email,
-      phone,
-      companyType,
-      taxId,
-      city,
-      district,
-      password,
-      confirmPassword,
-      agreeTerms,
+      companyName: values.companyName,
+      email: values.email,
+      phone: values.phone,
+      companyType: values.companyType ?? '',
+      taxId: values.taxId,
+      city: values.city,
+      district: values.district ?? '',
+      password: values.password,
+      confirmPassword: values.confirmPassword,
+      agreeTerms: values.agreeTerms,
     });
-  };
 
   return (
-    <div className="min-h-screen bg-surface flex">
-      {/* Left - Hero */}
-      <div className="hidden lg:flex flex-1 hero-gradient items-center justify-center p-12">
-        <div className="max-w-lg text-inverted text-center">
-          <div
-
-           
-          >
-            <div className="text-8xl mb-8">🏢</div>
-            <h2 className="text-3xl font-bold mb-4">
-              {locale === 'en' ? "Business Account" : "Şirket Hesabı"}
-            </h2>
-            <p className="text-border-strong text-lg">
-              {locale === 'en'
-                ? "Create a business account to access advanced features and manage your company listings."
-                : "Gelişmiş özelliklere erişmek ve şirket ilanlarınızı yönetmek için şirket hesabı oluşturun."}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Right - Form */}
-      <div className="flex-1 flex items-center justify-center p-8 overflow-y-auto">
-        <div
-      className="w-full max-w-2xl"
-        >
-          <div className="text-center mb-8">
-            <Link href="/" className="inline-flex items-center gap-2 mb-8">
-              <Image src="/tarodan-logo.jpg" alt="Tarodan" width={200} height={49} className="rounded-lg object-contain" />
-            </Link>
-            <h1 className="text-3xl font-bold text-heading mb-2">
-              {locale === 'en'
-                ? "Business Account Registration"
-                : "Şirket Hesabı Kaydı"}
-            </h1>
-            <p className="text-muted">
-              {locale === 'en'
-                ? "Create your business account"
-                : "Şirket hesabınızı oluşturun"}
-            </p>
-          </div>
-
-          <form
-            onSubmit={handleSubmit}
-            className="space-y-5 bg-surface-elevated rounded-xl shadow-lg p-6 md:p-8"
-          >
-            <div>
-              <label className="block text-sm font-medium text-body mb-2">
-                {locale === 'en' ? "Company Name" : "Şirket İsmi"}{" "}
-                <span className="text-danger-500">*</span>
-              </label>
-              <div className="relative">
-                <BuildingOfficeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
-                <Input
-                  type="text"
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder={locale === 'en' ? "Company Name" : "Şirket İsmi"}
-                  className="rounded-[4px] pl-12"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-body mb-2">
-                  {t("auth.email")} <span className="text-danger-500">*</span>
-                </label>
-                <div className="relative">
-                  <EnvelopeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
-                  <Input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder={
-                      locale === 'en' ? "example@email.com" : "ornek@email.com"
-                    }
-                    className="rounded-[4px] pl-12"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-body mb-2">
-                  {t("auth.phone")} <span className="text-danger-500">*</span>
-                </label>
-                <div className="flex min-w-0 overflow-hidden rounded-xl border border-border bg-surface transition-colors focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-200 focus-within:ring-offset-1">
-                  <span className="inline-flex flex-shrink-0 items-center px-3 bg-surface-alt text-muted font-medium">
-                    +90
-                  </span>
-                  <Input
-                    type="tel"
-                    value={phone}
-                    onChange={handlePhoneChange}
-                    placeholder="5XX XXX XX XX"
-                    maxLength={14}
-                    className="flex-1 min-w-0 rounded-none border-0 bg-transparent focus:ring-0 focus:ring-offset-0"
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-body mb-2">
-                  {locale === 'en' ? "Company Type" : "Şirket Türü"}{" "}
-                  <span className="text-danger-500">*</span>
-                </label>
-                <div className="relative">
-                  <BuildingOfficeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle pointer-events-none z-10" />
-                  <Select
-                    value={companyType}
-                    onChange={(e) => setCompanyType(e.target.value)}
-                    className="pl-12 appearance-none"
-                    required
-                  >
-                    <option value="">
-                      {locale === 'en'
-                        ? "Select Company Type"
-                        : "Şirket Türü Seçin"}
-                    </option>
-                    {COMPANY_TYPES.map((type) => (
-                      <option key={type} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-body mb-2">
-                  {locale === 'en' ? "Tax ID Number" : "Vergi Kimlik Numarası"}{" "}
-                  <span className="text-danger-500">*</span>
-                </label>
-                <div className="relative">
-                  <HashtagIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
-                  <Input
-                    type="text"
-                    value={taxId}
-                    onChange={(e) =>
-                      setTaxId(e.target.value.replace(/\D/g, ""))
-                    }
-                    placeholder={
-                      locale === 'en' ? "10-11 digits" : "10-11 haneli"
-                    }
-                    maxLength={11}
-                    className="rounded-[4px] pl-12"
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-body mb-2">
-                  {locale === 'en' ? "City" : "İl"}{" "}
-                  <span className="text-danger-500">*</span>
-                </label>
-                <div className="relative">
-                  <MapPinIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle pointer-events-none z-10" />
-                  <Select
-                    value={city}
-                    onChange={(e) => {
-                      setCity(e.target.value);
-                      setDistrict(""); // Reset district when city changes
-                    }}
-                    className="pl-12 appearance-none"
-                    required
-                  >
-                    <option value="">
-                      {locale === 'en' ? "Select City" : "İl Seçin"}
-                    </option>
-                    {TURKISH_CITIES.map((cityName) => (
-                      <option key={cityName} value={cityName}>
-                        {cityName}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-body mb-2">
-                  {locale === 'en' ? "District" : "İlçe"}{" "}
-                  <span className="text-danger-500">*</span>
-                </label>
-                <div className="relative">
-                  <MapPinIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
-                  <Input
-                    type="text"
-                    value={district}
-                    onChange={(e) => setDistrict(e.target.value)}
-                    placeholder={locale === 'en' ? "District" : "İlçe"}
-                    className="rounded-[4px] pl-12"
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-body mb-2">
-                  {t("auth.password")}{" "}
-                  <span className="text-danger-500">*</span>
-                </label>
-                <div className="relative">
-                  <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
-                  <Input
-                    type={showPassword ? "text" : "password"} hidePasswordToggle
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="rounded-[4px] pl-12 pr-12"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    aria-label={showPassword ? (locale === 'en' ? "Hide password" : "Şifreyi gizle") : (locale === 'en' ? "Show password" : "Şifreyi göster")}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-subtle hover:text-muted transition-colors"
-                  >
-                    {showPassword ? (
-                      <EyeSlashIcon className="w-5 h-5" />
-                    ) : (
-                      <EyeIcon className="w-5 h-5" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-body mb-2">
-                  {t("auth.confirmPassword")}{" "}
-                  <span className="text-danger-500">*</span>
-                </label>
-                <div className="relative">
-                  <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-subtle" />
-                  <Input
-                    type={showPassword ? "text" : "password"} hidePasswordToggle
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="rounded-[4px] pl-12"
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-
-            <label className="flex items-start gap-3 cursor-pointer">
-              <Checkbox
-                checked={agreeTerms}
-                onChange={(e) => setAgreeTerms(e.target.checked)}
-                className="mt-0.5 h-5 w-5"
-                required
-              />
-              <span className="text-sm text-muted">
-                {locale === 'en' ? (
-                  <>
-                    I have read and accept the{" "}
-                    <Link
-                      href="/terms"
-                      className="text-primary-500 hover:text-primary-600"
-                    >
-                      Terms of Service
-                    </Link>{" "}
-                    and{" "}
-                    <Link
-                      href="/privacy"
-                      className="text-primary-500 hover:text-primary-600"
-                    >
-                      Privacy Policy
-                    </Link>
-                    .
-                  </>
-                ) : (
-                  <>
-                    <Link
-                      href="/terms"
-                      className="text-primary-500 hover:text-primary-600"
-                    >
-                      Kullanım Şartları
-                    </Link>{" "}
-                    ve{" "}
-                    <Link
-                      href="/privacy"
-                      className="text-primary-500 hover:text-primary-600"
-                    >
-                      Gizlilik Politikası
-                    </Link>
-                    'nı okudum ve kabul ediyorum.
-                  </>
-                )}
-              </span>
-            </label>
-
-            <Button type="submit" disabled={isLoading} className="w-full">
-              {isLoading
-                ? locale === 'en'
-                  ? "Registering..."
-                  : "Kayıt yapılıyor..."
-                : locale === 'en'
-                  ? "Register Business Account"
-                  : "Şirket Hesabı Oluştur"}
-            </Button>
-          </form>
-
-          <p className="text-center mt-6 text-muted">
-            {locale === 'en'
-              ? "Already have an account?"
-              : "Zaten hesabınız var mı?"}{" "}
-            <Link
-              href="/login"
-              className="text-primary-500 font-semibold hover:text-primary-600"
-            >
-              {t("common.login")}
+    <AuthCard
+      title={locale === 'en' ? 'Business Account Registration' : 'Şirket Hesabı Kaydı'}
+      description={
+        locale === 'en' ? 'Create your business account' : 'Şirket hesabınızı oluşturun'
+      }
+      footer={
+        <>
+          <p>
+            {locale === 'en' ? 'Already have an account?' : 'Zaten hesabınız var mı?'}{' '}
+            <Link href="/login" className="font-semibold text-primary-600 hover:text-primary-700">
+              {t('common.login')}
             </Link>
           </p>
-
-          <p className="text-center mt-4 text-muted">
-            {locale === 'en' ? "Not a business?" : "Şirket değil misiniz?"}{" "}
+          <p className="mt-2">
+            {locale === 'en' ? 'Not a business?' : 'Şirket değil misiniz?'}{' '}
             <Link
               href="/register"
-              className="text-primary-500 font-semibold hover:text-primary-600"
+              className="font-semibold text-primary-600 hover:text-primary-700"
             >
-              {locale === 'en' ? "Register as Individual" : "Bireysel Kayıt Ol"}
+              {locale === 'en' ? 'Register as Individual' : 'Bireysel Kayıt Ol'}
             </Link>
           </p>
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    >
+      <Form form={form} onSubmit={onSubmit} className="space-y-4">
+        <FormInput
+          name="companyName"
+          label={`${locale === 'en' ? 'Company Name' : 'Şirket İsmi'} *`}
+          placeholder={locale === 'en' ? 'Company Name' : 'Şirket İsmi'}
+        />
+
+        <FormInput
+          name="email"
+          type="email"
+          label={`${t('auth.email')} *`}
+          placeholder={locale === 'en' ? 'example@email.com' : 'ornek@email.com'}
+        />
+
+        <FormInput
+          name="phone"
+          label={`${t('auth.phone')} *`}
+          placeholder="5XX XXX XX XX"
+        />
+
+        <FormSelect
+          name="companyType"
+          label={`${locale === 'en' ? 'Company Type' : 'Şirket Türü'} *`}
+        >
+          <option value="">
+            {locale === 'en' ? 'Select Company Type' : 'Şirket Türü Seçin'}
+          </option>
+          {COMPANY_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {type}
+            </option>
+          ))}
+        </FormSelect>
+
+        <FormInput
+          name="taxId"
+          label={`${locale === 'en' ? 'Tax ID Number' : 'Vergi Kimlik Numarası'} *`}
+          placeholder={locale === 'en' ? '10-11 digits' : '10-11 haneli'}
+          inputMode="numeric"
+          maxLength={11}
+        />
+
+        <FormSelect name="city" label={`${locale === 'en' ? 'City' : 'İl'} *`}>
+          <option value="">{locale === 'en' ? 'Select City' : 'İl Seçin'}</option>
+          {TURKISH_CITIES.map((cityName) => (
+            <option key={cityName} value={cityName}>
+              {cityName}
+            </option>
+          ))}
+        </FormSelect>
+
+        <FormInput
+          name="district"
+          label={`${locale === 'en' ? 'District' : 'İlçe'} *`}
+          placeholder={locale === 'en' ? 'District' : 'İlçe'}
+        />
+
+        <FormInput
+          name="password"
+          type="password"
+          label={`${t('auth.password')} *`}
+          placeholder="••••••••"
+        />
+
+        <FormInput
+          name="confirmPassword"
+          type="password"
+          label={`${t('auth.confirmPassword')} *`}
+          placeholder="••••••••"
+        />
+
+        <FormCheckbox
+          name="agreeTerms"
+          label={
+            locale === 'en' ? (
+              <>
+                I have read and accept the{' '}
+                <Link href="/terms" className="text-primary-600 hover:text-primary-700">
+                  Terms of Service
+                </Link>{' '}
+                and{' '}
+                <Link href="/privacy" className="text-primary-600 hover:text-primary-700">
+                  Privacy Policy
+                </Link>
+                .
+              </>
+            ) : (
+              <>
+                <Link href="/terms" className="text-primary-600 hover:text-primary-700">
+                  Kullanım Şartları
+                </Link>{' '}
+                ve{' '}
+                <Link href="/privacy" className="text-primary-600 hover:text-primary-700">
+                  Gizlilik Politikası
+                </Link>
+                &apos;nı okudum ve kabul ediyorum.
+              </>
+            )
+          }
+        />
+
+        <FormError />
+
+        <Button type="submit" isLoading={form.formState.isSubmitting} className="w-full">
+          {locale === 'en' ? 'Register Business Account' : 'Şirket Hesabı Oluştur'}
+        </Button>
+      </Form>
+    </AuthCard>
   );
 }

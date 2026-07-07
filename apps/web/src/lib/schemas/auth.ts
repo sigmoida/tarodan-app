@@ -12,6 +12,26 @@ import { z } from 'zod';
 type Locale = string;
 const tr = (locale: Locale) => locale === 'tr';
 
+export const loginSchema = (locale: Locale) =>
+  z.object({
+    email: z
+      .string()
+      .min(1, tr(locale) ? 'E-posta adresi gerekli' : 'Email is required')
+      .email(tr(locale) ? 'Geçerli bir e-posta adresi girin' : 'Enter a valid email address'),
+    password: z.string().min(1, tr(locale) ? 'Şifre gerekli' : 'Password is required'),
+  });
+export type LoginValues = z.infer<ReturnType<typeof loginSchema>>;
+
+/** Just an e-mail — the verify-email "resend" mini-form. */
+export const resendEmailSchema = (locale: Locale) =>
+  z.object({
+    email: z
+      .string()
+      .min(1, tr(locale) ? 'E-posta adresi gerekli' : 'Email is required')
+      .email(tr(locale) ? 'Geçerli bir e-posta adresi girin' : 'Enter a valid email address'),
+  });
+export type ResendEmailValues = z.infer<ReturnType<typeof resendEmailSchema>>;
+
 export const forgotPasswordSchema = (locale: Locale) =>
   z.object({
     email: z
@@ -77,7 +97,7 @@ export const registerSchema = (locale: Locale) =>
         ),
       confirmPassword: z.string(),
       agreeTerms: z.boolean(),
-      acceptsMarketingEmails: z.boolean().default(false),
+      acceptsMarketingEmails: z.boolean(),
     })
     .refine((d) => d.password === d.confirmPassword, {
       message: tr(locale) ? 'Şifreler eşleşmiyor' : 'Passwords do not match',

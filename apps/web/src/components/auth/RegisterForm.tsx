@@ -2,48 +2,54 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import {
-  UserIcon,
-  EnvelopeIcon,
-  LockClosedIcon,
-  EyeIcon,
-  EyeSlashIcon,
-  CalendarIcon,
-} from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n/LanguageContext';
-import { Button, Checkbox, Input, Spinner } from '@tarodan/ui';
-import { formatPhoneNumber } from '@/lib/phone';
+import { Button, Spinner } from '@tarodan/ui';
+import { Form, FormInput, FormCheckbox, FormError, useZodForm } from '@tarodan/ui/form';
+import { registerSchema, type RegisterValues } from '@/lib/schemas/auth';
 import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
 import { useRegister } from '@/hooks/useRegister';
+import { AuthCard } from '@/components/auth/AuthCard';
+import { PasswordChecklist } from './PasswordChecklist';
 
 export function RegisterForm() {
   const router = useRouter();
   const { t, locale } = useTranslation();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
-  const { isLoading, registrationSuccess, registeredEmail, submit, resendVerification } = useRegister();
+  const { registrationSuccess, registeredEmail, submit, resendVerification } = useRegister();
 
-  const [displayName, setDisplayName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [birthDate, setBirthDate] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [agreeTerms, setAgreeTerms] = useState(false);
-  const [acceptMarketing, setAcceptMarketing] = useState(false);
   // authStore ilk client render'da (giriş yapmamış kullanıcı) isLoading=false
-  // verirken server isLoading=true verir; bu fark "Expected <img> in <div>"
-  // hydration hatasına yol açıyordu. mounted guard'ı ile server + client ilk
-  // render aynı (Spinner) kalır, gerçek duruma mount sonrası geçilir.
+  // verirken server isLoading=true verir; bu fark hydration hatasına yol
+  // açıyordu. mounted guard'ı ile server + client ilk render aynı (Spinner)
+  // kalır, gerçek duruma mount sonrası geçilir.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPhone(formatPhoneNumber(e.target.value));
-  };
+  const form = useZodForm(registerSchema(locale), {
+    defaultValues: {
+      displayName: '',
+      email: '',
+      phone: '',
+      birthDate: '',
+      password: '',
+      confirmPassword: '',
+      agreeTerms: false,
+      acceptsMarketingEmails: false,
+    },
+  });
+
+  const onSubmit = (v: RegisterValues) =>
+    submit({
+      displayName: v.displayName,
+      email: v.email,
+      phone: v.phone ?? '',
+      birthDate: v.birthDate,
+      password: v.password,
+      confirmPassword: v.confirmPassword,
+      agreeTerms: v.agreeTerms,
+      acceptMarketing: v.acceptsMarketingEmails,
+    });
 
   const getMaxBirthDate = (): string => {
     const today = new Date();
@@ -58,414 +64,162 @@ export function RegisterForm() {
   }, [isAuthenticated, router]);
 
   if (!mounted || (authLoading && !isAuthenticated)) {
-    return (
-      <div className="min-h-screen bg-surface-elevated flex items-center justify-center">
-        <Spinner size="lg" />
-      </div>
-    );
+    return <Spinner size="lg" />;
   }
 
   if (isAuthenticated) {
     return (
-      <div className="min-h-screen bg-surface-elevated flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-muted mb-4">
-            {locale === 'en' ? 'You are already logged in.' : 'Zaten giriş yapmışsınız.'}
-          </p>
-          <Link href="/" className="inline-block px-6 py-2.5 rounded-lg bg-primary-500 text-inverted font-semibold text-sm hover:bg-primary-600 transition-all duration-200 ease-premium">
-            {locale === 'en' ? 'Go to Home' : 'Ana Sayfaya Dön'}
-          </Link>
-        </div>
-      </div>
+      <AuthCard
+        title={locale === 'en' ? 'Already signed in' : 'Zaten giriş yaptınız'}
+        description={locale === 'en' ? 'You are already logged in.' : 'Zaten giriş yapmışsınız.'}
+      >
+        <Button className="w-full" onClick={() => router.push('/')}>
+          {locale === 'en' ? 'Go to Home' : 'Ana Sayfaya Dön'}
+        </Button>
+      </AuthCard>
     );
   }
 
   if (registrationSuccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-surface-elevated to-warning-50 flex flex-col">
-        <header className="p-6">
-          <Link href="/" className="inline-flex items-center gap-2 group">
-            <Image src="/tarodan-logo.jpg" alt="Tarodan" width={162} height={40} className="rounded-lg object-contain" />
+      <AuthCard
+        title={locale === 'en' ? 'Almost There!' : 'Neredeyse Tamam!'}
+        description={
+          <>
+            {locale === 'en' ? 'We sent a verification link to ' : 'Doğrulama linki gönderildi: '}
+            <span className="font-semibold text-body">{registeredEmail}</span>
+          </>
+        }
+        footer={
+          <Link href="/verify-email" className="font-semibold text-primary-600 hover:text-primary-700">
+            {locale === 'en'
+              ? 'Need to verify later? Go to verification page'
+              : 'Daha sonra mı doğrulayacaksınız? Doğrulama sayfasına gidin'}
           </Link>
-        </header>
-
-        <main className="flex-1 flex items-center justify-center px-4 py-8">
-          <div
-      className="w-full max-w-lg"
-          >
-            <div className="bg-surface-elevated rounded-3xl shadow-2xl shadow-success-500/10 p-8 md:p-10 border border-border-subtle text-center relative overflow-hidden">
-              {/* Decorative background circles */}
-              <div className="absolute -top-10 -right-10 w-40 h-40 bg-success-50 rounded-full opacity-60" />
-              <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-primary-50 rounded-full opacity-60" />
-
-              <div className="relative z-10">
-                <div className="flex justify-center mb-6">
-                  <div
-      className="w-24 h-24 bg-gradient-to-br from-success-400 to-success-500 rounded-full flex items-center justify-center shadow-lg shadow-success-500/30"
-                  >
-                    <EnvelopeIcon className="w-12 h-12 text-inverted" />
-                  </div>
-                </div>
-
-                <h2
-      className="text-2xl md:text-3xl font-bold text-heading mb-2"
-                >
-                  {locale === 'en' ? 'Almost There!' : 'Neredeyse Tamam!'}
-                </h2>
-
-                <p
-      className="text-muted mb-1"
-                >
-                  {locale === 'en' ? 'We sent a verification link to:' : 'Doğrulama linki gönderildi:'}
-                </p>
-
-                <p
-      className="font-semibold text-body mb-6 text-lg bg-surface py-2 px-4 rounded-lg inline-block"
-                >
-                  {registeredEmail}
-                </p>
-
-                <div
-      className="bg-gradient-to-r from-surface to-surface-alt border border-border rounded-2xl p-6 mb-6 text-left"
-                >
-                  <p className="text-sm text-body font-semibold mb-4 flex items-center gap-2">
-                    <span className="w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-xs font-bold">?</span>
-                    {locale === 'en' ? 'What to do next:' : 'Şimdi ne yapmalısınız:'}
-                  </p>
-                  <div className="space-y-3">
-                    {[
-                      { step: '1', text: locale === 'en' ? 'Open your email inbox' : 'E-posta kutunuzu açın' },
-                      { step: '2', text: locale === 'en' ? 'Find the email from Tarodan' : 'Tarodan\'dan gelen e-postayı bulun' },
-                      { step: '3', text: locale === 'en' ? 'Click the verification link' : 'Doğrulama linkine tıklayın' },
-                      { step: '4', text: locale === 'en' ? 'Come back and login!' : 'Geri gelip giriş yapın!' },
-                    ].map((item, i) => (
-                      <div
-                        key={item.step}
-
-                       
-                        className="flex items-center gap-3"
-                      >
-                        <span className="w-7 h-7 bg-primary-500 text-inverted rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
-                          {item.step}
-                        </span>
-                        <span className="text-sm text-body">{item.text}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div
-      className="bg-warning-50 border border-warning-200 rounded-xl p-4 mb-6 flex items-start gap-3"
-                >
-                  <span className="text-warning-500 text-lg flex-shrink-0 mt-0.5">💡</span>
-                  <p className="text-sm text-warning-800 text-left">
-                    {locale === 'en'
-                      ? "Can't find it? Check your spam/junk folder. Verification link expires in 24 hours."
-                      : "Bulamıyor musunuz? Spam/Gereksiz klasörünü kontrol edin. Doğrulama linki 24 saat geçerlidir."}
-                  </p>
-                </div>
-
-                <div
-      className="space-y-3"
-                >
-                  <Link
-                    href="/login"
-                    className="block w-full py-3.5 bg-primary-500 text-inverted font-semibold rounded-xl hover:bg-primary-600 transition-all duration-200 ease-premium shadow-lg shadow-primary-500/25 text-center"
-                  >
-                    {locale === 'en' ? 'Go to Login' : 'Giriş Sayfasına Git'}
-                  </Link>
-
-                  <Button variant="secondary" onClick={resendVerification}
-                    className="block w-full py-3 bg-surface-elevated border-2 border-border text-body font-medium rounded-xl hover:bg-surface hover:border-border transition-all">
-                    {locale === 'en' ? 'Resend Verification Email' : 'Doğrulama E-postasını Tekrar Gönder'}
-                  </Button>
-
-                  <Link
-                    href="/verify-email"
-                    className="block text-center text-sm text-muted hover:text-primary-600 transition-colors duration-200 mt-2"
-                  >
-                    {locale === 'en' ? 'Need to verify later? Go to verification page' : 'Daha sonra mı doğrulayacaksınız? Doğrulama sayfasına gidin'}
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </div>
-        </main>
-
-        <footer className="p-6 text-center">
-          <p className="text-sm text-subtle">
-            © {new Date().getFullYear()} Tarodan. {locale === 'en' ? 'All rights reserved.' : 'Tüm hakları saklıdır.'}
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted">
+            {locale === 'en'
+              ? "Can't find it? Check your spam/junk folder. The verification link expires in 24 hours."
+              : 'Bulamıyor musunuz? Spam/Gereksiz klasörünü kontrol edin. Doğrulama linki 24 saat geçerlidir.'}
           </p>
-        </footer>
-      </div>
+          <Button className="w-full" onClick={() => router.push('/login')}>
+            {locale === 'en' ? 'Go to Login' : 'Giriş Sayfasına Git'}
+          </Button>
+          <Button variant="secondary" className="w-full" onClick={resendVerification}>
+            {locale === 'en' ? 'Resend Verification Email' : 'Doğrulama E-postasını Tekrar Gönder'}
+          </Button>
+        </div>
+      </AuthCard>
     );
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    submit({
-      displayName,
-      email,
-      phone,
-      birthDate,
-      password,
-      confirmPassword,
-      agreeTerms,
-      acceptMarketing,
-    });
-  };
-
-  const inputClass = "pl-10 pr-4 bg-surface focus:bg-surface-elevated transition-all duration-200 ease-premium";
-
   return (
-    <div className="min-h-screen flex">
-      {/* Left - Image panel */}
-      <div className="hidden lg:flex flex-1 relative overflow-hidden">
-        <Image
-          src="/photos/hero/hero-hot-wheels.png"
-          alt="Diecast model araba koleksiyonu"
-          fill
-          className="object-cover"
-          priority
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-heading/70 via-heading/50 to-heading/20" />
-        <div className="absolute inset-0 flex items-center justify-center p-10 z-10">
-          <div
-
-           
-          >
-            <h2 className="text-2xl font-bold text-inverted mb-2 drop-shadow-lg">
-              {locale === 'en' ? 'Grow Your Collection' : 'Koleksiyonunuzu Büyütün'}
-            </h2>
-            <p className="text-sm text-inverted/80 max-w-md drop-shadow">
-              {locale === 'en'
-                ? 'Sign up for free and start your diecast journey today.'
-                : 'Ücretsiz üye olun, diecast yolculuğunuza bugün başlayın.'}
-            </p>
-            <div className="flex items-center gap-5 mt-5">
-              {[
-                { v: '10K+', l: locale === 'en' ? 'Listings' : 'İlan' },
-                { v: '5K+', l: locale === 'en' ? 'Members' : 'Üye' },
-                { v: '2K+', l: locale === 'en' ? 'Trades' : 'Takas' },
-              ].map((s, i) => (
-                <div key={s.l} className="flex items-center gap-5">
-                  {i > 0 && <div className="w-px h-6 bg-surface-elevated/30" />}
-                  <div>
-                    <p className="text-lg font-bold text-inverted drop-shadow">{s.v}</p>
-                    <p className="text-xs text-inverted/60">{s.l}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Right - Form */}
-      <div className="flex-1 flex flex-col bg-surface-elevated overflow-y-auto">
-        <div className="px-6 pt-6">
-          <Link href="/" className="inline-flex items-center gap-2 group">
-            <Image src="/tarodan-logo.jpg" alt="Tarodan" width={162} height={40} className="rounded-lg object-contain" />
+    <AuthCard
+      title={t('auth.createAccount')}
+      description={locale === 'en' ? 'Join the collectors community' : 'Koleksiyonerler topluluğuna katılın'}
+      footer={
+        <>
+          {t('auth.hasAccount')}{' '}
+          <Link href="/login" className="font-semibold text-primary-600 hover:text-primary-700">
+            {t('common.login')}
           </Link>
-        </div>
-        <div className="flex-1 flex items-center justify-center px-6 py-10">
-        <div
-      className="w-full max-w-[420px]"
-        >
-          <div className="mb-7">
-            <h1 className="text-2xl font-bold text-heading tracking-tight mb-1">
-              {t('auth.createAccount')}
-            </h1>
-            <p className="text-sm text-muted">
-              {locale === 'en' ? 'Join the collectors community' : 'Koleksiyonerler topluluğuna katılın'}
-            </p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-body mb-1.5">
-                {locale === 'en' ? 'Full Name' : 'Ad Soyad'} <span className="text-danger-500">*</span>
-              </label>
-              <div className="relative">
-                <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-subtle" />
-                <Input
-                  type="text"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder={locale === 'en' ? 'Your Full Name' : 'Adınız Soyadınız'}
-                  className={inputClass}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-body mb-1.5">
-                {t('auth.email')} <span className="text-danger-500">*</span>
-              </label>
-              <div className="relative">
-                <EnvelopeIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-subtle" />
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder={locale === 'en' ? 'example@email.com' : 'ornek@email.com'}
-                  className={inputClass}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-body mb-1.5">
-                  {t('auth.phone')}
-                </label>
-                <div className="flex min-w-0 overflow-hidden rounded-lg border border-border bg-surface transition-all duration-200 ease-premium focus-within:border-primary-500 focus-within:bg-surface-elevated focus-within:ring-2 focus-within:ring-primary-200 focus-within:ring-offset-1">
-                  <span className="inline-flex flex-shrink-0 items-center px-3 bg-surface-alt text-muted font-medium">
-                    +90
-                  </span>
-                  <Input
-                    type="tel"
-                    value={phone}
-                    onChange={handlePhoneChange}
-                    placeholder="5XX XXX XX XX"
-                    maxLength={14}
-                    className="flex-1 min-w-0 rounded-none border-0 bg-transparent focus:ring-0 focus:ring-offset-0"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-body mb-1.5">
-                  {t('auth.birthDate')} <span className="text-danger-500">*</span>
-                </label>
-                <div className="relative">
-                  <CalendarIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-subtle" />
-                  <Input
-                    type="date"
-                    value={birthDate}
-                    onChange={(e) => setBirthDate(e.target.value)}
-                    max={getMaxBirthDate()}
-                    required
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-body mb-1.5">
-                {t('auth.password')} <span className="text-danger-500">*</span>
-              </label>
-              <div className="relative">
-                <LockClosedIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-subtle" />
-                <Input
-                  type={showPassword ? 'text' : 'password'} hidePasswordToggle
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="pl-10 pr-10 bg-surface focus:bg-surface-elevated transition-all duration-200 ease-premium"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? (locale === 'en' ? 'Hide password' : 'Şifreyi gizle') : (locale === 'en' ? 'Show password' : 'Şifreyi göster')}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-subtle hover:text-muted transition-colors duration-200">
-                  {showPassword ? <EyeSlashIcon className="w-[18px] h-[18px]" /> : <EyeIcon className="w-[18px] h-[18px]" />}
-                </button>
-              </div>
-              <p className="text-xs text-subtle mt-1">
-                {locale === 'en' ? 'Min 8 chars, uppercase, lowercase & number' : 'En az 8 karakter, büyük/küçük harf ve rakam'}
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-body mb-1.5">
-                {t('auth.confirmPassword')} <span className="text-danger-500">*</span>
-              </label>
-              <div className="relative">
-                <LockClosedIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-subtle" />
-                <Input
-                  type={showPassword ? 'text' : 'password'} hidePasswordToggle
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className={inputClass}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-3 pt-1">
-              <label className="flex items-start gap-2.5 cursor-pointer">
-                <Checkbox
-                  checked={agreeTerms}
-                  onChange={(e) => setAgreeTerms(e.target.checked)}
-                  className="mt-0.5 rounded-sm transition-colors duration-200"
-                />
-                <span className="text-sm text-muted leading-snug">
-                  {locale === 'en' ? (
-                    <>
-                      I accept the{' '}
-                      <Link href="/terms" className="text-primary-600 hover:text-primary-700 font-medium transition-colors duration-200">Terms of Service</Link>
-                      {' '}and{' '}
-                      <Link href="/privacy" className="text-primary-600 hover:text-primary-700 font-medium transition-colors duration-200">Privacy Policy</Link>.
-                    </>
-                  ) : (
-                    <>
-                      <Link href="/terms" className="text-primary-600 hover:text-primary-700 font-medium transition-colors duration-200">Kullanım Şartları</Link>
-                      {' '}ve{' '}
-                      <Link href="/privacy" className="text-primary-600 hover:text-primary-700 font-medium transition-colors duration-200">Gizlilik Politikası</Link>
-                      &apos;nı okudum ve kabul ediyorum.
-                    </>
-                  )}
-                </span>
-              </label>
-
-              <Checkbox
-                checked={acceptMarketing}
-                onChange={(e) => setAcceptMarketing(e.target.checked)}
-                label={locale === 'en'
-                  ? 'I want to receive promotional emails and special offers.'
-                  : 'Reklam ve kampanya e-postalarını almak istiyorum.'}
-              />
-            </div>
-
-            <Button variant="secondary" type="submit"
-              disabled={isLoading}
-              className="w-full py-2.5 rounded-lg bg-primary-500 text-inverted font-semibold text-sm hover:bg-primary-600 active:bg-primary-700 transition-all duration-200 ease-premium disabled:opacity-60 disabled:pointer-events-none flex items-center justify-center gap-2 mt-1">
-              {isLoading && (
-                <svg className="animate-spin h-4 w-4 text-inverted/80" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-              )}
-              {isLoading
-                ? (locale === 'en' ? 'Signing up...' : 'Kayıt yapılıyor...')
-                : t('common.register')}
-            </Button>
-          </form>
-
-          <div className="mt-4">
-            <GoogleSignInButton onSuccess={() => router.push('/')} />
-          </div>
-
-          <p className="text-center mt-5 text-sm text-muted">
-            {t('auth.hasAccount')}{' '}
-            <Link href="/login" className="font-semibold text-primary-600 hover:text-primary-700 transition-colors duration-200">
-              {t('common.login')}
-            </Link>
-          </p>
-
-          <div className="mt-5 pt-5 border-t border-border">
-            <Link
-              href="/register/business"
-              className="items-center justify-center gap-2 py-2.5 text-body font-medium hover:bg-surface transition-all duration-200 ease-premium"
-            >
+          <span className="mt-3 block border-t border-border pt-3">
+            <Link href="/register/business" className="font-medium text-body hover:text-primary-600">
               {locale === 'en' ? 'Open Business Account' : 'Şirket Hesabı Aç'}
             </Link>
-          </div>
-        </div>
-        </div>
-      </div>
-    </div>
+          </span>
+        </>
+      }
+    >
+      <Form form={form} onSubmit={onSubmit} className="space-y-4">
+        <FormInput
+          name="displayName"
+          label={`${locale === 'en' ? 'Full Name' : 'Ad Soyad'} *`}
+          placeholder={locale === 'en' ? 'Your Full Name' : 'Adınız Soyadınız'}
+          autoComplete="name"
+        />
+
+        <FormInput
+          name="email"
+          type="email"
+          label={`${t('auth.email')} *`}
+          placeholder={locale === 'en' ? 'example@email.com' : 'ornek@email.com'}
+          autoComplete="email"
+        />
+
+        <FormInput
+          name="phone"
+          type="tel"
+          label={t('auth.phone')}
+          placeholder="5XX XXX XX XX"
+          autoComplete="tel"
+        />
+
+        <FormInput
+          name="birthDate"
+          type="date"
+          label={`${t('auth.birthDate')} *`}
+          max={getMaxBirthDate()}
+        />
+
+        <FormInput
+          name="password"
+          type="password"
+          label={`${t('auth.password')} *`}
+          placeholder="••••••••"
+          autoComplete="new-password"
+        />
+
+        <PasswordChecklist password={form.watch('password')} locale={locale} />
+
+        <FormInput
+          name="confirmPassword"
+          type="password"
+          label={`${t('auth.confirmPassword')} *`}
+          placeholder="••••••••"
+          autoComplete="new-password"
+        />
+
+        <FormCheckbox
+          name="agreeTerms"
+          label={
+            <span className="text-sm text-muted leading-snug">
+              {locale === 'en' ? (
+                <>
+                  I accept the{' '}
+                  <Link href="/terms" className="font-medium text-primary-600 hover:text-primary-700">Terms of Service</Link>
+                  {' '}and{' '}
+                  <Link href="/privacy" className="font-medium text-primary-600 hover:text-primary-700">Privacy Policy</Link>.
+                </>
+              ) : (
+                <>
+                  <Link href="/terms" className="font-medium text-primary-600 hover:text-primary-700">Kullanım Şartları</Link>
+                  {' '}ve{' '}
+                  <Link href="/privacy" className="font-medium text-primary-600 hover:text-primary-700">Gizlilik Politikası</Link>
+                  &apos;nı okudum ve kabul ediyorum.
+                </>
+              )}
+            </span>
+          }
+        />
+
+        <FormCheckbox
+          name="acceptsMarketingEmails"
+          label={locale === 'en'
+            ? 'I want to receive promotional emails and special offers.'
+            : 'Reklam ve kampanya e-postalarını almak istiyorum.'}
+        />
+
+        <FormError />
+
+        <Button type="submit" isLoading={form.formState.isSubmitting} className="w-full">
+          {t('common.register')}
+        </Button>
+
+        <GoogleSignInButton onSuccess={() => router.push('/')} />
+      </Form>
+    </AuthCard>
   );
 }

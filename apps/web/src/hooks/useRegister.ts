@@ -17,12 +17,13 @@ interface RegisterInput {
 }
 
 /**
- * Individual-registration flow. Preserves the page's exact sequential
- * validation (toast on the first failing rule), the `/auth/register` payload
- * shape, the success screen state, and the resend-verification action.
+ * Individual-registration flow. Field validation lives in `registerSchema`
+ * (the form gates on it before calling `submit`), so this hook owns only the
+ * `/auth/register` payload shape, the success screen state, and the
+ * resend-verification action.
  */
 export function useRegister() {
-  const { t, locale } = useTranslation();
+  const { locale } = useTranslation();
 
   const [isLoading, setIsLoading] = useState(false);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
@@ -34,57 +35,8 @@ export function useRegister() {
     phone,
     birthDate,
     password,
-    confirmPassword,
-    agreeTerms,
     acceptMarketing,
   }: RegisterInput) => {
-    if (!displayName.trim() || !email.trim() || !password.trim()) {
-      toast.error(locale === 'en' ? 'Please fill in all fields' : 'Tüm alanları doldurun');
-      return;
-    }
-
-    if (!birthDate) {
-      toast.error(locale === 'en' ? 'Please enter your birth date' : 'Lütfen doğum tarihinizi girin');
-      return;
-    }
-
-    const birthDateObj = new Date(birthDate);
-    const today = new Date();
-    let age = today.getFullYear() - birthDateObj.getFullYear();
-    const monthDiff = today.getMonth() - birthDateObj.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateObj.getDate())) {
-      age--;
-    }
-
-    if (age < 18) {
-      toast.error(locale === 'en'
-        ? 'You must be at least 18 years old to register.'
-        : 'Kayıt olmak için 18 yaşından büyük olmalısınız.');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      toast.error(t('validation.passwordMatch'));
-      return;
-    }
-
-    if (password.length < 8) {
-      toast.error(locale === 'en' ? 'Password must be at least 8 characters' : 'Şifre en az 8 karakter olmalıdır');
-      return;
-    }
-
-    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
-      toast.error(locale === 'en'
-        ? 'Password must contain at least one uppercase, one lowercase, and one number'
-        : 'Şifre en az bir büyük harf, bir küçük harf ve bir rakam içermelidir');
-      return;
-    }
-
-    if (!agreeTerms) {
-      toast.error(locale === 'en' ? 'You must accept the terms of service' : 'Kullanım şartlarını kabul etmelisiniz');
-      return;
-    }
-
     const formattedPhone = phone ? '+90' + phone.replace(/\s/g, '') : undefined;
 
     setIsLoading(true);
