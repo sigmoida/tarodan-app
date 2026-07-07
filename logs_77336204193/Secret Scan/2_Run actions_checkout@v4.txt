@@ -1,0 +1,107 @@
+﻿2026-07-02T20:36:46.5361148Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-02T20:36:46.5370539Z ##[group]Run actions/checkout@v4
+2026-07-02T20:36:46.5371319Z with:
+2026-07-02T20:36:46.5371757Z   fetch-depth: 0
+2026-07-02T20:36:46.5372244Z   repository: sigmoida/tarodan-app
+2026-07-02T20:36:46.5376745Z   token: ***
+2026-07-02T20:36:46.5377201Z   ssh-strict: true
+2026-07-02T20:36:46.5377648Z   ssh-user: git
+2026-07-02T20:36:46.5378124Z   persist-credentials: true
+2026-07-02T20:36:46.5378613Z   clean: true
+2026-07-02T20:36:46.5379062Z   sparse-checkout-cone-mode: true
+2026-07-02T20:36:46.5379590Z   fetch-tags: false
+2026-07-02T20:36:46.5380033Z   show-progress: true
+2026-07-02T20:36:46.5380482Z   lfs: false
+2026-07-02T20:36:46.5380902Z   submodules: false
+2026-07-02T20:36:46.5381409Z   set-safe-directory: true
+2026-07-02T20:36:46.5382182Z ##[endgroup]
+2026-07-02T20:36:46.6424997Z Syncing repository: sigmoida/tarodan-app
+2026-07-02T20:36:46.6427898Z ##[group]Getting Git version info
+2026-07-02T20:36:46.6429115Z Working directory is '/home/runner/work/tarodan-app/tarodan-app'
+2026-07-02T20:36:46.6431410Z [command]/usr/bin/git version
+2026-07-02T20:36:46.6493594Z git version 2.54.0
+2026-07-02T20:36:46.6517437Z ##[endgroup]
+2026-07-02T20:36:46.6533999Z Temporarily overriding HOME='/home/runner/work/_temp/9bb261ac-9d5e-4151-8d05-3caad4efa314' before making global git config changes
+2026-07-02T20:36:46.6536735Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-02T20:36:46.6541602Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/tarodan-app/tarodan-app
+2026-07-02T20:36:46.6603752Z Deleting the contents of '/home/runner/work/tarodan-app/tarodan-app'
+2026-07-02T20:36:46.6608672Z ##[group]Initializing the repository
+2026-07-02T20:36:46.6615085Z [command]/usr/bin/git init /home/runner/work/tarodan-app/tarodan-app
+2026-07-02T20:36:46.6754360Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-07-02T20:36:46.6756487Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-07-02T20:36:46.6757604Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-07-02T20:36:46.6758404Z hint: call:
+2026-07-02T20:36:46.6758825Z hint:
+2026-07-02T20:36:46.6759486Z hint: 	git config --global init.defaultBranch <name>
+2026-07-02T20:36:46.6760580Z hint:
+2026-07-02T20:36:46.6761601Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-07-02T20:36:46.6763315Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-07-02T20:36:46.6764463Z hint:
+2026-07-02T20:36:46.6765501Z hint: 	git branch -m <name>
+2026-07-02T20:36:46.6766278Z hint:
+2026-07-02T20:36:46.6766978Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-07-02T20:36:46.6768652Z Initialized empty Git repository in /home/runner/work/tarodan-app/tarodan-app/.git/
+2026-07-02T20:36:46.6784232Z [command]/usr/bin/git remote add origin https://github.com/sigmoida/tarodan-app
+2026-07-02T20:36:46.6826048Z ##[endgroup]
+2026-07-02T20:36:46.6827294Z ##[group]Disabling automatic garbage collection
+2026-07-02T20:36:46.6830403Z [command]/usr/bin/git config --local gc.auto 0
+2026-07-02T20:36:46.6869371Z ##[endgroup]
+2026-07-02T20:36:46.6870666Z ##[group]Setting up auth
+2026-07-02T20:36:46.6877432Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-07-02T20:36:46.6916027Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-07-02T20:36:46.7341425Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-07-02T20:36:46.7371319Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-07-02T20:36:46.7606705Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-02T20:36:46.7689577Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-07-02T20:36:46.7920335Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-07-02T20:36:46.7959714Z ##[endgroup]
+2026-07-02T20:36:46.7960579Z ##[group]Fetching the repository
+2026-07-02T20:36:46.7971113Z [command]/usr/bin/git -c protocol.version=2 fetch --prune --no-recurse-submodules origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/*
+2026-07-02T20:36:50.9728494Z From https://github.com/sigmoida/tarodan-app
+2026-07-02T20:36:50.9731852Z  * [new branch]        chore/cherry-pick-uyelik-uretici-odeme-fixes -> origin/chore/cherry-pick-uyelik-uretici-odeme-fixes
+2026-07-02T20:36:50.9735391Z  * [new branch]        ci/cicd-architecture   -> origin/ci/cicd-architecture
+2026-07-02T20:36:50.9738735Z  * [new branch]        dependabot/github_actions/docker/build-push-action-7 -> origin/dependabot/github_actions/docker/build-push-action-7
+2026-07-02T20:36:50.9743652Z  * [new branch]        dependabot/github_actions/docker/login-action-4 -> origin/dependabot/github_actions/docker/login-action-4
+2026-07-02T20:36:50.9748788Z  * [new branch]        dependabot/github_actions/expo/expo-github-action-9 -> origin/dependabot/github_actions/expo/expo-github-action-9
+2026-07-02T20:36:50.9753326Z  * [new branch]        dependabot/github_actions/github/codeql-action-4 -> origin/dependabot/github_actions/github/codeql-action-4
+2026-07-02T20:36:50.9757976Z  * [new branch]        dependabot/github_actions/mobile-dev-inc/action-maestro-cloud-3 -> origin/dependabot/github_actions/mobile-dev-inc/action-maestro-cloud-3
+2026-07-02T20:36:50.9762183Z  * [new branch]        dependabot/npm_and_yarn/class-validator-0.15.1 -> origin/dependabot/npm_and_yarn/class-validator-0.15.1
+2026-07-02T20:36:50.9766672Z  * [new branch]        dependabot/npm_and_yarn/dev-dependencies-5d9294b38b -> origin/dependabot/npm_and_yarn/dev-dependencies-5d9294b38b
+2026-07-02T20:36:50.9771209Z  * [new branch]        dependabot/npm_and_yarn/nestjs/platform-express-11.1.24 -> origin/dependabot/npm_and_yarn/nestjs/platform-express-11.1.24
+2026-07-02T20:36:50.9775510Z  * [new branch]        dependabot/npm_and_yarn/next-16.2.7 -> origin/dependabot/npm_and_yarn/next-16.2.7
+2026-07-02T20:36:50.9778845Z  * [new branch]        dependabot/npm_and_yarn/prisma/client-7.8.0 -> origin/dependabot/npm_and_yarn/prisma/client-7.8.0
+2026-07-02T20:36:50.9782691Z  * [new branch]        dependabot/npm_and_yarn/radix-ui/react-dialog-1.1.16 -> origin/dependabot/npm_and_yarn/radix-ui/react-dialog-1.1.16
+2026-07-02T20:36:50.9788026Z  * [new branch]        dependabot/npm_and_yarn/react-native-async-storage/async-storage-3.1.1 -> origin/dependabot/npm_and_yarn/react-native-async-storage/async-storage-3.1.1
+2026-07-02T20:36:50.9792515Z  * [new branch]        dependabot/npm_and_yarn/recharts-3.8.1 -> origin/dependabot/npm_and_yarn/recharts-3.8.1
+2026-07-02T20:36:50.9796172Z  * [new branch]        dependabot/npm_and_yarn/reflect-metadata-0.2.2 -> origin/dependabot/npm_and_yarn/reflect-metadata-0.2.2
+2026-07-02T20:36:50.9799463Z  * [new branch]        dependabot/npm_and_yarn/zod-4.4.3 -> origin/dependabot/npm_and_yarn/zod-4.4.3
+2026-07-02T20:36:50.9801760Z  * [new branch]        development            -> origin/development
+2026-07-02T20:36:50.9803577Z  * [new branch]        feat/ai-moderation     -> origin/feat/ai-moderation
+2026-07-02T20:36:50.9806094Z  * [new branch]        feat/boost-trust-relevance -> origin/feat/boost-trust-relevance
+2026-07-02T20:36:50.9808595Z  * [new branch]        feat/mobile-web-parity -> origin/feat/mobile-web-parity
+2026-07-02T20:36:50.9812462Z  * [new branch]        feat/sms-telefon-dogrulama -> origin/feat/sms-telefon-dogrulama
+2026-07-02T20:36:50.9815986Z  * [new branch]        feat/uyelik-uretici-odeme-fixes -> origin/feat/uyelik-uretici-odeme-fixes
+2026-07-02T20:36:50.9819717Z  * [new branch]        feature/cron-jobs-bull-monitoring -> origin/feature/cron-jobs-bull-monitoring
+2026-07-02T20:36:50.9823247Z  * [new branch]        feature/paytr-recurring-saved-cards -> origin/feature/paytr-recurring-saved-cards
+2026-07-02T20:36:50.9827632Z  * [new branch]        main                   -> origin/main
+2026-07-02T20:36:50.9830632Z  * [new branch]        master                 -> origin/master
+2026-07-02T20:36:50.9835183Z  * [new branch]        payment-shipping-integration-incomplete -> origin/payment-shipping-integration-incomplete
+2026-07-02T20:36:50.9840250Z  * [new branch]        seo/google-verify-html -> origin/seo/google-verify-html
+2026-07-02T20:36:50.9843746Z  * [new branch]        seo/noindex-deploy     -> origin/seo/noindex-deploy
+2026-07-02T20:36:50.9847667Z  * [new branch]        test/senaryo-kapsami-2293 -> origin/test/senaryo-kapsami-2293
+2026-07-02T20:36:50.9853616Z [command]/usr/bin/git branch --list --remote origin/master
+2026-07-02T20:36:50.9863670Z   origin/master
+2026-07-02T20:36:50.9876685Z [command]/usr/bin/git rev-parse refs/remotes/origin/master
+2026-07-02T20:36:50.9902921Z 043a41c03dec8d5d6d770b398ffb52d360abfe7d
+2026-07-02T20:36:50.9910188Z ##[endgroup]
+2026-07-02T20:36:50.9913053Z ##[group]Determining the checkout info
+2026-07-02T20:36:50.9916587Z ##[endgroup]
+2026-07-02T20:36:50.9918625Z [command]/usr/bin/git sparse-checkout disable
+2026-07-02T20:36:50.9972819Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-07-02T20:36:51.0006829Z ##[group]Checking out the ref
+2026-07-02T20:36:51.0009740Z [command]/usr/bin/git checkout --progress --force -B master refs/remotes/origin/master
+2026-07-02T20:36:51.4446712Z Reset branch 'master'
+2026-07-02T20:36:51.4456828Z branch 'master' set up to track 'origin/master'.
+2026-07-02T20:36:51.4523368Z ##[endgroup]
+2026-07-02T20:36:51.4577575Z [command]/usr/bin/git log -1 --format=%H
+2026-07-02T20:36:51.4607558Z 043a41c03dec8d5d6d770b398ffb52d360abfe7d

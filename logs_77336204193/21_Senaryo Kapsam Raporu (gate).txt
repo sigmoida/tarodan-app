@@ -1,0 +1,309 @@
+﻿2026-07-02T20:36:45.3846351Z Current runner version: '2.335.1'
+2026-07-02T20:36:45.3883098Z ##[group]Runner Image Provisioner
+2026-07-02T20:36:45.3885027Z Hosted Compute Agent
+2026-07-02T20:36:45.3886014Z Version: 20260624.560
+2026-07-02T20:36:45.3887072Z Commit: 925d229a51159bc391ae97e54a2dd1fe20af789d
+2026-07-02T20:36:45.3888753Z Build Date: 2026-06-24T18:26:47Z
+2026-07-02T20:36:45.3889981Z Worker ID: {7a773dc4-0de1-4460-b83c-b0adb1a4a6cc}
+2026-07-02T20:36:45.3891439Z Azure Region: eastus
+2026-07-02T20:36:45.3892488Z ##[endgroup]
+2026-07-02T20:36:45.3894904Z ##[group]Operating System
+2026-07-02T20:36:45.3896170Z Ubuntu
+2026-07-02T20:36:45.3897063Z 24.04.4
+2026-07-02T20:36:45.3898431Z LTS
+2026-07-02T20:36:45.3899372Z ##[endgroup]
+2026-07-02T20:36:45.3900286Z ##[group]Runner Image
+2026-07-02T20:36:45.3902074Z Image: ubuntu-24.04
+2026-07-02T20:36:45.3903052Z Version: 20260628.225.1
+2026-07-02T20:36:45.3905391Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260628.225/images/ubuntu/Ubuntu2404-Readme.md
+2026-07-02T20:36:45.3908582Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260628.225
+2026-07-02T20:36:45.3910385Z ##[endgroup]
+2026-07-02T20:36:45.3915875Z ##[group]GITHUB_TOKEN Permissions
+2026-07-02T20:36:45.3919604Z Actions: write
+2026-07-02T20:36:45.3920747Z ArtifactMetadata: write
+2026-07-02T20:36:45.3921889Z Attestations: write
+2026-07-02T20:36:45.3922850Z Checks: write
+2026-07-02T20:36:45.3923894Z CodeQuality: write
+2026-07-02T20:36:45.3924881Z Contents: write
+2026-07-02T20:36:45.3925947Z CopilotRequests: write
+2026-07-02T20:36:45.3927345Z Deployments: write
+2026-07-02T20:36:45.3928506Z Discussions: write
+2026-07-02T20:36:45.3929511Z Issues: write
+2026-07-02T20:36:45.3930388Z Metadata: read
+2026-07-02T20:36:45.3931414Z Models: read
+2026-07-02T20:36:45.3932559Z Packages: write
+2026-07-02T20:36:45.3933637Z Pages: write
+2026-07-02T20:36:45.3934688Z PullRequests: write
+2026-07-02T20:36:45.3935705Z RepositoryProjects: write
+2026-07-02T20:36:45.3936755Z SecurityEvents: write
+2026-07-02T20:36:45.3938138Z Statuses: write
+2026-07-02T20:36:45.3939213Z VulnerabilityAlerts: read
+2026-07-02T20:36:45.3940471Z ##[endgroup]
+2026-07-02T20:36:45.3944098Z Secret source: Actions
+2026-07-02T20:36:45.3945938Z Prepare workflow directory
+2026-07-02T20:36:45.4441884Z Prepare all required actions
+2026-07-02T20:36:45.4499848Z Getting action download info
+2026-07-02T20:36:45.6461946Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+2026-07-02T20:36:45.7651574Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-07-02T20:36:46.0309783Z Complete job name: Senaryo Kapsam Raporu (gate)
+2026-07-02T20:36:46.1237953Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-02T20:36:46.1246726Z ##[group]Run actions/checkout@v4
+2026-07-02T20:36:46.1247970Z with:
+2026-07-02T20:36:46.1248443Z   repository: sigmoida/tarodan-app
+2026-07-02T20:36:46.1253105Z   token: ***
+2026-07-02T20:36:46.1253546Z   ssh-strict: true
+2026-07-02T20:36:46.1253981Z   ssh-user: git
+2026-07-02T20:36:46.1254425Z   persist-credentials: true
+2026-07-02T20:36:46.1254921Z   clean: true
+2026-07-02T20:36:46.1255369Z   sparse-checkout-cone-mode: true
+2026-07-02T20:36:46.1255885Z   fetch-depth: 1
+2026-07-02T20:36:46.1256318Z   fetch-tags: false
+2026-07-02T20:36:46.1256768Z   show-progress: true
+2026-07-02T20:36:46.1257458Z   lfs: false
+2026-07-02T20:36:46.1257940Z   submodules: false
+2026-07-02T20:36:46.1258400Z   set-safe-directory: true
+2026-07-02T20:36:46.1259165Z ##[endgroup]
+2026-07-02T20:36:46.2290162Z Syncing repository: sigmoida/tarodan-app
+2026-07-02T20:36:46.2291992Z ##[group]Getting Git version info
+2026-07-02T20:36:46.2292978Z Working directory is '/home/runner/work/tarodan-app/tarodan-app'
+2026-07-02T20:36:46.2295260Z [command]/usr/bin/git version
+2026-07-02T20:36:46.2395663Z git version 2.54.0
+2026-07-02T20:36:46.2420569Z ##[endgroup]
+2026-07-02T20:36:46.2438339Z Temporarily overriding HOME='/home/runner/work/_temp/fed46109-346d-4bb2-af54-022f451ce9f7' before making global git config changes
+2026-07-02T20:36:46.2440969Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-02T20:36:46.2444614Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/tarodan-app/tarodan-app
+2026-07-02T20:36:46.2502822Z Deleting the contents of '/home/runner/work/tarodan-app/tarodan-app'
+2026-07-02T20:36:46.2507650Z ##[group]Initializing the repository
+2026-07-02T20:36:46.2512962Z [command]/usr/bin/git init /home/runner/work/tarodan-app/tarodan-app
+2026-07-02T20:36:46.2647891Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-07-02T20:36:46.2649554Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-07-02T20:36:46.2651289Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-07-02T20:36:46.2652513Z hint: call:
+2026-07-02T20:36:46.2653135Z hint:
+2026-07-02T20:36:46.2653932Z hint: 	git config --global init.defaultBranch <name>
+2026-07-02T20:36:46.2654913Z hint:
+2026-07-02T20:36:46.2655851Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-07-02T20:36:46.2657656Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-07-02T20:36:46.2658896Z hint:
+2026-07-02T20:36:46.2659542Z hint: 	git branch -m <name>
+2026-07-02T20:36:46.2660318Z hint:
+2026-07-02T20:36:46.2661421Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-07-02T20:36:46.2663137Z Initialized empty Git repository in /home/runner/work/tarodan-app/tarodan-app/.git/
+2026-07-02T20:36:46.2669967Z [command]/usr/bin/git remote add origin https://github.com/sigmoida/tarodan-app
+2026-07-02T20:36:46.2731051Z ##[endgroup]
+2026-07-02T20:36:46.2732464Z ##[group]Disabling automatic garbage collection
+2026-07-02T20:36:46.2733542Z [command]/usr/bin/git config --local gc.auto 0
+2026-07-02T20:36:46.2763631Z ##[endgroup]
+2026-07-02T20:36:46.2764363Z ##[group]Setting up auth
+2026-07-02T20:36:46.2775324Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-07-02T20:36:46.2817589Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-07-02T20:36:46.3226746Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-07-02T20:36:46.3263003Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-07-02T20:36:46.3505476Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-02T20:36:46.3544293Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-07-02T20:36:46.3795169Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-07-02T20:36:46.3836370Z ##[endgroup]
+2026-07-02T20:36:46.3838547Z ##[group]Fetching the repository
+2026-07-02T20:36:46.3848698Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +043a41c03dec8d5d6d770b398ffb52d360abfe7d:refs/remotes/origin/master
+2026-07-02T20:36:50.5161673Z From https://github.com/sigmoida/tarodan-app
+2026-07-02T20:36:50.5163206Z  * [new ref]         043a41c03dec8d5d6d770b398ffb52d360abfe7d -> origin/master
+2026-07-02T20:36:50.5212472Z ##[endgroup]
+2026-07-02T20:36:50.5213660Z ##[group]Determining the checkout info
+2026-07-02T20:36:50.5214942Z ##[endgroup]
+2026-07-02T20:36:50.5225026Z [command]/usr/bin/git sparse-checkout disable
+2026-07-02T20:36:50.5284250Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-07-02T20:36:50.5322399Z ##[group]Checking out the ref
+2026-07-02T20:36:50.5328838Z [command]/usr/bin/git checkout --progress --force -B master refs/remotes/origin/master
+2026-07-02T20:36:50.9623711Z Reset branch 'master'
+2026-07-02T20:36:50.9629541Z branch 'master' set up to track 'origin/master'.
+2026-07-02T20:36:50.9695069Z ##[endgroup]
+2026-07-02T20:36:50.9747799Z [command]/usr/bin/git log -1 --format=%H
+2026-07-02T20:36:50.9783281Z 043a41c03dec8d5d6d770b398ffb52d360abfe7d
+2026-07-02T20:36:51.0079531Z Prepare all required actions
+2026-07-02T20:36:51.0080126Z Getting action download info
+2026-07-02T20:36:51.1030259Z Download action repository 'pnpm/action-setup@v4' (SHA:b906affcce14559ad1aafd4ab0e942779e9f58b1)
+2026-07-02T20:36:51.2941004Z Download action repository 'actions/setup-node@v4' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-07-02T20:36:51.4243284Z Download action repository 'actions/cache@v4' (SHA:0057852bfaa89a56745cba8c7296529d2fc39830)
+2026-07-02T20:36:51.5984670Z ##[group]Run ./.github/actions/setup-workspace
+2026-07-02T20:36:51.5985016Z with:
+2026-07-02T20:36:51.5985227Z   prisma: false
+2026-07-02T20:36:51.5985449Z   turbo-cache: false
+2026-07-02T20:36:51.5985669Z ##[endgroup]
+2026-07-02T20:36:51.6093314Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-02T20:36:51.6094891Z ##[group]Run pnpm/action-setup@v4
+2026-07-02T20:36:51.6095153Z with:
+2026-07-02T20:36:51.6095352Z   dest: ~/setup-pnpm
+2026-07-02T20:36:51.6095572Z   run_install: null
+2026-07-02T20:36:51.6095796Z   cache: false
+2026-07-02T20:36:51.6096054Z   cache_dependency_path: pnpm-lock.yaml
+2026-07-02T20:36:51.6096358Z   package_json_file: package.json
+2026-07-02T20:36:51.6096622Z   standalone: false
+2026-07-02T20:36:51.6096832Z ##[endgroup]
+2026-07-02T20:36:51.7598667Z ##[group]Running self-installer...
+2026-07-02T20:36:52.1678580Z (node:2300) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-07-02T20:36:52.1680291Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-02T20:36:52.3156833Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-07-02T20:36:52.6096445Z 
+2026-07-02T20:36:52.6096972Z dependencies:
+2026-07-02T20:36:52.6097638Z + pnpm 8.12.0
+2026-07-02T20:36:52.6097815Z 
+2026-07-02T20:36:52.6156939Z Packages: +1
+2026-07-02T20:36:52.6157568Z +
+2026-07-02T20:36:52.6628062Z Progress: resolved 1, reused 0, downloaded 1, added 1, done
+2026-07-02T20:36:52.6838128Z Done in 753ms
+2026-07-02T20:36:52.6984249Z ##[endgroup]
+2026-07-02T20:36:52.6984806Z Installation Completed!
+2026-07-02T20:36:52.7160692Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-02T20:36:52.7161994Z ##[group]Run actions/setup-node@v4
+2026-07-02T20:36:52.7162269Z with:
+2026-07-02T20:36:52.7162480Z   node-version-file: .nvmrc
+2026-07-02T20:36:52.7162722Z   cache: pnpm
+2026-07-02T20:36:52.7162941Z   always-auth: false
+2026-07-02T20:36:52.7163165Z   check-latest: false
+2026-07-02T20:36:52.7166592Z   token: ***
+2026-07-02T20:36:52.7166803Z env:
+2026-07-02T20:36:52.7167061Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-07-02T20:36:52.7167624Z ##[endgroup]
+2026-07-02T20:36:52.8524846Z Node version file is not JSON file
+2026-07-02T20:36:52.8527334Z Resolved .nvmrc as 20.19.5
+2026-07-02T20:36:52.8631622Z Attempting to download 20.19.5...
+2026-07-02T20:36:52.8738348Z (node:2313) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-02T20:36:52.8739314Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-02T20:36:53.2919555Z Acquiring 20.19.5 - x64 from https://github.com/actions/node-versions/releases/download/20.19.5-17451167955/node-20.19.5-linux-x64.tar.gz
+2026-07-02T20:36:53.7708689Z Extracting ...
+2026-07-02T20:36:53.7829936Z [command]/usr/bin/tar xz --strip 1 --warning=no-unknown-keyword --overwrite -C /home/runner/work/_temp/dccea945-33d9-4f26-bc11-88f0f28aef5e -f /home/runner/work/_temp/97c01271-6940-447c-8296-dac4ff500936
+2026-07-02T20:36:54.7744834Z Adding to the cache ...
+2026-07-02T20:36:56.5909112Z ##[group]Environment details
+2026-07-02T20:36:56.9359441Z node: v20.19.5
+2026-07-02T20:36:56.9360002Z npm: 10.8.2
+2026-07-02T20:36:56.9360296Z yarn: 1.22.22
+2026-07-02T20:36:56.9361016Z ##[endgroup]
+2026-07-02T20:36:56.9383951Z [command]/home/runner/setup-pnpm/node_modules/.bin/pnpm store path --silent
+2026-07-02T20:36:57.3118482Z /home/runner/setup-pnpm/node_modules/.bin/store/v3
+2026-07-02T20:36:57.3882846Z Cache hit for: node-cache-Linux-x64-pnpm-fc739e9ce3af9124622ee0916e2e85b4d90368bff66d576a6bd0c5dc52c3d59e
+2026-07-02T20:36:57.3984410Z (node:2313) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-07-02T20:36:58.4559115Z Received 205520896 of 386870584 (53.1%), 195.0 MBs/sec
+2026-07-02T20:36:59.0187786Z Received 386870584 of 386870584 (100.0%), 235.3 MBs/sec
+2026-07-02T20:36:59.0188649Z Cache Size: ~369 MB (386870584 B)
+2026-07-02T20:36:59.0252975Z [command]/usr/bin/tar -xf /home/runner/work/_temp/d5797cff-fa7d-417e-9c5b-5ad040052691/cache.tzst -P -C /home/runner/work/tarodan-app/tarodan-app --use-compress-program unzstd
+2026-07-02T20:37:04.7826742Z Cache restored successfully
+2026-07-02T20:37:04.8000508Z Cache restored from key: node-cache-Linux-x64-pnpm-fc739e9ce3af9124622ee0916e2e85b4d90368bff66d576a6bd0c5dc52c3d59e
+2026-07-02T20:37:04.8561475Z ##[group]Run pnpm install --frozen-lockfile
+2026-07-02T20:37:04.8562124Z [36;1mpnpm install --frozen-lockfile[0m
+2026-07-02T20:37:04.9150023Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-07-02T20:37:04.9150668Z env:
+2026-07-02T20:37:04.9151133Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-07-02T20:37:04.9151691Z ##[endgroup]
+2026-07-02T20:37:05.4034652Z Scope: all 12 workspace projects
+2026-07-02T20:37:05.5538758Z Lockfile is up to date, resolution step is skipped
+2026-07-02T20:37:06.1018517Z Packages: +2807
+2026-07-02T20:37:06.1019680Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-07-02T20:37:06.1091492Z Progress: resolved 0, reused 1, downloaded 0, added 0
+2026-07-02T20:37:07.1110352Z Progress: resolved 0, reused 811, downloaded 0, added 0
+2026-07-02T20:37:08.1113301Z Progress: resolved 0, reused 2248, downloaded 0, added 118
+2026-07-02T20:37:09.1115498Z Progress: resolved 0, reused 2248, downloaded 0, added 561
+2026-07-02T20:37:10.1116586Z Progress: resolved 0, reused 2248, downloaded 0, added 1882
+2026-07-02T20:37:11.1114558Z Progress: resolved 0, reused 2248, downloaded 0, added 2740
+2026-07-02T20:37:11.4672601Z Progress: resolved 0, reused 2248, downloaded 0, added 2807, done
+2026-07-02T20:37:12.0071665Z 
+2026-07-02T20:37:12.2705630Z . postinstall$ echo Skipping husky
+2026-07-02T20:37:12.2804905Z . postinstall: Skipping husky
+2026-07-02T20:37:12.2832904Z . postinstall: Done
+2026-07-02T20:37:12.2915656Z Done in 7.3s
+2026-07-02T20:37:12.3544567Z ##[group]Run if [ -f Tarodan-Test-Konsolu.html ]; then
+2026-07-02T20:37:12.3545032Z [36;1mif [ -f Tarodan-Test-Konsolu.html ]; then[0m
+2026-07-02T20:37:12.3545404Z [36;1m  node scripts/extract-scenarios.mjs[0m
+2026-07-02T20:37:12.3545824Z [36;1m  git diff --exit-code apps/api/test/scenarios/manifest.json \[0m
+2026-07-02T20:37:12.3546704Z [36;1m    || echo '::warning::manifest.json node ile yeniden üretilince farklı (kozmetik) — committed manifest kullanılıyor.'[0m
+2026-07-02T20:37:12.3547675Z [36;1melse[0m
+2026-07-02T20:37:12.3548088Z [36;1m  echo 'Tarodan-Test-Konsolu.html yok — manifest senkron kontrolü atlandı.'[0m
+2026-07-02T20:37:12.3548520Z [36;1mfi[0m
+2026-07-02T20:37:12.3582903Z shell: /usr/bin/bash -e {0}
+2026-07-02T20:37:12.3583176Z env:
+2026-07-02T20:37:12.3583446Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-07-02T20:37:12.3583783Z ##[endgroup]
+2026-07-02T20:37:12.4431931Z [extract-scenarios] manifest.json: 2293 senaryo, 33 gap
+2026-07-02T20:37:12.4436661Z [extract-scenarios] docs/TEST-KNOWN-GAPS.md yazıldı
+2026-07-02T20:37:12.4640780Z diff --git a/apps/api/test/scenarios/manifest.json b/apps/api/test/scenarios/manifest.json
+2026-07-02T20:37:12.4641762Z index 9b8881b..e37c2a1 100644
+2026-07-02T20:37:12.4642366Z --- a/apps/api/test/scenarios/manifest.json
+2026-07-02T20:37:12.4642933Z +++ b/apps/api/test/scenarios/manifest.json
+2026-07-02T20:37:12.4643258Z @@ -18488,7 +18488,7 @@
+2026-07-02T20:37:12.4644375Z        "title": "Bölge eşleşme önceliği: regionCode tam eşleşme default'a tercih edilir",
+2026-07-02T20:37:12.4645211Z        "tur": "Sınır değer",
+2026-07-02T20:37:12.4645653Z        "pri": "P1",
+2026-07-02T20:37:12.4646810Z -      "steps": "1. GET /api/tax/calculate?countryCode=TR®ionCode=34&subtotal=1000 çağır.",
+2026-07-02T20:37:12.4648501Z +      "steps": "1. GET /api/tax/calculate?countryCode=TR&regionCode=34&subtotal=1000 çağır.",
+2026-07-02T20:37:12.4649625Z        "exp": "HTTP 200; rate=18 (TR/34 bölgesi), taxAmount=180. — tax.service.ts:44-50 (tam eşleşme önce).",
+2026-07-02T20:37:12.4650327Z        "gap": false,
+2026-07-02T20:37:12.4650584Z        "gapRefs": []
+2026-07-02T20:37:12.4670458Z @@ -18501,7 +18501,7 @@
+2026-07-02T20:37:12.4671429Z        "title": "Bilinmeyen regionCode → aynı ülkenin genel bölgesine düşer",
+2026-07-02T20:37:12.4672107Z        "tur": "Sınır değer",
+2026-07-02T20:37:12.4672396Z        "pri": "P1",
+2026-07-02T20:37:12.4673077Z -      "steps": "1. GET /api/tax/calculate?countryCode=TR®ionCode=99&subtotal=1000 çağır.",
+2026-07-02T20:37:12.4674050Z +      "steps": "1. GET /api/tax/calculate?countryCode=TR&regionCode=99&subtotal=1000 çağır.",
+2026-07-02T20:37:12.4674931Z        "exp": "HTTP 200; rate=20 (TR genel bölgeye fallback). — tax.service.ts:51-55.",
+2026-07-02T20:37:12.4675473Z        "gap": false,
+2026-07-02T20:37:12.4675761Z        "gapRefs": []
+2026-07-02T20:37:12.4697476Z ##[warning]manifest.json node ile yeniden üretilince farklı (kozmetik) — committed manifest kullanılıyor.
+2026-07-02T20:37:12.4741751Z ##[group]Run node scripts/scenario-coverage.mjs || echo '::warning::kapsam raporu üretilemedi'
+2026-07-02T20:37:12.4742450Z [36;1mnode scripts/scenario-coverage.mjs || echo '::warning::kapsam raporu üretilemedi'[0m
+2026-07-02T20:37:12.4775731Z shell: /usr/bin/bash -e {0}
+2026-07-02T20:37:12.4776016Z env:
+2026-07-02T20:37:12.4776279Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-07-02T20:37:12.4776603Z ##[endgroup]
+2026-07-02T20:37:12.6310398Z [scenario-coverage] docs/SCENARIO-COVERAGE.md yazıldı — %90 (2045/2260), 0 eksik.
+2026-07-02T20:37:12.6404696Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-02T20:37:12.6406002Z ##[group]Run actions/upload-artifact@v4
+2026-07-02T20:37:12.6406288Z with:
+2026-07-02T20:37:12.6406492Z   name: scenario-coverage
+2026-07-02T20:37:12.6406746Z   path: docs/SCENARIO-COVERAGE.md
+2026-07-02T20:37:12.6407017Z   retention-days: 14
+2026-07-02T20:37:12.6407600Z   if-no-files-found: warn
+2026-07-02T20:37:12.6407855Z   compression-level: 6
+2026-07-02T20:37:12.6408105Z   overwrite: false
+2026-07-02T20:37:12.6408543Z   include-hidden-files: false
+2026-07-02T20:37:12.6408786Z env:
+2026-07-02T20:37:12.6409039Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-07-02T20:37:12.6409370Z ##[endgroup]
+2026-07-02T20:37:12.8035363Z (node:2409) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-02T20:37:12.8036883Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-02T20:37:12.8128640Z With the provided path, there will be 1 file uploaded
+2026-07-02T20:37:12.8130694Z Artifact name is valid!
+2026-07-02T20:37:12.8131435Z Root directory input is valid!
+2026-07-02T20:37:12.9673158Z Beginning upload of artifact content to blob storage
+2026-07-02T20:37:12.9862840Z (node:2409) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-07-02T20:37:13.0099151Z Uploaded bytes 2111
+2026-07-02T20:37:13.0242852Z Finished uploading artifact content to blob storage!
+2026-07-02T20:37:13.0244233Z SHA256 digest of uploaded artifact zip is b34a0dd4eb2237f56668a092b174e0aa647b4e680975edc7c534a8baf31d6ee9
+2026-07-02T20:37:13.0246345Z Finalizing artifact upload
+2026-07-02T20:37:13.1826082Z Artifact scenario-coverage.zip successfully finalized. Artifact ID 8050979995
+2026-07-02T20:37:13.1827589Z Artifact scenario-coverage has been successfully uploaded! Final size is 2111 bytes. Artifact ID is 8050979995
+2026-07-02T20:37:13.1833162Z Artifact download URL: https://github.com/sigmoida/tarodan-app/actions/runs/28619952180/artifacts/8050979995
+2026-07-02T20:37:13.1996849Z Post job cleanup.
+2026-07-02T20:37:13.2042083Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-02T20:37:13.2043494Z Post job cleanup.
+2026-07-02T20:37:13.3255697Z (node:2421) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-02T20:37:13.3256805Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-02T20:37:13.3260043Z Cache hit occurred on the primary key node-cache-Linux-x64-pnpm-fc739e9ce3af9124622ee0916e2e85b4d90368bff66d576a6bd0c5dc52c3d59e, not saving cache.
+2026-07-02T20:37:13.3353875Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-02T20:37:13.3355113Z Post job cleanup.
+2026-07-02T20:37:13.4812477Z Pruning is unnecessary.
+2026-07-02T20:37:13.5015216Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-02T20:37:13.5016502Z Post job cleanup.
+2026-07-02T20:37:13.5917404Z [command]/usr/bin/git version
+2026-07-02T20:37:13.5960010Z git version 2.54.0
+2026-07-02T20:37:13.6001653Z Temporarily overriding HOME='/home/runner/work/_temp/563bff07-434c-4016-b930-c2b52204ca51' before making global git config changes
+2026-07-02T20:37:13.6003199Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-02T20:37:13.6007738Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/tarodan-app/tarodan-app
+2026-07-02T20:37:13.6048504Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-07-02T20:37:13.6085696Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-07-02T20:37:13.6351710Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-07-02T20:37:13.6380358Z http.https://github.com/.extraheader
+2026-07-02T20:37:13.6408332Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-07-02T20:37:13.6432149Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-07-02T20:37:13.6693636Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-02T20:37:13.6739065Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-07-02T20:37:13.7136080Z Cleaning up orphan processes
+2026-07-02T20:37:13.7435395Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4, actions/upload-artifact@v4, pnpm/action-setup@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

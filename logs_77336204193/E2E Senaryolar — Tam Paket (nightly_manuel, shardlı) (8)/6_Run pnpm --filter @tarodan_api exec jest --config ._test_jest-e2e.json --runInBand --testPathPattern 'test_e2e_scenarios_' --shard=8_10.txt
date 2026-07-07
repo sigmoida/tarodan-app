@@ -1,0 +1,427 @@
+﻿2026-07-02T20:41:00.3652853Z ##[group]Run pnpm --filter @tarodan/api exec jest --config ./test/jest-e2e.json --runInBand --testPathPattern 'test/e2e/scenarios/' --shard=8/10
+2026-07-02T20:41:00.3654528Z [36;1mpnpm --filter @tarodan/api exec jest --config ./test/jest-e2e.json --runInBand --testPathPattern 'test/e2e/scenarios/' --shard=8/10[0m
+2026-07-02T20:41:00.3704594Z shell: /usr/bin/bash -e {0}
+2026-07-02T20:41:00.3704991Z env:
+2026-07-02T20:41:00.3705341Z   MAILHOG_URL: http://localhost:8025
+2026-07-02T20:41:00.3705868Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-07-02T20:41:00.3706356Z ##[endgroup]
+2026-07-02T20:41:01.4686246Z ts-jest[config] (WARN) 
+2026-07-02T20:41:01.4688579Z     The "ts-jest" config option "isolatedModules" is deprecated and will be removed in v30.0.0. Please use "isolatedModules: true" in /home/runner/work/tarodan-app/tarodan-app/apps/api/tsconfig.json instead, see https://www.typescriptlang.org/tsconfig/#isolatedModules
+2026-07-02T20:41:01.4690266Z   
+2026-07-02T20:41:01.5443957Z   console.log
+2026-07-02T20:41:01.5445322Z     ◇ injected env (41) from .env.test // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+2026-07-02T20:41:01.5445696Z 
+2026-07-02T20:41:01.5445888Z       at _log (node_modules/dotenv/lib/main.js:131:11)
+2026-07-02T20:41:01.5446111Z 
+2026-07-02T20:41:09.8069651Z   console.log
+2026-07-02T20:41:09.8129736Z     prisma:info Starting a postgresql pool with 5 connections.
+2026-07-02T20:41:09.8188621Z 
+2026-07-02T20:41:09.8219581Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:41:09.8248732Z 
+2026-07-02T20:41:51.4533989Z FAIL test/e2e/scenarios/20-mod.e2e-spec.ts (50.016 s)
+2026-07-02T20:41:51.4536228Z   20 — Moderasyon, Destek & Şikayet (MOD)
+2026-07-02T20:41:51.4536790Z     Misafir iletişim formu
+2026-07-02T20:41:51.4537822Z       ✓ MOD-001 [P0] Misafir geçerli iletişim formu gönderir (572 ms)
+2026-07-02T20:41:51.4541472Z       ✓ MOD-002 [P0] Misafir formu zorunlu alan eksik (mesaj boş) (459 ms)
+2026-07-02T20:41:51.4542299Z       ✓ MOD-003 [P1] Misafir formu geçersiz e-posta (526 ms)
+2026-07-02T20:41:51.4543254Z       ✓ MOD-004 [P1] Misafir formu sınır değerleri (isim/mesaj uzunluğu) (415 ms)
+2026-07-02T20:41:51.4544173Z       ✓ MOD-005 [P0] Misafir formu IP başına saatte 5 istek limiti (447 ms)
+2026-07-02T20:41:51.4544937Z       ✓ MOD-006 [P2] Admin misafir iletişim gönderimlerini listeler (422 ms)
+2026-07-02T20:41:51.4545611Z     Destek talebi oluşturma
+2026-07-02T20:41:51.4546272Z       ✓ MOD-010 [P0] Üye geçerli destek talebi oluşturur (406 ms)
+2026-07-02T20:41:51.4547095Z       ✓ MOD-011 [P0] Girişsiz ticket oluşturma reddedilir (415 ms)
+2026-07-02T20:41:51.4548050Z       ✓ MOD-012 [P1] Ticket DTO doğrulama (subject/message/category sınırları) (456 ms)
+2026-07-02T20:41:51.4549679Z       ✓ MOD-013 [P2] Ticket geçersiz orderId/tradeId UUID formatı (390 ms)
+2026-07-02T20:41:51.4550819Z       ✓ MOD-014 [P2] Ticket öncelik (priority) belirtilerek oluşturma (395 ms)
+2026-07-02T20:41:51.4551692Z     Destek talebi görüntüleme
+2026-07-02T20:41:51.4552559Z       ✓ MOD-020 [P0] Sahip kendi talebini görüntüler (415 ms)
+2026-07-02T20:41:51.4553627Z       ✓ MOD-021 [P0] Yabancı kullanıcı başkasının talebini göremez (409 ms)
+2026-07-02T20:41:51.4554659Z       ✓ MOD-022 [P1] Var olmayan ticket id (geçersiz UUID) (391 ms)
+2026-07-02T20:41:51.4555539Z       ✓ MOD-023 [P1] Girişsiz ticket detay (376 ms)
+2026-07-02T20:41:51.4556411Z       ✓ MOD-024 [P1] Admin internal mesajları görür (421 ms)
+2026-07-02T20:41:51.4557101Z     Talebe mesaj ekleme
+2026-07-02T20:41:51.4557941Z       ✓ MOD-030 [P0] Sahip kendi talebine yanıt ekler (in_progress) (434 ms)
+2026-07-02T20:41:51.4559207Z       ✓ MOD-031 [P0] Yabancı kullanıcı talebe mesaj ekleyemez (414 ms)
+2026-07-02T20:41:51.4560162Z       ✓ MOD-032 [P1] Boş mesaj içeriği reddedilir (416 ms)
+2026-07-02T20:41:51.4561134Z       ✓ MOD-033 [P1] Admin yanıtı durumu waiting_customer yapar (423 ms)
+2026-07-02T20:41:51.4562171Z       ✓ MOD-034 [P1] Admin internal not ekler (isInternal=true) (438 ms)
+2026-07-02T20:41:51.4563847Z       ✓ MOD-035 [P0] Kapatılmış (closed) talebe mesaj eklenemez (676 ms)
+2026-07-02T20:41:51.4565024Z       ✓ MOD-036 [P2] Resolved talepte mesaj ekleyince durum değişmez (433 ms)
+2026-07-02T20:41:51.4565876Z     Admin talep yönetimi
+2026-07-02T20:41:51.4566701Z       ✓ MOD-040 [P0] Admin tüm talepleri listeler + filtreler (469 ms)
+2026-07-02T20:41:51.4567737Z       ✓ MOD-041 [P0] Normal kullanıcı admin liste ucuna erişemez (431 ms)
+2026-07-02T20:41:51.4568981Z       ✓ MOD-042 [P0] Admin ticket durumunu günceller + not ekler (442 ms)
+2026-07-02T20:41:51.4569954Z       ✓ MOD-043 [P1] Geçersiz durum değeri reddedilir (405 ms)
+2026-07-02T20:41:51.4570839Z       ✓ MOD-044 [P1] Admin ticket atar (assign) (411 ms)
+2026-07-02T20:41:51.4571877Z       ✓ MOD-045 [P0] Moderator atama/öncelik/istatistik uçlarına erişemez (436 ms)
+2026-07-02T20:41:51.4572899Z       ✓ MOD-046 [P2] Admin öncelik günceller (415 ms)
+2026-07-02T20:41:51.4573821Z       ✓ MOD-047 [P2] Admin istatistik (stats) görüntüler (433 ms)
+2026-07-02T20:41:51.4575026Z       ✓ MOD-048 [P1] Normal kullanıcı stats göremez (388 ms)
+2026-07-02T20:41:51.4575598Z     Kullanıcı şikayetleri
+2026-07-02T20:41:51.4576165Z       ✓ MOD-060 [P0] Üye bir ürünü şikayet eder (424 ms)
+2026-07-02T20:41:51.4576906Z       ✓ MOD-061 [P0] Üye başka bir kullanıcıyı şikayet eder (395 ms)
+2026-07-02T20:41:51.4577635Z       ✓ MOD-062 [P0] Girişsiz şikayet reddedilir (374 ms)
+2026-07-02T20:41:51.4578525Z       ✓ MOD-063 [P1] Geçersiz şikayet tipi / gerekçe (413 ms)
+2026-07-02T20:41:51.4579199Z       ✓ MOD-064 [P1] targetId UUID değil (388 ms)
+2026-07-02T20:41:51.4579868Z       ✓ MOD-065 [P1] Var olmayan hedef şikayeti (386 ms)
+2026-07-02T20:41:51.4580643Z       ✓ MOD-066 [P2] Açıklama sınır değerleri (10-1000) (436 ms)
+2026-07-02T20:41:51.4581376Z       ✓ MOD-067 [P2] Mesaj ve koleksiyon şikayeti (429 ms)
+2026-07-02T20:41:51.4582154Z       ✓ MOD-068 [P1] Kullanıcı kendi şikayetlerini listeler (448 ms)
+2026-07-02T20:41:51.4582830Z     Şikayet tekrarı ve admin yönetimi
+2026-07-02T20:41:51.4583712Z       ✓ MOD-070 [P0] Aynı kullanıcı aynı hedefe ikinci PENDING şikayet açamaz (420 ms)
+2026-07-02T20:41:51.4584735Z       ✓ MOD-071 [P1] Farklı kullanıcılar aynı hedefi şikayet edebilir (423 ms)
+2026-07-02T20:41:51.4585659Z       ✓ MOD-072 [P2] Çözümlenen şikayetten sonra tekrar açılabilir (425 ms)
+2026-07-02T20:41:51.4586593Z       ✓ MOD-073 [P0] Admin tüm şikayetleri listeler + filtreler (415 ms)
+2026-07-02T20:41:51.4587533Z       ✓ MOD-074 [P0] Normal kullanıcı admin şikayet listesine erişemez (384 ms)
+2026-07-02T20:41:51.4589007Z       ✓ MOD-075 [P0] Admin şikayet durumunu günceller (resolved → resolvedAt/resolvedBy) (426 ms)
+2026-07-02T20:41:51.4590137Z       ✓ MOD-076 [P2] Şikayet under_review'e alınca resolvedAt null kalır (549 ms)
+2026-07-02T20:41:51.4591130Z       ✓ MOD-077 [P2] Şikayet hedefi silinmişse detayda deleted işareti (476 ms)
+2026-07-02T20:41:51.4591969Z       ✓ MOD-078 [P2] Admin şikayet istatistiği (424 ms)
+2026-07-02T20:41:51.4592534Z     Mesaj içerik filtresi
+2026-07-02T20:41:51.4593267Z       ✓ MOD-090 [P0] Telefon numarası içeren mesaj onaya düşer (466 ms)
+2026-07-02T20:41:51.4594232Z       ✓ MOD-091 [P1] E-posta / WhatsApp / Instagram içeren mesaj yakalanır (476 ms)
+2026-07-02T20:41:51.4595157Z       ✓ MOD-092 [P1] Yazıyla/boşluklu gizli numara yakalanır (454 ms)
+2026-07-02T20:41:51.4596096Z       ✓ MOD-093 [P0] Türkçe küfür içeren mesaj onaya düşer (deterministik) (437 ms)
+2026-07-02T20:41:51.4597072Z       ✓ MOD-094 [P1] Tam-kelime kısa küfür kalıbı yanlış pozitif vermez (534 ms)
+2026-07-02T20:41:51.4597918Z       ✓ MOD-095 [P0] Temiz mesaj doğrudan gönderilir (447 ms)
+2026-07-02T20:41:51.4599123Z       ✓ MOD-096 [P1] AI servisi kapalı/erişilemez → regex sonucu kullanılır (fail-open) (449 ms)
+2026-07-02T20:41:51.4599961Z     Admin mesaj moderasyon kuyruğu
+2026-07-02T20:41:51.4600676Z       ✓ MOD-110 [P0] Admin bekleyen mesaj kuyruğunu listeler (431 ms)
+2026-07-02T20:41:51.4601466Z       ✓ MOD-111 [P0] Admin bekleyen mesajı onaylar (449 ms)
+2026-07-02T20:41:51.4602648Z       ✓ MOD-112 [P1] Admin bekleyen mesajı reddeder (437 ms)
+2026-07-02T20:41:51.4621257Z       ✓ MOD-113 [P0] Zaten moderasyonu yapılmış mesajı tekrar moderate etme (447 ms)
+2026-07-02T20:41:51.4622520Z       ✓ MOD-114 [P0] Normal kullanıcı moderasyon kuyruğuna erişemez (422 ms)
+2026-07-02T20:41:51.4623675Z       ✓ MOD-115 [P1] Moderator içerik filtre listesine/testine erişemez (sadece admin+) (428 ms)
+2026-07-02T20:41:51.4624759Z       ✓ MOD-116 [P2] Filtre kalıbı testi (geçersiz regex kırılmaz) (399 ms)
+2026-07-02T20:41:51.4625464Z     Admin ürün moderasyonu
+2026-07-02T20:41:51.4626068Z       ✓ MOD-130 [P0] Admin bekleyen ilanı onaylar (418 ms)
+2026-07-02T20:41:51.4626852Z       ✓ MOD-131 [P1] Moderator ilan onaylar (rol kapsamı) (447 ms)
+2026-07-02T20:41:51.4627634Z       ✓ MOD-132 [P0] Normal kullanıcı ilan onaylayamaz (418 ms)
+2026-07-02T20:41:51.4628644Z       ✓ MOD-133 [P1] Pending olmayan ilan onaylanamaz (547 ms)
+2026-07-02T20:41:51.4629440Z       ✓ MOD-134 [P0] Admin ilanı gerekçeyle reddeder (405 ms)
+2026-07-02T20:41:51.4630502Z       ✓ MOD-135 [P1] Red gerekçesi (reason) zorunlu (462 ms)
+2026-07-02T20:41:51.4631217Z       ✓ MOD-136 [P1] Bulk onay (gövde `ids` alanı) (560 ms)
+2026-07-02T20:41:51.4631671Z       ✓ MOD-137 [P0] Bulk işlem yetkisiz kullanıcı (380 ms)
+2026-07-02T20:41:51.4632229Z       ✓ MOD-138 [P2] Birleşik moderasyon eylemi (message reject ile içerik gizleme) (437 ms)
+2026-07-02T20:41:51.4632746Z     AI moderasyonu (fail-open davranışı)
+2026-07-02T20:41:51.4633255Z       ✓ MOD-150 [P0] AI kapalıyken görsel yükleme bloklanmaz (fail-open) (395 ms)
+2026-07-02T20:41:51.4633955Z       ✓ MOD-154 [P1] AI kapalıyken ilan başlığı küfür kontrolü çalışmaz (bilinen davranış) (483 ms)
+2026-07-02T20:41:51.4634614Z       ✓ MOD-156 [P1] Admin AI Denetim kuyruğu + günlük + config okuma (405 ms)
+2026-07-02T20:41:51.4635159Z       ✕ MOD-157 [P1] AI eşik AYARLAMA ek izin (`ai_moderation`) ister (399 ms)
+2026-07-02T20:41:51.4636413Z       ○ skipped MOD-151 [P0] AI açıkken NSFW görsel bloklanır (decision=flag) — SKIP(NSFW görsel bloklama (decision=flag) AI_MODERATION_ENABLED=true + gerçek AI servisi ister; .env.test’te AI kapalı → assertImageClean no-op, blok üretilemez)
+2026-07-02T20:41:51.4638124Z       ○ skipped MOD-152 [P1] AI açıkken temiz görsel pass + event loglanır — SKIP(AI-açık temiz görsel pass + event loglama AI servisini gerektirir; test ortamında AI kapalı → decision=pass event üretilemez)
+2026-07-02T20:41:51.4640113Z       ○ skipped MOD-153 [P0] İlan başlığında küfür → oluşturma bloklanır — SKIP(İlan başlığında küfür bloklama assertTextClean → AI_MODERATION_ENABLED gerektirir (kapalıyken no-op); MOD-154 bu kapalı-davranışı doğrular)
+2026-07-02T20:41:51.4641652Z       ○ skipped MOD-155 [P1] Profil adı/bio küfür kontrolü — SKIP(Profil bio/ad küfür bloklama assertTextClean → AI kapalıyken no-op (user.service.ts:292/299 enabled guard); AI servisi olmadan blok üretilemez)
+2026-07-02T20:41:51.4643280Z       ○ skipped MOD-158 [P2] AI servis timeout görsel yüklemeyi bloklamaz — SKIP(AI servis timeout’unun yüklemeyi bloklamadığı (fail-open) senaryosu AI_MODERATION_ENABLED=true + yanıt vermeyen AI servisi gerektirir; test ortamında AI kapalı)
+2026-07-02T20:41:51.4645048Z       ○ skipped MOD-194 [P2] moderation_event yazma hatası isteği bozmaz — SKIP(moderation_event yazma hatasının isteği bozmadığı senaryosu; AI kapalıyken event zaten yazılmaz + yazma hatası API’den enjekte edilemez (fault injection yok))
+2026-07-02T20:41:51.4646002Z     Rol matrisi, güvenlik, eşzamanlılık
+2026-07-02T20:41:51.4646444Z       ✓ MOD-170 [P0] Destek/şikayet/moderasyon rol matrisi (553 ms)
+2026-07-02T20:41:51.4646958Z       ✓ MOD-171 [P2] Banlı kullanıcı şikayet/ticket açabilir mi (409 ms)
+2026-07-02T20:41:51.4647464Z       ✓ MOD-180 [P1] Aynı şikayetin eşzamanlı iki gönderimi (412 ms)
+2026-07-02T20:41:51.4647989Z       ✓ MOD-181 [P1] Aynı bekleyen mesajın eşzamanlı approve+reject (435 ms)
+2026-07-02T20:41:51.4649181Z       ✓ MOD-182 [P2] Ticket durumu resolved idempotency (resolvedAt korunur) (419 ms)
+2026-07-02T20:41:51.4649970Z       ✓ MOD-183 [P2] Eşzamanlı ürün onay+red yarışı (434 ms)
+2026-07-02T20:41:51.4650536Z       ✓ MOD-190 [P0] IDOR: başkasının ticket id'siyle mesaj/detay denemesi (447 ms)
+2026-07-02T20:41:51.4651149Z       ✓ MOD-191 [P0] Misafir iletişim formu spam flood (rate limit + boyut) (425 ms)
+2026-07-02T20:41:51.4651698Z       ✓ MOD-192 [P1] XSS/HTML enjeksiyonu ticket içeriğinde (419 ms)
+2026-07-02T20:41:51.4652356Z       ✓ MOD-193 [P1] Filtre kaçırma: birleşik kalıplar (454 ms)
+2026-07-02T20:41:51.4652862Z       ✓ MOD-200 [P2] Sistem mesajları Türkçe (TR) doğrulanır (449 ms)
+2026-07-02T20:41:51.4653217Z     Web/Mobile parite
+2026-07-02T20:41:51.4653651Z       ✓ MOD-201 [P1] Web/Mobile destek talebi oluşturma paritesi (421 ms)
+2026-07-02T20:41:51.4654191Z       ✓ MOD-202 [P2] Web/Mobile ticket detay + yanıt paritesi (453 ms)
+2026-07-02T20:41:51.4654726Z       ✓ MOD-203 [P2] Misafir iletişim formu web (contact) paritesi (397 ms)
+2026-07-02T20:41:51.4655001Z 
+2026-07-02T20:41:51.4655609Z   ● 20 — Moderasyon, Destek & Şikayet (MOD) › AI moderasyonu (fail-open davranışı) › MOD-157 [P1] AI eşik AYARLAMA ek izin (`ai_moderation`) ister
+2026-07-02T20:41:51.4656299Z 
+2026-07-02T20:41:51.4656467Z     expected 403 "Forbidden", got 400 "Bad Request"
+2026-07-02T20:41:51.4656682Z 
+2026-07-02T20:41:51.4656979Z     [0m [90m 1620 |[39m         [33m.[39m[36mset[39m(authHeader(moderator))
+2026-07-02T20:41:51.4657561Z      [90m 1621 |[39m         [33m.[39msend({ nsfwThreshold[33m:[39m [35m0.7[39m })
+2026-07-02T20:41:51.4658171Z     [31m[1m>[22m[39m[90m 1622 |[39m         [33m.[39mexpect([35m403[39m)[33m;[39m
+2026-07-02T20:41:51.4658892Z      [90m      |[39m          [31m[1m^[22m[39m
+2026-07-02T20:41:51.4659359Z      [90m 1623 |[39m       [90m// super_admin (matris bypass) → 200/201.[39m
+2026-07-02T20:41:51.4659929Z      [90m 1624 |[39m       [36mconst[39m ok [33m=[39m [36mawait[39m request(server())
+2026-07-02T20:41:51.4660533Z      [90m 1625 |[39m         [33m.[39mpost([32m'/api/admin/moderation/ai-config'[39m)[0m
+2026-07-02T20:41:51.4660855Z 
+2026-07-02T20:41:51.4661119Z       at Object.<anonymous> (test/e2e/scenarios/20-mod.e2e-spec.ts:1622:10)
+2026-07-02T20:41:51.4661505Z       ----
+2026-07-02T20:41:51.4661864Z       at Test._assertStatus (../../node_modules/supertest/lib/test.js:309:14)
+2026-07-02T20:41:51.4662309Z       at ../../node_modules/supertest/lib/test.js:365:13
+2026-07-02T20:41:51.4662762Z       at Test._assertFunction (../../node_modules/supertest/lib/test.js:342:13)
+2026-07-02T20:41:51.4663247Z       at Test.assert (../../node_modules/supertest/lib/test.js:195:23)
+2026-07-02T20:41:51.4663694Z       at localAssert (../../node_modules/supertest/lib/test.js:138:14)
+2026-07-02T20:41:51.4664161Z       at Server.<anonymous> (../../node_modules/supertest/lib/test.js:152:11)
+2026-07-02T20:41:51.4664431Z 
+2026-07-02T20:41:51.4664550Z   console.log
+2026-07-02T20:41:51.4665097Z     ◇ injected env (41) from .env.test // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+2026-07-02T20:41:51.4665434Z 
+2026-07-02T20:41:51.4665608Z       at _log (node_modules/dotenv/lib/main.js:131:11)
+2026-07-02T20:41:51.4665826Z 
+2026-07-02T20:41:52.6225532Z   console.log
+2026-07-02T20:41:52.6231472Z     prisma:info Starting a postgresql pool with 5 connections.
+2026-07-02T20:41:52.6232193Z 
+2026-07-02T20:41:52.6232984Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:41:52.6235958Z 
+2026-07-02T20:41:56.1965091Z   console.log
+2026-07-02T20:41:56.1965717Z     prisma:error 
+2026-07-02T20:41:56.1966383Z     Invalid `this.prisma.refreshToken.create()` invocation in
+2026-07-02T20:41:56.1967476Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/src/modules/auth/auth.service.ts:872:38
+2026-07-02T20:41:56.1968475Z     
+2026-07-02T20:41:56.1968855Z       869 const expiresAt = decoded?.exp
+2026-07-02T20:41:56.1969432Z       870   ? new Date(decoded.exp * 1000)
+2026-07-02T20:41:56.1970083Z       871   : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+2026-07-02T20:41:56.1971568Z     → 872 await this.prisma.refreshToken.create(
+2026-07-02T20:41:56.1972312Z     Unique constraint failed on the fields: (`token_hash`)
+2026-07-02T20:41:56.1972765Z 
+2026-07-02T20:41:56.1973439Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:41:56.1973922Z 
+2026-07-02T20:42:41.4381240Z FAIL test/e2e/scenarios/22-adm.e2e-spec.ts (49.978 s)
+2026-07-02T20:42:41.4382338Z   22 — Admin Paneli & Yetkilendirme (ADM)
+2026-07-02T20:42:41.4383266Z     ✓ ADM-001 [P0] Super Admin admin paneline giriş yapabilir (happy path) (537 ms)
+2026-07-02T20:42:41.4384296Z     ✓ ADM-002 [P0] Yanlış şifre ile admin girişi reddedilir (negatif) (418 ms)
+2026-07-02T20:42:41.4385294Z     ✓ ADM-004 [P2] Admin profil ucu throttle'a takılmaz (parite/güvenlik) (441 ms)
+2026-07-02T20:42:41.4386228Z     ✓ ADM-005 [P0] Admin token olmadan profil 401 döner (yetki) (382 ms)
+2026-07-02T20:42:41.4387196Z     ✓ ADM-006 [P0] Normal kullanıcı token'ı ile admin ucu 401 döner (yetki) (377 ms)
+2026-07-02T20:42:41.4388968Z     ✓ ADM-007 [P0] Oturumsuz istek admin uçlarında 401 döner (yetki) (371 ms)
+2026-07-02T20:42:41.4389897Z     ✓ ADM-008 [P1] Admin logout cookie'leri temizler (happy path) (392 ms)
+2026-07-02T20:42:41.4390805Z     ✓ ADM-009 [P2] Admin token yenileme ayrı uçtan çalışır (parite) (467 ms)
+2026-07-02T20:42:41.4391713Z     ✓ ADM-010 [P1] Geçersiz refresh token ile yenileme 401 (negatif) (381 ms)
+2026-07-02T20:42:41.4392688Z     ✓ ADM-013 [P0] Super Admin commission-rules okuyabilir (happy path) (394 ms)
+2026-07-02T20:42:41.4393657Z     ✓ ADM-014 [P0] Moderator commission-rules okuyamaz (yetki, matris) (391 ms)
+2026-07-02T20:42:41.4394638Z     ✓ ADM-015 [P0] Admin (non-super) commission kuralı OLUŞTURAMAZ (yetki) (408 ms)
+2026-07-02T20:42:41.4395631Z     ✓ ADM-016 [P1] Super Admin commission kuralı oluşturabilir (happy path) (426 ms)
+2026-07-02T20:42:41.4396639Z     ✓ ADM-072 [P1] Komisyon kuralı silme yalnızca super_admin (yetki, para) (405 ms)
+2026-07-02T20:42:41.4397460Z     ✓ ADM-017 [P0] Admin platform ayarlarını OKUYAMAZ (yetki, matris override) (392 ms)
+2026-07-02T20:42:41.4398089Z     ✓ ADM-018 [P0] Moderator ayarları PATCH edemez (yetki) (400 ms)
+2026-07-02T20:42:41.4398985Z     ✓ ADM-067 [P2] Public settings kimlik doğrulamasız erişilebilir (parite) (398 ms)
+2026-07-02T20:42:41.4399770Z     ✓ ADM-068 [P2] Setting anahtarı segment-bazlı güncelleme (`PATCH /settings/:key`) super_admin (yetki) (408 ms)
+2026-07-02T20:42:41.4400517Z     ✓ ADM-069 [P1] Eksik `key`/`value` ile ayar güncelleme 400 (negatif/doğrulama) (395 ms)
+2026-07-02T20:42:41.4401145Z     ✓ ADM-070 [P2] Yeni ayar anahtarı upsert ile oluşturulur (sınır değer) (401 ms)
+2026-07-02T20:42:41.4401823Z     ✓ ADM-063 [P0] Üyelik fiyatı güncellenince yıllık fiyat otomatik hesaplanır (para) (411 ms)
+2026-07-02T20:42:41.4402534Z     ✓ ADM-064 [P1] Yıllık indirim yüzdesi tüm tier'ları yeniden hesaplar (para) (406 ms)
+2026-07-02T20:42:41.4403170Z     ✓ ADM-065 [P1] Geçersiz/NaN fiyat değeri tier'ı bozmaz (negatif/sağlamlık) (402 ms)
+2026-07-02T20:42:41.4403774Z     ✓ ADM-019 [P1] Admin kullanıcı listeleyebilir (happy path) (406 ms)
+2026-07-02T20:42:41.4404329Z     ✓ ADM-020 [P1] Moderator kullanıcı listeleyebilir (yetki, matris) (400 ms)
+2026-07-02T20:42:41.4404897Z     ✓ ADM-036 [P0] Kullanıcı banı AuditLog'a yazılır (happy path) (416 ms)
+2026-07-02T20:42:41.4405433Z     ✓ ADM-037 [P0] AuditLog hassas alanları maskeler (güvenlik) (414 ms)
+2026-07-02T20:42:41.4405978Z     ✕ ADM-038 [P2] AuditLog Date/Decimal serileştirir (sınır değer) (410 ms)
+2026-07-02T20:42:41.4406580Z     ✕ ADM-043 [P1] Audit log yazımı başarısız olsa ana işlem bozulmaz (sağlamlık) (393 ms)
+2026-07-02T20:42:41.4407218Z     ✕ ADM-046 [P1] Setting update AuditLog'a old/new değer ile yazılır (para) (401 ms)
+2026-07-02T20:42:41.4407856Z     ✓ ADM-113 [P1] Zaten banlı kullanıcı tekrar banlanamaz (negatif/idempotency) (512 ms)
+2026-07-02T20:42:41.4408873Z     ✕ ADM-114 [P1] Ban işlemi kargolanmamış takasları iptal eder, kargodakilere dokunmaz (sınır değer) (465 ms)
+2026-07-02T20:42:41.4409896Z     ✓ ADM-115 [P1] Ban aktif ürünleri suspended, pending'leri rejected yapar (sınır değer) (462 ms)
+2026-07-02T20:42:41.4410632Z     ✓ ADM-116 [P1] Unban sonrası ürünler otomatik active'e döner, onaya girmez (happy path) (420 ms)
+2026-07-02T20:42:41.4411419Z     ✓ ADM-118 [P1] Audit log adminId olarak User.id geçilse de AdminUser.id'ye çözülür (güvenlik/doğruluk) (406 ms)
+2026-07-02T20:42:41.4412072Z     ✓ ADM-021 [P1] Moderator ürün onaylayabilir (yetki, matris) (425 ms)
+2026-07-02T20:42:41.4412822Z     ✓ ADM-039 [P1] Ürün onayı AuditLog'a yazılır (happy path) (466 ms)
+2026-07-02T20:42:41.4413742Z     ✓ ADM-040 [P1] Ürün reddi AuditLog'a sebep ile yazılır (happy path) (433 ms)
+2026-07-02T20:42:41.4414737Z     ✓ ADM-022 [P0] Moderator emirleri (orders) listeleyemez (yetki, matris) (393 ms)
+2026-07-02T20:42:41.4415706Z     ✓ ADM-034 [P0] Force-complete order yalnızca super_admin (yetki) (582 ms)
+2026-07-02T20:42:41.4416636Z     ✓ ADM-041 [P1] Dispute çözümü AuditLog'a yazılır (happy path) (538 ms)
+2026-07-02T20:42:41.4417763Z     ✓ ADM-111 [P1] Var olmayan order detayında 404 (sınır değer) (419 ms)
+2026-07-02T20:42:41.4419143Z     ✓ ADM-112 [P0] Admin herhangi bir kullanıcının siparişini görebilir ama kullanıcı erişemez (IDOR sınırı) (608 ms)
+2026-07-02T20:42:41.4420168Z     ✓ ADM-023 [P1] Moderator discount oluşturamaz/silemez (yetki, matris) (408 ms)
+2026-07-02T20:42:41.4420749Z     ✓ ADM-024 [P1] Admin discount oluşturabilir (happy path) (409 ms)
+2026-07-02T20:42:41.4421357Z     ✓ ADM-025 [P0] Moderator audit-logs okuyamaz (`@RequirePermission('logs')`) (410 ms)
+2026-07-02T20:42:41.4421931Z     ✓ ADM-045 [P2] AuditLog filtreleme (super_admin görür) (421 ms)
+2026-07-02T20:42:41.4422533Z     ✓ ADM-027 [P1] Moderator güvenlik kaydı çözemez (`@RequirePermission('logs')`) (393 ms)
+2026-07-02T20:42:41.4423299Z     ✓ ADM-028 [P1] IP engelleme yalnızca super_admin (`@Roles(super_admin)`+`@RequirePermission('logs')`) (410 ms)
+2026-07-02T20:42:41.4424141Z     ✓ ADM-026 [P2] Moderator AI eşik ayarını değiştirebilir (`@RequirePermission('ai_moderation')`) (425 ms)
+2026-07-02T20:42:41.4424870Z     ✓ ADM-029 [P0] Reports modülü: moderator sales raporu göremez (yetki) (385 ms)
+2026-07-02T20:42:41.4425507Z     ✓ ADM-030 [P1] Reports modülü: moderator dashboard görebilir (yetki, parite) (399 ms)
+2026-07-02T20:42:41.4426074Z     ✓ ADM-031 [P0] Normal kullanıcı reports erişemez (401) (384 ms)
+2026-07-02T20:42:41.4426591Z     ✓ ADM-055 [P1] Reports modülü sales raporu 200 (happy path) (449 ms)
+2026-07-02T20:42:41.4427158Z     ✓ ADM-056 [P2] Sales CSV export doğru header'larla iner (happy path) (455 ms)
+2026-07-02T20:42:41.4427794Z     ✓ ADM-057 [P2] Realtime visitor stats moderator dahil görebilir (yetki, parite) (387 ms)
+2026-07-02T20:42:41.4428760Z     ✓ ADM-058 [P1] Access raporu (site erişim) admin için 200, moderator 403 (yetki) (392 ms)
+2026-07-02T20:42:41.4429788Z     ✓ ADM-059 [P2] Reports dashboard 30 günlük pencere döner (sınır değer) (396 ms)
+2026-07-02T20:42:41.4430673Z     ✓ ADM-061 [P2] Boş tarih aralığında rapor 200 ve sıfır/boş döner (sınır değer) (389 ms)
+2026-07-02T20:42:41.4431339Z     ✓ ADM-047 [P1] Admin dashboard istatistiklerini görebilir (happy path) (415 ms)
+2026-07-02T20:42:41.4431922Z     ✓ ADM-048 [P1] Moderator dashboard görebilir (yetki, parite) (402 ms)
+2026-07-02T20:42:41.4432442Z     ✓ ADM-049 [P0] Normal kullanıcı dashboard erişemez (401) (384 ms)
+2026-07-02T20:42:41.4432974Z     ✓ ADM-050 [P2] Pending actions sayacı doğru döner (happy path) (407 ms)
+2026-07-02T20:42:41.4433575Z     ✓ ADM-051 [P1] Sales analytics admin için 200, moderator için 403 (yetki) (407 ms)
+2026-07-02T20:42:41.4434142Z     ✓ ADM-052 [P1] Revenue analytics doğru toplam döner (para) (376 ms)
+2026-07-02T20:42:41.4434717Z     ✓ ADM-053 [P1] Analytics snapshot kaydetme yalnızca super_admin (yetki) (397 ms)
+2026-07-02T20:42:41.4435340Z     ✓ ADM-054 [P1] Reports/sales (admin modülü) admin için 200 (happy path) (423 ms)
+2026-07-02T20:42:41.4435965Z     ✓ ADM-060 [P1] Commission revenue özeti yalnızca admin/super_admin (yetki) (390 ms)
+2026-07-02T20:42:41.4437090Z     ✓ ADM-032 [P1] Tax bölümü: admin tax raporu görebilir ama kural CUD yapamaz (yetki, matris) (436 ms)
+2026-07-02T20:42:41.4437842Z     ✓ ADM-066 [P0] KDV/tax oranı yalnızca super_admin yönetir (yetki, para) (410 ms)
+2026-07-02T20:42:41.4438599Z     ✓ ADM-071 [P1] Tax raporu (read) admin matrisinde yok → 403 (yetki, matris) (410 ms)
+2026-07-02T20:42:41.4439271Z     ✓ ADM-033 [P1] Membership tier güncelleme: moderator yapamaz (yetki, matris) (427 ms)
+2026-07-02T20:42:41.4439969Z     ✓ ADM-035 [P2] Bilinmeyen route'ta sadece rol kontrolü uygulanır (matris fallback) (408 ms)
+2026-07-02T20:42:41.4440602Z     ✓ ADM-042 [P0] Escrow release AuditLog'a sebep ile yazılır (para) (539 ms)
+2026-07-02T20:42:41.4441200Z     ✓ ADM-083 [P0] Moderator escrow payout release EDEMEZ (yetki, para) (399 ms)
+2026-07-02T20:42:41.4441766Z     ✓ ADM-084 [P0] Admin escrow release sebep zorunlu (para, negatif) (405 ms)
+2026-07-02T20:42:41.4442333Z     ✓ ADM-085 [P0] Admin sebep ile escrow release eder (para, happy path) (536 ms)
+2026-07-02T20:42:41.4442925Z     ✓ ADM-086 [P0] Moderator manuel iade EDEMEZ (yetki, para) (400 ms)
+2026-07-02T20:42:41.4443497Z     ✓ ADM-087 [P0] Admin manuel iade yalnız completed ödeme (para, negatif) (415 ms)
+2026-07-02T20:42:41.4444205Z     ✓ ADM-088 [P0] Moderator trade refund retry EDEMEZ (`@RequirePermission('refund_requests')`) (380 ms)
+2026-07-02T20:42:41.4444882Z     ✓ ADM-089 [P1] Admin payout retry yalnız failed/returned (para, negatif) (394 ms)
+2026-07-02T20:42:41.4445565Z     ✓ ADM-090 [P1] Admin failed payout retry başarılı, durum pending'e döner (para, happy path) (400 ms)
+2026-07-02T20:42:41.4446263Z     ✓ ADM-091 [P1] Returned transfer retry'da YENİ transId üretilir (idempotency) (396 ms)
+2026-07-02T20:42:41.4446946Z     ✓ ADM-092 [P1] Failed payouts listesi yalnız failed+returned döner (para, sınır) (409 ms)
+2026-07-02T20:42:41.4447575Z     ✓ ADM-093 [P1] Trade nakit hold release idempotent (idempotency) (434 ms)
+2026-07-02T20:42:41.4448195Z     ✓ ADM-094 [P1] İade edilmiş trade nakit release edilemez (para, negatif) (398 ms)
+2026-07-02T20:42:41.4449037Z     ✓ ADM-095 [P0] Normal kullanıcı payout uçlarına 401 (yetki) (388 ms)
+2026-07-02T20:42:41.4449641Z     ✓ ADM-096 [P1] Moderator refund-requests kuyruğunu göremez (yetki, matris) (404 ms)
+2026-07-02T20:42:41.4450264Z     ✓ ADM-097 [P1] Moderator force-finalize refund yapamaz (yetki, para) (385 ms)
+2026-07-02T20:42:41.4450852Z     ✓ ADM-119 [P2] Bilinmeyen payment id force-cancel 404 (negatif) (396 ms)
+2026-07-02T20:42:41.4451422Z     ✓ ADM-074 [P1] Public yayında sayfa slug ile okunur (happy path) (376 ms)
+2026-07-02T20:42:41.4451980Z     ✓ ADM-075 [P1] Yayında olmayan/var olmayan sayfa 404 (negatif) (386 ms)
+2026-07-02T20:42:41.4452590Z     ✓ ADM-076 [P2] Public sayfa listesi yalnız yayında sayfaları döner (güvenlik) (376 ms)
+2026-07-02T20:42:41.4453175Z     ✓ ADM-077 [P1] Admin yeni statik sayfa oluşturur (happy path) (388 ms)
+2026-07-02T20:42:41.4453729Z     ✓ ADM-078 [P0] Moderator statik sayfa oluşturamaz (yetki, matris) (389 ms)
+2026-07-02T20:42:41.4454457Z     ✓ ADM-079 [P2] Admin statik sayfa günceller (happy path) (396 ms)
+2026-07-02T20:42:41.4454961Z     ✓ ADM-080 [P2] Admin statik sayfa siler (happy path) (394 ms)
+2026-07-02T20:42:41.4455533Z     ✓ ADM-081 [P1] Aynı slug ile ikinci sayfa oluşturma çakışır (sınır/negatif) (398 ms)
+2026-07-02T20:42:41.4456206Z     ✓ ADM-082 [P2] Email template CMS moderator dahil ama matris engelli (yetki, parite) (401 ms)
+2026-07-02T20:42:41.4456808Z     ✓ ADM-044 [P1] Staff atama AuditLog'a yazılır (happy path) (672 ms)
+2026-07-02T20:42:41.4457416Z     ✓ ADM-098 [P1] Super Admin yeni moderator atar, geçici şifre döner (happy path) (656 ms)
+2026-07-02T20:42:41.4457984Z     ✓ ADM-099 [P0] Moderator staff yönetimi yapamaz (yetki) (424 ms)
+2026-07-02T20:42:41.4458651Z     ✕ ADM-100 [P0] Admin, ayar kapalıyken rol atayamaz (yetki, iş kuralı) (417 ms)
+2026-07-02T20:42:41.4459310Z     ✕ ADM-101 [P0] Admin, ayar açıkken bile super_admin rolü atayamaz (yetki, iş kuralı) (386 ms)
+2026-07-02T20:42:41.4460146Z     ✓ ADM-102 [P1] Staff settings (allow_admin_assign) yalnız super_admin (yetki) (378 ms)
+2026-07-02T20:42:41.4460772Z     ✓ ADM-103 [P0] Son super_admin rolü düşürülemez (sınır değer/güvenlik) (390 ms)
+2026-07-02T20:42:41.4461318Z     ✓ ADM-105 [P0] Admin kendi yetkisini kaldıramaz (güvenlik) (410 ms)
+2026-07-02T20:42:41.4461871Z     ✓ ADM-106 [P1] Role-permissions matrisi okunabilir (matris bypass) (406 ms)
+2026-07-02T20:42:41.4462542Z     ✓ ADM-107 [P0] İzin matrisini güncelleme yalnız super_admin + cache invalidate (yetki) (439 ms)
+2026-07-02T20:42:41.4463247Z     ✕ ADM-108 [P1] İzin matrisi değişimi anında uygulanır (cache invalidate doğrulama) (429 ms)
+2026-07-02T20:42:41.4463986Z     ✓ ADM-109 [P2] Eski (legacy) izin anahtarları yeni 36'lı formata migrate edilir (sağlamlık) (407 ms)
+2026-07-02T20:42:41.4464665Z     ✓ ADM-110 [P2] Geçersiz role-permissions gövdesi 400 (negatif/doğrulama) (415 ms)
+2026-07-02T20:42:41.4465245Z     ✓ ADM-120 [P2] i18n: hata mesajları Türkçe ve tutarlı (i18n) (419 ms)
+2026-07-02T20:42:41.4466280Z     ○ skipped ADM-003 [P1] Brute-force koruması: dakikada 5 deneme sonrası 429 (sınır değer) — SKIP(Throttle test env’de kapalı (skipIf NODE_ENV=test) → admin login 429 üretilemez)
+2026-07-02T20:42:41.4467874Z     ○ skipped ADM-104 [P0] Son super_admin kaldırılamaz (sınır değer/güvenlik) — SKIP(removeAdminStaff son-süper dalı erişilemez: actor≠target super_admin ⇒ activeSupers>1; actor===target ⇒ önce "kendi yetkini" hatası (aynı garanti ADM-103’te))
+2026-07-02T20:42:41.4468808Z 
+2026-07-02T20:42:41.4469256Z   ● 22 — Admin Paneli & Yetkilendirme (ADM) › ADM-038 [P2] AuditLog Date/Decimal serileştirir (sınır değer)
+2026-07-02T20:42:41.4469646Z 
+2026-07-02T20:42:41.4469782Z     expect(received).toBeTruthy()
+2026-07-02T20:42:41.4469962Z 
+2026-07-02T20:42:41.4470054Z     Received: null
+2026-07-02T20:42:41.4470192Z 
+2026-07-02T20:42:41.4470468Z     [0m [90m 447 |[39m       [33m.[39mexpect([35m200[39m)[33m;[39m
+2026-07-02T20:42:41.4471760Z      [90m 448 |[39m     [36mconst[39m log [33m=[39m [36mawait[39m prisma[33m.[39mauditLog[33m.[39mfindFirst({ where[33m:[39m { action[33m:[39m [32m'setting_update'[39m }[33m,[39m orderBy[33m:[39m { createdAt[33m:[39m [32m'desc'[39m } })[33m;[39m
+2026-07-02T20:42:41.4472859Z     [31m[1m>[22m[39m[90m 449 |[39m     expect(log)[33m.[39mtoBeTruthy()[33m;[39m
+2026-07-02T20:42:41.4473347Z      [90m     |[39m                 [31m[1m^[22m[39m
+2026-07-02T20:42:41.4473961Z      [90m 450 |[39m     [36mconst[39m nv [33m=[39m log[33m![39m[33m.[39mnewValue [36mas[39m any[33m;[39m
+2026-07-02T20:42:41.4474666Z      [90m 451 |[39m     [90m// createdAt/updatedAt Date alanları ISO-8601 string olmalı.[39m
+2026-07-02T20:42:41.4475624Z      [90m 452 |[39m     [36mif[39m (nv[33m?[39m[33m.[39mupdatedAt) expect([36mtypeof[39m nv[33m.[39mupdatedAt)[33m.[39mtoBe([32m'string'[39m)[33m;[39m[0m
+2026-07-02T20:42:41.4476144Z 
+2026-07-02T20:42:41.4476387Z       at Object.<anonymous> (test/e2e/scenarios/22-adm.e2e-spec.ts:449:17)
+2026-07-02T20:42:41.4476849Z 
+2026-07-02T20:42:41.4477347Z   ● 22 — Admin Paneli & Yetkilendirme (ADM) › ADM-043 [P1] Audit log yazımı başarısız olsa ana işlem bozulmaz (sağlamlık)
+2026-07-02T20:42:41.4477762Z 
+2026-07-02T20:42:41.4477960Z     expect(received).toBe(expected) // Object.is equality
+2026-07-02T20:42:41.4478307Z 
+2026-07-02T20:42:41.4478412Z     Expected: 200
+2026-07-02T20:42:41.4478632Z     Received: 401
+2026-07-02T20:42:41.4478751Z 
+2026-07-02T20:42:41.4479048Z     [0m [90m 469 |[39m       [33m.[39m[36mset[39m(authHeader(superAdmin))
+2026-07-02T20:42:41.4479819Z      [90m 470 |[39m       [33m.[39msend({ key[33m:[39m [32m'robustness_key'[39m[33m,[39m value[33m:[39m [32m'1'[39m })[33m;[39m
+2026-07-02T20:42:41.4480646Z     [31m[1m>[22m[39m[90m 471 |[39m     expect(res[33m.[39mstatus)[33m.[39mtoBe([35m200[39m)[33m;[39m
+2026-07-02T20:42:41.4481203Z      [90m     |[39m                        [31m[1m^[22m[39m
+2026-07-02T20:42:41.4481998Z      [90m 472 |[39m     [90m// Ana işlem başarılı; audit atlandı (adminUser isActive:false) — hata yok.[39m
+2026-07-02T20:42:41.4483173Z      [90m 473 |[39m     [36mconst[39m setting [33m=[39m [36mawait[39m prisma[33m.[39mplatformSetting[33m.[39mfindUnique({ where[33m:[39m { settingKey[33m:[39m [32m'robustness_key'[39m } })[33m;[39m
+2026-07-02T20:42:41.4484249Z      [90m 474 |[39m     expect(setting[33m?[39m[33m.[39msettingValue)[33m.[39mtoBe([32m'1'[39m)[33m;[39m[0m
+2026-07-02T20:42:41.4484623Z 
+2026-07-02T20:42:41.4484859Z       at Object.<anonymous> (test/e2e/scenarios/22-adm.e2e-spec.ts:471:24)
+2026-07-02T20:42:41.4485143Z 
+2026-07-02T20:42:41.4485611Z   ● 22 — Admin Paneli & Yetkilendirme (ADM) › ADM-046 [P1] Setting update AuditLog'a old/new değer ile yazılır (para)
+2026-07-02T20:42:41.4486015Z 
+2026-07-02T20:42:41.4486194Z     expect(received).toBe(expected) // Object.is equality
+2026-07-02T20:42:41.4486424Z 
+2026-07-02T20:42:41.4486546Z     Expected: "0.05"
+2026-07-02T20:42:41.4486776Z     Received: undefined
+2026-07-02T20:42:41.4486920Z 
+2026-07-02T20:42:41.4487279Z     [0m [90m 492 |[39m       orderBy[33m:[39m { createdAt[33m:[39m [32m'desc'[39m }[33m,[39m
+2026-07-02T20:42:41.4487756Z      [90m 493 |[39m     })[33m;[39m
+2026-07-02T20:42:41.4488812Z     [31m[1m>[22m[39m[90m 494 |[39m     expect((log[33m?[39m[33m.[39moldValue [36mas[39m any)[33m?[39m[33m.[39msettingValue)[33m.[39mtoBe([32m'0.05'[39m)[33m;[39m
+2026-07-02T20:42:41.4489628Z      [90m     |[39m                                                  [31m[1m^[22m[39m
+2026-07-02T20:42:41.4490449Z      [90m 495 |[39m     expect((log[33m?[39m[33m.[39mnewValue [36mas[39m any)[33m?[39m[33m.[39msettingValue)[33m.[39mtoBe([32m'0.07'[39m)[33m;[39m
+2026-07-02T20:42:41.4491074Z      [90m 496 |[39m   })[33m;[39m
+2026-07-02T20:42:41.4491363Z      [90m 497 |[39m[0m
+2026-07-02T20:42:41.4491508Z 
+2026-07-02T20:42:41.4491745Z       at Object.<anonymous> (test/e2e/scenarios/22-adm.e2e-spec.ts:494:50)
+2026-07-02T20:42:41.4492160Z 
+2026-07-02T20:42:41.4493121Z   ● 22 — Admin Paneli & Yetkilendirme (ADM) › ADM-114 [P1] Ban işlemi kargolanmamış takasları iptal eder, kargodakilere dokunmaz (sınır değer)
+2026-07-02T20:42:41.4493726Z 
+2026-07-02T20:42:41.4493897Z     expect(received).toContain(expected) // indexOf
+2026-07-02T20:42:41.4494125Z 
+2026-07-02T20:42:41.4494329Z     Matcher error: received value must not be null nor undefined
+2026-07-02T20:42:41.4494591Z 
+2026-07-02T20:42:41.4494714Z     Received has value: undefined
+2026-07-02T20:42:41.4494886Z 
+2026-07-02T20:42:41.4495329Z     [0m [90m 552 |[39m     expect(acc[33m?[39m[33m.[39mstatus)[33m.[39mtoBe([32m'cancelled'[39m)[33m;[39m
+2026-07-02T20:42:41.4496274Z      [90m 553 |[39m     expect(wh[33m?[39m[33m.[39mstatus)[33m.[39mtoBe([32m'at_warehouse'[39m)[33m;[39m [90m// kargo/depo aşaması → DOKUNULMAZ[39m
+2026-07-02T20:42:41.4497358Z     [31m[1m>[22m[39m[90m 554 |[39m     expect(res[33m.[39mbody[33m.[39mcancelledTradeIds)[33m.[39mtoContain(acceptedTrade[33m.[39mid)[33m;[39m
+2026-07-02T20:42:41.4498456Z      [90m     |[39m                                        [31m[1m^[22m[39m
+2026-07-02T20:42:41.4499291Z      [90m 555 |[39m     expect([33mArray[39m[33m.[39misArray(res[33m.[39mbody[33m.[39maffectedProductIds))[33m.[39mtoBe([36mtrue[39m)[33m;[39m
+2026-07-02T20:42:41.4499925Z      [90m 556 |[39m   })[33m;[39m
+2026-07-02T20:42:41.4500212Z      [90m 557 |[39m[0m
+2026-07-02T20:42:41.4500357Z 
+2026-07-02T20:42:41.4500593Z       at Object.<anonymous> (test/e2e/scenarios/22-adm.e2e-spec.ts:554:40)
+2026-07-02T20:42:41.4500872Z 
+2026-07-02T20:42:41.4501325Z   ● 22 — Admin Paneli & Yetkilendirme (ADM) › ADM-100 [P0] Admin, ayar kapalıyken rol atayamaz (yetki, iş kuralı)
+2026-07-02T20:42:41.4501721Z 
+2026-07-02T20:42:41.4501880Z     expect(received).toContain(expected) // indexOf
+2026-07-02T20:42:41.4502104Z 
+2026-07-02T20:42:41.4502428Z     Expected substring: "yalnızca süper"
+2026-07-02T20:42:41.4502954Z     Received string:    "Bu işlem için [staff] izinlerinden biri gerekiyor. Rol: admin"
+2026-07-02T20:42:41.4503263Z 
+2026-07-02T20:42:41.4503760Z     [0m [90m 1555 |[39m       [33m.[39msend({ email[33m:[39m [32m'x@y.com'[39m[33m,[39m role[33m:[39m [32m'moderator'[39m })
+2026-07-02T20:42:41.4504398Z      [90m 1556 |[39m       [33m.[39mexpect([35m403[39m)[33m;[39m
+2026-07-02T20:42:41.4505254Z     [31m[1m>[22m[39m[90m 1557 |[39m     expect([33mString[39m(res[33m.[39mbody[33m.[39mmessage))[33m.[39mtoContain([32m'yalnızca süper'[39m)[33m;[39m
+2026-07-02T20:42:41.4505994Z      [90m      |[39m                                      [31m[1m^[22m[39m
+2026-07-02T20:42:41.4506382Z      [90m 1558 |[39m   })[33m;[39m
+2026-07-02T20:42:41.4506662Z      [90m 1559 |[39m
+2026-07-02T20:42:41.4507157Z      [90m 1560 |[39m   scenario([32m'ADM-101'[39m[33m,[39m [36masync[39m () [33m=>[39m {[0m
+2026-07-02T20:42:41.4507498Z 
+2026-07-02T20:42:41.4507741Z       at Object.<anonymous> (test/e2e/scenarios/22-adm.e2e-spec.ts:1557:38)
+2026-07-02T20:42:41.4508024Z 
+2026-07-02T20:42:41.4508663Z   ● 22 — Admin Paneli & Yetkilendirme (ADM) › ADM-101 [P0] Admin, ayar açıkken bile super_admin rolü atayamaz (yetki, iş kuralı)
+2026-07-02T20:42:41.4509104Z 
+2026-07-02T20:42:41.4509272Z     expect(received).toContain(expected) // indexOf
+2026-07-02T20:42:41.4509486Z 
+2026-07-02T20:42:41.4509668Z     Expected substring: "Süper admin"
+2026-07-02T20:42:41.4510177Z     Received string:    "Bu işlem için [staff] izinlerinden biri gerekiyor. Rol: admin"
+2026-07-02T20:42:41.4510485Z 
+2026-07-02T20:42:41.4510976Z     [0m [90m 1573 |[39m       [33m.[39msend({ email[33m:[39m [32m'x@y.com'[39m[33m,[39m role[33m:[39m [32m'super_admin'[39m })
+2026-07-02T20:42:41.4511613Z      [90m 1574 |[39m       [33m.[39mexpect([35m403[39m)[33m;[39m
+2026-07-02T20:42:41.4512431Z     [31m[1m>[22m[39m[90m 1575 |[39m     expect([33mString[39m(res[33m.[39mbody[33m.[39mmessage))[33m.[39mtoContain([32m'Süper admin'[39m)[33m;[39m
+2026-07-02T20:42:41.4513166Z      [90m      |[39m                                      [31m[1m^[22m[39m
+2026-07-02T20:42:41.4513550Z      [90m 1576 |[39m   })[33m;[39m
+2026-07-02T20:42:41.4513826Z      [90m 1577 |[39m
+2026-07-02T20:42:41.4514309Z      [90m 1578 |[39m   scenario([32m'ADM-102'[39m[33m,[39m [36masync[39m () [33m=>[39m {[0m
+2026-07-02T20:42:41.4514635Z 
+2026-07-02T20:42:41.4514867Z       at Object.<anonymous> (test/e2e/scenarios/22-adm.e2e-spec.ts:1575:38)
+2026-07-02T20:42:41.4515146Z 
+2026-07-02T20:42:41.4515652Z   ● 22 — Admin Paneli & Yetkilendirme (ADM) › ADM-108 [P1] İzin matrisi değişimi anında uygulanır (cache invalidate doğrulama)
+2026-07-02T20:42:41.4516072Z 
+2026-07-02T20:42:41.4516208Z     expected 403 "Forbidden", got 200 "OK"
+2026-07-02T20:42:41.4516401Z 
+2026-07-02T20:42:41.4516655Z     [0m [90m 1662 |[39m       [33m.[39mexpect([35m200[39m)[33m;[39m
+2026-07-02T20:42:41.4517379Z      [90m 1663 |[39m     [90m// 3) anında 403 (controller invalidateCache çağırır).[39m
+2026-07-02T20:42:41.4518630Z     [31m[1m>[22m[39m[90m 1664 |[39m     [36mawait[39m request(server())[33m.[39m[36mget[39m([32m'/api/admin/products'[39m)[33m.[39m[36mset[39m(authHeader(moderator))[33m.[39mexpect([35m403[39m)[33m;[39m
+2026-07-02T20:42:41.4519633Z      [90m      |[39m                                                                                   [31m[1m^[22m[39m
+2026-07-02T20:42:41.4520075Z      [90m 1665 |[39m   })[33m;[39m
+2026-07-02T20:42:41.4520368Z      [90m 1666 |[39m
+2026-07-02T20:42:41.4520853Z      [90m 1667 |[39m   scenario([32m'ADM-109'[39m[33m,[39m [36masync[39m () [33m=>[39m {[0m
+2026-07-02T20:42:41.4521175Z 
+2026-07-02T20:42:41.4521421Z       at Object.<anonymous> (test/e2e/scenarios/22-adm.e2e-spec.ts:1664:83)
+2026-07-02T20:42:41.4521812Z       ----
+2026-07-02T20:42:41.4522171Z       at Test._assertStatus (../../node_modules/supertest/lib/test.js:309:14)
+2026-07-02T20:42:41.4522766Z       at ../../node_modules/supertest/lib/test.js:365:13
+2026-07-02T20:42:41.4523226Z       at Test._assertFunction (../../node_modules/supertest/lib/test.js:342:13)
+2026-07-02T20:42:41.4523710Z       at Test.assert (../../node_modules/supertest/lib/test.js:195:23)
+2026-07-02T20:42:41.4524157Z       at localAssert (../../node_modules/supertest/lib/test.js:138:14)
+2026-07-02T20:42:41.4524635Z       at Server.<anonymous> (../../node_modules/supertest/lib/test.js:152:11)
+2026-07-02T20:42:41.4524902Z 
+2026-07-02T20:42:41.4525049Z Test Suites: 2 failed, 2 total
+2026-07-02T20:42:41.4525407Z Tests:       8 failed, 8 skipped, 196 passed, 212 total
+2026-07-02T20:42:41.4525729Z Snapshots:   0 total
+2026-07-02T20:42:41.4525985Z Time:        100.217 s
+2026-07-02T20:42:41.4526311Z Ran all test suites matching /test\/e2e\/scenarios\//i.
+2026-07-02T20:42:41.6023709Z undefined
+2026-07-02T20:42:41.6033459Z /home/runner/work/tarodan-app/tarodan-app/apps/api:
+2026-07-02T20:42:41.6035750Z  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: jest --config ./test/jest-e2e.json --runInBand --testPathPattern test/e2e/scenarios/ --shard=8/10
+2026-07-02T20:42:41.6235860Z ##[error]Process completed with exit code 1.

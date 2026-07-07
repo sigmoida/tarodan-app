@@ -1,0 +1,47 @@
+﻿2026-07-02T20:36:45.6196676Z Current runner version: '2.335.1'
+2026-07-02T20:36:45.6234177Z ##[group]Runner Image Provisioner
+2026-07-02T20:36:45.6235455Z Hosted Compute Agent
+2026-07-02T20:36:45.6236517Z Version: 20260624.560
+2026-07-02T20:36:45.6237616Z Commit: 925d229a51159bc391ae97e54a2dd1fe20af789d
+2026-07-02T20:36:45.6238758Z Build Date: 2026-06-24T18:26:47Z
+2026-07-02T20:36:45.6240014Z Worker ID: {7157d2ec-cd7f-46ee-b5b9-385ebcc6b2a1}
+2026-07-02T20:36:45.6241199Z Azure Region: eastus
+2026-07-02T20:36:45.6242460Z ##[endgroup]
+2026-07-02T20:36:45.6244903Z ##[group]Operating System
+2026-07-02T20:36:45.6245925Z Ubuntu
+2026-07-02T20:36:45.6246864Z 24.04.4
+2026-07-02T20:36:45.6247692Z LTS
+2026-07-02T20:36:45.6248540Z ##[endgroup]
+2026-07-02T20:36:45.6249414Z ##[group]Runner Image
+2026-07-02T20:36:45.6250465Z Image: ubuntu-24.04
+2026-07-02T20:36:45.6251443Z Version: 20260628.225.1
+2026-07-02T20:36:45.6253589Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260628.225/images/ubuntu/Ubuntu2404-Readme.md
+2026-07-02T20:36:45.6256647Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260628.225
+2026-07-02T20:36:45.6258324Z ##[endgroup]
+2026-07-02T20:36:45.6263958Z ##[group]GITHUB_TOKEN Permissions
+2026-07-02T20:36:45.6267113Z Actions: write
+2026-07-02T20:36:45.6268130Z ArtifactMetadata: write
+2026-07-02T20:36:45.6269125Z Attestations: write
+2026-07-02T20:36:45.6270115Z Checks: write
+2026-07-02T20:36:45.6271023Z CodeQuality: write
+2026-07-02T20:36:45.6272739Z Contents: write
+2026-07-02T20:36:45.6273776Z CopilotRequests: write
+2026-07-02T20:36:45.6274786Z Deployments: write
+2026-07-02T20:36:45.6275751Z Discussions: write
+2026-07-02T20:36:45.6276615Z Issues: write
+2026-07-02T20:36:45.6277582Z Metadata: read
+2026-07-02T20:36:45.6278488Z Models: read
+2026-07-02T20:36:45.6279509Z Packages: write
+2026-07-02T20:36:45.6280530Z Pages: write
+2026-07-02T20:36:45.6281420Z PullRequests: write
+2026-07-02T20:36:45.6282683Z RepositoryProjects: write
+2026-07-02T20:36:45.6283874Z SecurityEvents: write
+2026-07-02T20:36:45.6284937Z Statuses: write
+2026-07-02T20:36:45.6285911Z VulnerabilityAlerts: read
+2026-07-02T20:36:45.6286856Z ##[endgroup]
+2026-07-02T20:36:45.6289953Z Secret source: Actions
+2026-07-02T20:36:45.6291680Z Prepare workflow directory
+2026-07-02T20:36:45.6779239Z Prepare all required actions
+2026-07-02T20:36:45.6837854Z Getting action download info
+2026-07-02T20:36:45.8796403Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+2026-07-02T20:36:46.0439017Z Complete job name: Dependency Audit

@@ -1,0 +1,10 @@
+﻿2026-07-02T20:36:51.4813466Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-02T20:36:51.4815577Z ##[group]Run gitleaks/gitleaks-action@v2
+2026-07-02T20:36:51.4815898Z env:
+2026-07-02T20:36:51.4818977Z   GITHUB_TOKEN: ***
+2026-07-02T20:36:51.4819211Z ##[endgroup]
+2026-07-02T20:36:51.6576301Z (node:2287) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-02T20:36:51.6577606Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-02T20:36:51.6734627Z (node:2287) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-07-02T20:36:51.7844081Z [sigmoida] is an organization. License key is required.
+2026-07-02T20:36:51.7868377Z ##[error]🛑 missing gitleaks license. Go grab one at gitleaks.io and store it as a GitHub Secret named GITLEAKS_LICENSE. For more info about the recent breaking update, see [here](https://github.com/gitleaks/gitleaks-action#-announcement).

@@ -1,0 +1,136 @@
+﻿2026-07-02T20:40:46.6063797Z Prepare all required actions
+2026-07-02T20:40:46.6064298Z Getting action download info
+2026-07-02T20:40:46.7730073Z Download action repository 'pnpm/action-setup@v4' (SHA:b906affcce14559ad1aafd4ab0e942779e9f58b1)
+2026-07-02T20:40:47.2648080Z Download action repository 'actions/setup-node@v4' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-07-02T20:40:47.3523663Z Download action repository 'actions/cache@v4' (SHA:0057852bfaa89a56745cba8c7296529d2fc39830)
+2026-07-02T20:40:47.4631971Z ##[group]Run ./.github/actions/setup-workspace
+2026-07-02T20:40:47.4632303Z with:
+2026-07-02T20:40:47.4632497Z   turbo-cache: false
+2026-07-02T20:40:47.4632728Z   prisma: true
+2026-07-02T20:40:47.4632917Z env:
+2026-07-02T20:40:47.4633128Z   MAILHOG_URL: http://localhost:8025
+2026-07-02T20:40:47.4633402Z ##[endgroup]
+2026-07-02T20:40:47.4730237Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-02T20:40:47.4732231Z ##[group]Run pnpm/action-setup@v4
+2026-07-02T20:40:47.4732495Z with:
+2026-07-02T20:40:47.4732691Z   dest: ~/setup-pnpm
+2026-07-02T20:40:47.4732907Z   run_install: null
+2026-07-02T20:40:47.4733101Z   cache: false
+2026-07-02T20:40:47.4733321Z   cache_dependency_path: pnpm-lock.yaml
+2026-07-02T20:40:47.4733671Z   package_json_file: package.json
+2026-07-02T20:40:47.4733925Z   standalone: false
+2026-07-02T20:40:47.4734121Z env:
+2026-07-02T20:40:47.4734323Z   MAILHOG_URL: http://localhost:8025
+2026-07-02T20:40:47.4734608Z ##[endgroup]
+2026-07-02T20:40:47.6268398Z ##[group]Running self-installer...
+2026-07-02T20:40:48.0675331Z (node:3684) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-07-02T20:40:48.0677446Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-02T20:40:48.2190027Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-07-02T20:40:48.4937341Z 
+2026-07-02T20:40:48.4937884Z dependencies:
+2026-07-02T20:40:48.4938188Z + pnpm 8.12.0
+2026-07-02T20:40:48.4938323Z 
+2026-07-02T20:40:48.4994322Z Packages: +1
+2026-07-02T20:40:48.4994725Z +
+2026-07-02T20:40:48.5464722Z Progress: resolved 1, reused 0, downloaded 1, added 1, done
+2026-07-02T20:40:48.5684838Z Done in 753ms
+2026-07-02T20:40:48.5862499Z ##[endgroup]
+2026-07-02T20:40:48.5863024Z Installation Completed!
+2026-07-02T20:40:48.6027162Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-02T20:40:48.6028431Z ##[group]Run actions/setup-node@v4
+2026-07-02T20:40:48.6029030Z with:
+2026-07-02T20:40:48.6029253Z   node-version-file: .nvmrc
+2026-07-02T20:40:48.6029491Z   cache: pnpm
+2026-07-02T20:40:48.6029687Z   always-auth: false
+2026-07-02T20:40:48.6029902Z   check-latest: false
+2026-07-02T20:40:48.6032790Z   token: ***
+2026-07-02T20:40:48.6032985Z env:
+2026-07-02T20:40:48.6033190Z   MAILHOG_URL: http://localhost:8025
+2026-07-02T20:40:48.6033522Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-07-02T20:40:48.6033832Z ##[endgroup]
+2026-07-02T20:40:48.7455153Z Node version file is not JSON file
+2026-07-02T20:40:48.7457098Z Resolved .nvmrc as 20.19.5
+2026-07-02T20:40:48.7478404Z Attempting to download 20.19.5...
+2026-07-02T20:40:48.7589583Z (node:3697) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-02T20:40:48.7590935Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-02T20:40:49.5121883Z Acquiring 20.19.5 - x64 from https://github.com/actions/node-versions/releases/download/20.19.5-17451167955/node-20.19.5-linux-x64.tar.gz
+2026-07-02T20:40:50.0268466Z Extracting ...
+2026-07-02T20:40:50.0393056Z [command]/usr/bin/tar xz --strip 1 --warning=no-unknown-keyword --overwrite -C /home/runner/work/_temp/9aa5e594-8cdc-4096-9d22-85dc7ef75892 -f /home/runner/work/_temp/591af6fd-3426-4f06-9cc9-22a350fd9fd5
+2026-07-02T20:40:51.0578339Z Adding to the cache ...
+2026-07-02T20:40:52.9505506Z ##[group]Environment details
+2026-07-02T20:40:53.1833201Z node: v20.19.5
+2026-07-02T20:40:53.1833642Z npm: 10.8.2
+2026-07-02T20:40:53.1833973Z yarn: 1.22.22
+2026-07-02T20:40:53.1834636Z ##[endgroup]
+2026-07-02T20:40:53.1860423Z [command]/home/runner/setup-pnpm/node_modules/.bin/pnpm store path --silent
+2026-07-02T20:40:53.5768886Z /home/runner/setup-pnpm/node_modules/.bin/store/v3
+2026-07-02T20:40:53.8674220Z Cache hit for: node-cache-Linux-x64-pnpm-fc739e9ce3af9124622ee0916e2e85b4d90368bff66d576a6bd0c5dc52c3d59e
+2026-07-02T20:40:53.8777413Z (node:3697) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-07-02T20:40:55.1534533Z Received 4194304 of 386870584 (1.1%), 4.0 MBs/sec
+2026-07-02T20:40:56.1535274Z Received 117440512 of 386870584 (30.4%), 56.0 MBs/sec
+2026-07-02T20:40:57.1526769Z Received 264241152 of 386870584 (68.3%), 84.0 MBs/sec
+2026-07-02T20:40:58.0113696Z Received 386870584 of 386870584 (100.0%), 95.6 MBs/sec
+2026-07-02T20:40:58.0114834Z Cache Size: ~369 MB (386870584 B)
+2026-07-02T20:40:58.0231744Z [command]/usr/bin/tar -xf /home/runner/work/_temp/9fae20ec-5348-4fbf-914d-3dd833307eeb/cache.tzst -P -C /home/runner/work/tarodan-app/tarodan-app --use-compress-program unzstd
+2026-07-02T20:41:04.2150283Z Cache restored successfully
+2026-07-02T20:41:04.2326072Z Cache restored from key: node-cache-Linux-x64-pnpm-fc739e9ce3af9124622ee0916e2e85b4d90368bff66d576a6bd0c5dc52c3d59e
+2026-07-02T20:41:04.2537343Z ##[group]Run pnpm install --frozen-lockfile
+2026-07-02T20:41:04.2537785Z [36;1mpnpm install --frozen-lockfile[0m
+2026-07-02T20:41:04.2576590Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-07-02T20:41:04.2576976Z env:
+2026-07-02T20:41:04.2577209Z   MAILHOG_URL: http://localhost:8025
+2026-07-02T20:41:04.2577563Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-07-02T20:41:04.2577888Z ##[endgroup]
+2026-07-02T20:41:04.7087961Z Scope: all 12 workspace projects
+2026-07-02T20:41:04.8386947Z Lockfile is up to date, resolution step is skipped
+2026-07-02T20:41:05.3970795Z Packages: +2807
+2026-07-02T20:41:05.3990482Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-07-02T20:41:05.4055838Z Progress: resolved 0, reused 1, downloaded 0, added 0
+2026-07-02T20:41:06.4071385Z Progress: resolved 0, reused 821, downloaded 0, added 0
+2026-07-02T20:41:07.4065742Z Progress: resolved 0, reused 2248, downloaded 0, added 131
+2026-07-02T20:41:08.4071877Z Progress: resolved 0, reused 2248, downloaded 0, added 531
+2026-07-02T20:41:09.4094982Z Progress: resolved 0, reused 2248, downloaded 0, added 1648
+2026-07-02T20:41:10.4130291Z Progress: resolved 0, reused 2248, downloaded 0, added 2169
+2026-07-02T20:41:11.4150276Z Progress: resolved 0, reused 2248, downloaded 0, added 2576
+2026-07-02T20:41:12.0046118Z Progress: resolved 0, reused 2248, downloaded 0, added 2807, done
+2026-07-02T20:41:12.6498971Z 
+2026-07-02T20:41:12.8853984Z . postinstall$ echo Skipping husky
+2026-07-02T20:41:12.8954644Z . postinstall: Skipping husky
+2026-07-02T20:41:12.8968820Z . postinstall: Done
+2026-07-02T20:41:12.9043748Z Done in 8.6s
+2026-07-02T20:41:12.9635594Z Prepare all required actions
+2026-07-02T20:41:12.9662735Z ##[group]Run ./.github/actions/prisma-generate
+2026-07-02T20:41:12.9663078Z env:
+2026-07-02T20:41:12.9663303Z   MAILHOG_URL: http://localhost:8025
+2026-07-02T20:41:12.9663637Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-07-02T20:41:12.9663952Z ##[endgroup]
+2026-07-02T20:41:12.9695746Z ##[group]Run attempt=0
+2026-07-02T20:41:12.9696015Z [36;1mattempt=0[0m
+2026-07-02T20:41:12.9696229Z [36;1mmax_attempts=3[0m
+2026-07-02T20:41:12.9696548Z [36;1muntil pnpm --filter @tarodan/api prisma:generate; do[0m
+2026-07-02T20:41:12.9696922Z [36;1m  attempt=$((attempt + 1))[0m
+2026-07-02T20:41:12.9697229Z [36;1m  if [ $attempt -ge $max_attempts ]; then[0m
+2026-07-02T20:41:12.9697656Z [36;1m    echo "::error::prisma generate failed after $max_attempts attempts" >&2[0m
+2026-07-02T20:41:12.9698051Z [36;1m    exit 1[0m
+2026-07-02T20:41:12.9698251Z [36;1m  fi[0m
+2026-07-02T20:41:12.9698461Z [36;1m  backoff=$((attempt * 10))[0m
+2026-07-02T20:41:12.9699272Z [36;1m  echo "::warning::prisma generate failed (attempt $attempt/$max_attempts), retrying in ${backoff}s..."[0m
+2026-07-02T20:41:12.9699782Z [36;1m  sleep $backoff[0m
+2026-07-02T20:41:12.9700006Z [36;1mdone[0m
+2026-07-02T20:41:12.9733009Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-07-02T20:41:12.9733380Z env:
+2026-07-02T20:41:12.9733603Z   MAILHOG_URL: http://localhost:8025
+2026-07-02T20:41:12.9733944Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-07-02T20:41:12.9734253Z ##[endgroup]
+2026-07-02T20:41:13.4270201Z 
+2026-07-02T20:41:13.4271231Z > @tarodan/api@1.0.0 prisma:generate /home/runner/work/tarodan-app/tarodan-app/apps/api
+2026-07-02T20:41:13.4271810Z > prisma generate
+2026-07-02T20:41:13.4271954Z 
+2026-07-02T20:41:13.7652516Z Prisma schema loaded from prisma/schema.prisma
+2026-07-02T20:41:15.5772644Z 
+2026-07-02T20:41:15.5774418Z ✔ Generated Prisma Client (v5.22.0) to ./../../node_modules/@prisma/client in 867ms
+2026-07-02T20:41:15.5775186Z 
+2026-07-02T20:41:15.5775872Z Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+2026-07-02T20:41:15.5776526Z 
+2026-07-02T20:41:15.5777487Z Tip: Want to react to database changes in your app as they happen? Discover how with Pulse: https://pris.ly/tip-1-pulse
+2026-07-02T20:41:15.5778345Z 
