@@ -1,6 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { UserService } from './user.service';
+import { UserCommonService } from './user-common.service';
+import { UserProfileService } from './user-profile.service';
+import { UserAddressService } from './user-address.service';
+import { UserSocialService } from './user-social.service';
+import { UserStatsService } from './user-stats.service';
+import { UserAnalyticsService } from './user-analytics.service';
+import { UserDiscoveryService } from './user-discovery.service';
+import { UserBankService } from './user-bank.service';
 import { PrismaService } from '../../prisma';
 import { NotificationService } from '../notification/notification.service';
 import { RatingService } from '../rating/rating.service';
@@ -35,6 +43,14 @@ describe('UserService deleteAddress (edge case 1.11)', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserService,
+        UserCommonService,
+        UserProfileService,
+        UserAddressService,
+        UserSocialService,
+        UserStatsService,
+        UserAnalyticsService,
+        UserDiscoveryService,
+        UserBankService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: NotificationService, useValue: {} },
         { provide: RatingService, useValue: {} },
