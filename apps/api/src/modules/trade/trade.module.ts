@@ -6,6 +6,7 @@ import { TradeService } from './trade.service';
 import { TradeShipmentService } from './trade-shipment.service';
 import { TradeCommonService } from './trade-common.service';
 import { TradeQueryService } from './trade-query.service';
+import { TradeLifecycleService } from './trade-lifecycle.service';
 import { TradeSchedulerService } from './trade-scheduler.service';
 import { TradeScheduledProcessor } from './trade-scheduled.processor';
 import { QUEUE_NAMES } from '../../workers/constants';
@@ -22,7 +23,7 @@ import { SuratCargoModule } from '../surat-cargo/surat-cargo.module';
 @Module({
   imports: [ScheduleModule.forRoot(), PrismaModule, CacheModule, MembershipModule, forwardRef(() => NotificationModule), StorageModule, PaymentModule, ProductModule, EventModule, SuratCargoModule, BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED })],
   controllers: [TradeController],
-  providers: [TradeService, TradeShipmentService, TradeCommonService, TradeQueryService, TradeSchedulerService, TradeScheduledProcessor],
+  providers: [TradeService, TradeShipmentService, TradeCommonService, TradeQueryService, TradeLifecycleService, TradeSchedulerService, TradeScheduledProcessor],
   exports: [TradeService],
 })
 export class TradeModule {}
