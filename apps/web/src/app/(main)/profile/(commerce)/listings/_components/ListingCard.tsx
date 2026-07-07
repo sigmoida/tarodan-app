@@ -3,7 +3,6 @@
 'use client';
 
 import Link from 'next/link';
-import { motion } from 'framer-motion';
 import {
 	PencilIcon,
 	TrashIcon,
@@ -23,7 +22,12 @@ import {
 	isProductOnSaleDisplay,
 	getProductOriginalPriceForDisplay,
 } from '@/lib/productPrice';
-import { getListingImage, formatTL, type EstimatedNet, type Listing } from '../_lib/types';
+import {
+	getListingImage,
+	formatTL,
+	type EstimatedNet,
+	type Listing,
+} from '../_lib/types';
 import { getListingStatus } from '../_lib/status';
 
 const VIEWABLE = ['active', 'sold', 'reserved', 'inactive'];
@@ -56,11 +60,7 @@ export default function ListingCard({
 		listing.status === 'inactive';
 
 	return (
-		<motion.div
-			initial={{ opacity: 0, y: 20 }}
-			animate={{ opacity: 1, y: 0 }}
-			transition={{ delay: index * 0.05 }}
-			className='group relative flex flex-col overflow-hidden rounded-lg border border-border bg-surface-elevated transition-shadow hover:shadow-lg'>
+		<div className='group relative flex flex-col overflow-hidden rounded-lg border border-border bg-surface-elevated transition-shadow hover:shadow-lg'>
 			{/* Media */}
 			<div className='relative aspect-square bg-surface-alt'>
 				<OptimizedImage
@@ -111,7 +111,9 @@ export default function ListingCard({
 							<span className='text-sm text-subtle line-through'>
 								{formatTL(getProductOriginalPriceForDisplay(listing))}
 							</span>
-							<Badge variant='danger' size='sm'>
+							<Badge
+								variant='danger'
+								size='sm'>
 								İndirim
 							</Badge>
 						</div>
@@ -229,6 +231,6 @@ export default function ListingCard({
 					)}
 				</div>
 			</div>
-		</motion.div>
+		</div>
 	);
 }
