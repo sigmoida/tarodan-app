@@ -70,7 +70,7 @@ export default function Footer() {
 		{
 			title: L('Güven & Güvenlik', 'Trust & Safety'),
 			links: [
-				{ href: '/guvenli-takas', label: L('Güvenli Takas', 'Secure Swap') },
+				{ href: '/secure-swap', label: L('Güvenli Takas', 'Secure Swap') },
 				{ href: '/buyer-protection', label: L('Alıcı Koruması', 'Buyer Protection') },
 				{ href: '/authenticity', label: L('Orijinallik Garantisi', 'Authenticity') },
 				{ href: '/security-features', label: L('Güvenlik Özellikleri', 'Security Features') },

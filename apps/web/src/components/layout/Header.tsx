@@ -43,7 +43,7 @@ const HIDDEN_CATEGORY_PATHS = [
 	'/checkout',
 	'/settings',
 	'/messages',
-	'/guvenli-takas',
+	'/secure-swap',
 	'/orders',
 	'/favorites',
 	'/trades',

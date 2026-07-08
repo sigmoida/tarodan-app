@@ -37,7 +37,7 @@ export const HERO_SLIDES: Record<'tr' | 'en', HeroSlide[]> = {
 			subtitle:
 				'Koleksiyonlarınızı diğer koleksiyonerlerle güvenle takas edin. Her iki taraf için korumalı sistem.',
 			cta1: { label: 'Takasa Başla', href: '/profile/trades' },
-			cta2: { label: 'Nasıl Çalışır?', href: '/guvenli-takas' },
+			cta2: { label: 'Nasıl Çalışır?', href: '/secure-swap' },
 			image: '/photos/hero/hero-trading.png',
 			imageRight: true,
 		},
@@ -65,7 +65,7 @@ export const HERO_SLIDES: Record<'tr' | 'en', HeroSlide[]> = {
 			subtitle:
 				'Trade your collections with other collectors safely. Protected system for both parties.',
 			cta1: { label: 'Start Trading', href: '/profile/trades' },
-			cta2: { label: 'How It Works?', href: '/guvenli-takas' },
+			cta2: { label: 'How It Works?', href: '/secure-swap' },
 			image: '/photos/hero/hero-trading.png',
 			imageRight: true,
 		},

@@ -154,6 +154,12 @@ const nextConfig = {
         destination: '/brands',
         permanent: true,
       },
+      // /guvenli-takas → /secure-swap (route slug İngilizce'ye çevrildi).
+      {
+        source: '/guvenli-takas',
+        destination: '/secure-swap',
+        permanent: true,
+      },
     ];
   },
 };
