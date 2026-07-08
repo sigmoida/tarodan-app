@@ -38,6 +38,18 @@ function shouldPreserveAuthTokenOn401(): boolean {
   return p === '/checkout' || p.startsWith('/payment') || p.startsWith('/cart');
 }
 
+/**
+ * Genuinely private pages — a session that expires while the user is on one
+ * should bounce to login. The whole account area lives under `/profile/*`
+ * (orders, messages, favorites, notifications, …); the owner-only edit flows are
+ * the other private surfaces. Kept in sync with the middleware matcher; public /
+ * SEO pages are deliberately absent so a stray 401 there doesn't eject the user.
+ */
+function isProtectedPath(path: string): boolean {
+  if (path.startsWith('/profile')) return true;
+  return /^\/(listings|collections)\/[^/]+\/edit$/.test(path);
+}
+
 // Response interceptor
 api.interceptors.response.use(
   (response) => response,
@@ -72,11 +84,8 @@ api.interceptors.response.use(
           (p) => currentPath === p || currentPath.startsWith(p + '/'),
         );
         clearSessionMarker();
-        if (!isPublicPath) {
-          const protectedPaths = ['/profile', '/orders', '/messages', '/favorites', '/cart/checkout'];
-          if (protectedPaths.some((path) => currentPath.startsWith(path))) {
-            window.location.href = '/login?expired=true';
-          }
+        if (!isPublicPath && isProtectedPath(currentPath)) {
+          window.location.href = '/login?expired=true';
         }
       }
     }
