@@ -1,10 +1,9 @@
 'use client';
 
-import { FormInput, FormSelect, FormTextarea, FormCheckbox, useZodForm } from '@tarodan/ui/form';
+import { FormModal, FormInput, FormSelect, FormTextarea, FormCheckbox, useZodForm } from '@tarodan/ui/form';
 import { adminApi } from '@/lib/api';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { useCategories } from '@/hooks/useCategories';
-import { FormModal } from '@/components/form/FormModal';
 import { discountSchema, type DiscountFormValues } from '../_lib/schema';
 import { discountTypeOptions, scopeFormOptions, type Discount } from '../_lib/types';
 

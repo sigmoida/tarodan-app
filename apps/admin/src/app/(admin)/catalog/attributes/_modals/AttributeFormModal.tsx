@@ -1,10 +1,9 @@
 'use client';
 
-import { FormInput, FormCheckbox, useZodForm } from '@tarodan/ui/form';
+import { FormModal, FormInput, FormCheckbox, useZodForm } from '@tarodan/ui/form';
 import { colors } from '@tarodan/ui';
 import { adminApi } from '@/lib/api';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
-import { FormModal } from '@/components/form/FormModal';
 import { attributeSchema, type AttributeFormValues } from '../_lib/schema';
 import type { Attribute } from '../_lib/types';
 

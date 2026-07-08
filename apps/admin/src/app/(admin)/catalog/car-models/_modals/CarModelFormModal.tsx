@@ -1,10 +1,9 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { FormInput, FormSelect, FormCheckbox, useZodForm } from '@tarodan/ui/form';
+import { FormModal, FormInput, FormSelect, FormCheckbox, useZodForm } from '@tarodan/ui/form';
 import { adminApi } from '@/lib/api';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
-import { FormModal } from '@/components/form/FormModal';
 import { carModelSchema, type CarModelFormValues } from '../_lib/schema';
 import type { Brand, CarModel } from '../_lib/types';
 

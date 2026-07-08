@@ -1,9 +1,8 @@
 'use client';
 
-import { FormInput, FormTextarea, FormCheckbox, FormImageUpload, useZodForm } from '@tarodan/ui/form';
+import { FormModal, FormInput, FormTextarea, FormCheckbox, FormImageUpload, useZodForm } from '@tarodan/ui/form';
 import { adminApi } from '@/lib/api';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
-import { FormModal } from '@/components/form/FormModal';
 import { manufacturerSchema, type ManufacturerFormValues } from '../_lib/schema';
 import type { Manufacturer } from '../_lib/types';
 

@@ -2,10 +2,9 @@
 
 import toast from 'react-hot-toast';
 import { Button } from '@tarodan/ui';
-import { FormInput, FormSelect, useZodForm } from '@tarodan/ui/form';
+import { FormModal, FormInput, FormSelect, useZodForm } from '@tarodan/ui/form';
 import { adminApi } from '@/lib/api';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
-import { FormModal } from '@/components/form/FormModal';
 import { ROLES, ROLE_META, type RoleId } from '../_lib/constants';
 import { staffSchema, type StaffFormValues } from '../_lib/schema';
 import type { StaffItem } from '../_lib/types';

@@ -3,11 +3,10 @@
 import { useState } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { Input } from '@tarodan/ui';
-import { FormInput, FormSelect, FormCheckbox, useZodForm } from '@tarodan/ui/form';
+import { FormModal, FormInput, FormSelect, FormCheckbox, useZodForm } from '@tarodan/ui/form';
 import { adminApi } from '@/lib/api';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { useCategories } from '@/hooks/useCategories';
-import { FormModal } from '@/components/form/FormModal';
 import { fmtTry } from '@/lib/format';
 import {
   type CommissionRule,

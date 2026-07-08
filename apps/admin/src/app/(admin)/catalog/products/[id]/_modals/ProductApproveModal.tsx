@@ -1,9 +1,8 @@
 'use client';
 
-import { FormTextarea, useZodForm } from '@tarodan/ui/form';
+import { FormModal, FormTextarea, useZodForm } from '@tarodan/ui/form';
 import { adminApi } from '@/lib/api';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
-import { FormModal } from '@/components/form/FormModal';
 import { productApproveSchema, type ProductApproveValues } from '../_lib/schema';
 
 export function ProductApproveModal({

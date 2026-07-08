@@ -3,6 +3,7 @@
 import { useRef, useState, useCallback } from 'react';
 import { useFormContext } from 'react-hook-form';
 import {
+  FormModal,
   FormInput,
   FormSelect,
   FormCheckbox,
@@ -17,7 +18,6 @@ import {
 import toast from 'react-hot-toast';
 import { adminApi } from '@/lib/api';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
-import { FormModal } from '@/components/form/FormModal';
 import {
   type Ad,
   type AdFormValues,
