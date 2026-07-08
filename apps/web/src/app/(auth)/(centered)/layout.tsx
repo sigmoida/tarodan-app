@@ -6,15 +6,18 @@ import { usePathname } from 'next/navigation';
 import { useTranslation } from '@/i18n';
 
 /**
- * Shared two-panel hero frame for every auth screen. LEFT column = brand logo +
- * the centered form card (`AuthCard`, rendered as `children`) + copyright. RIGHT
- * column = a per-route marketplace hero image + gradient + headline (and stats
- * on the entry screens), shown on `lg+`. The frame + form card are identical
- * everywhere; only the hero image/copy changes per page — one config below.
+ * Shared two-panel hero frame for every auth screen. One column = brand logo +
+ * the centered form (`AuthCard`, rendered as `children`) + copyright. The other
+ * column = a per-route marketplace hero image with a punchy, top-left headline
+ * (and stats on the entry screens), shown on `lg+`. The frame + form are
+ * identical everywhere; per page, the hero image/copy AND which side it sits on
+ * change — all from the one config below.
  */
 
 interface Hero {
   image: string;
+  /** Which side the hero panel sits on at `lg+` — the form takes the other. */
+  side: 'left' | 'right';
   titleTr: string;
   titleEn: string;
   subtitleTr: string;
@@ -28,63 +31,35 @@ const HERO_BY_PATH: Array<{ prefix: string; hero: Hero }> = [
     prefix: '/register/business',
     hero: {
       image: '/photos/hero/hero-trading.png',
-      titleTr: 'Şirket Hesabı',
-      titleEn: 'Business Account',
-      subtitleTr:
-        'Gelişmiş özelliklere erişmek ve şirket ilanlarınızı yönetmek için şirket hesabı oluşturun.',
+      side: 'right',
+      titleTr: 'İşini Vitrine Taşı',
+      titleEn: 'Put Your Business Center Stage',
+      subtitleTr: 'Şirket hesabıyla binlerce koleksiyonere ulaş, ilanlarını tek yerden yönet.',
       subtitleEn:
-        'Create a business account to access advanced features and manage your company listings.',
+        'Reach thousands of collectors and manage every listing from one business account.',
     },
   },
   {
     prefix: '/register',
     hero: {
       image: '/photos/hero/hero-hot-wheels.png',
-      titleTr: 'Koleksiyonunuzu Büyütün',
-      titleEn: 'Grow Your Collection',
-      subtitleTr: 'Ücretsiz üye olun, diecast yolculuğunuza bugün başlayın.',
-      subtitleEn: 'Sign up for free and start your diecast journey today.',
+      side: 'left',
+      titleTr: 'Koleksiyonun Başlasın',
+      titleEn: 'Let the Collection Begin',
+      subtitleTr: 'Ücretsiz katıl, ilk modelini bugün keşfet.',
+      subtitleEn: 'Join free and discover your first model today.',
       stats: true,
-    },
-  },
-  {
-    prefix: '/forgot-password',
-    hero: {
-      image: '/photos/hero/hero-trading.png',
-      titleTr: 'Şifreni mi unuttun?',
-      titleEn: 'Forgot your password?',
-      subtitleTr: 'Endişelenme — hesabına yeniden erişmen için sana bir bağlantı gönderelim.',
-      subtitleEn: "No worries — we'll send you a link to get back into your account.",
-    },
-  },
-  {
-    prefix: '/reset-password',
-    hero: {
-      image: '/photos/hero/hero-trading.png',
-      titleTr: 'Yeni Şifre Belirle',
-      titleEn: 'Set a New Password',
-      subtitleTr: 'Güçlü bir şifre seç ve hesabına güvenle geri dön.',
-      subtitleEn: 'Choose a strong password and get back to your account safely.',
-    },
-  },
-  {
-    prefix: '/verify-email',
-    hero: {
-      image: '/photos/hero/hero-marketplace.png',
-      titleTr: 'E-postanı Doğrula',
-      titleEn: 'Verify Your Email',
-      subtitleTr: 'Hesabını etkinleştirmek için son bir adım kaldı.',
-      subtitleEn: 'One last step to activate your account.',
     },
   },
 ];
 
 const DEFAULT_HERO: Hero = {
   image: '/photos/hero/hero-marketplace.png',
-  titleTr: 'Koleksiyonerlerin Buluşma Noktası',
-  titleEn: 'The Meeting Point for Collectors',
-  subtitleTr: 'Binlerce diecast model arasından aradığınızı bulun.',
-  subtitleEn: "Find what you're looking for among thousands of diecast models.",
+  side: 'right',
+  titleTr: 'Koleksiyonun Kalbi Burada',
+  titleEn: 'Where Collections Come Alive',
+  subtitleTr: 'Binlerce diecast model, tek adres. Aradığını bul, koleksiyonunu büyüt.',
+  subtitleEn: 'Thousands of diecast models, one place. Find it, own it, grow it.',
   stats: true,
 };
 
@@ -101,6 +76,7 @@ export default function AuthHeroLayout({
   const pathname = usePathname();
   const hero = heroFor(pathname ?? '/login');
   const en = locale === 'en';
+  const heroLeft = hero.side === 'left';
 
   const stats = [
     { v: '10K+', l: en ? 'Listings' : 'İlan' },
@@ -110,8 +86,12 @@ export default function AuthHeroLayout({
 
   return (
     <div className="flex min-h-screen">
-      {/* Left — form column */}
-      <div className="flex flex-1 flex-col bg-surface-elevated">
+      {/* Form column */}
+      <div
+        className={`flex flex-1 flex-col bg-surface-elevated ${
+          heroLeft ? 'lg:order-2' : 'lg:order-1'
+        }`}
+      >
         <header className="p-6">
           <Link href="/" className="inline-flex items-center gap-2">
             <Image
@@ -136,8 +116,12 @@ export default function AuthHeroLayout({
         </footer>
       </div>
 
-      {/* Right — per-route hero panel (lg+) */}
-      <div className="relative hidden flex-1 overflow-hidden lg:flex">
+      {/* Per-route hero panel (lg+), side driven by config */}
+      <div
+        className={`relative hidden flex-1 overflow-hidden lg:flex ${
+          heroLeft ? 'lg:order-1' : 'lg:order-2'
+        }`}
+      >
         <Image
           src={hero.image}
           alt="Diecast model araba koleksiyonu"
@@ -145,29 +129,32 @@ export default function AuthHeroLayout({
           className="object-cover"
           priority
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-heading/70 via-heading/50 to-heading/20" />
-        <div className="absolute inset-0 z-10 flex items-center justify-center p-10">
-          <div>
-            <h2 className="mb-2 text-2xl font-bold text-inverted drop-shadow-lg">
+        {/* Darkest at the top-left corner so the headline stays legible there. */}
+        <div className="absolute inset-0 bg-gradient-to-br from-heading/80 via-heading/45 to-heading/10" />
+
+        <div className="absolute inset-0 z-10 flex flex-col justify-between p-10 lg:p-14">
+          <div className="max-w-lg">
+            <h2 className="text-4xl font-extrabold leading-tight tracking-tight text-inverted drop-shadow-lg lg:text-5xl">
               {en ? hero.titleEn : hero.titleTr}
             </h2>
-            <p className="max-w-md text-sm text-inverted/80 drop-shadow">
+            <p className="mt-4 max-w-md text-base text-inverted/85 drop-shadow lg:text-lg">
               {en ? hero.subtitleEn : hero.subtitleTr}
             </p>
-            {hero.stats && (
-              <div className="mt-5 flex items-center gap-6">
-                {stats.map((s, i) => (
-                  <div key={s.l} className="flex items-center gap-6">
-                    {i > 0 && <div className="h-6 w-px bg-surface-elevated/30" />}
-                    <div>
-                      <p className="text-lg font-bold text-inverted drop-shadow">{s.v}</p>
-                      <p className="text-xs text-inverted/60">{s.l}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
+
+          {hero.stats && (
+            <div className="flex items-center gap-8">
+              {stats.map((s, i) => (
+                <div key={s.l} className="flex items-center gap-8">
+                  {i > 0 && <div className="h-8 w-px bg-inverted/25" />}
+                  <div>
+                    <p className="text-2xl font-bold text-inverted drop-shadow">{s.v}</p>
+                    <p className="text-xs uppercase tracking-wide text-inverted/60">{s.l}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

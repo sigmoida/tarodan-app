@@ -4,12 +4,13 @@ import Link from 'next/link';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 
 /**
- * The single card shell for EVERY auth screen (login, register, business
- * register, forgot / reset password, verify email — form state AND success /
- * status states). One wrapper, one radius/shadow/padding/border, one header
- * position: title + optional description, always top-left, in the same spot on
- * every screen. Screens render only their fields (or status content) as
- * `children`; links go in `footer`. No per-form gradient badges or bespoke cards.
+ * The single shell for EVERY auth screen (login, register, business register,
+ * forgot / reset password, verify email — form state AND success / status
+ * states). A plain constrained column — no card chrome (border / padding /
+ * shadow / bg); the surrounding layout owns the background. One header position:
+ * title + optional description, always top-left, in the same spot on every
+ * screen. Screens render only their fields (or status content) as `children`;
+ * links go in `footer`.
  */
 export function AuthCard({
   title,
@@ -29,7 +30,7 @@ export function AuthCard({
   footer?: React.ReactNode;
 }) {
   return (
-    <div className="w-full max-w-md rounded-2xl border border-border bg-surface-elevated p-8 shadow-sm">
+    <div className="w-full max-w-md">
       {backHref && (
         <Link
           href={backHref}

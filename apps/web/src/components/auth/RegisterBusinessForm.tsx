@@ -224,69 +224,77 @@ export function RegisterBusinessForm() {
           placeholder={locale === 'en' ? 'Company Name' : 'Şirket İsmi'}
         />
 
-        <FormInput
-          name="email"
-          type="email"
-          label={`${t('auth.email')} *`}
-          placeholder={locale === 'en' ? 'example@email.com' : 'ornek@email.com'}
-        />
+        <div className="grid grid-cols-2 gap-4">
+          <FormInput
+            name="email"
+            type="email"
+            label={`${t('auth.email')} *`}
+            placeholder={locale === 'en' ? 'example@email.com' : 'ornek@email.com'}
+          />
 
-        <FormInput
-          name="phone"
-          label={`${t('auth.phone')} *`}
-          placeholder="5XX XXX XX XX"
-        />
+          <FormInput
+            name="phone"
+            label={`${t('auth.phone')} *`}
+            placeholder="5XX XXX XX XX"
+          />
+        </div>
 
-        <FormSelect
-          name="companyType"
-          label={`${locale === 'en' ? 'Company Type' : 'Şirket Türü'} *`}
-        >
-          <option value="">
-            {locale === 'en' ? 'Select Company Type' : 'Şirket Türü Seçin'}
-          </option>
-          {COMPANY_TYPES.map((type) => (
-            <option key={type} value={type}>
-              {type}
+        <div className="grid grid-cols-2 gap-4">
+          <FormSelect
+            name="companyType"
+            label={`${locale === 'en' ? 'Company Type' : 'Şirket Türü'} *`}
+          >
+            <option value="">
+              {locale === 'en' ? 'Select Company Type' : 'Şirket Türü Seçin'}
             </option>
-          ))}
-        </FormSelect>
+            {COMPANY_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </FormSelect>
 
-        <FormInput
-          name="taxId"
-          label={`${locale === 'en' ? 'Tax ID Number' : 'Vergi Kimlik Numarası'} *`}
-          placeholder={locale === 'en' ? '10-11 digits' : '10-11 haneli'}
-          inputMode="numeric"
-          maxLength={11}
-        />
+          <FormInput
+            name="taxId"
+            label={`${locale === 'en' ? 'Tax ID Number' : 'Vergi Kimlik Numarası'} *`}
+            placeholder={locale === 'en' ? '10-11 digits' : '10-11 haneli'}
+            inputMode="numeric"
+            maxLength={11}
+          />
+        </div>
 
-        <FormSelect name="city" label={`${locale === 'en' ? 'City' : 'İl'} *`}>
-          <option value="">{locale === 'en' ? 'Select City' : 'İl Seçin'}</option>
-          {TURKISH_CITIES.map((cityName) => (
-            <option key={cityName} value={cityName}>
-              {cityName}
-            </option>
-          ))}
-        </FormSelect>
+        <div className="grid grid-cols-2 gap-4">
+          <FormSelect name="city" label={`${locale === 'en' ? 'City' : 'İl'} *`}>
+            <option value="">{locale === 'en' ? 'Select City' : 'İl Seçin'}</option>
+            {TURKISH_CITIES.map((cityName) => (
+              <option key={cityName} value={cityName}>
+                {cityName}
+              </option>
+            ))}
+          </FormSelect>
 
-        <FormInput
-          name="district"
-          label={`${locale === 'en' ? 'District' : 'İlçe'} *`}
-          placeholder={locale === 'en' ? 'District' : 'İlçe'}
-        />
+          <FormInput
+            name="district"
+            label={`${locale === 'en' ? 'District' : 'İlçe'} *`}
+            placeholder={locale === 'en' ? 'District' : 'İlçe'}
+          />
+        </div>
 
-        <FormInput
-          name="password"
-          type="password"
-          label={`${t('auth.password')} *`}
-          placeholder="••••••••"
-        />
+        <div className="grid grid-cols-2 gap-4">
+          <FormInput
+            name="password"
+            type="password"
+            label={`${t('auth.password')} *`}
+            placeholder="••••••••"
+          />
 
-        <FormInput
-          name="confirmPassword"
-          type="password"
-          label={`${t('auth.confirmPassword')} *`}
-          placeholder="••••••••"
-        />
+          <FormInput
+            name="confirmPassword"
+            type="password"
+            label={`${t('auth.confirmPassword')} *`}
+            placeholder="••••••••"
+          />
+        </div>
 
         <FormCheckbox
           name="agreeTerms"

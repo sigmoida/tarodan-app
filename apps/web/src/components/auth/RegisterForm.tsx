@@ -149,38 +149,42 @@ export function RegisterForm() {
           autoComplete="email"
         />
 
-        <FormInput
-          name="phone"
-          type="tel"
-          label={t('auth.phone')}
-          placeholder="5XX XXX XX XX"
-          autoComplete="tel"
-        />
+        <div className="grid grid-cols-2 gap-4">
+          <FormInput
+            name="phone"
+            type="tel"
+            label={t('auth.phone')}
+            placeholder="5XX XXX XX XX"
+            autoComplete="tel"
+          />
 
-        <FormInput
-          name="birthDate"
-          type="date"
-          label={`${t('auth.birthDate')} *`}
-          max={getMaxBirthDate()}
-        />
+          <FormInput
+            name="birthDate"
+            type="date"
+            label={`${t('auth.birthDate')} *`}
+            max={getMaxBirthDate()}
+          />
+        </div>
 
-        <FormInput
-          name="password"
-          type="password"
-          label={`${t('auth.password')} *`}
-          placeholder="••••••••"
-          autoComplete="new-password"
-        />
+        <div className="grid grid-cols-2 gap-4">
+          <FormInput
+            name="password"
+            type="password"
+            label={`${t('auth.password')} *`}
+            placeholder="••••••••"
+            autoComplete="new-password"
+          />
+
+          <FormInput
+            name="confirmPassword"
+            type="password"
+            label={`${t('auth.confirmPassword')} *`}
+            placeholder="••••••••"
+            autoComplete="new-password"
+          />
+        </div>
 
         <PasswordChecklist password={form.watch('password')} locale={locale} />
-
-        <FormInput
-          name="confirmPassword"
-          type="password"
-          label={`${t('auth.confirmPassword')} *`}
-          placeholder="••••••••"
-          autoComplete="new-password"
-        />
 
         <FormCheckbox
           name="agreeTerms"
