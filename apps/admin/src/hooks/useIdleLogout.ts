@@ -1,23 +1,22 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { useAuthStore } from '@/lib/stores/authStore';
+import { useSession } from '@/context/SessionContext';
 
-/** Hareketsizlik süresi (ms). Balanced politika: 1 saat. */
+/** Idle duration (ms). Balanced policy: 1 hour. */
 const IDLE_TIMEOUT_MS = 60 * 60 * 1000;
-/** Aktivite olaylarını bu aralıkta en çok bir kez işle (gürültüyü azalt). */
+/** Process activity events at most once per this interval (reduce noise). */
 const ACTIVITY_THROTTLE_MS = 5 * 1000;
-/** Sekmeler arası son aktivite paylaşımı (hassas değil). */
+/** Cross-tab sharing of last activity (not sensitive). */
 const LAST_ACTIVITY_KEY = 'admin_last_activity';
 
 /**
- * 1 saat hareketsizlikte otomatik logout + /login'e yönlendirme.
- * lastActivity localStorage'da paylaşılır; böylece bir sekmedeki aktivite diğerlerinin
- * timer'ını da tazeler ve oturum gerçekten boştayken kapanır.
+ * Auto-logout + redirect to /login after 1 hour of inactivity.
+ * lastActivity is shared via localStorage, so activity in one tab also refreshes
+ * the others' timers and the session only closes when it's truly idle.
  */
 export function useIdleLogout() {
-  const logout = useAuthStore((s) => s.logout);
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const { logout, isAuthenticated } = useSession();
   const lastWriteRef = useRef(0);
 
   useEffect(() => {
@@ -27,7 +26,7 @@ export function useIdleLogout() {
 
     const triggerLogout = () => {
       void logout();
-      // logout zaten /login'e yönlendiriyor; expired işareti için yine de ekle.
+      // logout already redirects to /login; still add the expired marker.
       if (window.location.pathname !== '/login') {
         window.location.href = '/login?expired=idle';
       }
@@ -63,7 +62,7 @@ export function useIdleLogout() {
     events.forEach((ev) => window.addEventListener(ev, markActivity, { passive: true }));
     window.addEventListener('storage', onStorage);
 
-    // İlk aktiviteyi işaretle ve timer'ı kur.
+    // Mark initial activity and set up the timer.
     markActivity();
 
     return () => {

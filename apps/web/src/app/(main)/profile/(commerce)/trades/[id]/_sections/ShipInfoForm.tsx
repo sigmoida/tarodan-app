@@ -1,0 +1,103 @@
+/** @format */
+
+import Link from "next/link";
+import { TruckIcon } from "@heroicons/react/24/outline";
+import { Button, Select, Spinner } from "@tarodan/ui";
+
+interface ShipInfoFormProps {
+  locale: string;
+  addresses: any[];
+  addressesLoading: boolean;
+  shipAddressId: string;
+  onShipAddressChange: (id: string) => void;
+  onSubmit: () => void;
+  isActionLoading: boolean;
+}
+
+export default function ShipInfoForm({
+  locale,
+  addresses,
+  addressesLoading,
+  shipAddressId,
+  onShipAddressChange,
+  onSubmit,
+  isActionLoading,
+}: ShipInfoFormProps) {
+  return (
+    <div className="card p-6 mb-6 bg-primary-50 border-primary-200">
+      <h2 className="text-lg font-semibold text-heading mb-4">
+        {locale === "en" ? "Enter Shipping Info" : "Kargo Bilgisi Gir"}
+      </h2>
+      <p className="text-muted text-sm mb-4">
+        {locale === "en"
+          ? "Select the address you will ship from and the carrier."
+          : "Gönderim yapacağınız adresi ve kargo firmasını seçin."}
+      </p>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-body mb-2">
+            {locale === "en" ? "Shipping address" : "Gönderim adresi"}
+          </label>
+          <Select
+            value={shipAddressId}
+            onChange={(e) => onShipAddressChange(e.target.value)}
+            className="rounded-xl"
+          >
+            <option value="">
+              {addressesLoading
+                ? locale === "en"
+                  ? "Loading..."
+                  : "Yükleniyor..."
+                : locale === "en"
+                  ? "Select address"
+                  : "Adres seçin"}
+            </option>
+            {addresses.map((addr: any) => (
+              <option key={addr.id} value={addr.id}>
+                {addr.fullName || addr.title} – {addr.city} / {addr.district}{" "}
+                {addr.address ? `– ${addr.address}` : ""}
+              </option>
+            ))}
+          </Select>
+          {addresses.length === 0 && !addressesLoading && (
+            <p className="text-sm text-warning-600 mt-2">
+              {locale === "en"
+                ? "No saved addresses. Add one in "
+                : "Kayıtlı adres yok. "}
+              <Link href="/profile" className="underline font-medium">
+                {locale === "en"
+                  ? "Profile → Addresses"
+                  : "Profil → Adresler"}
+              </Link>
+              {locale === "en" ? "" : " bölümünden ekleyebilirsiniz."}
+            </p>
+          )}
+        </div>
+        <Button
+          variant="primary"
+          size="lg"
+          className="w-full flex items-center justify-center gap-2"
+          onClick={onSubmit}
+          disabled={isActionLoading || !shipAddressId || addresses.length === 0}
+        >
+          {isActionLoading ? (
+            <>
+              <Spinner
+                size="sm"
+                color="border-surface-elevated border-t-transparent"
+              />
+              {locale === "en" ? "Submitting..." : "Gönderiliyor..."}
+            </>
+          ) : (
+            <>
+              <TruckIcon className="w-5 h-5" />
+              {locale === "en"
+                ? "Submit Shipping Info"
+                : "Kargo Bilgisini Gönder"}
+            </>
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+}

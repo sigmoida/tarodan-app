@@ -1,28 +1,34 @@
+/** @format */
+
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Noto_Sans } from 'next/font/google';
 import './globals.css';
 import { Toaster } from 'react-hot-toast';
-import AuthBootstrap from '@/components/AuthBootstrap';
 
-const inter = Inter({ subsets: ['latin'] });
+const notoSans = Noto_Sans({
+	subsets: ['latin', 'latin-ext'],
+	weight: '400',
+});
 
 export const metadata: Metadata = {
-  title: 'Tarodan Admin Panel',
-  description: 'Tarodan Marketplace Administration Dashboard',
+	title: 'Tarodan Admin',
+	description: 'Tarodan Marketplace yönetim paneli',
 };
 
 export default function RootLayout({
-  children,
+	children,
 }: {
-  children: React.ReactNode;
+	children: React.ReactNode;
 }) {
-  return (
-    <html lang="tr">
-      <body className={inter.className}>
-        <AuthBootstrap />
-        <Toaster position="bottom-right" toastOptions={{ style: { maxWidth: '360px' } }} />
-        {children}
-      </body>
-    </html>
-  );
+	return (
+		<html lang='tr'>
+			<body className={notoSans.className}>
+				<Toaster
+					position='bottom-right'
+					toastOptions={{ style: { maxWidth: '360px' } }}
+				/>
+				{children}
+			</body>
+		</html>
+	);
 }

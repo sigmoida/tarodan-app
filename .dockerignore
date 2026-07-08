@@ -1,0 +1,24 @@
+# Dependencies — reinstalled inside the image from the lockfile
+**/node_modules
+
+# Build output & caches — rebuilt inside the image
+**/.next
+**/.turbo
+**/dist
+**/out
+**/coverage
+
+# Local env / secrets — never bake into an image layer
+**/.env
+**/.env.*
+!**/.env.example
+
+# VCS & tooling
+.git
+.gitignore
+**/.DS_Store
+**/*.log
+
+# Editor / IDE
+.vscode
+.idea

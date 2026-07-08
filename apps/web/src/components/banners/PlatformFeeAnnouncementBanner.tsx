@@ -45,7 +45,7 @@ export function PlatformFeeAnnouncementBanner() {
           satın almalardan ürün bedelinin <strong>%3'ü oranında</strong>{" "}
           Platform Hizmet Bedeli alınmaya başlanmıştır.{" "}
           <Link
-            href="/platform-hizmet-bedeli"
+            href="/platform-service-fee"
             className="underline hover:text-info-700 font-medium"
           >
             Detaylı bilgi

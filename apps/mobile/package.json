@@ -4,7 +4,7 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
-    "eas-build-post-install": "cd ../.. && pnpm --filter @tarodan/design-tokens --filter @tarodan/core --filter @tarodan/types --filter @tarodan/api-client run build",
+    "eas-build-post-install": "cd ../.. && pnpm --filter @tarodan/types run build",
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
@@ -26,8 +26,6 @@
     "@react-native-community/datetimepicker": "8.4.4",
     "@react-native-google-signin/google-signin": "^16.1.2",
     "@tanstack/react-query": "^5.45.0",
-    "@tarodan/api-client": "workspace:*",
-    "@tarodan/core": "workspace:*",
     "@tarodan/design-tokens": "workspace:*",
     "@tarodan/types": "workspace:*",
     "@tarodan/ui-native": "workspace:*",

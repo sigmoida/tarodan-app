@@ -1,5 +1,5 @@
 import type { Config } from 'tailwindcss';
-import tarodanPreset from '@tarodan/ui/tailwind-preset';
+import tarodanPreset from '@tarodan/design-tokens/tailwind';
 
 const config: Config = {
   presets: [tarodanPreset as Config],
@@ -9,19 +9,10 @@ const config: Config = {
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     '../../packages/ui/src/**/*.{ts,tsx}',
   ],
+  // All design tokens (colors, radius, spacing, typography, ...) come from the
+  // preset (@tarodan/design-tokens/tailwind). Keep app-specific overrides only.
   theme: {
-    extend: {
-      // Web-specific overrides only (preset handles shared tokens)
-      borderRadius: {
-        none: '0px',
-        sm: '2px',
-        DEFAULT: '4px',
-        md: '4px',
-        lg: '6px',
-        xl: '8px',
-        '2xl': '10px',
-      },
-    },
+    extend: {},
   },
   plugins: [],
 };

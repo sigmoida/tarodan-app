@@ -29,7 +29,7 @@ const nextConfig = {
   // standalone ile "Starting..."da takılıyor → dev'de devre dışı bırak.
   output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
   reactStrictMode: true,
-  transpilePackages: ['@tarodan/ui', '@tarodan/design-tokens'],
+  transpilePackages: ['@tarodan/ui', '@tarodan/design-tokens', '@tarodan/shared'],
   webpack: (config, { isServer }) => {
     // ESM packages için webpack config
     if (!isServer) {
@@ -152,6 +152,18 @@ const nextConfig = {
       {
         source: '/modeller',
         destination: '/brands',
+        permanent: true,
+      },
+      // /guvenli-takas → /secure-swap (route slug İngilizce'ye çevrildi).
+      {
+        source: '/guvenli-takas',
+        destination: '/secure-swap',
+        permanent: true,
+      },
+      // /platform-hizmet-bedeli → /platform-service-fee (route slug İngilizce'ye çevrildi).
+      {
+        source: '/platform-hizmet-bedeli',
+        destination: '/platform-service-fee',
         permanent: true,
       },
     ];

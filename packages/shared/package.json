@@ -1,0 +1,20 @@
+{
+  "name": "@tarodan/shared",
+  "private": true,
+  "sideEffects": false,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint \"src/**/*.ts\"",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo"
+  },
+  "devDependencies": {
+    "@tarodan/eslint-config": "workspace:*",
+    "@tarodan/tsconfig": "workspace:*",
+    "typescript": "^5.3.2"
+  }
+}

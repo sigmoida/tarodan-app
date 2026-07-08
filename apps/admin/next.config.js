@@ -8,7 +8,7 @@ const nextConfig = {
   // Dev'de StrictMode effect'leri 2× çalıştırıp her yükleme/hata toast'ını ikiye
   // katlıyordu (örn. "Siparişler/Ayarlar yüklenemedi" 2×). Kapatıyoruz.
   reactStrictMode: false,
-  transpilePackages: ['@tarodan/ui', '@tarodan/design-tokens'],
+  transpilePackages: ['@tarodan/ui', '@tarodan/design-tokens', '@tarodan/shared'],
   experimental: {
     outputFileTracingRoot: path.join(__dirname, '../../'),
     // Next 14.2 strictly requires a Suspense boundary around useSearchParams()
@@ -54,18 +54,8 @@ const nextConfig = {
     contentDispositionType: 'attachment',
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
-  env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
-  },
-  async rewrites() {
-    const apiUrl = process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${apiUrl}/api/:path*`,
-      },
-    ];
-  },
+  // Data calls go to the same-origin BFF proxy at app/api/[...path]/route.ts
+  // (which injects the Bearer token server-side) — no next.config rewrite.
 };
 
 // Sentry configuration options

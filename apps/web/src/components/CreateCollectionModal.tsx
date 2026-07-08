@@ -38,7 +38,7 @@ export default function CreateCollectionModal({
       const errorMessage = error.response?.data?.message || 'Koleksiyon oluşturulamadı';
       toast.error(errorMessage);
       if (errorMessage.includes('üyeliğiniz') || errorMessage.includes('yetkiniz yok')) {
-        setTimeout(() => { window.location.href = '/pricing'; }, 2000);
+        setTimeout(() => { window.location.href = '/membership'; }, 2000);
       }
     } finally {
       setLoading(false);

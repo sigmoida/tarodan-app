@@ -1,28 +1,28 @@
 /**
- * Escrow / payout zamanlama yardımcıları (yeni escrow modeli).
+ * Escrow / payout scheduling helpers (new escrow model).
  *
- * Kural (backend ile birebir): Satıcıya ödeme = teslim (deliveredAt) + 14 gün
- * iade penceresi + 1 gün grace. Onay/ödeme anında payout YOK; teslim anında
- * PaymentHold.releaseAt set edilir. Açık bir iade varken hold frozenByRefundId
- * ile kilitlenir ve serbest bırakılamaz.
+ * Rule (mirrors the backend): payout to seller = delivery (deliveredAt) + 14-day
+ * refund window + 1-day grace. NO payout on approval/payment; PaymentHold.releaseAt
+ * is set at delivery. While a refund is open the hold is locked via frozenByRefundId
+ * and cannot be released.
  *
- * Bu modül salt-okunur UI hesabıdır — gerçek release tarihini backend yazar.
- * deliveredAt'ten türeyen tarih "tahmini serbest bırakma" olarak gösterilir;
- * payout listesindeki releaseAt varsa o gerçek değer önceliklidir.
+ * This module is a read-only UI computation — the backend writes the real release
+ * date. The date derived from deliveredAt is shown as an "estimated release"; if the
+ * payout list has a releaseAt, that real value takes precedence.
  */
 
-/** İade penceresi: teslimden sonra 14 gün koşulsuz iade. */
+/** Refund window: 14 days of unconditional returns after delivery. */
 export const REFUND_WINDOW_DAYS = 14;
-/** Pencere kapandıktan sonra payout'a kadar 1 gün grace. */
+/** 1-day grace after the window closes, before payout. */
 export const PAYOUT_GRACE_DAYS = 1;
-/** Teslimden serbest bırakmaya toplam gün (14 + 1). */
+/** Total days from delivery to release (14 + 1). */
 export const ESCROW_RELEASE_DAYS = REFUND_WINDOW_DAYS + PAYOUT_GRACE_DAYS;
 
 const DAY_MS = 86_400_000;
 
 /**
- * deliveredAt + 14 + 1 gün → tahmini serbest bırakma tarihi.
- * deliveredAt yoksa null (henüz teslim edilmedi → escrow saati başlamadı).
+ * deliveredAt + 14 + 1 days → estimated release date.
+ * Null if no deliveredAt (not yet delivered → escrow clock hasn't started).
  */
 export function computeEstimatedReleaseAt(
   deliveredAt: string | Date | null | undefined,
@@ -33,7 +33,7 @@ export function computeEstimatedReleaseAt(
   return new Date(base + ESCROW_RELEASE_DAYS * DAY_MS);
 }
 
-/** İade penceresinin (teslim + 14 gün) bitiş tarihi. */
+/** End date of the refund window (delivery + 14 days). */
 export function computeRefundWindowEnd(
   deliveredAt: string | Date | null | undefined,
 ): Date | null {
@@ -52,30 +52,30 @@ export type EscrowHoldReasonCode =
 
 export interface EscrowHoldReason {
   code: EscrowHoldReasonCode;
-  /** Kısa rozet etiketi. */
+  /** Short badge label. */
   label: string;
-  /** Bir cümlelik açıklama. */
+  /** One-sentence description. */
   detail: string;
-  /** Rozet tonu (tailwind sınıf grubu seçimi için). */
+  /** Badge tone (for picking the tailwind class group). */
   tone: 'danger' | 'warning' | 'info' | 'success';
 }
 
 export interface EscrowHoldReasonInput {
-  /** Hold frozenByRefundId dolu mu (atomik kilit). */
+  /** Is the hold's frozenByRefundId set (atomic lock). */
   frozen?: boolean;
-  /** Sipariş/Hold için açık bir iade talebi var mı. */
+  /** Is there an open refund request for the order/hold. */
   hasOpenRefund?: boolean;
-  /** Teslim tarihi (escrow saatinin başlangıcı). */
+  /** Delivery date (start of the escrow clock). */
   deliveredAt?: string | Date | null;
-  /** Gerçek release tarihi (backend yazdıysa öncelikli). */
+  /** Real release date (takes precedence if the backend wrote it). */
   releaseAt?: string | Date | null;
-  /** Karşılaştırma anı (test edilebilirlik için). */
+  /** Comparison instant (for testability). */
   now?: Date;
 }
 
 /**
- * Bir hold neden bekliyor? Öncelik sırası:
- *   frozen > açık iade > teslim+14 dolmadı > teslim edilmedi > hazır.
+ * Why is a hold waiting? Priority order:
+ *   frozen > open refund > delivery+14 not elapsed > not delivered > ready.
  */
 export function describeHoldReason(input: EscrowHoldReasonInput): EscrowHoldReason {
   const now = input.now ?? new Date();
@@ -130,7 +130,7 @@ export function describeHoldReason(input: EscrowHoldReasonInput): EscrowHoldReas
   };
 }
 
-/** Order.cancellationType (iptal | iade) için Türkçe rozet etiketi. */
+/** Turkish badge label for Order.cancellationType (iptal | iade). */
 export function cancellationTypeLabel(
   type?: string | null,
 ): { label: string; detail: string } | null {

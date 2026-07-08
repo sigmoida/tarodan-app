@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "sync:brand": "node scripts/sync-brand-assets.mjs",
+    "predev": "node scripts/sync-brand-assets.mjs",
     "dev": "next dev -p 3000",
+    "prebuild": "node scripts/sync-brand-assets.mjs",
     "build": "next build",
     "start": "next start -p 3000",
     "lint": "next lint",
@@ -33,8 +36,7 @@
     "@react-oauth/google": "^0.13.5",
     "@sentry/nextjs": "^7.91.0",
     "@tanstack/react-query": "^5.17.0",
-    "@tarodan/api-client": "workspace:*",
-    "@tarodan/core": "workspace:*",
+    "@tarodan/auth": "workspace:*",
     "@tarodan/design-tokens": "workspace:*",
     "@tarodan/types": "workspace:*",
     "@tarodan/ui": "workspace:*",
@@ -54,6 +56,9 @@
     "zustand": "^4.4.7"
   },
   "devDependencies": {
+    "@tarodan/brand": "workspace:*",
+    "@tarodan/eslint-config": "workspace:*",
+    "@tarodan/tsconfig": "workspace:*",
     "@playwright/test": "^1.40.0",
     "@types/node": "^20.10.0",
     "@types/react": "^18.2.42",

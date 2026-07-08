@@ -1,44 +1,48 @@
 {
-  "name": "@tarodan/ui",
-  "version": "1.0.0",
-  "description": "Shared UI components for Tarodan",
-  "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
-    },
-    "./tailwind-preset": "./src/tailwind-preset.ts"
-  },
-  "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts",
-    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
-    "lint": "eslint \"src/**/*.{ts,tsx}\"",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@radix-ui/react-dialog": "^1.0.5",
-    "@radix-ui/react-dropdown-menu": "^2.0.6",
-    "@radix-ui/react-slot": "^1.0.2",
-    "@radix-ui/react-tabs": "^1.0.4",
-    "@radix-ui/react-tooltip": "^1.0.7",
-    "@tarodan/design-tokens": "workspace:*",
-    "class-variance-authority": "^0.7.0",
-    "clsx": "^2.0.0",
-    "tailwind-merge": "^2.1.0"
-  },
-  "devDependencies": {
-    "@types/node": "^20.10.0",
-    "@types/react": "^18.2.42",
-    "tailwindcss": "^3.4.0",
-    "tsup": "^8.0.1",
-    "typescript": "^5.3.2",
-    "react": "^18.2.0"
-  },
-  "peerDependencies": {
-    "react": ">=18.0.0"
-  }
+	"name": "@tarodan/ui",
+	"private": true,
+	"sideEffects": false,
+	"main": "./src/index.ts",
+	"types": "./src/index.ts",
+	"exports": {
+		".": "./src/index.ts",
+		"./form": "./src/form.ts",
+		"./logo": "./src/components/Logo.tsx"
+	},
+	"scripts": {
+		"lint": "eslint \"src/**/*.{ts,tsx}\"",
+		"typecheck": "tsc --noEmit",
+		"clean": "rm -rf dist .turbo"
+	},
+	"dependencies": {
+		"@tarodan/brand": "workspace:*",
+		"@tarodan/design-tokens": "workspace:*",
+		"@tarodan/shared": "workspace:*",
+		"@radix-ui/react-accordion": "^1.2.0",
+		"@radix-ui/react-dropdown-menu": "^2.0.6",
+		"@radix-ui/react-navigation-menu": "^1.2.0",
+		"@radix-ui/react-select": "^2.0.0",
+		"@radix-ui/react-slot": "^1.0.2",
+		"@radix-ui/react-tabs": "^1.0.4",
+		"@radix-ui/react-tooltip": "^1.0.7",
+		"class-variance-authority": "^0.7.0",
+		"clsx": "^2.0.0",
+		"tailwind-merge": "^2.1.0"
+	},
+	"devDependencies": {
+		"@hookform/resolvers": "^3.3.4",
+		"@tarodan/eslint-config": "workspace:*",
+		"@tarodan/tsconfig": "workspace:*",
+		"@types/react": "^18.2.42",
+		"react": "^18.2.0",
+		"react-hook-form": "^7.49.3",
+		"typescript": "^5.3.2",
+		"zod": "^3.22.4"
+	},
+	"peerDependencies": {
+		"@hookform/resolvers": ">=3.3.0",
+		"react": ">=18.0.0",
+		"react-hook-form": ">=7.49.0",
+		"zod": ">=3.22.0"
+	}
 }

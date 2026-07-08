@@ -53,6 +53,10 @@ scripts/generate-images.mjs
 
 # Seed tarafından photos/ kopyalanır; kaynak photos/ root'ta
 apps/web/public/photos/
+
+# @tarodan/brand tarafından üretilen marka logoları (sync:brand / predev / prebuild)
+apps/web/public/tarodan-logo.jpg
+apps/web/public/tarodan-logo-transparent.png
 .claude/
 
 # PayTR Direkt API vendor PDF/örnek klasörü — lokal referans, repoya girmez
@@ -61,3 +65,6 @@ PayTR Direkt API/
 PayTR IFrame API/
 # Playwright MCP test artefaktları (snapshot/screenshot/log) — repoya girmez
 .playwright-mcp/
+
+# Cursor IDE ayar/plan dosyaları — repoya girmez (içerik junk/cursor-plans altına taşındı)
+.cursor/

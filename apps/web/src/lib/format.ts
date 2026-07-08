@@ -1,3 +1,46 @@
+// Cached Intl instances — built once and reused across every row (constructing an
+// Intl formatter is the costly part; formatting with it is cheap). Replaces the
+// per-render `new Date().toLocaleDateString()` / `toLocaleString()` churn in lists.
+const tlNumberFmt = new Intl.NumberFormat('tr-TR', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+const dateFmt = new Intl.DateTimeFormat('tr-TR');
+const timeFmt = new Intl.DateTimeFormat('tr-TR', {
+  hour: '2-digit',
+  minute: '2-digit',
+});
+const dateTimeFmt = new Intl.DateTimeFormat('tr-TR', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+type DateLike = string | number | Date | null | undefined;
+
+/** Locale-default short date (dd.MM.yyyy) — matches `toLocaleDateString('tr-TR')`. */
+export function formatDate(value: DateLike): string {
+  if (value === null || value === undefined || value === '') return '';
+  const d = value instanceof Date ? value : new Date(value);
+  return isNaN(d.getTime()) ? '' : dateFmt.format(d);
+}
+
+/** Short time (HH:mm) — matches `toLocaleTimeString('tr-TR', { hour, minute })`. */
+export function formatTime(value: DateLike): string {
+  if (value === null || value === undefined || value === '') return '';
+  const d = value instanceof Date ? value : new Date(value);
+  return isNaN(d.getTime()) ? '' : timeFmt.format(d);
+}
+
+/** Short date + time (dd.MM.yyyy HH:mm). */
+export function formatDateTime(value: DateLike): string {
+  if (value === null || value === undefined || value === '') return '';
+  const d = value instanceof Date ? value : new Date(value);
+  return isNaN(d.getTime()) ? '' : dateTimeFmt.format(d);
+}
+
 /**
  * Format price as "12.30 TL" instead of "₺12.30" or "TRY 12.30"
  */
@@ -12,8 +55,12 @@ export function formatPrice(price: number | string | null | undefined): string {
     return '0,00 TL';
   }
 
-  return `${numPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`;
+  return `${tlNumberFmt.format(numPrice)} TL`;
 }
+
+/** Alias of {@link formatPrice} — "12,30 TL". The single money formatter used
+ * across profile surfaces (my-listings, orders, offers, trades, …). */
+export const formatTL = formatPrice;
 
 /**
  * Format price without TL suffix (for cases where TL is added separately)

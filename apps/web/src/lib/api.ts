@@ -1,11 +1,13 @@
 import axios from 'axios';
+import { hasAuthMarker, clearAuthMarker } from '@/lib/authMarker';
 
-// Tarayıcıda doğrudan API'ye git (3001); proxy bazen 500 veriyor. Sunucu tarafında /api (rewrite) kullanılır.
+// Browser → same-origin BFF proxy (`/bff`): the proxy adds the `Bearer` token
+// server-side from the Next-owned `web_at` cookie and refreshes it on 401, so the
+// browser never holds an API token. Public/guest calls work through the same hop
+// (no cookie → no Bearer). Public SSR fetches use the absolute API directly (not
+// this client); server-side axios (rare) also goes direct.
 const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-const baseURL =
-  typeof window !== 'undefined'
-    ? `${API_ORIGIN}/api`
-    : '/api';
+const baseURL = typeof window !== 'undefined' ? '/bff' : `${API_ORIGIN}/api`;
 
 export const api = axios.create({
   baseURL,
@@ -18,16 +20,14 @@ export const api = axios.create({
 
 /**
  * httpOnly cookie JS'ten okunamadığı için "kullanıcının oturumu var mıydı" kararını
- * hassas OLMAYAN bir işaretçiyle veririz (token DEĞERİ değil, yalnızca '1'). authStore
- * login/checkAuth başarısında set eder, logout/kesin 401'de silinir.
+ * server'ın session ile birlikte yazdığı JS-okunabilir `tarodan_authed` cookie'siyle
+ * veririz (token DEĞERİ değil, yalnızca varlık). Bkz. lib/authMarker.
  */
-export const AUTH_MARKER_KEY = 'tarodan_authed';
 function hadSession(): boolean {
-  if (typeof window === 'undefined') return false;
-  return localStorage.getItem(AUTH_MARKER_KEY) === '1';
+  return hasAuthMarker();
 }
 function clearSessionMarker() {
-  if (typeof window !== 'undefined') localStorage.removeItem(AUTH_MARKER_KEY);
+  clearAuthMarker();
 }
 
 /** Checkout / ödeme sırasında 401'de token silmek PayTR dönüşü veya /payments/status çağrısını kırar. */
@@ -37,12 +37,22 @@ function shouldPreserveAuthTokenOn401(): boolean {
   return p === '/checkout' || p.startsWith('/payment') || p.startsWith('/cart');
 }
 
+/**
+ * Genuinely private pages — a session that expires while the user is on one
+ * should bounce to login. The whole account area lives under `/profile/*`
+ * (orders, messages, favorites, notifications, …); the owner-only edit flows are
+ * the other private surfaces. Kept in sync with the middleware matcher; public /
+ * SEO pages are deliberately absent so a stray 401 there doesn't eject the user.
+ */
+function isProtectedPath(path: string): boolean {
+  if (path.startsWith('/profile')) return true;
+  return /^\/(listings|collections)\/[^/]+\/edit$/.test(path);
+}
+
 // Response interceptor
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest = error.config;
-
     // Banlı kullanıcı: backend BannedUserGuard tüm istekleri 403 + USER_BANNED
     // ile bloklar. Kullanıcıyı /banned sayfasına yönlendir (zaten oradaysa dokunma).
     const errData = error.response?.data;
@@ -60,43 +70,21 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      if (typeof window !== 'undefined' && originalRequest.url !== '/auth/refresh') {
-        try {
-          // Refresh token httpOnly cookie'de; body göndermiyoruz. Doğrudan API'ye, cookie ile.
-          // Sunucu yeni cookie'leri set eder → orijinal isteği tekrarla.
-          await axios.post(`${API_ORIGIN}/api/auth/refresh`, null, {
-            withCredentials: true,
-          });
-          return api(originalRequest);
-        } catch (refreshError: any) {
-          // Refresh'in network/5xx ile patlaması (API erişilemez) ≠ geçersiz refresh token.
-          // Sadece refresh GERÇEKTEN 401/403 dönerse oturumu kapat; geçici hatada işareti koru
-          // ki API hıçkırınca (özellikle ödeme dönüşü) kullanıcı login'e atılmasın.
-          const refreshStatus = refreshError?.response?.status;
-          const refreshRejectedAuth = refreshStatus === 401 || refreshStatus === 403;
-          const had = hadSession();
-          if (refreshRejectedAuth && !shouldPreserveAuthTokenOn401()) {
-            clearSessionMarker();
-          }
-
-          // Yalnızca gerçekten süresi dolmuş oturumlarda yönlendir; misafir/geçici hatada asla.
-          if (refreshRejectedAuth && had) {
-            const currentPath = window.location?.pathname || '';
-            const publicPathsNoRedirect = ['/track-order', '/orders/track', '/login', '/register'];
-            const isPublicPath = publicPathsNoRedirect.some(p => currentPath === p || currentPath.startsWith(p + '/'));
-            if (!isPublicPath) {
-              const protectedPaths = ['/profile', '/orders', '/messages', '/favorites', '/cart/checkout'];
-              const isProtectedPath = protectedPaths.some(path => currentPath.startsWith(path));
-              if (isProtectedPath) {
-                window.location.href = '/login?expired=true';
-              }
-            }
-          }
-
-          return Promise.reject(refreshError);
+    // 401 → the BFF proxy already attempted a server-side refresh; reaching the
+    // client means the session is genuinely gone. Clear the marker and, on a
+    // protected page, bounce to login. Guests, temporary errors, and checkout /
+    // payment returns are left alone (shouldPreserveAuthTokenOn401).
+    if (error.response?.status === 401 && typeof window !== 'undefined') {
+      const had = hadSession();
+      if (had && !shouldPreserveAuthTokenOn401()) {
+        const currentPath = window.location?.pathname || '';
+        const publicPathsNoRedirect = ['/track-order', '/profile/orders/track', '/login', '/register'];
+        const isPublicPath = publicPathsNoRedirect.some(
+          (p) => currentPath === p || currentPath.startsWith(p + '/'),
+        );
+        clearSessionMarker();
+        if (!isPublicPath && isProtectedPath(currentPath)) {
+          window.location.href = '/login?expired=true';
         }
       }
     }
@@ -108,10 +96,13 @@ api.interceptors.response.use(
 export const authApi = {
   login: (email: string, password: string) =>
     api.post('/auth/login', { email, password }),
+<<<<<<< HEAD
   loginWithGoogle: (idToken: string) =>
     api.post('/auth/google', { idToken }),
   loginWithApple: (idToken: string, fullName?: string) =>
     api.post('/auth/apple', { identityToken: idToken, fullName }),
+=======
+>>>>>>> web-app-refactor
   register: (data: { displayName: string; email: string; password: string; phone?: string; birthDate?: string; acceptsMarketingEmails?: boolean }) =>
     api.post('/auth/register', data),
   logout: () => api.post('/auth/logout'),
@@ -474,6 +465,11 @@ export const userApi = {
     api.get('/products/my', { params }),
   getMyProductById: (id: string) => api.get(`/products/my/${id}`),
   getStats: () => api.get('/users/me/stats'),
+  // Public home-page spotlights
+  getTopCollections: (limit = 20) =>
+    api.get('/users/top-collections', { params: { limit } }),
+  getFeaturedCollector: () => api.get('/users/featured-collector'),
+  getFeaturedBusiness: () => api.get('/users/featured-business'),
 };
 
 // Messages (thread-based messaging)

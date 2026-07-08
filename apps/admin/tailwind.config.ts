@@ -1,5 +1,5 @@
 import type { Config } from 'tailwindcss';
-import tarodanPreset from '@tarodan/ui/tailwind-preset';
+import tarodanPreset from '@tarodan/design-tokens/tailwind';
 
 const config: Config = {
   presets: [tarodanPreset as Config],
@@ -18,15 +18,8 @@ const config: Config = {
       },
     },
     extend: {
-      borderRadius: {
-        none: '0px',
-        sm: '2px',
-        DEFAULT: '4px',
-        md: '4px',
-        lg: '6px',
-        xl: '8px',
-        '2xl': '10px',
-      },
+      // Tokens (colors/radius/spacing/...) come from the preset; keep only
+      // admin-specific extensions below.
       keyframes: {
         'accordion-down': {
           from: { height: '0' },

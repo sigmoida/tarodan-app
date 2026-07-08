@@ -1,0 +1,69 @@
+'use client';
+
+import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { DataTable } from '@/components/DataTable';
+import { useResourceList } from '@/components/list';
+import { StatusUpdateModal } from '../[id]/_modals/StatusUpdateModal';
+import { orderColumns } from '../_lib/columns';
+import { orderRowMenu } from '../_lib/rowActions';
+import { type Order, mapOrders, useOrderGroups } from '../_lib/orders';
+
+/**
+ * The orders table — the page's unique logic (checkout-group accordion) lives
+ * here, reading rows from the ResourceList context. Status editing goes through
+ * the shared StatusUpdateModal (same as the detail page).
+ */
+export function OrdersTable() {
+  const router = useRouter();
+  const { rows, isLoading, search, filters } = useResourceList<any>();
+
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [statusOrder, setStatusOrder] = useState<Order | null>(null);
+
+  const toggleGroup = (gid: string) =>
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(gid)) next.delete(gid);
+      else next.add(gid);
+      return next;
+    });
+
+  const orders = useMemo(() => mapOrders(rows), [rows]);
+  const { displayRows, rowClassById } = useOrderGroups(orders, expandedGroups);
+
+  const columns = orderColumns({
+    expandedGroups,
+    toggleGroup,
+    rowMenu: orderRowMenu({
+      onView: (o) => router.push(`/operations/orders/${o.id}`),
+      onEditStatus: (o) => setStatusOrder(o),
+    }),
+  });
+
+  const emptyText =
+    search || filters.status !== 'all' || filters.userId
+      ? 'Filtreye uygun sipariş bulunamadı'
+      : 'Henüz sipariş yok';
+
+  return (
+    <>
+      <DataTable
+        columns={columns}
+        data={displayRows}
+        loading={isLoading}
+        rowClassName={(o) => rowClassById.get(o.id)}
+        emptyText={emptyText}
+        getRowId={(o) => o.id}
+      />
+      {statusOrder && (
+        <StatusUpdateModal
+          open
+          orderId={statusOrder.id}
+          currentStatus={statusOrder.status}
+          onClose={() => setStatusOrder(null)}
+        />
+      )}
+    </>
+  );
+}
