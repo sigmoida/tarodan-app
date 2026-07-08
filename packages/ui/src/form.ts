@@ -9,4 +9,5 @@ export { FormSelect, type FormSelectProps } from './components/form/FormSelect';
 export { FormTextarea, type FormTextareaProps } from './components/form/FormTextarea';
 export { FormCheckbox, type FormCheckboxProps } from './components/form/FormCheckbox';
 export { FormImageUpload, type FormImageUploadProps } from './components/form/FormImageUpload';
+export { FormModal, type FormModalProps } from './components/form/FormModal';
 export { useZodForm } from './lib/use-zod-form';

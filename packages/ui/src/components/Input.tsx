@@ -134,9 +134,13 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
 			<button
 				type='button'
 				tabIndex={-1}
+				// Toggling must not steal focus from the field — keep the input
+				// focused (no flicker) and the eye reads as an internal icon, not a
+				// separate control with its own focus ring.
+				onMouseDown={(e) => e.preventDefault()}
 				onClick={() => !props.disabled && setShowPassword((v) => !v)}
 				aria-label={showPassword ? 'Şifreyi gizle' : 'Şifreyi göster'}
-				className='flex items-center text-subtle hover:text-body transition-colors disabled:cursor-not-allowed'
+				className='flex items-center text-subtle outline-none transition-colors hover:text-body focus:outline-none disabled:cursor-not-allowed'
 				disabled={props.disabled}>
 				{showPassword ? <EyeOffIcon /> : <EyeIcon />}
 			</button>

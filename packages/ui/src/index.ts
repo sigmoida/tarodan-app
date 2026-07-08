@@ -43,6 +43,7 @@ export { Alert, type AlertProps } from './components/Alert';
 export { Modal, type ModalProps } from './components/Modal';
 export { Dialog, ConfirmDialog, ModalFooter, type DialogProps, type ConfirmDialogProps, type ModalFooterProps } from './components/Dialog';
 export { EmptyState, type EmptyStateProps } from './components/EmptyState';
+export { ThumbnailStack, type ThumbnailStackProps } from './components/ThumbnailStack';
 export { Breadcrumb, type BreadcrumbProps, type BreadcrumbItem } from './components/Breadcrumb';
 
 // Table
