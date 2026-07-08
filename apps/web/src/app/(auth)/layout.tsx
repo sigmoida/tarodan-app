@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/server/session';
+import QueryProvider from '@/components/QueryProvider';
 
 /** Auth pages are never indexable — one layout-level guard so a new page can't
  *  forget it (individual pages may still override title/description). */
@@ -26,5 +27,8 @@ export default async function AuthLayout({
   const session = await getSession();
   if (session) redirect('/');
 
-  return <>{children}</>;
+  // Server shell (auth gate + noindex) that provides a single QueryClient to the
+  // whole group — the auth forms use TanStack mutations and (main)'s provider
+  // doesn't wrap this route group.
+  return <QueryProvider>{children}</QueryProvider>;
 }

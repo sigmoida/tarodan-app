@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import QueryProvider from '@/components/QueryProvider';
 import { ResetPasswordForm } from '../../_components/ResetPasswordForm';
 
 export const metadata: Metadata = {
@@ -11,10 +10,8 @@ export const metadata: Metadata = {
 
 export default function ResetPasswordPage() {
   return (
-    <QueryProvider>
-      <Suspense>
-        <ResetPasswordForm />
-      </Suspense>
-    </QueryProvider>
+    <Suspense>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }
