@@ -23,6 +23,7 @@ import AccountMenu from './header/AccountMenu';
 import CategoryNav from './header/CategoryNav';
 import TopAdsBar from './header/TopAdsBar';
 import { useHeaderData } from './header/_hooks/useHeaderData';
+import { shouldShowCategoryBar } from './header/_lib/categoryBar';
 
 const AuthRequiredModal = dynamic(
 	withChunkErrorLogging(
@@ -31,29 +32,6 @@ const AuthRequiredModal = dynamic(
 	),
 	{ ssr: false },
 );
-
-// NOT: '/collections' burada DEĞİL — kategori çubuğu (Tüm İlanlar/İndirimler/
-// Koleksiyonlar...) public koleksiyonlar sayfasında da görünmeli, yoksa kullanıcı
-// koleksiyonlara girince navigasyon kayboluyor. (/profile/collections '/profile'
-// ile zaten gizli kalır.)
-const HIDDEN_CATEGORY_PATHS = [
-	'/profile',
-	'/login',
-	'/register',
-	'/checkout',
-	'/settings',
-	'/messages',
-	'/secure-swap',
-	'/orders',
-	'/favorites',
-	'/trades',
-	'/offers',
-	'/seller',
-	'/support',
-	'/forgot-password',
-	'/reset-password',
-	'/verify-email',
-];
 
 /**
  * The whole storefront header as one unit: the top-ads marquee (scrolls away),
@@ -81,9 +59,7 @@ export default function Header() {
 	const [showAuthModal, setShowAuthModal] = useState(false);
 	const [showTradesAuthModal, setShowTradesAuthModal] = useState(false);
 
-	const showCategoryBar = !HIDDEN_CATEGORY_PATHS.some((p) =>
-		pathname.startsWith(p),
-	);
+	const showCategoryBar = shouldShowCategoryBar(pathname);
 
 	return (
 		<>
@@ -191,7 +167,7 @@ export default function Header() {
 
 				{/* Category bar - directly under the main bar, same header unit */}
 				{showCategoryBar && (
-					<div className='bg-primary-500 border-b border-primary-600 relative z-40'>
+					<div className='bg-surface border-b border-primary-300 relative z-40'>
 						<Container className='px-4'>
 							<CategoryNav />
 						</Container>

@@ -19,9 +19,9 @@ import CategoriesPanel from './nav/CategoriesPanel';
 import ScalesPanel from './nav/ScalesPanel';
 
 const NAV_LINK_CLASS =
-	'whitespace-nowrap px-3 py-2 text-sm font-medium text-inverted/90 hover:text-inverted hover:bg-surface-elevated/10 transition-colors rounded';
+	'whitespace-nowrap px-3 py-2 text-sm font-medium text-body hover:text-heading hover:bg-surface-elevated transition-colors rounded';
 const NAV_TRIGGER_CLASS =
-	'text-inverted/90 hover:text-inverted hover:bg-surface-elevated/10 data-[state=open]:bg-surface-elevated/10 data-[state=open]:text-inverted';
+	'text-body hover:text-heading hover:bg-surface-elevated data-[state=open]:bg-surface-elevated data-[state=open]:text-heading';
 
 export default function CategoryNav() {
 	const { locale } = useTranslation();
