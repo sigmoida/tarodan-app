@@ -1,7 +1,0 @@
-﻿2026-07-02T20:37:12.4741742Z ##[group]Run node scripts/scenario-coverage.mjs || echo '::warning::kapsam raporu üretilemedi'
-2026-07-02T20:37:12.4742447Z [36;1mnode scripts/scenario-coverage.mjs || echo '::warning::kapsam raporu üretilemedi'[0m
-2026-07-02T20:37:12.4775725Z shell: /usr/bin/bash -e {0}
-2026-07-02T20:37:12.4776013Z env:
-2026-07-02T20:37:12.4776276Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
-2026-07-02T20:37:12.4776600Z ##[endgroup]
-2026-07-02T20:37:12.6310339Z [scenario-coverage] docs/SCENARIO-COVERAGE.md yazıldı — %90 (2045/2260), 0 eksik.
