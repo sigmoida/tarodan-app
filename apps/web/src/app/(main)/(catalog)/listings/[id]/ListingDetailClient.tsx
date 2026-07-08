@@ -20,13 +20,6 @@ import OfferModal from './_modals/OfferModal';
 import CollectionPickerModal from './_modals/CollectionPickerModal';
 import TradePremiumModal from './_modals/TradePremiumModal';
 
-const AuthRequiredModal = dynamic(
-	withChunkErrorLogging(
-		() => import('@/components/AuthRequiredModal'),
-		'AuthRequiredModal',
-	),
-	{ ssr: false },
-);
 const ReportModal = dynamic(
 	withChunkErrorLogging(
 		() => import('@/components/ReportModal'),
@@ -41,9 +34,7 @@ function ListingDetailLayout() {
 		locale,
 		listing,
 		isLoading,
-		showAuthModal,
-		setShowAuthModal,
-		authModalConfig,
+		authModal,
 		showReportModal,
 		setShowReportModal,
 	} = useListingDetail();
@@ -111,13 +102,7 @@ function ListingDetailLayout() {
 			<OfferModal />
 			<TradePremiumModal />
 
-			<AuthRequiredModal
-				isOpen={showAuthModal}
-				onClose={() => setShowAuthModal(false)}
-				title={authModalConfig.title}
-				message={authModalConfig.message}
-				icon={authModalConfig.icon}
-			/>
+			{authModal}
 
 			<ReportModal
 				isOpen={showReportModal}

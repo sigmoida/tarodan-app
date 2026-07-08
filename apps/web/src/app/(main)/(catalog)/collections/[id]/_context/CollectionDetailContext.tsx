@@ -14,9 +14,11 @@ import {
 import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import { HeartIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n';
 import { collectionsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import { useAuthGate } from '@/hooks/useAuthGate';
 import { useConfirm } from '@/components/ConfirmProvider';
 import { isUUID, sortCollectionItems, type Collection } from '../_lib/types';
 
@@ -24,14 +26,14 @@ function useCollectionDetailValue() {
 	const params = useParams();
 	const router = useRouter();
 	const queryClient = useQueryClient();
-	const { user, isAuthenticated } = useAuthStore();
+	const { user } = useAuthStore();
+	const { requireAuth, authModal } = useAuthGate();
 	const { t, locale } = useTranslation();
 	const confirm = useConfirm();
 	const collectionIdOrSlug = params.id as string;
 	const collectionKey = ['collection', collectionIdOrSlug];
 
 	const [showAddModal, setShowAddModal] = useState(false);
-	const [showAuthModal, setShowAuthModal] = useState(false);
 	const slugReplacedRef = useRef(false);
 
 	const collectionQuery = useQuery({
@@ -123,15 +125,23 @@ function useCollectionDetailValue() {
 	});
 
 	const handleLike = () => {
-		if (!isAuthenticated) {
-			setShowAuthModal(true);
-			return;
-		}
-		if (!collection?.id) {
-			toast.error(t('collection.collectionInfoNotFound'));
-			return;
-		}
-		likeMutation.mutate();
+		requireAuth(
+			{
+				title: t('collection.loginToLike'),
+				message: t('collection.loginToLikeMsg'),
+				icon: <HeartIcon className='h-10 w-10 text-primary-500' />,
+				redirectPath: collection?.id
+					? `/collections/${collection.id}`
+					: `/collections/${collectionIdOrSlug}`,
+			},
+			() => {
+				if (!collection?.id) {
+					toast.error(t('collection.collectionInfoNotFound'));
+					return;
+				}
+				likeMutation.mutate();
+			},
+		);
 	};
 
 	const handleShare = async () => {
@@ -182,8 +192,7 @@ function useCollectionDetailValue() {
 		invalidateCollection,
 		showAddModal,
 		setShowAddModal,
-		showAuthModal,
-		setShowAuthModal,
+		authModal,
 		handleLike,
 		handleShare,
 		handleRemoveItem,

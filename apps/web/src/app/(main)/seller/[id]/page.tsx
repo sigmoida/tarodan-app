@@ -29,15 +29,12 @@ import toast from 'react-hot-toast';
 import { api, listingsApi, ratingsApi } from '@/lib/api';
 import { ProductCard } from '@/components/ui';
 import { useAuthStore } from '@/stores/authStore';
+import { useAuthGate } from '@/hooks/useAuthGate';
 import dynamic from 'next/dynamic';
 import { withChunkErrorLogging } from '@/lib/withChunkErrorLogging';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { Button } from '@tarodan/ui';
 
-const AuthRequiredModal = dynamic(
-  withChunkErrorLogging(() => import('@/components/AuthRequiredModal'), 'AuthRequiredModal'),
-  { ssr: false }
-);
 const ReportModal = dynamic(
   withChunkErrorLogging(() => import('@/components/ReportModal'), 'ReportModal'),
   { ssr: false }
@@ -106,9 +103,9 @@ export default function SellerProfilePage() {
   const queryClient = useQueryClient();
   const sellerId = params.id as string;
   const { isAuthenticated, user } = useAuthStore();
+  const { requireAuth, authModal } = useAuthGate();
   const { t, locale } = useTranslation();
-  
-  const [showAuthModal, setShowAuthModal] = useState(false);
+
   const [showReportModal, setShowReportModal] = useState(false);
   const [tab, setTab] = useState<'listings' | 'reviews'>('listings');
 
@@ -206,10 +203,7 @@ export default function SellerProfilePage() {
   const ratingStats = ratingStatsQuery.data ?? null;
 
   const handleFollow = async () => {
-    if (!isAuthenticated) {
-      setShowAuthModal(true);
-      return;
-    }
+    if (!requireAuth({ message: t('auth.authRequiredMessage') })) return;
 
     try {
       if (isFollowing) {
@@ -229,18 +223,12 @@ export default function SellerProfilePage() {
   };
 
   const handleMessage = () => {
-    if (!isAuthenticated) {
-      setShowAuthModal(true);
-      return;
-    }
+    if (!requireAuth({ message: t('auth.authRequiredMessage') })) return;
     window.location.href = `/profile/messages?to=${sellerId}`;
   };
 
   const handleReport = () => {
-    if (!isAuthenticated) {
-      setShowAuthModal(true);
-      return;
-    }
+    if (!requireAuth({ message: t('auth.authRequiredMessage') })) return;
     setShowReportModal(true);
   };
 
@@ -640,11 +628,7 @@ export default function SellerProfilePage() {
       </div>
 
       {/* Modals */}
-      <AuthRequiredModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        message={t('auth.authRequiredMessage')}
-      />
+      {authModal}
 
       {seller && (
         <ReportModal

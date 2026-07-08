@@ -4,7 +4,6 @@
 
 import {
 	createContext,
-	useCallback,
 	useContext,
 	useEffect,
 	useState,
@@ -25,15 +24,10 @@ import { useTranslation } from '@/i18n';
 import { collectionsApi, wishlistApi } from '@/lib/api';
 import { useCartStore } from '@/stores/cartStore';
 import { useAuthStore } from '@/stores/authStore';
+import { useAuthGate } from '@/hooks/useAuthGate';
 import { getCardImageUrl } from '../_lib/images';
 import { useListingData } from '../_hooks/useListingData';
 import { useProductGallery } from '../_hooks/useProductGallery';
-
-interface AuthModalConfig {
-	title: string;
-	message: string;
-	icon: ReactNode;
-}
 
 function useListingDetailValue() {
 	const params = useParams();
@@ -53,6 +47,7 @@ function useListingDetailValue() {
 		isLoading: cartLoading,
 	} = useCartStore();
 	const { isAuthenticated, user, limits } = useAuthStore();
+	const { requireAuth, authModal } = useAuthGate();
 
 	const data = useListingData(id, isAuthenticated);
 	const { listing, effectivePrice, images } = data;
@@ -111,20 +106,9 @@ function useListingDetailValue() {
 			toast.error(t('product.collectionsLoadFailed'));
 		}
 	}, [collectionsQuery.isError, collectionsQuery.error, t]);
-	const [showAuthModal, setShowAuthModal] = useState(false);
-	const [authModalConfig, setAuthModalConfig] = useState<AuthModalConfig>({
-		title: '',
-		message: '',
-		icon: null,
-	});
 	const [showReportModal, setShowReportModal] = useState(false);
 	const [showOfferModal, setShowOfferModal] = useState(false);
 	const [isAddingToCart, setIsAddingToCart] = useState(false);
-
-	const requireAuth = useCallback((config: AuthModalConfig) => {
-		setAuthModalConfig(config);
-		setShowAuthModal(true);
-	}, []);
 
 	// ---- Cart ----
 	const handleAddToCart = async () => {
@@ -408,10 +392,8 @@ function useListingDetailValue() {
 		// trade
 		showTradeModal,
 		setShowTradeModal,
-		// auth modal
-		showAuthModal,
-		setShowAuthModal,
-		authModalConfig,
+		// auth modal (rendered ready-to-drop-in element from useAuthGate)
+		authModal,
 	};
 }
 

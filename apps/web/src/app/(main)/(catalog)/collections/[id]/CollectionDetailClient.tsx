@@ -2,12 +2,9 @@
 
 'use client';
 
-import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { HeartIcon } from '@heroicons/react/24/outline';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { withChunkErrorLogging } from '@/lib/withChunkErrorLogging';
 import {
 	CollectionDetailProvider,
 	useCollectionDetail,
@@ -16,14 +13,6 @@ import CollectionBreadcrumbs from './_components/CollectionBreadcrumbs';
 import CollectionHeaderCard from './_components/CollectionHeaderCard';
 import CollectionItemsGrid from './_components/CollectionItemsGrid';
 import AddItemModal from './_modals/AddItemModal';
-
-const AuthRequiredModal = dynamic(
-	withChunkErrorLogging(
-		() => import('@/components/AuthRequiredModal'),
-		'AuthRequiredModal',
-	),
-	{ ssr: false },
-);
 
 function CollectionDetailSkeleton() {
 	return (
@@ -59,9 +48,7 @@ function CollectionDetailLayout() {
 		isLoading,
 		error,
 		collection,
-		collectionIdOrSlug,
-		showAuthModal,
-		setShowAuthModal,
+		authModal,
 	} = useCollectionDetail();
 
 	return (
@@ -89,18 +76,7 @@ function CollectionDetailLayout() {
 				</>
 			)}
 
-			<AuthRequiredModal
-				isOpen={showAuthModal}
-				onClose={() => setShowAuthModal(false)}
-				title={t('collection.loginToLike')}
-				message={t('collection.loginToLikeMsg')}
-				icon={<HeartIcon className='h-10 w-10 text-primary-500' />}
-				redirectPath={
-					collection?.id
-						? `/collections/${collection.id}`
-						: `/collections/${collectionIdOrSlug}`
-				}
-			/>
+			{authModal}
 		</PageShell>
 	);
 }
