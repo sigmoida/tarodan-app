@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import QueryProvider from '@/components/QueryProvider';
 import { LoginForm } from '../../_components/LoginForm';
 
 export const metadata: Metadata = {
@@ -8,5 +9,9 @@ export const metadata: Metadata = {
 };
 
 export default function LoginPage() {
-  return <LoginForm />;
+  return (
+    <QueryProvider>
+      <LoginForm />
+    </QueryProvider>
+  );
 }

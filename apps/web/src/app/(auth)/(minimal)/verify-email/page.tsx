@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
+import QueryProvider from '@/components/QueryProvider';
 import { VerifyEmailForm } from '../../_components/VerifyEmailForm';
 
 export const metadata: Metadata = {
@@ -10,8 +11,9 @@ export const metadata: Metadata = {
 
 export default function VerifyEmailPage() {
   return (
-    <Suspense
-      fallback={
+    <QueryProvider>
+      <Suspense
+        fallback={
         <div className="flex items-center justify-center py-10">
           <svg className="animate-spin h-8 w-8 text-primary-600" viewBox="0 0 24 24" fill="none">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -20,7 +22,8 @@ export default function VerifyEmailPage() {
         </div>
       }
     >
-      <VerifyEmailForm />
-    </Suspense>
+        <VerifyEmailForm />
+      </Suspense>
+    </QueryProvider>
   );
 }

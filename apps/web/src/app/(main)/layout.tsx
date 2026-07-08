@@ -1,6 +1,6 @@
 /** @format */
 
-import QueryProvider from './QueryProvider';
+import QueryProvider from '@/components/QueryProvider';
 import { RealtimeProvider } from '@/components/realtime/RealtimeProvider';
 import { PlatformFeeAnnouncementBanner } from '@/components/banners/PlatformFeeAnnouncementBanner';
 import { ConfirmProvider } from '@/components/ConfirmProvider';

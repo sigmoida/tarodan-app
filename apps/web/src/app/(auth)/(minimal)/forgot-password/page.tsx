@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import QueryProvider from '@/components/QueryProvider';
 import { ForgotPasswordForm } from '../../_components/ForgotPasswordForm';
 
 export const metadata: Metadata = {
@@ -8,5 +9,9 @@ export const metadata: Metadata = {
 };
 
 export default function ForgotPasswordPage() {
-  return <ForgotPasswordForm />;
+  return (
+    <QueryProvider>
+      <ForgotPasswordForm />
+    </QueryProvider>
+  );
 }

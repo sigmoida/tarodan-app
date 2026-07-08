@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import QueryProvider from '@/components/QueryProvider';
 import { RegisterBusinessForm } from '../../../_components/RegisterBusinessForm';
 
 export const metadata: Metadata = {
@@ -8,5 +9,9 @@ export const metadata: Metadata = {
 };
 
 export default function BusinessRegisterPage() {
-  return <RegisterBusinessForm />;
+  return (
+    <QueryProvider>
+      <RegisterBusinessForm />
+    </QueryProvider>
+  );
 }
