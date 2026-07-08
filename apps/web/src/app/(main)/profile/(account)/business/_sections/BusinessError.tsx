@@ -27,7 +27,7 @@ export default function BusinessError({ error }: { error: string }) {
 					</Button>
 				) : (
 					<Button asChild>
-						<Link href='/pricing'>Üyeliğimi Yükselt</Link>
+						<Link href='/membership'>Üyeliğimi Yükselt</Link>
 					</Button>
 				)
 			}

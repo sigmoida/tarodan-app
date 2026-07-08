@@ -33,7 +33,7 @@ export default function PremiumUpsell() {
 					</div>
 				</div>
 				<Button asChild variant='secondary' className='gap-2 whitespace-nowrap'>
-					<Link href='/pricing'>
+					<Link href='/membership'>
 						<SparklesIcon className='h-5 w-5' />
 						Premium&apos;a Geç
 					</Link>

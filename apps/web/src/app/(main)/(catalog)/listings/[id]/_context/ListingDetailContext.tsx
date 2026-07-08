@@ -217,7 +217,7 @@ function useListingDetailValue() {
 		}
 		if (!limits?.canCreateCollections) {
 			toast.error(t('product.collectionFeatureNotAvailable'));
-			router.push('/pricing');
+			router.push('/membership');
 			return;
 		}
 		// Opening the modal enables the collections query above.

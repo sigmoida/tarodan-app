@@ -16,7 +16,7 @@ export const SITEMAP_SECTIONS: SitemapSection[] = [
 			{ href: '/collections', labelKey: 'nav.collections' },
 			{ href: '/brands', labelKey: 'nav.brands' },
 			{ href: '/models', labelKey: 'nav.models' },
-			{ href: '/pricing', labelKey: 'membership.title' },
+			{ href: '/membership', labelKey: 'membership.title' },
 		],
 	},
 	{

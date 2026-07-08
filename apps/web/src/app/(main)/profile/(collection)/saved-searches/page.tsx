@@ -86,7 +86,7 @@ export default function SavedSearchesPage() {
 					<p className='text-sm text-warning-800'>
 						Kayıtlı arama limitinize ulaştınız ({searchLimit} arama).{' '}
 						{user?.membershipTier === 'free' && (
-							<Link href='/pricing' className='font-medium underline'>
+							<Link href='/membership' className='font-medium underline'>
 								Premium üyelikle daha fazla arama kaydedin →
 							</Link>
 						)}

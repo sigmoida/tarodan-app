@@ -55,7 +55,7 @@ function CollectionsLayout() {
 						)}
 						{needsUpgrade && (
 							<Link
-								href='/pricing'
+								href='/membership'
 								className='px-4 py-2 bg-surface-alt text-body hover:bg-border-subtle rounded text-sm font-medium transition-colors'>
 								{t('membership.upgrade')}
 							</Link>

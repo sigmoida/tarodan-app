@@ -48,7 +48,7 @@ function NewTradeContent() {
 			router.push(`/login?redirect=/profile/trades/new?listing=${listingId}`);
 		} else if (limits !== null && !canTrade) {
 			toast.error(t('trade.requiresPremium'));
-			router.push('/pricing');
+			router.push('/membership');
 		}
 	}, [authLoading, isAuthenticated, limits, canTrade, listingId, router, t]);
 

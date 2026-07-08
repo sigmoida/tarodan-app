@@ -45,7 +45,7 @@ export function LimitBanner() {
           )}
         </div>
         {!listingLimits.canCreateListing && !listingLimits.isPremium && (
-          <ButtonLink href="/pricing">Premium'a Geç</ButtonLink>
+          <ButtonLink href="/membership">Premium'a Geç</ButtonLink>
         )}
       </div>
     </div>

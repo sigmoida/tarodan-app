@@ -61,7 +61,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
 		links: [
 			{ href: '/guides#selling', label: 'İlan Verme Rehberi' },
 			{ href: '/faq#selling', label: 'Komisyon Oranları' },
-			{ href: '/pricing', label: 'Üyelik Planları' },
+			{ href: '/membership', label: 'Üyelik Planları' },
 		],
 	},
 	{
@@ -125,7 +125,7 @@ export const POPULAR_TOPICS: { q: string; href: string }[] = [
 	{ q: 'İlk satışımı nasıl yaparım?', href: '/guides#selling' },
 	{ q: '500 TL üzeri ücretsiz kargo nasıl çalışır?', href: '/faq#buying' },
 	{ q: 'Takas teklifi nasıl gönderirim?', href: '/faq#trade' },
-	{ q: 'Üyelik planları arasındaki farklar nelerdir?', href: '/pricing' },
+	{ q: 'Üyelik planları arasındaki farklar nelerdir?', href: '/membership' },
 	{ q: 'Siparişimi nasıl takip ederim?', href: '/faq#shipping' },
 	{ q: 'İade ve değişim politikası nedir?', href: '/terms' },
 ];

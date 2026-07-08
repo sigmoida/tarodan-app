@@ -33,7 +33,7 @@ export default function OptionsSection({ formData, setFormData, limits }: Option
             size="md"
           />
         ) : (
-          <Link href="/pricing" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+          <Link href="/membership" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
             Premium'a Geç →
           </Link>
         )}
