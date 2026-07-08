@@ -1,5 +1,12 @@
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/server/session';
+
+/** Auth pages are never indexable — one layout-level guard so a new page can't
+ *  forget it (individual pages may still override title/description). */
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 /**
  * Layout for unauthenticated pages (login, register, forgot/reset password,
