@@ -14,6 +14,10 @@ const API =
  */
 export const webAuthConfig: AuthConfig = {
   cookies: { access: 'web_at', refresh: 'web_rt' },
+  // JS-readable session indicator, written by the engine alongside web_at/web_rt.
+  // The client reads THIS (not a self-written localStorage flag) so its auth
+  // signal can never drift from the real session — see stores/authStore.ts.
+  indicatorCookie: 'tarodan_authed',
   apiBaseUrl: `${API}/api`,
   endpoints: {
     login: '/auth/login',

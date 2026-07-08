@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { hasAuthMarker, clearAuthMarker } from '@/lib/authMarker';
 
 // Browser → same-origin BFF proxy (`/bff`): the proxy adds the `Bearer` token
 // server-side from the Next-owned `web_at` cookie and refreshes it on 401, so the
@@ -19,16 +20,14 @@ export const api = axios.create({
 
 /**
  * httpOnly cookie JS'ten okunamadığı için "kullanıcının oturumu var mıydı" kararını
- * hassas OLMAYAN bir işaretçiyle veririz (token DEĞERİ değil, yalnızca '1'). authStore
- * login/checkAuth başarısında set eder, logout/kesin 401'de silinir.
+ * server'ın session ile birlikte yazdığı JS-okunabilir `tarodan_authed` cookie'siyle
+ * veririz (token DEĞERİ değil, yalnızca varlık). Bkz. lib/authMarker.
  */
-export const AUTH_MARKER_KEY = 'tarodan_authed';
 function hadSession(): boolean {
-  if (typeof window === 'undefined') return false;
-  return localStorage.getItem(AUTH_MARKER_KEY) === '1';
+  return hasAuthMarker();
 }
 function clearSessionMarker() {
-  if (typeof window !== 'undefined') localStorage.removeItem(AUTH_MARKER_KEY);
+  clearAuthMarker();
 }
 
 /** Checkout / ödeme sırasında 401'de token silmek PayTR dönüşü veya /payments/status çağrısını kırar. */

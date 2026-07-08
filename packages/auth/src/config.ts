@@ -26,6 +26,14 @@ export interface AuthEndpoints {
 export interface AuthConfig {
 	/** The app-owned httpOnly cookie names (must differ per app). */
 	cookies: { access: string; refresh: string };
+	/**
+	 * Optional JS-READABLE session-indicator cookie name. When set, the engine
+	 * writes a non-httpOnly `'1'` cookie of this name alongside the httpOnly
+	 * session cookies (and clears it on logout / rotates it on refresh), so the
+	 * client can detect "there is a session" without a token and WITHOUT drifting
+	 * from the real session — the server owns both. Omit to opt out (admin does).
+	 */
+	indicatorCookie?: string;
 	/** Full upstream API base including the `/api` prefix. */
 	apiBaseUrl: string;
 	endpoints: AuthEndpoints;

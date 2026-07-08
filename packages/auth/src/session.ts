@@ -3,7 +3,7 @@ import 'server-only';
 import { cookies } from 'next/headers';
 import type { NextResponse } from 'next/server';
 import type { AuthConfig } from './config';
-import { cookieOptions } from './cookies';
+import { cookieOptions, indicatorCookieOptions } from './cookies';
 
 export interface ApiFetchResult {
 	res: Response;
@@ -42,7 +42,8 @@ export function createSession<TUser>(
 	config: AuthConfig,
 	mapUser: (raw: unknown) => TUser | null,
 ): SessionToolkit<TUser> {
-	const { cookies: names, apiBaseUrl, endpoints, upstreamRefreshCookie, ttls } = config;
+	const { cookies: names, apiBaseUrl, endpoints, upstreamRefreshCookie, ttls, indicatorCookie } =
+		config;
 	const isProd = config.isProd ?? process.env.NODE_ENV === 'production';
 
 	const readTokens = () => {
@@ -57,12 +58,17 @@ export function createSession<TUser>(
 		const store = cookies();
 		store.set(names.access, access, cookieOptions(ttls.accessMaxAge, isProd));
 		store.set(names.refresh, refresh, cookieOptions(ttls.refreshMaxAge, isProd));
+		// JS-readable indicator, synced to the session so the client never drifts.
+		if (indicatorCookie) {
+			store.set(indicatorCookie, '1', indicatorCookieOptions(ttls.refreshMaxAge, isProd));
+		}
 	};
 
 	const clearTokens = () => {
 		const store = cookies();
 		store.delete(names.access);
 		store.delete(names.refresh);
+		if (indicatorCookie) store.delete(indicatorCookie);
 	};
 
 	async function doRefresh(
@@ -132,6 +138,9 @@ export function createSession<TUser>(
 	) => {
 		res.cookies.set(names.access, tokens.access, cookieOptions(ttls.accessMaxAge, isProd));
 		res.cookies.set(names.refresh, tokens.refresh, cookieOptions(ttls.refreshMaxAge, isProd));
+		if (indicatorCookie) {
+			res.cookies.set(indicatorCookie, '1', indicatorCookieOptions(ttls.refreshMaxAge, isProd));
+		}
 	};
 
 	async function getSession(): Promise<TUser | null> {

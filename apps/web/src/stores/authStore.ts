@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { authApi, userApi } from '@/lib/api';
 import { loginAction, googleLoginAction, logoutAction } from '@/lib/server/bff-auth-actions';
+import { hasAuthMarker, clearAuthMarker } from '@/lib/authMarker';
 
 // Membership tier types
 export type MembershipTier = 'free' | 'basic' | 'premium' | 'business';
@@ -186,9 +187,10 @@ function getInitialAuthFromStorage(): Pick<AuthState, 'token' | 'refreshToken' |
   if (typeof window === 'undefined') {
     return { token: null, refreshToken: null, isAuthenticated: false, isLoading: true };
   }
-  // Token artık JS'te tutulmuyor (httpOnly cookie). Girişli olabileceğimizi hassas OLMAYAN
-  // işaretçiden tahmin et; kesin karar checkAuth() ile cookie üzerinden verilir.
-  const maybeAuthed = localStorage.getItem('tarodan_authed') === '1';
+  // Token artık JS'te tutulmuyor (httpOnly cookie). Girişli olabileceğimizi, server'ın
+  // session ile birlikte yazdığı JS-okunabilir `tarodan_authed` COOKIE'sinden tahmin et
+  // (client artık kendi yazmıyor → cookie ile kayma olmaz). Kesin karar checkAuth()'ta.
+  const maybeAuthed = hasAuthMarker();
   return {
     token: null,
     refreshToken: null,
@@ -216,7 +218,7 @@ export const useAuthStore = create<AuthState>()(
         const result = await loginAction({ email, password });
         if (result.status === 'error') throw new Error(result.message);
         if (result.status === '2fa') throw new Error('İki adımlı doğrulama gerekli');
-        if (typeof window !== 'undefined') localStorage.setItem('tarodan_authed', '1');
+        // loginAction (server) yazdı: web_at/web_rt + tarodan_authed. Client yazmaz.
         await get().checkAuth();
       },
 
@@ -224,7 +226,6 @@ export const useAuthStore = create<AuthState>()(
         const result = await googleLoginAction(idToken);
         if (result.status === 'error') throw new Error(result.message);
         if (result.status === '2fa') throw new Error('İki adımlı doğrulama gerekli');
-        if (typeof window !== 'undefined') localStorage.setItem('tarodan_authed', '1');
         await get().checkAuth();
       },
 
@@ -242,7 +243,9 @@ export const useAuthStore = create<AuthState>()(
         }
 
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('tarodan_authed');
+          // tarodan_authed cookie'sini logoutAction (server) sildi; yine de yerel
+          // olarak da süresini geçir ki bir sonraki okuma anında misafir görsün.
+          clearAuthMarker();
           // Eski anahtarların tek seferlik temizliği (token artık cookie'de).
           localStorage.removeItem('auth_token');
           localStorage.removeItem('refresh_token');
@@ -258,9 +261,9 @@ export const useAuthStore = create<AuthState>()(
           localStorage.removeItem('auth_token');
           localStorage.removeItem('refresh_token');
         }
-        // Girişli olabilir miyiz? Hassas olmayan işaretçi. Yoksa profil çağrısı yapmadan misafir say.
-        const maybeAuthed =
-          typeof window !== 'undefined' && localStorage.getItem('tarodan_authed') === '1';
+        // Girişli olabilir miyiz? Server'ın yazdığı JS-okunabilir cookie. Yoksa profil
+        // çağrısı yapmadan misafir say.
+        const maybeAuthed = hasAuthMarker();
 
         if (!maybeAuthed) {
           clearUserSnapshot();
@@ -289,7 +292,7 @@ export const useAuthStore = create<AuthState>()(
           const apiUser = response.data.user || response.data;
           const user = mapApiUser(apiUser);
           const limits = TIER_LIMITS[user.membershipTier];
-          if (typeof window !== 'undefined') localStorage.setItem('tarodan_authed', '1');
+          // tarodan_authed cookie'sini server yönetir; client yazmaz.
           writeUserSnapshot(user);
           set({ user, token: null, refreshToken: null, isAuthenticated: true, limits });
         } catch (error: unknown) {
@@ -297,9 +300,7 @@ export const useAuthStore = create<AuthState>()(
           const isUnauthorized = status === 401 || status === 403;
           if (isUnauthorized) {
             // Oturum gerçekten geçersiz → işaretçiyi ve snapshot'ı temizle, oturumu kapat.
-            if (typeof window !== 'undefined') {
-              localStorage.removeItem('tarodan_authed');
-            }
+            clearAuthMarker();
             clearUserSnapshot();
             set({ user: null, token: null, refreshToken: null, isAuthenticated: false, limits: null });
           } else {

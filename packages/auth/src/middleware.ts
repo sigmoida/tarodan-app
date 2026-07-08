@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import type { AuthConfig } from './config';
 import { isExpired } from './jwt';
-import { cookieOptions } from './cookies';
+import { cookieOptions, indicatorCookieOptions } from './cookies';
 
 export interface AuthMiddlewareOptions {
 	/** Paths that never require auth (login, forgot-password, …). */
@@ -37,11 +37,27 @@ export function createAuthMiddleware(config: AuthConfig, options: AuthMiddleware
 		if (!refresh) {
 			const loginUrl = new URL(loginPath, request.url);
 			loginUrl.searchParams.set('redirect', pathname);
-			return NextResponse.redirect(loginUrl);
+			const res = NextResponse.redirect(loginUrl);
+			// No session → clear any stale JS-readable indicator so the client can't
+			// mistakenly render as authed on the next page.
+			if (config.indicatorCookie) res.cookies.set(config.indicatorCookie, '', { path: '/', maxAge: 0 });
+			return res;
 		}
 
 		const access = request.cookies.get(config.cookies.access)?.value;
 		if (!isExpired(access, skew)) {
+			// Valid session — make sure the JS-readable indicator reflects it. This
+			// self-heals sessions created before the indicator existed and keeps it
+			// fresh on every authed navigation.
+			if (config.indicatorCookie) {
+				const res = NextResponse.next();
+				res.cookies.set(
+					config.indicatorCookie,
+					'1',
+					indicatorCookieOptions(config.ttls.refreshMaxAge, isProd),
+				);
+				return res;
+			}
 			return NextResponse.next();
 		}
 
@@ -52,7 +68,9 @@ export function createAuthMiddleware(config: AuthConfig, options: AuthMiddleware
 		});
 		const tokens = res.ok ? await res.json().catch(() => null) : null;
 		if (!tokens?.accessToken) {
-			return NextResponse.redirect(new URL(loginPath, request.url));
+			const res = NextResponse.redirect(new URL(loginPath, request.url));
+			if (config.indicatorCookie) res.cookies.set(config.indicatorCookie, '', { path: '/', maxAge: 0 });
+			return res;
 		}
 
 		const newRefresh = tokens.refreshToken ?? refresh;
@@ -67,6 +85,14 @@ export function createAuthMiddleware(config: AuthConfig, options: AuthMiddleware
 			cookieOptions(config.ttls.accessMaxAge, isProd),
 		);
 		response.cookies.set(config.cookies.refresh, newRefresh, cookieOptions(config.ttls.refreshMaxAge, isProd));
+		// Keep the JS-readable indicator alive across the rotation.
+		if (config.indicatorCookie) {
+			response.cookies.set(
+				config.indicatorCookie,
+				'1',
+				indicatorCookieOptions(config.ttls.refreshMaxAge, isProd),
+			);
+		}
 		return response;
 	};
 }

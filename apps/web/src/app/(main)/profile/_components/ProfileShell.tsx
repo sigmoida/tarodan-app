@@ -3,8 +3,35 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { ProfileProvider } from '../_context/ProfileContext';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
+import { ProfileProvider, useProfile } from '../_context/ProfileContext';
 import ProfileSidebar from './ProfileSidebar';
+
+/**
+ * The two-column frame. Once auth has resolved to a guest (`mounted &&
+ * !authLoading && !isAuthenticated`), the `ProfileContext` redirect to /login is
+ * in flight — don't paint the account content in that window (the flash). While
+ * auth is still resolving (`authLoading`) an authed user keeps their SSR content,
+ * so this gate never shows a spinner to a logged-in visitor.
+ */
+function ProfileFrame({ children }: { children: ReactNode }) {
+	const { mounted, authLoading, isAuthenticated } = useProfile();
+
+	if (mounted && !authLoading && !isAuthenticated) {
+		return <AuthLoadingScreen />;
+	}
+
+	return (
+		<div className='flex flex-col gap-6 lg:flex-row'>
+			<aside className='hidden lg:block lg:w-64 lg:flex-shrink-0'>
+				<div className='lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto'>
+					<ProfileSidebar />
+				</div>
+			</aside>
+			<div className='min-w-0 flex-1'>{children}</div>
+		</div>
+	);
+}
 
 /**
  * The `/profile/*` two-column frame: a sticky account nav on the left (the
@@ -16,14 +43,7 @@ import ProfileSidebar from './ProfileSidebar';
 export default function ProfileShell({ children }: { children: ReactNode }) {
 	return (
 		<ProfileProvider>
-			<div className='flex flex-col gap-6 lg:flex-row'>
-				<aside className='hidden lg:block lg:w-64 lg:flex-shrink-0'>
-					<div className='lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto'>
-						<ProfileSidebar />
-					</div>
-				</aside>
-				<div className='min-w-0 flex-1'>{children}</div>
-			</div>
+			<ProfileFrame>{children}</ProfileFrame>
 		</ProfileProvider>
 	);
 }
