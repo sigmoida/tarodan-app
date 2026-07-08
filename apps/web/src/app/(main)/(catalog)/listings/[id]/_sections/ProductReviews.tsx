@@ -7,7 +7,7 @@ import {
 	ChatBubbleLeftRightIcon,
 	CheckBadgeIcon,
 } from '@heroicons/react/24/outline';
-import { Button, Select, Spinner } from '@tarodan/ui';
+import { Badge, Button, Select, Spinner } from '@tarodan/ui';
 import { SectionCard } from '@/components/ui';
 import UserAvatar from '@/components/UserAvatar';
 import { useListingDetail } from '../_context/ListingDetailContext';
@@ -183,12 +183,14 @@ export default function ProductReviews() {
 											))}
 										</div>
 										{review.isVerifiedPurchase && (
-											<span className='inline-flex items-center gap-1 text-xs text-success-700 bg-success-50 px-2 py-0.5 rounded-full'>
-												<CheckBadgeIcon className='w-3.5 h-3.5' />
+											<Badge
+												variant='success'
+												size='sm'
+												icon={<CheckBadgeIcon className='h-3.5 w-3.5' />}>
 												{locale === 'en'
 													? 'Verified Purchase'
 													: 'Doğrulanmış Alıcı'}
-											</span>
+											</Badge>
 										)}
 										<span className='text-sm text-muted'>
 											{new Date(review.createdAt).toLocaleDateString('tr-TR')}

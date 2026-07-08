@@ -5,11 +5,11 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
-import { Spinner } from '@tarodan/ui';
+import { Badge, Spinner } from '@tarodan/ui';
 import { queryKeys } from '@/lib/query/keys';
 import { useTranslation } from '@/i18n';
 import { PageShell } from '@/components/layout/PageShell';
+import { PageHeader } from '@/components/layout/PageHeader';
 import type { Product } from '@/types/product';
 import {
 	fetchManufacturerBySlugClient,
@@ -72,12 +72,16 @@ export default function ManufacturerDetailClient() {
 	return (
 		<PageShell className='pb-24 pt-8'>
 			<div className='container mx-auto px-4 max-w-7xl'>
-				<Link
-					href='/manufacturers'
-					className='inline-flex items-center gap-2 text-subtle hover:text-primary-600 font-medium mb-8 transition-colors group'>
-					<ArrowLeftIcon className='h-4 w-4 transform group-hover:-translate-x-1 transition-transform' />
-					{t('brands.backToAll') || 'Tüm Üreticiler'}
-				</Link>
+				<PageHeader
+					backHref='/manufacturers'
+					backLabel={t('brands.backToAll') || 'Tüm Üreticiler'}
+					title={brand.name}
+					actions={
+						<Badge variant='info' size='sm'>
+							{brand.productCount} {t('brands.activeListings') || 'Aktif İlan'}
+						</Badge>
+					}
+				/>
 
 				<ManufacturerHero brand={brand} />
 

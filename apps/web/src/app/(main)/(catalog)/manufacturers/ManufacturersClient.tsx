@@ -7,6 +7,7 @@ import { Accordion, Button } from '@tarodan/ui';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ButtonLink } from '@/components/ui/ButtonLink';
+import { MetricCard } from '@/components/ui';
 import {
 	ManufacturersProvider,
 	useManufacturers,
@@ -45,16 +46,7 @@ function ManufacturersLayout() {
 			{/* Metric cards */}
 			<div className='grid grid-cols-2 gap-4 sm:grid-cols-4'>
 				{stats.map((stat) => (
-					<div
-						key={stat.label}
-						className='rounded-lg border border-border bg-surface-elevated p-4 text-center'>
-						<p className='text-2xl font-black text-heading sm:text-3xl'>
-							{stat.value}
-						</p>
-						<p className='mt-1 text-xs font-medium uppercase tracking-wider text-muted'>
-							{stat.label}
-						</p>
-					</div>
+					<MetricCard key={stat.label} value={stat.value} label={stat.label} />
 				))}
 			</div>
 
@@ -73,9 +65,7 @@ function ManufacturersLayout() {
 					<p className='mb-4 text-sm text-muted'>
 						&quot;{searchQuery}&quot; aramasıyla eşleşen üretici yok.
 					</p>
-					<Button
-						variant='secondary'
-						onClick={clearFilters}>
+					<Button variant='secondary' onClick={clearFilters}>
 						Filtreleri Temizle
 					</Button>
 				</div>
@@ -87,10 +77,7 @@ function ManufacturersLayout() {
 					onValueChange={setExpanded}
 					className='space-y-4'>
 					{filteredBrands.map((brand) => (
-						<ManufacturerCard
-							key={brand.slug}
-							brand={brand}
-						/>
+						<ManufacturerCard key={brand.slug} brand={brand} />
 					))}
 				</Accordion>
 			)}
@@ -110,16 +97,10 @@ function ManufacturersLayout() {
 							yapın. Hemen üye olun ve koleksiyonunuzu oluşturmaya başlayın.
 						</p>
 						<div className='flex items-center justify-center gap-3'>
-							<ButtonLink
-								variant='primary'
-								size='md'
-								href='/listings'>
+							<ButtonLink variant='primary' size='md' href='/listings'>
 								İlanları Keşfet
 							</ButtonLink>
-							<ButtonLink
-								variant='secondary'
-								size='md'
-								href='/register'>
+							<ButtonLink variant='secondary' size='md' href='/register'>
 								Üye Ol
 							</ButtonLink>
 						</div>

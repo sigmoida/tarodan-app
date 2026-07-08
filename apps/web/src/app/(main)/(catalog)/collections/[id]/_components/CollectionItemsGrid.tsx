@@ -3,7 +3,7 @@
 'use client';
 
 import { TrashIcon } from '@heroicons/react/24/outline';
-import { Button } from '@tarodan/ui';
+import { Badge, Button } from '@tarodan/ui';
 import { ProductCard } from '@/components/ui';
 import { useCollectionDetail } from '../_context/CollectionDetailContext';
 import { itemToProduct, type CollectionItem } from '../_lib/types';
@@ -14,14 +14,14 @@ function ItemOverlay({ item }: { item: CollectionItem }) {
 	return (
 		<div className='flex flex-col items-end gap-1'>
 			{item.isCustom && (
-				<span className='rounded bg-info-500 px-1.5 py-0.5 text-[10px] font-semibold text-inverted'>
+				<Badge variant='info' appearance='solid' size='sm'>
 					{locale === 'en' ? 'Collection' : 'Koleksiyon'}
-				</span>
+				</Badge>
 			)}
 			{item.productStatus === 'sold' && (
-				<span className='rounded bg-danger-600 px-1.5 py-0.5 text-[10px] font-semibold text-inverted'>
+				<Badge variant='danger' appearance='solid' size='sm'>
 					{locale === 'en' ? 'SOLD' : 'SATILDI'}
-				</span>
+				</Badge>
 			)}
 			{isOwner && (
 				<Button

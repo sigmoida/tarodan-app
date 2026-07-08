@@ -1,5 +1,6 @@
 /** @format */
 
+import { Badge } from '@tarodan/ui';
 import SectionCard from '@/components/ui/SectionCard';
 import { DIECAST_TIMELINE } from '../_lib/brands-data';
 
@@ -24,9 +25,9 @@ export default function DiecastTimeline() {
 							</div>
 							<div className='pb-1 pt-1'>
 								<div className='flex items-center gap-2 mb-1'>
-									<span className='text-xs font-black text-primary-600 bg-primary-50 px-2 py-0.5 rounded-sm'>
+									<Badge variant='primary' size='sm'>
 										{item.year}
-									</span>
+									</Badge>
 									<span className='text-sm font-bold text-heading'>
 										{item.event}
 									</span>

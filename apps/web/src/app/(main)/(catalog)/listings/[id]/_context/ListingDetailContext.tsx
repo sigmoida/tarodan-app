@@ -22,7 +22,7 @@ import {
 	HeartIcon as HeartOutlineIcon,
 } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n';
-import { offersApi, collectionsApi, wishlistApi } from '@/lib/api';
+import { collectionsApi, wishlistApi } from '@/lib/api';
 import { useCartStore } from '@/stores/cartStore';
 import { useAuthStore } from '@/stores/authStore';
 import { getCardImageUrl } from '../_lib/images';
@@ -119,9 +119,6 @@ function useListingDetailValue() {
 	});
 	const [showReportModal, setShowReportModal] = useState(false);
 	const [showOfferModal, setShowOfferModal] = useState(false);
-	const [offerAmount, setOfferAmount] = useState('');
-	const [offerMessage, setOfferMessage] = useState('');
-	const [isSubmittingOffer, setIsSubmittingOffer] = useState(false);
 	const [isAddingToCart, setIsAddingToCart] = useState(false);
 
 	const requireAuth = useCallback((config: AuthModalConfig) => {
@@ -225,43 +222,7 @@ function useListingDetailValue() {
 			toast.error(t('product.cannotOfferOwn'));
 			return;
 		}
-		setOfferAmount('');
-		setOfferMessage('');
 		setShowOfferModal(true);
-	};
-
-	const handleSubmitOffer = async () => {
-		if (!listing) return;
-		const amount = parseFloat(offerAmount);
-		if (isNaN(amount) || amount <= 0) {
-			toast.error(t('product.enterValidAmount'));
-			return;
-		}
-		const minOffer = effectivePrice * 0.5; // Minimum %50 of current price
-		if (amount < minOffer) {
-			toast.error(`Min: ${minOffer.toFixed(2)} TL (50%)`);
-			return;
-		}
-		if (amount >= effectivePrice) {
-			toast.error(t('product.offerMustBeLower'));
-			return;
-		}
-		setIsSubmittingOffer(true);
-		try {
-			await offersApi.create({
-				productId: listing.id,
-				amount,
-				message: offerMessage.trim() || undefined,
-			});
-			toast.success(t('product.offerSentSuccess'));
-			setShowOfferModal(false);
-			setOfferAmount('');
-			setOfferMessage('');
-		} catch (error: any) {
-			toast.error(error.response?.data?.message || t('product.offerFailed'));
-		} finally {
-			setIsSubmittingOffer(false);
-		}
 	};
 
 	// ---- Collections ----
@@ -427,14 +388,8 @@ function useListingDetailValue() {
 		handleBuyNow,
 		// offer
 		handleMakeOffer,
-		handleSubmitOffer,
 		showOfferModal,
 		setShowOfferModal,
-		offerAmount,
-		setOfferAmount,
-		offerMessage,
-		setOfferMessage,
-		isSubmittingOffer,
 		// collections
 		handleOpenCollectionModal,
 		handleAddToCollection,

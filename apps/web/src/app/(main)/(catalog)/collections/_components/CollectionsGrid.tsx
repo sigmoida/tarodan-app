@@ -13,6 +13,7 @@ import OptimizedImage from '@/components/OptimizedImage';
 import { useTranslation } from '@/i18n';
 import { Button } from '@tarodan/ui';
 import { useCollections } from '../_context/CollectionsContext';
+import CollectionVisibilityBadge from './CollectionVisibilityBadge';
 
 export default function CollectionsGrid() {
 	const { t, locale } = useTranslation();
@@ -105,15 +106,14 @@ export default function CollectionsGrid() {
 								</div>
 							)}
 							<div className='absolute top-1.5 right-1.5'>
-								{collection.isPublic ? (
-									<span className='px-1.5 py-0.5 bg-success-500/90 text-inverted text-[10px] font-medium rounded'>
-										{t('collection.isPublic')}
-									</span>
-								) : (
-									<span className='px-1.5 py-0.5 bg-body/90 text-inverted text-[10px] font-medium rounded'>
-										{t('collection.isPrivate')}
-									</span>
-								)}
+								<CollectionVisibilityBadge
+									isPublic={collection.isPublic}
+									label={
+										collection.isPublic
+											? t('collection.isPublic')
+											: t('collection.isPrivate')
+									}
+								/>
 							</div>
 						</div>
 						<div className='p-2.5'>

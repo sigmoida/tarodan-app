@@ -15,7 +15,7 @@ import {
 	ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
-import { Button } from '@tarodan/ui';
+import { Badge, Button } from '@tarodan/ui';
 import { ButtonLink } from '@/components/ui/ButtonLink';
 import { SectionCard } from '@/components/ui';
 import {
@@ -89,9 +89,7 @@ export default function ProductInfo() {
 						{listing.title}
 					</h1>
 					{listing.status === 'sold' && (
-						<span className='px-3 py-1 bg-danger-100 text-danger-700 text-sm font-semibold rounded'>
-							{t('product.sold')}
-						</span>
+						<Badge variant='danger'>{t('product.sold')}</Badge>
 					)}
 				</div>
 				<div className='flex gap-2'>
@@ -197,7 +195,7 @@ export default function ProductInfo() {
 							})}{' '}
 							TL
 						</span>
-						<span className='bg-danger-500 text-inverted text-sm font-bold px-2 py-0.5 rounded'>
+						<Badge variant='danger' appearance='solid' size='sm'>
 							%
 							{listing.discountPercent ??
 								(listing.oldPrice != null && listing.price
@@ -206,7 +204,7 @@ export default function ProductInfo() {
 										)
 									: 0)}{' '}
 							indirim
-						</span>
+						</Badge>
 					</div>
 				)}
 				<p className='text-2xl sm:text-3xl lg:text-4xl font-bold text-primary-500'>

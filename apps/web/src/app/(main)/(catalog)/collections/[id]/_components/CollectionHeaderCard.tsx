@@ -13,6 +13,7 @@ import { HeartIcon as HeartIconSolid } from '@heroicons/react/24/solid';
 import { Button } from '@tarodan/ui';
 import OptimizedImage from '@/components/OptimizedImage';
 import { useCollectionDetail } from '../_context/CollectionDetailContext';
+import CollectionVisibilityBadge from '../../_components/CollectionVisibilityBadge';
 
 export default function CollectionHeaderCard() {
 	const {
@@ -78,15 +79,14 @@ export default function CollectionHeaderCard() {
 							</div>
 						)}
 						<div className='absolute right-1.5 top-1.5'>
-							{collection.isPublic ? (
-								<span className='rounded bg-success-500/90 px-1.5 py-0.5 text-[10px] font-medium text-inverted'>
-									{t('collection.isPublic')}
-								</span>
-							) : (
-								<span className='rounded bg-body/90 px-1.5 py-0.5 text-[10px] font-medium text-inverted'>
-									{t('collection.isPrivate')}
-								</span>
-							)}
+							<CollectionVisibilityBadge
+								isPublic={collection.isPublic}
+								label={
+									collection.isPublic
+										? t('collection.isPublic')
+										: t('collection.isPrivate')
+								}
+							/>
 						</div>
 					</div>
 				</div>

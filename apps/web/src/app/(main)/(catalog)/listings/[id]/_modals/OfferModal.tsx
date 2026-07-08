@@ -2,113 +2,104 @@
 
 'use client';
 
-import { XMarkIcon } from '@heroicons/react/24/outline';
-import { Button, Input, Textarea } from '@tarodan/ui';
+import { useMutation } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
+import {
+	FormInput,
+	FormTextarea,
+	FormModal,
+	useZodForm,
+} from '@tarodan/ui/form';
+import { offersApi } from '@/lib/api';
 import { useListingDetail } from '../_context/ListingDetailContext';
+import { offerSchema, type OfferValues } from './offerSchema';
 
+/**
+ * Make-offer dialog — owns its RHF+zod form and the create-offer mutation, framed
+ * by the shared `FormModal`. The context holds only open/close state + the listing
+ * price, from which the min (50%) / max (< price) offer bounds are derived.
+ */
 export default function OfferModal() {
-	const {
-		t,
-		locale,
-		listing,
-		effectivePrice,
-		showOfferModal,
-		setShowOfferModal,
-		offerAmount,
-		setOfferAmount,
-		offerMessage,
-		setOfferMessage,
-		isSubmittingOffer,
-		handleSubmitOffer,
-	} = useListingDetail();
+	const { t, locale, listing, effectivePrice, showOfferModal, setShowOfferModal } =
+		useListingDetail();
 
-	if (!showOfferModal || !listing) return null;
+	const minOffer = Math.round(effectivePrice * 0.5);
+	const form = useZodForm(offerSchema(minOffer, effectivePrice, locale), {
+		defaultValues: { amount: '', message: '' },
+	});
+	const message = form.watch('message') ?? '';
+
+	const create = useMutation({
+		mutationFn: (values: OfferValues) =>
+			offersApi.create({
+				productId: listing!.id,
+				amount: parseFloat(values.amount),
+				message: values.message?.trim() || undefined,
+			}),
+		onSuccess: () => {
+			toast.success(t('product.offerSentSuccess'));
+			setShowOfferModal(false);
+		},
+		onError: (error: any) =>
+			toast.error(error.response?.data?.message || t('product.offerFailed')),
+	});
+
+	if (!listing) return null;
 
 	return (
-		<div className='fixed inset-0 z-50 flex items-center justify-center bg-heading/50'>
-			<div className='bg-surface-elevated rounded p-6 w-full max-w-md shadow-xl'>
-				<div className='flex items-center justify-between mb-4'>
-					<h2 className='text-xl font-semibold text-heading'>
-						{t('product.makeOffer')}
-					</h2>
-					<Button
-						variant='secondary'
-						onClick={() => setShowOfferModal(false)}
-						className='text-subtle hover:text-muted'>
-						<XMarkIcon className='w-6 h-6' />
-					</Button>
+		<FormModal
+			open={showOfferModal}
+			onClose={() => setShowOfferModal(false)}
+			title={t('product.makeOffer')}
+			form={form}
+			onSubmit={(values) => create.mutate(values)}
+			isSubmitting={create.isPending}
+			resetValues={{ amount: '', message: '' }}
+			submitLabel={t('product.sendOffer')}
+			cancelLabel={t('common.cancel')}
+			maxWidth='max-w-md'>
+			<div>
+				<label className='block text-sm font-medium text-body mb-2'>
+					{t('product.productPrice')}
+				</label>
+				<div className='text-lg font-semibold text-heading'>
+					{effectivePrice.toLocaleString('tr-TR')} TL
 				</div>
-
-				<div className='space-y-4'>
-					<div>
-						<label className='block text-sm font-medium text-body mb-2'>
-							{t('product.productPrice')}
-						</label>
-						<div className='text-lg font-semibold text-heading'>
-							{effectivePrice.toLocaleString('tr-TR')} TL
-						</div>
-						<p className='text-xs text-muted mt-1'>
-							{locale === 'en' ? 'Minimum offer:' : 'Minimum teklif:'}{' '}
-							{Math.round(effectivePrice * 0.5).toLocaleString('tr-TR')} TL (%50)
-						</p>
-					</div>
-
-					<div>
-						<label className='block text-sm font-medium text-body mb-2'>
-							{locale === 'en' ? 'Your Offer Amount (TL)' : 'Teklif Tutarınız (TL)'}
-						</label>
-						<Input
-							type='number'
-							value={offerAmount}
-							onChange={(e) => setOfferAmount(e.target.value)}
-							placeholder={
-								locale === 'en' ? 'Enter offer amount' : 'Teklif tutarını giriniz'
-							}
-							min={Math.round(effectivePrice * 0.5)}
-							max={Math.max(0, Math.round(effectivePrice) - 1)}
-							className='px-4 rounded'
-						/>
-					</div>
-
-					<div>
-						<label className='block text-sm font-medium text-body mb-2'>
-							{locale === 'en' ? 'Message (Optional)' : 'Mesaj (Opsiyonel)'}
-						</label>
-						<Textarea
-							value={offerMessage}
-							onChange={(e) => setOfferMessage(e.target.value)}
-							placeholder={
-								locale === 'en'
-									? 'Message you want to send to seller...'
-									: 'Satıcıya iletmek istediğiniz mesaj...'
-							}
-							rows={4}
-							maxLength={500}
-							className='px-4 rounded resize-none'
-						/>
-						<p className='text-xs text-muted mt-1'>
-							{offerMessage.length}/500{' '}
-							{locale === 'en' ? 'characters' : 'karakter'}
-						</p>
-					</div>
-
-					<div className='flex gap-3 pt-2'>
-						<Button
-							variant='secondary'
-							onClick={() => setShowOfferModal(false)}
-							className='flex-1 px-4 rounded text-body hover:bg-surface'>
-							{t('common.cancel')}
-						</Button>
-						<Button
-							variant='secondary'
-							onClick={handleSubmitOffer}
-							disabled={isSubmittingOffer || !offerAmount}
-							className='flex-1 px-4 py-2 bg-primary-500 text-inverted rounded hover:bg-primary-600 disabled:bg-border-strong disabled:cursor-not-allowed'>
-							{isSubmittingOffer ? t('common.sending') : t('product.sendOffer')}
-						</Button>
-					</div>
-				</div>
+				<p className='text-xs text-muted mt-1'>
+					{locale === 'en' ? 'Minimum offer:' : 'Minimum teklif:'}{' '}
+					{minOffer.toLocaleString('tr-TR')} TL (%50)
+				</p>
 			</div>
-		</div>
+
+			<FormInput
+				name='amount'
+				type='number'
+				label={
+					locale === 'en' ? 'Your Offer Amount (TL)' : 'Teklif Tutarınız (TL)'
+				}
+				placeholder={
+					locale === 'en' ? 'Enter offer amount' : 'Teklif tutarını giriniz'
+				}
+				min={minOffer}
+				max={Math.max(0, Math.round(effectivePrice) - 1)}
+			/>
+
+			<div>
+				<FormTextarea
+					name='message'
+					label={locale === 'en' ? 'Message (Optional)' : 'Mesaj (Opsiyonel)'}
+					placeholder={
+						locale === 'en'
+							? 'Message you want to send to seller...'
+							: 'Satıcıya iletmek istediğiniz mesaj...'
+					}
+					rows={4}
+					maxLength={500}
+				/>
+				<p className='text-xs text-muted mt-1'>
+					{message.length}/500 {locale === 'en' ? 'characters' : 'karakter'}
+				</p>
+			</div>
+		</FormModal>
 	);
 }
