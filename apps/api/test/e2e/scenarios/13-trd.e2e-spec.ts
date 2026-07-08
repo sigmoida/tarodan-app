@@ -648,6 +648,17 @@ describe('13 — Takas (TRD)', () => {
 
   scenario('TRD-021', async () => {
     // İdempotency: tamamlanmış nakit ödeme tekrar başlatılamaz.
+    // GERÇEK KOD (payment.service.ts initiateTradeCashPayment): kontrol sırası
+    //   1) trade.status ∈ [accepted, awaiting_payment] değilse → 'Takas henüz kabul
+    //      edilmedi veya uygun durumda değil' (payment.service.ts:835)
+    //   2) cashPayment.status === completed ise → 'Bu takas ödemesi zaten tamamlandı'
+    //      (payment.service.ts:849)
+    // processSuccessfulTradeCashPayment: başarılı callback cashPayment'i completed yapar
+    // VE trade'i awaiting_payment → shipping_to_warehouse'a taşır (payment.service.ts:2622).
+    // shipping_to_warehouse payable DEĞİL → kontrol #1 önce patlar, idempotency (#2)
+    // dalına HİÇ ulaşılmaz. Idempotency guard'ını gerçekten sınamak için trade'i tekrar
+    // payable pencereye (awaiting_payment) çek: cashPayment=completed + trade payable →
+    // kontrol #1 geçer, #2 patlar → 'Bu takas ödemesi zaten tamamlandı'.
     const f = await setupBilateral();
     const tradeId = await createPendingTrade(f, { cashAmount: 100 });
     await post(`/api/trades/${tradeId}/accept`, f.receiver).send({}).expect(201);
@@ -669,7 +680,17 @@ describe('13 — Takas (TRD)', () => {
       )
       .expect(200);
 
-    // Tekrar başlat → zaten tamamlandı
+    // Callback sonrası: cashPayment.status === completed (idempotency ön koşulu).
+    const cashAfter = await prisma.tradeCashPayment.findUnique({ where: { tradeId } });
+    expect(cashAfter?.status).toBe(PaymentStatus.completed);
+
+    // Trade'i payable pencereye geri çek ki idempotency guard'ına ulaşılsın.
+    await prisma.trade.update({
+      where: { id: tradeId },
+      data: { status: TradeStatus.awaiting_payment },
+    });
+
+    // Tekrar başlat → cashPayment zaten completed → 'zaten tamamlandı'.
     const res = await post('/api/payments/initiate-trade-cash', f.initiator)
       .send({ tradeId })
       .expect(400);
@@ -966,6 +987,14 @@ describe('13 — Takas (TRD)', () => {
     await post(`/api/trades/${tradeId}/ship-to-warehouse`, f.initiator)
       .send({ fromAddressId: shipAddr.id, carrier: 'Sürat Kargo' })
       .expect(410);
+
+    // Nakitsiz kabul, arka planda (fire-and-forget) createInboundTradeShipments
+    // tetikler. Test burada bitip bir sonraki beforeEach truncateAll'ı çalışırsa,
+    // hâlâ uçuşta olan tx.tradeShipment.create (trade.service.ts) silinmiş trade'e
+    // yazmaya çalışır → prisma:error trade_shipments_trade_id_fkey (konsol gürültüsü).
+    // Arka plan kargo oluşturmayı bekleyip yarışı kapat.
+    const prisma = getPrisma();
+    await waitForInboundShipments(prisma, tradeId);
   });
 
   scenario('TRD-036', async () => {

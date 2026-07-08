@@ -96,18 +96,38 @@ describe('10 — Ödeme & Escrow (PAY)', () => {
     return prisma.payment.findFirst({ where: { orderId }, orderBy: { createdAt: 'desc' } });
   }
 
-  /** Siparişin son payment'ına başarılı PayTR callback'i gönder (kuruş = amount*100). */
-  async function successCallback(orderId: string, overrideKurus?: number) {
-    const payment = await lastPayment(orderId);
-    return request(server())
-      .post('/api/payments/callback/paytr')
-      .send(
-        signCallback({
-          merchantOid: payment!.providerConversationId!,
-          status: 'success',
-          totalAmount: overrideKurus ?? Math.round(Number(payment!.amount) * 100),
-        }),
+  /**
+   * Siparişin son payment'ına başarılı PayTR callback'i gönder (kuruş = amount*100).
+   *
+   * NON-async: gerçek `request.Test` döner ki çağrı yerleri `.expect(200)` (ve
+   * ardından `await`) zincirleyebilsin. Gövde (merchant_oid + tutar) DB'deki son
+   * payment'a bağlı olduğundan, bu async okuma supertest Test'i DISPATCH etmeden
+   * ÖNCE tembel olarak yapılır: dispatch'in TEK giriş noktası olan `.end()`
+   * sarılır (superagent'ta `.then`/`await` da içeride `self.end()` çağırır), son
+   * payment okunup `.send()` ile gövde doldurulduktan SONRA orijinal `.end`
+   * çalıştırılır. Böylece assertion/response davranışı async sürümle birebir
+   * aynı kalır; çağrı yerleri değişmeden `.expect(200)` zincirlenebilir.
+   */
+  function successCallback(orderId: string, overrideKurus?: number): request.Test {
+    const req = request(server()).post('/api/payments/callback/paytr');
+    const originalEnd = req.end.bind(req);
+    req.end = ((callback?: (err: any, res: any) => void) => {
+      lastPayment(orderId).then(
+        (payment) => {
+          req.send(
+            signCallback({
+              merchantOid: payment!.providerConversationId!,
+              status: 'success',
+              totalAmount: overrideKurus ?? Math.round(Number(payment!.amount) * 100),
+            }),
+          );
+          originalEnd(callback);
+        },
+        (err) => callback?.(err, undefined),
       );
+      return req;
+    }) as typeof req.end;
+    return req;
   }
 
   /** buy + process-direct(yeni kart) + başarılı callback → ödenmiş sipariş (preparing). */

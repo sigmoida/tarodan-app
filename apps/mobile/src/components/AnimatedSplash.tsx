@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Image,
   LayoutChangeEvent,
@@ -93,6 +93,13 @@ export default function AnimatedSplash({ appReady, onFinish }: AnimatedSplashPro
   const [minElapsed, setMinElapsed] = useState(false);
   const splashHidden = useRef(false);
   const exiting = useRef(false);
+  const finished = useRef(false);
+
+  const finishOnce = useCallback(() => {
+    if (finished.current) return;
+    finished.current = true;
+    onFinish();
+  }, [onFinish]);
 
   // Giriş animasyonu (mount'ta bir kez).
   useEffect(() => {
@@ -116,11 +123,20 @@ export default function AnimatedSplash({ appReady, onFinish }: AnimatedSplashPro
     rootOpacity.value = withTiming(
       0,
       { duration: 350, easing: Easing.in(Easing.cubic) },
-      (finished) => {
-        if (finished) runOnJS(onFinish)();
+      () => {
+        runOnJS(finishOnce)();
       },
     );
-  }, [appReady, minElapsed, logoScale, rootOpacity, onFinish]);
+  }, [appReady, minElapsed, logoScale, rootOpacity, finishOnce]);
+
+  // Güvenlik ağı: appReady/animasyon ne olursa olsun splash en geç bu süre sonra kapanır.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      rootOpacity.value = 0;
+      finishOnce();
+    }, 8000);
+    return () => clearTimeout(t);
+  }, [rootOpacity, finishOnce]);
 
   // Overlay boyandıktan sonra native splash'i kapat → beyaz parlama yok.
   const handleLayout = (_e: LayoutChangeEvent) => {

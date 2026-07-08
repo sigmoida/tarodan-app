@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,6 +20,7 @@ import {
 } from '@tarodan/ui-native';
 import { authApi } from '../../src/services/api';
 import { signInWithGoogle, isGoogleConfigured } from '../../src/services/googleSignin';
+import { signInWithApple, isAppleAvailable } from '../../src/services/appleSignin';
 import { useAuthStore } from '../../src/stores/authStore';
 import { BrandLogo } from '../../src/components/BrandLogo';
 
@@ -43,6 +44,8 @@ export default function LoginScreen() {
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(false);
 
   const { control, handleSubmit, formState: { errors }, getValues } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -131,14 +134,25 @@ export default function LoginScreen() {
     },
   });
 
+  useEffect(() => {
+    isAppleAvailable().then(setAppleAvailable);
+  }, []);
+
   const handleGoogle = async () => {
     if (googleLoading) return;
     setGoogleLoading(true);
     try {
       const idToken = await signInWithGoogle();
       const response = await authApi.loginWithGoogle(idToken);
-      const { tokens, user } = response.data as any;
-      await login(tokens.accessToken, user, tokens.refreshToken);
+      const data = response.data as any;
+      const accessToken = data.tokens?.accessToken || data.accessToken;
+      const refreshToken = data.tokens?.refreshToken || data.refreshToken;
+      const user = data.user;
+      if (!accessToken) {
+        appAlert('Hata', 'Giriş yanıtı beklenmedik biçimde geldi. Lütfen tekrar deneyin.');
+        return;
+      }
+      await login(accessToken, user, refreshToken);
       router.push('/' as never);
     } catch (e: any) {
       // İptal sessiz geçilir; diğer her hata KULLANICIYA gösterilir (önceden
@@ -151,6 +165,34 @@ export default function LoginScreen() {
       appAlert('Google ile giriş başarısız', `${detail}${code}`);
     } finally {
       setGoogleLoading(false);
+    }
+  };
+
+  const handleApple = async () => {
+    if (appleLoading) return;
+    setAppleLoading(true);
+    try {
+      const { identityToken, fullName } = await signInWithApple();
+      const response = await authApi.loginWithApple(identityToken, fullName);
+      const data = response.data as any;
+      const accessToken = data.tokens?.accessToken || data.accessToken;
+      const refreshToken = data.tokens?.refreshToken || data.refreshToken;
+      const user = data.user;
+      if (!accessToken) {
+        appAlert('Hata', 'Giriş yanıtı beklenmedik biçimde geldi. Lütfen tekrar deneyin.');
+        return;
+      }
+      await login(accessToken, user, refreshToken);
+      router.push('/' as never);
+    } catch (e: any) {
+      // Kullanıcı iptali sessiz geçilir.
+      if (e?.code === 'ERR_REQUEST_CANCELED') return;
+      const apiMsg = e?.response?.data?.message;
+      const detail = apiMsg || e?.message || 'Bilinmeyen hata';
+      const code = e?.code ? ` (kod: ${e.code})` : '';
+      appAlert('Apple ile giriş başarısız', `${detail}${code}`);
+    } finally {
+      setAppleLoading(false);
     }
   };
 
@@ -356,6 +398,26 @@ export default function LoginScreen() {
             </Pressable>
           )}
 
+          {appleAvailable && (
+            <Pressable
+              testID="login-apple-button"
+              onPress={handleApple}
+              accessibilityRole="button"
+              accessibilityLabel="Apple ile devam et"
+              disabled={loginMutation.isPending || appleLoading}
+              style={[styles.appleButton, (loginMutation.isPending || appleLoading) && { opacity: 0.6 }]}
+            >
+              {appleLoading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="logo-apple" size={18} color="#FFFFFF" />
+              )}
+              <Text variant="body" weight="semibold" style={styles.appleButtonText}>
+                {appleLoading ? 'Giriş yapılıyor…' : 'Apple ile devam et'}
+              </Text>
+            </Pressable>
+          )}
+
           <Button
             testID="continue-as-guest-button"
             variant="outline"
@@ -463,5 +525,18 @@ const styles = StyleSheet.create({
     borderColor: colors.border.DEFAULT,
     borderRadius: 12,
     backgroundColor: colors.white,
+  },
+  appleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: '#000000',
+    marginTop: 12,
+  },
+  appleButtonText: {
+    color: '#FFFFFF',
   },
 });

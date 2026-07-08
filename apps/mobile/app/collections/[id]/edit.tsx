@@ -195,7 +195,7 @@ export default function EditCollectionScreen() {
         icon="albums-outline"
         title="Koleksiyon bulunamadı"
         actionLabel="Geri Dön"
-        onAction={() => router.back()}
+        onAction={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')}
       />
     );
   }
@@ -208,7 +208,7 @@ export default function EditCollectionScreen() {
         icon="lock-closed-outline"
         title="Bu koleksiyonu düzenleme yetkiniz yok"
         actionLabel="Geri Dön"
-        onAction={() => router.back()}
+        onAction={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')}
       />
     );
   }

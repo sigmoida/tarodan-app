@@ -136,7 +136,7 @@ jobs:
       - run: pnpm --filter @tarodan/api test:e2e:setup
       # Mevcut paket (72 spec). Yeni senaryo paketi (test/e2e/scenarios) burada HARİÇ —
       # o paket e2e-scenarios-smoke (PR, P0) ve e2e-scenarios-full (nightly, shard) ile koşar.
-      - run: pnpm --filter @tarodan/api test:e2e -- --testPathIgnorePatterns=/node_modules/ --testPathIgnorePatterns=test/e2e/scenarios/
+      - run: pnpm --filter @tarodan/api exec jest --config ./test/jest-e2e.json --runInBand --testPathIgnorePatterns=/node_modules/ --testPathIgnorePatterns=test/e2e/scenarios/
 
   e2e-scenarios-smoke:
     name: E2E Senaryolar — P0 Smoke (PR gate)
@@ -195,7 +195,7 @@ jobs:
           turbo-cache: 'false'
       - run: pnpm --filter @tarodan/api test:e2e:setup
       # Yalnız senaryo paketi + yalnız P0 testleri (test adında [P0] geçenler).
-      - run: pnpm --filter @tarodan/api test:e2e -- --testPathPattern 'test/e2e/scenarios/' -t '\[P0\]'
+      - run: pnpm --filter @tarodan/api exec jest --config ./test/jest-e2e.json --runInBand --testPathPattern 'test/e2e/scenarios/' -t '\[P0\]'
 
   e2e-scenarios-full:
     name: E2E Senaryolar — Tam Paket (nightly/manuel, shardlı)
@@ -261,7 +261,7 @@ jobs:
           turbo-cache: 'false'
       - run: pnpm --filter @tarodan/api test:e2e:setup
       # Senaryo paketini 10 shard'a böl (her shard kendi job + kendi servis container'ları).
-      - run: pnpm --filter @tarodan/api test:e2e -- --testPathPattern 'test/e2e/scenarios/' --shard=${{ matrix.shard }}/10
+      - run: pnpm --filter @tarodan/api exec jest --config ./test/jest-e2e.json --runInBand --testPathPattern 'test/e2e/scenarios/' --shard=${{ matrix.shard }}/10
 
   scenario-coverage:
     name: Senaryo Kapsam Raporu (gate)
@@ -409,6 +409,7 @@ jobs:
   security-audit:
     name: Dependency Audit
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-workspace

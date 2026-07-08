@@ -16,12 +16,12 @@ type Auth = { accessToken: string };
 const server = (ctx: E2ETestApp) => ctx.app.getHttpServer();
 
 /** POST /api/orders/buy — pending_payment sipariş oluştur (ödeme yok). */
-export async function buyNow(
+export function buyNow(
   ctx: E2ETestApp,
   buyer: Auth,
   productId: string,
   shippingAddressId: string,
-): Promise<request.Response> {
+): request.Test {
   return request(server(ctx))
     .post('/api/orders/buy')
     .set(authHeader(buyer))
@@ -113,11 +113,11 @@ export async function driveOrderToCompleted(
 }
 
 /** POST /api/membership/subscribe — kullanıcıyı bir tier'a abone et (varsayılan premium). */
-export async function subscribeMembership(
+export function subscribeMembership(
   ctx: E2ETestApp,
   user: Auth,
   tierType: 'basic' | 'premium' | 'business' = 'premium',
-): Promise<request.Response> {
+): request.Test {
   return request(server(ctx))
     .post('/api/membership/subscribe')
     .set(authHeader(user))

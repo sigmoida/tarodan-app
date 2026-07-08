@@ -22,11 +22,20 @@
  *        - getPresignedDownloadUrl() → her zaman sabit URL; asla fırlatmaz.
  *        - getPublicAssetUrl(key) → `https://test-cdn.invalid/${key}` (asla boş).
  *        - isStorageAvailable() → her zaman true (S3-down simüle edilemez).
- *   2) `sharp` native modülü node_modules'ta KURULU DEĞİL (package.json'da declared ama
- *      pnpm store'da yok) → media.service require('sharp') null. Bu yüzden:
- *        - upload resize/thumbnail SESSİZCE atlanır (koşul `&& sharp`).
- *        - uploadProductImageVariants sharp null'da EN BAŞTA 400 fırlatır
- *          (media.service.ts:294-296) → ürün-görseli "happy path 201" bu ortamda ERİŞİLEMEZ.
+ *   2) `sharp` native modülü CI'da KURULUDUR ve require('sharp') BAŞARILI olur:
+ *      pnpm-lock.yaml @img/sharp-linux-x64@0.34.5 + @img/sharp-libvips-linux-x64@1.2.4
+ *      prebuilt paketlerini içerir; setup-workspace `pnpm install --frozen-lockfile`
+ *      (ignore-scripts YOK, node-linker=hoisted) ile bunları kurar; ubuntu-latest (glibc)
+ *      = linux-x64. → media.service'te `sharp` TRUTHY. Sonuçlar:
+ *        - upload resize/thumbnail çalıştırılır (koşul `&& sharp` TRUE). Girdi GEÇERLİ bir
+ *          görsel DEĞİLSE sharp toBuffer() reddeder → upload try/catch'i "File upload failed"
+ *          400'e çevirir (media.service.ts:152-154). Bu yüzden resize/thumbnail/avatar
+ *          testleri GERÇEK bir PNG (realPngBuffer) yollar → resize başarılı → 201.
+ *        - uploadProductImageVariants sharp TRUTHY olduğundan "sharp yok 400" dalına (service:
+ *          294-296) HİÇ girmez → o negatif senaryo (MED-102) bu ortamda ERİŞİLEMEZ (skip).
+ *          [Empirik doğrulama: ilk CI koşusunda bu testler 201 değil 400/500 verdi; sharp
+ *          null olsaydı sessiz-atlama ile 201 dönerlerdi → CI çıktısı sharp'ın YÜKLENDİĞİNİ
+ *          kanıtlar.]
  *   3) AI moderation KAPALI (AI_MODERATION_ENABLED varsayılan 'false') → assertImageClean
  *      no-op (fail-open). NSFW engelleme (MED-049/055) TETİKLENEMEZ; fail-open (MED-104/105)
  *      ise VARSAYILAN davranıştır ve doğrulanır (201 + moderation_events yazılmaz).
@@ -45,12 +54,20 @@ import { scenario } from '../../test-utils/scenario';
 
 // ──────────────────────────── Dosya içerik üreticileri ────────────────────────────
 // Multer memory storage kullanılır (global override yok) → .attach(field, buffer, {filename,
-// contentType}) req.file.buffer/mimetype/originalname/size'ı doldurur. İçeriğin geçerli
-// bir görsel olması gerekmez: media.service yalnız file.size + file.mimetype'a bakar
-// (gerçek decode sharp'ta olur, o da bu ortamda yok).
+// contentType}) req.file.buffer/mimetype/originalname/size'ı doldurur.
+//
+// İKİ TÜR içerik üretici var; hangisinin kullanılacağı testin sharp'a DOKUNUP dokunmamasına
+// bağlıdır (sharp CI'da KURULUDUR — bkz. üstteki HARNESS notu, madde 2):
+//   • jpegBuffer/pngBuffer → SAHTE imza + sıfır dolgu. Yalnız `file.size`/`file.mimetype`
+//     kontrol edilen (sharp'a girmeyen) uçlar için: guard/limit/tip/boyut/çoklu-sayı/
+//     public-url/silme senaryoları. sharp bu tamponları DECODE EDEMEZ.
+//   • realPngBuffer → GERÇEK, decode edilebilir 2x2 PNG. resize/thumbnail/avatar gibi
+//     media.service.upload'ın sharp'a soktuğu (koşul `&& sharp` TRUE) uçlar için ZORUNLU;
+//     aksi hâlde sharp toBuffer() reddeder → upload try/catch'i "File upload failed" 400'e
+//     çevirir (media.service.ts:88-92,128-131,152-154). Gerçek PNG ile resize BAŞARILI → 201.
 const jpegBuffer = (bytes = 200 * 1024): Buffer => {
   const buf = Buffer.alloc(bytes, 0x00);
-  // JPEG SOI/APP0 imzası (dekode gerekmediği için içerik önemsiz, ama gerçekçi tutulur).
+  // JPEG SOI/APP0 imzası (bu tampon sharp'a girmez; yalnız size/mimetype için).
   buf[0] = 0xff;
   buf[1] = 0xd8;
   buf[2] = 0xff;
@@ -60,10 +77,17 @@ const jpegBuffer = (bytes = 200 * 1024): Buffer => {
 };
 const pngBuffer = (bytes = 50 * 1024): Buffer => {
   const buf = Buffer.alloc(bytes, 0x00);
-  // PNG imzası.
+  // PNG imzası (bu tampon sharp'a girmez; yalnız size/mimetype için).
   Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buf);
   return buf;
 };
+// GERÇEK 2x2 kırmızı RGB PNG (73 bayt). sharp bunu decode + resize edebilir → sharp'a giren
+// (resize=…, thumbnail=true, avatar zorunlu 300x300) uçlarda 201 alınır. Storage STUB olduğu
+// için üretilen objenin gerçek boyutu gözlemlenemez; yalnız isteğin sharp'ta patlamadan 201
+// ile tamamlandığı doğrulanır.
+const REAL_PNG_B64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGP4z8AARAwQCgAf7gP9i18U1AAAAABJRU5ErkJggg==';
+const realPngBuffer = (): Buffer => Buffer.from(REAL_PNG_B64, 'base64');
 
 describe('21 — Medya & Dosya Yükleme (MED)', () => {
   let ctx: E2ETestApp;
@@ -312,13 +336,14 @@ describe('21 — Medya & Dosya Yükleme (MED)', () => {
     });
 
     scenario('MED-017', async () => {
-      // resize=300x300 → 201. NOT: sharp yok + storage stub → gerçek boyut GÖZLEMLENEMEZ;
-      // yalnız isteğin 201 ile geçtiği (resize parse'ının patlamadığı) doğrulanır.
+      // resize=300x300 → 201. sharp KURULU (bkz. HARNESS notu 2) → resize GERÇEKTEN çalışır;
+      // bu yüzden GEÇERLİ bir PNG (realPngBuffer) yollanır → sharp toBuffer başarılı. Storage
+      // stub üretilen objenin gerçek boyutunu gözlemletmez; yalnız 201 (resize patlamadı) assert.
       const user = await createUser(ctx.module, { email: 'up-resize@test.com' });
       await request(server())
         .post('/api/media/upload?folder=messages&resize=300x300')
         .set(authHeader(user))
-        .attach('file', jpegBuffer(), { filename: 'r.jpg', contentType: 'image/jpeg' })
+        .attach('file', realPngBuffer(), { filename: 'r.png', contentType: 'image/png' })
         .expect(201);
     });
 
@@ -333,16 +358,20 @@ describe('21 — Medya & Dosya Yükleme (MED)', () => {
     });
 
     scenario('MED-019', async () => {
-      // thumbnail=true → 201. NOT: sharp yok → thumbnail üretilmez (koşul `&& sharp` false);
-      // gövdede thumbnail alanı BULUNMAZ. İstek yine başarıyla tamamlanır.
+      // thumbnail=true → 201. sharp KURULU → thumbnail ÜRETİLİR (koşul `generateThumbnail &&
+      // … && sharp` TRUE; media.service.ts:128-147). Girdi GERÇEK PNG olmalı (aksi hâlde sharp
+      // toBuffer reddeder → 400). NOT: storage STUB uploadFile sabit key ('test/file.bin')
+      // döndürdüğünden result.thumbnail o sabit key olur — gerçek `.../thumbnails/thumb_…` key
+      // şablonu (media.service.ts:133,138) stub yüzünden gözlemlenemez; yalnız thumbnail alanının
+      // ÜRETİLDİĞİ (tanımlı/truthy) doğrulanır.
       const user = await createUser(ctx.module, { email: 'up-thumb@test.com' });
       const res = await request(server())
         .post('/api/media/upload?folder=messages&thumbnail=true')
         .set(authHeader(user))
-        .attach('file', jpegBuffer(), { filename: 't.jpg', contentType: 'image/jpeg' })
+        .attach('file', realPngBuffer(), { filename: 't.png', contentType: 'image/png' })
         .expect(201);
-      // sharp yok → thumbnail undefined (ortam kısıtı; sharp varsa .../thumbnails/thumb_ olurdu).
-      expect(res.body.thumbnail).toBeUndefined();
+      // sharp KURULU → thumbnail üretildi → alan tanımlı (stub sabit key nedeniyle içerik jenerik).
+      expect(res.body.thumbnail).toBeTruthy();
     });
 
     scenario('MED-020', async () => {
@@ -380,15 +409,12 @@ describe('21 — Medya & Dosya Yükleme (MED)', () => {
         .expect(201);
     });
 
-    scenario('MED-103', async () => {
-      // Sharp yokken resize sessizce atlanır → 201 (koşul `resize && … && sharp` sharp null'da false).
-      const user = await createUser(ctx.module, { email: 'up-noresize@test.com' });
-      await request(server())
-        .post('/api/media/upload?folder=messages&resize=300x300')
-        .set(authHeader(user))
-        .attach('file', jpegBuffer(), { filename: 'x.jpg', contentType: 'image/jpeg' })
-        .expect(201);
-    });
+    // MED-103 — "sharp yokken resize sessizce atlanır → 201" — bu ortamda ERİŞİLEMEZ:
+    // sharp KURULU (bkz. HARNESS notu 2) → `if (resize && … && sharp)` TRUE olur; fake jpeg
+    // sharp'ta decode edilemez → try/catch "File upload failed" 400'e çevirir (201 değil). Gerçek
+    // PNG yollanırsa resize BAŞARILI olur ama yine "sessiz-atlama" dalı gözlemlenmez. Sharp-yok
+    // silent-skip davranışı yalnız sharp KURULU DEĞİLKEN doğrulanabilir → gerekçeli skip.
+    scenario.skip('MED-103', 'Sharp yokken genel upload resize sessiz atlanır → 201: sharp bu ortamda KURULU olduğundan silent-skip dalına (media.service.ts:88 `&& sharp` FALSE) hiç girilmez — fake tampon 400 (decode fail), gerçek PNG ise gerçekten resize edilir; sessiz-atlama gözlemlenemez.');
   });
 
   // ─────────────────────── Çoklu upload (POST /api/media/upload/multiple) ───────────────────────
@@ -485,8 +511,9 @@ describe('21 — Medya & Dosya Yükleme (MED)', () => {
 
     scenario('MED-046', async () => {
       // Geçersiz tip (pdf): limit geçer, moderasyon no-op, sonra uploadProductImageVariants.
-      // NOT: sharp kontrolü tip kontrolünden ÖNCE (service:294 vs 297) → bu ortamda 400
-      // (sharp yok) veya tip 400 — her hâlükârda 400. Status assert edilir.
+      // sharp KURULU → `!sharp` dalı atlanır; TİP kontrolü (service:298) pdf'i reddeder → 400
+      // "Geçersiz dosya tipi…". Bu dal sharp'a HİÇ girmez (tampon toBuffer'a ulaşmaz). Yalnız
+      // status (400) assert edilir (mesaj değil).
       const user = await createUser(ctx.module, { email: 'prod-type@test.com' });
       await request(server())
         .post('/api/media/upload/product')
@@ -499,8 +526,10 @@ describe('21 — Medya & Dosya Yükleme (MED)', () => {
     });
 
     scenario('MED-047', async () => {
-      // 11MB jpeg ürün görseli → 400. NOT: sharp kontrolü boyut kontrolünden ÖNCE
-      // (service:294 vs 301) → bu ortamda sharp 400 (veya boyut 400). Status assert edilir.
+      // 11MB jpeg ürün görseli → 400. sharp KURULU → `!sharp` dalı atlanır; tip geçer, sonra
+      // BOYUT kontrolü (service:301) 11MB > 10MB → 400 "Dosya boyutu çok büyük". Boyut/tip
+      // kontrolleri sharp(...).toBuffer() ÇAĞRISINDAN önce (service:298,301 vs 313) → tampon
+      // sharp'a hiç girmez. Yalnız status (400) assert edilir.
       const user = await createUser(ctx.module, { email: 'prod-big@test.com' });
       await request(server())
         .post('/api/media/upload/product')
@@ -512,30 +541,29 @@ describe('21 — Medya & Dosya Yükleme (MED)', () => {
         .expect(400);
     });
 
-    scenario('MED-102', async () => {
-      // Sharp yokken ürün varyantı → 400 "Image processing (sharp) is not available"
-      // (service:294-296). Bu ortamda sharp KURULU DEĞİL → tam bu dal çalışır.
-      const user = await createUser(ctx.module, { email: 'prod-sharp@test.com' });
-      const res = await request(server())
-        .post('/api/media/upload/product')
-        .set(authHeader(user))
-        .attach('images', jpegBuffer(), { filename: 'p.jpg', contentType: 'image/jpeg' })
-        .expect(400);
-      expect(res.body.message).toBe('Image processing (sharp) is not available');
-    });
+    // MED-102 — "Sharp yokken ürün varyantı → 400 'Image processing (sharp) is not available'"
+    // (media.service.ts:294-296) — bu ortamda ERİŞİLEMEZ: sharp KURULU (bkz. HARNESS notu 2)
+    // → `if (!sharp)` FALSE, o dal atlanır. Fake jpeg bunun yerine sharp(...).toBuffer()'ı
+    // reddettirir; uploadProductImageVariants'te try/catch YOK → ham hata NestJS'e sızar → 500
+    // (400 DEĞİL). Yani ne "sharp-yok 400" ne de anlamlı bir tip/boyut 400'ü gözlemlenir; yalnız
+    // bir robustness-500 kalır. Sharp-yok dalı yalnız sharp KURULU DEĞİLKEN doğrulanabilir.
+    scenario.skip('MED-102', 'Sharp yokken ürün varyantı 400 "Image processing (sharp) is not available": sharp bu ortamda KURULU olduğundan `if (!sharp)` dalına (media.service.ts:294) hiç girilmez → fake görsel sharp decode hatasını try/catch olmadan yükseltir ve 500 verir (400 değil). Sharp-yok davranışı yalnız sharp kurulu değilken assert edilebilir; MED-040/042/043/048 ile tutarlı gerekçeli skip.');
   });
 
   // ─────────────────────── Avatar (POST /api/media/upload/avatar) ───────────────────────
   describe('POST /api/media/upload/avatar', () => {
     scenario('MED-050', async () => {
-      // Avatar happy path. Storage STUB → gerçek 300x300 obje ve MediaFile satırı
-      // gözlemlenemez; yalnız 201 + gövde (key/url) assert edilir. (sharp yok → resize atlanır
-      // ama upload yine 201; bucket kontrolü media.service içinde değil, controller options'ta.)
+      // Avatar happy path. Avatar ucu resize'ı ZORUNLU uygular (controller:149
+      // resize:{300x300}); sharp bu ortamda KURULU (bkz. HARNESS notu 2) → media.service.upload
+      // fake tamponu sharp'a sokar ve decode edemezse try/catch "File upload failed" 400'e çevirir
+      // (media.service.ts:88-92,152-154). Bu yüzden happy path GERÇEK, decode edilebilir bir PNG
+      // (realPngBuffer) yollar → resize başarılı → 201. Storage STUB → 300x300 obje ve MediaFile
+      // satırı gözlemlenemez; yalnız 201 + gövde (key) assert edilir.
       const user = await createUser(ctx.module, { email: 'ayse-av@test.com' });
       const res = await request(server())
         .post('/api/media/upload/avatar')
         .set(authHeader(user))
-        .attach('avatar', jpegBuffer(300 * 1024), { filename: 'me.jpg', contentType: 'image/jpeg' })
+        .attach('avatar', realPngBuffer(), { filename: 'me.png', contentType: 'image/png' })
         .expect(201);
       expect(res.body.key).toBeTruthy();
     });
@@ -582,13 +610,15 @@ describe('21 — Medya & Dosya Yükleme (MED)', () => {
       // İzolasyon: controller avatar folder'ını req.user.id'ye SABİTLER; herhangi bir
       // folder/query enjeksiyonu kabul edilmez (uploadAvatar query almaz). Kötücül query
       // yollansa da istek yine 201 ile geçer ve controller'ın hardcode ettiği folder kullanılır.
-      // NOT: gerçek key (dev/avatars/{userId}) storage STUB nedeniyle gözlemlenemez; burada
-      // guard'ın query'yi yok saydığı (401/500 üretmediği, başka klasöre yazamadığı) doğrulanır.
+      // NOT: avatar ucu resize'ı ZORUNLU uygular ve sharp KURULU (bkz. HARNESS notu 2) → decode
+      // edilebilir GERÇEK PNG (realPngBuffer) gerekir; fake tampon sharp'ta patlar → 400. Gerçek
+      // key (dev/avatars/{userId}) storage STUB nedeniyle gözlemlenemez; burada guard'ın query'yi
+      // yok saydığı (401/500 üretmediği, başka klasöre yazamadığı) doğrulanır.
       const user = await createUser(ctx.module, { email: 'av-iso@test.com' });
       await request(server())
         .post('/api/media/upload/avatar?folder=../mehmet&bucket=documents')
         .set(authHeader(user))
-        .attach('avatar', jpegBuffer(), { filename: 'me.jpg', contentType: 'image/jpeg' })
+        .attach('avatar', realPngBuffer(), { filename: 'me.png', contentType: 'image/png' })
         .expect(201);
     });
   });
@@ -834,11 +864,14 @@ describe('21 — Medya & Dosya Yükleme (MED)', () => {
     scenario('MED-104', async () => {
       // AI moderation KAPALI (AI_MODERATION_ENABLED='false') → assertImageClean no-op:
       // engelleme yok, moderation_events yazılmaz → avatar yükleme 201.
+      // NOT: avatar ucu resize'ı ZORUNLU uygular ve sharp KURULU (bkz. HARNESS notu 2) →
+      // fail-open'ın 201 ürettiğini doğrulamak için decode edilebilir GERÇEK PNG gerekir;
+      // fake tampon sharp'ta patlayıp 400 verir → moderasyon dalını değil sharp'ı test ederdi.
       const user = await createUser(ctx.module, { email: 'mod-off@test.com' });
       await request(server())
         .post('/api/media/upload/avatar')
         .set(authHeader(user))
-        .attach('avatar', jpegBuffer(), { filename: 'a.jpg', contentType: 'image/jpeg' })
+        .attach('avatar', realPngBuffer(), { filename: 'a.png', contentType: 'image/png' })
         .expect(201);
       const prisma = getPrisma();
       expect(await prisma.moderationEvent.count()).toBe(0);
@@ -848,11 +881,12 @@ describe('21 — Medya & Dosya Yükleme (MED)', () => {
       // Moderation servisi erişilemez (fail-open): AI null → verdict?.decision==='flag' false
       // → engelleme yok. Test ortamında enabled=false olduğundan çağrı yapılmaz; net sonuç
       // aynıdır: 201 + moderation_events yazılmaz.
+      // NOT: MED-104 ile aynı gerekçe — avatar zorunlu resize + sharp KURULU → GERÇEK PNG gerekir.
       const user = await createUser(ctx.module, { email: 'mod-timeout@test.com' });
       await request(server())
         .post('/api/media/upload/avatar')
         .set(authHeader(user))
-        .attach('avatar', jpegBuffer(), { filename: 'a.jpg', contentType: 'image/jpeg' })
+        .attach('avatar', realPngBuffer(), { filename: 'a.png', contentType: 'image/png' })
         .expect(201);
       const prisma = getPrisma();
       expect(await prisma.moderationEvent.count()).toBe(0);
@@ -860,18 +894,22 @@ describe('21 — Medya & Dosya Yükleme (MED)', () => {
   });
 
   // ─────────────────────── SKIP — ortam/harness kısıtları ───────────────────────
-  // Ürün-görseli happy path'leri (2 varyant / tier limitleri / temp klasör): sharp native
-  // modülü bu ortamda KURULU DEĞİL → uploadProductImageVariants EN BAŞTA 400 fırlatır
-  // (media.service.ts:294-296) → "201 + cardKey/detailKey/cardUrl/detailUrl" ulaşılamaz.
-  // Bu, MED-102'de zaten pozitif olarak doğrulanan sharp-yok davranışının aynısıdır.
-  scenario.skip('MED-040', 'Ürün varyantı happy path (201): sharp native modülü test ortamında kurulu değil → uploadProductImageVariants sharp-yok 400 verir (bkz. MED-102). Storage stub ayrıca cardUrl/detailUrl ve MediaFile-yazmama davranışını da gözlemletmez.');
-  scenario.skip('MED-042', 'FREE=3 tam sınır 3 resim kabul (201): limit geçse de sharp-yok nedeniyle varyant üretimi 400 verir → 201 ulaşılamaz (bkz. MED-102).');
-  scenario.skip('MED-043', 'Business=15 tam 15 resim (201): sharp-yok → varyant üretimi 400 → 201 ulaşılamaz (bkz. MED-102).');
-  scenario.skip('MED-048', 'productId yokken temp klasör (201): sharp-yok → varyant üretimi 400 → 201/temp key ulaşılamaz (bkz. MED-102).');
+  // Ürün-görseli happy path'leri (2 varyant / tier limitleri / temp klasör): sharp KURULU
+  // (bkz. HARNESS notu 2) → gerçek bir PNG ile uploadProductImageVariants çalışır, AMA storage
+  // TAM STUB'lanmış (create-app.ts:89-126): uploadFile sabit key ('test/file.bin') döner ve
+  // getPublicAssetUrl her zaman `https://test-cdn.invalid/...` verir. Bu yüzden senaryonun
+  // GERÇEK exp'i — cardKey/detailKey `.../product-images/{id}/…-card|detail.webp` şablonu,
+  // cardUrl/detailUrl S3_PUBLIC_BASE_URL öneki, media_files'e EK kayıt oluşmaması (skipMediaFile)
+  // — API'den GÖZLEMLENEMEZ. (Fake jpeg yollanırsa sharp decode hatası try/catch olmadan 500
+  // verir; bkz. MED-102 notu.) Anlamlı bir yeşil üretilemeyeceğinden gerekçeli skip.
+  scenario.skip('MED-040', 'Ürün varyantı happy path (201, [{cardKey,detailKey,cardUrl,detailUrl}]): sharp KURULU ama storage STUB → uploadFile sabit key ("test/file.bin") döner, getPublicAssetUrl sabit test-cdn URL verir; gerçek variant key şablonu, S3_PUBLIC_BASE_URL öneki ve skipMediaFile (media_files ek kayıt yok) davranışı API üzerinden gözlemlenemez.');
+  scenario.skip('MED-042', 'FREE=3 tam sınır 3 resim kabul (201, 3 varyant çifti): sharp KURULU ama storage STUB variant key/URL şablonunu gözlemletmez (bkz. MED-040); limit dalı MED-041\'de zaten doğrulanır.');
+  scenario.skip('MED-043', 'Business=15 tam 15 resim kabul (201, 15 sonuç): sharp KURULU ama storage STUB variant key/URL şablonunu gözlemletmez (bkz. MED-040).');
+  scenario.skip('MED-048', 'productId yokken temp klasör (201, cardKey .../product-images/temp/…): sharp KURULU ama storage STUB uploadFile sabit "test/file.bin" döndüğünden "temp" folder\'lı gerçek key gözlemlenemez (bkz. MED-040).');
 
   // Moderation KAPALI (AI_MODERATION_ENABLED='false') → NSFW engelleme tetiklenemez;
   // moderation_events'e 'blocked' yazan dallar API'den çalıştırılamaz.
-  scenario.skip('MED-049', 'Ürün görseli NSFW engeli + moderation_events(blocked): AI_MODERATION_ENABLED=false → assertImageClean no-op; NSFW reddi ve blocked event üretilemez. (Ek olarak sharp-yok nedeniyle bu uç zaten 400 verir.)');
+  scenario.skip('MED-049', 'Ürün görseli NSFW engeli + moderation_events(blocked): AI_MODERATION_ENABLED=false → assertImageClean no-op; NSFW reddi ve blocked event üretilemez. (Ayrıca variant happy-path storage STUB nedeniyle zaten gözlemlenemez; bkz. MED-040.)');
   scenario.skip('MED-055', 'Avatar NSFW engeli + moderation_events(blocked): AI kapalı → assertImageClean no-op; NSFW reddi/blocked event üretilemez.');
 
   // Storage TAM STUB → aşağıdaki gözlemler API'den yapılamaz.

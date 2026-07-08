@@ -29,6 +29,7 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
   GoogleAuthDto,
+  AppleAuthDto,
   SendPhoneCodeDto,
   VerifyPhoneDto,
 } from './dto';
@@ -122,6 +123,23 @@ export class AuthController {
   ): Promise<AuthResponseDto> {
     const result = await this.authService.loginWithGoogle(dto.idToken);
     // Tarayıcı için httpOnly cookie; mobil yine body'deki token'ı kullanır.
+    if (result?.tokens) {
+      setAuthCookies(res, result.tokens, { admin: false });
+    }
+    return result;
+  }
+
+  /**
+   * POST /auth/apple — Apple identity token ile giriş/kayıt
+   */
+  @Post('apple')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  async apple(
+    @Body() dto: AppleAuthDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthResponseDto> {
+    const result = await this.authService.loginWithApple(dto.identityToken, dto.fullName);
     if (result?.tokens) {
       setAuthCookies(res, result.tokens, { admin: false });
     }

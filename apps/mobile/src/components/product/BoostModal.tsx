@@ -95,6 +95,7 @@ export function BoostModal({
       // ile aynı pattern: tek kullanımlık token boşa harcanmaz.
       const paymentUrl: string | undefined = data.paymentUrl;
       if (paymentId) {
+        setSubmitting(false);
         onClose();
         router.push({
           pathname: '/payment/[id]',

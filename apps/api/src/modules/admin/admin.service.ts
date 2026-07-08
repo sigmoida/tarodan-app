@@ -9706,6 +9706,48 @@ export class AdminService {
     return this.suratCargoService.cancelShipmentByOrderNumber(ref.trim());
   }
 
+  /**
+   * Test konsolu: OrtakBarkodOlustur ile gönderi oluştur + barkod/etiket üret.
+   * Gerçek KargoTakipNo + ZPL etiket döner (düz create bunları vermez). DB'ye dokunmaz.
+   */
+  async suratTestBarcode(): Promise<any> {
+    if (!this.suratTrackingService) return { ok: false, error: 'Takip servisi kullanılamıyor' };
+    if (!this.suratCargoService?.isIntegrationEnabled()) {
+      return { ok: false, error: 'SURAT_CARGO_ENABLED kapalı (Coolify env kontrol et)' };
+    }
+    const ref = `ADMIN-BARKOD-${Date.now()}`;
+    const result = await this.suratTrackingService.probeBarcode({
+      KisiKurum: 'ADMIN BARKOD TEST',
+      SahisBirim: 'Endpoint testi',
+      AliciAdresi: 'Caferağa Mah. Moda Cad. No:14',
+      Il: 'İstanbul',
+      Ilce: 'Kadıköy',
+      TelefonCep: '5321112233',
+      KargoTuru: SuratKargoTuru.Koli,
+      OdemeTipi: SuratOdemeTipi.Pesin,
+      OzelKargoTakipNo: ref,
+      Adet: 1,
+      BirimDesi: 1,
+      BirimKg: 1,
+      KapidanOdemeTahsilatTipi: SuratKapidanOdemeTahsilatTipi.Nakit,
+      TasimaSekli: SuratTasimaSekli.KaraYolu,
+      TeslimSekli: SuratTeslimSekli.AdreseTeslim,
+      GonderiSekli: SuratGonderiSekli.Standart,
+      Pazaryerimi: 0,
+      Iademi: false,
+    });
+    return { ref, ...result };
+  }
+
+  /**
+   * Test konsolu: GonderiSil ile gönderiyi sil/pasif et (referansla). DB'ye dokunmaz.
+   */
+  async suratTestSil(ref: string): Promise<any> {
+    if (!ref?.trim()) return { ok: false, error: 'Referans (WebSiparisKodu) gerekli' };
+    if (!this.suratTrackingService) return { ok: false, error: 'Takip servisi kullanılamıyor' };
+    return this.suratTrackingService.probeGonderiSil(ref.trim());
+  }
+
   // ==================== NOTIFICATION MANAGEMENT ====================
 
   /**

@@ -109,18 +109,43 @@ describe('24 — Uçtan Uca Entegrasyon Journeyleri (JRN)', () => {
     return getPrisma().payment.findFirst({ where: { orderId }, orderBy: { createdAt: 'desc' } });
   }
 
-  /** Siparişin son payment'ına başarılı PayTR callback'i gönder (kuruş = amount*100). */
-  async function successCallback(orderId: string, overrideKurus?: number) {
-    const payment = await lastPayment(orderId);
-    return request(server())
-      .post('/api/payments/callback/paytr')
-      .send(
-        signCallback({
-          merchantOid: payment!.providerConversationId!,
-          status: 'success',
-          totalAmount: overrideKurus ?? Math.round(Number(payment!.amount) * 100),
-        }),
-      );
+  /**
+   * Siparişin son payment'ına başarılı PayTR callback'i gönder (kuruş = amount*100).
+   *
+   * NON-async: gerçek `request.Test` döner ki çağrı yerleri `.expect(200)` (ve
+   * ardından `await`) zincirleyebilsin. Gövde (merchant_oid + tutar) DB'deki son
+   * payment'a bağlı olduğundan, bu async okuma supertest Test'i DISPATCH etmeden
+   * ÖNCE (`.then`/`.end` tetiklenince) tembel olarak yapılıp `.send()` ile
+   * doldurulur. Böylece assertion/response davranışı async sürümle birebir aynı kalır.
+   */
+  function successCallback(orderId: string, overrideKurus?: number): request.Test {
+    const req = request(server()).post('/api/payments/callback/paytr');
+
+    // İmzalı gövdeyi tek sefer hazırla (idempotent) ve request'e yükle.
+    let prepared: Promise<void> | undefined;
+    const prepareBody = () =>
+      (prepared ??= lastPayment(orderId).then((payment) => {
+        req.send(
+          signCallback({
+            merchantOid: payment!.providerConversationId!,
+            status: 'success',
+            totalAmount: overrideKurus ?? Math.round(Number(payment!.amount) * 100),
+          }),
+        );
+      }));
+
+    // Dispatch tetikleyicilerini (then/end) sararak gövde hazırlığını öne al.
+    const originalThen = req.then.bind(req);
+    req.then = ((onFulfilled?: any, onRejected?: any) =>
+      prepareBody().then(() => originalThen(onFulfilled, onRejected))) as typeof req.then;
+
+    const originalEnd = req.end.bind(req);
+    req.end = ((callback?: any) => {
+      void prepareBody().then(() => originalEnd(callback), (err) => callback?.(err));
+      return req;
+    }) as typeof req.end;
+
+    return req;
   }
 
   /** buy + initiate + başarılı callback → ödenmiş sipariş (callback sonrası 'preparing'). */
@@ -253,7 +278,10 @@ describe('24 — Uçtan Uca Entegrasyon Journeyleri (JRN)', () => {
     const config = {
       get: (k: string) => (k === 'FEATURE_48H_CONFIRMATION_WINDOW' ? 'true' : undefined),
     };
-    return new OrderSchedulerService(prisma, orderService, config as any, {} as any);
+    // Constructor: (prisma, orderService, configService, elogoInvoicing, scheduledQueue).
+    // runAutoCompleteConfirmedOrders yalnız config flag + prisma + orderService kullanır;
+    // elogoInvoicing ve scheduledQueue stub geçilir.
+    return new OrderSchedulerService(prisma, orderService, config as any, {} as any, {} as any);
   }
 
   // ══════════════════════════ Alıcı ilk alışveriş (mutlu yol) ══════════════════════════
@@ -698,7 +726,8 @@ describe('24 — Uçtan Uca Entegrasyon Journeyleri (JRN)', () => {
 
   scenario('JRN-021', async () => {
     // Kayıtlı e-posta ile misafir checkout engellenir.
-    const existing = (await createUser(ctx.module, { email: 'kayitli-jrn21@demo.com' })) as Auth;
+    // `as Auth` cast'i email'i düşürüyordu; CreatedTestUser tipini koru (email içerir).
+    const existing = await createUser(ctx.module, { email: 'kayitli-jrn21@demo.com' });
     const res = await request(server())
       .post('/api/orders/guest/send-verification-code')
       .send({ email: existing.email })

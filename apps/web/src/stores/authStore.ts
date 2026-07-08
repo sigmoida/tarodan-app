@@ -136,6 +136,7 @@ interface AuthState {
   
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
+  loginWithApple: (idToken: string, fullName?: string) => Promise<void>;
   register: (username: string, email: string, password: string, phone?: string, birthDate?: string, acceptMarketing?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
@@ -198,6 +199,20 @@ export const useAuthStore = create<AuthState>()(
         const { user: apiUser } = response.data;
         // Token'lar httpOnly cookie olarak backend tarafından set edildi; JS'te saklamıyoruz.
         // Sadece hassas olmayan "girişli" işaretçisini bırakırız (interceptor/cart için).
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('tarodan_authed', '1');
+        }
+
+        const user = mapApiUser(apiUser);
+        const limits = TIER_LIMITS[user.membershipTier];
+
+        set({ user, token: null, refreshToken: null, isAuthenticated: true, limits });
+      },
+
+      loginWithApple: async (idToken: string, fullName?: string) => {
+        const response = await authApi.loginWithApple(idToken, fullName);
+        const { user: apiUser } = response.data;
+        // Token'lar httpOnly cookie olarak backend tarafından set edildi; JS'te saklamıyoruz.
         if (typeof window !== 'undefined') {
           localStorage.setItem('tarodan_authed', '1');
         }

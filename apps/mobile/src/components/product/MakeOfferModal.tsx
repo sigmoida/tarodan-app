@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation } from '@tanstack/react-query';
-import { theme, Text, Button, Modal, Input, Textarea, appAlert } from '@tarodan/ui-native';
+import { theme, Text, Button, Modal, Input, Textarea, useModalMessage, ModalMessage } from '@tarodan/ui-native';
 import { offersApi } from '../../services/api';
 import { formatPrice } from '../../utils/format';
 
@@ -33,6 +33,7 @@ export default function MakeOfferModal({
 }: MakeOfferModalProps) {
   const [amount, setAmount] = useState('');
   const [message, setMessage] = useState('');
+  const msg = useModalMessage();
 
   const createOfferMutation = useMutation({
     mutationFn: () =>
@@ -44,6 +45,7 @@ export default function MakeOfferModal({
   });
 
   const handleClose = () => {
+    msg.clear();
     setAmount('');
     setMessage('');
     createOfferMutation.reset();
@@ -51,23 +53,20 @@ export default function MakeOfferModal({
   };
 
   const handleSubmit = async () => {
+    msg.clear();
     const numeric = parseFloat(amount);
     if (!numeric || numeric <= 0) {
-      appAlert('Geçersiz Tutar', 'Pozitif bir teklif tutarı girin.');
+      msg.error('Pozitif bir teklif tutarı girin.');
       return;
     }
     // API kuralı: minimum teklif fiyatın %50'si (web paritesi) — yoksa ham 400 dönüyordu.
     const minOffer = listPrice * 0.5;
     if (numeric < minOffer) {
-      appAlert('Düşük Tutar', `Minimum teklif ₺${minOffer.toLocaleString('tr-TR')} (fiyatın %50'si).`);
+      msg.error(`Minimum teklif ₺${minOffer.toLocaleString('tr-TR')} (fiyatın %50'si).`);
       return;
     }
     if (numeric >= listPrice) {
-      appAlert(
-        'Yüksek Tutar',
-        'Teklifiniz liste fiyatından yüksek veya eşit. Doğrudan satın alma seçeneğini kullanabilirsiniz.',
-        [{ text: 'Tamam' }],
-      );
+      msg.error('Teklifiniz liste fiyatından yüksek veya eşit. Doğrudan satın alma seçeneğini kullanabilirsiniz.');
       return;
     }
     try {
@@ -75,10 +74,7 @@ export default function MakeOfferModal({
       onSuccess?.();
       handleClose();
     } catch (e: any) {
-      appAlert(
-        'Hata',
-        e?.response?.data?.message || 'Teklif gönderilemedi. Lütfen tekrar deneyin.',
-      );
+      msg.error(e?.response?.data?.message || 'Teklif gönderilemedi. Lütfen tekrar deneyin.');
     }
   };
 
@@ -152,6 +148,7 @@ export default function MakeOfferModal({
           disabled={!numeric || createOfferMutation.isPending}
         />
       </View>
+      <ModalMessage state={msg.state} />
     </Modal>
   );
 }

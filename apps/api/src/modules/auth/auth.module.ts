@@ -11,6 +11,7 @@ import { CacheModule } from '../cache/cache.module';
 import { StorageModule } from '../storage/storage.module';
 import { BannedUserGuard } from './guards/banned-user.guard';
 import { GoogleAuthService } from './google-auth.service';
+import { AppleAuthService } from './apple-auth.service';
 import { RolesGuard } from './guards/roles.guard';
 import { PhoneVerificationService } from './phone-verification.service';
 
@@ -35,6 +36,7 @@ import { PhoneVerificationService } from './phone-verification.service';
   providers: [
     AuthService,
     GoogleAuthService,
+    AppleAuthService,
     JwtStrategy,
     JwtRefreshStrategy,
     AdminJwtStrategy,

@@ -40,7 +40,7 @@ interface SuratRestResult {
  * WSDL/JSON `Gonderi` modelini eksiksiz kurar — her string alan mevcut ve non-null.
  * Enum/numerik alanlar dokümandaki tiplere göre gönderilir; `Iademi` byte (1/0).
  */
-function buildRestGonderi(p: SuratGonderiPayload): Record<string, unknown> {
+export function buildRestGonderi(p: SuratGonderiPayload): Record<string, unknown> {
   return {
     KisiKurum: p.KisiKurum ?? '',
     SahisBirim: p.SahisBirim ?? '',

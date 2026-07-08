@@ -4,7 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
 import { ShipmentStatus, OrderStatus, TradeStatus, PaymentStatus } from '@prisma/client';
 import { ElogoInvoicingService } from '../elogo/elogo-invoicing.service';
-import type { SuratTakipResponse, SuratTakipGonderi } from './surat-cargo.types';
+import type { SuratTakipResponse, SuratTakipGonderi, SuratGonderiPayload } from './surat-cargo.types';
+import { buildRestGonderi } from './surat-rest.client';
 import {
   mapSuratStatusToShipmentStatus,
   isSuratDelivered,
@@ -14,6 +15,12 @@ import {
 
 const SURAT_API_LIVE = 'https://api01.suratkargo.com.tr/api/KargoTakipHareketDetayi';
 const SURAT_API_TEST = 'https://api02.suratkargo.com.tr/api/KargoTakipHareketDetayi';
+// OrtakBarkodOlustur = gönderi oluştur + barkod/etiket üret (gerçek KargoTakipNo + ZPL döner).
+const SURAT_BARKOD_LIVE = 'https://api01.suratkargo.com.tr/api/OrtakBarkodOlustur';
+const SURAT_BARKOD_TEST = 'https://api02.suratkargo.com.tr/api/OrtakBarkodOlustur';
+// GonderiSil = gönderiyi sil/pasif et. Query auth (CariKodu/Sifre) + WebSiparisKodu.
+const SURAT_SIL_LIVE = 'https://api01.suratkargo.com.tr/api/GonderiSil';
+const SURAT_SIL_TEST = 'https://api02.suratkargo.com.tr/api/GonderiSil';
 
 @Injectable()
 export class SuratTrackingService {
@@ -137,6 +144,121 @@ export class SuratTrackingService {
         message: body?.errorMessage ?? null,
         gonderiCount: body?.Gonderiler?.length ?? 0,
         durum: body?.Gonderiler?.[0]?.KargonunDurumu ?? null,
+      };
+    } catch (error: any) {
+      return { ok: false, error: error?.message || String(error) };
+    }
+  }
+
+  /**
+   * Test konsolu: OrtakBarkodOlustur = gönderi oluştur + barkod/etiket üret.
+   * Gövde create ile aynı desende: { KullaniciAdi, Sifre, Gonderi:{...} }. Dönüşte
+   * gerçek KargoTakipNo + ZPL etiket verir (düz create bunları vermez). DB'ye dokunmaz.
+   */
+  async probeBarcode(payload: SuratGonderiPayload): Promise<{
+    ok: boolean;
+    isError?: boolean;
+    message?: string | null;
+    kargoTakipNo?: string | null;
+    barcodeCount?: number;
+    barcodeSample?: string | null;
+    error?: string;
+  }> {
+    const cariKodu = this.configService.get<string>('SURAT_KARGO_CARI_KODU', '');
+    const sifre = this.configService.get<string>('SURAT_KARGO_SIFRE', '');
+    if (!cariKodu || !sifre) {
+      return { ok: false, error: 'SURAT_KARGO_CARI_KODU / SURAT_KARGO_SIFRE tanımlı değil' };
+    }
+    const isTestMode =
+      this.configService.get<string>('SURAT_KARGO_TEST_MODE', 'true')?.trim() !== 'false';
+    const url = isTestMode ? SURAT_BARKOD_TEST : SURAT_BARKOD_LIVE;
+    const body = JSON.stringify({
+      KullaniciAdi: cariKodu,
+      Sifre: sifre,
+      Gonderi: buildRestGonderi(payload),
+    });
+
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 20000);
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body,
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+
+      const text = await response.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        return { ok: false, error: text?.slice(0, 200) || 'JSON olmayan yanıt' };
+      }
+
+      const isError = data?.isError ?? data?.IsError ?? false;
+      const barcode: unknown[] = Array.isArray(data?.Barcode) ? data.Barcode : [];
+      return {
+        ok: isError !== true,
+        isError: isError === true,
+        message: data?.Message ?? null,
+        kargoTakipNo: data?.KargoTakipNo ?? null,
+        barcodeCount: barcode.length,
+        barcodeSample: barcode.length ? String(barcode[0]).slice(0, 200) : null,
+      };
+    } catch (error: any) {
+      return { ok: false, error: error?.message || String(error) };
+    }
+  }
+
+  /**
+   * Test konsolu: GonderiSil = gönderiyi sil/pasif et. Query auth (CariKodu/Sifre) +
+   * WebSiparisKodu. Ham cevabı döner; DB'ye dokunmaz.
+   */
+  async probeGonderiSil(webSiparisKodu: string): Promise<{
+    ok: boolean;
+    httpStatus?: number;
+    isError?: boolean;
+    message?: string | null;
+    error?: string;
+  }> {
+    const cariKodu = this.configService.get<string>('SURAT_KARGO_CARI_KODU', '');
+    const sifre = this.configService.get<string>('SURAT_KARGO_SIFRE', '');
+    if (!cariKodu || !sifre) {
+      return { ok: false, error: 'SURAT_KARGO_CARI_KODU / SURAT_KARGO_SIFRE tanımlı değil' };
+    }
+    const isTestMode =
+      this.configService.get<string>('SURAT_KARGO_TEST_MODE', 'true')?.trim() !== 'false';
+    const baseUrl = isTestMode ? SURAT_SIL_TEST : SURAT_SIL_LIVE;
+    const url = `${baseUrl}?CariKodu=${encodeURIComponent(cariKodu)}&Sifre=${encodeURIComponent(sifre)}&WebSiparisKodu=${encodeURIComponent(webSiparisKodu)}`;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: '{}',
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      const text = await response.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        return {
+          ok: false,
+          httpStatus: response.status,
+          error: text?.slice(0, 200) || 'JSON olmayan yanıt',
+        };
+      }
+      const isError = data?.IsError ?? data?.isError ?? false;
+      return {
+        ok: isError !== true,
+        httpStatus: response.status,
+        isError: isError === true,
+        message: data?.Message ?? data?.GonderiSilResult ?? null,
       };
     } catch (error: any) {
       return { ok: false, error: error?.message || String(error) };
