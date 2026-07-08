@@ -10,6 +10,13 @@ const timeFmt = new Intl.DateTimeFormat('tr-TR', {
   hour: '2-digit',
   minute: '2-digit',
 });
+const dateTimeFmt = new Intl.DateTimeFormat('tr-TR', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
 
 type DateLike = string | number | Date | null | undefined;
 
@@ -25,6 +32,13 @@ export function formatTime(value: DateLike): string {
   if (value === null || value === undefined || value === '') return '';
   const d = value instanceof Date ? value : new Date(value);
   return isNaN(d.getTime()) ? '' : timeFmt.format(d);
+}
+
+/** Short date + time (dd.MM.yyyy HH:mm). */
+export function formatDateTime(value: DateLike): string {
+  if (value === null || value === undefined || value === '') return '';
+  const d = value instanceof Date ? value : new Date(value);
+  return isNaN(d.getTime()) ? '' : dateTimeFmt.format(d);
 }
 
 /**
