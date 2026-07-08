@@ -4,7 +4,7 @@
 
 import type { ReactNode } from 'react';
 import { ProductCard, SkeletonCard } from '@/components/ui';
-import type { Product } from '../lib/types';
+import type { Product } from '@/types/product';
 
 /** The default home grid: 2 rows × 6 columns on desktop (12 cards). */
 export const HOME_GRID_CLASS =

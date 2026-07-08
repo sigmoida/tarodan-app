@@ -31,6 +31,18 @@ export function getProductOriginalPriceForDisplay(p: ProductPriceFields): number
 }
 
 /**
+ * Gerçek indirim var mı: eski fiyat, güncel fiyattan kesin olarak yüksek.
+ * API bazen %0 / hatalı fiyat döndürebildiği için ana sayfa "İndirimdekiler"
+ * rail'i ve server prefetch'i bu tek kaynağı kullanır.
+ */
+export function hasRealDiscount(p: ProductPriceFields): boolean {
+  return (
+    isProductOnSaleDisplay(p) &&
+    getProductOriginalPriceForDisplay(p) > getProductEffectivePrice(p)
+  );
+}
+
+/**
  * Ürün stokta yok mu?
  * - active dışı her statü (sold / inactive vb.) "stokta yok" sayılır.
  * - availableQuantity (quantity - reserved) <= 0 → stokta yok. null = sınırsız stok → stokta.

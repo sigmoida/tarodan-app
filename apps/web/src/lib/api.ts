@@ -450,6 +450,11 @@ export const userApi = {
     api.get('/products/my', { params }),
   getMyProductById: (id: string) => api.get(`/products/my/${id}`),
   getStats: () => api.get('/users/me/stats'),
+  // Public home-page spotlights
+  getTopCollections: (limit = 20) =>
+    api.get('/users/top-collections', { params: { limit } }),
+  getFeaturedCollector: () => api.get('/users/featured-collector'),
+  getFeaturedBusiness: () => api.get('/users/featured-business'),
 };
 
 // Messages (thread-based messaging)
