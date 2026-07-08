@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { RocketLaunchIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { Button, Spinner } from "@tarodan/ui";
@@ -11,6 +12,11 @@ interface BoostOption {
   durationDays: number;
   price: number;
   label: string;
+}
+
+interface BoostPricing {
+  options?: BoostOption[];
+  enabled?: boolean;
 }
 
 interface BoostModalProps {
@@ -37,32 +43,63 @@ export default function BoostModal({
   onClose,
 }: BoostModalProps) {
   const router = useRouter();
-  const [loadingPricing, setLoadingPricing] = useState(false);
-  const [options, setOptions] = useState<BoostOption[]>([]);
-  const [enabled, setEnabled] = useState(true);
   const [selected, setSelected] = useState<number | null>(null);
   const [autoRenew, setAutoRenew] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+
+  // Pricing options — fetched only while the modal is open, cached across reopens.
+  const pricingQuery = useQuery({
+    queryKey: ["boost-pricing"],
+    queryFn: async (): Promise<BoostPricing> => {
+      const res = await api.get("/products/boost/pricing");
+      return res.data || {};
+    },
+    enabled: open,
+    staleTime: 5 * 60 * 1000,
+    meta: { page: "boost-pricing" },
+  });
+
+  const options: BoostOption[] = pricingQuery.data?.options ?? [];
+  const enabled = pricingQuery.data ? pricingQuery.data.enabled !== false : true;
+  const loadingPricing = open && pricingQuery.isLoading;
 
   useEffect(() => {
-    if (!open) return;
-    setLoadingPricing(true);
-    api
-      .get("/products/boost/pricing")
-      .then((res) => {
-        const data = res.data || {};
-        const opts: BoostOption[] = data.options || [];
-        setOptions(opts);
-        setEnabled(data.enabled !== false);
-        // Varsayılan seçim: 7 gün varsa o, yoksa ilk seçenek
-        const seven = opts.find((o) => o.durationDays === 7);
-        setSelected(seven?.durationDays ?? opts[0]?.durationDays ?? null);
-      })
-      .catch(() => {
-        toast.error("Fiyatlar yüklenemedi");
-      })
-      .finally(() => setLoadingPricing(false));
-  }, [open]);
+    if (pricingQuery.isError) toast.error("Fiyatlar yüklenemedi");
+  }, [pricingQuery.isError]);
+
+  // Default selection once options arrive: 7 days if present, else the first —
+  // without overriding a choice the user already made.
+  useEffect(() => {
+    const opts = pricingQuery.data?.options;
+    if (!opts?.length) return;
+    setSelected(
+      (cur) =>
+        cur ??
+        (opts.find((o) => o.durationDays === 7)?.durationDays ??
+          opts[0].durationDays),
+    );
+  }, [pricingQuery.data]);
+
+  const boost = useMutation({
+    mutationFn: (durationDays: number) =>
+      api.post(`/products/${listingId}/boost/initiate`, {
+        durationDays,
+        autoRenew: isPremium ? autoRenew : false,
+      }),
+    // Üyelik/sipariş akışıyla parite: tüm tarayıcıyı PayTR'a atmak yerine uygulama-içi
+    // ödeme ekranına (/payment/[id]) git — PayTR kart formu iframe içinde gösterilir,
+    // bypass modunda da aynı ekran otomatik tamamlar.
+    onSuccess: (res) => {
+      const paymentId = res.data?.paymentId;
+      if (paymentId) {
+        onClose();
+        router.push(`/payment/${paymentId}?type=boost`);
+      } else {
+        toast.error("Ödeme başlatılamadı");
+      }
+    },
+    onError: (error: any) =>
+      toast.error(error?.response?.data?.message || "Öne çıkarma başlatılamadı"),
+  });
 
   if (!open) return null;
 
@@ -71,31 +108,8 @@ export default function BoostModal({
     : 0;
   const hasActiveBoost = remainingDays > 0;
 
-  const handleConfirm = async () => {
-    if (selected == null) return;
-    setSubmitting(true);
-    try {
-      const res = await api.post(`/products/${listingId}/boost/initiate`, {
-        durationDays: selected,
-        autoRenew: isPremium ? autoRenew : false,
-      });
-      // Üyelik/sipariş akışıyla parite: tüm tarayıcıyı PayTR'a atmak yerine uygulama-içi
-      // ödeme ekranına (/payment/[id]) git — PayTR kart formu iframe içinde gösterilir,
-      // bypass modunda da aynı ekran otomatik tamamlar.
-      const paymentId = res.data?.paymentId;
-      if (paymentId) {
-        onClose();
-        router.push(`/payment/${paymentId}?type=boost`);
-        return;
-      }
-      toast.error("Ödeme başlatılamadı");
-    } catch (error: any) {
-      toast.error(
-        error?.response?.data?.message || "Öne çıkarma başlatılamadı",
-      );
-    } finally {
-      setSubmitting(false);
-    }
+  const handleConfirm = () => {
+    if (selected != null) boost.mutate(selected);
   };
 
   return (
@@ -199,7 +213,7 @@ export default function BoostModal({
             variant="secondary"
             className="flex-1"
             onClick={onClose}
-            disabled={submitting}
+            disabled={boost.isPending}
           >
             Vazgeç
           </Button>
@@ -207,10 +221,10 @@ export default function BoostModal({
             className="flex-1"
             onClick={handleConfirm}
             disabled={
-              submitting || loadingPricing || !enabled || selected == null
+              boost.isPending || loadingPricing || !enabled || selected == null
             }
           >
-            {submitting
+            {boost.isPending
               ? "Yönlendiriliyor..."
               : hasActiveBoost
                 ? "Süreyi Uzat ve Öde"

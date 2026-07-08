@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import OptimizedImage from '@/components/OptimizedImage';
 import UserAvatar from '@/components/UserAvatar';
@@ -85,14 +85,15 @@ export default function LikedCollectionsClient() {
     }
   }, [likedQuery.error, isAuthenticated, router]);
 
-  const handleUnlike = async (collectionId: string) => {
-    try {
-      await collectionsApi.unlike(collectionId);
-      await queryClient.invalidateQueries({ queryKey: ['collections-liked'] });
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || t('collection.unlikeFailed'));
-    }
-  };
+  const unlikeMutation = useMutation({
+    mutationFn: (collectionId: string) => collectionsApi.unlike(collectionId),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ['collections-liked'] }),
+    onError: (err: any) =>
+      toast.error(err.response?.data?.message || t('collection.unlikeFailed')),
+  });
+  const handleUnlike = (collectionId: string) =>
+    unlikeMutation.mutate(collectionId);
 
   if (!mounted || !isAuthenticated) {
     return (

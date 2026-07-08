@@ -1,6 +1,7 @@
 "use client";
 
 import { Button, Input, Modal, Select, Spinner, Textarea } from "@/components/ui";
+import { useMutation } from "@tanstack/react-query";
 import { mediaApi, refundsApi, type RefundReason } from "@/lib/api";
 import { useTranslation } from "@/i18n/LanguageContext";
 import { useState } from "react";
@@ -34,7 +35,44 @@ export default function RefundRequestModal({
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [evidencePreviews, setEvidencePreviews] = useState<string[]>([]);
   const [refundQuantity, setRefundQuantity] = useState(1);
-  const [submitting, setSubmitting] = useState(false);
+
+  const submitMutation = useMutation({
+    mutationFn: async () => {
+      // Fotoğrafları doğrudan yükle (URL yapıştırmaya gerek yok)
+      let evidencePhotoUrls: string[] = [];
+      if (evidenceFiles.length > 0) {
+        const results = await Promise.all(
+          evidenceFiles.map((file) => mediaApi.uploadReviewImage(file)),
+        );
+        evidencePhotoUrls = results
+          .map((r) => r.data?.url)
+          .filter(Boolean) as string[];
+      }
+      await refundsApi.create(orderId, {
+        reason,
+        description: description.trim() || undefined,
+        evidencePhotoUrls:
+          evidencePhotoUrls.length > 0 ? evidencePhotoUrls : undefined,
+        // Adet bazlı kısmi iade: tüm adet iade ediliyorsa alanı gönderme.
+        refundQuantity:
+          quantity > 1 && refundQuantity < quantity ? refundQuantity : undefined,
+      });
+    },
+    onSuccess: () => {
+      toast.success(
+        locale === "en" ? "Refund request created" : "İade talebi oluşturuldu",
+      );
+      onSuccess();
+      onClose();
+    },
+    onError: (err: any) =>
+      toast.error(
+        err?.response?.data?.message ||
+          (locale === "en"
+            ? "Failed to create refund request"
+            : "İade talebi oluşturulamadı"),
+      ),
+  });
 
   const handleEvidenceAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -117,46 +155,7 @@ export default function RefundRequestModal({
       return;
     }
 
-    setSubmitting(true);
-    try {
-      // Fotoğrafları doğrudan yükle (URL yapıştırmaya gerek yok)
-      let evidencePhotoUrls: string[] = [];
-      if (evidenceFiles.length > 0) {
-        const results = await Promise.all(
-          evidenceFiles.map((file) => mediaApi.uploadReviewImage(file)),
-        );
-        evidencePhotoUrls = results
-          .map((r) => r.data?.url)
-          .filter(Boolean) as string[];
-      }
-      await refundsApi.create(orderId, {
-        reason,
-        description: description.trim() || undefined,
-        evidencePhotoUrls:
-          evidencePhotoUrls.length > 0 ? evidencePhotoUrls : undefined,
-        // Adet bazlı kısmi iade: tüm adet iade ediliyorsa alanı gönderme.
-        refundQuantity:
-          quantity > 1 && refundQuantity < quantity
-            ? refundQuantity
-            : undefined,
-      });
-      toast.success(
-        locale === "en"
-          ? "Refund request created"
-          : "İade talebi oluşturuldu",
-      );
-      onSuccess();
-      onClose();
-    } catch (err: any) {
-      toast.error(
-        err?.response?.data?.message ||
-          (locale === "en"
-            ? "Failed to create refund request"
-            : "İade talebi oluşturulamadı"),
-      );
-    } finally {
-      setSubmitting(false);
-    }
+    submitMutation.mutate();
   };
 
   const phaseDescription =
@@ -318,7 +317,7 @@ export default function RefundRequestModal({
             variant="secondary"
             className="flex-1"
             onClick={onClose}
-            disabled={submitting}
+            disabled={submitMutation.isPending}
           >
             {locale === "en" ? "Cancel" : "Vazgeç"}
           </Button>
@@ -326,9 +325,9 @@ export default function RefundRequestModal({
             variant="primary"
             className="flex-1 flex items-center justify-center gap-2"
             onClick={handleSubmit}
-            disabled={submitting}
+            disabled={submitMutation.isPending}
           >
-            {submitting ? (
+            {submitMutation.isPending ? (
               <Spinner size="sm" color="border-surface-elevated border-t-transparent" />
             ) : null}
             {locale === "en" ? "Submit" : "Talep Oluştur"}

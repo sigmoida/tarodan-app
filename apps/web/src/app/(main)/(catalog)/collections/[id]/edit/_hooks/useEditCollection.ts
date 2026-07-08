@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
 import { collectionsApi } from '@/lib/api';
 import { useTranslation } from '@/i18n/LanguageContext';
@@ -16,12 +16,7 @@ export function useEditCollection() {
   const { t } = useTranslation();
   const collectionIdOrSlug = params.id as string;
 
-  const [collection, setCollection] = useState<Collection | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   // Form state
   const [name, setName] = useState('');
@@ -31,149 +26,137 @@ export function useEditCollection() {
   const [isPublic, setIsPublic] = useState(true);
   const [coverImageFile, setCoverImageFile] = useState<File | null>(null);
   const [coverImagePreview, setCoverImagePreview] = useState<string>('');
-  const [isUploadingCover, setIsUploadingCover] = useState(false);
 
+  // Auth gate.
   useEffect(() => {
     if (authLoading) return;
-    if (!isAuthenticated || !user) {
-      router.push('/login');
-      return;
-    }
+    if (!isAuthenticated || !user) router.push('/login');
+  }, [authLoading, isAuthenticated, user, router]);
 
-    if (collectionIdOrSlug) {
-      fetchCollection();
-    }
-  }, [collectionIdOrSlug, authLoading, isAuthenticated, user]);
+  // Load the collection — same key the detail page uses, so its cache is reused.
+  const collectionQuery = useQuery({
+    queryKey: ['collection', collectionIdOrSlug],
+    queryFn: async (): Promise<Collection> => {
+      const response = isUUID(collectionIdOrSlug)
+        ? await collectionsApi.getOne(collectionIdOrSlug)
+        : await collectionsApi.getBySlug(collectionIdOrSlug);
+      return response.data.collection || response.data;
+    },
+    enabled: !authLoading && isAuthenticated && !!user && !!collectionIdOrSlug,
+    meta: { page: 'collection-edit' },
+  });
+  const collection = collectionQuery.data ?? null;
 
-  const fetchCollection = async () => {
-    if (!collectionIdOrSlug) {
-      setError(t('collection.invalidLink'));
-      setIsLoading(false);
-      return;
-    }
+  // Populate the form once, when the collection first arrives.
+  const populatedRef = useRef(false);
+  useEffect(() => {
+    const data = collectionQuery.data;
+    if (!data || populatedRef.current) return;
+    populatedRef.current = true;
+    setName(data.name || '');
+    setDescription(data.description || '');
+    setCategoryId(data.categoryId || '');
+    setCoverImageUrl(data.coverImageUrl || '');
+    setCoverImagePreview(data.coverImageUrl || '');
+    setIsPublic(data.isPublic ?? true);
+  }, [collectionQuery.data]);
 
-    setIsLoading(true);
-    setError(null);
-    try {
-      // Try UUID endpoint first if it looks like a UUID, otherwise try slug
-      let response;
-      if (isUUID(collectionIdOrSlug)) {
-        response = await collectionsApi.getOne(collectionIdOrSlug);
-      } else {
-        response = await collectionsApi.getBySlug(collectionIdOrSlug);
-      }
-      const data = response.data.collection || response.data;
-      setCollection(data);
+  const error = !collectionIdOrSlug
+    ? t('collection.invalidLink')
+    : collectionQuery.isError
+      ? (collectionQuery.error as any)?.response?.data?.message ||
+        t('collection.loadFailed')
+      : collection && user && collection.userId !== user.id
+        ? t('collection.noEditPermission')
+        : null;
 
-      // Check if user is the owner
-      if (data.userId !== user?.id) {
-        setError(t('collection.noEditPermission'));
-        setIsLoading(false);
-        return;
-      }
+  const isLoading = !collectionIdOrSlug
+    ? false
+    : authLoading || collectionQuery.isPending;
 
-      // Populate form with existing data
-      setName(data.name || '');
-      setDescription(data.description || '');
-      setCategoryId(data.categoryId || '');
-      setCoverImageUrl(data.coverImageUrl || '');
-      setCoverImagePreview(data.coverImageUrl || '');
-      setIsPublic(data.isPublic ?? true);
-    } catch (error: any) {
-      setError(error.response?.data?.message || t('collection.loadFailed'));
-      toast.error(t('collection.loadFailed'));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleCoverImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      toast.error('Lütfen geçerli bir resim dosyası seçin');
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('Resim boyutu 10MB\'dan küçük olmalıdır');
-      return;
-    }
-
-    setCoverImageFile(file);
-    const preview = URL.createObjectURL(file);
-    setCoverImagePreview(preview);
-
-    // Upload cover image
-    setIsUploadingCover(true);
-    try {
-      const response = await collectionsApi.updateCover(collection!.id, file);
-      const newCoverUrl = response.data.collection?.coverImageUrl || response.data.coverImageUrl;
+  const coverMutation = useMutation({
+    mutationFn: (file: File) => collectionsApi.updateCover(collection!.id, file),
+    onSuccess: (response) => {
+      const newCoverUrl =
+        response.data.collection?.coverImageUrl || response.data.coverImageUrl;
       if (newCoverUrl) {
         setCoverImageUrl(newCoverUrl);
         setCoverImagePreview(newCoverUrl);
         toast.success('Kapak resmi yüklendi');
       }
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Kapak resmi yüklenemedi');
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'Kapak resmi yüklenemedi');
       setCoverImageFile(null);
       setCoverImagePreview(coverImageUrl);
-    } finally {
-      setIsUploadingCover(false);
+    },
+  });
+
+  const handleCoverImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Lütfen geçerli bir resim dosyası seçin');
+      return;
     }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Resim boyutu 10MB\'dan küçük olmalıdır');
+      return;
+    }
+    setCoverImageFile(file);
+    setCoverImagePreview(URL.createObjectURL(file));
+    coverMutation.mutate(file);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!name.trim()) {
-      toast.error(t('collection.collectionNameRequired'));
-      return;
-    }
-
-    if (!collection) {
-      toast.error(t('collection.collectionNotFound'));
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      await collectionsApi.update(collection.id, {
+  const updateMutation = useMutation({
+    mutationFn: () =>
+      collectionsApi.update(collection!.id, {
         name: name.trim(),
         description: description.trim() || undefined,
         categoryId: categoryId || null,
         isPublic,
-      });
-
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['collection'] });
       toast.success(t('collection.collectionUpdated'));
-      // Use slug if available, otherwise use ID
-      router.push(`/collections/${collection.id}`);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || t('collection.loadFailed'));
-    } finally {
-      setIsSaving(false);
-    }
-  };
+      router.push(`/collections/${collection!.id}`);
+    },
+    onError: (err: any) =>
+      toast.error(err.response?.data?.message || t('collection.loadFailed')),
+  });
 
-  const handleDelete = async () => {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      toast.error(t('collection.collectionNameRequired'));
+      return;
+    }
     if (!collection) {
       toast.error(t('collection.collectionNotFound'));
       return;
     }
+    updateMutation.mutate();
+  };
 
-    setIsDeleting(true);
-    try {
-      await collectionsApi.delete(collection.id);
+  const deleteMutation = useMutation({
+    mutationFn: () => collectionsApi.delete(collection!.id),
+    onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['collections', 'mine'] });
       await queryClient.invalidateQueries({ queryKey: ['collections'] });
-      queryClient.removeQueries({ queryKey: ['collection', collection.id] });
+      queryClient.removeQueries({ queryKey: ['collection', collection!.id] });
       toast.success(t('collection.collectionDeleted'));
       router.push('/collections');
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || t('collection.loadFailed'));
-      setIsDeleting(false);
+    },
+    onError: (err: any) =>
+      toast.error(err.response?.data?.message || t('collection.loadFailed')),
+  });
+
+  const handleDelete = () => {
+    if (!collection) {
+      toast.error(t('collection.collectionNotFound'));
+      return;
     }
+    deleteMutation.mutate();
   };
 
   return {
@@ -184,8 +167,8 @@ export function useEditCollection() {
     collection,
     isLoading,
     error,
-    isSaving,
-    isDeleting,
+    isSaving: updateMutation.isPending,
+    isDeleting: deleteMutation.isPending,
     showDeleteModal,
     setShowDeleteModal,
     name,
@@ -195,7 +178,7 @@ export function useEditCollection() {
     categoryId,
     setCategoryId,
     coverImagePreview,
-    isUploadingCover,
+    isUploadingCover: coverMutation.isPending,
     isPublic,
     setIsPublic,
     handleCoverImageChange,
