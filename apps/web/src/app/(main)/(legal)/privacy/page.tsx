@@ -3,23 +3,10 @@ import type { Metadata } from 'next';
 import { DocPage } from '@/components/layout/DocPage';
 import SectionCard from '@/components/ui/SectionCard';
 import { PageContent } from '@/app/(main)/(trash)/sayfa/[slug]/PageContent';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
-async function getPage() {
-  try {
-    const res = await fetch(`${API_BASE}/api/pages/privacy`, {
-      next: { revalidate: 60 },
-    });
-    if (!res.ok) return null;
-    return res.json();
-  } catch {
-    return null;
-  }
-}
+import { getPrivacyPage } from './_lib/data';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const page = await getPage();
+  const page = await getPrivacyPage();
   if (!page) return { title: 'Gizlilik Politikası' };
   return {
     title: page.metaTitle || page.title,
@@ -33,7 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function PrivacyPage() {
-  const page = await getPage();
+  const page = await getPrivacyPage();
   if (!page) notFound();
 
   return (
