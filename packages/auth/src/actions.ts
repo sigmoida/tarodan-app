@@ -15,11 +15,11 @@ export type AuthLoginResult =
 	| { status: 'error'; reason: 'invalid' | 'connection' | 'unknown'; serverMessage?: string };
 
 /**
- * The auth flow LOGIC (login / logout / forgot-password), factored out of the
- * admin app. Pure async functions — NOT Server Actions and carrying NO
- * user-facing copy: each app wraps these in its own `'use server'` file, maps
- * the `reason` codes to localized messages, and handles `redirect()`. On a
- * successful login the tokens are written to the app's httpOnly cookies here.
+ * The auth flow LOGIC (login / google-login / logout / forgot-password),
+ * factored out of the admin app. Pure async functions — NOT Server Actions and
+ * carrying NO user-facing copy: each app wraps these in its own `'use server'`
+ * file, maps the `reason` codes to localized messages, and handles `redirect()`.
+ * On a successful login the tokens are written to the app's httpOnly cookies here.
  */
 export function createAuthLogic<TUser>(config: AuthConfig, session: SessionToolkit<TUser>) {
 	const { apiBaseUrl, endpoints } = config;
@@ -44,6 +44,40 @@ export function createAuthLogic<TUser>(config: AuthConfig, session: SessionToolk
 		const data = await res.json().catch(() => null);
 
 		if (res.ok && data?.requires2FA) return { status: '2fa' };
+		if (res.ok && data?.tokens?.accessToken) {
+			session.writeTokens(data.tokens.accessToken, data.tokens.refreshToken);
+			return { status: 'ok' };
+		}
+		if (res.status === 401 || res.status === 400) {
+			return { status: 'error', reason: 'invalid' };
+		}
+		return { status: 'error', reason: 'unknown', serverMessage: data?.message };
+	}
+
+	/**
+	 * Exchange a Google id_token for app tokens. Mirrors `login`: same result
+	 * shape, same token-writing, same `reason` mapping — Google is a first-class
+	 * flow through the engine, not a bespoke per-app fetch. Requires
+	 * `endpoints.google` to be configured (web only; admin omits it).
+	 */
+	async function googleLogin(idToken: string): Promise<AuthLoginResult> {
+		if (!endpoints.google) {
+			return { status: 'error', reason: 'unknown', serverMessage: 'Google login not configured' };
+		}
+		let res: Response;
+		try {
+			res = await fetch(`${apiBaseUrl}${endpoints.google}`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ idToken }),
+				cache: 'no-store',
+			});
+		} catch {
+			return { status: 'error', reason: 'connection' };
+		}
+
+		const data = await res.json().catch(() => null);
+
 		if (res.ok && data?.tokens?.accessToken) {
 			session.writeTokens(data.tokens.accessToken, data.tokens.refreshToken);
 			return { status: 'ok' };
@@ -82,5 +116,5 @@ export function createAuthLogic<TUser>(config: AuthConfig, session: SessionToolk
 		}
 	}
 
-	return { login, logout, forgotPassword };
+	return { login, googleLogin, logout, forgotPassword };
 }

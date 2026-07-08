@@ -1,7 +1,7 @@
 'use server';
 
-import { webAuthConfig, type WebUser } from '@/lib/auth.config';
-import { authLogic, bffSession, getSession } from './bff-session';
+import { type WebUser } from '@/lib/auth.config';
+import { authLogic, getSession } from './bff-session';
 
 export type WebLoginResult =
   | { status: 'ok'; user: WebUser | null }
@@ -39,24 +39,13 @@ export async function loginAction(input: {
 }
 
 export async function googleLoginAction(idToken: string): Promise<WebLoginResult> {
-  let res: Response;
-  try {
-    res = await fetch(`${webAuthConfig.apiBaseUrl}/auth/google`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken }),
-      cache: 'no-store',
-    });
-  } catch {
-    return { status: 'error', message: 'Sunucuya bağlanılamadı.' };
+  const result = await authLogic.googleLogin(idToken);
+  if (result.status === 'error') {
+    return { status: 'error', message: reasonMessage(result.reason, result.serverMessage) };
   }
-  const data = await res.json().catch(() => null);
-  if (res.ok && data?.tokens?.accessToken) {
-    bffSession.writeTokens(data.tokens.accessToken, data.tokens.refreshToken);
-    const user = await getSession();
-    return { status: 'ok', user };
-  }
-  return { status: 'error', message: data?.message || 'Google ile giriş başarısız' };
+  if (result.status === '2fa') return { status: '2fa' };
+  const user = await getSession();
+  return { status: 'ok', user };
 }
 
 export async function logoutAction(): Promise<void> {

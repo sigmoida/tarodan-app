@@ -19,6 +19,8 @@ export interface AuthEndpoints {
 	logout: string;
 	/** POST — request a password reset e-mail. */
 	forgotPassword: string;
+	/** POST — exchange a Google id_token for app tokens. Optional (web only). */
+	google?: string;
 }
 
 export interface AuthConfig {

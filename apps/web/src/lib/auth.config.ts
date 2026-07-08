@@ -21,6 +21,7 @@ export const webAuthConfig: AuthConfig = {
     profile: '/auth/profile',
     logout: '/auth/logout',
     forgotPassword: '/auth/forgot-password',
+    google: '/auth/google',
   },
   // NestJS user refresh guard reads the refresh token from this cookie.
   upstreamRefreshCookie: 'refresh_token',
