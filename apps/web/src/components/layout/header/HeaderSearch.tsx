@@ -9,13 +9,11 @@ import { useQuery } from '@tanstack/react-query';
 import {
 	MagnifyingGlassIcon,
 	XMarkIcon,
-	ClockIcon,
-	FireIcon,
 	ArrowRightIcon,
 	ShoppingBagIcon,
 	TagIcon,
 } from '@heroicons/react/24/outline';
-import { Button, Input, Spinner } from '@tarodan/ui';
+import { Button, Chip, IconButton, Input, Spinner } from '@tarodan/ui';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { isValidImageSrc } from '@/components/OptimizedImage';
 import { searchApi } from '@/lib/api';
@@ -329,16 +327,15 @@ export default function HeaderSearch() {
 								{/* Son Aramalar */}
 								{recentSearches.length > 0 && (
 									<div className='px-4 pt-3 pb-2'>
-										<div className='flex items-center justify-between mb-2'>
-											<span className='text-xs font-semibold text-muted uppercase tracking-wide flex items-center gap-1.5'>
-												<ClockIcon className='w-3.5 h-3.5 shrink-0' />
+										<div className='mb-2 flex items-center justify-between'>
+											<span className='text-xs font-semibold uppercase tracking-wide text-muted'>
 												{locale === 'en' ? 'Recent Searches' : 'Son Aramalar'}
 											</span>
 											<Button
-												variant='secondary'
+												variant='link'
+												size='sm'
 												type='button'
-												onClick={clearSearches}
-												className='text-xs text-primary-500 hover:text-primary-600 font-medium'>
+												onClick={clearSearches}>
 												{locale === 'en' ? 'Clear' : 'Temizle'}
 											</Button>
 										</div>
@@ -346,26 +343,27 @@ export default function HeaderSearch() {
 											{recentSearches.map((s, idx) => (
 												<div
 													key={s}
-													className='flex items-center justify-between gap-1 group'>
+													className='group flex items-center gap-1'>
 													<Button
-														variant='secondary'
+														variant='ghost'
+														size='sm'
 														type='button'
 														onClick={() => navigateSearch(s)}
-														className={`flex-1 min-w-0 flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg transition-colors text-left ${activeIndex === idx ? 'bg-primary-50 text-primary-600' : 'text-body hover:bg-primary-50 hover:text-primary-600'}`}>
-														<ClockIcon className='w-4 h-4 text-subtle shrink-0' />
+														className={`min-w-0 flex-1 justify-start ${activeIndex === idx ? 'bg-primary-50 text-primary-600' : ''}`}>
 														<span className='truncate'>{s}</span>
 													</Button>
-													<Button
-														variant='secondary'
+													<IconButton
+														variant='ghost'
+														size='sm'
 														type='button'
 														onClick={(e) => {
 															e.stopPropagation();
 															removeSearch(s);
 														}}
-														className='p-1.5 shrink-0 text-subtle hover:text-danger-500 rounded transition-opacity opacity-0 group-hover:opacity-100'
+														className='shrink-0 text-subtle opacity-0 transition-opacity hover:text-danger-500 group-hover:opacity-100'
 														aria-label={locale === 'en' ? 'Remove' : 'Kaldır'}>
-														<XMarkIcon className='w-4 h-4' />
-													</Button>
+														<XMarkIcon className='h-4 w-4' />
+													</IconButton>
 												</div>
 											))}
 										</div>
@@ -374,21 +372,18 @@ export default function HeaderSearch() {
 
 								{/* Popüler Aramalar */}
 								<div
-									className={`px-4 pb-3 ${recentSearches.length > 0 ? 'pt-2 border-t border-border-subtle' : 'pt-3'}`}>
-									<span className='text-xs font-semibold text-muted uppercase tracking-wide flex items-center gap-1.5 mb-2'>
-										<FireIcon className='w-3.5 h-3.5 shrink-0' />
+									className={`px-4 pb-3 ${recentSearches.length > 0 ? 'border-t border-border-subtle pt-2' : 'pt-3'}`}>
+									<span className='mb-2 block text-xs font-semibold uppercase tracking-wide text-muted'>
 										{locale === 'en' ? 'Popular Searches' : 'Popüler Aramalar'}
 									</span>
 									<div className='flex flex-wrap gap-2'>
 										{POPULAR_SEARCHES[locale as 'tr' | 'en']?.map((s) => (
-											<Button
-												variant='secondary'
+											<Chip
 												key={s}
 												type='button'
-												onClick={() => navigateSearch(s)}
-												className='px-3 py-1.5 text-sm bg-surface-alt hover:bg-primary-100 text-body hover:text-primary-600 rounded-full transition-colors whitespace-nowrap'>
+												onClick={() => navigateSearch(s)}>
 												{s}
-											</Button>
+											</Chip>
 										))}
 									</div>
 								</div>

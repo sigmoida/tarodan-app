@@ -104,37 +104,19 @@ export default function Footer() {
 		<footer className='bg-surface-elevated border-t border-border'>
 			<Container className='pt-16'>
 				{/* Brand */}
-				<div className='mb-12 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'>
-					<div>
-						<Link href='/' className='mb-3 inline-block'>
-							<Image
-								src='/tarodan-logo.jpg'
-								alt='Tarodan Logo'
-								width={110}
-								height={36}
-								className='object-contain'
-								style={{ width: 'auto', height: 'auto', borderRadius: '2px' }}
-							/>
-						</Link>
-						<p className='max-w-[320px] text-xs leading-relaxed text-muted'>
-							{t('footer.description')}
-						</p>
-					</div>
-					<a
-						href='https://www.instagram.com/tarodan.com.tr/'
-						target='_blank'
-						rel='noopener noreferrer'
-						className='inline-flex items-center justify-center transition-opacity hover:opacity-80'
-						aria-label='Instagram'>
+				<div className='mb-12'>
+					<Link href='/' className='mb-3 inline-block'>
 						<Image
-							src='/instagram.png'
-							alt='Instagram'
-							width={32}
-							height={32}
-							className='object-contain'
-							style={{ borderRadius: '8px' }}
+							src='/tarodan-logo.jpg'
+							alt='Tarodan'
+							width={162}
+							height={40}
+							className='rounded-lg object-contain'
 						/>
-					</a>
+					</Link>
+					<p className='max-w-[320px] text-xs leading-relaxed text-muted'>
+						{t('footer.description')}
+					</p>
 				</div>
 
 				{/* Category columns — new categories wrap onto the next row */}

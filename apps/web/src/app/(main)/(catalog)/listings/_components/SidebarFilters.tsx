@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { FunnelIcon } from '@heroicons/react/24/outline';
 import {
 	Accordion,
 	AccordionItem,
@@ -338,12 +337,15 @@ export default function SidebarFilters({
 			{/* Header */}
 			<div className="flex items-center justify-between px-4 py-3 bg-surface border-b border-border-subtle">
 				<div className="flex items-center gap-2">
-					<FunnelIcon className="w-5 h-5 text-muted" />
 					<span className="font-semibold text-heading">{t('product.filters')}</span>
 					{activeFilterCount > 0 && (
-						<span className="px-2 py-0.5 bg-primary-500 text-inverted text-xs font-bold rounded-sm">
+						<Badge
+							variant="primary"
+							appearance="solid"
+							size="sm"
+							className="min-w-[18px] justify-center rounded-full px-1.5">
 							{activeFilterCount}
-						</span>
+						</Badge>
 					)}
 				</div>
 			</div>

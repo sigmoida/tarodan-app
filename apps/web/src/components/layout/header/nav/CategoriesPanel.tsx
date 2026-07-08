@@ -28,7 +28,7 @@ export default function CategoriesPanel({
 			<div className='grid grid-cols-2 gap-8'>
 				{/* Vehicle types */}
 				<div>
-					<h3 className='text-primary-500 font-bold text-base mb-4 tracking-wide'>
+					<h3 className='mb-3 text-xs font-semibold uppercase tracking-wide text-muted'>
 						{locale === 'en' ? 'VEHICLE TYPES' : 'ARAÇ TÜRLERİ'}
 					</h3>
 					<div className='grid grid-cols-2 gap-x-8 gap-y-2'>
@@ -48,13 +48,13 @@ export default function CategoriesPanel({
 
 				{/* Manufacturers */}
 				<div>
-					<h3 className='text-primary-500 font-bold text-base mb-4 tracking-wide'>
+					<h3 className='mb-3 text-xs font-semibold uppercase tracking-wide text-muted'>
 						{locale === 'en' ? 'MANUFACTURERS' : 'ÜRETİCİLER'}
 					</h3>
 					<div className='space-y-2.5'>
 						{groups.map((group) => (
 							<div key={group.range}>
-								<p className='text-base font-bold text-subtle uppercase tracking-wider mb-1'>
+								<p className='mb-1 text-xs font-bold uppercase tracking-wider text-subtle'>
 									{group.range}
 								</p>
 								<div className='flex flex-wrap gap-x-1 gap-y-0.5'>

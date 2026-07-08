@@ -17,7 +17,7 @@ import {
 	ChevronDownIcon,
 	BellIcon,
 } from '@heroicons/react/24/outline';
-import { Button } from '@tarodan/ui';
+import { Badge, Button } from '@tarodan/ui';
 import UserAvatar from '@/components/UserAvatar';
 import { useTranslation } from '@/i18n/LanguageContext';
 import type { HeaderData } from './_hooks/useHeaderData';
@@ -193,9 +193,13 @@ export default function AccountMenu({
 								<CurrencyDollarIcon className='w-5 h-5' />
 								{t('offer.myOffers')}
 								{pendingOffersCount > 0 && (
-									<span className='ml-auto text-xs text-danger-600'>
-										{pendingOffersCount}
-									</span>
+									<Badge
+										variant='danger'
+										appearance='solid'
+										size='sm'
+										className='ml-auto min-w-[18px] justify-center rounded-full px-1.5'>
+										{pendingOffersCount > 99 ? '99+' : pendingOffersCount}
+									</Badge>
 								)}
 							</Link>
 
@@ -209,9 +213,13 @@ export default function AccountMenu({
 								<ChatBubbleLeftRightIcon className='w-5 h-5' />
 								{t('nav.messages')}
 								{unreadMessageCount > 0 && (
-									<span className='ml-auto px-1.5 py-0.5 bg-danger-500 text-inverted text-xs rounded-full'>
-										{unreadMessageCount > 9 ? '9+' : unreadMessageCount}
-									</span>
+									<Badge
+										variant='danger'
+										appearance='solid'
+										size='sm'
+										className='ml-auto min-w-[18px] justify-center rounded-full px-1.5'>
+										{unreadMessageCount > 99 ? '99+' : unreadMessageCount}
+									</Badge>
 								)}
 							</Link>
 							<Link
@@ -221,9 +229,13 @@ export default function AccountMenu({
 								<HeartIcon className='w-5 h-5' />
 								{t('nav.favorites')}
 								{wishlistCount > 0 && (
-									<span className='ml-auto text-xs text-muted'>
-										{wishlistCount}
-									</span>
+									<Badge
+										variant='danger'
+										appearance='solid'
+										size='sm'
+										className='ml-auto min-w-[18px] justify-center rounded-full px-1.5'>
+										{wishlistCount > 99 ? '99+' : wishlistCount}
+									</Badge>
 								)}
 							</Link>
 							<Link
@@ -233,11 +245,15 @@ export default function AccountMenu({
 								<BellIcon className='w-5 h-5' />
 								{t('nav.notifications')}
 								{unreadNotificationsCount > 0 && (
-									<span className='ml-auto px-1.5 py-0.5 bg-danger-500 text-inverted text-xs rounded-full'>
+									<Badge
+										variant='danger'
+										appearance='solid'
+										size='sm'
+										className='ml-auto min-w-[18px] justify-center rounded-full px-1.5'>
 										{unreadNotificationsCount > 99
 											? '99+'
 											: unreadNotificationsCount}
-									</span>
+									</Badge>
 								)}
 							</Link>
 

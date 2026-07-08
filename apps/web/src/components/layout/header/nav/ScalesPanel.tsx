@@ -15,17 +15,17 @@ export default function ScalesPanel({
 }) {
 	return (
 		<NavPanel>
-			<h3 className='text-primary-500 font-bold text-base mb-4 tracking-wide'>
+			<h3 className='mb-3 text-xs font-semibold uppercase tracking-wide text-muted'>
 				{title}
 			</h3>
-			<div className='flex flex-wrap gap-2.5'>
+			<div className='flex flex-wrap gap-2'>
 				{scales.map((scale) => (
 					<NavigationMenuLink
 						asChild
 						key={scale}>
 						<Link
 							href={`/listings?scale=${encodeURIComponent(scale)}`}
-							className='px-4 py-2 bg-surface border border-border hover:bg-primary-50 hover:border-primary-300 text-body hover:text-primary-600 text-sm font-medium transition-colors rounded-lg'>
+							className='rounded-full border border-border px-3 py-1.5 text-sm text-muted transition-colors hover:border-primary-200 hover:bg-surface-alt hover:text-primary-600'>
 							{scale}
 						</Link>
 					</NavigationMenuLink>
