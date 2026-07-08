@@ -36,6 +36,7 @@ const badgeVariants = cva(
 			},
 		},
 		compoundVariants: [
+			{ appearance: 'solid', variant: 'default', class: 'bg-heading text-inverted' },
 			{ appearance: 'solid', variant: 'primary', class: 'bg-primary-600 text-inverted' },
 			{ appearance: 'solid', variant: 'secondary', class: 'bg-surface text-heading border border-border' },
 			{ appearance: 'solid', variant: 'success', class: 'bg-success-600 text-inverted' },
