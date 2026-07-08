@@ -44,7 +44,7 @@ export default function Footer() {
 				{ href: '/listings', label: t('nav.listings') },
 				{ href: '/profile/trades', label: t('nav.trades') },
 				{ href: '/collections', label: t('nav.collections') },
-				{ href: '/pricing', label: t('membership.title') },
+				{ href: '/membership', label: t('membership.title') },
 			],
 		},
 		{
@@ -83,7 +83,7 @@ export default function Footer() {
 				{ href: '/shipping-delivery', label: L('Kargo & Teslimat', 'Shipping & Delivery') },
 				{ href: '/returns-exchanges', label: L('İade & Değişim', 'Returns & Exchanges') },
 				{ href: '/sell', label: L('Satış Yap', 'Sell') },
-				{ href: '/platform-hizmet-bedeli', label: L('Platform Hizmet Bedeli', 'Platform Service Fee') },
+				{ href: '/platform-service-fee', label: L('Platform Hizmet Bedeli', 'Platform Service Fee') },
 			],
 		},
 		{
@@ -103,20 +103,52 @@ export default function Footer() {
 	return (
 		<footer className='bg-surface-elevated border-t border-border'>
 			<Container className='pt-16'>
-				{/* Brand */}
-				<div className='mb-12'>
-					<Link href='/' className='mb-3 inline-block'>
-						<Image
-							src='/tarodan-logo.jpg'
-							alt='Tarodan'
-							width={162}
-							height={40}
-							className='rounded-lg object-contain'
-						/>
-					</Link>
-					<p className='max-w-[320px] text-xs leading-relaxed text-muted'>
-						{t('footer.description')}
-					</p>
+				{/* Brand + app download */}
+				<div className='mb-12 flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between'>
+					<div>
+						<Link href='/' className='mb-3 inline-block'>
+							<Image
+								src='/tarodan-logo.jpg'
+								alt='Tarodan'
+								width={162}
+								height={40}
+								className='rounded-lg object-contain'
+							/>
+						</Link>
+						<p className='max-w-[320px] text-xs leading-relaxed text-muted'>
+							{t('footer.description')}
+						</p>
+					</div>
+
+					{/* App stores — grab the app on iOS / Android */}
+					<div className='sm:text-right'>
+						<p className='mb-3 text-sm font-medium text-heading'>
+							{L(
+								'Tarodan’ı cebinize taşıyın — mobil uygulamamızı indirin',
+								'Take Tarodan with you — download our mobile app',
+							)}
+						</p>
+						{/* Both official badges fill their whole viewBox (no built-in
+						    padding), so the SAME rendered height makes the buttons match;
+						    only the widths differ (different aspect ratios). Pass each true
+						    intrinsic size so no layout shift, and items-center aligns them. */}
+						<div className='flex items-center gap-2 sm:justify-end'>
+							<Image
+								src='/Download_on_the_App_Store_Badge_US-UK_RGB_blk_092917.svg'
+								alt={L('App Store’dan indirin', 'Download on the App Store')}
+								width={120}
+								height={40}
+								className='h-11 w-auto'
+							/>
+							<Image
+								src='/GetItOnGooglePlay_Badge_Web_color_English.svg'
+								alt={L('Google Play’den indirin', 'Get it on Google Play')}
+								width={239}
+								height={71}
+								className='h-11 w-auto'
+							/>
+						</div>
+					</div>
 				</div>
 
 				{/* Category columns — new categories wrap onto the next row */}
@@ -186,16 +218,13 @@ export default function Footer() {
 							className='text-xs text-muted'>
 							{locale === 'en' ? 'Cookie Settings' : 'Çerez Ayarları'}
 						</Button>
-						<span
-							className='px-3 py-1 bg-surface-alt text-[10px] font-semibold text-muted uppercase tracking-wide'
-							style={{ borderRadius: '2px' }}>
-							PayTR
-						</span>
-						<span
-							className='px-3 py-1 bg-surface-alt text-[10px] font-semibold text-muted uppercase tracking-wide'
-							style={{ borderRadius: '2px' }}>
-							SSL
-						</span>
+						<Image
+							src='/idHcfrz3L6_1783526429272.svg'
+							alt={locale === 'en' ? 'Secure payment' : 'Güvenli ödeme'}
+							width={135}
+							height={24}
+							className='h-5 w-auto'
+						/>
 					</div>
 				</div>
 			</Container>
