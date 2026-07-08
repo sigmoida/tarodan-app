@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Spinner, Tabs, TabsList, TabsTrigger } from '@tarodan/ui';
 import { ButtonLink } from '@/components/ui/ButtonLink';
+import { EmptyStateCard } from '@/components/feedback/EmptyStateCard';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useAuthStore } from '@/stores/authStore';
+import { useRequireAuth } from '@/lib/useRequireAuth';
 import { useTranslation } from '@/i18n';
 import {
 	useOrders,
@@ -23,13 +25,10 @@ import ShippingModal from './_modals/ShippingModal';
 import CancelOrderModal from './_modals/CancelOrderModal';
 
 export default function OrdersPage() {
-	const router = useRouter();
 	const searchParams = useSearchParams();
 	const { t, locale } = useTranslation();
-	const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
-
-	const [mounted, setMounted] = useState(false);
-	useEffect(() => setMounted(true), []);
+	const { ready } = useRequireAuth();
+	const user = useAuthStore((s) => s.user);
 
 	const initialRole = (['buyer', 'seller', 'all'].includes(searchParams.get('filter') || '')
 		? searchParams.get('filter')
@@ -41,12 +40,7 @@ export default function OrdersPage() {
 	const [shippingOrderId, setShippingOrderId] = useState<string | null>(null);
 	const [cancelModalOrder, setCancelModalOrder] = useState<Order | null>(null);
 
-	useEffect(() => {
-		if (!mounted || authLoading) return;
-		if (!isAuthenticated) router.push('/login?redirect=/profile/orders');
-	}, [mounted, isAuthenticated, authLoading, router]);
-
-	const enabled = mounted && !authLoading && isAuthenticated;
+	const enabled = ready;
 	const { orders, isLoading } = useOrders(role, statusFilter, enabled);
 	const counts = useOrderCounts(enabled);
 	const { downloadingId, download } = useInvoiceDownload();
@@ -77,7 +71,7 @@ export default function OrdersPage() {
 		onReview: setReviewingOrder,
 	};
 
-	if (!mounted || authLoading || !isAuthenticated) {
+	if (!ready) {
 		return (
 			<div className='flex items-center justify-center py-24'>
 				<Spinner size='xl' />
@@ -87,7 +81,14 @@ export default function OrdersPage() {
 
 	return (
 		<PageShell className='pb-16'>
-			<PageHeader title={t('order.myOrders')} />
+			<PageHeader
+				title={t('order.myOrders')}
+				description={
+					locale === 'en'
+						? 'Track and manage your purchases and sales.'
+						: 'Alım ve satışlarını takip et ve yönet.'
+				}
+			/>
 
 			<div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
 				<Tabs value={role} onValueChange={(v) => setRole(v as OrderRole)}>
@@ -117,12 +118,10 @@ export default function OrdersPage() {
 					<Spinner size='xl' />
 				</div>
 			) : orders.length === 0 ? (
-				<div className='rounded-lg bg-surface-elevated py-12 text-center'>
-					<p className='text-muted'>{t('order.noOrders')}</p>
-					<ButtonLink href='/listings' className='mt-4'>
-						{t('cart.browseListings')}
-					</ButtonLink>
-				</div>
+				<EmptyStateCard
+					title={t('order.noOrders')}
+					action={<ButtonLink href='/listings'>{t('cart.browseListings')}</ButtonLink>}
+				/>
 			) : (
 				<div className='space-y-4'>
 					{groups.map((group) =>

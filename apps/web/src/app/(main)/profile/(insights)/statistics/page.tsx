@@ -1,7 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
 	TagIcon,
@@ -21,7 +19,8 @@ import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import SectionCard from '@/components/ui/SectionCard';
 import MetricCard from '@/components/ui/MetricCard';
-import { useAuthStore } from '@/stores/authStore';
+import AuthLoadingScreen from '@/components/AuthLoadingScreen';
+import { useRequireAuth } from '@/lib/useRequireAuth';
 import { useStatistics, useRecentSales } from './_hooks/useStatistics';
 import { membershipDuration } from './_lib/types';
 import StatSummaryCard from './_components/StatSummaryCard';
@@ -30,18 +29,14 @@ import RecentSalesSection from './_sections/RecentSalesSection';
 import QuickLinksCard from './_sections/QuickLinksCard';
 
 export default function StatisticsPage() {
-	const router = useRouter();
-	const { isAuthenticated, isLoading: authLoading } = useAuthStore();
+	const { ready } = useRequireAuth();
 
-	useEffect(() => {
-		if (!authLoading && !isAuthenticated) router.push('/login');
-	}, [authLoading, isAuthenticated, router]);
+	const { stats, isLoading } = useStatistics(ready);
+	const recentSales = useRecentSales(ready);
 
-	const enabled = !authLoading && isAuthenticated;
-	const { stats, isLoading } = useStatistics(enabled);
-	const recentSales = useRecentSales(enabled);
+	if (!ready) return <AuthLoadingScreen />;
 
-	if (authLoading || isLoading || !stats) {
+	if (isLoading || !stats) {
 		return (
 			<div className='flex items-center justify-center py-24'>
 				<Spinner size='xl' color='border-primary-500 border-t-transparent' />

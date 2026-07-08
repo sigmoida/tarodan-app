@@ -2,7 +2,8 @@
 
 'use client';
 
-import { reasonLabelOf } from '../../_lib/refundStatus';
+import SectionCard from '@/components/ui/SectionCard';
+import { reasonLabelOf } from '../../_lib/refund-status';
 import type { RefundRequest } from '../../_lib/types';
 
 export default function ReasonCard({
@@ -16,10 +17,7 @@ export default function ReasonCard({
 	const photos = Array.isArray(refund.evidencePhotoUrls) ? refund.evidencePhotoUrls : [];
 
 	return (
-		<div className='rounded-lg border border-border bg-surface-elevated p-5'>
-			<h2 className='mb-3 text-sm font-semibold text-heading'>
-				{locale === 'en' ? 'Reason' : 'Sebep'}
-			</h2>
+		<SectionCard title={locale === 'en' ? 'Reason' : 'Sebep'}>
 			<p className='text-base font-medium text-heading'>
 				{locale === 'en' ? reason.en : reason.tr}
 			</p>
@@ -57,6 +55,6 @@ export default function ReasonCard({
 					</div>
 				</div>
 			)}
-		</div>
+		</SectionCard>
 	);
 }

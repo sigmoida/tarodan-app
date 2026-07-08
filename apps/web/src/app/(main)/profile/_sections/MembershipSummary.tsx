@@ -10,6 +10,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { Badge, type BadgeVariant } from '@tarodan/ui';
 import UserAvatar from '@/components/UserAvatar';
+import MetricCard from '@/components/ui/MetricCard';
+import { ButtonLink } from '@/components/ui/ButtonLink';
 import { useProfile } from '../_context/ProfileContext';
 
 const TIER_VARIANT: Record<string, BadgeVariant> = {
@@ -18,28 +20,11 @@ const TIER_VARIANT: Record<string, BadgeVariant> = {
 	free: 'secondary',
 };
 
-function MetricBox({
-	icon: Icon,
-	value,
-	label,
-}: {
-	icon: typeof ShoppingBagIcon;
-	value: number;
-	label: string;
-}) {
-	return (
-		<div className='flex flex-col items-center gap-1 rounded-lg bg-surface p-4 text-center'>
-			<Icon className='h-6 w-6 text-primary-500' />
-			<span className='text-2xl font-bold text-heading'>{value}</span>
-			<span className='text-xs text-muted'>{label}</span>
-		</div>
-	);
-}
-
 /**
  * The account overview card at the top of the profile dashboard: identity + tier
- * badge + a metrics grid. Reads the shared overview query via ProfileContext so
- * it renders instantly alongside the independent section cards below.
+ * badge + a "manage membership" shortcut + a metrics grid (the shared MetricCard,
+ * so it matches the offers / discounts metric rows). Reads the shared overview
+ * query via ProfileContext so it renders instantly alongside the sections below.
  */
 export default function MembershipSummary() {
 	const { profile, wishlistCount } = useProfile();
@@ -81,13 +66,41 @@ export default function MembershipSummary() {
 						)}
 					</div>
 				</div>
+
+				<ButtonLink
+					href='/membership'
+					variant='outline'
+					size='sm'
+					className='shrink-0'>
+					Üyeliği Yönet
+				</ButtonLink>
 			</div>
 
 			<div className='mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4'>
-				<MetricBox icon={ShoppingBagIcon} value={stats?.productsCount ?? 0} label='İlan' />
-				<MetricBox icon={TagIcon} value={stats?.ordersCount ?? 0} label='Sipariş' />
-				<MetricBox icon={ArrowsRightLeftIcon} value={stats?.tradesCount ?? 0} label='Takas' />
-				<MetricBox icon={HeartIcon} value={wishlistCount} label='Favori' />
+				<MetricCard
+					icon={ShoppingBagIcon}
+					label='İlan'
+					value={stats?.productsCount ?? 0}
+					accent='text-primary-600'
+				/>
+				<MetricCard
+					icon={TagIcon}
+					label='Sipariş'
+					value={stats?.ordersCount ?? 0}
+					accent='text-info-600'
+				/>
+				<MetricCard
+					icon={ArrowsRightLeftIcon}
+					label='Takas'
+					value={stats?.tradesCount ?? 0}
+					accent='text-success-600'
+				/>
+				<MetricCard
+					icon={HeartIcon}
+					label='Favori'
+					value={wishlistCount}
+					accent='text-danger-600'
+				/>
 			</div>
 		</div>
 	);

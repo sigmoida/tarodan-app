@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Badge } from '@tarodan/ui';
 import { useTranslation } from '@/i18n';
 import { formatTL } from '@/lib/format';
-import { statusMetaOf } from '../_lib/refundStatus';
+import { statusMetaOf } from '../_lib/refund-status';
 import type { RefundRequest } from '../_lib/types';
 
 export default function RefundRequestCard({ request }: { request: RefundRequest }) {

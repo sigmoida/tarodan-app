@@ -4,8 +4,10 @@
 
 import {
 	createContext,
+	useCallback,
 	useContext,
 	useEffect,
+	useMemo,
 	useState,
 	type ReactNode,
 } from 'react';
@@ -117,7 +119,10 @@ function useProfileValue() {
 	const overviewQuery = useQuery<ProfileOverview>({
 		queryKey: queryKeys.profile.overview(),
 		enabled,
-		refetchOnWindowFocus: true,
+		// The aggregate is 8 upstream calls (+ a refreshUserData); refetching it on
+		// every window focus was a request storm. Keep it fresh for 5 min and let
+		// mutations/manual invalidation drive updates instead.
+		staleTime: 5 * 60 * 1000,
 		placeholderData: user
 			? { profile: mapAuthUserToProfile(user), pendingCounts: { offers: 0, trades: 0 } }
 			: undefined,
@@ -227,22 +232,37 @@ function useProfileValue() {
 		},
 	});
 
-	const handleLogout = () => {
+	const handleLogout = useCallback(() => {
 		logout();
 		router.push('/');
-	};
+	}, [logout, router]);
 
-	return {
-		mounted,
-		authLoading,
-		isAuthenticated,
-		profile: overviewQuery.data?.profile ?? null,
-		pendingCounts: overviewQuery.data?.pendingCounts ?? { offers: 0, trades: 0 },
-		isLoadingProfile: overviewQuery.isLoading && !overviewQuery.data,
-		wishlistCount: wishlistQuery.data?.length ?? 0,
-		unreadMessagesCount: unreadMessagesQuery.data ?? 0,
-		handleLogout,
-	};
+	// Memoize the context value + callback so consumers (sidebar, summary, every
+	// section) don't re-render on unrelated provider renders (pathname changes,
+	// unrelated store updates). Only the actual data/auth transitions propagate.
+	return useMemo(
+		() => ({
+			mounted,
+			authLoading,
+			isAuthenticated,
+			profile: overviewQuery.data?.profile ?? null,
+			pendingCounts: overviewQuery.data?.pendingCounts ?? { offers: 0, trades: 0 },
+			isLoadingProfile: overviewQuery.isLoading && !overviewQuery.data,
+			wishlistCount: wishlistQuery.data?.length ?? 0,
+			unreadMessagesCount: unreadMessagesQuery.data ?? 0,
+			handleLogout,
+		}),
+		[
+			mounted,
+			authLoading,
+			isAuthenticated,
+			overviewQuery.data,
+			overviewQuery.isLoading,
+			wishlistQuery.data,
+			unreadMessagesQuery.data,
+			handleLogout,
+		],
+	);
 }
 
 type ProfileValue = ReturnType<typeof useProfileValue>;

@@ -3,7 +3,7 @@
 'use client';
 
 import Link from 'next/link';
-import { CreditCardIcon, CalendarIcon } from '@heroicons/react/24/outline';
+import { CreditCardIcon, CalendarIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import {
 	Button,
 	StatusBadge,
@@ -12,6 +12,7 @@ import {
 	AccordionItem,
 	AccordionTrigger,
 	AccordionContent,
+	ThumbnailStack,
 } from '@tarodan/ui';
 import { useTranslation } from '@/i18n';
 import { formatTL } from '@/lib/format';
@@ -66,18 +67,22 @@ export default function PaymentCard({
 			<div className='flex items-start gap-4'>
 				{/* Thumbnail(s) */}
 				{isGroup ? (
-					<div className='flex flex-shrink-0 -space-x-2'>
-						{groupOrders.slice(0, 3).map((o) => (
-							<div key={o.id} className='ring-2 ring-surface-elevated rounded-lg'>
-								<Thumb src={o.image} alt={o.title} />
-							</div>
-						))}
-						{groupOrders.length > 3 && (
-							<div className='flex h-12 w-12 items-center justify-center rounded-lg bg-primary-50 text-xs font-semibold text-primary-600 ring-2 ring-surface-elevated'>
-								+{groupOrders.length - 3}
-							</div>
-						)}
-					</div>
+					<ThumbnailStack
+						items={groupOrders}
+						getKey={(o) => o.id}
+						max={3}
+						size='md'
+						renderItem={(o) =>
+							o.image ? (
+								// eslint-disable-next-line @next/next/no-img-element
+								<img src={o.image} alt={o.title} className='h-full w-full object-cover' />
+							) : (
+								<div className='flex h-full w-full items-center justify-center'>
+									<CreditCardIcon className='h-6 w-6 text-subtle' />
+								</div>
+							)
+						}
+					/>
 				) : (
 					<Thumb src={payment.product?.images?.[0]} alt={payment.product?.title ?? ''} />
 				)}
@@ -145,7 +150,10 @@ export default function PaymentCard({
 				<div className='mt-3 flex items-center justify-end gap-2 border-t border-border pt-3'>
 					{payment.orderId && (
 						<Button asChild variant='outline' size='sm'>
-							<Link href={`/profile/orders/${payment.orderId}`}>{t('common.details')}</Link>
+							<Link href={`/profile/orders/${payment.orderId}`}>
+								{t('common.details')}
+								<ChevronRightIcon className='h-4 w-4' />
+							</Link>
 						</Button>
 					)}
 					{payment.status === 'pending' && (

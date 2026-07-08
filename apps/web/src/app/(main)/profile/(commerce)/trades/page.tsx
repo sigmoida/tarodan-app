@@ -49,7 +49,14 @@ export default function TradesPage() {
 
   return (
     <PageShell className="pb-16">
-      <PageHeader title={t("trade.myTrades")} />
+      <PageHeader
+        title={t("trade.myTrades")}
+        description={
+          locale === "en"
+            ? "Manage your active and past trade offers."
+            : "Aktif ve geçmiş takas tekliflerini yönet."
+        }
+      />
 
       <Tabs
         value={statusFilter ?? "all"}

@@ -2,16 +2,15 @@
 
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { BellIcon } from '@heroicons/react/24/outline';
+import { useMemo, useState } from 'react';
 import { CheckCircleIcon } from '@heroicons/react/24/outline';
 import { Button, Select, Spinner } from '@tarodan/ui';
-import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n';
+import { useRequireAuth } from '@/lib/useRequireAuth';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
+import { EmptyStateCard } from '@/components/feedback/EmptyStateCard';
 import { useNotifications } from './_hooks/useNotifications';
 import NotificationCard from './_components/NotificationCard';
 import {
@@ -21,19 +20,11 @@ import {
 } from './_lib/notifications';
 
 export default function NotificationsPage() {
-	const router = useRouter();
 	const { t, locale } = useTranslation();
-	const { isAuthenticated, isLoading: authLoading } = useAuthStore();
+	const { ready } = useRequireAuth();
 	const [filter, setFilter] = useState<FilterType>('all');
 
-	useEffect(() => {
-		if (authLoading) return;
-		if (!isAuthenticated) router.push('/login?redirect=/profile/notifications');
-	}, [authLoading, isAuthenticated, router]);
-
-	const { notifications, isLoading, markRead, markAllRead } = useNotifications(
-		!authLoading && isAuthenticated,
-	);
+	const { notifications, isLoading, markRead, markAllRead } = useNotifications(ready);
 
 	const unreadCount = notifications.filter((n) => !n.isRead).length;
 	const filtered = useMemo(
@@ -46,8 +37,7 @@ export default function NotificationsPage() {
 		[notifications, filter],
 	);
 
-	if (authLoading) return <AuthLoadingScreen />;
-	if (!isAuthenticated) return null;
+	if (!ready) return <AuthLoadingScreen />;
 
 	const description =
 		unreadCount > 0
@@ -103,25 +93,22 @@ export default function NotificationsPage() {
 					</p>
 				</div>
 			) : filtered.length === 0 ? (
-				<div className='rounded-xl border border-border bg-surface-elevated py-16 text-center'>
-					<div className='mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-surface-alt'>
-						<BellIcon className='h-8 w-8 text-subtle' />
-					</div>
-					<h3 className='mb-1 text-lg font-semibold text-heading'>
-						{filter === 'unread'
+				<EmptyStateCard
+					title={
+						filter === 'unread'
 							? locale === 'en'
 								? 'No unread notifications'
 								: 'Okunmamış bildirim yok'
 							: locale === 'en'
 								? 'No notifications yet'
-								: 'Henüz bildirim yok'}
-					</h3>
-					<p className='mx-auto max-w-sm text-muted'>
-						{locale === 'en'
+								: 'Henüz bildirim yok'
+					}
+					description={
+						locale === 'en'
 							? 'When you receive notifications, they will appear here.'
-							: 'Bildirimleriniz burada görünecek.'}
-					</p>
-				</div>
+							: 'Bildirimleriniz burada görünecek.'
+					}
+				/>
 			) : (
 				<div className='space-y-2'>
 					{filtered.map((notification) => (

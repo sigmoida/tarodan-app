@@ -1,17 +1,13 @@
 /** @format */
 
-import { ChatBubbleLeftRightIcon } from "@heroicons/react/24/outline";
+import SectionCard from "@/components/ui/SectionCard";
 import type { Trade } from "../_lib/types";
 
 export default function TradeMessages({ trade }: { trade: Trade }) {
   if (!(trade.initiatorMessage || trade.receiverMessage)) return null;
 
   return (
-    <div className="card p-6 mb-6">
-      <h3 className="font-semibold mb-4 flex items-center gap-2">
-        <ChatBubbleLeftRightIcon className="w-5 h-5" />
-        Mesajlar
-      </h3>
+    <SectionCard title="Mesajlar" className="mb-6">
       <div className="space-y-4">
         {trade.initiatorMessage && (
           <div>
@@ -30,6 +26,6 @@ export default function TradeMessages({ trade }: { trade: Trade }) {
           </div>
         )}
       </div>
-    </div>
+    </SectionCard>
   );
 }

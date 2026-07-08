@@ -3,7 +3,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { paymentsApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
@@ -30,6 +30,9 @@ export function usePayments(enabled: boolean) {
 			return res.data;
 		},
 		enabled,
+		// Keep the current page visible while the next loads — no spinner flash on
+		// pagination / filter changes.
+		placeholderData: keepPreviousData,
 		meta: { page: 'profile-payments' },
 	});
 

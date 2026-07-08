@@ -55,8 +55,7 @@ export default function ReturnShipmentCard({
 
 	return (
 		<div className='rounded-lg border-2 border-info-200 bg-info-50 p-5'>
-			<h2 className='mb-3 flex items-center gap-2 text-base font-semibold text-info-900'>
-				<TruckIcon className='h-5 w-5' />
+			<h2 className='mb-3 text-base font-semibold text-info-900'>
 				{isBuyer
 					? locale === 'en'
 						? 'Your Return Shipment'

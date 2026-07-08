@@ -18,8 +18,7 @@ export default function ReturnShipmentCard({
 
   return (
     <div className="card p-6 mb-6 bg-warning-50 border-warning-200">
-      <h3 className="font-semibold text-warning-900 mb-2 flex items-center gap-2">
-        <TruckIcon className="w-5 h-5" />
+      <h3 className="font-semibold text-warning-900 mb-2">
         {locale === "en" ? "Return Shipment" : "İade Kargosu"}
       </h3>
       <p className="text-sm text-body">

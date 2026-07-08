@@ -1,9 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n';
+import { useRequireAuth } from '@/lib/useRequireAuth';
 import { useMessaging } from './_hooks/useMessaging';
 import ThreadList from './_components/ThreadList';
 import ChatHeader from './_components/ChatHeader';
@@ -12,25 +10,13 @@ import MessageComposer from './_components/MessageComposer';
 import EmptyConversation from './_components/EmptyConversation';
 
 export default function MessagesPage() {
-  const router = useRouter();
   const { locale } = useTranslation();
-  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
-  const [mounted, setMounted] = useState(false);
+  const { ready } = useRequireAuth();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (mounted && !authLoading && !isAuthenticated) {
-      router.push('/login?redirect=' + encodeURIComponent(window.location.pathname + window.location.search));
-    }
-  }, [mounted, authLoading, isAuthenticated, router]);
-
-  const vm = useMessaging(mounted && isAuthenticated);
+  const vm = useMessaging(ready);
 
   // Avoid hydration mismatch: render same placeholder until mounted and auth resolved.
-  if (!mounted || authLoading || !isAuthenticated) {
+  if (!ready) {
     return (
       <div className="min-h-screen bg-surface text-heading flex flex-col">
         <div className="flex-1 flex items-center justify-center">

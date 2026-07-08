@@ -14,7 +14,7 @@ import {
 	useSetDefaultAddress,
 	type Address,
 } from '../_hooks/useAddresses';
-import AddressFormModal from '../_components/AddressFormModal';
+import AddressFormModal from '../_modals/AddressFormModal';
 
 const MAX_ADDRESSES = 10;
 

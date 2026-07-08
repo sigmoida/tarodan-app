@@ -27,7 +27,7 @@ import {
 	ShieldCheckIcon,
 	ArrowRightOnRectangleIcon,
 } from '@heroicons/react/24/outline';
-import { Button } from '@tarodan/ui';
+import { Badge, Button } from '@tarodan/ui';
 import UserAvatar from '@/components/UserAvatar';
 import { useTranslation } from '@/i18n';
 import { useProfile } from '../_context/ProfileContext';
@@ -141,14 +141,11 @@ export default function ProfileSidebar() {
 			? pathname === '/profile'
 			: pathname === href || pathname.startsWith(`${href}/`);
 
-	const membershipTier = profile?.membership?.tier;
 
 	return (
 		<nav className='flex flex-col rounded-lg border border-border-subtle bg-surface-elevated overflow-hidden'>
 			{/* Identity header */}
-			<Link
-				href='/profile'
-				className='flex items-center gap-3 px-4 py-4 hover:bg-primary-50/50 transition-colors'>
+			<div className='flex items-center gap-3 px-4 py-4'>
 				<UserAvatar
 					displayName={profile?.displayName || profile?.email}
 					avatarUrl={profile?.avatarUrl}
@@ -160,13 +157,8 @@ export default function ProfileSidebar() {
 						{profile?.displayName || t('nav.account')}
 					</p>
 					<p className='text-xs text-muted truncate'>{profile?.email}</p>
-					{membershipTier && membershipTier.type !== 'free' && (
-						<span className='inline-block mt-1 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-warning-100 text-warning-700 rounded'>
-							{membershipTier.name}
-						</span>
-					)}
 				</div>
-			</Link>
+			</div>
 
 			<div className='border-t border-border-subtle' />
 
@@ -194,9 +186,13 @@ export default function ProfileSidebar() {
 											<LinkIcon className='w-5 h-5 flex-shrink-0' />
 											<span className='flex-1 truncate'>{label}</span>
 											{badge != null && badge > 0 && (
-												<span className='ml-auto min-w-[18px] px-1.5 py-0.5 bg-danger-500 text-inverted text-xs font-semibold rounded-full text-center'>
+												<Badge
+													variant='danger'
+													appearance='solid'
+													size='sm'
+													className='ml-auto min-w-[18px] justify-center rounded-full px-1.5'>
 													{badge > 99 ? '99+' : badge}
-												</span>
+												</Badge>
 											)}
 										</Link>
 									</li>

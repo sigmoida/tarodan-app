@@ -1,5 +1,6 @@
 'use client';
 
+import { Badge } from '@tarodan/ui';
 import UserAvatar from '@/components/UserAvatar';
 import { useTranslation } from '@/i18n';
 import { getThreadPreview, type MessageThread } from '../_lib/messages';
@@ -40,9 +41,9 @@ export default function ThreadListItem({
               {thread.otherUser?.displayName || 'Kullanıcı'}
             </span>
             {thread.unreadCount > 0 && (
-              <span className="flex-shrink-0 text-xs font-medium text-primary-600 bg-primary-100 px-1.5 py-0.5 rounded">
+              <Badge variant="primary" size="sm" className="flex-shrink-0 px-1.5">
                 {thread.unreadCount}
-              </span>
+              </Badge>
             )}
           </div>
           {thread.lastMessage && (

@@ -5,7 +5,6 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import {
-  ArrowLeftIcon,
   TruckIcon,
   MapPinIcon,
   MagnifyingGlassIcon,
@@ -22,6 +21,8 @@ import {
   orderStatusConfig,
 } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
+import { PageShell } from "@/components/layout/PageShell";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 interface GuestOrderDetail {
   id: string;
@@ -182,21 +183,17 @@ export default function TrackOrderPage() {
   const shipAddr = order?.shippingAddress as Record<string, string> | undefined;
 
   return (
-    <div className="min-h-screen bg-surface">
-      <main className="max-w-2xl mx-auto px-4 py-8">
-        <div className="flex items-center gap-4 mb-8">
-          <button
-            type="button"
-            onClick={handleBack}
-            aria-label={locale === "en" ? "Go back" : "Geri"}
-            className="p-2 hover:bg-border-subtle rounded-lg transition-colors"
-          >
-            <ArrowLeftIcon className="w-6 h-6 text-muted" />
-          </button>
-          <h1 className="text-2xl font-bold text-heading">
-            {locale === "en" ? "Track your order" : "Sipariş Takip"}
-          </h1>
-        </div>
+    <PageShell className="pb-8">
+      <div className="mx-auto w-full max-w-2xl space-y-6 px-4 pt-4">
+        <PageHeader
+          onBack={handleBack}
+          title={locale === "en" ? "Track your order" : "Sipariş Takip"}
+          description={
+            locale === "en"
+              ? "Enter your order number and email to view its status and tracking."
+              : "Sipariş numaran ve e-postanla sipariş durumunu ve kargo bilgisini gör."
+          }
+        />
 
         {!order ? (
           <div className="bg-surface-elevated rounded-xl shadow-sm p-6">
@@ -477,7 +474,7 @@ export default function TrackOrderPage() {
             </div>
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </PageShell>
   );
 }

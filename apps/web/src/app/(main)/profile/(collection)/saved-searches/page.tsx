@@ -1,28 +1,22 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { Button } from '@tarodan/ui';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
+import { EmptyStateCard } from '@/components/feedback/EmptyStateCard';
 import { useAuthStore } from '@/stores/authStore';
+import { useRequireAuth } from '@/lib/useRequireAuth';
 import { useSavedSearches } from './_hooks/useSavedSearches';
 import SavedSearchCard from './_components/SavedSearchCard';
 
 export default function SavedSearchesPage() {
-	const router = useRouter();
-	const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
+	const { ready } = useRequireAuth();
+	const user = useAuthStore((s) => s.user);
 
-	useEffect(() => {
-		if (authLoading) return;
-		if (!isAuthenticated) router.push('/login?redirect=/profile/saved-searches');
-	}, [authLoading, isAuthenticated, router]);
-
-	const enabled = !authLoading && isAuthenticated;
-	const { savedSearches, isLoading, remove, toggleNotify, runSearch } = useSavedSearches(enabled);
+	const { savedSearches, isLoading, remove, toggleNotify, runSearch } = useSavedSearches(ready);
 
 	const searchLimit =
 		user?.membershipTier === 'free'
@@ -33,8 +27,7 @@ export default function SavedSearchesPage() {
 					? 20
 					: 50;
 
-	if (authLoading) return <AuthLoadingScreen />;
-	if (!isAuthenticated) return null;
+	if (!ready) return <AuthLoadingScreen />;
 
 	if (isLoading) {
 		return (
@@ -61,28 +54,19 @@ export default function SavedSearchesPage() {
 				}
 			/>
 
-			<div className='rounded-lg border border-info-200 bg-info-50 p-4'>
-				<p className='text-sm text-info-800'>
-					<strong>İpucu:</strong> Arama yaparken sonuç sayfasında &quot;Bu aramayı kaydet&quot;
-					butonunu kullanarak yeni arama ekleyebilirsiniz.
-				</p>
-			</div>
-
 			{savedSearches.length === 0 ? (
-				<div className='rounded-lg border border-border bg-surface-elevated p-12 text-center'>
-					<MagnifyingGlassIcon className='mx-auto mb-4 h-16 w-16 text-border-strong' />
-					<h2 className='mb-2 text-xl font-semibold text-heading'>Kayıtlı Arama Yok</h2>
-					<p className='mb-6 text-muted'>
-						Henüz kayıtlı aramanız bulunmuyor. İlanları ararken &quot;Bu aramayı kaydet&quot;
-						butonunu kullanın.
-					</p>
-					<Button asChild className='gap-2'>
-						<Link href='/listings'>
-							<MagnifyingGlassIcon className='h-5 w-5' />
-							İlan Ara
-						</Link>
-					</Button>
-				</div>
+				<EmptyStateCard
+					title='Kayıtlı Arama Yok'
+					description='İlanları ararken sonuç sayfasındaki "Bu aramayı kaydet" butonuyla aramanı kaydet; buradan yönetip yeni sonuçlarda bildirim alabilirsin.'
+					action={
+						<Button asChild className='gap-2'>
+							<Link href='/listings'>
+								<MagnifyingGlassIcon className='h-5 w-5' />
+								İlan Ara
+							</Link>
+						</Button>
+					}
+				/>
 			) : (
 				<div className='space-y-4'>
 					{savedSearches.map((search) => (

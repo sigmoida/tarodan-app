@@ -3,6 +3,7 @@
 'use client';
 
 import Link from 'next/link';
+import SectionCard from '@/components/ui/SectionCard';
 import type { RefundRequest } from '../../_lib/types';
 
 export default function RelatedOrderCard({
@@ -15,10 +16,7 @@ export default function RelatedOrderCard({
 	const image = refund.order?.product?.images?.[0];
 
 	return (
-		<div className='rounded-lg border border-border bg-surface-elevated p-5'>
-			<h2 className='mb-3 text-sm font-semibold text-heading'>
-				{locale === 'en' ? 'Related Order' : 'İlgili Sipariş'}
-			</h2>
+		<SectionCard title={locale === 'en' ? 'Related Order' : 'İlgili Sipariş'}>
 			<Link
 				href={`/profile/orders/${refund.order.id}`}
 				className='-mx-2 flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-surface'>
@@ -44,6 +42,6 @@ export default function RelatedOrderCard({
 					{locale === 'en' ? 'View →' : 'Aç →'}
 				</span>
 			</Link>
-		</div>
+		</SectionCard>
 	);
 }

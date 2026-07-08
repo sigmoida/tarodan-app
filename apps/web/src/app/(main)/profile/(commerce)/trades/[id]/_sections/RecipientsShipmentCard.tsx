@@ -33,8 +33,7 @@ export default function RecipientsShipmentCard({
 
   return (
     <div className="card p-6 mb-6 bg-info-50 border-info-200">
-      <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
-        <TruckIcon className="w-5 h-5 text-info-600" />
+      <h2 className="text-lg font-semibold text-heading mb-4">
         {locale === "en" ? "Your Shipment is on the Way" : "Kargonuz Yolda"}
       </h2>
 

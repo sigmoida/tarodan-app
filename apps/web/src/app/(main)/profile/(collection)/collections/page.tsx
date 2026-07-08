@@ -10,10 +10,11 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n';
 import CreateCollectionModal from '@/components/CreateCollectionModal';
+import { EmptyStateCard } from '@/components/feedback/EmptyStateCard';
 import { useMyCollections } from './_hooks/useMyCollections';
 import CollectionCard from './_components/CollectionCard';
 import CollectionsToolbar from './_components/CollectionsToolbar';
-import PremiumRequiredModal from './_components/PremiumRequiredModal';
+import PremiumRequiredModal from './_modals/PremiumRequiredModal';
 
 export default function MyCollectionsPage() {
 	const { t, locale } = useTranslation();
@@ -85,30 +86,29 @@ export default function MyCollectionsPage() {
 					))}
 				</div>
 			) : displayedCollections.length === 0 ? (
-				<div className='rounded-lg border border-border bg-surface-elevated py-20 text-center'>
-					<div className='mx-auto mb-4 inline-flex h-16 w-16 items-center justify-center rounded-lg bg-surface'>
-						<FolderPlusIcon className='h-7 w-7 text-subtle' />
-					</div>
-					<p className='mb-1 text-lg font-medium text-muted'>
-						{searchQuery
+				<EmptyStateCard
+					title={
+						searchQuery
 							? `"${searchQuery}" ${t('common.noResults')}`
-							: t('collection.noCollections')}
-					</p>
-					<p className='mb-4 text-sm text-subtle'>
-						{locale === 'en'
+							: t('collection.noCollections')
+					}
+					description={
+						locale === 'en'
 							? 'Start building your collection today'
-							: 'Koleksiyonunuzu bugün oluşturmaya başlayın'}
-					</p>
-					{searchQuery ? (
-						<Button variant='secondary' onClick={() => setSearchQuery('')}>
-							{t('common.clear')}
-						</Button>
-					) : (
-						<Button variant='primary' onClick={handleCreateClick}>
-							{t('collection.createCollection')}
-						</Button>
-					)}
-				</div>
+							: 'Koleksiyonunuzu bugün oluşturmaya başlayın'
+					}
+					action={
+						searchQuery ? (
+							<Button variant='secondary' onClick={() => setSearchQuery('')}>
+								{t('common.clear')}
+							</Button>
+						) : (
+							<Button variant='primary' onClick={handleCreateClick}>
+								{t('collection.createCollection')}
+							</Button>
+						)
+					}
+				/>
 			) : (
 				<div className='grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5'>
 					{displayedCollections.map((collection) => (

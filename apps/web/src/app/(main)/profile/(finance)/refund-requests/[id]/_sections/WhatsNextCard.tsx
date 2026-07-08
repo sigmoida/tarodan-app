@@ -2,6 +2,8 @@
 
 'use client';
 
+import SectionCard from '@/components/ui/SectionCard';
+
 const NEXT_COPY: Record<string, { tr: string; en: string }> = {
 	pending_review: {
 		tr: 'Satıcının 48 saat içinde cevap vermesi gerekiyor. Cevap gelmezse talep otomatik olarak onaylanacak.',
@@ -44,13 +46,10 @@ export default function WhatsNextCard({
 	if (!copy) return null;
 
 	return (
-		<div className='rounded-lg border border-border bg-surface p-5'>
-			<h2 className='mb-2 text-sm font-semibold text-heading'>
-				{locale === 'en' ? "What's next?" : 'Sonraki Adım'}
-			</h2>
+		<SectionCard title={locale === 'en' ? "What's next?" : 'Sonraki Adım'}>
 			<p className='text-sm leading-relaxed text-muted'>
 				{locale === 'en' ? copy.en : copy.tr}
 			</p>
-		</div>
+		</SectionCard>
 	);
 }

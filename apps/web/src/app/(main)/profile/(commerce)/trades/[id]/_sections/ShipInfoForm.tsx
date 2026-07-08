@@ -25,8 +25,7 @@ export default function ShipInfoForm({
 }: ShipInfoFormProps) {
   return (
     <div className="card p-6 mb-6 bg-primary-50 border-primary-200">
-      <h2 className="text-lg font-semibold text-heading mb-4 flex items-center gap-2">
-        <TruckIcon className="w-5 h-5 text-primary-600" />
+      <h2 className="text-lg font-semibold text-heading mb-4">
         {locale === "en" ? "Enter Shipping Info" : "Kargo Bilgisi Gir"}
       </h2>
       <p className="text-muted text-sm mb-4">

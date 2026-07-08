@@ -1,6 +1,6 @@
 /** @format */
 
-import { TruckIcon } from "@heroicons/react/24/outline";
+import SectionCard from "@/components/ui/SectionCard";
 import ShipmentStatusChip from "../_components/ShipmentStatusChip";
 import type { Trade, TradeShipment } from "../_lib/types";
 
@@ -28,13 +28,14 @@ export default function WarehouseShipmentCard({
   }
 
   return (
-    <div className="bg-surface-elevated border border-border rounded-xl p-6 mb-6">
-      <h3 className="text-lg font-semibold text-heading mb-2 flex items-center gap-2">
-        <TruckIcon className="w-5 h-5 text-primary-600" />
-        {locale === "en"
+    <SectionCard
+      title={
+        locale === "en"
           ? "Shipping to Tarodan Warehouse"
-          : "Tarodan Deposuna Gönderim"}
-      </h3>
+          : "Tarodan Deposuna Gönderim"
+      }
+      className="mb-6"
+    >
       <p className="text-sm text-subtle mb-5">
         {locale === "en"
           ? "The system has issued a Sürat Kargo tracking number for both parties. Take your item to the nearest Sürat branch with the number below."
@@ -128,6 +129,6 @@ export default function WarehouseShipmentCard({
           );
         })()}
       </div>
-    </div>
+    </SectionCard>
   );
 }

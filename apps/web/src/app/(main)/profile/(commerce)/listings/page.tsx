@@ -2,21 +2,18 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import {
-	PlusIcon,
-	ClockIcon,
-	ArchiveBoxIcon,
-} from '@heroicons/react/24/outline';
-import toast from 'react-hot-toast';
-import { Button, Spinner, Tabs, TabsList, TabsTrigger } from '@tarodan/ui';
+import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { PlusIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { Badge, Button, Spinner, Tabs, TabsList, TabsTrigger } from '@tarodan/ui';
 import BoostModal from '@/components/BoostModal';
 import { ButtonLink } from '@/components/ui/ButtonLink';
+import { EmptyStateCard } from '@/components/feedback/EmptyStateCard';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useConfirm } from '@/components/ConfirmProvider';
 import { useAuthStore } from '@/stores/authStore';
+import { useRequireAuth } from '@/lib/useRequireAuth';
 import { useMyListings, useDeleteListing } from './_hooks/useMyListings';
 import { useCommissionPreviews } from '@/hooks/useCommissionPreviews';
 import { FILTER_TABS } from './_lib/status';
@@ -24,10 +21,10 @@ import type { Listing } from './_lib/types';
 import ListingCard from './_components/ListingCard';
 
 export default function ProfileListingsPage() {
-	const router = useRouter();
 	const confirm = useConfirm();
 	const searchParams = useSearchParams();
-	const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
+	const { ready } = useRequireAuth();
+	const user = useAuthStore((s) => s.user);
 	const isPremiumUser =
 		!!(user as any)?.membershipTier && (user as any).membershipTier !== 'free';
 
@@ -36,14 +33,7 @@ export default function ProfileListingsPage() {
 	);
 	const [boostTarget, setBoostTarget] = useState<Listing | null>(null);
 
-	useEffect(() => {
-		if (!authLoading && !isAuthenticated) {
-			toast.error('İlanlarınızı görmek için giriş yapmalısınız');
-			router.push('/login?redirect=/profile/listings');
-		}
-	}, [authLoading, isAuthenticated, router]);
-
-	const { listings, isLoading } = useMyListings(activeFilter, isAuthenticated);
+	const { listings, isLoading } = useMyListings(activeFilter, ready);
 	const estimatedNets = useCommissionPreviews(
 		listings.map((l) => ({ id: l.id, amount: Number(l.price) || 0, categoryId: l.category?.id })),
 	);
@@ -61,7 +51,7 @@ export default function ProfileListingsPage() {
 		if (ok) deleteMutation.mutate(id);
 	};
 
-	if (authLoading) {
+	if (!ready) {
 		return (
 			<div className='flex items-center justify-center py-20'>
 				<Spinner size='xl' />
@@ -73,6 +63,7 @@ export default function ProfileListingsPage() {
 		<PageShell className='pb-16'>
 			<PageHeader
 				title='İlanlarım'
+				description='Tüm ilanlarını tek yerden yönet, düzenle ve performanslarını takip et.'
 				actions={
 					<ButtonLink
 						href='/listings/new'
@@ -94,9 +85,13 @@ export default function ProfileListingsPage() {
 							className='gap-1.5'>
 							{tab.label}
 							{tab.value === 'pending' && pendingCount > 0 && (
-								<span className='rounded-full bg-warning-500 px-1.5 py-0.5 text-xs text-inverted'>
+								<Badge
+									variant='warning'
+									appearance='solid'
+									size='sm'
+									className='rounded-full px-1.5'>
 									{pendingCount}
-								</span>
+								</Badge>
 							)}
 						</TabsTrigger>
 					))}
@@ -132,20 +127,15 @@ export default function ProfileListingsPage() {
 					))}
 				</div>
 			) : listings.length === 0 ? (
-				<div className='rounded-lg bg-surface-elevated py-16 text-center'>
-					<div className='mb-4 inline-flex h-20 w-20 items-center justify-center rounded-lg bg-surface'>
-						<ArchiveBoxIcon className='h-8 w-8 text-subtle' />
-					</div>
-					<h3 className='mb-2 text-xl font-semibold text-heading'>
-						{activeFilter !== 'all'
+				<EmptyStateCard
+					title={
+						activeFilter !== 'all'
 							? 'Bu filtreye uygun ilan yok'
-							: 'Henüz ilanınız yok'}
-					</h3>
-					<p className='mb-6 text-muted'>
-						Koleksiyonunuzdaki ürünleri satışa çıkarın
-					</p>
-					<ButtonLink href='/listings/new'>İlk İlanınızı Oluşturun</ButtonLink>
-				</div>
+							: 'Henüz ilanınız yok'
+					}
+					description='Koleksiyonunuzdaki ürünleri satışa çıkarın'
+					action={<ButtonLink href='/listings/new'>İlk İlanınızı Oluşturun</ButtonLink>}
+				/>
 			) : (
 				<div className='grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3'>
 					{listings.map((listing, index) => (

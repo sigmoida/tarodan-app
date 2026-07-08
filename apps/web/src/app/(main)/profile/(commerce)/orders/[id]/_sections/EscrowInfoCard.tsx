@@ -2,7 +2,6 @@
 
 'use client';
 
-import { ShieldCheckIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@/i18n';
 import { computePayoutDate, isMembershipOrder, type OrderDetail } from '../_lib/types';
 
@@ -25,8 +24,7 @@ export default function EscrowInfoCard({ order }: { order: OrderDetail }) {
 
 	return (
 		<div className='bg-info-50 border border-info-200 rounded-xl shadow-sm p-6'>
-			<h2 className='text-lg font-semibold text-info-800 mb-2 flex items-center gap-2'>
-				<ShieldCheckIcon className='w-5 h-5' />
+			<h2 className='mb-2 text-lg font-semibold text-info-800'>
 				{locale === 'en' ? 'Delivered' : 'Teslim Edildi'}
 			</h2>
 			<p className='text-sm text-info-800'>

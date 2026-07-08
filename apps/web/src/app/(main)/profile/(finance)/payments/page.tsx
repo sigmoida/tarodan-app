@@ -1,38 +1,32 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { CreditCardIcon } from '@heroicons/react/24/outline';
 import { Button, Spinner, ConfirmDialog } from '@tarodan/ui';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { useAuthStore } from '@/stores/authStore';
+import { useRequireAuth } from '@/lib/useRequireAuth';
 import { useTranslation } from '@/i18n';
 import { usePayments, usePaymentAction, type PaymentActionType } from './_hooks/usePayments';
 import PaymentFilters from './_components/PaymentFilters';
 import PaymentCard from './_components/PaymentCard';
 
 export default function PaymentHistoryPage() {
-	const router = useRouter();
-	const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
+	const { ready } = useRequireAuth();
+	const user = useAuthStore((s) => s.user);
 	const { t, locale } = useTranslation();
-	const [showFilters, setShowFilters] = useState(false);
 	const [confirm, setConfirm] = useState<{ type: PaymentActionType; paymentId: string } | null>(
 		null,
 	);
 
-	useEffect(() => {
-		if (!authLoading && !isAuthenticated) router.push('/login');
-	}, [authLoading, isAuthenticated, router]);
-
-	const enabled = !authLoading && isAuthenticated;
+	const enabled = ready;
 	const { payments, pagination, isLoading, page, setPage, filters, setFilter, clearFilters } =
 		usePayments(enabled);
 	const action = usePaymentAction();
 
-	if (authLoading) return <AuthLoadingScreen />;
-	if (!isAuthenticated) return null;
+	if (!ready) return <AuthLoadingScreen />;
 
 	const runConfirmed = () => {
 		if (!confirm) return;
@@ -46,13 +40,7 @@ export default function PaymentHistoryPage() {
 				description={t('payment.historyDesc')}
 			/>
 
-			<PaymentFilters
-				filters={filters}
-				show={showFilters}
-				onToggle={() => setShowFilters((s) => !s)}
-				onChange={setFilter}
-				onClear={clearFilters}
-			/>
+			<PaymentFilters filters={filters} onChange={setFilter} onClear={clearFilters} />
 
 			{isLoading ? (
 				<div className='flex justify-center py-16'>

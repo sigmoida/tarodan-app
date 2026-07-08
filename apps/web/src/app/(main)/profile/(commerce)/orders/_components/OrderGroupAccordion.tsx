@@ -8,6 +8,7 @@ import {
 	AccordionTrigger,
 	AccordionContent,
 	Badge,
+	ThumbnailStack,
 } from '@tarodan/ui';
 import OptimizedImage from '@/components/OptimizedImage';
 import { useTranslation } from '@/i18n';
@@ -39,8 +40,6 @@ export default function OrderGroupAccordion({
 	const { locale } = useTranslation();
 	const total = group.orders.reduce((sum, o) => sum + orderAmount(o), 0);
 	const date = group.orders[0]?.createdAt;
-	const thumbs = group.orders.slice(0, 4);
-	const extra = group.orders.length - thumbs.length;
 
 	return (
 		<Accordion
@@ -67,33 +66,25 @@ export default function OrderGroupAccordion({
 
 						{/* Row 2 — overlapping thumbnails */}
 						<div className='flex items-center gap-4'>
-							<div className='flex flex-shrink-0 items-center'>
-								{thumbs.map((o, i) => {
+							<ThumbnailStack
+								items={group.orders}
+								getKey={(o) => o.id}
+								max={4}
+								size='lg'
+								renderItem={(o) => {
 									const { image } = getOrderPrimary(o);
 									return (
-										<div
-											key={o.id}
-											className={`relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-surface-alt ring-2 ring-surface-elevated ${
-												i > 0 ? '-ml-4' : ''
-											}`}
-											style={{ zIndex: thumbs.length - i }}>
-											<OptimizedImage
-												src={image || PLACEHOLDER}
-												alt=''
-												fill
-												className='object-cover'
-												fallbackSrc={PLACEHOLDER}
-												logContext={{ orderId: o.id, page: 'orders-group' }}
-											/>
-										</div>
+										<OptimizedImage
+											src={image || PLACEHOLDER}
+											alt=''
+											fill
+											className='object-cover'
+											fallbackSrc={PLACEHOLDER}
+											logContext={{ orderId: o.id, page: 'orders-group' }}
+										/>
 									);
-								})}
-								{extra > 0 && (
-									<div className='-ml-4 flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-lg bg-primary-50 text-sm font-semibold text-primary-600 ring-2 ring-surface-elevated'>
-										+{extra}
-									</div>
-								)}
-							</div>
+								}}
+							/>
 							<div className='min-w-0 flex-1 text-left'>
 								<p className='font-medium text-heading'>
 									{locale === 'en'

@@ -16,6 +16,7 @@ import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useConfirm } from '@/components/ConfirmProvider';
 import { useAuthStore } from '@/stores/authStore';
+import { useRequireAuth } from '@/lib/useRequireAuth';
 import {
 	useDiscounts,
 	useSellerProducts,
@@ -29,30 +30,29 @@ import {
 	type DiscountFilter,
 } from './_lib/types';
 import DiscountCard from './_components/DiscountCard';
-import DiscountFormModal from './_components/DiscountFormModal';
+import DiscountFormModal from './_modals/DiscountFormModal';
 import MetricCard from '@/components/ui/MetricCard';
 
 export default function ProfileDiscountsPage() {
 	const router = useRouter();
 	const confirm = useConfirm();
-	const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
+	const { ready } = useRequireAuth();
+	const user = useAuthStore((s) => s.user);
 
 	const [filter, setFilter] = useState<DiscountFilter>('all');
 	const [modalOpen, setModalOpen] = useState(false);
 	const [editing, setEditing] = useState<Discount | null>(null);
 
-	const canAccess = isAuthenticated && !!user?.isSeller;
+	const canAccess = ready && !!user?.isSeller;
 
+	// Auth is gated on the server; only the seller-role check redirects here.
 	useEffect(() => {
-		if (authLoading) return;
-		if (!isAuthenticated) {
-			toast.error('İndirimlerinizi görmek için giriş yapmalısınız');
-			router.push('/login?redirect=/profile/discounts');
-		} else if (!user?.isSeller) {
+		if (!ready) return;
+		if (!user?.isSeller) {
 			toast.error('Bu sayfaya erişim için satıcı olmanız gerekiyor');
 			router.push('/profile');
 		}
-	}, [authLoading, isAuthenticated, user?.isSeller, router]);
+	}, [ready, user?.isSeller, router]);
 
 	const { discounts, isLoading } = useDiscounts(canAccess);
 	const products = useSellerProducts(canAccess);
@@ -94,7 +94,7 @@ export default function ProfileDiscountsPage() {
 		if (ok) deleteDiscount.mutate(discount.id);
 	};
 
-	if (authLoading || !canAccess) {
+	if (!canAccess) {
 		return (
 			<div className='flex items-center justify-center py-24'>
 				<Spinner size='xl' color='border-primary-500 border-t-transparent' />

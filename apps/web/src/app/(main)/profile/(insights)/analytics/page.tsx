@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import {
 	EyeIcon,
 	HeartIcon,
@@ -17,6 +16,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import SectionCard from '@/components/ui/SectionCard';
 import MetricCard from '@/components/ui/MetricCard';
 import { useAuthStore } from '@/stores/authStore';
+import { useRequireAuth } from '@/lib/useRequireAuth';
 import { formatTL } from '@/lib/format';
 import { useAnalytics } from './_hooks/useAnalytics';
 import { PERIOD_TABS, type AnalyticsPeriod } from './_lib/types';
@@ -29,21 +29,16 @@ import PremiumUpsell from './_sections/PremiumUpsell';
 import TipsSection from './_sections/TipsSection';
 
 export default function AnalyticsPage() {
-	const router = useRouter();
-	const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
+	const { ready } = useRequireAuth();
+	const user = useAuthStore((s) => s.user);
 	const [period, setPeriod] = useState<AnalyticsPeriod>('30d');
 
 	const isPremium =
 		user?.membershipTier === 'premium' || user?.membershipTier === 'business';
 
-	useEffect(() => {
-		if (!authLoading && !isAuthenticated) router.push('/login?redirect=/profile/analytics');
-	}, [authLoading, isAuthenticated, router]);
+	const { analytics, isLoading } = useAnalytics(period, ready);
 
-	const enabled = !authLoading && isAuthenticated;
-	const { analytics, isLoading } = useAnalytics(period, enabled);
-
-	if (authLoading || !isAuthenticated) {
+	if (!ready) {
 		return (
 			<div className='flex items-center justify-center py-24'>
 				<Spinner size='xl' color='border-primary-500 border-t-transparent' />

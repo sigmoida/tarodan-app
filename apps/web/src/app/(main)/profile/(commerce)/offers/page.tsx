@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useMemo, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
 	InboxArrowDownIcon,
@@ -15,21 +15,18 @@ import {
 import { Button, Spinner, Tabs, TabsList, TabsTrigger } from '@tarodan/ui';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { useAuthStore } from '@/stores/authStore';
+import { EmptyStateCard } from '@/components/feedback/EmptyStateCard';
+import { useRequireAuth } from '@/lib/useRequireAuth';
 import { useOffers, useOfferAction } from './_hooks/useOffers';
 import { useCommissionPreviews } from '@/hooks/useCommissionPreviews';
 import type { Offer, OfferTab } from './_lib/types';
 import OfferCard from './_components/OfferCard';
-import CounterOfferModal from './_components/CounterOfferModal';
+import CounterOfferModal from './_modals/CounterOfferModal';
 import MetricCard from '@/components/ui/MetricCard';
 
 function OffersPageContent() {
-	const router = useRouter();
 	const searchParams = useSearchParams();
-	const { isAuthenticated, isLoading: authLoading } = useAuthStore();
-
-	const [mounted, setMounted] = useState(false);
-	useEffect(() => setMounted(true), []);
+	const { ready } = useRequireAuth();
 
 	const [activeTab, setActiveTab] = useState<OfferTab>(
 		searchParams.get('tab') === 'sent' ? 'sent' : 'received',
@@ -46,12 +43,7 @@ function OffersPageContent() {
 		null,
 	);
 
-	useEffect(() => {
-		if (!mounted || authLoading) return;
-		if (!isAuthenticated) router.push('/login?redirect=/profile/offers');
-	}, [mounted, authLoading, isAuthenticated, router]);
-
-	const enabled = mounted && isAuthenticated;
+	const enabled = ready;
 	// Both tabs are fetched so the metric cards stay tab-independent.
 	const received = useOffers('received', enabled);
 	const sent = useOffers('sent', enabled);
@@ -83,7 +75,7 @@ function OffersPageContent() {
 		};
 	}, [received.offers, sent.offers]);
 
-	if (!mounted || authLoading || !isAuthenticated) {
+	if (!ready) {
 		return (
 			<div className='flex items-center justify-center py-24'>
 				<Spinner size='xl' color='border-primary-500 border-t-transparent' />
@@ -129,29 +121,24 @@ function OffersPageContent() {
 					<p className='mb-4 text-danger-500'>Teklifler yüklenirken bir hata oluştu</p>
 				</div>
 			) : offers.length === 0 ? (
-				<div className='rounded-lg border border-border bg-surface-elevated py-16 text-center'>
-					<div className='mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-lg bg-primary-100'>
-						{activeTab === 'received' ? (
-							<InboxArrowDownIcon className='h-10 w-10 text-primary-500' />
-						) : (
-							<PaperAirplaneIcon className='h-10 w-10 text-primary-500' />
-						)}
-					</div>
-					<h3 className='mb-2 text-xl font-semibold text-heading'>
-						{activeTab === 'received' ? 'Henüz gelen teklif yok' : 'Henüz gönderilen teklif yok'}
-					</h3>
-					<p className='mx-auto mb-6 max-w-md text-muted'>
-						{activeTab === 'received'
+				<EmptyStateCard
+					title={
+						activeTab === 'received' ? 'Henüz gelen teklif yok' : 'Henüz gönderilen teklif yok'
+					}
+					description={
+						activeTab === 'received'
 							? 'Alıcılar ilanlarınıza teklif verdiğinde burada görünecek.'
-							: 'İlanlara göz atın ve ilk teklifinizi yapın!'}
-					</p>
-					<Button asChild className='gap-2'>
-						<Link href='/listings'>
-							<TagIcon className='h-5 w-5' />
-							İlanlara Göz At
-						</Link>
-					</Button>
-				</div>
+							: 'İlanlara göz atın ve ilk teklifinizi yapın!'
+					}
+					action={
+						<Button asChild className='gap-2'>
+							<Link href='/listings'>
+								<TagIcon className='h-5 w-5' />
+								İlanlara Göz At
+							</Link>
+						</Button>
+					}
+				/>
 			) : (
 				<div className='space-y-4'>
 					{offers.map((offer) => (

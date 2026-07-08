@@ -33,7 +33,14 @@ export default function MyRefundRequestsPage() {
 
 	return (
 		<PageShell>
-			<PageHeader title={locale === 'en' ? 'Refund Requests' : 'İade Taleplerim'} />
+			<PageHeader
+				title={locale === 'en' ? 'Refund Requests' : 'İade Taleplerim'}
+				description={
+					locale === 'en'
+						? 'Track the status of your refund requests.'
+						: 'İade taleplerinin durumunu takip et.'
+				}
+			/>
 
 			{isLoading ? (
 				<div className='flex justify-center py-12'>

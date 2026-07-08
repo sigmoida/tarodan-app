@@ -7,7 +7,7 @@ import {
 	REFUND_LIFECYCLE,
 	refundStatusPhase,
 	refundTerminalStatuses,
-} from '../../_lib/refundStatus';
+} from '../../_lib/refund-status';
 
 /**
  * Horizontal stepper showing which phase the refund is in — built on the shared

@@ -1,30 +1,24 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { CreditCardIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import { Spinner, ConfirmDialog } from '@tarodan/ui';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
-import { useAuthStore } from '@/stores/authStore';
+import { useRequireAuth } from '@/lib/useRequireAuth';
 import type { SavedCard } from '@/lib/api';
 import { useSavedCards, useDeleteCard } from './_hooks/useSavedCards';
 import SavedCardCard from './_components/SavedCardCard';
 
 export default function PaymentMethodsPage() {
-	const router = useRouter();
-	const { isAuthenticated, isLoading: authLoading } = useAuthStore();
+	const { ready } = useRequireAuth();
 	const [toDelete, setToDelete] = useState<SavedCard | null>(null);
 
-	const { cards, isLoading } = useSavedCards(isAuthenticated);
+	const { cards, isLoading } = useSavedCards(ready);
 	const deleteCard = useDeleteCard();
 
-	if (authLoading) return <AuthLoadingScreen />;
-	if (!isAuthenticated) {
-		if (typeof window !== 'undefined') router.push('/login?redirect=/profile/payment-methods');
-		return null;
-	}
+	if (!ready) return <AuthLoadingScreen />;
 
 	const confirmDelete = () => {
 		if (!toDelete) return;

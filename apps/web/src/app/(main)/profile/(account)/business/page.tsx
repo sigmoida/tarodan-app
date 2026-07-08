@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { Spinner, Tabs, TabsList, TabsTrigger } from '@tarodan/ui';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { useAuthStore } from '@/stores/authStore';
+import { useRequireAuth } from '@/lib/useRequireAuth';
 import { useBusinessStats } from './_hooks/useBusinessStats';
 import { BUSINESS_TABS, type BusinessTab } from './_lib/types';
 import BusinessHeader from './_sections/BusinessHeader';
@@ -15,18 +14,12 @@ import ProductsTab from './_sections/ProductsTab';
 import CollectionsTab from './_sections/CollectionsTab';
 
 export default function BusinessDashboardPage() {
-	const router = useRouter();
-	const { isAuthenticated, isLoading: authLoading } = useAuthStore();
+	const { ready } = useRequireAuth();
 	const [tab, setTab] = useState<BusinessTab>('overview');
 
-	useEffect(() => {
-		if (!authLoading && !isAuthenticated) router.push('/login');
-	}, [authLoading, isAuthenticated, router]);
+	const { stats, isLoading, error } = useBusinessStats(ready);
 
-	const enabled = !authLoading && isAuthenticated;
-	const { stats, isLoading, error } = useBusinessStats(enabled);
-
-	if (authLoading || !isAuthenticated) {
+	if (!ready) {
 		return (
 			<div className='flex items-center justify-center py-24'>
 				<Spinner size='xl' color='border-primary-500 border-t-transparent' />

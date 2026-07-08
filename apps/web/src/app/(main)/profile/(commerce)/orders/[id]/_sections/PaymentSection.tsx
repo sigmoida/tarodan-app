@@ -4,12 +4,10 @@
 
 import { useEffect, useState } from 'react';
 import {
-	CreditCardIcon,
-	MapPinIcon,
 	PlusIcon,
 	ShieldCheckIcon,
 } from '@heroicons/react/24/outline';
-import { Button, Input, Radio, Spinner, Textarea } from '@tarodan/ui';
+import { Badge, Button, Input, Radio, Spinner, Textarea } from '@tarodan/ui';
 import CityDistrictSelector from '@/components/CityDistrictSelector';
 import { formatTL } from '@/lib/format';
 import { useTranslation } from '@/i18n';
@@ -94,8 +92,7 @@ export default function PaymentSection({ order }: { order: OrderDetail }) {
 		<div className='bg-surface-elevated rounded-xl shadow-sm overflow-hidden'>
 			{/* Header banner */}
 			<div className='bg-gradient-to-r from-primary-500 to-primary-600 px-6 py-4'>
-				<h2 className='text-lg font-semibold text-inverted flex items-center gap-2'>
-					<CreditCardIcon className='w-5 h-5' />
+				<h2 className='text-lg font-semibold text-inverted'>
 					{locale === 'en' ? 'Complete Your Payment' : 'Ödemenizi Tamamlayın'}
 				</h2>
 				<p className='text-sm text-primary-100 mt-1'>
@@ -112,8 +109,7 @@ export default function PaymentSection({ order }: { order: OrderDetail }) {
 						<span className='flex items-center justify-center w-6 h-6 rounded-full bg-primary-100 text-primary-700 text-xs font-bold'>
 							1
 						</span>
-						<h3 className='font-semibold text-heading flex items-center gap-2'>
-							<MapPinIcon className='w-5 h-5 text-primary-500' />
+						<h3 className='font-semibold text-heading'>
 							{locale === 'en' ? 'Delivery Address' : 'Teslimat Adresi'}
 						</h3>
 					</div>
@@ -148,9 +144,9 @@ export default function PaymentSection({ order }: { order: OrderDetail }) {
 										</p>
 									</div>
 									{addr.isDefault && (
-										<span className='text-xs px-2 py-1 bg-primary-100 text-primary-700 rounded-sm'>
+										<Badge variant='primary' size='sm'>
 											{locale === 'en' ? 'Default' : 'Varsayılan'}
-										</span>
+										</Badge>
 									)}
 								</label>
 							))}
@@ -261,8 +257,7 @@ export default function PaymentSection({ order }: { order: OrderDetail }) {
 						<span className='flex items-center justify-center w-6 h-6 rounded-full bg-primary-100 text-primary-700 text-xs font-bold'>
 							2
 						</span>
-						<h3 className='font-semibold text-heading flex items-center gap-2'>
-							<ShieldCheckIcon className='w-5 h-5 text-success-500' />
+						<h3 className='font-semibold text-heading'>
 							{locale === 'en' ? 'Secure Payment' : 'Güvenli Ödeme'}
 						</h3>
 					</div>

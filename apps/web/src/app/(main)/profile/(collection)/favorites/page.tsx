@@ -2,12 +2,10 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import toast from 'react-hot-toast';
 import { useTranslation } from '@/i18n';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { useRequireAuth } from '@/lib/useRequireAuth';
 import { useFavorites } from './_hooks/useFavorites';
 import FavoritesGrid from './_components/FavoritesGrid';
 import ShareFavoritesButton from './_components/ShareFavoritesButton';
@@ -26,33 +24,19 @@ function FavoritesSkeleton() {
 }
 
 export default function FavoritesPage() {
-	const router = useRouter();
 	const { t, locale } = useTranslation();
-	const [mounted, setMounted] = useState(false);
-	useEffect(() => {
-		setMounted(true);
-	}, []);
+	const { ready } = useRequireAuth();
 
 	const {
 		items,
 		isLoading,
 		isSharedView,
-		isAuthenticated,
-		authLoading,
 		handleRemove,
 		handleAddToCart,
 	} = useFavorites();
 
 	// Private favorites require auth; a shared (?ids=) view is public.
-	useEffect(() => {
-		if (!mounted || authLoading || isSharedView) return;
-		if (!isAuthenticated) {
-			toast.error(t('favorites.loginRequired'));
-			router.push('/login?redirect=/profile/favorites');
-		}
-	}, [mounted, isAuthenticated, authLoading, isSharedView, router, t]);
-
-	if (!isSharedView && (!mounted || authLoading || !isAuthenticated)) {
+	if (!isSharedView && !ready) {
 		return (
 			<PageShell className='flex items-center justify-center'>
 				<p className='animate-pulse text-sm text-muted'>

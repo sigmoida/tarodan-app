@@ -11,6 +11,7 @@ import TradeAddressPicker from '@/components/TradeAddressPicker';
 import SectionCard from '@/components/ui/SectionCard';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { EmptyStateCard } from '@/components/feedback/EmptyStateCard';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n';
 import { getProductEffectivePrice } from '@/lib/productPrice';
@@ -91,12 +92,18 @@ function NewTradeContent() {
 
 	if (!target) {
 		return (
-			<div className='py-16 text-center'>
-				<p className='mb-4 text-muted'>{t('trade.targetNotFound')}</p>
-				<Link href='/listings' className='text-primary-500 hover:text-primary-600'>
-					{t('seller.backToListings')}
-				</Link>
-			</div>
+			<PageShell className='pb-16'>
+				<div className='mx-auto w-full max-w-2xl px-4 pt-4'>
+					<EmptyStateCard
+						title={t('trade.targetNotFound')}
+						action={
+							<Button asChild>
+								<Link href='/listings'>{t('seller.backToListings')}</Link>
+							</Button>
+						}
+					/>
+				</div>
+			</PageShell>
 		);
 	}
 

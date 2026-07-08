@@ -2,13 +2,13 @@
 
 "use client";
 
-import Link from "next/link";
 import {
-  HeartIcon,
   TrashIcon,
   ShoppingCartIcon,
 } from "@heroicons/react/24/outline";
 import { Button, IconButton } from "@tarodan/ui";
+import { ButtonLink } from "@/components/ui/ButtonLink";
+import { EmptyStateCard } from "@/components/feedback/EmptyStateCard";
 import { ProductCard } from "@/components/ui";
 import { useTranslation } from "@/i18n";
 import { wishlistItemToProduct, type WishlistItem } from "../_lib/types";
@@ -24,20 +24,21 @@ export default function FavoritesGrid({
   onRemove: (productId: string) => void;
   onAddToCart: (item: WishlistItem) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   if (items.length === 0) {
     return (
-      <div className="rounded-xl bg-surface-elevated py-16 text-center">
-        <HeartIcon className="mx-auto mb-4 h-16 w-16 text-border-strong" />
-        <p className="mb-4 text-lg text-muted">{t("favorites.empty")}</p>
-        <Link
-          href="/listings"
-          className="inline-block rounded-xl bg-primary-500 px-6 py-3 text-inverted hover:bg-primary-600"
-        >
-          {t("favorites.browseProducts")}
-        </Link>
-      </div>
+      <EmptyStateCard
+        title={t("favorites.empty")}
+        description={
+          locale === "en"
+            ? "Add the products you like to your favorites and keep track of them from here."
+            : "Beğendiğin ürünleri favorilerine ekle, buradan kolayca takip et."
+        }
+        action={
+          <ButtonLink href="/listings">{t("favorites.browseProducts")}</ButtonLink>
+        }
+      />
     );
   }
 
