@@ -11,7 +11,7 @@ import toast from "react-hot-toast";
 import { paymentsApi } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import AuthLoadingScreen from "@/components/AuthLoadingScreen";
-import CardPaymentForm from "@/components/CardPaymentForm";
+import CardPaymentForm from "./_components/CardPaymentForm";
 import { Button } from "@tarodan/ui";
 
 /**

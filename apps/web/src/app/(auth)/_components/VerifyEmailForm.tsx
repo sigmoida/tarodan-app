@@ -4,9 +4,9 @@ import Link from 'next/link';
 import { Button, Spinner } from '@tarodan/ui';
 import { Form, FormInput, FormError, useZodForm } from '@tarodan/ui/form';
 import { useTranslation } from '@/i18n/LanguageContext';
-import { AuthCard } from '@/components/auth/AuthCard';
-import { useVerifyEmail } from '@/hooks/useVerifyEmail';
-import { resendEmailSchema, type ResendEmailValues } from '@/lib/schemas/auth';
+import { AuthCard } from './AuthCard';
+import { useVerifyEmail } from '../_hooks/useVerifyEmail';
+import { resendEmailSchema, type ResendEmailValues } from '../_lib/auth';
 
 export function VerifyEmailForm() {
   const { locale } = useTranslation();

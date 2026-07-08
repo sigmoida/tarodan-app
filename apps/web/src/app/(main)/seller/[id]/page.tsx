@@ -30,7 +30,7 @@ import { api, listingsApi, ratingsApi } from '@/lib/api';
 import { ProductCard } from '@/components/ui';
 import { useAuthStore } from '@/stores/authStore';
 import dynamic from 'next/dynamic';
-import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
+import { withChunkErrorLogging } from '@/lib/withChunkErrorLogging';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { Button } from '@tarodan/ui';
 

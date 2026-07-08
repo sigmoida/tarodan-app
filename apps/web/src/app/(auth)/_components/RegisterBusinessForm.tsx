@@ -5,10 +5,10 @@ import Link from 'next/link';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { Button } from '@tarodan/ui';
 import { Form, FormInput, FormSelect, FormCheckbox, FormError, useZodForm } from '@tarodan/ui/form';
-import { businessRegisterSchema, type BusinessRegisterValues } from '@/lib/schemas/auth';
-import { AuthCard } from '@/components/auth/AuthCard';
+import { businessRegisterSchema, type BusinessRegisterValues } from '../_lib/auth';
+import { AuthCard } from './AuthCard';
 import { ButtonLink } from '@/components/ui/ButtonLink';
-import { useRegisterBusiness } from '@/hooks/useRegisterBusiness';
+import { useRegisterBusiness } from '../_hooks/useRegisterBusiness';
 
 // Turkish cities (major ones)
 const TURKISH_CITIES = [

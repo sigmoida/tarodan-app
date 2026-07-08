@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import { ResetPasswordForm } from '@/components/auth/ResetPasswordForm';
+import { ResetPasswordForm } from '../../_components/ResetPasswordForm';
 
 export const metadata: Metadata = {
   title: 'Şifre Sıfırla · Tarodan',

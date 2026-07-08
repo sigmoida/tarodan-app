@@ -8,7 +8,7 @@ import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { formatTL } from '@/lib/format';
 import { useAuthStore } from '@/stores/authStore';
-import { useRequireAuth } from '@/lib/useRequireAuth';
+import { useRequireAuth } from '../../../_hooks/useRequireAuth';
 import { useTranslation } from '@/i18n';
 import { statusMetaOf } from '../_lib/refund-status';
 import { useRefundDetail, useCancelRefund } from '../_hooks/useRefundRequests';

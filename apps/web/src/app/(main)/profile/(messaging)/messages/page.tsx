@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslation } from '@/i18n';
-import { useRequireAuth } from '@/lib/useRequireAuth';
+import { useRequireAuth } from '../../_hooks/useRequireAuth';
 import { useMessaging } from './_hooks/useMessaging';
 import ThreadList from './_components/ThreadList';
 import ChatHeader from './_components/ChatHeader';

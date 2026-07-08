@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { HeartIcon } from '@heroicons/react/24/outline';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
+import { withChunkErrorLogging } from '@/lib/withChunkErrorLogging';
 import {
 	CollectionDetailProvider,
 	useCollectionDetail,

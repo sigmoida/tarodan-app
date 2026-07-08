@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { getQueryClient } from '@/lib/queryClient';
+import { getQueryClient } from '@/lib/query/getQueryClient';
 
 /**
  * Client-only wrapper that provides QueryClient to the app.

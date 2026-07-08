@@ -4,9 +4,9 @@ import Link from 'next/link';
 import { Button } from '@tarodan/ui';
 import { Form, FormInput, FormError, useZodForm } from '@tarodan/ui/form';
 import { useTranslation } from '@/i18n/LanguageContext';
-import { AuthCard } from '@/components/auth/AuthCard';
-import { resetPasswordSchema, type ResetPasswordValues } from '@/lib/schemas/auth';
-import { useResetPassword } from '@/hooks/useResetPassword';
+import { AuthCard } from './AuthCard';
+import { resetPasswordSchema, type ResetPasswordValues } from '../_lib/auth';
+import { useResetPassword } from '../_hooks/useResetPassword';
 import { PasswordChecklist } from './PasswordChecklist';
 
 export function ResetPasswordForm() {

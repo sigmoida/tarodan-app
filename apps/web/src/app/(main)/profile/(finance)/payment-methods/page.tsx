@@ -6,7 +6,7 @@ import { Spinner, ConfirmDialog } from '@tarodan/ui';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
-import { useRequireAuth } from '@/lib/useRequireAuth';
+import { useRequireAuth } from '../../_hooks/useRequireAuth';
 import type { SavedCard } from '@/lib/api';
 import { useSavedCards, useDeleteCard } from './_hooks/useSavedCards';
 import SavedCardCard from './_components/SavedCardCard';

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { RegisterForm } from '@/components/auth/RegisterForm';
+import { RegisterForm } from '../../_components/RegisterForm';
 
 export const metadata: Metadata = {
   title: 'Kayıt Ol · Tarodan',

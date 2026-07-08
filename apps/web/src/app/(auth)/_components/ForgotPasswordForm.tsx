@@ -4,9 +4,9 @@ import Link from 'next/link';
 import { Button } from '@tarodan/ui';
 import { Form, FormInput, FormError, useZodForm } from '@tarodan/ui/form';
 import { useTranslation } from '@/i18n';
-import { AuthCard } from '@/components/auth/AuthCard';
-import { forgotPasswordSchema, type ForgotPasswordValues } from '@/lib/schemas/auth';
-import { useForgotPassword } from '@/hooks/useForgotPassword';
+import { AuthCard } from './AuthCard';
+import { forgotPasswordSchema, type ForgotPasswordValues } from '../_lib/auth';
+import { useForgotPassword } from '../_hooks/useForgotPassword';
 
 export function ForgotPasswordForm() {
   const { locale } = useTranslation();

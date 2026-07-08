@@ -4,11 +4,11 @@ import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Spinner, Tabs, TabsList, TabsTrigger } from '@tarodan/ui';
 import { ButtonLink } from '@/components/ui/ButtonLink';
-import { EmptyStateCard } from '@/components/feedback/EmptyStateCard';
+import { EmptyStateCard } from '../../_components/EmptyStateCard';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useAuthStore } from '@/stores/authStore';
-import { useRequireAuth } from '@/lib/useRequireAuth';
+import { useRequireAuth } from '../../_hooks/useRequireAuth';
 import { useTranslation } from '@/i18n';
 import {
 	useOrders,

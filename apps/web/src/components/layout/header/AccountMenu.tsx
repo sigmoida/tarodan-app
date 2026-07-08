@@ -20,7 +20,7 @@ import {
 import { Button } from '@tarodan/ui';
 import UserAvatar from '@/components/UserAvatar';
 import { useTranslation } from '@/i18n/LanguageContext';
-import type { HeaderData } from './useHeaderData';
+import type { HeaderData } from './_hooks/useHeaderData';
 
 /**
  * Owns the account dropdown state: open/close, the container ref used for the

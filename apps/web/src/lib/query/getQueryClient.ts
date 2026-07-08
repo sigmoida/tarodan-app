@@ -1,6 +1,6 @@
 'use client';
 
-import { makeQueryClient, onQueryError } from './query/client';
+import { makeQueryClient, onQueryError } from './client';
 
 let browserQueryClient: ReturnType<typeof makeQueryClient> | undefined;
 

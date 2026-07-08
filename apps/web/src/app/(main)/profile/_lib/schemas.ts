@@ -1,7 +1,7 @@
 /** @format */
 
 import { z } from 'zod';
-import { isValidTrIban } from '@/lib/iban';
+import { isValidTrIban } from './iban';
 
 /**
  * Zod schemas for the profile dashboard forms. One source of truth for both

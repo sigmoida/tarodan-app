@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { queryKeys } from '@/lib/query/keys';
 import { membershipApi, api, paymentsApi } from '@/lib/api';
-import { tierChangeKind } from '@/lib/membershipTiers';
+import { tierChangeKind } from '../../_lib/membershipTiers';
 import { useAuthStore } from '@/stores/authStore';
 import { TIER_FEATURES, TIER_NAMES, PAID_TIERS, type TierInfo } from '../_lib/tiers';
 

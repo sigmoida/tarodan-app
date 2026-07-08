@@ -7,7 +7,7 @@ import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { useAuthStore } from '@/stores/authStore';
-import { useRequireAuth } from '@/lib/useRequireAuth';
+import { useRequireAuth } from '../../_hooks/useRequireAuth';
 import { useTranslation } from '@/i18n';
 import { usePayments, usePaymentAction, type PaymentActionType } from './_hooks/usePayments';
 import PaymentFilters from './_components/PaymentFilters';

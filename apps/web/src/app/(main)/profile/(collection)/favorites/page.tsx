@@ -5,7 +5,7 @@
 import { useTranslation } from '@/i18n';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { useRequireAuth } from '@/lib/useRequireAuth';
+import { useRequireAuth } from '../../_hooks/useRequireAuth';
 import { useFavorites } from './_hooks/useFavorites';
 import FavoritesGrid from './_components/FavoritesGrid';
 import ShareFavoritesButton from './_components/ShareFavoritesButton';

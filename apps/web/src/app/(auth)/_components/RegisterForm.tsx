@@ -7,10 +7,10 @@ import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { Button, Spinner } from '@tarodan/ui';
 import { Form, FormInput, FormCheckbox, FormError, useZodForm } from '@tarodan/ui/form';
-import { registerSchema, type RegisterValues } from '@/lib/schemas/auth';
-import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
-import { useRegister } from '@/hooks/useRegister';
-import { AuthCard } from '@/components/auth/AuthCard';
+import { registerSchema, type RegisterValues } from '../_lib/auth';
+import { GoogleSignInButton } from './GoogleSignInButton';
+import { useRegister } from '../_hooks/useRegister';
+import { AuthCard } from './AuthCard';
 import { PasswordChecklist } from './PasswordChecklist';
 
 export function RegisterForm() {

@@ -9,7 +9,7 @@
  */
 
 import { manufacturersApi, listingsApi } from '@/lib/api';
-import { countryToFlag } from '@/lib/countryFlag';
+import { countryToFlag } from './countryFlag';
 import { BRANDS_DATA } from './brands-data';
 import type { ManufacturerApi, ManufacturerCard, ManufacturerDetail } from './types';
 

@@ -10,7 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Badge, type BadgeVariant } from '@tarodan/ui';
 import UserAvatar from '@/components/UserAvatar';
-import MetricCard from '@/components/ui/MetricCard';
+import { MetricCard } from '@/components/ui';
 import { ButtonLink } from '@/components/ui/ButtonLink';
 import { useProfile } from '../_context/ProfileContext';
 

@@ -5,7 +5,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { bankAccountApi } from '@/lib/api';
-import { normalizeIban } from '@/lib/iban';
+import { normalizeIban } from '../_lib/iban';
 import type { BankAccountValues } from '../_lib/schemas';
 
 export interface BankAccount {

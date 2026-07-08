@@ -5,7 +5,7 @@
 import dynamic from 'next/dynamic';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
+import { withChunkErrorLogging } from '@/lib/withChunkErrorLogging';
 import {
 	ListingDetailProvider,
 	useListingDetail,

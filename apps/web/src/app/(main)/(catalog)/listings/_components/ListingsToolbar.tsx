@@ -8,7 +8,7 @@ import { FunnelIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Button, Chip, Select } from '@tarodan/ui';
 import { useTranslation } from '@/i18n';
 import { formatCondition } from '@/lib/format';
-import ProductLayoutSelector from '@/components/ProductLayoutSelector';
+import ProductLayoutSelector from './ProductLayoutSelector';
 import { useListings } from '../_context/ListingsContext';
 
 /**

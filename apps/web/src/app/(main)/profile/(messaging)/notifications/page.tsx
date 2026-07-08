@@ -6,11 +6,11 @@ import { useMemo, useState } from 'react';
 import { CheckCircleIcon } from '@heroicons/react/24/outline';
 import { Button, Select, Spinner } from '@tarodan/ui';
 import { useTranslation } from '@/i18n';
-import { useRequireAuth } from '@/lib/useRequireAuth';
+import { useRequireAuth } from '../../_hooks/useRequireAuth';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
-import { EmptyStateCard } from '@/components/feedback/EmptyStateCard';
+import { EmptyStateCard } from '../../_components/EmptyStateCard';
 import { useNotifications } from './_hooks/useNotifications';
 import NotificationCard from './_components/NotificationCard';
 import {

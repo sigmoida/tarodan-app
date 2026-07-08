@@ -23,7 +23,7 @@ export interface Listing {
 }
 
 /** Estimated seller net — single source in the shared commission-preview hook. */
-export type { EstimatedNet } from '@/hooks/useCommissionPreviews';
+export type { EstimatedNet } from '../../_hooks/useCommissionPreviews';
 
 const PLACEHOLDER = 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün';
 

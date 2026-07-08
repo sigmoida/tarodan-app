@@ -17,6 +17,7 @@ import {
 import { queryKeys } from '@/lib/query/keys';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { categoriesApi, manufacturersApi, listingsApi } from '@/lib/api';
+import { SCALE_FALLBACK } from '@/lib/constants';
 
 interface Category {
 	id: string;
@@ -46,8 +47,6 @@ interface FiltersData {
 }
 
 const STALE = 60 * 60 * 1000;
-
-const SCALE_FALLBACK = ['1:18', '1:24', '1:43', '1:64', '1:87'];
 
 const MATERIAL_FALLBACK = [
 	{ slug: 'diecast', label: 'Diecast (Metal)' },

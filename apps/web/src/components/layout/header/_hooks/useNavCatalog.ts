@@ -5,7 +5,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query/keys';
 import { categoriesApi, manufacturersApi, listingsApi } from '@/lib/api';
-import type { ManufacturerRef } from './config';
+import type { ManufacturerRef } from '../nav/config';
 
 interface Category {
 	id: string;

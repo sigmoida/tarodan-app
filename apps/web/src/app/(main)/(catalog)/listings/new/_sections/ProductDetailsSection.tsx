@@ -3,7 +3,7 @@
 "use client";
 
 import { Select } from "@tarodan/ui";
-import { SimpleDropdown } from "@/components/SimpleDropdown";
+import { SimpleDropdown } from "../../_components/SimpleDropdown";
 import { FormSection } from "./FormSection";
 import { useNewListing } from "../_context/NewListingContext";
 

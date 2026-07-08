@@ -7,7 +7,7 @@ import { PlusIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import { Button, Input, Radio, Textarea } from '@tarodan/ui';
 import { SectionCard } from '@/components/ui';
 import CityDistrictSelector from '@/components/CityDistrictSelector';
-import { PhoneInput } from '@/components/forms';
+import { PhoneInput } from '../_components/PhoneInput';
 import { useCheckout } from '../_context/CheckoutContext';
 
 export default function AddressStep() {

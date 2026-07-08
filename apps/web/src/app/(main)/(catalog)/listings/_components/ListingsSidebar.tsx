@@ -3,7 +3,7 @@
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { Button } from '@tarodan/ui';
 import { useTranslation } from '@/i18n';
-import SidebarFilters from '@/components/SidebarFilters';
+import SidebarFilters from './SidebarFilters';
 import { useListings } from '../_context/ListingsContext';
 
 /**

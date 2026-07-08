@@ -31,8 +31,6 @@ export const CATEGORY_BAR_ITEMS: Record<'tr' | 'en', NavBarItem[]> = {
 	],
 };
 
-export const SCALE_FALLBACK = ['1:18', '1:24', '1:43', '1:64', '1:87'];
-
 export interface ManufacturerRef {
 	id: string;
 	name: string;

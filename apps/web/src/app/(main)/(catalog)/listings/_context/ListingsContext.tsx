@@ -20,7 +20,7 @@ import {
   type Filters,
 } from '../_lib/params';
 import { fetchListingsClient } from '../_lib/data';
-import { type ProductLayout } from '@/components/ProductLayoutSelector';
+import { type ProductLayout } from '../_components/ProductLayoutSelector';
 
 export interface Listing {
   id: string | number;

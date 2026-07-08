@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import { VerifyEmailForm } from '@/components/auth/VerifyEmailForm';
+import { VerifyEmailForm } from '../../_components/VerifyEmailForm';
 
 export const metadata: Metadata = {
   title: 'E-posta Doğrulama · Tarodan',

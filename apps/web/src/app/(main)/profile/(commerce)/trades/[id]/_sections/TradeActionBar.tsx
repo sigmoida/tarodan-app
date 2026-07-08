@@ -1,7 +1,7 @@
 /** @format */
 
 import { Button } from "@tarodan/ui";
-import TradeAddressPicker from "@/components/TradeAddressPicker";
+import TradeAddressPicker from "../../_components/TradeAddressPicker";
 
 interface TradeActionBarProps {
   locale: string;

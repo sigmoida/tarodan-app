@@ -9,7 +9,7 @@ import { Form, FormInput, useZodForm } from '@tarodan/ui/form';
 import SectionCard from '@/components/ui/SectionCard';
 import { useConfirm } from '@/components/ConfirmProvider';
 import { useAuthStore } from '@/stores/authStore';
-import { formatIbanDisplay } from '@/lib/iban';
+import { formatIbanDisplay } from '../_lib/iban';
 import { bankAccountSchema, type BankAccountValues } from '../_lib/schemas';
 import {
 	useBankAccount,

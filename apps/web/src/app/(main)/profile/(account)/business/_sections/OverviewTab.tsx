@@ -8,7 +8,7 @@ import {
 	RectangleStackIcon,
 } from '@heroicons/react/24/outline';
 import SectionCard from '@/components/ui/SectionCard';
-import MetricCard from '@/components/ui/MetricCard';
+import { MetricCard } from '@/components/ui';
 import { formatTL } from '@/lib/format';
 import type { BusinessStats } from '../_lib/types';
 

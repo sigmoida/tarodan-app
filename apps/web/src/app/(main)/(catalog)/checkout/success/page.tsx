@@ -3,7 +3,8 @@
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   CheckCircleIcon,
   EnvelopeIcon,
@@ -14,7 +15,8 @@ import {
   CalendarIcon,
 } from '@heroicons/react/24/outline';
 import { api } from '@/lib/api';
-import { useAuthStore } from '@/stores/authStore';import { Button } from '@tarodan/ui';
+import { useAuthStore } from '@/stores/authStore';
+import { Button } from '@tarodan/ui';
 
 
 interface OrderDetails {
@@ -68,41 +70,30 @@ export default function CheckoutSuccessPage() {
   const isGuest = searchParams.get('guest') === 'true';
 
   const { isAuthenticated } = useAuthStore();
-  const [order, setOrder] = useState<OrderDetails | null>(null);
-  const [invoice, setInvoice] = useState<InvoiceDetails | null>(null);
-  const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
 
-  useEffect(() => {
-    async function fetchOrderDetails() {
-      if (!orderId) {
-        setLoading(false);
-        return;
-      }
+  const orderQuery = useQuery({
+    queryKey: ['checkout-success-order', orderId],
+    queryFn: async () => (await api.get(`/orders/${orderId}`)).data as OrderDetails,
+    enabled: !!orderId && isAuthenticated && !isGuest,
+  });
+  const order = orderQuery.data ?? null;
+  const loading = orderQuery.isLoading;
 
+  // YENİ eLogo e-Arşiv faturası (yoksa null → buton çıkmaz; sipariş teslimde kesilir)
+  const invoiceQuery = useQuery({
+    queryKey: ['checkout-success-invoice', orderId],
+    queryFn: async () => {
       try {
-        // Fetch order details
-        if (isAuthenticated && !isGuest) {
-          const orderRes = await api.get(`/orders/${orderId}`);
-          setOrder(orderRes.data);
-
-          // YENİ eLogo e-Arşiv faturası (yoksa null → buton çıkmaz; sipariş teslimde kesilir)
-          try {
-            const invoiceRes = await api.get(`/elogo/invoices/by-order/${orderId}`);
-            if (invoiceRes.data?.id) setInvoice(invoiceRes.data);
-          } catch {
-            // Fatura henüz hazır değil
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch order details:', error);
-      } finally {
-        setLoading(false);
+        const res = await api.get(`/elogo/invoices/by-order/${orderId}`);
+        return res.data?.id ? (res.data as InvoiceDetails) : null;
+      } catch {
+        return null; // Fatura henüz hazır değil
       }
-    }
-
-    fetchOrderDetails();
-  }, [orderId, isAuthenticated, isGuest]);
+    },
+    enabled: !!order,
+  });
+  const invoice = invoiceQuery.data ?? null;
 
   const handleDownloadInvoice = async () => {
     if (!invoice?.id) return;

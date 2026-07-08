@@ -16,7 +16,7 @@ import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useConfirm } from '@/components/ConfirmProvider';
 import { useAuthStore } from '@/stores/authStore';
-import { useRequireAuth } from '@/lib/useRequireAuth';
+import { useRequireAuth } from '../../_hooks/useRequireAuth';
 import {
 	useDiscounts,
 	useSellerProducts,
@@ -31,7 +31,7 @@ import {
 } from './_lib/types';
 import DiscountCard from './_components/DiscountCard';
 import DiscountFormModal from './_modals/DiscountFormModal';
-import MetricCard from '@/components/ui/MetricCard';
+import { MetricCard } from '@/components/ui';
 
 export default function ProfileDiscountsPage() {
 	const router = useRouter();

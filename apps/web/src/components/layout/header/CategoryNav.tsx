@@ -12,8 +12,9 @@ import {
 	NavigationMenuLink,
 } from '@tarodan/ui';
 import { useTranslation } from '@/i18n/LanguageContext';
-import { CATEGORY_BAR_ITEMS, SCALE_FALLBACK } from './nav/config';
-import { useNavCatalog } from './nav/useNavCatalog';
+import { CATEGORY_BAR_ITEMS } from './nav/config';
+import { SCALE_FALLBACK } from '@/lib/constants';
+import { useNavCatalog } from './_hooks/useNavCatalog';
 import CategoriesPanel from './nav/CategoriesPanel';
 import ScalesPanel from './nav/ScalesPanel';
 

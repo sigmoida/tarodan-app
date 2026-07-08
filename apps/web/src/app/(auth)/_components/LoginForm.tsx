@@ -7,10 +7,10 @@ import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { Button, Checkbox } from '@tarodan/ui';
 import { Form, FormInput, FormError, useZodForm } from '@tarodan/ui/form';
 import { useTranslation } from '@/i18n/LanguageContext';
-import { AuthCard } from '@/components/auth/AuthCard';
-import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
-import { loginSchema, type LoginValues } from '@/lib/schemas/auth';
-import { useLogin } from '@/hooks/useLogin';
+import { AuthCard } from './AuthCard';
+import { GoogleSignInButton } from './GoogleSignInButton';
+import { loginSchema, type LoginValues } from '../_lib/auth';
+import { useLogin } from '../_hooks/useLogin';
 
 export function LoginForm() {
 	const { t, locale } = useTranslation();

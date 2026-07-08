@@ -15,14 +15,14 @@ import {
 } from '@heroicons/react/24/outline';
 import { Button } from '@tarodan/ui';
 import NotificationBell from '@/components/notifications/NotificationBell';
-import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
+import { withChunkErrorLogging } from '@/lib/withChunkErrorLogging';
 import { useTranslation } from '@/i18n/LanguageContext';
 import { Container } from './Container';
 import HeaderSearch from './header/HeaderSearch';
 import AccountMenu from './header/AccountMenu';
 import CategoryNav from './header/CategoryNav';
 import TopAdsBar from './header/TopAdsBar';
-import { useHeaderData } from './header/useHeaderData';
+import { useHeaderData } from './header/_hooks/useHeaderData';
 
 const AuthRequiredModal = dynamic(
 	withChunkErrorLogging(

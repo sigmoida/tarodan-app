@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Spinner, Tabs, TabsList, TabsTrigger } from '@tarodan/ui';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { useRequireAuth } from '@/lib/useRequireAuth';
+import { useRequireAuth } from '../../_hooks/useRequireAuth';
 import { useBusinessStats } from './_hooks/useBusinessStats';
 import { BUSINESS_TABS, type BusinessTab } from './_lib/types';
 import BusinessHeader from './_sections/BusinessHeader';

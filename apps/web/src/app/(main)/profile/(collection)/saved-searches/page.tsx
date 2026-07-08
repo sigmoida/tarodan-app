@@ -6,9 +6,9 @@ import { Button } from '@tarodan/ui';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
-import { EmptyStateCard } from '@/components/feedback/EmptyStateCard';
+import { EmptyStateCard } from '../../_components/EmptyStateCard';
 import { useAuthStore } from '@/stores/authStore';
-import { useRequireAuth } from '@/lib/useRequireAuth';
+import { useRequireAuth } from '../../_hooks/useRequireAuth';
 import { useSavedSearches } from './_hooks/useSavedSearches';
 import SavedSearchCard from './_components/SavedSearchCard';
 

@@ -8,7 +8,7 @@ import * as Sentry from '@sentry/nextjs';
  *
  * Usage:
  *   import dynamic from 'next/dynamic';
- *   import { withChunkErrorLogging } from '@/lib/dynamicWithLogging';
+ *   import { withChunkErrorLogging } from '@/lib/withChunkErrorLogging';
  *
  *   const AuthRequiredModal = dynamic(
  *     withChunkErrorLogging(() => import('@/components/AuthRequiredModal'), 'AuthRequiredModal'),

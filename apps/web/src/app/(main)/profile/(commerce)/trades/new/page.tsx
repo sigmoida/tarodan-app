@@ -7,11 +7,11 @@ import { ArrowsRightLeftIcon, ArrowLeftIcon } from '@heroicons/react/24/outline'
 import toast from 'react-hot-toast';
 import { Button, Input, Radio, Spinner, Textarea } from '@tarodan/ui';
 import OptimizedImage from '@/components/OptimizedImage';
-import TradeAddressPicker from '@/components/TradeAddressPicker';
+import TradeAddressPicker from '../_components/TradeAddressPicker';
 import SectionCard from '@/components/ui/SectionCard';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { EmptyStateCard } from '@/components/feedback/EmptyStateCard';
+import { EmptyStateCard } from '../../../_components/EmptyStateCard';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n';
 import { getProductEffectivePrice } from '@/lib/productPrice';

@@ -15,14 +15,14 @@ import {
 import { Button, Spinner, Tabs, TabsList, TabsTrigger } from '@tarodan/ui';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { EmptyStateCard } from '@/components/feedback/EmptyStateCard';
-import { useRequireAuth } from '@/lib/useRequireAuth';
+import { EmptyStateCard } from '../../_components/EmptyStateCard';
+import { useRequireAuth } from '../../_hooks/useRequireAuth';
 import { useOffers, useOfferAction } from './_hooks/useOffers';
-import { useCommissionPreviews } from '@/hooks/useCommissionPreviews';
+import { useCommissionPreviews } from '../_hooks/useCommissionPreviews';
 import type { Offer, OfferTab } from './_lib/types';
 import OfferCard from './_components/OfferCard';
 import CounterOfferModal from './_modals/CounterOfferModal';
-import MetricCard from '@/components/ui/MetricCard';
+import { MetricCard } from '@/components/ui';
 
 function OffersPageContent() {
 	const searchParams = useSearchParams();
