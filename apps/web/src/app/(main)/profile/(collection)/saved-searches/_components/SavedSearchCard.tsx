@@ -4,6 +4,7 @@
 
 import { MagnifyingGlassIcon, BellIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { Badge, Button, IconButton } from '@tarodan/ui';
+import { formatDate } from '@/lib/format';
 import type { SavedSearch } from '../_lib/types';
 
 export default function SavedSearchCard({
@@ -52,7 +53,7 @@ export default function SavedSearchCard({
 						</div>
 					)}
 					<p className='text-sm text-muted'>
-						Kaydedildi: {new Date(search.createdAt).toLocaleDateString('tr-TR')}
+						Kaydedildi: {formatDate(search.createdAt)}
 					</p>
 				</div>
 

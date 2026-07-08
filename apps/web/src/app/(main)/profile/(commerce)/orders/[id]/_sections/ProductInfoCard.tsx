@@ -3,6 +3,7 @@
 'use client';
 
 import Link from 'next/link';
+import OptimizedImage from '@/components/OptimizedImage';
 import { TagIcon } from '@heroicons/react/24/outline';
 import { SectionCard } from '@/components/ui';
 import { formatTL } from '@/lib/format';
@@ -18,12 +19,14 @@ export default function ProductInfoCard({ order }: { order: OrderDetail }) {
 	return (
 		<SectionCard title={locale === 'en' ? 'Product Information' : 'Ürün Bilgileri'}>
 			<div className='flex gap-4'>
-				<div className='w-24 h-24 bg-surface-alt rounded-lg overflow-hidden flex-shrink-0'>
+				<div className='relative w-24 h-24 bg-surface-alt rounded-lg overflow-hidden flex-shrink-0'>
 					{productImage ? (
-						<img
+						<OptimizedImage
 							src={productImage}
 							alt={productInfo?.title || (locale === 'en' ? 'Product' : 'Ürün')}
-							className='w-full h-full object-cover'
+							fill
+							sizes='96px'
+							className='object-cover'
 						/>
 					) : (
 						<div className='w-full h-full flex items-center justify-center bg-surface'>

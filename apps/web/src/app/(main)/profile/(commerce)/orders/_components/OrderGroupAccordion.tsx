@@ -12,6 +12,7 @@ import {
 } from '@tarodan/ui';
 import OptimizedImage from '@/components/OptimizedImage';
 import { useTranslation } from '@/i18n';
+import { formatDate } from '@/lib/format';
 import {
 	formatTL,
 	getOrderPrimary,
@@ -56,7 +57,7 @@ export default function OrderGroupAccordion({
 									{locale === 'en' ? 'Multi-item order' : 'Çoklu sipariş'}
 								</p>
 								<p className='text-sm font-normal text-subtle'>
-									{date ? new Date(date).toLocaleDateString('tr-TR') : ''}
+									{formatDate(date)}
 								</p>
 							</div>
 							<Badge variant='info' size='sm'>

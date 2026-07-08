@@ -3,9 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { RocketLaunchIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
-import { Button, Spinner } from "@tarodan/ui";
+import { Button, Checkbox, Modal, Radio, Spinner } from "@tarodan/ui";
 import { api } from "@/lib/api";
 
 interface BoostOption {
@@ -101,8 +100,6 @@ export default function BoostModal({
       toast.error(error?.response?.data?.message || "Öne çıkarma başlatılamadı"),
   });
 
-  if (!open) return null;
-
   const remainingDays = boostedUntil
     ? Math.max(0, Math.ceil((new Date(boostedUntil).getTime() - Date.now()) / 86400000))
     : 0;
@@ -113,125 +110,103 @@ export default function BoostModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-surface-elevated rounded-lg shadow-xl w-full max-w-md overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <div className="flex items-center gap-2">
-            <RocketLaunchIcon className="w-5 h-5 text-amber-500" />
-            <h2 className="text-lg font-bold text-heading">İlanı Öne Çıkar</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-muted hover:text-heading"
-            aria-label="Kapat"
-          >
-            <XMarkIcon className="w-5 h-5" />
-          </button>
+    <Modal isOpen={open} onClose={onClose} title="İlanı Öne Çıkar" maxWidth="max-w-md">
+      <p className="text-sm text-muted mb-4 line-clamp-2">
+        <span className="font-medium text-heading">{listingTitle}</span> ilanını
+        seçtiğiniz süre boyunca arama, kategori ve ana sayfa vitrininde üst
+        sıralarda gösterin.
+      </p>
+
+      {hasActiveBoost && (
+        <div className="mb-4 p-3 rounded bg-warning-50 border border-warning-200 text-sm text-warning-800">
+          Bu ilanda aktif öne çıkarma var:{" "}
+          <span className="font-semibold">~{remainingDays} gün</span> kaldı.
+          Seçtiğiniz süre kalan sürenin üstüne eklenir.
+          {selected != null && (
+            <div className="mt-1 font-semibold">
+              Kalan {remainingDays} günün üstüne {selected} gün eklenecektir →
+              toplam ~{remainingDays + selected} gün
+            </div>
+          )}
         </div>
+      )}
 
-        <div className="p-5">
-          <p className="text-sm text-muted mb-4 line-clamp-2">
-            <span className="font-medium text-heading">{listingTitle}</span>{" "}
-            ilanını seçtiğiniz süre boyunca arama, kategori ve ana sayfa
-            vitrininde üst sıralarda gösterin.
-          </p>
-
-          {hasActiveBoost && (
-            <div className="mb-4 p-3 rounded bg-amber-50 border border-amber-200 text-sm text-amber-800">
-              Bu ilanda aktif öne çıkarma var:{" "}
-              <span className="font-semibold">~{remainingDays} gün</span> kaldı.
-              Seçtiğiniz süre kalan sürenin üstüne eklenir.
-              {selected != null && (
-                <div className="mt-1 font-semibold">
-                  Kalan {remainingDays} günün üstüne {selected} gün eklenecektir →
-                  toplam ~{remainingDays + selected} gün
-                </div>
-              )}
-            </div>
-          )}
-
-          {loadingPricing ? (
-            <div className="flex justify-center py-8">
-              <Spinner size="lg" />
-            </div>
-          ) : !enabled ? (
-            <div className="text-center py-6 text-muted">
-              Öne çıkarma şu anda kullanılamıyor.
-            </div>
-          ) : options.length === 0 ? (
-            <div className="text-center py-6 text-muted">
-              Uygun bir öne çıkarma paketi bulunamadı.
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {options.map((opt) => (
-                <label
-                  key={opt.durationDays}
-                  className={`flex items-center justify-between p-3 rounded border cursor-pointer transition-colors ${
-                    selected === opt.durationDays
-                      ? "border-amber-500 bg-amber-50"
-                      : "border-border hover:border-amber-300"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      name="boost-duration"
-                      checked={selected === opt.durationDays}
-                      onChange={() => setSelected(opt.durationDays)}
-                      className="accent-amber-500"
-                    />
-                    <span className="font-medium text-heading">{opt.label}</span>
-                  </div>
-                  <span className="font-bold text-primary-600">
-                    {opt.price.toLocaleString("tr-TR", {
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 2,
-                    })}{" "}
-                    ₺
-                  </span>
-                </label>
-              ))}
-            </div>
-          )}
-
-          {isPremium && enabled && options.length > 0 && (
-            <label className="mt-4 flex items-center gap-2 text-sm text-body cursor-pointer">
-              <input
-                type="checkbox"
-                checked={autoRenew}
-                onChange={(e) => setAutoRenew(e.target.checked)}
-                className="accent-amber-500"
-              />
-              Süre bitince otomatik yenileme hatırlatması al (Premium)
+      {loadingPricing ? (
+        <div className="flex justify-center py-8">
+          <Spinner size="lg" />
+        </div>
+      ) : !enabled ? (
+        <div className="text-center py-6 text-muted">
+          Öne çıkarma şu anda kullanılamıyor.
+        </div>
+      ) : options.length === 0 ? (
+        <div className="text-center py-6 text-muted">
+          Uygun bir öne çıkarma paketi bulunamadı.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {options.map((opt) => (
+            <label
+              key={opt.durationDays}
+              className={`flex items-center justify-between p-3 rounded border cursor-pointer transition-colors ${
+                selected === opt.durationDays
+                  ? "border-warning-500 bg-warning-50"
+                  : "border-border hover:border-warning-300"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Radio
+                  name="boost-duration"
+                  checked={selected === opt.durationDays}
+                  onChange={() => setSelected(opt.durationDays)}
+                />
+                <span className="font-medium text-heading">{opt.label}</span>
+              </div>
+              <span className="font-bold text-primary-600">
+                {opt.price.toLocaleString("tr-TR", {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 2,
+                })}{" "}
+                ₺
+              </span>
             </label>
-          )}
+          ))}
         </div>
+      )}
 
-        <div className="flex gap-2 px-5 py-4 border-t border-border">
-          <Button
-            variant="secondary"
-            className="flex-1"
-            onClick={onClose}
-            disabled={boost.isPending}
-          >
-            Vazgeç
-          </Button>
-          <Button
-            className="flex-1"
-            onClick={handleConfirm}
-            disabled={
-              boost.isPending || loadingPricing || !enabled || selected == null
-            }
-          >
-            {boost.isPending
-              ? "Yönlendiriliyor..."
-              : hasActiveBoost
-                ? "Süreyi Uzat ve Öde"
-                : "Öne Çıkar ve Öde"}
-          </Button>
-        </div>
+      {isPremium && enabled && options.length > 0 && (
+        <label className="mt-4 flex items-center gap-2 text-sm text-body cursor-pointer">
+          <Checkbox
+            checked={autoRenew}
+            onChange={(e) => setAutoRenew(e.target.checked)}
+          />
+          Süre bitince otomatik yenileme hatırlatması al (Premium)
+        </label>
+      )}
+
+      <div className="mt-5 flex gap-2 pt-4 border-t border-border">
+        <Button
+          variant="secondary"
+          className="flex-1"
+          onClick={onClose}
+          disabled={boost.isPending}
+        >
+          Vazgeç
+        </Button>
+        <Button
+          className="flex-1"
+          onClick={handleConfirm}
+          disabled={
+            boost.isPending || loadingPricing || !enabled || selected == null
+          }
+        >
+          {boost.isPending
+            ? "Yönlendiriliyor..."
+            : hasActiveBoost
+              ? "Süreyi Uzat ve Öde"
+              : "Öne Çıkar ve Öde"}
+        </Button>
       </div>
-    </div>
+    </Modal>
   );
 }

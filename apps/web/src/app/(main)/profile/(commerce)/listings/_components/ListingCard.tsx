@@ -3,6 +3,7 @@
 'use client';
 
 import Link from 'next/link';
+import { formatDate } from '@/lib/format';
 import {
 	PencilIcon,
 	TrashIcon,
@@ -129,7 +130,7 @@ export default function ListingCard({
 				</div>
 
 				<div className='mb-3 flex items-center justify-between text-sm text-muted'>
-					<span>{new Date(listing.createdAt).toLocaleDateString('tr-TR')}</span>
+					<span>{formatDate(listing.createdAt)}</span>
 					<div className='flex items-center gap-3'>
 						{listing.rating &&
 							listing.rating.average !== null &&
@@ -159,7 +160,7 @@ export default function ListingCard({
 							<div className='flex items-center gap-2 text-muted'>
 								<CalendarDaysIcon className='h-4 w-4 text-primary-500' />
 								<span>
-									Satış: {new Date(listing.soldAt).toLocaleDateString('tr-TR')}
+									Satış: {formatDate(listing.soldAt)}
 								</span>
 							</div>
 						)}

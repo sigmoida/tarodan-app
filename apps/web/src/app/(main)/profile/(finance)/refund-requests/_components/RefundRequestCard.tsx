@@ -3,6 +3,7 @@
 'use client';
 
 import Link from 'next/link';
+import OptimizedImage from '@/components/OptimizedImage';
 import { Badge } from '@tarodan/ui';
 import { useTranslation } from '@/i18n';
 import { formatTL } from '@/lib/format';
@@ -19,13 +20,14 @@ export default function RefundRequestCard({ request }: { request: RefundRequest 
 			href={`/profile/refund-requests/${request.id}`}
 			className='block rounded-lg border border-border bg-surface-elevated p-4 transition-shadow hover:shadow-md'>
 			<div className='flex items-start gap-3'>
-				<div className='flex h-14 w-14 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface'>
+				<div className='relative flex h-14 w-14 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface'>
 					{image ? (
-						// eslint-disable-next-line @next/next/no-img-element
-						<img
+						<OptimizedImage
 							src={image}
 							alt={request.order?.product?.title ?? ''}
-							className='h-full w-full object-cover'
+							fill
+							sizes='56px'
+							className='object-cover'
 						/>
 					) : (
 						<span className='text-2xl'>📦</span>

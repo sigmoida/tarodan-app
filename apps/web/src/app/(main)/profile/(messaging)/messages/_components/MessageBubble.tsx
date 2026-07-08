@@ -2,6 +2,7 @@
 
 import MessageTicks from './MessageTicks';
 import { parseMessageContent, type Message } from '../_lib/messages';
+import { formatTime } from '@/lib/format';
 
 export default function MessageBubble({
   message,
@@ -38,10 +39,7 @@ export default function MessageBubble({
         </div>
         <div className="flex items-center justify-end gap-1.5 mt-1">
           <span className={`text-xs ${isFromMe ? 'text-inverted/80' : 'text-subtle'}`}>
-            {new Date(message.createdAt).toLocaleTimeString('tr-TR', {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
+            {formatTime(message.createdAt)}
           </span>
           {message.status === 'pending' && <span className="text-xs">⏳</span>}
           {message.status === 'rejected' && <span className="text-xs">❌</span>}

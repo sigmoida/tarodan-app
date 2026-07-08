@@ -1,9 +1,10 @@
 /** @format */
 
 import Link from 'next/link';
+import OptimizedImage from '@/components/OptimizedImage';
 import { TagIcon } from '@heroicons/react/24/outline';
 import SectionCard from '@/components/ui/SectionCard';
-import { formatTL } from '@/lib/format';
+import { formatDate, formatTL } from '@/lib/format';
 import type { RecentSale } from '../_lib/types';
 
 export default function RecentSalesSection({ sales }: { sales: RecentSale[] }) {
@@ -25,9 +26,15 @@ export default function RecentSalesSection({ sales }: { sales: RecentSale[] }) {
 						key={sale.id}
 						href={`/profile/orders?highlight=${sale.orderId}`}
 						className='group flex items-center gap-4 rounded-lg p-3 transition-colors hover:bg-surface'>
-						<div className='h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg bg-surface-alt'>
+						<div className='relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg bg-surface-alt'>
 							{sale.productImage ? (
-								<img src={sale.productImage} alt='' className='h-full w-full object-cover' />
+								<OptimizedImage
+									src={sale.productImage}
+									alt=''
+									fill
+									sizes='48px'
+									className='object-cover'
+								/>
 							) : (
 								<div className='flex h-full w-full items-center justify-center'>
 									<TagIcon className='h-5 w-5 text-subtle' />
@@ -39,7 +46,7 @@ export default function RecentSalesSection({ sales }: { sales: RecentSale[] }) {
 								{sale.productTitle}
 							</p>
 							<p className='text-xs text-muted'>
-								@{sale.buyerName} · {new Date(sale.soldAt).toLocaleDateString('tr-TR')}
+								@{sale.buyerName} · {formatDate(sale.soldAt)}
 							</p>
 						</div>
 						<span className='whitespace-nowrap text-sm font-bold text-success-600'>

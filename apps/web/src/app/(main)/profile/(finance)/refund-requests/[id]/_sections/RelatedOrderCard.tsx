@@ -3,6 +3,7 @@
 'use client';
 
 import Link from 'next/link';
+import OptimizedImage from '@/components/OptimizedImage';
 import SectionCard from '@/components/ui/SectionCard';
 import type { RefundRequest } from '../../_lib/types';
 
@@ -20,13 +21,14 @@ export default function RelatedOrderCard({
 			<Link
 				href={`/profile/orders/${refund.order.id}`}
 				className='-mx-2 flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-surface'>
-				<div className='flex h-14 w-14 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface'>
+				<div className='relative flex h-14 w-14 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface'>
 					{image ? (
-						// eslint-disable-next-line @next/next/no-img-element
-						<img
+						<OptimizedImage
 							src={image}
 							alt={refund.order.product?.title ?? ''}
-							className='h-full w-full object-cover'
+							fill
+							sizes='56px'
+							className='object-cover'
 						/>
 					) : (
 						<span className='text-2xl'>📦</span>

@@ -1,6 +1,7 @@
 /** @format */
 
 import Link from 'next/link';
+import OptimizedImage from '@/components/OptimizedImage';
 import {
 	ArchiveBoxIcon,
 	EyeIcon,
@@ -26,13 +27,14 @@ export default function ProductRow({
 			<div className='flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-surface-alt text-sm font-bold text-muted'>
 				{index + 1}
 			</div>
-			<div className='h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-surface-alt'>
+			<div className='relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-surface-alt'>
 				{product.image ? (
-					// eslint-disable-next-line @next/next/no-img-element
-					<img
+					<OptimizedImage
 						src={product.image}
 						alt={product.title}
-						className='h-full w-full object-cover'
+						fill
+						sizes='64px'
+						className='object-cover'
 					/>
 				) : (
 					<div className='flex h-full w-full items-center justify-center'>

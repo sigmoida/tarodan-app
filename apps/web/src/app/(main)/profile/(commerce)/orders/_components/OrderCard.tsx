@@ -5,6 +5,7 @@
 import Link from 'next/link';
 import { StatusBadge, orderStatusConfig } from '@tarodan/ui';
 import OptimizedImage from '@/components/OptimizedImage';
+import { formatDate } from '@/lib/format';
 import { useTranslation } from '@/i18n';
 import {
 	formatTL,
@@ -41,7 +42,7 @@ export default function OrderCard({ order, actions, compact }: OrderCardProps) {
 						{t('order.orderNumber')} #{order.orderNumber}
 					</p>
 					<p className='text-sm text-subtle'>
-						{new Date(order.createdAt).toLocaleDateString('tr-TR')}
+						{formatDate(order.createdAt)}
 					</p>
 				</div>
 				<StatusBadge

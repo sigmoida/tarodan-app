@@ -3,6 +3,7 @@
 'use client';
 
 import Link from 'next/link';
+import OptimizedImage from '@/components/OptimizedImage';
 import { CreditCardIcon, CalendarIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import {
 	Button,
@@ -25,8 +26,11 @@ import {
 
 function Thumb({ src, alt }: { src?: string | null; alt: string }) {
 	if (src) {
-		// eslint-disable-next-line @next/next/no-img-element
-		return <img src={src} alt={alt} className='h-12 w-12 rounded-lg object-cover' />;
+		return (
+			<div className='relative h-12 w-12 overflow-hidden rounded-lg'>
+				<OptimizedImage src={src} alt={alt} fill sizes='48px' className='object-cover' />
+			</div>
+		);
 	}
 	return (
 		<div className='flex h-12 w-12 items-center justify-center rounded-lg bg-surface-alt'>
