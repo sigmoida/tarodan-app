@@ -15,6 +15,7 @@
 		"clean": "rm -rf dist .turbo"
 	},
 	"dependencies": {
+		"@tarodan/brand": "workspace:*",
 		"@tarodan/design-tokens": "workspace:*",
 		"@tarodan/shared": "workspace:*",
 		"@radix-ui/react-accordion": "^1.2.0",

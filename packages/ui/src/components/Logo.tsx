@@ -1,6 +1,6 @@
 import React from 'react';
 import { cn } from '../lib/utils';
-import { tarodanLogoDataUri } from '../assets/tarodan-logo';
+import { tarodanLogoDataUri } from '@tarodan/brand';
 
 export type LogoProps = Omit<React.ImgHTMLAttributes<HTMLImageElement>, 'src'>;
 

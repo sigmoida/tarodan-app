@@ -53,6 +53,10 @@ scripts/generate-images.mjs
 
 # Seed tarafından photos/ kopyalanır; kaynak photos/ root'ta
 apps/web/public/photos/
+
+# @tarodan/brand tarafından üretilen marka logoları (sync:brand / predev / prebuild)
+apps/web/public/tarodan-logo.jpg
+apps/web/public/tarodan-logo-transparent.png
 .claude/
 
 # PayTR Direkt API vendor PDF/örnek klasörü — lokal referans, repoya girmez
