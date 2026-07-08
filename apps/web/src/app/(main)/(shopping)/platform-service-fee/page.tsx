@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 	title: 'Platform Hizmet Bedeli · Tarodan',
 	description:
 		'TARODAN Platform Hizmet Bedeli nedir, nasıl hesaplanır, nereye gider ve iade durumunda ne olur? Şeffaf ücretlendirme hakkında bilmeniz gerekenler.',
-	alternates: { canonical: '/platform-hizmet-bedeli' },
+	alternates: { canonical: '/platform-service-fee' },
 };
 
 export default function PlatformHizmetBedeliPage() {

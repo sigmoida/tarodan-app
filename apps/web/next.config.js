@@ -160,6 +160,12 @@ const nextConfig = {
         destination: '/secure-swap',
         permanent: true,
       },
+      // /platform-hizmet-bedeli → /platform-service-fee (route slug İngilizce'ye çevrildi).
+      {
+        source: '/platform-hizmet-bedeli',
+        destination: '/platform-service-fee',
+        permanent: true,
+      },
     ];
   },
 };

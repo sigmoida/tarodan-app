@@ -113,7 +113,7 @@ export default function OrderSummarySidebar() {
 								? 'Platform Service Fee (3%)'
 								: 'Platform Hizmet Bedeli (%3)'}
 							<a
-								href='/platform-hizmet-bedeli'
+								href='/platform-service-fee'
 								target='_blank'
 								rel='noopener noreferrer'
 								className='text-info-600 hover:text-info-700 text-xs underline'
