@@ -1,6 +1,7 @@
 import { Prisma, OrderStatus, CommissionLedgerStatus } from '@prisma/client';
 import { PrismaService } from '../../src/prisma';
 import { OrderService } from '../../src/modules/order/order.service';
+import { OrderLifecycleService } from '../../src/modules/order/order-lifecycle.service';
 import { CommissionLedgerService } from '../../src/modules/commission/commission-ledger.service';
 import { OrderSchedulerService } from '../../src/modules/order/order-scheduler.service';
 import {
@@ -21,20 +22,26 @@ describe('48h window core + auto-complete cron (E2E)', () => {
   let ledger: CommissionLedgerService;
 
   function makeOrderService(): OrderService {
-    return new OrderService(
+    // Order refactor sonrası: completeOrder/confirmReceipt OrderLifecycleService'e
+    // taşındı (byte-identical), OrderService facade delege ediyor. Aynı davranışı
+    // test etmek için facade'ı gerçek bir OrderLifecycleService ile kuruyoruz.
+    // completeOrder/confirmReceipt yalnızca prisma + commissionLedger + notificationService
+    // (best-effort) kullanır; diğer alt-servisler stub.
+    const lifecycle = new OrderLifecycleService(
       prisma,
-      {} as any, // eventService
       {} as any, // cache
-      { get: jest.fn() } as any, // configService
-      {} as any, // notificationService
-      {} as any, // discountService
-      {} as any, // discountCalculator
-      {} as any, // suratCargoService
+      {} as any, // notificationService (gövdede best-effort)
       {} as any, // productLockService
-      {} as any, // storageService
-      ledger,
-      { resolveTaxRate: async () => null, calculateTaxAmount: () => 0 } as any, // taxService (no-tax stub)
-      { issueCommissionInvoice: async () => {}, issueServiceFeeInvoice: async () => {} } as any, // elogoInvoicing (no-op stub)
+      ledger, // commissionLedger
+      {} as any, // orderCommon
+      {} as any, // orderQuery
+      { issueCommissionInvoice: async () => {}, issueServiceFeeInvoice: async () => {}, issuePlatformSaleInvoice: async () => {} } as any, // elogoInvoicing (no-op stub)
+    );
+    return new OrderService(
+      {} as any, // orderPricing
+      {} as any, // orderCheckout
+      {} as any, // orderQuery
+      lifecycle, // orderLifecycle
     );
   }
 
@@ -44,7 +51,13 @@ describe('48h window core + auto-complete cron (E2E)', () => {
         k === 'FEATURE_48H_CONFIRMATION_WINDOW' ? flagValue : undefined,
       ),
     };
-    return new OrderSchedulerService(prisma, makeOrderService(), config as any, {} as any /* scheduledQueue */);
+    return new OrderSchedulerService(
+      prisma,
+      makeOrderService(),
+      config as any,
+      { issueCommissionInvoice: async () => {}, issueServiceFeeInvoice: async () => {}, issuePlatformSaleInvoice: async () => {} } as any /* elogoInvoicing (no-op stub) */,
+      {} as any /* scheduledQueue */,
+    );
   }
 
   beforeAll(() => {

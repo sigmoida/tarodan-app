@@ -1,0 +1,47 @@
+﻿2026-07-02T20:39:42.7012459Z Current runner version: '2.335.1'
+2026-07-02T20:39:42.7038708Z ##[group]Runner Image Provisioner
+2026-07-02T20:39:42.7039642Z Hosted Compute Agent
+2026-07-02T20:39:42.7040284Z Version: 20260624.560
+2026-07-02T20:39:42.7041025Z Commit: 925d229a51159bc391ae97e54a2dd1fe20af789d
+2026-07-02T20:39:42.7041789Z Build Date: 2026-06-24T18:26:47Z
+2026-07-02T20:39:42.7042540Z Worker ID: {c57c9afa-d8c9-423a-ad00-bd0e0d94b720}
+2026-07-02T20:39:42.7043373Z Azure Region: centralus
+2026-07-02T20:39:42.7044300Z ##[endgroup]
+2026-07-02T20:39:42.7045758Z ##[group]Operating System
+2026-07-02T20:39:42.7046493Z Ubuntu
+2026-07-02T20:39:42.7047057Z 24.04.4
+2026-07-02T20:39:42.7048129Z LTS
+2026-07-02T20:39:42.7049071Z ##[endgroup]
+2026-07-02T20:39:42.7049694Z ##[group]Runner Image
+2026-07-02T20:39:42.7050354Z Image: ubuntu-24.04
+2026-07-02T20:39:42.7050996Z Version: 20260628.225.1
+2026-07-02T20:39:42.7052155Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260628.225/images/ubuntu/Ubuntu2404-Readme.md
+2026-07-02T20:39:42.7054328Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260628.225
+2026-07-02T20:39:42.7055391Z ##[endgroup]
+2026-07-02T20:39:42.7058476Z ##[group]GITHUB_TOKEN Permissions
+2026-07-02T20:39:42.7061193Z Actions: write
+2026-07-02T20:39:42.7061890Z ArtifactMetadata: write
+2026-07-02T20:39:42.7062677Z Attestations: write
+2026-07-02T20:39:42.7063386Z Checks: write
+2026-07-02T20:39:42.7064353Z CodeQuality: write
+2026-07-02T20:39:42.7064993Z Contents: write
+2026-07-02T20:39:42.7065594Z CopilotRequests: write
+2026-07-02T20:39:42.7066269Z Deployments: write
+2026-07-02T20:39:42.7066931Z Discussions: write
+2026-07-02T20:39:42.7067513Z Issues: write
+2026-07-02T20:39:42.7068179Z Metadata: read
+2026-07-02T20:39:42.7068761Z Models: read
+2026-07-02T20:39:42.7069501Z Packages: write
+2026-07-02T20:39:42.7070151Z Pages: write
+2026-07-02T20:39:42.7070746Z PullRequests: write
+2026-07-02T20:39:42.7071430Z RepositoryProjects: write
+2026-07-02T20:39:42.7072138Z SecurityEvents: write
+2026-07-02T20:39:42.7072818Z Statuses: write
+2026-07-02T20:39:42.7073474Z VulnerabilityAlerts: read
+2026-07-02T20:39:42.7074382Z ##[endgroup]
+2026-07-02T20:39:42.7076608Z Secret source: Actions
+2026-07-02T20:39:42.7077746Z Prepare workflow directory
+2026-07-02T20:39:42.7530397Z Prepare all required actions
+2026-07-02T20:39:42.7569855Z Getting action download info
+2026-07-02T20:39:43.0339870Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+2026-07-02T20:39:43.2431854Z Complete job name: E2E Senaryolar — Tam Paket (nightly/manuel, shardlı) (1)

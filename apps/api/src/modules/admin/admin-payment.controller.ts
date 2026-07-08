@@ -1,0 +1,262 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
+  Res,
+} from '@nestjs/common';
+
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
+import { AdminService } from './admin.service';
+import { AdvertisementService } from '../advertisement/advertisement.service';
+import { MediaService } from '../media/media.service';
+import { CreateAdvertisementDto, UpdateAdvertisementDto, ReorderAdsDto } from '../advertisement/dto';
+import { DiscountService } from '../discount/discount.service';
+import { CreateDiscountDto, UpdateDiscountDto, DiscountQueryDto } from '../discount/dto';
+import { AdminJwtAuthGuard } from '../auth/guards/admin-jwt-auth.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
+import { BypassPermissionMatrix } from '../auth/decorators/bypass-permission-matrix.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { AdminRoute } from '../auth/decorators/admin-route.decorator';
+import { Public } from '../auth/decorators/public.decorator';
+import { AdminRole } from '@prisma/client';
+import { ForceCompleteOrderDto, ExtendConfirmationDto } from '../order/dto';
+import { OverrideRefundPolicyDto, SetReturnShippingPayerDto } from '../refund/dto';
+import {
+  CreateCommissionRuleDto,
+  UpdateCommissionRuleDto,
+  CommissionRuleResponseDto,
+  UpdatePlatformSettingDto,
+  PlatformSettingResponseDto,
+  AdminUserQueryDto,
+  AdminProductQueryDto,
+  AdminOrderQueryDto,
+  AuditLogQueryDto,
+  ApproveProductDto,
+  RejectProductDto,
+  BanUserDto,
+  AssignAdminStaffDto,
+  UpdateAdminStaffDto,
+  UpdateStaffSettingsDto,
+  SetRolePermissionsDto,
+  ResolveDisputeDto,
+  AnalyticsQueryDto,
+  UpdateOrderStatusDto,
+  ReportQueryDto,
+  AdminPaymentQueryDto,
+  PaymentStatisticsQueryDto,
+  PayoutTransactionsQueryDto,
+  PayoutExportQueryDto,
+  CreateTaxRegionDto,
+  UpdateTaxRegionDto,
+  CreateTaxRateDto,
+  UpdateTaxRateDto,
+  CreateTaxRuleDto,
+  UpdateTaxRuleDto,
+  TaxReportQueryDto,
+  CreateStaticPageDto,
+  UpdateStaticPageDto,
+  UpdateEmailTemplateDto,
+  UpdateProductDto,
+  SendTestEmailDto,
+  RatingQueryDto,
+  UpdateRatingStatusDto,
+  ApproveWarehouseTradeDto,
+  RejectWarehouseTradeDto,
+  MarkShipmentDto,
+  MarkReturnLostDto,
+  ForceCancelStuckDto,
+  TradeShipmentQueryDto,
+  RefundRequestQueryDto,
+  AdminChangeMembershipDto,
+} from './dto';
+
+@ApiTags('admin')
+@Controller('admin')
+@AdminRoute() // Mark as admin route to skip global JwtAuthGuard
+@UseGuards(AdminJwtAuthGuard, RolesGuard)
+@ApiBearerAuth()
+export class AdminPaymentController {
+  constructor(
+    private readonly adminService: AdminService,
+  ) { }
+
+  // ==================== PAYMENT MANAGEMENT ====================
+
+  @Get('payments')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Get all payments with filters' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of payments' })
+  async getPayments(@Query() query: AdminPaymentQueryDto) {
+    return this.adminService.getPayments(query);
+  }
+
+  // NOTE: Literal sub-routes (statistics, failed) MUST be declared before the
+  // parameterized `payments/:id` route. NestJS/Express match sequentially, so
+  // otherwise `:id` would capture "statistics"/"failed" and these would 404.
+  @Get('payments/statistics')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Get payment statistics' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Payment statistics' })
+  async getPaymentStatistics(@Query() query: PaymentStatisticsQueryDto) {
+    return this.adminService.getPaymentStatistics(query);
+  }
+
+  @Get('payments/failed')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Get failed payments' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of failed payments' })
+  async getFailedPayments(@Query() query: AdminPaymentQueryDto) {
+    return this.adminService.getFailedPayments(query);
+  }
+
+  @Get('payments/:id')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Get payment details by ID' })
+  @ApiParam({ name: 'id', description: 'Payment ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Payment details' })
+  async getPaymentById(@Param('id') id: string) {
+    return this.adminService.getPaymentById(id);
+  }
+
+  @Post('payments/:id/manual-refund')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Manual refund by admin' })
+  @ApiParam({ name: 'id', description: 'Payment ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Refund processed' })
+  async manualRefund(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: { amount?: number; reason?: string },
+  ) {
+    return this.adminService.manualRefund(adminId, id, body.amount, body.reason);
+  }
+
+  @Post('payments/:id/force-cancel')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Force cancel payment by admin' })
+  @ApiParam({ name: 'id', description: 'Payment ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Payment cancelled' })
+  async forceCancelPayment(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() body: { reason: string },
+  ) {
+    return this.adminService.forceCancelPayment(adminId, id, body.reason);
+  }
+
+  // ==================== SELLER PAYOUTS ====================
+
+  @Get('payouts/summary')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Get payout summary (pending, released, next releases)' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Payout summary' })
+  async getPayoutsSummary() {
+    return this.adminService.getPayoutsSummary();
+  }
+
+  @Get('payouts/transactions')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Get payout transaction history' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'List of payout transactions' })
+  async getPayoutsTransactions(@Query() query: PayoutTransactionsQueryDto) {
+    return this.adminService.getPayoutsTransactions(query);
+  }
+
+  @Get('payouts/schedule')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Get payout schedule (upcoming releases)' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Payout schedule' })
+  async getPayoutsSchedule(
+    @Query('sellerId') sellerId?: string,
+    @Query('limit') limit?: number,
+  ) {
+    return this.adminService.getPayoutsSchedule({ sellerId, limit });
+  }
+
+  @Get('payouts/export')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Export payout transactions as CSV' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'CSV content and filename' })
+  async getPayoutsExport(@Query() query: PayoutExportQueryDto) {
+    return this.adminService.getPayoutsExport(query);
+  }
+
+  @Post('payouts/release/:orderId')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Release payment hold to seller (manual)' })
+  @ApiParam({ name: 'orderId', description: 'Order ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Hold released' })
+  async releasePayout(
+    @Param('orderId') orderId: string,
+    @CurrentUser('id') adminId: string,
+    @Body('reason') reason: string,
+  ) {
+    return this.adminService.releasePayout(adminId, orderId, reason);
+  }
+
+  @Post('payouts/release-trade/:tradeId')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Release trade cash payment hold (manual)' })
+  @ApiParam({ name: 'tradeId', description: 'Trade ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Trade cash hold released' })
+  async releaseTradePaymentHold(
+    @Param('tradeId') tradeId: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.releaseTradePaymentHold(adminId, tradeId);
+  }
+
+  @Post('payouts/:transferId/retry')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Retry a failed payout transfer' })
+  @ApiParam({ name: 'transferId', description: 'PayoutTransfer ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Payout retried' })
+  async retryPayoutTransfer(
+    @Param('transferId') transferId: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.retryPayoutTransfer(adminId, transferId);
+  }
+
+  @Get('payouts/failed')
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: 'Get failed/returned payout transfers' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Failed payouts list' })
+  async getFailedPayouts(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.adminService.getFailedPayouts(
+      page ? parseInt(page, 10) : 1,
+      limit ? parseInt(limit, 10) : 20,
+    );
+  }
+
+}

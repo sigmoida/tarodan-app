@@ -1,18 +1,4 @@
-import {
-  Injectable,
-  BadRequestException,
-  NotFoundException,
-  ForbiddenException,
-  Inject,
-  forwardRef,
-  Logger,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { Prisma } from '@prisma/client';
-import {
-  fulltextCollectionSearch,
-  fulltextUserDisplayNameSearch,
-} from '../../common/helpers/fulltext-search';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   CreateCollectionDto,
   UpdateCollectionDto,
@@ -22,351 +8,63 @@ import {
   CollectionListResponseDto,
   CollectionItemResponseDto,
 } from './dto';
-import { MembershipService } from '../membership/membership.service';
-import { ModerationAiClient } from '../moderation/moderation-ai.client';
-import { NotificationService } from '../notification/notification.service';
-import { NotificationType } from '../notification/dto';
-import { MediaService } from '../media/media.service';
-import { StorageService } from '../storage/storage.service';
-import { SearchService } from '../search/search.service';
-import { SearchIndexingService } from '../search/search-indexing.service';
-import * as https from 'https';
-import * as http from 'http';
-import { v4 as uuidv4 } from 'uuid';
+import { CollectionCrudService } from './collection-crud.service';
+import { CollectionCoverService } from './collection-cover.service';
+import { CollectionItemsService } from './collection-items.service';
+import { CollectionSocialService } from './collection-social.service';
 
-// Sharp is optional
-let sharp: any;
-try {
-  sharp = require('sharp');
-} catch {
-  sharp = null;
-}
-
-// "Görünür" item filtresi: custom item'lar + ürünü active/sold olan item'lar.
-// mapCollectionToDto'daki filtreyle birebir aynı semantik — liste ve detay
-// endpoint'lerinin aynı itemCount'u dönmesi için tek kaynak.
-const VISIBLE_ITEM_FILTER: Prisma.CollectionItemWhereInput = {
-  OR: [
-    { productId: null },
-    { product: { status: { in: ['active', 'sold'] } } },
-  ],
-};
-
+/**
+ * CollectionService (facade) — her public imza aynen korunur. CRUD/okuma/browse
+ * crud'a, kapak (updateCollectionCover/generateCoverImage) cover'a, öğe işlemleri
+ * (add/remove/reorder) items'a, beğeni/etkileşim (like/unlike/getLiked) social'a
+ * delege edilir. Paylaşılan DTO/eşleme yardımcıları CollectionCommonService'te.
+ * Controller değişmez; dış çağıran yok (admin AdminCollectionService kullanır).
+ * DI grafı asiklik: sub → common, crud → cover, facade → {crud, cover, items,
+ * social}; forwardRef yok.
+ */
 @Injectable()
 export class CollectionService {
   private readonly logger = new Logger(CollectionService.name);
 
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly membershipService: MembershipService,
-    @Inject(forwardRef(() => NotificationService))
-    private readonly notificationService: NotificationService,
-    private readonly mediaService: MediaService,
-    private readonly storageService: StorageService,
-    private readonly searchService: SearchService,
-    private readonly searchIndexing: SearchIndexingService,
-    private readonly moderationAi: ModerationAiClient,
+    private readonly crud: CollectionCrudService,
+    private readonly cover: CollectionCoverService,
+    private readonly items: CollectionItemsService,
+    private readonly social: CollectionSocialService,
   ) {}
 
   // ==========================================================================
-  // CREATE COLLECTION
+  // CREATE COLLECTION (delegate → CollectionCrudService)
   // ==========================================================================
   async createCollection(
     userId: string,
     dto: CreateCollectionDto,
   ): Promise<CollectionResponseDto> {
-    // Check if user can create collections based on membership tier
-    const canCreate = await this.membershipService.canCreateCollection(userId);
-    if (!canCreate.allowed) {
-      throw new ForbiddenException(
-        canCreate.reason || 'Koleksiyon oluşturma yetkiniz yok',
-      );
-    }
-
-    // Koleksiyon adı ve açıklaması metin denetimi
-    await this.moderationAi.assertTextClean(dto.name, {
-      entityType: 'collection',
-      userId,
-      field: 'name',
-      label: 'koleksiyon adı',
-    });
-    if (dto.description) {
-      await this.moderationAi.assertTextClean(dto.description, {
-        entityType: 'collection',
-        userId,
-        field: 'description',
-        label: 'koleksiyon açıklaması',
-      });
-    }
-
-    // Generate slug from name
-    const slug = this.generateSlug(dto.name);
-
-    // Check if slug already exists for user
-    const existing = await this.prisma.collection.findUnique({
-      where: { userId_slug: { userId, slug } },
-    });
-
-    if (existing) {
-      throw new BadRequestException('Bu isimde bir koleksiyonunuz zaten var');
-    }
-
-    const collection = await this.prisma.collection.create({
-      data: {
-        userId,
-        name: dto.name,
-        slug,
-        description: dto.description,
-        coverImageKey: dto.coverImageKey,
-        isPublic: dto.isPublic ?? true,
-        categoryId: dto.categoryId || undefined,
-      },
-      include: {
-        user: { select: { id: true, displayName: true } },
-        category: { select: { id: true, name: true, slug: true } },
-        items: {
-          include: {
-            product: {
-              include: { 
-                images: { 
-                  take: 1
-                } 
-              },
-            },
-          },
-          orderBy: { sortOrder: 'asc' },
-        },
-      },
-    });
-
-    return await this.mapCollectionToDto(collection, false);
+    return this.crud.createCollection(userId, dto);
   }
 
   // ==========================================================================
-  // GET COLLECTION BY ID
+  // GET COLLECTION BY ID (delegate → CollectionCrudService)
   // ==========================================================================
   async getCollectionById(
     collectionId: string,
     viewerId?: string,
   ): Promise<CollectionResponseDto> {
-    // First get basic collection info
-    const basicCollection = await this.prisma.collection.findUnique({
-      where: { id: collectionId },
-      select: { id: true },
-    });
-
-    if (!basicCollection) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
-    }
-
-    // Now get full collection with relations
-    const collection = await this.prisma.collection.findUnique({
-      where: { id: collectionId },
-      include: {
-        user: { select: { id: true, displayName: true } },
-        category: { select: { id: true, name: true, slug: true } },
-        items: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                title: true,
-                price: true,
-                status: true,
-                boostedUntil: true,
-              },
-            },
-          },
-          orderBy: { sortOrder: 'asc' },
-        },
-      },
-    });
-
-    if (!collection) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
-    }
-
-    // Fetch images separately for each product
-    const productIds = (collection.items?.map(item => item.productId).filter((id): id is string => id !== null) || []) as string[];
-    if (productIds.length > 0) {
-      const productImages = await this.prisma.productImage.findMany({
-        where: { productId: { in: productIds } },
-        orderBy: [{ productId: 'asc' }, { sortOrder: 'asc' }],
-      });
-      
-      const imagesByProduct = new Map<string, any[]>();
-      for (const img of productImages) {
-        if (!imagesByProduct.has(img.productId)) {
-          imagesByProduct.set(img.productId, []);
-        }
-        const arr = imagesByProduct.get(img.productId)!;
-        if (arr.length < 1) {
-          arr.push({ cardKey: img.cardKey, detailKey: img.detailKey });
-        }
-      }
-      
-      // Attach images to products
-      if (collection.items) {
-        for (const item of collection.items) {
-          if (item.product && imagesByProduct.has(item.product.id)) {
-            (item.product as any).images = imagesByProduct.get(item.product.id) || [];
-          } else if (item.product) {
-            (item.product as any).images = [];
-          }
-        }
-      }
-    }
-
-    // Private collection can only be seen by owner
-    if (!collection.isPublic && collection.userId !== viewerId) {
-      throw new ForbiddenException('Bu koleksiyon özel');
-    }
-
-    // Check if viewer has liked this collection
-    let isLiked = false;
-    if (viewerId) {
-      const like = await this.prisma.collectionLike.findFirst({
-        where: {
-          collectionId: collection.id,
-          userId: viewerId,
-        },
-      });
-      isLiked = !!like;
-    }
-
-    // Increment view count only if viewer is not the owner
-    // If viewerId is provided and matches owner, don't increment
-    // Otherwise increment (anonymous users or different users)
-    if (!viewerId || viewerId !== collection.userId) {
-      await this.prisma.collection.update({
-        where: { id: collectionId },
-        data: { viewCount: { increment: 1 } },
-      });
-    }
-
-    // Generate cover image if not exists
-    if (!collection.coverImageKey) {
-      await this.generateCoverImage(collectionId);
-      const updated = await this.prisma.collection.findUnique({
-        where: { id: collectionId },
-        select: { coverImageKey: true },
-      });
-      if (updated?.coverImageKey) {
-        collection.coverImageKey = updated.coverImageKey;
-      }
-    }
-
-    return await this.mapCollectionToDto(collection, isLiked);
+    return this.crud.getCollectionById(collectionId, viewerId);
   }
 
   // ==========================================================================
-  // GET COLLECTION BY SLUG
+  // GET COLLECTION BY SLUG (delegate → CollectionCrudService)
   // ==========================================================================
   async getCollectionBySlug(
     slug: string,
     viewerId?: string,
   ): Promise<CollectionResponseDto> {
-    const collection = await this.prisma.collection.findFirst({
-      where: { slug },
-      include: {
-        user: { select: { id: true, displayName: true } },
-        category: { select: { id: true, name: true, slug: true } },
-        items: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                title: true,
-                price: true,
-                status: true,
-                boostedUntil: true,
-              },
-            },
-          },
-          orderBy: { sortOrder: 'asc' },
-        },
-      },
-    });
-
-    if (collection) {
-      const productIds = (collection.items?.map(item => item.productId).filter((id): id is string => id !== null) || []) as string[];
-      if (productIds.length > 0) {
-        const productImages = await this.prisma.productImage.findMany({
-          where: { productId: { in: productIds } },
-          orderBy: [{ productId: 'asc' }, { sortOrder: 'asc' }],
-        });
-
-        const imagesByProduct = new Map<string, any[]>();
-        for (const img of productImages) {
-          if (!imagesByProduct.has(img.productId)) {
-            imagesByProduct.set(img.productId, []);
-          }
-          const arr = imagesByProduct.get(img.productId)!;
-          if (arr.length < 1) {
-            arr.push({ cardKey: img.cardKey, detailKey: img.detailKey });
-          }
-        }
-
-        if (collection.items) {
-          for (const item of collection.items) {
-            if (item.product && imagesByProduct.has(item.product.id)) {
-              (item.product as any).images = imagesByProduct.get(item.product.id) || [];
-            } else if (item.product) {
-              (item.product as any).images = [];
-            }
-          }
-        }
-      }
-    }
-
-    if (!collection) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
-    }
-
-    // Private collection can only be seen by owner
-    if (!collection.isPublic && collection.userId !== viewerId) {
-      throw new ForbiddenException('Bu koleksiyon özel');
-    }
-
-    // Check if viewer has liked this collection
-    let isLiked = false;
-    if (viewerId) {
-      const like = await this.prisma.collectionLike.findFirst({
-        where: {
-          collectionId: collection.id,
-          userId: viewerId,
-        },
-      });
-      isLiked = !!like;
-    }
-
-    // Increment view count only if viewer is not the owner
-    // If viewerId is provided and matches owner, don't increment
-    // Otherwise increment (anonymous users or different users)
-    if (!viewerId || viewerId !== collection.userId) {
-      await this.prisma.collection.update({
-        where: { id: collection.id },
-        data: { viewCount: { increment: 1 } },
-      });
-    }
-
-    // Generate cover image if not exists
-    if (!collection.coverImageKey) {
-      await this.generateCoverImage(collection.id);
-      const updated = await this.prisma.collection.findUnique({
-        where: { id: collection.id },
-        select: { coverImageKey: true },
-      });
-      if (updated?.coverImageKey) {
-        collection.coverImageKey = updated.coverImageKey;
-      }
-    }
-
-    return await this.mapCollectionToDto(collection, isLiked);
+    return this.crud.getCollectionBySlug(slug, viewerId);
   }
 
   // ==========================================================================
-  // GET USER COLLECTIONS
+  // GET USER COLLECTIONS (delegate → CollectionCrudService)
   // ==========================================================================
   async getUserCollections(
     userId: string,
@@ -374,71 +72,11 @@ export class CollectionService {
     page?: number,
     pageSize?: number,
   ): Promise<CollectionListResponseDto> {
-    // Ensure valid pagination values
-    const safePage = Math.max(1, Number(page) || 1);
-    const safePageSize = Math.min(100, Math.max(1, Number(pageSize) || 20));
-    
-    // If viewing own collections, show all. Otherwise only public.
-    const isOwner = userId === viewerId;
-
-    const where: Prisma.CollectionWhereInput = {
-      userId,
-      ...(isOwner ? {} : { isPublic: true }),
-    };
-
-    const [collections, total] = await Promise.all([
-      this.prisma.collection.findMany({
-        where,
-        include: {
-          user: { select: { id: true, displayName: true } },
-          _count: { select: { items: { where: VISIBLE_ITEM_FILTER } } },
-        },
-        orderBy: { createdAt: 'desc' },
-        skip: (safePage - 1) * safePageSize,
-        take: safePageSize,
-      }),
-      this.prisma.collection.count({ where }),
-    ]);
-
-    // Generate cover images for collections that don't have one (fire and forget)
-    const collectionsWithoutCover = collections.filter((c) => !c.coverImageKey && (c._count?.items ?? 0) > 0);
-    if (collectionsWithoutCover.length > 0) {
-      // Generate covers in background (don't await)
-      Promise.all(
-        collectionsWithoutCover.map((c) =>
-          this.generateCoverImage(c.id).catch((err) => {
-            this.logger.warn(`Failed to generate cover for collection ${c.id}: ${err.message}`);
-          })
-        )
-      ).catch(() => {
-        // Ignore errors in background generation
-      });
-    }
-
-    return {
-      collections: await Promise.all(collections.map(async (c) => ({
-        id: c.id,
-        userId: c.userId,
-        userName: c.user.displayName,
-        name: c.name,
-        slug: c.slug,
-        description: c.description || undefined,
-        coverImageUrl: c.coverImageKey ? this.storageService.getPublicAssetUrl(c.coverImageKey) : undefined,
-        isPublic: c.isPublic,
-        viewCount: c.viewCount,
-        likeCount: c.likeCount,
-        itemCount: c._count?.items ?? 0,
-        createdAt: c.createdAt,
-        updatedAt: c.updatedAt,
-      }))),
-      total,
-      page: safePage,
-      pageSize: safePageSize,
-    };
+    return this.crud.getUserCollections(userId, viewerId, page, pageSize);
   }
 
   // ==========================================================================
-  // BROWSE PUBLIC COLLECTIONS
+  // BROWSE PUBLIC COLLECTIONS (delegate → CollectionCrudService)
   // ==========================================================================
   async browsePublicCollections(
     page?: number,
@@ -448,516 +86,47 @@ export class CollectionService {
     categoryId?: string,
     categorySlug?: string,
   ): Promise<CollectionListResponseDto> {
-    const safePage = Math.max(1, Number(page) || 1);
-    const safePageSize = Math.min(100, Math.max(1, Number(pageSize) || 20));
-
-    let resolvedCategoryId = categoryId;
-    if (!resolvedCategoryId && categorySlug?.trim()) {
-      const slug = categorySlug.trim().toLowerCase();
-      const cat = await this.prisma.category.findFirst({
-        where: { slug: { equals: slug, mode: 'insensitive' }, isActive: true },
-        select: { id: true },
-      });
-      resolvedCategoryId = cat?.id ?? undefined;
-    }
-
-    // Try Elasticsearch first
-    const esResult = await this.searchService.searchCollections({
-      query: search,
-      categoryId: resolvedCategoryId,
-      isPublic: true,
-      sortBy,
-      page: safePage,
-      pageSize: safePageSize,
-    });
-
-    if (esResult && esResult.ids.length > 0) {
-      const validIds = esResult.ids.filter((id): id is string => id != null && id !== '');
-      const expectedCount = Math.min(esResult.total, safePageSize);
-
-      if (validIds.length < expectedCount * 0.5) {
-        this.logger.warn(
-          `ES returned ${validIds.length} valid IDs but expected ~${expectedCount} (total=${esResult.total}) – falling back to Prisma and triggering reindex`,
-        );
-        this.searchIndexing.queueReindexAllCollections().catch(() => {});
-        return this.browsePublicCollectionsPrisma(safePage, safePageSize, sortBy, search, resolvedCategoryId);
-      }
-
-      const hydrated = await this.hydrateCollections(validIds, esResult.total, safePage, safePageSize);
-      if (hydrated.collections.length < validIds.length * 0.5) {
-        this.logger.warn(
-          `ES returned ${validIds.length} IDs but Prisma hydrated only ${hydrated.collections.length} – stale index, falling back to Prisma`,
-        );
-        this.searchIndexing.queueReindexAllCollections().catch(() => {});
-        return this.browsePublicCollectionsPrisma(safePage, safePageSize, sortBy, search, resolvedCategoryId);
-      }
-      return hydrated;
-    }
-
-    // ES returned null (unavailable) or 0 results – fall back to Prisma (source of truth).
-    return this.browsePublicCollectionsPrisma(safePage, safePageSize, sortBy, search, resolvedCategoryId);
-  }
-
-  private async hydrateCollections(
-    ids: string[],
-    total: number,
-    page: number,
-    pageSize: number,
-  ): Promise<CollectionListResponseDto> {
-    const collections = await this.prisma.collection.findMany({
-      where: { id: { in: ids } },
-      include: {
-        user: { select: { id: true, displayName: true } },
-        category: { select: { id: true, name: true, slug: true } },
-        _count: { select: { items: { where: VISIBLE_ITEM_FILTER } } },
-      },
-    });
-
-    const orderMap = new Map(ids.map((id, i) => [id, i]));
-    collections.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
-
-    const noCover = collections.filter((c) => !c.coverImageKey && (c._count?.items ?? 0) > 0);
-    if (noCover.length > 0) {
-      Promise.all(noCover.map((c) => this.generateCoverImage(c.id).catch(() => {}))).catch(() => {});
-    }
-
-    return {
-      collections: await Promise.all(collections.map(async (c) => ({
-        id: c.id,
-        userId: c.userId,
-        userName: c.user.displayName,
-        categoryId: c.categoryId ?? undefined,
-        category: c.category ? { id: c.category.id, name: c.category.name, slug: c.category.slug } : undefined,
-        name: c.name,
-        slug: c.slug,
-        description: c.description || undefined,
-        coverImageUrl: c.coverImageKey ? this.storageService.getPublicAssetUrl(c.coverImageKey) : undefined,
-        isPublic: c.isPublic,
-        viewCount: c.viewCount,
-        likeCount: c.likeCount,
-        itemCount: c._count?.items ?? 0,
-        createdAt: c.createdAt,
-        updatedAt: c.updatedAt,
-      }))),
-      total,
-      page,
-      pageSize,
-    };
-  }
-
-  private async browsePublicCollectionsPrisma(
-    safePage: number,
-    safePageSize: number,
-    sortBy: string,
-    search?: string,
-    resolvedCategoryId?: string,
-  ): Promise<CollectionListResponseDto> {
-    const where: Prisma.CollectionWhereInput = {
-      isPublic: true,
-      ...(resolvedCategoryId ? { categoryId: resolvedCategoryId } : {}),
-    };
-
-    if (search && search.trim() !== '') {
-      const trimmed = search.trim();
-      const [collectionIds, userIds] = await Promise.all([
-        fulltextCollectionSearch(this.prisma, trimmed),
-        fulltextUserDisplayNameSearch(this.prisma, trimmed),
-      ]);
-
-      if (collectionIds.length === 0 && userIds.length === 0) {
-        return { collections: [], total: 0, page: safePage, pageSize: safePageSize };
-      }
-
-      const conditions: Prisma.CollectionWhereInput[] = [];
-      if (collectionIds.length > 0) conditions.push({ id: { in: collectionIds } });
-      if (userIds.length > 0) conditions.push({ userId: { in: userIds } });
-      where.OR = conditions;
-    }
-
-    let orderBy: Prisma.CollectionOrderByWithRelationInput;
-    let needsInMemorySort = false;
-
-    switch (sortBy) {
-      case 'popular': orderBy = { viewCount: 'desc' }; break;
-      case 'recent': orderBy = { createdAt: 'desc' }; break;
-      case 'name': needsInMemorySort = true; orderBy = { createdAt: 'desc' }; break;
-      case 'items': case 'items_asc': case 'items_desc':
-        needsInMemorySort = true; orderBy = { createdAt: 'desc' }; break;
-      default: orderBy = { viewCount: 'desc' };
-    }
-
-    let [collections, total] = await Promise.all([
-      this.prisma.collection.findMany({
-        where,
-        include: {
-          user: { select: { id: true, displayName: true } },
-          category: { select: { id: true, name: true, slug: true } },
-          _count: { select: { items: { where: VISIBLE_ITEM_FILTER } } },
-        },
-        ...(needsInMemorySort ? {} : { orderBy, skip: (safePage - 1) * safePageSize, take: safePageSize }),
-      }),
-      this.prisma.collection.count({ where }),
-    ]);
-
-    if (needsInMemorySort) {
-      if (sortBy === 'name') {
-        const collator = new Intl.Collator('tr', { sensitivity: 'base', numeric: false });
-        collections = collections.sort((a, b) => collator.compare(a.name.toLowerCase(), b.name.toLowerCase()));
-      } else if (sortBy === 'items' || sortBy === 'items_desc') {
-        collections = collections.sort((a, b) => (b._count?.items ?? 0) - (a._count?.items ?? 0));
-      } else if (sortBy === 'items_asc') {
-        collections = collections.sort((a, b) => (a._count?.items ?? 0) - (b._count?.items ?? 0));
-      }
-      collections = collections.slice((safePage - 1) * safePageSize, safePage * safePageSize);
-    }
-
-    const noCover = collections.filter((c) => !c.coverImageKey && (c._count?.items ?? 0) > 0);
-    if (noCover.length > 0) {
-      Promise.all(noCover.map((c) => this.generateCoverImage(c.id).catch(() => {}))).catch(() => {});
-    }
-
-    return {
-      collections: await Promise.all(collections.map(async (c) => ({
-        id: c.id,
-        userId: c.userId,
-        userName: c.user.displayName,
-        categoryId: c.categoryId ?? undefined,
-        category: c.category ? { id: c.category.id, name: c.category.name, slug: c.category.slug } : undefined,
-        name: c.name,
-        slug: c.slug,
-        description: c.description || undefined,
-        coverImageUrl: c.coverImageKey ? this.storageService.getPublicAssetUrl(c.coverImageKey) : undefined,
-        isPublic: c.isPublic,
-        viewCount: c.viewCount,
-        likeCount: c.likeCount,
-        itemCount: c._count?.items ?? 0,
-        createdAt: c.createdAt,
-        updatedAt: c.updatedAt,
-      }))),
-      total,
-      page: safePage,
-      pageSize: safePageSize,
-    };
+    return this.crud.browsePublicCollections(page, pageSize, sortBy, search, categoryId, categorySlug);
   }
 
   // ==========================================================================
-  // UPDATE COLLECTION
+  // UPDATE COLLECTION (delegate → CollectionCrudService)
   // ==========================================================================
   async updateCollection(
     collectionId: string,
     userId: string,
     dto: UpdateCollectionDto,
   ): Promise<CollectionResponseDto> {
-    const collection = await this.prisma.collection.findUnique({
-      where: { id: collectionId },
-    });
-
-    if (!collection) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
-    }
-
-    if (collection.userId !== userId) {
-      throw new ForbiddenException('Bu koleksiyonu düzenleme yetkiniz yok');
-    }
-
-    // Değişen metin alanları denetimi
-    if (dto.name && dto.name !== collection.name) {
-      await this.moderationAi.assertTextClean(dto.name, {
-        entityType: 'collection',
-        entityId: collectionId,
-        userId,
-        field: 'name',
-        label: 'koleksiyon adı',
-      });
-    }
-    if (dto.description !== undefined && dto.description !== collection.description) {
-      await this.moderationAi.assertTextClean(dto.description, {
-        entityType: 'collection',
-        entityId: collectionId,
-        userId,
-        field: 'description',
-        label: 'koleksiyon açıklaması',
-      });
-    }
-
-    let newSlug = collection.slug;
-    if (dto.name && dto.name !== collection.name) {
-      newSlug = this.generateSlug(dto.name);
-
-      // Check if new slug already exists
-      const existing = await this.prisma.collection.findFirst({
-        where: {
-          userId,
-          slug: newSlug,
-          id: { not: collectionId },
-        },
-      });
-
-      if (existing) {
-        throw new BadRequestException('Bu isimde bir koleksiyonunuz zaten var');
-      }
-    }
-
-    const updated = await this.prisma.collection.update({
-      where: { id: collectionId },
-      data: {
-        ...(dto.name && { name: dto.name, slug: newSlug }),
-        ...(dto.description !== undefined && { description: dto.description }),
-        ...(dto.coverImageKey !== undefined && { coverImageKey: dto.coverImageKey }),
-        ...(dto.isPublic !== undefined && { isPublic: dto.isPublic }),
-        ...(dto.categoryId !== undefined
-          ? (dto.categoryId == null || dto.categoryId === ''
-            ? { category: { disconnect: true } }
-            : { category: { connect: { id: dto.categoryId } } })
-          : {}),
-      },
-      include: {
-        user: { select: { id: true, displayName: true } },
-        category: { select: { id: true, name: true, slug: true } },
-        items: {
-          include: {
-            product: {
-              include: { 
-                images: { 
-                  take: 1
-                } 
-              },
-            },
-          },
-          orderBy: { sortOrder: 'asc' },
-        },
-      },
-    });
-
-    return await this.mapCollectionToDto(updated, false);
+    return this.crud.updateCollection(collectionId, userId, dto);
   }
 
   // ==========================================================================
-  // UPDATE COLLECTION COVER IMAGE
+  // UPDATE COLLECTION COVER IMAGE (delegate → CollectionCoverService)
   // ==========================================================================
   async updateCollectionCover(
     collectionId: string,
     userId: string,
     coverImageKey: string,
   ): Promise<CollectionResponseDto> {
-    const collection = await this.prisma.collection.findUnique({
-      where: { id: collectionId },
-    });
-
-    if (!collection) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
-    }
-
-    if (collection.userId !== userId) {
-      throw new ForbiddenException('Bu koleksiyonu düzenleme yetkiniz yok');
-    }
-
-    const updated = await this.prisma.collection.update({
-      where: { id: collectionId },
-      data: { coverImageKey },
-      include: {
-        user: { select: { id: true, displayName: true } },
-        items: {
-          include: {
-            product: {
-              include: { 
-                images: { 
-                  take: 1
-                } 
-              },
-            },
-          },
-          orderBy: { sortOrder: 'asc' },
-        },
-      },
-    });
-
-    return await this.mapCollectionToDto(updated, false);
+    return this.cover.updateCollectionCover(collectionId, userId, coverImageKey);
   }
 
   // ==========================================================================
-  // GENERATE COVER IMAGE FROM COLLECTION ITEMS
+  // GENERATE COVER IMAGE FROM COLLECTION ITEMS (delegate → CollectionCoverService)
   // ==========================================================================
-  private async downloadImage(url: string): Promise<Buffer> {
-    return new Promise((resolve, reject) => {
-      const protocol = url.startsWith('https') ? https : http;
-      protocol.get(url, (response) => {
-        if (response.statusCode !== 200) {
-          reject(new Error(`Failed to download image: ${response.statusCode}`));
-          return;
-        }
-        const chunks: Buffer[] = [];
-        response.on('data', (chunk) => chunks.push(chunk));
-        response.on('end', () => resolve(Buffer.concat(chunks)));
-        response.on('error', reject);
-      }).on('error', reject);
-    });
-  }
-
   async generateCoverImage(collectionId: string): Promise<string | null> {
-    if (!sharp) {
-      this.logger.warn('Sharp not available, skipping cover image generation');
-      return null;
-    }
-
-    try {
-      const collection = await this.prisma.collection.findUnique({
-        where: { id: collectionId },
-        include: {
-          items: {
-            include: {
-              product: {
-                include: {
-                  images: {
-                    take: 1,
-                    orderBy: { sortOrder: 'asc' },
-                  },
-                },
-              },
-            },
-            orderBy: { sortOrder: 'asc' },
-            take: 4,
-          },
-        },
-      });
-
-      if (!collection || collection.items.length === 0) {
-        return null;
-      }
-
-      // Get image URLs from items (product cardKey -> public URL, or customImageUrl)
-      const imageUrls: string[] = [];
-      for (const item of collection.items) {
-        const firstImg = item.product?.images?.[0];
-        const rawUrl = item.customImageUrl || (firstImg?.cardKey ? this.storageService.getPublicAssetUrl(firstImg.cardKey) : null);
-        if (rawUrl) {
-          const resolved = await this.resolveProductImageUrl(rawUrl);
-          if (resolved) imageUrls.push(resolved);
-        }
-        if (imageUrls.length >= 4) break;
-      }
-
-      if (imageUrls.length === 0) {
-        return null;
-      }
-
-      // If less than 4 images, use the first one
-      if (imageUrls.length < 4) {
-        const singleImageUrl = imageUrls[0];
-        try {
-          const imageBuffer = await this.downloadImage(singleImageUrl);
-          const resizedBuffer = await sharp(imageBuffer)
-            .resize(1200, 600, { fit: 'cover' })
-            .toBuffer();
-
-          // Upload to S3 using MediaService
-          const uploadResult = await this.mediaService.uploadBuffer(resizedBuffer, {
-            folder: 'collection-covers',
-            mimeType: 'image/jpeg',
-            bucket: 'collections',
-          });
-
-          await this.prisma.collection.update({
-            where: { id: collectionId },
-            data: { coverImageKey: uploadResult.key },
-          });
-
-          return uploadResult.key;
-        } catch (error) {
-          this.logger.error(`Failed to generate single cover image: ${error.message}`);
-          return null;
-        }
-      }
-
-      // Download and resize images to 400x400
-      const imageBuffers: Buffer[] = [];
-      for (const url of imageUrls) {
-        try {
-          const buffer = await this.downloadImage(url);
-          const resized = await sharp(buffer)
-            .resize(400, 400, { fit: 'cover' })
-            .toBuffer();
-          imageBuffers.push(resized);
-        } catch (error) {
-          this.logger.warn(`Failed to download image ${url}: ${error.message}`);
-        }
-      }
-
-      if (imageBuffers.length === 0) {
-        return null;
-      }
-
-      // Create 2x2 grid (800x800)
-      const gridWidth = 800;
-      const gridHeight = 800;
-      const cellWidth = 400;
-      const cellHeight = 400;
-
-      const composite = sharp({
-        create: {
-          width: gridWidth,
-          height: gridHeight,
-          channels: 3,
-          background: { r: 255, g: 255, b: 255 },
-        },
-      });
-
-      const composites = [];
-      for (let i = 0; i < Math.min(4, imageBuffers.length); i++) {
-        const row = Math.floor(i / 2);
-        const col = i % 2;
-        composites.push({
-          input: imageBuffers[i],
-          left: col * cellWidth,
-          top: row * cellHeight,
-        });
-      }
-
-      const finalBuffer = await composite.composite(composites).jpeg().toBuffer();
-
-      // Upload to S3 using MediaService
-      const uploadResult = await this.mediaService.uploadBuffer(finalBuffer, {
-        folder: 'collection-covers',
-        mimeType: 'image/jpeg',
-        bucket: 'collections',
-      });
-
-      await this.prisma.collection.update({
-        where: { id: collectionId },
-        data: { coverImageKey: uploadResult.key },
-      });
-
-      return uploadResult.key;
-    } catch (error) {
-      this.logger.error(`Failed to generate cover image: ${error.message}`);
-      return null;
-    }
+    return this.cover.generateCoverImage(collectionId);
   }
 
   // ==========================================================================
-  // DELETE COLLECTION
+  // DELETE COLLECTION (delegate → CollectionCrudService)
   // ==========================================================================
   async deleteCollection(collectionId: string, userId: string): Promise<void> {
-    const collection = await this.prisma.collection.findUnique({
-      where: { id: collectionId },
-    });
-
-    if (!collection) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
-    }
-
-    if (collection.userId !== userId) {
-      throw new ForbiddenException('Bu koleksiyonu silme yetkiniz yok');
-    }
-
-    await this.prisma.collection.delete({
-      where: { id: collectionId },
-    });
-
+    return this.crud.deleteCollection(collectionId, userId);
   }
 
   // ==========================================================================
-  // ADD ITEM TO COLLECTION
+  // ADD ITEM TO COLLECTION (delegate → CollectionItemsService)
   // ==========================================================================
   async addItemToCollection(
     collectionId: string,
@@ -965,690 +134,53 @@ export class CollectionService {
     dto: AddCollectionItemDto,
     imageUrl?: string,
   ): Promise<CollectionItemResponseDto> {
-    const collection = await this.prisma.collection.findUnique({
-      where: { id: collectionId },
-    });
-
-    if (!collection) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
-    }
-
-    if (collection.userId !== userId) {
-      throw new ForbiddenException('Bu koleksiyona ekleme yetkiniz yok');
-    }
-
-    // Validate: either productId or customTitle must be provided
-    if (!dto.productId && !dto.customTitle) {
-      throw new BadRequestException('Ürün ID veya custom ürün bilgileri gerekli');
-    }
-
-    // If productId is provided, use existing product logic
-    if (dto.productId) {
-      // Verify product exists
-      const product = await this.prisma.product.findUnique({
-        where: { id: dto.productId },
-        include: { images: { take: 1 } },
-      });
-
-      if (!product) {
-        throw new NotFoundException('Ürün bulunamadı');
-      }
-
-      // Check if already in collection
-      const existing = await this.prisma.collectionItem.findUnique({
-        where: {
-          collectionId_productId: {
-            collectionId,
-            productId: dto.productId,
-          },
-        },
-      });
-
-      if (existing) {
-        throw new BadRequestException('Ürün zaten koleksiyonda');
-      }
-
-      // Get max sort order
-      const maxSort = await this.prisma.collectionItem.aggregate({
-        where: { collectionId },
-        _max: { sortOrder: true },
-      });
-
-      let item;
-      try {
-        item = await this.prisma.collectionItem.create({
-          data: {
-            collectionId,
-            productId: dto.productId,
-            sortOrder: dto.sortOrder ?? (maxSort._max.sortOrder ?? 0) + 1,
-            isFeatured: dto.isFeatured ?? false,
-          },
-          include: {
-            product: {
-              include: { images: { take: 1 } },
-            },
-          },
-        });
-      } catch (e) {
-        // Eşzamanlı istekler existence kontrolünü birlikte geçebilir; unique
-        // ihlalini (collectionId, productId) 500 yerine aynı 400'e çevir.
-        if (
-          e instanceof Prisma.PrismaClientKnownRequestError &&
-          e.code === 'P2002'
-        ) {
-          throw new BadRequestException('Ürün zaten koleksiyonda');
-        }
-        throw e;
-      }
-
-      return await this.mapItemToDto(item);
-    }
-
-    // Custom product logic
-    // Validate customTitle is required for custom products
-    if (!dto.customTitle || dto.customTitle.trim().length === 0) {
-      throw new BadRequestException('Custom ürün için isim zorunludur');
-    }
-
-    // Get max sort order
-    const maxSort = await this.prisma.collectionItem.aggregate({
-      where: { collectionId },
-      _max: { sortOrder: true },
-    });
-
-    const item = await this.prisma.collectionItem.create({
-      data: {
-        collectionId,
-        productId: null,
-        customTitle: dto.customTitle,
-        customDescription: dto.customDescription,
-        customBrand: dto.customBrand,
-        customModel: dto.customModel,
-        customYear: dto.customYear,
-        customScale: dto.customScale,
-        customManufacturer: dto.customManufacturer,
-        customMaterial: dto.customMaterial,
-        customImageUrl: imageUrl || dto.customImageUrl,
-        sortOrder: dto.sortOrder ?? (maxSort._max.sortOrder ?? 0) + 1,
-        isFeatured: dto.isFeatured ?? false,
-      },
-    });
-
-    return await this.mapItemToDto(item);
+    return this.items.addItemToCollection(collectionId, userId, dto, imageUrl);
   }
 
   // ==========================================================================
-  // REMOVE ITEM FROM COLLECTION
+  // REMOVE ITEM FROM COLLECTION (delegate → CollectionItemsService)
   // ==========================================================================
   async removeItemFromCollection(
     collectionId: string,
     itemId: string,
     userId: string,
   ): Promise<void> {
-    const collection = await this.prisma.collection.findUnique({
-      where: { id: collectionId },
-    });
-
-    if (!collection) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
-    }
-
-    if (collection.userId !== userId) {
-      throw new ForbiddenException('Bu koleksiyondan silme yetkiniz yok');
-    }
-
-    const item = await this.prisma.collectionItem.findFirst({
-      where: { id: itemId, collectionId },
-    });
-
-    if (!item) {
-      throw new NotFoundException('Koleksiyon öğesi bulunamadı');
-    }
-
-    await this.prisma.collectionItem.delete({
-      where: { id: itemId },
-    });
+    return this.items.removeItemFromCollection(collectionId, itemId, userId);
   }
 
   // ==========================================================================
-  // REORDER ITEMS
+  // REORDER ITEMS (delegate → CollectionItemsService)
   // ==========================================================================
   async reorderItems(
     collectionId: string,
     userId: string,
     dto: ReorderCollectionItemsDto,
   ): Promise<void> {
-    const collection = await this.prisma.collection.findUnique({
-      where: { id: collectionId },
-    });
-
-    if (!collection) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
-    }
-
-    if (collection.userId !== userId) {
-      throw new ForbiddenException('Bu koleksiyonu düzenleme yetkiniz yok');
-    }
-
-    await this.prisma.$transaction(
-      dto.items.map((item) =>
-        this.prisma.collectionItem.update({
-          where: { id: item.itemId },
-          data: { sortOrder: item.sortOrder },
-        }),
-      ),
-    );
+    return this.items.reorderItems(collectionId, userId, dto);
   }
 
   // ==========================================================================
-  // LIKE COLLECTION
+  // LIKE COLLECTION (delegate → CollectionSocialService)
   // ==========================================================================
   async likeCollection(idOrSlug: string, userId: string): Promise<{ liked: boolean; likeCount: number }> {
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
-    const isCollectionId = idOrSlug.startsWith('collection-');
-
-    // Find collection by ID or slug
-    let collection;
-    try {
-      if (isUUID || isCollectionId) {
-        // Try to find by ID first
-        collection = await this.prisma.collection.findUnique({
-          where: { id: idOrSlug },
-          select: { id: true, name: true, likeCount: true, isPublic: true, userId: true },
-        });
-        
-        // If not found and it's a collection- prefixed ID, try to find by slug (strip prefix)
-        if (!collection && isCollectionId) {
-          const slug = idOrSlug.replace('collection-', '');
-          collection = await this.prisma.collection.findFirst({
-            where: { slug },
-            select: { id: true, name: true, likeCount: true, isPublic: true, userId: true },
-          });
-        }
-      } else {
-        // For slug, we need to find by slug (slug is unique per user, not globally)
-        // First try to find public collection with this slug
-        collection = await this.prisma.collection.findFirst({
-          where: { slug: idOrSlug, isPublic: true },
-          select: { id: true, name: true, likeCount: true, isPublic: true, userId: true },
-        });
-        
-        // If not found and user is logged in, try to find user's own collection (even if private)
-        if (!collection && userId) {
-          collection = await this.prisma.collection.findFirst({
-            where: { slug: idOrSlug, userId: userId },
-            select: { id: true, name: true, likeCount: true, isPublic: true, userId: true },
-          });
-        }
-        
-        // If still not found, try any collection (for cases where slug might match)
-        if (!collection) {
-          collection = await this.prisma.collection.findFirst({
-            where: { slug: idOrSlug },
-            select: { id: true, name: true, likeCount: true, isPublic: true, userId: true },
-          });
-        }
-        
-        // If collection is private and user is not the owner, don't allow like
-        if (collection && !collection.isPublic && collection.userId !== userId) {
-          throw new ForbiddenException('Bu koleksiyon özel');
-        }
-      }
-    } catch (error) {
-      if (error instanceof ForbiddenException) {
-        throw error;
-      }
-      this.logger.error('likeCollection: error finding collection');
-      throw new NotFoundException('Koleksiyon bulunamadı');
-    }
-
-    if (!collection || !collection.id) {
-      this.logger.warn('likeCollection: collection not found');
-      throw new NotFoundException('Koleksiyon bulunamadı');
-    }
-    
-    // Prevent users from liking their own collections
-    if (collection.userId === userId) {
-      throw new BadRequestException('Kendi koleksiyonunuzu beğenemezsiniz');
-    }
-    
-    // Check if user already liked this collection
-    // Use findFirst to avoid composite key issues
-    let existingLike;
-    try {
-      existingLike = await this.prisma.collectionLike.findFirst({
-        where: {
-          collectionId: collection.id,
-          userId: userId,
-        },
-      });
-    } catch (findError) {
-      this.logger.error('likeCollection: error finding existing like');
-      throw findError;
-    }
-
-    let liked: boolean;
-    let likeCount: number;
-
-    try {
-      if (existingLike) {
-        await this.prisma.$transaction(async (tx) => {
-          const likeToDelete = await tx.collectionLike.findFirst({
-            where: {
-              collectionId: collection.id,
-              userId: userId,
-            },
-          });
-          if (likeToDelete) {
-            await tx.collectionLike.delete({
-              where: { id: likeToDelete.id },
-            });
-          }
-          await tx.collection.update({
-            where: { id: collection.id },
-            data: { likeCount: { decrement: 1 } },
-          });
-        });
-
-        liked = false;
-        likeCount = Math.max(0, (collection.likeCount || 0) - 1);
-      } else {
-        await this.prisma.$transaction(async (tx) => {
-          const existing = await tx.collectionLike.findFirst({
-            where: {
-              collectionId: collection.id,
-              userId: userId,
-            },
-          });
-          if (!existing) {
-            await tx.collectionLike.create({
-              data: {
-                collectionId: collection.id,
-                userId: userId,
-              },
-            });
-          }
-          await tx.collection.update({
-            where: { id: collection.id },
-            data: { likeCount: { increment: 1 } },
-          });
-        });
-
-        liked = true;
-        likeCount = (collection.likeCount || 0) + 1;
-
-        // Send notification to collection owner
-        try {
-          const user = await this.prisma.user.findUnique({
-            where: { id: userId },
-            select: { displayName: true },
-          });
-          
-          await this.notificationService.createInAppNotification(
-            collection.userId,
-            NotificationType.COLLECTION_LIKED,
-            {
-              collectionId: collection.id,
-              collectionName: collection.name,
-              userName: user?.displayName || 'Bir kullanıcı',
-            },
-          );
-        } catch (notifError) {
-          this.logger.warn('likeCollection: failed to send notification');
-        }
-      }
-    } catch (error) {
-      this.logger.error('likeCollection: transaction error');
-      throw error;
-    }
-
-    return {
-      liked,
-      likeCount,
-    };
+    return this.social.likeCollection(idOrSlug, userId);
   }
 
   // ==========================================================================
-  // UNLIKE COLLECTION
+  // UNLIKE COLLECTION (delegate → CollectionSocialService)
   // ==========================================================================
   async unlikeCollection(idOrSlug: string, userId: string): Promise<{ liked: boolean; likeCount: number }> {
-    // Check if idOrSlug is UUID or collection- prefixed ID
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
-    const isCollectionId = idOrSlug.startsWith('collection-');
-    
-    // Find collection by ID or slug
-    let collection;
-    if (isUUID || isCollectionId) {
-      collection = await this.prisma.collection.findUnique({
-        where: { id: idOrSlug },
-        select: { id: true, likeCount: true },
-      });
-      
-      if (!collection && isCollectionId) {
-        const slug = idOrSlug.replace('collection-', '');
-        collection = await this.prisma.collection.findFirst({
-          where: { slug },
-          select: { id: true, likeCount: true },
-        });
-      }
-    } else {
-      collection = await this.prisma.collection.findFirst({
-        where: { slug: idOrSlug },
-        select: { id: true, likeCount: true },
-      });
-    }
-
-    if (!collection) {
-      throw new NotFoundException('Koleksiyon bulunamadı');
-    }
-
-    // Find and delete the like
-    const existingLike = await this.prisma.collectionLike.findFirst({
-      where: {
-        collectionId: collection.id,
-        userId: userId,
-      },
-    });
-
-    if (!existingLike) {
-      return {
-        liked: false,
-        likeCount: collection.likeCount || 0,
-      };
-    }
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.collectionLike.delete({
-        where: { id: existingLike.id },
-      });
-      await tx.collection.update({
-        where: { id: collection.id },
-        data: { likeCount: { decrement: 1 } },
-      });
-    });
-
-    return {
-      liked: false,
-      likeCount: Math.max(0, (collection.likeCount || 0) - 1),
-    };
+    return this.social.unlikeCollection(idOrSlug, userId);
   }
 
   // ==========================================================================
-  // GET LIKED COLLECTIONS
+  // GET LIKED COLLECTIONS (delegate → CollectionSocialService)
   // ==========================================================================
   async getLikedCollections(
     userId: string,
     page: number = 1,
     pageSize: number = 20,
   ): Promise<CollectionListResponseDto> {
-    if (!userId) {
-      return {
-        collections: [],
-        total: 0,
-        page: 1,
-        pageSize: 20,
-      };
-    }
-    
-    // Validate and sanitize page and pageSize parameters
-    const validPage = isNaN(page) || page < 1 ? 1 : Math.max(1, Math.floor(page));
-    const validPageSize = isNaN(pageSize) || pageSize < 1 ? 20 : Math.max(1, Math.min(Math.floor(pageSize), 100));
-    
-    try {
-      const skip = (validPage - 1) * validPageSize;
-
-      const [likedCollections, total] = await Promise.all([
-        this.prisma.collectionLike.findMany({
-          where: { userId },
-          include: {
-            collection: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    displayName: true,
-                    avatarUrl: true,
-                  },
-                },
-                // Gerçek görünür item sayısı — items aşağıda kapak için take:4 ile
-                // sınırlı olduğundan itemCount'u bu _count'tan override ediyoruz.
-                _count: { select: { items: { where: VISIBLE_ITEM_FILTER } } },
-                items: {
-                  take: 4,
-                  orderBy: { sortOrder: 'asc' },
-                  include: {
-                    product: {
-                      select: {
-                        id: true,
-                        title: true,
-                        status: true,
-                        boostedUntil: true,
-                        images: {
-                          take: 1,
-                          select: { cardKey: true },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-          orderBy: { createdAt: 'desc' },
-          skip,
-          take: validPageSize,
-        }),
-        this.prisma.collectionLike.count({
-          where: { userId },
-        }),
-      ]);
-
-      const validLikes = likedCollections
-        .filter(like => {
-          const col = (like as any).collection;
-          if (!col) return false;
-          if (!col.isPublic && col.userId !== userId) return false;
-          return true;
-        });
-
-      const collections = (await Promise.all(
-        validLikes.map(async (like) => {
-          try {
-            const col = (like as any).collection;
-            const dto = await this.mapCollectionToDto(col, true);
-            // items take:4 ile sınırlı olduğu için mapCollectionToDto'nun
-            // ürettiği itemCount yanıltıcı; gerçek görünür sayıyla değiştir.
-            dto.itemCount = col._count?.items ?? dto.itemCount;
-            return dto;
-          } catch (err) {
-            this.logger.error('getLikedCollections: error mapping collection');
-            return null;
-          }
-        })
-      )).filter(collection => collection !== null);
-
-      return {
-        collections,
-        total,
-        page: validPage,
-        pageSize: validPageSize,
-      };
-    } catch (error) {
-      this.logger.error('getLikedCollections: database error');
-      // Return empty result instead of throwing
-      return {
-        collections: [],
-        total: 0,
-        page: validPage,
-        pageSize: validPageSize,
-      };
-    }
-  }
-
-  // ==========================================================================
-  // HELPER METHODS
-  // ==========================================================================
-  private generateSlug(name: string): string {
-    return name
-      .toLowerCase()
-      .replace(/[^a-z0-9çğıöşü]+/g, '-')
-      .replace(/^-|-$/g, '');
-  }
-
-  private async resolveProductImageUrl(imageUrl: string | null | undefined): Promise<string | null> {
-    if (!imageUrl) return null;
-    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://') || imageUrl.startsWith('/')) return imageUrl;
-    // S3 key (dev/ or prod/) -> public URL
-    if (imageUrl.includes('dev/') || imageUrl.includes('prod/')) {
-      return this.storageService.getPublicAssetUrl(imageUrl);
-    }
-    try {
-      return await this.storageService.getPresignedDownloadUrl('products', imageUrl, 3600);
-    } catch (e: any) {
-      this.logger.warn(`Failed to resolve product image: ${imageUrl} - ${e.message}`);
-      return null;
-    }
-  }
-
-  private async mapCollectionToDto(collection: any, isLiked?: boolean): Promise<CollectionResponseDto> {
-    const resolvedCoverUrl = collection.coverImageKey
-      ? this.storageService.getPublicAssetUrl(collection.coverImageKey)
-      : undefined;
-
-    // Filter out products that are not active or sold
-    const activeItems = (collection.items && Array.isArray(collection.items))
-      ? collection.items.filter((item: any) => {
-          if (!item.productId) return true;
-          const status = item.product?.status;
-          return status === 'active' || status === 'sold';
-        })
-      : [];
-
-    const mappedItems = (await Promise.all(
-      activeItems.map(async (item: any) => {
-        try {
-          return await this.mapItemToDto(item);
-        } catch (itemError) {
-          this.logger.warn('mapCollectionToDto: error mapping item');
-          return null;
-        }
-      })
-    )).filter((item: any) => item !== null);
-
-    return {
-      id: collection.id,
-      userId: collection.userId,
-      userName: collection.user?.displayName || '',
-      categoryId: collection.categoryId ?? undefined,
-      category: collection.category ? { id: collection.category.id, name: collection.category.name, slug: collection.category.slug } : undefined,
-      name: collection.name,
-      slug: collection.slug,
-      description: collection.description || undefined,
-      coverImageUrl: resolvedCoverUrl,
-      isPublic: collection.isPublic,
-      viewCount: collection.viewCount ?? 0,
-      likeCount: collection.likeCount ?? 0,
-      itemCount: mappedItems.length,
-      items: mappedItems,
-      isLiked: isLiked ?? false,
-      createdAt: collection.createdAt,
-      updatedAt: collection.updatedAt,
-    };
-  }
-
-  private async mapItemToDto(item: any): Promise<CollectionItemResponseDto> {
-    try {
-      // Check if this is a custom product (no productId)
-      if (!item.productId) {
-        // Custom product
-        return {
-          id: item.id || '',
-          productId: undefined,
-          productTitle: item.customTitle || 'İsimsiz Ürün',
-          productImage: item.customImageUrl || undefined,
-          productPrice: undefined,
-          sortOrder: item.sortOrder || 0,
-          isFeatured: item.isFeatured || false,
-          addedAt: item.addedAt || new Date(),
-          isCustom: true,
-          customTitle: item.customTitle,
-          customDescription: item.customDescription,
-          customBrand: item.customBrand,
-          customModel: item.customModel,
-          customYear: item.customYear,
-          customScale: item.customScale,
-          customManufacturer: item.customManufacturer,
-          customMaterial: item.customMaterial,
-          customImageUrl: item.customImageUrl,
-        };
-      }
-
-      // Regular product
-      if (!item || !item.product) {
-        // Product was deleted or item is invalid, return minimal data
-        return {
-          id: item?.id || '',
-          productId: item?.productId || '',
-          productTitle: 'Ürün bulunamadı',
-          productImage: undefined,
-          productPrice: 0,
-          sortOrder: item?.sortOrder || 0,
-          isFeatured: item?.isFeatured || false,
-          addedAt: item?.addedAt || new Date(),
-          isCustom: false,
-        };
-      }
-      
-      const product = item.product;
-      // Safely access images array - handle both array and null/undefined
-      let firstImage = null;
-      if (product) {
-        if (product.images && Array.isArray(product.images) && product.images.length > 0) {
-          firstImage = product.images[0];
-        }
-      }
-      
-      const boostedUntil = (product as any).boostedUntil
-        ? new Date((product as any).boostedUntil)
-        : null;
-      const isBoosted = boostedUntil != null && boostedUntil.getTime() > Date.now();
-
-      return {
-        id: item.id || '',
-        productId: product.id || '',
-        productTitle: product.title || 'İsimsiz Ürün',
-        productImage: firstImage?.cardKey ? this.storageService.getPublicAssetUrl(firstImage.cardKey) : undefined,
-        productPrice: product.price ? parseFloat(String(product.price)) : 0,
-        productStatus: (product as any).status ?? 'active',
-        sortOrder: item.sortOrder || 0,
-        isFeatured: item.isFeatured || false,
-        isBoosted,
-        addedAt: item.addedAt || new Date(),
-        isCustom: false,
-      };
-    } catch (error) {
-      this.logger.warn('mapItemToDto: error mapping collection item');
-      // Return safe fallback
-      return {
-        id: item?.id || '',
-        productId: item?.productId || undefined,
-        productTitle: item?.customTitle || 'Hata: Ürün bilgisi yüklenemedi',
-        productImage: item?.customImageUrl || undefined,
-        productPrice: undefined,
-        sortOrder: item?.sortOrder || 0,
-        isFeatured: item?.isFeatured || false,
-        addedAt: item?.addedAt || new Date(),
-        isCustom: !item?.productId,
-        customTitle: item?.customTitle,
-        customDescription: item?.customDescription,
-        customBrand: item?.customBrand,
-        customModel: item?.customModel,
-        customYear: item?.customYear,
-        customScale: item?.customScale,
-        customManufacturer: item?.customManufacturer,
-        customMaterial: item?.customMaterial,
-        customImageUrl: item?.customImageUrl,
-      };
-    }
+    return this.social.getLikedCollections(userId, page, pageSize);
   }
 }

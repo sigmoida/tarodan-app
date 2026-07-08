@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -21,7 +21,7 @@ import { RefundScheduledProcessor } from './refund-scheduled.processor';
     ConfigModule,
     SuratCargoModule,
     StorageModule,
-    forwardRef(() => PaymentModule),
+    PaymentModule,
     NotificationModule,
     ScheduleModule.forRoot(),
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),

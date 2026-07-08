@@ -1,0 +1,344 @@
+﻿2026-07-02T20:40:57.7188135Z ##[group]Run pnpm --filter @tarodan/api test:e2e:setup
+2026-07-02T20:40:57.7189069Z [36;1mpnpm --filter @tarodan/api test:e2e:setup[0m
+2026-07-02T20:40:57.7227504Z shell: /usr/bin/bash -e {0}
+2026-07-02T20:40:57.7227768Z env:
+2026-07-02T20:40:57.7228005Z   MAILHOG_URL: http://localhost:8025
+2026-07-02T20:40:57.7228594Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-07-02T20:40:57.7228919Z ##[endgroup]
+2026-07-02T20:40:58.1676888Z 
+2026-07-02T20:40:58.1678006Z > @tarodan/api@1.0.0 test:e2e:setup /home/runner/work/tarodan-app/tarodan-app/apps/api
+2026-07-02T20:40:58.1678895Z > dotenv -e .env.test -- prisma migrate deploy
+2026-07-02T20:40:58.1679129Z 
+2026-07-02T20:40:58.8433993Z Prisma schema loaded from prisma/schema.prisma
+2026-07-02T20:40:58.8605943Z Datasource "db": PostgreSQL database "tarodan_test", schema "public" at "localhost:5432"
+2026-07-02T20:40:58.9572324Z 
+2026-07-02T20:40:58.9573203Z 104 migrations found in prisma/migrations
+2026-07-02T20:40:58.9573669Z 
+2026-07-02T20:40:59.0124905Z Applying migration `20260118220111_init`
+2026-07-02T20:40:59.3960321Z Applying migration `20260118230000_add_custom_collection_items`
+2026-07-02T20:40:59.4113608Z Applying migration `20260118230550_add_collection_likes`
+2026-07-02T20:40:59.4260725Z Applying migration `20260130100000_add_advertisements`
+2026-07-02T20:40:59.4359329Z Applying migration `20260130120000_enhance_advertisements_iab`
+2026-07-02T20:40:59.4468926Z Applying migration `20260131000000_add_user_missing_columns`
+2026-07-02T20:40:59.4520731Z Applying migration `20260131100000_add_discount_system`
+2026-07-02T20:40:59.4999597Z Applying migration `20260131150000_add_old_price_to_product`
+2026-07-02T20:40:59.5030404Z Applying migration `20260202000000_add_user_login_columns`
+2026-07-02T20:40:59.5063504Z Applying migration `20260203000000_add_brands`
+2026-07-02T20:40:59.5162961Z Applying migration `20260203100000_add_products_slug_and_columns`
+2026-07-02T20:40:59.5220492Z Applying migration `20260204000000_add_tax_settings`
+2026-07-02T20:40:59.5493719Z Applying migration `20260204100000_add_commission_rule_columns`
+2026-07-02T20:40:59.5541423Z Applying migration `20260204110000_commission_seller_type_enum`
+2026-07-02T20:40:59.5704078Z Applying migration `20260204120000_add_orders_fee_columns`
+2026-07-02T20:40:59.5747031Z Applying migration `20260204150000_add_static_pages_and_email_templates`
+2026-07-02T20:40:59.5876212Z Applying migration `20260210000000_add_newsletter_subscribers`
+2026-07-02T20:40:59.5978879Z Applying migration `20260220000000_add_category_image`
+2026-07-02T20:40:59.6005657Z Applying migration `20260220010000_sync_schema`
+2026-07-02T20:40:59.7457574Z Applying migration `20260220020000_fix_enums_and_columns`
+2026-07-02T20:40:59.7543862Z Applying migration `20260228000000_add_manufacturers`
+2026-07-02T20:40:59.7676907Z Applying migration `20260228101718_mig`
+2026-07-02T20:40:59.7731025Z Applying migration `20260309000000_media_public_keys`
+2026-07-02T20:40:59.7789450Z Applying migration `20260311000000_fulltext_and_vehicle_type`
+2026-07-02T20:40:59.8037446Z Applying migration `20260312000000_fulltext_all_tables`
+2026-07-02T20:40:59.8241842Z Applying migration `20260312000000_fulltext_collections_autocomplete`
+2026-07-02T20:40:59.8265050Z Applying migration `20260312204345_add_product_rating_columns`
+2026-07-02T20:40:59.8325239Z Applying migration `20260313000000_add_collection_item_manufacturer_material`
+2026-07-02T20:40:59.8352850Z Applying migration `20260315000000_remove_category_image`
+2026-07-02T20:40:59.8379779Z Applying migration `20260315000001_add_rating_status`
+2026-07-02T20:40:59.8439075Z Applying migration `20260315144357_`
+2026-07-02T20:40:59.8505844Z Applying migration `20260315154057_add_product_reserved_quantity`
+2026-07-02T20:40:59.8535981Z Applying migration `20260316000000_add_payments_trade_cash_payment_id`
+2026-07-02T20:40:59.8592530Z Applying migration `20260316000001_make_payments_order_id_nullable`
+2026-07-02T20:40:59.8618175Z Applying migration `20260316000002_add_offer_message`
+2026-07-02T20:40:59.8646414Z Applying migration `20260317000000_car_models_fts`
+2026-07-02T20:40:59.8676571Z Applying migration `20260321114507_offer_buyer_must_accept`
+2026-07-02T20:40:59.8705084Z Applying migration `20260321120000_offer_buyer_must_accept`
+2026-07-02T20:40:59.8726304Z Applying migration `20260328000000_order_number_seq`
+2026-07-02T20:40:59.8764290Z Applying migration `20260410000000_stock_model_v2`
+2026-07-02T20:40:59.8793275Z Applying migration `20260419212030_safe_trade_flow`
+2026-07-02T20:40:59.8851061Z Applying migration `20260420120000_add_preparing_deadline`
+2026-07-02T20:40:59.8879176Z Applying migration `20260423201017_add_shipment_provider_fields`
+2026-07-02T20:40:59.8914812Z Applying migration `20260425154837_add_seller_bank_account_and_payout_transfer`
+2026-07-02T20:40:59.9141820Z Applying migration `20260429000000_add_refund_requests`
+2026-07-02T20:40:59.9300478Z Applying migration `20260501203841_split_payment_window`
+2026-07-02T20:40:59.9354649Z Applying migration `20260513000000_add_attribute_group_manufacturer_scope`
+2026-07-02T20:40:59.9393226Z Applying migration `20260513100000_product_search_text_with_attributes`
+2026-07-02T20:40:59.9453845Z Applying migration `20260514173735_trade_cancel_hardening`
+2026-07-02T20:40:59.9517098Z Applying migration `20260514175446_trade_compensation_and_lost_shipments`
+2026-07-02T20:40:59.9568769Z Applying migration `20260531190000_fix_trades_compensation_user_id_drift`
+2026-07-02T20:40:59.9705198Z Applying migration `20260531192054_add_commission_ledger`
+2026-07-02T20:40:59.9818117Z Applying migration `20260531192149_add_order_buyer_confirmation`
+2026-07-02T20:40:59.9863004Z Applying migration `20260531192226_add_awaiting_buyer_confirmation_status`
+2026-07-02T20:40:59.9885810Z Applying migration `20260531192300_add_refund_reason_values`
+2026-07-02T20:40:59.9911356Z Applying migration `20260531192335_add_refund_policy_fields`
+2026-07-02T20:40:59.9962526Z Applying migration `20260531192400_backfill_commission_ledger`
+2026-07-02T20:41:00.0003792Z Applying migration `20260531204024_seed_buyer_fee_commission_rule`
+2026-07-02T20:41:00.0036271Z Applying migration `20260603114321_activate_buyer_fee_rule`
+2026-07-02T20:41:00.0060846Z Applying migration `20260606160910_add_product_boost`
+2026-07-02T20:41:00.0228447Z Applying migration `20260606175645_add_show_trust_score`
+2026-07-02T20:41:00.0259586Z Applying migration `20260606191010_add_boost_auto_renew`
+2026-07-02T20:41:00.0287650Z Applying migration `20260606210135_add_relevance_score`
+2026-07-02T20:41:00.0329527Z Applying migration `20260607162210_trade_shipment_from_address_nullable`
+2026-07-02T20:41:00.0387916Z Applying migration `20260609120000_backfill_order_subtotal`
+2026-07-02T20:41:00.0412335Z Applying migration `20260611090000_deactivate_zero_stock_active_products`
+2026-07-02T20:41:00.0444064Z Applying migration `20260611110000_checkout_groups`
+2026-07-02T20:41:00.0633525Z Applying migration `20260611121303_add_product_ai_moderation`
+2026-07-02T20:41:00.0666583Z Applying migration `20260611231909_trade_shipping_address`
+2026-07-02T20:41:00.0694445Z Applying migration `20260612153717_drop_payment_methods`
+2026-07-02T20:41:00.0768100Z Applying migration `20260614121855_product_status_deleted`
+2026-07-02T20:41:00.0791595Z Applying migration `20260618181303_payment_integrity_constraints`
+2026-07-02T20:41:00.0839526Z Applying migration `20260619180003_drop_shipping_config_models`
+2026-07-02T20:41:00.1071071Z Applying migration `20260619185258_remove_product_draft_status`
+2026-07-02T20:41:00.1342057Z Applying migration `20260619190000_rating_status_deleted`
+2026-07-02T20:41:00.1365128Z Applying migration `20260619190100_fold_spam_reviews_into_rejected`
+2026-07-02T20:41:00.1400029Z Applying migration `20260619231904_add_founded_year_to_manufacturer`
+2026-07-02T20:41:00.1424004Z Applying migration `20260619235133_add_business_status`
+2026-07-02T20:41:00.1453584Z Applying migration `20260620000000_add_moderation_events`
+2026-07-02T20:41:00.1552279Z Applying migration `20260620012427_add_message_soft_delete`
+2026-07-02T20:41:00.1580555Z Applying migration `20260620100000_fix_attribute_empty_display_value`
+2026-07-02T20:41:00.1605233Z Applying migration `20260620110000_remove_tags`
+2026-07-02T20:41:00.1735981Z Applying migration `20260620115847_add_order_tax_amount`
+2026-07-02T20:41:00.1765792Z Applying migration `20260620141527_add_oauth_accounts`
+2026-07-02T20:41:00.1861849Z Applying migration `20260620184314_add_saved_cards`
+2026-07-02T20:41:00.1976582Z Applying migration `20260626120000_add_user_notification_settings`
+2026-07-02T20:41:00.2003048Z Applying migration `20260626190000_add_payment_hold_frozen_by_refund`
+2026-07-02T20:41:00.2027778Z Applying migration `20260626190100_backfill_payment_hold_release_to_delivery`
+2026-07-02T20:41:00.2070635Z Applying migration `20260626193000_add_order_cancellation_type`
+2026-07-02T20:41:00.2098003Z Applying migration `20260626194000_add_order_quantity_unitprice`
+2026-07-02T20:41:00.2132763Z Applying migration `20260626195000_add_partial_refund_fields`
+2026-07-02T20:41:00.2166693Z Applying migration `20260627130542_add_report_model`
+2026-07-02T20:41:00.2275506Z Applying migration `20260627133936_add_product_suspended_status`
+2026-07-02T20:41:00.2297839Z Applying migration `20260628235414_add_user_deleted_at`
+2026-07-02T20:41:00.2324516Z Applying migration `20260629120000_add_featured_snapshot`
+2026-07-02T20:41:00.2381727Z Applying migration `20260629140000_refund_status_default_approved`
+2026-07-02T20:41:00.2411715Z Applying migration `20260629210205_add_phone_verification_token`
+2026-07-02T20:41:00.2490579Z Applying migration `20260630000000_add_scheduled_tier_type`
+2026-07-02T20:41:00.2515455Z Applying migration `20260630010000_add_scheduled_billing_period`
+2026-07-02T20:41:00.2543777Z Applying migration `20260630175419_add_elogo_invoice`
+2026-07-02T20:41:00.2724045Z Applying migration `20260630213736_add_elogo_invoice_pdfurl`
+2026-07-02T20:41:00.2751161Z Applying migration `20260630220324_add_platform_sale_einvoice_type`
+2026-07-02T20:41:00.2774969Z Applying migration `20260701133823_add_seller_uploaded_invoice`
+2026-07-02T20:41:00.2876039Z Applying migration `20260702090000_add_withholding_tax`
+2026-07-02T20:41:00.2912373Z 
+2026-07-02T20:41:00.2932248Z The following migration(s) have been applied:
+2026-07-02T20:41:00.2932719Z 
+2026-07-02T20:41:00.2932865Z migrations/
+2026-07-02T20:41:00.2933659Z   └─ 20260118220111_init/
+2026-07-02T20:41:00.2934164Z     └─ migration.sql
+2026-07-02T20:41:00.2934884Z   └─ 20260118230000_add_custom_collection_items/
+2026-07-02T20:41:00.2935645Z     └─ migration.sql
+2026-07-02T20:41:00.2936326Z   └─ 20260118230550_add_collection_likes/
+2026-07-02T20:41:00.2937020Z     └─ migration.sql
+2026-07-02T20:41:00.2937558Z   └─ 20260130100000_add_advertisements/
+2026-07-02T20:41:00.2938037Z     └─ migration.sql
+2026-07-02T20:41:00.2938934Z   └─ 20260130120000_enhance_advertisements_iab/
+2026-07-02T20:41:00.2939566Z     └─ migration.sql
+2026-07-02T20:41:00.2940250Z   └─ 20260131000000_add_user_missing_columns/
+2026-07-02T20:41:00.2940836Z     └─ migration.sql
+2026-07-02T20:41:00.2941469Z   └─ 20260131100000_add_discount_system/
+2026-07-02T20:41:00.2942064Z     └─ migration.sql
+2026-07-02T20:41:00.2942760Z   └─ 20260131150000_add_old_price_to_product/
+2026-07-02T20:41:00.2943427Z     └─ migration.sql
+2026-07-02T20:41:00.2943902Z   └─ 20260202000000_add_user_login_columns/
+2026-07-02T20:41:00.2944588Z     └─ migration.sql
+2026-07-02T20:41:00.2945038Z   └─ 20260203000000_add_brands/
+2026-07-02T20:41:00.2945630Z     └─ migration.sql
+2026-07-02T20:41:00.2946184Z   └─ 20260203100000_add_products_slug_and_columns/
+2026-07-02T20:41:00.2946715Z     └─ migration.sql
+2026-07-02T20:41:00.2947171Z   └─ 20260204000000_add_tax_settings/
+2026-07-02T20:41:00.2947635Z     └─ migration.sql
+2026-07-02T20:41:00.2948120Z   └─ 20260204100000_add_commission_rule_columns/
+2026-07-02T20:41:00.2948841Z     └─ migration.sql
+2026-07-02T20:41:00.2949302Z   └─ 20260204110000_commission_seller_type_enum/
+2026-07-02T20:41:00.2949811Z     └─ migration.sql
+2026-07-02T20:41:00.2950289Z   └─ 20260204120000_add_orders_fee_columns/
+2026-07-02T20:41:00.2951280Z     └─ migration.sql
+2026-07-02T20:41:00.2951827Z   └─ 20260204150000_add_static_pages_and_email_templates/
+2026-07-02T20:41:00.2952420Z     └─ migration.sql
+2026-07-02T20:41:00.2952949Z   └─ 20260210000000_add_newsletter_subscribers/
+2026-07-02T20:41:00.2953467Z     └─ migration.sql
+2026-07-02T20:41:00.2953918Z   └─ 20260220000000_add_category_image/
+2026-07-02T20:41:00.2954430Z     └─ migration.sql
+2026-07-02T20:41:00.2954864Z   └─ 20260220010000_sync_schema/
+2026-07-02T20:41:00.2955295Z     └─ migration.sql
+2026-07-02T20:41:00.2955745Z   └─ 20260220020000_fix_enums_and_columns/
+2026-07-02T20:41:00.2956223Z     └─ migration.sql
+2026-07-02T20:41:00.2956724Z   └─ 20260228000000_add_manufacturers/
+2026-07-02T20:41:00.2957189Z     └─ migration.sql
+2026-07-02T20:41:00.2957563Z   └─ 20260228101718_mig/
+2026-07-02T20:41:00.2957936Z     └─ migration.sql
+2026-07-02T20:41:00.2958745Z   └─ 20260309000000_media_public_keys/
+2026-07-02T20:41:00.2959266Z     └─ migration.sql
+2026-07-02T20:41:00.2959788Z   └─ 20260311000000_fulltext_and_vehicle_type/
+2026-07-02T20:41:00.2960294Z     └─ migration.sql
+2026-07-02T20:41:00.2960732Z   └─ 20260312000000_fulltext_all_tables/
+2026-07-02T20:41:00.2961195Z     └─ migration.sql
+2026-07-02T20:41:00.2961795Z   └─ 20260312000000_fulltext_collections_autocomplete/
+2026-07-02T20:41:00.2962416Z     └─ migration.sql
+2026-07-02T20:41:00.2962932Z   └─ 20260312204345_add_product_rating_columns/
+2026-07-02T20:41:00.2963460Z     └─ migration.sql
+2026-07-02T20:41:00.2964082Z   └─ 20260313000000_add_collection_item_manufacturer_material/
+2026-07-02T20:41:00.2964681Z     └─ migration.sql
+2026-07-02T20:41:00.2965167Z   └─ 20260315000000_remove_category_image/
+2026-07-02T20:41:00.2965635Z     └─ migration.sql
+2026-07-02T20:41:00.2966073Z   └─ 20260315000001_add_rating_status/
+2026-07-02T20:41:00.2966564Z     └─ migration.sql
+2026-07-02T20:41:00.2966934Z   └─ 20260315144357_/
+2026-07-02T20:41:00.2967301Z     └─ migration.sql
+2026-07-02T20:41:00.2968167Z   └─ 20260315154057_add_product_reserved_quantity/
+2026-07-02T20:41:00.2968965Z     └─ migration.sql
+2026-07-02T20:41:00.2969597Z   └─ 20260316000000_add_payments_trade_cash_payment_id/
+2026-07-02T20:41:00.2970145Z     └─ migration.sql
+2026-07-02T20:41:00.2970640Z   └─ 20260316000001_make_payments_order_id_nullable/
+2026-07-02T20:41:00.2971149Z     └─ migration.sql
+2026-07-02T20:41:00.2971575Z   └─ 20260316000002_add_offer_message/
+2026-07-02T20:41:00.2972012Z     └─ migration.sql
+2026-07-02T20:41:00.2972456Z   └─ 20260317000000_car_models_fts/
+2026-07-02T20:41:00.2972898Z     └─ migration.sql
+2026-07-02T20:41:00.2973370Z   └─ 20260321114507_offer_buyer_must_accept/
+2026-07-02T20:41:00.2973859Z     └─ migration.sql
+2026-07-02T20:41:00.2974325Z   └─ 20260321120000_offer_buyer_must_accept/
+2026-07-02T20:41:00.2974808Z     └─ migration.sql
+2026-07-02T20:41:00.2975248Z   └─ 20260328000000_order_number_seq/
+2026-07-02T20:41:00.2975703Z     └─ migration.sql
+2026-07-02T20:41:00.2976112Z   └─ 20260410000000_stock_model_v2/
+2026-07-02T20:41:00.2976569Z     └─ migration.sql
+2026-07-02T20:41:00.2976989Z   └─ 20260419212030_safe_trade_flow/
+2026-07-02T20:41:00.2977421Z     └─ migration.sql
+2026-07-02T20:41:00.2977866Z   └─ 20260420120000_add_preparing_deadline/
+2026-07-02T20:41:00.2978925Z     └─ migration.sql
+2026-07-02T20:41:00.2979436Z   └─ 20260423201017_add_shipment_provider_fields/
+2026-07-02T20:41:00.2979932Z     └─ migration.sql
+2026-07-02T20:41:00.2980521Z   └─ 20260425154837_add_seller_bank_account_and_payout_transfer/
+2026-07-02T20:41:00.2981096Z     └─ migration.sql
+2026-07-02T20:41:00.2981536Z   └─ 20260429000000_add_refund_requests/
+2026-07-02T20:41:00.2981983Z     └─ migration.sql
+2026-07-02T20:41:00.2982410Z   └─ 20260501203841_split_payment_window/
+2026-07-02T20:41:00.2982850Z     └─ migration.sql
+2026-07-02T20:41:00.2983408Z   └─ 20260513000000_add_attribute_group_manufacturer_scope/
+2026-07-02T20:41:00.2983969Z     └─ migration.sql
+2026-07-02T20:41:00.2984519Z   └─ 20260513100000_product_search_text_with_attributes/
+2026-07-02T20:41:00.2985278Z     └─ migration.sql
+2026-07-02T20:41:00.2985742Z   └─ 20260514173735_trade_cancel_hardening/
+2026-07-02T20:41:00.2986217Z     └─ migration.sql
+2026-07-02T20:41:00.2986777Z   └─ 20260514175446_trade_compensation_and_lost_shipments/
+2026-07-02T20:41:00.2987337Z     └─ migration.sql
+2026-07-02T20:41:00.2987889Z   └─ 20260531190000_fix_trades_compensation_user_id_drift/
+2026-07-02T20:41:00.2988945Z     └─ migration.sql
+2026-07-02T20:41:00.2989396Z   └─ 20260531192054_add_commission_ledger/
+2026-07-02T20:41:00.2989860Z     └─ migration.sql
+2026-07-02T20:41:00.2990339Z   └─ 20260531192149_add_order_buyer_confirmation/
+2026-07-02T20:41:00.2990856Z     └─ migration.sql
+2026-07-02T20:41:00.2991392Z   └─ 20260531192226_add_awaiting_buyer_confirmation_status/
+2026-07-02T20:41:00.2991944Z     └─ migration.sql
+2026-07-02T20:41:00.2992529Z   └─ 20260531192300_add_refund_reason_values/
+2026-07-02T20:41:00.2993026Z     └─ migration.sql
+2026-07-02T20:41:00.2993497Z   └─ 20260531192335_add_refund_policy_fields/
+2026-07-02T20:41:00.2994029Z     └─ migration.sql
+2026-07-02T20:41:00.2994518Z   └─ 20260531192400_backfill_commission_ledger/
+2026-07-02T20:41:00.2995026Z     └─ migration.sql
+2026-07-02T20:41:00.2995542Z   └─ 20260531204024_seed_buyer_fee_commission_rule/
+2026-07-02T20:41:00.2996060Z     └─ migration.sql
+2026-07-02T20:41:00.2996542Z   └─ 20260603114321_activate_buyer_fee_rule/
+2026-07-02T20:41:00.2997027Z     └─ migration.sql
+2026-07-02T20:41:00.2997478Z   └─ 20260606160910_add_product_boost/
+2026-07-02T20:41:00.2997940Z     └─ migration.sql
+2026-07-02T20:41:00.2998533Z   └─ 20260606175645_add_show_trust_score/
+2026-07-02T20:41:00.2999015Z     └─ migration.sql
+2026-07-02T20:41:00.2999610Z   └─ 20260606191010_add_boost_auto_renew/
+2026-07-02T20:41:00.3000069Z     └─ migration.sql
+2026-07-02T20:41:00.3000525Z   └─ 20260606210135_add_relevance_score/
+2026-07-02T20:41:00.3000995Z     └─ migration.sql
+2026-07-02T20:41:00.3001556Z   └─ 20260607162210_trade_shipment_from_address_nullable/
+2026-07-02T20:41:00.3002377Z     └─ migration.sql
+2026-07-02T20:41:00.3002844Z   └─ 20260609120000_backfill_order_subtotal/
+2026-07-02T20:41:00.3003331Z     └─ migration.sql
+2026-07-02T20:41:00.3003890Z   └─ 20260611090000_deactivate_zero_stock_active_products/
+2026-07-02T20:41:00.3004451Z     └─ migration.sql
+2026-07-02T20:41:00.3004891Z   └─ 20260611110000_checkout_groups/
+2026-07-02T20:41:00.3005353Z     └─ migration.sql
+2026-07-02T20:41:00.3005838Z   └─ 20260611121303_add_product_ai_moderation/
+2026-07-02T20:41:00.3006336Z     └─ migration.sql
+2026-07-02T20:41:00.3006806Z   └─ 20260611231909_trade_shipping_address/
+2026-07-02T20:41:00.3007298Z     └─ migration.sql
+2026-07-02T20:41:00.3007753Z   └─ 20260612153717_drop_payment_methods/
+2026-07-02T20:41:00.3008655Z     └─ migration.sql
+2026-07-02T20:41:00.3009132Z   └─ 20260614121855_product_status_deleted/
+2026-07-02T20:41:00.3009610Z     └─ migration.sql
+2026-07-02T20:41:00.3010122Z   └─ 20260618181303_payment_integrity_constraints/
+2026-07-02T20:41:00.3010665Z     └─ migration.sql
+2026-07-02T20:41:00.3011170Z   └─ 20260619180003_drop_shipping_config_models/
+2026-07-02T20:41:00.3011675Z     └─ migration.sql
+2026-07-02T20:41:00.3012166Z   └─ 20260619185258_remove_product_draft_status/
+2026-07-02T20:41:00.3012667Z     └─ migration.sql
+2026-07-02T20:41:00.3013118Z   └─ 20260619190000_rating_status_deleted/
+2026-07-02T20:41:00.3013589Z     └─ migration.sql
+2026-07-02T20:41:00.3014093Z   └─ 20260619190100_fold_spam_reviews_into_rejected/
+2026-07-02T20:41:00.3014629Z     └─ migration.sql
+2026-07-02T20:41:00.3015155Z   └─ 20260619231904_add_founded_year_to_manufacturer/
+2026-07-02T20:41:00.3015685Z     └─ migration.sql
+2026-07-02T20:41:00.3016135Z   └─ 20260619235133_add_business_status/
+2026-07-02T20:41:00.3016598Z     └─ migration.sql
+2026-07-02T20:41:00.3017060Z   └─ 20260620000000_add_moderation_events/
+2026-07-02T20:41:00.3017532Z     └─ migration.sql
+2026-07-02T20:41:00.3018003Z   └─ 20260620012427_add_message_soft_delete/
+2026-07-02T20:41:00.3018666Z     └─ migration.sql
+2026-07-02T20:41:00.3019437Z   └─ 20260620100000_fix_attribute_empty_display_value/
+2026-07-02T20:41:00.3019981Z     └─ migration.sql
+2026-07-02T20:41:00.3020412Z   └─ 20260620110000_remove_tags/
+2026-07-02T20:41:00.3020857Z     └─ migration.sql
+2026-07-02T20:41:00.3021310Z   └─ 20260620115847_add_order_tax_amount/
+2026-07-02T20:41:00.3021778Z     └─ migration.sql
+2026-07-02T20:41:00.3022240Z   └─ 20260620141527_add_oauth_accounts/
+2026-07-02T20:41:00.3022700Z     └─ migration.sql
+2026-07-02T20:41:00.3023133Z   └─ 20260620184314_add_saved_cards/
+2026-07-02T20:41:00.3023580Z     └─ migration.sql
+2026-07-02T20:41:00.3024090Z   └─ 20260626120000_add_user_notification_settings/
+2026-07-02T20:41:00.3024616Z     └─ migration.sql
+2026-07-02T20:41:00.3025142Z   └─ 20260626190000_add_payment_hold_frozen_by_refund/
+2026-07-02T20:41:00.3025666Z     └─ migration.sql
+2026-07-02T20:41:00.3026266Z   └─ 20260626190100_backfill_payment_hold_release_to_delivery/
+2026-07-02T20:41:00.3026850Z     └─ migration.sql
+2026-07-02T20:41:00.3027384Z   └─ 20260626193000_add_order_cancellation_type/
+2026-07-02T20:41:00.3027898Z     └─ migration.sql
+2026-07-02T20:41:00.3032889Z   └─ 20260626194000_add_order_quantity_unitprice/
+2026-07-02T20:41:00.3033527Z     └─ migration.sql
+2026-07-02T20:41:00.3034050Z   └─ 20260626195000_add_partial_refund_fields/
+2026-07-02T20:41:00.3034572Z     └─ migration.sql
+2026-07-02T20:41:00.3035120Z   └─ 20260627130542_add_report_model/
+2026-07-02T20:41:00.3035588Z     └─ migration.sql
+2026-07-02T20:41:00.3036095Z   └─ 20260627133936_add_product_suspended_status/
+2026-07-02T20:41:00.3036618Z     └─ migration.sql
+2026-07-02T20:41:00.3037066Z   └─ 20260628235414_add_user_deleted_at/
+2026-07-02T20:41:00.3037535Z     └─ migration.sql
+2026-07-02T20:41:00.3037994Z   └─ 20260629120000_add_featured_snapshot/
+2026-07-02T20:41:00.3038643Z     └─ migration.sql
+2026-07-02T20:41:00.3039175Z   └─ 20260629140000_refund_status_default_approved/
+2026-07-02T20:41:00.3039718Z     └─ migration.sql
+2026-07-02T20:41:00.3040491Z   └─ 20260629210205_add_phone_verification_token/
+2026-07-02T20:41:00.3041023Z     └─ migration.sql
+2026-07-02T20:41:00.3041494Z   └─ 20260630000000_add_scheduled_tier_type/
+2026-07-02T20:41:00.3041980Z     └─ migration.sql
+2026-07-02T20:41:00.3042475Z   └─ 20260630010000_add_scheduled_billing_period/
+2026-07-02T20:41:00.3042979Z     └─ migration.sql
+2026-07-02T20:41:00.3043429Z   └─ 20260630175419_add_elogo_invoice/
+2026-07-02T20:41:00.3043884Z     └─ migration.sql
+2026-07-02T20:41:00.3044359Z   └─ 20260630213736_add_elogo_invoice_pdfurl/
+2026-07-02T20:41:00.3044853Z     └─ migration.sql
+2026-07-02T20:41:00.3045366Z   └─ 20260630220324_add_platform_sale_einvoice_type/
+2026-07-02T20:41:00.3045890Z     └─ migration.sql
+2026-07-02T20:41:00.3046377Z   └─ 20260701133823_add_seller_uploaded_invoice/
+2026-07-02T20:41:00.3046890Z     └─ migration.sql
+2026-07-02T20:41:00.3047350Z   └─ 20260702090000_add_withholding_tax/
+2026-07-02T20:41:00.3047817Z     └─ migration.sql
+2026-07-02T20:41:00.3048153Z       
+2026-07-02T20:41:00.3048815Z All migrations have been successfully applied.
+2026-07-02T20:41:00.3308694Z ┌─────────────────────────────────────────────────────────┐
+2026-07-02T20:41:00.3309623Z │  Update available 5.22.0 -> 7.8.0                       │
+2026-07-02T20:41:00.3310281Z │                                                         │
+2026-07-02T20:41:00.3310971Z │  This is a major update - please follow the guide at    │
+2026-07-02T20:41:00.3311764Z │  https://pris.ly/d/major-version-upgrade                │
+2026-07-02T20:41:00.3312450Z │                                                         │
+2026-07-02T20:41:00.3313097Z │  Run the following to update                            │
+2026-07-02T20:41:00.3313793Z │    npm i --save-dev prisma@latest                       │
+2026-07-02T20:41:00.3314481Z │    npm i @prisma/client@latest                          │
+2026-07-02T20:41:00.3315215Z └─────────────────────────────────────────────────────────┘

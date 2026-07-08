@@ -587,6 +587,22 @@ export class UserController {
     return this.userService.getTopSellers(limit ? parseInt(limit, 10) : 5);
   }
 
+  /**
+   * GET /users/search?q=...
+   * İsimle satıcı arama (autocomplete). Herkese açık.
+   */
+  @Get('search')
+  @Public()
+  @ApiOperation({ summary: 'İsimle satıcı arama' })
+  @ApiQuery({ name: 'q', required: true, type: String })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Limit (default: 8)' })
+  async searchSellers(
+    @Query('q') q?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.userService.searchSellers(q ?? '', limit ? parseInt(limit, 10) : 8);
+  }
+
   // -------- Seller Bank Account --------
 
   @Get('me/bank-account')

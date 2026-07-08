@@ -6,8 +6,6 @@ import {
   ConflictException,
   Optional,
   Logger,
-  Inject,
-  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
@@ -34,9 +32,7 @@ export class OfferService {
     private readonly cache: CacheService,
     private readonly configService: ConfigService,
     private readonly eventService: EventService,
-    @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
-    @Inject(forwardRef(() => OrderService))
     private readonly orderService: OrderService,
     private readonly productLockService: ProductLockService,
     @Optional()

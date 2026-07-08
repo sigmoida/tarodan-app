@@ -1,0 +1,348 @@
+﻿2026-07-02T20:40:54.8952701Z ##[group]Run pnpm --filter @tarodan/api exec jest --config ./test/jest-e2e.json --runInBand --testPathPattern 'test/e2e/scenarios/' --shard=6/10
+2026-07-02T20:40:54.8953648Z [36;1mpnpm --filter @tarodan/api exec jest --config ./test/jest-e2e.json --runInBand --testPathPattern 'test/e2e/scenarios/' --shard=6/10[0m
+2026-07-02T20:40:54.8973147Z shell: /usr/bin/bash -e {0}
+2026-07-02T20:40:54.8973423Z env:
+2026-07-02T20:40:54.8973662Z   MAILHOG_URL: http://localhost:8025
+2026-07-02T20:40:54.8973989Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-07-02T20:40:54.8974293Z ##[endgroup]
+2026-07-02T20:40:55.9196005Z ts-jest[config] (WARN) 
+2026-07-02T20:40:55.9197685Z     The "ts-jest" config option "isolatedModules" is deprecated and will be removed in v30.0.0. Please use "isolatedModules: true" in /home/runner/work/tarodan-app/tarodan-app/apps/api/tsconfig.json instead, see https://www.typescriptlang.org/tsconfig/#isolatedModules
+2026-07-02T20:40:55.9199170Z   
+2026-07-02T20:40:55.9879380Z   console.log
+2026-07-02T20:40:55.9880302Z     ◇ injected env (41) from .env.test // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+2026-07-02T20:40:55.9880667Z 
+2026-07-02T20:40:55.9880881Z       at _log (node_modules/dotenv/lib/main.js:131:11)
+2026-07-02T20:40:55.9881144Z 
+2026-07-02T20:41:03.4144212Z   console.log
+2026-07-02T20:41:03.4145331Z     prisma:info Starting a postgresql pool with 5 connections.
+2026-07-02T20:41:03.4146129Z 
+2026-07-02T20:41:03.4146765Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:41:03.4147427Z 
+2026-07-02T20:41:43.0121988Z FAIL test/e2e/scenarios/12-ref.e2e-spec.ts (47.118 s)
+2026-07-02T20:41:43.0124995Z   12 — İade & İptal (REF)
+2026-07-02T20:41:43.0126516Z     ✓ REF-064 [P2] Sürat entegrasyonu kapalıyken manuel kargo açılır (550 ms)
+2026-07-02T20:41:43.0127679Z     ✓ REF-094 [P2] PAYMENT_BYPASS modunda PayTR çağrısı atlanır (577 ms)
+2026-07-02T20:41:43.0128987Z     ○ skipped REF-130 [P2] Web iade detay TR/EN metinleri — SKIP(Saf web UI (i18n metinleri) — API e2e ile doğrulanamaz.)
+2026-07-02T20:41:43.0130728Z     ○ skipped REF-131 [P2] Mobil iade ekranı yalnızca TR (EN paritesi yok) — SKIP(Saf mobil UI (yalnız-TR etiketler) — API e2e ile doğrulanamaz.)
+2026-07-02T20:41:43.0132795Z     ○ skipped REF-133 [P2] Sebep etiketleri parite: counterfeit/lost_in_transit eksikliği — SKIP(Saf web/mobil UI (reasonLabels eşlemesi) — API e2e ile doğrulanamaz.)
+2026-07-02T20:41:43.0135338Z     ○ skipped REF-134 [P1] Sipariş listesi durum rozeti tutarlılığı (cancellationType iptal vs iade) — SKIP(Saf UI rozet metni (İptal/İade Edildi) — cancellationType API tarafı REF-001/REF-072 kapsıyor.)
+2026-07-02T20:41:43.0136844Z     Cooling-off / anlık iade talebi oluşturma
+2026-07-02T20:41:43.0137698Z       ✓ REF-001 [P0] Kargo öncesi (paid, henüz kargolanmamış) anlık iade (850 ms)
+2026-07-02T20:41:43.0138729Z       ✓ REF-002 [P0] Kargoda (shipped/in_transit) ≤14 gün → wait_for_delivery (538 ms)
+2026-07-02T20:41:43.0140022Z       ✓ REF-003 [P0] Teslim edilmiş (delivered) ≤14 gün → kargo hemen açılır (726 ms)
+2026-07-02T20:41:43.0141312Z       ✓ REF-004 [P1] preparing fazında (hazırlanıyor, shipment pending/cancelled/failed) anlık iade (601 ms)
+2026-07-02T20:41:43.0142618Z       ✓ REF-005 [P2] Teslim edilmiş ama deliveredAt boş → in_cooling_off varsayımı (581 ms)
+2026-07-02T20:41:43.0143634Z       ✓ REF-120 [P1] 14. günün tam sınırı (ageDays == 14) iade edilebilir (558 ms)
+2026-07-02T20:41:43.0144327Z     İade talebi reddi
+2026-07-02T20:41:43.0145214Z       ✓ REF-010 [P0] 14 gün dolmuş (>14 gün teslim) → iade bloklanır (455 ms)
+2026-07-02T20:41:43.0146153Z       ✓ REF-011 [P0] Ödenmemiş sipariş (pending_payment) → iade reddi (351 ms)
+2026-07-02T20:41:43.0147014Z       ✓ REF-012 [P1] Tamamlanmamış ödeme → iade reddi (427 ms)
+2026-07-02T20:41:43.0147832Z       ✓ REF-013 [P1] Zaten iptal/iade edilmiş siparişte iade reddi (425 ms)
+2026-07-02T20:41:43.0148727Z       ✓ REF-014 [P0] Aynı sipariş için çift aktif iade engeli (566 ms)
+2026-07-02T20:41:43.0149594Z       ✓ REF-015 [P1] Üyelik (MEM-) siparişinde iade reddi (416 ms)
+2026-07-02T20:41:43.0151127Z       ✓ REF-016 [P1] Geçersiz `reason` enum değeri → 400 (411 ms)
+2026-07-02T20:41:43.0151976Z       ✓ REF-017 [P1] `refundQuantity < 1` veya non-int → 400 (434 ms)
+2026-07-02T20:41:43.0153052Z       ✓ REF-018 [P2] `evidencePhotoUrls` geçersiz URL → 400; `description > 2000` → 400 (457 ms)
+2026-07-02T20:41:43.0154143Z       ✓ REF-019 [P1] Bozuk / olmayan orderId → 400 / 404 (323 ms)
+2026-07-02T20:41:43.0155140Z     Yetki & güvenlik (oluşturma/görüntüleme/iptal)
+2026-07-02T20:41:43.0156012Z       ✓ REF-020 [P0] Yalnızca alıcı iade talebi oluşturabilir (412 ms)
+2026-07-02T20:41:43.0156902Z       ✓ REF-021 [P0] Kimliksiz (auth yok) iade talebi → 401 (399 ms)
+2026-07-02T20:41:43.0157813Z       ✓ REF-022 [P0] İade detayını yalnızca alıcı/satıcı görür; yabancı → 403 (607 ms)
+2026-07-02T20:41:43.0158815Z       ✓ REF-023 [P0] Satıcı, alıcının iade talebini iptal edemez (403) (496 ms)
+2026-07-02T20:41:43.0160093Z       ✓ REF-140 [P0] Başka kullanıcının iade talebini iptal etme (IDOR) → 403 (496 ms)
+2026-07-02T20:41:43.0161218Z       ✓ REF-141 [P0] Başka kullanıcının iade talebini görüntüleme (IDOR) → 403 (802 ms)
+2026-07-02T20:41:43.0162358Z       ✓ REF-142 [P2] `refundNumber` tahmin edilemez (sıra/sayı sızdırmaz) (1083 ms)
+2026-07-02T20:41:43.0163115Z     İade talebi iptali
+2026-07-02T20:41:43.0163820Z       ✓ REF-030 [P0] `wait_for_delivery` talebi alıcı tarafından iptal edilir (492 ms)
+2026-07-02T20:41:43.0165057Z       ✓ REF-031 [P1] `pending_review` talebi alıcı tarafından iptal edilir (443 ms)
+2026-07-02T20:41:43.0166137Z       ✓ REF-032 [P0] Kargo açıldıktan sonra (return_shipment_open) iptal reddi (561 ms)
+2026-07-02T20:41:43.0167884Z       ✓ REF-033 [P1] `refunded`/`rejected`/`disputed` talebin iptal reddi (504 ms)
+2026-07-02T20:41:43.0169295Z       ✓ REF-034 [P2] Olmayan iade talebi id → 404 (303 ms)
+2026-07-02T20:41:43.0170738Z       ✓ REF-132 [P1] İptal butonu parite farkı: backend vs web vs mobil (617 ms)
+2026-07-02T20:41:43.0171500Z     Sipariş iptali
+2026-07-02T20:41:43.0173617Z       ✓ REF-040 [P0] paid sipariş iptali → refunded; cron PayTR iadesini yapar (554 ms)
+2026-07-02T20:41:43.0180264Z       ✓ REF-041 [P0] Kargoya verildikten (shipped) sonra sipariş iptali reddi (444 ms)
+2026-07-02T20:41:43.0181576Z       ✓ REF-042 [P1] pending_payment sipariş iptali → cancelled (rezervasyon serbest) (366 ms)
+2026-07-02T20:41:43.0182685Z       ✓ REF-043 [P1] Sipariş iptalini yalnızca alıcı yapabilir (403) (397 ms)
+2026-07-02T20:41:43.0183474Z     PaymentHold ↔ iade kilit etkileşimi
+2026-07-02T20:41:43.0184309Z       ✓ REF-050 [P0] Cooling-off iade açılınca PaymentHold dondurulur (541 ms)
+2026-07-02T20:41:43.0185390Z       ✓ REF-051 [P0] İade iptal edilince hold kilidi çözülür (490 ms)
+2026-07-02T20:41:43.0186457Z       ✓ REF-052 [P0] Donmuş hold, releaseAt geçmişte olsa bile serbest BIRAKILMAZ (14. gün yarışı) (551 ms)
+2026-07-02T20:41:43.0186943Z     İade kargosu + finalize
+2026-07-02T20:41:43.0187537Z       ✓ REF-060 [P0] Teslimat sonrası cron iade kargosunu açar (wait_for_delivery → return_shipment_open) (537 ms)
+2026-07-02T20:41:43.0188338Z       ✓ REF-061 [P0] Kargo takibi in_transit → delivered ilerler; 30dk sonra finalize cron iadeyi tamamlar (761 ms)
+2026-07-02T20:41:43.0189019Z       ✓ REF-062 [P1] Satıcı adresi YOKKEN iade kargosu depo fallback ile açılır (613 ms)
+2026-07-02T20:41:43.0189578Z       ✓ REF-063 [P1] Alıcı adresi de yoksa iade kargosu açılamaz (400) (521 ms)
+2026-07-02T20:41:43.0190214Z       ✓ REF-065 [P1] `openReturnShipment` idempotent (returnTrackingNumber doluysa no-op) (549 ms)
+2026-07-02T20:41:43.0190679Z     İade bildirimleri
+2026-07-02T20:41:43.0191112Z       ✓ REF-070 [P1] Cooling-off onayda alıcıya REFUND_APPROVED bildirimi (479 ms)
+2026-07-02T20:41:43.0191689Z       ✓ REF-071 [P1] Talep iptalinde satıcıya REFUND_CANCELLED bildirimi (498 ms)
+2026-07-02T20:41:43.0192312Z       ✓ REF-072 [P0] "İade Sürecinde" → "İade Edildi" geçişinde alıcı/satıcı bildirimleri (688 ms)
+2026-07-02T20:41:43.0192977Z       ✓ REF-073 [P2] Kargo in_transit/delivered geçişlerinde her iki tarafa bildirim (613 ms)
+2026-07-02T20:41:43.0193687Z     Sipariş listesi iade durumu
+2026-07-02T20:41:43.0194182Z       ✓ REF-074 [P1] Sipariş listesi iade durumunu yansıtır (activeRefundRequest) (580 ms)
+2026-07-02T20:41:43.0195010Z       ✓ REF-075 [P1] Tamamlanmış iade `refundsOnly=true` "İadeler" sekmesinde görünür (719 ms)
+2026-07-02T20:41:43.0195523Z     Kısmi iade tutarı & admin override-policy
+2026-07-02T20:41:43.0195996Z       ✓ REF-080 [P0] Adet bazlı kısmi iade tutarı orantılı hesaplanır (560 ms)
+2026-07-02T20:41:43.0196523Z       ✓ REF-081 [P1] refundQuantity sipariş adedine clamp'lenir (569 ms)
+2026-07-02T20:41:43.0197168Z       ✓ REF-082 [P0] Admin override-policy: yalnızca ürün → tutar = total - shipping - buyerFee (503 ms)
+2026-07-02T20:41:43.0197821Z       ✓ REF-083 [P2] override-policy negatif ürün tutarı 0'a sabitlenir (497 ms)
+2026-07-02T20:41:43.0198397Z       ✓ REF-084 [P1] refundSellerCommission alıcı iade tutarına EKLENMEZ (504 ms)
+2026-07-02T20:41:43.0199126Z       ✓ REF-104 [P1] Admin set-shipping-payer iade kargo tarafını günceller (501 ms)
+2026-07-02T20:41:43.0199687Z       ✓ REF-105 [P2] set-shipping-payer geçersiz değer → 400 (476 ms)
+2026-07-02T20:41:43.0200078Z     POST /api/payments/refund (legacy iade)
+2026-07-02T20:41:43.0200676Z       ✓ REF-024 [P1] `POST /payments/refund` (legacy) yalnızca alıcı + auth + UUID kuralları (498 ms)
+2026-07-02T20:41:43.0201253Z       ✓ REF-085 [P0] İade tutarı üst sınır aşımı (O12) reddi (447 ms)
+2026-07-02T20:41:43.0201833Z       ✓ REF-093 [P0] Payout completed/processing iken iade reddi (çift-ödeme koruması) (432 ms)
+2026-07-02T20:41:43.0202414Z       ✓ REF-122 [P1] Anlık iade + eşzamanlı payout cron yarışı (446 ms)
+2026-07-02T20:41:43.0203015Z       ✓ REF-143 [P0] Satıcı, alıcı adına `POST /payments/refund` ile para iadesi tetikleyemez (416 ms)
+2026-07-02T20:41:43.0203992Z       ○ skipped REF-144 [P2] `POST /payments/refund` rate limit (5 istek/dk) — SKIP(ThrottlerModule test modunda skipIf ile devre dışı (app.module.ts:116) → 429 üretilmiyor.)
+2026-07-02T20:41:43.0204897Z     processRefundedOrders idempotency & retry
+2026-07-02T20:41:43.0205443Z       ✓ REF-090 [P0] processRefundedOrders idempotent (ikinci tur PayTR çağırmaz) (553 ms)
+2026-07-02T20:41:43.0206067Z       ✓ REF-091 [P0] PayTR iadesi başarısızsa retry; sipariş refunded kalır (551 ms)
+2026-07-02T20:41:43.0206634Z       ✓ REF-092 [P1] Anlık iade PayTR hatasında RefundRequest rollback (582 ms)
+2026-07-02T20:41:43.0207234Z       ✕ REF-121 [P1] Eşzamanlı iki iade talebi (aynı sipariş) — sadece biri başarılı (495 ms)
+2026-07-02T20:41:43.0207697Z     Admin iade yönetimi & yetki
+2026-07-02T20:41:43.0208144Z       ✓ REF-100 [P1] Admin iade taleplerini listeler (super_admin/admin) (499 ms)
+2026-07-02T20:41:43.0208677Z       ✓ REF-101 [P0] Moderator iade taleplerini listeleyemez (403) (292 ms)
+2026-07-02T20:41:43.0209388Z       ✓ REF-102 [P0] Moderator iade detayını / force-finalize / override-policy / set-shipping-payer tetikleyemez (306 ms)
+2026-07-02T20:41:43.0210104Z       ✓ REF-103 [P1] Moderator takas retry-refund tetikleyemez (403) (312 ms)
+2026-07-02T20:41:43.0210672Z       ✓ REF-106 [P1] Admin force-finalize yalnızca return_delivered'da çalışır (799 ms)
+2026-07-02T20:41:43.0211252Z       ✓ REF-107 [P2] Admin manuel iade (POST /payments/:id/manual-refund) (445 ms)
+2026-07-02T20:41:43.0211664Z     Takas cash iptal → iade
+2026-07-02T20:41:43.0212531Z       ✓ REF-110 [P0] Karşı-ödemeli takas kargo öncesi iptal → tam PayTR iadesi + rezervasyon serbest (526 ms)
+2026-07-02T20:41:43.0213173Z       ✓ REF-111 [P1] Takas iade başarısızsa retry; iptal geri ALINMAZ (300 ms)
+2026-07-02T20:41:43.0213442Z 
+2026-07-02T20:41:43.0214095Z   ● 12 — İade & İptal (REF) › processRefundedOrders idempotency & retry › REF-121 [P1] Eşzamanlı iki iade talebi (aynı sipariş) — sadece biri başarılı
+2026-07-02T20:41:43.0214962Z 
+2026-07-02T20:41:43.0215262Z     expect(received).toBeLessThanOrEqual(expected)
+2026-07-02T20:41:43.0215673Z 
+2026-07-02T20:41:43.0215828Z     Expected: <= 1
+2026-07-02T20:41:43.0216399Z     Received:    2
+2026-07-02T20:41:43.0216608Z 
+2026-07-02T20:41:43.0217411Z     [0m [90m 1204 |[39m       [90m// (Salt app-katmanı guard'ı; DB unique kısıtı yok — iki paralel istek nadiren[39m
+2026-07-02T20:41:43.0218576Z      [90m 1205 |[39m       [90m// ikisi de 201 dönebilir; o durumda bu test guard'daki yarışı ORTAYA ÇIKARIR.)[39m
+2026-07-02T20:41:43.0219367Z     [31m[1m>[22m[39m[90m 1206 |[39m       expect(successCount)[33m.[39mtoBeLessThanOrEqual([35m1[39m)[33m;[39m
+2026-07-02T20:41:43.0219949Z      [90m      |[39m                            [31m[1m^[22m[39m
+2026-07-02T20:41:43.0220428Z      [90m 1207 |[39m       [90m// Kaybeden istek "zaten aktif" (400) döner.[39m
+2026-07-02T20:41:43.0220993Z      [90m 1208 |[39m       expect(statuses)[33m.[39mtoContain([35m400[39m)[33m;[39m
+2026-07-02T20:41:43.0221436Z      [90m 1209 |[39m     })[33m;[39m[0m
+2026-07-02T20:41:43.0221726Z 
+2026-07-02T20:41:43.0221960Z       at Object.<anonymous> (test/e2e/scenarios/12-ref.e2e-spec.ts:1206:28)
+2026-07-02T20:41:43.0222244Z 
+2026-07-02T20:41:43.0222376Z   console.log
+2026-07-02T20:41:43.0222827Z     ◇ injected env (41) from .env.test // tip: ⌘ override existing { override: true }
+2026-07-02T20:41:43.0223122Z 
+2026-07-02T20:41:43.0223278Z       at _log (node_modules/dotenv/lib/main.js:131:11)
+2026-07-02T20:41:43.0223491Z 
+2026-07-02T20:41:43.8684958Z   console.log
+2026-07-02T20:41:43.8693013Z     prisma:info Starting a postgresql pool with 5 connections.
+2026-07-02T20:41:43.8693523Z 
+2026-07-02T20:41:43.8693999Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:41:43.8694535Z 
+2026-07-02T20:41:47.6975895Z   console.log
+2026-07-02T20:41:47.6976378Z     prisma:error 
+2026-07-02T20:41:47.6976936Z     Invalid `this.prisma.messageThread.create()` invocation in
+2026-07-02T20:41:47.6977960Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/src/modules/messaging/messaging.service.ts:123:46
+2026-07-02T20:41:47.6978548Z     
+2026-07-02T20:41:47.6978736Z       120 }
+2026-07-02T20:41:47.6978928Z       121 
+2026-07-02T20:41:47.6979151Z       122 // Create new thread
+2026-07-02T20:41:47.6979759Z     → 123 thread = await this.prisma.messageThread.create(
+2026-07-02T20:41:47.6980308Z     Unique constraint failed on the fields: (`participant1_id`,`participant2_id`,`product_id`)
+2026-07-02T20:41:47.6980647Z 
+2026-07-02T20:41:47.6980893Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:41:47.6981178Z 
+2026-07-02T20:42:11.5272145Z FAIL test/e2e/scenarios/18-msg.e2e-spec.ts (28.507 s)
+2026-07-02T20:42:11.5273144Z   18 — Mesajlaşma & Bildirim (MSG)
+2026-07-02T20:42:11.5275304Z     ○ skipped MSG-035 [P2] Web istemci ön-uyarısı kişisel iletişim bilgisinde gösterilir (client-side) — SKIP(Salt web-client ön-uyarısı (i18n toast); backend kararı MSG-031/105 ile kaplı, API tarafında gözlemlenecek davranış yok.)
+2026-07-02T20:42:11.5278068Z     ○ skipped MSG-041 [P2] Admin moderasyon paneli (admin UI) bekleyen filtresi — SKIP(Salt admin-UI paneli (rozet/aksiyon render); API tarafı MSG-029/036/037 ile kaplı.)
+2026-07-02T20:42:11.5280191Z     ○ skipped MSG-044 [P0] Token'sız WS bağlantısı reddedilir — SKIP(WS bağlantı reddi: paylaşılan test app app.listen() çağırmaz + socket.io-client paketi yok → handshake gözlemlenemez.)
+2026-07-02T20:42:11.5282023Z     ○ skipped MSG-045 [P1] Geçersiz token ile bağlantı reddedilir — SKIP(WS geçersiz token reddi: aynı WS harness kısıtı (bkz. MSG-044).)
+2026-07-02T20:42:11.5283666Z     ○ skipped MSG-046 [P0] Geçerli token ile bağlanınca `connected` ve kişisel oda — SKIP(WS connected/kişisel oda: WS istemcisi yok → event alınamaz.)
+2026-07-02T20:42:11.5285327Z     ○ skipped MSG-047 [P0] `join:thread` katılımcı değilse reddedilir — SKIP(WS join:thread yetki reddi: WS istemcisi yok.)
+2026-07-02T20:42:11.5287398Z     ○ skipped MSG-048 [P0] Yeni mesaj iki kanaldan yayılır (`message:new` + `thread:updated`) — SKIP(WS message:new + thread:updated yayılımı: WS istemcisi yok (senkron in-app bildirim MSG-063 ile kaplı).)
+2026-07-02T20:42:11.5290224Z     ○ skipped MSG-049 [P1] `pending_approval` mesajda realtime emit OLMAZ — SKIP(WS pending mesajda emit olmaması: WS istemcisi yok (pending davranışı MSG-032/104 ile kaplı).)
+2026-07-02T20:42:11.5292117Z     ○ skipped MSG-050 [P1] Okundu olayı `message:read` yayılır — SKIP(WS message:read yayılımı: WS istemcisi yok (okundu DB davranışı MSG-019 ile kaplı).)
+2026-07-02T20:42:11.5293873Z     ○ skipped MSG-051 [P2] Yazıyor göstergesi (`typing:start`/`stop`) — SKIP(WS typing:start/stop: WS istemcisi yok.)
+2026-07-02T20:42:11.5296035Z     ○ skipped MSG-052 [P2] Çoklu cihaz (aynı kullanıcı birden fazla socket) — SKIP(WS çoklu cihaz/isUserOnline: WS istemcisi yok, in-memory socket haritası gözlemlenemez.)
+2026-07-02T20:42:11.5298210Z     ○ skipped MSG-055 [P2] API restart'ında engellemeler kaybolur (kalıcılık yok) — SKIP(Engellemenin API restart’ta kaybı: paylaşılan test app restart edilemez (in-memory Map).)
+2026-07-02T20:42:11.5301046Z     ○ skipped MSG-065 [P1] Teklif alındı → OFFER_RECEIVED satıcıya — SKIP(OFFER_RECEIVED (create) BullMQ emailQueue/pushQueue üzerinden asenkron; create akışı senkron in-app NotificationLog yazmaz → deterministik assert yok.)
+2026-07-02T20:42:11.5303830Z     ○ skipped MSG-066 [P1] İade akışı bildirimleri (REFUND_*) — SKIP(REFUND_* bildirimleri event/queue tabanlı çok-adımlı akış; test worker deterministik koşmaz → senkron NotificationLog doğrulanamaz.)
+2026-07-02T20:42:11.5306773Z     ○ skipped MSG-067 [P1] Stok bittiğinde sipariş/teklif iptal bildirimi + tekrar stoğa girince BACK_IN_STOCK — SKIP(Stokout/BACK_IN_STOCK bildirimleri sweep-cron + queue + 24s debounce ile asenkron; harness’te deterministik değil.)
+2026-07-02T20:42:11.5309561Z     ○ skipped MSG-075 [P1] Sipariş oluşturuldu e-postası MailHog'a düşer — SKIP(Sipariş-oluşturuldu e-postası emailQueue üzerinden asenkron işlenir; MailHog’a düşmesi test worker’a bağlı → deterministik değil.)
+2026-07-02T20:42:11.5312301Z     ○ skipped MSG-076 [P1] emailNotifications=false iken e-posta gitmez — SKIP(emailNotifications=false EMAIL atlama: EMAIL kanalı queue tabanlı; kategori/kanal gating mantığı MSG-079/080/081 ile fiilen kaplı.)
+2026-07-02T20:42:11.5315135Z     ○ skipped MSG-077 [P0] ALWAYS_SEND e-postası tercih kapalı olsa bile gider (şifre sıfırlama) — SKIP(PASSWORD_RESET (ALWAYS_SEND) e-postası: e-posta gönderimi queue/SMTP’ye bağlı asenkron; auth domaininde (01) test edilir.)
+2026-07-02T20:42:11.5317564Z     ○ skipped MSG-078 [P2] E-postalar yalnız Türkçedir (i18n yok) — SKIP(E-postaların yalnız TR olması: dokümante kısıt, saf içerik/i18n gözlemi; API tarafında assert edilecek davranış yok.)
+2026-07-02T20:42:11.5320090Z     ○ skipped MSG-090 [P1] Cron planlı bildirimi zamanı gelince gönderir — SKIP(Cron planlı bildirim gönderimi: scheduled-notification cron/processor için /dev hook’u yok (runScheduler listesinde değil) → tetiklenemez.)
+2026-07-02T20:42:11.5322393Z     ○ skipped MSG-091 [P1] Cron çift-işlem koruması (processing flag) — SKIP(Cron çift-işlem koruması (isProcessing flag): manuel cron tetikleme hook’u yok → gözlemlenemez.)
+2026-07-02T20:42:11.5325206Z     ○ skipped MSG-094 [P2] Mesaj listesi önizleme: resim mesajı için "📷 Fotoğraf"/"📷 Photo" — SKIP(Mesaj önizleme i18n "📷 Fotoğraf"/"📷 Photo": salt-UI/preview render pariteи; getThreadPreview backend’i mesaj listesi uçlarında ayrı DTO döndürmez.)
+2026-07-02T20:42:11.5327252Z     ○ skipped MSG-095 [P2] Web vs Mobile mesaj ekranı parite — SKIP(Web vs Mobile mesaj ekranı paritesi: salt istemci karşılaştırması.)
+2026-07-02T20:42:11.5328896Z     ○ skipped MSG-096 [P2] Bildirim metinleri TR (in-app/push şablonları) — SKIP(Bildirim metinlerinin TR olması: dokümante i18n kısıtı, saf içerik gözlemi.)
+2026-07-02T20:42:11.5330734Z     ○ skipped MSG-097 [P2] Mobil bildirim ayarları ekranı parite — SKIP(Mobil bildirim ayarları ekranı paritesi: salt istemci; ayar backend’i MSG-083 ile kaplı.)
+2026-07-02T20:42:11.5332488Z     ○ skipped MSG-101 [P2] Yükleniyor/hata UI durumları — SKIP(Yükleniyor/hata UI durumları: salt istemci render/hata-sınırı davranışı.)
+2026-07-02T20:42:11.5334943Z     ○ skipped MSG-106 [P1] WS oda izolasyonu: yetkisiz kullanıcı thread event'i almaz — SKIP(WS oda izolasyonu (yetkisiz kullanıcı event almaz): WS istemcisi yok; thread erişim izolasyonu MSG-026/103 ile kaplı.)
+2026-07-02T20:42:11.5337351Z     ○ skipped MSG-107 [P2] Mesaj/bildirim XSS koruması (UI render) — SKIP(Mesaj/bildirim XSS koruması: React varsayılan escaping (render katmanı); backend içeriği ham saklar, API’de assert edilecek dönüşüm yok.)
+2026-07-02T20:42:11.5338598Z     POST /api/messages/threads
+2026-07-02T20:42:11.5339328Z       ✓ MSG-001 [P0] İki üye arasında yeni thread oluşturma (mutlu yol) (474 ms)
+2026-07-02T20:42:11.5340179Z       ✓ MSG-002 [P1] `participantId` alias'ı ile thread oluşturma (323 ms)
+2026-07-02T20:42:11.5341238Z       ✓ MSG-003 [P0] Aynı kişi+ürün için ikinci kez thread → mevcut thread döner (idempotent anahtar) (390 ms)
+2026-07-02T20:42:11.5342530Z       ✓ MSG-004 [P1] Ürünsüz ve ürünlü thread'ler ayrıdır (321 ms)
+2026-07-02T20:42:11.5343263Z       ✓ MSG-005 [P0] Kendine mesaj göndermek yasak (301 ms)
+2026-07-02T20:42:11.5343966Z       ✓ MSG-006 [P1] Var olmayan alıcıya thread → 404 (302 ms)
+2026-07-02T20:42:11.5344945Z       ✓ MSG-007 [P1] Geçersiz UUID `recipientId` → 400 validasyon (296 ms)
+2026-07-02T20:42:11.5345768Z       ✓ MSG-008 [P2] recipientId/participantId ikisi de yok → 400 (295 ms)
+2026-07-02T20:42:11.5346538Z       ✓ MSG-009 [P2] Olmayan `productId` ile thread → 404 (301 ms)
+2026-07-02T20:42:11.5347347Z       ✓ MSG-010 [P2] Mesajsız thread oluşturma (boş sohbet) (321 ms)
+2026-07-02T20:42:11.5348273Z       ✓ MSG-099 [P1] Eşzamanlı thread oluşturma (race) → tek thread (unique kısıt) (334 ms)
+2026-07-02T20:42:11.5348978Z     POST /api/messages/threads/:id/messages
+2026-07-02T20:42:11.5349734Z       ✓ MSG-011 [P0] Mevcut thread'e mesaj gönderme (mutlu yol) (334 ms)
+2026-07-02T20:42:11.5350538Z       ✓ MSG-012 [P1] Tam 1000 karakter mesaj (alt sınır kabul) (321 ms)
+2026-07-02T20:42:11.5351312Z       ✓ MSG-013 [P1] 1001 karakter mesaj → 400 (318 ms)
+2026-07-02T20:42:11.5352008Z       ✓ MSG-014 [P1] Boş içerik (`""`) → 400 (317 ms)
+2026-07-02T20:42:11.5352687Z       ✓ MSG-015 [P2] `content` alanı eksik → 400 (309 ms)
+2026-07-02T20:42:11.5353686Z       ✓ MSG-016 [P2] Platform ayarı `max_message_length` özelleştirilince limit değişir (336 ms)
+2026-07-02T20:42:11.5354603Z       ✓ MSG-017 [P2] Var olmayan thread'e mesaj → 404 (292 ms)
+2026-07-02T20:42:11.5355638Z       ✓ MSG-018 [P2] Geçersiz UUID thread id → 400 (ParseUUIDPipe) (300 ms)
+2026-07-02T20:42:11.5356444Z       ✓ MSG-027 [P0] Katılımcı olmayan mesaj gönderemez (403) (313 ms)
+2026-07-02T20:42:11.5357279Z       ✓ MSG-098 [P2] Eşzamanlı çift mesaj gönderimi → iki ayrı mesaj (322 ms)
+2026-07-02T20:42:11.5357925Z     GET messages & unread-count
+2026-07-02T20:42:11.5358730Z       ✓ MSG-019 [P0] Mesaj listesi açılınca okunmamışlar otomatik okundu olur (363 ms)
+2026-07-02T20:42:11.5359793Z       ✓ MSG-020 [P0] Okunmamış sayısı (header rozeti) doğru toplanır (393 ms)
+2026-07-02T20:42:11.5360990Z       ✓ MSG-021 [P1] Gönderdiği mesaj kendi okunmamış sayısını artırmaz (321 ms)
+2026-07-02T20:42:11.5361913Z       ✓ MSG-022 [P1] `pending_approval`/`rejected` mesajlar okunmamış sayısına dahil edilmez (321 ms)
+2026-07-02T20:42:11.5362609Z       ✓ MSG-023 [P1] `since` parametresiyle catch-up (yalnız yeni mesajlar) (336 ms)
+2026-07-02T20:42:11.5363201Z       ✓ MSG-024 [P2] Sayfalama: pageSize üst sınırı (mesajlar 100, thread 50) (311 ms)
+2026-07-02T20:42:11.5363728Z       ✓ MSG-102 [P2] Sayfalama: 2. sayfa thread/bildirim (883 ms)
+2026-07-02T20:42:11.5364199Z       ✓ MSG-100 [P2] Boş durum UI: hiç mesaj/bildirim yokken (310 ms)
+2026-07-02T20:42:11.5364537Z     Yetki (Authz)
+2026-07-02T20:42:11.5365148Z       ✓ MSG-025 [P0] Kimlik doğrulamasız tüm uçlar 401 (286 ms)
+2026-07-02T20:42:11.5365654Z       ✓ MSG-026 [P0] Katılımcı olmayan thread detayını göremez (403/404) (337 ms)
+2026-07-02T20:42:11.5366361Z       ✓ MSG-103 [P0] Thread mesaj enumerasyonu (IDOR) engellenir (339 ms)
+2026-07-02T20:42:11.5366924Z       ✓ MSG-028 [P0] Normal kullanıcı admin moderasyon uçlarına erişemez (293 ms)
+2026-07-02T20:42:11.5367563Z       ✓ MSG-029 [P1] Moderator onay bekleyenleri görebilir ama filtre yönetimine erişemez (303 ms)
+2026-07-02T20:42:11.5368054Z     İçerik filtresi & moderasyon
+2026-07-02T20:42:11.5368436Z       ✓ MSG-030 [P0] Temiz mesaj doğrudan `sent` (319 ms)
+2026-07-02T20:42:11.5368934Z       ✓ MSG-034 [P2] AI moderasyon servisi erişilemezse istek bloklanmaz (318 ms)
+2026-07-02T20:42:11.5369503Z       ✓ MSG-031 [P0] Telefon numarası içeren mesaj maskelenir/onaya düşer (329 ms)
+2026-07-02T20:42:11.5370062Z       ✓ MSG-032 [P1] Küfür içeren mesaj onaya düşer (deterministik liste) (314 ms)
+2026-07-02T20:42:11.5370661Z       ✓ MSG-033 [P2] Tam-kelime küfür sınırı: "göt" yakalanır, "götür" yakalanmaz (352 ms)
+2026-07-02T20:42:11.5371212Z       ✓ MSG-036 [P0] Onay bekleyen mesaj onaylanır → görünür olur (351 ms)
+2026-07-02T20:42:11.5371770Z       ✓ MSG-037 [P1] Onay bekleyen mesaj reddedilir → "[Mesaj reddedildi]" (342 ms)
+2026-07-02T20:42:11.5372439Z       ✓ MSG-038 [P1] Zaten kararlaşmış mesajı tekrar moderasyon → 400 (idempotency korumalı) (329 ms)
+2026-07-02T20:42:11.5372997Z       ✓ MSG-039 [P2] Var olmayan mesajı moderasyon → 404 (300 ms)
+2026-07-02T20:42:11.5373432Z       ✓ MSG-040 [P2] Admin filtre listeleme & test (304 ms)
+2026-07-02T20:42:11.5373969Z       ✓ MSG-104 [P1] pending/rejected mesaj içeriği alıcıya/karşı tarafa sızmaz (328 ms)
+2026-07-02T20:42:11.5374534Z       ✓ MSG-105 [P1] İletişim bilgisi maskeleme atlatma denemeleri (315 ms)
+2026-07-02T20:42:11.5375064Z     Günlük limit
+2026-07-02T20:42:11.5375417Z       ✓ MSG-042 [P1] Günlük limit raporu döner (338 ms)
+2026-07-02T20:42:11.5375984Z       ✓ MSG-043 [P1] Günlük limit GÖNDERİMDE uygulanmıyor (bilinen davranış / olası bug) (350 ms)
+2026-07-02T20:42:11.5376438Z     Bildirimler (/api/notifications)
+2026-07-02T20:42:11.5376868Z       ✓ MSG-056 [P0] Bildirim listesi sahibe izole döner (310 ms)
+2026-07-02T20:42:11.5377381Z       ✓ MSG-057 [P0] Okunmamış sayısı (`status='sent'`) doğru (324 ms)
+2026-07-02T20:42:11.5377845Z       ✓ MSG-058 [P1] Tek bildirimi okundu işaretle (303 ms)
+2026-07-02T20:42:11.5378349Z       ✓ MSG-059 [P0] Başkasının bildirimini okundu işaretleyemez (IDOR) (298 ms)
+2026-07-02T20:42:11.5378811Z       ✓ MSG-060 [P1] Tümünü okundu işaretle (311 ms)
+2026-07-02T20:42:11.5379327Z       ✓ MSG-061 [P1] NEW_MESSAGE bildirimi thread başına sıkıştırılır (collapse) (357 ms)
+2026-07-02T20:42:11.5379852Z       ✓ MSG-062 [P2] Bildirim ikonu/link interpolasyonu (320 ms)
+2026-07-02T20:42:11.5380348Z       ✓ MSG-063 [P0] Yeni mesaj → alıcıya NEW_MESSAGE in-app + push (329 ms)
+2026-07-02T20:42:11.5380748Z     Push token (/api/notifications/push-token)
+2026-07-02T20:42:11.5381151Z       ✓ MSG-068 [P0] Push token kaydı (mutlu yol) (291 ms)
+2026-07-02T20:42:11.5381662Z       ✓ MSG-069 [P1] Geçersiz token formatı → kayıt başarısız (success:false) (297 ms)
+2026-07-02T20:42:11.5382183Z       ✓ MSG-070 [P2] `token` eksik → 400 (DTO @IsString) (298 ms)
+2026-07-02T20:42:11.5382802Z       ✓ MSG-071 [P1] Aynı (userId, token) tekrar kayıt → upsert (dedup) (306 ms)
+2026-07-02T20:42:11.5383335Z       ✓ MSG-072 [P1] Logout: `revoke=true` token'ı pasifleştirir (304 ms)
+2026-07-02T20:42:11.5383854Z       ✓ MSG-073 [P2] Token'sız kullanıcıya push → "No push tokens" (333 ms)
+2026-07-02T20:42:11.5384360Z       ✓ MSG-074 [P1] Push token kaydı kimlik doğrulamasız → 401 (284 ms)
+2026-07-02T20:42:11.5384820Z     Tercih gating
+2026-07-02T20:42:11.5385241Z       ✓ MSG-083 [P2] Tercih ayarı endpoint'i (PATCH /users/me/settings) (322 ms)
+2026-07-02T20:42:11.5385785Z       ✓ MSG-082 [P2] Varsayılan tercihler (kullanıcı hiç ayar yapmamış) (333 ms)
+2026-07-02T20:42:11.5386387Z       ✓ MSG-079 [P0] messageAlerts=false → NEW_MESSAGE zil+emit+push hepsi atlanır (334 ms)
+2026-07-02T20:42:11.5386978Z       ✓ MSG-080 [P1] pushNotifications=false → zil kalır, push gitmez (348 ms)
+2026-07-02T20:42:11.5387636Z       ✕ MSG-064 [P1] Sipariş kargoya verildi → ORDER_SHIPPED push+in-app (474 ms)
+2026-07-02T20:42:11.5388255Z       ✕ MSG-081 [P1] orderUpdates=false → sipariş bildirimleri tamamen baskılanır (415 ms)
+2026-07-02T20:42:11.5388679Z     Admin broadcast & scheduled
+2026-07-02T20:42:11.5389083Z       ✓ MSG-084 [P1] Admin tüm kullanıcılara anlık broadcast (313 ms)
+2026-07-02T20:42:11.5389623Z       ✓ MSG-085 [P1] Broadcast tercihten muaf (admin_broadcast ALWAYS_SEND) (333 ms)
+2026-07-02T20:42:11.5390207Z       ✓ MSG-086 [P2] Segment hedefleme (yalnız satıcılar / üyelik kademesi) (308 ms)
+2026-07-02T20:42:11.5390691Z       ✓ MSG-087 [P2] Hedef yoksa broadcast → 400 (402 ms)
+2026-07-02T20:42:11.5391173Z       ✓ MSG-088 [P1] Bildirim zamanla (gelecek tarih) → pending kaydı (314 ms)
+2026-07-02T20:42:11.5391662Z       ✓ MSG-089 [P1] Geçmiş tarihle zamanlama → 400 (294 ms)
+2026-07-02T20:42:11.5392070Z       ✓ MSG-092 [P2] Planlı bildirimi iptal (313 ms)
+2026-07-02T20:42:11.5392588Z       ✕ MSG-093 [P1] Planlı/broadcast uçları yetki (super_admin/admin/moderator) (300 ms)
+2026-07-02T20:42:11.5393059Z     Kullanıcı engelleme
+2026-07-02T20:42:11.5393440Z       ✓ MSG-053 [P2] Kullanıcı engelleme (bellekte, geçici) (346 ms)
+2026-07-02T20:42:11.5394004Z       ✓ MSG-054 [P1] Engelleme mesajlaşmayı ENGELLEMİYOR (bilinen davranış / risk) (337 ms)
+2026-07-02T20:42:11.5394318Z 
+2026-07-02T20:42:11.5394930Z   ● 18 — Mesajlaşma & Bildirim (MSG) › Tercih gating › MSG-064 [P1] Sipariş kargoya verildi → ORDER_SHIPPED push+in-app
+2026-07-02T20:42:11.5395332Z 
+2026-07-02T20:42:11.5395504Z     expected 201 "Created", got 400 "Bad Request"
+2026-07-02T20:42:11.5395722Z 
+2026-07-02T20:42:11.5395998Z     [0m [90m 1233 |[39m         [33m.[39m[36mset[39m(authHeader(seller))
+2026-07-02T20:42:11.5396620Z      [90m 1234 |[39m         [33m.[39msend({ orderId[33m,[39m provider[33m:[39m [32m'surat'[39m })
+2026-07-02T20:42:11.5397239Z     [31m[1m>[22m[39m[90m 1235 |[39m         [33m.[39mexpect([35m201[39m)[33m;[39m
+2026-07-02T20:42:11.5397716Z      [90m      |[39m          [31m[1m^[22m[39m
+2026-07-02T20:42:11.5398305Z      [90m 1236 |[39m       [36mconst[39m shipmentId [33m=[39m ship[33m.[39mbody[33m.[39mid[33m;[39m
+2026-07-02T20:42:11.5398901Z      [90m 1237 |[39m       expect(shipmentId)[33m.[39mtoBeTruthy()[33m;[39m
+2026-07-02T20:42:11.5399275Z      [90m 1238 |[39m[0m
+2026-07-02T20:42:11.5399424Z 
+2026-07-02T20:42:11.5399656Z       at Object.<anonymous> (test/e2e/scenarios/18-msg.e2e-spec.ts:1235:10)
+2026-07-02T20:42:11.5400013Z       ----
+2026-07-02T20:42:11.5400344Z       at Test._assertStatus (../../node_modules/supertest/lib/test.js:309:14)
+2026-07-02T20:42:11.5400774Z       at ../../node_modules/supertest/lib/test.js:365:13
+2026-07-02T20:42:11.5401200Z       at Test._assertFunction (../../node_modules/supertest/lib/test.js:342:13)
+2026-07-02T20:42:11.5401657Z       at Test.assert (../../node_modules/supertest/lib/test.js:195:23)
+2026-07-02T20:42:11.5402097Z       at localAssert (../../node_modules/supertest/lib/test.js:138:14)
+2026-07-02T20:42:11.5402648Z       at Server.<anonymous> (../../node_modules/supertest/lib/test.js:152:11)
+2026-07-02T20:42:11.5402913Z 
+2026-07-02T20:42:11.5403392Z   ● 18 — Mesajlaşma & Bildirim (MSG) › Tercih gating › MSG-081 [P1] orderUpdates=false → sipariş bildirimleri tamamen baskılanır
+2026-07-02T20:42:11.5403817Z 
+2026-07-02T20:42:11.5403968Z     expected 201 "Created", got 400 "Bad Request"
+2026-07-02T20:42:11.5404165Z 
+2026-07-02T20:42:11.5404432Z     [0m [90m 1274 |[39m         [33m.[39m[36mset[39m(authHeader(seller))
+2026-07-02T20:42:11.5405185Z      [90m 1275 |[39m         [33m.[39msend({ orderId[33m,[39m provider[33m:[39m [32m'surat'[39m })
+2026-07-02T20:42:11.5405800Z     [31m[1m>[22m[39m[90m 1276 |[39m         [33m.[39mexpect([35m201[39m)[33m;[39m
+2026-07-02T20:42:11.5406252Z      [90m      |[39m          [31m[1m^[22m[39m
+2026-07-02T20:42:11.5406808Z      [90m 1277 |[39m       [36mconst[39m shipmentId [33m=[39m ship[33m.[39mbody[33m.[39mid[33m;[39m
+2026-07-02T20:42:11.5407460Z      [90m 1278 |[39m       [36mawait[39m request(server())
+2026-07-02T20:42:11.5407998Z      [90m 1279 |[39m         [33m.[39mpatch([32m`/api/shipping/${shipmentId}/tracking`[39m)[0m
+2026-07-02T20:42:11.5408307Z 
+2026-07-02T20:42:11.5408527Z       at Object.<anonymous> (test/e2e/scenarios/18-msg.e2e-spec.ts:1276:10)
+2026-07-02T20:42:11.5408880Z       ----
+2026-07-02T20:42:11.5409216Z       at Test._assertStatus (../../node_modules/supertest/lib/test.js:309:14)
+2026-07-02T20:42:11.5409646Z       at ../../node_modules/supertest/lib/test.js:365:13
+2026-07-02T20:42:11.5410098Z       at Test._assertFunction (../../node_modules/supertest/lib/test.js:342:13)
+2026-07-02T20:42:11.5410565Z       at Test.assert (../../node_modules/supertest/lib/test.js:195:23)
+2026-07-02T20:42:11.5411002Z       at localAssert (../../node_modules/supertest/lib/test.js:138:14)
+2026-07-02T20:42:11.5411465Z       at Server.<anonymous> (../../node_modules/supertest/lib/test.js:152:11)
+2026-07-02T20:42:11.5411728Z 
+2026-07-02T20:42:11.5412265Z   ● 18 — Mesajlaşma & Bildirim (MSG) › Admin broadcast & scheduled › MSG-093 [P1] Planlı/broadcast uçları yetki (super_admin/admin/moderator)
+2026-07-02T20:42:11.5412725Z 
+2026-07-02T20:42:11.5412848Z     expected 200 "OK", got 403 "Forbidden"
+2026-07-02T20:42:11.5413029Z 
+2026-07-02T20:42:11.5413298Z     [0m [90m 1448 |[39m         [33m.[39m[36mset[39m(authHeader(moderator))
+2026-07-02T20:42:11.5414268Z      [90m 1449 |[39m         [33m.[39msend({ title[33m:[39m [32m'Mod'[39m[33m,[39m body[33m:[39m [32m'b'[39m[33m,[39m channels[33m:[39m [[32m'in_app'[39m][33m,[39m targetType[33m:[39m [32m'all'[39m })
+2026-07-02T20:42:11.5415272Z     [31m[1m>[22m[39m[90m 1450 |[39m         [33m.[39mexpect([35m200[39m)[33m;[39m
+2026-07-02T20:42:11.5415727Z      [90m      |[39m          [31m[1m^[22m[39m
+2026-07-02T20:42:11.5416041Z      [90m 1451 |[39m
+2026-07-02T20:42:11.5416588Z      [90m 1452 |[39m       [36mconst[39m deniz [33m=[39m [36mawait[39m createUser(ctx[33m.[39mmodule)[33m;[39m
+2026-07-02T20:42:11.5417293Z      [90m 1453 |[39m       [36mconst[39m res [33m=[39m [36mawait[39m request(server())[0m
+2026-07-02T20:42:11.5417592Z 
+2026-07-02T20:42:11.5417809Z       at Object.<anonymous> (test/e2e/scenarios/18-msg.e2e-spec.ts:1450:10)
+2026-07-02T20:42:11.5418172Z       ----
+2026-07-02T20:42:11.5418493Z       at Test._assertStatus (../../node_modules/supertest/lib/test.js:309:14)
+2026-07-02T20:42:11.5418912Z       at ../../node_modules/supertest/lib/test.js:365:13
+2026-07-02T20:42:11.5419339Z       at Test._assertFunction (../../node_modules/supertest/lib/test.js:342:13)
+2026-07-02T20:42:11.5419806Z       at Test.assert (../../node_modules/supertest/lib/test.js:195:23)
+2026-07-02T20:42:11.5420236Z       at localAssert (../../node_modules/supertest/lib/test.js:138:14)
+2026-07-02T20:42:11.5420683Z       at Server.<anonymous> (../../node_modules/supertest/lib/test.js:152:11)
+2026-07-02T20:42:11.5420952Z 
+2026-07-02T20:42:11.5421234Z Test Suites: 2 failed, 2 total
+2026-07-02T20:42:11.5421585Z Tests:       4 failed, 33 skipped, 148 passed, 185 total
+2026-07-02T20:42:11.5421902Z Snapshots:   0 total
+2026-07-02T20:42:11.5422138Z Time:        75.823 s
+2026-07-02T20:42:11.5422454Z Ran all test suites matching /test\/e2e\/scenarios\//i.
+2026-07-02T20:42:11.6824435Z undefined
+2026-07-02T20:42:11.6832908Z /home/runner/work/tarodan-app/tarodan-app/apps/api:
+2026-07-02T20:42:11.6835113Z  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: jest --config ./test/jest-e2e.json --runInBand --testPathPattern test/e2e/scenarios/ --shard=6/10
+2026-07-02T20:42:11.6969135Z ##[error]Process completed with exit code 1.

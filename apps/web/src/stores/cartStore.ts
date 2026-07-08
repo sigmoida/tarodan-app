@@ -19,6 +19,7 @@ interface CartItem {
   productDiscount?: number;
   isAvailable: boolean;
   stockWarning?: string;
+  maxQuantity?: number;
 }
 
 // Applied discount info
@@ -336,13 +337,15 @@ export const useCartStore = create<CartState>()(
             isLoading: false,
           });
         } catch (error) {
-          set({ 
-            isLoading: false, 
+          set({
+            isLoading: false,
             error: error instanceof Error ? error.message : 'Hata oluştu',
           });
         }
       },
-      
+
+      // NOT: updateQuantity, addToCart'ın aksine hatayı YENİDEN FIRLATIR — sepet
+      // sayfasındaki stepper backend'in adet/stok reddini toast ile gösterebilsin diye.
       updateQuantity: async (productId, quantity) => {
         const token = get().authToken ?? (typeof window !== 'undefined' && localStorage.getItem('tarodan_authed') === '1' ? '1' : null);
         if (!token) return;
@@ -381,13 +384,14 @@ export const useCartStore = create<CartState>()(
             isLoading: false,
           });
         } catch (error) {
-          set({ 
-            isLoading: false, 
+          set({
+            isLoading: false,
             error: error instanceof Error ? error.message : 'Hata oluştu',
           });
+          throw error;
         }
       },
-      
+
       applyCoupon: async (code) => {
         const token = get().authToken ?? (typeof window !== 'undefined' && localStorage.getItem('tarodan_authed') === '1' ? '1' : null);
         if (!token) {

@@ -1,0 +1,1470 @@
+﻿2026-07-02T20:36:45.3919257Z Current runner version: '2.335.1'
+2026-07-02T20:36:45.3944693Z ##[group]Runner Image Provisioner
+2026-07-02T20:36:45.3945581Z Hosted Compute Agent
+2026-07-02T20:36:45.3946268Z Version: 20260624.560
+2026-07-02T20:36:45.3946937Z Commit: 925d229a51159bc391ae97e54a2dd1fe20af789d
+2026-07-02T20:36:45.3947688Z Build Date: 2026-06-24T18:26:47Z
+2026-07-02T20:36:45.3948835Z Worker ID: {af7016a3-8ab5-40e9-9edc-293a84b939c9}
+2026-07-02T20:36:45.3949582Z Azure Region: eastus2
+2026-07-02T20:36:45.3950210Z ##[endgroup]
+2026-07-02T20:36:45.3952087Z ##[group]Operating System
+2026-07-02T20:36:45.3952748Z Ubuntu
+2026-07-02T20:36:45.3953368Z 24.04.4
+2026-07-02T20:36:45.3953883Z LTS
+2026-07-02T20:36:45.3954448Z ##[endgroup]
+2026-07-02T20:36:45.3955046Z ##[group]Runner Image
+2026-07-02T20:36:45.3955677Z Image: ubuntu-24.04
+2026-07-02T20:36:45.3956260Z Version: 20260628.225.1
+2026-07-02T20:36:45.3957667Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260628.225/images/ubuntu/Ubuntu2404-Readme.md
+2026-07-02T20:36:45.3959441Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260628.225
+2026-07-02T20:36:45.3960626Z ##[endgroup]
+2026-07-02T20:36:45.3965397Z ##[group]GITHUB_TOKEN Permissions
+2026-07-02T20:36:45.3967855Z Actions: write
+2026-07-02T20:36:45.3968662Z ArtifactMetadata: write
+2026-07-02T20:36:45.3969414Z Attestations: write
+2026-07-02T20:36:45.3970007Z Checks: write
+2026-07-02T20:36:45.3970560Z CodeQuality: write
+2026-07-02T20:36:45.3971254Z Contents: write
+2026-07-02T20:36:45.3971841Z CopilotRequests: write
+2026-07-02T20:36:45.3972478Z Deployments: write
+2026-07-02T20:36:45.3973069Z Discussions: write
+2026-07-02T20:36:45.3973633Z Issues: write
+2026-07-02T20:36:45.3974234Z Metadata: read
+2026-07-02T20:36:45.3974863Z Models: read
+2026-07-02T20:36:45.3975948Z Packages: write
+2026-07-02T20:36:45.3976535Z Pages: write
+2026-07-02T20:36:45.3977103Z PullRequests: write
+2026-07-02T20:36:45.3977786Z RepositoryProjects: write
+2026-07-02T20:36:45.3978555Z SecurityEvents: write
+2026-07-02T20:36:45.3979134Z Statuses: write
+2026-07-02T20:36:45.3979776Z VulnerabilityAlerts: read
+2026-07-02T20:36:45.3980392Z ##[endgroup]
+2026-07-02T20:36:45.3982611Z Secret source: Actions
+2026-07-02T20:36:45.3983635Z Prepare workflow directory
+2026-07-02T20:36:45.4312571Z Prepare all required actions
+2026-07-02T20:36:45.4350401Z Getting action download info
+2026-07-02T20:36:45.6602317Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+2026-07-02T20:36:45.8156178Z Complete job name: Lint
+2026-07-02T20:36:45.8977188Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-02T20:36:45.8986220Z ##[group]Run actions/checkout@v4
+2026-07-02T20:36:45.8986922Z with:
+2026-07-02T20:36:45.8987376Z   repository: sigmoida/tarodan-app
+2026-07-02T20:36:45.8991648Z   token: ***
+2026-07-02T20:36:45.8992101Z   ssh-strict: true
+2026-07-02T20:36:45.8992548Z   ssh-user: git
+2026-07-02T20:36:45.8992993Z   persist-credentials: true
+2026-07-02T20:36:45.8993490Z   clean: true
+2026-07-02T20:36:45.8993943Z   sparse-checkout-cone-mode: true
+2026-07-02T20:36:45.8994466Z   fetch-depth: 1
+2026-07-02T20:36:45.8994909Z   fetch-tags: false
+2026-07-02T20:36:45.8995361Z   show-progress: true
+2026-07-02T20:36:45.8995816Z   lfs: false
+2026-07-02T20:36:45.8996272Z   submodules: false
+2026-07-02T20:36:45.8996735Z   set-safe-directory: true
+2026-07-02T20:36:45.8997470Z ##[endgroup]
+2026-07-02T20:36:46.0012600Z Syncing repository: sigmoida/tarodan-app
+2026-07-02T20:36:46.0015025Z ##[group]Getting Git version info
+2026-07-02T20:36:46.0016153Z Working directory is '/home/runner/work/tarodan-app/tarodan-app'
+2026-07-02T20:36:46.0017806Z [command]/usr/bin/git version
+2026-07-02T20:36:46.0061892Z git version 2.54.0
+2026-07-02T20:36:46.0081680Z ##[endgroup]
+2026-07-02T20:36:46.0094682Z Temporarily overriding HOME='/home/runner/work/_temp/29844954-f1a2-430a-8405-79eff0596731' before making global git config changes
+2026-07-02T20:36:46.0096900Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-02T20:36:46.0101777Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/tarodan-app/tarodan-app
+2026-07-02T20:36:46.0156126Z Deleting the contents of '/home/runner/work/tarodan-app/tarodan-app'
+2026-07-02T20:36:46.0158322Z ##[group]Initializing the repository
+2026-07-02T20:36:46.0163113Z [command]/usr/bin/git init /home/runner/work/tarodan-app/tarodan-app
+2026-07-02T20:36:46.0279519Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-07-02T20:36:46.0281136Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-07-02T20:36:46.0282643Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-07-02T20:36:46.0283838Z hint: call:
+2026-07-02T20:36:46.0284454Z hint:
+2026-07-02T20:36:46.0285231Z hint: 	git config --global init.defaultBranch <name>
+2026-07-02T20:36:46.0286199Z hint:
+2026-07-02T20:36:46.0287107Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-07-02T20:36:46.0288816Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-07-02T20:36:46.0290013Z hint:
+2026-07-02T20:36:46.0290677Z hint: 	git branch -m <name>
+2026-07-02T20:36:46.0291430Z hint:
+2026-07-02T20:36:46.0292435Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-07-02T20:36:46.0294007Z Initialized empty Git repository in /home/runner/work/tarodan-app/tarodan-app/.git/
+2026-07-02T20:36:46.0296559Z [command]/usr/bin/git remote add origin https://github.com/sigmoida/tarodan-app
+2026-07-02T20:36:46.0367767Z ##[endgroup]
+2026-07-02T20:36:46.0368933Z ##[group]Disabling automatic garbage collection
+2026-07-02T20:36:46.0371913Z [command]/usr/bin/git config --local gc.auto 0
+2026-07-02T20:36:46.0405225Z ##[endgroup]
+2026-07-02T20:36:46.0406145Z ##[group]Setting up auth
+2026-07-02T20:36:46.0412279Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-07-02T20:36:46.0448321Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-07-02T20:36:46.0834147Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-07-02T20:36:46.0872294Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-07-02T20:36:46.1124541Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-02T20:36:46.1164979Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-07-02T20:36:46.1406265Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-07-02T20:36:46.1448082Z ##[endgroup]
+2026-07-02T20:36:46.1449121Z ##[group]Fetching the repository
+2026-07-02T20:36:46.1458272Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +043a41c03dec8d5d6d770b398ffb52d360abfe7d:refs/remotes/origin/master
+2026-07-02T20:36:49.9172926Z From https://github.com/sigmoida/tarodan-app
+2026-07-02T20:36:49.9174567Z  * [new ref]         043a41c03dec8d5d6d770b398ffb52d360abfe7d -> origin/master
+2026-07-02T20:36:49.9198863Z ##[endgroup]
+2026-07-02T20:36:49.9200020Z ##[group]Determining the checkout info
+2026-07-02T20:36:49.9201924Z ##[endgroup]
+2026-07-02T20:36:49.9207549Z [command]/usr/bin/git sparse-checkout disable
+2026-07-02T20:36:49.9260907Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-07-02T20:36:49.9294486Z ##[group]Checking out the ref
+2026-07-02T20:36:49.9299111Z [command]/usr/bin/git checkout --progress --force -B master refs/remotes/origin/master
+2026-07-02T20:36:50.3924666Z Reset branch 'master'
+2026-07-02T20:36:50.3925522Z branch 'master' set up to track 'origin/master'.
+2026-07-02T20:36:50.3995392Z ##[endgroup]
+2026-07-02T20:36:50.4057084Z [command]/usr/bin/git log -1 --format=%H
+2026-07-02T20:36:50.4086264Z 043a41c03dec8d5d6d770b398ffb52d360abfe7d
+2026-07-02T20:36:50.4384458Z Prepare all required actions
+2026-07-02T20:36:50.4384977Z Getting action download info
+2026-07-02T20:36:50.5452343Z Download action repository 'pnpm/action-setup@v4' (SHA:b906affcce14559ad1aafd4ab0e942779e9f58b1)
+2026-07-02T20:36:50.7954838Z Download action repository 'actions/setup-node@v4' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-07-02T20:36:50.8801871Z Download action repository 'actions/cache@v4' (SHA:0057852bfaa89a56745cba8c7296529d2fc39830)
+2026-07-02T20:36:51.0734098Z ##[group]Run ./.github/actions/setup-workspace
+2026-07-02T20:36:51.0734517Z with:
+2026-07-02T20:36:51.0734776Z   prisma: false
+2026-07-02T20:36:51.0735053Z   turbo-cache: true
+2026-07-02T20:36:51.0806568Z ##[endgroup]
+2026-07-02T20:36:51.0921340Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-02T20:36:51.0923497Z ##[group]Run pnpm/action-setup@v4
+2026-07-02T20:36:51.0923801Z with:
+2026-07-02T20:36:51.0924044Z   dest: ~/setup-pnpm
+2026-07-02T20:36:51.0924303Z   run_install: null
+2026-07-02T20:36:51.0924569Z   cache: false
+2026-07-02T20:36:51.0924862Z   cache_dependency_path: pnpm-lock.yaml
+2026-07-02T20:36:51.0925204Z   package_json_file: package.json
+2026-07-02T20:36:51.0925509Z   standalone: false
+2026-07-02T20:36:51.0925772Z ##[endgroup]
+2026-07-02T20:36:51.2340867Z ##[group]Running self-installer...
+2026-07-02T20:36:51.6467974Z (node:2300) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-07-02T20:36:51.6470468Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-02T20:36:51.8205581Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-07-02T20:36:52.1217448Z 
+2026-07-02T20:36:52.1217948Z dependencies:
+2026-07-02T20:36:52.1218761Z + pnpm 8.12.0
+2026-07-02T20:36:52.1218982Z 
+2026-07-02T20:36:52.1270486Z Packages: +1
+2026-07-02T20:36:52.1270735Z +
+2026-07-02T20:36:52.1716215Z Progress: resolved 1, reused 0, downloaded 1, added 1, done
+2026-07-02T20:36:52.1922083Z Done in 763ms
+2026-07-02T20:36:52.2076053Z ##[endgroup]
+2026-07-02T20:36:52.2076343Z Installation Completed!
+2026-07-02T20:36:52.2273937Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-02T20:36:52.2275157Z ##[group]Run actions/setup-node@v4
+2026-07-02T20:36:52.2275409Z with:
+2026-07-02T20:36:52.2275629Z   node-version-file: .nvmrc
+2026-07-02T20:36:52.2275879Z   cache: pnpm
+2026-07-02T20:36:52.2276099Z   always-auth: false
+2026-07-02T20:36:52.2276330Z   check-latest: false
+2026-07-02T20:36:52.2279020Z   token: ***
+2026-07-02T20:36:52.2279222Z env:
+2026-07-02T20:36:52.2279478Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-07-02T20:36:52.2279788Z ##[endgroup]
+2026-07-02T20:36:52.3634045Z Node version file is not JSON file
+2026-07-02T20:36:52.3635905Z Resolved .nvmrc as 20.19.5
+2026-07-02T20:36:52.3657366Z Attempting to download 20.19.5...
+2026-07-02T20:36:52.3761918Z (node:2315) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-02T20:36:52.3763511Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-02T20:36:52.8469249Z Acquiring 20.19.5 - x64 from https://github.com/actions/node-versions/releases/download/20.19.5-17451167955/node-20.19.5-linux-x64.tar.gz
+2026-07-02T20:36:53.2210689Z Extracting ...
+2026-07-02T20:36:53.2330117Z [command]/usr/bin/tar xz --strip 1 --warning=no-unknown-keyword --overwrite -C /home/runner/work/_temp/c4652941-8a1e-4372-84c6-2542537da217 -f /home/runner/work/_temp/c1188009-b288-4f53-92a3-ead26b4fd575
+2026-07-02T20:36:54.3306135Z Adding to the cache ...
+2026-07-02T20:36:55.9677257Z ##[group]Environment details
+2026-07-02T20:36:56.1878536Z node: v20.19.5
+2026-07-02T20:36:56.1879032Z npm: 10.8.2
+2026-07-02T20:36:56.1879309Z yarn: 1.22.22
+2026-07-02T20:36:56.1879968Z ##[endgroup]
+2026-07-02T20:36:56.1902661Z [command]/home/runner/setup-pnpm/node_modules/.bin/pnpm store path --silent
+2026-07-02T20:36:56.5468984Z /home/runner/setup-pnpm/node_modules/.bin/store/v3
+2026-07-02T20:36:56.6201868Z Cache hit for: node-cache-Linux-x64-pnpm-fc739e9ce3af9124622ee0916e2e85b4d90368bff66d576a6bd0c5dc52c3d59e
+2026-07-02T20:36:56.6301764Z (node:2315) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-07-02T20:36:57.6909119Z Received 268435456 of 386870584 (69.4%), 252.0 MBs/sec
+2026-07-02T20:36:58.1383934Z Received 386870584 of 386870584 (100.0%), 251.7 MBs/sec
+2026-07-02T20:36:58.1385070Z Cache Size: ~369 MB (386870584 B)
+2026-07-02T20:36:58.1450977Z [command]/usr/bin/tar -xf /home/runner/work/_temp/ad482c07-0dcd-4b9a-88df-5014943d943f/cache.tzst -P -C /home/runner/work/tarodan-app/tarodan-app --use-compress-program unzstd
+2026-07-02T20:37:03.8309601Z Cache restored successfully
+2026-07-02T20:37:03.8558092Z Cache restored from key: node-cache-Linux-x64-pnpm-fc739e9ce3af9124622ee0916e2e85b4d90368bff66d576a6bd0c5dc52c3d59e
+2026-07-02T20:37:03.8802637Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-02T20:37:03.8803854Z ##[group]Run actions/cache@v4
+2026-07-02T20:37:03.8804139Z with:
+2026-07-02T20:37:03.8804341Z   path: .turbo
+2026-07-02T20:37:03.8804645Z   key: turbo-Linux-lint-043a41c03dec8d5d6d770b398ffb52d360abfe7d
+2026-07-02T20:37:03.8805028Z   restore-keys: turbo-Linux-lint-
+
+2026-07-02T20:37:03.8805315Z   enableCrossOsArchive: false
+2026-07-02T20:37:03.8805566Z   fail-on-cache-miss: false
+2026-07-02T20:37:03.8805805Z   lookup-only: false
+2026-07-02T20:37:03.8806021Z   save-always: false
+2026-07-02T20:37:03.8806221Z env:
+2026-07-02T20:37:03.8806467Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-07-02T20:37:03.8806789Z ##[endgroup]
+2026-07-02T20:37:03.9890465Z (node:2366) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-02T20:37:03.9891774Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-02T20:37:04.0607419Z Cache not found for input keys: turbo-Linux-lint-043a41c03dec8d5d6d770b398ffb52d360abfe7d, turbo-Linux-lint-
+2026-07-02T20:37:04.0701799Z ##[group]Run pnpm install --frozen-lockfile
+2026-07-02T20:37:04.0702223Z [36;1mpnpm install --frozen-lockfile[0m
+2026-07-02T20:37:04.0860745Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-07-02T20:37:04.0861115Z env:
+2026-07-02T20:37:04.0861385Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-07-02T20:37:04.0861707Z ##[endgroup]
+2026-07-02T20:37:04.5112237Z Scope: all 12 workspace projects
+2026-07-02T20:37:04.6407165Z Lockfile is up to date, resolution step is skipped
+2026-07-02T20:37:05.1170665Z Packages: +2807
+2026-07-02T20:37:05.1172158Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-07-02T20:37:05.1247985Z Progress: resolved 0, reused 1, downloaded 0, added 0
+2026-07-02T20:37:06.1543757Z Progress: resolved 0, reused 907, downloaded 0, added 0
+2026-07-02T20:37:07.1545602Z Progress: resolved 0, reused 2248, downloaded 0, added 156
+2026-07-02T20:37:08.1544209Z Progress: resolved 0, reused 2248, downloaded 0, added 666
+2026-07-02T20:37:09.1552246Z Progress: resolved 0, reused 2248, downloaded 0, added 1974
+2026-07-02T20:37:10.1553826Z Progress: resolved 0, reused 2248, downloaded 0, added 2807
+2026-07-02T20:37:10.3635994Z Progress: resolved 0, reused 2248, downloaded 0, added 2807, done
+2026-07-02T20:37:10.9240449Z 
+2026-07-02T20:37:11.1126777Z . postinstall$ echo Skipping husky
+2026-07-02T20:37:11.1222733Z . postinstall: Skipping husky
+2026-07-02T20:37:11.1235164Z . postinstall: Done
+2026-07-02T20:37:11.1301411Z Done in 7s
+2026-07-02T20:37:11.1921355Z ##[group]Run pnpm lint
+2026-07-02T20:37:11.1921666Z [36;1mpnpm lint[0m
+2026-07-02T20:37:11.1958742Z shell: /usr/bin/bash -e {0}
+2026-07-02T20:37:11.1959004Z env:
+2026-07-02T20:37:11.1959270Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-07-02T20:37:11.1959590Z ##[endgroup]
+2026-07-02T20:37:11.5671251Z 
+2026-07-02T20:37:11.5672355Z > tarodan@1.0.0 lint /home/runner/work/tarodan-app/tarodan-app
+2026-07-02T20:37:11.5672823Z > turbo run lint
+2026-07-02T20:37:11.5672965Z 
+2026-07-02T20:37:11.6077874Z 
+2026-07-02T20:37:11.6078567Z Attention:
+2026-07-02T20:37:11.6080111Z Turborepo now collects completely anonymous telemetry regarding usage.
+2026-07-02T20:37:11.6081155Z This information is used to shape the Turborepo roadmap and prioritize features.
+2026-07-02T20:37:11.6082594Z You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+2026-07-02T20:37:11.6083832Z https://turbo.build/repo/docs/telemetry
+2026-07-02T20:37:11.6084179Z 
+2026-07-02T20:37:11.7204612Z • Packages in scope: @tarodan/admin, @tarodan/api, @tarodan/api-client, @tarodan/core, @tarodan/design-tokens, @tarodan/mobile, @tarodan/types, @tarodan/ui, @tarodan/ui-native, @tarodan/validators, @tarodan/web
+2026-07-02T20:37:11.7206445Z • Running lint in 11 packages
+2026-07-02T20:37:11.7207135Z • Remote caching disabled
+2026-07-02T20:37:14.8300786Z ##[group]@tarodan/types:lint
+2026-07-02T20:37:14.8319157Z cache miss, executing b9253f4db7b719c8
+2026-07-02T20:37:14.8358631Z 
+2026-07-02T20:37:14.8378889Z > @tarodan/types@1.0.0 lint /home/runner/work/tarodan-app/tarodan-app/packages/types
+2026-07-02T20:37:14.8424770Z > eslint "src/**/*.ts"
+2026-07-02T20:37:14.8428660Z 
+2026-07-02T20:37:14.8448730Z 
+2026-07-02T20:37:14.8479295Z /home/runner/work/tarodan-app/tarodan-app/packages/types/src/admin.ts
+2026-07-02T20:37:14.8571875Z ##[warning]  95:30  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:14.8634477Z ##[warning]  96:30  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:14.8635942Z 
+2026-07-02T20:37:14.8659363Z /home/runner/work/tarodan-app/tarodan-app/packages/types/src/index.ts
+2026-07-02T20:37:14.8689609Z ##[warning]  61:28  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:14.8715584Z 
+2026-07-02T20:37:14.8739200Z /home/runner/work/tarodan-app/tarodan-app/packages/types/src/notification.ts
+2026-07-02T20:37:14.8755431Z ##[warning]  34:25  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:14.8816518Z 
+2026-07-02T20:37:14.8836890Z /home/runner/work/tarodan-app/tarodan-app/packages/types/src/order.ts
+2026-07-02T20:37:14.8879108Z ##[warning]  78:35  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:14.8888656Z 
+2026-07-02T20:37:14.8919282Z /home/runner/work/tarodan-app/tarodan-app/packages/types/src/product.ts
+2026-07-02T20:37:14.8930115Z ##[warning]  82:18  warning  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-interface
+2026-07-02T20:37:14.8932552Z 
+2026-07-02T20:37:14.8933297Z /home/runner/work/tarodan-app/tarodan-app/packages/types/src/wishlist.ts
+2026-07-02T20:37:14.8935235Z ##[warning]  49:18  warning  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-interface
+2026-07-02T20:37:14.8936972Z 
+2026-07-02T20:37:14.8937778Z ✖ 7 problems (0 errors, 7 warnings)
+2026-07-02T20:37:14.8938824Z   0 errors and 2 warnings potentially fixable with the `--fix` option.
+2026-07-02T20:37:14.8939500Z 
+2026-07-02T20:37:14.8940215Z ##[endgroup]
+2026-07-02T20:37:14.8941096Z ##[group]@tarodan/validators:lint
+2026-07-02T20:37:14.8941834Z cache miss, executing 025ec2915bcbd500
+2026-07-02T20:37:14.8942355Z 
+2026-07-02T20:37:14.8943499Z > @tarodan/validators@1.0.0 lint /home/runner/work/tarodan-app/tarodan-app/packages/validators
+2026-07-02T20:37:14.8944505Z > eslint "src/**/*.ts"
+2026-07-02T20:37:14.8944954Z 
+2026-07-02T20:37:14.8945528Z ##[endgroup]
+2026-07-02T20:37:17.2961939Z ##[group]@tarodan/types:build
+2026-07-02T20:37:17.2963033Z cache miss, executing fb5f3cd5e0e2abc3
+2026-07-02T20:37:17.2963791Z 
+2026-07-02T20:37:17.2964952Z > @tarodan/types@1.0.0 build /home/runner/work/tarodan-app/tarodan-app/packages/types
+2026-07-02T20:37:17.2966155Z > tsup src/index.ts --format cjs,esm --dts
+2026-07-02T20:37:17.2966709Z 
+2026-07-02T20:37:17.2967545Z [34mCLI[39m Building entry: src/index.ts
+2026-07-02T20:37:17.2968789Z [34mCLI[39m Using tsconfig: tsconfig.json
+2026-07-02T20:37:17.2969687Z [34mCLI[39m tsup v8.5.1
+2026-07-02T20:37:17.2970387Z [34mCLI[39m Target: es2020
+2026-07-02T20:37:17.2971065Z [34mCJS[39m Build start
+2026-07-02T20:37:17.2971723Z [34mESM[39m Build start
+2026-07-02T20:37:17.2972671Z [32mCJS[39m [1mdist/index.js [22m[32m7.89 KB[39m
+2026-07-02T20:37:17.2973727Z [32mCJS[39m ⚡️ Build success in 52ms
+2026-07-02T20:37:17.2999665Z [32mESM[39m [1mdist/index.mjs [22m[32m6.41 KB[39m
+2026-07-02T20:37:17.3086379Z [32mESM[39m ⚡️ Build success in 50ms
+2026-07-02T20:37:17.3189531Z [34mDTS[39m Build start
+2026-07-02T20:37:17.3279625Z [32mDTS[39m ⚡️ Build success in 3904ms
+2026-07-02T20:37:17.3309705Z [32mDTS[39m [1mdist/index.d.ts  [22m[32m21.87 KB[39m
+2026-07-02T20:37:17.3385827Z [32mDTS[39m [1mdist/index.d.mts [22m[32m21.87 KB[39m
+2026-07-02T20:37:17.3448388Z ##[endgroup]
+2026-07-02T20:37:17.8741912Z ##[group]@tarodan/design-tokens:build
+2026-07-02T20:37:17.8794673Z cache miss, executing eec28b1f9d86e16e
+2026-07-02T20:37:17.8795939Z 
+2026-07-02T20:37:17.8809751Z > @tarodan/design-tokens@1.0.0 build /home/runner/work/tarodan-app/tarodan-app/packages/design-tokens
+2026-07-02T20:37:17.8838831Z > tsup src/index.ts --format cjs,esm --dts
+2026-07-02T20:37:17.8891788Z 
+2026-07-02T20:37:17.8941787Z [34mCLI[39m Building entry: src/index.ts
+2026-07-02T20:37:17.8969248Z [34mCLI[39m Using tsconfig: tsconfig.json
+2026-07-02T20:37:17.8970137Z [34mCLI[39m tsup v8.5.1
+2026-07-02T20:37:17.8999227Z [34mCLI[39m Target: es2020
+2026-07-02T20:37:17.9029085Z [34mCJS[39m Build start
+2026-07-02T20:37:17.9058852Z [34mESM[39m Build start
+2026-07-02T20:37:17.9059915Z [32mESM[39m [1mdist/index.mjs [22m[32m3.97 KB[39m
+2026-07-02T20:37:17.9089082Z [32mESM[39m ⚡️ Build success in 39ms
+2026-07-02T20:37:17.9139270Z [32mCJS[39m [1mdist/index.js [22m[32m5.55 KB[39m
+2026-07-02T20:37:17.9169307Z [32mCJS[39m ⚡️ Build success in 43ms
+2026-07-02T20:37:17.9198883Z [34mDTS[39m Build start
+2026-07-02T20:37:17.9199864Z [32mDTS[39m ⚡️ Build success in 4449ms
+2026-07-02T20:37:17.9229171Z [32mDTS[39m [1mdist/index.d.ts  [22m[32m13.06 KB[39m
+2026-07-02T20:37:17.9269219Z [32mDTS[39m [1mdist/index.d.mts [22m[32m13.06 KB[39m
+2026-07-02T20:37:17.9299095Z ##[endgroup]
+2026-07-02T20:37:19.4669612Z ##[group]@tarodan/ui-native:lint
+2026-07-02T20:37:19.4670373Z cache miss, executing cfc54256e6458655
+2026-07-02T20:37:19.4728802Z 
+2026-07-02T20:37:19.4790389Z > @tarodan/ui-native@1.0.0 lint /home/runner/work/tarodan-app/tarodan-app/packages/ui-native
+2026-07-02T20:37:19.4809094Z > echo 'skip'
+2026-07-02T20:37:19.4845756Z 
+2026-07-02T20:37:19.4849994Z skip
+2026-07-02T20:37:19.4850771Z ##[endgroup]
+2026-07-02T20:37:23.0549784Z ##[group]@tarodan/core:lint
+2026-07-02T20:37:23.0609548Z cache miss, executing f7204f1123555aef
+2026-07-02T20:37:23.0658902Z 
+2026-07-02T20:37:23.0716250Z > @tarodan/core@1.0.0 lint /home/runner/work/tarodan-app/tarodan-app/packages/core
+2026-07-02T20:37:23.0789073Z > eslint "src/**/*.ts"
+2026-07-02T20:37:23.0858585Z 
+2026-07-02T20:37:23.0888700Z 
+2026-07-02T20:37:23.0949565Z /home/runner/work/tarodan-app/tarodan-app/packages/core/src/hooks/useAuth.ts
+2026-07-02T20:37:23.0993285Z ##[warning]  20:9   warning  'handleLogin' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:23.1050939Z ##[warning]  21:12  warning  'email' is defined but never used. Allowed unused args must match /^_/u                 @typescript-eslint/no-unused-vars
+2026-07-02T20:37:23.1090265Z ##[warning]  21:27  warning  'password' is defined but never used. Allowed unused args must match /^_/u              @typescript-eslint/no-unused-vars
+2026-07-02T20:37:23.1168576Z 
+2026-07-02T20:37:23.1209443Z /home/runner/work/tarodan-app/tarodan-app/packages/core/src/stores/notificationStore.ts
+2026-07-02T20:37:23.1280867Z ##[warning]  18:69  warning  'get' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:23.1308512Z 
+2026-07-02T20:37:23.1349253Z /home/runner/work/tarodan-app/tarodan-app/packages/core/src/stores/uiStore.ts
+2026-07-02T20:37:23.1351235Z ##[warning]  13:26  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:23.1390409Z 
+2026-07-02T20:37:23.1449401Z ✖ 5 problems (0 errors, 5 warnings)
+2026-07-02T20:37:23.1490116Z 
+2026-07-02T20:37:23.1519358Z ##[endgroup]
+2026-07-02T20:37:23.3353513Z ##[group]@tarodan/api-client:lint
+2026-07-02T20:37:23.3354593Z cache miss, executing 034721956896fee5
+2026-07-02T20:37:23.3355184Z 
+2026-07-02T20:37:23.3355984Z > @tarodan/api-client@1.0.0 lint /home/runner/work/tarodan-app/tarodan-app/packages/api-client
+2026-07-02T20:37:23.3357002Z > eslint "src/**/*.ts"
+2026-07-02T20:37:23.3357429Z 
+2026-07-02T20:37:23.3357621Z 
+2026-07-02T20:37:23.3358553Z /home/runner/work/tarodan-app/tarodan-app/packages/api-client/src/admin-client.ts
+2026-07-02T20:37:23.3409104Z ##[warning]   27:42  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:23.3414173Z ##[warning]   51:45  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:23.3422253Z ##[warning]   70:43  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:23.3424958Z ##[warning]  147:52  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:23.3449902Z ##[warning]  161:46  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:23.3573197Z 
+2026-07-02T20:37:23.3649552Z /home/runner/work/tarodan-app/tarodan-app/packages/api-client/src/client.ts
+2026-07-02T20:37:23.3705837Z ##[warning]  60:37  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:23.3777461Z ##[warning]  64:36  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:23.3809629Z ##[warning]  68:38  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:23.3868553Z 
+2026-07-02T20:37:23.3959401Z /home/runner/work/tarodan-app/tarodan-app/packages/api-client/src/endpoints/user.ts
+2026-07-02T20:37:23.3990415Z ##[warning]  61:106  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:23.4109894Z ##[warning]  62:62   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:23.4203394Z 
+2026-07-02T20:37:23.4260594Z /home/runner/work/tarodan-app/tarodan-app/packages/api-client/src/hooks/useApi.ts
+2026-07-02T20:37:23.4262813Z ##[warning]  11:22  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:23.4288060Z ##[warning]  16:26  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:23.4329794Z ##[warning]  25:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:23.4347296Z ##[warning]  48:39  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:23.4368922Z 
+2026-07-02T20:37:23.4399035Z ✖ 14 problems (0 errors, 14 warnings)
+2026-07-02T20:37:23.4399668Z 
+2026-07-02T20:37:23.4405159Z ##[endgroup]
+2026-07-02T20:37:24.7339956Z ##[group]@tarodan/ui:lint
+2026-07-02T20:37:24.7442930Z cache miss, executing 89be710898a1421d
+2026-07-02T20:37:24.7468766Z 
+2026-07-02T20:37:24.7509814Z > @tarodan/ui@1.0.0 lint /home/runner/work/tarodan-app/tarodan-app/packages/ui
+2026-07-02T20:37:24.7555402Z > eslint "src/**/*.{ts,tsx}"
+2026-07-02T20:37:24.7588577Z 
+2026-07-02T20:37:24.7628645Z 
+2026-07-02T20:37:24.7689186Z /home/runner/work/tarodan-app/tarodan-app/packages/ui/src/Card.tsx
+2026-07-02T20:37:24.7710697Z ##[warning]  32:18  warning  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-interface
+2026-07-02T20:37:24.7714077Z ##[warning]  46:18  warning  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-interface
+2026-07-02T20:37:24.7752100Z ##[warning]  60:18  warning  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-interface
+2026-07-02T20:37:24.7778013Z ##[warning]  74:18  warning  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-interface
+2026-07-02T20:37:24.7794387Z ##[warning]  84:18  warning  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-interface
+2026-07-02T20:37:24.7796204Z 
+2026-07-02T20:37:24.7799039Z /home/runner/work/tarodan-app/tarodan-app/packages/ui/src/Skeleton.tsx
+2026-07-02T20:37:24.7801003Z ##[warning]  4:18  warning  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-interface
+2026-07-02T20:37:24.7802629Z 
+2026-07-02T20:37:24.7811292Z ✖ 6 problems (0 errors, 6 warnings)
+2026-07-02T20:37:24.7812165Z   0 errors and 6 warnings potentially fixable with the `--fix` option.
+2026-07-02T20:37:24.7812776Z 
+2026-07-02T20:37:24.7813399Z ##[endgroup]
+2026-07-02T20:37:28.0239728Z ##[group]@tarodan/core:build
+2026-07-02T20:37:28.0299188Z cache miss, executing 7fc2e5cde93952eb
+2026-07-02T20:37:28.0358528Z 
+2026-07-02T20:37:28.0389276Z > @tarodan/core@1.0.0 build /home/runner/work/tarodan-app/tarodan-app/packages/core
+2026-07-02T20:37:28.0418813Z > tsup src/index.ts --format cjs,esm --dts
+2026-07-02T20:37:28.0448573Z 
+2026-07-02T20:37:28.0479112Z [34mCLI[39m Building entry: src/index.ts
+2026-07-02T20:37:28.0508930Z [34mCLI[39m Using tsconfig: tsconfig.json
+2026-07-02T20:37:28.0538961Z [34mCLI[39m tsup v8.5.1
+2026-07-02T20:37:28.0549168Z [34mCLI[39m Target: es2020
+2026-07-02T20:37:28.0549862Z [34mCJS[39m Build start
+2026-07-02T20:37:28.0550479Z [34mESM[39m Build start
+2026-07-02T20:37:28.0551247Z [32mCJS[39m [1mdist/index.js [22m[32m19.11 KB[39m
+2026-07-02T20:37:28.0552077Z [32mCJS[39m ⚡️ Build success in 127ms
+2026-07-02T20:37:28.0552906Z [32mESM[39m [1mdist/index.mjs [22m[32m16.14 KB[39m
+2026-07-02T20:37:28.0553710Z [32mESM[39m ⚡️ Build success in 128ms
+2026-07-02T20:37:28.0554349Z [34mDTS[39m Build start
+2026-07-02T20:37:28.0555036Z [32mDTS[39m ⚡️ Build success in 7892ms
+2026-07-02T20:37:28.0555885Z [32mDTS[39m [1mdist/index.d.ts  [22m[32m10.73 KB[39m
+2026-07-02T20:37:28.0556826Z [32mDTS[39m [1mdist/index.d.mts [22m[32m10.73 KB[39m
+2026-07-02T20:37:28.0558496Z ##[endgroup]
+2026-07-02T20:37:28.3737234Z ##[group]@tarodan/api-client:build
+2026-07-02T20:37:28.3761516Z cache miss, executing 6b03b8441d820a5f
+2026-07-02T20:37:28.3868697Z 
+2026-07-02T20:37:28.3899329Z > @tarodan/api-client@1.0.0 build /home/runner/work/tarodan-app/tarodan-app/packages/api-client
+2026-07-02T20:37:28.3900362Z > tsup src/index.ts --format cjs,esm --dts --external react
+2026-07-02T20:37:28.3900822Z 
+2026-07-02T20:37:28.3989596Z [34mCLI[39m Building entry: src/index.ts
+2026-07-02T20:37:28.4049199Z [34mCLI[39m Using tsconfig: tsconfig.json
+2026-07-02T20:37:28.4091200Z [34mCLI[39m tsup v8.5.1
+2026-07-02T20:37:28.4119001Z [34mCLI[39m Target: es2020
+2026-07-02T20:37:28.4148923Z [34mCJS[39m Build start
+2026-07-02T20:37:28.4208914Z [34mESM[39m Build start
+2026-07-02T20:37:28.4249403Z [32mCJS[39m [1mdist/index.js [22m[32m24.64 KB[39m
+2026-07-02T20:37:28.4270088Z [32mCJS[39m ⚡️ Build success in 142ms
+2026-07-02T20:37:28.4299124Z [32mESM[39m [1mdist/index.mjs [22m[32m22.17 KB[39m
+2026-07-02T20:37:28.4339476Z [32mESM[39m ⚡️ Build success in 136ms
+2026-07-02T20:37:28.4369066Z [34mDTS[39m Build start
+2026-07-02T20:37:28.4429360Z [32mDTS[39m ⚡️ Build success in 7517ms
+2026-07-02T20:37:28.4459082Z [32mDTS[39m [1mdist/index.d.ts  [22m[32m13.98 KB[39m
+2026-07-02T20:37:28.4489195Z [32mDTS[39m [1mdist/index.d.mts [22m[32m13.98 KB[39m
+2026-07-02T20:37:28.4519204Z ##[endgroup]
+2026-07-02T20:37:30.9770224Z ##[group]@tarodan/ui:build
+2026-07-02T20:37:30.9789331Z cache miss, executing b6ea97571586133b
+2026-07-02T20:37:30.9858714Z 
+2026-07-02T20:37:30.9910727Z > @tarodan/ui@1.0.0 build /home/runner/work/tarodan-app/tarodan-app/packages/ui
+2026-07-02T20:37:30.9981905Z > tsup src/index.ts --format cjs,esm --dts
+2026-07-02T20:37:31.0068644Z 
+2026-07-02T20:37:31.0159603Z [34mCLI[39m Building entry: src/index.ts
+2026-07-02T20:37:31.0219551Z [34mCLI[39m Using tsconfig: tsconfig.json
+2026-07-02T20:37:31.0249166Z [34mCLI[39m tsup v8.5.1
+2026-07-02T20:37:31.0279151Z [34mCLI[39m Target: es2020
+2026-07-02T20:37:31.0369174Z [34mCJS[39m Build start
+2026-07-02T20:37:31.0429034Z [34mESM[39m Build start
+2026-07-02T20:37:31.0459061Z [32mESM[39m [1mdist/index.mjs [22m[32m62.62 KB[39m
+2026-07-02T20:37:31.0549365Z [32mESM[39m ⚡️ Build success in 260ms
+2026-07-02T20:37:31.0600577Z [32mCJS[39m [1mdist/index.js [22m[32m72.51 KB[39m
+2026-07-02T20:37:31.0670183Z [32mCJS[39m ⚡️ Build success in 272ms
+2026-07-02T20:37:31.0729412Z [34mDTS[39m Build start
+2026-07-02T20:37:31.0789742Z [32mDTS[39m ⚡️ Build success in 8730ms
+2026-07-02T20:37:31.0799008Z [32mDTS[39m [1mdist/index.d.ts  [22m[32m25.66 KB[39m
+2026-07-02T20:37:31.0819094Z [32mDTS[39m [1mdist/index.d.mts [22m[32m25.66 KB[39m
+2026-07-02T20:37:31.0820018Z ##[endgroup]
+2026-07-02T20:37:41.3790032Z [;31m@tarodan/mobile:lint[;0m
+2026-07-02T20:37:41.3791166Z cache miss, executing 4da79a8a3a01e177
+2026-07-02T20:37:41.3791734Z 
+2026-07-02T20:37:41.3792443Z > @tarodan/mobile@1.0.0 lint /home/runner/work/tarodan-app/tarodan-app/apps/mobile
+2026-07-02T20:37:41.3793360Z > eslint . --ext .ts,.tsx
+2026-07-02T20:37:41.3793783Z 
+2026-07-02T20:37:41.3794628Z 
+2026-07-02T20:37:41.3795189Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/App.tsx
+2026-07-02T20:37:41.3799747Z ##[warning]  19:27  warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.3801941Z 
+2026-07-02T20:37:41.3819281Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/(auth)/__tests__/forgot-password.test.tsx
+2026-07-02T20:37:41.3830290Z ##[warning]  10:32  warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.3831998Z 
+2026-07-02T20:37:41.3832841Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/(auth)/__tests__/login.test.tsx
+2026-07-02T20:37:41.3834623Z ##[warning]  9:32  warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.3835985Z 
+2026-07-02T20:37:41.3836995Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/(auth)/__tests__/register.test.tsx
+2026-07-02T20:37:41.3838849Z ##[warning]  11:32  warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.3840097Z 
+2026-07-02T20:37:41.3840562Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/(auth)/login.tsx
+2026-07-02T20:37:41.3842490Z ##[warning]  147:49  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.3845447Z ##[warning]  150:17  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.3901517Z ##[warning]  170:49  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.3904413Z ##[warning]  173:17  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.3910218Z ##[error]  397:55  error    Hex literal renk yasak. '@tarodan/design-tokens'tan semantic token kullan (örn. colors.primary[600], colors.text.heading)  no-restricted-syntax
+2026-07-02T20:37:41.3913775Z ##[error]  399:61  error    Hex literal renk yasak. '@tarodan/design-tokens'tan semantic token kullan (örn. colors.primary[600], colors.text.heading)  no-restricted-syntax
+2026-07-02T20:37:41.3917086Z ##[error]  522:22  error    Hex literal renk yasak. '@tarodan/design-tokens'tan semantic token kullan (örn. colors.primary[600], colors.text.heading)  no-restricted-syntax
+2026-07-02T20:37:41.3927626Z ##[error]  526:12  error    Hex literal renk yasak. '@tarodan/design-tokens'tan semantic token kullan (örn. colors.primary[600], colors.text.heading)  no-restricted-syntax
+2026-07-02T20:37:41.3929389Z 
+2026-07-02T20:37:41.3929882Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/(auth)/register.tsx
+2026-07-02T20:37:41.3931218Z ##[warning]  252:55  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.3932454Z 
+2026-07-02T20:37:41.3933078Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/(tabs)/__tests__/messages.test.tsx
+2026-07-02T20:37:41.3935096Z ##[warning]  14:6   warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.3937225Z ##[warning]  23:15  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.3939412Z ##[warning]  28:19  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.3941382Z ##[warning]  58:30  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.3942561Z 
+2026-07-02T20:37:41.3943214Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/(tabs)/__tests__/notifications.test.tsx
+2026-07-02T20:37:41.3945045Z ##[warning]  13:38  warning  'routerMock' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.3947581Z ##[warning]  17:6   warning  Require statement not part of import statement                                @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.3950106Z ##[warning]  19:19  warning  Require statement not part of import statement                                @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.3951424Z 
+2026-07-02T20:37:41.3952006Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/(tabs)/__tests__/search.test.tsx
+2026-07-02T20:37:41.3953424Z ##[warning]  15:32  warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.3955455Z ##[warning]  44:34  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.3957006Z 
+2026-07-02T20:37:41.3957462Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/(tabs)/index.tsx
+2026-07-02T20:37:41.3959344Z ##[warning]   20:17  warning  'spacing' is assigned a value but never used. Allowed unused vars must match /^_/u       @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.3962031Z ##[warning]   20:26  warning  'radius' is assigned a value but never used. Allowed unused vars must match /^_/u        @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.3964881Z ##[warning]   28:10  warning  'apiConnected' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.3967289Z ##[warning]  131:26  warning  Unexpected any. Specify a different type                                                 @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.3970124Z ##[warning]  271:32  warning  Unexpected any. Specify a different type                                                 @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.3972490Z ##[warning]  275:36  warning  Unexpected any. Specify a different type                                                 @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.3974866Z ##[warning]  482:49  warning  Unexpected any. Specify a different type                                                 @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.3977194Z ##[warning]  582:67  warning  Unexpected any. Specify a different type                                                 @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.3979783Z ##[warning]  600:86  warning  Unexpected any. Specify a different type                                                 @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.3982267Z ##[warning]  618:56  warning  Unexpected any. Specify a different type                                                 @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.3984712Z ##[warning]  648:49  warning  Unexpected any. Specify a different type                                                 @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.3987238Z ##[warning]  666:48  warning  Unexpected any. Specify a different type                                                 @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.3989799Z ##[warning]  763:69  warning  Unexpected any. Specify a different type                                                 @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.3992197Z ##[warning]  791:75  warning  Unexpected any. Specify a different type                                                 @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.3994601Z ##[warning]  795:85  warning  Unexpected any. Specify a different type                                                 @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.3997034Z ##[warning]  850:45  warning  Unexpected any. Specify a different type                                                 @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.3999523Z ##[warning]  854:81  warning  Unexpected any. Specify a different type                                                 @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4000785Z 
+2026-07-02T20:37:41.4001317Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/(tabs)/notifications.tsx
+2026-07-02T20:37:41.4002664Z ##[warning]  209:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4004660Z ##[warning]  219:36  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4006600Z ##[warning]  219:70  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4008669Z ##[warning]  221:53  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4010618Z ##[warning]  278:39  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4012001Z 
+2026-07-02T20:37:41.4012506Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/(tabs)/profile.tsx
+2026-07-02T20:37:41.4013798Z ##[warning]   60:34  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4015744Z ##[warning]   60:66  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4017610Z ##[warning]   69:35  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4019622Z ##[warning]   78:32  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4021491Z ##[warning]   78:64  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4023885Z ##[warning]   82:53  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4025840Z ##[warning]   84:26  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4027964Z ##[warning]   84:72  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4030500Z ##[warning]   85:51  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4032499Z ##[warning]   86:49  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4034411Z ##[warning]   94:62  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4036267Z ##[warning]   99:37  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4038279Z ##[warning]  136:54  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4040307Z ##[warning]  138:52  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4041479Z 
+2026-07-02T20:37:41.4041972Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/(tabs)/search.tsx
+2026-07-02T20:37:41.4043253Z ##[warning]  215:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4045149Z ##[warning]  258:44  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4047056Z ##[warning]  512:98  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4048332Z 
+2026-07-02T20:37:41.4048870Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/__tests__/cart.test.tsx
+2026-07-02T20:37:41.4050426Z ##[warning]  16:32  warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4052512Z ##[warning]  20:33  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4053683Z 
+2026-07-02T20:37:41.4054249Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/__tests__/favorites.test.tsx
+2026-07-02T20:37:41.4055659Z ##[warning]  12:14  warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4057742Z ##[warning]  13:40  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4060058Z ##[warning]  18:16  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4061271Z 
+2026-07-02T20:37:41.4061822Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/__tests__/following.test.tsx
+2026-07-02T20:37:41.4063207Z ##[warning]  11:6   warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4065199Z ##[warning]  21:16  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4066395Z 
+2026-07-02T20:37:41.4066966Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/__tests__/support-new.test.tsx
+2026-07-02T20:37:41.4068767Z ##[warning]  25:49  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4069967Z 
+2026-07-02T20:37:41.4070408Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/_layout.tsx
+2026-07-02T20:37:41.4071690Z ##[warning]  27:20  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4073717Z ##[warning]  91:50  warning  Unexpected empty arrow function           @typescript-eslint/no-empty-function
+2026-07-02T20:37:41.4075667Z ##[warning]  99:59  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4076804Z 
+2026-07-02T20:37:41.4077233Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/about.tsx
+2026-07-02T20:37:41.4078781Z ##[warning]  16:83  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4079905Z 
+2026-07-02T20:37:41.4080364Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/brands/index.tsx
+2026-07-02T20:37:41.4081721Z ##[warning]  40:44  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4082843Z 
+2026-07-02T20:37:41.4083345Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/buyer-protection.tsx
+2026-07-02T20:37:41.4084631Z ##[warning]  76:102  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4086621Z ##[warning]  80:106  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4087756Z 
+2026-07-02T20:37:41.4088362Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/cart.tsx
+2026-07-02T20:37:41.4089563Z ##[warning]  31:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4090686Z 
+2026-07-02T20:37:41.4091243Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/category/[slug].tsx
+2026-07-02T20:37:41.4092679Z ##[warning]   54:23  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4094751Z ##[warning]   78:30  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4096708Z ##[warning]   86:36  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4098715Z ##[warning]  214:34  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4099872Z 
+2026-07-02T20:37:41.4100498Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/checkout/__tests__/checkout-otp.test.tsx
+2026-07-02T20:37:41.4102401Z ##[warning]   12:8   warning  'React' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.4104839Z ##[warning]   22:32  warning  Require statement not part of import statement                           @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4107149Z ##[warning]   29:17  warning  Require statement not part of import statement                           @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4109579Z ##[warning]   30:31  warning  Require statement not part of import statement                           @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4111900Z ##[warning]  135:26  warning  Unexpected any. Specify a different type                                 @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4113179Z 
+2026-07-02T20:37:41.4113818Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/checkout/__tests__/checkout.test.tsx
+2026-07-02T20:37:41.4115288Z ##[warning]  18:32  warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4117307Z ##[warning]  43:26  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4118750Z 
+2026-07-02T20:37:41.4119444Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/checkout/index.tsx
+2026-07-02T20:37:41.4121221Z ##[warning]   175:18  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4123952Z ##[warning]   196:54  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4126633Z ##[warning]   260:33  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4129714Z ##[warning]   269:44  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4132428Z ##[warning]   279:38  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4135098Z ##[warning]   415:19  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4137795Z ##[warning]   415:43  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4140595Z ##[warning]   425:37  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4143221Z ##[warning]   432:25  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4145891Z ##[warning]   446:31  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4148850Z ##[warning]   457:16  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4151628Z ##[warning]   475:14  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4154304Z ##[warning]   476:24  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4156883Z ##[warning]   492:18  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4159608Z ##[warning]   497:95  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4162243Z ##[warning]   500:21  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4164831Z ##[warning]   533:16  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4167406Z ##[warning]   568:19  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4170146Z ##[warning]   578:17  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4173009Z ##[warning]   602:19  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4175644Z ##[warning]   611:17  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4178526Z ##[warning]   632:48  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4181305Z ##[warning]   830:65  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4183902Z ##[warning]   881:48  warning  Unexpected empty arrow function                                                                                            @typescript-eslint/no-empty-function
+2026-07-02T20:37:41.4187246Z ##[error]  1028:49  error    Hex literal renk yasak. '@tarodan/design-tokens'tan semantic token kullan (örn. colors.primary[600], colors.text.heading)  no-restricted-syntax
+2026-07-02T20:37:41.4188912Z 
+2026-07-02T20:37:41.4189562Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/collections/[id]/__tests__/detail.test.tsx
+2026-07-02T20:37:41.4191680Z ##[warning]   9:18  warning  'fireEvent' is defined but never used. Allowed unused vars must match /^_/u       @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.4194219Z ##[warning]  24:15  warning  'collectionsApi' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.4195599Z 
+2026-07-02T20:37:41.4196174Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/collections/[id]/add-items.tsx
+2026-07-02T20:37:41.4197553Z ##[warning]  111:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4199826Z ##[warning]  126:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4201010Z 
+2026-07-02T20:37:41.4201568Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/collections/[id]/edit.tsx
+2026-07-02T20:37:41.4202921Z ##[warning]  101:14  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4204867Z ##[warning]  113:22  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4206795Z ##[warning]  127:22  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4209434Z ##[warning]  139:22  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4210851Z 
+2026-07-02T20:37:41.4211555Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/collections/[id]/index.tsx
+2026-07-02T20:37:41.4213299Z ##[warning]   81:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4215698Z ##[warning]   97:58  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4218340Z ##[warning]  278:33  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4306894Z 
+2026-07-02T20:37:41.4307629Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/collections/__tests__/new.test.tsx
+2026-07-02T20:37:41.4309776Z ##[warning]  12:32  warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4311107Z 
+2026-07-02T20:37:41.4311640Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/collections/index.tsx
+2026-07-02T20:37:41.4312923Z ##[warning]  43:54  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4315302Z ##[warning]  48:47  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4316334Z 
+2026-07-02T20:37:41.4316784Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/collections/new.tsx
+2026-07-02T20:37:41.4318049Z ##[warning]  69:14  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4319706Z ##[warning]  83:22  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4320433Z 
+2026-07-02T20:37:41.4320874Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/contact.tsx
+2026-07-02T20:37:41.4321980Z ##[warning]  78:21  warning  Unexpected empty method 'action'          @typescript-eslint/no-empty-function
+2026-07-02T20:37:41.4324010Z ##[warning]  97:48  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4325156Z 
+2026-07-02T20:37:41.4325576Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/help.tsx
+2026-07-02T20:37:41.4326859Z ##[warning]  294:44  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4329244Z ##[warning]  354:50  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4330502Z 
+2026-07-02T20:37:41.4330922Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/listings.tsx
+2026-07-02T20:37:41.4332286Z ##[warning]  104:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4334414Z ##[warning]  135:48  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4335560Z 
+2026-07-02T20:37:41.4336122Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/membership/__tests__/index.test.tsx
+2026-07-02T20:37:41.4337884Z ##[warning]  12:32  warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4340425Z ##[warning]  18:20  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4341640Z 
+2026-07-02T20:37:41.4342206Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/membership/__tests__/success.test.tsx
+2026-07-02T20:37:41.4343610Z ##[warning]  13:6  warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4344853Z 
+2026-07-02T20:37:41.4345444Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/membership/__tests__/visibility.test.tsx
+2026-07-02T20:37:41.4347039Z ##[warning]  13:32  warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4349531Z ##[warning]  19:20  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4350884Z 
+2026-07-02T20:37:41.4351436Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/membership/checkout.tsx
+2026-07-02T20:37:41.4352904Z ##[warning]   97:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4355132Z ##[warning]  137:23  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4357222Z ##[warning]  148:31  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4359574Z ##[warning]  158:66  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4361787Z ##[warning]  178:14  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4363994Z ##[warning]  183:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4365313Z 
+2026-07-02T20:37:41.4365830Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/membership/index.tsx
+2026-07-02T20:37:41.4367796Z ##[warning]   79:35  warning  Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4370367Z ##[warning]   81:19  warning  Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4372840Z ##[error]  125:7   error    Definition for rule 'react-hooks/exhaustive-deps' was not found  react-hooks/exhaustive-deps
+2026-07-02T20:37:41.4375179Z ##[warning]  324:64  warning  Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4376576Z 
+2026-07-02T20:37:41.4377119Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/membership/manage.tsx
+2026-07-02T20:37:41.4378782Z ##[warning]   93:22   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4381166Z ##[warning]  110:22   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4383319Z ##[warning]  139:131  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4385523Z ##[warning]  149:129  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4387669Z ##[warning]  240:59   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4390132Z ##[warning]  260:57   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4391540Z 
+2026-07-02T20:37:41.4392149Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/messages/[threadId].tsx
+2026-07-02T20:37:41.4394798Z ##[warning]   30:5   warning  'dailyMessageCount' is assigned a value but never used. Allowed unused vars must match /^_/u                               @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.4398390Z ##[warning]  140:78  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4401399Z ##[warning]  141:41  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4404695Z ##[warning]  141:72  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4408022Z ##[warning]  144:21  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4411759Z ##[error]  655:12  error    Hex literal renk yasak. '@tarodan/design-tokens'tan semantic token kullan (örn. colors.primary[600], colors.text.heading)  no-restricted-syntax
+2026-07-02T20:37:41.4412885Z 
+2026-07-02T20:37:41.4413266Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/messages/__tests__/new.test.tsx
+2026-07-02T20:37:41.4414653Z ##[warning]  22:14  warning  Require statement not part of import statement                              @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4416374Z ##[warning]  25:23  warning  'backMock' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.4417346Z 
+2026-07-02T20:37:41.4417826Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/messages/__tests__/thread.test.tsx
+2026-07-02T20:37:41.4420120Z ##[warning]  14:6   warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4421695Z ##[warning]  29:15  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4423840Z ##[warning]  34:16  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4426265Z ##[warning]  36:29  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4428424Z ##[warning]  76:30  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4429674Z 
+2026-07-02T20:37:41.4430129Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/models/[slug].tsx
+2026-07-02T20:37:41.4431479Z ##[warning]   62:32   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4433681Z ##[warning]   72:21   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4435765Z ##[warning]  117:55   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4437744Z ##[warning]  188:101  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4439636Z 
+2026-07-02T20:37:41.4440220Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/models/index.tsx
+2026-07-02T20:37:41.4441569Z ##[warning]   49:51   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4443602Z ##[warning]  168:108  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4444796Z 
+2026-07-02T20:37:41.4445455Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/newsletter/__tests__/newsletter.test.tsx
+2026-07-02T20:37:41.4447108Z ##[warning]  40:65  warning  Unexpected empty arrow function  @typescript-eslint/no-empty-function
+2026-07-02T20:37:41.4449210Z ##[warning]  84:65  warning  Unexpected empty arrow function  @typescript-eslint/no-empty-function
+2026-07-02T20:37:41.4450378Z 
+2026-07-02T20:37:41.4450891Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/newsletter/index.tsx
+2026-07-02T20:37:41.4452254Z ##[warning]  32:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4454369Z ##[warning]  81:69  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4455588Z 
+2026-07-02T20:37:41.4456165Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/newsletter/unsubscribe.tsx
+2026-07-02T20:37:41.4457522Z ##[warning]  25:22  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4459720Z ##[warning]  33:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4460896Z 
+2026-07-02T20:37:41.4461341Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/offers/[id].tsx
+2026-07-02T20:37:41.4462686Z ##[warning]   91:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4464644Z ##[warning]  101:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4466731Z ##[warning]  112:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4468900Z ##[warning]  124:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4470930Z ##[warning]  149:38  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4472947Z ##[warning]  149:84  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4474145Z 
+2026-07-02T20:37:41.4474635Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/offers/index.tsx
+2026-07-02T20:37:41.4475930Z ##[warning]  368:90   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4477914Z ##[warning]  373:92   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4480257Z ##[warning]  561:22   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4482497Z ##[warning]  570:106  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4483260Z 
+2026-07-02T20:37:41.4483561Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/order-track.tsx
+2026-07-02T20:37:41.4484413Z ##[warning]   77:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4485642Z ##[warning]  173:61  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4486941Z ##[warning]  235:65  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4488567Z ##[warning]  259:66  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4489810Z 
+2026-07-02T20:37:41.4490137Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/orders/[id].tsx
+2026-07-02T20:37:41.4491609Z ##[warning]    30:30  warning  'UiOrderStatus' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.4493263Z ##[warning]    35:11  warning  'OrderDetail' is defined but never used. Allowed unused vars must match /^_/u    @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.4494824Z ##[warning]   159:27  warning  Unexpected any. Specify a different type                                         @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4496290Z ##[warning]   327:20  warning  Unexpected any. Specify a different type                                         @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4497780Z ##[warning]   389:20  warning  Unexpected any. Specify a different type                                         @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4499445Z ##[warning]   435:20  warning  Unexpected any. Specify a different type                                         @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4500861Z ##[warning]   479:18  warning  Unexpected any. Specify a different type                                         @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4502265Z ##[warning]   482:23  warning  Unexpected any. Specify a different type                                         @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4503692Z ##[warning]   487:57  warning  Unexpected any. Specify a different type                                         @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4505120Z ##[warning]   497:14  warning  Unexpected any. Specify a different type                                         @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4506583Z ##[warning]   503:12  warning  Unexpected any. Specify a different type                                         @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4508078Z ##[warning]   505:20  warning  Unexpected any. Specify a different type                                         @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4510049Z ##[warning]  1363:27  warning  Unexpected any. Specify a different type                                         @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4510842Z 
+2026-07-02T20:37:41.4511161Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/orders/group/[id].tsx
+2026-07-02T20:37:41.4512123Z ##[warning]   97:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4513349Z ##[warning]  105:44  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4514564Z ##[warning]  220:80  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4515308Z 
+2026-07-02T20:37:41.4515589Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/orders/index.tsx
+2026-07-02T20:37:41.4516709Z ##[warning]   24:17  warning  'spacing' is assigned a value but never used. Allowed unused vars must match /^_/u            @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.4518755Z ##[warning]   92:27  warning  Unexpected any. Specify a different type                                                      @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4520518Z ##[warning]  103:7   warning  'showOrderTracking' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.4522276Z ##[warning]  136:37  warning  Unexpected any. Specify a different type                                                      @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4523887Z ##[warning]  160:36  warning  Unexpected any. Specify a different type                                                      @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4524737Z 
+2026-07-02T20:37:41.4525068Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/payment-options.tsx
+2026-07-02T20:37:41.4526128Z ##[warning]  49:43  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4526962Z 
+2026-07-02T20:37:41.4527264Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/payment/[id].tsx
+2026-07-02T20:37:41.4528458Z ##[warning]   76:57   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4529838Z ##[warning]   82:18   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4531176Z ##[warning]  102:29   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4532459Z ##[warning]  142:17   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4533734Z ##[warning]  181:12   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4535022Z ##[warning]  191:12   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4536322Z ##[warning]  196:102  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4537091Z 
+2026-07-02T20:37:41.4537491Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/payment/__tests__/webview.test.tsx
+2026-07-02T20:37:41.4539416Z ##[warning]  15:25  warning  Unexpected empty method 'useFocusEffect'        @typescript-eslint/no-empty-function
+2026-07-02T20:37:41.4541553Z ##[warning]  31:24  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4543582Z ##[warning]  33:17  warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4545604Z ##[warning]  34:20  warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4547633Z ##[warning]  36:22  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4549085Z 
+2026-07-02T20:37:41.4549528Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/payment/fail.tsx
+2026-07-02T20:37:41.4550493Z ##[warning]   56:89  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4551775Z ##[warning]   57:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4553078Z ##[warning]  106:68  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4554353Z ##[warning]  114:69  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4555109Z 
+2026-07-02T20:37:41.4555410Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/payment/success.tsx
+2026-07-02T20:37:41.4556228Z ##[warning]  100:51  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4557463Z ##[warning]  186:64  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4559658Z ##[warning]  194:83  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4561331Z ##[warning]  202:69  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4562196Z 
+2026-07-02T20:37:41.4562574Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/product/[id]/index.tsx
+2026-07-02T20:37:41.4563685Z ##[warning]   172:29  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4565195Z ##[warning]   211:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4566662Z ##[warning]   240:32  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4568092Z ##[warning]   327:41  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4570132Z ##[warning]   392:55  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4571612Z ##[warning]   401:81  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4572845Z ##[warning]   408:55  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4574687Z ##[warning]   421:55  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4575921Z ##[warning]   468:39  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4577120Z ##[warning]   471:29  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4578597Z ##[warning]   536:29  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4579828Z ##[warning]   558:29  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4581063Z ##[warning]   774:62  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4582284Z ##[warning]   821:79  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4583836Z ##[warning]   892:75  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4585092Z ##[warning]   911:30  warning  Unexpected empty arrow function           @typescript-eslint/no-empty-function
+2026-07-02T20:37:41.4586321Z ##[warning]  1004:31  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4587058Z 
+2026-07-02T20:37:41.4587393Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/product/[id]/reviews.tsx
+2026-07-02T20:37:41.4588772Z ##[warning]   1:38  warning  'TouchableOpacity' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.4590368Z ##[warning]  63:16  warning  Unexpected any. Specify a different type                                            @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4591228Z 
+2026-07-02T20:37:41.4591617Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/products/unavailable/[productId].tsx
+2026-07-02T20:37:41.4592742Z ##[warning]   29:30  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4593977Z ##[warning]   42:35  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4595183Z ##[warning]   63:83  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4596370Z ##[warning]   86:66  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4597567Z ##[warning]  110:76  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4598539Z 
+2026-07-02T20:37:41.4599231Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/products/unavailable/__tests__/productId.test.tsx
+2026-07-02T20:37:41.4601582Z ##[warning]   8:29  warning  'waitFor' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.4604331Z ##[warning]  22:14  warning  Require statement not part of import statement                             @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4606807Z ##[warning]  24:32  warning  Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4607709Z 
+2026-07-02T20:37:41.4608060Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/refund-requests/[id].tsx
+2026-07-02T20:37:41.4609570Z ##[warning]  79:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4611166Z ##[warning]  80:55  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4612401Z ##[warning]  96:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4613145Z 
+2026-07-02T20:37:41.4613474Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/refund-requests/index.tsx
+2026-07-02T20:37:41.4614367Z ##[warning]   70:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4615659Z ##[warning]   86:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4616970Z ##[warning]  143:96  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4617742Z 
+2026-07-02T20:37:41.4618020Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/sales/index.tsx
+2026-07-02T20:37:41.4619286Z ##[warning]   96:23  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4620624Z ##[warning]  106:39  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4621961Z ##[warning]  108:56  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4623278Z ##[warning]  145:43  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4624598Z ##[warning]  145:74  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4625930Z ##[warning]  159:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4626764Z 
+2026-07-02T20:37:41.4627054Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/sayfa/[slug].tsx
+2026-07-02T20:37:41.4627970Z ##[warning]   80:25  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4629580Z ##[warning]   83:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4630851Z ##[warning]  135:29  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4631560Z 
+2026-07-02T20:37:41.4631849Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/seller/[id].tsx
+2026-07-02T20:37:41.4632717Z ##[warning]   37:34  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4633939Z ##[warning]   51:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4635230Z ##[warning]   66:34  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4636517Z ##[warning]   79:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4637756Z ##[warning]  209:50  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4639401Z ##[warning]  278:37  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4640907Z ##[warning]  314:36  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4642040Z 
+2026-07-02T20:37:41.4642606Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/seller/dashboard.tsx
+2026-07-02T20:37:41.4643459Z ##[warning]  112:40  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4644702Z ##[warning]  112:86  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4645463Z 
+2026-07-02T20:37:41.4645876Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/settings/__tests__/addresses.test.tsx
+2026-07-02T20:37:41.4647093Z ##[warning]   14:6   warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4648948Z ##[warning]   43:65  warning  Unexpected empty arrow function                 @typescript-eslint/no-empty-function
+2026-07-02T20:37:41.4650469Z ##[warning]  107:54  warning  Unexpected empty arrow function                 @typescript-eslint/no-empty-function
+2026-07-02T20:37:41.4651282Z 
+2026-07-02T20:37:41.4651658Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/settings/__tests__/discounts.test.tsx
+2026-07-02T20:37:41.4652749Z ##[warning]  13:28  warning  'pushMock' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.4654268Z ##[warning]  15:32  warning  Require statement not part of import statement                              @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4655859Z ##[warning]  17:20  warning  Unexpected any. Specify a different type                                    @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4657324Z ##[warning]  73:65  warning  Unexpected empty arrow function                                             @typescript-eslint/no-empty-function
+2026-07-02T20:37:41.4658334Z 
+2026-07-02T20:37:41.4658866Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/settings/__tests__/edit-profile.test.tsx
+2026-07-02T20:37:41.4659821Z ##[warning]  10:32  warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4660645Z 
+2026-07-02T20:37:41.4661056Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/settings/__tests__/my-listings.test.tsx
+2026-07-02T20:37:41.4662051Z ##[warning]  13:26  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4663342Z ##[warning]  14:24  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4664702Z ##[warning]  38:27  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4666006Z ##[warning]  39:24  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4666812Z 
+2026-07-02T20:37:41.4667236Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/settings/__tests__/payment-history.test.tsx
+2026-07-02T20:37:41.4668451Z ##[warning]  13:19  warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4669262Z 
+2026-07-02T20:37:41.4669700Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/settings/__tests__/security-extra.test.tsx
+2026-07-02T20:37:41.4670712Z ##[warning]  13:32  warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4672084Z ##[warning]  61:71  warning  Unexpected empty arrow function                 @typescript-eslint/no-empty-function
+2026-07-02T20:37:41.4673453Z ##[warning]  75:45  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4674808Z ##[warning]  76:44  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4675626Z 
+2026-07-02T20:37:41.4676041Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/settings/__tests__/subscription.test.tsx
+2026-07-02T20:37:41.4677217Z ##[warning]  14:14  warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4678790Z ##[warning]  15:40  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4680186Z ##[warning]  29:21  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4680988Z 
+2026-07-02T20:37:41.4681328Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/settings/addresses.tsx
+2026-07-02T20:37:41.4682220Z ##[warning]  114:20  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4683534Z ##[warning]  129:20  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4684321Z 
+2026-07-02T20:37:41.4684787Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/settings/analytics.tsx
+2026-07-02T20:37:41.4685938Z ##[warning]  20:17  warning  'spacing' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.4686894Z 
+2026-07-02T20:37:41.4687237Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/settings/bank-account.tsx
+2026-07-02T20:37:41.4688302Z ##[warning]   94:22  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4689641Z ##[warning]  111:22  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4690418Z 
+2026-07-02T20:37:41.4690741Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/settings/business.tsx
+2026-07-02T20:37:41.4691897Z ##[warning]   19:17  warning  'spacing' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.4693524Z ##[warning]   90:19  warning  Unexpected any. Specify a different type                                            @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4695119Z ##[warning]  181:35  warning  Unexpected any. Specify a different type                                            @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4696661Z ##[warning]  300:31  warning  Unexpected any. Specify a different type                                            @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4697474Z 
+2026-07-02T20:37:41.4697803Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/settings/collections.tsx
+2026-07-02T20:37:41.4699198Z ##[warning]  12:17  warning  'radius' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.4700842Z ##[warning]  99:45  warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4701668Z 
+2026-07-02T20:37:41.4702001Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/settings/discounts.tsx
+2026-07-02T20:37:41.4703171Z ##[warning]   30:17  warning  'spacing' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.4704807Z ##[warning]  110:19  warning  Unexpected any. Specify a different type                                            @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4706413Z ##[warning]  122:21  warning  Unexpected any. Specify a different type                                            @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4707977Z ##[warning]  150:33  warning  Unexpected any. Specify a different type                                            @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4709790Z ##[warning]  162:18  warning  Unexpected any. Specify a different type                                            @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4711348Z ##[warning]  173:18  warning  Unexpected any. Specify a different type                                            @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4713122Z ##[warning]  232:20  warning  Unexpected any. Specify a different type                                            @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4714677Z ##[warning]  283:58  warning  Unexpected any. Specify a different type                                            @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4716243Z ##[warning]  298:61  warning  Unexpected any. Specify a different type                                            @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4717091Z 
+2026-07-02T20:37:41.4717464Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/settings/edit-profile.tsx
+2026-07-02T20:37:41.4718715Z ##[warning]   84:35  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4720303Z ##[warning]   88:31  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4721608Z ##[warning]   96:34  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4722902Z ##[warning]   99:27  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4724195Z ##[warning]   99:61  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4725532Z ##[warning]  100:29  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4726831Z ##[warning]  101:23  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4728266Z ##[warning]  102:27  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4729537Z ##[warning]  126:37  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4730890Z ##[warning]  160:22  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4731705Z 
+2026-07-02T20:37:41.4732052Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/settings/my-listings.tsx
+2026-07-02T20:37:41.4733244Z ##[warning]  27:17  warning  'spacing' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.4734892Z ##[warning]  58:14  warning  Unexpected any. Specify a different type                                            @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4736459Z ##[warning]  59:17  warning  Unexpected any. Specify a different type                                            @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4738026Z ##[warning]  59:51  warning  Unexpected any. Specify a different type                                            @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4740116Z ##[warning]  65:21  warning  Unexpected any. Specify a different type                                            @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4742363Z ##[warning]  85:42  warning  Unexpected any. Specify a different type                                            @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4744799Z ##[warning]  88:44  warning  Unexpected any. Specify a different type                                            @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4746092Z 
+2026-07-02T20:37:41.4746648Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/settings/notifications.tsx
+2026-07-02T20:37:41.4748001Z ##[warning]   23:17  warning  'spacing' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.4749735Z ##[warning]  270:31  warning  Unexpected any. Specify a different type                                            @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4750573Z 
+2026-07-02T20:37:41.4750920Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/settings/payment-history.tsx
+2026-07-02T20:37:41.4752069Z ##[warning]   67:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4753336Z ##[warning]   68:20  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4754541Z ##[warning]   69:45  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4755729Z ##[warning]   83:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4756941Z ##[warning]  124:47  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4757664Z 
+2026-07-02T20:37:41.4758005Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/settings/payment-methods.tsx
+2026-07-02T20:37:41.4759238Z ##[warning]  37:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4760494Z ##[warning]  57:25  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4807120Z 
+2026-07-02T20:37:41.4807506Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/settings/payments.tsx
+2026-07-02T20:37:41.4808694Z ##[warning]   44:84   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4810035Z ##[warning]   62:21   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4811281Z ##[warning]   65:19   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4812473Z ##[warning]   86:25   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4813724Z ##[warning]  105:31   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4814952Z ##[warning]  108:95   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4816196Z ##[warning]  113:25   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4817381Z ##[warning]  136:58   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4818790Z ##[warning]  247:107  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4819516Z 
+2026-07-02T20:37:41.4819842Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/settings/security.tsx
+2026-07-02T20:37:41.4820677Z ##[warning]   45:38  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4821880Z ##[warning]   45:65  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4823068Z ##[warning]   77:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4824268Z ##[warning]   94:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4825439Z ##[warning]  140:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4826617Z ##[warning]  151:41  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4827787Z ##[warning]  151:73  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4829104Z ##[warning]  155:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4830326Z ##[warning]  175:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4831532Z ##[warning]  200:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4832715Z ##[warning]  215:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4834133Z ##[warning]  219:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4834837Z 
+2026-07-02T20:37:41.4835174Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/settings/subscription.tsx
+2026-07-02T20:37:41.4836045Z ##[warning]  231:55  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4836799Z 
+2026-07-02T20:37:41.4837086Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/support/[id].tsx
+2026-07-02T20:37:41.4838014Z ##[warning]   93:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4839501Z ##[warning]  106:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4840216Z 
+2026-07-02T20:37:41.4840657Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/support/index.tsx
+2026-07-02T20:37:41.4841463Z ##[warning]   70:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4842698Z ##[warning]  143:94  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4843424Z 
+2026-07-02T20:37:41.4843705Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/support/new.tsx
+2026-07-02T20:37:41.4844516Z ##[warning]  131:35  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4845274Z 
+2026-07-02T20:37:41.4845554Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/trade/[id].tsx
+2026-07-02T20:37:41.4846438Z ##[warning]   370:22  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4847685Z ##[warning]   390:22  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4849055Z ##[warning]   402:22  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4850263Z ##[warning]   411:27  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4851454Z ##[warning]   430:12  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4852620Z ##[warning]   432:22  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4853805Z ##[warning]   452:22  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4854986Z ##[warning]   473:22  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4856155Z ##[warning]   644:46  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4857324Z ##[warning]   729:60  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4858736Z ##[warning]  1181:72  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4859450Z 
+2026-07-02T20:37:41.4859763Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/trade/counter/[id].tsx
+2026-07-02T20:37:41.4860670Z ##[warning]   55:20  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4862247Z ##[warning]   58:31  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4863513Z ##[warning]   58:46  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4864724Z ##[warning]   73:38  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4865936Z ##[warning]  132:30  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4867132Z ##[warning]  145:30  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4868678Z ##[warning]  173:57  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4869875Z ##[warning]  175:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4871057Z ##[warning]  204:26  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4872247Z ##[warning]  205:65  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4873434Z ##[warning]  207:70  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4874621Z ##[warning]  213:28  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4875932Z ##[warning]  214:67  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4877168Z ##[warning]  216:74  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4878612Z ##[warning]  241:15  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4879881Z ##[warning]  243:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4880588Z 
+2026-07-02T20:37:41.4880991Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/trade/counter/__tests__/counter.test.tsx
+2026-07-02T20:37:41.4882019Z ##[warning]   64:42  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4883314Z ##[warning]   77:54  warning  Unexpected empty arrow function                 @typescript-eslint/no-empty-function
+2026-07-02T20:37:41.4884607Z ##[warning]  117:28  warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4885945Z ##[warning]  118:19  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4886687Z 
+2026-07-02T20:37:41.4886961Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/trade/new.tsx
+2026-07-02T20:37:41.4887759Z ##[warning]  36:12  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4888603Z 
+2026-07-02T20:37:41.4888905Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/app/ureticiler/index.tsx
+2026-07-02T20:37:41.4889777Z ##[warning]  46:64  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4890485Z 
+2026-07-02T20:37:41.4890745Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/jest.setup.ts
+2026-07-02T20:37:41.4891536Z ##[warning]  20:17  warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4892774Z ##[warning]  23:38  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4893989Z ##[warning]  24:34  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4895196Z ##[warning]  33:17  warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4896408Z ##[warning]  34:20  warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4897649Z ##[warning]  35:46  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4898625Z 
+2026-07-02T20:37:41.4898972Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/components/AnimatedSplash.tsx
+2026-07-02T20:37:41.4900010Z ##[warning]  47:20  warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.4900753Z 
+2026-07-02T20:37:41.4901122Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/components/CardPaymentForm.tsx
+2026-07-02T20:37:41.4902279Z ##[warning]   98:20  warning  Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4903688Z ##[error]  112:5   error    Definition for rule 'react-hooks/exhaustive-deps' was not found  react-hooks/exhaustive-deps
+2026-07-02T20:37:41.4905053Z ##[warning]  127:21  warning  Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4906379Z ##[warning]  161:15  warning  Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4907696Z ##[warning]  193:18  warning  Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4909162Z ##[warning]  208:17  warning  Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4910061Z 
+2026-07-02T20:37:41.4910452Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/components/FeaturedListingsModal.tsx
+2026-07-02T20:37:41.4911348Z ##[warning]  105:22  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4912556Z ##[warning]  120:22  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4913269Z 
+2026-07-02T20:37:41.4913610Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/components/PremiumBadge.tsx
+2026-07-02T20:37:41.4914444Z ##[warning]   90:32  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4915626Z ##[warning]   96:32  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4916797Z ##[warning]  204:34  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4917505Z 
+2026-07-02T20:37:41.4917834Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/components/RatingModal.tsx
+2026-07-02T20:37:41.4918913Z ##[warning]  198:24  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4919644Z 
+2026-07-02T20:37:41.4919982Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/components/ReputationBadge.tsx
+2026-07-02T20:37:41.4920849Z ##[warning]   88:30  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4922070Z ##[warning]  171:54  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4923290Z ##[warning]  173:40  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4924003Z 
+2026-07-02T20:37:41.4924327Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/components/ShareModal.tsx
+2026-07-02T20:37:41.4925144Z ##[warning]    9:13  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4926348Z ##[warning]  232:38  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4927054Z 
+2026-07-02T20:37:41.4927379Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/components/SignupPrompt.tsx
+2026-07-02T20:37:41.4928303Z ##[warning]  98:44  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4929027Z 
+2026-07-02T20:37:41.4929350Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/components/UpgradePrompt.tsx
+2026-07-02T20:37:41.4930171Z ##[warning]   82:40  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4931402Z ##[warning]  103:42  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4932127Z 
+2026-07-02T20:37:41.4932495Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/components/VerificationStatus.tsx
+2026-07-02T20:37:41.4933357Z ##[warning]  37:80  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4934291Z 
+2026-07-02T20:37:41.4934673Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/components/common/AuthRequiredSheet.tsx
+2026-07-02T20:37:41.4935677Z ##[warning]  33:24  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4936428Z 
+2026-07-02T20:37:41.4936810Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/components/common/CommissionPreview.tsx
+2026-07-02T20:37:41.4937747Z ##[warning]  54:45  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4938668Z 
+2026-07-02T20:37:41.4939056Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/components/common/TradeAddressPicker.tsx
+2026-07-02T20:37:41.4939941Z ##[warning]   52:44  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4941283Z ##[warning]   52:76  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4942505Z ##[warning]  125:65  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4943225Z 
+2026-07-02T20:37:41.4943586Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/components/listing/ListingForm.tsx
+2026-07-02T20:37:41.4944844Z ##[warning]   267:51  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4946642Z ##[warning]   301:24  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4948383Z ##[warning]   306:35  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4949978Z ##[warning]   310:15  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4951594Z ##[warning]   314:30  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4953169Z ##[warning]   549:14  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4954742Z ##[warning]   557:40  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4956320Z ##[warning]   561:47  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4957897Z ##[warning]   565:19  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4959740Z ##[warning]   632:25  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4961314Z ##[warning]   701:39  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4962873Z ##[warning]   731:19  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4964434Z ##[warning]   755:19  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4966199Z ##[warning]   778:25  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4967817Z ##[warning]   830:11  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4969691Z ##[warning]   831:22  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4971475Z ##[warning]   835:26  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4973049Z ##[warning]   836:28  warning  Unexpected any. Specify a different type                                                                                   @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4975215Z ##[error]  1709:44  error    Hex literal renk yasak. '@tarodan/design-tokens'tan semantic token kullan (örn. colors.primary[600], colors.text.heading)  no-restricted-syntax
+2026-07-02T20:37:41.4977247Z ##[error]  1712:41  error    Hex literal renk yasak. '@tarodan/design-tokens'tan semantic token kullan (örn. colors.primary[600], colors.text.heading)  no-restricted-syntax
+2026-07-02T20:37:41.4979617Z ##[error]  1717:35  error    Hex literal renk yasak. '@tarodan/design-tokens'tan semantic token kullan (örn. colors.primary[600], colors.text.heading)  no-restricted-syntax
+2026-07-02T20:37:41.4981636Z ##[error]  1722:35  error    Hex literal renk yasak. '@tarodan/design-tokens'tan semantic token kullan (örn. colors.primary[600], colors.text.heading)  no-restricted-syntax
+2026-07-02T20:37:41.4983614Z ##[error]  1727:45  error    Hex literal renk yasak. '@tarodan/design-tokens'tan semantic token kullan (örn. colors.primary[600], colors.text.heading)  no-restricted-syntax
+2026-07-02T20:37:41.4984564Z 
+2026-07-02T20:37:41.4985022Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/components/listing/__tests__/ListingForm.test.tsx
+2026-07-02T20:37:41.4986210Z ##[warning]   31:22  warning  Unexpected any. Specify a different type                               @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4987691Z ##[warning]   47:10  warning  'api' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.4989259Z ##[warning]   55:42  warning  Unexpected empty async arrow function                                  @typescript-eslint/no-empty-function
+2026-07-02T20:37:41.4990653Z ##[warning]   90:65  warning  Unexpected empty arrow function                                        @typescript-eslint/no-empty-function
+2026-07-02T20:37:41.4992048Z ##[warning]  107:65  warning  Unexpected empty arrow function                                        @typescript-eslint/no-empty-function
+2026-07-02T20:37:41.4993448Z ##[warning]  154:65  warning  Unexpected empty arrow function                                        @typescript-eslint/no-empty-function
+2026-07-02T20:37:41.4994216Z 
+2026-07-02T20:37:41.4994636Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/components/product/AddToCollectionModal.tsx
+2026-07-02T20:37:41.4995626Z ##[warning]   53:37  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4996847Z ##[warning]   84:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4998057Z ##[warning]   94:23  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.4999373Z ##[warning]  111:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5000299Z 
+2026-07-02T20:37:41.5000655Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/components/product/BoostModal.tsx
+2026-07-02T20:37:41.5001522Z ##[warning]   62:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5002764Z ##[warning]   90:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5003958Z ##[warning]  108:14  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5004675Z 
+2026-07-02T20:37:41.5005054Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/components/product/MakeOfferModal.tsx
+2026-07-02T20:37:41.5005936Z ##[warning]  77:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5006652Z 
+2026-07-02T20:37:41.5007146Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/components/product/ProductCard.tsx
+2026-07-02T20:37:41.5008004Z ##[warning]  63:40  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5008967Z 
+2026-07-02T20:37:41.5009346Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/components/product/ProductGrid.tsx
+2026-07-02T20:37:41.5010476Z ##[warning]    1:17  warning  'useMemo' is defined but never used. Allowed unused vars must match /^_/u                @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.5012002Z ##[warning]   26:45  warning  Unexpected any. Specify a different type                                                 @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5013572Z ##[warning]   44:7   warning  'SCREEN_WIDTH' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.5015132Z ##[warning]  105:58  warning  Unexpected any. Specify a different type                                                 @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5015934Z 
+2026-07-02T20:37:41.5016387Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/components/product/__tests__/MakeOfferModal.test.tsx
+2026-07-02T20:37:41.5017382Z ##[warning]  41:54  warning  Unexpected empty arrow function  @typescript-eslint/no-empty-function
+2026-07-02T20:37:41.5018089Z 
+2026-07-02T20:37:41.5018655Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/hooks/useProductFilterOptions.ts
+2026-07-02T20:37:41.5019593Z ##[warning]  50:31  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5020328Z 
+2026-07-02T20:37:41.5020611Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/services/api.ts
+2026-07-02T20:37:41.5021484Z ##[warning]   156:41  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5022689Z ##[warning]   227:36  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5023883Z ##[warning]   251:33  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5025077Z ##[warning]   253:54  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5026259Z ##[warning]   258:43  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5027448Z ##[warning]   285:36  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5028743Z ##[warning]   313:36  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5029926Z ##[warning]   320:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5031115Z ##[warning]   367:39  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5032290Z ##[warning]   431:40  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5033648Z ##[warning]   435:59  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5034878Z ##[warning]   450:36  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5036063Z ##[warning]   452:46  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5037250Z ##[warning]   454:49  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5038526Z ##[warning]   478:36  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5039736Z ##[warning]   499:40  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5040926Z ##[warning]   511:36  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5042232Z ##[warning]   533:60  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5043413Z ##[warning]   541:66  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5044634Z ##[warning]   765:36  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5045812Z ##[warning]   786:32  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5046986Z ##[warning]   902:36  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5048262Z ##[warning]   923:45  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5049614Z ##[warning]   943:34  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5050808Z ##[warning]  1052:35  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5052010Z ##[warning]  1053:38  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5052716Z 
+2026-07-02T20:37:41.5053036Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/services/googleSignin.ts
+2026-07-02T20:37:41.5053860Z ##[warning]  38:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5054572Z 
+2026-07-02T20:37:41.5054862Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/services/push.ts
+2026-07-02T20:37:41.5055644Z ##[warning]   12:20  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5056819Z ##[warning]   40:54  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5057989Z ##[warning]  103:20  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5059383Z ##[warning]  108:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5060569Z ##[warning]  173:28  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5061744Z ##[warning]  174:4   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5062934Z ##[warning]  176:28  warning  Unexpected empty method 'remove'          @typescript-eslint/no-empty-function
+2026-07-02T20:37:41.5064120Z ##[warning]  182:24  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5065308Z ##[warning]  183:4   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5066491Z ##[warning]  185:28  warning  Unexpected empty method 'remove'          @typescript-eslint/no-empty-function
+2026-07-02T20:37:41.5067673Z ##[warning]  196:45  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5069292Z ##[warning]  205:36  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5070473Z ##[warning]  215:63  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5071654Z ##[warning]  217:50  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5072841Z ##[warning]  225:47  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5074016Z ##[warning]  227:36  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5075191Z ##[warning]  240:30  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5076372Z ##[warning]  244:44  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5077707Z ##[warning]  246:58  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5079051Z ##[warning]  255:30  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5080281Z ##[warning]  281:18  warning  Unexpected empty arrow function           @typescript-eslint/no-empty-function
+2026-07-02T20:37:41.5081490Z ##[warning]  286:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5082678Z ##[warning]  295:20  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5083384Z 
+2026-07-02T20:37:41.5083674Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/services/sentry.ts
+2026-07-02T20:37:41.5084647Z ##[warning]  98:25  warning  'user' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.5085446Z 
+2026-07-02T20:37:41.5085872Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/stores/__tests__/applyIncomingMessage.test.ts
+2026-07-02T20:37:41.5086978Z ##[warning]   7:85   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5088285Z ##[warning]  14:105  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5089633Z ##[warning]  15:57   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5090830Z ##[warning]  17:105  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5092017Z ##[warning]  23:110  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5093191Z ##[warning]  24:57   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5093900Z 
+2026-07-02T20:37:41.5094310Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/stores/__tests__/messageReadReceipt.test.ts
+2026-07-02T20:37:41.5095195Z ##[warning]   8:108  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5096381Z ##[warning]   9:113  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5097561Z ##[warning]  10:111  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5098979Z ##[warning]  12:49   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5100189Z ##[warning]  20:26   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5101372Z ##[warning]  21:26   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5102544Z ##[warning]  22:26   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5103728Z ##[warning]  27:58   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5105099Z ##[warning]  33:26   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5106273Z ##[warning]  34:26   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5107450Z ##[warning]  36:57   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5108262Z 
+2026-07-02T20:37:41.5108662Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/stores/__tests__/messageUnreadBadge.test.ts
+2026-07-02T20:37:41.5109540Z ##[warning]  14:51   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5110728Z ##[warning]  18:49   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5112057Z ##[warning]  26:10   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5113243Z ##[warning]  28:57   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5114437Z ##[warning]  34:10   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5115610Z ##[warning]  42:10   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5116783Z ##[warning]  48:96   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5117957Z ##[warning]  52:57   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5119254Z ##[warning]  57:124  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5119951Z 
+2026-07-02T20:37:41.5120255Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/stores/authStore.ts
+2026-07-02T20:37:41.5121120Z ##[warning]  189:41  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5122375Z ##[warning]  210:36  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5123637Z ##[warning]  287:43  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5124893Z ##[warning]  337:47  warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.5126131Z ##[warning]  354:33  warning  Require statement not part of import statement  @typescript-eslint/no-var-requires
+2026-07-02T20:37:41.5127361Z ##[warning]  397:23  warning  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5128085Z 
+2026-07-02T20:37:41.5128637Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/stores/favoritesStore.ts
+2026-07-02T20:37:41.5129491Z ##[warning]   56:24  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5130693Z ##[warning]   57:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5131877Z ##[warning]   80:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5133056Z ##[warning]  118:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5134247Z ##[warning]  148:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5135425Z ##[warning]  170:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5136130Z 
+2026-07-02T20:37:41.5136430Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/stores/followStore.ts
+2026-07-02T20:37:41.5137247Z ##[warning]  39:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5138848Z ##[warning]  62:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5140031Z ##[warning]  85:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5140729Z 
+2026-07-02T20:37:41.5141033Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/stores/listingsStore.ts
+2026-07-02T20:37:41.5141842Z ##[warning]   71:23  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5143050Z ##[warning]   72:22  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5194185Z ##[warning]   80:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5196242Z ##[warning]   93:23  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5198825Z ##[warning]   95:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5200405Z ##[warning]  113:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5201391Z 
+2026-07-02T20:37:41.5201743Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/stores/messagesStore.ts
+2026-07-02T20:37:41.5202847Z ##[warning]   52:30  warning  Unexpected any. Specify a different type                                                      @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5204356Z ##[warning]   84:53  warning  Unexpected any. Specify a different type                                                      @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5205818Z ##[warning]   99:29  warning  Unexpected any. Specify a different type                                                      @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5207271Z ##[warning]  159:37  warning  Unexpected any. Specify a different type                                                      @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5209034Z ##[warning]  168:21  warning  Unexpected any. Specify a different type                                                      @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5210810Z ##[warning]  178:30  warning  Unexpected any. Specify a different type                                                      @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5213000Z ##[warning]  193:37  warning  Unexpected any. Specify a different type                                                      @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5215199Z ##[warning]  195:21  warning  Unexpected any. Specify a different type                                                      @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5217647Z ##[warning]  226:21  warning  Unexpected any. Specify a different type                                                      @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5220832Z ##[warning]  234:13  warning  'dailyMessageCount' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.5223585Z ##[warning]  234:32  warning  'dailyMessageLimit' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.5226071Z ##[warning]  270:21  warning  Unexpected any. Specify a different type                                                      @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5228556Z ##[warning]  309:21  warning  Unexpected any. Specify a different type                                                      @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5230637Z ##[warning]  365:46  warning  Unexpected any. Specify a different type                                                      @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5232113Z ##[warning]  368:15  warning  Unexpected any. Specify a different type                                                      @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5233766Z ##[warning]  368:23  warning  Unexpected any. Specify a different type                                                      @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5235210Z ##[warning]  380:38  warning  Unexpected any. Specify a different type                                                      @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5236829Z ##[warning]  400:32  warning  'dailyMessageLimit' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.5238576Z ##[warning]  429:20  warning  Unexpected any. Specify a different type                                                      @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5240292Z ##[warning]  430:36  warning  Unexpected any. Specify a different type                                                      @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5241634Z 
+2026-07-02T20:37:41.5242241Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/stores/subscriptionStore.ts
+2026-07-02T20:37:41.5243425Z ##[warning]   80:45  warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5244936Z ##[warning]   81:21  warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5246560Z ##[warning]   90:38  warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5248707Z ##[warning]   91:21  warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5250215Z ##[warning]  151:38  warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5251657Z ##[warning]  153:21  warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5253052Z ##[warning]  168:46  warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5254438Z ##[warning]  169:21  warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5255826Z ##[warning]  184:21  warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5257230Z ##[warning]  201:21  warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5258891Z ##[warning]  210:31  warning  'paymentMethodId' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.5260373Z ##[warning]  218:21  warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5261134Z 
+2026-07-02T20:37:41.5261449Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/stores/tradesStore.ts
+2026-07-02T20:37:41.5262289Z ##[warning]   63:23  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5263860Z ##[warning]   82:23  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5265056Z ##[warning]   84:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5266230Z ##[warning]   97:23  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5267402Z ##[warning]   99:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5269164Z ##[warning]  107:29  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5270339Z ##[warning]  114:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5271500Z ##[warning]  129:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5272682Z ##[warning]  144:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5273858Z ##[warning]  160:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5275052Z ##[warning]  175:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5276247Z ##[warning]  190:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5277098Z 
+2026-07-02T20:37:41.5277417Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/test-utils/fixtures.ts
+2026-07-02T20:37:41.5278689Z ##[warning]   2:55  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5279938Z ##[warning]  16:52  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5281114Z ##[warning]  27:53  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5282282Z ##[warning]  40:53  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5283448Z ##[warning]  51:55  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5284150Z 
+2026-07-02T20:37:41.5284476Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/test-utils/router-mock.ts
+2026-07-02T20:37:41.5285434Z ##[error]  25:5  error  Definition for rule 'react-hooks/exhaustive-deps' was not found  react-hooks/exhaustive-deps
+2026-07-02T20:37:41.5286196Z 
+2026-07-02T20:37:41.5286515Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/utils/membershipLimits.ts
+2026-07-02T20:37:41.5287799Z ##[warning]  7:40  warning  'MembershipLimits' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+2026-07-02T20:37:41.5288999Z 
+2026-07-02T20:37:41.5289314Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/utils/productFilters.ts
+2026-07-02T20:37:41.5290153Z ##[warning]   91:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5291355Z ##[warning]   92:27  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5292518Z ##[warning]  147:38  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5293698Z ##[warning]  147:44  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5294893Z ##[warning]  158:8   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5295592Z 
+2026-07-02T20:37:41.5295881Z /home/runner/work/tarodan-app/tarodan-app/apps/mobile/src/utils/safeString.ts
+2026-07-02T20:37:41.5296671Z ##[warning]  5:33  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+2026-07-02T20:37:41.5297381Z 
+2026-07-02T20:37:41.5297779Z ✖ 646 problems (14 errors, 632 warnings)
+2026-07-02T20:37:41.5297985Z 
+2026-07-02T20:37:41.5298471Z  ELIFECYCLE  Command failed with exit code 1.
+2026-07-02T20:37:41.5299472Z [ERROR] command finished with error: command (/home/runner/work/tarodan-app/tarodan-app/apps/mobile) /home/runner/setup-pnpm/node_modules/.bin/pnpm run lint exited (1)
+2026-07-02T20:37:41.5312073Z ##[error]@tarodan/mobile#lint: command (/home/runner/work/tarodan-app/tarodan-app/apps/mobile) /home/runner/setup-pnpm/node_modules/.bin/pnpm run lint exited (1)
+2026-07-02T20:37:41.5313511Z  ERROR  run failed: command  exited (1)
+2026-07-02T20:37:41.5314022Z ##[group]@tarodan/admin:lint
+2026-07-02T20:37:41.5314360Z cache miss, executing 74b1fdfd61a51aee
+2026-07-02T20:37:41.5314556Z 
+2026-07-02T20:37:41.5314866Z > @tarodan/admin@1.0.0 lint /home/runner/work/tarodan-app/tarodan-app/apps/admin
+2026-07-02T20:37:41.5315261Z > next lint
+2026-07-02T20:37:41.5315385Z 
+2026-07-02T20:37:41.5315697Z Attention: Next.js now collects completely anonymous telemetry regarding usage.
+2026-07-02T20:37:41.5316289Z This information is used to shape Next.js' roadmap and prioritize features.
+2026-07-02T20:37:41.5317112Z You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+2026-07-02T20:37:41.5317697Z https://nextjs.org/telemetry
+2026-07-02T20:37:41.5317872Z 
+2026-07-02T20:37:41.5318338Z ##[endgroup]
+2026-07-02T20:37:41.5318757Z ##[group]@tarodan/web:lint
+2026-07-02T20:37:41.5319215Z cache miss, executing 349affb31dd8a333
+2026-07-02T20:37:41.5319410Z 
+2026-07-02T20:37:41.5319687Z > @tarodan/web@1.0.0 lint /home/runner/work/tarodan-app/tarodan-app/apps/web
+2026-07-02T20:37:41.5320058Z > next lint
+2026-07-02T20:37:41.5320180Z 
+2026-07-02T20:37:41.5320403Z ##[endgroup]
+2026-07-02T20:37:41.5320742Z ##[group]@tarodan/api:lint
+2026-07-02T20:37:41.5321034Z cache miss, executing f76893e26ed89a57
+2026-07-02T20:37:41.5321212Z 
+2026-07-02T20:37:41.5321479Z > @tarodan/api@1.0.0 lint /home/runner/work/tarodan-app/tarodan-app/apps/api
+2026-07-02T20:37:41.5321931Z > eslint "{src,apps,libs,test}/**/*.ts" --fix
+2026-07-02T20:37:41.5322145Z 
+2026-07-02T20:37:41.5322361Z ##[endgroup]
+2026-07-02T20:37:41.5322484Z 
+2026-07-02T20:37:41.5322612Z  Tasks:    11 successful, 15 total
+2026-07-02T20:37:41.5322906Z Cached:    0 cached, 15 total
+2026-07-02T20:37:41.5323154Z   Time:    29.849s 
+2026-07-02T20:37:41.5323418Z Failed:    @tarodan/mobile#lint
+2026-07-02T20:37:41.5323583Z 
+2026-07-02T20:37:41.5323914Z  ELIFECYCLE  Command failed with exit code 1.
+2026-07-02T20:37:41.5452253Z ##[error]Process completed with exit code 1.
+2026-07-02T20:37:41.5544964Z Post job cleanup.
+2026-07-02T20:37:41.5582351Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-02T20:37:41.5583497Z Post job cleanup.
+2026-07-02T20:37:41.7027775Z Pruning is unnecessary.
+2026-07-02T20:37:41.7226857Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-02T20:37:41.7229048Z Post job cleanup.
+2026-07-02T20:37:41.8185521Z [command]/usr/bin/git version
+2026-07-02T20:37:41.8259563Z git version 2.54.0
+2026-07-02T20:37:41.8301883Z Temporarily overriding HOME='/home/runner/work/_temp/a3e4fb1b-a208-4133-93f0-bc3fa75778dd' before making global git config changes
+2026-07-02T20:37:41.8303628Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-02T20:37:41.8307841Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/tarodan-app/tarodan-app
+2026-07-02T20:37:41.8349443Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-07-02T20:37:41.8385660Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-07-02T20:37:41.8663803Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-07-02T20:37:41.8689333Z http.https://github.com/.extraheader
+2026-07-02T20:37:41.8700491Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-07-02T20:37:41.8736825Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-07-02T20:37:41.9007627Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-02T20:37:41.9046079Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-07-02T20:37:41.9463259Z Cleaning up orphan processes
+2026-07-02T20:37:41.9766676Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache@v4, actions/checkout@v4, actions/setup-node@v4, pnpm/action-setup@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

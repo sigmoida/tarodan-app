@@ -20,14 +20,21 @@ import {
   ArrowTrendingUpIcon,
   HeartIcon,
   SparklesIcon,
+  RectangleStackIcon,
 } from '@heroicons/react/24/outline';
 import { 
   StarIcon as StarSolidIcon,
   CheckBadgeIcon as CheckBadgeSolidIcon,
 } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
+<<<<<<< HEAD:apps/web/src/app/(main)/seller/[id]/page.tsx
 import { api, listingsApi, ratingsApi } from '@/lib/api';
 import { ProductCard } from '@/components/ui';
+=======
+import { api, listingsApi, ratingsApi, collectionsApi } from '@/lib/api';
+import { getProductEffectivePrice, isProductOutOfStock } from '@/lib/productPrice';
+import { OutOfStockOverlay } from '@/components/ui';
+>>>>>>> refactor:apps/web/src/app/seller/[id]/page.tsx
 import { useAuthStore } from '@/stores/authStore';
 import { useAuthGate } from '@/hooks/useAuthGate';
 import dynamic from 'next/dynamic';
@@ -107,7 +114,7 @@ export default function SellerProfilePage() {
   const { t, locale } = useTranslation();
 
   const [showReportModal, setShowReportModal] = useState(false);
-  const [tab, setTab] = useState<'listings' | 'reviews'>('listings');
+  const [tab, setTab] = useState<'listings' | 'reviews' | 'collections'>('listings');
 
   const sellerQuery = useQuery({
     queryKey: ['seller', sellerId],
@@ -190,6 +197,19 @@ export default function SellerProfilePage() {
   });
   const reviews = reviewsQuery.data ?? [];
   const reviewsLoading = reviewsQuery.isLoading;
+
+  // Satıcının herkese açık koleksiyonları (backend başkası bakınca yalnızca public döner)
+  const collectionsQuery = useQuery({
+    queryKey: ['seller-collections', sellerId],
+    queryFn: async (): Promise<any[]> => {
+      const response = await collectionsApi.getUserCollections(sellerId, { pageSize: 50 });
+      return response.data?.collections || response.data?.data?.collections || [];
+    },
+    enabled: !!sellerId,
+    meta: { page: 'seller-collections' },
+  });
+  const collections = collectionsQuery.data ?? [];
+  const collectionsLoading = collectionsQuery.isLoading;
 
   const ratingStatsQuery = useQuery({
     queryKey: ['seller-rating-stats', sellerId],
@@ -455,6 +475,20 @@ export default function SellerProfilePage() {
               {seller.stats?.totalRatings || 0}
             </span>
           </Button>
+          <Button variant="secondary" onClick={() => setTab('collections')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium transition-all ${
+              tab === 'collections'
+                ? 'bg-surface-elevated text-primary-600 shadow-sm'
+                : 'text-muted hover:text-heading'
+            }`}>
+            <RectangleStackIcon className="w-5 h-5" />
+            {t('nav.collections')}
+            <span className={`text-xs px-2 py-0.5 rounded-full ${
+              tab === 'collections' ? 'bg-primary-100 text-primary-600' : 'bg-border-subtle text-muted'
+            }`}>
+              {collections.length}
+            </span>
+          </Button>
         </div>
 
         <AnimatePresence mode="wait">
@@ -620,6 +654,77 @@ export default function SellerProfilePage() {
                       );
                     })}
                   </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {/* Collections Tab */}
+          {tab === 'collections' && (
+            <motion.div
+              key="collections"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              {collectionsLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <div className="relative w-12 h-12">
+                    <div className="absolute inset-0 rounded-full border-4 border-primary-200"></div>
+                    <div className="absolute inset-0 rounded-full border-4 border-primary-600 border-t-transparent animate-spin"></div>
+                  </div>
+                </div>
+              ) : collections.length === 0 ? (
+                <div className="text-center py-16 bg-surface-elevated rounded-2xl border border-border-subtle">
+                  <RectangleStackIcon className="w-16 h-16 text-border-strong mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-heading mb-2">
+                    {locale === 'en' ? 'No collections yet' : 'Henüz koleksiyon yok'}
+                  </h3>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                  {collections.map((collection: any, index: number) => (
+                    <motion.div
+                      key={collection.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.03 }}
+                    >
+                      <Link
+                        href={`/collections/${collection.id}`}
+                        className="block bg-surface-elevated rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 group border border-border-subtle h-full"
+                      >
+                        <div className="relative aspect-[4/3] bg-surface overflow-hidden">
+                          {collection.coverImageUrl ? (
+                            <OptimizedImage
+                              src={collection.coverImageUrl}
+                              alt={collection.name}
+                              fill
+                              className="object-cover group-hover:scale-105 transition-transform duration-500"
+                              fallbackSrc="https://placehold.co/400x300/f8fafc/94a3b8?text=Koleksiyon"
+                              logContext={{ collectionId: collection.id, page: 'seller-collections' }}
+                            />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 text-4xl">
+                              🚗
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-3">
+                          <h3 className="font-medium text-heading line-clamp-1 text-sm group-hover:text-primary-600 transition-colors">
+                            {collection.name}
+                          </h3>
+                          <div className="flex items-center justify-between mt-2 text-xs text-subtle">
+                            <span className="font-medium">{collection.itemCount} {locale === 'en' ? 'items' : 'ürün'}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="flex items-center gap-0.5"><EyeIcon className="w-3.5 h-3.5" />{collection.viewCount ?? 0}</span>
+                              <span className="flex items-center gap-0.5"><HeartIcon className="w-3.5 h-3.5" />{collection.likeCount ?? 0}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </Link>
+                    </motion.div>
+                  ))}
                 </div>
               )}
             </motion.div>

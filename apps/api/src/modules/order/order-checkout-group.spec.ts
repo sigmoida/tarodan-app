@@ -2,6 +2,15 @@ import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { OrderService } from './order.service';
+import { OrderPricingService } from './order-pricing.service';
+import { OrderCheckoutService } from './order-checkout.service';
+import { OrderCheckoutCommonService } from './order-checkout-common.service';
+import { OrderCheckoutDirectService } from './order-checkout-direct.service';
+import { OrderCheckoutGroupService } from './order-checkout-group.service';
+import { OrderGuestCheckoutService } from './order-guest-checkout.service';
+import { OrderCommonService } from './order-common.service';
+import { OrderQueryService } from './order-query.service';
+import { OrderLifecycleService } from './order-lifecycle.service';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { EventService } from '../events';
@@ -100,6 +109,10 @@ describe('OrderService checkout group (batch checkout)', () => {
           Promise.resolve({ id: 'group-1', ...data }),
         ),
       },
+      // Sipariş oluşturulunca alıcının sepetindeki sipariş edilen ürünler silinir.
+      cartItem: {
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
     };
 
     mockPrisma.user.findUnique.mockResolvedValue({
@@ -120,6 +133,15 @@ describe('OrderService checkout group (batch checkout)', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrderService,
+        OrderPricingService,
+        OrderCheckoutService,
+        OrderCheckoutCommonService,
+        OrderCheckoutDirectService,
+        OrderCheckoutGroupService,
+        OrderGuestCheckoutService,
+        OrderCommonService,
+        OrderQueryService,
+        OrderLifecycleService,
         { provide: ElogoInvoicingService, useValue: { issueCommissionInvoice: jest.fn().mockResolvedValue(undefined), issueServiceFeeInvoice: jest.fn().mockResolvedValue(undefined), issueMembershipInvoice: jest.fn().mockResolvedValue(undefined), issueBoostInvoice: jest.fn().mockResolvedValue(undefined), handleOrderRefund: jest.fn().mockResolvedValue(undefined), issuePlatformSaleInvoice: jest.fn().mockResolvedValue(undefined), handleTradeCashRefund: jest.fn().mockResolvedValue(undefined), issueTradeCashCommissionInvoice: jest.fn().mockResolvedValue(undefined), retryPendingInvoices: jest.fn().mockResolvedValue(undefined) } },
         { provide: PrismaService, useValue: mockPrisma },
         { provide: CacheService, useValue: { del: jest.fn(), delPattern: jest.fn() } },
@@ -182,6 +204,12 @@ describe('OrderService checkout group (batch checkout)', () => {
     expect(mockTx.product.update).toHaveBeenCalledWith({
       where: { id: productB },
       data: { reservedQuantity: { increment: 1 } },
+    });
+
+    // Sipariş oluşunca alıcının sepetindeki sipariş edilen ürünler server-side silinir
+    // (bayat sepet satırı kalmasın; iptal sonrası "tekrar sipariş" akışı bozulmasın).
+    expect(mockTx.cartItem.deleteMany).toHaveBeenCalledWith({
+      where: { cart: { userId: buyerId }, productId: { in: [productA, productB].sort() } },
     });
   });
 

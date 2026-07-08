@@ -1,0 +1,73 @@
+﻿2026-07-02T20:36:46.1390553Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-02T20:36:46.1399918Z ##[group]Run actions/checkout@v4
+2026-07-02T20:36:46.1400687Z with:
+2026-07-02T20:36:46.1401169Z   repository: sigmoida/tarodan-app
+2026-07-02T20:36:46.1405037Z   token: ***
+2026-07-02T20:36:46.1405480Z   ssh-strict: true
+2026-07-02T20:36:46.1405922Z   ssh-user: git
+2026-07-02T20:36:46.1406394Z   persist-credentials: true
+2026-07-02T20:36:46.1406899Z   clean: true
+2026-07-02T20:36:46.1407344Z   sparse-checkout-cone-mode: true
+2026-07-02T20:36:46.1407875Z   fetch-depth: 1
+2026-07-02T20:36:46.1408313Z   fetch-tags: false
+2026-07-02T20:36:46.1408758Z   show-progress: true
+2026-07-02T20:36:46.1409217Z   lfs: false
+2026-07-02T20:36:46.1409640Z   submodules: false
+2026-07-02T20:36:46.1410138Z   set-safe-directory: true
+2026-07-02T20:36:46.1410884Z ##[endgroup]
+2026-07-02T20:36:46.2455568Z Syncing repository: sigmoida/tarodan-app
+2026-07-02T20:36:46.2457925Z ##[group]Getting Git version info
+2026-07-02T20:36:46.2458995Z Working directory is '/home/runner/work/tarodan-app/tarodan-app'
+2026-07-02T20:36:46.2460230Z [command]/usr/bin/git version
+2026-07-02T20:36:46.2512292Z git version 2.54.0
+2026-07-02T20:36:46.2537519Z ##[endgroup]
+2026-07-02T20:36:46.2554083Z Temporarily overriding HOME='/home/runner/work/_temp/7339fd90-af47-41ed-ad24-471458caf531' before making global git config changes
+2026-07-02T20:36:46.2556508Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-02T20:36:46.2560547Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/tarodan-app/tarodan-app
+2026-07-02T20:36:46.2633246Z Deleting the contents of '/home/runner/work/tarodan-app/tarodan-app'
+2026-07-02T20:36:46.2637433Z ##[group]Initializing the repository
+2026-07-02T20:36:46.2643726Z [command]/usr/bin/git init /home/runner/work/tarodan-app/tarodan-app
+2026-07-02T20:36:46.2744814Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-07-02T20:36:46.2746645Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-07-02T20:36:46.2747991Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-07-02T20:36:46.2749379Z hint: call:
+2026-07-02T20:36:46.2750065Z hint:
+2026-07-02T20:36:46.2750934Z hint: 	git config --global init.defaultBranch <name>
+2026-07-02T20:36:46.2752218Z hint:
+2026-07-02T20:36:46.2753085Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-07-02T20:36:46.2754152Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-07-02T20:36:46.2755231Z hint:
+2026-07-02T20:36:46.2755968Z hint: 	git branch -m <name>
+2026-07-02T20:36:46.2756781Z hint:
+2026-07-02T20:36:46.2757858Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-07-02T20:36:46.2759536Z Initialized empty Git repository in /home/runner/work/tarodan-app/tarodan-app/.git/
+2026-07-02T20:36:46.2764640Z [command]/usr/bin/git remote add origin https://github.com/sigmoida/tarodan-app
+2026-07-02T20:36:46.2809914Z ##[endgroup]
+2026-07-02T20:36:46.2811108Z ##[group]Disabling automatic garbage collection
+2026-07-02T20:36:46.2814258Z [command]/usr/bin/git config --local gc.auto 0
+2026-07-02T20:36:46.2846608Z ##[endgroup]
+2026-07-02T20:36:46.2847657Z ##[group]Setting up auth
+2026-07-02T20:36:46.2854617Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-07-02T20:36:46.2891046Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-07-02T20:36:46.3254655Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-07-02T20:36:46.3290706Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-07-02T20:36:46.3587425Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-02T20:36:46.3627057Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-07-02T20:36:46.3882070Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-07-02T20:36:46.3927920Z ##[endgroup]
+2026-07-02T20:36:46.3929848Z ##[group]Fetching the repository
+2026-07-02T20:36:46.3942575Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +043a41c03dec8d5d6d770b398ffb52d360abfe7d:refs/remotes/origin/master
+2026-07-02T20:36:50.5258307Z From https://github.com/sigmoida/tarodan-app
+2026-07-02T20:36:50.5259767Z  * [new ref]         043a41c03dec8d5d6d770b398ffb52d360abfe7d -> origin/master
+2026-07-02T20:36:50.5293625Z ##[endgroup]
+2026-07-02T20:36:50.5294608Z ##[group]Determining the checkout info
+2026-07-02T20:36:50.5296862Z ##[endgroup]
+2026-07-02T20:36:50.5304288Z [command]/usr/bin/git sparse-checkout disable
+2026-07-02T20:36:50.5355851Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-07-02T20:36:50.5387841Z ##[group]Checking out the ref
+2026-07-02T20:36:50.5393387Z [command]/usr/bin/git checkout --progress --force -B master refs/remotes/origin/master
+2026-07-02T20:36:50.9823984Z Reset branch 'master'
+2026-07-02T20:36:50.9834194Z branch 'master' set up to track 'origin/master'.
+2026-07-02T20:36:50.9894686Z ##[endgroup]
+2026-07-02T20:36:50.9953960Z [command]/usr/bin/git log -1 --format=%H
+2026-07-02T20:36:50.9982461Z 043a41c03dec8d5d6d770b398ffb52d360abfe7d

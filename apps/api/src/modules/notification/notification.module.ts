@@ -8,6 +8,9 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { NotificationController } from './notification.controller';
 import { NotificationService } from './notification.service';
+import { NotificationDispatchService } from './notification-dispatch.service';
+import { NotificationCommerceService } from './notification-commerce.service';
+import { NotificationAccountService } from './notification-account.service';
 import { PrismaModule } from '../../prisma';
 import { StorageModule } from '../storage/storage.module';
 import { WebSocketModule } from '../websocket/websocket.module';
@@ -22,6 +25,9 @@ import { NetGsmProvider } from './providers/netgsm.provider';
   controllers: [NotificationController],
   providers: [
     NotificationService,
+    NotificationDispatchService,
+    NotificationCommerceService,
+    NotificationAccountService,
     SendGridProvider,
     ExpoPushProvider,
     SmsProvider,

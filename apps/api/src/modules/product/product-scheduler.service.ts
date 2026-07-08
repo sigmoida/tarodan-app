@@ -1,4 +1,4 @@
-import { Injectable, Logger, Inject, forwardRef, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { TrackedCron } from '../../monitoring/tracked-cron.decorator';
@@ -38,7 +38,6 @@ export class ProductSchedulerService implements OnModuleInit {
 
   constructor(
     private readonly prisma: PrismaService,
-    @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
     @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
   ) {}

@@ -161,28 +161,27 @@ export class CartService {
     });
 
     if (existingItem) {
-      // Update quantity
-      const newQuantity = existingItem.quantity + (dto.quantity || 1);
+      // Sepette ZATEN olan ürüne tekrar "Sepete Ekle": adet artırma denemesi, stok
+      // ve sipariş-başına-maksimum üst sınırına GÜVENLİ biçimde sabitlenir — hata
+      // fırlatmaz. Tekil (quantity=1) ürünlerde ekleme idempotenttir: zaten sepette
+      // olan tek parça için ikinci ekleme no-op'tur. (Eski davranış newQuantity'yi
+      // körlemesine +1 yapıp "en fazla 1 adet" hatası veriyordu; iptal sonrası kalan
+      // bayat sepet satırıyla birleşince kullanıcıyı "tekrar sipariş veremiyorum"
+      // sanısına düşürüyordu.)
+      const requestedTotal = existingItem.quantity + (dto.quantity || 1);
 
-      // Check max quantity per order
-      if (product.maxQuantityPerOrder && newQuantity > product.maxQuantityPerOrder) {
-        throw new BadRequestException(
-          `Bu üründen maksimum ${product.maxQuantityPerOrder} adet alabilirsiniz`,
-        );
+      // Üst sınırlar: null stok = sınırsız (kısıt yok); maxQuantityPerOrder yoksa kısıt yok.
+      const stockCap = product.quantity ?? requestedTotal;
+      const perOrderCap = product.maxQuantityPerOrder ?? requestedTotal;
+      const cappedQuantity = Math.min(requestedTotal, stockCap, perOrderCap);
+
+      // Yalnızca gerçek artış varsa güncelle; aksi halde no-op (zaten sınırda / sepette).
+      if (cappedQuantity > existingItem.quantity) {
+        await this.prisma.cartItem.update({
+          where: { id: existingItem.id },
+          data: { quantity: cappedQuantity },
+        });
       }
-
-      if (!canAddRequestedQuantityToCart(product, newQuantity)) {
-        throw new BadRequestException(
-          product.quantity === 0
-            ? 'Ürün stokta yok'
-            : `Bu üründen en fazla ${product.quantity} adet sipariş verilebilir`,
-        );
-      }
-
-      await this.prisma.cartItem.update({
-        where: { id: existingItem.id },
-        data: { quantity: newQuantity },
-      });
     } else {
       // Check max quantity per order
       if (product.maxQuantityPerOrder && (dto.quantity || 1) > product.maxQuantityPerOrder) {
@@ -482,6 +481,17 @@ export class CartService {
       // Resolve product image URL (S3 key -> presigned URL)
       const resolvedImage = this.resolveProductImageUrl(product.images?.[0]?.cardKey);
 
+      // Bu satırda sipariş edilebilecek üst sınır = fiziksel stok ∧ sipariş-başına-maks.
+      // updateItem/addItem backend doğrulamasıyla BİREBİR aynı sınır (product.quantity +
+      // maxQuantityPerOrder) → frontend + butonu tam backend'in kabul ettiği yerde durur.
+      // İkisi de null ise (sınırsız stok, per-order limit yok) → undefined (üst sınır yok).
+      const stockCap = product.quantity; // null = sınırsız
+      const perOrderCap = product.maxQuantityPerOrder; // null = limit yok
+      const maxQuantity =
+        stockCap != null || perOrderCap != null
+          ? Math.min(stockCap ?? Infinity, perOrderCap ?? Infinity)
+          : undefined;
+
       items.push({
         id: item.id,
         productId: product.id,
@@ -497,6 +507,7 @@ export class CartService {
         productDiscount: productDiscount > 0 ? productDiscount : undefined,
         isAvailable,
         stockWarning,
+        maxQuantity,
       });
     }
 

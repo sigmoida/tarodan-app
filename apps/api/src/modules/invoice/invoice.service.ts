@@ -1,86 +1,28 @@
 /**
- * Invoice Service
+ * Invoice Service (facade)
  * Generates PDF invoices for orders and stores them in AWS S3
- * 
+ *
  * Requirement: "After payment, invoices will be sent to users automatically" (requirements.txt)
+ *
+ * İnce facade: her public imza aynen korunur. PDF/HTML render işleri
+ * InvoicePdfService'e (this.pdf.*) delege edilir; e-posta gövdesi saf
+ * renderer'lardan gelir (invoice-email.renderer). Dış çağıranlar
+ * (payment.service, payment-reconciliation.service) etkilenmez.
  */
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as fs from 'fs';
-import * as path from 'path';
 import { PrismaService } from '../../prisma';
 import { StorageService } from '../storage/storage.service';
 import { NotificationService } from '../notification/notification.service';
 import { SmtpProvider } from '../notification/providers/smtp.provider';
 import { NotificationType, NotificationChannel } from '../notification/dto';
 import { TaxService } from '../tax';
-import * as PDFDocument from 'pdfkit';
 import { renderEmailTemplate, getEmailTemplateSubject, substituteEmailVariables } from '../../common/helpers/email-template-renderer';
-
-// Invoice generation service using pdfkit for reliable PDF creation
-// Turkish character support via system font fallbacks or embedded fonts
-
-export interface InvoiceData {
-  invoiceNumber: string;
-  invoiceDate: Date;
-  dueDate?: Date;
-
-  // Seller info
-  seller: {
-    name: string;
-    email: string;
-    phone?: string;
-    address?: string;
-    taxId?: string;
-  };
-
-  // Buyer info
-  buyer: {
-    name: string;
-    email: string;
-    phone?: string;
-    address?: string;
-    taxId?: string;
-  };
-
-  // Order info
-  orderId: string;
-  orderNumber: string;
-
-  // Line items
-  items: Array<{
-    description: string;
-    quantity: number;
-    unitPrice: number;
-    total: number;
-  }>;
-
-  // Totals
-  subtotal: number;
-  taxRate: number;
-  taxAmount: number;
-  shippingCost: number;
-  commission: number;
-  total: number;
-
-  // Payment info
-  paymentMethod: string;
-  paymentDate?: Date;
-
-  // Currency
-  currency: string;
-}
+import { InvoicePdfService, InvoiceData } from './invoice-pdf.service';
 
 @Injectable()
 export class InvoiceService {
   private readonly logger = new Logger(InvoiceService.name);
-  private readonly companyInfo = {
-    name: 'Tarodan Marketplace',
-    address: 'İstanbul, Türkiye',
-    taxId: '0000000000',
-    email: 'info@tarodan.com',
-    phone: '+90 212 000 0000',
-  };
 
   constructor(
     private readonly prisma: PrismaService,
@@ -89,86 +31,8 @@ export class InvoiceService {
     private readonly notificationService: NotificationService,
     private readonly smtpProvider: SmtpProvider,
     private readonly taxService: TaxService,
+    private readonly pdf: InvoicePdfService,
   ) { }
-
-  /**
-   * Resolve a Turkish-capable Unicode TrueType font for the invoice PDF.
-   *
-   * The standard PDF font (Helvetica) only covers Latin-1 and mangles İ/ı/ş/ğ — which is why
-   * invoices looked like garbled "dummy" PDFs. We bundle DejaVu Sans (full Turkish coverage,
-   * freely redistributable) so rendering is correct on EVERY platform, including the
-   * node:alpine container which ships no system fonts at all.
-   *
-   * Priority: bundled DejaVu → INVOICE_FONT_PATH env → platform system fonts → null (Helvetica).
-   * @param weight 'regular' | 'bold'
-   */
-  private getInvoiceFontPath(weight: 'regular' | 'bold' = 'regular'): string | null {
-    const bundledName = weight === 'bold' ? 'DejaVuSans-Bold.ttf' : 'DejaVuSans.ttf';
-    // Cover both dev and built layouts (code runs from dist/src/..., assets land under dist/...).
-    const bundledCandidates = [
-      path.join(__dirname, '../assets/fonts', bundledName),
-      path.join(__dirname, '../../assets/fonts', bundledName),
-      path.join(__dirname, '../../../assets/fonts', bundledName),
-      path.join(__dirname, '../../../../assets/fonts', bundledName),
-      path.join(process.cwd(), 'dist/src/assets/fonts', bundledName),
-      path.join(process.cwd(), 'dist/assets/fonts', bundledName),
-      path.join(process.cwd(), 'src/assets/fonts', bundledName),
-      path.join(process.cwd(), 'assets/fonts', bundledName),
-    ];
-    for (const p of bundledCandidates) {
-      if (fs.existsSync(p)) return p;
-    }
-
-    // Optional explicit override (regular weight).
-    const envPath = this.configService.get('INVOICE_FONT_PATH');
-    if (weight === 'regular' && envPath && typeof envPath === 'string' && fs.existsSync(envPath)) return envPath;
-
-    // System font fallbacks (Arial & DejaVu both support Turkish).
-    const platform = process.platform;
-    const candidates: string[] = [];
-    if (platform === 'win32') {
-      candidates.push(
-        weight === 'bold' ? 'C:\\Windows\\Fonts\\arialbd.ttf' : 'C:\\Windows\\Fonts\\arial.ttf',
-        'C:\\Windows\\Fonts\\arial.ttf',
-      );
-    } else if (platform === 'darwin') {
-      candidates.push(
-        weight === 'bold' ? '/Library/Fonts/Arial Bold.ttf' : '/System/Library/Fonts/Supplemental/Arial.ttf',
-        '/System/Library/Fonts/Supplemental/Arial.ttf',
-        '/Library/Fonts/Arial.ttf',
-      );
-    } else {
-      candidates.push(
-        weight === 'bold'
-          ? '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
-          : '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
-        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
-        '/usr/share/fonts/truetype/msttcorefonts/arial.ttf',
-        '/usr/share/fonts/TTF/Arial.ttf',
-      );
-    }
-    for (const p of candidates) {
-      if (fs.existsSync(p)) return p;
-    }
-    return null;
-  }
-
-  /**
-   * Resolve invoice pdfUrl - if it's an S3 key, generate presigned URL
-   * If it's already an http(s) URL, return as-is
-   */
-  private async resolveInvoicePdfUrl(pdfUrl: string | null | undefined): Promise<string | null> {
-    if (!pdfUrl) return null;
-    // Already a full URL - return as-is
-    if (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://')) return pdfUrl;
-    // S3 key - resolve to presigned URL
-    try {
-      return await this.storageService.getPresignedDownloadUrl('documents', pdfUrl, 3600 * 24); // 24 hours
-    } catch (e: any) {
-      this.logger.warn(`Failed to resolve invoice PDF presigned URL for key: ${pdfUrl} - ${e.message}`);
-      return null;
-    }
-  }
 
   /**
    * Generate invoice for an order
@@ -199,7 +63,7 @@ export class InvoiceService {
     }
 
     // Generate invoice number
-    const invoiceNumber = await this.generateInvoiceNumber();
+    const invoiceNumber = await this.pdf.generateInvoiceNumber();
 
     // Parse shipping address (it's stored as JSON); country default TR (addresses don't store country yet)
     const shippingAddr = order.shippingAddress as Record<string, string> | null;
@@ -276,10 +140,10 @@ export class InvoiceService {
     };
 
     // Generate HTML invoice (for email body)
-    const htmlContent = this.generateInvoiceHtml(invoiceData);
+    const htmlContent = this.pdf.generateInvoiceHtml(invoiceData);
 
     // Generate PDF buffer from data
-    const pdfBuffer = await this.generatePdfFromData(invoiceData);
+    const pdfBuffer = await this.pdf.generatePdfFromData(invoiceData);
 
     // Store in S3 - save S3 key (not presigned URL, it would expire)
     let pdfUrl = '';
@@ -324,7 +188,7 @@ export class InvoiceService {
     this.logger.log(`Invoice ${invoiceNumber} generated for order ${order.orderNumber}`);
 
     // Resolve S3 key to presigned URL for the response
-    const resolvedPdfUrl = await this.resolveInvoicePdfUrl(pdfUrl);
+    const resolvedPdfUrl = await this.pdf.resolveInvoicePdfUrl(pdfUrl);
 
     return {
       invoiceNumber,
@@ -445,317 +309,6 @@ export class InvoiceService {
   }
 
   /**
-   * Generate invoice email HTML for buyer
-   */
-  private generateInvoiceEmailHtml(data: {
-    buyerName: string;
-    invoiceNumber: string;
-    orderNumber: string;
-    productTitle: string;
-    totalAmount: number;
-    sellerName: string;
-    invoiceUrl: string;
-    orderId: string;
-    frontendUrl: string;
-  }): string {
-    const formatPrice = (amount: number) =>
-      new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
-
-    return `
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px;">
-    <tr>
-      <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-          
-          <!-- Header -->
-          <tr>
-            <td style="background: linear-gradient(135deg, #e63946 0%, #1d3557 100%); padding: 30px; text-align: center;">
-              <h1 style="color: #ffffff; margin: 0; font-size: 28px;">Taro<span style="color: #f1faee;">dan</span></h1>
-              <p style="color: #f1faee; margin: 10px 0 0 0; font-size: 14px;">Diecast Koleksiyoncuları Platformu</p>
-            </td>
-          </tr>
-
-          <!-- Invoice Icon -->
-          <tr>
-            <td style="padding: 30px 40px 20px 40px; text-align: center;">
-              <div style="background-color: #e8f5e9; border-radius: 50%; width: 80px; height: 80px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px;">
-                <span style="font-size: 40px;">📄</span>
-              </div>
-              <h2 style="color: #1d3557; margin: 0; font-size: 24px;">Faturanız Hazır!</h2>
-            </td>
-          </tr>
-
-          <!-- Content -->
-          <tr>
-            <td style="padding: 0 40px 30px 40px;">
-              <p style="color: #333; font-size: 16px; line-height: 1.6;">
-                Merhaba <strong>${data.buyerName}</strong>,
-              </p>
-              <p style="color: #666; font-size: 15px; line-height: 1.6;">
-                Siparişiniz için faturanız oluşturuldu. Fatura detayları aşağıda yer almaktadır.
-              </p>
-
-              <!-- Invoice Details Box -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8f9fa; border-radius: 8px; margin: 25px 0;">
-                <tr>
-                  <td style="padding: 20px;">
-                    <table width="100%" cellpadding="0" cellspacing="0">
-                      <tr>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #e9ecef;">
-                          <span style="color: #666; font-size: 14px;">Fatura No:</span>
-                        </td>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #e9ecef; text-align: right;">
-                          <strong style="color: #1d3557; font-size: 14px;">${data.invoiceNumber}</strong>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #e9ecef;">
-                          <span style="color: #666; font-size: 14px;">Sipariş No:</span>
-                        </td>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #e9ecef; text-align: right;">
-                          <strong style="color: #1d3557; font-size: 14px;">${data.orderNumber}</strong>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #e9ecef;">
-                          <span style="color: #666; font-size: 14px;">Ürün:</span>
-                        </td>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #e9ecef; text-align: right;">
-                          <strong style="color: #1d3557; font-size: 14px;">${data.productTitle}</strong>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #e9ecef;">
-                          <span style="color: #666; font-size: 14px;">Satıcı:</span>
-                        </td>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #e9ecef; text-align: right;">
-                          <strong style="color: #1d3557; font-size: 14px;">${data.sellerName}</strong>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 12px 0 0 0;">
-                          <span style="color: #333; font-size: 16px; font-weight: bold;">Toplam Tutar:</span>
-                        </td>
-                        <td style="padding: 12px 0 0 0; text-align: right;">
-                          <strong style="color: #28a745; font-size: 20px;">${formatPrice(data.totalAmount)} ₺</strong>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
-
-              <!-- Info Note -->
-              <div style="background-color: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; border-radius: 4px; margin-bottom: 25px;">
-                <p style="color: #1565c0; margin: 0; font-size: 14px;">
-                  📋 <strong>Bilgi:</strong> Fatura detaylarınız yukarıda yer almaktadır. Siparişinizi takip etmek için aşağıdaki butona tıklayabilirsiniz.
-                </p>
-              </div>
-
-              <!-- CTA Button (invoiceUrl is track page for guest, orders/[id] for member) -->
-              <table width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td align="center" style="padding: 10px 0;">
-                    <a href="${data.invoiceUrl}" 
-                       style="display: inline-block; background-color: #e63946; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
-                      Siparişi Takip Et
-                    </a>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="background-color: #1d3557; padding: 25px 40px; text-align: center;">
-              <p style="color: #f1faee; margin: 0 0 10px 0; font-size: 14px;">
-                <strong>Tarodan Marketplace</strong>
-              </p>
-              <p style="color: #a8dadc; margin: 0; font-size: 12px;">
-                İstanbul, Türkiye | info@tarodan.com
-              </p>
-              <p style="color: #457b9d; margin: 15px 0 0 0; font-size: 11px;">
-                Bu e-posta otomatik olarak oluşturulmuştur. Lütfen yanıtlamayınız.
-              </p>
-            </td>
-          </tr>
-
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-    `;
-  }
-
-  /**
-   * Generate invoice email HTML for seller
-   */
-  private generateSellerInvoiceEmailHtml(data: {
-    sellerName: string;
-    invoiceNumber: string;
-    orderNumber: string;
-    productTitle: string;
-    totalAmount: number;
-    commissionAmount: number;
-    buyerName: string;
-    frontendUrl: string;
-    orderId: string;
-  }): string {
-    const formatPrice = (amount: number) =>
-      new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
-
-    const netAmount = data.totalAmount - data.commissionAmount;
-
-    return `
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px;">
-    <tr>
-      <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-          
-          <!-- Header -->
-          <tr>
-            <td style="background: linear-gradient(135deg, #e63946 0%, #1d3557 100%); padding: 30px; text-align: center;">
-              <h1 style="color: #ffffff; margin: 0; font-size: 28px;">Taro<span style="color: #f1faee;">dan</span></h1>
-              <p style="color: #f1faee; margin: 10px 0 0 0; font-size: 14px;">Satıcı Faturası</p>
-            </td>
-          </tr>
-
-          <!-- Content -->
-          <tr>
-            <td style="padding: 30px 40px;">
-              <p style="color: #333; font-size: 16px; line-height: 1.6;">
-                Merhaba <strong>${data.sellerName}</strong>,
-              </p>
-              <p style="color: #666; font-size: 15px; line-height: 1.6;">
-                Satışınız için fatura oluşturuldu. Kayıtlarınız için saklayabilirsiniz.
-              </p>
-
-              <!-- Invoice Details Box -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8f9fa; border-radius: 8px; margin: 25px 0;">
-                <tr>
-                  <td style="padding: 20px;">
-                    <table width="100%" cellpadding="0" cellspacing="0">
-                      <tr>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #e9ecef;">
-                          <span style="color: #666; font-size: 14px;">Fatura No:</span>
-                        </td>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #e9ecef; text-align: right;">
-                          <strong style="color: #1d3557; font-size: 14px;">${data.invoiceNumber}</strong>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #e9ecef;">
-                          <span style="color: #666; font-size: 14px;">Sipariş No:</span>
-                        </td>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #e9ecef; text-align: right;">
-                          <strong style="color: #1d3557; font-size: 14px;">${data.orderNumber}</strong>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #e9ecef;">
-                          <span style="color: #666; font-size: 14px;">Ürün:</span>
-                        </td>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #e9ecef; text-align: right;">
-                          <strong style="color: #1d3557; font-size: 14px;">${data.productTitle}</strong>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #e9ecef;">
-                          <span style="color: #666; font-size: 14px;">Alıcı:</span>
-                        </td>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #e9ecef; text-align: right;">
-                          <strong style="color: #1d3557; font-size: 14px;">${data.buyerName}</strong>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #e9ecef;">
-                          <span style="color: #666; font-size: 14px;">Satış Tutarı:</span>
-                        </td>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #e9ecef; text-align: right;">
-                          <strong style="color: #1d3557; font-size: 14px;">${formatPrice(data.totalAmount)} ₺</strong>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #e9ecef;">
-                          <span style="color: #666; font-size: 14px;">Platform Komisyonu:</span>
-                        </td>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #e9ecef; text-align: right;">
-                          <strong style="color: #dc3545; font-size: 14px;">-${formatPrice(data.commissionAmount)} ₺</strong>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 12px 0 0 0;">
-                          <span style="color: #333; font-size: 16px; font-weight: bold;">Net Kazancınız:</span>
-                        </td>
-                        <td style="padding: 12px 0 0 0; text-align: right;">
-                          <strong style="color: #28a745; font-size: 20px;">${formatPrice(netAmount)} ₺</strong>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
-
-              <!-- Info Note -->
-              <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 4px; margin-bottom: 25px;">
-                <p style="color: #856404; margin: 0; font-size: 14px;">
-                  ⏰ <strong>Hatırlatma:</strong> Ödemeniz, alıcı ürünü teslim aldıktan 14 gün sonra hesabınıza aktarılacaktır.
-                </p>
-              </div>
-
-              <!-- CTA Button -->
-              <table width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td align="center" style="padding: 10px 0;">
-                    <a href="${data.frontendUrl}/seller/orders/${data.orderId}" 
-                       style="display: inline-block; background-color: #1d3557; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
-                      Siparişi Görüntüle
-                    </a>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="background-color: #1d3557; padding: 25px 40px; text-align: center;">
-              <p style="color: #f1faee; margin: 0 0 10px 0; font-size: 14px;">
-                <strong>Tarodan Marketplace</strong>
-              </p>
-              <p style="color: #a8dadc; margin: 0; font-size: 12px;">
-                İstanbul, Türkiye | info@tarodan.com
-              </p>
-            </td>
-          </tr>
-
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-    `;
-  }
-
-  /**
    * Get invoice by order ID
    * Optionally verify with paymentId (useful for guest checkouts or user ID mismatches on success page)
    * If no invoice exists but order is paid and user is buyer/seller, generates the invoice (lazy creation).
@@ -839,7 +392,7 @@ export class InvoiceService {
     // Resolve pdfUrl (S3 key -> presigned URL)
     return {
       ...invoice,
-      pdfUrl: await this.resolveInvoicePdfUrl(invoice.pdfUrl) || '',
+      pdfUrl: await this.pdf.resolveInvoicePdfUrl(invoice.pdfUrl) || '',
     };
   }
 
@@ -865,7 +418,7 @@ export class InvoiceService {
     return Promise.all(
       invoices.map(async (invoice) => ({
         ...invoice,
-        pdfUrl: await this.resolveInvoicePdfUrl(invoice.pdfUrl) || '',
+        pdfUrl: await this.pdf.resolveInvoicePdfUrl(invoice.pdfUrl) || '',
       }))
     );
   }
@@ -947,318 +500,7 @@ export class InvoiceService {
       currency: 'TRY',
     };
 
-    return this.generatePdfFromData(invoiceData);
-  }
-
-  /**
-   * Generate unique invoice number
-   */
-  private async generateInvoiceNumber(): Promise<string> {
-    const year = new Date().getFullYear();
-    const month = String(new Date().getMonth() + 1).padStart(2, '0');
-
-    // Get last invoice number for this month
-    const lastInvoice = await this.prisma.invoice.findFirst({
-      where: {
-        invoiceNumber: {
-          startsWith: `TRD-${year}${month}`,
-        },
-      },
-      orderBy: { invoiceNumber: 'desc' },
-    });
-
-    let sequence = 1;
-    if (lastInvoice) {
-      const lastSequence = parseInt(lastInvoice.invoiceNumber.split('-')[2], 10);
-      sequence = lastSequence + 1;
-    }
-
-    return `TRD-${year}${month}-${String(sequence).padStart(6, '0')}`;
-  }
-
-  /**
-   * Generate HTML invoice content
-   */
-  private generateInvoiceHtml(data: InvoiceData): string {
-    const formatCurrency = (amount: number) =>
-      new Intl.NumberFormat('tr-TR', { style: 'currency', currency: data.currency }).format(amount);
-
-    const formatDate = (date: Date) =>
-      new Intl.DateTimeFormat('tr-TR', { dateStyle: 'long' }).format(date);
-
-    return `
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Fatura ${data.invoiceNumber}</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333; background: #f5f5f5; }
-    .invoice { max-width: 800px; margin: 20px auto; background: white; padding: 40px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-    .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 2px solid #e63946; }
-    .logo { font-size: 28px; font-weight: bold; color: #e63946; }
-    .logo span { color: #1d3557; }
-    .invoice-info { text-align: right; }
-    .invoice-info h1 { font-size: 24px; color: #1d3557; margin-bottom: 5px; }
-    .invoice-info .invoice-number { font-size: 16px; color: #666; }
-    .parties { display: flex; justify-content: space-between; margin-bottom: 40px; }
-    .party { width: 45%; }
-    .party h3 { font-size: 12px; text-transform: uppercase; color: #999; margin-bottom: 10px; letter-spacing: 1px; }
-    .party p { margin-bottom: 5px; }
-    .party .name { font-size: 16px; font-weight: bold; color: #1d3557; }
-    .details { margin-bottom: 30px; }
-    .details table { width: 100%; border-collapse: collapse; }
-    .details th { background: #1d3557; color: white; padding: 12px; text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
-    .details td { padding: 12px; border-bottom: 1px solid #eee; }
-    .details tr:hover { background: #f9f9f9; }
-    .details .amount { text-align: right; }
-    .totals { display: flex; justify-content: flex-end; margin-top: 20px; }
-    .totals table { width: 300px; }
-    .totals td { padding: 8px 0; }
-    .totals td:last-child { text-align: right; font-weight: bold; }
-    .totals .total-row { border-top: 2px solid #1d3557; font-size: 18px; color: #1d3557; }
-    .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #999; font-size: 12px; }
-    .payment-info { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 20px; }
-    .payment-info h4 { color: #1d3557; margin-bottom: 10px; }
-    .badge { display: inline-block; padding: 4px 8px; background: #28a745; color: white; border-radius: 4px; font-size: 12px; }
-  </style>
-</head>
-<body>
-  <div class="invoice">
-    <div class="header">
-      <div class="logo">Taro<span>dan</span></div>
-      <div class="invoice-info">
-        <h1>FATURA</h1>
-        <div class="invoice-number">${data.invoiceNumber}</div>
-        <p style="margin-top: 10px;">Tarih: ${formatDate(data.invoiceDate)}</p>
-        <p>Sipariş No: ${data.orderNumber}</p>
-      </div>
-    </div>
-
-    <div class="parties">
-      <div class="party">
-        <h3>Satıcı</h3>
-        <p class="name">${data.seller.name}</p>
-        <p>${data.seller.email}</p>
-        ${data.seller.phone ? `<p>${data.seller.phone}</p>` : ''}
-        ${data.seller.address ? `<p>${data.seller.address}</p>` : ''}
-        ${data.seller.taxId ? `<p>Vergi No: ${data.seller.taxId}</p>` : ''}
-      </div>
-      <div class="party">
-        <h3>Alıcı</h3>
-        <p class="name">${data.buyer.name}</p>
-        <p>${data.buyer.email}</p>
-        ${data.buyer.phone ? `<p>${data.buyer.phone}</p>` : ''}
-        ${data.buyer.address ? `<p>${data.buyer.address}</p>` : ''}
-        ${data.buyer.taxId ? `<p>Vergi No: ${data.buyer.taxId}</p>` : ''}
-      </div>
-    </div>
-
-    <div class="details">
-      <table>
-        <thead>
-          <tr>
-            <th>Açıklama</th>
-            <th style="width: 80px; text-align: center;">Adet</th>
-            <th style="width: 120px; text-align: right;">Birim Fiyat</th>
-            <th style="width: 120px; text-align: right;">Toplam</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${data.items.map(item => `
-            <tr>
-              <td>${item.description}</td>
-              <td style="text-align: center;">${item.quantity}</td>
-              <td class="amount">${formatCurrency(item.unitPrice)}</td>
-              <td class="amount">${formatCurrency(item.total)}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
-
-    <div class="totals">
-      <table>
-        <tr>
-          <td>Ara Toplam:</td>
-          <td>${formatCurrency(data.subtotal)}</td>
-        </tr>
-        ${data.shippingCost > 0 ? `
-          <tr>
-            <td>Kargo:</td>
-            <td>${formatCurrency(data.shippingCost)}</td>
-          </tr>
-        ` : ''}
-        ${data.commission > 0 ? `
-          <tr>
-            <td>Platform ücreti:</td>
-            <td>${formatCurrency(data.commission)}</td>
-          </tr>
-        ` : ''}
-        ${data.taxAmount > 0 ? `
-          <tr>
-            <td>KDV (%${data.taxRate}):</td>
-            <td>${formatCurrency(data.taxAmount)}</td>
-          </tr>
-        ` : ''}
-        <tr class="total-row">
-          <td>Genel Toplam:</td>
-          <td>${formatCurrency(data.total)}</td>
-        </tr>
-      </table>
-    </div>
-
-    <div class="payment-info">
-      <h4>Ödeme Bilgileri</h4>
-      <p>Ödeme Yöntemi: ${data.paymentMethod}</p>
-      ${data.paymentDate ? `<p>Ödeme Tarihi: ${formatDate(data.paymentDate)}</p>` : ''}
-      <p style="margin-top: 10px;"><span class="badge">✓ Ödendi</span></p>
-    </div>
-
-    <div class="footer">
-      <p><strong>${this.companyInfo.name}</strong></p>
-      <p>${this.companyInfo.address} | ${this.companyInfo.email} | ${this.companyInfo.phone}</p>
-      <p style="margin-top: 10px;">Bu fatura elektronik olarak oluşturulmuştur.</p>
-    </div>
-  </div>
-</body>
-</html>
-    `;
-  }
-
-  /**
-   * Internal PDF generator using pdfkit
-   */
-  private async generatePdfFromData(data: InvoiceData): Promise<Buffer> {
-    return new Promise((resolve, reject) => {
-      try {
-        const doc = new PDFDocument({ margin: 50, size: 'A4' });
-        const buffers: Buffer[] = [];
-
-        doc.on('data', (chunk) => buffers.push(chunk));
-        doc.on('end', () => resolve(Buffer.concat(buffers)));
-        doc.on('error', (err) => reject(err));
-
-        // Register a Unicode TrueType font so Turkish characters (İ, ı, ş, ğ, ç, ö, ü) render correctly.
-        // Without this, PDFKit's default Helvetica (Latin-1 only) mangles İ/ı/ş/ğ — the cause of the
-        // garbled, "dummy"-looking invoices. Bundled DejaVu Sans works on every platform.
-        const regularPath = this.getInvoiceFontPath('regular');
-        const boldPath = this.getInvoiceFontPath('bold');
-        let fontRegular = 'Helvetica';
-        let fontBold = 'Helvetica-Bold';
-        if (regularPath) {
-          try {
-            doc.registerFont('body', regularPath);
-            doc.registerFont('body-bold', boldPath || regularPath);
-            fontRegular = 'body';
-            fontBold = 'body-bold';
-          } catch (e: any) {
-            this.logger.warn(`Failed to register invoice font (${regularPath}): ${e?.message}. Falling back to Helvetica.`);
-          }
-        } else {
-          this.logger.warn('No Unicode invoice font found — Turkish characters may not render. Bundle DejaVu Sans or set INVOICE_FONT_PATH.');
-        }
-        doc.font(fontRegular);
-
-        // Header
-        doc.font(fontBold).fillColor('#1d3557').fontSize(24).text('TARODAN', { align: 'left' });
-        doc.font(fontRegular).fontSize(10).fillColor('#666666').text('İkinci El Model Araba Pazarı', { align: 'left' });
-
-        doc.moveDown();
-        doc.font(fontBold).fillColor('#000000').fontSize(20).text('FATURA', { align: 'right' });
-        doc.font(fontRegular).fontSize(10).text(`Fatura No: ${data.invoiceNumber}`, { align: 'right' });
-        doc.text(`Tarih: ${data.invoiceDate.toLocaleDateString('tr-TR')}`, { align: 'right' });
-
-        doc.moveDown();
-        const yBeforeInfo = doc.y;
-
-        // Seller Block
-        doc.font(fontBold).fontSize(12).fillColor('#1d3557').text('SATICI BİLGİLERİ', 50, yBeforeInfo);
-        doc.font(fontRegular).fontSize(10).fillColor('#333333');
-        doc.text(data.seller.name);
-        doc.text(data.seller.email);
-        if (data.seller.taxId) doc.text(`Vergi No: ${data.seller.taxId}`);
-        if (data.seller.address) doc.text(data.seller.address, { width: 200 });
-
-        // Buyer Block
-        doc.font(fontBold).fontSize(12).fillColor('#1d3557').text('ALICI BİLGİLERİ', 300, yBeforeInfo);
-        doc.font(fontRegular).fontSize(10).fillColor('#333333');
-        doc.text(data.buyer.name, 300);
-        doc.text(data.buyer.email, 300);
-        if (data.buyer.address) doc.text(data.buyer.address, 300, doc.y, { width: 200 });
-
-        doc.moveDown(4);
-
-        // Table Header
-        const tableTop = doc.y;
-        doc.rect(50, tableTop, 500, 20).fill('#f8f9fa');
-        doc.font(fontBold).fillColor('#1d3557').fontSize(10);
-        doc.text('Açıklama', 60, tableTop + 6);
-        doc.text('Adet', 350, tableTop + 6, { width: 50, align: 'center' });
-        doc.text('Birim Fiyat', 400, tableTop + 6, { width: 70, align: 'right' });
-        doc.text('Toplam', 480, tableTop + 6, { width: 60, align: 'right' });
-
-        // Table Items
-        let currentY = tableTop + 25;
-        doc.font(fontRegular);
-        data.items.forEach((item) => {
-          doc.fillColor('#333333');
-          doc.text(item.description, 60, currentY, { width: 280 });
-          doc.text(item.quantity.toString(), 350, currentY, { width: 50, align: 'center' });
-          doc.text(`${item.unitPrice.toLocaleString('tr-TR')} TL`, 400, currentY, { width: 70, align: 'right' });
-          doc.text(`${item.total.toLocaleString('tr-TR')} TL`, 480, currentY, { width: 60, align: 'right' });
-          currentY += 20;
-        });
-
-        // Totals
-        const totalGap = 15;
-        currentY += 20;
-        doc.fontSize(10).fillColor('#666666');
-
-        doc.text('Ara Toplam:', 380, currentY, { width: 100, align: 'right' });
-        doc.text(`${data.subtotal.toLocaleString('tr-TR')} TL`, 480, currentY, { width: 60, align: 'right' });
-
-        currentY += totalGap;
-        doc.text(`KDV (%${data.taxRate}):`, 380, currentY, { width: 100, align: 'right' });
-        doc.text(`${data.taxAmount.toLocaleString('tr-TR')} TL`, 480, currentY, { width: 60, align: 'right' });
-
-        if (data.shippingCost > 0) {
-          currentY += totalGap;
-          doc.text('Kargo Ücreti:', 380, currentY, { width: 100, align: 'right' });
-          doc.text(`${data.shippingCost.toLocaleString('tr-TR')} TL`, 480, currentY, { width: 60, align: 'right' });
-        }
-        if (data.commission > 0) {
-          currentY += totalGap;
-          doc.text('Platform ücreti:', 380, currentY, { width: 100, align: 'right' });
-          doc.text(`${data.commission.toLocaleString('tr-TR')} TL`, 480, currentY, { width: 60, align: 'right' });
-        }
-
-        currentY += 25;
-        doc.font(fontBold).fontSize(14).fillColor('#1d3557').text('GENEL TOPLAM:', 300, currentY, { width: 180, align: 'right' });
-        doc.text(`${data.total.toLocaleString('tr-TR')} TL`, 480, currentY, { width: 60, align: 'right' });
-
-        // Footer
-        const footerY = 750;
-        doc.font(fontRegular).fontSize(8).fillColor('#999999');
-        doc.text('Bu fatura elektronik olarak oluşturulmuştur ve mali değeri vardır.', 50, footerY, { align: 'center', width: 500 });
-        doc.text('Tarodan - Model Araba Alım Satım ve Takas Platformu', 50, footerY + 12, { align: 'center', width: 500 });
-        doc.text('https://tarodan.com', 50, footerY + 24, { align: 'center', width: 500 });
-
-        doc.end();
-      } catch (error) {
-        reject(error);
-      }
-    });
-  }
-
-  /**
-   * Convert HTML to PDF buffer (Legacy - kept for compatibility, uses generatePdfFromData internally if possible)
-   */
-  private async htmlToPdf(html: string): Promise<Buffer> {
-    // This is now redundant but kept to avoid breaking types if any external calls exist
-    return Buffer.from(html, 'utf-8');
+    return this.pdf.generatePdfFromData(invoiceData);
   }
 
   /**

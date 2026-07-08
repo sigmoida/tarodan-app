@@ -185,6 +185,22 @@ export default function SearchScreen() {
   });
   const autocomplete = autocompleteQueryRes.data;
 
+  // İsimle satıcı arama — autocomplete'te "Satıcılar" bölümü
+  const sellerAutoRes = useQuery({
+    queryKey: ['autocomplete-sellers', autocompleteQuery],
+    queryFn: async () => {
+      if (!autocompleteQuery) return [];
+      try {
+        const response = await searchApi.users(autocompleteQuery, 6);
+        return response.data ?? [];
+      } catch {
+        return [];
+      }
+    },
+    enabled: !!autocompleteQuery,
+  });
+  const sellerResults = sellerAutoRes.data ?? [];
+
   // --- Ürün listesi: web /products endpoint'i + sayfalama (sonsuz kaydırma) ---
   const {
     data,
@@ -518,6 +534,30 @@ export default function SearchScreen() {
                               <Text style={styles.acItemMeta}>
                                 {p.brandName ? `${p.brandName} · ` : ''}₺{p.price?.toLocaleString('tr-TR')}
                               </Text>
+                            </View>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    ) : null}
+
+                    {sellerResults.length > 0 ? (
+                      <View style={styles.acSection}>
+                        <Text style={styles.acSectionTitle}>Satıcılar</Text>
+                        {sellerResults.slice(0, 6).map((s) => (
+                          <TouchableOpacity
+                            key={`s-${s.id}`}
+                            style={styles.acItem}
+                            onPress={() => {
+                              setAutocompleteOpen(false);
+                              router.push(`/seller/${s.id}` as any);
+                            }}
+                          >
+                            <Ionicons name="storefront-outline" size={16} color={colors.primary[600]!} />
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.acItemText} numberOfLines={1}>{s.displayName}</Text>
+                              {typeof s.totalListings === 'number' ? (
+                                <Text style={styles.acItemMeta}>{s.totalListings} ilan</Text>
+                              ) : null}
                             </View>
                           </TouchableOpacity>
                         ))}

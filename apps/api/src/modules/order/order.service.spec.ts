@@ -3,6 +3,15 @@ import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { createHash } from 'crypto';
 import { OrderService } from './order.service';
+import { OrderPricingService } from './order-pricing.service';
+import { OrderCheckoutService } from './order-checkout.service';
+import { OrderCheckoutCommonService } from './order-checkout-common.service';
+import { OrderCheckoutDirectService } from './order-checkout-direct.service';
+import { OrderCheckoutGroupService } from './order-checkout-group.service';
+import { OrderGuestCheckoutService } from './order-guest-checkout.service';
+import { OrderCommonService } from './order-common.service';
+import { OrderQueryService } from './order-query.service';
+import { OrderLifecycleService } from './order-lifecycle.service';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { EventService } from '../events';
@@ -95,6 +104,11 @@ describe.skip('OrderService createDirectOrder (1.6 idempotent Buy Now)', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrderService,
+        OrderPricingService,
+        OrderCheckoutService,
+        OrderCommonService,
+        OrderQueryService,
+        OrderLifecycleService,
         { provide: ElogoInvoicingService, useValue: { issueCommissionInvoice: jest.fn().mockResolvedValue(undefined), issueServiceFeeInvoice: jest.fn().mockResolvedValue(undefined), issueMembershipInvoice: jest.fn().mockResolvedValue(undefined), issueBoostInvoice: jest.fn().mockResolvedValue(undefined), handleOrderRefund: jest.fn().mockResolvedValue(undefined), issuePlatformSaleInvoice: jest.fn().mockResolvedValue(undefined), handleTradeCashRefund: jest.fn().mockResolvedValue(undefined), issueTradeCashCommissionInvoice: jest.fn().mockResolvedValue(undefined), retryPendingInvoices: jest.fn().mockResolvedValue(undefined) } },
         { provide: PrismaService, useValue: mockPrisma },
         { provide: CacheService, useValue: { del: jest.fn(), delPattern: jest.fn() } },
@@ -186,6 +200,11 @@ describe.skip('OrderService guest checkout OTP (1.12)', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrderService,
+        OrderPricingService,
+        OrderCheckoutService,
+        OrderCommonService,
+        OrderQueryService,
+        OrderLifecycleService,
         { provide: ElogoInvoicingService, useValue: { issueCommissionInvoice: jest.fn().mockResolvedValue(undefined), issueServiceFeeInvoice: jest.fn().mockResolvedValue(undefined), issueMembershipInvoice: jest.fn().mockResolvedValue(undefined), issueBoostInvoice: jest.fn().mockResolvedValue(undefined), handleOrderRefund: jest.fn().mockResolvedValue(undefined), issuePlatformSaleInvoice: jest.fn().mockResolvedValue(undefined), handleTradeCashRefund: jest.fn().mockResolvedValue(undefined), issueTradeCashCommissionInvoice: jest.fn().mockResolvedValue(undefined), retryPendingInvoices: jest.fn().mockResolvedValue(undefined) } },
         { provide: PrismaService, useValue: mockPrisma },
         { provide: CacheService, useValue: mockCache },
@@ -357,6 +376,15 @@ describe('OrderService findOne (response shape for mobile order detail)', () => 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrderService,
+        OrderPricingService,
+        OrderCheckoutService,
+        OrderCheckoutCommonService,
+        OrderCheckoutDirectService,
+        OrderCheckoutGroupService,
+        OrderGuestCheckoutService,
+        OrderCommonService,
+        OrderQueryService,
+        OrderLifecycleService,
         { provide: ElogoInvoicingService, useValue: { issueCommissionInvoice: jest.fn().mockResolvedValue(undefined), issueServiceFeeInvoice: jest.fn().mockResolvedValue(undefined), issueMembershipInvoice: jest.fn().mockResolvedValue(undefined), issueBoostInvoice: jest.fn().mockResolvedValue(undefined), handleOrderRefund: jest.fn().mockResolvedValue(undefined), issuePlatformSaleInvoice: jest.fn().mockResolvedValue(undefined), handleTradeCashRefund: jest.fn().mockResolvedValue(undefined), issueTradeCashCommissionInvoice: jest.fn().mockResolvedValue(undefined), retryPendingInvoices: jest.fn().mockResolvedValue(undefined) } },
         { provide: PrismaService, useValue: mockPrisma },
         { provide: EventService, useValue: {} },
@@ -472,6 +500,15 @@ describe('OrderService getCommissionPreview (stopaj / withholding)', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrderService,
+        OrderPricingService,
+        OrderCheckoutService,
+        OrderCheckoutCommonService,
+        OrderCheckoutDirectService,
+        OrderCheckoutGroupService,
+        OrderGuestCheckoutService,
+        OrderCommonService,
+        OrderQueryService,
+        OrderLifecycleService,
         { provide: ElogoInvoicingService, useValue: {} },
         { provide: PrismaService, useValue: mockPrisma },
         { provide: EventService, useValue: {} },

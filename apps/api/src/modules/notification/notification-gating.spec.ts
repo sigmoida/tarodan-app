@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { NotificationService } from './notification.service';
+import { NotificationDispatchService } from './notification-dispatch.service';
+import { NotificationCommerceService } from './notification-commerce.service';
+import { NotificationAccountService } from './notification-account.service';
 import { PrismaService } from '../../prisma';
 import { SendGridProvider } from './providers/sendgrid.provider';
 import { ExpoPushProvider } from './providers/expo-push.provider';
@@ -60,6 +63,9 @@ describe('Notification preference gating (wiring)', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           NotificationService,
+          NotificationDispatchService,
+          NotificationCommerceService,
+          NotificationAccountService,
           { provide: PrismaService, useValue: mockPrisma },
           { provide: ConfigService, useValue: { get: jest.fn() } },
           { provide: SendGridProvider, useValue: { sendEmail, isConfigured: () => false } },

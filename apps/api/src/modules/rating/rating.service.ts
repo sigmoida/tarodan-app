@@ -3,8 +3,6 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
-  Inject,
-  forwardRef,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
@@ -30,7 +28,6 @@ export class RatingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
-    @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
     private readonly storageService: StorageService,
     private readonly moderationAi: ModerationAiClient,
@@ -179,7 +176,9 @@ export class RatingService {
         tradeId: dto.tradeId,
         score: dto.score,
         comment: dto.comment,
-        status: RatingStatus.pending, // Admin onayı gerekli; onaylanmadan gösterilmez
+        // Post-moderasyon: değerlendirme anında yayınlanır (profilde hemen görünür),
+        // admin uygunsuzsa panelden kaldırabilir/rejected yapabilir.
+        status: RatingStatus.approved,
       },
       include: {
         giver: { select: { id: true, displayName: true, avatarUrl: true } },
@@ -283,7 +282,8 @@ export class RatingService {
         review: dto.review,
         images: dto.images || [],
         isVerifiedPurchase: true,
-        status: RatingStatus.pending, // Admin onayı gerekli; onaylanmadan gösterilmez
+        // Post-moderasyon: ürün değerlendirmesi anında yayınlanır; admin sonradan kaldırabilir.
+        status: RatingStatus.approved,
       },
       include: {
         product: { select: { id: true, title: true } },

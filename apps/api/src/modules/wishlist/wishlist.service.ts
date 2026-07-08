@@ -2,8 +2,6 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
-  Inject,
-  forwardRef,
   Optional,
   Logger,
 } from '@nestjs/common';
@@ -27,7 +25,6 @@ export class WishlistService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
-    @Inject(forwardRef(() => NotificationService))
     private readonly notificationService: NotificationService,
     private readonly discountService: DiscountService,
     @Optional()

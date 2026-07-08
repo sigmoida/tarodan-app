@@ -476,10 +476,12 @@ export const collectionsApi = {
     api.get('/collections/me', { params }),
   getLikedCollections: (params?: Record<string, any>) =>
     api.get('/collections/liked', { params }),
-  getOne: (id: string) => 
+  getOne: (id: string) =>
     api.get(`/collections/${id}`),
-  getBySlug: (slug: string) => 
+  getBySlug: (slug: string) =>
     api.get(`/collections/slug/${slug}`),
+  getUserCollections: (userId: string, params?: Record<string, any>) =>
+    api.get(`/collections/user/${userId}`, { params }),
   create: (data: { name: string; description?: string; coverImageUrl?: string; isPublic?: boolean }) =>
     api.post('/collections', data),
   update: (id: string, data: { name?: string; description?: string; coverImageUrl?: string; isPublic?: boolean }) =>
@@ -862,9 +864,12 @@ export const searchApi = {
       suggestions: string[];
     }>('/search/autocomplete-rich', { params: { q: query } }),
 
-  // Kullanıcı arama
+  // İsimle satıcı arama (autocomplete)
   users: (query: string, limit?: number) =>
-    api.get('/users/search', { params: { q: query, limit } }),
+    api.get<Array<{ id: string; displayName: string; avatarUrl?: string; isVerified?: boolean; totalListings?: number }>>(
+      '/users/search',
+      { params: { q: query, limit } },
+    ),
 };
 
 // =============================================================================

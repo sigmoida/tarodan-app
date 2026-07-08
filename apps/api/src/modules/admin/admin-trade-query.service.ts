@@ -1,0 +1,278 @@
+import {
+  Injectable,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
+import { PrismaService } from '../../prisma';
+import { StorageService } from '../storage/storage.service';
+import { Prisma, TradeStatus, ShipmentStatus } from '@prisma/client';
+
+/**
+ * Takas yönetimi salt-okunur sorguları (admin liste/detay) — AdminTradeService'ten
+ * birebir taşındı: getTrades, findTradeShipments, getTradeById. AdminTradeService
+ * ince alt-facade olarak buraya delege eder. Ürün görsel URL çözümü (resolveProductImageUrl)
+ * yalnız getTradeById kullandığı için burada özel kalır. Leaf: prisma, @Optional() storageService.
+ */
+@Injectable()
+export class AdminTradeQueryService {
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional()
+    private readonly storageService: StorageService,
+  ) {}
+
+  // AdminService'teki leaf yardımcı ile birebir aynı (bilinçli kopya; facade'da
+  // başka bölümler de kullandığı için oradan kaldırılamadı).
+  private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
+    if (!imageKeyOrUrl) return null;
+    // Strip expired presigned S3 query params to get the clean public URL
+    if ((imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://')) && imageKeyOrUrl.includes('X-Amz-Signature')) {
+      try {
+        const parsed = new URL(imageKeyOrUrl);
+        parsed.search = '';
+        return parsed.toString();
+      } catch {
+        // fall through
+      }
+    }
+    if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
+    // Try to resolve any non-URL string as an S3 key (covers dev/, prod/, and other prefixes)
+    if (this.storageService) {
+      return this.storageService.getPublicAssetUrl(imageKeyOrUrl) ?? null;
+    }
+    return null;
+  }
+
+  // ==================== TRADE MANAGEMENT ====================
+
+  /**
+   * Get trades with filters for admin
+   */
+  async getTrades(query: {
+    status?: TradeStatus;
+    initiatorId?: string;
+    receiverId?: string;
+    userId?: string;
+    fromDate?: string;
+    toDate?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const { status, initiatorId, receiverId, userId, fromDate, toDate, search, page = 1, limit = 20 } = query;
+
+    const where: Prisma.TradeWhereInput = {};
+
+    if (status) {
+      where.status = status;
+    }
+
+    // AND koşulları: userId/initiatorId/receiverId filtresi ile search çakışmasın
+    const and: Prisma.TradeWhereInput[] = [];
+
+    if (userId) {
+      // Kullanıcıya ait tüm takaslar (başlatan VEYA alan)
+      and.push({ OR: [{ initiatorId: userId }, { receiverId: userId }] });
+    } else {
+      // Tekil id filtresi: AND içinde ayrı ayrı koy
+      if (initiatorId) and.push({ initiatorId });
+      if (receiverId) and.push({ receiverId });
+    }
+
+    if (search) {
+      // Takas no, başlatan displayName/email veya alıcı displayName/email araması
+      and.push({
+        OR: [
+          { tradeNumber: { contains: search, mode: 'insensitive' } },
+          { initiator: { displayName: { contains: search, mode: 'insensitive' } } },
+          { receiver:  { displayName: { contains: search, mode: 'insensitive' } } },
+          { initiator: { email: { contains: search, mode: 'insensitive' } } },
+          { receiver:  { email: { contains: search, mode: 'insensitive' } } },
+        ],
+      });
+    }
+
+    if (and.length) {
+      where.AND = and;
+    }
+
+    if (fromDate || toDate) {
+      where.createdAt = {};
+      if (fromDate) {
+        where.createdAt.gte = new Date(fromDate);
+      }
+      if (toDate) {
+        where.createdAt.lte = new Date(toDate);
+      }
+    }
+
+    const [total, trades] = await Promise.all([
+      this.prisma.trade.count({ where }),
+      this.prisma.trade.findMany({
+        where,
+        include: {
+          initiator: { select: { id: true, displayName: true, email: true } },
+          receiver: { select: { id: true, displayName: true, email: true } },
+          items: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  title: true,
+                  price: true,
+                  images: { take: 1, orderBy: { sortOrder: 'asc' } },
+                },
+              },
+            },
+          },
+          shipments: true,
+          cashPayment: true,
+          dispute: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      data: trades,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  /**
+   * List ALL TradeShipments across trades with status / leg / tradeNumber filters.
+   * Joins shipper and (when present) recipient users by user id since
+   * TradeShipment does not have direct relations to User.
+   */
+  async findTradeShipments(query: {
+    status?: ShipmentStatus;
+    leg?: 'to_warehouse' | 'from_warehouse' | 'return';
+    tradeNumber?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const { status, leg, tradeNumber, page = 1, limit = 20 } = query;
+
+    const where: Prisma.TradeShipmentWhereInput = {
+      ...(status && { status }),
+      ...(leg && { leg }),
+      ...(tradeNumber && {
+        trade: {
+          tradeNumber: { contains: tradeNumber, mode: 'insensitive' },
+        },
+      }),
+    };
+
+    const [total, shipments] = await Promise.all([
+      this.prisma.tradeShipment.count({ where }),
+      this.prisma.tradeShipment.findMany({
+        where,
+        include: {
+          trade: {
+            select: { id: true, tradeNumber: true, status: true },
+          },
+        },
+        orderBy: { updatedAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+
+    // Resolve shipper / recipient users in a single batched query
+    const userIds = Array.from(
+      new Set(
+        shipments
+          .flatMap((s) => [s.shipperId, s.recipientUserId])
+          .filter((v): v is string => !!v),
+      ),
+    );
+
+    const users = userIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, displayName: true, email: true },
+        })
+      : [];
+    const userMap = new Map(users.map((u) => [u.id, u]));
+
+    const data = shipments.map((s) => ({
+      ...s,
+      shipper: userMap.get(s.shipperId) ?? null,
+      recipientUser: s.recipientUserId
+        ? userMap.get(s.recipientUserId) ?? null
+        : null,
+    }));
+
+    return {
+      data,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  /**
+   * Get trade by ID for admin
+   */
+  async getTradeById(tradeId: string) {
+    const trade = await this.prisma.trade.findUnique({
+      where: { id: tradeId },
+      include: {
+        initiator: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+            phone: true,
+            addresses: true,
+          },
+        },
+        receiver: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+            phone: true,
+            addresses: true,
+          },
+        },
+        items: {
+          include: {
+            product: {
+              include: {
+                images: { orderBy: { sortOrder: 'asc' } },
+                category: true,
+                seller: { select: { id: true, displayName: true } },
+              },
+            },
+          },
+        },
+        shipments: {
+          include: {
+            events: { orderBy: { eventTime: 'asc' } },
+          },
+        },
+        cashPayment: true,
+        dispute: true,
+      },
+    });
+
+    if (!trade) {
+      throw new NotFoundException('Takas bulunamadı');
+    }
+
+    // Resolve product image S3 keys (cardKey) into usable URLs. The frontend
+    // renders `item.product.images[0].url`, but ProductImage stores cardKey/detailKey
+    // (no `url` column), so without this mapping the photos would not show.
+    for (const item of (trade as any).items ?? []) {
+      const product = item?.product;
+      if (product) {
+        product.images = (product.images ?? [])
+          .map((img: any) => ({ url: this.resolveProductImageUrl(img?.cardKey) }))
+          .filter((img: any) => img.url);
+      }
+    }
+
+    return trade;
+  }
+}

@@ -1,4 +1,4 @@
-import { Module, NestModule, MiddlewareConsumer, forwardRef } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -6,6 +6,10 @@ import { BullModule } from '@nestjs/bull';
 import { PaymentController } from './payment.controller';
 import { PaytrCallbackAliasController } from './paytr-callback-alias.controller';
 import { PaymentService } from './payment.service';
+import { PaymentQueryService } from './payment-query.service';
+import { PaymentCommonService } from './payment-common.service';
+import { PaymentRefundService } from './payment-refund.service';
+import { PaymentReconciliationService } from './payment-reconciliation.service';
 import { PaymentSchedulerService } from './payment-scheduler.service';
 import { PaymentScheduledProcessor } from './payment-scheduled.processor';
 import { QUEUE_NAMES } from '../../workers/constants';
@@ -15,7 +19,7 @@ import { PaymentProvidersModule } from '../payment-providers';
 import { EventModule } from '../events';
 import { RawBodyMiddleware } from './middleware/raw-body.middleware';
 import { InvoiceModule } from '../invoice/invoice.module';
-import { ProductModule } from '../product/product.module';
+import { ProductLockModule } from '../product/product-lock.module';
 import { NotificationModule } from '../notification/notification.module';
 import { PayoutModule } from '../payout/payout.module';
 import { SuratCargoModule } from '../surat-cargo/surat-cargo.module';
@@ -37,8 +41,8 @@ import { ElogoModule } from '../elogo';
     SuratCargoModule,
     CommissionModule,
     StorageModule,
+    ProductLockModule,
     ElogoModule,
-    forwardRef(() => ProductModule),
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -50,7 +54,7 @@ import { ElogoModule } from '../elogo';
     }),
   ],
   controllers: [PaymentController, PaytrCallbackAliasController],
-  providers: [PaymentService, PaymentSchedulerService, PaymentScheduledProcessor, RawBodyMiddleware],
+  providers: [PaymentService, PaymentQueryService, PaymentCommonService, PaymentRefundService, PaymentReconciliationService, PaymentSchedulerService, PaymentScheduledProcessor, RawBodyMiddleware],
   exports: [PaymentService],
 })
 export class PaymentModule implements NestModule {

@@ -2,6 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { ModuleRef } from '@nestjs/core';
 import { PaymentService } from './payment.service';
+import { PaymentQueryService } from './payment-query.service';
+import { PaymentCommonService } from './payment-common.service';
+import { PaymentRefundService } from './payment-refund.service';
+import { PaymentReconciliationService } from './payment-reconciliation.service';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { PayTRService } from '../payment-providers/paytr.service';
@@ -48,6 +52,10 @@ describe('PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PaymentService,
+        PaymentQueryService,
+        PaymentCommonService,
+        PaymentRefundService,
+        PaymentReconciliationService,
         { provide: ElogoInvoicingService, useValue: { issueCommissionInvoice: jest.fn().mockResolvedValue(undefined), issueServiceFeeInvoice: jest.fn().mockResolvedValue(undefined), issueMembershipInvoice: jest.fn().mockResolvedValue(undefined), issueBoostInvoice: jest.fn().mockResolvedValue(undefined), handleOrderRefund: jest.fn().mockResolvedValue(undefined), issuePlatformSaleInvoice: jest.fn().mockResolvedValue(undefined), handleTradeCashRefund: jest.fn().mockResolvedValue(undefined), issueTradeCashCommissionInvoice: jest.fn().mockResolvedValue(undefined), retryPendingInvoices: jest.fn().mockResolvedValue(undefined) } },
         { provide: PrismaService, useValue: mockPrisma },
         { provide: CacheService, useValue: { del: jest.fn() } },

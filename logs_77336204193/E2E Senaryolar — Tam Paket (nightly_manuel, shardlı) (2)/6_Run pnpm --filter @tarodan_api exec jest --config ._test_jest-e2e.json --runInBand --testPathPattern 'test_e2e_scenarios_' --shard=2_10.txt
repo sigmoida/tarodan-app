@@ -1,0 +1,1607 @@
+﻿2026-07-02T20:40:59.8713979Z ##[group]Run pnpm --filter @tarodan/api exec jest --config ./test/jest-e2e.json --runInBand --testPathPattern 'test/e2e/scenarios/' --shard=2/10
+2026-07-02T20:40:59.8715035Z [36;1mpnpm --filter @tarodan/api exec jest --config ./test/jest-e2e.json --runInBand --testPathPattern 'test/e2e/scenarios/' --shard=2/10[0m
+2026-07-02T20:40:59.8749106Z shell: /usr/bin/bash -e {0}
+2026-07-02T20:40:59.8749373Z env:
+2026-07-02T20:40:59.8749597Z   MAILHOG_URL: http://localhost:8025
+2026-07-02T20:40:59.8749955Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-07-02T20:40:59.8750290Z ##[endgroup]
+2026-07-02T20:41:00.9855754Z ts-jest[config] (WARN) 
+2026-07-02T20:41:00.9857283Z     The "ts-jest" config option "isolatedModules" is deprecated and will be removed in v30.0.0. Please use "isolatedModules: true" in /home/runner/work/tarodan-app/tarodan-app/apps/api/tsconfig.json instead, see https://www.typescriptlang.org/tsconfig/#isolatedModules
+2026-07-02T20:41:00.9858787Z   
+2026-07-02T20:41:01.0627508Z   console.log
+2026-07-02T20:41:01.0628745Z     ◇ injected env (41) from .env.test // tip: ⌁ auth for agents [www.vestauth.com]
+2026-07-02T20:41:01.0629193Z 
+2026-07-02T20:41:01.0629428Z       at _log (node_modules/dotenv/lib/main.js:131:11)
+2026-07-02T20:41:01.0629713Z 
+2026-07-02T20:41:09.3532086Z   console.log
+2026-07-02T20:41:09.3533343Z     prisma:info Starting a postgresql pool with 5 connections.
+2026-07-02T20:41:09.3561471Z 
+2026-07-02T20:41:09.3591808Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:41:09.3601382Z 
+2026-07-02T20:41:56.1927994Z   console.log
+2026-07-02T20:41:56.1928654Z     prisma:error 
+2026-07-02T20:41:56.1929327Z     Invalid `this.prisma.product.update()` invocation in
+2026-07-02T20:41:56.1930559Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/src/modules/product/product.service.ts:1255:49
+2026-07-02T20:41:56.1931675Z     
+2026-07-02T20:41:56.1932017Z       1252 
+2026-07-02T20:41:56.1932483Z       1253 // Update with optimistic locking
+2026-07-02T20:41:56.1932941Z       1254 try {
+2026-07-02T20:41:56.1933547Z     → 1255   const updated = await this.prisma.product.update(
+2026-07-02T20:41:56.1934279Z     An operation failed because it depends on one or more records that were required but not found. Record to update not found.
+2026-07-02T20:41:56.1934768Z 
+2026-07-02T20:41:56.1935061Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:41:56.1935613Z 
+2026-07-02T20:41:56.6607037Z   console.log
+2026-07-02T20:41:56.6607640Z     prisma:error 
+2026-07-02T20:41:56.6608635Z     Invalid `this.prisma.productLike.create()` invocation in
+2026-07-02T20:41:56.6609934Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/src/modules/product/product.service.ts:2167:31
+2026-07-02T20:41:56.6611418Z     
+2026-07-02T20:41:56.6611778Z       2164 
+2026-07-02T20:41:56.6612354Z       2165 // Create like and increment counter in transaction
+2026-07-02T20:41:56.6613013Z       2166 const [_, updatedProduct] = await this.prisma.$transaction([
+2026-07-02T20:41:56.6670617Z     → 2167   this.prisma.productLike.create(
+2026-07-02T20:41:56.6671701Z     Unique constraint failed on the fields: (`product_id`,`user_id`)
+2026-07-02T20:41:56.6672190Z 
+2026-07-02T20:41:56.6672659Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:41:56.6673184Z 
+2026-07-02T20:41:56.6673373Z   console.log
+2026-07-02T20:41:56.6674066Z     prisma:error Unique constraint failed on the fields: (`product_id`,`user_id`)
+2026-07-02T20:41:56.6674641Z 
+2026-07-02T20:41:56.6675088Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:41:56.6675632Z 
+2026-07-02T20:42:02.5265217Z FAIL test/e2e/scenarios/04-prd.e2e-spec.ts (61.57 s)
+2026-07-02T20:42:02.5268950Z   04 — Ürün/İlan & Katalog (PRD)
+2026-07-02T20:42:02.5269586Z     POST /api/products — oluşturma
+2026-07-02T20:42:02.5272080Z       ✓ PRD-001 [P0] Satıcı geçerli ilan oluşturur (pending olarak) (716 ms)
+2026-07-02T20:42:02.5276024Z       ✓ PRD-002 [P0] Satıcı olmayan ilk ilanında otomatik satıcıya yükseltilir (599 ms)
+2026-07-02T20:42:02.5277208Z       ✓ PRD-003 [P1] Tüm opsiyonel alanlarla zengin ilan oluşturma (687 ms)
+2026-07-02T20:42:02.5278282Z       ✓ PRD-004 [P2] Sınırsız stok (quantity=null) ile ilan (504 ms)
+2026-07-02T20:42:02.5279079Z       ✓ PRD-010 [P0] Başlık eksik (400) (447 ms)
+2026-07-02T20:42:02.5279821Z       ✓ PRD-011 [P0] Başlık 5 karakterden kısa (400) (418 ms)
+2026-07-02T20:42:02.5280692Z       ✓ PRD-012 [P1] Başlık 200 karakterden uzun (400) (506 ms)
+2026-07-02T20:42:02.5282169Z       ✓ PRD-013 [P2] Açıklama 5000 karakterden uzun (400) (416 ms)
+2026-07-02T20:42:02.5282973Z       ✓ PRD-014 [P0] Fiyat < 1 (400) (541 ms)
+2026-07-02T20:42:02.5283771Z       ✓ PRD-015 [P1] Fiyat sayı değil (400) (434 ms)
+2026-07-02T20:42:02.5284637Z       ✓ PRD-016 [P1] Geçersiz condition enum (400) (714 ms)
+2026-07-02T20:42:02.5285532Z       ✓ PRD-017 [P1] categoryId geçersiz UUID formatı (400) (437 ms)
+2026-07-02T20:42:02.5286909Z       ✓ PRD-018 [P1] categoryId geçerli UUID ama yok / pasif (400) (513 ms)
+2026-07-02T20:42:02.5288091Z       ✓ PRD-019 [P2] bundleSize < 2 (400) ve isSet=false ile bundleSize yok sayılır (498 ms)
+2026-07-02T20:42:02.5289038Z       ✓ PRD-020 [P2] year sınır dışı (400) (555 ms)
+2026-07-02T20:42:02.5289943Z       ✓ PRD-021 [P2] DTO'da tanımsız alan sessizce ayıklanır (400 değil) (490 ms)
+2026-07-02T20:42:02.5291152Z     POST /api/products — yetki & limit & fiyat
+2026-07-02T20:42:02.5292063Z       ✓ PRD-030 [P0] Misafir ilan oluşturamaz (401) (439 ms)
+2026-07-02T20:42:02.5293130Z       ✓ PRD-031 [P0] Banlanmış kullanıcı ilan oluşturamaz (403) (430 ms)
+2026-07-02T20:42:02.5294221Z       ✓ PRD-032 [P0] Ücretsiz üyelik ilan limiti dolunca 403 (493 ms)
+2026-07-02T20:42:02.5295309Z       ✓ PRD-033 [P1] İlan limit sayacı doğru statüleri sayar (502 ms)
+2026-07-02T20:42:02.5296486Z       ✓ PRD-034 [P2] Premium/Business sınırsız ilan (platform setting -1) (456 ms)
+2026-07-02T20:42:02.5297623Z       ✓ PRD-040 [P0] Tier görsel limiti aşımı (400) (439 ms)
+2026-07-02T20:42:02.5298543Z       ✓ PRD-041 [P1] DTO hard limit 10 görsel (400) (432 ms)
+2026-07-02T20:42:02.5299516Z       ✓ PRD-042 [P2] Görsel variant alanları eksik (400) (419 ms)
+2026-07-02T20:42:02.5300404Z       ✓ PRD-050 [P1] Platform min/max fiyat sınırı (400) (580 ms)
+2026-07-02T20:42:02.5302165Z       ✓ PRD-051 [P1] İndirim ayarlama (salePrice ile price/oldPrice güncellenir) (488 ms)
+2026-07-02T20:42:02.5303104Z       ✓ PRD-052 [P2] İndirim temizleme (salePrice=null/0) (533 ms)
+2026-07-02T20:42:02.5303989Z       ✕ PRD-053 [P1] Stok 0'a düşürülünce ilan otomatik pasif (430 ms)
+2026-07-02T20:42:02.5304678Z       ✓ PRD-054 [P2] Vergi hesaplama endpoint (catalog) (408 ms)
+2026-07-02T20:42:02.5305203Z       ✓ PRD-055 [P2] Fiyat ondalık yuvarlama (Decimal 10,2) (484 ms)
+2026-07-02T20:42:02.5306503Z       ○ skipped PRD-043 [P1] AI moderasyon: NSFW görsel senkron engelleme (400) — SKIP(AI görsel moderasyonu AI_MODERATION_ENABLED ile açılır; .env.test'te kapalı (moderationAi.isEnabled=false) → NSFW senkron engelleme (400) üretilemez.)
+2026-07-02T20:42:02.5308253Z       ○ skipped PRD-044 [P1] Başlık/açıklamada küfür senkron engelleme — SKIP(assertTextClean !enabled iken no-op; test'te AI moderasyon kapalı → başlık/açıklama küfür engellemesi (400) üretilemez.)
+2026-07-02T20:42:02.5309128Z     PATCH /api/products/:id — güncelleme
+2026-07-02T20:42:02.5309549Z       ✓ PRD-060 [P0] Sahibi ilanını günceller (456 ms)
+2026-07-02T20:42:02.5310042Z       ✓ PRD-061 [P0] Başkasının ilanını güncelleyemez (403) (426 ms)
+2026-07-02T20:42:02.5310637Z       ✓ PRD-062 [P0] Satıcı ilanı doğrudan aktifleştiremez (pending'e gider) (458 ms)
+2026-07-02T20:42:02.5311860Z       ✓ PRD-063 [P1] Satıcı ilanını pasife alabilir (inactive) (491 ms)
+2026-07-02T20:42:02.5312521Z       ✓ PRD-064 [P1] Reserved ilan güncellenemez (400) (479 ms)
+2026-07-02T20:42:02.5313051Z       ✓ PRD-065 [P1] Deleted ilan düzenlenemez/geri açılamaz (400) (428 ms)
+2026-07-02T20:42:02.5313704Z       ✓ PRD-066 [P1] Sold/inactive ilanı yeniden satışa açma (stok ile pending'e) (438 ms)
+2026-07-02T20:42:02.5315348Z       ✕ PRD-067 [P2] Sold/inactive ilanda stoksuz yeniden açma (400) (414 ms)
+2026-07-02T20:42:02.5316542Z       ✓ PRD-068 [P1] Takas açma premium gerektirir (400 ücretsiz tier) (459 ms)
+2026-07-02T20:42:02.5317633Z       ✓ PRD-069 [P2] Düzenleme arama indeksini & cache'i tetikler (859 ms)
+2026-07-02T20:42:02.5318175Z     DELETE /api/products/:id — silme
+2026-07-02T20:42:02.5318628Z       ✓ PRD-080 [P0] Sahibi ilanını siler (soft delete) (423 ms)
+2026-07-02T20:42:02.5319135Z       ✓ PRD-081 [P0] Başkasının ilanını silemez (403) (461 ms)
+2026-07-02T20:42:02.5319633Z       ✓ PRD-082 [P1] Satılmış/rezerve ilan silinemez (400) (466 ms)
+2026-07-02T20:42:02.5320080Z       ✓ PRD-083 [P1] Misafir silemez (401) (410 ms)
+2026-07-02T20:42:02.5320520Z       ✓ PRD-084 [P2] Silme arama indeksinden kaldırır (831 ms)
+2026-07-02T20:42:02.5321349Z     GET detay & görünürlük
+2026-07-02T20:42:02.5322263Z       ✓ PRD-090 [P0] Aktif ürün detayı herkese açık (440 ms)
+2026-07-02T20:42:02.5322897Z       ✓ PRD-091 [P0] Pending/rejected/inactive(qty>0) detay 404 (misafir & başkası) (434 ms)
+2026-07-02T20:42:02.5323570Z       ✓ PRD-092 [P1] Sold ve inactive(qty=0) detay görünür ("stok bitti") (450 ms)
+2026-07-02T20:42:02.5324202Z       ✓ PRD-093 [P1] Sahip kendi pending/rejected ilanını /my/:id ile görür (459 ms)
+2026-07-02T20:42:02.5324746Z       ✓ PRD-094 [P0] /products/my/:id başkasına 403 (446 ms)
+2026-07-02T20:42:02.5325267Z       ✓ PRD-095 [P1] Public liste statü filtresi (status verilmez) (472 ms)
+2026-07-02T20:42:02.5325868Z       ✓ PRD-096 [P1] Admin moderasyon kuyruğunda pending ürünleri görür (437 ms)
+2026-07-02T20:42:02.5326264Z     like / view / stats
+2026-07-02T20:42:02.5326664Z       ✓ PRD-100 [P0] Kullanıcı ürünü beğenir + liked durumu (457 ms)
+2026-07-02T20:42:02.5327155Z       ✓ PRD-101 [P1] Kendi ürününü beğenemez (400) (430 ms)
+2026-07-02T20:42:02.5327642Z       ✓ PRD-102 [P1] Aynı ürünü iki kez beğenme (400) (463 ms)
+2026-07-02T20:42:02.5328096Z       ✓ PRD-103 [P1] Unlike (beğeniyi kaldır) (451 ms)
+2026-07-02T20:42:02.5328558Z       ✓ PRD-104 [P2] Beğenilmemiş ürünü unlike (400) (442 ms)
+2026-07-02T20:42:02.5329018Z       ✓ PRD-105 [P1] Misafir beğenemez (401) (406 ms)
+2026-07-02T20:42:02.5329503Z       ✓ PRD-106 [P2] Olmayan ürünü beğenme (404 / 400 format) (440 ms)
+2026-07-02T20:42:02.5329952Z       ✓ PRD-110 [P1] View sayacı artar (438 ms)
+2026-07-02T20:42:02.5330474Z       ✓ PRD-111 [P1] Aynı kullanıcı/IP 30 dk içinde tekrar view sayılmaz (449 ms)
+2026-07-02T20:42:02.5331386Z       ✓ PRD-112 [P2] Bot user-agent view'i sayılmaz (419 ms)
+2026-07-02T20:42:02.5331954Z       ✓ PRD-113 [P2] Satıcı kendi ürününü görüntüleyince sayılmaz (429 ms)
+2026-07-02T20:42:02.5332513Z       ✓ PRD-114 [P1] Ürün istatistikleri yalnız sahibe (403) (436 ms)
+2026-07-02T20:42:02.5332900Z     boost / öne çıkarma
+2026-07-02T20:42:02.5333263Z       ✓ PRD-120 [P2] Boost fiyat listesi (public) (418 ms)
+2026-07-02T20:42:02.5333814Z       ✓ PRD-121 [P1] Boost başlatma happy path (paymentUrl döner) (470 ms)
+2026-07-02T20:42:02.5334336Z       ✓ PRD-122 [P1] Geçersiz boost süresi (400) (456 ms)
+2026-07-02T20:42:02.5334818Z       ✓ PRD-123 [P0] Başkasının ilanını boost edemez (403) (434 ms)
+2026-07-02T20:42:02.5335333Z       ✓ PRD-124 [P1] Aktif olmayan ilan boost edilemez (400) (423 ms)
+2026-07-02T20:42:02.5335817Z       ✓ PRD-125 [P2] Boost kapalıyken başlatma (400) (423 ms)
+2026-07-02T20:42:02.5336303Z       ✓ PRD-126 [P2] autoRenew yalnız premium üyeye etkili (519 ms)
+2026-07-02T20:42:02.5336761Z       ✓ PRD-127 [P2] Boost geçmişim (auth) (470 ms)
+2026-07-02T20:42:02.5337221Z       ✓ PRD-128 [P1] Boost başlatma yetkisi: misafir 401 (418 ms)
+2026-07-02T20:42:02.5337560Z     admin onay/ret
+2026-07-02T20:42:02.5337962Z       ✓ PRD-140 [P0] Admin pending ürünü onaylar → active (431 ms)
+2026-07-02T20:42:02.5338489Z       ✓ PRD-141 [P1] Pending olmayan ürün onaylanamaz (400) (504 ms)
+2026-07-02T20:42:02.5339106Z       ✓ PRD-142 [P0] Admin ürünü reddeder (reason zorunlu) → rejected + bildirim (446 ms)
+2026-07-02T20:42:02.5340000Z       ✓ PRD-143 [P1] Reddedilen ilan satıcı düzenleyince yeniden pending (464 ms)
+2026-07-02T20:42:02.5340693Z       ✓ PRD-144 [P0] Moderator rolü onay/ret yapabilir, normal kullanıcı yapamaz (403) (460 ms)
+2026-07-02T20:42:02.5341543Z       ✓ PRD-145 [P2] Bulk approve/reject (520 ms)
+2026-07-02T20:42:02.5341896Z     liste / filtre / sıralama
+2026-07-02T20:42:02.5342280Z       ✓ PRD-160 [P1] Sayfalı liste (boş ve dolu) (445 ms)
+2026-07-02T20:42:02.5342723Z       ✓ PRD-161 [P2] limit sınır (>100 reddedilir) (399 ms)
+2026-07-02T20:42:02.5343220Z       ✓ PRD-162 [P1] Kategori / marka / üretici / model filtresi (503 ms)
+2026-07-02T20:42:02.5343886Z       ✓ PRD-163 [P2] Fiyat aralığı, condition, tradeOnly, set, preOrder, limited filtreleri (428 ms)
+2026-07-02T20:42:02.5344494Z       ✓ PRD-164 [P2] scale/material attribute filtresi (540 ms)
+2026-07-02T20:42:02.5345008Z       ✓ PRD-165 [P2] attrGroups grup-içi OR / gruplar-arası AND (475 ms)
+2026-07-02T20:42:02.5345827Z       ✓ PRD-166 [P1] Sıralama: relevance varsayılan + price/created/title/view/rating (568 ms)
+2026-07-02T20:42:02.5346365Z       ✓ PRD-167 [P1] Arama (full-text) (642 ms)
+2026-07-02T20:42:02.5346746Z       ✓ PRD-168 [P2] Popüler ilanlar (421 ms)
+2026-07-02T20:42:02.5347112Z       ✓ PRD-169 [P2] Benzer ürünler (420 ms)
+2026-07-02T20:42:02.5347519Z       ✓ PRD-170 [P2] Dinamik filtre seçenekleri (416 ms)
+2026-07-02T20:42:02.5347918Z     katalog (kategori/marka/üretici/model)
+2026-07-02T20:42:02.5348313Z       ✓ PRD-180 [P1] Kategori listesi (public) (395 ms)
+2026-07-02T20:42:02.5348759Z       ✓ PRD-181 [P1] Kategori ID/slug ile detay + 404 (416 ms)
+2026-07-02T20:42:02.5349241Z       ✓ PRD-182 [P1] Kategori yazma yalnız admin (403/401) (418 ms)
+2026-07-02T20:42:02.5349734Z       ✓ PRD-183 [P1] Marka listesi + slug detay (404) (416 ms)
+2026-07-02T20:42:02.5350183Z       ✓ PRD-184 [P2] Üretici listesi + slug detay (416 ms)
+2026-07-02T20:42:02.5350965Z       ✓ PRD-185 [P2] Araba modeli listesi + marka filtresi + slug detay (426 ms)
+2026-07-02T20:42:02.5351472Z     eşzamanlılık & zamanlanmış
+2026-07-02T20:42:02.5351952Z       ✓ PRD-200 [P0] Eşzamanlı güncelleme optimistic lock çakışması (409) (504 ms)
+2026-07-02T20:42:02.5352492Z       ✓ PRD-201 [P1] Eşzamanlı beğeni (unique kısıt) (446 ms)
+2026-07-02T20:42:02.5352937Z       ✓ PRD-202 [P2] Eşzamanlı view rate-limit (451 ms)
+2026-07-02T20:42:02.5353485Z       ✓ PRD-203 [P2] Eşzamanlı boost başlatma (çift sanal ürün/order olmaması) (512 ms)
+2026-07-02T20:42:02.5354072Z       ✓ PRD-220 [P2] 60 günden eski aktif ilan otomatik pasif (502 ms)
+2026-07-02T20:42:02.5354592Z       ✓ PRD-221 [P2] Süresi biten boost düşürülür (rankTier) (428 ms)
+2026-07-02T20:42:02.5354987Z     i18n / parite / güvenlik
+2026-07-02T20:42:02.5355609Z       ✓ PRD-240 [P2] Doğrulama mesajları Türkçe (451 ms)
+2026-07-02T20:42:02.5356591Z       ✓ PRD-260 [P0] IDOR: başkasının ürününü düzenleme/silme/boost/stats (485 ms)
+2026-07-02T20:42:02.5357810Z       ✓ PRD-261 [P0] Yetki yükseltme: create DTO ile status enjekte edilemez (467 ms)
+2026-07-02T20:42:02.5358977Z       ✓ PRD-262 [P1] Update ile başka satıcıya devir / yetkisiz statü engeli (547 ms)
+2026-07-02T20:42:02.5359804Z       ✓ PRD-263 [P2] XSS/HTML enjeksiyon başlık/açıklamada (484 ms)
+2026-07-02T20:42:02.5360375Z       ✓ PRD-264 [P2] UUID enjeksiyon / SQL-injection denemesi (param) (409 ms)
+2026-07-02T20:42:02.5361892Z       ○ skipped PRD-241 [P1] Web ilan ver formu happy path — SKIP(Saf web parite ("İlan Ver" formu / onay bekliyor mesajı UI). API karşılığı PRD-001 (POST /api/products 201 → pending) ile kapsanır.)
+2026-07-02T20:42:02.5363421Z       ○ skipped PRD-242 [P1] Mobile ilan detay & "stok bitti" durumu — SKIP(Saf mobil parite (products/unavailable ekranı "stok bitti"). API karşılığı PRD-092 (sold/inactive-qty0 detay 200) ile kapsanır.)
+2026-07-02T20:42:02.5365128Z       ○ skipped PRD-243 [P2] Boş / yükleniyor / hata UI durumları — SKIP(Saf UI durumları (boş/loading skeleton/hata kutusu). API tarafı findAll hata yutup boş döndürür (PRD-160 boş data ile kapsanır); skeleton/spinner API'den doğrulanamaz.)
+2026-07-02T20:42:02.5366921Z       ○ skipped PRD-244 [P2] Admin moderasyon sayfası parite — SKIP(Admin moderasyon SAYFASI paritesi (UI liste güncelleme). API karşılığı PRD-140/142/096 ile kapsanır.)
+2026-07-02T20:42:02.5367531Z 
+2026-07-02T20:42:02.5368086Z   ● 04 — Ürün/İlan & Katalog (PRD) › POST /api/products — yetki & limit & fiyat › PRD-053 [P1] Stok 0'a düşürülünce ilan otomatik pasif
+2026-07-02T20:42:02.5368556Z 
+2026-07-02T20:42:02.5368697Z     expected 200 "OK", got 400 "Bad Request"
+2026-07-02T20:42:02.5368897Z 
+2026-07-02T20:42:02.5369177Z     [0m [90m 538 |[39m         [33m.[39m[36mset[39m(authHeader(seller))
+2026-07-02T20:42:02.5369730Z      [90m 539 |[39m         [33m.[39msend({ quantity[33m:[39m [35m0[39m })
+2026-07-02T20:42:02.5370325Z     [31m[1m>[22m[39m[90m 540 |[39m         [33m.[39mexpect([35m200[39m)[33m;[39m
+2026-07-02T20:42:02.5371287Z      [90m     |[39m          [31m[1m^[22m[39m
+2026-07-02T20:42:02.5371812Z      [90m 541 |[39m       [36mconst[39m prisma [33m=[39m getPrisma()[33m;[39m
+2026-07-02T20:42:02.5372819Z      [90m 542 |[39m       [36mconst[39m row [33m=[39m [36mawait[39m prisma[33m.[39mproduct[33m.[39mfindUnique({ where[33m:[39m { id[33m:[39m p[33m.[39mid } })[33m;[39m
+2026-07-02T20:42:02.5373927Z      [90m 543 |[39m       expect(row[33m?[39m[33m.[39mstatus)[33m.[39mtoBe([33mProductStatus[39m[33m.[39minactive)[33m;[39m[0m
+2026-07-02T20:42:02.5374388Z 
+2026-07-02T20:42:02.5374639Z       at Object.<anonymous> (test/e2e/scenarios/04-prd.e2e-spec.ts:540:10)
+2026-07-02T20:42:02.5375027Z       ----
+2026-07-02T20:42:02.5375384Z       at Test._assertStatus (../../node_modules/supertest/lib/test.js:309:14)
+2026-07-02T20:42:02.5375851Z       at ../../node_modules/supertest/lib/test.js:365:13
+2026-07-02T20:42:02.5376319Z       at Test._assertFunction (../../node_modules/supertest/lib/test.js:342:13)
+2026-07-02T20:42:02.5376837Z       at Test.assert (../../node_modules/supertest/lib/test.js:195:23)
+2026-07-02T20:42:02.5377315Z       at localAssert (../../node_modules/supertest/lib/test.js:138:14)
+2026-07-02T20:42:02.5377819Z       at Server.<anonymous> (../../node_modules/supertest/lib/test.js:152:11)
+2026-07-02T20:42:02.5378128Z 
+2026-07-02T20:42:02.5378709Z   ● 04 — Ürün/İlan & Katalog (PRD) › PATCH /api/products/:id — güncelleme › PRD-067 [P2] Sold/inactive ilanda stoksuz yeniden açma (400)
+2026-07-02T20:42:02.5379256Z 
+2026-07-02T20:42:02.5379431Z     expect(received).toContain(expected) // indexOf
+2026-07-02T20:42:02.5379658Z 
+2026-07-02T20:42:02.5379869Z     Expected substring: "stok miktarı belirleyin"
+2026-07-02T20:42:02.5380334Z     Received string:    "[\"Stok miktarı en az 1 olmalıdır\"]"
+2026-07-02T20:42:02.5380586Z 
+2026-07-02T20:42:02.5381239Z     [0m [90m 674 |[39m         [33m.[39msend({ status[33m:[39m [32m'active'[39m[33m,[39m quantity[33m:[39m [35m0[39m })
+2026-07-02T20:42:02.5381912Z      [90m 675 |[39m         [33m.[39mexpect([35m400[39m)[33m;[39m
+2026-07-02T20:42:02.5383761Z     [31m[1m>[22m[39m[90m 676 |[39m       expect([33mJSON[39m[33m.[39mstringify(res[33m.[39mbody[33m.[39mmessage))[33m.[39mtoContain([32m'stok miktarı belirleyin'[39m)[33m;[39m
+2026-07-02T20:42:02.5385479Z      [90m     |[39m                                                [31m[1m^[22m[39m
+2026-07-02T20:42:02.5386280Z      [90m 677 |[39m     })[33m;[39m
+2026-07-02T20:42:02.5386719Z      [90m 678 |[39m
+2026-07-02T20:42:02.5387242Z      [90m 679 |[39m     scenario([32m'PRD-068'[39m[33m,[39m [36masync[39m () [33m=>[39m {[0m
+2026-07-02T20:42:02.5387588Z 
+2026-07-02T20:42:02.5387844Z       at Object.<anonymous> (test/e2e/scenarios/04-prd.e2e-spec.ts:676:48)
+2026-07-02T20:42:02.5388146Z 
+2026-07-02T20:42:02.5388283Z   console.log
+2026-07-02T20:42:02.5388765Z     ◇ injected env (41) from .env.test // tip: ⌁ auth for agents [www.vestauth.com]
+2026-07-02T20:42:02.5389107Z 
+2026-07-02T20:42:02.5389280Z       at _log (node_modules/dotenv/lib/main.js:131:11)
+2026-07-02T20:42:02.5389697Z 
+2026-07-02T20:42:03.7121411Z   console.log
+2026-07-02T20:42:03.7122104Z     prisma:info Starting a postgresql pool with 5 connections.
+2026-07-02T20:42:03.7122404Z 
+2026-07-02T20:42:03.7122672Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:42:03.7122984Z 
+2026-07-02T20:42:08.5520528Z   console.log
+2026-07-02T20:42:08.5521281Z     prisma:error 
+2026-07-02T20:42:08.5521728Z     Invalid `this.prisma.collection.create()` invocation in
+2026-07-02T20:42:08.5522566Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/src/modules/collection/collection.service.ts:114:53
+2026-07-02T20:42:08.5523181Z     
+2026-07-02T20:42:08.5523642Z       111   throw new BadRequestException('Bu isimde bir koleksiyonunuz zaten var');
+2026-07-02T20:42:08.5524139Z       112 }
+2026-07-02T20:42:08.5524372Z       113 
+2026-07-02T20:42:08.5525380Z     → 114 const collection = await this.prisma.collection.create(
+2026-07-02T20:42:08.5526066Z     Foreign key constraint violated: `collections_category_id_fkey (index)`
+2026-07-02T20:42:08.5526454Z 
+2026-07-02T20:42:08.5526767Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:42:08.5527135Z 
+2026-07-02T20:42:22.8925669Z   console.log
+2026-07-02T20:42:22.8926171Z     prisma:error 
+2026-07-02T20:42:22.8926813Z     Invalid `this.prisma.collectionItem.create()` invocation in
+2026-07-02T20:42:22.8928016Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/src/modules/collection/collection.service.ts:1019:49
+2026-07-02T20:42:22.8928909Z     
+2026-07-02T20:42:22.8929110Z       1016 
+2026-07-02T20:42:22.8929328Z       1017 let item;
+2026-07-02T20:42:22.8929591Z       1018 try {
+2026-07-02T20:42:22.8930331Z     → 1019   item = await this.prisma.collectionItem.create(
+2026-07-02T20:42:22.8931205Z     Unique constraint failed on the fields: (`collection_id`,`product_id`)
+2026-07-02T20:42:22.8931580Z 
+2026-07-02T20:42:22.8931882Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:42:22.8932210Z 
+2026-07-02T20:42:44.5351773Z   console.log
+2026-07-02T20:42:44.5352537Z     prisma:error 
+2026-07-02T20:42:44.5353367Z     Invalid `this.prisma.wishlistItem.create()` invocation in
+2026-07-02T20:42:44.5354766Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/src/modules/wishlist/wishlist.service.ts:146:32
+2026-07-02T20:42:44.5355833Z     
+2026-07-02T20:42:44.5356282Z       143 
+2026-07-02T20:42:44.5357081Z       144 // Use transaction to create wishlist item and increment like count
+2026-07-02T20:42:44.5358118Z       145 const [item] = await this.prisma.$transaction([
+2026-07-02T20:42:44.5359252Z     → 146   this.prisma.wishlistItem.create(
+2026-07-02T20:42:44.5360251Z     Unique constraint failed on the fields: (`wishlist_id`,`product_id`)
+2026-07-02T20:42:44.5361226Z 
+2026-07-02T20:42:44.5361846Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:42:44.5362589Z 
+2026-07-02T20:42:44.5362934Z   console.log
+2026-07-02T20:42:44.5363886Z     prisma:error Unique constraint failed on the fields: (`wishlist_id`,`product_id`)
+2026-07-02T20:42:44.5364642Z 
+2026-07-02T20:42:44.5365203Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:42:44.5365875Z 
+2026-07-02T20:42:48.4662840Z FAIL test/e2e/scenarios/05-col.e2e-spec.ts (45.932 s)
+2026-07-02T20:42:48.4663875Z   05 — Koleksiyon & Favori (Wishlist) (COL)
+2026-07-02T20:42:48.4665300Z     ○ skipped COL-094 [P1] Web /wishlist rotası /favorites'e yönlenir — SKIP(Web /wishlist → /favorites yönlendirmesi: Next.js rota davranışı (apps/web), API kapsamı dışı.)
+2026-07-02T20:42:48.4667119Z     ○ skipped COL-095 [P2] Koleksiyon i18n anahtar paritesi (TR vs EN) — SKIP(Koleksiyon/favori i18n anahtar paritesi (tr.json vs en.json): statik dosya karşılaştırması, e2e API testi değil.)
+2026-07-02T20:42:48.4669089Z     ○ skipped COL-096 [P2] Web vs Mobile koleksiyon oluşturma parite — SKIP(Web vs Mobile koleksiyon oluşturma parite (premium modal vs snackbar): istemci-UI davranışı; backend 403 COL-002/COL-081/COL-084 ile kapsanır.)
+2026-07-02T20:42:48.4671906Z     ○ skipped COL-097 [P2] Web vs Mobile favori statü badge parite — SKIP(Web vs Mobile favori statü badge paritesi: istemci-UI render karşılaştırması; backend statüsü COL-079 ile kapsanır.)
+2026-07-02T20:42:48.4673585Z     ○ skipped COL-102 [P2] Koleksiyon listesi boş durumu — SKIP(Koleksiyon listesi boş durumu: UI empty-state + CTA görünümü, API kapsamı dışı.)
+2026-07-02T20:42:48.4674935Z     ○ skipped COL-103 [P2] Favori listesi boş durumu — SKIP(Favori listesi boş durumu: UI empty-state metni, API kapsamı dışı.)
+2026-07-02T20:42:48.4679064Z     ○ skipped COL-104 [P2] Favori/Koleksiyon yüklenirken ve hata durumu — SKIP(Favori/Koleksiyon yükleniyor & hata UI: istemci loading/retry davranışı; GET /wishlist hata-tolerans dalı backend tarafında yapay hata enjeksiyonu gerektirir, saf-API e2e değil.)
+2026-07-02T20:42:48.4681760Z     ○ skipped COL-105 [P2] Giriş yapmamış kullanıcıya favori/beğeni CTA'sı — SKIP(Misafire favori/beğeni CTA & login yönlendirme: UI akışı; API 401 davranışı COL-077/COL-083/COL-049 ile kapsanır.)
+2026-07-02T20:42:48.4682921Z     POST /api/collections
+2026-07-02T20:42:48.4684003Z       ✓ COL-001 [P0] Premium satıcı koleksiyon oluşturur (mutlu yol) (574 ms)
+2026-07-02T20:42:48.4685199Z       ✓ COL-002 [P0] FREE kullanıcı koleksiyon oluşturamaz (gating) (468 ms)
+2026-07-02T20:42:48.4686366Z       ✓ COL-003 [P1] Basic tier koleksiyon oluşturabilir (sınır gating) (435 ms)
+2026-07-02T20:42:48.4687472Z       ✓ COL-004 [P2] Business tier koleksiyon oluşturabilir (439 ms)
+2026-07-02T20:42:48.4688569Z       ✓ COL-005 [P0] Aynı isimle ikinci koleksiyon reddedilir (slug çakışması) (490 ms)
+2026-07-02T20:42:48.4689737Z       ✓ COL-006 [P1] Farklı kullanıcılar aynı isimde koleksiyon oluşturabilir (453 ms)
+2026-07-02T20:42:48.4691167Z       ✓ COL-007 [P1] Name minimum/maksimum uzunluk doğrulaması (472 ms)
+2026-07-02T20:42:48.4692234Z       ✓ COL-008 [P2] Description maksimum uzunluk + boş açıklama (444 ms)
+2026-07-02T20:42:48.4693255Z       ✓ COL-009 [P2] İsimde yasaklı içerik moderasyonla reddedilir (429 ms)
+2026-07-02T20:42:48.4694170Z       ✓ COL-010 [P2] Geçersiz categoryId ile oluşturma (439 ms)
+2026-07-02T20:42:48.4694936Z       ✓ COL-088 [P1] TR karakterli koleksiyon adından slug üretimi (433 ms)
+2026-07-02T20:42:48.4695539Z       ✓ COL-089 [P2] Yalnızca özel karakter/emoji içeren ad → boş slug riski (448 ms)
+2026-07-02T20:42:48.4696153Z       ✓ COL-101 [P2] XSS/enjeksiyon: koleksiyon adı/açıklamada script (422 ms)
+2026-07-02T20:42:48.4696595Z     PATCH/DELETE /api/collections/:id
+2026-07-02T20:42:48.4697097Z       ✓ COL-011 [P0] Sahip koleksiyon adını günceller (slug yenilenir) (427 ms)
+2026-07-02T20:42:48.4697663Z       ✓ COL-012 [P1] Güncellemede ad çakışması reddedilir (422 ms)
+2026-07-02T20:42:48.4698194Z       ✓ COL-013 [P0] Sahip olmayan kullanıcı güncelleyemez (436 ms)
+2026-07-02T20:42:48.4698794Z       ✓ COL-014 [P1] `isPublic` ve `categoryId` güncelleme (disconnect dahil) (458 ms)
+2026-07-02T20:42:48.4699375Z       ✓ COL-015 [P2] Açıklamayı boş string'e güncelleme (437 ms)
+2026-07-02T20:42:48.4699851Z       ✓ COL-016 [P0] Sahip koleksiyonu siler (cascade) (463 ms)
+2026-07-02T20:42:48.4700289Z       ✓ COL-017 [P0] Sahip olmayan silemez (432 ms)
+2026-07-02T20:42:48.4700995Z       ✓ COL-018 [P1] Var olmayan koleksiyon güncelle/sil (433 ms)
+2026-07-02T20:42:48.4701535Z       ✓ COL-019 [P2] Kapak resmi yükleme (cover) (430 ms)
+2026-07-02T20:42:48.4701887Z     Collection items & reorder
+2026-07-02T20:42:48.4702317Z       ✓ COL-020 [P0] Sahip gerçek ürünü koleksiyona ekler (463 ms)
+2026-07-02T20:42:48.4702831Z       ✓ COL-021 [P0] Aynı ürünü iki kez eklemek reddedilir (450 ms)
+2026-07-02T20:42:48.4703320Z       ✓ COL-022 [P1] Var olmayan ürün eklenemez (484 ms)
+2026-07-02T20:42:48.4703817Z       ✓ COL-023 [P1] productId VE customTitle yoksa reddedilir (422 ms)
+2026-07-02T20:42:48.4704319Z       ✓ COL-024 [P0] Sahip olmayan item ekleyemez (427 ms)
+2026-07-02T20:42:48.4704981Z       ✓ COL-025 [P0] Item çıkarma (mutlu yol) (421 ms)
+2026-07-02T20:42:48.4705556Z       ✓ COL-026 [P1] Başka koleksiyonun item'ı bu koleksiyondan silinemez (415 ms)
+2026-07-02T20:42:48.4706132Z       ✓ COL-027 [P2] Geçersiz itemId formatı (ParseUUIDPipe) (426 ms)
+2026-07-02T20:42:48.4706626Z       ✓ COL-028 [P1] Item yeniden sıralama (reorder) (439 ms)
+2026-07-02T20:42:48.4707106Z       ✓ COL-029 [P2] Reorder'da yabancı itemId davranışı (432 ms)
+2026-07-02T20:42:48.4707568Z       ✓ COL-030 [P1] Sahip olmayan reorder yapamaz (420 ms)
+2026-07-02T20:42:48.4708014Z       ✓ COL-031 [P1] Custom item ekleme (resimsiz) (425 ms)
+2026-07-02T20:42:48.4708543Z       ✕ COL-032 [P2] Custom item resimle ekleme (multipart + moderasyon) (434 ms)
+2026-07-02T20:42:48.4709055Z       ✓ COL-033 [P1] Boş customTitle reddedilir (404 ms)
+2026-07-02T20:42:48.4709540Z       ✓ COL-034 [P2] customYear sınır doğrulaması (1900–2100) (443 ms)
+2026-07-02T20:42:48.4710491Z       ✓ COL-035 [P2] customTitle maksimum 200 / customDescription 1000 / brand,model,manufacturer 100 / scale,material 50 (448 ms)
+2026-07-02T20:42:48.4711639Z       ✓ COL-036 [P2] Aynı custom başlık tekrar eklenebilir (benzersizlik yok) (432 ms)
+2026-07-02T20:42:48.4712233Z       ✓ COL-090 [P2] sortOrder negatif/sınır doğrulaması (418 ms)
+2026-07-02T20:42:48.4712732Z       ✓ COL-091 [P2] Reorder body'de boş items dizisi (417 ms)
+2026-07-02T20:42:48.4713194Z       ✓ COL-092 [P2] Body'de items olmadan reorder (430 ms)
+2026-07-02T20:42:48.4713707Z       ✓ COL-085 [P1] Aynı ürünü koleksiyona eşzamanlı çift ekleme (442 ms)
+2026-07-02T20:42:48.4714273Z       ✓ COL-098 [P0] IDOR: başka kullanıcının item'ını silme/sıralama (440 ms)
+2026-07-02T20:42:48.4714688Z     Collection viewing & privacy
+2026-07-02T20:42:48.4715202Z       ✓ COL-037 [P0] Anonim kullanıcı herkese açık koleksiyonu slug ile görür (420 ms)
+2026-07-02T20:42:48.4715821Z       ✓ COL-038 [P0] Anonim/yabancı kullanıcı özel koleksiyonu göremez (451 ms)
+2026-07-02T20:42:48.4716407Z       ✓ COL-039 [P0] Sahip kendi özel koleksiyonunu görebilir (426 ms)
+2026-07-02T20:42:48.4717094Z       ✓ COL-040 [P0] Başka kullanıcının koleksiyon listesinde yalnızca herkese açıklar görünür (443 ms)
+2026-07-02T20:42:48.4717895Z       ✓ COL-041 [P1] `GET /collections/me` yalnızca kendi koleksiyonlarını döner ve hepsini gösterir (438 ms)
+2026-07-02T20:42:48.4718496Z       ✓ COL-042 [P0] `me` anonim çağrıda 401 (409 ms)
+2026-07-02T20:42:48.4718959Z       ✓ COL-051 [P2] `isLiked` bayrağı detayda doğru döner (488 ms)
+2026-07-02T20:42:48.4719534Z       ✓ COL-100 [P0] Cross-tenant koleksiyon erişimi (özel bilgi sızıntısı) (437 ms)
+2026-07-02T20:42:48.4719946Z     Collection likes
+2026-07-02T20:42:48.4720358Z       ✓ COL-043 [P0] Üye başka kullanıcının koleksiyonunu beğenir (488 ms)
+2026-07-02T20:42:48.4721110Z       ✓ COL-044 [P1] Aynı beğeni POST'u toggle ile kaldırır (480 ms)
+2026-07-02T20:42:48.4721611Z       ✓ COL-045 [P1] DELETE /like ile beğeni kaldırma (472 ms)
+2026-07-02T20:42:48.4722134Z       ✓ COL-046 [P1] Beğeni yokken DELETE /like hata vermez (445 ms)
+2026-07-02T20:42:48.4722792Z       ✓ COL-047 [P0] Kendi koleksiyonunu beğenemez (443 ms)
+2026-07-02T20:42:48.4723304Z       ✓ COL-048 [P1] Özel koleksiyonu yabancı slug ile beğenemez (430 ms)
+2026-07-02T20:42:48.4723774Z       ✓ COL-049 [P0] Anonim beğeni 401 (411 ms)
+2026-07-02T20:42:48.4724465Z       ✓ COL-050 [P2] Var olmayan koleksiyonu beğenme (423 ms)
+2026-07-02T20:42:48.4725211Z       ✓ COL-056 [P1] Beğenilen koleksiyonlar listesi (480 ms)
+2026-07-02T20:42:48.4726197Z       ✓ COL-057 [P2] Beğenilen listede artık görünmeyen private koleksiyon filtrelenir (484 ms)
+2026-07-02T20:42:48.4727146Z       ✓ COL-058 [P2] liked anonim çağrıda boş döner (406 ms)
+2026-07-02T20:42:48.4727998Z       ✓ COL-087 [P2] Eşzamanlı like/like (toggle) tutarlılığı (457 ms)
+2026-07-02T20:42:48.4728622Z     Browse public collections
+2026-07-02T20:42:48.4729315Z       ✓ COL-052 [P1] Public browse (anonim, sayfalı) (434 ms)
+2026-07-02T20:42:48.4730350Z       ✓ COL-053 [P2] Browse sıralama seçenekleri (528 ms)
+2026-07-02T20:42:48.4735212Z       ✓ COL-054 [P2] Browse arama (koleksiyon adı + kullanıcı adı) (460 ms)
+2026-07-02T20:42:48.4735867Z       ✓ COL-055 [P2] Browse kategori filtresi (id veya slug) (451 ms)
+2026-07-02T20:42:48.4736791Z       ✓ COL-060 [P2] Sayfalama sınırları (pageSize max 100, geçersiz değerler) (463 ms)
+2026-07-02T20:42:48.4737310Z     Item visibility by product status
+2026-07-02T20:42:48.4737849Z       ✓ COL-059 [P1] itemCount liste ile detay arasında tutarlı (görünür item) (460 ms)
+2026-07-02T20:42:48.4738474Z       ✓ COL-061 [P1] Satılmış (sold) ürün koleksiyonda görünür kalır (425 ms)
+2026-07-02T20:42:48.4739058Z       ✓ COL-062 [P1] Draft/pending/removed ürün koleksiyonda gizlenir (455 ms)
+2026-07-02T20:42:48.4739633Z       ✓ COL-063 [P1] Ürün tamamen silinince item cascade silinir (436 ms)
+2026-07-02T20:42:48.4740234Z       ✓ COL-064 [P2] Status değişen ürün tekrar active olunca yeniden görünür (439 ms)
+2026-07-02T20:42:48.4740653Z     Wishlist
+2026-07-02T20:42:48.4741368Z       ✓ COL-065 [P0] Ürünü favoriye ekleme (mutlu yol) (494 ms)
+2026-07-02T20:42:48.4741917Z       ✓ COL-066 [P0] Aynı ürünü ikinci kez ekleme idempotent (472 ms)
+2026-07-02T20:42:48.4742430Z       ✓ COL-067 [P0] Kendi ürününü favoriye ekleyemez (436 ms)
+2026-07-02T20:42:48.4742902Z       ✓ COL-068 [P1] Var olmayan ürünü favoriye ekleme (414 ms)
+2026-07-02T20:42:48.4743368Z       ✓ COL-069 [P1] Geçersiz UUID formatlı productId (445 ms)
+2026-07-02T20:42:48.4743824Z       ✓ COL-070 [P0] Favoriden çıkarma (mutlu yol) (486 ms)
+2026-07-02T20:42:48.4744291Z       ✓ COL-071 [P1] Listede olmayan ürünü çıkarma 404 (456 ms)
+2026-07-02T20:42:48.4744826Z       ✓ COL-072 [P2] Hiç favorisi olmayan kullanıcının çıkarma denemesi (425 ms)
+2026-07-02T20:42:48.4745329Z       ✓ COL-073 [P1] Favori kontrolü (check) (465 ms)
+2026-07-02T20:42:48.4745791Z       ✓ COL-074 [P0] Favori listesini görme (boş + dolu) (500 ms)
+2026-07-02T20:42:48.4746329Z       ✓ COL-075 [P1] Favori listesini tamamen temizle (clear) (464 ms)
+2026-07-02T20:42:48.4746870Z       ✓ COL-076 [P2] Wishlist yokken clear sessizce başarılı (417 ms)
+2026-07-02T20:42:48.4747347Z       ✓ COL-077 [P0] Tüm favori uçları anonim 401 (399 ms)
+2026-07-02T20:42:48.4747877Z       ✓ COL-078 [P1] Favori listede kampanya indirimli fiyat gösterilir (468 ms)
+2026-07-02T20:42:48.4748498Z       ✓ COL-079 [P1] Favorideki satılan/pasif ürün listede statüsüyle kalır (462 ms)
+2026-07-02T20:42:48.4749075Z       ✓ COL-080 [P2] Favorideki silinen ürün listeden atlanır (490 ms)
+2026-07-02T20:42:48.4749590Z       ✓ COL-086 [P2] Eşzamanlı favoriye ekleme idempotency (434 ms)
+2026-07-02T20:42:48.4750162Z       ✓ COL-099 [P1] Favori sayımı manipülasyonu (likeCount tutarlılığı) (505 ms)
+2026-07-02T20:42:48.4750590Z     Authorization matrix & i18n
+2026-07-02T20:42:48.4751355Z       ✓ COL-081 [P0] Koleksiyon yetki matrisi (oluştur) (500 ms)
+2026-07-02T20:42:48.4752020Z       ✓ COL-082 [P2] platform@tarodan.com (üyeliksiz platform satıcı) koleksiyon davranışı (448 ms)
+2026-07-02T20:42:48.4752915Z       ✓ COL-083 [P1] Misafir vs üye: public koleksiyon görüntüleme (487 ms)
+2026-07-02T20:42:48.4753587Z       ✓ COL-084 [P1] Alıcı rolü (deniz) favori kullanabilir ama koleksiyon oluşturamaz (457 ms)
+2026-07-02T20:42:48.4754164Z       ✓ COL-093 [P2] Hata mesajları TR sabit (i18n) (434 ms)
+2026-07-02T20:42:48.4754409Z 
+2026-07-02T20:42:48.4755001Z   ● 05 — Koleksiyon & Favori (Wishlist) (COL) › Collection items & reorder › COL-032 [P2] Custom item resimle ekleme (multipart + moderasyon)
+2026-07-02T20:42:48.4755510Z 
+2026-07-02T20:42:48.4755664Z     expected 201 "Created", got 400 "Bad Request"
+2026-07-02T20:42:48.4755884Z 
+2026-07-02T20:42:48.4756301Z     [0m [90m 703 |[39m         [33m.[39mfield([32m'customTitle'[39m[33m,[39m [32m'Nadir Görselli'[39m)
+2026-07-02T20:42:48.4758314Z      [90m 704 |[39m         [33m.[39mattach([32m'image'[39m[33m,[39m jpegBuffer()[33m,[39m { filename[33m:[39m [32m'x.jpg'[39m[33m,[39m contentType[33m:[39m [32m'image/jpeg'[39m })
+2026-07-02T20:42:48.4760196Z     [31m[1m>[22m[39m[90m 705 |[39m         [33m.[39mexpect([35m201[39m)[33m;[39m
+2026-07-02T20:42:48.4761277Z      [90m     |[39m          [31m[1m^[22m[39m
+2026-07-02T20:42:48.4762395Z      [90m 706 |[39m       expect(res[33m.[39mbody[33m.[39misCustom)[33m.[39mtoBe([36mtrue[39m)[33m;[39m
+2026-07-02T20:42:48.4763375Z      [90m 707 |[39m       expect(res[33m.[39mbody[33m.[39mproductId)[33m.[39mtoBeUndefined()[33m;[39m
+2026-07-02T20:42:48.4764259Z      [90m 708 |[39m       expect(res[33m.[39mbody[33m.[39mproductTitle)[33m.[39mtoBe([32m'Nadir Görselli'[39m)[33m;[39m[0m
+2026-07-02T20:42:48.4764702Z 
+2026-07-02T20:42:48.4764948Z       at Object.<anonymous> (test/e2e/scenarios/05-col.e2e-spec.ts:705:10)
+2026-07-02T20:42:48.4765325Z       ----
+2026-07-02T20:42:48.4765685Z       at Test._assertStatus (../../node_modules/supertest/lib/test.js:309:14)
+2026-07-02T20:42:48.4766157Z       at ../../node_modules/supertest/lib/test.js:365:13
+2026-07-02T20:42:48.4766632Z       at Test._assertFunction (../../node_modules/supertest/lib/test.js:342:13)
+2026-07-02T20:42:48.4767160Z       at Test.assert (../../node_modules/supertest/lib/test.js:195:23)
+2026-07-02T20:42:48.4767644Z       at localAssert (../../node_modules/supertest/lib/test.js:138:14)
+2026-07-02T20:42:48.4768146Z       at Server.<anonymous> (../../node_modules/supertest/lib/test.js:152:11)
+2026-07-02T20:42:48.4768437Z 
+2026-07-02T20:42:48.4768565Z   console.log
+2026-07-02T20:42:48.4769018Z     ◇ injected env (41) from .env.test // tip: ◈ encrypted .env [www.dotenvx.com]
+2026-07-02T20:42:48.4769336Z 
+2026-07-02T20:42:48.4769496Z       at _log (node_modules/dotenv/lib/main.js:131:11)
+2026-07-02T20:42:48.4769720Z 
+2026-07-02T20:42:49.6781708Z   console.log
+2026-07-02T20:42:49.6785571Z     prisma:info Starting a postgresql pool with 5 connections.
+2026-07-02T20:42:49.6789271Z 
+2026-07-02T20:42:49.6792945Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:42:49.6793723Z 
+2026-07-02T20:42:57.9814110Z   console.log
+2026-07-02T20:42:57.9814624Z     prisma:error 
+2026-07-02T20:42:57.9814985Z     Invalid `getPrisma().user.update()` invocation in
+2026-07-02T20:42:57.9815620Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/test/e2e/scenarios/16-tax.e2e-spec.ts:119:28
+2026-07-02T20:42:57.9816108Z     
+2026-07-02T20:42:57.9816302Z       116 
+2026-07-02T20:42:57.9817047Z       117 /** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */
+2026-07-02T20:42:57.9817765Z       118 async function makeCorporate(sellerId: string, taxId = '1234567890'): Promise<void> {
+2026-07-02T20:42:57.9818321Z     → 119   await getPrisma().user.update({
+2026-07-02T20:42:57.9818615Z               where: {
+2026-07-02T20:42:57.9818926Z                 id: "7eb1571a-57a2-4fd4-ab89-9faedd7a5fda"
+2026-07-02T20:42:57.9819236Z               },
+2026-07-02T20:42:57.9819450Z               data: {
+2026-07-02T20:42:57.9819747Z                 businessStatus: "approved",
+2026-07-02T20:42:57.9820571Z                 taxId: "1234567890",
+2026-07-02T20:42:57.9821340Z                 sellerType: "business"
+2026-07-02T20:42:57.9821663Z                             ~~~~~~~~~~
+2026-07-02T20:42:57.9821922Z               }
+2026-07-02T20:42:57.9822122Z             })
+2026-07-02T20:42:57.9822316Z     
+2026-07-02T20:42:57.9822636Z     Invalid value for argument `sellerType`. Expected SellerType.
+2026-07-02T20:42:57.9823055Z 
+2026-07-02T20:42:57.9823476Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:42:57.9823964Z 
+2026-07-02T20:42:59.0477220Z   console.log
+2026-07-02T20:42:59.0477559Z     prisma:error 
+2026-07-02T20:42:59.0477919Z     Invalid `getPrisma().user.update()` invocation in
+2026-07-02T20:42:59.0478574Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/test/e2e/scenarios/16-tax.e2e-spec.ts:454:30
+2026-07-02T20:42:59.0479069Z     
+2026-07-02T20:42:59.0479626Z       451 scenario('TAX-014', async () => {
+2026-07-02T20:42:59.0480405Z       452   // businessStatus=approved AMA taxId boş → resolveSellerTax early return 0.
+2026-07-02T20:42:59.0481666Z       453   const { buyer, seller, product, addr } = await makeBuyerSellerProduct({ price: 1000 });
+2026-07-02T20:42:59.0482280Z     → 454   await getPrisma().user.update({
+2026-07-02T20:42:59.0482591Z               where: {
+2026-07-02T20:42:59.0482962Z                 id: "db635466-f338-4f63-a741-be7945af4479"
+2026-07-02T20:42:59.0483423Z               },
+2026-07-02T20:42:59.0483642Z               data: {
+2026-07-02T20:42:59.0483927Z                 businessStatus: "approved",
+2026-07-02T20:42:59.0484230Z                 taxId: null,
+2026-07-02T20:42:59.0484722Z                 sellerType: "business"
+2026-07-02T20:42:59.0485327Z                             ~~~~~~~~~~
+2026-07-02T20:42:59.0485861Z               }
+2026-07-02T20:42:59.0486261Z             })
+2026-07-02T20:42:59.0486648Z     
+2026-07-02T20:42:59.0487339Z     Invalid value for argument `sellerType`. Expected SellerType.
+2026-07-02T20:42:59.0487923Z 
+2026-07-02T20:42:59.0488428Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:42:59.0489044Z 
+2026-07-02T20:43:00.0919502Z   console.log
+2026-07-02T20:43:00.0920543Z     prisma:error 
+2026-07-02T20:43:00.0921904Z     Invalid `getPrisma().user.update()` invocation in
+2026-07-02T20:43:00.0923058Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/test/e2e/scenarios/16-tax.e2e-spec.ts:119:28
+2026-07-02T20:43:00.0923978Z     
+2026-07-02T20:43:00.0924325Z       116 
+2026-07-02T20:43:00.0925573Z       117 /** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */
+2026-07-02T20:43:00.0926942Z       118 async function makeCorporate(sellerId: string, taxId = '1234567890'): Promise<void> {
+2026-07-02T20:43:00.0927948Z     → 119   await getPrisma().user.update({
+2026-07-02T20:43:00.0928442Z               where: {
+2026-07-02T20:43:00.0929007Z                 id: "cf950610-79a2-4298-a149-613fcbc85a97"
+2026-07-02T20:43:00.0929544Z               },
+2026-07-02T20:43:00.0929889Z               data: {
+2026-07-02T20:43:00.0930356Z                 businessStatus: "approved",
+2026-07-02T20:43:00.0931271Z                 taxId: "1234567890",
+2026-07-02T20:43:00.0934687Z                 sellerType: "business"
+2026-07-02T20:43:00.0938244Z                             ~~~~~~~~~~
+2026-07-02T20:43:00.0938763Z               }
+2026-07-02T20:43:00.0951535Z             })
+2026-07-02T20:43:00.0951981Z     
+2026-07-02T20:43:00.0952622Z     Invalid value for argument `sellerType`. Expected SellerType.
+2026-07-02T20:43:00.0953209Z 
+2026-07-02T20:43:00.0953770Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:43:00.0954391Z 
+2026-07-02T20:43:00.5296099Z   console.log
+2026-07-02T20:43:00.5296550Z     prisma:error 
+2026-07-02T20:43:00.5296976Z     Invalid `getPrisma().user.update()` invocation in
+2026-07-02T20:43:00.5297619Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/test/e2e/scenarios/16-tax.e2e-spec.ts:119:28
+2026-07-02T20:43:00.5298398Z     
+2026-07-02T20:43:00.5298586Z       116 
+2026-07-02T20:43:00.5299323Z       117 /** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */
+2026-07-02T20:43:00.5300028Z       118 async function makeCorporate(sellerId: string, taxId = '1234567890'): Promise<void> {
+2026-07-02T20:43:00.5301013Z     → 119   await getPrisma().user.update({
+2026-07-02T20:43:00.5301566Z               where: {
+2026-07-02T20:43:00.5302132Z                 id: "736ee96e-d707-4df1-be38-04ff4b50c766"
+2026-07-02T20:43:00.5302644Z               },
+2026-07-02T20:43:00.5302859Z               data: {
+2026-07-02T20:43:00.5303133Z                 businessStatus: "approved",
+2026-07-02T20:43:00.5303525Z                 taxId: "1234567890",
+2026-07-02T20:43:00.5303990Z                 sellerType: "business"
+2026-07-02T20:43:00.5304311Z                             ~~~~~~~~~~
+2026-07-02T20:43:00.5304856Z               }
+2026-07-02T20:43:00.5305075Z             })
+2026-07-02T20:43:00.5305269Z     
+2026-07-02T20:43:00.5305624Z     Invalid value for argument `sellerType`. Expected SellerType.
+2026-07-02T20:43:00.5305924Z 
+2026-07-02T20:43:00.5306198Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:43:00.5306532Z 
+2026-07-02T20:43:00.9393881Z   console.log
+2026-07-02T20:43:00.9394396Z     prisma:error 
+2026-07-02T20:43:00.9394804Z     Invalid `getPrisma().user.update()` invocation in
+2026-07-02T20:43:00.9395420Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/test/e2e/scenarios/16-tax.e2e-spec.ts:119:28
+2026-07-02T20:43:00.9395920Z     
+2026-07-02T20:43:00.9396112Z       116 
+2026-07-02T20:43:00.9396858Z       117 /** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */
+2026-07-02T20:43:00.9397562Z       118 async function makeCorporate(sellerId: string, taxId = '1234567890'): Promise<void> {
+2026-07-02T20:43:00.9398140Z     → 119   await getPrisma().user.update({
+2026-07-02T20:43:00.9398438Z               where: {
+2026-07-02T20:43:00.9398929Z                 id: "5e4d2af5-392d-4237-ad85-f14b58938d47"
+2026-07-02T20:43:00.9399477Z               },
+2026-07-02T20:43:00.9399851Z               data: {
+2026-07-02T20:43:00.9400292Z                 businessStatus: "approved",
+2026-07-02T20:43:00.9400955Z                 taxId: "1234567890",
+2026-07-02T20:43:00.9401505Z                 sellerType: "business"
+2026-07-02T20:43:00.9402128Z                             ~~~~~~~~~~
+2026-07-02T20:43:00.9402611Z               }
+2026-07-02T20:43:00.9402990Z             })
+2026-07-02T20:43:00.9403359Z     
+2026-07-02T20:43:00.9403989Z     Invalid value for argument `sellerType`. Expected SellerType.
+2026-07-02T20:43:00.9404548Z 
+2026-07-02T20:43:00.9405036Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:43:00.9405629Z 
+2026-07-02T20:43:08.6643811Z   console.log
+2026-07-02T20:43:08.6644657Z     prisma:error 
+2026-07-02T20:43:08.6645818Z     Invalid `this.prisma.invoice.create()` invocation in
+2026-07-02T20:43:08.6647137Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/src/modules/invoice/invoice.service.ts:308:31
+2026-07-02T20:43:08.6648335Z     
+2026-07-02T20:43:08.6648903Z       305 }
+2026-07-02T20:43:08.6649302Z       306 
+2026-07-02T20:43:08.6649755Z       307 // Store invoice record in database
+2026-07-02T20:43:08.6650650Z     → 308 await this.prisma.invoice.create(
+2026-07-02T20:43:08.6651683Z     Unique constraint failed on the fields: (`invoice_number`)
+2026-07-02T20:43:08.6652153Z 
+2026-07-02T20:43:08.6652612Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:43:08.6653138Z 
+2026-07-02T20:43:18.4611980Z   console.log
+2026-07-02T20:43:18.4612329Z     prisma:error 
+2026-07-02T20:43:18.4612689Z     Invalid `getPrisma().user.update()` invocation in
+2026-07-02T20:43:18.4613348Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/test/e2e/scenarios/16-tax.e2e-spec.ts:119:28
+2026-07-02T20:43:18.4613885Z     
+2026-07-02T20:43:18.4614360Z       116 
+2026-07-02T20:43:18.4615134Z       117 /** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */
+2026-07-02T20:43:18.4615874Z       118 async function makeCorporate(sellerId: string, taxId = '1234567890'): Promise<void> {
+2026-07-02T20:43:18.4616437Z     → 119   await getPrisma().user.update({
+2026-07-02T20:43:18.4616739Z               where: {
+2026-07-02T20:43:18.4617066Z                 id: "211692b7-2288-4c8e-96a0-487b4edca5bc"
+2026-07-02T20:43:18.4617558Z               },
+2026-07-02T20:43:18.4617835Z               data: {
+2026-07-02T20:43:18.4618115Z                 businessStatus: "approved",
+2026-07-02T20:43:18.4618555Z                 taxId: "1234567890",
+2026-07-02T20:43:18.4618875Z                 sellerType: "business"
+2026-07-02T20:43:18.4619170Z                             ~~~~~~~~~~
+2026-07-02T20:43:18.4619429Z               }
+2026-07-02T20:43:18.4620121Z             })
+2026-07-02T20:43:18.4620354Z     
+2026-07-02T20:43:18.4621029Z     Invalid value for argument `sellerType`. Expected SellerType.
+2026-07-02T20:43:18.4621391Z 
+2026-07-02T20:43:18.4621694Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:43:18.4622051Z 
+2026-07-02T20:43:18.8815091Z   console.log
+2026-07-02T20:43:18.8815454Z     prisma:error 
+2026-07-02T20:43:18.8815809Z     Invalid `getPrisma().user.update()` invocation in
+2026-07-02T20:43:18.8816460Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/test/e2e/scenarios/16-tax.e2e-spec.ts:119:28
+2026-07-02T20:43:18.8816969Z     
+2026-07-02T20:43:18.8817166Z       116 
+2026-07-02T20:43:18.8817937Z       117 /** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */
+2026-07-02T20:43:18.8818680Z       118 async function makeCorporate(sellerId: string, taxId = '1234567890'): Promise<void> {
+2026-07-02T20:43:18.8819247Z     → 119   await getPrisma().user.update({
+2026-07-02T20:43:18.8819585Z               where: {
+2026-07-02T20:43:18.8819898Z                 id: "46246b7b-be9d-403c-9868-c5260d562f0d"
+2026-07-02T20:43:18.8820481Z               },
+2026-07-02T20:43:18.8821218Z               data: {
+2026-07-02T20:43:18.8821784Z                 businessStatus: "approved",
+2026-07-02T20:43:18.8822390Z                 taxId: "1234567890",
+2026-07-02T20:43:18.8823074Z                 sellerType: "business"
+2026-07-02T20:43:18.8823769Z                             ~~~~~~~~~~
+2026-07-02T20:43:18.8824437Z               }
+2026-07-02T20:43:18.8824990Z             })
+2026-07-02T20:43:18.8825455Z     
+2026-07-02T20:43:18.8826215Z     Invalid value for argument `sellerType`. Expected SellerType.
+2026-07-02T20:43:18.8826914Z 
+2026-07-02T20:43:18.8827776Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:43:18.8829383Z 
+2026-07-02T20:43:19.3082017Z   console.log
+2026-07-02T20:43:19.3082635Z     prisma:error 
+2026-07-02T20:43:19.3083224Z     Invalid `getPrisma().user.update()` invocation in
+2026-07-02T20:43:19.3084417Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/test/e2e/scenarios/16-tax.e2e-spec.ts:119:28
+2026-07-02T20:43:19.3085384Z     
+2026-07-02T20:43:19.3085716Z       116 
+2026-07-02T20:43:19.3086941Z       117 /** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */
+2026-07-02T20:43:19.3088284Z       118 async function makeCorporate(sellerId: string, taxId = '1234567890'): Promise<void> {
+2026-07-02T20:43:19.3101908Z     → 119   await getPrisma().user.update({
+2026-07-02T20:43:19.3108143Z               where: {
+2026-07-02T20:43:19.3108918Z                 id: "d6792437-fd36-4805-b871-726a67927924"
+2026-07-02T20:43:19.3111308Z               },
+2026-07-02T20:43:19.3111787Z               data: {
+2026-07-02T20:43:19.3112338Z                 businessStatus: "approved",
+2026-07-02T20:43:19.3113015Z                 taxId: "1234567890",
+2026-07-02T20:43:19.3113591Z                 sellerType: "business"
+2026-07-02T20:43:19.3114246Z                             ~~~~~~~~~~
+2026-07-02T20:43:19.3115138Z               }
+2026-07-02T20:43:19.3115567Z             })
+2026-07-02T20:43:19.3115916Z     
+2026-07-02T20:43:19.3116514Z     Invalid value for argument `sellerType`. Expected SellerType.
+2026-07-02T20:43:19.3117001Z 
+2026-07-02T20:43:19.3117499Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:43:19.3118059Z 
+2026-07-02T20:43:26.0132559Z   console.log
+2026-07-02T20:43:26.0133062Z     prisma:error 
+2026-07-02T20:43:26.0133703Z     Invalid `this.taxPrisma.taxRegion.create()` invocation in
+2026-07-02T20:43:26.0134809Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/src/modules/admin/admin.service.ts:8304:51
+2026-07-02T20:43:26.0135620Z     
+2026-07-02T20:43:26.0136025Z       8301 if (dto.isDefault) {
+2026-07-02T20:43:26.0136802Z       8302   await this.taxPrisma.taxRegion.updateMany({ data: { isDefault: false } });
+2026-07-02T20:43:26.0137534Z       8303 }
+2026-07-02T20:43:26.0139074Z     → 8304 const region = await this.taxPrisma.taxRegion.create(
+2026-07-02T20:43:26.0140001Z     Unique constraint failed on the fields: (`country_code`,`region_code`)
+2026-07-02T20:43:26.0140525Z 
+2026-07-02T20:43:26.0141354Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:43:26.0141872Z 
+2026-07-02T20:43:31.1636729Z   console.log
+2026-07-02T20:43:31.1637288Z     prisma:error 
+2026-07-02T20:43:31.1637864Z     Invalid `getPrisma().user.update()` invocation in
+2026-07-02T20:43:31.1638895Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/test/e2e/scenarios/16-tax.e2e-spec.ts:119:28
+2026-07-02T20:43:31.1639803Z     
+2026-07-02T20:43:31.1640142Z       116 
+2026-07-02T20:43:31.1641593Z       117 /** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */
+2026-07-02T20:43:31.1642878Z       118 async function makeCorporate(sellerId: string, taxId = '1234567890'): Promise<void> {
+2026-07-02T20:43:31.1643869Z     → 119   await getPrisma().user.update({
+2026-07-02T20:43:31.1644243Z               where: {
+2026-07-02T20:43:31.1644575Z                 id: "69bca589-088e-46cb-a99b-3296046eaf59"
+2026-07-02T20:43:31.1644891Z               },
+2026-07-02T20:43:31.1645109Z               data: {
+2026-07-02T20:43:31.1645375Z                 businessStatus: "approved",
+2026-07-02T20:43:31.1645692Z                 taxId: "1234567890",
+2026-07-02T20:43:31.1645987Z                 sellerType: "business"
+2026-07-02T20:43:31.1646272Z                             ~~~~~~~~~~
+2026-07-02T20:43:31.1646527Z               }
+2026-07-02T20:43:31.1646726Z             })
+2026-07-02T20:43:31.1662167Z     
+2026-07-02T20:43:31.1662890Z     Invalid value for argument `sellerType`. Expected SellerType.
+2026-07-02T20:43:31.1663414Z 
+2026-07-02T20:43:31.1663934Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:43:31.1664575Z 
+2026-07-02T20:43:31.5831912Z   console.log
+2026-07-02T20:43:31.5832408Z     prisma:error 
+2026-07-02T20:43:31.5832990Z     Invalid `getPrisma().user.update()` invocation in
+2026-07-02T20:43:31.5833853Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/test/e2e/scenarios/16-tax.e2e-spec.ts:119:28
+2026-07-02T20:43:31.5834416Z     
+2026-07-02T20:43:31.5834613Z       116 
+2026-07-02T20:43:31.5835357Z       117 /** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */
+2026-07-02T20:43:31.5836127Z       118 async function makeCorporate(sellerId: string, taxId = '1234567890'): Promise<void> {
+2026-07-02T20:43:31.5836792Z     → 119   await getPrisma().user.update({
+2026-07-02T20:43:31.5837343Z               where: {
+2026-07-02T20:43:31.5837776Z                 id: "dda60073-f9d5-4974-8a13-ad6ad8703b77"
+2026-07-02T20:43:31.5838371Z               },
+2026-07-02T20:43:31.5838618Z               data: {
+2026-07-02T20:43:31.5838946Z                 businessStatus: "approved",
+2026-07-02T20:43:31.5839325Z                 taxId: "1234567890",
+2026-07-02T20:43:31.5839706Z                 sellerType: "business"
+2026-07-02T20:43:31.5840072Z                             ~~~~~~~~~~
+2026-07-02T20:43:31.5840694Z               }
+2026-07-02T20:43:31.5841237Z             })
+2026-07-02T20:43:31.5841450Z     
+2026-07-02T20:43:31.5841847Z     Invalid value for argument `sellerType`. Expected SellerType.
+2026-07-02T20:43:31.5842177Z 
+2026-07-02T20:43:31.5842483Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:43:31.5842857Z 
+2026-07-02T20:43:33.2580237Z   console.log
+2026-07-02T20:43:33.2581200Z     prisma:error 
+2026-07-02T20:43:33.2581802Z     Invalid `getPrisma().user.update()` invocation in
+2026-07-02T20:43:33.2582867Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/test/e2e/scenarios/16-tax.e2e-spec.ts:119:28
+2026-07-02T20:43:33.2583752Z     
+2026-07-02T20:43:33.2584070Z       116 
+2026-07-02T20:43:33.2585311Z       117 /** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */
+2026-07-02T20:43:33.2586609Z       118 async function makeCorporate(sellerId: string, taxId = '1234567890'): Promise<void> {
+2026-07-02T20:43:33.2587604Z     → 119   await getPrisma().user.update({
+2026-07-02T20:43:33.2588223Z               where: {
+2026-07-02T20:43:33.2588829Z                 id: "8bb0ccc5-708e-49dd-be6f-156affc35d5b"
+2026-07-02T20:43:33.2589447Z               },
+2026-07-02T20:43:33.2589845Z               data: {
+2026-07-02T20:43:33.2590387Z                 businessStatus: "approved",
+2026-07-02T20:43:33.2591284Z                 taxId: "1234567890",
+2026-07-02T20:43:33.2591860Z                 sellerType: "business"
+2026-07-02T20:43:33.2592454Z                             ~~~~~~~~~~
+2026-07-02T20:43:33.2592939Z               }
+2026-07-02T20:43:33.2593336Z             })
+2026-07-02T20:43:33.2593745Z     
+2026-07-02T20:43:33.2594377Z     Invalid value for argument `sellerType`. Expected SellerType.
+2026-07-02T20:43:33.2594935Z 
+2026-07-02T20:43:33.2595439Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:43:33.2596052Z 
+2026-07-02T20:43:33.6960941Z   console.log
+2026-07-02T20:43:33.6961506Z     prisma:error 
+2026-07-02T20:43:33.6961886Z     Invalid `getPrisma().user.update()` invocation in
+2026-07-02T20:43:33.6962574Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/test/e2e/scenarios/16-tax.e2e-spec.ts:119:28
+2026-07-02T20:43:33.6963124Z     
+2026-07-02T20:43:33.6963336Z       116 
+2026-07-02T20:43:33.6964137Z       117 /** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */
+2026-07-02T20:43:33.6964948Z       118 async function makeCorporate(sellerId: string, taxId = '1234567890'): Promise<void> {
+2026-07-02T20:43:33.6965576Z     → 119   await getPrisma().user.update({
+2026-07-02T20:43:33.6965898Z               where: {
+2026-07-02T20:43:33.6966235Z                 id: "2f08e4ad-b3ec-4086-ae9b-06e19a8dc710"
+2026-07-02T20:43:33.6966586Z               },
+2026-07-02T20:43:33.6966828Z               data: {
+2026-07-02T20:43:33.6967164Z                 businessStatus: "approved",
+2026-07-02T20:43:33.6967693Z                 taxId: "1234567890",
+2026-07-02T20:43:33.6968060Z                 sellerType: "business"
+2026-07-02T20:43:33.6968412Z                             ~~~~~~~~~~
+2026-07-02T20:43:33.6968707Z               }
+2026-07-02T20:43:33.6968940Z             })
+2026-07-02T20:43:33.6969164Z     
+2026-07-02T20:43:33.6969544Z     Invalid value for argument `sellerType`. Expected SellerType.
+2026-07-02T20:43:33.6969874Z 
+2026-07-02T20:43:33.6970182Z       at Object.mc (../../node_modules/@prisma/client/runtime/library.js:21:432)
+2026-07-02T20:43:33.6970546Z 
+2026-07-02T20:43:35.2147543Z FAIL test/e2e/scenarios/16-tax.e2e-spec.ts (46.74 s)
+2026-07-02T20:43:35.2148678Z   16 — Vergi & Fatura (TAX)
+2026-07-02T20:43:35.2150444Z     ○ skipped TAX-080 [P1] Web sipariş detayı KDV satırı yalnız taxAmount>0'da görünür (TR/EN) — SKIP(Saf-UI: web sipariş detayı KDV satırı (TR/EN) — apps/web bileşeni, API e2e kapsamı dışında)
+2026-07-02T20:43:35.2153266Z     ○ skipped TAX-081 [P1] Mobil sipariş detayı KDV satırı (parite) — ama PDF indirme YOK — SKIP(Saf-UI parite: mobil sipariş detayı KDV satırı + PDF indirme yok — apps/mobile bileşeni)
+2026-07-02T20:43:35.2156285Z     ○ skipped TAX-082 [P1] Web fatura indir butonu yalnız alıcıda görünür (satıcıda yok) — SKIP(Saf-UI parite: web fatura indir butonu yalnız alıcıda — apps/web bileşeni)
+2026-07-02T20:43:35.2158748Z     ○ skipped TAX-083 [P1] Misafir payment/success ekranı public endpoint ile fatura indirir — SKIP(Saf-UI parite: misafir payment/success public fatura indirme — apps/web sayfası (API yolları TAX-047/050/051 ile kapsanır))
+2026-07-02T20:43:35.2160380Z     ○ skipped TAX-084 [P2] Fatura üretilemezse success sayfası hata durumu (loading→error) — SKIP(Saf-UI: success sayfası loading→error durumu — apps/web sayfa state)
+2026-07-02T20:43:35.2162148Z     ○ skipped TAX-085 [P2] Admin tax sayfası 4 sekme (Bölgeler/Oranlar/Kurallar/Rapor) — SKIP(Saf-UI parite: admin tax sayfası 4 sekme — apps/admin bileşeni)
+2026-07-02T20:43:35.2163248Z     GET /api/tax/calculate (public)
+2026-07-02T20:43:35.2164387Z       ✓ TAX-001 [P0] Public /tax/calculate default ülke (TR) + default_rate ile oran döner (545 ms)
+2026-07-02T20:43:35.2165696Z       ✓ TAX-002 [P1] /tax/calculate subtotal verilmezse taxAmount alanı dönmez (405 ms)
+2026-07-02T20:43:35.2166911Z       ✓ TAX-003 [P2] /tax/calculate geçersiz subtotal (NaN) → taxAmount dönmez (416 ms)
+2026-07-02T20:43:35.2167887Z       ✓ TAX-004 [P0] Hiç vergi bölgesi/kuralı tanımlı değilken oran null (419 ms)
+2026-07-02T20:43:35.2168593Z       ✓ TAX-005 [P1] Bölge eşleşme önceliği: regionCode tam eşleşme default'a tercih edilir (423 ms)
+2026-07-02T20:43:35.2169296Z       ✓ TAX-006 [P1] Bilinmeyen regionCode → aynı ülkenin genel bölgesine düşer (421 ms)
+2026-07-02T20:43:35.2169946Z       ✓ TAX-007 [P1] Bilinmeyen ülke → isDefault bölgeye fallback (413 ms)
+2026-07-02T20:43:35.2170504Z       ✓ TAX-008 [P0] Kategori kuralı default_rate'e tercih edilir (427 ms)
+2026-07-02T20:43:35.2171344Z       ✓ TAX-009 [P1] Eşleşmeyen kategori → default_rate'e döner (415 ms)
+2026-07-02T20:43:35.2171931Z       ✓ TAX-010 [P1] Pasif taxRate'e bağlı kural → oran null (415 ms)
+2026-07-02T20:43:35.2172497Z       ✓ TAX-011 [P2] Kural priority kırılması: yüksek priority kazanır (414 ms)
+2026-07-02T20:43:35.2173061Z       ✓ TAX-019 [P1] KDV yuvarlama: 333.33 KDV → 2 ondalık (414 ms)
+2026-07-02T20:43:35.2173541Z       ✓ TAX-020 [P2] KDV yuvarlama yukarı: .005 sınırı (416 ms)
+2026-07-02T20:43:35.2173981Z       ✓ TAX-021 [P2] KDV oranı %0 → tutar 0 (413 ms)
+2026-07-02T20:43:35.2174538Z       ✓ TAX-086 [P2] Tax modelleri yoksa hesap güvenli null (hasTaxModels false) (418 ms)
+2026-07-02T20:43:35.2175217Z       ✓ TAX-087 [P1] effectiveFrom/effectiveTo çözümlemede kullanılmıyor (risk) (404 ms)
+2026-07-02T20:43:35.2175867Z       ✓ TAX-088 [P2] scope='product' kuralı çözümlemede uygulanmaz (risk) (430 ms)
+2026-07-02T20:43:35.2176437Z       ✓ TAX-089 [P2] Çok büyük subtotal yuvarlama (overflow yok) (415 ms)
+2026-07-02T20:43:35.2176854Z     Sipariş bazlı KDV
+2026-07-02T20:43:35.2177392Z       ✕ TAX-012 [P0] Kurumsal satıcı (Business+Verified+taxId) siparişinde KDV uygulanır (446 ms)
+2026-07-02T20:43:35.2178081Z       ✕ TAX-013 [P0] Bireysel satıcı (Basic, taxId yok) siparişinde KDV = 0 (650 ms)
+2026-07-02T20:43:35.2178659Z       ✕ TAX-014 [P1] Business onaylı ama taxId boş satıcı → KDV = 0 (416 ms)
+2026-07-02T20:43:35.2179246Z       ✕ TAX-015 [P1] Platform satıcı (platform@tarodan.com) KDV davranışı (620 ms)
+2026-07-02T20:43:35.2179878Z       ✕ TAX-016 [P1] Teklif (offer) kabulüyle oluşan siparişte KDV satıcı bazlı (424 ms)
+2026-07-02T20:43:35.2180461Z       ✕ TAX-017 [P1] Misafir siparişte KDV satıcı bazlı çözülür (437 ms)
+2026-07-02T20:43:35.2181574Z       ✕ TAX-018 [P0] KDV fiyatın ÜSTÜNE eklenir (hariç), total = subtotal + shipping + buyerFee + tax (410 ms)
+2026-07-02T20:43:35.2182615Z     Otomatik fatura üretimi (ödeme başarısı)
+2026-07-02T20:43:35.2183643Z       ✕ TAX-024 [P0] Ödeme başarısında fatura otomatik oluşur ve iki tarafa e-posta gider (540 ms)
+2026-07-02T20:43:35.2184975Z       ✓ TAX-095 [P1] Misafir siparişte fatura e-postası gerçek misafir adresine gider (666 ms)
+2026-07-02T20:43:35.2186067Z     Fatura üretim uçları
+2026-07-02T20:43:35.2186968Z       ✓ TAX-025 [P0] Tembel (lazy) üretim: fatura yoksa GET ile anında üretilir (alıcı) (642 ms)
+2026-07-02T20:43:35.2188164Z       ✓ TAX-026 [P0] Tembel üretim: ödenmemiş/iptal siparişte fatura reddedilir (510 ms)
+2026-07-02T20:43:35.2189009Z       ✓ TAX-027 [P1] POST /api/invoices/generate/:orderId ile manuel üretim (ödenmiş sipariş) (623 ms)
+2026-07-02T20:43:35.2189786Z       ✓ TAX-028 [P1] POST generate olmayan siparişte 404 (427 ms)
+2026-07-02T20:43:35.2190258Z       ✓ TAX-029 [P0] POST generate kimliksiz → 401 (408 ms)
+2026-07-02T20:43:35.2190997Z       ✓ TAX-030 [P2] Alıcı bilgisi eksik siparişte üretim hatası (649 ms)
+2026-07-02T20:43:35.2191637Z       ✓ TAX-053 [P2] Geçersiz UUID orderId → 400 (ParseUUIDPipe) (429 ms)
+2026-07-02T20:43:35.2192269Z       ✓ TAX-094 [P2] Storage erişilemez ise fatura kaydı yine oluşur (pdfUrl boş) (635 ms)
+2026-07-02T20:43:35.2192965Z     Fatura numarası / mükerrer
+2026-07-02T20:43:35.2193389Z       ✓ TAX-037 [P0] Numara formatı ve aylık sıralı artış (836 ms)
+2026-07-02T20:43:35.2193902Z       ✕ TAX-038 [P1] Numara DB unique kısıtı (çakışma fırlatır) (640 ms)
+2026-07-02T20:43:35.2194471Z       ✓ TAX-039 [P1] Eşzamanlı iki fatura üretimi → numara çakışma riski (722 ms)
+2026-07-02T20:43:35.2195137Z       ✓ TAX-040 [P1] Aynı sipariş için çift üretim (idempotency yok) → mükerrer fatura (697 ms)
+2026-07-02T20:43:35.2195686Z     Fatura görüntüleme (GET /invoices/order/:orderId)
+2026-07-02T20:43:35.2196181Z       ✓ TAX-041 [P0] Alıcı kendi siparişinin faturasını görür (628 ms)
+2026-07-02T20:43:35.2196708Z       ✓ TAX-042 [P0] Satıcı kendi siparişinin faturasını görür (635 ms)
+2026-07-02T20:43:35.2197310Z       ✓ TAX-043 [P0] Yabancı kullanıcı başka siparişin faturasına erişemez → 404 (555 ms)
+2026-07-02T20:43:35.2197903Z       ✕ TAX-090 [P2] Liste type geçersiz değerde default 'buyer' (579 ms)
+2026-07-02T20:43:35.2198326Z     Fatura listesi (GET /invoices)
+2026-07-02T20:43:35.2198776Z       ✕ TAX-044 [P1] Liste endpoint'i type=buyer/seller filtresi (549 ms)
+2026-07-02T20:43:35.2199270Z       ✓ TAX-045 [P0] Liste endpoint'i kimliksiz → 401 (414 ms)
+2026-07-02T20:43:35.2199734Z       ✓ TAX-046 [P2] Boş liste (siparişsiz kullanıcı) (433 ms)
+2026-07-02T20:43:35.2200162Z     Public fatura uçları (paymentId doğrulaması)
+2026-07-02T20:43:35.2200717Z       ✓ TAX-047 [P0] Misafir public endpoint geçerli paymentId ile fatura görür (602 ms)
+2026-07-02T20:43:35.2201668Z       ✓ TAX-048 [P0] Misafir public endpoint paymentId yoksa → 400 (541 ms)
+2026-07-02T20:43:35.2202233Z       ✓ TAX-049 [P0] Misafir public endpoint yanlış paymentId → 404 (549 ms)
+2026-07-02T20:43:35.2202770Z       ✕ TAX-050 [P1] Misafir PDF indir public (paymentId ile) (545 ms)
+2026-07-02T20:43:35.2203306Z       ✓ TAX-051 [P1] Misafir PDF indir public paymentId yoksa → 400 (418 ms)
+2026-07-02T20:43:35.2203889Z       ✕ TAX-092 [P1] paymentId brute-force ile fatura çekme engeli (575 ms)
+2026-07-02T20:43:35.2204503Z       ✕ TAX-093 [P2] Presigned URL süresi (24 saat) ve S3 key DB'de saklanır (526 ms)
+2026-07-02T20:43:35.2204949Z     PDF indirme (GET /invoices/download/:id)
+2026-07-02T20:43:35.2205452Z       ✕ TAX-052 [P1] Üye PDF indir auth (Content-Disposition attachment) (559 ms)
+2026-07-02T20:43:35.2206066Z       ✕ TAX-091 [P0] IDOR: başka faturanın PDF'i invoiceId ile indirilememeli (545 ms)
+2026-07-02T20:43:35.2206638Z       ✕ TAX-031 [P0] PDF satıcı/alıcı/tutar/KDV alanları doğru (439 ms)
+2026-07-02T20:43:35.2207210Z       ✕ TAX-022 [P1] PDF'te KDV oranı yeniden türetilir (taxAmount/subtotal) (420 ms)
+2026-07-02T20:43:35.2207891Z       ✕ TAX-023 [P2] Türetilen KDV oranında yuvarlama kaybı riski (örn. %18 → görünür %18) (427 ms)
+2026-07-02T20:43:35.2208470Z       ✕ TAX-033 [P2] Para birimi TRY ve TL gösterimi (548 ms)
+2026-07-02T20:43:35.2209004Z       ✕ TAX-034 [P2] Kargo/platform ücreti 0 ise PDF satırı gizlenir (536 ms)
+2026-07-02T20:43:35.2209600Z       ✓ TAX-035 [P1] Çok adetli üründe birim fiyat × adet PDF'te doğru (616 ms)
+2026-07-02T20:43:35.2210449Z       ✕ TAX-036 [P2] downloadInvoice PDF her zaman adet=1 göstermesi (bilinen sapma) (599 ms)
+2026-07-02T20:43:35.2211459Z       ✕ TAX-032 [P1] PDF Türkçe karakter (İ/ı/ş/ğ/ç/ö/ü) düzgün render (546 ms)
+2026-07-02T20:43:35.2211941Z     İade faturası (generateRefundInvoice)
+2026-07-02T20:43:35.2212520Z       ✕ TAX-054 [P1] generateRefundInvoice credit note üretir (-amount, taxAmount=0) (522 ms)
+2026-07-02T20:43:35.2213186Z       ✓ TAX-055 [P2] generateRefundInvoice orijinal fatura yoksa → 404 (516 ms)
+2026-07-02T20:43:35.2213788Z       ✓ TAX-056 [P1] İade faturası akışa bağlı DEĞİL (dead code uyarısı) (530 ms)
+2026-07-02T20:43:35.2214207Z     Admin vergi bölgeleri
+2026-07-02T20:43:35.2214608Z       ✓ TAX-058 [P0] super_admin vergi bölgesi oluşturur (430 ms)
+2026-07-02T20:43:35.2215119Z       ✓ TAX-059 [P0] moderator vergi bölgesi oluşturamaz → 403 (431 ms)
+2026-07-02T20:43:35.2215846Z       ✕ TAX-060 [P1] moderator vergi bölge/oran/kuralları okuyabilir (442 ms)
+2026-07-02T20:43:35.2216378Z       ✓ TAX-061 [P0] Vergi yönetimi kimliksiz → 401 (391 ms)
+2026-07-02T20:43:35.2216940Z       ✓ TAX-062 [P1] Aynı (countryCode, regionCode) ikinci bölge → unique hata (599 ms)
+2026-07-02T20:43:35.2217593Z       ✓ TAX-063 [P1] isDefault set edince diğer bölgelerin default'u sıfırlanır (418 ms)
+2026-07-02T20:43:35.2218152Z       ✓ TAX-064 [P0] Oranı olan bölgeyi silme reddedilir (417 ms)
+2026-07-02T20:43:35.2218714Z       ✓ TAX-065 [P2] Oransız bölge silinince bağlı kurallar da temizlenir (443 ms)
+2026-07-02T20:43:35.2219120Z     Admin vergi oranları
+2026-07-02T20:43:35.2219502Z       ✓ TAX-066 [P1] Oran DTO rate sınır: 100 üstü → 400 (430 ms)
+2026-07-02T20:43:35.2219948Z       ✓ TAX-067 [P1] Oran DTO rate negatif → 400 (446 ms)
+2026-07-02T20:43:35.2220437Z       ✓ TAX-068 [P2] Oran sınır kabul: rate=0 ve rate=100 geçerli (443 ms)
+2026-07-02T20:43:35.2221244Z       ✓ TAX-069 [P1] Olmayan bölgeye oran ekleme → 404 (426 ms)
+2026-07-02T20:43:35.2221630Z     Admin vergi kuralları
+2026-07-02T20:43:35.2222053Z       ✓ TAX-070 [P0] Kategori kuralı categoryId olmadan → 400 (427 ms)
+2026-07-02T20:43:35.2222558Z       ✓ TAX-071 [P1] Kural: rate başka bölgeye ait → 400 (417 ms)
+2026-07-02T20:43:35.2223030Z       ✓ TAX-072 [P2] Kural scope geçersiz enum → 400 (422 ms)
+2026-07-02T20:43:35.2223530Z       ✓ TAX-073 [P1] Kural güncelleme (PATCH) yalnız super_admin (437 ms)
+2026-07-02T20:43:35.2223966Z     Admin vergi raporu (GET /admin/tax/report)
+2026-07-02T20:43:35.2224475Z       ✕ TAX-074 [P1] Vergi raporu aylık kırılım (default groupBy=month) (419 ms)
+2026-07-02T20:43:35.2224981Z       ✕ TAX-075 [P2] Rapor groupBy=day / year (419 ms)
+2026-07-02T20:43:35.2225409Z       ✓ TAX-076 [P1] Rapor fromDate > toDate → 400 (417 ms)
+2026-07-02T20:43:35.2225846Z       ✕ TAX-077 [P2] Rapor moderator erişebilir (414 ms)
+2026-07-02T20:43:35.2226313Z       ✓ TAX-078 [P2] Rapor varsayılan aralık son 1 yıl (415 ms)
+2026-07-02T20:43:35.2226881Z       ✕ TAX-079 [P1] KDV=0 faturalar raporda ciroya yansır, vergiye yansımaz (428 ms)
+2026-07-02T20:43:35.2227488Z       ✕ TAX-057 [P1] İptal edilen fatura vergi raporundan dışlanır (438 ms)
+2026-07-02T20:43:35.2227776Z 
+2026-07-02T20:43:35.2228336Z   ● 16 — Vergi & Fatura (TAX) › Sipariş bazlı KDV › TAX-012 [P0] Kurumsal satıcı (Business+Verified+taxId) siparişinde KDV uygulanır
+2026-07-02T20:43:35.2228810Z 
+2026-07-02T20:43:35.2228951Z     PrismaClientValidationError: 
+2026-07-02T20:43:35.2229298Z     Invalid `getPrisma().user.update()` invocation in
+2026-07-02T20:43:35.2229879Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/test/e2e/scenarios/16-tax.e2e-spec.ts:119:28
+2026-07-02T20:43:35.2230278Z 
+2026-07-02T20:43:35.2230364Z       116 
+2026-07-02T20:43:35.2231014Z       117 /** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */
+2026-07-02T20:43:35.2231702Z       118 async function makeCorporate(sellerId: string, taxId = '1234567890'): Promise<void> {
+2026-07-02T20:43:35.2232390Z     → 119   await getPrisma().user.update({
+2026-07-02T20:43:35.2232851Z               where: {
+2026-07-02T20:43:35.2233152Z                 id: "7eb1571a-57a2-4fd4-ab89-9faedd7a5fda"
+2026-07-02T20:43:35.2233450Z               },
+2026-07-02T20:43:35.2233694Z               data: {
+2026-07-02T20:43:35.2233951Z                 businessStatus: "approved",
+2026-07-02T20:43:35.2234257Z                 taxId: "1234567890",
+2026-07-02T20:43:35.2234544Z                 sellerType: "business"
+2026-07-02T20:43:35.2234825Z                             ~~~~~~~~~~
+2026-07-02T20:43:35.2235071Z               }
+2026-07-02T20:43:35.2235268Z             })
+2026-07-02T20:43:35.2235381Z 
+2026-07-02T20:43:35.2235595Z     Invalid value for argument `sellerType`. Expected SellerType.
+2026-07-02T20:43:35.2235861Z 
+2026-07-02T20:43:35.2236384Z     [0m [90m 117 |[39m   [90m/** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */[39m
+2026-07-02T20:43:35.2237680Z      [90m 118 |[39m   [36masync[39m [36mfunction[39m makeCorporate(sellerId[33m:[39m string[33m,[39m taxId [33m=[39m [32m'1234567890'[39m)[33m:[39m [33mPromise[39m[33m<[39m[36mvoid[39m[33m>[39m {
+2026-07-02T20:43:35.2238733Z     [31m[1m>[22m[39m[90m 119 |[39m     [36mawait[39m getPrisma()[33m.[39muser[33m.[39mupdate({
+2026-07-02T20:43:35.2239249Z      [90m     |[39m     [31m[1m^[22m[39m
+2026-07-02T20:43:35.2239716Z      [90m 120 |[39m       where[33m:[39m { id[33m:[39m sellerId }[33m,[39m
+2026-07-02T20:43:35.2240888Z      [90m 121 |[39m       data[33m:[39m { businessStatus[33m:[39m [32m'approved'[39m [36mas[39m any[33m,[39m taxId[33m,[39m sellerType[33m:[39m [32m'business'[39m [36mas[39m any }[33m,[39m
+2026-07-02T20:43:35.2241868Z      [90m 122 |[39m     })[33m;[39m[0m
+2026-07-02T20:43:35.2242053Z 
+2026-07-02T20:43:35.2242274Z       at wn (../../node_modules/@prisma/client/runtime/library.js:29:1363)
+2026-07-02T20:43:35.2242843Z       at $n.handleRequestError (../../node_modules/@prisma/client/runtime/library.js:121:6958)
+2026-07-02T20:43:35.2243522Z       at $n.handleAndLogRequestError (../../node_modules/@prisma/client/runtime/library.js:121:6623)
+2026-07-02T20:43:35.2244129Z       at $n.request (../../node_modules/@prisma/client/runtime/library.js:121:6307)
+2026-07-02T20:43:35.2244628Z       at l (../../node_modules/@prisma/client/runtime/library.js:130:9633)
+2026-07-02T20:43:35.2245107Z       at makeCorporate (test/e2e/scenarios/16-tax.e2e-spec.ts:119:5)
+2026-07-02T20:43:35.2245594Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:425:7)
+2026-07-02T20:43:35.2245876Z 
+2026-07-02T20:43:35.2246371Z   ● 16 — Vergi & Fatura (TAX) › Sipariş bazlı KDV › TAX-013 [P0] Bireysel satıcı (Basic, taxId yok) siparişinde KDV = 0
+2026-07-02T20:43:35.2246801Z 
+2026-07-02T20:43:35.2246985Z     expect(received).toBe(expected) // Object.is equality
+2026-07-02T20:43:35.2247228Z 
+2026-07-02T20:43:35.2247313Z     Expected: 0
+2026-07-02T20:43:35.2247531Z     Received: undefined
+2026-07-02T20:43:35.2247675Z 
+2026-07-02T20:43:35.2248106Z     [0m [90m 446 |[39m         [33m.[39m[36mset[39m(authHeader(buyer))
+2026-07-02T20:43:35.2248611Z      [90m 447 |[39m         [33m.[39mexpect([35m200[39m)[33m;[39m
+2026-07-02T20:43:35.2249332Z     [31m[1m>[22m[39m[90m 448 |[39m       expect(res[33m.[39mbody[33m.[39mtaxAmount)[33m.[39mtoBe([35m0[39m)[33m;[39m
+2026-07-02T20:43:35.2249980Z      [90m     |[39m                                  [31m[1m^[22m[39m
+2026-07-02T20:43:35.2250365Z      [90m 449 |[39m     })[33m;[39m
+2026-07-02T20:43:35.2250645Z      [90m 450 |[39m
+2026-07-02T20:43:35.2251429Z      [90m 451 |[39m     scenario([32m'TAX-014'[39m[33m,[39m [36masync[39m () [33m=>[39m {[0m
+2026-07-02T20:43:35.2251768Z 
+2026-07-02T20:43:35.2252009Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:448:34)
+2026-07-02T20:43:35.2252300Z 
+2026-07-02T20:43:35.2252737Z   ● 16 — Vergi & Fatura (TAX) › Sipariş bazlı KDV › TAX-014 [P1] Business onaylı ama taxId boş satıcı → KDV = 0
+2026-07-02T20:43:35.2253292Z 
+2026-07-02T20:43:35.2253429Z     PrismaClientValidationError: 
+2026-07-02T20:43:35.2253773Z     Invalid `getPrisma().user.update()` invocation in
+2026-07-02T20:43:35.2254345Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/test/e2e/scenarios/16-tax.e2e-spec.ts:454:30
+2026-07-02T20:43:35.2254743Z 
+2026-07-02T20:43:35.2254876Z       451 scenario('TAX-014', async () => {
+2026-07-02T20:43:35.2255415Z       452   // businessStatus=approved AMA taxId boş → resolveSellerTax early return 0.
+2026-07-02T20:43:35.2256057Z       453   const { buyer, seller, product, addr } = await makeBuyerSellerProduct({ price: 1000 });
+2026-07-02T20:43:35.2256588Z     → 454   await getPrisma().user.update({
+2026-07-02T20:43:35.2256866Z               where: {
+2026-07-02T20:43:35.2257148Z                 id: "db635466-f338-4f63-a741-be7945af4479"
+2026-07-02T20:43:35.2257446Z               },
+2026-07-02T20:43:35.2257660Z               data: {
+2026-07-02T20:43:35.2257916Z                 businessStatus: "approved",
+2026-07-02T20:43:35.2258214Z                 taxId: null,
+2026-07-02T20:43:35.2258501Z                 sellerType: "business"
+2026-07-02T20:43:35.2258789Z                             ~~~~~~~~~~
+2026-07-02T20:43:35.2259033Z               }
+2026-07-02T20:43:35.2259234Z             })
+2026-07-02T20:43:35.2259345Z 
+2026-07-02T20:43:35.2259557Z     Invalid value for argument `sellerType`. Expected SellerType.
+2026-07-02T20:43:35.2259828Z 
+2026-07-02T20:43:35.2260289Z     [0m [90m 452 |[39m       [90m// businessStatus=approved AMA taxId boş → resolveSellerTax early return 0.[39m
+2026-07-02T20:43:35.2261628Z      [90m 453 |[39m       [36mconst[39m { buyer[33m,[39m seller[33m,[39m product[33m,[39m addr } [33m=[39m [36mawait[39m makeBuyerSellerProduct({ price[33m:[39m [35m1000[39m })[33m;[39m
+2026-07-02T20:43:35.2262642Z     [31m[1m>[22m[39m[90m 454 |[39m       [36mawait[39m getPrisma()[33m.[39muser[33m.[39mupdate({
+2026-07-02T20:43:35.2263175Z      [90m     |[39m       [31m[1m^[22m[39m
+2026-07-02T20:43:35.2263695Z      [90m 455 |[39m         where[33m:[39m { id[33m:[39m seller[33m.[39mid }[33m,[39m
+2026-07-02T20:43:35.2264860Z      [90m 456 |[39m         data[33m:[39m { businessStatus[33m:[39m [32m'approved'[39m [36mas[39m any[33m,[39m taxId[33m:[39m [36mnull[39m[33m,[39m sellerType[33m:[39m [32m'business'[39m [36mas[39m any }[33m,[39m
+2026-07-02T20:43:35.2265861Z      [90m 457 |[39m       })[33m;[39m[0m
+2026-07-02T20:43:35.2266055Z 
+2026-07-02T20:43:35.2266281Z       at wn (../../node_modules/@prisma/client/runtime/library.js:29:1363)
+2026-07-02T20:43:35.2266855Z       at $n.handleRequestError (../../node_modules/@prisma/client/runtime/library.js:121:6958)
+2026-07-02T20:43:35.2267524Z       at $n.handleAndLogRequestError (../../node_modules/@prisma/client/runtime/library.js:121:6623)
+2026-07-02T20:43:35.2268139Z       at $n.request (../../node_modules/@prisma/client/runtime/library.js:121:6307)
+2026-07-02T20:43:35.2268803Z       at l (../../node_modules/@prisma/client/runtime/library.js:130:9633)
+2026-07-02T20:43:35.2269295Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:454:7)
+2026-07-02T20:43:35.2269580Z 
+2026-07-02T20:43:35.2270058Z   ● 16 — Vergi & Fatura (TAX) › Sipariş bazlı KDV › TAX-015 [P1] Platform satıcı (platform@tarodan.com) KDV davranışı
+2026-07-02T20:43:35.2270481Z 
+2026-07-02T20:43:35.2270667Z     expect(received).toBe(expected) // Object.is equality
+2026-07-02T20:43:35.2271084Z 
+2026-07-02T20:43:35.2271173Z     Expected: 200
+2026-07-02T20:43:35.2271388Z     Received: undefined
+2026-07-02T20:43:35.2271531Z 
+2026-07-02T20:43:35.2271805Z     [0m [90m 482 |[39m         [33m.[39m[36mset[39m(authHeader(buyer))
+2026-07-02T20:43:35.2272303Z      [90m 483 |[39m         [33m.[39mexpect([35m200[39m)[33m;[39m
+2026-07-02T20:43:35.2273024Z     [31m[1m>[22m[39m[90m 484 |[39m       expect(res[33m.[39mbody[33m.[39mtaxAmount)[33m.[39mtoBe([35m200[39m)[33m;[39m
+2026-07-02T20:43:35.2273836Z      [90m     |[39m                                  [31m[1m^[22m[39m
+2026-07-02T20:43:35.2274217Z      [90m 485 |[39m     })[33m;[39m
+2026-07-02T20:43:35.2274499Z      [90m 486 |[39m
+2026-07-02T20:43:35.2274994Z      [90m 487 |[39m     scenario([32m'TAX-016'[39m[33m,[39m [36masync[39m () [33m=>[39m {[0m
+2026-07-02T20:43:35.2275325Z 
+2026-07-02T20:43:35.2275560Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:484:34)
+2026-07-02T20:43:35.2275849Z 
+2026-07-02T20:43:35.2276338Z   ● 16 — Vergi & Fatura (TAX) › Sipariş bazlı KDV › TAX-016 [P1] Teklif (offer) kabulüyle oluşan siparişte KDV satıcı bazlı
+2026-07-02T20:43:35.2276777Z 
+2026-07-02T20:43:35.2276914Z     PrismaClientValidationError: 
+2026-07-02T20:43:35.2277259Z     Invalid `getPrisma().user.update()` invocation in
+2026-07-02T20:43:35.2277829Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/test/e2e/scenarios/16-tax.e2e-spec.ts:119:28
+2026-07-02T20:43:35.2278236Z 
+2026-07-02T20:43:35.2278328Z       116 
+2026-07-02T20:43:35.2278827Z       117 /** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */
+2026-07-02T20:43:35.2279496Z       118 async function makeCorporate(sellerId: string, taxId = '1234567890'): Promise<void> {
+2026-07-02T20:43:35.2280027Z     → 119   await getPrisma().user.update({
+2026-07-02T20:43:35.2280307Z               where: {
+2026-07-02T20:43:35.2280589Z                 id: "cf950610-79a2-4298-a149-613fcbc85a97"
+2026-07-02T20:43:35.2281023Z               },
+2026-07-02T20:43:35.2281377Z               data: {
+2026-07-02T20:43:35.2281649Z                 businessStatus: "approved",
+2026-07-02T20:43:35.2281950Z                 taxId: "1234567890",
+2026-07-02T20:43:35.2282240Z                 sellerType: "business"
+2026-07-02T20:43:35.2282519Z                             ~~~~~~~~~~
+2026-07-02T20:43:35.2282760Z               }
+2026-07-02T20:43:35.2282959Z             })
+2026-07-02T20:43:35.2283080Z 
+2026-07-02T20:43:35.2283383Z     Invalid value for argument `sellerType`. Expected SellerType.
+2026-07-02T20:43:35.2283657Z 
+2026-07-02T20:43:35.2284170Z     [0m [90m 117 |[39m   [90m/** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */[39m
+2026-07-02T20:43:35.2285452Z      [90m 118 |[39m   [36masync[39m [36mfunction[39m makeCorporate(sellerId[33m:[39m string[33m,[39m taxId [33m=[39m [32m'1234567890'[39m)[33m:[39m [33mPromise[39m[33m<[39m[36mvoid[39m[33m>[39m {
+2026-07-02T20:43:35.2286511Z     [31m[1m>[22m[39m[90m 119 |[39m     [36mawait[39m getPrisma()[33m.[39muser[33m.[39mupdate({
+2026-07-02T20:43:35.2287021Z      [90m     |[39m     [31m[1m^[22m[39m
+2026-07-02T20:43:35.2287487Z      [90m 120 |[39m       where[33m:[39m { id[33m:[39m sellerId }[33m,[39m
+2026-07-02T20:43:35.2288529Z      [90m 121 |[39m       data[33m:[39m { businessStatus[33m:[39m [32m'approved'[39m [36mas[39m any[33m,[39m taxId[33m,[39m sellerType[33m:[39m [32m'business'[39m [36mas[39m any }[33m,[39m
+2026-07-02T20:43:35.2289477Z      [90m 122 |[39m     })[33m;[39m[0m
+2026-07-02T20:43:35.2289663Z 
+2026-07-02T20:43:35.2289875Z       at wn (../../node_modules/@prisma/client/runtime/library.js:29:1363)
+2026-07-02T20:43:35.2290447Z       at $n.handleRequestError (../../node_modules/@prisma/client/runtime/library.js:121:6958)
+2026-07-02T20:43:35.2291309Z       at $n.handleAndLogRequestError (../../node_modules/@prisma/client/runtime/library.js:121:6623)
+2026-07-02T20:43:35.2291931Z       at $n.request (../../node_modules/@prisma/client/runtime/library.js:121:6307)
+2026-07-02T20:43:35.2292441Z       at l (../../node_modules/@prisma/client/runtime/library.js:130:9633)
+2026-07-02T20:43:35.2292911Z       at makeCorporate (test/e2e/scenarios/16-tax.e2e-spec.ts:119:5)
+2026-07-02T20:43:35.2293400Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:491:7)
+2026-07-02T20:43:35.2293682Z 
+2026-07-02T20:43:35.2294254Z   ● 16 — Vergi & Fatura (TAX) › Sipariş bazlı KDV › TAX-017 [P1] Misafir siparişte KDV satıcı bazlı çözülür
+2026-07-02T20:43:35.2294643Z 
+2026-07-02T20:43:35.2294780Z     PrismaClientValidationError: 
+2026-07-02T20:43:35.2295126Z     Invalid `getPrisma().user.update()` invocation in
+2026-07-02T20:43:35.2295700Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/test/e2e/scenarios/16-tax.e2e-spec.ts:119:28
+2026-07-02T20:43:35.2296092Z 
+2026-07-02T20:43:35.2296175Z       116 
+2026-07-02T20:43:35.2296684Z       117 /** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */
+2026-07-02T20:43:35.2297360Z       118 async function makeCorporate(sellerId: string, taxId = '1234567890'): Promise<void> {
+2026-07-02T20:43:35.2297884Z     → 119   await getPrisma().user.update({
+2026-07-02T20:43:35.2298164Z               where: {
+2026-07-02T20:43:35.2298456Z                 id: "736ee96e-d707-4df1-be38-04ff4b50c766"
+2026-07-02T20:43:35.2298751Z               },
+2026-07-02T20:43:35.2298964Z               data: {
+2026-07-02T20:43:35.2299215Z                 businessStatus: "approved",
+2026-07-02T20:43:35.2299528Z                 taxId: "1234567890",
+2026-07-02T20:43:35.2299814Z                 sellerType: "business"
+2026-07-02T20:43:35.2300095Z                             ~~~~~~~~~~
+2026-07-02T20:43:35.2300342Z               }
+2026-07-02T20:43:35.2300532Z             })
+2026-07-02T20:43:35.2300640Z 
+2026-07-02T20:43:35.2300993Z     Invalid value for argument `sellerType`. Expected SellerType.
+2026-07-02T20:43:35.2301270Z 
+2026-07-02T20:43:35.2301776Z     [0m [90m 117 |[39m   [90m/** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */[39m
+2026-07-02T20:43:35.2303157Z      [90m 118 |[39m   [36masync[39m [36mfunction[39m makeCorporate(sellerId[33m:[39m string[33m,[39m taxId [33m=[39m [32m'1234567890'[39m)[33m:[39m [33mPromise[39m[33m<[39m[36mvoid[39m[33m>[39m {
+2026-07-02T20:43:35.2304814Z     [31m[1m>[22m[39m[90m 119 |[39m     [36mawait[39m getPrisma()[33m.[39muser[33m.[39mupdate({
+2026-07-02T20:43:35.2305422Z      [90m     |[39m     [31m[1m^[22m[39m
+2026-07-02T20:43:35.2305946Z      [90m 120 |[39m       where[33m:[39m { id[33m:[39m sellerId }[33m,[39m
+2026-07-02T20:43:35.2307042Z      [90m 121 |[39m       data[33m:[39m { businessStatus[33m:[39m [32m'approved'[39m [36mas[39m any[33m,[39m taxId[33m,[39m sellerType[33m:[39m [32m'business'[39m [36mas[39m any }[33m,[39m
+2026-07-02T20:43:35.2307840Z      [90m 122 |[39m     })[33m;[39m[0m
+2026-07-02T20:43:35.2308023Z 
+2026-07-02T20:43:35.2308244Z       at wn (../../node_modules/@prisma/client/runtime/library.js:29:1363)
+2026-07-02T20:43:35.2308812Z       at $n.handleRequestError (../../node_modules/@prisma/client/runtime/library.js:121:6958)
+2026-07-02T20:43:35.2309482Z       at $n.handleAndLogRequestError (../../node_modules/@prisma/client/runtime/library.js:121:6623)
+2026-07-02T20:43:35.2310094Z       at $n.request (../../node_modules/@prisma/client/runtime/library.js:121:6307)
+2026-07-02T20:43:35.2310602Z       at l (../../node_modules/@prisma/client/runtime/library.js:130:9633)
+2026-07-02T20:43:35.2311484Z       at makeCorporate (test/e2e/scenarios/16-tax.e2e-spec.ts:119:5)
+2026-07-02T20:43:35.2311984Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:525:7)
+2026-07-02T20:43:35.2312269Z 
+2026-07-02T20:43:35.2312883Z   ● 16 — Vergi & Fatura (TAX) › Sipariş bazlı KDV › TAX-018 [P0] KDV fiyatın ÜSTÜNE eklenir (hariç), total = subtotal + shipping + buyerFee + tax
+2026-07-02T20:43:35.2313391Z 
+2026-07-02T20:43:35.2313531Z     PrismaClientValidationError: 
+2026-07-02T20:43:35.2313878Z     Invalid `getPrisma().user.update()` invocation in
+2026-07-02T20:43:35.2314458Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/test/e2e/scenarios/16-tax.e2e-spec.ts:119:28
+2026-07-02T20:43:35.2314853Z 
+2026-07-02T20:43:35.2314937Z       116 
+2026-07-02T20:43:35.2315436Z       117 /** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */
+2026-07-02T20:43:35.2316252Z       118 async function makeCorporate(sellerId: string, taxId = '1234567890'): Promise<void> {
+2026-07-02T20:43:35.2316791Z     → 119   await getPrisma().user.update({
+2026-07-02T20:43:35.2317069Z               where: {
+2026-07-02T20:43:35.2317357Z                 id: "5e4d2af5-392d-4237-ad85-f14b58938d47"
+2026-07-02T20:43:35.2317655Z               },
+2026-07-02T20:43:35.2317857Z               data: {
+2026-07-02T20:43:35.2318110Z                 businessStatus: "approved",
+2026-07-02T20:43:35.2318415Z                 taxId: "1234567890",
+2026-07-02T20:43:35.2318701Z                 sellerType: "business"
+2026-07-02T20:43:35.2318986Z                             ~~~~~~~~~~
+2026-07-02T20:43:35.2319227Z               }
+2026-07-02T20:43:35.2319421Z             })
+2026-07-02T20:43:35.2319531Z 
+2026-07-02T20:43:35.2319741Z     Invalid value for argument `sellerType`. Expected SellerType.
+2026-07-02T20:43:35.2320008Z 
+2026-07-02T20:43:35.2320514Z     [0m [90m 117 |[39m   [90m/** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */[39m
+2026-07-02T20:43:35.2322122Z      [90m 118 |[39m   [36masync[39m [36mfunction[39m makeCorporate(sellerId[33m:[39m string[33m,[39m taxId [33m=[39m [32m'1234567890'[39m)[33m:[39m [33mPromise[39m[33m<[39m[36mvoid[39m[33m>[39m {
+2026-07-02T20:43:35.2323170Z     [31m[1m>[22m[39m[90m 119 |[39m     [36mawait[39m getPrisma()[33m.[39muser[33m.[39mupdate({
+2026-07-02T20:43:35.2323680Z      [90m     |[39m     [31m[1m^[22m[39m
+2026-07-02T20:43:35.2324148Z      [90m 120 |[39m       where[33m:[39m { id[33m:[39m sellerId }[33m,[39m
+2026-07-02T20:43:35.2325189Z      [90m 121 |[39m       data[33m:[39m { businessStatus[33m:[39m [32m'approved'[39m [36mas[39m any[33m,[39m taxId[33m,[39m sellerType[33m:[39m [32m'business'[39m [36mas[39m any }[33m,[39m
+2026-07-02T20:43:35.2325977Z      [90m 122 |[39m     })[33m;[39m[0m
+2026-07-02T20:43:35.2326169Z 
+2026-07-02T20:43:35.2326396Z       at wn (../../node_modules/@prisma/client/runtime/library.js:29:1363)
+2026-07-02T20:43:35.2326969Z       at $n.handleRequestError (../../node_modules/@prisma/client/runtime/library.js:121:6958)
+2026-07-02T20:43:35.2327647Z       at $n.handleAndLogRequestError (../../node_modules/@prisma/client/runtime/library.js:121:6623)
+2026-07-02T20:43:35.2328258Z       at $n.request (../../node_modules/@prisma/client/runtime/library.js:121:6307)
+2026-07-02T20:43:35.2328760Z       at l (../../node_modules/@prisma/client/runtime/library.js:130:9633)
+2026-07-02T20:43:35.2329239Z       at makeCorporate (test/e2e/scenarios/16-tax.e2e-spec.ts:119:5)
+2026-07-02T20:43:35.2329729Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:568:7)
+2026-07-02T20:43:35.2330018Z 
+2026-07-02T20:43:35.2330655Z   ● 16 — Vergi & Fatura (TAX) › Otomatik fatura üretimi (ödeme başarısı) › TAX-024 [P0] Ödeme başarısında fatura otomatik oluşur ve iki tarafa e-posta gider
+2026-07-02T20:43:35.2331373Z 
+2026-07-02T20:43:35.2331506Z     expect(received).toBeTruthy()
+2026-07-02T20:43:35.2331841Z 
+2026-07-02T20:43:35.2331934Z     Received: null
+2026-07-02T20:43:35.2332064Z 
+2026-07-02T20:43:35.2332381Z     [0m [90m 596 |[39m       [36mconst[39m prisma [33m=[39m getPrisma()[33m;[39m
+2026-07-02T20:43:35.2333443Z      [90m 597 |[39m       [36mconst[39m invoice [33m=[39m [36mawait[39m prisma[33m.[39minvoice[33m.[39mfindFirst({ where[33m:[39m { orderId } })[33m;[39m
+2026-07-02T20:43:35.2334358Z     [31m[1m>[22m[39m[90m 598 |[39m       expect(invoice)[33m.[39mtoBeTruthy()[33m;[39m
+2026-07-02T20:43:35.2334883Z      [90m     |[39m                       [31m[1m^[22m[39m
+2026-07-02T20:43:35.2335521Z      [90m 599 |[39m       expect(invoice[33m![39m[33m.[39mstatus)[33m.[39mtoBe([32m'issued'[39m)[33m;[39m
+2026-07-02T20:43:35.2336004Z      [90m 600 |[39m
+2026-07-02T20:43:35.2336554Z      [90m 601 |[39m       [90m// İki tarafa e-posta (MailHog). Buyer + seller adreslerine mail gelir.[39m[0m
+2026-07-02T20:43:35.2337077Z 
+2026-07-02T20:43:35.2337324Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:598:23)
+2026-07-02T20:43:35.2337613Z 
+2026-07-02T20:43:35.2338083Z   ● 16 — Vergi & Fatura (TAX) › Fatura numarası / mükerrer › TAX-038 [P1] Numara DB unique kısıtı (çakışma fırlatır)
+2026-07-02T20:43:35.2338496Z 
+2026-07-02T20:43:35.2338623Z     expect(received).toBeTruthy()
+2026-07-02T20:43:35.2338797Z 
+2026-07-02T20:43:35.2338887Z     Received: null
+2026-07-02T20:43:35.2339017Z 
+2026-07-02T20:43:35.2339320Z     [0m [90m 832 |[39m       [36mconst[39m prisma [33m=[39m getPrisma()[33m;[39m
+2026-07-02T20:43:35.2340249Z      [90m 833 |[39m       [36mconst[39m existing [33m=[39m [36mawait[39m prisma[33m.[39minvoice[33m.[39mfindFirst({ where[33m:[39m { orderId } })[33m;[39m
+2026-07-02T20:43:35.2341260Z     [31m[1m>[22m[39m[90m 834 |[39m       expect(existing)[33m.[39mtoBeTruthy()[33m;[39m
+2026-07-02T20:43:35.2341802Z      [90m     |[39m                        [31m[1m^[22m[39m
+2026-07-02T20:43:35.2342213Z      [90m 835 |[39m       [36mawait[39m expect(
+2026-07-02T20:43:35.2342667Z      [90m 836 |[39m         prisma[33m.[39minvoice[33m.[39mcreate({
+2026-07-02T20:43:35.2343101Z      [90m 837 |[39m           data[33m:[39m {[0m
+2026-07-02T20:43:35.2343305Z 
+2026-07-02T20:43:35.2343542Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:834:24)
+2026-07-02T20:43:35.2343829Z 
+2026-07-02T20:43:35.2344406Z   ● 16 — Vergi & Fatura (TAX) › Fatura görüntüleme (GET /invoices/order/:orderId) › TAX-090 [P2] Liste type geçersiz değerde default 'buyer'
+2026-07-02T20:43:35.2344897Z 
+2026-07-02T20:43:35.2345068Z     expect(received).toBeGreaterThanOrEqual(expected)
+2026-07-02T20:43:35.2345303Z 
+2026-07-02T20:43:35.2345393Z     Expected: >= 1
+2026-07-02T20:43:35.2345603Z     Received:    0
+2026-07-02T20:43:35.2345727Z 
+2026-07-02T20:43:35.2345994Z     [0m [90m 938 |[39m         [33m.[39m[36mset[39m(authHeader(buyer))
+2026-07-02T20:43:35.2346505Z      [90m 939 |[39m         [33m.[39mexpect([35m200[39m)[33m;[39m
+2026-07-02T20:43:35.2347314Z     [31m[1m>[22m[39m[90m 940 |[39m       expect(asBuyer[33m.[39mbody[33m.[39mlength)[33m.[39mtoBeGreaterThanOrEqual([35m1[39m)[33m;[39m
+2026-07-02T20:43:35.2348029Z      [90m     |[39m                                   [31m[1m^[22m[39m
+2026-07-02T20:43:35.2348419Z      [90m 941 |[39m     })[33m;[39m
+2026-07-02T20:43:35.2348734Z      [90m 942 |[39m   })[33m;[39m
+2026-07-02T20:43:35.2349015Z      [90m 943 |[39m[0m
+2026-07-02T20:43:35.2349158Z 
+2026-07-02T20:43:35.2349391Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:940:35)
+2026-07-02T20:43:35.2349681Z 
+2026-07-02T20:43:35.2350160Z   ● 16 — Vergi & Fatura (TAX) › Fatura listesi (GET /invoices) › TAX-044 [P1] Liste endpoint'i type=buyer/seller filtresi
+2026-07-02T20:43:35.2350587Z 
+2026-07-02T20:43:35.2350849Z     expect(received).toBeGreaterThan(expected)
+2026-07-02T20:43:35.2351079Z 
+2026-07-02T20:43:35.2351172Z     Expected: > 0
+2026-07-02T20:43:35.2351521Z     Received:   0
+2026-07-02T20:43:35.2351646Z 
+2026-07-02T20:43:35.2351911Z     [0m [90m 953 |[39m         [33m.[39mexpect([35m200[39m)[33m;[39m
+2026-07-02T20:43:35.2352669Z      [90m 954 |[39m       expect([33mArray[39m[33m.[39misArray(buyerList[33m.[39mbody))[33m.[39mtoBe([36mtrue[39m)[33m;[39m
+2026-07-02T20:43:35.2353641Z     [31m[1m>[22m[39m[90m 955 |[39m       expect(buyerList[33m.[39mbody[33m.[39mlength)[33m.[39mtoBeGreaterThan([35m0[39m)[33m;[39m
+2026-07-02T20:43:35.2354337Z      [90m     |[39m                                     [31m[1m^[22m[39m
+2026-07-02T20:43:35.2354689Z      [90m 956 |[39m
+2026-07-02T20:43:35.2355169Z      [90m 957 |[39m       [36mconst[39m sellerList [33m=[39m [36mawait[39m request(server())
+2026-07-02T20:43:35.2355819Z      [90m 958 |[39m         [33m.[39m[36mget[39m([32m'/api/invoices?type=seller'[39m)[0m
+2026-07-02T20:43:35.2356249Z 
+2026-07-02T20:43:35.2356488Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:955:37)
+2026-07-02T20:43:35.2356778Z 
+2026-07-02T20:43:35.2357326Z   ● 16 — Vergi & Fatura (TAX) › Public fatura uçları (paymentId doğrulaması) › TAX-050 [P1] Misafir PDF indir public (paymentId ile)
+2026-07-02T20:43:35.2357804Z 
+2026-07-02T20:43:35.2357928Z     expect(received).toBeTruthy()
+2026-07-02T20:43:35.2358102Z 
+2026-07-02T20:43:35.2358190Z     Received: null
+2026-07-02T20:43:35.2358318Z 
+2026-07-02T20:43:35.2358628Z     [0m [90m 1011 |[39m       [36mconst[39m prisma [33m=[39m getPrisma()[33m;[39m
+2026-07-02T20:43:35.2359560Z      [90m 1012 |[39m       [36mconst[39m invoice [33m=[39m [36mawait[39m prisma[33m.[39minvoice[33m.[39mfindFirst({ where[33m:[39m { orderId } })[33m;[39m
+2026-07-02T20:43:35.2360425Z     [31m[1m>[22m[39m[90m 1013 |[39m       expect(invoice)[33m.[39mtoBeTruthy()[33m;[39m
+2026-07-02T20:43:35.2361299Z      [90m      |[39m                       [31m[1m^[22m[39m
+2026-07-02T20:43:35.2361878Z      [90m 1014 |[39m       [36mconst[39m res [33m=[39m [36mawait[39m request(server())
+2026-07-02T20:43:35.2362704Z      [90m 1015 |[39m         [33m.[39m[36mget[39m([32m`/api/invoices/download/${invoice!.id}/public?paymentId=${paymentId}`[39m)
+2026-07-02T20:43:35.2363408Z      [90m 1016 |[39m         [33m.[39mexpect([35m200[39m)[33m;[39m[0m
+2026-07-02T20:43:35.2363669Z 
+2026-07-02T20:43:35.2363914Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:1013:23)
+2026-07-02T20:43:35.2364208Z 
+2026-07-02T20:43:35.2364782Z   ● 16 — Vergi & Fatura (TAX) › Public fatura uçları (paymentId doğrulaması) › TAX-092 [P1] paymentId brute-force ile fatura çekme engeli
+2026-07-02T20:43:35.2365281Z 
+2026-07-02T20:43:35.2365480Z     TypeError: Cannot read properties of null (reading 'id')
+2026-07-02T20:43:35.2365730Z 
+2026-07-02T20:43:35.2365997Z     [0m [90m 1036 |[39m         [33m.[39mexpect([35m404[39m)[33m;[39m
+2026-07-02T20:43:35.2366485Z      [90m 1037 |[39m       [36mawait[39m request(server())
+2026-07-02T20:43:35.2367332Z     [31m[1m>[22m[39m[90m 1038 |[39m         [33m.[39m[36mget[39m([32m`/api/invoices/download/${invoice!.id}/public?paymentId=${NONEXISTENT_UUID}`[39m)
+2026-07-02T20:43:35.2368114Z      [90m      |[39m                                                 [31m[1m^[22m[39m
+2026-07-02T20:43:35.2368618Z      [90m 1039 |[39m         [33m.[39mexpect([35m404[39m)[33m;[39m
+2026-07-02T20:43:35.2369017Z      [90m 1040 |[39m     })[33m;[39m
+2026-07-02T20:43:35.2369305Z      [90m 1041 |[39m[0m
+2026-07-02T20:43:35.2369448Z 
+2026-07-02T20:43:35.2369684Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:1038:49)
+2026-07-02T20:43:35.2369979Z 
+2026-07-02T20:43:35.2370584Z   ● 16 — Vergi & Fatura (TAX) › Public fatura uçları (paymentId doğrulaması) › TAX-093 [P2] Presigned URL süresi (24 saat) ve S3 key DB'de saklanır
+2026-07-02T20:43:35.2371261Z 
+2026-07-02T20:43:35.2371488Z     TypeError: Cannot read properties of null (reading 'pdfUrl')
+2026-07-02T20:43:35.2371913Z 
+2026-07-02T20:43:35.2372598Z     [0m [90m 1048 |[39m       [36mconst[39m dbInvoice [33m=[39m [36mawait[39m prisma[33m.[39minvoice[33m.[39mfindFirst({ where[33m:[39m { orderId } })[33m;[39m
+2026-07-02T20:43:35.2373590Z      [90m 1049 |[39m       [90m// DB'de saklanan pdfUrl = stub upload key ('test/file.bin'), presigned değil.[39m
+2026-07-02T20:43:35.2375049Z     [31m[1m>[22m[39m[90m 1050 |[39m       expect(dbInvoice[33m![39m[33m.[39mpdfUrl [33m===[39m [32m''[39m [33m||[39m dbInvoice[33m![39m[33m.[39mpdfUrl[33m?[39m[33m.[39mstartsWith([32m'http'[39m) [33m===[39m [36mfalse[39m)[33m.[39mtoBe([36mtrue[39m)[33m;[39m
+2026-07-02T20:43:35.2376112Z      [90m      |[39m                         [31m[1m^[22m[39m
+2026-07-02T20:43:35.2376600Z      [90m 1051 |[39m       [90m// API yanıtı presigned/boş çözer.[39m
+2026-07-02T20:43:35.2377321Z      [90m 1052 |[39m       [36mconst[39m res [33m=[39m [36mawait[39m request(server())
+2026-07-02T20:43:35.2377997Z      [90m 1053 |[39m         [33m.[39m[36mget[39m([32m`/api/invoices/order/${orderId}`[39m)[0m
+2026-07-02T20:43:35.2378324Z 
+2026-07-02T20:43:35.2378564Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:1050:25)
+2026-07-02T20:43:35.2378857Z 
+2026-07-02T20:43:35.2379424Z   ● 16 — Vergi & Fatura (TAX) › PDF indirme (GET /invoices/download/:id) › TAX-052 [P1] Üye PDF indir auth (Content-Disposition attachment)
+2026-07-02T20:43:35.2379916Z 
+2026-07-02T20:43:35.2380112Z     TypeError: Cannot read properties of null (reading 'id')
+2026-07-02T20:43:35.2380366Z 
+2026-07-02T20:43:35.2381147Z     [0m [90m 1066 |[39m       [36mconst[39m invoice [33m=[39m [36mawait[39m prisma[33m.[39minvoice[33m.[39mfindFirst({ where[33m:[39m { orderId } })[33m;[39m
+2026-07-02T20:43:35.2382016Z      [90m 1067 |[39m       [36mconst[39m res [33m=[39m [36mawait[39m request(server())
+2026-07-02T20:43:35.2382765Z     [31m[1m>[22m[39m[90m 1068 |[39m         [33m.[39m[36mget[39m([32m`/api/invoices/download/${invoice!.id}`[39m)
+2026-07-02T20:43:35.2383417Z      [90m      |[39m                                                 [31m[1m^[22m[39m
+2026-07-02T20:43:35.2383923Z      [90m 1069 |[39m         [33m.[39m[36mset[39m(authHeader(buyer))
+2026-07-02T20:43:35.2384412Z      [90m 1070 |[39m         [33m.[39mexpect([35m200[39m)[33m;[39m
+2026-07-02T20:43:35.2385211Z      [90m 1071 |[39m       expect(res[33m.[39mheaders[[32m'content-type'[39m])[33m.[39mtoContain([32m'application/pdf'[39m)[33m;[39m[0m
+2026-07-02T20:43:35.2385696Z 
+2026-07-02T20:43:35.2385932Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:1068:49)
+2026-07-02T20:43:35.2386219Z 
+2026-07-02T20:43:35.2386799Z   ● 16 — Vergi & Fatura (TAX) › PDF indirme (GET /invoices/download/:id) › TAX-091 [P0] IDOR: başka faturanın PDF'i invoiceId ile indirilememeli
+2026-07-02T20:43:35.2387306Z 
+2026-07-02T20:43:35.2387503Z     TypeError: Cannot read properties of null (reading 'id')
+2026-07-02T20:43:35.2387754Z 
+2026-07-02T20:43:35.2388401Z     [0m [90m 1082 |[39m       [36mconst[39m invoice [33m=[39m [36mawait[39m prisma[33m.[39minvoice[33m.[39mfindFirst({ where[33m:[39m { orderId } })[33m;[39m
+2026-07-02T20:43:35.2389154Z      [90m 1083 |[39m       [36mawait[39m request(server())
+2026-07-02T20:43:35.2389812Z     [31m[1m>[22m[39m[90m 1084 |[39m         [33m.[39m[36mget[39m([32m`/api/invoices/download/${invoice!.id}`[39m)
+2026-07-02T20:43:35.2390454Z      [90m      |[39m                                                 [31m[1m^[22m[39m
+2026-07-02T20:43:35.2391124Z      [90m 1085 |[39m         [33m.[39m[36mset[39m(authHeader(stranger))
+2026-07-02T20:43:35.2391639Z      [90m 1086 |[39m         [33m.[39mexpect([35m404[39m)[33m;[39m
+2026-07-02T20:43:35.2392040Z      [90m 1087 |[39m     })[33m;[39m[0m
+2026-07-02T20:43:35.2392233Z 
+2026-07-02T20:43:35.2392467Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:1084:49)
+2026-07-02T20:43:35.2392958Z 
+2026-07-02T20:43:35.2393478Z   ● 16 — Vergi & Fatura (TAX) › PDF indirme (GET /invoices/download/:id) › TAX-031 [P0] PDF satıcı/alıcı/tutar/KDV alanları doğru
+2026-07-02T20:43:35.2393931Z 
+2026-07-02T20:43:35.2394063Z     PrismaClientValidationError: 
+2026-07-02T20:43:35.2394411Z     Invalid `getPrisma().user.update()` invocation in
+2026-07-02T20:43:35.2394994Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/test/e2e/scenarios/16-tax.e2e-spec.ts:119:28
+2026-07-02T20:43:35.2395390Z 
+2026-07-02T20:43:35.2395474Z       116 
+2026-07-02T20:43:35.2395977Z       117 /** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */
+2026-07-02T20:43:35.2396666Z       118 async function makeCorporate(sellerId: string, taxId = '1234567890'): Promise<void> {
+2026-07-02T20:43:35.2397190Z     → 119   await getPrisma().user.update({
+2026-07-02T20:43:35.2397610Z               where: {
+2026-07-02T20:43:35.2397898Z                 id: "211692b7-2288-4c8e-96a0-487b4edca5bc"
+2026-07-02T20:43:35.2398198Z               },
+2026-07-02T20:43:35.2398397Z               data: {
+2026-07-02T20:43:35.2398653Z                 businessStatus: "approved",
+2026-07-02T20:43:35.2398960Z                 taxId: "1234567890",
+2026-07-02T20:43:35.2399248Z                 sellerType: "business"
+2026-07-02T20:43:35.2399531Z                             ~~~~~~~~~~
+2026-07-02T20:43:35.2399779Z               }
+2026-07-02T20:43:35.2399970Z             })
+2026-07-02T20:43:35.2400085Z 
+2026-07-02T20:43:35.2400293Z     Invalid value for argument `sellerType`. Expected SellerType.
+2026-07-02T20:43:35.2400561Z 
+2026-07-02T20:43:35.2401375Z     [0m [90m 117 |[39m   [90m/** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */[39m
+2026-07-02T20:43:35.2402674Z      [90m 118 |[39m   [36masync[39m [36mfunction[39m makeCorporate(sellerId[33m:[39m string[33m,[39m taxId [33m=[39m [32m'1234567890'[39m)[33m:[39m [33mPromise[39m[33m<[39m[36mvoid[39m[33m>[39m {
+2026-07-02T20:43:35.2403737Z     [31m[1m>[22m[39m[90m 119 |[39m     [36mawait[39m getPrisma()[33m.[39muser[33m.[39mupdate({
+2026-07-02T20:43:35.2404257Z      [90m     |[39m     [31m[1m^[22m[39m
+2026-07-02T20:43:35.2404727Z      [90m 120 |[39m       where[33m:[39m { id[33m:[39m sellerId }[33m,[39m
+2026-07-02T20:43:35.2405774Z      [90m 121 |[39m       data[33m:[39m { businessStatus[33m:[39m [32m'approved'[39m [36mas[39m any[33m,[39m taxId[33m,[39m sellerType[33m:[39m [32m'business'[39m [36mas[39m any }[33m,[39m
+2026-07-02T20:43:35.2406572Z      [90m 122 |[39m     })[33m;[39m[0m
+2026-07-02T20:43:35.2406754Z 
+2026-07-02T20:43:35.2406975Z       at wn (../../node_modules/@prisma/client/runtime/library.js:29:1363)
+2026-07-02T20:43:35.2407544Z       at $n.handleRequestError (../../node_modules/@prisma/client/runtime/library.js:121:6958)
+2026-07-02T20:43:35.2408227Z       at $n.handleAndLogRequestError (../../node_modules/@prisma/client/runtime/library.js:121:6623)
+2026-07-02T20:43:35.2408851Z       at $n.request (../../node_modules/@prisma/client/runtime/library.js:121:6307)
+2026-07-02T20:43:35.2409358Z       at l (../../node_modules/@prisma/client/runtime/library.js:130:9633)
+2026-07-02T20:43:35.2409843Z       at makeCorporate (test/e2e/scenarios/16-tax.e2e-spec.ts:119:5)
+2026-07-02T20:43:35.2410335Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:1095:7)
+2026-07-02T20:43:35.2410626Z 
+2026-07-02T20:43:35.2411392Z   ● 16 — Vergi & Fatura (TAX) › PDF indirme (GET /invoices/download/:id) › TAX-022 [P1] PDF'te KDV oranı yeniden türetilir (taxAmount/subtotal)
+2026-07-02T20:43:35.2411887Z 
+2026-07-02T20:43:35.2412025Z     PrismaClientValidationError: 
+2026-07-02T20:43:35.2412372Z     Invalid `getPrisma().user.update()` invocation in
+2026-07-02T20:43:35.2412948Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/test/e2e/scenarios/16-tax.e2e-spec.ts:119:28
+2026-07-02T20:43:35.2413350Z 
+2026-07-02T20:43:35.2413435Z       116 
+2026-07-02T20:43:35.2414108Z       117 /** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */
+2026-07-02T20:43:35.2414786Z       118 async function makeCorporate(sellerId: string, taxId = '1234567890'): Promise<void> {
+2026-07-02T20:43:35.2415312Z     → 119   await getPrisma().user.update({
+2026-07-02T20:43:35.2415588Z               where: {
+2026-07-02T20:43:35.2415874Z                 id: "46246b7b-be9d-403c-9868-c5260d562f0d"
+2026-07-02T20:43:35.2416174Z               },
+2026-07-02T20:43:35.2416376Z               data: {
+2026-07-02T20:43:35.2416628Z                 businessStatus: "approved",
+2026-07-02T20:43:35.2416930Z                 taxId: "1234567890",
+2026-07-02T20:43:35.2417215Z                 sellerType: "business"
+2026-07-02T20:43:35.2417498Z                             ~~~~~~~~~~
+2026-07-02T20:43:35.2417740Z               }
+2026-07-02T20:43:35.2417938Z             })
+2026-07-02T20:43:35.2418186Z 
+2026-07-02T20:43:35.2418401Z     Invalid value for argument `sellerType`. Expected SellerType.
+2026-07-02T20:43:35.2418679Z 
+2026-07-02T20:43:35.2419179Z     [0m [90m 117 |[39m   [90m/** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */[39m
+2026-07-02T20:43:35.2420453Z      [90m 118 |[39m   [36masync[39m [36mfunction[39m makeCorporate(sellerId[33m:[39m string[33m,[39m taxId [33m=[39m [32m'1234567890'[39m)[33m:[39m [33mPromise[39m[33m<[39m[36mvoid[39m[33m>[39m {
+2026-07-02T20:43:35.2421634Z     [31m[1m>[22m[39m[90m 119 |[39m     [36mawait[39m getPrisma()[33m.[39muser[33m.[39mupdate({
+2026-07-02T20:43:35.2422144Z      [90m     |[39m     [31m[1m^[22m[39m
+2026-07-02T20:43:35.2422619Z      [90m 120 |[39m       where[33m:[39m { id[33m:[39m sellerId }[33m,[39m
+2026-07-02T20:43:35.2423664Z      [90m 121 |[39m       data[33m:[39m { businessStatus[33m:[39m [32m'approved'[39m [36mas[39m any[33m,[39m taxId[33m,[39m sellerType[33m:[39m [32m'business'[39m [36mas[39m any }[33m,[39m
+2026-07-02T20:43:35.2424468Z      [90m 122 |[39m     })[33m;[39m[0m
+2026-07-02T20:43:35.2424649Z 
+2026-07-02T20:43:35.2424869Z       at wn (../../node_modules/@prisma/client/runtime/library.js:29:1363)
+2026-07-02T20:43:35.2425433Z       at $n.handleRequestError (../../node_modules/@prisma/client/runtime/library.js:121:6958)
+2026-07-02T20:43:35.2426109Z       at $n.handleAndLogRequestError (../../node_modules/@prisma/client/runtime/library.js:121:6623)
+2026-07-02T20:43:35.2426728Z       at $n.request (../../node_modules/@prisma/client/runtime/library.js:121:6307)
+2026-07-02T20:43:35.2427235Z       at l (../../node_modules/@prisma/client/runtime/library.js:130:9633)
+2026-07-02T20:43:35.2427711Z       at makeCorporate (test/e2e/scenarios/16-tax.e2e-spec.ts:119:5)
+2026-07-02T20:43:35.2428201Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:1115:7)
+2026-07-02T20:43:35.2428485Z 
+2026-07-02T20:43:35.2429138Z   ● 16 — Vergi & Fatura (TAX) › PDF indirme (GET /invoices/download/:id) › TAX-023 [P2] Türetilen KDV oranında yuvarlama kaybı riski (örn. %18 → görünür %18)
+2026-07-02T20:43:35.2429690Z 
+2026-07-02T20:43:35.2429825Z     PrismaClientValidationError: 
+2026-07-02T20:43:35.2430171Z     Invalid `getPrisma().user.update()` invocation in
+2026-07-02T20:43:35.2430853Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/test/e2e/scenarios/16-tax.e2e-spec.ts:119:28
+2026-07-02T20:43:35.2431255Z 
+2026-07-02T20:43:35.2431343Z       116 
+2026-07-02T20:43:35.2431841Z       117 /** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */
+2026-07-02T20:43:35.2432511Z       118 async function makeCorporate(sellerId: string, taxId = '1234567890'): Promise<void> {
+2026-07-02T20:43:35.2433038Z     → 119   await getPrisma().user.update({
+2026-07-02T20:43:35.2433314Z               where: {
+2026-07-02T20:43:35.2433596Z                 id: "d6792437-fd36-4805-b871-726a67927924"
+2026-07-02T20:43:35.2433931Z               },
+2026-07-02T20:43:35.2434135Z               data: {
+2026-07-02T20:43:35.2434525Z                 businessStatus: "approved",
+2026-07-02T20:43:35.2434821Z                 taxId: "1234567890",
+2026-07-02T20:43:35.2435109Z                 sellerType: "business"
+2026-07-02T20:43:35.2435388Z                             ~~~~~~~~~~
+2026-07-02T20:43:35.2435629Z               }
+2026-07-02T20:43:35.2435822Z             })
+2026-07-02T20:43:35.2435938Z 
+2026-07-02T20:43:35.2436150Z     Invalid value for argument `sellerType`. Expected SellerType.
+2026-07-02T20:43:35.2436414Z 
+2026-07-02T20:43:35.2436920Z     [0m [90m 117 |[39m   [90m/** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */[39m
+2026-07-02T20:43:35.2438179Z      [90m 118 |[39m   [36masync[39m [36mfunction[39m makeCorporate(sellerId[33m:[39m string[33m,[39m taxId [33m=[39m [32m'1234567890'[39m)[33m:[39m [33mPromise[39m[33m<[39m[36mvoid[39m[33m>[39m {
+2026-07-02T20:43:35.2439354Z     [31m[1m>[22m[39m[90m 119 |[39m     [36mawait[39m getPrisma()[33m.[39muser[33m.[39mupdate({
+2026-07-02T20:43:35.2439872Z      [90m     |[39m     [31m[1m^[22m[39m
+2026-07-02T20:43:35.2440343Z      [90m 120 |[39m       where[33m:[39m { id[33m:[39m sellerId }[33m,[39m
+2026-07-02T20:43:35.2441697Z      [90m 121 |[39m       data[33m:[39m { businessStatus[33m:[39m [32m'approved'[39m [36mas[39m any[33m,[39m taxId[33m,[39m sellerType[33m:[39m [32m'business'[39m [36mas[39m any }[33m,[39m
+2026-07-02T20:43:35.2442508Z      [90m 122 |[39m     })[33m;[39m[0m
+2026-07-02T20:43:35.2442695Z 
+2026-07-02T20:43:35.2442920Z       at wn (../../node_modules/@prisma/client/runtime/library.js:29:1363)
+2026-07-02T20:43:35.2443486Z       at $n.handleRequestError (../../node_modules/@prisma/client/runtime/library.js:121:6958)
+2026-07-02T20:43:35.2444155Z       at $n.handleAndLogRequestError (../../node_modules/@prisma/client/runtime/library.js:121:6623)
+2026-07-02T20:43:35.2444784Z       at $n.request (../../node_modules/@prisma/client/runtime/library.js:121:6307)
+2026-07-02T20:43:35.2445294Z       at l (../../node_modules/@prisma/client/runtime/library.js:130:9633)
+2026-07-02T20:43:35.2445771Z       at makeCorporate (test/e2e/scenarios/16-tax.e2e-spec.ts:119:5)
+2026-07-02T20:43:35.2446270Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:1131:7)
+2026-07-02T20:43:35.2446559Z 
+2026-07-02T20:43:35.2447053Z   ● 16 — Vergi & Fatura (TAX) › PDF indirme (GET /invoices/download/:id) › TAX-033 [P2] Para birimi TRY ve TL gösterimi
+2026-07-02T20:43:35.2447486Z 
+2026-07-02T20:43:35.2447681Z     TypeError: Cannot read properties of null (reading 'id')
+2026-07-02T20:43:35.2447938Z 
+2026-07-02T20:43:35.2448600Z     [0m [90m 1146 |[39m       [36mconst[39m invoice [33m=[39m [36mawait[39m prisma[33m.[39minvoice[33m.[39mfindFirst({ where[33m:[39m { orderId } })[33m;[39m
+2026-07-02T20:43:35.2449461Z      [90m 1147 |[39m       [36mconst[39m res [33m=[39m [36mawait[39m request(server())
+2026-07-02T20:43:35.2450214Z     [31m[1m>[22m[39m[90m 1148 |[39m         [33m.[39m[36mget[39m([32m`/api/invoices/download/${invoice!.id}`[39m)
+2026-07-02T20:43:35.2451039Z      [90m      |[39m                                                 [31m[1m^[22m[39m
+2026-07-02T20:43:35.2451554Z      [90m 1149 |[39m         [33m.[39m[36mset[39m(authHeader(buyer))
+2026-07-02T20:43:35.2452048Z      [90m 1150 |[39m         [33m.[39mexpect([35m200[39m)[33m;[39m
+2026-07-02T20:43:35.2452845Z      [90m 1151 |[39m       expect(res[33m.[39mheaders[[32m'content-type'[39m])[33m.[39mtoContain([32m'application/pdf'[39m)[33m;[39m[0m
+2026-07-02T20:43:35.2453327Z 
+2026-07-02T20:43:35.2453564Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:1148:49)
+2026-07-02T20:43:35.2453860Z 
+2026-07-02T20:43:35.2454400Z   ● 16 — Vergi & Fatura (TAX) › PDF indirme (GET /invoices/download/:id) › TAX-034 [P2] Kargo/platform ücreti 0 ise PDF satırı gizlenir
+2026-07-02T20:43:35.2454877Z 
+2026-07-02T20:43:35.2455114Z     TypeError: Cannot read properties of null (reading 'shippingCost')
+2026-07-02T20:43:35.2455554Z 
+2026-07-02T20:43:35.2456211Z     [0m [90m 1160 |[39m       [36mconst[39m invoice [33m=[39m [36mawait[39m prisma[33m.[39minvoice[33m.[39mfindFirst({ where[33m:[39m { orderId } })[33m;[39m
+2026-07-02T20:43:35.2457202Z      [90m 1161 |[39m       [90m// shippingCost DB'de 0 → PDF'te Kargo satırı gizlenir (invoice.service.ts:1227).[39m
+2026-07-02T20:43:35.2458171Z     [31m[1m>[22m[39m[90m 1162 |[39m       expect([33mNumber[39m(invoice[33m![39m[33m.[39mshippingCost))[33m.[39mtoBe([35m0[39m)[33m;[39m
+2026-07-02T20:43:35.2458875Z      [90m      |[39m                              [31m[1m^[22m[39m
+2026-07-02T20:43:35.2459326Z      [90m 1163 |[39m       [36mawait[39m request(server())
+2026-07-02T20:43:35.2459914Z      [90m 1164 |[39m         [33m.[39m[36mget[39m([32m`/api/invoices/download/${invoice!.id}`[39m)
+2026-07-02T20:43:35.2460642Z      [90m 1165 |[39m         [33m.[39m[36mset[39m(authHeader(buyer))[0m
+2026-07-02T20:43:35.2461041Z 
+2026-07-02T20:43:35.2461289Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:1162:30)
+2026-07-02T20:43:35.2461582Z 
+2026-07-02T20:43:35.2462206Z   ● 16 — Vergi & Fatura (TAX) › PDF indirme (GET /invoices/download/:id) › TAX-036 [P2] downloadInvoice PDF her zaman adet=1 göstermesi (bilinen sapma)
+2026-07-02T20:43:35.2462742Z 
+2026-07-02T20:43:35.2462962Z     TypeError: Cannot read properties of null (reading 'subtotal')
+2026-07-02T20:43:35.2463235Z 
+2026-07-02T20:43:35.2463880Z     [0m [90m 1199 |[39m       [36mconst[39m invoice [33m=[39m [36mawait[39m prisma[33m.[39minvoice[33m.[39mfindFirst({ where[33m:[39m { orderId } })[33m;[39m
+2026-07-02T20:43:35.2464812Z      [90m 1200 |[39m       [90m// download PDF veri kaynağı: quantity=1, unitPrice=subtotal (750).[39m
+2026-07-02T20:43:35.2465710Z     [31m[1m>[22m[39m[90m 1201 |[39m       expect([33mNumber[39m(invoice[33m![39m[33m.[39msubtotal))[33m.[39mtoBe([35m750[39m)[33m;[39m
+2026-07-02T20:43:35.2466411Z      [90m      |[39m                              [31m[1m^[22m[39m
+2026-07-02T20:43:35.2466859Z      [90m 1202 |[39m       [36mawait[39m request(server())
+2026-07-02T20:43:35.2467443Z      [90m 1203 |[39m         [33m.[39m[36mget[39m([32m`/api/invoices/download/${invoice!.id}`[39m)
+2026-07-02T20:43:35.2468034Z      [90m 1204 |[39m         [33m.[39m[36mset[39m(authHeader(buyer))[0m
+2026-07-02T20:43:35.2468300Z 
+2026-07-02T20:43:35.2468539Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:1201:30)
+2026-07-02T20:43:35.2468827Z 
+2026-07-02T20:43:35.2469399Z   ● 16 — Vergi & Fatura (TAX) › PDF indirme (GET /invoices/download/:id) › TAX-032 [P1] PDF Türkçe karakter (İ/ı/ş/ğ/ç/ö/ü) düzgün render
+2026-07-02T20:43:35.2469875Z 
+2026-07-02T20:43:35.2479299Z     TypeError: Cannot read properties of null (reading 'id')
+2026-07-02T20:43:35.2479658Z 
+2026-07-02T20:43:35.2480421Z     [0m [90m 1222 |[39m       [36mconst[39m invoice [33m=[39m [36mawait[39m prisma[33m.[39minvoice[33m.[39mfindFirst({ where[33m:[39m { orderId } })[33m;[39m
+2026-07-02T20:43:35.2481711Z      [90m 1223 |[39m       [36mconst[39m res [33m=[39m [36mawait[39m request(server())
+2026-07-02T20:43:35.2482501Z     [31m[1m>[22m[39m[90m 1224 |[39m         [33m.[39m[36mget[39m([32m`/api/invoices/download/${invoice!.id}`[39m)
+2026-07-02T20:43:35.2483163Z      [90m      |[39m                                                 [31m[1m^[22m[39m
+2026-07-02T20:43:35.2483677Z      [90m 1225 |[39m         [33m.[39m[36mset[39m(authHeader(buyer))
+2026-07-02T20:43:35.2484177Z      [90m 1226 |[39m         [33m.[39mexpect([35m200[39m)[33m;[39m
+2026-07-02T20:43:35.2484973Z      [90m 1227 |[39m       expect(res[33m.[39mheaders[[32m'content-type'[39m])[33m.[39mtoContain([32m'application/pdf'[39m)[33m;[39m[0m
+2026-07-02T20:43:35.2485458Z 
+2026-07-02T20:43:35.2485707Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:1224:49)
+2026-07-02T20:43:35.2486183Z 
+2026-07-02T20:43:35.2486857Z   ● 16 — Vergi & Fatura (TAX) › İade faturası (generateRefundInvoice) › TAX-054 [P1] generateRefundInvoice credit note üretir (-amount, taxAmount=0)
+2026-07-02T20:43:35.2487414Z 
+2026-07-02T20:43:35.2487608Z     NotFoundException: Orijinal fatura bulunamadı
+2026-07-02T20:43:35.2487842Z 
+2026-07-02T20:43:35.2487969Z     [0m [90m 1287 |[39m
+2026-07-02T20:43:35.2488364Z      [90m 1288 |[39m     [36mif[39m ([33m![39moriginalInvoice) {
+2026-07-02T20:43:35.2489198Z     [31m[1m>[22m[39m[90m 1289 |[39m       [36mthrow[39m [36mnew[39m [33mNotFoundException[39m([32m'Orijinal fatura bulunamadı'[39m)[33m;[39m
+2026-07-02T20:43:35.2489884Z      [90m      |[39m             [31m[1m^[22m[39m
+2026-07-02T20:43:35.2490204Z      [90m 1290 |[39m     }
+2026-07-02T20:43:35.2490461Z      [90m 1291 |[39m
+2026-07-02T20:43:35.2491535Z      [90m 1292 |[39m     [36mconst[39m refundInvoiceNumber [33m=[39m [32m`${originalInvoice.invoiceNumber}-R`[39m[33m;[39m[0m
+2026-07-02T20:43:35.2492006Z 
+2026-07-02T20:43:35.2492348Z       at InvoiceService.generateRefundInvoice (src/modules/invoice/invoice.service.ts:1289:13)
+2026-07-02T20:43:35.2492959Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:1242:28)
+2026-07-02T20:43:35.2493249Z 
+2026-07-02T20:43:35.2493725Z   ● 16 — Vergi & Fatura (TAX) › Admin vergi bölgeleri › TAX-060 [P1] moderator vergi bölge/oran/kuralları okuyabilir
+2026-07-02T20:43:35.2494142Z 
+2026-07-02T20:43:35.2494277Z     expected 200 "OK", got 403 "Forbidden"
+2026-07-02T20:43:35.2494469Z 
+2026-07-02T20:43:35.2495044Z     [0m [90m 1308 |[39m       [36mconst[39m { [33mAdminRole[39m } [33m=[39m [36mawait[39m [36mimport[39m([32m'@prisma/client'[39m)[33m;[39m
+2026-07-02T20:43:35.2496529Z      [90m 1309 |[39m       [36mconst[39m moderator [33m=[39m [36mawait[39m createAdminUser(ctx[33m.[39mmodule[33m,[39m { email[33m:[39m [32m'tax-mod-read@test.com'[39m[33m,[39m role[33m:[39m [33mAdminRole[39m[33m.[39mmoderator })[33m;[39m
+2026-07-02T20:43:35.2498624Z     [31m[1m>[22m[39m[90m 1310 |[39m       [36mawait[39m request(server())[33m.[39m[36mget[39m([32m'/api/admin/tax/regions'[39m)[33m.[39m[36mset[39m(authHeader(moderator))[33m.[39mexpect([35m200[39m)[33m;[39m
+2026-07-02T20:43:35.2499718Z      [90m      |[39m                                                                                        [31m[1m^[22m[39m
+2026-07-02T20:43:35.2500992Z      [90m 1311 |[39m       [36mawait[39m request(server())[33m.[39m[36mget[39m([32m'/api/admin/tax/rates'[39m)[33m.[39m[36mset[39m(authHeader(moderator))[33m.[39mexpect([35m200[39m)[33m;[39m
+2026-07-02T20:43:35.2502427Z      [90m 1312 |[39m       [36mawait[39m request(server())[33m.[39m[36mget[39m([32m'/api/admin/tax/rules'[39m)[33m.[39m[36mset[39m(authHeader(moderator))[33m.[39mexpect([35m200[39m)[33m;[39m
+2026-07-02T20:43:35.2503227Z      [90m 1313 |[39m     })[33m;[39m[0m
+2026-07-02T20:43:35.2503425Z 
+2026-07-02T20:43:35.2503667Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:1310:88)
+2026-07-02T20:43:35.2504047Z       ----
+2026-07-02T20:43:35.2504400Z       at Test._assertStatus (../../node_modules/supertest/lib/test.js:309:14)
+2026-07-02T20:43:35.2504860Z       at ../../node_modules/supertest/lib/test.js:365:13
+2026-07-02T20:43:35.2505336Z       at Test._assertFunction (../../node_modules/supertest/lib/test.js:342:13)
+2026-07-02T20:43:35.2505854Z       at Test.assert (../../node_modules/supertest/lib/test.js:195:23)
+2026-07-02T20:43:35.2506335Z       at localAssert (../../node_modules/supertest/lib/test.js:138:14)
+2026-07-02T20:43:35.2506842Z       at Server.<anonymous> (../../node_modules/supertest/lib/test.js:152:11)
+2026-07-02T20:43:35.2507131Z 
+2026-07-02T20:43:35.2507716Z   ● 16 — Vergi & Fatura (TAX) › Admin vergi raporu (GET /admin/tax/report) › TAX-074 [P1] Vergi raporu aylık kırılım (default groupBy=month)
+2026-07-02T20:43:35.2508406Z 
+2026-07-02T20:43:35.2508542Z     PrismaClientValidationError: 
+2026-07-02T20:43:35.2508910Z     Invalid `getPrisma().user.update()` invocation in
+2026-07-02T20:43:35.2509484Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/test/e2e/scenarios/16-tax.e2e-spec.ts:119:28
+2026-07-02T20:43:35.2509887Z 
+2026-07-02T20:43:35.2509970Z       116 
+2026-07-02T20:43:35.2510478Z       117 /** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */
+2026-07-02T20:43:35.2511363Z       118 async function makeCorporate(sellerId: string, taxId = '1234567890'): Promise<void> {
+2026-07-02T20:43:35.2511903Z     → 119   await getPrisma().user.update({
+2026-07-02T20:43:35.2512191Z               where: {
+2026-07-02T20:43:35.2512478Z                 id: "69bca589-088e-46cb-a99b-3296046eaf59"
+2026-07-02T20:43:35.2512776Z               },
+2026-07-02T20:43:35.2512977Z               data: {
+2026-07-02T20:43:35.2513439Z                 businessStatus: "approved",
+2026-07-02T20:43:35.2513751Z                 taxId: "1234567890",
+2026-07-02T20:43:35.2514035Z                 sellerType: "business"
+2026-07-02T20:43:35.2514321Z                             ~~~~~~~~~~
+2026-07-02T20:43:35.2514563Z               }
+2026-07-02T20:43:35.2514753Z             })
+2026-07-02T20:43:35.2514867Z 
+2026-07-02T20:43:35.2515073Z     Invalid value for argument `sellerType`. Expected SellerType.
+2026-07-02T20:43:35.2515340Z 
+2026-07-02T20:43:35.2515847Z     [0m [90m 117 |[39m   [90m/** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */[39m
+2026-07-02T20:43:35.2517125Z      [90m 118 |[39m   [36masync[39m [36mfunction[39m makeCorporate(sellerId[33m:[39m string[33m,[39m taxId [33m=[39m [32m'1234567890'[39m)[33m:[39m [33mPromise[39m[33m<[39m[36mvoid[39m[33m>[39m {
+2026-07-02T20:43:35.2518167Z     [31m[1m>[22m[39m[90m 119 |[39m     [36mawait[39m getPrisma()[33m.[39muser[33m.[39mupdate({
+2026-07-02T20:43:35.2518678Z      [90m     |[39m     [31m[1m^[22m[39m
+2026-07-02T20:43:35.2519151Z      [90m 120 |[39m       where[33m:[39m { id[33m:[39m sellerId }[33m,[39m
+2026-07-02T20:43:35.2520197Z      [90m 121 |[39m       data[33m:[39m { businessStatus[33m:[39m [32m'approved'[39m [36mas[39m any[33m,[39m taxId[33m,[39m sellerType[33m:[39m [32m'business'[39m [36mas[39m any }[33m,[39m
+2026-07-02T20:43:35.2521138Z      [90m 122 |[39m     })[33m;[39m[0m
+2026-07-02T20:43:35.2521326Z 
+2026-07-02T20:43:35.2521542Z       at wn (../../node_modules/@prisma/client/runtime/library.js:29:1363)
+2026-07-02T20:43:35.2522115Z       at $n.handleRequestError (../../node_modules/@prisma/client/runtime/library.js:121:6958)
+2026-07-02T20:43:35.2522783Z       at $n.handleAndLogRequestError (../../node_modules/@prisma/client/runtime/library.js:121:6623)
+2026-07-02T20:43:35.2523391Z       at $n.request (../../node_modules/@prisma/client/runtime/library.js:121:6307)
+2026-07-02T20:43:35.2523906Z       at l (../../node_modules/@prisma/client/runtime/library.js:130:9633)
+2026-07-02T20:43:35.2524381Z       at makeCorporate (test/e2e/scenarios/16-tax.e2e-spec.ts:119:5)
+2026-07-02T20:43:35.2524870Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:1525:7)
+2026-07-02T20:43:35.2525151Z 
+2026-07-02T20:43:35.2525611Z   ● 16 — Vergi & Fatura (TAX) › Admin vergi raporu (GET /admin/tax/report) › TAX-075 [P2] Rapor groupBy=day / year
+2026-07-02T20:43:35.2526019Z 
+2026-07-02T20:43:35.2526155Z     PrismaClientValidationError: 
+2026-07-02T20:43:35.2526509Z     Invalid `getPrisma().user.update()` invocation in
+2026-07-02T20:43:35.2527082Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/test/e2e/scenarios/16-tax.e2e-spec.ts:119:28
+2026-07-02T20:43:35.2527470Z 
+2026-07-02T20:43:35.2527554Z       116 
+2026-07-02T20:43:35.2528048Z       117 /** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */
+2026-07-02T20:43:35.2528720Z       118 async function makeCorporate(sellerId: string, taxId = '1234567890'): Promise<void> {
+2026-07-02T20:43:35.2529420Z     → 119   await getPrisma().user.update({
+2026-07-02T20:43:35.2529701Z               where: {
+2026-07-02T20:43:35.2529999Z                 id: "dda60073-f9d5-4974-8a13-ad6ad8703b77"
+2026-07-02T20:43:35.2530296Z               },
+2026-07-02T20:43:35.2530499Z               data: {
+2026-07-02T20:43:35.2530876Z                 businessStatus: "approved",
+2026-07-02T20:43:35.2531186Z                 taxId: "1234567890",
+2026-07-02T20:43:35.2531474Z                 sellerType: "business"
+2026-07-02T20:43:35.2531756Z                             ~~~~~~~~~~
+2026-07-02T20:43:35.2531994Z               }
+2026-07-02T20:43:35.2532183Z             })
+2026-07-02T20:43:35.2532291Z 
+2026-07-02T20:43:35.2532503Z     Invalid value for argument `sellerType`. Expected SellerType.
+2026-07-02T20:43:35.2532768Z 
+2026-07-02T20:43:35.2533276Z     [0m [90m 117 |[39m   [90m/** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */[39m
+2026-07-02T20:43:35.2534775Z      [90m 118 |[39m   [36masync[39m [36mfunction[39m makeCorporate(sellerId[33m:[39m string[33m,[39m taxId [33m=[39m [32m'1234567890'[39m)[33m:[39m [33mPromise[39m[33m<[39m[36mvoid[39m[33m>[39m {
+2026-07-02T20:43:35.2535829Z     [31m[1m>[22m[39m[90m 119 |[39m     [36mawait[39m getPrisma()[33m.[39muser[33m.[39mupdate({
+2026-07-02T20:43:35.2536335Z      [90m     |[39m     [31m[1m^[22m[39m
+2026-07-02T20:43:35.2536802Z      [90m 120 |[39m       where[33m:[39m { id[33m:[39m sellerId }[33m,[39m
+2026-07-02T20:43:35.2537839Z      [90m 121 |[39m       data[33m:[39m { businessStatus[33m:[39m [32m'approved'[39m [36mas[39m any[33m,[39m taxId[33m,[39m sellerType[33m:[39m [32m'business'[39m [36mas[39m any }[33m,[39m
+2026-07-02T20:43:35.2538621Z      [90m 122 |[39m     })[33m;[39m[0m
+2026-07-02T20:43:35.2538802Z 
+2026-07-02T20:43:35.2539019Z       at wn (../../node_modules/@prisma/client/runtime/library.js:29:1363)
+2026-07-02T20:43:35.2539595Z       at $n.handleRequestError (../../node_modules/@prisma/client/runtime/library.js:121:6958)
+2026-07-02T20:43:35.2540271Z       at $n.handleAndLogRequestError (../../node_modules/@prisma/client/runtime/library.js:121:6623)
+2026-07-02T20:43:35.2541039Z       at $n.request (../../node_modules/@prisma/client/runtime/library.js:121:6307)
+2026-07-02T20:43:35.2541544Z       at l (../../node_modules/@prisma/client/runtime/library.js:130:9633)
+2026-07-02T20:43:35.2542016Z       at makeCorporate (test/e2e/scenarios/16-tax.e2e-spec.ts:119:5)
+2026-07-02T20:43:35.2542504Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:1545:7)
+2026-07-02T20:43:35.2542788Z 
+2026-07-02T20:43:35.2543260Z   ● 16 — Vergi & Fatura (TAX) › Admin vergi raporu (GET /admin/tax/report) › TAX-077 [P2] Rapor moderator erişebilir
+2026-07-02T20:43:35.2543678Z 
+2026-07-02T20:43:35.2543818Z     expected 200 "OK", got 403 "Forbidden"
+2026-07-02T20:43:35.2544019Z 
+2026-07-02T20:43:35.2544341Z     [0m [90m 1575 |[39m         [33m.[39m[36mget[39m([32m'/api/admin/tax/report'[39m)
+2026-07-02T20:43:35.2544922Z      [90m 1576 |[39m         [33m.[39m[36mset[39m(authHeader(moderator))
+2026-07-02T20:43:35.2545490Z     [31m[1m>[22m[39m[90m 1577 |[39m         [33m.[39mexpect([35m200[39m)[33m;[39m
+2026-07-02T20:43:35.2545958Z      [90m      |[39m          [31m[1m^[22m[39m
+2026-07-02T20:43:35.2546302Z      [90m 1578 |[39m     })[33m;[39m
+2026-07-02T20:43:35.2546584Z      [90m 1579 |[39m
+2026-07-02T20:43:35.2547077Z      [90m 1580 |[39m     scenario([32m'TAX-078'[39m[33m,[39m [36masync[39m () [33m=>[39m {[0m
+2026-07-02T20:43:35.2547411Z 
+2026-07-02T20:43:35.2547648Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:1577:10)
+2026-07-02T20:43:35.2548027Z       ----
+2026-07-02T20:43:35.2548368Z       at Test._assertStatus (../../node_modules/supertest/lib/test.js:309:14)
+2026-07-02T20:43:35.2548821Z       at ../../node_modules/supertest/lib/test.js:365:13
+2026-07-02T20:43:35.2549291Z       at Test._assertFunction (../../node_modules/supertest/lib/test.js:342:13)
+2026-07-02T20:43:35.2549928Z       at Test.assert (../../node_modules/supertest/lib/test.js:195:23)
+2026-07-02T20:43:35.2550393Z       at localAssert (../../node_modules/supertest/lib/test.js:138:14)
+2026-07-02T20:43:35.2551075Z       at Server.<anonymous> (../../node_modules/supertest/lib/test.js:152:11)
+2026-07-02T20:43:35.2551367Z 
+2026-07-02T20:43:35.2551980Z   ● 16 — Vergi & Fatura (TAX) › Admin vergi raporu (GET /admin/tax/report) › TAX-079 [P1] KDV=0 faturalar raporda ciroya yansır, vergiye yansımaz
+2026-07-02T20:43:35.2552489Z 
+2026-07-02T20:43:35.2552624Z     PrismaClientValidationError: 
+2026-07-02T20:43:35.2552972Z     Invalid `getPrisma().user.update()` invocation in
+2026-07-02T20:43:35.2553538Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/test/e2e/scenarios/16-tax.e2e-spec.ts:119:28
+2026-07-02T20:43:35.2553937Z 
+2026-07-02T20:43:35.2554160Z       116 
+2026-07-02T20:43:35.2554678Z       117 /** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */
+2026-07-02T20:43:35.2555368Z       118 async function makeCorporate(sellerId: string, taxId = '1234567890'): Promise<void> {
+2026-07-02T20:43:35.2555896Z     → 119   await getPrisma().user.update({
+2026-07-02T20:43:35.2556179Z               where: {
+2026-07-02T20:43:35.2556470Z                 id: "8bb0ccc5-708e-49dd-be6f-156affc35d5b"
+2026-07-02T20:43:35.2556777Z               },
+2026-07-02T20:43:35.2556977Z               data: {
+2026-07-02T20:43:35.2557236Z                 businessStatus: "approved",
+2026-07-02T20:43:35.2557536Z                 taxId: "1234567890",
+2026-07-02T20:43:35.2557819Z                 sellerType: "business"
+2026-07-02T20:43:35.2558105Z                             ~~~~~~~~~~
+2026-07-02T20:43:35.2558347Z               }
+2026-07-02T20:43:35.2558539Z             })
+2026-07-02T20:43:35.2558654Z 
+2026-07-02T20:43:35.2558862Z     Invalid value for argument `sellerType`. Expected SellerType.
+2026-07-02T20:43:35.2559244Z 
+2026-07-02T20:43:35.2559955Z     [0m [90m 117 |[39m   [90m/** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */[39m
+2026-07-02T20:43:35.2561384Z      [90m 118 |[39m   [36masync[39m [36mfunction[39m makeCorporate(sellerId[33m:[39m string[33m,[39m taxId [33m=[39m [32m'1234567890'[39m)[33m:[39m [33mPromise[39m[33m<[39m[36mvoid[39m[33m>[39m {
+2026-07-02T20:43:35.2562446Z     [31m[1m>[22m[39m[90m 119 |[39m     [36mawait[39m getPrisma()[33m.[39muser[33m.[39mupdate({
+2026-07-02T20:43:35.2562955Z      [90m     |[39m     [31m[1m^[22m[39m
+2026-07-02T20:43:35.2563417Z      [90m 120 |[39m       where[33m:[39m { id[33m:[39m sellerId }[33m,[39m
+2026-07-02T20:43:35.2564460Z      [90m 121 |[39m       data[33m:[39m { businessStatus[33m:[39m [32m'approved'[39m [36mas[39m any[33m,[39m taxId[33m,[39m sellerType[33m:[39m [32m'business'[39m [36mas[39m any }[33m,[39m
+2026-07-02T20:43:35.2565659Z      [90m 122 |[39m     })[33m;[39m[0m
+2026-07-02T20:43:35.2565885Z 
+2026-07-02T20:43:35.2566113Z       at wn (../../node_modules/@prisma/client/runtime/library.js:29:1363)
+2026-07-02T20:43:35.2566707Z       at $n.handleRequestError (../../node_modules/@prisma/client/runtime/library.js:121:6958)
+2026-07-02T20:43:35.2567381Z       at $n.handleAndLogRequestError (../../node_modules/@prisma/client/runtime/library.js:121:6623)
+2026-07-02T20:43:35.2567992Z       at $n.request (../../node_modules/@prisma/client/runtime/library.js:121:6307)
+2026-07-02T20:43:35.2568500Z       at l (../../node_modules/@prisma/client/runtime/library.js:130:9633)
+2026-07-02T20:43:35.2568972Z       at makeCorporate (test/e2e/scenarios/16-tax.e2e-spec.ts:119:5)
+2026-07-02T20:43:35.2569463Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:1602:7)
+2026-07-02T20:43:35.2569747Z 
+2026-07-02T20:43:35.2570566Z   ● 16 — Vergi & Fatura (TAX) › Admin vergi raporu (GET /admin/tax/report) › TAX-057 [P1] İptal edilen fatura vergi raporundan dışlanır
+2026-07-02T20:43:35.2571446Z 
+2026-07-02T20:43:35.2571594Z     PrismaClientValidationError: 
+2026-07-02T20:43:35.2571960Z     Invalid `getPrisma().user.update()` invocation in
+2026-07-02T20:43:35.2572545Z     /home/runner/work/tarodan-app/tarodan-app/apps/api/test/e2e/scenarios/16-tax.e2e-spec.ts:119:28
+2026-07-02T20:43:35.2572942Z 
+2026-07-02T20:43:35.2573025Z       116 
+2026-07-02T20:43:35.2573573Z       117 /** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */
+2026-07-02T20:43:35.2574260Z       118 async function makeCorporate(sellerId: string, taxId = '1234567890'): Promise<void> {
+2026-07-02T20:43:35.2574792Z     → 119   await getPrisma().user.update({
+2026-07-02T20:43:35.2575075Z               where: {
+2026-07-02T20:43:35.2575372Z                 id: "2f08e4ad-b3ec-4086-ae9b-06e19a8dc710"
+2026-07-02T20:43:35.2575673Z               },
+2026-07-02T20:43:35.2575877Z               data: {
+2026-07-02T20:43:35.2576296Z                 businessStatus: "approved",
+2026-07-02T20:43:35.2576606Z                 taxId: "1234567890",
+2026-07-02T20:43:35.2576892Z                 sellerType: "business"
+2026-07-02T20:43:35.2577180Z                             ~~~~~~~~~~
+2026-07-02T20:43:35.2577429Z               }
+2026-07-02T20:43:35.2577624Z             })
+2026-07-02T20:43:35.2577741Z 
+2026-07-02T20:43:35.2577949Z     Invalid value for argument `sellerType`. Expected SellerType.
+2026-07-02T20:43:35.2578216Z 
+2026-07-02T20:43:35.2578722Z     [0m [90m 117 |[39m   [90m/** Satıcıyı kurumsal (businessStatus=approved + taxId) yap → siparişte KDV uygulanır. */[39m
+2026-07-02T20:43:35.2580013Z      [90m 118 |[39m   [36masync[39m [36mfunction[39m makeCorporate(sellerId[33m:[39m string[33m,[39m taxId [33m=[39m [32m'1234567890'[39m)[33m:[39m [33mPromise[39m[33m<[39m[36mvoid[39m[33m>[39m {
+2026-07-02T20:43:35.2581224Z     [31m[1m>[22m[39m[90m 119 |[39m     [36mawait[39m getPrisma()[33m.[39muser[33m.[39mupdate({
+2026-07-02T20:43:35.2581750Z      [90m     |[39m     [31m[1m^[22m[39m
+2026-07-02T20:43:35.2582226Z      [90m 120 |[39m       where[33m:[39m { id[33m:[39m sellerId }[33m,[39m
+2026-07-02T20:43:35.2583264Z      [90m 121 |[39m       data[33m:[39m { businessStatus[33m:[39m [32m'approved'[39m [36mas[39m any[33m,[39m taxId[33m,[39m sellerType[33m:[39m [32m'business'[39m [36mas[39m any }[33m,[39m
+2026-07-02T20:43:35.2584046Z      [90m 122 |[39m     })[33m;[39m[0m
+2026-07-02T20:43:35.2584231Z 
+2026-07-02T20:43:35.2584455Z       at wn (../../node_modules/@prisma/client/runtime/library.js:29:1363)
+2026-07-02T20:43:35.2585046Z       at $n.handleRequestError (../../node_modules/@prisma/client/runtime/library.js:121:6958)
+2026-07-02T20:43:35.2585726Z       at $n.handleAndLogRequestError (../../node_modules/@prisma/client/runtime/library.js:121:6623)
+2026-07-02T20:43:35.2586346Z       at $n.request (../../node_modules/@prisma/client/runtime/library.js:121:6307)
+2026-07-02T20:43:35.2586861Z       at l (../../node_modules/@prisma/client/runtime/library.js:130:9633)
+2026-07-02T20:43:35.2587343Z       at makeCorporate (test/e2e/scenarios/16-tax.e2e-spec.ts:119:5)
+2026-07-02T20:43:35.2587837Z       at Object.<anonymous> (test/e2e/scenarios/16-tax.e2e-spec.ts:1631:7)
+2026-07-02T20:43:35.2588124Z 
+2026-07-02T20:43:35.2588271Z Test Suites: 3 failed, 3 total
+2026-07-02T20:43:35.2588645Z Tests:       33 failed, 20 skipped, 261 passed, 314 total
+2026-07-02T20:43:35.2588979Z Snapshots:   0 total
+2026-07-02T20:43:35.2589215Z Time:        154.471 s
+2026-07-02T20:43:35.2589555Z Ran all test suites matching /test\/e2e\/scenarios\//i.
+2026-07-02T20:43:35.3876783Z undefined
+2026-07-02T20:43:35.3886079Z /home/runner/work/tarodan-app/tarodan-app/apps/api:
+2026-07-02T20:43:35.3888310Z  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: jest --config ./test/jest-e2e.json --runInBand --testPathPattern test/e2e/scenarios/ --shard=2/10
+2026-07-02T20:43:35.4072760Z ##[error]Process completed with exit code 1.

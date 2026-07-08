@@ -38,7 +38,7 @@ async function main() {
   const storage = new StorageService(config, prisma as any);
   await storage.onModuleInit();
   const elogo = new ElogoService(new LiveElogoSoapClient(config), config);
-  const svc = new ElogoInvoicingService(prisma as any, elogo, config, storage, smtp);
+  const svc = new ElogoInvoicingService(prisma as any, elogo, config, undefined as any, storage, smtp);
 
   console.log('→ issueCommissionInvoice + issueServiceFeeInvoice + issuePlatformSaleInvoice tetikleniyor...\n');
   await svc.issueCommissionInvoice(orderId);

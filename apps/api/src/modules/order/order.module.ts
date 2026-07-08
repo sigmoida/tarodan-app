@@ -1,8 +1,17 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bull';
 import { OrderController } from './order.controller';
 import { OrderService } from './order.service';
+import { OrderPricingService } from './order-pricing.service';
+import { OrderCheckoutService } from './order-checkout.service';
+import { OrderCheckoutCommonService } from './order-checkout-common.service';
+import { OrderCheckoutDirectService } from './order-checkout-direct.service';
+import { OrderCheckoutGroupService } from './order-checkout-group.service';
+import { OrderGuestCheckoutService } from './order-guest-checkout.service';
+import { OrderCommonService } from './order-common.service';
+import { OrderQueryService } from './order-query.service';
+import { OrderLifecycleService } from './order-lifecycle.service';
 import { OrderSchedulerService } from './order-scheduler.service';
 import { OrderScheduledProcessor } from './order-scheduled.processor';
 import { SellerInvoiceController } from './seller-invoice.controller';
@@ -25,7 +34,7 @@ import { ElogoModule } from '../elogo';
     ScheduleModule.forRoot(),
     PrismaModule,
     EventModule,
-    forwardRef(() => NotificationModule),
+    NotificationModule,
     DiscountModule,
     StorageModule,
     SuratCargoModule,
@@ -36,7 +45,7 @@ import { ElogoModule } from '../elogo';
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [OrderController, SellerInvoiceController],
-  providers: [OrderService, OrderSchedulerService, OrderScheduledProcessor, SellerInvoiceService, SmtpProvider],
+  providers: [OrderService, OrderPricingService, OrderCheckoutService, OrderCheckoutCommonService, OrderCheckoutDirectService, OrderCheckoutGroupService, OrderGuestCheckoutService, OrderCommonService, OrderQueryService, OrderLifecycleService, OrderSchedulerService, OrderScheduledProcessor, SellerInvoiceService, SmtpProvider],
   exports: [OrderService],
 })
 export class OrderModule {}

@@ -1,0 +1,14 @@
+﻿2026-07-02T20:38:15.1395761Z Post job cleanup.
+2026-07-02T20:38:15.1433441Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-02T20:38:15.1434843Z Post job cleanup.
+2026-07-02T20:38:15.2570398Z (node:2871) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-02T20:38:15.2571452Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-02T20:38:15.2707986Z [warning]Path Validation Error: Path(s) specified in the action for caching do(es) not exist, hence no cache is being saved.
+2026-07-02T20:38:15.2816030Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-02T20:38:15.2817335Z Post job cleanup.
+2026-07-02T20:38:15.4227578Z (node:2884) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-02T20:38:15.4229681Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-02T20:38:15.4232687Z Cache hit occurred on the primary key node-cache-Linux-x64-pnpm-fc739e9ce3af9124622ee0916e2e85b4d90368bff66d576a6bd0c5dc52c3d59e, not saving cache.
+2026-07-02T20:38:15.4397007Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-02T20:38:15.4398236Z Post job cleanup.
+2026-07-02T20:38:15.5954327Z Pruning is unnecessary.

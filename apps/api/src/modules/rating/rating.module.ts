@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { RatingController } from './rating.controller';
 import { RatingService } from './rating.service';
 import { PrismaModule } from '../../prisma';
@@ -8,7 +8,7 @@ import { StorageModule } from '../storage/storage.module';
 import { ModerationModule } from '../moderation/moderation.module';
 
 @Module({
-  imports: [PrismaModule, CacheModule, forwardRef(() => NotificationModule), StorageModule, ModerationModule],
+  imports: [PrismaModule, CacheModule, NotificationModule, StorageModule, ModerationModule],
   controllers: [RatingController],
   providers: [RatingService],
   exports: [RatingService],

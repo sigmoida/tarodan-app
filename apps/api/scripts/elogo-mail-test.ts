@@ -46,7 +46,7 @@ async function main() {
   const storage = new StorageService(config, prisma as any);
   await storage.onModuleInit(); // script'te S3'ü hazırla (API'de Nest otomatik çağırır)
   const elogo = new ElogoService(new LiveElogoSoapClient(config), config);
-  const svc = new ElogoInvoicingService(prisma as any, elogo, config, storage, smtp);
+  const svc = new ElogoInvoicingService(prisma as any, elogo, config, undefined as any, storage, smtp);
 
   console.log(`→ ${TO} için üyelik faturası kesiliyor + PDF çekilip maillenecek...\n`);
   await svc.issueMembershipInvoice(mp.id);

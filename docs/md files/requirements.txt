@@ -1,0 +1,164 @@
+SOLUTION DESCRIPTION
+
+
+1. SUMMARY OF SOLUTION
+
+Within the scope of the project, a web- and mobile-application–based marketplace will be developed for diecast model car collectors. Collectors will be able to showcase their collectible vehicles on this marketplace, sell their vehicles, or trade them with others.
+
+Currently, there is no such dedicated marketplace for collectors, and collectors try to sell their vehicles by sharing them on social media accounts or in relevant groups on messaging applications such as WhatsApp.
+
+The membership-based marketplace to be developed will be the first marketplace dedicated exclusively to diecast model cars, and it will provide collectors with a secure environment that enables them to carry out buying, selling, and trading transactions.
+
+2. DELIVERABLES
+
+Marketplace (Web-based)
+A web-based application compatible with desktop, tablet, and mobile phone browsers will be developed. This application will include the following features:
+* Without registering, users will be able to view collectible vehicles in the marketplace, search, filter, sort, examine details of selected vehicles, add items to the cart, and complete purchases as a guest.
+* By becoming a member of the marketplace:
+o Users will be able to post vehicle listings and sell vehicles free of charge.
+o With paid membership, users will be able to upload collections, sell and trade vehicles, use the system without advertisements, and feature their listings in the showcase.
+* With paid memberships, users will be able to display their collections and share links to these collections on social media or messaging applications. Marketplace users can rate collections they like, and the most liked collections will be displayed in the marketplace showcase.
+* Flexible membership and listing restrictions will be implemented, allowing the system to limit the number of free listings, enable paid listing options after a certain period, and manage these rules through the admin panel.
+* The application will also include features such as adding comments to products or collections, messaging with listing owners, and rating products and listing owners. During messaging, phone numbers, email addresses, and inappropriate content will be filtered. During messaging, phone numbers, email addresses, and inappropriate content will be filtered. Enhanced filtering will detect contact information in various formats (including spaced formats like "0 5 3 5") to prevent sharing of phone numbers, WhatsApp details, and similar contact information.
+* The application will be integrated with secure payment systems (PayTR and iyzico) and shipping companies (2 providers).
+o Payments will be accepted in Turkish Lira.
+o After payment, invoices will be sent to users automatically.
+o Shipping fees will be calculated in real time, and tracking numbers will be generated.
+* An advertising feature will be added.
+* Social media integrations enabling listings to be shared on social media platforms.
+
+Trade Process Visualization and Status Screens
+In trade transactions:
+
+* Clear recording of dialogues between parties
+* Transparent display of shipping delivery steps
+* Time-based countdown mechanism
+* Status screen (pending, in transit, delivered, confirmed, etc.)
+* Clarification of refund or cancellation scenarios before trade process completion must be included in the development scope.
+
+Corporate Seller and Invoicing Process
+* Infrastructure to support users (individuals or companies) selling with tax identification numbers
+* Infrastructure suitable for conducting invoiced sales must be established.
+
+Commissions Model
+* Flexible commission model allowing commissions to be collected from the buyer, seller, or both parties as needed.
+
+
+
+
+Admin Panel (Web-based)
+A web-based admin panel compatible with desktop, tablet, and mobile phone browsers will be developed. Through this panel, the following will be available:
+* Reporting capabilities:
+o Member reports (monthly number of free and paid members)
+o Site access reports (monthly number of unique visitors)
+o Listing reports (number of active listings and collections in the system)
+o Sales reports (completed sales on a daily and monthly basis)
+o Trade reports (completed trades on a daily and monthly basis)
+o Shipping reports (statuses of shipped products)
+o Revenue reports (sales commissions and membership revenues)
+* Approval of listings and messages in the system:
+o Approval of listings before they are published
+o Approval of messages before they are added to the system
+* Management of support requests:
+o Viewing support requests
+o Closing support requests
+* Management of memberships and listing restrictions:
+o Configuration of free listing limits 
+o Settings for paid listing requirements 
+o Flexible rule management for membership tiers
+* Commission Model Configuration
+o Settings to determine commission collection from buyers, sellers, or both parties
+
+Mobile Application (iOS and Android)
+* Mobile applications that can run on iOS and Android operating systems will be developed.
+* These applications will provide all the features available in the marketplace application.
+* In addition, push notification functionality will be provided.
+* Permission will be granted to use the phone’s camera to take photographs of products.
+
+Other Features
+* Multi-language support (English / Turkish) – to be developed upon request
+* Detection of toy cars in images using artificial intelligence (AI) and filtering of comments – to be developed upon request
+* Social media integrations – to be developed upon request:
+o Sharing collections on social media
+o Login to the system using Facebook and Google accounts
+
+List of All Deliverables
+
+1. Marketplace application (Web-based)
+2. iOS application
+3. Android application
+4. Admin panel (Web-based)
+5. Documentation
+6. Training
+7. Source code access
+8. 90-day warranty period
+
+3. EXCLUDED FEATURES
+
+Since the following features were not requested by the client, they have not been included in the proposal. If requested, a new proposal will be prepared.
+
+* Marketing and SEO services
+* Content creation (product descriptions, blog posts)
+* Professional product photography
+* Email marketing system integrations (e.g., Mailchimp)
+* Live support system integrations
+* Auction feature
+* Video uploading and storage
+* Integration with other marketplaces
+* Integration with analytics systems (Google Analytics 4)
+* Integration with artificial intelligence systems
+
+4. DELIVERABLES BY THE CUSTOMER
+
+   The following will be provided by the client:
+* Terms of use
+* Privacy policy
+* About us information
+* Sales, return, and trade agreements
+* Membership terms and agreements
+* Timely purchase of the systems required for development
+* User acceptance testing
+* Timely responses to questions during the development phase
+* Logo design
+* Color choices
+
+5. EXTERNAL SYSTEMS / THIRD PARTY SOLUTIONS
+
+System TypeDetailsExplanationsFeesWeb application hostingThe web application will be published on a system that provides hosting services in Türkiye (e.g., Natro).A domain name must be purchased. In addition, hosting services must be obtained. These fees are not included in the proposal and will be purchased by the client. Server and databaseA server, database, and storage space for photos are required for the application to operate.The systems must be rented.SSL certificates and security systemsSince payment systems will be integrated, the system must be secure.Required security systems will be communicated to the client. Apple and Google membershipsMemberships with Apple and Google are required to publish mobile applications.These memberships must be obtained by the client.Email deliveryEmails must be sent during registration and sales processes.Systems required for email delivery will be communicated to the client.Source code storageSource code will be stored securely, and access will be provided to the Customer at the end of the project. Systems where the source code will be stored will be communicated to the client.Artificial intelligence systemsIf requested, integrations with AI systems will be implemented (e.g., ChatGPT).These systems must be purchased by the client.Payment systemsVarious fees may be requested during integration with payment systems.These systems must be purchased by the client.Shipping systemsVarious fees may be requested during integration with shipping systems.These systems must be purchased by the client.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Sigmoid Analytics W.L.L.http://www.sigmoida.com
+
+
+
+Block 346, Road 4626, Building 1398 Page | 1Office 3453, Sea Front, ManamaKingdom of Bahrain
+
+
+
+
+

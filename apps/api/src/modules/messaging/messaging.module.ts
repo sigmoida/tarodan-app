@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { MessagingController } from './messaging.controller';
 import { MessagingService } from './messaging.service';
 import { ContentFilterService } from './content-filter.service';
@@ -11,7 +11,7 @@ import { WebSocketModule } from '../websocket/websocket.module';
 @Module({
   imports: [
     PrismaModule,
-    forwardRef(() => NotificationModule),
+    NotificationModule,
     StorageModule,
     ModerationModule,
     WebSocketModule,

@@ -1,0 +1,75 @@
+﻿2026-07-02T20:40:29.8599729Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-02T20:40:29.8607764Z ##[group]Run actions/checkout@v4
+2026-07-02T20:40:29.8608216Z with:
+2026-07-02T20:40:29.8608440Z   repository: sigmoida/tarodan-app
+2026-07-02T20:40:29.8611775Z   token: ***
+2026-07-02T20:40:29.8611985Z   ssh-strict: true
+2026-07-02T20:40:29.8612192Z   ssh-user: git
+2026-07-02T20:40:29.8612406Z   persist-credentials: true
+2026-07-02T20:40:29.8612644Z   clean: true
+2026-07-02T20:40:29.8612854Z   sparse-checkout-cone-mode: true
+2026-07-02T20:40:29.8613112Z   fetch-depth: 1
+2026-07-02T20:40:29.8613309Z   fetch-tags: false
+2026-07-02T20:40:29.8613532Z   show-progress: true
+2026-07-02T20:40:29.8613743Z   lfs: false
+2026-07-02T20:40:29.8613936Z   submodules: false
+2026-07-02T20:40:29.8614180Z   set-safe-directory: true
+2026-07-02T20:40:29.8614657Z env:
+2026-07-02T20:40:29.8614884Z   MAILHOG_URL: http://localhost:8025
+2026-07-02T20:40:29.8615156Z ##[endgroup]
+2026-07-02T20:40:29.9614722Z Syncing repository: sigmoida/tarodan-app
+2026-07-02T20:40:29.9616181Z ##[group]Getting Git version info
+2026-07-02T20:40:29.9616615Z Working directory is '/home/runner/work/tarodan-app/tarodan-app'
+2026-07-02T20:40:29.9617216Z [command]/usr/bin/git version
+2026-07-02T20:40:29.9751673Z git version 2.54.0
+2026-07-02T20:40:29.9763092Z ##[endgroup]
+2026-07-02T20:40:29.9791406Z Temporarily overriding HOME='/home/runner/work/_temp/9a15040f-4e65-4514-b8db-ebd1c36d1c61' before making global git config changes
+2026-07-02T20:40:29.9792740Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-02T20:40:29.9794004Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/tarodan-app/tarodan-app
+2026-07-02T20:40:29.9843191Z Deleting the contents of '/home/runner/work/tarodan-app/tarodan-app'
+2026-07-02T20:40:29.9848484Z ##[group]Initializing the repository
+2026-07-02T20:40:29.9853955Z [command]/usr/bin/git init /home/runner/work/tarodan-app/tarodan-app
+2026-07-02T20:40:30.0005140Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-07-02T20:40:30.0006215Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-07-02T20:40:30.0007099Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-07-02T20:40:30.0007778Z hint: call:
+2026-07-02T20:40:30.0008083Z hint:
+2026-07-02T20:40:30.0008507Z hint: 	git config --global init.defaultBranch <name>
+2026-07-02T20:40:30.0009024Z hint:
+2026-07-02T20:40:30.0009497Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-07-02T20:40:30.0010606Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-07-02T20:40:30.0011295Z hint:
+2026-07-02T20:40:30.0011607Z hint: 	git branch -m <name>
+2026-07-02T20:40:30.0012004Z hint:
+2026-07-02T20:40:30.0012575Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-07-02T20:40:30.0022051Z Initialized empty Git repository in /home/runner/work/tarodan-app/tarodan-app/.git/
+2026-07-02T20:40:30.0032144Z [command]/usr/bin/git remote add origin https://github.com/sigmoida/tarodan-app
+2026-07-02T20:40:30.0086419Z ##[endgroup]
+2026-07-02T20:40:30.0087090Z ##[group]Disabling automatic garbage collection
+2026-07-02T20:40:30.0090641Z [command]/usr/bin/git config --local gc.auto 0
+2026-07-02T20:40:30.0123353Z ##[endgroup]
+2026-07-02T20:40:30.0123973Z ##[group]Setting up auth
+2026-07-02T20:40:30.0130913Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-07-02T20:40:30.0173578Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-07-02T20:40:30.0619079Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-07-02T20:40:30.0656230Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-07-02T20:40:30.0917815Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-02T20:40:30.0955834Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-07-02T20:40:30.1185810Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-07-02T20:40:30.1225212Z ##[endgroup]
+2026-07-02T20:40:30.1225816Z ##[group]Fetching the repository
+2026-07-02T20:40:30.1235919Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +043a41c03dec8d5d6d770b398ffb52d360abfe7d:refs/remotes/origin/master
+2026-07-02T20:40:33.9709026Z From https://github.com/sigmoida/tarodan-app
+2026-07-02T20:40:33.9709876Z  * [new ref]         043a41c03dec8d5d6d770b398ffb52d360abfe7d -> origin/master
+2026-07-02T20:40:33.9746756Z ##[endgroup]
+2026-07-02T20:40:33.9747417Z ##[group]Determining the checkout info
+2026-07-02T20:40:33.9749516Z ##[endgroup]
+2026-07-02T20:40:33.9755466Z [command]/usr/bin/git sparse-checkout disable
+2026-07-02T20:40:33.9806304Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-07-02T20:40:33.9837735Z ##[group]Checking out the ref
+2026-07-02T20:40:33.9844160Z [command]/usr/bin/git checkout --progress --force -B master refs/remotes/origin/master
+2026-07-02T20:40:34.4161003Z Reset branch 'master'
+2026-07-02T20:40:34.4162415Z branch 'master' set up to track 'origin/master'.
+2026-07-02T20:40:34.4231098Z ##[endgroup]
+2026-07-02T20:40:34.4285418Z [command]/usr/bin/git log -1 --format=%H
+2026-07-02T20:40:34.4314312Z 043a41c03dec8d5d6d770b398ffb52d360abfe7d
