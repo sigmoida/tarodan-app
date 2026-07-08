@@ -2,17 +2,15 @@
 
 'use client';
 
-import { Button } from '@tarodan/ui';
-import { useTranslation } from '@/i18n';
 import PeriodToggle from '../_components/PeriodToggle';
 import TierCard from '../_components/TierCard';
 import type { Period, Tier, TierPrices } from '../_lib/types';
 
 const GRID_BY_COUNT: Record<number, string> = {
-	1: 'grid-cols-1 max-w-md',
-	2: 'grid-cols-1 md:grid-cols-2 max-w-3xl',
-	3: 'grid-cols-1 md:grid-cols-3 max-w-5xl',
-	4: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4 max-w-6xl',
+	1: 'grid-cols-1 max-w-lg',
+	2: 'grid-cols-1 md:grid-cols-2 max-w-4xl',
+	3: 'grid-cols-1 md:grid-cols-3 max-w-6xl',
+	4: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 max-w-7xl',
 };
 
 interface Props {
@@ -25,7 +23,6 @@ interface Props {
 	isAuthenticated: boolean;
 	isExactCurrentPlan: (tierId: string) => boolean;
 	onSelect: (tierId: string) => void;
-	onContinue: () => void;
 }
 
 export default function PlansSection({
@@ -38,12 +35,7 @@ export default function PlansSection({
 	isAuthenticated,
 	isExactCurrentPlan,
 	onSelect,
-	onContinue,
 }: Props) {
-	const { t } = useTranslation();
-	const showContinue =
-		!!selectedTier && selectedTier !== 'free' && !isExactCurrentPlan(selectedTier);
-
 	return (
 		<div className='space-y-8'>
 			<PeriodToggle
@@ -53,7 +45,8 @@ export default function PlansSection({
 			/>
 
 			<div className='flex justify-center'>
-				<div className={`grid gap-6 ${GRID_BY_COUNT[tiers.length] ?? GRID_BY_COUNT[4]}`}>
+				<div
+					className={`grid w-full gap-8 ${GRID_BY_COUNT[tiers.length] ?? GRID_BY_COUNT[4]}`}>
 					{tiers.map((tier) => (
 						<TierCard
 							key={tier.id}
@@ -69,14 +62,6 @@ export default function PlansSection({
 					))}
 				</div>
 			</div>
-
-			{showContinue && (
-				<div className='flex justify-center'>
-					<Button variant='primary' size='lg' onClick={onContinue} className='px-12'>
-						{t('common.continue')}
-					</Button>
-				</div>
-			)}
 		</div>
 	);
 }

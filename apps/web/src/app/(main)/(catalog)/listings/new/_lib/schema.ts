@@ -1,39 +1,35 @@
 /** @format */
 
 import { z } from 'zod';
+import {
+	baseListingFields,
+	bundleSizeRefine,
+	emptyBaseListingValues,
+	listingFieldMessages,
+	listingImageSchema,
+} from '@/components/listings/form/schema';
 
 /**
- * New-listing validation — the single source of truth for the fields that gate
- * submission (title, category, price, at least one photo). Locale-aware factory
- * (tr/en) like the other form schemas; the field order matches the flow's
- * original inline checks so the first error message stays the same.
+ * New-listing form schema — shared base fields plus new-only extras (at least one
+ * photo required, manufacturer custom attributes). Locale-aware messages.
  */
-
-type Locale = string;
-const tr = (locale: Locale) => locale !== 'en';
-
-export const newListingSchema = (locale: Locale) => {
-	const required = tr(locale)
-		? 'Lütfen tüm zorunlu alanları doldurun'
-		: 'Please fill in all required fields';
-	const validPrice = tr(locale)
-		? 'Geçerli bir fiyat giriniz'
-		: 'Please enter a valid price';
-	const photo = tr(locale)
-		? 'En az bir fotoğraf ekleyin'
-		: 'Please add at least one photo';
-
-	return z.object({
-		title: z.string().trim().min(1, required),
-		categoryId: z.string().min(1, required),
-		price: z
-			.string()
-			.min(1, required)
-			.refine((v) => !isNaN(Number(v)) && Number(v) >= 1, validPrice),
-		images: z
-			.array(z.object({ cardKey: z.string(), detailKey: z.string() }))
-			.min(1, photo),
-	});
+export const newListingSchema = (locale: string) => {
+	const msg = listingFieldMessages(locale);
+	return z
+		.object({
+			...baseListingFields(msg),
+			images: z.array(listingImageSchema).min(1, msg.photo),
+			customAttributes: z.record(z.string(), z.array(z.string())),
+		})
+		.superRefine(bundleSizeRefine(msg.setSize));
 };
 
 export type NewListingValues = z.infer<ReturnType<typeof newListingSchema>>;
+
+/** Seed values for `useZodForm({ defaultValues })`. */
+export const emptyListingValues: NewListingValues = {
+	...emptyBaseListingValues,
+	quantity: '1',
+	images: [],
+	customAttributes: {},
+};

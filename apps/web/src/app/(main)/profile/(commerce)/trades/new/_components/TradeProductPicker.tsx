@@ -2,8 +2,9 @@
 
 'use client';
 
-import Link from 'next/link';
+import { ChevronRightIcon } from '@heroicons/react/24/outline';
 import { Checkbox } from '@tarodan/ui';
+import { ButtonLink } from '@/components/ui';
 import OptimizedImage from '@/components/OptimizedImage';
 import { getProductEffectivePrice } from '@/lib/productPrice';
 import { formatTL } from '@/lib/format';
@@ -24,9 +25,10 @@ export default function TradeProductPicker({
 		return (
 			<div className='py-8 text-center'>
 				<p className='mb-4 text-muted'>Takas edilebilir aktif ilanınız yok.</p>
-				<Link href='/profile/listings' className='font-medium text-primary-500 hover:text-primary-600'>
-					İlanlarıma Git →
-				</Link>
+				<ButtonLink variant='secondary' href='/profile/listings' className='gap-2'>
+					İlanlarıma Git
+					<ChevronRightIcon className='h-5 w-5' />
+				</ButtonLink>
 			</div>
 		);
 	}

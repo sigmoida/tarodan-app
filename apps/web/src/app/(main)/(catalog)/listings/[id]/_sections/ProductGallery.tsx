@@ -8,7 +8,7 @@ import {
 	ChevronRightIcon,
 	ArrowPathIcon,
 } from '@heroicons/react/24/outline';
-import { Button } from '@tarodan/ui';
+import { Badge, Button } from '@tarodan/ui';
 import OptimizedImage from '@/components/OptimizedImage';
 import { PLACEHOLDER } from '../_lib/images';
 import { useListingDetail } from '../_context/ListingDetailContext';
@@ -74,9 +74,10 @@ export default function ProductGallery() {
 				)}
 
 				{isTradeAvailable && (
-					<div className='absolute top-4 left-4 badge badge-trade text-base z-10'>
-						<ArrowsRightLeftIcon className='w-5 h-5 mr-1' />
-						{locale === 'en' ? 'Trade Available' : 'Takasa Açık'}
+					<div className='absolute top-4 left-4 z-10'>
+						<Badge variant='success' icon={<ArrowsRightLeftIcon className='w-4 h-4' />}>
+							{locale === 'en' ? 'Trade Available' : 'Takasa Açık'}
+						</Badge>
 					</div>
 				)}
 

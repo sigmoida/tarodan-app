@@ -2,7 +2,6 @@
 
 'use client';
 
-import Link from 'next/link';
 import { Button } from '@tarodan/ui';
 import { useTranslation } from '@/i18n';
 import type { MembershipDetails } from '../_lib/types';
@@ -36,22 +35,6 @@ export default function MembershipStatusBanners({
 	const { t } = useTranslation();
 	const isPaid = !!currentTier && currentTier !== 'free';
 	const isCancelled = membership.status === 'cancelled';
-
-	// Ödeme bekleniyor
-	if (membership.pendingPayment && membership.pendingTierName) {
-		return (
-			<div className='mx-auto max-w-md rounded-lg border border-warning-200 bg-warning-50 p-4 text-center'>
-				<p className='font-medium text-warning-800'>
-					Ödeme bekleniyor – {membership.pendingTierName} planı için ödemeyi tamamlayın.
-				</p>
-				<Link
-					href={`/membership/checkout?tier=${membership.pendingTierType || 'premium'}&period=monthly`}
-					className='mt-1 inline-block text-sm font-medium text-warning-700 underline'>
-					Ödemeyi tamamla
-				</Link>
-			</div>
-		);
-	}
 
 	// İptal edildi ama dönem sürüyor
 	if (isCancelled && isPaid) {

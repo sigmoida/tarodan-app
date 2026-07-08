@@ -36,15 +36,13 @@ export default function TierCard({
 		? t('membership.currentPlan')
 		: tier.price === 0
 			? t('membership.free')
-			: isSelected
-				? t('common.selected')
-				: t('common.select');
+			: t('common.continue');
 
 	return (
 		<div
 			id={`tier-${tier.id}`}
 			onClick={disabled ? undefined : onSelect}
-			className={`relative flex flex-col rounded-lg border bg-surface-elevated p-6 transition-all ${
+			className={`relative flex flex-col rounded-xl border bg-surface-elevated p-8 transition-all ${
 				disabled
 					? 'cursor-not-allowed opacity-60'
 					: 'cursor-pointer hover:border-primary-300'
@@ -72,35 +70,35 @@ export default function TierCard({
 				) : null}
 			</div>
 
-			<h3 className='text-xl font-bold text-heading'>{tier.name}</h3>
-			<p className='mt-1 text-sm text-muted'>{tier.description}</p>
+			<h3 className='text-2xl font-bold text-heading'>{tier.name}</h3>
+			<p className='mt-1.5 text-sm text-muted'>{tier.description}</p>
 
-			<div className='mt-4'>
+			<div className='mt-6'>
 				<div className='flex items-baseline gap-1'>
-					<span className='text-3xl font-bold text-heading'>
+					<span className='text-4xl font-bold text-heading'>
 						{tier.price === 0 ? 'Ücretsiz' : formatTL(price)}
 					</span>
 					{tier.price > 0 && (
-						<span className='text-sm text-muted'>/{period === 'yearly' ? 'yıl' : 'ay'}</span>
+						<span className='text-base text-muted'>/{period === 'yearly' ? 'yıl' : 'ay'}</span>
 					)}
 				</div>
 				{period === 'yearly' && tier.price > 0 && (
-					<p className='mt-1 text-xs text-muted'>
+					<p className='mt-1.5 text-sm text-muted'>
 						Ayda {formatTL(Math.round(price / 12))}
 						<span className='ml-1 text-success-600'>· %{discount} indirim</span>
 					</p>
 				)}
 			</div>
 
-			<ul className='mt-4 flex-1 space-y-2.5'>
+			<ul className='mt-6 flex-1 space-y-3'>
 				{tier.features.map((feature, i) => (
-					<li key={i} className='flex items-start gap-2'>
+					<li key={i} className='flex items-start gap-2.5'>
 						{feature.included ? (
-							<CheckIcon className='mt-0.5 h-4 w-4 flex-shrink-0 text-success-500' />
+							<CheckIcon className='mt-0.5 h-5 w-5 flex-shrink-0 text-success-500' />
 						) : (
-							<XMarkIcon className='mt-0.5 h-4 w-4 flex-shrink-0 text-subtle' />
+							<XMarkIcon className='mt-0.5 h-5 w-5 flex-shrink-0 text-subtle' />
 						)}
-						<span className={`text-sm ${feature.included ? 'text-body' : 'text-subtle'}`}>
+						<span className={`text-[15px] ${feature.included ? 'text-body' : 'text-subtle'}`}>
 							{feature.text}
 						</span>
 					</li>
@@ -108,8 +106,8 @@ export default function TierCard({
 			</ul>
 
 			<Button
-				variant={isSelected ? 'primary' : isCurrent ? 'secondary' : 'outline'}
-				size='md'
+				variant={isExactCurrent ? 'secondary' : tier.price === 0 ? 'outline' : 'primary'}
+				size='lg'
 				disabled={disabled}
 				onClick={
 					disabled
@@ -119,7 +117,7 @@ export default function TierCard({
 								onSelect();
 							}
 				}
-				className='mt-6 w-full'>
+				className='mt-8 w-full'>
 				{ctaLabel}
 			</Button>
 		</div>

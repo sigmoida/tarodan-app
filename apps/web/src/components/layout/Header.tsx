@@ -167,7 +167,7 @@ export default function Header() {
 
 				{/* Category bar - directly under the main bar, same header unit */}
 				{showCategoryBar && (
-					<div className='bg-surface border-b border-primary-300 relative z-40'>
+					<div className='bg-surface border-b border-primary-200 relative z-40'>
 						<Container className='px-4'>
 							<CategoryNav />
 						</Container>

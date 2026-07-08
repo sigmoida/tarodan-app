@@ -2,22 +2,33 @@
 
 "use client";
 
+import { useFormContext } from "react-hook-form";
 import { Button, Select } from "@tarodan/ui";
-import { FormSection } from "./FormSection";
+import SectionCard from "@/components/ui/SectionCard";
 import { useNewListing } from "../_context/NewListingContext";
 
 export default function ManufacturerAttributesSection() {
-  const { locale, formData, setFormData, manufacturerList, manufacturerAttrGroups } =
-    useNewListing();
+  const { locale, manufacturerList, manufacturerAttrGroups } = useNewListing();
+  const { watch, setValue } = useFormContext();
+  const manufacturerId = watch("manufacturerId");
+  const customAttributes: Record<string, string[]> =
+    watch("customAttributes") ?? {};
 
   if (manufacturerAttrGroups.length === 0) return null;
 
   const manufacturerName = manufacturerList.find(
-    (m) => m.id === formData.manufacturerId,
+    (m) => m.id === manufacturerId,
   )?.name;
 
+  const setGroup = (slug: string, values: string[]) => {
+    const next = { ...customAttributes };
+    if (values.length === 0) delete next[slug];
+    else next[slug] = values;
+    setValue("customAttributes", next);
+  };
+
   return (
-    <FormSection
+    <SectionCard
       title={`${manufacturerName ?? ""} ${locale === "en" ? "details" : "detayları"}`}
     >
       <p className="text-xs text-muted -mt-2 mb-4">
@@ -27,7 +38,7 @@ export default function ManufacturerAttributesSection() {
       </p>
       <div className="space-y-4">
         {manufacturerAttrGroups.map((group) => {
-          const selected = formData.customAttributes[group.slug] ?? [];
+          const selected = customAttributes[group.slug] ?? [];
           const isLong = group.attributes.length > 20;
           return (
             <div key={group.slug}>
@@ -42,27 +53,19 @@ export default function ManufacturerAttributesSection() {
               {isLong ? (
                 <Select
                   value={selected[0] ?? ""}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setFormData((prev) => {
-                      const next = { ...prev.customAttributes };
-                      if (!value) delete next[group.slug];
-                      else next[group.slug] = [value];
-                      return { ...prev, customAttributes: next };
-                    });
-                  }}
-                >
-                  <option value="">
-                    {locale === "en"
+                  onChange={(e) =>
+                    setGroup(group.slug, e.target.value ? [e.target.value] : [])
+                  }
+                  placeholder={
+                    locale === "en"
                       ? `Select ${group.name.toLowerCase()}`
-                      : `${group.name} seçin`}
-                  </option>
-                  {group.attributes.map((a) => (
-                    <option key={a.slug} value={a.slug}>
-                      {a.label}
-                    </option>
-                  ))}
-                </Select>
+                      : `${group.name} seçin`
+                  }
+                  options={group.attributes.map((a) => ({
+                    value: a.slug,
+                    label: a.label,
+                  }))}
+                />
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {group.attributes.map((a) => {
@@ -72,18 +75,14 @@ export default function ManufacturerAttributesSection() {
                         key={a.slug}
                         variant="secondary"
                         type="button"
-                        onClick={() => {
-                          setFormData((prev) => {
-                            const current = prev.customAttributes[group.slug] ?? [];
-                            const nextArr = current.includes(a.slug)
-                              ? current.filter((s) => s !== a.slug)
-                              : [...current, a.slug];
-                            const map = { ...prev.customAttributes };
-                            if (nextArr.length === 0) delete map[group.slug];
-                            else map[group.slug] = nextArr;
-                            return { ...prev, customAttributes: map };
-                          });
-                        }}
+                        onClick={() =>
+                          setGroup(
+                            group.slug,
+                            isSelected
+                              ? selected.filter((s) => s !== a.slug)
+                              : [...selected, a.slug],
+                          )
+                        }
                         className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border transition-colors ${
                           isSelected
                             ? "bg-primary-500 text-inverted border-primary-500"
@@ -107,6 +106,6 @@ export default function ManufacturerAttributesSection() {
           );
         })}
       </div>
-    </FormSection>
+    </SectionCard>
   );
 }

@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowsRightLeftIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { ArrowsRightLeftIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { Button, Input, Radio, Spinner, Textarea } from '@tarodan/ui';
 import OptimizedImage from '@/components/OptimizedImage';
@@ -29,7 +29,7 @@ function NewTradeContent() {
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const listingId = searchParams.get('listing');
-	const { t } = useTranslation();
+	const { t, locale } = useTranslation();
 	const { user, isAuthenticated, isLoading: authLoading, limits } = useAuthStore();
 
 	const canTrade = limits
@@ -96,6 +96,11 @@ function NewTradeContent() {
 				<div className='mx-auto w-full max-w-2xl px-4 pt-4'>
 					<EmptyStateCard
 						title={t('trade.targetNotFound')}
+						description={
+							locale === 'en'
+								? 'The product you wanted to trade for could not be found or is no longer available.'
+								: 'Takas etmek istediğiniz ürün bulunamadı veya artık mevcut değil.'
+						}
 						action={
 							<Button asChild>
 								<Link href='/listings'>{t('seller.backToListings')}</Link>
@@ -110,14 +115,8 @@ function NewTradeContent() {
 	return (
 		<PageShell className='pb-16'>
 			<PageHeader
-				breadcrumb={
-					<Link
-						href={`/listings/${listingId}`}
-						className='inline-flex items-center gap-2 text-sm text-muted hover:text-heading'>
-						<ArrowLeftIcon className='h-4 w-4' />
-						{t('common.back')}
-					</Link>
-				}
+				backHref={`/listings/${listingId}`}
+				backLabel={t('common.back')}
 				title={t('trade.createTrade')}
 				description='Takas etmek istediğiniz ürünleri seçin'
 			/>

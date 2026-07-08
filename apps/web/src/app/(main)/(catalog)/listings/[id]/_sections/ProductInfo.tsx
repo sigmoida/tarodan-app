@@ -15,7 +15,7 @@ import {
 	ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
-import { Badge, Button } from '@tarodan/ui';
+import { Badge, Button, IconButton } from '@tarodan/ui';
 import { ButtonLink } from '@/components/ui/ButtonLink';
 import { SectionCard } from '@/components/ui';
 import {
@@ -93,25 +93,25 @@ export default function ProductInfo() {
 					)}
 				</div>
 				<div className='flex gap-2'>
-					<Button
-						variant='secondary'
+					<IconButton
+						variant={isFavorite ? 'danger' : 'ghost'}
 						onClick={handleToggleFavorite}
-						className='p-2 rounded hover:bg-surface-alt transition-colors'
+						aria-label={t('product.addToFavorites')}
 						title={t('product.addToFavorites')}>
 						{isFavorite ? (
-							<HeartSolidIcon className='w-6 h-6 text-danger-500' />
+							<HeartSolidIcon className='w-6 h-6' />
 						) : (
-							<HeartIcon className='w-6 h-6 text-subtle' />
+							<HeartIcon className='w-6 h-6' />
 						)}
-					</Button>
+					</IconButton>
 					<div className='relative'>
-						<Button
-							variant='secondary'
+						<IconButton
+							variant='ghost'
 							onClick={handleShare}
-							className='p-2 rounded hover:bg-surface-alt transition-colors'
+							aria-label={locale === 'en' ? 'Share' : 'Paylaş'}
 							title={locale === 'en' ? 'Share' : 'Paylaş'}>
-							<ShareIcon className='w-6 h-6 text-subtle' />
-						</Button>
+							<ShareIcon className='w-6 h-6' />
+						</IconButton>
 
 						{showShareMenu && (
 							<div className='absolute right-0 top-full mt-2 w-48 bg-surface-elevated rounded shadow-lg border border-border py-2 z-50'>
@@ -164,8 +164,8 @@ export default function ProductInfo() {
 						)}
 					</div>
 					{/* Report */}
-					<Button
-						variant='secondary'
+					<IconButton
+						variant='ghost'
 						onClick={() => {
 							if (!isAuthenticated) {
 								requireAuth({
@@ -177,10 +177,10 @@ export default function ProductInfo() {
 								setShowReportModal(true);
 							}
 						}}
-						className='p-2 rounded hover:bg-danger-50 transition-colors'
+						aria-label={t('product.reportListing')}
 						title={t('product.reportListing')}>
-						<FlagIcon className='w-6 h-6 text-subtle hover:text-danger-500' />
-					</Button>
+						<FlagIcon className='w-6 h-6' />
+					</IconButton>
 				</div>
 			</div>
 
@@ -359,6 +359,7 @@ export default function ProductInfo() {
 							// cartLoading: while the cart first loads the Add/Remove label isn't
 							// settled yet → block that click so we don't fire the wrong action.
 							disabled={isAddingToCart || cartLoading || listing.status !== 'active'}
+							isLoading={isAddingToCart}
 							leftIcon={<ShoppingCartIcon className='w-5 h-5' />}
 							className='w-full'>
 							{isAddingToCart

@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useZodForm } from '@tarodan/ui/form';
 import { listingsApi, userApi } from '@/lib/api';
-import { createInitialFormData, createInitialSaleData } from '../_lib/constants';
+import { createInitialSaleData } from '../_lib/constants';
 import { buildListingFormData, buildSaleDataFromListing } from '../_lib/build-edit-form-data';
+import { editListingSchema, emptyEditValues, type EditListingValues } from '../_lib/schema';
 import type { EditListingFormData, SaleData } from '../_lib/types';
 
 interface UseEditListingFormParams {
@@ -13,67 +15,36 @@ interface UseEditListingFormParams {
   isAuthenticated: boolean;
 }
 
+/** Normalize the mixed-typed merge result into all-string form values. */
+function toValues(fd: EditListingFormData): EditListingValues {
+  return {
+    ...emptyEditValues,
+    ...fd,
+    year: fd.year !== undefined && fd.year !== null ? String(fd.year) : '',
+    quantity:
+      fd.quantity !== undefined && fd.quantity !== null && fd.quantity !== ''
+        ? String(fd.quantity)
+        : '',
+    bundleSize:
+      fd.bundleSize !== undefined && fd.bundleSize !== null
+        ? String(fd.bundleSize)
+        : '',
+  };
+}
+
 export function useEditListingForm({ id, authLoading, isAuthenticated }: UseEditListingFormParams) {
   const router = useRouter();
   const queryClient = useQueryClient();
 
+  const form = useZodForm(editListingSchema, { defaultValues: emptyEditValues });
+  const { reset, getValues } = form;
+
   // Shared submit/lifecycle busy flag (also driven by `useListingLifecycle`).
   const [isLoading, setIsLoading] = useState(false);
-
-  const [formData, setFormData] = useState<EditListingFormData>(createInitialFormData);
-  // Store preview URLs separately (presigned URLs for display)
+  // Store preview URLs separately (presigned URLs for display).
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
   const [showDiscountSection, setShowDiscountSection] = useState(false);
   const [saleData, setSaleData] = useState<SaleData>(createInitialSaleData);
-
-  // Load saved form data from localStorage on mount (before the API resolves).
-  useEffect(() => {
-    if (!id) return;
-
-    // Use a small delay to ensure localStorage is ready after page navigation
-    const timer = setTimeout(() => {
-      const storageKey = `editListingFormData_${id}`;
-      const savedFormData = localStorage.getItem(storageKey);
-
-      if (savedFormData) {
-        try {
-          const parsed = JSON.parse(savedFormData);
-
-          // Always restore if we have data, even if quantity is empty string
-          const quantityValue = parsed.quantity !== undefined && parsed.quantity !== null && parsed.quantity !== ''
-            ? String(parsed.quantity)
-            : '';
-
-          setFormData(prev => ({
-            ...prev,
-            ...parsed,
-            quantity: quantityValue,
-          }));
-        } catch {
-        }
-      }
-    }, 100); // Small delay to ensure localStorage is ready
-
-    return () => clearTimeout(timer);
-  }, [id]);
-
-  // Save form data to localStorage whenever it changes (debounced).
-  useEffect(() => {
-    if (!id) return;
-
-    const timeoutId = setTimeout(() => {
-      const storageKey = `editListingFormData_${id}`;
-
-      // Ensure quantity is always saved as string (empty string = unlimited)
-      const quantityToSave = formData.quantity !== undefined && formData.quantity !== null && formData.quantity !== ''
-        ? String(formData.quantity)
-        : '';
-
-      localStorage.setItem(storageKey, JSON.stringify({ ...formData, quantity: quantityToSave }));
-    }, 300); // Debounce to avoid too many writes
-
-    return () => clearTimeout(timeoutId);
-  }, [formData, id]);
 
   // Auth gate.
   useEffect(() => {
@@ -112,59 +83,21 @@ export function useEditListingForm({ id, authLoading, isAuthenticated }: UseEdit
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listingQuery.isError]);
 
-  // Merge the fetched listing with any localStorage draft — once, when the data
-  // first arrives. Saved (draft) quantity wins over the API value so a reload
-  // never discards the user's in-progress edits.
+  // Populate the form from the fetched listing — once, when the data arrives.
   const populatedRef = useRef(false);
   useEffect(() => {
     const listing = listingQuery.data;
     if (!listing || populatedRef.current) return;
     populatedRef.current = true;
 
-    const storageKey = `editListingFormData_${id}`;
-    const savedFormData = localStorage.getItem(storageKey);
-    let savedData: any = null;
-    if (savedFormData) {
-      try {
-        savedData = JSON.parse(savedFormData);
-      } catch {
-      }
-    }
-
-    let quantityValue = '';
-    if (savedData && savedData.quantity !== undefined && savedData.quantity !== null && savedData.quantity !== '') {
-      quantityValue = String(savedData.quantity);
-    } else if (listing.quantity !== undefined && listing.quantity !== null) {
-      quantityValue = String(listing.quantity);
-    } else if (formData.quantity !== undefined && formData.quantity !== null && formData.quantity !== '') {
-      quantityValue = String(formData.quantity);
-    }
-
-    let finalQuantity = quantityValue;
-    if (savedData && savedData.quantity !== undefined && savedData.quantity !== null && savedData.quantity !== '') {
-      finalQuantity = String(savedData.quantity);
-    }
-
-    setFormData(prev => {
-      let quantityToUse = finalQuantity;
-      if (savedData && savedData.quantity !== undefined && savedData.quantity !== null && savedData.quantity !== '') {
-        quantityToUse = String(savedData.quantity);
-      } else if (prev.quantity && prev.quantity !== '') {
-        quantityToUse = String(prev.quantity);
-      } else {
-        quantityToUse = finalQuantity;
-      }
-
-      const { newFormData, previewUrls } = buildListingFormData(prev, listing, savedData, quantityToUse);
-      setImagePreviewUrls(previewUrls);
-      return newFormData;
-    });
+    const prev = getValues() as unknown as EditListingFormData;
+    const { newFormData, previewUrls } = buildListingFormData(prev, listing);
+    reset(toValues(newFormData));
+    setImagePreviewUrls(previewUrls);
 
     const { saleData: nextSaleData, saleActive } = buildSaleDataFromListing(listing);
     setSaleData(nextSaleData);
-    if (saleActive) {
-      setShowDiscountSection(true);
-    }
+    if (saleActive) setShowDiscountSection(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listingQuery.data]);
 
@@ -178,8 +111,6 @@ export function useEditListingForm({ id, authLoading, isAuthenticated }: UseEdit
       queryClient.invalidateQueries({ queryKey: ['listing', id] });
       queryClient.invalidateQueries({ queryKey: ['listings'] });
       queryClient.invalidateQueries({ queryKey: ['profile-listings'] });
-      // Clear the saved draft after a successful save.
-      localStorage.removeItem(`editListingFormData_${id}`);
       router.push(`/listings/${id}`);
     },
     onError: (error: any) =>
@@ -187,50 +118,34 @@ export function useEditListingForm({ id, authLoading, isAuthenticated }: UseEdit
     onSettled: () => setIsLoading(false),
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!formData.title || !formData.price || !formData.categoryId) {
-      toast.error('Lütfen tüm zorunlu alanları doldurun');
-      return;
-    }
-
-    if (isNaN(Number(formData.price)) || Number(formData.price) < 1) {
-      toast.error('Geçerli bir fiyat giriniz');
-      return;
-    }
-
-    const formPrice = Number(formData.price);
+  const onSubmit = (values: EditListingValues) => {
+    const formPrice = Number(values.price);
     const orig = saleData.originalPrice ? Number(saleData.originalPrice) : formPrice;
     const sale = saleData.salePrice ? Number(saleData.salePrice) : 0;
-    // Use whichever is higher between formData.price and saleData.originalPrice as the "original"
     const effectiveOrig = Math.max(orig, formPrice);
-    // A sale is valid only when salePrice > 0, effectively lower than the listed price, and distinct from it
     const hasSale = sale > 0 && effectiveOrig > sale && sale !== formPrice;
+
     const payload: Record<string, unknown> = {
-      title: formData.title,
-      description: formData.description || undefined,
-      price: Number(formData.price),
-      categoryId: formData.categoryId,
-      condition: formData.condition,
-      brandId: formData.brandId || undefined,
-      carModelId: formData.carModelId || undefined,
-      scale: formData.scale || undefined,
-      material: formData.material || undefined,
-      manufacturerId: formData.manufacturerId || undefined,
-      year: formData.year ? Number(formData.year) : undefined,
-      isTradeEnabled: formData.isTradeEnabled,
-      isPreorder: formData.isPreorder,
-      isSet: formData.isSet,
+      title: values.title,
+      description: values.description || undefined,
+      price: formPrice,
+      categoryId: values.categoryId,
+      condition: values.condition,
+      brandId: values.brandId || undefined,
+      carModelId: values.carModelId || undefined,
+      scale: values.scale || undefined,
+      material: values.material || undefined,
+      manufacturerId: values.manufacturerId || undefined,
+      year: values.year ? Number(values.year) : undefined,
+      isTradeEnabled: values.isTradeEnabled,
+      isPreorder: values.isPreorder,
+      isSet: values.isSet,
       bundleSize:
-        formData.isSet && Number(formData.bundleSize) >= 2
-          ? Number(formData.bundleSize)
-          : null,
-      quantity: formData.quantity && formData.quantity !== '' ? Number(formData.quantity) : null,
-      images: formData.images.length > 0 ? formData.images : undefined,
-      status: formData.status,
+        values.isSet && Number(values.bundleSize) >= 2 ? Number(values.bundleSize) : null,
+      quantity: values.quantity && values.quantity !== '' ? Number(values.quantity) : null,
+      images: values.images.length > 0 ? values.images : undefined,
+      status: values.status,
     };
-    // Sale/discount fields: send to backend so listing shows updated price
     if (hasSale) {
       payload.originalPrice = effectiveOrig;
       payload.salePrice = sale;
@@ -247,8 +162,8 @@ export function useEditListingForm({ id, authLoading, isAuthenticated }: UseEdit
   };
 
   return {
-    formData,
-    setFormData,
+    form,
+    onSubmit,
     saleData,
     setSaleData,
     imagePreviewUrls,
@@ -258,6 +173,5 @@ export function useEditListingForm({ id, authLoading, isAuthenticated }: UseEdit
     isLoading,
     setIsLoading,
     isFetching,
-    handleSubmit,
   };
 }

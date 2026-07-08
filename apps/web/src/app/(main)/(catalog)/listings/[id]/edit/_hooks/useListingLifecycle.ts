@@ -2,32 +2,34 @@ import { useState, useEffect } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
+import type { UseFormReturn } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { listingsApi, api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
-import type { EditListingFormData } from '../_lib/types';
+import type { EditListingValues } from '../_lib/schema';
 
 interface UseListingLifecycleParams {
   id: string;
-  formData: EditListingFormData;
-  setFormData: Dispatch<SetStateAction<EditListingFormData>>;
+  form: UseFormReturn<EditListingValues>;
   setIsLoading: Dispatch<SetStateAction<boolean>>;
 }
 
-export function useListingLifecycle({ id, formData, setFormData, setIsLoading }: UseListingLifecycleParams) {
+export function useListingLifecycle({ id, form, setIsLoading }: UseListingLifecycleParams) {
   const router = useRouter();
   const { refreshUserData } = useAuthStore();
 
   const [reactivateQuantity, setReactivateQuantity] = useState('1');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
+  const status = form.watch('status');
+  const quantity = form.watch('quantity');
+
   // Sync reactivateQuantity with actual product quantity when sold/inactive (so "Yeniden Satışa Aç" shows real stock)
   useEffect(() => {
-    if ((formData.status === 'sold' || formData.status === 'inactive') && formData.quantity !== undefined && formData.quantity !== null && formData.quantity !== '') {
-      const qty = String(formData.quantity);
-      setReactivateQuantity(qty);
+    if ((status === 'sold' || status === 'inactive') && quantity !== undefined && quantity !== null && quantity !== '') {
+      setReactivateQuantity(String(quantity));
     }
-  }, [formData.status, formData.quantity]);
+  }, [status, quantity]);
 
   const reactivateMutation = useMutation({
     mutationFn: (qty: number) => listingsApi.update(id, { status: 'active', quantity: qty } as any),
@@ -55,7 +57,7 @@ export function useListingLifecycle({ id, formData, setFormData, setIsLoading }:
       setIsLoading(true);
     },
     onSuccess: () => {
-      setFormData({ ...formData, status: 'inactive' });
+      form.setValue('status', 'inactive');
       toast.success('İlan pasife alındı');
     },
     onError: (error: any) => {
@@ -75,7 +77,7 @@ export function useListingLifecycle({ id, formData, setFormData, setIsLoading }:
       setIsLoading(true);
     },
     onSuccess: () => {
-      setFormData({ ...formData, status: 'pending' });
+      form.setValue('status', 'pending');
       toast.success('İlanınız incelemeye gönderildi. Onaylandığında yayına girecek.');
     },
     onError: (error: any) => {

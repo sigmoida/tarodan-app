@@ -2,27 +2,51 @@
 
 'use client';
 
-import Link from 'next/link';
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { Spinner } from '@tarodan/ui';
+import { Form } from '@tarodan/ui/form';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
+import {
+	TitleDescriptionCard,
+	ProductDetailsCard,
+	OptionsCard,
+	PricingCard,
+	ImagesCard,
+} from '@/components/listings/form';
 import {
 	NewListingProvider,
 	useNewListing,
 } from './_context/NewListingContext';
-import BasicInfoSection from './_sections/BasicInfoSection';
-import ProductDetailsSection from './_sections/ProductDetailsSection';
 import ManufacturerAttributesSection from './_sections/ManufacturerAttributesSection';
-import OptionsSection from './_sections/OptionsSection';
-import PricingSection from './_sections/PricingSection';
-import ImagesSection from './_sections/ImagesSection';
 import SubmitBar from './_sections/SubmitBar';
 import { LimitBanner, BankGate } from './_sections/ListingBanners';
 
 function NewListingLayout() {
-	const { authLoading, isAuthenticated, hasBankAccount, handleSubmit } =
-		useNewListing();
+	const {
+		authLoading,
+		isAuthenticated,
+		hasBankAccount,
+		form,
+		onSubmit,
+		locale,
+		CONDITIONS,
+		flatCategories,
+		brands,
+		brandsLoading,
+		models,
+		modelsLoading,
+		scaleList,
+		materialList,
+		manufacturerList,
+		yearOptions,
+		commissionPreview,
+		commissionPreviewLoading,
+		limits,
+		imagePreviewUrls,
+		uploadingImages,
+		handleFileUpload,
+		removeImage,
+	} = useNewListing();
 
 	if (authLoading) {
 		return (
@@ -40,24 +64,50 @@ function NewListingLayout() {
 				description='Ürününüzü koleksiyoncularla buluşturun'
 			/>
 
-			<div className='mx-auto w-full max-w-4xl'>
-				<LimitBanner />
-				<BankGate />
+			<LimitBanner />
+			<BankGate />
 
-				{hasBankAccount && (
-					<form
-						onSubmit={handleSubmit}
-						className='space-y-4'>
-						<BasicInfoSection />
-						<ProductDetailsSection />
-						<ManufacturerAttributesSection />
-						<OptionsSection />
-						<PricingSection />
-						<ImagesSection />
-						<SubmitBar />
-					</form>
-				)}
-			</div>
+			{hasBankAccount && (
+				<Form
+					form={form}
+					onSubmit={onSubmit}
+					className='space-y-4'>
+					<TitleDescriptionCard />
+					<ProductDetailsCard
+						locale={locale}
+						conditions={CONDITIONS}
+						flatCategories={flatCategories}
+						brands={brands}
+						brandsLoading={brandsLoading}
+						models={models}
+						modelsLoading={modelsLoading}
+						scaleList={scaleList}
+						materialList={materialList}
+						manufacturerList={manufacturerList}
+						yearOptions={yearOptions}
+					/>
+					<ManufacturerAttributesSection />
+					<OptionsCard locale={locale} canTrade={!!limits?.canTrade} />
+					<PricingCard
+						locale={locale}
+						commissionPreview={commissionPreview}
+						commissionPreviewLoading={commissionPreviewLoading}
+						quantityPlaceholder='1'
+						quantityHelper={
+							locale === 'en' ? 'Defaults to 1 if left empty' : 'Boş bırakırsanız 1 adet'
+						}
+					/>
+					<ImagesCard
+						locale={locale}
+						maxImages={limits?.maxImagesPerListing || 3}
+						imagePreviewUrls={imagePreviewUrls}
+						uploadingImages={uploadingImages}
+						handleFileUpload={handleFileUpload}
+						removeImage={removeImage}
+					/>
+					<SubmitBar />
+				</Form>
+			)}
 		</PageShell>
 	);
 }

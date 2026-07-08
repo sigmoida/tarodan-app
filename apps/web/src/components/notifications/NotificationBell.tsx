@@ -186,6 +186,17 @@ export default function NotificationBell() {
                         className="block"
                       >
                         <div className="flex items-start gap-3">
+                          {/* Leading unread indicator — reserves the same width
+                              when read so titles stay aligned. Kept on the left
+                              so it never collides with the top-right dismiss X. */}
+                          <span
+                            className="mt-1.5 h-2 w-2 flex-shrink-0"
+                            aria-hidden="true"
+                          >
+                            {!notification.isRead && (
+                              <span className="block h-2 w-2 rounded-full bg-primary-500" />
+                            )}
+                          </span>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2">
                               <p
@@ -197,6 +208,7 @@ export default function NotificationBell() {
                               >
                                 {notification.title}
                               </p>
+                              {/* Time hides on hover so the dismiss X can take its spot */}
                               <span className="text-xs text-subtle flex-shrink-0 transition-opacity group-hover:opacity-0">
                                 {getTimeAgo(notification.createdAt)}
                               </span>
@@ -205,9 +217,6 @@ export default function NotificationBell() {
                               {notification.message}
                             </p>
                           </div>
-                          {!notification.isRead && (
-                            <span className="w-2 h-2 bg-primary-500 rounded-full flex-shrink-0 mt-1.5"></span>
-                          )}
                         </div>
                       </Link>
                       <Button

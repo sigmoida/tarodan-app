@@ -85,6 +85,23 @@ export function useTierSelection({
 		};
 	}, [isRequired, isBusinessAccount, currentTier, router]);
 
+	// Route to login/checkout for a specific tier (uses the tierId directly rather
+	// than the async `selectedTier` state so a single card click can continue).
+	const proceed = (tierId: string) => {
+		if (!isAuthenticated) {
+			toast.error(t('membership.loginToContinue'));
+			router.push(`/login?redirect=/membership?tier=${tierId}`);
+			return;
+		}
+		const requiredParam = isRequired ? '&required=true' : '';
+		const checkoutUrl = `/membership/checkout?tier=${tierId}&period=${selectedPeriod}${requiredParam}`;
+		// required=true'da daha güvenilir navigasyon için window.location.
+		if (isRequired) window.location.href = checkoutUrl;
+		else router.push(checkoutUrl);
+	};
+
+	// One-click: selecting a plan card takes the user straight to checkout/login
+	// (no separate "continue" step). Free = downgrade; the active plan = a no-op.
 	const handleSelectTier = (tierId: string) => {
 		if (isExactCurrentPlan(tierId)) {
 			toast(t('membership.planAlreadyActive'));
@@ -97,23 +114,7 @@ export function useTierSelection({
 			return;
 		}
 		setSelectedTier(tierId);
-	};
-
-	const handleContinue = () => {
-		if (!selectedTier || selectedTier === 'free') {
-			toast.error(t('membership.selectPlan'));
-			return;
-		}
-		if (!isAuthenticated) {
-			toast.error(t('membership.loginToContinue'));
-			router.push(`/login?redirect=/membership?tier=${selectedTier}`);
-			return;
-		}
-		const requiredParam = isRequired ? '&required=true' : '';
-		const checkoutUrl = `/membership/checkout?tier=${selectedTier}&period=${selectedPeriod}${requiredParam}`;
-		// required=true'da daha güvenilir navigasyon için window.location.
-		if (isRequired) window.location.href = checkoutUrl;
-		else router.push(checkoutUrl);
+		proceed(tierId);
 	};
 
 	return {
@@ -124,6 +125,5 @@ export function useTierSelection({
 		isRequired,
 		isExactCurrentPlan,
 		handleSelectTier,
-		handleContinue,
 	};
 }

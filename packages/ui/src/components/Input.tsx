@@ -1,6 +1,7 @@
 /** @format */
 
 import React, { useState } from 'react';
+import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { cn } from '../lib/utils';
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -48,59 +49,18 @@ const inputClasses = (error?: string, inputSize: 'sm' | 'md' | 'lg' = 'md') =>
 		sizePaddingX[inputSize],
 		sizePaddingY[inputSize],
 		'placeholder:text-subtle',
+		// Tarayıcının kendi şifre göster/temizle/autofill butonlarını gizle
+		// (Edge kutulu göz + Chrome/Safari şifre yöneticisi ikonu, focus'ta belirir).
+		'[&::-ms-reveal]:hidden [&::-ms-clear]:hidden',
+		'[&::-webkit-credentials-auto-fill-button]:!hidden',
+		'[&::-webkit-strong-password-auto-fill-button]:!hidden',
+		'[&::-webkit-contacts-auto-fill-button]:!hidden',
 		'focus:outline-none focus:ring-1 focus:ring-offset-0',
 		error
 			? 'border-danger-500 focus:border-danger-500 focus:ring-danger-500'
 			: 'border-border focus:border-primary-500 focus:ring-primary-500',
 		'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-surface',
 	);
-
-/** Şifreyi göster (göz) ikonu */
-function EyeIcon() {
-	return (
-		<svg
-			width='20'
-			height='20'
-			viewBox='0 0 24 24'
-			fill='none'
-			stroke='currentColor'
-			strokeWidth='2'
-			strokeLinecap='round'
-			strokeLinejoin='round'
-			aria-hidden='true'>
-			<path d='M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z' />
-			<circle
-				cx='12'
-				cy='12'
-				r='3'
-			/>
-		</svg>
-	);
-}
-
-/** Şifreyi gizle (göz-çizgili) ikonu */
-function EyeOffIcon() {
-	return (
-		<svg
-			width='20'
-			height='20'
-			viewBox='0 0 24 24'
-			fill='none'
-			stroke='currentColor'
-			strokeWidth='2'
-			strokeLinecap='round'
-			strokeLinejoin='round'
-			aria-hidden='true'>
-			<path d='M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24' />
-			<line
-				x1='1'
-				y1='1'
-				x2='23'
-				y2='23'
-			/>
-		</svg>
-	);
-}
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
 	(
@@ -142,76 +102,59 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
 				aria-label={showPassword ? 'Şifreyi gizle' : 'Şifreyi göster'}
 				className='flex items-center text-subtle outline-none transition-colors hover:text-body focus:outline-none disabled:cursor-not-allowed'
 				disabled={props.disabled}>
-				{showPassword ? <EyeOffIcon /> : <EyeIcon />}
+				{showPassword ? (
+					<EyeSlashIcon className='h-5 w-5' />
+				) : (
+					<EyeIcon className='h-5 w-5' />
+				)}
 			</button>
 		) : null;
 
-		// Hem özel rightAdornment hem göz butonu olabilir → ikisini de göster.
+		// Göz butonu ve/veya özel rightAdornment birlikte olabilir.
 		const effectiveRight =
 			passwordToggle && rightAdornment ? (
-				<span className='flex items-center gap-2'>
+				<>
 					{rightAdornment}
 					{passwordToggle}
-				</span>
+				</>
 			) : (
 				(passwordToggle ?? rightAdornment)
 			);
 
-		const hasAdornment = Boolean(leftAdornment || effectiveRight);
+		const hasLeft = Boolean(leftAdornment);
+		const hasRight = Boolean(effectiveRight);
 
+		// Tek input border + focus ring'i taşır; adornment'lar üstünde absolute durur.
 		const renderControl = () => {
-			if (!hasAdornment) {
-				return (
-					<input
-						type={effectiveType}
-						id={inputId}
-						className={cn(inputClasses(error, inputSize), className)}
-						ref={ref}
-						{...props}
-					/>
-				);
-			}
-			// With adornment: input loses side padding; wrapper carries border.
-			return (
-				<div
+			const control = (
+				<input
+					type={effectiveType}
+					id={inputId}
 					className={cn(
-						'flex w-full items-center rounded-lg border bg-surface-elevated transition-colors',
-						sizeClasses[inputSize],
-						'focus-within:outline-none focus-within:ring-1 focus-within:ring-offset-0',
-						error
-							? 'border-danger-500 focus-within:border-danger-500 focus-within:ring-danger-500'
-							: 'border-border focus-within:border-primary-500 focus-within:ring-primary-500',
-						props.disabled && 'cursor-not-allowed opacity-50 bg-surface',
+						inputClasses(error, inputSize),
+						hasLeft && 'pl-10',
+						hasRight && 'pr-10',
 						className,
-					)}>
-					{leftAdornment && (
-						<span
-							className={cn(
-								'flex items-center pl-3 text-subtle',
-								sizePaddingY[inputSize],
-							)}>
+					)}
+					ref={ref}
+					{...props}
+				/>
+			);
+
+			if (!hasLeft && !hasRight) {
+				return control;
+			}
+
+			return (
+				<div className='relative w-full'>
+					{hasLeft && (
+						<span className='pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-subtle'>
 							{leftAdornment}
 						</span>
 					)}
-					<input
-						type={effectiveType}
-						id={inputId}
-						className={cn(
-							'flex w-full bg-transparent text-body outline-none placeholder:text-subtle disabled:cursor-not-allowed',
-							sizePaddingX[inputSize],
-							sizePaddingY[inputSize],
-							leftAdornment ? 'pl-2' : '',
-							effectiveRight ? 'pr-2' : '',
-						)}
-						ref={ref}
-						{...props}
-					/>
-					{effectiveRight && (
-						<span
-							className={cn(
-								'flex items-center pr-3 text-subtle',
-								sizePaddingY[inputSize],
-							)}>
+					{control}
+					{hasRight && (
+						<span className='absolute inset-y-0 right-0 flex items-center gap-1 pr-3 text-subtle'>
 							{effectiveRight}
 						</span>
 					)}

@@ -12,27 +12,27 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import type { UseFormReturn } from "react-hook-form";
+import { useZodForm } from "@tarodan/ui/form";
 import toast from "react-hot-toast";
-import { listingsApi, mediaApi, bankAccountApi } from "@/lib/api";
+import { listingsApi, bankAccountApi } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import { useTranslation } from "@/i18n/LanguageContext";
-import { newListingSchema } from "../_lib/schema";
 import {
-  useCategories,
+  newListingSchema,
+  emptyListingValues,
+  type NewListingValues,
+} from "../_lib/schema";
+import { getConditions } from "@/components/listings/form/constants";
+import {
+  useListingCategories,
   useListingFilters,
   useCarModels,
   useManufacturerAttributes,
   useListingLimits,
   useCommissionPreview,
-} from "../_hooks/useListingFormQueries";
-
-const getConditions = (locale: string) => [
-  { value: "new", label: locale === "en" ? "New" : "Yeni" },
-  { value: "like_new", label: locale === "en" ? "Like New" : "Sıfır Gibi" },
-  { value: "very_good", label: locale === "en" ? "Very Good" : "Mükemmel" },
-  { value: "good", label: locale === "en" ? "Good" : "İyi" },
-  { value: "fair", label: locale === "en" ? "Fair" : "Orta" },
-];
+} from "@/components/listings/form/queries";
+import { useListingImageUpload } from "@/components/listings/form/useListingImageUpload";
 
 function useNewListingValue() {
   const router = useRouter();
@@ -40,6 +40,17 @@ function useNewListingValue() {
     useAuthStore();
   const { locale } = useTranslation();
   const CONDITIONS = getConditions(locale);
+
+  const form = useZodForm(newListingSchema(locale), {
+    defaultValues: emptyListingValues,
+  });
+  const { watch, setValue, getValues } = form;
+
+  // Watched values that drive dependent queries / conditional UI.
+  const brandId = watch("brandId");
+  const manufacturerId = watch("manufacturerId");
+  const price = watch("price");
+  const categoryId = watch("categoryId");
 
   const bankAccountQuery = useQuery({
     queryKey: ["bank-account"],
@@ -49,49 +60,28 @@ function useNewListingValue() {
   const hasBankAccount = !!bankAccountQuery.data;
   const bankAccountLoading = bankAccountQuery.isLoading;
 
-  const [isLoading, setIsLoading] = useState(false);
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from(
     { length: currentYear - 1950 + 1 },
     (_, i) => currentYear - i,
   );
 
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    price: "",
-    categoryId: "",
-    condition: "very_good" as string,
-    brandId: "",
-    carModelId: "",
-    scale: "1:64",
-    material: "" as string,
-    manufacturerId: "" as string,
-    year: "" as string | number,
-    isTradeEnabled: false,
-    isSet: false,
-    bundleSize: undefined as number | undefined,
-    quantity: 1 as string | number,
-    images: [] as Array<{ cardKey: string; detailKey: string }>,
-    customAttributes: {} as Record<string, string[]>,
-  });
-  const [uploadingImages, setUploadingImages] = useState(false);
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
 
-  // ---- Server data (TanStack Query — _hooks/useListingFormQueries) ----
+  // ---- Server data (shared catalog queries) ----
   const queryEnabled = !authLoading && isAuthenticated;
-  const { flatCategories } = useCategories(queryEnabled);
+  const { flatCategories } = useListingCategories(queryEnabled, true);
   const {
     scales: scaleList,
     materials: materialList,
     brands,
     manufacturers: manufacturerList,
-    isLoading: brandsLoading,
+    brandsLoading,
   } = useListingFilters();
-  const selectedBrandSlug = brands.find((b) => b.id === formData.brandId)?.slug;
-  const { models, isLoading: modelsLoading } = useCarModels(selectedBrandSlug);
+  const selectedBrandSlug = brands.find((b) => b.id === brandId)?.slug;
+  const { models, modelsLoading } = useCarModels(selectedBrandSlug);
   const selectedManufacturerSlug = manufacturerList.find(
-    (m) => m.id === formData.manufacturerId,
+    (m) => m.id === manufacturerId,
   )?.slug;
   const { manufacturerAttrGroups } = useManufacturerAttributes(
     selectedManufacturerSlug,
@@ -101,94 +91,9 @@ function useNewListingValue() {
     user?.membershipTier || "free",
   );
   const { commissionPreview, commissionPreviewLoading } = useCommissionPreview(
-    formData.price,
-    formData.categoryId,
+    price,
+    categoryId,
   );
-
-  // Restore the draft from localStorage on mount.
-  useEffect(() => {
-    const savedFormData = localStorage.getItem("newListingFormData");
-    if (!savedFormData) return;
-    try {
-      const parsed = JSON.parse(savedFormData);
-      if (
-        parsed.title ||
-        parsed.description ||
-        parsed.price ||
-        parsed.quantity !== undefined ||
-        parsed.images?.length > 0 ||
-        parsed.imageUrls?.length > 0
-      ) {
-        const images =
-          parsed.images ??
-          parsed.imageUrls?.map((k: string) =>
-            typeof k === "string" ? { cardKey: k, detailKey: k } : k,
-          ) ??
-          [];
-        setFormData((prev) => ({
-          ...prev,
-          ...parsed,
-          images: Array.isArray(images) ? images : [],
-          quantity:
-            parsed.quantity !== undefined &&
-            parsed.quantity !== null &&
-            parsed.quantity !== ""
-              ? Number(parsed.quantity)
-              : "",
-        }));
-
-        if (images?.length > 0) {
-          const restorePreviewUrls = async () => {
-            const previewUrls: string[] = [];
-            for (const img of images) {
-              const key =
-                img?.cardKey ??
-                img?.detailKey ??
-                (typeof img === "string" ? img : null);
-              if (key && (key.includes("dev/") || key.includes("prod/"))) {
-                try {
-                  const response = await mediaApi.getPublicUrl(key);
-                  previewUrls.push(response.data.url);
-                } catch {
-                  previewUrls.push(
-                    "https://placehold.co/200x200/f3f4f6/9ca3af?text=Resim",
-                  );
-                }
-              } else if (typeof img === "object" && (img as any).cardUrl) {
-                previewUrls.push((img as any).cardUrl);
-              } else {
-                previewUrls.push(
-                  "https://placehold.co/200x200/f3f4f6/9ca3af?text=Resim",
-                );
-              }
-            }
-            setImagePreviewUrls(previewUrls);
-          };
-          restorePreviewUrls();
-        }
-      }
-    } catch (e) {
-      if (process.env.NODE_ENV === "development")
-        console.error("Failed to parse saved form data:", e);
-    }
-  }, []);
-
-  // Persist the draft (debounced).
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      const dataToSave = {
-        ...formData,
-        quantity:
-          formData.quantity !== undefined &&
-          formData.quantity !== null &&
-          formData.quantity !== ""
-            ? String(formData.quantity)
-            : "",
-      };
-      localStorage.setItem("newListingFormData", JSON.stringify(dataToSave));
-    }, 300);
-    return () => clearTimeout(timeoutId);
-  }, [formData]);
 
   // Auth gate: redirect out if signed out, else refresh the user once.
   useEffect(() => {
@@ -210,79 +115,26 @@ function useNewListingValue() {
   const activeAttrManufacturer = useRef<string>("");
   useEffect(() => {
     if (manufacturerList.length === 0) return;
-    const newKey =
-      manufacturerList.find((m) => m.id === formData.manufacturerId)?.id ?? "";
+    const newKey = manufacturerList.find((m) => m.id === manufacturerId)?.id ?? "";
     if (activeAttrManufacturer.current === newKey) return;
     if (
       activeAttrManufacturer.current !== "" &&
-      Object.keys(formData.customAttributes).length > 0
+      Object.keys(getValues("customAttributes")).length > 0
     ) {
-      setFormData((prev) => ({ ...prev, customAttributes: {} }));
+      setValue("customAttributes", {});
     }
     activeAttrManufacturer.current = newKey;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.manufacturerId, manufacturerList]);
+  }, [manufacturerId, manufacturerList]);
 
-  const handleFileUpload = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    const maxImages = limits?.maxImagesPerListing || 3;
-    const remainingSlots = maxImages - formData.images.length;
-    if (remainingSlots <= 0) return;
-    const filesToUpload = Array.from(files).slice(0, remainingSlots);
-    if (filesToUpload.length === 0) return;
+  const { uploadingImages, handleFileUpload, removeImage } = useListingImageUpload({
+    form,
+    maxImages: limits?.maxImagesPerListing || 3,
+    imagePreviewUrls,
+    setImagePreviewUrls,
+  });
 
-    setUploadingImages(true);
-    try {
-      const response = await mediaApi.uploadProductImages(filesToUpload);
-      const uploadedImages = response.data.map(
-        (r: { cardKey: string; detailKey: string }) => ({
-          cardKey: r.cardKey,
-          detailKey: r.detailKey,
-        }),
-      );
-      const previewUrls = response.data
-        .map(
-          (r: { cardUrl?: string; cardKey?: string }) =>
-            r.cardUrl || r.cardKey || "",
-        )
-        .filter(Boolean);
-      setFormData((prev) => ({
-        ...prev,
-        images: [...prev.images, ...uploadedImages],
-      }));
-      setImagePreviewUrls((prev) => [...prev, ...previewUrls]);
-      toast.success(`${uploadedImages.length} resim başarıyla yüklendi`);
-    } catch (error: any) {
-      if (process.env.NODE_ENV === "development")
-        console.error("Failed to upload images:", error);
-      toast.error(error.response?.data?.message || "Resim yükleme başarısız");
-    } finally {
-      setUploadingImages(false);
-    }
-  };
-
-  const removeImage = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index),
-    }));
-    setImagePreviewUrls((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const parsed = newListingSchema(locale).safeParse({
-      title: formData.title,
-      categoryId: formData.categoryId,
-      price: String(formData.price ?? ""),
-      images: formData.images,
-    });
-    if (!parsed.success) {
-      toast.error(parsed.error.issues[0].message);
-      return;
-    }
-
+  const onSubmit = async (values: NewListingValues) => {
     if (listingLimits && !listingLimits.canCreateListing) {
       toast.error(
         `İlan limitinize ulaştınız (${listingLimits.currentCount}/${listingLimits.maxListings}). Üyeliğinizi yükselterek daha fazla ilan oluşturabilirsiniz.`,
@@ -290,38 +142,32 @@ function useNewListingValue() {
       return;
     }
 
-    setIsLoading(true);
     try {
-      const customAttributeSlugs = Object.values(formData.customAttributes)
+      const customAttributeSlugs = Object.values(values.customAttributes)
         .flat()
         .filter(Boolean);
 
       const payload = {
-        title: formData.title,
-        description: formData.description || undefined,
-        price: Number(formData.price),
-        categoryId: formData.categoryId,
-        condition: formData.condition,
-        brandId: formData.brandId || undefined,
-        carModelId: formData.carModelId || undefined,
-        scale: formData.scale || undefined,
-        material: formData.material || undefined,
-        manufacturerId: formData.manufacturerId || undefined,
-        year: formData.year ? Number(formData.year) : undefined,
-        isTradeEnabled: formData.isTradeEnabled,
+        title: values.title,
+        description: values.description || undefined,
+        price: Number(values.price),
+        categoryId: values.categoryId,
+        condition: values.condition,
+        brandId: values.brandId || undefined,
+        carModelId: values.carModelId || undefined,
+        scale: values.scale || undefined,
+        material: values.material || undefined,
+        manufacturerId: values.manufacturerId || undefined,
+        year: values.year ? Number(values.year) : undefined,
+        isTradeEnabled: values.isTradeEnabled,
         isPreorder: false,
-        isSet: formData.isSet,
+        isSet: values.isSet,
         bundleSize:
-          formData.isSet && Number(formData.bundleSize) >= 2
-            ? Number(formData.bundleSize)
+          values.isSet && Number(values.bundleSize) >= 2
+            ? Number(values.bundleSize)
             : undefined,
-        quantity:
-          formData.quantity !== "" &&
-          formData.quantity !== null &&
-          formData.quantity !== undefined
-            ? Number(formData.quantity)
-            : 1,
-        images: formData.images.length > 0 ? formData.images : undefined,
+        quantity: values.quantity !== "" ? Number(values.quantity) : 1,
+        images: values.images.length > 0 ? values.images : undefined,
         attributes:
           customAttributeSlugs.length > 0 ? customAttributeSlugs : undefined,
       };
@@ -332,7 +178,6 @@ function useNewListingValue() {
           ? "Your listing has been created! Pending approval."
           : "İlanınız oluşturuldu! Onay bekliyor.",
       );
-      localStorage.removeItem("newListingFormData");
       await refreshUser();
       await refetchLimits();
       router.push("/profile/listings?status=pending");
@@ -347,8 +192,6 @@ function useNewListingValue() {
       const fallback =
         locale === "en" ? "Failed to create listing" : "İlan oluşturulamadı";
       toast.error(typeof msg === "string" && msg ? msg : fallback);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -358,10 +201,9 @@ function useNewListingValue() {
     isAuthenticated,
     authLoading,
     limits,
-    // form state
-    formData,
-    setFormData,
-    isLoading,
+    // form
+    form,
+    onSubmit,
     uploadingImages,
     imagePreviewUrls,
     CONDITIONS,
@@ -385,11 +227,12 @@ function useNewListingValue() {
     // actions
     handleFileUpload,
     removeImage,
-    handleSubmit,
   };
 }
 
-type NewListingValue = ReturnType<typeof useNewListingValue>;
+type NewListingValue = ReturnType<typeof useNewListingValue> & {
+  form: UseFormReturn<NewListingValues>;
+};
 
 const NewListingContext = createContext<NewListingValue | null>(null);
 

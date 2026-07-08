@@ -15,6 +15,7 @@
 		"clean": "rm -rf dist .turbo"
 	},
 	"dependencies": {
+		"@heroicons/react": "^2.1.1",
 		"@tarodan/brand": "workspace:*",
 		"@tarodan/design-tokens": "workspace:*",
 		"@tarodan/shared": "workspace:*",

@@ -1,11 +1,11 @@
 import type { Dispatch, SetStateAction } from 'react';
 import Link from 'next/link';
+import { useFormContext } from 'react-hook-form';
 import { TagIcon, ChevronDownIcon, ChevronUpIcon, ReceiptPercentIcon } from '@heroicons/react/24/outline';
 import { Badge, Button, Input } from '@tarodan/ui';
-import type { EditListingFormData, SaleData } from '../_lib/types';
+import type { SaleData } from '../_lib/types';
 
 interface DiscountSectionProps {
-  formData: EditListingFormData;
   saleData: SaleData;
   setSaleData: Dispatch<SetStateAction<SaleData>>;
   showDiscountSection: boolean;
@@ -14,13 +14,14 @@ interface DiscountSectionProps {
 }
 
 export default function DiscountSection({
-  formData,
   saleData,
   setSaleData,
   showDiscountSection,
   setShowDiscountSection,
   productDiscounts,
 }: DiscountSectionProps) {
+  const { watch } = useFormContext();
+  const price = (watch('price') as string) || '';
   return (
     <div className="border border-border rounded-xl overflow-hidden">
       <Button variant="secondary" type="button"
@@ -59,9 +60,9 @@ export default function DiscountSection({
                 </label>
                 <Input
                   type="number"
-                  value={saleData.originalPrice || formData.price}
+                  value={saleData.originalPrice || price}
                   onChange={(e) => setSaleData({ ...saleData, originalPrice: e.target.value })}
-                  placeholder={formData.price || 'Orijinal fiyat'}
+                  placeholder={price || 'Orijinal fiyat'}
                 />
               </div>
               <div>
