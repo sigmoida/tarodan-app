@@ -1,9 +1,9 @@
 /** @format */
 
-'use client';
+"use client";
 
-import { useQuery } from '@tanstack/react-query';
-import { ordersApi } from '@/lib/api';
+import { ordersApi } from "@/lib/api";
+import { useWebList } from "@/hooks/useWebResource";
 
 type QuoteItem = { productId?: string; id?: string; quantity?: number };
 
@@ -15,26 +15,27 @@ type QuoteItem = { productId?: string; id?: string; quantity?: number };
  * fee is resolved after login.
  */
 export function useBuyerFee(items: QuoteItem[] | undefined): number {
-	const list = items ?? [];
-	const signature = list
-		.map((it) => `${it.productId ?? it.id}:${it.quantity ?? 1}`)
-		.join(',');
+  const list = items ?? [];
+  const signature = list
+    .map((it) => `${it.productId ?? it.id}:${it.quantity ?? 1}`)
+    .join(",");
 
-	const { data } = useQuery({
-		queryKey: ['cart', 'buyer-fee', signature],
-		queryFn: async () => {
-			const res: any = await ordersApi.getQuote({
-				items: list.map((it) => ({
-					productId: it.productId ?? it.id!,
-					quantity: it.quantity ?? 1,
-				})),
-			});
-			return Number(
-				res.data?.pricing?.buyerFeeAmount ?? res.data?.buyerFeeAmount ?? 0,
-			);
-		},
-		enabled: list.length > 0,
-	});
+  const { data } = useWebList<number>({
+    resource: "cart",
+    params: ["buyer-fee", signature],
+    fetcher: async () => {
+      const res: any = await ordersApi.getQuote({
+        items: list.map((it) => ({
+          productId: it.productId ?? it.id!,
+          quantity: it.quantity ?? 1,
+        })),
+      });
+      return Number(
+        res.data?.pricing?.buyerFeeAmount ?? res.data?.buyerFeeAmount ?? 0,
+      );
+    },
+    enabled: list.length > 0,
+  });
 
-	return data ?? 0;
+  return data ?? 0;
 }

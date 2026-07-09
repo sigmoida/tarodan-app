@@ -1,179 +1,173 @@
 /** @format */
 
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { useQueryClient } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
-import { Spinner, StatusBadge, orderStatusConfig } from '@tarodan/ui';
-import { PageShell } from '@/components/layout/PageShell';
-import { PageHeader } from '@/components/layout/PageHeader';
-import RefundRequestModal from './_modals/RefundRequestModal';
-import { useRequireAuth } from '../../../_hooks/useRequireAuth';
-import { useTranslation } from '@/i18n';
-import { useOrderQuery } from './_hooks/useOrderDetail';
-import { inferRefundPhase, getOrderStatusLabel } from './_lib/types';
-import OrderBanners from './_sections/OrderBanners';
-import ProductInfoCard from './_sections/ProductInfoCard';
-import RefundRequestBanner from './_sections/RefundRequestBanner';
-import ShippingInfoCard from './_sections/ShippingInfoCard';
-import ShippingAddressCard from './_sections/ShippingAddressCard';
-import SellerActions from './_sections/SellerActions';
-import PaymentSection from './_sections/PaymentSection';
-import EscrowInfoCard from './_sections/EscrowInfoCard';
-import ReviewCta from './_sections/ReviewCta';
-import RefundActions from './_sections/RefundActions';
-import OrderSummaryCard from './_sections/OrderSummaryCard';
-import PartyCard from './_sections/PartyCard';
-import InvoicesSection from './_sections/InvoicesSection';
-import HelpCard from './_sections/HelpCard';
-import ReviewModal from './_modals/ReviewModal';
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import toast from "react-hot-toast";
+import { Spinner, StatusBadge, orderStatusConfig } from "@tarodan/ui";
+import { PageShell } from "@/components/layout/PageShell";
+import { PageHeader } from "@/components/layout/PageHeader";
+import RefundRequestModal from "./_modals/RefundRequestModal";
+import { useRequireAuth } from "../../../_hooks/useRequireAuth";
+import { useTranslation } from "@/i18n";
+import { useOrderQuery } from "./_hooks/useOrderDetail";
+import { inferRefundPhase, getOrderStatusLabel } from "./_lib/types";
+import OrderBanners from "./_sections/OrderBanners";
+import ProductInfoCard from "./_sections/ProductInfoCard";
+import RefundRequestBanner from "./_sections/RefundRequestBanner";
+import ShippingInfoCard from "./_sections/ShippingInfoCard";
+import ShippingAddressCard from "./_sections/ShippingAddressCard";
+import SellerActions from "./_sections/SellerActions";
+import PaymentSection from "./_sections/PaymentSection";
+import EscrowInfoCard from "./_sections/EscrowInfoCard";
+import ReviewCta from "./_sections/ReviewCta";
+import RefundActions from "./_sections/RefundActions";
+import OrderSummaryCard from "./_sections/OrderSummaryCard";
+import PartyCard from "./_sections/PartyCard";
+import InvoicesSection from "./_sections/InvoicesSection";
+import HelpCard from "./_sections/HelpCard";
+import ReviewModal from "./_modals/ReviewModal";
 
 export default function OrderDetailPage() {
-	const router = useRouter();
-	const params = useParams();
-	const queryClient = useQueryClient();
-	const { ready } = useRequireAuth();
-	const { locale } = useTranslation();
-	const orderId = params?.id as string;
+  const router = useRouter();
+  const params = useParams();
+  const queryClient = useQueryClient();
+  const { ready } = useRequireAuth();
+  const { locale } = useTranslation();
+  const orderId = params?.id as string;
 
-	const [showReviewModal, setShowReviewModal] = useState(false);
-	const [showRefundModal, setShowRefundModal] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showRefundModal, setShowRefundModal] = useState(false);
 
-	const orderQuery = useOrderQuery(orderId, ready);
-	const rawOrder = orderQuery.data;
-	const order =
-		rawOrder && typeof rawOrder === 'object' && rawOrder.status !== undefined
-			? rawOrder
-			: null;
-	const loading = orderQuery.isLoading;
+  const orderQuery = useOrderQuery(orderId, ready);
+  const rawOrder = orderQuery.data;
+  const order =
+    rawOrder && typeof rawOrder === "object" && rawOrder.status !== undefined
+      ? rawOrder
+      : null;
+  const loading = orderQuery.isLoading;
 
-	useEffect(() => {
-		if (orderQuery.isError && orderId) {
-			toast.error(
-				locale === 'en' ? 'Failed to load order' : 'Sipariş yüklenemedi',
-			);
-			router.push('/profile/orders');
-		}
-	}, [orderQuery.isError, orderId, locale, router]);
+  useEffect(() => {
+    if (orderQuery.isError && orderId) {
+      toast.error(
+        locale === "en" ? "Failed to load order" : "Sipariş yüklenemedi",
+      );
+      router.push("/profile/orders");
+    }
+  }, [orderQuery.isError, orderId, locale, router]);
 
-	if (!ready || loading) {
-		return (
-			<div className='min-h-screen bg-surface flex items-center justify-center'>
-				<Spinner size='xl' />
-			</div>
-		);
-	}
+  if (!ready || loading) {
+    return (
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <Spinner size="xl" />
+      </div>
+    );
+  }
 
-	if (!order) {
-		return (
-			<div className='min-h-screen bg-surface flex items-center justify-center'>
-				<p className='text-muted'>
-					{locale === 'en' ? 'Order not found' : 'Sipariş bulunamadı'}
-				</p>
-			</div>
-		);
-	}
+  if (!order) {
+    return (
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <p className="text-muted">
+          {locale === "en" ? "Order not found" : "Sipariş bulunamadı"}
+        </p>
+      </div>
+    );
+  }
 
-	// Status shown in the header badge. A pre-shipment cancel can leave the raw
-	// status as 'refunded' (money flow) — show "İptal Edildi" not "İade Edildi";
-	// an open refund request shows "İade Sürecinde".
-	const hasActiveRefund = !!order.activeRefundRequest;
-	const displayStatus = hasActiveRefund
-		? 'refund_requested'
-		: order.cancellationType === 'iptal'
-			? 'cancelled'
-			: order.status;
-	const statusLabel = hasActiveRefund
-		? locale === 'en'
-			? 'Refund in progress'
-			: 'İade Sürecinde'
-		: getOrderStatusLabel(displayStatus, locale);
+  // Status shown in the header badge. A pre-shipment cancel can leave the raw
+  // status as 'refunded' (money flow) — show "İptal Edildi" not "İade Edildi";
+  // an open refund request shows "İade Sürecinde".
+  const hasActiveRefund = !!order.activeRefundRequest;
+  const displayStatus = hasActiveRefund
+    ? "refund_requested"
+    : order.cancellationType === "iptal"
+      ? "cancelled"
+      : order.status;
+  const statusLabel = hasActiveRefund
+    ? locale === "en"
+      ? "Refund in progress"
+      : "İade Sürecinde"
+    : getOrderStatusLabel(displayStatus, locale);
 
-	const orderDate = new Date(order.createdAt).toLocaleDateString('tr-TR', {
-		year: 'numeric',
-		month: 'long',
-		day: 'numeric',
-		hour: '2-digit',
-		minute: '2-digit',
-	});
+  const orderDate = new Date(order.createdAt).toLocaleDateString("tr-TR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
-	const handleRefund = () => {
-		if (order.status === 'pending_payment') {
-			toast(
-				locale === 'en'
-					? 'This order is not paid; cancel it instead'
-					: 'Bu sipariş henüz ödenmemiş, iptal etmelisiniz',
-			);
-			return;
-		}
-		setShowRefundModal(true);
-	};
+  const handleRefund = () => {
+    if (order.status === "pending_payment") {
+      toast(
+        locale === "en"
+          ? "This order is not paid; cancel it instead"
+          : "Bu sipariş henüz ödenmemiş, iptal etmelisiniz",
+      );
+      return;
+    }
+    setShowRefundModal(true);
+  };
 
-	return (
-		<PageShell className='pb-16'>
-			<PageHeader
-				backHref='/profile/orders'
-				title={`Sipariş #${order.orderNumber}`}
-				description={orderDate}
-				actions={
-					<StatusBadge
-						status={displayStatus}
-						config={orderStatusConfig}
-						label={statusLabel}
-					/>
-				}
-			/>
+  return (
+    <PageShell className="pb-16">
+      <PageHeader
+        backHref="/profile/orders"
+        title={`Sipariş #${order.orderNumber}`}
+        description={orderDate}
+        actions={
+          <StatusBadge
+            status={displayStatus}
+            config={orderStatusConfig}
+            label={statusLabel}
+          />
+        }
+      />
 
-			<OrderBanners order={order} />
+      <OrderBanners order={order} />
 
-			<div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
-				{/* Main Content */}
-				<div className='lg:col-span-2 space-y-6'>
-					<ProductInfoCard order={order} />
-					<RefundRequestBanner order={order} />
-					<ShippingInfoCard order={order} />
-					<ShippingAddressCard order={order} />
-					<SellerActions order={order} />
-					<PaymentSection order={order} />
-					<EscrowInfoCard order={order} />
-					<ReviewCta
-						order={order}
-						onReview={() => setShowReviewModal(true)}
-					/>
-					<RefundActions
-						order={order}
-						onRequestRefund={handleRefund}
-					/>
-				</div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Content */}
+        <div className="lg:col-span-2 space-y-6">
+          <ProductInfoCard order={order} />
+          <RefundRequestBanner order={order} />
+          <ShippingInfoCard order={order} />
+          <ShippingAddressCard order={order} />
+          <SellerActions order={order} />
+          <PaymentSection order={order} />
+          <EscrowInfoCard order={order} />
+          <ReviewCta order={order} onReview={() => setShowReviewModal(true)} />
+          <RefundActions order={order} onRequestRefund={handleRefund} />
+        </div>
 
-				{/* Sidebar */}
-				<div className='space-y-6'>
-					<OrderSummaryCard order={order} />
-					<PartyCard order={order} />
-					<InvoicesSection order={order} />
-					<HelpCard orderId={orderId} />
-				</div>
-			</div>
+        {/* Sidebar */}
+        <div className="space-y-6">
+          <OrderSummaryCard order={order} />
+          <PartyCard order={order} />
+          <InvoicesSection order={order} />
+          <HelpCard orderId={orderId} />
+        </div>
+      </div>
 
-			<ReviewModal
-				order={showReviewModal ? order : null}
-				orderId={orderId}
-				onClose={() => setShowReviewModal(false)}
-			/>
+      <ReviewModal
+        order={showReviewModal ? order : null}
+        orderId={orderId}
+        onClose={() => setShowReviewModal(false)}
+      />
 
-			<RefundRequestModal
-				isOpen={showRefundModal}
-				onClose={() => setShowRefundModal(false)}
-				orderId={order.id}
-				orderNumber={order.orderNumber}
-				phase={inferRefundPhase(order)}
-				quantity={order.items?.[0]?.quantity ?? 1}
-				onSuccess={() => {
-					queryClient.invalidateQueries({ queryKey: ['order', orderId] });
-				}}
-			/>
-		</PageShell>
-	);
+      <RefundRequestModal
+        isOpen={showRefundModal}
+        onClose={() => setShowRefundModal(false)}
+        orderId={order.id}
+        orderNumber={order.orderNumber}
+        phase={inferRefundPhase(order)}
+        quantity={order.items?.[0]?.quantity ?? 1}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["order"] });
+        }}
+      />
+    </PageShell>
+  );
 }
