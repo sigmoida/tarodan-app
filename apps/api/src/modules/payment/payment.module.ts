@@ -10,6 +10,10 @@ import { PaymentQueryService } from './payment-query.service';
 import { PaymentCommonService } from './payment-common.service';
 import { PaymentRefundService } from './payment-refund.service';
 import { PaymentReconciliationService } from './payment-reconciliation.service';
+import { PaymentInitiationService } from './payment-initiation.service';
+import { PaymentCallbackService } from './payment-callback.service';
+import { PaymentFulfillmentService } from './payment-fulfillment.service';
+import { PaymentLifecycleService } from './payment-lifecycle.service';
 import { PaymentSchedulerService } from './payment-scheduler.service';
 import { PaymentScheduledProcessor } from './payment-scheduled.processor';
 import { QUEUE_NAMES } from '../../workers/constants';
@@ -54,13 +58,24 @@ import { ElogoModule } from '../elogo';
     }),
   ],
   controllers: [PaymentController, PaytrCallbackAliasController],
-  providers: [PaymentService, PaymentQueryService, PaymentCommonService, PaymentRefundService, PaymentReconciliationService, PaymentSchedulerService, PaymentScheduledProcessor, RawBodyMiddleware],
+  providers: [
+    PaymentService,
+    PaymentQueryService,
+    PaymentCommonService,
+    PaymentRefundService,
+    PaymentReconciliationService,
+    PaymentInitiationService,
+    PaymentCallbackService,
+    PaymentFulfillmentService,
+    PaymentLifecycleService,
+    PaymentSchedulerService,
+    PaymentScheduledProcessor,
+    RawBodyMiddleware,
+  ],
   exports: [PaymentService],
 })
 export class PaymentModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer
-      .apply(RawBodyMiddleware)
-      .forRoutes('payments/callback/paytr');
+    consumer.apply(RawBodyMiddleware).forRoutes('payments/callback/paytr');
   }
 }

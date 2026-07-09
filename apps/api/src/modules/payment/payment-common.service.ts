@@ -156,4 +156,38 @@ export class PaymentCommonService {
       this.logger.error(`Failed to log payment action ${action}: ${error}`);
     }
   }
+
+
+  /**
+   * Payment'a merchant_oid (providerConversationId) atar — PayTR çağrısı YAPMAZ.
+   * iframe kaldırıldıktan sonra ödeme niyeti (initiate) bir conversation id taşımalı ki
+   * gelen callback eşleşebilsin ve reconciliation çalışsın. Eski oid'i merchantOidHistory'e
+   * taşır (kullanıcı eski oid'le öderse callback yine eşleşir). process-direct daha sonra
+   * kendi oid'iyle bunu tazeler (aynı history mantığı).
+   */
+  async assignMerchantOid(paymentId: string, baseOidRaw: string): Promise<string> {
+    const baseOid = String(baseOidRaw).replace(/-/g, '');
+    const merchantOid = `${baseOid}T${Date.now().toString().slice(-6)}`;
+    const current = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      select: { providerConversationId: true, metadata: true },
+    });
+    const prevMeta = (current?.metadata as any) || {};
+    const oidHistory: string[] = Array.isArray(prevMeta.merchantOidHistory)
+      ? prevMeta.merchantOidHistory
+      : [];
+    const prevOid = current?.providerConversationId;
+    if (prevOid && prevOid !== merchantOid && !oidHistory.includes(prevOid)) {
+      oidHistory.push(prevOid);
+    }
+    await this.prisma.payment.update({
+      where: { id: paymentId },
+      data: {
+        providerConversationId: merchantOid,
+        providerPaymentId: null,
+        metadata: { ...prevMeta, merchantOidHistory: oidHistory },
+      },
+    });
+    return merchantOid;
+  }
 }
