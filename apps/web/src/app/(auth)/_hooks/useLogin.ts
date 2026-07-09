@@ -45,32 +45,18 @@ export function useLogin() {
       password: string;
     }) => {
       await login(email, password);
-      // Post-login: does a business account still need to pick a tier?
-      try {
-        const userResponse = await api.get("/users/me");
-        const currentUser = userResponse.data?.user || userResponse.data;
-        const membershipTier =
-          currentUser?.membership?.tier?.type ||
-          currentUser?.membership?.tier?.name ||
-          currentUser?.membershipTier ||
-          "free";
-        const normalizedTier = String(membershipTier).toLowerCase();
-        const isBusinessTier =
-          normalizedTier.includes("business") || normalizedTier === "business";
-        const needsMembership = !!(
-          currentUser?.isEmailVerified &&
-          currentUser?.companyName &&
-          currentUser?.taxId &&
-          !isBusinessTier
-        );
-        return { needsMembership };
-      } catch (error) {
-        if (process.env.NODE_ENV === "development") {
-          // eslint-disable-next-line no-console
-          console.error("Business account check failed:", error);
-        }
-        return { needsMembership: false };
-      }
+      // Post-login: does a business account still need to pick a tier? `login()`
+      // already hydrated the store via checkAuth (`/users/me`) — read the mapped
+      // user from there instead of a SECOND identical round-trip. `membershipTier`
+      // is already normalized to 'free' | … | 'business' by the store.
+      const currentUser = useAuthStore.getState().user;
+      const needsMembership = !!(
+        currentUser?.isEmailVerified &&
+        currentUser?.companyName &&
+        currentUser?.taxId &&
+        currentUser.membershipTier !== "business"
+      );
+      return { needsMembership };
     },
     onSuccess: ({ needsMembership }) => {
       const target = needsMembership
