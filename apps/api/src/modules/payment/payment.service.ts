@@ -5,31 +5,53 @@ import {
   ForbiddenException,
   GoneException,
   Logger,
-} from '@nestjs/common';
-import { ModuleRef } from '@nestjs/core';
-import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../prisma';
-import { CacheService } from '../cache/cache.service';
-import { InitiatePaymentDto, PaymentProvider, PayTRCallbackDto, DirectPaymentDto } from './dto';
-import { Prisma, PaymentStatus, PaymentHoldStatus, OrderStatus, ProductStatus, SubscriptionStatus, TradeStatus, OfferStatus, RefundRequestStatus, SavedCardStatus } from '@prisma/client';
-import { getProductStatusFromQuantity, getReservedAwareStatus } from '../product/helpers/product-status.helper';
-import { safeDecrementReserved } from '../product/helpers/product-availability.helper';
-import { computeRelevanceScore, RELEVANCE_PREMIUM_BONUS } from '../product/helpers/relevance-score';
-import { PayTRService, PayTRBuyer } from '../payment-providers/paytr.service';
-import { EventService } from '../events';
-import { InvoiceService } from '../invoice/invoice.service';
-import { ElogoInvoicingService } from '../elogo';
-import { ProductLockService } from '../product/product-lock.service';
-import { NotificationService } from '../notification/notification.service';
-import { NotificationType } from '../notification/dto/notification.dto';
-import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
-import { CommissionLedgerService } from '../commission/commission-ledger.service';
-import { StorageService } from '../storage/storage.service';
-import { PaymentQueryService } from './payment-query.service';
-import { PaymentCommonService } from './payment-common.service';
-import { PaymentRefundService } from './payment-refund.service';
-import { PaymentReconciliationService } from './payment-reconciliation.service';
-import { Request } from 'express';
+} from "@nestjs/common";
+import { ModuleRef } from "@nestjs/core";
+import { ConfigService } from "@nestjs/config";
+import { PrismaService } from "../../prisma";
+import { CacheService } from "../cache/cache.service";
+import {
+  InitiatePaymentDto,
+  PaymentProvider,
+  PayTRCallbackDto,
+  DirectPaymentDto,
+} from "./dto";
+import {
+  Prisma,
+  PaymentStatus,
+  PaymentHoldStatus,
+  OrderStatus,
+  ProductStatus,
+  SubscriptionStatus,
+  TradeStatus,
+  OfferStatus,
+  RefundRequestStatus,
+  SavedCardStatus,
+} from "@prisma/client";
+import {
+  getProductStatusFromQuantity,
+  getReservedAwareStatus,
+} from "../product/helpers/product-status.helper";
+import { safeDecrementReserved } from "../product/helpers/product-availability.helper";
+import {
+  computeRelevanceScore,
+  RELEVANCE_PREMIUM_BONUS,
+} from "../product/helpers/relevance-score";
+import { PayTRService, PayTRBuyer } from "../payment-providers/paytr.service";
+import { EventService } from "../events";
+import { InvoiceService } from "../invoice/invoice.service";
+import { ElogoInvoicingService } from "../elogo";
+import { ProductLockService } from "../product/product-lock.service";
+import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto/notification.dto";
+import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
+import { CommissionLedgerService } from "../commission/commission-ledger.service";
+import { StorageService } from "../storage/storage.service";
+import { PaymentQueryService } from "./payment-query.service";
+import { PaymentCommonService } from "./payment-common.service";
+import { PaymentRefundService } from "./payment-refund.service";
+import { PaymentReconciliationService } from "./payment-reconciliation.service";
+import { Request } from "express";
 
 @Injectable()
 export class PaymentService {
@@ -56,7 +78,10 @@ export class PaymentService {
   ) {}
 
   // Taşındı: payment-common.service.ts — Sürat kargo iptali (facade delege; imza aynı).
-  private async cancelSuratShipmentIfExists(orderId: string, orderNumber: string): Promise<void> {
+  private async cancelSuratShipmentIfExists(
+    orderId: string,
+    orderNumber: string,
+  ): Promise<void> {
     return this.paymentCommon.cancelSuratShipmentIfExists(orderId, orderNumber);
   }
 
@@ -65,24 +90,24 @@ export class PaymentService {
    */
   private getClientIp(req?: Request): string {
     if (!req) {
-      return '127.0.0.1';
+      return "127.0.0.1";
     }
 
     // Check for forwarded IP (behind proxy/load balancer)
-    const forwarded = req.headers['x-forwarded-for'];
+    const forwarded = req.headers["x-forwarded-for"];
     if (forwarded) {
       const ips = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-      return ips.split(',')[0].trim();
+      return ips.split(",")[0].trim();
     }
 
     // Check for real IP header
-    const realIp = req.headers['x-real-ip'];
+    const realIp = req.headers["x-real-ip"];
     if (realIp) {
       return Array.isArray(realIp) ? realIp[0] : realIp;
     }
 
     // Fallback to connection remote address
-    return req.ip || req.socket?.remoteAddress || '127.0.0.1';
+    return req.ip || req.socket?.remoteAddress || "127.0.0.1";
   }
 
   /**
@@ -92,8 +117,11 @@ export class PaymentService {
    * taşır (kullanıcı eski oid'le öderse callback yine eşleşir). process-direct daha sonra
    * kendi oid'iyle bunu tazeler (aynı history mantığı).
    */
-  private async assignMerchantOid(paymentId: string, baseOidRaw: string): Promise<string> {
-    const baseOid = String(baseOidRaw).replace(/-/g, '');
+  private async assignMerchantOid(
+    paymentId: string,
+    baseOidRaw: string,
+  ): Promise<string> {
+    const baseOid = String(baseOidRaw).replace(/-/g, "");
     const merchantOid = `${baseOid}T${Date.now().toString().slice(-6)}`;
     const current = await this.prisma.payment.findUnique({
       where: { id: paymentId },
@@ -122,7 +150,11 @@ export class PaymentService {
    * Unified payment initiation for both authenticated and guest users
    * POST /payments/initiate
    */
-  async initiatePaymentUnified(userId: string | null, dto: InitiatePaymentDto, req?: Request) {
+  async initiatePaymentUnified(
+    userId: string | null,
+    dto: InitiatePaymentDto,
+    req?: Request,
+  ) {
     // Grup ödemesi: tek ödeme checkout grubundaki tüm siparişleri kapsar
     if (dto.checkoutGroupId) {
       return this.initiateGroupPayment(userId, dto, req);
@@ -139,7 +171,7 @@ export class PaymentService {
     });
 
     if (!order) {
-      throw new NotFoundException('Sipariş bulunamadı');
+      throw new NotFoundException("Sipariş bulunamadı");
     }
 
     // Check if this is a guest order
@@ -150,23 +182,28 @@ export class PaymentService {
     if (userId) {
       // Authenticated user - must be the buyer
       if (order.buyerId !== userId) {
-        throw new ForbiddenException('Bu sipariş için ödeme yapamazsınız');
+        throw new ForbiddenException("Bu sipariş için ödeme yapamazsınız");
       }
     } else {
       // Guest user - order must be a guest order
       if (!isGuestOrder) {
-        throw new ForbiddenException('Bu sipariş için giriş yapmanız gerekiyor');
+        throw new ForbiddenException(
+          "Bu sipariş için giriş yapmanız gerekiyor",
+        );
       }
     }
 
     if (order.status !== OrderStatus.pending_payment) {
-      throw new BadRequestException('Bu sipariş için ödeme beklenmiyor');
+      throw new BadRequestException("Bu sipariş için ödeme beklenmiyor");
     }
 
     // 24h kill-switch: defense in depth in case the cron hasn't run yet.
-    if (order.paymentExpiresAt && order.paymentExpiresAt.getTime() < Date.now()) {
+    if (
+      order.paymentExpiresAt &&
+      order.paymentExpiresAt.getTime() < Date.now()
+    ) {
       throw new BadRequestException(
-        'Ödeme süresi doldu. Lütfen yeni bir sipariş oluşturun.',
+        "Ödeme süresi doldu. Lütfen yeni bir sipariş oluşturun.",
       );
     }
 
@@ -178,7 +215,11 @@ export class PaymentService {
    * Tüm siparişler pending_payment olmalı; biri iptal olduysa grup ödenemez
    * (tutar grubun tamamı olduğundan kısmi tahsilat yapılamaz).
    */
-  private async initiateGroupPayment(userId: string | null, dto: InitiatePaymentDto, req?: Request) {
+  private async initiateGroupPayment(
+    userId: string | null,
+    dto: InitiatePaymentDto,
+    req?: Request,
+  ) {
     const group = await this.prisma.checkoutGroup.findUnique({
       where: { id: dto.checkoutGroupId },
       include: {
@@ -189,16 +230,18 @@ export class PaymentService {
     });
 
     if (!group || group.orders.length === 0) {
-      throw new NotFoundException('Sipariş grubu bulunamadı');
+      throw new NotFoundException("Sipariş grubu bulunamadı");
     }
 
     // Erişim kontrolü
     if (userId) {
       if (group.buyerId !== userId) {
-        throw new ForbiddenException('Bu sipariş grubu için ödeme yapamazsınız');
+        throw new ForbiddenException(
+          "Bu sipariş grubu için ödeme yapamazsınız",
+        );
       }
     } else if (!group.isGuest) {
-      throw new ForbiddenException('Bu sipariş için giriş yapmanız gerekiyor');
+      throw new ForbiddenException("Bu sipariş için giriş yapmanız gerekiyor");
     }
 
     const now = Date.now();
@@ -209,7 +252,9 @@ export class PaymentService {
         );
       }
       if (order.paymentExpiresAt && order.paymentExpiresAt.getTime() < now) {
-        throw new BadRequestException('Ödeme süresi doldu. Lütfen yeni bir sipariş oluşturun.');
+        throw new BadRequestException(
+          "Ödeme süresi doldu. Lütfen yeni bir sipariş oluşturun.",
+        );
       }
     }
 
@@ -221,8 +266,12 @@ export class PaymentService {
    * Tek Payment satırı checkoutGroupId üzerinden yeniden kullanılır; PayTR'ye
    * groupNumber merchant_oid + sipariş başına basket item ile gidilir.
    */
-  private async processGroupPaymentInitiation(group: any, dto: InitiatePaymentDto, req?: Request) {
-    const bypassEnabled = this.configService.get('PAYMENT_BYPASS') === 'true';
+  private async processGroupPaymentInitiation(
+    group: any,
+    dto: InitiatePaymentDto,
+    req?: Request,
+  ) {
+    const bypassEnabled = this.configService.get("PAYMENT_BYPASS") === "true";
     const totalAmount = Number(group.totalAmount);
 
     // 30-dk cron rezervasyonları bıraktıysa sipariş başına CAS ile yeniden al
@@ -236,7 +285,9 @@ export class PaymentService {
           if (claimed.count === 0) return; // eşzamanlı retry kazandı
           await this.productLockService.checkAndReserve(tx, order.productId, 1);
         });
-        this.logger.log(`Re-reserved 1 unit for group order ${order.id} after release (retry)`);
+        this.logger.log(
+          `Re-reserved 1 unit for group order ${order.id} after release (retry)`,
+        );
       }
     }
 
@@ -249,7 +300,7 @@ export class PaymentService {
     let payment;
     if (existingPayment) {
       if (existingPayment.status === PaymentStatus.completed) {
-        throw new BadRequestException('Bu sipariş grubu zaten ödendi');
+        throw new BadRequestException("Bu sipariş grubu zaten ödendi");
       }
       payment = await this.prisma.payment.update({
         where: { id: existingPayment.id },
@@ -266,24 +317,34 @@ export class PaymentService {
         data: {
           checkoutGroupId: group.id,
           amount: totalAmount,
-          currency: 'TRY',
+          currency: "TRY",
           provider: PaymentProvider.paytr,
           status: PaymentStatus.pending,
         },
       });
     }
 
-    await this.logPaymentAction('created', payment.id, undefined, undefined, undefined, PaymentStatus.pending, {
-      amount: totalAmount,
-      provider: PaymentProvider.paytr,
-      checkoutGroupId: group.id,
-      groupNumber: group.groupNumber,
-      orderIds: group.orders.map((o: any) => o.id),
-      buyerId: group.buyerId,
-    });
+    await this.logPaymentAction(
+      "created",
+      payment.id,
+      undefined,
+      undefined,
+      undefined,
+      PaymentStatus.pending,
+      {
+        amount: totalAmount,
+        provider: PaymentProvider.paytr,
+        checkoutGroupId: group.id,
+        groupNumber: group.groupNumber,
+        orderIds: group.orders.map((o: any) => o.id),
+        buyerId: group.buyerId,
+      },
+    );
 
     if (bypassEnabled) {
-      this.logger.warn(`PAYMENT_BYPASS active: group payment ${payment.id} ready for bypass completion`);
+      this.logger.warn(
+        `PAYMENT_BYPASS active: group payment ${payment.id} ready for bypass completion`,
+      );
       return {
         paymentId: payment.id,
         checkoutGroupId: group.id,
@@ -296,7 +357,10 @@ export class PaymentService {
     }
 
     // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin), kart /payments/process-direct ile.
-    await this.assignMerchantOid(payment.id, String(group.groupNumber || group.id));
+    await this.assignMerchantOid(
+      payment.id,
+      String(group.groupNumber || group.id),
+    );
     return {
       paymentId: payment.id,
       checkoutGroupId: group.id,
@@ -309,7 +373,11 @@ export class PaymentService {
   /**
    * Initiate payment for an order (legacy - for backward compatibility)
    */
-  async initiatePayment(buyerId: string, dto: InitiatePaymentDto, req?: Request) {
+  async initiatePayment(
+    buyerId: string,
+    dto: InitiatePaymentDto,
+    req?: Request,
+  ) {
     return this.initiatePaymentUnified(buyerId, dto, req);
   }
 
@@ -336,33 +404,55 @@ export class PaymentService {
    * Kayıtlı kart (Flow B) + kart saklama, PayTR'nin Non3D/Tekrarlayan Ödeme yetkisine bağlıdır;
    * PAYTR_RECURRING_ENABLED arkasındadır. Yetki gelene kadar yalnız yeni-kart 3D yolu canlıdır.
    */
-  async processDirectPayment(userId: string | null, dto: DirectPaymentDto, req?: Request) {
+  async processDirectPayment(
+    userId: string | null,
+    dto: DirectPaymentDto,
+    req?: Request,
+  ) {
     if (!dto.card && !dto.savedCardId) {
-      throw new BadRequestException('Kart bilgisi veya kayıtlı kart seçimi zorunludur.');
+      throw new BadRequestException(
+        "Kart bilgisi veya kayıtlı kart seçimi zorunludur.",
+      );
     }
 
-    const recurringEnabled = this.configService.get('PAYTR_RECURRING_ENABLED') === 'true';
+    const recurringEnabled =
+      this.configService.get("PAYTR_RECURRING_ENABLED") === "true";
 
     // Kayıtlı kart yalnız giriş yapmış kullanıcıya aittir.
     if (dto.savedCardId && !userId) {
-      throw new ForbiddenException('Kayıtlı kartla ödeme için giriş yapmanız gerekiyor');
+      throw new ForbiddenException(
+        "Kayıtlı kartla ödeme için giriş yapmanız gerekiyor",
+      );
     }
     // Kayıtlı kartla ödeme PayTR Non3D yetkisine bağlı → flag kapalıyken kullanılamaz.
     if (dto.savedCardId && !recurringEnabled) {
       throw new GoneException(
-        'Kayıtlı kartla ödeme şu an kullanılamıyor. Lütfen kart bilgilerinizi girin.',
+        "Kayıtlı kartla ödeme şu an kullanılamıyor. Lütfen kart bilgilerinizi girin.",
       );
     }
 
     // Hedefi (sipariş / grup / takas) çöz; ortak Payment + buyer + sepet + merchant_oid hazırlanır.
     // resolveDirectPaymentContext payment'ı atomik olarak `processing`'e CLAIM eder (H2).
-    const { payment, buyer, basketItems, merchantOid, amount, successQueryParams } =
-      await this.resolveDirectPaymentContext(userId, dto, req);
+    const {
+      payment,
+      buyer,
+      basketItems,
+      merchantOid,
+      amount,
+      successQueryParams,
+    } = await this.resolveDirectPaymentContext(userId, dto, req);
 
     try {
       return await this.chargeDirectPayment(
         dto,
-        { payment, buyer, basketItems, merchantOid, amount, successQueryParams },
+        {
+          payment,
+          buyer,
+          basketItems,
+          merchantOid,
+          amount,
+          successQueryParams,
+        },
         userId,
       );
     } finally {
@@ -388,26 +478,44 @@ export class PaymentService {
     ctx: {
       payment: any;
       buyer: PayTRBuyer;
-      basketItems: Array<{ id: string; name: string; category: string; price: number; quantity: number }>;
+      basketItems: Array<{
+        id: string;
+        name: string;
+        category: string;
+        price: number;
+        quantity: number;
+      }>;
       merchantOid: string;
       amount: number;
       successQueryParams: string;
     },
     userId: string | null,
   ) {
-    const { payment, buyer, basketItems, merchantOid, amount, successQueryParams } = ctx;
-    const recurringEnabled = this.configService.get('PAYTR_RECURRING_ENABLED') === 'true';
+    const {
+      payment,
+      buyer,
+      basketItems,
+      merchantOid,
+      amount,
+      successQueryParams,
+    } = ctx;
+    const recurringEnabled =
+      this.configService.get("PAYTR_RECURRING_ENABLED") === "true";
 
     // Flow B — KAYITLI KARTLA ÖDEME: PayTR'da kayıtlı kartla ödeme Non3D recurring servisiyle
     // yapılır (chargeRecurring). Kart sahibi kullanıcı olmalı; require_cvv ise CVV zorunlu.
     // Sonuç callback ile kesinleşir (success/wait_callback) — sipariş/escrow ortak yoldan akar.
     if (dto.savedCardId) {
       const saved = await this.prisma.savedCard.findFirst({
-        where: { id: dto.savedCardId, userId: userId as string, status: SavedCardStatus.active },
+        where: {
+          id: dto.savedCardId,
+          userId: userId as string,
+          status: SavedCardStatus.active,
+        },
       });
-      if (!saved) throw new NotFoundException('Kayıtlı kart bulunamadı');
+      if (!saved) throw new NotFoundException("Kayıtlı kart bulunamadı");
       if (saved.requireCvv && !dto.cvv) {
-        throw new BadRequestException('Bu kart için CVV gereklidir');
+        throw new BadRequestException("Bu kart için CVV gereklidir");
       }
       const r = await this.paytrService.chargeRecurring({
         utoken: saved.utoken,
@@ -418,10 +526,10 @@ export class PaymentService {
         basketItems,
         cvv: dto.cvv,
       });
-      if (r.status === 'failed') {
+      if (r.status === "failed") {
         await this.prisma.payment.update({
           where: { id: payment.id },
-          data: { failureReason: r.reason || 'Kayıtlı kartla ödeme başarısız' },
+          data: { failureReason: r.reason || "Kayıtlı kartla ödeme başarısız" },
         });
       }
       return {
@@ -434,7 +542,7 @@ export class PaymentService {
 
     // Flow A — YENİ KART (CIT): 3D ile (non3d=false). storeCard yalnız giriş yapmış kullanıcı +
     // Non3D yetkisi (PAYTR_RECURRING_ENABLED) açıkken; aksi halde saklanan kart kullanılamaz.
-    if (!dto.card) throw new BadRequestException('Kart bilgisi zorunludur.');
+    if (!dto.card) throw new BadRequestException("Kart bilgisi zorunludur.");
     const storeCard = !!dto.saveCard && !!userId && recurringEnabled;
     const result = await this.paytrService.createDirectPayment(
       merchantOid,
@@ -454,7 +562,7 @@ export class PaymentService {
     return {
       paymentId: payment.id,
       threeDSHtml: (result as any).threeDSHtml ?? null,
-      status: 'pending' as const,
+      status: "pending" as const,
     };
   }
 
@@ -471,7 +579,13 @@ export class PaymentService {
   ): Promise<{
     payment: any;
     buyer: PayTRBuyer;
-    basketItems: Array<{ id: string; name: string; category: string; price: number; quantity: number }>;
+    basketItems: Array<{
+      id: string;
+      name: string;
+      category: string;
+      price: number;
+      quantity: number;
+    }>;
     merchantOid: string;
     amount: number;
     successQueryParams: string;
@@ -483,24 +597,32 @@ export class PaymentService {
       // placeholder'ı 'guest@tarodan.system' DEĞİL). Üye siparişinde hesabın bilgisi kullanılır.
       const isGuest = sa.isGuestOrder === true;
       const fullName: string = String(
-        (isGuest ? sa.fullName || sa.guestName : u?.displayName) || u?.displayName || 'Müşteri',
+        (isGuest ? sa.fullName || sa.guestName : u?.displayName) ||
+          u?.displayName ||
+          "Müşteri",
       ).trim();
       const parts = fullName.split(/\s+/);
       return {
-        name: parts[0] || 'Müşteri',
-        surname: parts.slice(1).join(' ') || parts[0] || 'Müşteri',
+        name: parts[0] || "Müşteri",
+        surname: parts.slice(1).join(" ") || parts[0] || "Müşteri",
         email: (isGuest ? sa.guestEmail : u?.email) || u?.email,
-        phone: sa.phone || sa.guestPhone || u?.phone || '+905000000000',
+        phone: sa.phone || sa.guestPhone || u?.phone || "+905000000000",
         ip: clientIp,
-        address: sa.address || sa.fullAddress || 'Türkiye',
-        city: sa.city || 'İstanbul',
-        country: 'Türkiye',
+        address: sa.address || sa.fullAddress || "Türkiye",
+        city: sa.city || "İstanbul",
+        country: "Türkiye",
       };
     };
 
     let payment: any;
     let buyer: PayTRBuyer;
-    let basketItems: Array<{ id: string; name: string; category: string; price: number; quantity: number }>;
+    let basketItems: Array<{
+      id: string;
+      name: string;
+      category: string;
+      price: number;
+      quantity: number;
+    }>;
     let baseOid: string;
     let amount: number;
     let successQueryParams: string;
@@ -510,19 +632,28 @@ export class PaymentService {
         where: { id: dto.orderId },
         include: { buyer: true, seller: true, product: true },
       });
-      if (!order) throw new NotFoundException('Sipariş bulunamadı');
+      if (!order) throw new NotFoundException("Sipariş bulunamadı");
       // Sahiplik: üye → alıcı olmalı; misafir → sipariş misafir siparişi olmalı (iframe ile aynı kural).
-      const isGuestOrder = (order.shippingAddress as any)?.isGuestOrder === true;
+      const isGuestOrder =
+        (order.shippingAddress as any)?.isGuestOrder === true;
       if (userId) {
-        if (order.buyerId !== userId) throw new ForbiddenException('Bu sipariş için ödeme yapamazsınız');
+        if (order.buyerId !== userId)
+          throw new ForbiddenException("Bu sipariş için ödeme yapamazsınız");
       } else if (!isGuestOrder) {
-        throw new ForbiddenException('Bu sipariş için giriş yapmanız gerekiyor');
+        throw new ForbiddenException(
+          "Bu sipariş için giriş yapmanız gerekiyor",
+        );
       }
       if (order.status !== OrderStatus.pending_payment) {
-        throw new BadRequestException('Bu sipariş için ödeme beklenmiyor');
+        throw new BadRequestException("Bu sipariş için ödeme beklenmiyor");
       }
-      if (order.paymentExpiresAt && order.paymentExpiresAt.getTime() < Date.now()) {
-        throw new BadRequestException('Ödeme süresi doldu. Lütfen yeni bir sipariş oluşturun.');
+      if (
+        order.paymentExpiresAt &&
+        order.paymentExpiresAt.getTime() < Date.now()
+      ) {
+        throw new BadRequestException(
+          "Ödeme süresi doldu. Lütfen yeni bir sipariş oluşturun.",
+        );
       }
       // 30-dk cron rezervasyonu bıraktıysa charge öncesi CAS ile geri al (oversell koruması;
       // iframe initiate yolundaki ile aynı kural — Direct tek yol olunca burada da şart).
@@ -535,7 +666,9 @@ export class PaymentService {
           if (claimed.count === 0) return; // eşzamanlı retry kazandı
           await this.productLockService.checkAndReserve(tx, order.productId, 1);
         });
-        this.logger.log(`Re-reserved 1 unit for order ${order.id} after release (direct)`);
+        this.logger.log(
+          `Re-reserved 1 unit for order ${order.id} after release (direct)`,
+        );
       }
       amount = Number(order.totalAmount);
       // orderId Payment üzerinde UNIQUE — mevcut ödemeyi DURUMDAN BAĞIMSIZ bul
@@ -547,7 +680,7 @@ export class PaymentService {
         where: { orderId: order.id },
       });
       if (existingOrderPayment?.status === PaymentStatus.completed) {
-        throw new BadRequestException('Bu sipariş zaten ödendi');
+        throw new BadRequestException("Bu sipariş zaten ödendi");
       }
       payment =
         existingOrderPayment ||
@@ -555,42 +688,60 @@ export class PaymentService {
           data: {
             orderId: order.id,
             amount: order.totalAmount,
-            currency: 'TRY',
+            currency: "TRY",
             provider: PaymentProvider.paytr,
             status: PaymentStatus.pending,
           },
         }));
       buyer = buildBuyer(order.buyer, order.shippingAddress);
       basketItems = [
-        { id: order.product.id, name: order.product.title, category: 'Koleksiyon', price: amount, quantity: 1 },
+        {
+          id: order.product.id,
+          name: order.product.title,
+          category: "Koleksiyon",
+          price: amount,
+          quantity: 1,
+        },
       ];
-      baseOid = String(order.orderNumber || order.id).replace(/-/g, '');
-      const isMembershipOrder = order.productId?.startsWith?.('membership-');
+      baseOid = String(order.orderNumber || order.id).replace(/-/g, "");
+      const isMembershipOrder = order.productId?.startsWith?.("membership-");
       // Misafir siparişinde başarı URL'ine guest=true taşı: aksi halde PayTR
       // dönüşünde /payment/success guest'i tanıyamayıp /login'e atıyor (fatura
       // da görünmüyor). Üyelik ödemesi misafir olamaz.
       successQueryParams = isMembershipOrder
         ? `paymentId=${payment.id}&type=membership`
-        : `paymentId=${payment.id}${isGuestOrder ? '&guest=true' : ''}`;
+        : `paymentId=${payment.id}${isGuestOrder ? "&guest=true" : ""}`;
     } else if (dto.checkoutGroupId) {
       const group = await this.prisma.checkoutGroup.findUnique({
         where: { id: dto.checkoutGroupId },
-        include: { orders: { include: { buyer: true, seller: true, product: true } } },
+        include: {
+          orders: { include: { buyer: true, seller: true, product: true } },
+        },
       });
-      if (!group || group.orders.length === 0) throw new NotFoundException('Sipariş grubu bulunamadı');
+      if (!group || group.orders.length === 0)
+        throw new NotFoundException("Sipariş grubu bulunamadı");
       // Sahiplik: üye → grup alıcısı olmalı; misafir → grup misafir grubu olmalı (iframe ile aynı kural).
       if (userId) {
-        if (group.buyerId !== userId) throw new ForbiddenException('Bu sipariş grubu için ödeme yapamazsınız');
+        if (group.buyerId !== userId)
+          throw new ForbiddenException(
+            "Bu sipariş grubu için ödeme yapamazsınız",
+          );
       } else if (!group.isGuest) {
-        throw new ForbiddenException('Bu sipariş için giriş yapmanız gerekiyor');
+        throw new ForbiddenException(
+          "Bu sipariş için giriş yapmanız gerekiyor",
+        );
       }
       const now = Date.now();
       for (const o of group.orders) {
         if (o.status !== OrderStatus.pending_payment) {
-          throw new BadRequestException('Gruptaki bir sipariş ödeme beklemiyor. Lütfen sepeti yeniden oluşturun.');
+          throw new BadRequestException(
+            "Gruptaki bir sipariş ödeme beklemiyor. Lütfen sepeti yeniden oluşturun.",
+          );
         }
         if (o.paymentExpiresAt && o.paymentExpiresAt.getTime() < now) {
-          throw new BadRequestException('Ödeme süresi doldu. Lütfen yeni bir sipariş oluşturun.');
+          throw new BadRequestException(
+            "Ödeme süresi doldu. Lütfen yeni bir sipariş oluşturun.",
+          );
         }
       }
       // 30-dk cron rezervasyonu bıraktıysa charge öncesi sipariş başına CAS ile geri al (oversell koruması).
@@ -604,79 +755,113 @@ export class PaymentService {
             if (claimed.count === 0) return;
             await this.productLockService.checkAndReserve(tx, o.productId, 1);
           });
-          this.logger.log(`Re-reserved 1 unit for group order ${o.id} after release (direct)`);
+          this.logger.log(
+            `Re-reserved 1 unit for group order ${o.id} after release (direct)`,
+          );
         }
       }
       amount = Number(group.totalAmount);
-      const existing = await this.prisma.payment.findUnique({ where: { checkoutGroupId: group.id } });
-      if (existing?.status === PaymentStatus.completed) throw new BadRequestException('Bu sipariş grubu zaten ödendi');
+      const existing = await this.prisma.payment.findUnique({
+        where: { checkoutGroupId: group.id },
+      });
+      if (existing?.status === PaymentStatus.completed)
+        throw new BadRequestException("Bu sipariş grubu zaten ödendi");
       payment =
         existing ||
         (await this.prisma.payment.create({
           data: {
             checkoutGroupId: group.id,
             amount: group.totalAmount,
-            currency: 'TRY',
+            currency: "TRY",
             provider: PaymentProvider.paytr,
             status: PaymentStatus.pending,
           },
         }));
-      buyer = buildBuyer(group.orders[0].buyer, group.orders[0].shippingAddress);
+      buyer = buildBuyer(
+        group.orders[0].buyer,
+        group.orders[0].shippingAddress,
+      );
       basketItems = group.orders.map((o: any) => ({
         id: o.product.id,
         name: o.product.title,
-        category: 'Koleksiyon',
+        category: "Koleksiyon",
         price: Number(o.totalAmount),
         quantity: 1,
       }));
-      baseOid = String(group.groupNumber || group.id).replace(/-/g, '');
+      baseOid = String(group.groupNumber || group.id).replace(/-/g, "");
       // Misafir grup ödemesinde başarı URL'ine guest=true taşı (yukarıdaki order
       // yolundaki ile aynı sebep: dönüşte /login'e atılmasın, fatura görünsün).
-      successQueryParams = `paymentId=${payment.id}${group.isGuest ? '&guest=true' : ''}`;
+      successQueryParams = `paymentId=${payment.id}${group.isGuest ? "&guest=true" : ""}`;
     } else if (dto.tradeId) {
       const trade = await this.prisma.trade.findUnique({
         where: { id: dto.tradeId },
         include: {
           cashPayment: true,
-          initiator: { select: { id: true, displayName: true, email: true, phone: true } },
-          receiver: { select: { id: true, displayName: true, email: true, phone: true } },
+          initiator: {
+            select: { id: true, displayName: true, email: true, phone: true },
+          },
+          receiver: {
+            select: { id: true, displayName: true, email: true, phone: true },
+          },
         },
       });
-      if (!trade) throw new NotFoundException('Takas bulunamadı');
-      const payableStatuses: TradeStatus[] = [TradeStatus.accepted, TradeStatus.awaiting_payment];
+      if (!trade) throw new NotFoundException("Takas bulunamadı");
+      const payableStatuses: TradeStatus[] = [
+        TradeStatus.accepted,
+        TradeStatus.awaiting_payment,
+      ];
       if (!payableStatuses.includes(trade.status)) {
-        throw new BadRequestException('Takas henüz kabul edilmedi veya uygun durumda değil');
+        throw new BadRequestException(
+          "Takas henüz kabul edilmedi veya uygun durumda değil",
+        );
       }
       if (!trade.cashAmount || Number(trade.cashAmount) <= 0) {
-        throw new BadRequestException('Bu takasta ekstra ödeme bulunmuyor');
+        throw new BadRequestException("Bu takasta ekstra ödeme bulunmuyor");
       }
       if (trade.cashPayerId !== userId) {
-        throw new ForbiddenException('Bu ödemeyi sadece belirlenmiş ödeyen taraf başlatabilir');
+        throw new ForbiddenException(
+          "Bu ödemeyi sadece belirlenmiş ödeyen taraf başlatabilir",
+        );
       }
       const cashPayment = trade.cashPayment;
-      if (!cashPayment) throw new BadRequestException('Nakit ödeme kaydı bulunamadı');
-      if (cashPayment.status === PaymentStatus.completed) throw new BadRequestException('Bu takas ödemesi zaten tamamlandı');
+      if (!cashPayment)
+        throw new BadRequestException("Nakit ödeme kaydı bulunamadı");
+      if (cashPayment.status === PaymentStatus.completed)
+        throw new BadRequestException("Bu takas ödemesi zaten tamamlandı");
       amount = Number(cashPayment.totalAmount);
-      const payer = trade.cashPayerId === trade.initiatorId ? trade.initiator : trade.receiver;
+      const payer =
+        trade.cashPayerId === trade.initiatorId
+          ? trade.initiator
+          : trade.receiver;
       payment =
-        (await this.prisma.payment.findUnique({ where: { tradeCashPaymentId: cashPayment.id } })) ||
+        (await this.prisma.payment.findUnique({
+          where: { tradeCashPaymentId: cashPayment.id },
+        })) ||
         (await this.prisma.payment.create({
           data: {
             tradeCashPaymentId: cashPayment.id,
             amount: cashPayment.totalAmount,
-            currency: 'TRY',
+            currency: "TRY",
             provider: PaymentProvider.paytr,
             status: PaymentStatus.pending,
           },
         }));
       buyer = buildBuyer(payer);
       basketItems = [
-        { id: `trade-cash-${trade.id}`, name: `Takas #${trade.tradeNumber} Ekstra Ödeme`, category: 'Takas', price: amount, quantity: 1 },
+        {
+          id: `trade-cash-${trade.id}`,
+          name: `Takas #${trade.tradeNumber} Ekstra Ödeme`,
+          category: "Takas",
+          price: amount,
+          quantity: 1,
+        },
       ];
-      baseOid = `TRADE${String(trade.tradeNumber).replace(/-/g, '')}`;
+      baseOid = `TRADE${String(trade.tradeNumber).replace(/-/g, "")}`;
       successQueryParams = `paymentId=${payment.id}`;
     } else {
-      throw new BadRequestException('orderId, checkoutGroupId veya tradeId zorunludur.');
+      throw new BadRequestException(
+        "orderId, checkoutGroupId veya tradeId zorunludur.",
+      );
     }
 
     // ÇİFT-ÇEKİM KORUMASI: bu ödemenin önceki bir denemesi (providerConversationId) varsa,
@@ -688,7 +873,7 @@ export class PaymentService {
       const verified = await this.verifyPaymentFromClient(payment.id);
       if (verified.completed) {
         throw new BadRequestException(
-          'Bu ödeme zaten alınmış görünüyor. Lütfen sayfayı yenileyin; tekrar ödeme yapmanıza gerek yok.',
+          "Bu ödeme zaten alınmış görünüyor. Lütfen sayfayı yenileyin; tekrar ödeme yapmanıza gerek yok.",
         );
       }
     }
@@ -696,7 +881,9 @@ export class PaymentService {
     // merchant_oid + Y8 deseni: eski oid'li callback de eşleşsin diye geçmişini koru.
     const merchantOid = `${baseOid}T${Date.now().toString().slice(-6)}`;
     const prevMeta = (payment.metadata as any) || {};
-    const oidHistory: string[] = Array.isArray(prevMeta.merchantOidHistory) ? prevMeta.merchantOidHistory : [];
+    const oidHistory: string[] = Array.isArray(prevMeta.merchantOidHistory)
+      ? prevMeta.merchantOidHistory
+      : [];
     if (
       payment.providerConversationId &&
       payment.providerConversationId !== merchantOid &&
@@ -726,29 +913,46 @@ export class PaymentService {
     });
     if (claimed.count === 0) {
       throw new BadRequestException(
-        'Bu ödeme şu anda işleniyor. Lütfen birkaç saniye bekleyip tekrar deneyin.',
+        "Bu ödeme şu anda işleniyor. Lütfen birkaç saniye bekleyip tekrar deneyin.",
       );
     }
-    payment = await this.prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+    payment = await this.prisma.payment.findUniqueOrThrow({
+      where: { id: payment.id },
+    });
 
-    return { payment, buyer, basketItems, merchantOid, amount, successQueryParams };
+    return {
+      payment,
+      buyer,
+      basketItems,
+      merchantOid,
+      amount,
+      successQueryParams,
+    };
   }
 
   /**
    * Initiate payment for a trade's cash amount (extra money on top of items).
    * Called from TradeController POST /trades/:id/cash-payment/initiate.
    */
-  async initiateTradeCashPayment(tradeId: string, userId: string, req?: Request) {
+  async initiateTradeCashPayment(
+    tradeId: string,
+    userId: string,
+    req?: Request,
+  ) {
     const trade = await this.prisma.trade.findUnique({
       where: { id: tradeId },
       include: {
         cashPayment: true,
-        initiator: { select: { id: true, displayName: true, email: true, phone: true } },
-        receiver: { select: { id: true, displayName: true, email: true, phone: true } },
+        initiator: {
+          select: { id: true, displayName: true, email: true, phone: true },
+        },
+        receiver: {
+          select: { id: true, displayName: true, email: true, phone: true },
+        },
       },
     });
 
-    if (!trade) throw new NotFoundException('Takas bulunamadı');
+    if (!trade) throw new NotFoundException("Takas bulunamadı");
     // Safe-trade akışı: cash trade kabul edildiğinde status 'awaiting_payment' olur.
     // Legacy akış için 'accepted' da destekleniyor.
     const payableStatuses: TradeStatus[] = [
@@ -756,24 +960,28 @@ export class PaymentService {
       TradeStatus.awaiting_payment,
     ];
     if (!payableStatuses.includes(trade.status)) {
-      throw new BadRequestException('Takas henüz kabul edilmedi veya uygun durumda değil');
+      throw new BadRequestException(
+        "Takas henüz kabul edilmedi veya uygun durumda değil",
+      );
     }
     if (!trade.cashAmount || Number(trade.cashAmount) <= 0) {
-      throw new BadRequestException('Bu takasta ekstra ödeme bulunmuyor');
+      throw new BadRequestException("Bu takasta ekstra ödeme bulunmuyor");
     }
     if (trade.cashPayerId !== userId) {
-      throw new ForbiddenException('Bu ödemeyi sadece belirlenmiş ödeyen taraf başlatabilir');
+      throw new ForbiddenException(
+        "Bu ödemeyi sadece belirlenmiş ödeyen taraf başlatabilir",
+      );
     }
 
     const cashPayment = trade.cashPayment;
     if (!cashPayment) {
-      throw new BadRequestException('Nakit ödeme kaydı bulunamadı');
+      throw new BadRequestException("Nakit ödeme kaydı bulunamadı");
     }
     if (cashPayment.status === PaymentStatus.completed) {
-      throw new BadRequestException('Bu takas ödemesi zaten tamamlandı');
+      throw new BadRequestException("Bu takas ödemesi zaten tamamlandı");
     }
 
-    const bypassEnabled = this.configService.get('PAYMENT_BYPASS') === 'true';
+    const bypassEnabled = this.configService.get("PAYMENT_BYPASS") === "true";
 
     // trade_cash_payment_id is unique: only one Payment per TradeCashPayment. Reuse existing if any.
     const existingPayment = await this.prisma.payment.findUnique({
@@ -786,7 +994,7 @@ export class PaymentService {
     // PAYMENT_BYPASS: dev/test — PayTR token üretmeden; istemci bypass-complete çağırır.
     if (existingPayment) {
       if (existingPayment.status === PaymentStatus.completed) {
-        throw new BadRequestException('Bu takas ödemesi zaten tamamlandı');
+        throw new BadRequestException("Bu takas ödemesi zaten tamamlandı");
       }
       if (bypassEnabled) {
         await this.prisma.payment.update({
@@ -797,7 +1005,9 @@ export class PaymentService {
             providerPaymentId: null,
           },
         });
-        this.logger.warn(`PAYMENT_BYPASS: trade cash payment ${existingPayment.id} ready for bypass completion`);
+        this.logger.warn(
+          `PAYMENT_BYPASS: trade cash payment ${existingPayment.id} ready for bypass completion`,
+        );
         return {
           paymentId: existingPayment.id,
           tradeId,
@@ -823,7 +1033,10 @@ export class PaymentService {
       });
 
       // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin), kart /payments/process-direct ile.
-      await this.assignMerchantOid(existingPayment.id, `TRADE-${trade.tradeNumber}`);
+      await this.assignMerchantOid(
+        existingPayment.id,
+        `TRADE-${trade.tradeNumber}`,
+      );
       return {
         paymentId: existingPayment.id,
         provider: existingPayment.provider,
@@ -837,22 +1050,32 @@ export class PaymentService {
       data: {
         tradeCashPaymentId: cashPayment.id,
         amount: totalAmount,
-        currency: 'TRY',
+        currency: "TRY",
         provider,
         status: PaymentStatus.pending,
       },
     });
 
-    await this.logPaymentAction('created', payment.id, undefined, undefined, undefined, PaymentStatus.pending, {
-      amount: totalAmount,
-      provider,
-      tradeId,
-      tradeCashPaymentId: cashPayment.id,
-      payerId: userId,
-    });
+    await this.logPaymentAction(
+      "created",
+      payment.id,
+      undefined,
+      undefined,
+      undefined,
+      PaymentStatus.pending,
+      {
+        amount: totalAmount,
+        provider,
+        tradeId,
+        tradeCashPaymentId: cashPayment.id,
+        payerId: userId,
+      },
+    );
 
     if (bypassEnabled) {
-      this.logger.warn(`PAYMENT_BYPASS: trade cash payment ${payment.id} ready for bypass completion`);
+      this.logger.warn(
+        `PAYMENT_BYPASS: trade cash payment ${payment.id} ready for bypass completion`,
+      );
       return {
         paymentId: payment.id,
         tradeId,
@@ -877,7 +1100,11 @@ export class PaymentService {
   /**
    * Common payment initiation logic for both authenticated and guest users
    */
-  private async processPaymentInitiation(order: any, dto: InitiatePaymentDto, req?: Request) {
+  private async processPaymentInitiation(
+    order: any,
+    dto: InitiatePaymentDto,
+    req?: Request,
+  ) {
     // Check for existing pending payment
     const existingPayment = await this.prisma.payment.findFirst({
       where: {
@@ -887,7 +1114,7 @@ export class PaymentService {
     });
 
     if (existingPayment) {
-      const bypassEnabled = this.configService.get('PAYMENT_BYPASS') === 'true';
+      const bypassEnabled = this.configService.get("PAYMENT_BYPASS") === "true";
 
       // Reset row before reuse: PayTR iframe tokens are single-use, so we must
       // mint a fresh one on every retry (otherwise iframe shows
@@ -931,7 +1158,10 @@ export class PaymentService {
       }
 
       // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin), kart /payments/process-direct ile.
-      await this.assignMerchantOid(existingPayment.id, String(order.orderNumber || order.id));
+      await this.assignMerchantOid(
+        existingPayment.id,
+        String(order.orderNumber || order.id),
+      );
       return {
         paymentId: existingPayment.id,
         orderId: order.id,
@@ -949,7 +1179,9 @@ export class PaymentService {
       await this.prisma.$transaction(async (tx) => {
         await this.productLockService.checkAndReserve(tx, order.productId, 1);
       });
-      this.logger.log(`Reserved 1 unit for offer-based order ${order.id} (product ${order.productId})`);
+      this.logger.log(
+        `Reserved 1 unit for offer-based order ${order.id} (product ${order.productId})`,
+      );
     } else if (order.reservationReleasedAt) {
       // Retry after 30-min release. CAS-gate on the flag so concurrent
       // initiate calls can't both increment reservedQuantity.
@@ -974,7 +1206,7 @@ export class PaymentService {
     let payment;
     if (existingOrderPayment) {
       if (existingOrderPayment.status === PaymentStatus.completed) {
-        throw new BadRequestException('Bu sipariş zaten ödendi');
+        throw new BadRequestException("Bu sipariş zaten ödendi");
       }
       payment = await this.prisma.payment.update({
         where: { id: existingOrderPayment.id },
@@ -991,7 +1223,7 @@ export class PaymentService {
         data: {
           orderId: dto.orderId,
           amount: order.totalAmount,
-          currency: 'TRY',
+          currency: "TRY",
           provider: PaymentProvider.paytr,
           status: PaymentStatus.pending,
         },
@@ -999,16 +1231,26 @@ export class PaymentService {
     }
 
     // Log payment creation
-    await this.logPaymentAction('created', payment.id, dto.orderId, undefined, undefined, PaymentStatus.pending, {
-      amount: Number(order.totalAmount),
-      provider: PaymentProvider.paytr,
-      buyerId: order.buyerId,
-    });
+    await this.logPaymentAction(
+      "created",
+      payment.id,
+      dto.orderId,
+      undefined,
+      undefined,
+      PaymentStatus.pending,
+      {
+        amount: Number(order.totalAmount),
+        provider: PaymentProvider.paytr,
+        buyerId: order.buyerId,
+      },
+    );
 
     // PAYMENT_BYPASS: dev/test modunda PayTR'ye gitmeden ödemeyi tamamla
-    const bypassEnabled = this.configService.get('PAYMENT_BYPASS') === 'true';
+    const bypassEnabled = this.configService.get("PAYMENT_BYPASS") === "true";
     if (bypassEnabled) {
-      this.logger.warn(`PAYMENT_BYPASS active: payment ${payment.id} ready for bypass completion`);
+      this.logger.warn(
+        `PAYMENT_BYPASS active: payment ${payment.id} ready for bypass completion`,
+      );
       return {
         paymentId: payment.id,
         orderId: order.id,
@@ -1020,7 +1262,10 @@ export class PaymentService {
     }
 
     // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin), kart /payments/process-direct ile.
-    await this.assignMerchantOid(payment.id, String(order.orderNumber || order.id));
+    await this.assignMerchantOid(
+      payment.id,
+      String(order.orderNumber || order.id),
+    );
     return {
       paymentId: payment.id,
       orderId: order.id,
@@ -1034,10 +1279,16 @@ export class PaymentService {
    * Bypass payment completion (dev/test only)
    * Directly marks payment as successful without going through PayTR.
    */
-  async bypassCompletePayment(paymentId: string): Promise<{ success: boolean }> {
-    const bypassEnabled = this.configService.get('PAYMENT_BYPASS') === 'true';
-    if (!bypassEnabled) {
-      throw new BadRequestException('Payment bypass is not enabled');
+  async bypassCompletePayment(
+    paymentId: string,
+  ): Promise<{ success: boolean }> {
+    // Defense-in-depth: this @Public endpoint completes a payment with no PayTR
+    // interaction, so it must NEVER run in production even if PAYMENT_BYPASS
+    // somehow leaked into the env. (main.ts already refuses to boot in that
+    // case; this is a second, local backstop.)
+    const bypassEnabled = this.configService.get("PAYMENT_BYPASS") === "true";
+    if (process.env.NODE_ENV === "production" || !bypassEnabled) {
+      throw new BadRequestException("Payment bypass is not enabled");
     }
 
     const payment = await this.prisma.payment.findUnique({
@@ -1055,15 +1306,20 @@ export class PaymentService {
     });
 
     if (!payment) {
-      throw new NotFoundException('Payment not found');
+      throw new NotFoundException("Payment not found");
     }
 
     if (payment.status !== PaymentStatus.pending) {
       throw new BadRequestException(`Payment already ${payment.status}`);
     }
 
-    const did = await this.processSuccessfulPayment(payment, `bypass:${paymentId}`);
-    this.logger.warn(`PAYMENT_BYPASS: payment ${paymentId} completed (did=${did})`);
+    const did = await this.processSuccessfulPayment(
+      payment,
+      `bypass:${paymentId}`,
+    );
+    this.logger.warn(
+      `PAYMENT_BYPASS: payment ${paymentId} completed (did=${did})`,
+    );
 
     return { success: did };
   }
@@ -1092,10 +1348,7 @@ export class PaymentService {
 
     let payment = await this.prisma.payment.findFirst({
       where: {
-        OR: [
-          { providerConversationId: merchantOid },
-          { orderId: merchantOid },
-        ],
+        OR: [{ providerConversationId: merchantOid }, { orderId: merchantOid }],
       },
       include: callbackInclude,
     });
@@ -1107,7 +1360,10 @@ export class PaymentService {
     if (!payment) {
       payment = await this.prisma.payment.findFirst({
         where: {
-          metadata: { path: ['merchantOidHistory'], array_contains: merchantOid },
+          metadata: {
+            path: ["merchantOidHistory"],
+            array_contains: merchantOid,
+          },
         },
         include: callbackInclude,
       });
@@ -1120,54 +1376,63 @@ export class PaymentService {
    * Hash mismatch: do not trust callback body; verify via PayTR durum-sorgu when a pending PayTR payment exists.
    * Returns OK so PayTR stops retrying; logs errors for ops.
    */
-  private async handlePayTRCallbackHashMismatch(dto: PayTRCallbackDto): Promise<string> {
+  private async handlePayTRCallbackHashMismatch(
+    dto: PayTRCallbackDto,
+  ): Promise<string> {
     const payment = await this.findPaymentForPaytrCallback(dto.merchant_oid);
 
     if (!payment) {
       this.logger.error(
         `PayTR callback invalid hash and no payment row: merchant_oid=${dto.merchant_oid} status=${dto.status}`,
       );
-      throw new NotFoundException('Payment not found');
+      throw new NotFoundException("Payment not found");
     }
 
     if (payment.provider !== PaymentProvider.paytr) {
       this.logger.error(
         `PayTR hash mismatch: payment=${payment.id} provider=${payment.provider} merchant_oid=${dto.merchant_oid}`,
       );
-      return 'OK';
+      return "OK";
     }
 
     if (payment.status !== PaymentStatus.pending) {
       this.logger.error(
         `PayTR hash mismatch: payment=${payment.id} status=${payment.status} merchant_oid=${dto.merchant_oid}`,
       );
-      return 'OK';
+      return "OK";
     }
 
-    if (payment.orderId && payment.order && payment.order.status !== OrderStatus.pending_payment) {
+    if (
+      payment.orderId &&
+      payment.order &&
+      payment.order.status !== OrderStatus.pending_payment
+    ) {
       this.logger.error(
         `PayTR hash mismatch: payment=${payment.id} orderStatus=${payment.order.status} merchant_oid=${dto.merchant_oid}`,
       );
-      return 'OK';
+      return "OK";
     }
 
     const tolerance = parseFloat(
-      this.configService.get('PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL') || '0.05',
+      this.configService.get("PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL") || "0.05",
     );
     const oid =
-      (payment.providerConversationId || dto.merchant_oid || '').trim() || dto.merchant_oid.trim();
+      (payment.providerConversationId || dto.merchant_oid || "").trim() ||
+      dto.merchant_oid.trim();
 
     let inquiry = await this.paytrService.queryPaymentStatus(oid);
-    if (!inquiry.ok && oid.includes('-')) {
-      inquiry = await this.paytrService.queryPaymentStatus(oid.replace(/-/g, ''));
+    if (!inquiry.ok && oid.includes("-")) {
+      inquiry = await this.paytrService.queryPaymentStatus(
+        oid.replace(/-/g, ""),
+      );
     }
 
     if (!inquiry.ok) {
       const fail = inquiry as { ok: false; errNo?: string; errMsg?: string };
       this.logger.error(
-        `PayTR hash mismatch: durum-sorgu failed payment=${payment.id} merchant_oid=${dto.merchant_oid} oid=${oid} err=${fail.errMsg ?? fail.errNo ?? 'unknown'} ourAmount=${Number(payment.amount)}`,
+        `PayTR hash mismatch: durum-sorgu failed payment=${payment.id} merchant_oid=${dto.merchant_oid} oid=${oid} err=${fail.errMsg ?? fail.errNo ?? "unknown"} ourAmount=${Number(payment.amount)}`,
       );
-      return 'OK';
+      return "OK";
     }
 
     const ourAmount = Number(payment.amount);
@@ -1175,11 +1440,11 @@ export class PaymentService {
       this.logger.error(
         `PayTR hash mismatch: amount mismatch payment=${payment.id} merchant_oid=${dto.merchant_oid} paytr=${inquiry.paymentTotalTl} ours=${ourAmount}`,
       );
-      return 'OK';
+      return "OK";
     }
 
     const txnRef =
-      inquiry.paymentDate != null && inquiry.paymentDate !== ''
+      inquiry.paymentDate != null && inquiry.paymentDate !== ""
         ? `paytr:${oid}:${inquiry.paymentDate}`
         : `paytr:${oid}`;
 
@@ -1189,7 +1454,7 @@ export class PaymentService {
         `PayTR hash mismatch recovered via durum-sorgu payment=${payment.id} merchant_oid=${dto.merchant_oid} dtoStatus=${dto.status}`,
       );
     }
-    return 'OK';
+    return "OK";
   }
 
   /**
@@ -1197,20 +1462,20 @@ export class PaymentService {
    * POST /payments/callback/paytr
    */
   async handlePayTRCallback(dto: PayTRCallbackDto) {
-    this.logger.log('PayTR callback received');
+    this.logger.log("PayTR callback received");
 
     // PayTR keeps retrying unless we reply with literal "OK". Always return
     // "OK" — even on bad/missing payloads — and just log the issue.
     if (!dto.merchant_oid || !dto.status || !dto.total_amount || !dto.hash) {
       this.logger.warn(
-        `PayTR callback missing required fields: merchant_oid=${dto.merchant_oid} status=${dto.status} total_amount=${dto.total_amount} hash=${dto.hash ? 'present' : 'missing'}`,
+        `PayTR callback missing required fields: merchant_oid=${dto.merchant_oid} status=${dto.status} total_amount=${dto.total_amount} hash=${dto.hash ? "present" : "missing"}`,
       );
-      return 'OK';
+      return "OK";
     }
 
     const isValid = this.paytrService.verifyCallback({
       merchant_oid: dto.merchant_oid,
-      status: dto.status as 'success' | 'failed',
+      status: dto.status as "success" | "failed",
       total_amount: dto.total_amount,
       hash: dto.hash,
       failed_reason_code: dto.failed_reason_code,
@@ -1224,17 +1489,19 @@ export class PaymentService {
     const payment = await this.findPaymentForPaytrCallback(dto.merchant_oid);
 
     if (!payment) {
-      this.logger.warn(`PayTR callback: payment not found for merchant_oid=${dto.merchant_oid}`);
-      return 'OK';
+      this.logger.warn(
+        `PayTR callback: payment not found for merchant_oid=${dto.merchant_oid}`,
+      );
+      return "OK";
     }
 
-    if (dto.status === 'success') {
+    if (dto.status === "success") {
       // Y16: Hash geçerli (otantik PayTR) olsa bile tutarı doğrula. PayTR beklenenden
       // farklı bir tutar bildirirse (ör. kısmi capture veya gevşek eşleşme), siparişi
       // YANLIŞ tutarla completed yapmayalım. Tolerans dışıysa logla ve tamamlama —
       // para PayTR'da kalır, sipariş pending kalır ve reconcile/manuel inceleme ele alır.
       const toleranceTl = parseFloat(
-        this.configService.get('PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL') || '0.05',
+        this.configService.get("PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL") || "0.05",
       );
       const expectedKurus = Math.round(Number(payment.amount) * 100);
       const callbackKurus = parseInt(dto.total_amount, 10);
@@ -1244,23 +1511,31 @@ export class PaymentService {
             `beklenen ${expectedKurus} kuruş, gelen ${callbackKurus} kuruş — ` +
             `ödeme TAMAMLANMADI, manuel inceleme gerekir`,
         );
-        return 'OK';
+        return "OK";
       }
       await this.processSuccessfulPayment(payment, dto.merchant_oid);
       // CAPI (Faz 3): store_card ödemesinde PayTR bildirimle utoken döndürür → kullanıcının
       // kayıtlı kartlarını SavedCard'a senkronla (recurring için). Best-effort, ödemeyi etkilemez.
       if (dto.utoken && payment.order?.buyerId) {
         try {
-          await this.syncSavedCardsFromUtoken(payment.order.buyerId, dto.utoken);
+          await this.syncSavedCardsFromUtoken(
+            payment.order.buyerId,
+            dto.utoken,
+          );
         } catch (e: any) {
-          this.logger.error(`SavedCard senkron hatası (oid=${dto.merchant_oid}): ${e?.message}`);
+          this.logger.error(
+            `SavedCard senkron hatası (oid=${dto.merchant_oid}): ${e?.message}`,
+          );
         }
       }
     } else {
-      await this.processFailedPayment(payment, dto.failed_reason_msg || 'PayTR payment failed');
+      await this.processFailedPayment(
+        payment,
+        dto.failed_reason_msg || "PayTR payment failed",
+      );
     }
 
-    return 'OK';
+    return "OK";
   }
 
   // Taşındı: payment-common.service.ts — ödeme aksiyonu audit log'u (facade delege; imza aynı).
@@ -1289,7 +1564,10 @@ export class PaymentService {
    * Requirement: Queue job publishing after payment (3.1)
    * @returns true if this invocation completed the payment; false if already completed (idempotent / race with callback).
    */
-  private async processSuccessfulPayment(payment: any, transactionId?: string): Promise<boolean> {
+  private async processSuccessfulPayment(
+    payment: any,
+    transactionId?: string,
+  ): Promise<boolean> {
     // Trade cash payment: different flow from order payments
     if (payment.tradeCashPaymentId && !payment.orderId) {
       return this.processSuccessfulTradeCashPayment(payment, transactionId);
@@ -1308,14 +1586,20 @@ export class PaymentService {
       offerId: string | null;
       hadPayment: boolean;
     }[] = [];
-    const cancelledOffers: { buyerId: string; productId: string; productTitle: string }[] = [];
+    const cancelledOffers: {
+      buyerId: string;
+      productId: string;
+      productTitle: string;
+    }[] = [];
     let stockoutCategoryId: string | null = null;
 
     const result = await this.prisma.$transaction(async (tx) => {
       const oldStatus = payment.status;
 
-      const auditHistory = ((payment.metadata as any)?.auditHistory || []).concat({
-        action: 'payment.completed',
+      const auditHistory = (
+        (payment.metadata as any)?.auditHistory || []
+      ).concat({
+        action: "payment.completed",
         timestamp: new Date().toISOString(),
         oldStatus,
         newStatus: PaymentStatus.completed,
@@ -1323,7 +1607,7 @@ export class PaymentService {
       });
 
       const newMetadata = {
-        ...(payment.metadata as any || {}),
+        ...((payment.metadata as any) || {}),
         auditHistory,
       };
 
@@ -1355,12 +1639,16 @@ export class PaymentService {
         this.logger.warn(
           `Payment ${payment.id} succeeded but order ${payment.orderId} (${currentOrder.orderNumber}) already cancelled. Auto-refund required.`,
         );
-        return { autoRefundRequired: true, orderId: payment.orderId, paymentId: payment.id };
+        return {
+          autoRefundRequired: true,
+          orderId: payment.orderId,
+          paymentId: payment.id,
+        };
       }
 
       // Update order status to PREPARING with shipping deadline for the seller
       const preparingDays = parseInt(
-        this.configService.get('PREPARING_DEADLINE_DAYS') || '3',
+        this.configService.get("PREPARING_DEADLINE_DAYS") || "3",
         10,
       );
       const preparingDeadline = new Date();
@@ -1376,9 +1664,11 @@ export class PaymentService {
       });
 
       // Check if this is a membership order (productId starts with "membership-")
-      const isMembershipOrder = payment.order?.productId?.startsWith('membership-') ?? false;
+      const isMembershipOrder =
+        payment.order?.productId?.startsWith("membership-") ?? false;
       // Boost (öne çıkarma) siparişi mi? (productId "boost-" ile başlar)
-      const isBoostOrder = payment.order?.productId?.startsWith('boost-') ?? false;
+      const isBoostOrder =
+        payment.order?.productId?.startsWith("boost-") ?? false;
       const productIdsToInvalidate: string[] = [];
 
       if (isMembershipOrder) {
@@ -1399,7 +1689,7 @@ export class PaymentService {
 
           // Premium (free olmayan) üyelik aktifleşti: satıcının boost'suz aktif ilanlarını
           // premium kademesine (rankTier=1) yükselt. Boost'lu (2) ürünlere dokunma.
-          if (membership.tier.type !== 'free') {
+          if (membership.tier.type !== "free") {
             await tx.product.updateMany({
               where: {
                 sellerId: payment.order.buyerId,
@@ -1407,7 +1697,10 @@ export class PaymentService {
                 rankTier: 0,
               },
               // rankTier 0→1; relevanceScore'a premium bonusu ekle (kademe 0→1 farkı)
-              data: { rankTier: 1, relevanceScore: { increment: RELEVANCE_PREMIUM_BONUS } },
+              data: {
+                rankTier: 1,
+                relevanceScore: { increment: RELEVANCE_PREMIUM_BONUS },
+              },
             });
           }
 
@@ -1415,15 +1708,17 @@ export class PaymentService {
           await tx.membershipPayment.updateMany({
             where: {
               membershipId: membership.id,
-              status: 'pending',
+              status: "pending",
             },
             data: {
-              status: 'completed',
+              status: "completed",
               providerPaymentId: transactionId || payment.providerPaymentId,
             },
           });
 
-          this.logger.log(`Membership activated for user ${payment.order.buyerId} after payment ${payment.id}`);
+          this.logger.log(
+            `Membership activated for user ${payment.order.buyerId} after payment ${payment.id}`,
+          );
         }
 
         // Üyelik sanal hizmettir: kargo/teslimat akışına girmesin → terminal "completed".
@@ -1454,9 +1749,14 @@ export class PaymentService {
           });
           await tx.payment.updateMany({
             where: { orderId: { in: ids }, status: PaymentStatus.pending },
-            data: { status: PaymentStatus.failed, failureReason: 'Üyelik başka ödeme ile tamamlandı' },
+            data: {
+              status: PaymentStatus.failed,
+              failureReason: "Üyelik başka ödeme ile tamamlandı",
+            },
           });
-          this.logger.log(`Cancelled ${ids.length} sibling pending membership orders for user ${payment.order.buyerId}`);
+          this.logger.log(
+            `Cancelled ${ids.length} sibling pending membership orders for user ${payment.order.buyerId}`,
+          );
         }
       } else if (isBoostOrder) {
         // Boost siparişi: ilgili ProductBoost'u aktive et, ürünü sponsorlu kademesine (rankTier=2) al.
@@ -1470,7 +1770,11 @@ export class PaymentService {
           // (örn. kalan 15 gün + yeni 30 gün = toplam 45 gün)
           const boostedProduct = await tx.product.findUnique({
             where: { id: boost.productId },
-            select: { boostedUntil: true, qualityScore: true, popularityScore: true },
+            select: {
+              boostedUntil: true,
+              qualityScore: true,
+              popularityScore: true,
+            },
           });
           const base =
             boostedProduct?.boostedUntil && boostedProduct.boostedUntil > nowTs
@@ -1482,7 +1786,7 @@ export class PaymentService {
           );
           await tx.productBoost.update({
             where: { id: boost.id },
-            data: { status: 'active', startsAt, endsAt },
+            data: { status: "active", startsAt, endsAt },
           });
           await tx.product.update({
             where: { id: boost.productId },
@@ -1507,7 +1811,9 @@ export class PaymentService {
             `Boost activated for product ${boost.productId} until ${endsAt.toISOString()} after payment ${payment.id}`,
           );
         } else {
-          this.logger.warn(`Boost order ${payment.orderId} paid but no matching ProductBoost found`);
+          this.logger.warn(
+            `Boost order ${payment.orderId} paid but no matching ProductBoost found`,
+          );
         }
       } else {
         // Regular product order: ödeme başarılı → quantity--, reservedQuantity--
@@ -1521,15 +1827,20 @@ export class PaymentService {
         });
 
         if (!product) {
-          throw new Error('Product not found');
+          throw new Error("Product not found");
         }
 
         const orderQty = payment.order?.quantity ?? 1;
         const newQuantity =
-          product.quantity !== null ? Math.max(0, product.quantity - orderQty) : null;
+          product.quantity !== null
+            ? Math.max(0, product.quantity - orderQty)
+            : null;
         const updateData: any = {
           status: getProductStatusFromQuantity(newQuantity),
-          reservedQuantity: safeDecrementReserved(product.reservedQuantity, orderQty),
+          reservedQuantity: safeDecrementReserved(
+            product.reservedQuantity,
+            orderQty,
+          ),
         };
         if (product.quantity !== null) {
           // Clamp'li mutlak set (FOR UPDATE kilidi altında yarışsız); { decrement } yerine
@@ -1563,17 +1874,23 @@ export class PaymentService {
           where: { id: payment.order.productId },
           select: { quantity: true, reservedQuantity: true, categoryId: true },
         });
-        if (refreshed && refreshed.quantity !== null && refreshed.quantity <= 0) {
+        if (
+          refreshed &&
+          refreshed.quantity !== null &&
+          refreshed.quantity <= 0
+        ) {
           stockoutCategoryId = refreshed.categoryId ?? null;
-          const orderResult = await this.productLockService.invalidatePendingOrdersForProduct(
-            tx,
-            payment.order.productId,
-            'Stok tükendi',
-          );
-          const offerResult = await this.productLockService.invalidateRelatedOffers(
-            tx,
-            payment.order.productId,
-          );
+          const orderResult =
+            await this.productLockService.invalidatePendingOrdersForProduct(
+              tx,
+              payment.order.productId,
+              "Stok tükendi",
+            );
+          const offerResult =
+            await this.productLockService.invalidateRelatedOffers(
+              tx,
+              payment.order.productId,
+            );
           cancelledOrders.push(
             ...orderResult.cancelledOrders.map((o) => ({
               orderId: o.orderId,
@@ -1609,7 +1926,7 @@ export class PaymentService {
       });
 
       if (!order) {
-        throw new Error('Order not found after payment');
+        throw new Error("Order not found after payment");
       }
 
       // Only create payment hold for regular product orders (not membership/boost orders)
@@ -1644,9 +1961,13 @@ export class PaymentService {
           tx,
         });
 
-        this.logger.log(`Payment ${payment.id} completed, hold created for seller ${order.sellerId}`);
+        this.logger.log(
+          `Payment ${payment.id} completed, hold created for seller ${order.sellerId}`,
+        );
       } else {
-        this.logger.log(`Virtual order payment ${payment.id} (membership/boost) completed, no hold needed`);
+        this.logger.log(
+          `Virtual order payment ${payment.id} (membership/boost) completed, no hold needed`,
+        );
       }
 
       return { order, productIdsToInvalidate };
@@ -1660,10 +1981,12 @@ export class PaymentService {
     }
 
     // Handle auto-refund: payment succeeded but order was already cancelled (race with cron)
-    if ('autoRefundRequired' in result && result.autoRefundRequired) {
+    if ("autoRefundRequired" in result && result.autoRefundRequired) {
       const refundOrderId = (result as any).orderId;
       const refundPaymentId = (result as any).paymentId;
-      this.logger.warn(`Auto-refunding payment ${refundPaymentId} — order ${refundOrderId} was already cancelled`);
+      this.logger.warn(
+        `Auto-refunding payment ${refundPaymentId} — order ${refundOrderId} was already cancelled`,
+      );
       try {
         await this.processRefund(refundOrderId);
         this.logger.log(`Auto-refund completed for order ${refundOrderId}`);
@@ -1696,10 +2019,22 @@ export class PaymentService {
       notifiedBuyers.add(o.buyerId);
       const isUnpaidOffer = o.offerId !== null && !o.hadPayment;
       const notify = isUnpaidOffer
-        ? this.notificationService.notifyOfferCancelledOutOfStock(o.buyerId, o.productId, o.productTitle, stockoutCategoryId)
-        : this.notificationService.notifyOrderCancelledOutOfStock(o.buyerId, o.productId, o.productTitle, stockoutCategoryId);
+        ? this.notificationService.notifyOfferCancelledOutOfStock(
+            o.buyerId,
+            o.productId,
+            o.productTitle,
+            stockoutCategoryId,
+          )
+        : this.notificationService.notifyOrderCancelledOutOfStock(
+            o.buyerId,
+            o.productId,
+            o.productTitle,
+            stockoutCategoryId,
+          );
       await notify.catch((err) =>
-        this.logger.warn(`stockout-notify (${isUnpaidOffer ? 'offer' : 'order'}) failed for ${o.buyerId}: ${err.message}`),
+        this.logger.warn(
+          `stockout-notify (${isUnpaidOffer ? "offer" : "order"}) failed for ${o.buyerId}: ${err.message}`,
+        ),
       );
     }
     // Sipariş iptali e-postaları (alıcı+satıcı) — sipariş bazlı; teklif
@@ -1715,16 +2050,23 @@ export class PaymentService {
       if (notifiedBuyers.has(o.buyerId)) continue;
       notifiedBuyers.add(o.buyerId);
       await this.notificationService
-        .notifyOfferCancelledOutOfStock(o.buyerId, o.productId, o.productTitle, stockoutCategoryId)
+        .notifyOfferCancelledOutOfStock(
+          o.buyerId,
+          o.productId,
+          o.productTitle,
+          stockoutCategoryId,
+        )
         .catch((err) =>
-          this.logger.warn(`stockout-notify (offer) failed for ${o.buyerId}: ${err.message}`),
+          this.logger.warn(
+            `stockout-notify (offer) failed for ${o.buyerId}: ${err.message}`,
+          ),
         );
     }
 
     // Emit order.paid event AFTER transaction commits (only for regular product orders, not membership/boost)
     // This publishes jobs to email, push, and shipping queues
-    const isMembershipOrder = resultOrder.productId.startsWith('membership-');
-    const isBoostOrder = resultOrder.productId.startsWith('boost-');
+    const isMembershipOrder = resultOrder.productId.startsWith("membership-");
+    const isBoostOrder = resultOrder.productId.startsWith("boost-");
 
     // Ürün listesi cache'ini temizle:
     // - Boost: öne çıkarma sıralamayı etkiler.
@@ -1732,7 +2074,7 @@ export class PaymentService {
     //   listelerde "stokta yok" olarak sona kayar; sıralama/görünürlük değişir.
     // Membership siparişleri ürün listelerini etkilemez.
     if (!isMembershipOrder) {
-      await this.cache.delPattern('products:list:*').catch(() => {});
+      await this.cache.delPattern("products:list:*").catch(() => {});
     }
 
     if (!isMembershipOrder && !isBoostOrder) {
@@ -1740,15 +2082,23 @@ export class PaymentService {
         const shippingAddressData = resultOrder.shippingAddress as any;
 
         // Check if this is a guest order and get actual buyer info
-        const isGuestOrder = resultOrder.buyer.email === 'guest@tarodan.system' || shippingAddressData?.isGuestOrder;
+        const isGuestOrder =
+          resultOrder.buyer.email === "guest@tarodan.system" ||
+          shippingAddressData?.isGuestOrder;
         const actualBuyerEmail = isGuestOrder
-          ? (shippingAddressData?.guestEmail || shippingAddressData?.email || resultOrder.buyer.email)
+          ? shippingAddressData?.guestEmail ||
+            shippingAddressData?.email ||
+            resultOrder.buyer.email
           : resultOrder.buyer.email;
         const actualBuyerName = isGuestOrder
-          ? (shippingAddressData?.guestName || shippingAddressData?.fullName || 'Misafir Müşteri')
-          : (resultOrder.buyer.displayName || resultOrder.buyer.email);
+          ? shippingAddressData?.guestName ||
+            shippingAddressData?.fullName ||
+            "Misafir Müşteri"
+          : resultOrder.buyer.displayName || resultOrder.buyer.email;
 
-        this.logger.log(`Emitting order.paid event - buyerEmail: ${actualBuyerEmail}, isGuest: ${isGuestOrder}`);
+        this.logger.log(
+          `Emitting order.paid event - buyerEmail: ${actualBuyerEmail}, isGuest: ${isGuestOrder}`,
+        );
 
         await this.eventService.emitOrderPaid({
           orderId: resultOrder.id,
@@ -1762,22 +2112,26 @@ export class PaymentService {
           buyerEmail: actualBuyerEmail,
           buyerName: actualBuyerName,
           sellerEmail: resultOrder.seller.email,
-          sellerName: resultOrder.seller.displayName || resultOrder.seller.email,
+          sellerName:
+            resultOrder.seller.displayName || resultOrder.seller.email,
           paymentMethod: payment.provider,
-          transactionId: transactionId || payment.providerPaymentId || payment.id,
+          transactionId:
+            transactionId || payment.providerPaymentId || payment.id,
           shippingAddress: {
-            fullName: shippingAddressData?.fullName || '',
-            phone: shippingAddressData?.phone || '',
-            address: shippingAddressData?.address || '',
-            city: shippingAddressData?.city || '',
-            district: shippingAddressData?.district || '',
-            zipCode: shippingAddressData?.zipCode || '',
+            fullName: shippingAddressData?.fullName || "",
+            phone: shippingAddressData?.phone || "",
+            address: shippingAddressData?.address || "",
+            city: shippingAddressData?.city || "",
+            district: shippingAddressData?.district || "",
+            zipCode: shippingAddressData?.zipCode || "",
           },
           isGuestOrder,
-          buyerSystemEmail: resultOrder.buyer.email || '',
+          buyerSystemEmail: resultOrder.buyer.email || "",
         });
 
-        this.logger.log(`order.paid event emitted for order ${resultOrder.orderNumber}`);
+        this.logger.log(
+          `order.paid event emitted for order ${resultOrder.orderNumber}`,
+        );
       } catch (error) {
         // Log but don't fail - payment was already successful
         this.logger.error(`Failed to emit order.paid event: ${error}`);
@@ -1792,7 +2146,9 @@ export class PaymentService {
         // await this.invoiceService.generateAndSendInvoice(resultOrder.id);
       } catch (error) {
         // Log but don't fail - payment was already successful
-        this.logger.error(`Failed to generate invoice for order ${resultOrder.orderNumber}: ${error}`);
+        this.logger.error(
+          `Failed to generate invoice for order ${resultOrder.orderNumber}: ${error}`,
+        );
       }
     }
 
@@ -1801,15 +2157,23 @@ export class PaymentService {
     if (isMembershipOrder) {
       void (async () => {
         const mp = await this.prisma.membershipPayment.findFirst({
-          where: { providerPaymentId: transactionId || payment.providerPaymentId || undefined },
-          orderBy: { createdAt: 'desc' },
+          where: {
+            providerPaymentId:
+              transactionId || payment.providerPaymentId || undefined,
+          },
+          orderBy: { createdAt: "desc" },
           select: { id: true },
         });
         // membershipPayment kaydı varsa ondan; YOKSA (mevcut akış MEM- order + tier upgrade
         // yapıyor, ayrı membershipPayment üretmiyor) MEM- SİPARİŞTEN kes.
         if (mp) await this.elogoInvoicing.issueMembershipInvoice(mp.id);
-        else await this.elogoInvoicing.issueMembershipInvoiceForOrder(resultOrder.id);
-      })().catch((e) => this.logger.warn(`eLogo üyelik faturası tetik hatası: ${e?.message}`));
+        else
+          await this.elogoInvoicing.issueMembershipInvoiceForOrder(
+            resultOrder.id,
+          );
+      })().catch((e) =>
+        this.logger.warn(`eLogo üyelik faturası tetik hatası: ${e?.message}`),
+      );
     }
     if (isBoostOrder) {
       void (async () => {
@@ -1818,7 +2182,9 @@ export class PaymentService {
           select: { id: true },
         });
         if (boost) await this.elogoInvoicing.issueBoostInvoice(boost.id);
-      })().catch((e) => this.logger.warn(`eLogo boost faturası tetik hatası: ${e?.message}`));
+      })().catch((e) =>
+        this.logger.warn(`eLogo boost faturası tetik hatası: ${e?.message}`),
+      );
     }
 
     // Auto-create Shipment record (Sürat Kargo gönderi kaydı oluşturuldu at order creation)
@@ -1835,8 +2201,8 @@ export class PaymentService {
           await this.prisma.shipment.create({
             data: {
               orderId: resultOrder.id,
-              provider: 'surat',
-              status: 'pending',
+              provider: "surat",
+              status: "pending",
               // Sürat'a OzelKargoTakipNo olarak sipariş numarası gönderiliyor; aynısını
               // takip numarası olarak DB'ye de yazıyoruz ki UI'da gösterilsin.
               trackingNumber: resultOrder.orderNumber,
@@ -1844,10 +2210,14 @@ export class PaymentService {
               estimatedDelivery,
             },
           });
-          this.logger.log(`Auto-created shipment for order ${resultOrder.orderNumber} tracking=${resultOrder.orderNumber}`);
+          this.logger.log(
+            `Auto-created shipment for order ${resultOrder.orderNumber} tracking=${resultOrder.orderNumber}`,
+          );
         }
       } catch (error) {
-        this.logger.error(`Failed to auto-create shipment for order ${resultOrder.orderNumber}: ${error}`);
+        this.logger.error(
+          `Failed to auto-create shipment for order ${resultOrder.orderNumber}: ${error}`,
+        );
       }
     }
 
@@ -1861,7 +2231,10 @@ export class PaymentService {
    * pending_payment siparişleri iptal eder — kardeşler önce preparing yapılırsa
    * kaskad onlara dokunamaz.
    */
-  private async processSuccessfulGroupPayment(payment: any, transactionId?: string): Promise<boolean> {
+  private async processSuccessfulGroupPayment(
+    payment: any,
+    transactionId?: string,
+  ): Promise<boolean> {
     const cancelledOrders: {
       orderId: string;
       buyerId: string;
@@ -1870,14 +2243,20 @@ export class PaymentService {
       offerId: string | null;
       hadPayment: boolean;
     }[] = [];
-    const cancelledOffers: { buyerId: string; productId: string; productTitle: string }[] = [];
+    const cancelledOffers: {
+      buyerId: string;
+      productId: string;
+      productTitle: string;
+    }[] = [];
     let stockoutCategoryId: string | null = null;
 
     const result = await this.prisma.$transaction(
       async (tx) => {
         const oldStatus = payment.status;
-        const auditHistory = ((payment.metadata as any)?.auditHistory || []).concat({
-          action: 'payment.completed',
+        const auditHistory = (
+          (payment.metadata as any)?.auditHistory || []
+        ).concat({
+          action: "payment.completed",
           timestamp: new Date().toISOString(),
           oldStatus,
           newStatus: PaymentStatus.completed,
@@ -1890,7 +2269,10 @@ export class PaymentService {
             status: PaymentStatus.completed,
             paidAt: new Date(),
             providerPaymentId: transactionId || payment.providerPaymentId,
-            metadata: { ...((payment.metadata as any) || {}), auditHistory } as object,
+            metadata: {
+              ...((payment.metadata as any) || {}),
+              auditHistory,
+            } as object,
           },
         });
         if (claimed.count === 0) {
@@ -1903,11 +2285,15 @@ export class PaymentService {
         });
 
         // Cron yarışı: callback uçuştayken iptal edilen siparişler kısmi otomatik iadeye gider
-        const aliveOrders = groupOrders.filter((o) => o.status === OrderStatus.pending_payment);
-        const refundOrders = groupOrders.filter((o) => o.status === OrderStatus.cancelled);
+        const aliveOrders = groupOrders.filter(
+          (o) => o.status === OrderStatus.pending_payment,
+        );
+        const refundOrders = groupOrders.filter(
+          (o) => o.status === OrderStatus.cancelled,
+        );
 
         const preparingDays = parseInt(
-          this.configService.get('PREPARING_DEADLINE_DAYS') || '3',
+          this.configService.get("PREPARING_DEADLINE_DAYS") || "3",
           10,
         );
         const preparingDeadline = new Date();
@@ -1942,10 +2328,15 @@ export class PaymentService {
           // Adet bazlı stok düşümü: sipariş adedi kadar quantity-- ve reserved--.
           const orderQty = order.quantity ?? 1;
           const newQuantity =
-            product.quantity !== null ? Math.max(0, product.quantity - orderQty) : null;
+            product.quantity !== null
+              ? Math.max(0, product.quantity - orderQty)
+              : null;
           const updateData: any = {
             status: getProductStatusFromQuantity(newQuantity),
-            reservedQuantity: safeDecrementReserved(product.reservedQuantity, orderQty),
+            reservedQuantity: safeDecrementReserved(
+              product.reservedQuantity,
+              orderQty,
+            ),
           };
           if (product.quantity !== null) {
             // Clamp'li mutlak set (FOR UPDATE altında yarışsız) — negatif stok imkânsız.
@@ -1958,7 +2349,11 @@ export class PaymentService {
 
           const refreshed = await tx.product.findUnique({
             where: { id: order.productId },
-            select: { quantity: true, reservedQuantity: true, categoryId: true },
+            select: {
+              quantity: true,
+              reservedQuantity: true,
+              categoryId: true,
+            },
           });
           // Gate on PHYSICAL stock (quantity <= 0), not available-for-new-buyers
           // (quantity - reservedQuantity). reservedQuantity still includes other
@@ -1966,17 +2361,23 @@ export class PaymentService {
           // gating on (q-r) would wrongly cancel + auto-refund them whenever
           // stock > 1 and buyers checked out concurrently. See the direct-buy
           // branch above for the detailed 2-stock/2-buyer walkthrough.
-          if (refreshed && refreshed.quantity !== null && refreshed.quantity <= 0) {
+          if (
+            refreshed &&
+            refreshed.quantity !== null &&
+            refreshed.quantity <= 0
+          ) {
             stockoutCategoryId = refreshed.categoryId ?? null;
-            const orderResult = await this.productLockService.invalidatePendingOrdersForProduct(
-              tx,
-              order.productId,
-              'Stok tükendi',
-            );
-            const offerResult = await this.productLockService.invalidateRelatedOffers(
-              tx,
-              order.productId,
-            );
+            const orderResult =
+              await this.productLockService.invalidatePendingOrdersForProduct(
+                tx,
+                order.productId,
+                "Stok tükendi",
+              );
+            const offerResult =
+              await this.productLockService.invalidateRelatedOffers(
+                tx,
+                order.productId,
+              );
             cancelledOrders.push(
               ...orderResult.cancelledOrders.map((o) => ({
                 orderId: o.orderId,
@@ -2042,7 +2443,9 @@ export class PaymentService {
       );
       try {
         await this.processRefund(order.id, Number(order.totalAmount));
-        this.logger.log(`Partial auto-refund completed for group order ${order.id}`);
+        this.logger.log(
+          `Partial auto-refund completed for group order ${order.id}`,
+        );
       } catch (refundError: any) {
         this.logger.error(
           `PARTIAL AUTO-REFUND FAILED for group order ${order.id}: ${refundError.message}. MANUAL INTERVENTION REQUIRED.`,
@@ -2053,7 +2456,7 @@ export class PaymentService {
     for (const productId of result.productIdsToInvalidate) {
       await this.cache.del(`products:detail:${productId}`);
     }
-    await this.cache.delPattern('products:list:*').catch(() => {});
+    await this.cache.delPattern("products:list:*").catch(() => {});
 
     // Stockout kaskad bildirimleri (tx sonrası; tek bildirimle alıcı başına)
     const notifiedBuyers = new Set<string>();
@@ -2062,10 +2465,22 @@ export class PaymentService {
       notifiedBuyers.add(o.buyerId);
       const isUnpaidOffer = o.offerId !== null && !o.hadPayment;
       const notify = isUnpaidOffer
-        ? this.notificationService.notifyOfferCancelledOutOfStock(o.buyerId, o.productId, o.productTitle, stockoutCategoryId)
-        : this.notificationService.notifyOrderCancelledOutOfStock(o.buyerId, o.productId, o.productTitle, stockoutCategoryId);
+        ? this.notificationService.notifyOfferCancelledOutOfStock(
+            o.buyerId,
+            o.productId,
+            o.productTitle,
+            stockoutCategoryId,
+          )
+        : this.notificationService.notifyOrderCancelledOutOfStock(
+            o.buyerId,
+            o.productId,
+            o.productTitle,
+            stockoutCategoryId,
+          );
       await notify.catch((err) =>
-        this.logger.warn(`stockout-notify failed for ${o.buyerId}: ${err.message}`),
+        this.logger.warn(
+          `stockout-notify failed for ${o.buyerId}: ${err.message}`,
+        ),
       );
     }
     // Sipariş iptali e-postaları (alıcı+satıcı) — sipariş bazlı; teklif
@@ -2081,9 +2496,16 @@ export class PaymentService {
       if (notifiedBuyers.has(o.buyerId)) continue;
       notifiedBuyers.add(o.buyerId);
       await this.notificationService
-        .notifyOfferCancelledOutOfStock(o.buyerId, o.productId, o.productTitle, stockoutCategoryId)
+        .notifyOfferCancelledOutOfStock(
+          o.buyerId,
+          o.productId,
+          o.productTitle,
+          stockoutCategoryId,
+        )
         .catch((err) =>
-          this.logger.warn(`stockout-notify (offer) failed for ${o.buyerId}: ${err.message}`),
+          this.logger.warn(
+            `stockout-notify (offer) failed for ${o.buyerId}: ${err.message}`,
+          ),
         );
     }
 
@@ -2095,13 +2517,14 @@ export class PaymentService {
         const firstOrder = result.aliveOrders[0];
         const firstAddr = firstOrder.shippingAddress as any;
         const groupIsGuest =
-          firstOrder.buyer.email === 'guest@tarodan.system' || firstAddr?.isGuestOrder;
+          firstOrder.buyer.email === "guest@tarodan.system" ||
+          firstAddr?.isGuestOrder;
         const groupBuyerEmail = groupIsGuest
-          ? (firstAddr?.guestEmail || firstAddr?.email || firstOrder.buyer.email)
+          ? firstAddr?.guestEmail || firstAddr?.email || firstOrder.buyer.email
           : firstOrder.buyer.email;
         const groupBuyerName = groupIsGuest
-          ? (firstAddr?.guestName || firstAddr?.fullName || 'Misafir Müşteri')
-          : (firstOrder.buyer.displayName || firstOrder.buyer.email);
+          ? firstAddr?.guestName || firstAddr?.fullName || "Misafir Müşteri"
+          : firstOrder.buyer.displayName || firstOrder.buyer.email;
         const group = await this.prisma.checkoutGroup.findUnique({
           where: { id: payment.checkoutGroupId },
           select: { groupNumber: true },
@@ -2112,27 +2535,33 @@ export class PaymentService {
           buyerId: firstOrder.buyerId,
           buyerEmail: groupBuyerEmail,
           buyerName: groupBuyerName,
-          groupTotal: result.aliveOrders.reduce((sum, o) => sum + Number(o.totalAmount), 0),
+          groupTotal: result.aliveOrders.reduce(
+            (sum, o) => sum + Number(o.totalAmount),
+            0,
+          ),
           paymentMethod: payment.provider,
-          transactionId: transactionId || payment.providerPaymentId || payment.id,
+          transactionId:
+            transactionId || payment.providerPaymentId || payment.id,
           items: result.aliveOrders.map((o) => ({
             productTitle: o.product.title,
             totalAmount: Number(o.totalAmount),
           })),
           shippingAddress: {
-            fullName: firstAddr?.fullName || '',
-            phone: firstAddr?.phone || '',
-            address: firstAddr?.address || '',
-            city: firstAddr?.city || '',
-            district: firstAddr?.district || '',
-            zipCode: firstAddr?.zipCode || '',
+            fullName: firstAddr?.fullName || "",
+            phone: firstAddr?.phone || "",
+            address: firstAddr?.address || "",
+            city: firstAddr?.city || "",
+            district: firstAddr?.district || "",
+            zipCode: firstAddr?.zipCode || "",
           },
           isGuestOrder: groupIsGuest,
-          buyerSystemEmail: firstOrder.buyer.email || '',
+          buyerSystemEmail: firstOrder.buyer.email || "",
           representativeOrderNumber: firstOrder.orderNumber,
         });
       } catch (error) {
-        this.logger.error(`Failed to emit group buyer order.paid for payment ${payment.id}: ${error}`);
+        this.logger.error(
+          `Failed to emit group buyer order.paid for payment ${payment.id}: ${error}`,
+        );
       }
     }
 
@@ -2141,13 +2570,18 @@ export class PaymentService {
       try {
         const shippingAddressData = resultOrder.shippingAddress as any;
         const isGuestOrder =
-          resultOrder.buyer.email === 'guest@tarodan.system' || shippingAddressData?.isGuestOrder;
+          resultOrder.buyer.email === "guest@tarodan.system" ||
+          shippingAddressData?.isGuestOrder;
         const actualBuyerEmail = isGuestOrder
-          ? (shippingAddressData?.guestEmail || shippingAddressData?.email || resultOrder.buyer.email)
+          ? shippingAddressData?.guestEmail ||
+            shippingAddressData?.email ||
+            resultOrder.buyer.email
           : resultOrder.buyer.email;
         const actualBuyerName = isGuestOrder
-          ? (shippingAddressData?.guestName || shippingAddressData?.fullName || 'Misafir Müşteri')
-          : (resultOrder.buyer.displayName || resultOrder.buyer.email);
+          ? shippingAddressData?.guestName ||
+            shippingAddressData?.fullName ||
+            "Misafir Müşteri"
+          : resultOrder.buyer.displayName || resultOrder.buyer.email;
 
         await this.eventService.emitOrderPaid({
           orderId: resultOrder.id,
@@ -2161,24 +2595,28 @@ export class PaymentService {
           buyerEmail: actualBuyerEmail,
           buyerName: actualBuyerName,
           sellerEmail: resultOrder.seller.email,
-          sellerName: resultOrder.seller.displayName || resultOrder.seller.email,
+          sellerName:
+            resultOrder.seller.displayName || resultOrder.seller.email,
           paymentMethod: payment.provider,
-          transactionId: transactionId || payment.providerPaymentId || payment.id,
+          transactionId:
+            transactionId || payment.providerPaymentId || payment.id,
           shippingAddress: {
-            fullName: shippingAddressData?.fullName || '',
-            phone: shippingAddressData?.phone || '',
-            address: shippingAddressData?.address || '',
-            city: shippingAddressData?.city || '',
-            district: shippingAddressData?.district || '',
-            zipCode: shippingAddressData?.zipCode || '',
+            fullName: shippingAddressData?.fullName || "",
+            phone: shippingAddressData?.phone || "",
+            address: shippingAddressData?.address || "",
+            city: shippingAddressData?.city || "",
+            district: shippingAddressData?.district || "",
+            zipCode: shippingAddressData?.zipCode || "",
           },
           isGuestOrder,
-          buyerSystemEmail: resultOrder.buyer.email || '',
+          buyerSystemEmail: resultOrder.buyer.email || "",
           // Sepet akışı: alıcı onayı grup başına tek kez gönderildi → burada atla.
           skipBuyer: true,
         });
       } catch (error) {
-        this.logger.error(`Failed to emit order.paid event for group order ${resultOrder.id}: ${error}`);
+        this.logger.error(
+          `Failed to emit order.paid event for group order ${resultOrder.id}: ${error}`,
+        );
       }
 
       // ESKİ PDFKit makbuzu KALDIRILDI (grup akışı) — yasal değil; eLogo e-Arşiv tek belge.
@@ -2194,8 +2632,8 @@ export class PaymentService {
           await this.prisma.shipment.create({
             data: {
               orderId: resultOrder.id,
-              provider: 'surat',
-              status: 'pending',
+              provider: "surat",
+              status: "pending",
               trackingNumber: resultOrder.orderNumber,
               cost: Number(resultOrder.shippingCost),
               estimatedDelivery,
@@ -2206,7 +2644,9 @@ export class PaymentService {
           );
         }
       } catch (error) {
-        this.logger.error(`Failed to auto-create shipment for order ${resultOrder.orderNumber}: ${error}`);
+        this.logger.error(
+          `Failed to auto-create shipment for order ${resultOrder.orderNumber}: ${error}`,
+        );
       }
     }
 
@@ -2232,20 +2672,32 @@ export class PaymentService {
           reservationReleasedAt: true,
         },
       });
-      if (!order || order.status !== OrderStatus.pending_payment || !order.productId) return;
+      if (
+        !order ||
+        order.status !== OrderStatus.pending_payment ||
+        !order.productId
+      )
+        return;
 
       const before = await this.prisma.product.findUnique({
         where: { id: order.productId },
-        select: { quantity: true, reservedQuantity: true, title: true, status: true },
+        select: {
+          quantity: true,
+          reservedQuantity: true,
+          title: true,
+          status: true,
+        },
       });
-      const beforeAvailable = (before?.quantity ?? 0) - (before?.reservedQuantity ?? 0);
+      const beforeAvailable =
+        (before?.quantity ?? 0) - (before?.reservedQuantity ?? 0);
 
       // GUARD (Bulgu I): 5dk cron (releaseExpiredOrderReservations) rezervi ZATEN
       // bıraktıysa (reservationReleasedAt dolu) burada TEKRAR bırakmayız — yoksa
       // eşzamanlı başka alıcının canlı rezervini "çalarız". Sipariş/teklif iptali
       // yine yapılır; yalnız reservedQuantity decrement'i atlanır.
       const alreadyReleased = order.reservationReleasedAt !== null;
-      const updateData: { reservedQuantity?: number; status?: ProductStatus } = {};
+      const updateData: { reservedQuantity?: number; status?: ProductStatus } =
+        {};
       if (before && !alreadyReleased) {
         // Adet bazlı: rezervasyonu sipariş adedi kadar serbest bırak (1 değil).
         const newReserved = safeDecrementReserved(
@@ -2285,7 +2737,9 @@ export class PaymentService {
             ]
           : []),
       ]);
-      this.logger.log(`Order ${orderId} cancelled and product ${order.productId} reservation released after payment failure`);
+      this.logger.log(
+        `Order ${orderId} cancelled and product ${order.productId} reservation released after payment failure`,
+      );
       await this.cache.del(`products:detail:${order.productId}`);
 
       // BACK_IN_STOCK dispatch: only when availability transitioned from <=0 to >0.
@@ -2293,14 +2747,18 @@ export class PaymentService {
         where: { id: order.productId },
         select: { quantity: true, reservedQuantity: true },
       });
-      const afterAvailable = (after?.quantity ?? 0) - (after?.reservedQuantity ?? 0);
+      const afterAvailable =
+        (after?.quantity ?? 0) - (after?.reservedQuantity ?? 0);
       if (beforeAvailable <= 0 && afterAvailable > 0 && before?.title) {
-        await this.dispatchBackInStock(order.productId, before.title).catch((err: any) =>
-          this.logger.warn(`back-in-stock dispatch failed: ${err?.message}`),
+        await this.dispatchBackInStock(order.productId, before.title).catch(
+          (err: any) =>
+            this.logger.warn(`back-in-stock dispatch failed: ${err?.message}`),
         );
       }
     } catch (error: any) {
-      this.logger.error(`Failed to release product for order ${orderId}: ${error?.message}`);
+      this.logger.error(
+        `Failed to release product for order ${orderId}: ${error?.message}`,
+      );
     }
   }
 
@@ -2309,12 +2767,17 @@ export class PaymentService {
    * unavailable -> available. Debounced 24h per (userId, productId) so
    * repeated payment failures don't spam wishlists.
    */
-  private async dispatchBackInStock(productId: string, productTitle: string): Promise<void> {
+  private async dispatchBackInStock(
+    productId: string,
+    productTitle: string,
+  ): Promise<void> {
     // Delegated to NotificationService.broadcastBackInStock — kept here only
     // as a thin wrapper to preserve the existing call site contract.
-    return this.notificationService.broadcastBackInStock(productId, productTitle);
+    return this.notificationService.broadcastBackInStock(
+      productId,
+      productTitle,
+    );
   }
-
 
   /**
    * Process failed payment
@@ -2362,16 +2825,28 @@ export class PaymentService {
             failureReason: reason,
           });
         } catch (error) {
-          this.logger.error(`Failed to emit payment.failed event for group order ${order.id}: ${error}`);
+          this.logger.error(
+            `Failed to emit payment.failed event for group order ${order.id}: ${error}`,
+          );
         }
       }
 
-      await this.logPaymentAction('failed', payment.id, undefined, undefined, oldStatus, PaymentStatus.failed, {
-        reason,
-        checkoutGroupId: payment.checkoutGroupId,
-      });
+      await this.logPaymentAction(
+        "failed",
+        payment.id,
+        undefined,
+        undefined,
+        oldStatus,
+        PaymentStatus.failed,
+        {
+          reason,
+          checkoutGroupId: payment.checkoutGroupId,
+        },
+      );
 
-      this.logger.warn(`Group payment ${payment.id} failed: ${reason} (${groupOrders.length} orders released)`);
+      this.logger.warn(
+        `Group payment ${payment.id} failed: ${reason} (${groupOrders.length} orders released)`,
+      );
       return;
     }
 
@@ -2385,14 +2860,25 @@ export class PaymentService {
         select: { orderNumber: true },
       });
       if (order) {
-        await this.cancelSuratShipmentIfExists(payment.orderId, order.orderNumber);
+        await this.cancelSuratShipmentIfExists(
+          payment.orderId,
+          order.orderNumber,
+        );
       }
     }
 
     // Log payment failure
-    await this.logPaymentAction('failed', payment.id, payment.orderId, undefined, oldStatus, PaymentStatus.failed, {
-      reason,
-    });
+    await this.logPaymentAction(
+      "failed",
+      payment.id,
+      payment.orderId,
+      undefined,
+      oldStatus,
+      PaymentStatus.failed,
+      {
+        reason,
+      },
+    );
 
     this.logger.warn(`Payment ${payment.id} failed: ${reason}`);
 
@@ -2419,7 +2905,9 @@ export class PaymentService {
             failureReason: reason,
           });
 
-          this.logger.log(`payment.failed event emitted for payment ${payment.id}`);
+          this.logger.log(
+            `payment.failed event emitted for payment ${payment.id}`,
+          );
         }
       }
     } catch (error) {
@@ -2435,12 +2923,16 @@ export class PaymentService {
    * Safe-trade (escrow) flow: if the associated Trade is in `awaiting_payment`,
    * transition it to `shipping_to_warehouse` and set the shipping deadline.
    */
-  private async processSuccessfulTradeCashPayment(payment: any, transactionId?: string): Promise<boolean> {
+  private async processSuccessfulTradeCashPayment(
+    payment: any,
+    transactionId?: string,
+  ): Promise<boolean> {
     // Platform ayarı: takas kargo süresi (gün). Varsayılan 7 gün.
     const shippingDaysSetting = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: 'trade_shipping_deadline_days' },
+      where: { settingKey: "trade_shipping_deadline_days" },
     });
-    const shippingDays = parseInt(shippingDaysSetting?.settingValue ?? '7', 10) || 7;
+    const shippingDays =
+      parseInt(shippingDaysSetting?.settingValue ?? "7", 10) || 7;
 
     const result = await this.prisma.$transaction(async (tx) => {
       const claimed = await tx.payment.updateMany({
@@ -2500,7 +2992,9 @@ export class PaymentService {
       return false;
     }
 
-    this.logger.log(`Trade cash payment ${payment.id} completed (tradeCashPaymentId=${payment.tradeCashPaymentId})`);
+    this.logger.log(
+      `Trade cash payment ${payment.id} completed (tradeCashPaymentId=${payment.tradeCashPaymentId})`,
+    );
 
     // NOT: Takas nakit komisyonu e-Arşivi ARTIK BURADA (ödeme anında) DEĞİL, ürünler DEPOYA VARINCA
     // (at_warehouse) kesilir — surat-tracking.maybeTransitionTradeToAtWarehouse. İptal penceresi
@@ -2520,7 +3014,9 @@ export class PaymentService {
         );
       } catch (error) {
         // Log but don't fail - payment was already completed
-        this.logger.error(`Failed to emit trade.ready-for-shipping event: ${error}`);
+        this.logger.error(
+          `Failed to emit trade.ready-for-shipping event: ${error}`,
+        );
       }
 
       // Auto-create the two `to_warehouse` Sürat shipments now that the cash
@@ -2531,14 +3027,21 @@ export class PaymentService {
       // imports Payment; Payment can't statically import Trade).
       try {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { TradeService } = require('../trade/trade.service');
-        const tradeService = this.moduleRef.get(TradeService, { strict: false });
-        if (tradeService && typeof tradeService.createInboundTradeShipments === 'function') {
-          tradeService.createInboundTradeShipments(result.trade.id).catch((err: any) =>
-            this.logger.error(
-              `createInboundTradeShipments crashed for cash-trade ${result.trade!.id}: ${err?.message ?? err}`,
-            ),
-          );
+        const { TradeService } = require("../trade/trade.service");
+        const tradeService = this.moduleRef.get(TradeService, {
+          strict: false,
+        });
+        if (
+          tradeService &&
+          typeof tradeService.createInboundTradeShipments === "function"
+        ) {
+          tradeService
+            .createInboundTradeShipments(result.trade.id)
+            .catch((err: any) =>
+              this.logger.error(
+                `createInboundTradeShipments crashed for cash-trade ${result.trade!.id}: ${err?.message ?? err}`,
+              ),
+            );
         } else {
           this.logger.warn(
             `TradeService.createInboundTradeShipments not available; inbound shipments NOT auto-created for cash-trade ${result.trade.id}`,
@@ -2573,24 +3076,26 @@ export class PaymentService {
     });
 
     if (!payment) {
-      throw new NotFoundException('Ödeme bulunamadı');
+      throw new NotFoundException("Ödeme bulunamadı");
     }
 
     // Grup ödemesi retry'ı initiate üzerinden yapılır (payment satırı yeniden kullanılır)
     if (!payment.order) {
       throw new BadRequestException(
-        'Bu ödeme bir sipariş grubuna ait. Lütfen ödemeyi sipariş grubuyla yeniden başlatın.',
+        "Bu ödeme bir sipariş grubuna ait. Lütfen ödemeyi sipariş grubuyla yeniden başlatın.",
       );
     }
 
     // Verify user owns the order
     if (payment.order.buyerId !== userId && payment.order.sellerId !== userId) {
-      throw new ForbiddenException('Bu ödemeyi tekrar deneme yetkiniz yok');
+      throw new ForbiddenException("Bu ödemeyi tekrar deneme yetkiniz yok");
     }
 
     // Only allow retrying failed payments
     if (payment.status !== PaymentStatus.failed) {
-      throw new BadRequestException('Sadece başarısız ödemeler tekrar denenebilir');
+      throw new BadRequestException(
+        "Sadece başarısız ödemeler tekrar denenebilir",
+      );
     }
 
     const order = payment.order;
@@ -2603,7 +3108,7 @@ export class PaymentService {
       });
       if (!product || product.status !== ProductStatus.active) {
         throw new BadRequestException(
-          'Ürün artık satışta değil veya başka alıcıya satıldı. Lütfen ilanlar sayfasından tekrar sipariş oluşturun.',
+          "Ürün artık satışta değil veya başka alıcıya satıldı. Lütfen ilanlar sayfasından tekrar sipariş oluşturun.",
         );
       }
       await this.prisma.$transaction([
@@ -2626,7 +3131,9 @@ export class PaymentService {
         },
       });
     } else if (order.status !== OrderStatus.pending_payment) {
-      throw new BadRequestException('Sipariş durumu ödeme tekrarına uygun değil');
+      throw new BadRequestException(
+        "Sipariş durumu ödeme tekrarına uygun değil",
+      );
     }
 
     // Create new payment record
@@ -2640,26 +3147,41 @@ export class PaymentService {
         metadata: {
           retriedFrom: paymentId,
           retriedAt: new Date().toISOString(),
-          auditHistory: [{
-            action: 'payment.retried',
-            timestamp: new Date().toISOString(),
-            originalPaymentId: paymentId,
-            userId,
-          }],
+          auditHistory: [
+            {
+              action: "payment.retried",
+              timestamp: new Date().toISOString(),
+              originalPaymentId: paymentId,
+              userId,
+            },
+          ],
         },
       },
     });
 
     // Log retry action on original payment
-    await this.logPaymentAction('retried', paymentId, payment.orderId, undefined, PaymentStatus.failed, undefined, {
-      newPaymentId: newPayment.id,
-      userId,
-    });
+    await this.logPaymentAction(
+      "retried",
+      paymentId,
+      payment.orderId,
+      undefined,
+      PaymentStatus.failed,
+      undefined,
+      {
+        newPaymentId: newPayment.id,
+        userId,
+      },
+    );
 
     // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin), kart /payments/process-direct ile.
-    await this.assignMerchantOid(newPayment.id, String(order.orderNumber || order.id));
+    await this.assignMerchantOid(
+      newPayment.id,
+      String(order.orderNumber || order.id),
+    );
 
-    this.logger.log(`Payment ${paymentId} retried, new payment ${newPayment.id} created`);
+    this.logger.log(
+      `Payment ${paymentId} retried, new payment ${newPayment.id} created`,
+    );
 
     return {
       success: true,
@@ -2690,7 +3212,7 @@ export class PaymentService {
     });
 
     if (!payment) {
-      throw new NotFoundException('Ödeme bulunamadı');
+      throw new NotFoundException("Ödeme bulunamadı");
     }
 
     // Grup ödemesi: erişim grup üzerinden doğrulanır, tüm siparişler bırakılır
@@ -2700,28 +3222,35 @@ export class PaymentService {
         select: { buyerId: true },
       });
       if (!group || group.buyerId !== userId) {
-        throw new ForbiddenException('Bu ödemeyi iptal etme yetkiniz yok');
+        throw new ForbiddenException("Bu ödemeyi iptal etme yetkiniz yok");
       }
       if (payment.status !== PaymentStatus.pending) {
-        throw new BadRequestException('Sadece bekleyen ödemeler iptal edilebilir');
+        throw new BadRequestException(
+          "Sadece bekleyen ödemeler iptal edilebilir",
+        );
       }
-      await this.processFailedPayment(payment, 'Kullanıcı tarafından iptal edildi');
+      await this.processFailedPayment(
+        payment,
+        "Kullanıcı tarafından iptal edildi",
+      );
       this.logger.log(`Group payment ${paymentId} cancelled by user ${userId}`);
       return {
         success: true,
         paymentId: payment.id,
-        message: 'Ödeme başarıyla iptal edildi',
+        message: "Ödeme başarıyla iptal edildi",
       };
     }
 
     // Verify user owns the order
     if (payment.order.buyerId !== userId && payment.order.sellerId !== userId) {
-      throw new ForbiddenException('Bu ödemeyi iptal etme yetkiniz yok');
+      throw new ForbiddenException("Bu ödemeyi iptal etme yetkiniz yok");
     }
 
     // Only allow canceling pending payments
     if (payment.status !== PaymentStatus.pending) {
-      throw new BadRequestException('Sadece bekleyen ödemeler iptal edilebilir');
+      throw new BadRequestException(
+        "Sadece bekleyen ödemeler iptal edilebilir",
+      );
     }
 
     const oldStatus = payment.status;
@@ -2731,7 +3260,7 @@ export class PaymentService {
       where: { id: paymentId },
       data: {
         status: PaymentStatus.failed,
-        failureReason: 'Kullanıcı tarafından iptal edildi',
+        failureReason: "Kullanıcı tarafından iptal edildi",
       },
     });
 
@@ -2741,10 +3270,18 @@ export class PaymentService {
     this.logger.log(`Payment ${paymentId} cancelled by user ${userId}`);
 
     // Log payment cancellation
-    await this.logPaymentAction('cancelled', paymentId, payment.orderId, undefined, oldStatus, PaymentStatus.failed, {
-      reason: 'Kullanıcı tarafından iptal edildi',
-      userId,
-    });
+    await this.logPaymentAction(
+      "cancelled",
+      paymentId,
+      payment.orderId,
+      undefined,
+      oldStatus,
+      PaymentStatus.failed,
+      {
+        reason: "Kullanıcı tarafından iptal edildi",
+        userId,
+      },
+    );
 
     // Emit payment.failed event
     try {
@@ -2757,7 +3294,7 @@ export class PaymentService {
         buyerName: payment.order.buyer.displayName || payment.order.buyer.email,
         amount: Number(payment.amount),
         provider: payment.provider,
-        failureReason: 'Kullanıcı tarafından iptal edildi',
+        failureReason: "Kullanıcı tarafından iptal edildi",
       });
 
       this.logger.log(`payment.failed event emitted for payment ${payment.id}`);
@@ -2769,7 +3306,7 @@ export class PaymentService {
     return {
       success: true,
       paymentId: payment.id,
-      message: 'Ödeme başarıyla iptal edildi',
+      message: "Ödeme başarıyla iptal edildi",
     };
   }
 
@@ -2778,7 +3315,9 @@ export class PaymentService {
    * bu endpoint ile ürün rezervasyonu hemen serbest bırakılır (ilan tekrar listelerde görünür).
    * Sadece status=pending ise işlem yapılır; idempotent.
    */
-  async confirmFailedFromClient(paymentId: string): Promise<{ released: boolean }> {
+  async confirmFailedFromClient(
+    paymentId: string,
+  ): Promise<{ released: boolean }> {
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
       include: { order: { select: { id: true } } },
@@ -2786,7 +3325,10 @@ export class PaymentService {
     if (!payment || payment.status !== PaymentStatus.pending) {
       return { released: false };
     }
-    await this.processFailedPayment(payment, 'Fail sayfasından onay - rezervasyon serbest bırakıldı');
+    await this.processFailedPayment(
+      payment,
+      "Fail sayfasından onay - rezervasyon serbest bırakıldı",
+    );
     return { released: true };
   }
 
@@ -2807,59 +3349,63 @@ export class PaymentService {
     });
 
     if (!payment) {
-      return { completed: false, status: 'not_found' };
+      return { completed: false, status: "not_found" };
     }
 
     if (payment.status === PaymentStatus.completed) {
-      return { completed: true, status: 'already_completed' };
+      return { completed: true, status: "already_completed" };
     }
 
     if (payment.status !== PaymentStatus.pending) {
       return { completed: false, status: payment.status };
     }
 
-    if (payment.provider !== 'paytr') {
-      return { completed: false, status: 'unsupported_provider' };
+    if (payment.provider !== "paytr") {
+      return { completed: false, status: "unsupported_provider" };
     }
 
-    const oid = (payment.providerConversationId || '').trim();
+    const oid = (payment.providerConversationId || "").trim();
     if (!oid) {
-      return { completed: false, status: 'no_provider_oid' };
+      return { completed: false, status: "no_provider_oid" };
     }
 
     let inquiry = await this.paytrService.queryPaymentStatus(oid);
-    if (!inquiry.ok && oid.includes('-')) {
-      inquiry = await this.paytrService.queryPaymentStatus(oid.replace(/-/g, ''));
+    if (!inquiry.ok && oid.includes("-")) {
+      inquiry = await this.paytrService.queryPaymentStatus(
+        oid.replace(/-/g, ""),
+      );
     }
 
     if (!inquiry.ok) {
-      return { completed: false, status: 'paytr_not_found' };
+      return { completed: false, status: "paytr_not_found" };
     }
 
     // O16: Tolerans eşiğini tüm yollarda BİRLEŞTİR (eskiden burada 0.01, reconcile/mismatch'te
     // 0.05 idi → aynı ödeme için tutarsız kabul/ret). Tek config: PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL.
     const tolerance = parseFloat(
-      this.configService.get('PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL') || '0.05',
+      this.configService.get("PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL") || "0.05",
     );
     const ourAmount = Number(payment.amount);
     if (Math.abs(inquiry.paymentTotalTl - ourAmount) > tolerance) {
       this.logger.warn(
         `verifyPaymentFromClient amount mismatch payment=${payment.id} oid=${oid} paytr=${inquiry.paymentTotalTl} ours=${ourAmount}`,
       );
-      return { completed: false, status: 'amount_mismatch' };
+      return { completed: false, status: "amount_mismatch" };
     }
 
     const txnRef =
-      inquiry.paymentDate != null && inquiry.paymentDate !== ''
+      inquiry.paymentDate != null && inquiry.paymentDate !== ""
         ? `paytr:${oid}:${inquiry.paymentDate}`
         : `paytr:${oid}`;
 
     const did = await this.processSuccessfulPayment(payment, txnRef);
     if (did) {
-      this.logger.log(`verifyPaymentFromClient completed payment=${payment.id} oid=${oid}`);
-      return { completed: true, status: 'completed_now' };
+      this.logger.log(
+        `verifyPaymentFromClient completed payment=${payment.id} oid=${oid}`,
+      );
+      return { completed: true, status: "completed_now" };
     }
-    return { completed: false, status: 'process_skipped' };
+    return { completed: false, status: "process_skipped" };
   }
 
   // Taşındı: payment-refund.service.ts — iade/escrow serbest bırakma (facade delege; imzalar aynı).
@@ -2889,10 +3435,17 @@ export class PaymentService {
     deliveredAt: Date,
     tx?: Prisma.TransactionClient,
   ): Promise<void> {
-    return this.paymentRefund.scheduleHoldReleaseOnDelivery(orderId, deliveredAt, tx);
+    return this.paymentRefund.scheduleHoldReleaseOnDelivery(
+      orderId,
+      deliveredAt,
+      tx,
+    );
   }
 
-  async releaseHoldsDue(): Promise<{ count: number; tradeCashReleased: number }> {
+  async releaseHoldsDue(): Promise<{
+    count: number;
+    tradeCashReleased: number;
+  }> {
     return this.paymentRefund.releaseHoldsDue();
   }
 
@@ -2918,7 +3471,11 @@ export class PaymentService {
     utoken: string,
     mandate?: { ip?: string; termsVersion?: string },
   ): Promise<number> {
-    return this.paymentReconciliation.syncSavedCardsFromUtoken(userId, utoken, mandate);
+    return this.paymentReconciliation.syncSavedCardsFromUtoken(
+      userId,
+      utoken,
+      mandate,
+    );
   }
 
   // Taşındı: payment-reconciliation.service.ts — facade delege (imza aynı).
@@ -2966,31 +3523,43 @@ export class PaymentService {
    * PayTR callback sunucuya ulaşmadan ödeme başarılı olduysa: durum-sorgu ile doğrula ve tamamla (1.4).
    * PAYTR_RECONCILIATION_ENABLED=false ile kapatılabilir.
    */
-  async reconcilePendingPaytrPayments(): Promise<{ checked: number; completed: number }> {
-    const enabled = this.configService.get('PAYTR_RECONCILIATION_ENABLED');
-    if (enabled === 'false' || enabled === '0') {
+  async reconcilePendingPaytrPayments(): Promise<{
+    checked: number;
+    completed: number;
+  }> {
+    const enabled = this.configService.get("PAYTR_RECONCILIATION_ENABLED");
+    if (enabled === "false" || enabled === "0") {
       return { checked: 0, completed: 0 };
     }
 
     const minAgeMin = parseInt(
-      this.configService.get('PAYTR_RECONCILIATION_MIN_AGE_MINUTES') || '3',
+      this.configService.get("PAYTR_RECONCILIATION_MIN_AGE_MINUTES") || "3",
       10,
     );
-    const batch = parseInt(this.configService.get('PAYTR_RECONCILIATION_BATCH_LIMIT') || '40', 10);
-    const tolerance = parseFloat(this.configService.get('PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL') || '0.05');
+    const batch = parseInt(
+      this.configService.get("PAYTR_RECONCILIATION_BATCH_LIMIT") || "40",
+      10,
+    );
+    const tolerance = parseFloat(
+      this.configService.get("PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL") || "0.05",
+    );
 
     const cutoff = new Date();
     cutoff.setMinutes(cutoff.getMinutes() - minAgeMin);
 
     const candidates = await this.prisma.payment.findMany({
       where: {
-        provider: 'paytr',
+        provider: "paytr",
         status: PaymentStatus.pending,
         providerConversationId: { not: null },
         OR: [
           { order: { status: OrderStatus.pending_payment } },
           // Grup ödemesi: gruptaki en az bir sipariş hâlâ ödeme bekliyorsa
-          { checkoutGroup: { orders: { some: { status: OrderStatus.pending_payment } } } },
+          {
+            checkoutGroup: {
+              orders: { some: { status: OrderStatus.pending_payment } },
+            },
+          },
         ],
         createdAt: { lt: cutoff },
       },
@@ -2998,7 +3567,7 @@ export class PaymentService {
         order: { select: { id: true, status: true, totalAmount: true } },
       },
       take: batch,
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: "asc" },
     });
 
     let checked = 0;
@@ -3037,24 +3606,34 @@ export class PaymentService {
 
         const orderStillPayable = full?.orderId
           ? full.order?.status === OrderStatus.pending_payment
-          : full?.checkoutGroup?.orders.some((o) => o.status === OrderStatus.pending_payment) ?? false;
+          : (full?.checkoutGroup?.orders.some(
+              (o) => o.status === OrderStatus.pending_payment,
+            ) ?? false);
 
-        if (!full || full.status !== PaymentStatus.pending || !orderStillPayable) {
+        if (
+          !full ||
+          full.status !== PaymentStatus.pending ||
+          !orderStillPayable
+        ) {
           continue;
         }
 
         const txnRef =
-          inquiry.paymentDate != null && inquiry.paymentDate !== ''
+          inquiry.paymentDate != null && inquiry.paymentDate !== ""
             ? `paytr:${oid}:${inquiry.paymentDate}`
             : `paytr:${oid}`;
 
         const did = await this.processSuccessfulPayment(full, txnRef);
         if (did) {
           completed++;
-          this.logger.log(`PayTR reconcile completed payment ${row.id} oid=${oid}`);
+          this.logger.log(
+            `PayTR reconcile completed payment ${row.id} oid=${oid}`,
+          );
         }
       } catch (error: any) {
-        this.logger.error(`PayTR reconcile failed payment ${row.id}: ${error?.message}`);
+        this.logger.error(
+          `PayTR reconcile failed payment ${row.id}: ${error?.message}`,
+        );
       }
     }
 
@@ -3091,7 +3670,7 @@ export class PaymentService {
     // Stok zaten 5dk'da releaseExpiredOrderReservations ile boşaldığı için bu
     // gecikme stok'u bağlamaz; sadece terk edilen payment satırı daha geç failed olur.
     const timeoutMinutes = parseInt(
-      this.configService.get('PAYMENT_FAIL_TIMEOUT_MINUTES') || '35',
+      this.configService.get("PAYMENT_FAIL_TIMEOUT_MINUTES") || "35",
       10,
     );
     const timeoutDate = new Date();
@@ -3104,7 +3683,10 @@ export class PaymentService {
     const staleProcessing = new Date();
     staleProcessing.setMinutes(staleProcessing.getMinutes() - 5);
     await this.prisma.payment.updateMany({
-      where: { status: PaymentStatus.processing, updatedAt: { lt: staleProcessing } },
+      where: {
+        status: PaymentStatus.processing,
+        updatedAt: { lt: staleProcessing },
+      },
       data: { status: PaymentStatus.pending },
     });
 
@@ -3157,7 +3739,9 @@ export class PaymentService {
           ? payment.order.status === OrderStatus.pending_payment &&
             payment.order.paymentExpiresAt > now
           : payment.checkoutGroup!.orders.some(
-              (o) => o.status === OrderStatus.pending_payment && o.paymentExpiresAt > now,
+              (o) =>
+                o.status === OrderStatus.pending_payment &&
+                o.paymentExpiresAt > now,
             );
 
         // H3: Atomik CAS — yalnızca HÂLÂ `pending` olan ödemeyi `failed` yap.
@@ -3180,11 +3764,17 @@ export class PaymentService {
           // Order has been cancelled (or 24h passed): release stock + cleanup.
           if (payment.order) {
             await this.releaseProductForFailedPayment(payment.orderId);
-            await this.cancelSuratShipmentIfExists(payment.orderId, payment.order.orderNumber);
+            await this.cancelSuratShipmentIfExists(
+              payment.orderId,
+              payment.order.orderNumber,
+            );
           } else {
             for (const groupOrder of payment.checkoutGroup!.orders) {
               await this.releaseProductForFailedPayment(groupOrder.id);
-              await this.cancelSuratShipmentIfExists(groupOrder.id, groupOrder.orderNumber);
+              await this.cancelSuratShipmentIfExists(
+                groupOrder.id,
+                groupOrder.orderNumber,
+              );
             }
           }
         }
@@ -3198,14 +3788,17 @@ export class PaymentService {
               orderNumber: payment.order.orderNumber,
               buyerId: payment.order.buyerId,
               buyerEmail: payment.order.buyer.email,
-              buyerName: payment.order.buyer.displayName || payment.order.buyer.email,
+              buyerName:
+                payment.order.buyer.displayName || payment.order.buyer.email,
               amount: Number(payment.amount),
               provider: payment.provider,
               failureReason: `Ödeme ${timeoutMinutes} dakika içinde tamamlanmadığı için otomatik olarak iptal edildi`,
             });
           } catch (error) {
             // Log but don't fail
-            this.logger.error(`Failed to emit payment.failed event for payment ${payment.id}: ${error}`);
+            this.logger.error(
+              `Failed to emit payment.failed event for payment ${payment.id}: ${error}`,
+            );
           }
         }
 
@@ -3214,7 +3807,9 @@ export class PaymentService {
           `Cancelled expired payment ${payment.id} for ${payment.order ? `order ${payment.order.orderNumber}` : `group ${payment.checkoutGroupId}`}`,
         );
       } catch (error: any) {
-        this.logger.error(`Failed to cancel expired payment ${payment.id}: ${error.message}`);
+        this.logger.error(
+          `Failed to cancel expired payment ${payment.id}: ${error.message}`,
+        );
       }
     }
 
@@ -3222,7 +3817,10 @@ export class PaymentService {
   }
 
   // Taşındı: payment-reconciliation.service.ts — facade delege (imza aynı).
-  async handleExpiredPreparingOrders(): Promise<{ warned: number; cancelled: number }> {
+  async handleExpiredPreparingOrders(): Promise<{
+    warned: number;
+    cancelled: number;
+  }> {
     return this.paymentReconciliation.handleExpiredPreparingOrders();
   }
 }
