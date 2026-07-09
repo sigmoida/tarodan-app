@@ -230,18 +230,12 @@ export const useAuthStore = create<AuthState>()(
         await get().checkAuth();
       },
 
-      loginWithApple: async (idToken: string, fullName?: string) => {
-        const response = await authApi.loginWithApple(idToken, fullName);
-        const { user: apiUser } = response.data;
-        // Token'lar httpOnly cookie olarak backend tarafından set edildi; JS'te saklamıyoruz.
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('tarodan_authed', '1');
-        }
-
-        const user = mapApiUser(apiUser);
-        const limits = TIER_LIMITS[user.membershipTier];
-
-        set({ user, token: null, refreshToken: null, isAuthenticated: true, limits });
+      // NOTE: Apple sign-in is not wired end-to-end yet — there is no client/BFF
+      // apple action (unlike googleLogin's `googleLoginAction`) and no
+      // `authApi.loginWithApple`. Fail gracefully instead of referencing a
+      // non-existent method (which broke the production build).
+      loginWithApple: async () => {
+        throw new Error('Apple ile giriş şu anda kullanılamıyor.');
       },
 
       register: async (displayName: string, email: string, password: string, phone?: string, birthDate?: string, acceptMarketing?: boolean) => {
