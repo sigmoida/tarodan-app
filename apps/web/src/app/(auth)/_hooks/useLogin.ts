@@ -35,9 +35,6 @@ export function useLogin() {
   const { login } = useAuthStore();
 
   const [showVerificationBanner, setShowVerificationBanner] = useState(false);
-  // Once login succeeds we swap the form for a full-screen loader and keep it up
-  // through the redirect, so the UI never flashes blank while the target renders.
-  const [isRedirecting, setIsRedirecting] = useState(false);
 
   const loginMutation = useMutation({
     mutationFn: async ({
@@ -76,15 +73,17 @@ export function useLogin() {
       }
     },
     onSuccess: ({ needsMembership }) => {
-      setIsRedirecting(true);
-      if (needsMembership) {
-        router.push("/membership?required=true");
-        return;
-      }
-      const target = resolveRedirect();
-      setTimeout(() => {
-        router.push(target);
-      }, 1000);
+      const target = needsMembership
+        ? "/membership?required=true"
+        : resolveRedirect();
+      // Navigate immediately (same recipe as admin's useLogin). A client
+      // router.replace keeps the current UI up and shows the root loading
+      // spinner while the target renders — instead of leaving the user on
+      // /login long enough for the Server Action's post-login revalidation to
+      // re-run the async (auth) layout, redirect to '/', and re-stream a BLANK
+      // document. refresh() drops any stale RSC cache so the fresh session is read.
+      router.replace(target);
+      router.refresh();
     },
     onError: (error: unknown) => {
       if (process.env.NODE_ENV === "development") {
@@ -153,14 +152,13 @@ export function useLogin() {
 
   /** Redirect after a successful Google sign-in (store already updated). */
   const redirectAfterGoogle = () => {
-    setIsRedirecting(true);
-    router.push(resolveRedirect());
+    router.replace(resolveRedirect());
+    router.refresh();
   };
 
   return {
     submit,
     isLoading: loginMutation.isPending,
-    isRedirecting,
     showVerificationBanner,
     resendVerification,
     isResending: resendMutation.isPending,

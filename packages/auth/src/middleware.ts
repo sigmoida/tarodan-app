@@ -8,6 +8,17 @@ export interface AuthMiddlewareOptions {
   publicPaths: string[];
   /** Where to send unauthenticated users. Default `/login`. */
   loginPath?: string;
+  /**
+   * Guest-only paths (login, register, forgot-password, …). An already-authed
+   * user hitting one — via a real navigation, NOT an RSC prefetch/revalidation —
+   * is bounced to `authedHome`. Doing this at the edge (before render) replaces
+   * the async `(auth)` layout guard that flashed a blank frame during the
+   * post-login route revalidation. Prefetch/RSC requests are left alone so that
+   * revalidation can't retrigger that blank.
+   */
+  guestOnlyPaths?: string[];
+  /** Where to send authed users who hit a guest-only path. Default `/`. */
+  authedHome?: string;
 }
 
 /**
@@ -39,6 +50,27 @@ export function createAuthMiddleware(
     }
 
     const refresh = request.cookies.get(config.cookies.refresh)?.value;
+
+    // Guest-only pages: bounce an authed user to home, let guests through. Only
+    // on real navigations — an RSC prefetch or the Server Action revalidation
+    // that fires right after login also hits `/login`, and redirecting THAT is
+    // exactly what re-streamed a blank document. Detect those via Next's RSC
+    // headers and leave them untouched.
+    const isGuestOnly = (options.guestOnlyPaths ?? []).some(
+      (p) => pathname === p || pathname.startsWith(p + "/"),
+    );
+    if (isGuestOnly) {
+      const isRscRequest =
+        request.headers.has("rsc") ||
+        request.headers.has("next-router-prefetch");
+      if (refresh && !isRscRequest) {
+        return NextResponse.redirect(
+          new URL(options.authedHome ?? "/", request.url),
+        );
+      }
+      return NextResponse.next();
+    }
+
     if (!refresh) {
       const loginUrl = new URL(loginPath, request.url);
       loginUrl.searchParams.set("redirect", pathname);
