@@ -3,7 +3,10 @@
 // (webp / responsive / lazy) instead of embedding a heavy base64 data URI.
 //
 // The package is the single source of truth; these public files are generated
-// build artifacts (gitignored). Runs automatically via web's predev / prebuild.
+// build artifacts (gitignored). Invoked inline at the start of web's `dev` and
+// `build` scripts (not via pnpm pre/post hooks — those need
+// `enable-pre-post-scripts`, which is off by default in pnpm 8, so the Docker
+// prod build silently skipped them and shipped without the logos).
 //
 // Zero runtime deps: it reads the package's asset modules as text and pulls the
 // data URI out, so there's no TS loader (tsx/ts-node) to install.
