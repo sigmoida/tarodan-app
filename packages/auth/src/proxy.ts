@@ -18,6 +18,41 @@ interface ProxySession {
 
 type RouteCtx = { params: { path: string[] } };
 
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/**
+ * CSRF defense for the gateway. The proxy attaches a server-side Bearer to
+ * whatever it forwards and the API also accepts cookie auth, so without this the
+ * only barrier is SameSite=Lax — which has gaps (the Lax+POST 2-minute window,
+ * same-site subdomain attackers). On a STATE-CHANGING request we require the
+ * `Origin` header's host to match the request `Host` header (both are the public
+ * host the browser/proxy see, so this survives a reverse proxy that preserves
+ * Host — the standard setup). An ABSENT Origin is allowed: non-browser clients
+ * hit the API directly, and Lax already blocks cross-site form POSTs.
+ *
+ * Ops levers: `ALLOWED_ORIGINS` (comma-separated origins/hosts) whitelists extra
+ * origins; `CSRF_ORIGIN_CHECK=off` is an emergency kill-switch if a proxy that
+ * rewrites Host ever causes false positives.
+ */
+function isForbiddenCrossOrigin(request: NextRequest): boolean {
+  if (SAFE_METHODS.has(request.method)) return false;
+  if (process.env.CSRF_ORIGIN_CHECK === "off") return false;
+  const origin = request.headers.get("origin");
+  if (!origin) return false;
+  let originHost: string;
+  try {
+    originHost = new URL(origin).host;
+  } catch {
+    return true; // malformed Origin on a write → reject
+  }
+  if (originHost === request.headers.get("host")) return false;
+  const allowed = (process.env.ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+  return !(allowed.includes(origin) || allowed.includes(originHost));
+}
+
 /**
  * The BFF proxy handlers, factored out of the admin app. Every client data call
  * goes to same-origin `/api/*` (no CORS) and is forwarded to the upstream API
@@ -33,6 +68,12 @@ export function createBffProxy(session: ProxySession) {
     request: NextRequest,
     path: string[],
   ): Promise<NextResponse> {
+    if (isForbiddenCrossOrigin(request)) {
+      return new NextResponse("Forbidden: cross-origin request rejected", {
+        status: 403,
+      });
+    }
+
     const suffix = "/" + (path?.join("/") ?? "") + request.nextUrl.search;
 
     const hasBody = !["GET", "HEAD"].includes(request.method);
