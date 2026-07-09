@@ -1,9 +1,14 @@
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger, ConsoleLogger, RequestMethod } from '@nestjs/common';
+import { NestFactory } from "@nestjs/core";
+import {
+  ValidationPipe,
+  Logger,
+  ConsoleLogger,
+  RequestMethod,
+} from "@nestjs/common";
 
 /** Her route için RouterExplorer / RoutesResolver satırlarını susturur; `NEST_VERBOSE_ROUTES=true` ile eski davranış. */
 class QuietRouteNestLogger extends ConsoleLogger {
-  private static readonly SKIP = new Set(['RouterExplorer', 'RoutesResolver']);
+  private static readonly SKIP = new Set(["RouterExplorer", "RoutesResolver"]);
 
   log(message: unknown, context?: string) {
     if (context && QuietRouteNestLogger.SKIP.has(context)) {
@@ -12,13 +17,13 @@ class QuietRouteNestLogger extends ConsoleLogger {
     super.log(message, context);
   }
 }
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import helmet from 'helmet';
-import { AppModule } from './app.module';
+import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
+import helmet from "helmet";
+import { AppModule } from "./app.module";
 
-import { NestExpressApplication } from '@nestjs/platform-express';
-import { json, urlencoded } from 'express';
-import { setupBullBoard } from './bull-board.setup';
+import { NestExpressApplication } from "@nestjs/platform-express";
+import { json, urlencoded } from "express";
+import { setupBullBoard } from "./bull-board.setup";
 
 /**
  * Hard guard: PAYMENT_BYPASS allows completing payments without going through
@@ -27,28 +32,63 @@ import { setupBullBoard } from './bull-board.setup';
  * silently leak free orders/memberships.
  */
 function assertPaymentBypassNotInProduction(logger: Logger): void {
-  const isProduction = process.env.NODE_ENV === 'production';
-  const bypassEnabled = process.env.PAYMENT_BYPASS === 'true';
+  const isProduction = process.env.NODE_ENV === "production";
+  const bypassEnabled = process.env.PAYMENT_BYPASS === "true";
   if (isProduction && bypassEnabled) {
     logger.error(
-      'FATAL: PAYMENT_BYPASS=true cannot be set when NODE_ENV=production. ' +
-        'This would let clients complete payments without provider charge. ' +
-        'Set PAYMENT_BYPASS=false (or unset) in the production environment.',
+      "FATAL: PAYMENT_BYPASS=true cannot be set when NODE_ENV=production. " +
+        "This would let clients complete payments without provider charge. " +
+        "Set PAYMENT_BYPASS=false (or unset) in the production environment.",
     );
     process.exit(1);
   }
 }
 
+/**
+ * Fail fast in PRODUCTION on missing critical config, instead of silently
+ * running insecure/broken. Runs ONLY when NODE_ENV==='production', so dev / test /
+ * CI (which never set that) are unaffected. Hard-fails the absolutely-required
+ * secrets; loudly warns on missing PayTR creds (a payments-disabled deploy is a
+ * valid but rare case, so we surface it rather than block boot).
+ */
+function assertRequiredEnvInProduction(logger: Logger): void {
+  if (process.env.NODE_ENV !== "production") return;
+
+  const required = ["JWT_SECRET", "DATABASE_URL"];
+  const missing = required.filter((k) => !process.env[k]);
+  if (missing.length > 0) {
+    logger.error(
+      `FATAL: missing required environment variable(s) in production: ${missing.join(", ")}. ` +
+        "Set them in the production environment before starting.",
+    );
+    process.exit(1);
+  }
+
+  const paytr = [
+    "PAYTR_MERCHANT_ID",
+    "PAYTR_MERCHANT_KEY",
+    "PAYTR_MERCHANT_SALT",
+  ];
+  const paytrMissing = paytr.filter((k) => !process.env[k]);
+  if (paytrMissing.length > 0) {
+    logger.error(
+      `WARNING: PayTR credentials missing in production: ${paytrMissing.join(", ")}. ` +
+        "Live payments will fail until these are set.",
+    );
+  }
+}
+
 async function bootstrap() {
-  const logger = new Logger('Bootstrap');
+  const logger = new Logger("Bootstrap");
   try {
     assertPaymentBypassNotInProduction(logger);
+    assertRequiredEnvInProduction(logger);
 
     // IMPORTANT: Disable default body parser so custom parsers work for payment callbacks
     const app = await NestFactory.create<NestExpressApplication>(AppModule, {
       bodyParser: false, // Disable default parser
       logger:
-        process.env.NEST_VERBOSE_ROUTES === 'true'
+        process.env.NEST_VERBOSE_ROUTES === "true"
           ? new ConsoleLogger()
           : new QuietRouteNestLogger(),
     });
@@ -56,11 +96,11 @@ async function bootstrap() {
     // Reverse proxy (Coolify/nginx) arkasında gerçek istemci IP'sini X-Forwarded-For'dan
     // al; yoksa rate-limit (ThrottlerGuard) tüm kullanıcıları tek proxy IP'sinde
     // toplayıp birbirini kilitler. İlk hop'a güven.
-    app.set('trust proxy', 1);
+    app.set("trust proxy", 1);
 
     // Custom Body Parsers (e.g. PayTR form-urlencoded callbacks)
-    app.use(json({ limit: '50mb' }));
-    app.use(urlencoded({ extended: true, limit: '50mb' }));
+    app.use(json({ limit: "50mb" }));
+    app.use(urlencoded({ extended: true, limit: "50mb" }));
 
     // Bull Board — kuyruk izleme dashboard'u. helmet'TEN ÖNCE mount edilir
     // ki CSP UI'ı bozmasın; istek burada yanıtlanıp helmet'e düşmez.
@@ -71,26 +111,26 @@ async function bootstrap() {
     app.use(helmet());
 
     // CORS - Development'ta tüm origin'lere izin ver (mobil için)
-    const isDevelopment = process.env.NODE_ENV !== 'production';
+    const isDevelopment = process.env.NODE_ENV !== "production";
     app.enableCors({
       origin: isDevelopment
         ? true // Development'ta tüm origin'lere izin ver
-        : (process.env.CORS_ORIGINS?.split(',') || [
-          'http://localhost:3000',
-          'http://localhost:3001',
-          'http://localhost:3002',
-        ]),
+        : process.env.CORS_ORIGINS?.split(",") || [
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "http://localhost:3002",
+          ],
       credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       // Tarayıcı/Axios bazen Cache-Control, Pragma vb. ekliyor; hepsine izin ver ki CORS preflight geçsin
       allowedHeaders: [
-        'Content-Type',
-        'Authorization',
-        'Cache-Control',
-        'Pragma',
-        'Accept',
-        'Accept-Language',
-        'X-Requested-With',
+        "Content-Type",
+        "Authorization",
+        "Cache-Control",
+        "Pragma",
+        "Accept",
+        "Accept-Language",
+        "X-Requested-With",
       ],
     });
 
@@ -108,47 +148,48 @@ async function bootstrap() {
 
     // API prefix. PayTR "Bildirim URL" alias'ı /callback prefix DIŞINDA kalır
     // (panel .../callback ile bittiğinde çalışsın; kanonik /api/payments/callback/paytr da durur).
-    app.setGlobalPrefix('api', {
-      exclude: [{ path: 'callback', method: RequestMethod.POST }],
+    app.setGlobalPrefix("api", {
+      exclude: [{ path: "callback", method: RequestMethod.POST }],
     });
 
     // Swagger documentation — prod'da KAPALI (tüm endpoint şemasını/payload'larını
     // herkese açar). Sadece non-production'da; staging gerekiyorsa ENABLE_SWAGGER=true.
-    const swaggerEnabled = isDevelopment || process.env.ENABLE_SWAGGER === 'true';
+    const swaggerEnabled =
+      isDevelopment || process.env.ENABLE_SWAGGER === "true";
     if (swaggerEnabled) {
       const config = new DocumentBuilder()
-        .setTitle('Tarodan API')
-        .setDescription('Tarodan Koleksiyoner Oyuncak Marketplace API')
-        .setVersion('1.0')
+        .setTitle("Tarodan API")
+        .setDescription("Tarodan Koleksiyoner Oyuncak Marketplace API")
+        .setVersion("1.0")
         .addBearerAuth()
-        .addTag('auth', 'Authentication endpoints')
-        .addTag('users', 'User management')
-        .addTag('products', 'Product catalog')
-        .addTag('offers', 'Offer/negotiation system')
-        .addTag('orders', 'Order management')
-        .addTag('payments', 'Payment processing')
-        .addTag('shipping', 'Shipping integration')
-        .addTag('admin', 'Admin panel endpoints')
+        .addTag("auth", "Authentication endpoints")
+        .addTag("users", "User management")
+        .addTag("products", "Product catalog")
+        .addTag("offers", "Offer/negotiation system")
+        .addTag("orders", "Order management")
+        .addTag("payments", "Payment processing")
+        .addTag("shipping", "Shipping integration")
+        .addTag("admin", "Admin panel endpoints")
         .build();
       const document = SwaggerModule.createDocument(app, config);
-      SwaggerModule.setup('api/docs', app, document);
-      logger.log('Swagger docs available at /api/docs');
+      SwaggerModule.setup("api/docs", app, document);
+      logger.log("Swagger docs available at /api/docs");
     } else {
-      logger.log('Swagger docs disabled (production)');
+      logger.log("Swagger docs disabled (production)");
     }
 
     const port = process.env.PORT || 3000;
     // 0.0.0.0 — telefonun LAN IP üzerinden erişebilmesi için tüm arayüzleri dinle.
-    await app.listen(port, '0.0.0.0');
+    await app.listen(port, "0.0.0.0");
     logger.log(`Application running on port ${port}`);
   } catch (error) {
-    logger.error('Failed to start application:', error);
+    logger.error("Failed to start application:", error);
     process.exit(1);
   }
 }
 
-const bootstrapLogger = new Logger('Bootstrap');
+const bootstrapLogger = new Logger("Bootstrap");
 bootstrap().catch(() => {
-  bootstrapLogger.error('Bootstrap failed');
+  bootstrapLogger.error("Bootstrap failed");
   process.exit(1);
 });
