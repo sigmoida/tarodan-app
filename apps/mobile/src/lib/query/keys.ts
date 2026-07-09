@@ -26,6 +26,12 @@ export const qk = {
     search: (query?: string, filters?: Filters) =>
       ['products-search', query, filters] as const,
     detail: (id: string) => ['product', id] as const,
+    reviews: (id: string) => ['product-reviews', id] as const,
+    /** Liste ekranlarının (home/arama/öne-çıkanlar) prefix root'ları — beğeni/
+     * görüntülenme değişince hepsi tazelensin diye tek yerde. */
+    searchAll: ['products-search'] as const,
+    featuredBusiness: ['featured-business'] as const,
+    featuredCollector: ['featured-collector'] as const,
     myListings: (filters?: Filters) => ['my-listings', filters] as const,
     myListingsStats: ['my-listings-stats'] as const,
     myFeatured: ['my-featured-listings'] as const,

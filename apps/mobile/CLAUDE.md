@@ -200,6 +200,18 @@ Patterns to copy:
 - All feedback strings, status colors, and formatting live in `_lib/status.ts`, not
   scattered in JSX.
 
+**Second worked example — `app/product/[id]/` (heavy screen).** Same shape applied
+to a 1530-line screen (→ ~215-line `index.tsx`): query hooks with side effects
+(`useProduct` owns the view-count POST + list invalidation), a `useProductActions`
+hook that centralizes the snackbar + every handler (cart/offer/trade/report/share),
+and presentational `_components` (`ProductInfo`, `SellerCard`, `ProductBottomBar`,
+`ProductGallery`, …). Note two patterns for scale: hooks are called
+**unconditionally before** the `isLoading` / not-found early returns (never
+conditionally), and `useProductActions` accepts a nullable product with guarded
+handlers so the hook order is stable while the screen is still loading. A
+route-local loose `Product` DTO (`_lib/types.ts`) with an index signature keeps the
+gradual `any` migration (Faz 4) from blocking the split.
+
 ## 13. Verification
 
 - `npx tsc --noEmit` introduces **no new errors** beyond the tracked baseline.
