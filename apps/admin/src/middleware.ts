@@ -7,9 +7,15 @@ import { adminAuthConfig } from "@/lib/auth.config";
  * every protected navigation the engine redirects cookieless guests, refreshes a
  * missing/expired access token, and rotates the cookies before RSCs read them.
  * Data calls (`/gateway/*`) are excluded — the gateway proxy refreshes those itself.
+ *
+ * The auth pages (`/login`, …) are `guestOnlyPaths`: a logged-in user is bounced
+ * to `/dashboard` here at the edge instead of in the async `(auth)` layout, which
+ * flashed a blank frame during the post-login revalidation (same fix as web).
  */
 export const middleware = createAuthMiddleware(adminAuthConfig, {
-  publicPaths: ["/login", "/forgot-password", "/reset-password"],
+  publicPaths: [],
+  guestOnlyPaths: ["/login", "/forgot-password", "/reset-password"],
+  authedHome: "/dashboard",
 });
 
 export const config = {
