@@ -9,6 +9,9 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "dev:restart": "lsof -ti:3000 -ti:3001 -ti:3002 2>/dev/null | xargs kill -9 2>/dev/null; sleep 2; pnpm dev",
+    "dev:up": "docker compose -f infrastructure/docker-compose.yml up -d && docker compose -f infrastructure/docker-compose.yml up -d --wait postgres redis",
+    "dev:local": "pnpm dev:up && pnpm db:migrate:deploy && turbo run dev --filter=@tarodan/web --filter=@tarodan/admin --filter=@tarodan/api",
+    "dev:reset": "pnpm dev:up && pnpm db:reset && turbo run dev --filter=@tarodan/web --filter=@tarodan/admin --filter=@tarodan/api",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
@@ -33,9 +36,11 @@
     "stack:down": "pnpm pm2:stop; pnpm docker:down",
     "stack:status": "pnpm pm2:status && docker compose -f infrastructure/docker-compose.yml ps",
     "ngrok": "./tools/ngrok http 3001",
-    "postinstall": "echo Skipping husky"
+    "prepare": "husky install || true"
   },
   "devDependencies": {
+    "@commitlint/cli": "^18.6.1",
+    "@commitlint/config-conventional": "^18.6.3",
     "@types/node": "^20.10.0",
     "@typescript-eslint/eslint-plugin": "^6.14.0",
     "@typescript-eslint/parser": "^6.14.0",
