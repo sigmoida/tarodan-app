@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { CronExpression } from '@nestjs/schedule';
 import { TrackedCron } from '../../monitoring/tracked-cron.decorator';
 import { cronsViaBull } from '../../monitoring/bull-cron.helper';
 import { PrismaService } from '../../prisma';
@@ -79,13 +79,30 @@ export class SearchSyncService {
    * bazlı drift hiç yakalanmaz. Bu yüzden sayıdan bağımsız, saatlik tam reconcile
    * çalıştırıp yetim/eksik dokümanları her durumda eşitliyoruz.
    */
-  @Cron(CronExpression.EVERY_HOUR)
+  @TrackedCron(CronExpression.EVERY_HOUR)
   async handleHourlyReconcile() {
-    if (!this.common.isAvailable()) return;
-    await this.deltaSync();
+    if (cronsViaBull()) {
+      return;
+    }
+    return this.runHandleHourlyReconcile();
   }
 
-  private async deltaSync(): Promise<void> {
+  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+  async runHandleHourlyReconcile(log: (msg: string) => void = () => {}) {
+    if (!this.common.isAvailable()) {
+      log('Elasticsearch erişilemez, atlandı');
+      return { summary: 'ES erişilemez, atlandı', stats: { skipped: 1 } };
+    }
+    const { indexed, removed } = await this.deltaSync(log);
+    return {
+      summary: `Reconcile OK (indexed ${indexed}, removed ${removed})`,
+      stats: { indexed, removed },
+    };
+  }
+
+  private async deltaSync(
+    log: (msg: string) => void = () => {},
+  ): Promise<{ indexed: number; removed: number }> {
     try {
       const indexableProducts = await this.prisma.product.findMany({
         where: this.common.indexableProductWhere(),
@@ -129,8 +146,12 @@ export class SearchSyncService {
           `Delta sync: indexed ${missingIds.length}, removed ${staleIds.length}`,
         );
       }
+      log(`indexed ${missingIds.length}, removed ${staleIds.length}`);
+      return { indexed: missingIds.length, removed: staleIds.length };
     } catch (error) {
       this.logger.error('Delta sync failed');
+      log('delta sync HATA');
+      return { indexed: 0, removed: 0 };
     }
   }
 }

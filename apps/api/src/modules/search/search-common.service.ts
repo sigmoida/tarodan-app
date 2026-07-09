@@ -132,11 +132,20 @@ export class SearchCommonService implements OnModuleInit {
     await this.ensureIndexExists();
     await this.ensureCollectionsIndexExists();
 
-    // Cron'u Bull repeatable'a senkronla (flag açıksa kaydet, kapalıysa temizle).
+    // Cron'ları Bull repeatable'a senkronla (flag açıksa kaydet, kapalıysa temizle).
+    // NOT: cron ifadeleri search-sync.service.ts'teki @TrackedCron ile AYNI olmalı
+    // (periodic = EVERY_5_MINUTES, hourly = EVERY_HOUR).
     await registerRepeatableCron(
       this.scheduledQueue,
       'search-periodic-sync',
       '0 */5 * * * *',
+      cronsViaBull(),
+      this.logger,
+    );
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      'search-hourly-reconcile',
+      '0 0 * * * *',
       cronsViaBull(),
       this.logger,
     );

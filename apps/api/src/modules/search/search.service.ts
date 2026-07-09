@@ -152,9 +152,13 @@ export class SearchService implements OnModuleInit {
   // dekoratörlü giriş noktaları (handlePeriodicSync/handleHourlyReconcile) alt
   // serviste yaşar ve ScheduleModule onları orada keşfeder — facade'de tekrar
   // tanımlanmaz (çift kayıt olmaması için). Yalnızca processor'ın çağırdığı
-  // runHandlePeriodicSync facade'den delege edilir.
+  // run* metotları facade'den delege edilir.
 
   async runHandlePeriodicSync(log: (msg: string) => void = () => {}) {
     return this.sync.runHandlePeriodicSync(log);
+  }
+
+  async runHandleHourlyReconcile(log: (msg: string) => void = () => {}) {
+    return this.sync.runHandleHourlyReconcile(log);
   }
 }
