@@ -59,7 +59,7 @@ const nextConfig = {
     contentDispositionType: 'attachment',
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
-  // Data calls go to the same-origin BFF proxy at app/api/[...path]/route.ts
+  // Data calls go to the same-origin gateway proxy at app/gateway/[...path]/route.ts
   // (which injects the Bearer token server-side) — no next.config rewrite.
 };
 

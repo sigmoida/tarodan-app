@@ -5,7 +5,7 @@ import {
   loginAction,
   googleLoginAction,
   logoutAction,
-} from "@/lib/server/bff-auth-actions";
+} from "@/lib/server/auth-actions";
 import { hasAuthMarker, clearAuthMarker } from "@/lib/authMarker";
 
 // Membership tier types
