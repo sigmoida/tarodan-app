@@ -1,5 +1,9 @@
-import { createBffProxy } from '@tarodan/auth';
-import { apiFetch, attachSessionCookies } from '@/lib/server/session';
+import { createBffProxy } from "@tarodan/auth";
+import {
+  apiFetch,
+  attachSessionCookies,
+  clearSessionCookies,
+} from "@/lib/server/session";
 
 /**
  * BFF proxy. Every client data call goes to same-origin `/api/*` (no CORS) and
@@ -11,9 +15,10 @@ import { apiFetch, attachSessionCookies } from '@/lib/server/session';
  * Auth flows (login / forgot-password / logout) are Server Actions, not this
  * proxy — so this handler only ever carries already-authenticated traffic.
  */
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export const { GET, POST, PUT, PATCH, DELETE } = createBffProxy({
   apiFetch,
   attachSessionCookies,
+  clearSessionCookies,
 });

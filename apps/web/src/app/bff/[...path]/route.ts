@@ -1,5 +1,9 @@
-import { createBffProxy } from '@tarodan/auth';
-import { apiFetch, attachSessionCookies } from '@/lib/server/bff-session';
+import { createBffProxy } from "@tarodan/auth";
+import {
+  apiFetch,
+  attachSessionCookies,
+  clearSessionCookies,
+} from "@/lib/server/bff-session";
 
 /**
  * BFF proxy for the web app's authenticated client calls.
@@ -12,9 +16,10 @@ import { apiFetch, attachSessionCookies } from '@/lib/server/bff-session';
  * A separate namespace from `/api/*` on purpose: the existing `/api/:path*` and
  * `/api/payment/callback/:path*` rewrites (PayTR) must keep working untouched.
  */
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export const { GET, POST, PUT, PATCH, DELETE } = createBffProxy({
   apiFetch,
   attachSessionCookies,
+  clearSessionCookies,
 });

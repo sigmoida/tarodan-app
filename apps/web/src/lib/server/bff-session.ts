@@ -1,7 +1,11 @@
-import 'server-only';
+import "server-only";
 
-import { createSession, createAuthLogic, type ApiFetchResult } from '@tarodan/auth';
-import { webAuthConfig, mapWebUser, type WebUser } from '@/lib/auth.config';
+import {
+  createSession,
+  createAuthLogic,
+  type ApiFetchResult,
+} from "@tarodan/auth";
+import { webAuthConfig, mapWebUser, type WebUser } from "@/lib/auth.config";
 
 /**
  * Server-only BFF session core for the web app, built on the shared
@@ -20,6 +24,7 @@ export const {
   refreshTokens,
   apiFetch,
   attachSessionCookies,
+  clearSessionCookies,
   getSession,
   apiBaseUrl,
 } = session;
