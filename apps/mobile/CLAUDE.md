@@ -212,6 +212,17 @@ handlers so the hook order is stable while the screen is still loading. A
 route-local loose `Product` DTO (`_lib/types.ts`) with an index signature keeps the
 gradual `any` migration (Faz 4) from blocking the split.
 
+**Third worked example — `app/trade/[id]/` (status machine).** The 1830-line trade
+detail (→ ~170-line `index.tsx`) shows the pattern on a status-driven screen: a
+single `useTradeActions` controller hook owns all 6 mutations + snackbar + both
+modals' UI state; a pure `_lib/derive.ts` computes every derived value (party,
+totals, shipment selectors, cash) once so JSX never re-derives; and the huge
+status-conditional JSX splits into `TradeStatusHeader` / `TradeShippingSection` /
+`TradeActions` etc., each rendering `null` when its status branch is inactive.
+`_lib/status.ts` is the single source for the status maps, step flow, and countdown
+helpers. `[id].tsx` became the folder `[id]/index.tsx` (expo-router resolves the
+directory) — colocated tests importing `../[id]` keep working.
+
 ## 13. Verification
 
 - `npx tsc --noEmit` introduces **no new errors** beyond the tracked baseline.
