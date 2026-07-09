@@ -1,8 +1,30 @@
 const { withSentryConfig } = require('@sentry/nextjs');
 const path = require('path');
 
+/**
+ * App-level security headers for the admin dashboard. Stricter than web: it's a
+ * private, non-indexable app that should never be framed. No CSP here (tracked
+ * separately — needs nonces + report-only rollout).
+ */
+const SECURITY_HEADERS = [
+  { key: 'X-Frame-Options', value: 'DENY' },
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  {
+    key: 'Strict-Transport-Security',
+    value: 'max-age=63072000; includeSubDomains; preload',
+  },
+  {
+    key: 'Permissions-Policy',
+    value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()',
+  },
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  async headers() {
+    return [{ source: '/(.*)', headers: SECURITY_HEADERS }];
+  },
   // standalone yalnızca prod build için; dev-server bu monorepo'da standalone ile takılıyor.
   output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
   // Dev'de StrictMode effect'leri 2× çalıştırıp her yükleme/hata toast'ını ikiye
