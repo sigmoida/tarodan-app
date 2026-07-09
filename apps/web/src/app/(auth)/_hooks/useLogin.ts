@@ -19,7 +19,15 @@ function resolveRedirect(): string {
   }
   if (!redirect)
     redirect = new URLSearchParams(window.location.search).get("redirect");
-  return redirect && redirect.startsWith("/") ? redirect : "/";
+  // Must be a same-origin ABSOLUTE PATH. `startsWith('/')` alone is bypassable by
+  // a protocol-relative URL (`//evil.com`) or `/\evil.com`, which resolve
+  // off-origin — an open redirect. Reject those; fall back to home.
+  const isSafe =
+    !!redirect &&
+    redirect.startsWith("/") &&
+    !redirect.startsWith("//") &&
+    !redirect.startsWith("/\\");
+  return isSafe ? (redirect as string) : "/";
 }
 
 /**
