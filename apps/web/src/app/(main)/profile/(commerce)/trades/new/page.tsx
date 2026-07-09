@@ -11,7 +11,7 @@ import TradeAddressPicker from '../_components/TradeAddressPicker';
 import SectionCard from '@/components/ui/SectionCard';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { EmptyStateCard } from '../../../_components/EmptyStateCard';
+import { EmptyStateCard } from '@/components/ui';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n';
 import { getProductEffectivePrice } from '@/lib/productPrice';

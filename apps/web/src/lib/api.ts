@@ -534,6 +534,8 @@ export const collectionsApi = {
 	},
 	browse: (params?: Record<string, any>) =>
 		api.get('/collections/browse', { params }),
+	getUserCollections: (userId: string, params?: Record<string, any>) =>
+		api.get(`/collections/user/${userId}`, { params }),
 	getMyCollections: (params?: Record<string, any>) =>
 		api.get('/collections/me', { params }),
 	getLiked: (params?: Record<string, any>) =>

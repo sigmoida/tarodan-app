@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Button, Spinner } from '@tarodan/ui';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { EmptyStateCard } from '../../_components/EmptyStateCard';
+import { EmptyStateCard } from '@/components/ui';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { useRequireAuth } from '../../_hooks/useRequireAuth';
 import { useFollowing, useUnfollow } from './_hooks/useFollowing';

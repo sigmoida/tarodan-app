@@ -1,26 +1,11 @@
-'use client';
+/** @format */
 
-import { useParams, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { redirect } from 'next/navigation';
 
-/**
- * Email templates link to /seller/orders/:orderId.
- * Redirect to the main order detail page so the link works.
- */
-export default function SellerOrderRedirectPage() {
-  const params = useParams();
-  const router = useRouter();
-  const orderId = params?.id as string;
+type Props = { params: Promise<{ id: string }> };
 
-  useEffect(() => {
-    if (orderId) {
-      router.replace(`/profile/orders/${orderId}`);
-    }
-  }, [orderId, router]);
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-surface">
-      <p className="text-muted">Yönlendiriliyorsunuz…</p>
-    </div>
-  );
+/** Email templates link to /seller/orders/:orderId — forward to the order detail. */
+export default async function SellerOrderPage({ params }: Props) {
+	const { id } = await params;
+	redirect(`/profile/orders/${id}`);
 }

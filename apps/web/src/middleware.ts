@@ -7,11 +7,11 @@ import { webAuthConfig } from '@/lib/auth.config';
  * `web_rt` → redirect to /login?redirect=…; `web_at` missing/expired → refresh
  * server-side and rotate the Next-owned cookies before RSCs read them.
  *
- * Matched: the `/profile/*` account area plus the owner-only edit flows
- * (`/listings/[id]/edit`, `/collections/[id]/edit`) — these mutate user-owned
- * data and previously relied only on a client `useEffect` redirect (content
- * flashed before bouncing). Guest-capable flows (checkout, cart, payment
- * callbacks) and all public/SEO routes are intentionally excluded.
+ * Matched: the `/profile/*`, `/seller/*` and `/products/*` account areas plus the owner-only
+ * edit flows (`/listings/[id]/edit`, `/collections/[id]/edit`) — these are
+ * behind auth and previously relied only on a client `useEffect` redirect
+ * (content flashed before bouncing). Guest-capable flows (checkout, cart,
+ * payment callbacks) and all public/SEO routes are intentionally excluded.
  */
 export const middleware = createAuthMiddleware(webAuthConfig, { publicPaths: [] });
 
@@ -19,6 +19,10 @@ export const config = {
 	matcher: [
 		'/profile',
 		'/profile/:path*',
+		'/seller',
+		'/seller/:path*',
+		'/products',
+		'/products/:path*',
 		'/listings/:id/edit',
 		'/collections/:id/edit',
 	],

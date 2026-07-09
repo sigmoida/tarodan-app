@@ -8,7 +8,7 @@ import { PlusIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { Badge, Button, Spinner, Tabs, TabsList, TabsTrigger } from '@tarodan/ui';
 import BoostModal from './_modals/BoostModal';
 import { ButtonLink } from '@/components/ui/ButtonLink';
-import { EmptyStateCard } from '../../_components/EmptyStateCard';
+import { EmptyStateCard } from '@/components/ui';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useConfirm } from '@/components/ConfirmProvider';

@@ -10,7 +10,7 @@ import { useRequireAuth } from '../../_hooks/useRequireAuth';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
-import { EmptyStateCard } from '../../_components/EmptyStateCard';
+import { EmptyStateCard } from '@/components/ui';
 import { useNotifications } from './_hooks/useNotifications';
 import NotificationCard from './_components/NotificationCard';
 import {

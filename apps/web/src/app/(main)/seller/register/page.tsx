@@ -1,22 +1,8 @@
-'use client';
+/** @format */
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { redirect } from 'next/navigation';
 
-/**
- * Seller Registration = business/company signup.
- * Redirect to the existing business registration page.
- */
-export default function SellerRegisterRedirectPage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace('/register/business');
-  }, [router]);
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-surface">
-      <p className="text-muted">Yönlendiriliyorsunuz…</p>
-    </div>
-  );
+/** Seller registration = business/company signup — handled by /register/business. */
+export default function SellerRegisterPage() {
+	redirect('/register/business');
 }

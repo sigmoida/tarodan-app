@@ -1,13 +1,14 @@
+/** @format */
+
 import type { ReactNode } from 'react';
 
 /**
- * The single "no data yet" card for the web app (profile area and anywhere a
- * data list can come back empty). A bordered, centered card with a title, an
- * optional subtitle and an optional action button — deliberately ICON-LESS, so
- * every empty state reads the same. Each route passes its own copy + CTA
- * (colocated, i18n-friendly); the layout lives here once instead of being
- * hand-rolled per page. Need an icon for a special case? Use `@tarodan/ui`'s
- * `EmptyState` instead — this card is the plain, uniform default.
+ * The single "no data yet" card for the web app (profile area, seller profile,
+ * and anywhere a data list can come back empty). A bordered, centered card with a
+ * title, an optional subtitle and an optional action button — deliberately
+ * ICON-LESS, so every empty state reads the same. Each route passes its own copy
+ * + CTA. Need an icon for a special case? Use `@tarodan/ui`'s `EmptyState`
+ * instead — this card is the plain, uniform default.
  */
 export function EmptyStateCard({
 	title,

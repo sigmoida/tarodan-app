@@ -8,7 +8,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { Button, IconButton } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
-import { EmptyStateCard } from "../../../_components/EmptyStateCard";
+import { EmptyStateCard } from '@/components/ui';
 import { ProductCard } from "@/components/ui";
 import { useTranslation } from "@/i18n";
 import { wishlistItemToProduct, type WishlistItem } from "../_lib/types";

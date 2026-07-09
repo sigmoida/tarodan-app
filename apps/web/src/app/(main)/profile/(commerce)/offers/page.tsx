@@ -15,7 +15,7 @@ import {
 import { Button, Spinner, Tabs, TabsList, TabsTrigger } from '@tarodan/ui';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { EmptyStateCard } from '../../_components/EmptyStateCard';
+import { EmptyStateCard } from '@/components/ui';
 import { useRequireAuth } from '../../_hooks/useRequireAuth';
 import { useOffers, useOfferAction } from './_hooks/useOffers';
 import { useCommissionPreviews } from '../_hooks/useCommissionPreviews';

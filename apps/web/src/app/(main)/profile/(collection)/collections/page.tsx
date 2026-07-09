@@ -10,7 +10,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n';
 import CreateCollectionModal from '@/components/CreateCollectionModal';
-import { EmptyStateCard } from '../../_components/EmptyStateCard';
+import { EmptyStateCard } from '@/components/ui';
 import { useMyCollections } from './_hooks/useMyCollections';
 import CollectionCard from './_components/CollectionCard';
 import CollectionsToolbar from './_components/CollectionsToolbar';

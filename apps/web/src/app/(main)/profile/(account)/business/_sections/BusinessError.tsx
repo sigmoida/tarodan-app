@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Button } from '@tarodan/ui';
-import { EmptyStateCard } from '../../../_components/EmptyStateCard';
+import { EmptyStateCard } from '@/components/ui';
 
 /** Backend hints that the company name is missing → send the user to /profile;
  * otherwise the account simply isn't a business tier → send them to /pricing. */
