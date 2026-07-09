@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, RefreshControl, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { theme, ScreenHeader } from '@tarodan/ui-native';
+import { theme, ScreenHeader, ErrorState } from '@tarodan/ui-native';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n';
 import type { Offer, TabType } from './_lib/types';
@@ -39,7 +39,7 @@ export default function OffersScreen() {
     router.replace(`/offers?tab=${tab}`);
   }, []);
 
-  const { data: offers = [], isLoading, isRefetching, refetch } = useOffers(activeTab, isAuthenticated);
+  const { data: offers = [], isLoading, isError, isRefetching, refetch } = useOffers(activeTab, isAuthenticated);
   const estimatedNetByOfferId = useCommissionPreview(offers, activeTab);
   const { accept, reject, cancel, pendingOfferId } = useOfferActions();
 
@@ -67,6 +67,14 @@ export default function OffersScreen() {
           <ActivityIndicator size="large" color={colors.primary[600]!} />
           <Text style={styles.loadingText}>Teklifler yükleniyor...</Text>
         </View>
+      ) : isError ? (
+        // Hatayı boş durumdan ayır (eskiden appAlert; artık kalıcı ErrorState +
+        // tekrar-dene). "Henüz teklif yok" bir yükleme hatasını maskelememeli.
+        <ErrorState
+          fullscreen
+          message="Teklifler yüklenirken bir hata oluştu"
+          onRetry={() => refetch()}
+        />
       ) : (
         <FlatList
           data={offers}
