@@ -16,11 +16,13 @@ jest.mock('../../../src/i18n', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 
-jest.mock('../../../src/services/api', () => ({
+// Yeni mimaride ekran/hook'lar `@/lib/api`'den import ediyor (services/api artık
+// yalnız geriye-dönük barrel). Mock, kodun gerçekten import ettiği modülü hedefler.
+jest.mock('@/lib/api', () => ({
   offersApi: { getAll: jest.fn() },
   ordersApi: { getCommissionPreviewBatch: jest.fn(() => Promise.resolve({ data: { results: [] } })) },
 }));
-import { offersApi } from '../../../src/services/api';
+import { offersApi } from '@/lib/api';
 
 let mockAuth = { isAuthenticated: true, isLoading: false };
 jest.mock('../../../src/stores/authStore', () => ({
