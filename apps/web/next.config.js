@@ -29,6 +29,12 @@ const nextConfig = {
   // standalone ile "Starting..."da takılıyor → dev'de devre dışı bırak.
   output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
   reactStrictMode: true,
+  // Type-check + lint are gated in CI (`pnpm typecheck` / `pnpm lint`) and
+  // locally; running the full type-check again inside `next build` OOM-killed the
+  // memory-constrained deploy server. Skip the in-build checks (the webpack
+  // compile still runs) to keep the Docker build lean.
+  eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: true },
   transpilePackages: ['@tarodan/ui', '@tarodan/design-tokens', '@tarodan/shared'],
   webpack: (config, { isServer }) => {
     // ESM packages için webpack config
