@@ -1,12 +1,23 @@
 /** @format */
 
-'use client';
+"use client";
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
-import { api } from '@/lib/api';
-import { useTranslation } from '@/i18n';
-import type { Notification } from '../_lib/notifications';
+import { api } from "@/lib/api";
+import { useTranslation } from "@/i18n";
+import { useWebList } from "@/hooks/useWebResource";
+import { useWebMutation } from "@/hooks/useWebMutation";
+import type { Notification } from "../_lib/notifications";
+
+const RESOURCE = "notifications";
+/** Header bell counters that must refresh alongside the list. */
+const UNREAD_COUNT_RESOURCE = "notifications-unread-count";
+const BELL_RESOURCE = "notifications-bell";
+
+const NOTIFICATION_INVALIDATES = [
+  RESOURCE,
+  UNREAD_COUNT_RESOURCE,
+  BELL_RESOURCE,
+];
 
 /**
  * Notifications list + read mutations. Replaces the page's inline `useQuery` and
@@ -14,48 +25,41 @@ import type { Notification } from '../_lib/notifications';
  * and the header bell counters.
  */
 export function useNotifications(enabled: boolean) {
-	const queryClient = useQueryClient();
-	const { t, locale } = useTranslation();
+  const { t, locale } = useTranslation();
 
-	const query = useQuery({
-		queryKey: ['notifications'],
-		queryFn: async (): Promise<Notification[]> => {
-			const response = await api.get('/notifications', {
-				params: { page: 1, limit: 100 },
-			});
-			return response.data.notifications || response.data.data || [];
-		},
-		enabled,
-		meta: { page: 'notifications' },
-	});
+  const query = useWebList<Notification[]>({
+    resource: RESOURCE,
+    fetcher: async () => {
+      const response = await api.get("/notifications", {
+        params: { page: 1, limit: 100 },
+      });
+      return response.data.notifications || response.data.data || [];
+    },
+    enabled,
+    query: { meta: { page: "notifications" } },
+  });
 
-	const invalidate = () =>
-		Promise.all([
-			queryClient.invalidateQueries({ queryKey: ['notifications'] }),
-			queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] }),
-			queryClient.invalidateQueries({ queryKey: ['notifications-bell'] }),
-		]);
+  const markRead = useWebMutation(
+    (id: string) => api.patch(`/notifications/${id}/read`),
+    { invalidates: NOTIFICATION_INVALIDATES },
+  );
 
-	const markRead = useMutation({
-		mutationFn: (id: string) => api.patch(`/notifications/${id}/read`),
-		onSuccess: invalidate,
-	});
+  const markAllRead = useWebMutation(
+    () => api.post("/notifications/mark-all-read"),
+    {
+      invalidates: NOTIFICATION_INVALIDATES,
+      successMessage:
+        locale === "en"
+          ? "All marked as read"
+          : "Tümü okundu olarak işaretlendi",
+      errorMessage: t("common.operationFailed"),
+    },
+  );
 
-	const markAllRead = useMutation({
-		mutationFn: () => api.post('/notifications/mark-all-read'),
-		onSuccess: async () => {
-			toast.success(
-				locale === 'en' ? 'All marked as read' : 'Tümü okundu olarak işaretlendi',
-			);
-			await invalidate();
-		},
-		onError: () => toast.error(t('common.operationFailed')),
-	});
-
-	return {
-		notifications: query.data ?? [],
-		isLoading: query.isLoading,
-		markRead: (id: string) => markRead.mutate(id),
-		markAllRead: () => markAllRead.mutate(),
-	};
+  return {
+    notifications: query.data ?? [],
+    isLoading: query.isLoading,
+    markRead: (id: string) => markRead.mutate(id),
+    markAllRead: () => markAllRead.mutate(),
+  };
 }
