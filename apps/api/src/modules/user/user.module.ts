@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
+import { BullModule } from '@nestjs/bull';
 import { UserService } from './user.service';
 import { UserCommonService } from './user-common.service';
 import { UserProfileService } from './user-profile.service';
@@ -11,13 +12,22 @@ import { UserDiscoveryService } from './user-discovery.service';
 import { UserBankService } from './user-bank.service';
 import { UserController } from './user.controller';
 import { FeaturedSchedulerService } from './featured-scheduler.service';
+import { FeaturedScheduledProcessor } from './featured-scheduled.processor';
 import { NotificationModule } from '../notification/notification.module';
 import { StorageModule } from '../storage/storage.module';
 import { RatingModule } from '../rating/rating.module';
 import { ModerationModule } from '../moderation/moderation.module';
+import { QUEUE_NAMES } from '../../workers/constants';
 
 @Module({
-  imports: [ScheduleModule.forRoot(), NotificationModule, StorageModule, RatingModule, ModerationModule],
+  imports: [
+    ScheduleModule.forRoot(),
+    NotificationModule,
+    StorageModule,
+    RatingModule,
+    ModerationModule,
+    BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
+  ],
   controllers: [UserController],
   providers: [
     UserService,
@@ -30,6 +40,7 @@ import { ModerationModule } from '../moderation/moderation.module';
     UserDiscoveryService,
     UserBankService,
     FeaturedSchedulerService,
+    FeaturedScheduledProcessor,
   ],
   exports: [UserService],
 })
