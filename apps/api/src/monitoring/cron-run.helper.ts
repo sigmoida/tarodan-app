@@ -1,4 +1,4 @@
-import type { Job } from 'bull';
+import type { Job } from "bull";
 
 export interface CronRunSummary {
   /** Tek satır insan-okur özet (PII İÇERMEZ — sayaç/durum). */
@@ -24,7 +24,9 @@ export interface CronRunResult extends CronRunSummary {
 export async function runTrackedJob(
   job: Job,
   jobName: string,
-  fn: (log: (msg: string) => void) => Promise<CronRunSummary | void> | CronRunSummary | void,
+  fn: (
+    log: (msg: string) => void,
+  ) => Promise<CronRunSummary | void> | CronRunSummary | void,
 ): Promise<CronRunResult> {
   const started = Date.now();
   const log = (msg: string): void => {
@@ -35,7 +37,23 @@ export async function runTrackedJob(
   try {
     const res = (await fn(log)) || {};
     const durationMs = Date.now() - started;
-    log(`✓ bitti (${durationMs}ms)${res.summary ? ' — ' + res.summary : ''}`);
+
+    // stats'ı her zaman Logs'a yaz — başarı VEYA hata fark etmez; böylece iş
+    // FAILED işaretlense bile sayısal detay Logs sekmesinde kaybolmaz.
+    if (res.stats && Object.keys(res.stats).length > 0) {
+      log(`stats: ${JSON.stringify(res.stats)}`);
+    }
+
+    // İş kendi içinde iş-seviyesi hata raporladıysa (stats.errors > 0) Bull'da
+    // FAILED (kırmızı) işaretle → FAILED sekmesinde bir bakışta görünür.
+    // Kalem-seviyesi 'failed' sayıları (ör. 2 payout başarısız) işi KIRMIZI YAPMAZ:
+    // onlar özet/stats'ta görünür ama beklenen/işlenmiş durumlardır (alarm yorgunluğu olmasın).
+    const errorCount = Number(res.stats?.errors ?? 0);
+    if (errorCount > 0) {
+      throw new Error(res.summary || `${jobName}: ${errorCount} hata`);
+    }
+
+    log(`✓ bitti (${durationMs}ms)${res.summary ? " — " + res.summary : ""}`);
     return { ok: true, durationMs, summary: res.summary, stats: res.stats };
   } catch (e: any) {
     log(`✗ HATA (${Date.now() - started}ms): ${e?.message ?? e}`);
