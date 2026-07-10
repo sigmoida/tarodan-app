@@ -102,17 +102,17 @@ export class PaymentSchedulerService implements OnModuleInit {
       if ((stats[key] ?? 0) > 0) parts.push(`${label}=${stats[key]}`);
     };
     push("paytr", "paytrCompleted");
-    push("rezervasyon", "reservationsReleased");
+    push("reservations", "reservationsReleased");
     push("qty-fix", "qtyReconciled");
-    push("sipariş-iptal", "ordersExpired");
-    push("ödeme-iptal", "paymentsCancelled");
-    push("oto-iade", "autoRefunded");
-    push("iade-başarısız", "autoRefundFailed");
-    push("fatura", "invoicesGenerated");
-    push("stok-teklif-iptal", "stockOffersCancelled");
-    push("stok-takas-iptal", "stockTradesCancelled");
-    if ((stats.errors ?? 0) > 0) parts.push(`ADIM-HATASI=${stats.errors}`);
-    return parts.length ? parts.join(" · ") : "yapılacak iş yok (temiz)";
+    push("orders-cancelled", "ordersExpired");
+    push("payments-cancelled", "paymentsCancelled");
+    push("auto-refunded", "autoRefunded");
+    push("refund-failed", "autoRefundFailed");
+    push("invoices", "invoicesGenerated");
+    push("stock-offers-cancelled", "stockOffersCancelled");
+    push("stock-trades-cancelled", "stockTradesCancelled");
+    if ((stats.errors ?? 0) > 0) parts.push(`STEP-ERROR=${stats.errors}`);
+    return parts.length ? parts.join(" · ") : "nothing to do (clean)";
   }
 
   @TrackedCron("*/5 * * * *") // Every 5 minutes
@@ -296,7 +296,7 @@ export class PaymentSchedulerService implements OnModuleInit {
 
     this.stepLog = () => {};
     return {
-      summary: `${releasedHolds} hold serbest · ${payoutsCreated} payout oluşturuldu`,
+      summary: `${releasedHolds} holds released · ${payoutsCreated} payouts created`,
       stats: {
         releasedHolds,
         tradeCash,
@@ -325,7 +325,7 @@ export class PaymentSchedulerService implements OnModuleInit {
     try {
       const result = await this.paymentService.handleExpiredPreparingOrders();
       log(
-        `${result.warned} satıcı uyarıldı · ${result.cancelled} sipariş oto-iptal`,
+        `${result.warned} sellers warned · ${result.cancelled} orders auto-cancelled`,
       );
       if (result.warned > 0) {
         this.logger.log(
@@ -338,7 +338,7 @@ export class PaymentSchedulerService implements OnModuleInit {
         );
       }
       return {
-        summary: `${result.warned} uyarı · ${result.cancelled} oto-iptal`,
+        summary: `${result.warned} warnings · ${result.cancelled} auto-cancelled`,
         stats: { warned: result.warned, cancelled: result.cancelled },
       };
     } catch (error: any) {
@@ -346,8 +346,8 @@ export class PaymentSchedulerService implements OnModuleInit {
         `Error in expired preparing orders job: ${error.message}`,
         error.stack,
       );
-      log(`HATA: ${error.message}`);
-      return { summary: `Hata: ${error.message}`, stats: { errors: 1 } };
+      log(`ERROR: ${error.message}`);
+      return { summary: `Error: ${error.message}`, stats: { errors: 1 } };
     }
   }
 }

@@ -1,10 +1,13 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
-import { TrackedCron } from '../../monitoring/tracked-cron.decorator';
-import { cronsViaBull, registerRepeatableCron } from '../../monitoring/bull-cron.helper';
-import { QUEUE_NAMES } from '../../workers/constants';
-import { SuratTrackingService } from '../surat-cargo/surat-tracking.service';
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
+import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
+import {
+  cronsViaBull,
+  registerRepeatableCron,
+} from "../../monitoring/bull-cron.helper";
+import { QUEUE_NAMES } from "../../workers/constants";
+import { SuratTrackingService } from "../surat-cargo/surat-tracking.service";
 
 @Injectable()
 export class ShippingSchedulerService implements OnModuleInit {
@@ -18,8 +21,8 @@ export class ShippingSchedulerService implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     await registerRepeatableCron(
       this.scheduledQueue,
-      'sync-surat-tracking',
-      '*/30 * * * *',
+      "sync-surat-tracking",
+      "*/30 * * * *",
       cronsViaBull(),
       this.logger,
     );
@@ -29,7 +32,7 @@ export class ShippingSchedulerService implements OnModuleInit {
    * Every 30 minutes: sync tracking status for all active Sürat shipments.
    * Flag (CRONS_VIA_BULL) açıkken iş Bull repeatable'a taşınır; in-process no-op.
    */
-  @TrackedCron('*/30 * * * *')
+  @TrackedCron("*/30 * * * *")
   async syncSuratTracking() {
     if (cronsViaBull()) {
       return;
@@ -39,48 +42,71 @@ export class ShippingSchedulerService implements OnModuleInit {
 
   /** Gerçek iş — hem in-process cron hem Bull processor buradan çağırır. */
   async runSyncSuratTracking(log: (msg: string) => void = () => {}) {
-    const stats = { shipmentSynced: 0, tradeSynced: 0, refundSynced: 0, failed: 0 };
+    const stats = {
+      shipmentSynced: 0,
+      tradeSynced: 0,
+      refundSynced: 0,
+      failed: 0,
+    };
 
     try {
       const result = await this.suratTracking.syncAllActiveShipments();
       stats.shipmentSynced = result.synced;
       stats.failed += result.failed;
-      log(`Sipariş kargo senkron: ${result.synced} güncellendi, ${result.failed} başarısız`);
+      log(
+        `Order shipment sync: ${result.synced} updated, ${result.failed} failed`,
+      );
       if (result.synced > 0 || result.failed > 0) {
-        this.logger.log(`Sürat tracking sync: ${result.synced} synced, ${result.failed} failed`);
+        this.logger.log(
+          `Sürat tracking sync: ${result.synced} synced, ${result.failed} failed`,
+        );
       }
     } catch (error: any) {
       this.logger.error(`Sürat tracking sync error: ${error.message}`);
-      log(`Sipariş kargo senkron HATASI: ${error.message}`);
+      log(`Order shipment sync ERROR: ${error.message}`);
     }
 
     try {
-      const tradeResult = await this.suratTracking.syncAllActiveTradeShipments();
+      const tradeResult =
+        await this.suratTracking.syncAllActiveTradeShipments();
       stats.tradeSynced = tradeResult.synced;
       stats.failed += tradeResult.failed;
-      log(`Takas kargo senkron: ${tradeResult.synced} güncellendi, ${tradeResult.failed} başarısız`);
+      log(
+        `Trade shipment sync: ${tradeResult.synced} updated, ${tradeResult.failed} failed`,
+      );
       if (tradeResult.synced > 0 || tradeResult.failed > 0) {
-        this.logger.log(`Sürat trade-shipment sync: ${tradeResult.synced} synced, ${tradeResult.failed} failed`);
+        this.logger.log(
+          `Sürat trade-shipment sync: ${tradeResult.synced} synced, ${tradeResult.failed} failed`,
+        );
       }
     } catch (error: any) {
       this.logger.error(`Sürat trade-shipment sync error: ${error.message}`);
-      log(`Takas kargo senkron HATASI: ${error.message}`);
+      log(`Trade shipment sync ERROR: ${error.message}`);
     }
 
     try {
-      const refundResult = await this.suratTracking.syncAllActiveRefundReturns();
+      const refundResult =
+        await this.suratTracking.syncAllActiveRefundReturns();
       stats.refundSynced = refundResult.synced;
       stats.failed += refundResult.failed;
-      log(`İade kargo senkron: ${refundResult.synced} güncellendi, ${refundResult.failed} başarısız`);
+      log(
+        `Return shipment sync: ${refundResult.synced} updated, ${refundResult.failed} failed`,
+      );
       if (refundResult.synced > 0 || refundResult.failed > 0) {
-        this.logger.log(`Sürat refund-return sync: ${refundResult.synced} synced, ${refundResult.failed} failed`);
+        this.logger.log(
+          `Sürat refund-return sync: ${refundResult.synced} synced, ${refundResult.failed} failed`,
+        );
       }
     } catch (error: any) {
       this.logger.error(`Sürat refund-return sync error: ${error.message}`);
-      log(`İade kargo senkron HATASI: ${error.message}`);
+      log(`Return shipment sync ERROR: ${error.message}`);
     }
 
-    const totalSynced = stats.shipmentSynced + stats.tradeSynced + stats.refundSynced;
-    return { summary: `${totalSynced} kargo güncellendi · ${stats.failed} başarısız`, stats };
+    const totalSynced =
+      stats.shipmentSynced + stats.tradeSynced + stats.refundSynced;
+    return {
+      summary: `${totalSynced} shipments updated · ${stats.failed} failed`,
+      stats,
+    };
   }
 }

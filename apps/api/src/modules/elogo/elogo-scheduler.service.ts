@@ -56,20 +56,20 @@ export class ElogoSchedulerService implements OnModuleInit {
     try {
       const r = await this.invoicing.retryPendingInvoices();
       if (!r.enabled) {
-        log("eLogo kapalı (ELOGO_ENABLED=false), atlandı");
-        return { summary: "eLogo kapalı, atlandı", stats: { skipped: 1 } };
+        log("eLogo disabled (ELOGO_ENABLED=false), skipped");
+        return { summary: "eLogo disabled, skipped", stats: { skipped: 1 } };
       }
       log(
-        `eLogo retry: ${r.attempted} denendi · ${r.sent} gönderildi · ${r.failed} başarısız`,
+        `eLogo retry: ${r.attempted} attempted · ${r.sent} sent · ${r.failed} failed`,
       );
       return {
-        summary: `${r.attempted} denendi · ${r.sent} gönderildi · ${r.failed} başarısız`,
+        summary: `${r.attempted} attempted · ${r.sent} sent · ${r.failed} failed`,
         stats: { attempted: r.attempted, sent: r.sent, failed: r.failed },
       };
     } catch (err: any) {
       this.logger.warn(`eLogo retry cron hatası: ${err?.message}`);
-      log(`HATA: ${err?.message}`);
-      return { summary: `Hata: ${err?.message}`, stats: { errors: 1 } };
+      log(`ERROR: ${err?.message}`);
+      return { summary: `Error: ${err?.message}`, stats: { errors: 1 } };
     }
   }
 }

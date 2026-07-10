@@ -1,23 +1,26 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
-import { TrackedCron } from '../../monitoring/tracked-cron.decorator';
-import { moneyCronsViaBull, registerRepeatableCron } from '../../monitoring/bull-cron.helper';
-import { QUEUE_NAMES } from '../../workers/constants';
-import { ConfigService } from '@nestjs/config';
-import { OrderStatus, TradeStatus, PaymentStatus } from '@prisma/client';
-import { PrismaService } from '../../prisma';
-import { OrderService } from './order.service';
-import { ElogoInvoicingService } from '../elogo/elogo-invoicing.service';
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
+import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
+import {
+  moneyCronsViaBull,
+  registerRepeatableCron,
+} from "../../monitoring/bull-cron.helper";
+import { QUEUE_NAMES } from "../../workers/constants";
+import { ConfigService } from "@nestjs/config";
+import { OrderStatus, TradeStatus, PaymentStatus } from "@prisma/client";
+import { PrismaService } from "../../prisma";
+import { OrderService } from "./order.service";
+import { ElogoInvoicingService } from "../elogo/elogo-invoicing.service";
 
 const OPEN_REFUND_STATUSES = [
-  'pending_review',
-  'approved',
-  'wait_for_delivery',
-  'return_shipment_open',
-  'return_in_transit',
-  'return_delivered',
-  'disputed',
+  "pending_review",
+  "approved",
+  "wait_for_delivery",
+  "return_shipment_open",
+  "return_in_transit",
+  "return_delivered",
+  "disputed",
 ] as const;
 
 @Injectable()
@@ -33,8 +36,20 @@ export class OrderSchedulerService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    await registerRepeatableCron(this.scheduledQueue, 'order-auto-complete', '*/10 * * * *', moneyCronsViaBull(), this.logger);
-    await registerRepeatableCron(this.scheduledQueue, 'process-delivered-orders', '*/2 * * * *', moneyCronsViaBull(), this.logger);
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "order-auto-complete",
+      "*/10 * * * *",
+      moneyCronsViaBull(),
+      this.logger,
+    );
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "process-delivered-orders",
+      "*/2 * * * *",
+      moneyCronsViaBull(),
+      this.logger,
+    );
   }
 
   /**
@@ -42,7 +57,7 @@ export class OrderSchedulerService implements OnModuleInit {
    * Spec: Bölüm 6.3.
    * Feature flag korumalı: FEATURE_48H_CONFIRMATION_WINDOW=true gerekli.
    */
-  @TrackedCron('*/10 * * * *')
+  @TrackedCron("*/10 * * * *")
   async autoCompleteConfirmedOrders(): Promise<void> {
     if (moneyCronsViaBull()) {
       return;
@@ -53,10 +68,11 @@ export class OrderSchedulerService implements OnModuleInit {
   /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
   async runAutoCompleteConfirmedOrders(log: (msg: string) => void = () => {}) {
     if (
-      this.configService.get<string>('FEATURE_48H_CONFIRMATION_WINDOW') !== 'true'
+      this.configService.get<string>("FEATURE_48H_CONFIRMATION_WINDOW") !==
+      "true"
     ) {
-      log('FEATURE_48H_CONFIRMATION_WINDOW kapalı, atlandı');
-      return { summary: 'Özellik kapalı, atlandı', stats: { skipped: 1 } };
+      log("FEATURE_48H_CONFIRMATION_WINDOW disabled, skipped");
+      return { summary: "Feature disabled, skipped", stats: { skipped: 1 } };
     }
 
     const candidates = await this.prisma.order.findMany({
@@ -69,8 +85,11 @@ export class OrderSchedulerService implements OnModuleInit {
     });
 
     if (candidates.length === 0) {
-      log('Onay süresi dolmuş sipariş yok');
-      return { summary: '0 aday sipariş', stats: { processed: 0, skipped: 0, failed: 0 } };
+      log("No orders past confirmation deadline");
+      return {
+        summary: "0 candidate orders",
+        stats: { processed: 0, skipped: 0, failed: 0 },
+      };
     }
 
     let processed = 0;
@@ -88,7 +107,10 @@ export class OrderSchedulerService implements OnModuleInit {
           continue;
         }
 
-        const result = await this.orderService.completeOrder(id, 'auto_timeout');
+        const result = await this.orderService.completeOrder(
+          id,
+          "auto_timeout",
+        );
         if (result.completed) processed++;
         else skipped++;
       } catch (e: any) {
@@ -103,9 +125,11 @@ export class OrderSchedulerService implements OnModuleInit {
     this.logger.log(
       `autoCompleteConfirmedOrders: processed=${processed} skipped=${skipped} failed=${failed} total=${candidates.length}`,
     );
-    log(`${candidates.length} aday · ${processed} tamamlandı · ${skipped} atlandı · ${failed} başarısız`);
+    log(
+      `${candidates.length} candidates · ${processed} completed · ${skipped} skipped · ${failed} failed`,
+    );
     return {
-      summary: `${processed} tamamlandı · ${skipped} atlandı · ${failed} başarısız`,
+      summary: `${processed} completed · ${skipped} skipped · ${failed} failed`,
       stats: { candidates: candidates.length, processed, skipped, failed },
     };
   }
@@ -117,7 +141,7 @@ export class OrderSchedulerService implements OnModuleInit {
    *      `delivered` siparişler 'completed'e geçer (fatura zaten kesilmiş).
    * Tüm teslim yollarını (webhook + worker) yakalar; idempotent.
    */
-  @TrackedCron('*/2 * * * *')
+  @TrackedCron("*/2 * * * *")
   async processDeliveredOrders(): Promise<void> {
     if (moneyCronsViaBull()) return;
     await this.runProcessDeliveredOrders();
@@ -144,7 +168,7 @@ export class OrderSchedulerService implements OnModuleInit {
       const invSources = await this.prisma.elogoInvoice.findMany({
         where: {
           sourceId: { in: delivered.map((o) => o.id) },
-          type: { in: ['commission', 'service_fee', 'platform_sale'] as any },
+          type: { in: ["commission", "service_fee", "platform_sale"] as any },
         },
         select: { sourceId: true },
       });
@@ -155,19 +179,27 @@ export class OrderSchedulerService implements OnModuleInit {
           await this.orderService.emitDeliveryRevenueInvoices(o.id);
           invoiced++;
         } catch (e: any) {
-          this.logger.warn(`processDeliveredOrders fatura hatası ${o.id}: ${e?.message}`);
+          this.logger.warn(
+            `processDeliveredOrders fatura hatası ${o.id}: ${e?.message}`,
+          );
         }
       }
     }
 
     // 2) İade penceresi kapanan teslim edilmiş siparişler → tamamlandı
-    const returnWindowDays = Number(this.configService.get<string>('RETURN_WINDOW_DAYS') ?? '14') || 14;
-    const cutoff = new Date(Date.now() - returnWindowDays * 24 * 60 * 60 * 1000);
+    const returnWindowDays =
+      Number(this.configService.get<string>("RETURN_WINDOW_DAYS") ?? "14") ||
+      14;
+    const cutoff = new Date(
+      Date.now() - returnWindowDays * 24 * 60 * 60 * 1000,
+    );
     const dueToComplete = await this.prisma.order.findMany({
       where: {
         status: OrderStatus.delivered,
         deliveredAt: { lte: cutoff },
-        refundRequests: { none: { status: { in: OPEN_REFUND_STATUSES as any } } },
+        refundRequests: {
+          none: { status: { in: OPEN_REFUND_STATUSES as any } },
+        },
       },
       select: { id: true },
       take: 200,
@@ -178,7 +210,9 @@ export class OrderSchedulerService implements OnModuleInit {
         const r = await this.orderService.autoCompleteDeliveredOrder(o.id);
         if (r.completed) completed++;
       } catch (e: any) {
-        this.logger.warn(`processDeliveredOrders tamamlama hatası ${o.id}: ${e?.message}`);
+        this.logger.warn(
+          `processDeliveredOrders tamamlama hatası ${o.id}: ${e?.message}`,
+        );
       }
     }
 
@@ -190,7 +224,11 @@ export class OrderSchedulerService implements OnModuleInit {
         status: PaymentStatus.completed,
         trade: {
           status: {
-            in: [TradeStatus.at_warehouse, TradeStatus.shipping_to_recipients, TradeStatus.completed],
+            in: [
+              TradeStatus.at_warehouse,
+              TradeStatus.shipping_to_recipients,
+              TradeStatus.completed,
+            ],
           },
         },
       },
@@ -202,7 +240,10 @@ export class OrderSchedulerService implements OnModuleInit {
       const invoicedTcp = new Set(
         (
           await this.prisma.elogoInvoice.findMany({
-            where: { sourceId: { in: paidWarehouseTcps.map((c) => c.id) }, type: 'trade_commission' as any },
+            where: {
+              sourceId: { in: paidWarehouseTcps.map((c) => c.id) },
+              type: "trade_commission" as any,
+            },
             select: { sourceId: true },
           })
         ).map((i) => i.sourceId),
@@ -213,7 +254,9 @@ export class OrderSchedulerService implements OnModuleInit {
           await this.elogoInvoicing.issueTradeCashCommissionInvoice(c.id);
           tradeInvoiced++;
         } catch (e: any) {
-          this.logger.warn(`processDeliveredOrders takas komisyonu hatası ${c.id}: ${e?.message}`);
+          this.logger.warn(
+            `processDeliveredOrders takas komisyonu hatası ${c.id}: ${e?.message}`,
+          );
         }
       }
     }
@@ -221,7 +264,16 @@ export class OrderSchedulerService implements OnModuleInit {
     this.logger.log(
       `processDeliveredOrders: teslim=${delivered.length} yeniFatura=${invoiced} tamamlanan=${completed} takasFatura=${tradeInvoiced} (returnWindow=${returnWindowDays}g)`,
     );
-    log(`${delivered.length} teslim · ${invoiced} yeni fatura · ${completed} tamamlandı · ${tradeInvoiced} takas faturası`);
-    return { stats: { delivered: delivered.length, invoiced, completed, tradeInvoiced } };
+    log(
+      `${delivered.length} delivered · ${invoiced} new invoices · ${completed} completed · ${tradeInvoiced} trade invoices`,
+    );
+    return {
+      stats: {
+        delivered: delivered.length,
+        invoiced,
+        completed,
+        tradeInvoiced,
+      },
+    };
   }
 }

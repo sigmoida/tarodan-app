@@ -50,13 +50,13 @@ export async function runTrackedJob(
     // onlar özet/stats'ta görünür ama beklenen/işlenmiş durumlardır (alarm yorgunluğu olmasın).
     const errorCount = Number(res.stats?.errors ?? 0);
     if (errorCount > 0) {
-      throw new Error(res.summary || `${jobName}: ${errorCount} hata`);
+      throw new Error(res.summary || `${jobName}: ${errorCount} error(s)`);
     }
 
-    log(`✓ bitti (${durationMs}ms)${res.summary ? " — " + res.summary : ""}`);
+    log(`✓ done (${durationMs}ms)${res.summary ? " — " + res.summary : ""}`);
     return { ok: true, durationMs, summary: res.summary, stats: res.stats };
   } catch (e: any) {
-    log(`✗ HATA (${Date.now() - started}ms): ${e?.message ?? e}`);
+    log(`✗ ERROR (${Date.now() - started}ms): ${e?.message ?? e}`);
     throw e; // Bull job'u "failed" yapsın, Hata sekmesi stack göstersin.
   }
 }

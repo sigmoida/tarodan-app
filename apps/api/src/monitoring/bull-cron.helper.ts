@@ -96,15 +96,15 @@ export async function registerRepeatableCron(
         },
       );
       logger.log(
-        `Bull repeatable kayıtlı: '${jobName}' (${cron}, tz=${tz}, attempts=${attempts}).`,
+        `Bull repeatable registered: '${jobName}' (${cron}, tz=${tz}, attempts=${attempts}).`,
       );
       registeredJobNames.add(jobName);
     } else if (existing.some((r) => r.name === jobName)) {
-      logger.log(`Bull repeatable temizlendi (flag kapalı): '${jobName}'.`);
+      logger.log(`Bull repeatable removed (flag disabled): '${jobName}'.`);
     }
   } catch (e: any) {
     logger.error(
-      `Bull repeatable sync başarısız ('${jobName}', non-fatal): ${e.message}`,
+      `Bull repeatable sync failed ('${jobName}', non-fatal): ${e.message}`,
     );
   }
 }
@@ -130,15 +130,13 @@ export async function cleanupOrphanRepeatables(
       if (!registeredJobNames.has(r.name)) {
         await queue.removeRepeatableByKey(r.key);
         removed++;
-        logger.warn(`Orphan repeatable temizlendi: '${r.name}' (${r.cron}).`);
+        logger.warn(`Orphan repeatable removed: '${r.name}' (${r.cron}).`);
       }
     }
     if (removed > 0) {
-      logger.log(`Orphan repeatable süpürme: ${removed} kayıt temizlendi.`);
+      logger.log(`Orphan repeatable sweep: ${removed} records removed.`);
     }
   } catch (e: any) {
-    logger.error(
-      `Orphan repeatable süpürme başarısız (non-fatal): ${e.message}`,
-    );
+    logger.error(`Orphan repeatable sweep failed (non-fatal): ${e.message}`);
   }
 }

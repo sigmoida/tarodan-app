@@ -1,10 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { CronExpression } from '@nestjs/schedule';
-import { TrackedCron } from '../../monitoring/tracked-cron.decorator';
-import { cronsViaBull } from '../../monitoring/bull-cron.helper';
-import { PrismaService } from '../../prisma';
-import { SearchCommonService } from './search-common.service';
-import { SearchProductService } from './search-product.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { CronExpression } from "@nestjs/schedule";
+import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
+import { cronsViaBull } from "../../monitoring/bull-cron.helper";
+import { PrismaService } from "../../prisma";
+import { SearchCommonService } from "./search-common.service";
+import { SearchProductService } from "./search-product.service";
 
 /**
  * Periyodik ES↔DB senkron alt servisi (search.service.ts'ten birebir taşındı):
@@ -37,8 +37,8 @@ export class SearchSyncService {
   /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
   async runHandlePeriodicSync(log: (msg: string) => void = () => {}) {
     if (!this.common.isAvailable()) {
-      log('Elasticsearch erişilemez, atlandı');
-      return { summary: 'ES erişilemez, atlandı', stats: { skipped: 1 } };
+      log("Elasticsearch unreachable, skipped");
+      return { summary: "ES unreachable, skipped", stats: { skipped: 1 } };
     }
 
     try {
@@ -46,30 +46,35 @@ export class SearchSyncService {
         where: this.common.indexableProductWhere(),
       });
 
-      const esResponse = await this.common.client.count({ index: this.common.productsIndex });
+      const esResponse = await this.common.client.count({
+        index: this.common.productsIndex,
+      });
       const esCount = esResponse.count;
       const drift = Math.abs(dbCount - esCount);
-      log(`DB=${dbCount}, ES=${esCount}, fark=${drift}`);
+      log(`DB=${dbCount}, ES=${esCount}, drift=${drift}`);
 
       if (drift > 2) {
         this.logger.warn(
           `ES/DB count mismatch: DB=${dbCount}, ES=${esCount}. Running delta sync...`,
         );
-        log('Fark > 2 → delta sync çalıştırılıyor');
+        log("Drift > 2 → running delta sync");
         await this.deltaSync();
         return {
-          summary: `Senkron yapıldı (DB=${dbCount}, ES=${esCount})`,
+          summary: `Synced (DB=${dbCount}, ES=${esCount})`,
           stats: { dbCount, esCount, drift, synced: 1 },
         };
       }
       return {
-        summary: `Senkron OK (DB=${dbCount}, ES=${esCount})`,
+        summary: `Sync OK (DB=${dbCount}, ES=${esCount})`,
         stats: { dbCount, esCount, drift, synced: 0 },
       };
     } catch (error: any) {
-      this.logger.warn('Periodic sync check failed');
-      log(`HATA: ${error?.message ?? error}`);
-      return { summary: `Hata: ${error?.message ?? error}`, stats: { errors: 1 } };
+      this.logger.warn("Periodic sync check failed");
+      log(`ERROR: ${error?.message ?? error}`);
+      return {
+        summary: `Error: ${error?.message ?? error}`,
+        stats: { errors: 1 },
+      };
     }
   }
 
@@ -90,8 +95,8 @@ export class SearchSyncService {
   /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
   async runHandleHourlyReconcile(log: (msg: string) => void = () => {}) {
     if (!this.common.isAvailable()) {
-      log('Elasticsearch erişilemez, atlandı');
-      return { summary: 'ES erişilemez, atlandı', stats: { skipped: 1 } };
+      log("Elasticsearch unreachable, skipped");
+      return { summary: "ES unreachable, skipped", stats: { skipped: 1 } };
     }
     const { indexed, removed } = await this.deltaSync(log);
     return {
@@ -119,7 +124,7 @@ export class SearchSyncService {
           index: this.common.productsIndex,
           size: 1000,
           _source: false,
-          sort: [{ _doc: 'asc' }],
+          sort: [{ _doc: "asc" }],
         };
         if (searchAfter) params.search_after = searchAfter;
         const resp = await this.common.client.search(params);
@@ -149,8 +154,8 @@ export class SearchSyncService {
       log(`indexed ${missingIds.length}, removed ${staleIds.length}`);
       return { indexed: missingIds.length, removed: staleIds.length };
     } catch (error) {
-      this.logger.error('Delta sync failed');
-      log('delta sync HATA');
+      this.logger.error("Delta sync failed");
+      log("delta sync ERROR");
       return { indexed: 0, removed: 0 };
     }
   }

@@ -64,8 +64,8 @@ export class FeaturedSchedulerService implements OnModuleInit {
     const r = await this.refresh("cron", log);
     return {
       summary: r.errors
-        ? "Hata: featured snapshot yenilenemedi"
-        : `koleksiyoncu=${r.collector} · şirket=${r.business}`,
+        ? "Error: featured snapshot refresh failed"
+        : `collector=${r.collector} · company=${r.business}`,
       stats: { collector: r.collector, business: r.business, errors: r.errors },
     };
   }
@@ -80,7 +80,7 @@ export class FeaturedSchedulerService implements OnModuleInit {
         `Featured snapshots refreshed (${trigger}): collector=${r.collector} business=${r.business}`,
       );
       log(
-        `snapshot yenilendi (${trigger}): koleksiyoncu=${r.collector} şirket=${r.business}`,
+        `snapshot refreshed (${trigger}): collector=${r.collector} company=${r.business}`,
       );
       return { collector: r.collector, business: r.business, errors: 0 };
     } catch (error: any) {
@@ -88,7 +88,7 @@ export class FeaturedSchedulerService implements OnModuleInit {
         `Featured snapshot refresh failed (${trigger}): ${error.message}`,
         error.stack,
       );
-      log(`HATA (${trigger}): ${error.message}`);
+      log(`ERROR (${trigger}): ${error.message}`);
       return { collector: 0, business: 0, errors: 1 };
     }
   }

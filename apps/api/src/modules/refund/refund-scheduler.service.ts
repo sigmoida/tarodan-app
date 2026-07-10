@@ -43,7 +43,7 @@ export class RefundSchedulerService implements OnModuleInit {
     const finalized = await this.finalizeReturnedShipments(log);
     const failed = opened.failed + finalized.failed;
     return {
-      summary: `${opened.done} açıldı · ${finalized.done} finalize${failed ? ` · ${failed} başarısız` : ""}`,
+      summary: `${opened.done} opened · ${finalized.done} finalized${failed ? ` · ${failed} failed` : ""}`,
       // NOT: 'failed' kalem-seviyesidir (bir sonraki turda yeniden denenir) → işi
       // KIRMIZI YAPMAZ ama özet/stats'ta görünür. İş-seviyesi hata olsaydı 'errors' olurdu.
       stats: { opened: opened.done, finalized: finalized.done, failed },
@@ -70,7 +70,9 @@ export class RefundSchedulerService implements OnModuleInit {
       }
     }
     const done = pending.length - failed;
-    log(`${done} iade kargosu açıldı${failed ? ` · ${failed} başarısız` : ""}`);
+    log(
+      `${done} return shipments opened${failed ? ` · ${failed} failed` : ""}`,
+    );
     return { done, failed };
   }
 
@@ -95,7 +97,7 @@ export class RefundSchedulerService implements OnModuleInit {
       }
     }
     const done = pending.length - failed;
-    log(`${done} iade finalize${failed ? ` · ${failed} başarısız` : ""}`);
+    log(`${done} refunds finalized${failed ? ` · ${failed} failed` : ""}`);
     return { done, failed };
   }
 }
