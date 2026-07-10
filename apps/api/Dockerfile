@@ -66,7 +66,9 @@ COPY --from=builder --chown=nestjs:nodejs /app/photos ./photos
 
 # Copy entrypoint script (runs migrations before starting)
 COPY --chown=nestjs:nodejs apps/api/entrypoint.sh ./entrypoint.sh
-RUN chmod +x ./entrypoint.sh
+# Windows CRLF -> LF: aksi halde 'exec ./entrypoint.sh: no such file or directory'
+# (shebang satirindaki \r yuzunden kernel /bin/sh\r arar). Checkout ne olursa olsun garanti.
+RUN sed -i 's/\r$//' ./entrypoint.sh && chmod +x ./entrypoint.sh
 
 USER nestjs
 

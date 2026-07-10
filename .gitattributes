@@ -1,0 +1,5 @@
+# Shell scripts MUST be LF — they run inside Linux containers (entrypoint.sh) and
+# as git hooks. CRLF breaks the shebang: `exec ./entrypoint.sh: no such file`.
+*.sh text eol=lf
+apps/api/entrypoint.sh text eol=lf
+.husky/** text eol=lf
