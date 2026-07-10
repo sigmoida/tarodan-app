@@ -1,0 +1,103 @@
+# Yerel "sunucu-birebir" kurulum: api + worker + bullboard CONTAINER'ları.
+# Sunucudaki topolojinin aynısı (tek imaj, PROCESS_ROLE ile 3 rol) — yerelde görmek için.
+#
+# Önce altyapıyı ayağa kaldır:
+#   docker compose -f infrastructure/docker-compose.yml up -d postgres redis elasticsearch
+# Sonra bu dosya (imajı build eder ve 3 app container'ını kaldırır):
+#   docker compose -f infrastructure/docker-compose.local.yml up -d --build
+#
+# Altyapıya container ADIYLA erişilir (tarodan-postgres/redis/elasticsearch) — container
+# içinde 'localhost' kendisi demektir, host değil. Gizli anahtarlar ../apps/api/.env'den
+# (env_file) gelir; altyapı host'ları aşağıda override edilir.
+
+name: tarodan
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    image: tarodan-api:local
+    container_name: tarodan-api
+    restart: unless-stopped
+    env_file:
+      - ../apps/api/.env
+    environment:
+      PROCESS_ROLE: api
+      DATABASE_URL: postgresql://postgres:postgres@tarodan-postgres:5432/tarodan?schema=public
+      REDIS_HOST: tarodan-redis
+      REDIS_PORT: 6379
+      ELASTICSEARCH_NODE: http://tarodan-elasticsearch:9200
+      CRONS_VIA_BULL: "true"
+      MONEY_CRONS_VIA_BULL: "true"
+      BULLBOARD_ENABLED: "false" # panel ayrı bullboard container'ında
+    ports:
+      - "3001:3001"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 40s
+    networks:
+      - default
+
+  worker:
+    image: tarodan-api:local # api servisi build eder; worker aynı imajı kullanır
+    container_name: tarodan-worker
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+    env_file:
+      - ../apps/api/.env
+    environment:
+      PROCESS_ROLE: worker
+      DATABASE_URL: postgresql://postgres:postgres@tarodan-postgres:5432/tarodan?schema=public
+      REDIS_HOST: tarodan-redis
+      REDIS_PORT: 6379
+      ELASTICSEARCH_NODE: http://tarodan-elasticsearch:9200
+      WORKER_HEALTH_PORT: 3003
+      CRONS_VIA_BULL: "true"
+      MONEY_CRONS_VIA_BULL: "true"
+    ports:
+      - "3003:3003"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3003/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - default
+
+  bullboard:
+    image: tarodan-api:local
+    container_name: tarodan-bullboard
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      PROCESS_ROLE: bullboard
+      REDIS_HOST: tarodan-redis
+      REDIS_PORT: 6379
+      BULLBOARD_PORT: 3004
+      BULLBOARD_USER: admin
+      BULLBOARD_PASS: admin
+    ports:
+      - "3004:3004"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3004/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - default
+
+# Altyapı ağı docker-compose.yml tarafından oluşturulur; burada dışarıdan bağlanıyoruz.
+networks:
+  default:
+    name: tarodan-network
+    external: true
