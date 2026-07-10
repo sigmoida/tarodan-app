@@ -1,44 +1,44 @@
 // Cached Intl instances — built once and reused across every row (constructing an
 // Intl formatter is the costly part; formatting with it is cheap). Replaces the
 // per-render `new Date().toLocaleDateString()` / `toLocaleString()` churn in lists.
-const tlNumberFmt = new Intl.NumberFormat('tr-TR', {
+const tlNumberFmt = new Intl.NumberFormat("tr-TR", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
-const dateFmt = new Intl.DateTimeFormat('tr-TR');
-const timeFmt = new Intl.DateTimeFormat('tr-TR', {
-  hour: '2-digit',
-  minute: '2-digit',
+const dateFmt = new Intl.DateTimeFormat("tr-TR");
+const timeFmt = new Intl.DateTimeFormat("tr-TR", {
+  hour: "2-digit",
+  minute: "2-digit",
 });
-const dateTimeFmt = new Intl.DateTimeFormat('tr-TR', {
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
+const dateTimeFmt = new Intl.DateTimeFormat("tr-TR", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
 });
 
 type DateLike = string | number | Date | null | undefined;
 
 /** Locale-default short date (dd.MM.yyyy) — matches `toLocaleDateString('tr-TR')`. */
 export function formatDate(value: DateLike): string {
-  if (value === null || value === undefined || value === '') return '';
+  if (value === null || value === undefined || value === "") return "";
   const d = value instanceof Date ? value : new Date(value);
-  return isNaN(d.getTime()) ? '' : dateFmt.format(d);
+  return isNaN(d.getTime()) ? "" : dateFmt.format(d);
 }
 
 /** Short time (HH:mm) — matches `toLocaleTimeString('tr-TR', { hour, minute })`. */
 export function formatTime(value: DateLike): string {
-  if (value === null || value === undefined || value === '') return '';
+  if (value === null || value === undefined || value === "") return "";
   const d = value instanceof Date ? value : new Date(value);
-  return isNaN(d.getTime()) ? '' : timeFmt.format(d);
+  return isNaN(d.getTime()) ? "" : timeFmt.format(d);
 }
 
 /** Short date + time (dd.MM.yyyy HH:mm). */
 export function formatDateTime(value: DateLike): string {
-  if (value === null || value === undefined || value === '') return '';
+  if (value === null || value === undefined || value === "") return "";
   const d = value instanceof Date ? value : new Date(value);
-  return isNaN(d.getTime()) ? '' : dateTimeFmt.format(d);
+  return isNaN(d.getTime()) ? "" : dateTimeFmt.format(d);
 }
 
 /**
@@ -46,13 +46,13 @@ export function formatDateTime(value: DateLike): string {
  */
 export function formatPrice(price: number | string | null | undefined): string {
   if (price === null || price === undefined) {
-    return '0,00 TL';
+    return "0,00 TL";
   }
 
-  const numPrice = typeof price === 'string' ? parseFloat(price) : price;
+  const numPrice = typeof price === "string" ? parseFloat(price) : price;
 
   if (isNaN(numPrice)) {
-    return '0,00 TL';
+    return "0,00 TL";
   }
 
   return `${tlNumberFmt.format(numPrice)} TL`;
@@ -65,203 +65,249 @@ export const formatTL = formatPrice;
 /**
  * Format price without TL suffix (for cases where TL is added separately)
  */
-export function formatPriceNumber(price: number | string | null | undefined): string {
+export function formatPriceNumber(
+  price: number | string | null | undefined,
+): string {
   if (price === null || price === undefined) {
-    return '0,00';
+    return "0,00";
   }
 
-  const numPrice = typeof price === 'string' ? parseFloat(price) : price;
+  const numPrice = typeof price === "string" ? parseFloat(price) : price;
 
   if (isNaN(numPrice)) {
-    return '0,00';
+    return "0,00";
   }
 
-  return numPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return numPrice.toLocaleString("tr-TR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+/**
+ * Sayaç formatı (görüntülenme/beğeni) — "1.590". Locale SABİT tr-TR:
+ * locale'siz toLocaleString() server'da en-US ("1,590"), tarayıcıda kullanıcı
+ * diliyle çalışıp hydration mismatch üretir.
+ */
+export function formatCount(value: number | null | undefined): string {
+  return (value ?? 0).toLocaleString("tr-TR");
 }
 
 /**
  * Format product condition to Turkish
  * Converts: new, like_new, very_good, good, fair, poor
  */
-export function formatCondition(condition: string | null | undefined, locale: string = 'tr'): string {
-  if (!condition) return locale === 'en' ? 'Unknown' : 'Bilinmiyor';
+export function formatCondition(
+  condition: string | null | undefined,
+  locale: string = "tr",
+): string {
+  if (!condition) return locale === "en" ? "Unknown" : "Bilinmiyor";
 
   // Filtre ve ürün kartında aynı etiketler kullanılsın (Yeni, Yeni Gibi, İyi, Orta)
   const conditionMap: Record<string, { tr: string; en: string }> = {
-    'new': { tr: 'Yeni', en: 'New' },
-    'like_new': { tr: 'Yeni Gibi', en: 'Like New' },
-    'very_good': { tr: 'Çok İyi', en: 'Very Good' },
-    'good': { tr: 'İyi', en: 'Good' },
-    'fair': { tr: 'Orta', en: 'Fair' },
-    'poor': { tr: 'Kötü', en: 'Poor' },
+    new: { tr: "Yeni", en: "New" },
+    like_new: { tr: "Yeni Gibi", en: "Like New" },
+    very_good: { tr: "Çok İyi", en: "Very Good" },
+    good: { tr: "İyi", en: "Good" },
+    fair: { tr: "Orta", en: "Fair" },
+    poor: { tr: "Kötü", en: "Poor" },
   };
 
   const normalized = condition.toLowerCase().trim();
   const mapped = conditionMap[normalized];
 
   if (mapped) {
-    return locale === 'en' ? mapped.en : mapped.tr;
+    return locale === "en" ? mapped.en : mapped.tr;
   }
 
   // Fallback: capitalize and replace underscores
-  return condition.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());
+  return condition.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 }
 
 /**
  * Format order status to Turkish
  * Converts: pending_payment, paid, preparing, shipped, delivered, completed, cancelled, refund_requested, refunded
  */
-export function formatOrderStatus(status: string | null | undefined, locale: string = 'tr'): string {
-  if (!status) return locale === 'en' ? 'Unknown' : 'Bilinmiyor';
+export function formatOrderStatus(
+  status: string | null | undefined,
+  locale: string = "tr",
+): string {
+  if (!status) return locale === "en" ? "Unknown" : "Bilinmiyor";
 
   const statusMap: Record<string, { tr: string; en: string }> = {
-    'pending_payment': { tr: 'Ödeme Bekleniyor', en: 'Pending Payment' },
-    'paid': { tr: 'Ödeme Alındı', en: 'Paid' },
-    'preparing': { tr: 'Hazırlanıyor', en: 'Preparing' },
-    'shipped': { tr: 'Kargoya Verildi', en: 'Shipped' },
-    'in_transit': { tr: 'Yolda', en: 'In Transit' },
-    'out_for_delivery': { tr: 'Dağıtımda', en: 'Out for Delivery' },
-    'delivered': { tr: 'Teslim Edildi', en: 'Delivered' },
-    'completed': { tr: 'Tamamlandı', en: 'Completed' },
-    'cancelled': { tr: 'İptal Edildi', en: 'Cancelled' },
-    'refund_requested': { tr: 'İade Talep Edildi', en: 'Refund Requested' },
-    'refunded': { tr: 'İade Edildi', en: 'Refunded' },
+    pending_payment: { tr: "Ödeme Bekleniyor", en: "Pending Payment" },
+    paid: { tr: "Ödeme Alındı", en: "Paid" },
+    preparing: { tr: "Hazırlanıyor", en: "Preparing" },
+    shipped: { tr: "Kargoya Verildi", en: "Shipped" },
+    in_transit: { tr: "Yolda", en: "In Transit" },
+    out_for_delivery: { tr: "Dağıtımda", en: "Out for Delivery" },
+    delivered: { tr: "Teslim Edildi", en: "Delivered" },
+    completed: { tr: "Tamamlandı", en: "Completed" },
+    cancelled: { tr: "İptal Edildi", en: "Cancelled" },
+    refund_requested: { tr: "İade Talep Edildi", en: "Refund Requested" },
+    refunded: { tr: "İade Edildi", en: "Refunded" },
   };
 
   const normalized = status.toLowerCase().trim();
   const mapped = statusMap[normalized];
 
   if (mapped) {
-    return locale === 'en' ? mapped.en : mapped.tr;
+    return locale === "en" ? mapped.en : mapped.tr;
   }
 
   // Fallback: capitalize and replace underscores
-  return status.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());
+  return status.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 }
 
 /**
  * Format product status to Turkish
  * Converts: pending, active, reserved, sold, inactive, rejected
  */
-export function formatProductStatus(status: string | null | undefined, locale: string = 'tr'): string {
-  if (!status) return locale === 'en' ? 'Unknown' : 'Bilinmiyor';
+export function formatProductStatus(
+  status: string | null | undefined,
+  locale: string = "tr",
+): string {
+  if (!status) return locale === "en" ? "Unknown" : "Bilinmiyor";
 
   const statusMap: Record<string, { tr: string; en: string }> = {
-    'pending': { tr: 'Onay Bekliyor', en: 'Pending' },
-    'active': { tr: 'Aktif', en: 'Active' },
-    'reserved': { tr: 'Rezerve', en: 'Reserved' },
-    'sold': { tr: 'Satıldı', en: 'Sold' },
-    'inactive': { tr: 'Pasif', en: 'Inactive' },
-    'rejected': { tr: 'Reddedildi', en: 'Rejected' },
-    'deleted': { tr: 'Kaldırıldı', en: 'Removed' },
+    pending: { tr: "Onay Bekliyor", en: "Pending" },
+    active: { tr: "Aktif", en: "Active" },
+    reserved: { tr: "Rezerve", en: "Reserved" },
+    sold: { tr: "Satıldı", en: "Sold" },
+    inactive: { tr: "Pasif", en: "Inactive" },
+    rejected: { tr: "Reddedildi", en: "Rejected" },
+    deleted: { tr: "Kaldırıldı", en: "Removed" },
   };
 
   const normalized = status.toLowerCase().trim();
   const mapped = statusMap[normalized];
 
   if (mapped) {
-    return locale === 'en' ? mapped.en : mapped.tr;
+    return locale === "en" ? mapped.en : mapped.tr;
   }
 
   // Fallback: capitalize and replace underscores
-  return status.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());
+  return status.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 }
 
 /**
  * Format shipment status to Turkish
  * Converts: pending, label_created, picked_up, in_transit, out_for_delivery, delivered, returned, failed
  */
-export function formatShipmentStatus(status: string | null | undefined, locale: string = 'tr'): string {
-  if (!status) return locale === 'en' ? 'Unknown' : 'Bilinmiyor';
+export function formatShipmentStatus(
+  status: string | null | undefined,
+  locale: string = "tr",
+): string {
+  if (!status) return locale === "en" ? "Unknown" : "Bilinmiyor";
 
   const statusMap: Record<string, { tr: string; en: string }> = {
-    'pending': { tr: 'Beklemede', en: 'Pending' },
-    'label_created': { tr: 'Etiket Oluşturuldu', en: 'Label Created' },
-    'picked_up': { tr: 'Teslim Alındı', en: 'Picked Up' },
-    'in_transit': { tr: 'Yolda', en: 'In Transit' },
-    'out_for_delivery': { tr: 'Dağıtımda', en: 'Out for Delivery' },
-    'delivered': { tr: 'Teslim Edildi', en: 'Delivered' },
-    'returned': { tr: 'İade Edildi', en: 'Returned' },
-    'failed': { tr: 'Başarısız', en: 'Failed' },
+    pending: { tr: "Beklemede", en: "Pending" },
+    label_created: { tr: "Etiket Oluşturuldu", en: "Label Created" },
+    picked_up: { tr: "Teslim Alındı", en: "Picked Up" },
+    in_transit: { tr: "Yolda", en: "In Transit" },
+    out_for_delivery: { tr: "Dağıtımda", en: "Out for Delivery" },
+    delivered: { tr: "Teslim Edildi", en: "Delivered" },
+    returned: { tr: "İade Edildi", en: "Returned" },
+    failed: { tr: "Başarısız", en: "Failed" },
   };
 
   const normalized = status.toLowerCase().trim();
   const mapped = statusMap[normalized];
 
   if (mapped) {
-    return locale === 'en' ? mapped.en : mapped.tr;
+    return locale === "en" ? mapped.en : mapped.tr;
   }
 
   // Fallback: capitalize and replace underscores
-  return status.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());
+  return status.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 }
 
 /**
  * Format trade status to Turkish
  * Converts: pending, accepted, rejected, cancelled, completed
  */
-export function formatTradeStatus(status: string | null | undefined, locale: string = 'tr'): string {
-  if (!status) return locale === 'en' ? 'Unknown' : 'Bilinmiyor';
+export function formatTradeStatus(
+  status: string | null | undefined,
+  locale: string = "tr",
+): string {
+  if (!status) return locale === "en" ? "Unknown" : "Bilinmiyor";
 
   const statusMap: Record<string, { tr: string; en: string }> = {
-    'pending': { tr: 'Beklemede', en: 'Pending' },
-    'accepted': { tr: 'Kabul Edildi', en: 'Accepted' },
-    'rejected': { tr: 'Reddedildi', en: 'Rejected' },
-    'cancelled': { tr: 'İptal Edildi', en: 'Cancelled' },
-    'completed': { tr: 'Tamamlandı', en: 'Completed' },
-    'in_progress': { tr: 'Devam Ediyor', en: 'In Progress' },
-    'shipping': { tr: 'Kargo Aşamasında', en: 'Shipping' },
-    'awaiting_confirmation': { tr: 'Onay Bekleniyor', en: 'Awaiting Confirmation' },
-    'initiator_shipped': { tr: 'Gönderen Kargoya Verdi', en: 'Initiator Shipped' },
-    'receiver_shipped': { tr: 'Alıcı Kargoya Verdi', en: 'Receiver Shipped' },
-    'both_shipped': { tr: 'Her İki Taraf Kargoda', en: 'Both Shipped' },
-    'initiator_received': { tr: 'Gönderen Teslim Aldı', en: 'Initiator Received' },
-    'receiver_received': { tr: 'Alıcı Teslim Aldı', en: 'Receiver Received' },
+    pending: { tr: "Beklemede", en: "Pending" },
+    accepted: { tr: "Kabul Edildi", en: "Accepted" },
+    rejected: { tr: "Reddedildi", en: "Rejected" },
+    cancelled: { tr: "İptal Edildi", en: "Cancelled" },
+    completed: { tr: "Tamamlandı", en: "Completed" },
+    in_progress: { tr: "Devam Ediyor", en: "In Progress" },
+    shipping: { tr: "Kargo Aşamasında", en: "Shipping" },
+    awaiting_confirmation: {
+      tr: "Onay Bekleniyor",
+      en: "Awaiting Confirmation",
+    },
+    initiator_shipped: {
+      tr: "Gönderen Kargoya Verdi",
+      en: "Initiator Shipped",
+    },
+    receiver_shipped: { tr: "Alıcı Kargoya Verdi", en: "Receiver Shipped" },
+    both_shipped: { tr: "Her İki Taraf Kargoda", en: "Both Shipped" },
+    initiator_received: {
+      tr: "Gönderen Teslim Aldı",
+      en: "Initiator Received",
+    },
+    receiver_received: { tr: "Alıcı Teslim Aldı", en: "Receiver Received" },
     // Escrow / güvenli takas statüleri
-    'awaiting_payment': { tr: 'Ödeme Bekleniyor', en: 'Awaiting Payment' },
-    'shipping_to_warehouse': { tr: 'Depoya Gönderiliyor', en: 'Shipping to Warehouse' },
-    'at_warehouse': { tr: 'Depoda', en: 'At Warehouse' },
-    'admin_reviewing': { tr: 'İnceleniyor', en: 'Under Review' },
-    'shipping_to_recipients': { tr: 'Alıcılara Gönderiliyor', en: 'Shipping to Recipients' },
-    'returning': { tr: 'İade Ediliyor', en: 'Returning' },
-    'disputed': { tr: 'Anlaşmazlık', en: 'Disputed' },
+    awaiting_payment: { tr: "Ödeme Bekleniyor", en: "Awaiting Payment" },
+    shipping_to_warehouse: {
+      tr: "Depoya Gönderiliyor",
+      en: "Shipping to Warehouse",
+    },
+    at_warehouse: { tr: "Depoda", en: "At Warehouse" },
+    admin_reviewing: { tr: "İnceleniyor", en: "Under Review" },
+    shipping_to_recipients: {
+      tr: "Alıcılara Gönderiliyor",
+      en: "Shipping to Recipients",
+    },
+    returning: { tr: "İade Ediliyor", en: "Returning" },
+    disputed: { tr: "Anlaşmazlık", en: "Disputed" },
   };
 
   const normalized = status.toLowerCase().trim();
   const mapped = statusMap[normalized];
 
   if (mapped) {
-    return locale === 'en' ? mapped.en : mapped.tr;
+    return locale === "en" ? mapped.en : mapped.tr;
   }
 
   // Fallback: capitalize and replace underscores
-  return status.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());
+  return status.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 }
 
 /**
  * Format offer status to Turkish
  * Converts: pending, accepted, rejected, expired, cancelled, counter_offered
  */
-export function formatOfferStatus(status: string | null | undefined, locale: string = 'tr'): string {
-  if (!status) return locale === 'en' ? 'Unknown' : 'Bilinmiyor';
+export function formatOfferStatus(
+  status: string | null | undefined,
+  locale: string = "tr",
+): string {
+  if (!status) return locale === "en" ? "Unknown" : "Bilinmiyor";
 
   const statusMap: Record<string, { tr: string; en: string }> = {
-    'pending': { tr: 'Beklemede', en: 'Pending' },
-    'accepted': { tr: 'Kabul Edildi', en: 'Accepted' },
-    'rejected': { tr: 'Reddedildi', en: 'Rejected' },
-    'expired': { tr: 'Süresi Doldu', en: 'Expired' },
-    'cancelled': { tr: 'İptal Edildi', en: 'Cancelled' },
-    'counter_offered': { tr: 'Karşı Teklif Yapıldı', en: 'Counter Offered' },
+    pending: { tr: "Beklemede", en: "Pending" },
+    accepted: { tr: "Kabul Edildi", en: "Accepted" },
+    rejected: { tr: "Reddedildi", en: "Rejected" },
+    expired: { tr: "Süresi Doldu", en: "Expired" },
+    cancelled: { tr: "İptal Edildi", en: "Cancelled" },
+    counter_offered: { tr: "Karşı Teklif Yapıldı", en: "Counter Offered" },
   };
 
   const normalized = status.toLowerCase().trim();
   const mapped = statusMap[normalized];
 
   if (mapped) {
-    return locale === 'en' ? mapped.en : mapped.tr;
+    return locale === "en" ? mapped.en : mapped.tr;
   }
 
   // Fallback: capitalize and replace underscores
-  return status.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());
+  return status.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 }
-
