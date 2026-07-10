@@ -6,6 +6,10 @@ import { PaymentQueryService } from './payment-query.service';
 import { PaymentCommonService } from './payment-common.service';
 import { PaymentRefundService } from './payment-refund.service';
 import { PaymentReconciliationService } from './payment-reconciliation.service';
+import { PaymentInitiationService } from './payment-initiation.service';
+import { PaymentCallbackService } from './payment-callback.service';
+import { PaymentFulfillmentService } from './payment-fulfillment.service';
+import { PaymentLifecycleService } from './payment-lifecycle.service';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { PayTRService } from '../payment-providers/paytr.service';
@@ -56,10 +60,32 @@ describe('PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
         PaymentCommonService,
         PaymentRefundService,
         PaymentReconciliationService,
-        { provide: ElogoInvoicingService, useValue: { issueCommissionInvoice: jest.fn().mockResolvedValue(undefined), issueServiceFeeInvoice: jest.fn().mockResolvedValue(undefined), issueMembershipInvoice: jest.fn().mockResolvedValue(undefined), issueBoostInvoice: jest.fn().mockResolvedValue(undefined), handleOrderRefund: jest.fn().mockResolvedValue(undefined), issuePlatformSaleInvoice: jest.fn().mockResolvedValue(undefined), handleTradeCashRefund: jest.fn().mockResolvedValue(undefined), issueTradeCashCommissionInvoice: jest.fn().mockResolvedValue(undefined), retryPendingInvoices: jest.fn().mockResolvedValue(undefined) } },
+        PaymentInitiationService,
+        PaymentCallbackService,
+        PaymentFulfillmentService,
+        PaymentLifecycleService,
+        {
+          provide: ElogoInvoicingService,
+          useValue: {
+            issueCommissionInvoice: jest.fn().mockResolvedValue(undefined),
+            issueServiceFeeInvoice: jest.fn().mockResolvedValue(undefined),
+            issueMembershipInvoice: jest.fn().mockResolvedValue(undefined),
+            issueBoostInvoice: jest.fn().mockResolvedValue(undefined),
+            handleOrderRefund: jest.fn().mockResolvedValue(undefined),
+            issuePlatformSaleInvoice: jest.fn().mockResolvedValue(undefined),
+            handleTradeCashRefund: jest.fn().mockResolvedValue(undefined),
+            issueTradeCashCommissionInvoice: jest
+              .fn()
+              .mockResolvedValue(undefined),
+            retryPendingInvoices: jest.fn().mockResolvedValue(undefined),
+          },
+        },
         { provide: PrismaService, useValue: mockPrisma },
         { provide: CacheService, useValue: { del: jest.fn() } },
-        { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue(undefined) } },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn().mockReturnValue(undefined) },
+        },
         { provide: PayTRService, useValue: mockPaytr },
         { provide: EventService, useValue: noop },
         { provide: InvoiceService, useValue: noop },
@@ -145,7 +171,10 @@ describe('PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
 
   it('G5: PayoutTransfer processing/completed varsa iade atlanır (payout_already_in_progress)', async () => {
     mockPrisma.payment.findFirst.mockResolvedValue(basePayment({ foo: 1 }));
-    mockPrisma.payoutTransfer.findFirst.mockResolvedValue({ id: 'po-1', status: 'completed' });
+    mockPrisma.payoutTransfer.findFirst.mockResolvedValue({
+      id: 'po-1',
+      status: 'completed',
+    });
 
     const r = await service.refundTradeCashPaymentIfCompleted(TRADE_ID);
 

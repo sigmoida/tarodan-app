@@ -11,6 +11,9 @@ import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto/notification.dto';
 import { CommissionLedgerService } from '../commission/commission-ledger.service';
 import { PaymentRefundService } from './payment-refund.service';
+import { EventService } from '../events';
+import { PaymentCommonService } from './payment-common.service';
+import { PaymentFulfillmentService } from './payment-fulfillment.service';
 
 // Takasta reservedQuantity, takas KABUL edildiğinde (checkAndReserve) artar ve
 // ancak tamamlanma / iptal / red / iade-teslim adımlarında geri verilir. Bu
@@ -55,6 +58,9 @@ export class PaymentReconciliationService {
     private readonly notificationService: NotificationService,
     private readonly commissionLedger: CommissionLedgerService,
     private readonly paymentRefund: PaymentRefundService,
+    private readonly eventService: EventService,
+    private readonly paymentCommon: PaymentCommonService,
+    private readonly paymentFulfillment: PaymentFulfillmentService,
   ) {}
 
   /**
@@ -686,5 +692,252 @@ export class PaymentReconciliationService {
     }
 
     return { warned, cancelled };
+  }
+
+
+
+  /**
+   * PayTR callback sunucuya ulaşmadan ödeme başarılı olduysa: durum-sorgu ile doğrula ve tamamla (1.4).
+   * PAYTR_RECONCILIATION_ENABLED=false ile kapatılabilir.
+   */
+  async reconcilePendingPaytrPayments(): Promise<{ checked: number; completed: number }> {
+    const enabled = this.configService.get('PAYTR_RECONCILIATION_ENABLED');
+    if (enabled === 'false' || enabled === '0') {
+      return { checked: 0, completed: 0 };
+    }
+
+    const minAgeMin = parseInt(
+      this.configService.get('PAYTR_RECONCILIATION_MIN_AGE_MINUTES') || '3',
+      10,
+    );
+    const batch = parseInt(this.configService.get('PAYTR_RECONCILIATION_BATCH_LIMIT') || '40', 10);
+    const tolerance = parseFloat(this.configService.get('PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL') || '0.05');
+
+    const cutoff = new Date();
+    cutoff.setMinutes(cutoff.getMinutes() - minAgeMin);
+
+    const candidates = await this.prisma.payment.findMany({
+      where: {
+        provider: 'paytr',
+        status: PaymentStatus.pending,
+        providerConversationId: { not: null },
+        OR: [
+          { order: { status: OrderStatus.pending_payment } },
+          // Grup ödemesi: gruptaki en az bir sipariş hâlâ ödeme bekliyorsa
+          { checkoutGroup: { orders: { some: { status: OrderStatus.pending_payment } } } },
+        ],
+        createdAt: { lt: cutoff },
+      },
+      include: {
+        order: { select: { id: true, status: true, totalAmount: true } },
+      },
+      take: batch,
+      orderBy: { createdAt: 'asc' },
+    });
+
+    let checked = 0;
+    let completed = 0;
+
+    for (const row of candidates) {
+      checked++;
+      const oid = row.providerConversationId as string;
+      try {
+        const inquiry = await this.paytrService.queryPaymentStatus(oid);
+        if (!inquiry.ok) {
+          continue;
+        }
+
+        const ourAmount = Number(row.amount);
+        if (Math.abs(inquiry.paymentTotalTl - ourAmount) > tolerance) {
+          // O10: tutar uyuşmazlığını ALARM (error) olarak logla — sessizce atlamak yerine
+          // operasyon ekibinin görmesi için yüksek-öncelik. Ödeme completed yapılmaz.
+          this.logger.error(
+            `ALARM: PayTR reconcile tutar uyuşmazlığı — payment=${row.id} oid=${oid} ` +
+              `paytr=${inquiry.paymentTotalTl} ours=${ourAmount}. Ödeme tamamlanmadı, manuel inceleme gerekir.`,
+          );
+          continue;
+        }
+
+        const full = await this.prisma.payment.findUnique({
+          where: { id: row.id },
+          include: {
+            order: { include: { buyer: true, seller: true, product: true } },
+            checkoutGroup: {
+              include: { orders: { select: { status: true } } },
+            },
+            tradeCashPayment: true,
+          },
+        });
+
+        const orderStillPayable = full?.orderId
+          ? full.order?.status === OrderStatus.pending_payment
+          : full?.checkoutGroup?.orders.some((o) => o.status === OrderStatus.pending_payment) ?? false;
+
+        if (!full || full.status !== PaymentStatus.pending || !orderStillPayable) {
+          continue;
+        }
+
+        const txnRef =
+          inquiry.paymentDate != null && inquiry.paymentDate !== ''
+            ? `paytr:${oid}:${inquiry.paymentDate}`
+            : `paytr:${oid}`;
+
+        const did = await this.paymentFulfillment.processSuccessfulPayment(full, txnRef);
+        if (did) {
+          completed++;
+          this.logger.log(`PayTR reconcile completed payment ${row.id} oid=${oid}`);
+        }
+      } catch (error: any) {
+        this.logger.error(`PayTR reconcile failed payment ${row.id}: ${error?.message}`);
+      }
+    }
+
+    return { checked, completed };
+  }
+
+
+  /**
+   * Cancel expired pending payments
+   * Called by scheduler to automatically cancel payments older than timeout period
+   */
+  async cancelExpiredPayments() {
+    // H1: Ödeme SATIRINI `failed` yapma penceresi, REZERVASYON serbest bırakma
+    // penceresinden (PAYMENT_TIMEOUT_MINUTES=5dk) AYRIDIR ve PayTR 3DS oturumundan
+    // (createDirectPayment timeout_limit=30dk) MUTLAKA UZUN olmalıdır.
+    // Aksi halde: kullanıcı 3DS'i 5-30dk arası tamamlar → PayTR parayı çeker →
+    // callback gelir ama bu cron payment'ı çoktan `failed` yapmıştır → CAS düşer →
+    // çekilen para sipariş'e bağlanmaz, iade yok (orphan capture). Pencereyi
+    // PayTR oturum süresi + grace üstüne çekerek bu yarışı kökten kapatıyoruz.
+    // Stok zaten 5dk'da releaseExpiredOrderReservations ile boşaldığı için bu
+    // gecikme stok'u bağlamaz; sadece terk edilen payment satırı daha geç failed olur.
+    const timeoutMinutes = parseInt(
+      this.configService.get('PAYMENT_FAIL_TIMEOUT_MINUTES') || '35',
+      10,
+    );
+    const timeoutDate = new Date();
+    timeoutDate.setMinutes(timeoutDate.getMinutes() - timeoutMinutes);
+
+    // H2 self-heal: `processing` claim'i normalde çekim süresince (saniyeler) tutulur ve
+    // processDirectPayment finally'sinde `pending`'e döner. Süreç çekim ortasında çökerse
+    // (hard kill) claim `processing`'de takılı kalır. 5dk'dan eski `processing` ödemeleri
+    // `pending`'e döndürerek yeniden denenebilir/işlenebilir hale getir (callback CAS pending bekler).
+    const staleProcessing = new Date();
+    staleProcessing.setMinutes(staleProcessing.getMinutes() - 5);
+    await this.prisma.payment.updateMany({
+      where: { status: PaymentStatus.processing, updatedAt: { lt: staleProcessing } },
+      data: { status: PaymentStatus.pending },
+    });
+
+    // Find pending payments older than timeout
+    const expiredPayments = await this.prisma.payment.findMany({
+      where: {
+        status: PaymentStatus.pending,
+        createdAt: {
+          lt: timeoutDate,
+        },
+      },
+      include: {
+        order: {
+          include: {
+            buyer: { select: { id: true, email: true, displayName: true } },
+          },
+        },
+        checkoutGroup: {
+          include: {
+            orders: {
+              select: {
+                id: true,
+                orderNumber: true,
+                status: true,
+                paymentExpiresAt: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    let cancelledCount = 0;
+
+    for (const payment of expiredPayments) {
+      try {
+        // Trade cash vb. siparişsiz/grupsuz ödemeleri bu cron'da atlama (eski davranış order'a bağlıydı)
+        if (!payment.order && !payment.checkoutGroup) {
+          continue;
+        }
+
+        // Split-window contract: if the parent order is still in pending_payment
+        // and its 24h paymentExpiresAt has not yet passed, only fail the Payment
+        // row. The order stays alive so the buyer can hit initiate again and a
+        // new Payment row is created. The 30-min reservation cron and the 24h
+        // kill-switch handle stock + order state independently.
+        // Grup ödemesi: gruptaki HERHANGİ bir sipariş canlıysa ödeme yeniden başlatılabilir.
+        const now = new Date();
+        const orderStillAlive = payment.order
+          ? payment.order.status === OrderStatus.pending_payment &&
+            payment.order.paymentExpiresAt > now
+          : payment.checkoutGroup!.orders.some(
+              (o) => o.status === OrderStatus.pending_payment && o.paymentExpiresAt > now,
+            );
+
+        // H3: Atomik CAS — yalnızca HÂLÂ `pending` olan ödemeyi `failed` yap.
+        // findMany (snapshot) ile bu update arasında gerçek bir başarı callback'i
+        // ödemeyi `completed` yapmış olabilir; CAS'sız `update` bunu `failed`'a
+        // ezerdi (TOCTOU → ödenmiş sipariş bozulur). count===0 ise ödeme bu turda
+        // tamamlandı/işlendi demektir; stok/iade cleanup'ını ÇALIŞTIRMA, atla.
+        const failedClaim = await this.prisma.payment.updateMany({
+          where: { id: payment.id, status: PaymentStatus.pending },
+          data: {
+            status: PaymentStatus.failed,
+            failureReason: `Ödeme ${timeoutMinutes} dakika içinde tamamlanmadığı için otomatik olarak iptal edildi`,
+          },
+        });
+        if (failedClaim.count === 0) {
+          continue;
+        }
+
+        if (!orderStillAlive) {
+          // Order has been cancelled (or 24h passed): release stock + cleanup.
+          if (payment.order) {
+            await this.paymentFulfillment.releaseProductForFailedPayment(payment.orderId);
+            await this.paymentCommon.cancelSuratShipmentIfExists(payment.orderId, payment.order.orderNumber);
+          } else {
+            for (const groupOrder of payment.checkoutGroup!.orders) {
+              await this.paymentFulfillment.releaseProductForFailedPayment(groupOrder.id);
+              await this.paymentCommon.cancelSuratShipmentIfExists(groupOrder.id, groupOrder.orderNumber);
+            }
+          }
+        }
+
+        // Emit payment.failed event (grup ödemesinde alıcı bilgisi sipariş bazında olmadığından atlanır; log yeterli)
+        if (payment.order) {
+          try {
+            await this.eventService.emitPaymentFailed({
+              paymentId: payment.id,
+              orderId: payment.orderId,
+              orderNumber: payment.order.orderNumber,
+              buyerId: payment.order.buyerId,
+              buyerEmail: payment.order.buyer.email,
+              buyerName: payment.order.buyer.displayName || payment.order.buyer.email,
+              amount: Number(payment.amount),
+              provider: payment.provider,
+              failureReason: `Ödeme ${timeoutMinutes} dakika içinde tamamlanmadığı için otomatik olarak iptal edildi`,
+            });
+          } catch (error) {
+            // Log but don't fail
+            this.logger.error(`Failed to emit payment.failed event for payment ${payment.id}: ${error}`);
+          }
+        }
+
+        cancelledCount++;
+        this.logger.log(
+          `Cancelled expired payment ${payment.id} for ${payment.order ? `order ${payment.order.orderNumber}` : `group ${payment.checkoutGroupId}`}`,
+        );
+      } catch (error: any) {
+        this.logger.error(`Failed to cancel expired payment ${payment.id}: ${error.message}`);
+      }
+    }
+
+    return { count: cancelledCount };
   }
 }

@@ -7,6 +7,10 @@ import { PaymentQueryService } from './payment-query.service';
 import { PaymentCommonService } from './payment-common.service';
 import { PaymentRefundService } from './payment-refund.service';
 import { PaymentReconciliationService } from './payment-reconciliation.service';
+import { PaymentInitiationService } from './payment-initiation.service';
+import { PaymentCallbackService } from './payment-callback.service';
+import { PaymentFulfillmentService } from './payment-fulfillment.service';
+import { PaymentLifecycleService } from './payment-lifecycle.service';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { PayTRService } from '../payment-providers/paytr.service';
@@ -27,6 +31,10 @@ import { OrderStatus, PaymentStatus, ProductStatus } from '@prisma/client';
  */
 describe('PaymentService group payment (checkout group)', () => {
   let service: PaymentService;
+  let fulfillment: PaymentFulfillmentService;
+  let initiation: PaymentInitiationService;
+  let refund: PaymentRefundService;
+  let common: PaymentCommonService;
 
   const groupId = 'group-1';
   const paymentId = 'pay-group-1';
@@ -46,7 +54,11 @@ describe('PaymentService group payment (checkout group)', () => {
     reservationReleasedAt: null,
     shippingAddress: { fullName: 'Alıcı', phone: '+90555', city: 'İstanbul' },
     buyer: { id: 'buyer-1', email: 'buyer@test.com', displayName: 'Buyer' },
-    seller: { id: `seller-${n}`, email: `s${n}@test.com`, displayName: `Seller ${n}` },
+    seller: {
+      id: `seller-${n}`,
+      email: `s${n}@test.com`,
+      displayName: `Seller ${n}`,
+    },
     product: { id: `product-${n}`, title: `Ürün ${n}` },
     ...overrides,
   });
@@ -67,10 +79,17 @@ describe('PaymentService group payment (checkout group)', () => {
   let callSequence: string[];
 
   const mockPrisma: any = {
-    payment: { updateMany: jest.fn(), update: jest.fn(), findUnique: jest.fn() },
+    payment: {
+      updateMany: jest.fn(),
+      update: jest.fn(),
+      findUnique: jest.fn(),
+    },
     order: { findMany: jest.fn(), findUnique: jest.fn() },
     product: { findUnique: jest.fn() },
-    shipment: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn() },
+    shipment: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      create: jest.fn(),
+    },
     checkoutGroup: { findUnique: jest.fn() },
     $transaction: jest.fn(),
   };
@@ -80,7 +99,9 @@ describe('PaymentService group payment (checkout group)', () => {
     invalidatePendingOrdersForProduct: jest
       .fn()
       .mockResolvedValue({ cancelledOrders: [] }),
-    invalidateRelatedOffers: jest.fn().mockResolvedValue({ rejectedOffers: [] }),
+    invalidateRelatedOffers: jest
+      .fn()
+      .mockResolvedValue({ rejectedOffers: [] }),
     checkAndReserve: jest.fn(),
   };
   const mockEvents = {
@@ -141,11 +162,33 @@ describe('PaymentService group payment (checkout group)', () => {
         PaymentCommonService,
         PaymentRefundService,
         PaymentReconciliationService,
-        { provide: ElogoInvoicingService, useValue: { issueCommissionInvoice: jest.fn().mockResolvedValue(undefined), issueServiceFeeInvoice: jest.fn().mockResolvedValue(undefined), issueMembershipInvoice: jest.fn().mockResolvedValue(undefined), issueBoostInvoice: jest.fn().mockResolvedValue(undefined), handleOrderRefund: jest.fn().mockResolvedValue(undefined), issuePlatformSaleInvoice: jest.fn().mockResolvedValue(undefined), handleTradeCashRefund: jest.fn().mockResolvedValue(undefined), issueTradeCashCommissionInvoice: jest.fn().mockResolvedValue(undefined), retryPendingInvoices: jest.fn().mockResolvedValue(undefined) } },
+        PaymentInitiationService,
+        PaymentCallbackService,
+        PaymentFulfillmentService,
+        PaymentLifecycleService,
+        {
+          provide: ElogoInvoicingService,
+          useValue: {
+            issueCommissionInvoice: jest.fn().mockResolvedValue(undefined),
+            issueServiceFeeInvoice: jest.fn().mockResolvedValue(undefined),
+            issueMembershipInvoice: jest.fn().mockResolvedValue(undefined),
+            issueBoostInvoice: jest.fn().mockResolvedValue(undefined),
+            handleOrderRefund: jest.fn().mockResolvedValue(undefined),
+            issuePlatformSaleInvoice: jest.fn().mockResolvedValue(undefined),
+            handleTradeCashRefund: jest.fn().mockResolvedValue(undefined),
+            issueTradeCashCommissionInvoice: jest
+              .fn()
+              .mockResolvedValue(undefined),
+            retryPendingInvoices: jest.fn().mockResolvedValue(undefined),
+          },
+        },
         { provide: PrismaService, useValue: mockPrisma },
         {
           provide: CacheService,
-          useValue: { del: jest.fn(), delPattern: jest.fn().mockResolvedValue(undefined) },
+          useValue: {
+            del: jest.fn(),
+            delPattern: jest.fn().mockResolvedValue(undefined),
+          },
         },
         { provide: ConfigService, useValue: { get: jest.fn() } },
         { provide: PayTRService, useValue: {} },
@@ -158,16 +201,23 @@ describe('PaymentService group payment (checkout group)', () => {
         { provide: NotificationService, useValue: {} },
         { provide: SuratCargoService, useValue: {} },
         { provide: CommissionLedgerService, useValue: mockCommissionLedger },
-        { provide: StorageService, useValue: { getPublicAssetUrl: jest.fn().mockReturnValue('') } },
+        {
+          provide: StorageService,
+          useValue: { getPublicAssetUrl: jest.fn().mockReturnValue('') },
+        },
         { provide: ModuleRef, useValue: {} },
       ],
     }).compile();
 
     service = module.get(PaymentService);
+    fulfillment = module.get(PaymentFulfillmentService);
+    initiation = module.get(PaymentInitiationService);
+    refund = module.get(PaymentRefundService);
+    common = module.get(PaymentCommonService);
   });
 
   it('marks ALL orders preparing BEFORE any stock decrement (stockout cascade cannot cancel siblings)', async () => {
-    const did = await (service as any).processSuccessfulGroupPayment(
+    const did = await (fulfillment as any).processSuccessfulGroupPayment(
       basePayment(),
       'txn-1',
     );
@@ -175,7 +225,9 @@ describe('PaymentService group payment (checkout group)', () => {
     expect(did).toBe(true);
 
     // Sıralama: order.update'lerin TÜMÜ ilk product.update'ten önce gelmeli
-    const firstProductUpdate = callSequence.findIndex((c) => c.startsWith('product.update'));
+    const firstProductUpdate = callSequence.findIndex((c) =>
+      c.startsWith('product.update'),
+    );
     const orderUpdates = callSequence
       .map((c, i) => ({ c, i }))
       .filter(({ c }) => c.startsWith('order.update'));
@@ -230,13 +282,15 @@ describe('PaymentService group payment (checkout group)', () => {
       }),
     );
 
-    const did = await (service as any).processSuccessfulGroupPayment(
+    const did = await (fulfillment as any).processSuccessfulGroupPayment(
       basePayment(),
       'txn-1',
     );
 
     expect(did).toBe(true);
-    expect(mockProductLock.invalidatePendingOrdersForProduct).not.toHaveBeenCalled();
+    expect(
+      mockProductLock.invalidatePendingOrdersForProduct,
+    ).not.toHaveBeenCalled();
     expect(mockProductLock.invalidateRelatedOffers).not.toHaveBeenCalled();
   });
 
@@ -251,19 +305,21 @@ describe('PaymentService group payment (checkout group)', () => {
       }),
     );
 
-    const did = await (service as any).processSuccessfulGroupPayment(
+    const did = await (fulfillment as any).processSuccessfulGroupPayment(
       basePayment(),
       'txn-1',
     );
 
     expect(did).toBe(true);
-    expect(mockProductLock.invalidatePendingOrdersForProduct).toHaveBeenCalled();
+    expect(
+      mockProductLock.invalidatePendingOrdersForProduct,
+    ).toHaveBeenCalled();
   });
 
   it('is idempotent: second success callback does nothing (CAS claim fails)', async () => {
     mockTx.payment.updateMany.mockResolvedValue({ count: 0 });
 
-    const did = await (service as any).processSuccessfulGroupPayment(
+    const did = await (fulfillment as any).processSuccessfulGroupPayment(
       basePayment(),
       'txn-1',
     );
@@ -279,10 +335,10 @@ describe('PaymentService group payment (checkout group)', () => {
       makeOrder(2, { status: OrderStatus.cancelled }),
     ]);
     const refundSpy = jest
-      .spyOn(service as any, 'processRefund')
+      .spyOn(refund as any, 'processRefund')
       .mockResolvedValue({ success: true });
 
-    const did = await (service as any).processSuccessfulGroupPayment(
+    const did = await (fulfillment as any).processSuccessfulGroupPayment(
       basePayment(),
       'txn-1',
     );
@@ -291,7 +347,9 @@ describe('PaymentService group payment (checkout group)', () => {
     expect(refundSpy).toHaveBeenCalledWith('order-2', 102);
     // Sadece canlı sipariş işlenir
     expect(mockTx.paymentHold.create).toHaveBeenCalledTimes(1);
-    expect(mockTx.paymentHold.create.mock.calls[0][0].data.orderId).toBe('order-1');
+    expect(mockTx.paymentHold.create.mock.calls[0][0].data.orderId).toBe(
+      'order-1',
+    );
     expect(mockEvents.emitOrderPaid).toHaveBeenCalledTimes(1);
   });
 
@@ -305,7 +363,7 @@ describe('PaymentService group payment (checkout group)', () => {
     });
 
     await expect(
-      (service as any).initiateGroupPayment('buyer-1', {
+      (initiation as any).initiateGroupPayment('buyer-1', {
         checkoutGroupId: groupId,
         provider: 'paytr',
       }),
@@ -316,16 +374,19 @@ describe('PaymentService group payment (checkout group)', () => {
     mockPrisma.payment.update.mockResolvedValue({});
     mockPrisma.order.findMany.mockResolvedValue([makeOrder(1), makeOrder(2)]);
     const releaseSpy = jest
-      .spyOn(service as any, 'releaseProductForFailedPayment')
+      .spyOn(fulfillment as any, 'releaseProductForFailedPayment')
       .mockResolvedValue(undefined);
     const cancelSuratSpy = jest
-      .spyOn(service as any, 'cancelSuratShipmentIfExists')
+      .spyOn(common as any, 'cancelSuratShipmentIfExists')
       .mockResolvedValue(undefined);
     const logSpy = jest
-      .spyOn(service as any, 'logPaymentAction')
+      .spyOn(common as any, 'logPaymentAction')
       .mockResolvedValue(undefined);
 
-    await (service as any).processFailedPayment(basePayment(), 'kart reddedildi');
+    await (fulfillment as any).processFailedPayment(
+      basePayment(),
+      'kart reddedildi',
+    );
 
     expect(releaseSpy).toHaveBeenCalledTimes(2);
     expect(releaseSpy).toHaveBeenCalledWith('order-1');
