@@ -6663,6 +6663,61 @@ async function main() {
   );
 
   // ==========================================================================
+  // 30. User Avatars (S3→S3 copy from seed-assets/avatars)
+  //
+  // Runtime avatar semantics birebir: bucket 'avatars', folder = userId,
+  // user.avatarUrl = S3 KEY (public bucket; resolveAvatarUrl URL'e çevirir).
+  // platform/banned/yeni hesapları bilerek avatarsız (gerçekçi karışım).
+  // ==========================================================================
+  if (storageService) {
+    console.log("Creating user avatars...");
+    const AVATAR_BY_EMAIL: Record<string, string> = {
+      "admin@tarodan.com": "avatar-13.webp",
+      "moderator@tarodan.com": "avatar-09.webp",
+      "ahmet@demo.com": "avatar-04.webp",
+      "mehmet@demo.com": "avatar-07.webp",
+      "ayse@demo.com": "avatar-10.webp",
+      "fatma@demo.com": "avatar-14.webp",
+      "ali@demo.com": "avatar-05.webp",
+      "zeynep@demo.com": "avatar-01.webp",
+      "mustafa@demo.com": "avatar-12.webp",
+      "elif@demo.com": "avatar-02.webp",
+      "emre@demo.com": "avatar-08.webp",
+      "selin@demo.com": "avatar-11.webp",
+      "burak@demo.com": "avatar-16.webp",
+      "deniz@demo.com": "avatar-17.webp",
+      "ceren@demo.com": "avatar-03.webp",
+      "kaan@demo.com": "avatar-18.webp",
+      "irem@demo.com": "avatar-15.webp",
+      "kurumsal@demo.com": "avatar-06.webp",
+    };
+    const avatarSvc = storageService;
+    const avatarResults = await Promise.all(
+      Object.entries(AVATAR_BY_EMAIL).map(async ([email, avatarFile]) => {
+        const user = await prisma.user.findUnique({ where: { email } });
+        if (!user) return 0;
+        const { key } = await avatarSvc.copyFile(
+          `${SEED_ASSETS_PREFIX}/avatars/${avatarFile}`,
+          {
+            bucket: "avatars",
+            folder: user.id,
+            filename: `${randomUUID()}.webp`,
+          },
+        );
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { avatarUrl: key },
+        });
+        return 1;
+      }),
+    );
+    const avatarCount = avatarResults.reduce<number>((a, b) => a + b, 0);
+    console.log(`✅ Created ${avatarCount} user avatars (S3→S3 copies)`);
+  } else {
+    console.log("⏭️  SEED_SKIP_IMAGES set — skipping user avatars");
+  }
+
+  // ==========================================================================
   // Summary
   // ==========================================================================
   console.log("\n🎉 COMPREHENSIVE Database seed completed successfully!");
