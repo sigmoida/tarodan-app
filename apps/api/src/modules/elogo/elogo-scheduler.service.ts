@@ -1,12 +1,15 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { CronExpression } from '@nestjs/schedule';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
-import { TrackedCron } from '../../monitoring/tracked-cron.decorator';
-import { cronsViaBull, registerRepeatableCron } from '../../monitoring/bull-cron.helper';
-import type { CronRunSummary } from '../../monitoring/cron-run.helper';
-import { QUEUE_NAMES } from '../../workers/constants';
-import { ElogoInvoicingService } from './elogo-invoicing.service';
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { CronExpression } from "@nestjs/schedule";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
+import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
+import {
+  cronsViaBull,
+  registerRepeatableCron,
+} from "../../monitoring/bull-cron.helper";
+import type { CronRunSummary } from "../../monitoring/cron-run.helper";
+import { QUEUE_NAMES } from "../../workers/constants";
+import { ElogoInvoicingService } from "./elogo-invoicing.service";
 
 /** In-process cron ile Bull repeatable'ın aynı zamanlamayı paylaşması için tek kaynak. */
 const ELOGO_RETRY_CRON = CronExpression.EVERY_30_MINUTES;
@@ -31,7 +34,7 @@ export class ElogoSchedulerService implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     await registerRepeatableCron(
       this.scheduledQueue,
-      'elogo-retry-pending',
+      "elogo-retry-pending",
       ELOGO_RETRY_CRON,
       cronsViaBull(),
       this.logger,
@@ -47,11 +50,22 @@ export class ElogoSchedulerService implements OnModuleInit {
   }
 
   /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
-  async runRetryPending(log: (msg: string) => void = () => {}): Promise<CronRunSummary> {
+  async runRetryPending(
+    log: (msg: string) => void = () => {},
+  ): Promise<CronRunSummary> {
     try {
-      await this.invoicing.retryPendingInvoices();
-      log('eLogo pending/failed fatura retry taraması tamamlandı');
-      return { summary: 'retry taraması tamamlandı' };
+      const r = await this.invoicing.retryPendingInvoices();
+      if (!r.enabled) {
+        log("eLogo kapalı (ELOGO_ENABLED=false), atlandı");
+        return { summary: "eLogo kapalı, atlandı", stats: { skipped: 1 } };
+      }
+      log(
+        `eLogo retry: ${r.attempted} denendi · ${r.sent} gönderildi · ${r.failed} başarısız`,
+      );
+      return {
+        summary: `${r.attempted} denendi · ${r.sent} gönderildi · ${r.failed} başarısız`,
+        stats: { attempted: r.attempted, sent: r.sent, failed: r.failed },
+      };
     } catch (err: any) {
       this.logger.warn(`eLogo retry cron hatası: ${err?.message}`);
       log(`HATA: ${err?.message}`);

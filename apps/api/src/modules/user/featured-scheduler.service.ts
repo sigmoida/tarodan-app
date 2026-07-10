@@ -1,14 +1,17 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
-import { TrackedCron } from '../../monitoring/tracked-cron.decorator';
-import { cronsViaBull, registerRepeatableCron } from '../../monitoring/bull-cron.helper';
-import type { CronRunSummary } from '../../monitoring/cron-run.helper';
-import { QUEUE_NAMES } from '../../workers/constants';
-import { UserService } from './user.service';
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
+import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
+import {
+  cronsViaBull,
+  registerRepeatableCron,
+} from "../../monitoring/bull-cron.helper";
+import type { CronRunSummary } from "../../monitoring/cron-run.helper";
+import { QUEUE_NAMES } from "../../workers/constants";
+import { UserService } from "./user.service";
 
 /** In-process cron ile Bull repeatable'ın aynı zamanlamayı paylaşması için tek kaynak. */
-const FEATURED_REFRESH_CRON = '15 3 * * *';
+const FEATURED_REFRESH_CRON = "15 3 * * *";
 
 /**
  * Featured Scheduler Service
@@ -34,11 +37,11 @@ export class FeaturedSchedulerService implements OnModuleInit {
   async onModuleInit() {
     // Açılışta snapshot yoksa ilk değerin oluşması için bir kez hesapla.
     // (Okuma tarafında da fallback var; bu sadece ilk isteği hızlandırır.)
-    await this.refresh('startup');
+    await this.refresh("startup");
     // Günlük tazelemeyi flag durumuna göre Bull repeatable'a senkronla.
     await registerRepeatableCron(
       this.scheduledQueue,
-      'featured-daily-refresh',
+      "featured-daily-refresh",
       FEATURED_REFRESH_CRON,
       cronsViaBull(),
       this.logger,
@@ -55,22 +58,38 @@ export class FeaturedSchedulerService implements OnModuleInit {
   }
 
   /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
-  async runDailyRefresh(log: (msg: string) => void = () => {}): Promise<CronRunSummary> {
-    await this.refresh('cron', log);
-    return { summary: 'featured snapshot yenilendi' };
+  async runDailyRefresh(
+    log: (msg: string) => void = () => {},
+  ): Promise<CronRunSummary> {
+    const r = await this.refresh("cron", log);
+    return {
+      summary: r.errors
+        ? "Hata: featured snapshot yenilenemedi"
+        : `koleksiyoncu=${r.collector} · şirket=${r.business}`,
+      stats: { collector: r.collector, business: r.business, errors: r.errors },
+    };
   }
 
-  private async refresh(trigger: string, log: (msg: string) => void = () => {}) {
+  private async refresh(
+    trigger: string,
+    log: (msg: string) => void = () => {},
+  ): Promise<{ collector: number; business: number; errors: number }> {
     try {
-      await this.userService.refreshFeaturedSnapshots();
-      this.logger.log(`Featured snapshots refreshed (${trigger})`);
-      log(`snapshot yenilendi (${trigger})`);
+      const r = await this.userService.refreshFeaturedSnapshots();
+      this.logger.log(
+        `Featured snapshots refreshed (${trigger}): collector=${r.collector} business=${r.business}`,
+      );
+      log(
+        `snapshot yenilendi (${trigger}): koleksiyoncu=${r.collector} şirket=${r.business}`,
+      );
+      return { collector: r.collector, business: r.business, errors: 0 };
     } catch (error: any) {
       this.logger.error(
         `Featured snapshot refresh failed (${trigger}): ${error.message}`,
         error.stack,
       );
       log(`HATA (${trigger}): ${error.message}`);
+      return { collector: 0, business: 0, errors: 1 };
     }
   }
 }

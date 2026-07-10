@@ -1,11 +1,14 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { CronExpression } from '@nestjs/schedule';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
-import { TrackedCron } from '../../monitoring/tracked-cron.decorator';
-import { moneyCronsViaBull, registerRepeatableCron } from '../../monitoring/bull-cron.helper';
-import { QUEUE_NAMES } from '../../workers/constants';
-import { RefundService } from './refund.service';
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { CronExpression } from "@nestjs/schedule";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
+import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
+import {
+  moneyCronsViaBull,
+  registerRepeatableCron,
+} from "../../monitoring/bull-cron.helper";
+import { QUEUE_NAMES } from "../../workers/constants";
+import { RefundService } from "./refund.service";
 
 @Injectable()
 export class RefundSchedulerService implements OnModuleInit {
@@ -17,7 +20,13 @@ export class RefundSchedulerService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    await registerRepeatableCron(this.scheduledQueue, 'refund-crons', '0 */10 * * * *', moneyCronsViaBull(), this.logger);
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "refund-crons",
+      "0 */10 * * * *",
+      moneyCronsViaBull(),
+      this.logger,
+    );
   }
 
   @TrackedCron(CronExpression.EVERY_10_MINUTES)
@@ -30,41 +39,63 @@ export class RefundSchedulerService implements OnModuleInit {
 
   /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
   async runRefundCrons(log: (msg: string) => void = () => {}) {
-    const opened = await this.openReturnShipmentsForDeliveredOrders();
-    log(`${opened} iade kargosu açıldı (teslim edilmiş siparişler)`);
-    const finalized = await this.finalizeReturnedShipments();
-    log(`${finalized} iade finalize edildi (kargo döndü)`);
+    const opened = await this.openReturnShipmentsForDeliveredOrders(log);
+    const finalized = await this.finalizeReturnedShipments(log);
+    const failed = opened.failed + finalized.failed;
     return {
-      summary: `${opened} açıldı · ${finalized} finalize`,
-      stats: { opened, finalized },
+      summary: `${opened.done} açıldı · ${finalized.done} finalize${failed ? ` · ${failed} başarısız` : ""}`,
+      // NOT: 'failed' kalem-seviyesidir (bir sonraki turda yeniden denenir) → işi
+      // KIRMIZI YAPMAZ ama özet/stats'ta görünür. İş-seviyesi hata olsaydı 'errors' olurdu.
+      stats: { opened: opened.done, finalized: finalized.done, failed },
     };
   }
 
-  private async openReturnShipmentsForDeliveredOrders(): Promise<number> {
+  private async openReturnShipmentsForDeliveredOrders(
+    log: (msg: string) => void,
+  ): Promise<{ done: number; failed: number }> {
     const pending = await this.refundService.findPendingDeliveryToOpenReturn();
-    if (pending.length === 0) return 0;
-    this.logger.log(`Opening return shipments for ${pending.length} delivered refund request(s)`);
+    if (pending.length === 0) return { done: 0, failed: 0 };
+    this.logger.log(
+      `Opening return shipments for ${pending.length} delivered refund request(s)`,
+    );
+    let failed = 0;
     for (const id of pending) {
       try {
         await this.refundService.openReturnShipment(id);
       } catch (e) {
-        this.logger.error(`Failed to open return shipment for ${id}: ${(e as Error).message}`);
+        failed++;
+        this.logger.error(
+          `Failed to open return shipment for ${id}: ${(e as Error).message}`,
+        );
       }
     }
-    return pending.length;
+    const done = pending.length - failed;
+    log(`${done} iade kargosu açıldı${failed ? ` · ${failed} başarısız` : ""}`);
+    return { done, failed };
   }
 
-  private async finalizeReturnedShipments(): Promise<number> {
-    const pending = await this.refundService.findReturnDeliveredPendingFinalize();
-    if (pending.length === 0) return 0;
-    this.logger.log(`Finalizing refund for ${pending.length} returned shipment(s)`);
+  private async finalizeReturnedShipments(
+    log: (msg: string) => void,
+  ): Promise<{ done: number; failed: number }> {
+    const pending =
+      await this.refundService.findReturnDeliveredPendingFinalize();
+    if (pending.length === 0) return { done: 0, failed: 0 };
+    this.logger.log(
+      `Finalizing refund for ${pending.length} returned shipment(s)`,
+    );
+    let failed = 0;
     for (const id of pending) {
       try {
         await this.refundService.finalizeRefundForReturnedShipment(id);
       } catch (e) {
-        this.logger.error(`Failed to finalize refund ${id}: ${(e as Error).message}`);
+        failed++;
+        this.logger.error(
+          `Failed to finalize refund ${id}: ${(e as Error).message}`,
+        );
       }
     }
-    return pending.length;
+    const done = pending.length - failed;
+    log(`${done} iade finalize${failed ? ` · ${failed} başarısız` : ""}`);
+    return { done, failed };
   }
 }

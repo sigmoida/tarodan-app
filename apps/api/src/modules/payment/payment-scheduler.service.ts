@@ -1,14 +1,17 @@
-import { Injectable, Logger, Optional, OnModuleInit } from '@nestjs/common';
-import { CronExpression } from '@nestjs/schedule';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
-import { TrackedCron } from '../../monitoring/tracked-cron.decorator';
-import { moneyCronsViaBull, registerRepeatableCron } from '../../monitoring/bull-cron.helper';
-import { QUEUE_NAMES } from '../../workers/constants';
-import { PaymentService } from './payment.service';
-import { ProductLockService } from '../product/product-lock.service';
-import { EventService } from '../events/event.service';
-import { PayoutService } from '../payout/payout.service';
+import { Injectable, Logger, Optional, OnModuleInit } from "@nestjs/common";
+import { CronExpression } from "@nestjs/schedule";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
+import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
+import {
+  moneyCronsViaBull,
+  registerRepeatableCron,
+} from "../../monitoring/bull-cron.helper";
+import { QUEUE_NAMES } from "../../workers/constants";
+import { PaymentService } from "./payment.service";
+import { ProductLockService } from "../product/product-lock.service";
+import { EventService } from "../events/event.service";
+import { PayoutService } from "../payout/payout.service";
 
 /**
  * Payment Scheduler Service
@@ -28,9 +31,27 @@ export class PaymentSchedulerService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     const on = moneyCronsViaBull();
-    await registerRepeatableCron(this.scheduledQueue, 'payment-expired', '*/5 * * * *', on, this.logger);
-    await registerRepeatableCron(this.scheduledQueue, 'payment-release-holds', '0 * * * *', on, this.logger);
-    await registerRepeatableCron(this.scheduledQueue, 'payment-expired-preparing', '*/30 * * * *', on, this.logger);
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "payment-expired",
+      "*/5 * * * *",
+      on,
+      this.logger,
+    );
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "payment-release-holds",
+      "0 * * * *",
+      on,
+      this.logger,
+    );
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "payment-expired-preparing",
+      "*/30 * * * *",
+      on,
+      this.logger,
+    );
   }
 
   /**
@@ -49,17 +70,52 @@ export class PaymentSchedulerService implements OnModuleInit {
   // no-op olduğu için instance alanı kullanımı güvenli.
   private stepLog: (msg: string) => void = () => {};
 
-  private async runStep(name: string, fn: () => Promise<void>): Promise<void> {
+  private async runStep(
+    name: string,
+    fn: () => Promise<Record<string, number> | void>,
+    stats?: Record<string, number>,
+  ): Promise<void> {
     try {
-      await fn();
-      this.stepLog(`✓ ${name}`);
+      const result = (await fn()) || {};
+      if (stats) {
+        for (const [k, v] of Object.entries(result)) {
+          stats[k] = (stats[k] ?? 0) + v;
+        }
+      }
+      const detail = Object.entries(result)
+        .filter(([, v]) => v > 0)
+        .map(([k, v]) => `${k}=${v}`)
+        .join(" ");
+      this.stepLog(`✓ ${name}${detail ? ` (${detail})` : ""}`);
     } catch (error: any) {
       this.logger.error(`Step "${name}" failed: ${error.message}`, error.stack);
       this.stepLog(`✗ ${name}: ${error.message}`);
+      // Adım-seviyesi hata → job stats.errors artar → runTrackedJob işi FAILED yapar.
+      if (stats) stats.errors = (stats.errors ?? 0) + 1;
     }
   }
 
-  @TrackedCron('*/5 * * * *') // Every 5 minutes
+  /** Bakım turu stats'ından sıfır-olmayan sayılarla kısa özet üretir (PII YOK). */
+  private buildMaintenanceSummary(stats: Record<string, number>): string {
+    const parts: string[] = [];
+    const push = (label: string, key: string): void => {
+      if ((stats[key] ?? 0) > 0) parts.push(`${label}=${stats[key]}`);
+    };
+    push("paytr", "paytrCompleted");
+    push("rezervasyon", "reservationsReleased");
+    push("qty-fix", "qtyReconciled");
+    push("sipariş-iptal", "ordersExpired");
+    push("ödeme-iptal", "paymentsCancelled");
+    push("oto-iade", "autoRefunded");
+    push("iade-başarısız", "autoRefundFailed");
+    push("fatura", "invoicesGenerated");
+    push("stok-teklif-iptal", "stockOffersCancelled");
+    push("stok-takas-iptal", "stockTradesCancelled");
+    if ((stats.errors ?? 0) > 0) parts.push(`ADIM-HATASI=${stats.errors}`);
+    return parts.length ? parts.join(" · ") : "yapılacak iş yok (temiz)";
+  }
+
+  @TrackedCron("*/5 * * * *") // Every 5 minutes
   async handleExpiredPayments() {
     if (moneyCronsViaBull()) {
       return;
@@ -70,82 +126,85 @@ export class PaymentSchedulerService implements OnModuleInit {
   /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
   async runHandleExpiredPayments(log: (msg: string) => void = () => {}) {
     this.stepLog = log;
-    this.logger.log('Checking for expired reservations and payments...');
+    this.logger.log("Checking for expired reservations and payments...");
+    const stats: Record<string, number> = {};
 
-    await this.runStep('reconcilePendingPaytrPayments', async () => {
-      const reconcile = await this.paymentService.reconcilePendingPaytrPayments();
-      if (reconcile.completed > 0) {
-        this.logger.log(
-          `PayTR reconcile: completed ${reconcile.completed} of ${reconcile.checked} checked payment(s)`,
-        );
-      }
-    });
+    await this.runStep(
+      "reconcile-paytr",
+      async () => {
+        const r = await this.paymentService.reconcilePendingPaytrPayments();
+        return { paytrChecked: r.checked, paytrCompleted: r.completed };
+      },
+      stats,
+    );
 
-    await this.runStep('releaseExpiredOrderReservations', async () => {
-      const released = await this.paymentService.releaseExpiredOrderReservations();
-      if (released.count > 0) {
-        this.logger.log(`Released ${released.count} expired order reservation(s)`);
-      }
-    });
+    await this.runStep(
+      "release-reservations",
+      async () => {
+        const r = await this.paymentService.releaseExpiredOrderReservations();
+        return { reservationsReleased: r.count };
+      },
+      stats,
+    );
 
-    await this.runStep('reconcileReservedQuantities', async () => {
-      const recon = await this.paymentService.reconcileReservedQuantities();
-      if (recon.count > 0) {
-        this.logger.log(`Reconciled reservedQuantity drift on ${recon.count} product(s)`);
-      }
-    });
+    await this.runStep(
+      "reconcile-reserved-qty",
+      async () => {
+        const r = await this.paymentService.reconcileReservedQuantities();
+        return { qtyReconciled: r.count };
+      },
+      stats,
+    );
 
-    await this.runStep('expireUnpaidOrders', async () => {
-      const expired = await this.paymentService.expireUnpaidOrders();
-      if (expired.count > 0) {
-        this.logger.log(`Expired ${expired.count} unpaid order(s) past 24h TTL`);
-      }
-    });
+    await this.runStep(
+      "expire-unpaid-orders",
+      async () => {
+        const r = await this.paymentService.expireUnpaidOrders();
+        return { ordersExpired: r.count };
+      },
+      stats,
+    );
 
-    await this.runStep('cancelExpiredPayments', async () => {
-      const result = await this.paymentService.cancelExpiredPayments();
-      if (result.count > 0) {
-        this.logger.log(`Cancelled ${result.count} expired payment(s)`);
-      }
-    });
+    await this.runStep(
+      "cancel-expired-payments",
+      async () => {
+        const r = await this.paymentService.cancelExpiredPayments();
+        return { paymentsCancelled: r.count };
+      },
+      stats,
+    );
 
     // K3: Alıcının iptal ettiği (status=refunded) ama henüz iade edilmemiş siparişleri
-    // bul ve iadeyi tetikle. OrderService.cancel yalnız status'u refunded yapıyordu;
-    // bu adım gerçek PayTR iadesini + hold iptalini güvenilir şekilde tamamlar.
-    await this.runStep('processRefundedOrders', async () => {
-      const result = await this.paymentService.processRefundedOrders();
-      if (result.refunded > 0 || result.failed > 0) {
-        this.logger.log(
-          `Auto-refund: ${result.refunded} iptal edilen sipariş iade edildi, ${result.failed} başarısız`,
-        );
-      }
-    });
+    // bul ve gerçek PayTR iadesini + hold iptalini tamamla.
+    await this.runStep(
+      "auto-refund-cancelled",
+      async () => {
+        const r = await this.paymentService.processRefundedOrders();
+        return { autoRefunded: r.refunded, autoRefundFailed: r.failed };
+      },
+      stats,
+    );
 
-    // O6: Ödendi ama faturası oluşmamış siparişleri telafi et (tx-sonrası best-effort
-    // fatura üretimi hata vermişse güvenilir retry).
-    await this.runStep('reconcileMissingInvoices', async () => {
-      const result = await this.paymentService.reconcileMissingInvoices();
-      if (result.generated > 0) {
-        this.logger.log(`Eksik fatura telafisi: ${result.generated} fatura üretildi`);
-      }
-    });
+    // O6: Ödendi ama faturası oluşmamış siparişleri telafi et (best-effort retry).
+    await this.runStep(
+      "reconcile-missing-invoices",
+      async () => {
+        const r = await this.paymentService.reconcileMissingInvoices();
+        return { invoicesGenerated: r.generated };
+      },
+      stats,
+    );
 
-    // Safety net: sweep out-of-stock products and cancel lingering offers/trades
-    await this.runStep('sweepOutOfStockProducts', async () => {
-      const sweepResult = await this.productLockService.sweepOutOfStockProducts();
-      if (sweepResult.offersCancelled > 0 || sweepResult.tradesCancelled > 0) {
-        this.logger.log(
-          `Stock sweep: cancelled ${sweepResult.offersCancelled} offer(s) and ${sweepResult.tradesCancelled} trade(s) across ${sweepResult.productsScanned} out-of-stock product(s)`,
-        );
-
-        const cancelReason = 'Stok tükendiği için otomatik iptal edildi';
-
-        // NOT (mükerrer bildirim fix): İptal edilen TEKLİFLER zaten
-        // sweepOutOfStockProducts() içinde notifyOfferCancelledOutOfStock()
-        // (IN_APP + PUSH) ile bildiriliyor. Burada ayrıca emitOfferAutoRejected()
-        // çağırmak aynı teklif için İKİNCİ bir bildirim üretiyordu (çift). Teklif
-        // emit'i kaldırıldı; yalnız TAKAS bildirimi burada gönderiliyor (sweep
-        // takasları bildirmez).
+    // Güvenlik ağı: stoğu biten ürünleri süpür, asılı teklif/takasları iptal et.
+    await this.runStep(
+      "sweep-out-of-stock",
+      async () => {
+        const sweepResult =
+          await this.productLockService.sweepOutOfStockProducts();
+        // NOT (mükerrer bildirim fix): iptal edilen TEKLİFLER zaten sweep içinde
+        // (IN_APP + PUSH) bildiriliyor; burada yalnız TAKAS bildirimi gönderilir
+        // (sweep takasları bildirmez). cancelledTrades boşsa döngü hiçbir şey yapmaz.
+        const cancelReason = "Stok tükendiği için otomatik iptal edildi";
         for (const trade of sweepResult.cancelledTrades) {
           try {
             await this.eventService.emitTradeAutoCancelled({
@@ -155,20 +214,31 @@ export class PaymentSchedulerService implements OnModuleInit {
               reason: cancelReason,
             });
           } catch (err: any) {
-            this.logger.error(`Failed to notify trade ${trade.tradeId}: ${err.message}`);
+            this.logger.error(
+              `Failed to notify trade ${trade.tradeId}: ${err.message}`,
+            );
           }
         }
-      }
-    });
+        return {
+          stockOffersCancelled: sweepResult.offersCancelled,
+          stockTradesCancelled: sweepResult.tradesCancelled,
+          stockProductsScanned: sweepResult.productsScanned,
+        };
+      },
+      stats,
+    );
 
     this.stepLog = () => {};
-    return { summary: 'Süre dolumu bakım turu tamamlandı (9 adım)', stats: {} };
+
+    const summary = this.buildMaintenanceSummary(stats);
+    this.logger.log(`Süre dolumu bakım turu tamamlandı — ${summary}`);
+    return { summary, stats };
   }
 
   /**
    * Run every hour: release payment holds whose releaseAt date has passed
    */
-  @TrackedCron('0 * * * *') // Every hour at minute 0
+  @TrackedCron("0 * * * *") // Every hour at minute 0
   async handleReleaseHoldsDue() {
     if (moneyCronsViaBull()) {
       return;
@@ -179,41 +249,60 @@ export class PaymentSchedulerService implements OnModuleInit {
   /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
   async runHandleReleaseHoldsDue(log: (msg: string) => void = () => {}) {
     this.stepLog = log;
-    this.logger.log('Checking for payment holds due for release...');
+    this.logger.log("Checking for payment holds due for release...");
 
     let releasedHolds = 0;
     let tradeCash = 0;
     let payoutsCreated = 0;
+    const stepStats: Record<string, number> = {};
 
-    await this.runStep('releaseHoldsDue', async () => {
-      const result = await this.paymentService.releaseHoldsDue();
-      releasedHolds = result.count;
-      tradeCash = result.tradeCashReleased;
-      if (result.count > 0) {
-        this.logger.log(`Released ${result.count} payment hold(s)`);
-      }
-      if (result.tradeCashReleased > 0) {
-        this.logger.log(`Released ${result.tradeCashReleased} trade cash payment(s)`);
-      }
-    });
+    await this.runStep(
+      "releaseHoldsDue",
+      async () => {
+        const result = await this.paymentService.releaseHoldsDue();
+        releasedHolds = result.count;
+        tradeCash = result.tradeCashReleased;
+        if (result.count > 0) {
+          this.logger.log(`Released ${result.count} payment hold(s)`);
+        }
+        if (result.tradeCashReleased > 0) {
+          this.logger.log(
+            `Released ${result.tradeCashReleased} trade cash payment(s)`,
+          );
+        }
+      },
+      stepStats,
+    );
 
     // Y2 (payout starvation): Payout oluşturmayı release SONUCUNDAN BAĞIMSIZ her turda
     // çalıştır. Teslimat/48h/manuel gibi başka yollarla released olmuş ama henüz payout'u
     // olmayan hold'lar da yakalanır. createPayoutsForReleasedHolds idempotenttir
     // (payoutTransfer:null filtresi → payout'u olanları atlar), bu yüzden koşulsuz güvenli.
     if (this.payoutService) {
-      await this.runStep('createPayoutsForReleasedHolds', async () => {
-        payoutsCreated = await this.payoutService!.createPayoutsForReleasedHolds();
-        if (payoutsCreated > 0) {
-          this.logger.log(`Created ${payoutsCreated} payout transfer(s) for released holds`);
-        }
-      });
+      await this.runStep(
+        "createPayoutsForReleasedHolds",
+        async () => {
+          payoutsCreated =
+            await this.payoutService!.createPayoutsForReleasedHolds();
+          if (payoutsCreated > 0) {
+            this.logger.log(
+              `Created ${payoutsCreated} payout transfer(s) for released holds`,
+            );
+          }
+        },
+        stepStats,
+      );
     }
 
     this.stepLog = () => {};
     return {
       summary: `${releasedHolds} hold serbest · ${payoutsCreated} payout oluşturuldu`,
-      stats: { releasedHolds, tradeCash, payoutsCreated },
+      stats: {
+        releasedHolds,
+        tradeCash,
+        payoutsCreated,
+        ...(stepStats.errors ? { errors: stepStats.errors } : {}),
+      },
     };
   }
 
@@ -221,7 +310,7 @@ export class PaymentSchedulerService implements OnModuleInit {
    * Run every 30 minutes: check for orders stuck in "preparing" past deadline.
    * Warns sellers 24h before deadline, auto-cancels + refunds when deadline passes.
    */
-  @TrackedCron('*/30 * * * *') // Every 30 minutes
+  @TrackedCron("*/30 * * * *") // Every 30 minutes
   async handleExpiredPreparingOrders() {
     if (moneyCronsViaBull()) {
       return;
@@ -231,23 +320,32 @@ export class PaymentSchedulerService implements OnModuleInit {
 
   /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
   async runHandleExpiredPreparingOrders(log: (msg: string) => void = () => {}) {
-    this.logger.log('Checking for expired preparing orders...');
+    this.logger.log("Checking for expired preparing orders...");
 
     try {
       const result = await this.paymentService.handleExpiredPreparingOrders();
-      log(`${result.warned} satıcı uyarıldı · ${result.cancelled} sipariş oto-iptal`);
+      log(
+        `${result.warned} satıcı uyarıldı · ${result.cancelled} sipariş oto-iptal`,
+      );
       if (result.warned > 0) {
-        this.logger.log(`Warned ${result.warned} seller(s) about preparing deadline`);
+        this.logger.log(
+          `Warned ${result.warned} seller(s) about preparing deadline`,
+        );
       }
       if (result.cancelled > 0) {
-        this.logger.log(`Auto-cancelled ${result.cancelled} order(s) past preparing deadline`);
+        this.logger.log(
+          `Auto-cancelled ${result.cancelled} order(s) past preparing deadline`,
+        );
       }
       return {
         summary: `${result.warned} uyarı · ${result.cancelled} oto-iptal`,
         stats: { warned: result.warned, cancelled: result.cancelled },
       };
     } catch (error: any) {
-      this.logger.error(`Error in expired preparing orders job: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error in expired preparing orders job: ${error.message}`,
+        error.stack,
+      );
       log(`HATA: ${error.message}`);
       return { summary: `Hata: ${error.message}`, stats: { errors: 1 } };
     }
