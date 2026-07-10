@@ -21,6 +21,14 @@ import {
   TicketPriority,
   TicketCategory,
   RatingStatus,
+  BusinessStatus,
+  PaymentHoldStatus,
+  PayoutStatus,
+  CommissionLedgerStatus,
+  BoostStatus,
+  OrderCancellationType,
+  ElogoInvoiceType,
+  ElogoInvoiceStatus,
 } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
@@ -5341,6 +5349,1320 @@ async function main() {
   }
 
   // ==========================================================================
+  // 28. CHUNK A — Accounts & Membership States
+  //   Eksik hesap/üyelik durumlarından birer örnek: kurumsal (şirket) satıcı +
+  //   stopajlı tamamlanmış satış, banlı kullanıcı, yeni (boş, doğrulanmamış)
+  //   kullanıcı, üyelik durum çeşitleri (cancelled/expired/past_due), Google
+  //   OAuth bağlantısı ve "sorunlu müşteri" (spam rating + report).
+  // ==========================================================================
+  console.log("Creating Chunk A: account & membership states...");
+
+  // Benzersiz payout transId üretici (PayoutTransfer.transId @unique).
+  const genTransId = () => `PT-${randomUUID()}`;
+  const arabaCat = categories.find((c) => c.slug === "araba") || categories[0];
+
+  // --- 28a. Kurumsal satıcı: onaylı işletme + business üyelik + IBAN ---
+  const corporateSeller = await prisma.user.upsert({
+    where: { email: "kurumsal@demo.com" },
+    update: {
+      companyName: "Miniatür Dünyası Ticaret A.Ş.",
+      businessStatus: BusinessStatus.approved,
+      taxId: "1234567890",
+    },
+    create: {
+      email: "kurumsal@demo.com",
+      phone: "+905559000001",
+      passwordHash: passwordHash,
+      displayName: "Miniatür Dünyası Ticaret A.Ş.",
+      bio: "Kurumsal diecast tedarikçisi — faturalı satış, e-Arşiv fatura.",
+      isVerified: true,
+      isEmailVerified: true,
+      isSeller: true,
+      sellerType: SellerType.verified,
+      companyName: "Miniatür Dünyası Ticaret A.Ş.",
+      businessStatus: BusinessStatus.approved,
+      taxId: "1234567890",
+    },
+  });
+
+  await prisma.userMembership.upsert({
+    where: { userId: corporateSeller.id },
+    update: { tierId: businessTier.id, status: SubscriptionStatus.active },
+    create: {
+      userId: corporateSeller.id,
+      tierId: businessTier.id,
+      status: SubscriptionStatus.active,
+      currentPeriodStart: now,
+      currentPeriodEnd: oneYearLater,
+    },
+  });
+
+  await prisma.sellerBankAccount.upsert({
+    where: { userId: corporateSeller.id },
+    update: {},
+    create: {
+      userId: corporateSeller.id,
+      accountHolder: "Miniatür Dünyası Ticaret A.Ş.",
+      iban: "TR120006200000600000000001",
+      taxId: "1234567890",
+      isVerified: true,
+      verifiedAt: daysAgoDate(30),
+    },
+  });
+
+  const corpBuyer = users[14]; // Deniz Buyer
+  const corpBuyerAddr = addresses.find((a) => a.userId === corpBuyer.id);
+  const corpShippingAddress = corpBuyerAddr
+    ? {
+        fullName: corpBuyerAddr.fullName,
+        phone: corpBuyerAddr.phone,
+        city: corpBuyerAddr.city,
+        district: corpBuyerAddr.district,
+        address: corpBuyerAddr.address,
+      }
+    : undefined;
+
+  // Kurumsal satıcının 2 ürünü (mevcut seed-assets görsellerini yeniden kullanır).
+  const corpProductDefs = [
+    {
+      img: "product-autoart-mercedes-300sl-gullwing.png",
+      title: "AUTOart Mercedes 300SL Gullwing 1:18 (Kurumsal, Faturalı)",
+      price: 4200,
+    },
+    {
+      img: "product-kyosho-nissan-gtr-r35-118.png",
+      title: "Kyosho Nissan GT-R R35 1:18 (Kurumsal, Faturalı)",
+      price: 3600,
+    },
+  ];
+  const corpProducts: any[] = [];
+  for (let i = 0; i < corpProductDefs.length; i++) {
+    const cp = corpProductDefs[i];
+    const slug = `kurumsal-${seedAssetBase(cp.img)}-${i}`;
+    const product = await prisma.product.upsert({
+      where: { slug },
+      update: { price: cp.price, status: ProductStatus.active },
+      create: {
+        sellerId: corporateSeller.id,
+        categoryId: arabaCat.id,
+        title: cp.title,
+        slug,
+        description:
+          "Kurumsal satıcıdan orijinal, faturalı ürün. e-Arşiv fatura düzenlenir.",
+        price: cp.price,
+        condition: ProductCondition.new,
+        status: ProductStatus.active,
+        quantity: 5,
+        createdAt: daysAgoDate(45),
+      },
+    });
+    if (storageService) {
+      const existingImgs = await prisma.productImage.count({
+        where: { productId: product.id },
+      });
+      if (existingImgs === 0) {
+        const { cardKey, detailKey } = await copySeedProductImages(
+          storageService,
+          cp.img,
+          product.id,
+        );
+        await prisma.productImage.create({
+          data: { productId: product.id, cardKey, detailKey, sortOrder: 0 },
+        });
+      }
+    }
+    corpProducts.push(product);
+  }
+
+  // Kurumsal satıcının tamamlanmış (completed) satışları — stopaj (%1) snapshot'lı.
+  // Para tutarlılığı: hold = total − komisyon − stopaj (payment.service ile birebir).
+  // corpSales, Chunk B finans/fatura bölümlerinde yeniden kullanılır.
+  const corpSales: Array<{ order: any; hold: any }> = [];
+  for (let i = 0; i < corpProducts.length; i++) {
+    const p = corpProducts[i];
+    const subtotal = Number(p.price);
+    const shippingCost = 30;
+    const totalAmount = subtotal + shippingCost;
+    const commission = Math.round(subtotal * 0.05 * 100) / 100;
+    // %1 e-ticaret tevkifatı (GVK 94/19) — YALNIZCA kurumsal satıcıda.
+    const withholding = Math.round(subtotal * 0.01 * 100) / 100;
+    const createdAt = daysAgoDate(38 - i * 6);
+
+    const order = await prisma.order.create({
+      data: {
+        orderNumber: generateOrderNumber(),
+        buyerId: corpBuyer.id,
+        sellerId: corporateSeller.id,
+        productId: p.id,
+        totalAmount,
+        subtotal,
+        shippingCost,
+        commissionAmount: commission,
+        sellerFeeAmount: commission,
+        withholdingTaxAmount: withholding,
+        status: OrderStatus.completed,
+        paymentExpiresAt: new Date(createdAt.getTime() + 86400000),
+        deliveredAt: new Date(createdAt.getTime() + 3 * 86400000),
+        buyerConfirmedAt: new Date(createdAt.getTime() + 6 * 86400000),
+        completedAt: new Date(createdAt.getTime() + 6 * 86400000),
+        shippingAddress: corpShippingAddress,
+        createdAt,
+      },
+    });
+
+    const payment = await prisma.payment.create({
+      data: {
+        orderId: order.id,
+        provider: "paytr",
+        providerPaymentId: `PAY-${randomUUID().substring(0, 8)}`,
+        amount: totalAmount,
+        currency: "TRY",
+        status: PaymentStatus.completed,
+        paidAt: new Date(createdAt.getTime() + 3600000),
+      },
+    });
+
+    const holdAmount =
+      Math.round((totalAmount - commission - withholding) * 100) / 100;
+    const hold = await prisma.paymentHold.create({
+      data: {
+        paymentId: payment.id,
+        orderId: order.id,
+        sellerId: corporateSeller.id,
+        amount: holdAmount,
+        status: PaymentHoldStatus.released,
+        releaseAt: new Date(createdAt.getTime() + 5 * 86400000),
+        releasedAt: new Date(createdAt.getTime() + 6 * 86400000),
+      },
+    });
+
+    await prisma.commissionLedger.create({
+      data: {
+        orderId: order.id,
+        sellerCommission: commission,
+        buyerFee: 0,
+        totalPlatformRevenue: commission,
+        status: CommissionLedgerStatus.earned,
+        earnedAt: new Date(createdAt.getTime() + 6 * 86400000),
+      },
+    });
+
+    await prisma.shipment.create({
+      data: {
+        orderId: order.id,
+        provider: "surat",
+        trackingNumber: `SURAT${Math.random().toString().substring(2, 14)}`,
+        trackingUrl: "https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=",
+        status: ShipmentStatus.delivered,
+        shippedAt: new Date(createdAt.getTime() + 86400000),
+        deliveredAt: new Date(createdAt.getTime() + 3 * 86400000),
+      },
+    });
+
+    corpSales.push({ order, hold });
+  }
+
+  // --- 28b. Banlı (askıya alınmış) kullanıcı ---
+  const bannedUser = await prisma.user.upsert({
+    where: { email: "banned@demo.com" },
+    update: {
+      isBanned: true,
+      bannedAt: daysAgoDate(10),
+      bannedReason:
+        "Sahte ürün ilanı ve tekrarlanan dolandırıcılık şikayetleri",
+      bannedBy: superAdmin.id,
+    },
+    create: {
+      email: "banned@demo.com",
+      phone: "+905559000002",
+      passwordHash: passwordHash,
+      displayName: "Askıya Alınmış Kullanıcı",
+      isVerified: false,
+      isEmailVerified: true,
+      isSeller: false,
+      isBanned: true,
+      bannedAt: daysAgoDate(10),
+      bannedReason:
+        "Sahte ürün ilanı ve tekrarlanan dolandırıcılık şikayetleri",
+      bannedBy: superAdmin.id,
+    },
+  });
+
+  // --- 28c. Yeni (boş) kullanıcı — bugün oluştu, hiç aktivite yok, e-posta doğrulanmamış ---
+  const newUser = await prisma.user.upsert({
+    where: { email: "yeni@demo.com" },
+    update: {},
+    create: {
+      email: "yeni@demo.com",
+      phone: "+905559000003",
+      passwordHash: passwordHash,
+      displayName: "Yeni Üye",
+      isVerified: false,
+      isEmailVerified: false,
+      isSeller: false,
+      createdAt: new Date(),
+    },
+  });
+
+  // --- 28d. Üyelik durum çeşitleri (MEVCUT demo kullanıcılarında) ---
+  // cancelled: iptal edildi ama ödenmiş dönem sonuna kadar aktif (currentPeriodEnd gelecekte).
+  await prisma.userMembership.upsert({
+    where: { userId: users[4].id }, // Mehmet — Basic
+    update: {
+      status: SubscriptionStatus.cancelled,
+      cancelledAt: daysAgoDate(6),
+      currentPeriodStart: daysAgoDate(35),
+      currentPeriodEnd: new Date(now.getTime() + 20 * 86400000),
+      autoRenew: false,
+    },
+    create: {
+      userId: users[4].id,
+      tierId: basicTier.id,
+      status: SubscriptionStatus.cancelled,
+      cancelledAt: daysAgoDate(6),
+      currentPeriodStart: daysAgoDate(35),
+      currentPeriodEnd: new Date(now.getTime() + 20 * 86400000),
+    },
+  });
+  // expired: dönem geçmişte kaldı.
+  await prisma.userMembership.upsert({
+    where: { userId: users[6].id }, // Fatma — Basic
+    update: {
+      status: SubscriptionStatus.expired,
+      currentPeriodStart: daysAgoDate(400),
+      currentPeriodEnd: daysAgoDate(35),
+      autoRenew: false,
+    },
+    create: {
+      userId: users[6].id,
+      tierId: basicTier.id,
+      status: SubscriptionStatus.expired,
+      currentPeriodStart: daysAgoDate(400),
+      currentPeriodEnd: daysAgoDate(35),
+    },
+  });
+  // past_due: ödeme başarısız, dönem yeni geçti (yenileme bekliyor).
+  await prisma.userMembership.upsert({
+    where: { userId: users[11].id }, // Emre — Basic
+    update: {
+      status: SubscriptionStatus.past_due,
+      currentPeriodStart: daysAgoDate(35),
+      currentPeriodEnd: daysAgoDate(3),
+      autoRenew: true,
+    },
+    create: {
+      userId: users[11].id,
+      tierId: basicTier.id,
+      status: SubscriptionStatus.past_due,
+      currentPeriodStart: daysAgoDate(35),
+      currentPeriodEnd: daysAgoDate(3),
+      autoRenew: true,
+    },
+  });
+
+  // --- 28e. Google OAuth bağlantısı (mevcut kullanıcı) ---
+  await prisma.oAuthAccount.upsert({
+    where: {
+      provider_providerUserId: {
+        provider: "google",
+        providerUserId: "google-oauth2|103928374651029384756",
+      },
+    },
+    update: {},
+    create: {
+      userId: users[14].id, // Deniz Buyer
+      provider: "google",
+      providerUserId: "google-oauth2|103928374651029384756",
+      email: users[14].email,
+    },
+  });
+
+  // --- 28f. "Sorunlu müşteri": spam rating (yazan = müşteri) + report (hakkında) ---
+  const problemCustomer = users[16]; // Kaan
+  const annoyedSeller = users[3]; // Ahmet
+  const existingSpamRating = await prisma.rating.findFirst({
+    where: {
+      giverId: problemCustomer.id,
+      receiverId: annoyedSeller.id,
+      status: RatingStatus.spam,
+    },
+  });
+  if (!existingSpamRating) {
+    await prisma.rating.create({
+      data: {
+        giverId: problemCustomer.id,
+        receiverId: annoyedSeller.id,
+        score: 1,
+        comment:
+          "REZALET satıcı!! Herkes kaçsın, ucuz orijinal için bana yazın 0555 555 55 55",
+        status: RatingStatus.spam,
+      },
+    });
+  }
+  const existingReport = await prisma.report.findFirst({
+    where: {
+      reporterId: annoyedSeller.id,
+      type: "user",
+      targetId: problemCustomer.id,
+    },
+  });
+  if (!existingReport) {
+    await prisma.report.create({
+      data: {
+        reporterId: annoyedSeller.id,
+        type: "user",
+        targetId: problemCustomer.id,
+        reason: "spam",
+        description:
+          "Bu kullanıcı sürekli spam yorumlar bırakıyor ve satıcıları platform dışına yönlendiriyor.",
+        status: "under_review",
+      },
+    });
+  }
+
+  console.log(
+    `✅ Chunk A: corporate seller (${corpSales.length} completed sales w/ withholding), banned + new user, 3 membership states, OAuth, problem-customer report`,
+  );
+
+  // ==========================================================================
+  // 29. CHUNK B — Commerce & Content States
+  //   Sipariş/teklif/takas/ürün/finans/içerik/eLogo durumlarından birer örnek.
+  // ==========================================================================
+  console.log("Creating Chunk B: commerce & content states...");
+
+  const buyerDeniz = users[14]; // hiç satıcı değil → her ürün için geçerli alıcı
+  const denizAddr = addresses.find((a) => a.userId === buyerDeniz.id);
+  const denizShip = denizAddr
+    ? {
+        fullName: denizAddr.fullName,
+        phone: denizAddr.phone,
+        city: denizAddr.city,
+        district: denizAddr.district,
+        address: denizAddr.address,
+      }
+    : undefined;
+
+  // --- 29a. Sipariş durumları: cancelled(iptal) / refund_requested / refunded(iade) / awaiting_buyer_confirmation ---
+  const stateOrderProducts = activeProducts.slice(0, 4);
+
+  // (1) cancelled — kargo öncesi İPTAL (ödeme iade edildi).
+  {
+    const p = stateOrderProducts[0];
+    const subtotal = Number(p.price);
+    const totalAmount = subtotal + 30;
+    const createdAt = daysAgoDate(15);
+    const order = await prisma.order.create({
+      data: {
+        orderNumber: generateOrderNumber(),
+        buyerId: buyerDeniz.id,
+        sellerId: p.sellerId,
+        productId: p.id,
+        totalAmount,
+        subtotal,
+        shippingCost: 30,
+        commissionAmount: Math.round(subtotal * 0.05 * 100) / 100,
+        status: OrderStatus.cancelled,
+        cancellationType: OrderCancellationType.iptal,
+        cancelReason: "Alıcı kargo öncesi vazgeçti.",
+        paymentExpiresAt: new Date(createdAt.getTime() + 86400000),
+        shippingAddress: denizShip,
+        createdAt,
+      },
+    });
+    await prisma.payment.create({
+      data: {
+        orderId: order.id,
+        provider: "paytr",
+        providerPaymentId: `PAY-${randomUUID().substring(0, 8)}`,
+        amount: totalAmount,
+        currency: "TRY",
+        status: PaymentStatus.refunded,
+        paidAt: new Date(createdAt.getTime() + 3600000),
+        updatedAt: new Date(createdAt.getTime() + 2 * 3600000),
+      },
+    });
+  }
+
+  // (2) refund_requested — açık iade talebi + hold DONDURULMUŞ (frozenByRefundId).
+  {
+    const p = stateOrderProducts[1];
+    const subtotal = Number(p.price);
+    const totalAmount = subtotal + 30;
+    const commission = Math.round(subtotal * 0.05 * 100) / 100;
+    const createdAt = daysAgoDate(6);
+    const order = await prisma.order.create({
+      data: {
+        orderNumber: generateOrderNumber(),
+        buyerId: buyerDeniz.id,
+        sellerId: p.sellerId,
+        productId: p.id,
+        totalAmount,
+        subtotal,
+        shippingCost: 30,
+        commissionAmount: commission,
+        sellerFeeAmount: commission,
+        status: OrderStatus.refund_requested,
+        paymentExpiresAt: new Date(createdAt.getTime() + 86400000),
+        deliveredAt: new Date(createdAt.getTime() + 3 * 86400000),
+        shippingAddress: denizShip,
+        createdAt,
+      },
+    });
+    const payment = await prisma.payment.create({
+      data: {
+        orderId: order.id,
+        provider: "paytr",
+        providerPaymentId: `PAY-${randomUUID().substring(0, 8)}`,
+        amount: totalAmount,
+        currency: "TRY",
+        status: PaymentStatus.completed,
+        paidAt: new Date(createdAt.getTime() + 3600000),
+      },
+    });
+    const refundReq = await prisma.refundRequest.create({
+      data: {
+        refundNumber: generateRefundNumber(),
+        orderId: order.id,
+        requesterId: buyerDeniz.id,
+        reason: RefundReason.not_as_described,
+        description: "Ürün açıklamadan farklı geldi, iade istiyorum.",
+        amount: totalAmount,
+        status: RefundRequestStatus.pending_review,
+        createdAt: new Date(createdAt.getTime() + 4 * 86400000),
+      },
+    });
+    await prisma.paymentHold.create({
+      data: {
+        paymentId: payment.id,
+        orderId: order.id,
+        sellerId: p.sellerId,
+        amount: Math.round((totalAmount - commission) * 100) / 100,
+        status: PaymentHoldStatus.held,
+        releaseAt: new Date(createdAt.getTime() + 20 * 86400000),
+        frozenByRefundId: refundReq.id,
+      },
+    });
+  }
+
+  // (3) refunded — kargo sonrası İADE tamamlandı; hold cancelled, payment refunded.
+  {
+    const p = stateOrderProducts[2];
+    const subtotal = Number(p.price);
+    const totalAmount = subtotal + 30;
+    const commission = Math.round(subtotal * 0.05 * 100) / 100;
+    const createdAt = daysAgoDate(25);
+    const order = await prisma.order.create({
+      data: {
+        orderNumber: generateOrderNumber(),
+        buyerId: buyerDeniz.id,
+        sellerId: p.sellerId,
+        productId: p.id,
+        totalAmount,
+        subtotal,
+        shippingCost: 30,
+        commissionAmount: commission,
+        sellerFeeAmount: commission,
+        status: OrderStatus.refunded,
+        cancellationType: OrderCancellationType.iade,
+        cancelReason: "Hasarlı ürün — iade onaylandı ve tamamlandı.",
+        paymentExpiresAt: new Date(createdAt.getTime() + 86400000),
+        deliveredAt: new Date(createdAt.getTime() + 3 * 86400000),
+        shippingAddress: denizShip,
+        createdAt,
+      },
+    });
+    const payment = await prisma.payment.create({
+      data: {
+        orderId: order.id,
+        provider: "paytr",
+        providerPaymentId: `PAY-${randomUUID().substring(0, 8)}`,
+        amount: totalAmount,
+        currency: "TRY",
+        status: PaymentStatus.refunded,
+        paidAt: new Date(createdAt.getTime() + 3600000),
+        updatedAt: new Date(createdAt.getTime() + 9 * 86400000),
+      },
+    });
+    await prisma.refundRequest.create({
+      data: {
+        refundNumber: generateRefundNumber(),
+        orderId: order.id,
+        requesterId: buyerDeniz.id,
+        reason: RefundReason.damaged,
+        description: "Ürün kırık geldi, iade tamamlandı.",
+        amount: totalAmount,
+        status: RefundRequestStatus.refunded,
+        refundedAt: new Date(createdAt.getTime() + 9 * 86400000),
+        providerRefundId: `REFUND-${randomUUID().substring(0, 8)}`,
+        createdAt: new Date(createdAt.getTime() + 4 * 86400000),
+      },
+    });
+    await prisma.paymentHold.create({
+      data: {
+        paymentId: payment.id,
+        orderId: order.id,
+        sellerId: p.sellerId,
+        amount: Math.round((totalAmount - commission) * 100) / 100,
+        status: PaymentHoldStatus.cancelled,
+      },
+    });
+  }
+
+  // (4) awaiting_buyer_confirmation — teslim edildi, alıcı onayı bekleniyor.
+  //     Bu sipariş aynı zamanda finans "held hold (payout'suz)" senaryosudur.
+  let frozenHeldHoldInfo = "";
+  {
+    const p = stateOrderProducts[3];
+    const subtotal = Number(p.price);
+    const totalAmount = subtotal + 30;
+    const commission = Math.round(subtotal * 0.05 * 100) / 100;
+    const createdAt = daysAgoDate(4);
+    const order = await prisma.order.create({
+      data: {
+        orderNumber: generateOrderNumber(),
+        buyerId: buyerDeniz.id,
+        sellerId: p.sellerId,
+        productId: p.id,
+        totalAmount,
+        subtotal,
+        shippingCost: 30,
+        commissionAmount: commission,
+        sellerFeeAmount: commission,
+        status: OrderStatus.awaiting_buyer_confirmation,
+        paymentExpiresAt: new Date(createdAt.getTime() + 86400000),
+        deliveredAt: new Date(createdAt.getTime() + 3 * 86400000),
+        confirmationDeadline: new Date(now.getTime() + 4 * 86400000),
+        shippingAddress: denizShip,
+        createdAt,
+      },
+    });
+    const payment = await prisma.payment.create({
+      data: {
+        orderId: order.id,
+        provider: "paytr",
+        providerPaymentId: `PAY-${randomUUID().substring(0, 8)}`,
+        amount: totalAmount,
+        currency: "TRY",
+        status: PaymentStatus.completed,
+        paidAt: new Date(createdAt.getTime() + 3600000),
+      },
+    });
+    await prisma.commissionLedger.create({
+      data: {
+        orderId: order.id,
+        sellerCommission: commission,
+        buyerFee: 0,
+        totalPlatformRevenue: commission,
+        status: CommissionLedgerStatus.pending,
+      },
+    });
+    // held hold, payout YOK → satıcı geliri hâlâ escrow'da (frozen-hold görünürlüğü).
+    await prisma.paymentHold.create({
+      data: {
+        paymentId: payment.id,
+        orderId: order.id,
+        sellerId: p.sellerId,
+        amount: Math.round((totalAmount - commission) * 100) / 100,
+        status: PaymentHoldStatus.held,
+        releaseAt: new Date(now.getTime() + 4 * 86400000),
+      },
+    });
+    frozenHeldHoldInfo = order.orderNumber;
+  }
+
+  // --- 29a-2. Çoklu-satıcı checkout: 1 CheckoutGroup + 2 satıcıdan 2 sipariş ---
+  {
+    const s1Product = products.find((p) => p.sellerId === users[3].id); // Ahmet
+    const s2Product = products.find(
+      (p) => p.sellerId === users[5].id && p.id !== s1Product?.id,
+    ); // Ayşe
+    if (s1Product && s2Product) {
+      const sub1 = Number(s1Product.price);
+      const sub2 = Number(s2Product.price);
+      const groupTotal = sub1 + sub2 + 60;
+      const createdAt = daysAgoDate(8);
+      const group = await prisma.checkoutGroup.create({
+        data: {
+          groupNumber: `GRP${generateOrderNumber()}`,
+          buyerId: buyerDeniz.id,
+          idempotencyKey: `idem-${randomUUID()}`,
+          totalAmount: groupTotal,
+          createdAt,
+        },
+      });
+      for (const [sp, sub] of [
+        [s1Product, sub1],
+        [s2Product, sub2],
+      ] as const) {
+        await prisma.order.create({
+          data: {
+            orderNumber: generateOrderNumber(),
+            buyerId: buyerDeniz.id,
+            sellerId: sp.sellerId,
+            productId: sp.id,
+            checkoutGroupId: group.id,
+            totalAmount: sub + 30,
+            subtotal: sub,
+            shippingCost: 30,
+            commissionAmount: Math.round(sub * 0.05 * 100) / 100,
+            status: OrderStatus.paid,
+            paymentExpiresAt: new Date(createdAt.getTime() + 86400000),
+            shippingAddress: denizShip,
+            createdAt,
+          },
+        });
+      }
+      await prisma.payment.create({
+        data: {
+          checkoutGroupId: group.id,
+          provider: "paytr",
+          providerPaymentId: `PAY-${randomUUID().substring(0, 8)}`,
+          amount: groupTotal,
+          currency: "TRY",
+          status: PaymentStatus.completed,
+          paidAt: new Date(createdAt.getTime() + 3600000),
+        },
+      });
+    }
+  }
+
+  // --- 29b. Teklif durumları: cancelled + payment_expired ---
+  {
+    const p1 = activeProducts[5];
+    const p2 = activeProducts[6];
+    await prisma.offer.create({
+      data: {
+        productId: p1.id,
+        buyerId: buyerDeniz.id,
+        sellerId: p1.sellerId,
+        amount: Math.round(Number(p1.price) * 0.8 * 100) / 100,
+        status: OfferStatus.cancelled,
+        cancelReason: "Alıcı teklifini geri çekti.",
+        expiresAt: daysAgoDate(2),
+        createdAt: daysAgoDate(5),
+      },
+    });
+    await prisma.offer.create({
+      data: {
+        productId: p2.id,
+        buyerId: buyerDeniz.id,
+        sellerId: p2.sellerId,
+        amount: Math.round(Number(p2.price) * 0.85 * 100) / 100,
+        // Kabul edildi ama ödeme penceresi kaçırıldı → payment_expired.
+        status: OfferStatus.payment_expired,
+        expiresAt: daysAgoDate(1),
+        createdAt: daysAgoDate(4),
+      },
+    });
+  }
+
+  // --- 29c. Takas durumları: awaiting_payment / at_warehouse / admin_reviewing / disputed (+dispute) + TradeCashPayment ---
+  {
+    const initProd = products.find((p) => p.sellerId === users[3].id); // Ahmet
+    const recvProd = products.find(
+      (p) => p.sellerId === users[5].id && p.id !== initProd?.id,
+    ); // Ayşe
+    if (initProd && recvProd) {
+      const initiatorId = initProd.sellerId;
+      const receiverId = recvProd.sellerId;
+      const mkTrade = async (
+        status: TradeStatus,
+        extra: Record<string, any> = {},
+      ) => {
+        const trade = await prisma.trade.create({
+          data: {
+            tradeNumber: generateTradeNumber(),
+            initiatorId,
+            receiverId,
+            status,
+            initiatorMessage: `${recvProd.title} için ${initProd.title} modelimi takas etmek istiyorum.`,
+            responseDeadline: randomFutureDate(3),
+            acceptedAt: randomPastDate(4),
+            createdAt: randomPastDate(9),
+            ...extra,
+          },
+        });
+        await prisma.tradeItem.create({
+          data: {
+            tradeId: trade.id,
+            productId: initProd.id,
+            side: "initiator",
+            valueAtTrade: initProd.price,
+          },
+        });
+        await prisma.tradeItem.create({
+          data: {
+            tradeId: trade.id,
+            productId: recvProd.id,
+            side: "receiver",
+            valueAtTrade: recvProd.price,
+          },
+        });
+        return trade;
+      };
+
+      // awaiting_payment — nakit fark var; TradeCashPayment (pending) eşlenik.
+      const cashAmount = 150;
+      const cashCommission = Math.round(cashAmount * 0.05 * 100) / 100;
+      const awaitingTrade = await mkTrade(TradeStatus.awaiting_payment, {
+        cashAmount,
+        cashPayerId: initiatorId,
+        cashCommission,
+        paymentDeadline: randomFutureDate(1),
+      });
+      await prisma.tradeCashPayment.create({
+        data: {
+          tradeId: awaitingTrade.id,
+          payerId: initiatorId,
+          recipientId: receiverId,
+          amount: cashAmount,
+          commission: cashCommission,
+          totalAmount: cashAmount + cashCommission,
+          provider: "paytr",
+          status: PaymentStatus.pending,
+        },
+      });
+
+      await mkTrade(TradeStatus.at_warehouse, {
+        firstWarehouseArrivalAt: randomPastDate(2),
+      });
+      await mkTrade(TradeStatus.admin_reviewing);
+
+      const disputedTrade = await mkTrade(TradeStatus.disputed);
+      await prisma.tradeDispute.create({
+        data: {
+          tradeId: disputedTrade.id,
+          raisedById: receiverId,
+          reason: "item_not_as_described",
+          description:
+            "Karşı taraftan gelen ürün ilan fotoğrafındakinden farklı ve hasarlı.",
+        },
+      });
+    }
+  }
+
+  // --- 29d. Ürün durum örnekleri (rejected/suspended + eksik statüler) + ProductBoost ---
+  const stateProductDefs: Array<{
+    key: string;
+    status: ProductStatus;
+    img: string;
+    rejected?: boolean;
+    sellerId: string;
+  }> = [
+    {
+      key: "rejected-1",
+      status: ProductStatus.rejected,
+      img: productData[0].img,
+      rejected: true,
+      sellerId: users[3].id,
+    },
+    {
+      key: "rejected-2",
+      status: ProductStatus.rejected,
+      img: productData[1].img,
+      rejected: true,
+      sellerId: users[4].id,
+    },
+    {
+      key: "suspended-1",
+      status: ProductStatus.suspended,
+      img: productData[2].img,
+      sellerId: users[5].id,
+    },
+    {
+      key: "suspended-2",
+      status: ProductStatus.suspended,
+      img: productData[3].img,
+      sellerId: users[3].id,
+    },
+    {
+      key: "pending-1",
+      status: ProductStatus.pending,
+      img: productData[4].img,
+      sellerId: users[4].id,
+    },
+    {
+      key: "reserved-1",
+      status: ProductStatus.reserved,
+      img: productData[5].img,
+      sellerId: users[5].id,
+    },
+    {
+      key: "sold-1",
+      status: ProductStatus.sold,
+      img: productData[6].img,
+      sellerId: users[3].id,
+    },
+    {
+      key: "inactive-1",
+      status: ProductStatus.inactive,
+      img: productData[7].img,
+      sellerId: users[4].id,
+    },
+  ];
+
+  let stateProductCount = 0;
+  for (const sd of stateProductDefs) {
+    const slug = `durum-${sd.key}-${seedAssetBase(sd.img)}`;
+    const product = await prisma.product.upsert({
+      where: { slug },
+      update: { status: sd.status },
+      create: {
+        sellerId: sd.sellerId,
+        categoryId: arabaCat.id,
+        title: `[Durum: ${sd.key}] ${seedAssetBase(sd.img)}`,
+        slug,
+        description: `Durum örneği ürünü (${sd.status}).`,
+        price: randomPrice(150, 900),
+        condition: ProductCondition.good,
+        status: sd.status,
+        quantity: 1,
+        ...(sd.rejected
+          ? {
+              aiCheckStatus: "flag",
+              aiNsfwScore: 0.68,
+              aiCheckReason:
+                "Görsel ürünle alakasız / politika ihlali şüphesi — reddedildi.",
+            }
+          : {}),
+        createdAt: daysAgoDate(20),
+      },
+    });
+    if (storageService) {
+      const existingImgs = await prisma.productImage.count({
+        where: { productId: product.id },
+      });
+      if (existingImgs === 0) {
+        const { cardKey, detailKey } = await copySeedProductImages(
+          storageService,
+          sd.img,
+          product.id,
+        );
+        await prisma.productImage.create({
+          data: { productId: product.id, cardKey, detailKey, sortOrder: 0 },
+        });
+      }
+    }
+    // rejected ürünler için tutarlı ModerationEvent (section 27 formatı).
+    if (sd.rejected) {
+      const hasEvent = await prisma.moderationEvent.findFirst({
+        where: { entityType: "product", entityId: product.id },
+      });
+      if (!hasEvent) {
+        await prisma.moderationEvent.create({
+          data: {
+            entityType: "product",
+            entityId: product.id,
+            userId: sd.sellerId,
+            kind: "image",
+            field: "product_image",
+            decision: "flag",
+            nsfwScore: 0.68,
+            reason:
+              "Görsel ürünle alakasız / politika ihlali şüphesi — reddedildi.",
+          },
+        });
+      }
+    }
+    stateProductCount++;
+  }
+
+  // ProductBoost: bir aktif + bir süresi geçmiş boost (iki aktif ürün üzerinde).
+  {
+    const boostP1 = activeProducts[0];
+    const boostP2 = activeProducts[1];
+    const activeEndsAt = new Date(now.getTime() + 5 * 86400000);
+    await prisma.productBoost.create({
+      data: {
+        productId: boostP1.id,
+        userId: boostP1.sellerId,
+        durationDays: 7,
+        price: 49.99,
+        status: BoostStatus.active,
+        startsAt: daysAgoDate(2),
+        endsAt: activeEndsAt,
+      },
+    });
+    await prisma.product.update({
+      where: { id: boostP1.id },
+      data: { boostedUntil: activeEndsAt },
+    });
+    await prisma.productBoost.create({
+      data: {
+        productId: boostP2.id,
+        userId: boostP2.sellerId,
+        durationDays: 7,
+        price: 49.99,
+        status: BoostStatus.expired,
+        startsAt: daysAgoDate(14),
+        endsAt: daysAgoDate(7),
+      },
+    });
+  }
+
+  // --- 29e. Finans: satıcı banka hesapları + payout durumları (pending/completed/failed) ---
+  // Ana demo satıcılara IBAN (payout'ların "failed=no_bank_account" olmaması için).
+  const bankSellers = [
+    {
+      user: users[3],
+      name: "Ahmet Koleksiyoncu",
+      iban: "TR330006100519786457841326",
+    },
+    {
+      user: users[4],
+      name: "Mehmet Diecast",
+      iban: "TR120006200000600000000010",
+    },
+    {
+      user: users[5],
+      name: "Ayşe Vintage",
+      iban: "TR980006400000100000000011",
+    },
+    { user: users[7], name: "Ali Premium", iban: "TR760006200000600000000012" },
+  ];
+  for (const b of bankSellers) {
+    await prisma.sellerBankAccount.upsert({
+      where: { userId: b.user.id },
+      update: {},
+      create: {
+        userId: b.user.id,
+        accountHolder: b.name,
+        iban: b.iban,
+        tcKimlikNo: "11111111110",
+        isVerified: true,
+        verifiedAt: daysAgoDate(60),
+      },
+    });
+  }
+
+  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 15);
+
+  // completed payout — kurumsal satışın (corpSales[0]) released hold'undan; geçen ay işlendi.
+  {
+    const sale = corpSales[0];
+    await prisma.payoutTransfer.create({
+      data: {
+        paymentHoldId: sale.hold.id,
+        sellerId: corporateSeller.id,
+        // net_amount = amount - commission (DB CHECK). Stopaj hold'da düşülü
+        // olduğundan amount = netAmount + commission (totalAmount - stopaj).
+        amount: Number(sale.hold.amount) + Number(sale.order.commissionAmount),
+        commission: sale.order.commissionAmount,
+        withholdingTax: sale.order.withholdingTaxAmount,
+        netAmount: sale.hold.amount,
+        merchantOid: sale.order.orderNumber.replace(/-/g, ""),
+        transId: genTransId(),
+        transferIban: "TR120006200000600000000001",
+        transferName: "Miniatür Dünyası Ticaret A.Ş.",
+        status: PayoutStatus.completed,
+        processedAt: lastMonth,
+      },
+    });
+  }
+  // pending payout — kurumsal satışın (corpSales[1]) released hold'undan; henüz işlenmedi.
+  if (corpSales[1]) {
+    const sale = corpSales[1];
+    await prisma.payoutTransfer.create({
+      data: {
+        paymentHoldId: sale.hold.id,
+        sellerId: corporateSeller.id,
+        // net_amount = amount - commission (DB CHECK). Stopaj hold'da düşülü
+        // olduğundan amount = netAmount + commission (totalAmount - stopaj).
+        amount: Number(sale.hold.amount) + Number(sale.order.commissionAmount),
+        commission: sale.order.commissionAmount,
+        withholdingTax: sale.order.withholdingTaxAmount,
+        netAmount: sale.hold.amount,
+        merchantOid: sale.order.orderNumber.replace(/-/g, ""),
+        transId: genTransId(),
+        transferIban: "TR120006200000600000000001",
+        transferName: "Miniatür Dünyası Ticaret A.Ş.",
+        status: PayoutStatus.pending,
+      },
+    });
+  }
+  // failed payout — banka hesabı OLMAYAN satıcı (Zeynep) → no_bank_account.
+  {
+    const zeynep = users[8];
+    const zProduct = products.find((p) => p.sellerId === zeynep.id);
+    if (zProduct) {
+      const subtotal = Number(zProduct.price);
+      const totalAmount = subtotal + 30;
+      const commission = Math.round(subtotal * 0.05 * 100) / 100;
+      const createdAt = daysAgoDate(20);
+      const order = await prisma.order.create({
+        data: {
+          orderNumber: generateOrderNumber(),
+          buyerId: buyerDeniz.id,
+          sellerId: zeynep.id,
+          productId: zProduct.id,
+          totalAmount,
+          subtotal,
+          shippingCost: 30,
+          commissionAmount: commission,
+          sellerFeeAmount: commission,
+          status: OrderStatus.completed,
+          paymentExpiresAt: new Date(createdAt.getTime() + 86400000),
+          deliveredAt: new Date(createdAt.getTime() + 3 * 86400000),
+          completedAt: new Date(createdAt.getTime() + 6 * 86400000),
+          shippingAddress: denizShip,
+          createdAt,
+        },
+      });
+      const payment = await prisma.payment.create({
+        data: {
+          orderId: order.id,
+          provider: "paytr",
+          providerPaymentId: `PAY-${randomUUID().substring(0, 8)}`,
+          amount: totalAmount,
+          currency: "TRY",
+          status: PaymentStatus.completed,
+          paidAt: new Date(createdAt.getTime() + 3600000),
+        },
+      });
+      const holdAmount = Math.round((totalAmount - commission) * 100) / 100;
+      const hold = await prisma.paymentHold.create({
+        data: {
+          paymentId: payment.id,
+          orderId: order.id,
+          sellerId: zeynep.id,
+          amount: holdAmount,
+          status: PaymentHoldStatus.released,
+          releaseAt: new Date(createdAt.getTime() + 5 * 86400000),
+          releasedAt: new Date(createdAt.getTime() + 6 * 86400000),
+        },
+      });
+      await prisma.commissionLedger.create({
+        data: {
+          orderId: order.id,
+          sellerCommission: commission,
+          buyerFee: 0,
+          totalPlatformRevenue: commission,
+          status: CommissionLedgerStatus.earned,
+          earnedAt: new Date(createdAt.getTime() + 6 * 86400000),
+        },
+      });
+      await prisma.payoutTransfer.create({
+        data: {
+          paymentHoldId: hold.id,
+          sellerId: zeynep.id,
+          amount: totalAmount,
+          commission,
+          netAmount: holdAmount,
+          merchantOid: order.orderNumber.replace(/-/g, ""),
+          transId: genTransId(),
+          transferIban: "",
+          transferName: "",
+          status: PayoutStatus.failed,
+          failureReason: "no_bank_account",
+        },
+      });
+    }
+  }
+
+  // --- 29f. İçerik: rating (pending/rejected), mesaj (pending_approval/rejected), indirimler ---
+  await prisma.rating.create({
+    data: {
+      giverId: users[12].id, // Selin
+      receiverId: users[4].id, // Mehmet
+      score: 4,
+      comment:
+        "İyi satıcı, kargo biraz gecikti ama ürün güzeldi. (onay bekliyor)",
+      status: RatingStatus.pending,
+    },
+  });
+  await prisma.rating.create({
+    data: {
+      giverId: users[13].id, // Burak
+      receiverId: users[5].id, // Ayşe
+      score: 2,
+      comment: "Beğenmedim (moderasyon tarafından reddedildi).",
+      status: RatingStatus.rejected,
+    },
+  });
+
+  // Mesajlar: içerik filtresi → pending_approval (telefon paylaşımı) + rejected.
+  {
+    const mThread = await prisma.messageThread.create({
+      data: {
+        participant1Id: users[3].id,
+        participant2Id: users[8].id,
+        productId: null,
+        lastMessageAt: daysAgoDate(1),
+      },
+    });
+    await prisma.message.create({
+      data: {
+        threadId: mThread.id,
+        senderId: users[8].id,
+        receiverId: users[3].id,
+        content: "Direkt anlaşalım, numaram 0555 555 55 55, whatsapp'tan yaz.",
+        filteredContent:
+          "Direkt anlaşalım, numaram [telefon gizlendi], [iletişim bilgisi gizlendi] yaz.",
+        status: MessageStatus.pending_approval,
+        flaggedReason: "Telefon numarası ve WhatsApp paylaşımı",
+        createdAt: daysAgoDate(1),
+      },
+    });
+    await prisma.message.create({
+      data: {
+        threadId: mThread.id,
+        senderId: users[8].id,
+        receiverId: users[3].id,
+        content: "Platform dışına çıkalım, komisyon ödemeyelim.",
+        status: MessageStatus.rejected,
+        flaggedReason: "Platform dışı yönlendirme",
+        reviewedById: moderator.id,
+        reviewedAt: daysAgoDate(1),
+        createdAt: daysAgoDate(1),
+      },
+    });
+  }
+
+  // İndirimler: fixed_amount (mevcut TARODAN50) DIŞINDA bogo + bulk_quantity + expired.
+  const extraDiscounts = [
+    {
+      code: "AL2ODE1",
+      name: "2 Al 1 Öde",
+      description: "Seçili üründe ikincisi bedava (BOGO)",
+      type: "bogo" as const,
+      value: 100,
+      scope: "product" as const,
+      targetProductIds: [activeProducts[0].id],
+      buyQuantity: 1,
+      getQuantity: 1,
+      usageLimitTotal: 100,
+      usageLimitPerUser: 2,
+      isActive: true,
+      startDate: discountNow,
+      endDate: inOneYear,
+      priority: 4,
+    },
+    {
+      code: "TOPLU3",
+      name: "3+ Adet İndirimi",
+      description: "Aynı kategoriden 3 ve üzeri alımda %15 indirim",
+      type: "bulk_quantity" as const,
+      value: 15,
+      scope: "category" as const,
+      categoryId: arabaCat.id,
+      minQuantity: 3,
+      usageLimitTotal: 200,
+      usageLimitPerUser: 3,
+      isActive: true,
+      startDate: discountNow,
+      endDate: inOneYear,
+      priority: 5,
+    },
+    {
+      code: "GECMISKUPON",
+      name: "Süresi Dolmuş Kupon",
+      description: "Kampanya süresi geçmiş örnek kupon",
+      type: "percentage" as const,
+      value: 25,
+      scope: "global" as const,
+      usageLimitTotal: 100,
+      usageLimitPerUser: 1,
+      isActive: false,
+      startDate: new Date(discountNow.getTime() - 60 * 86400000),
+      endDate: daysAgoDate(10),
+      priority: 1,
+    },
+  ];
+  for (const d of extraDiscounts) {
+    await prisma.discount.upsert({
+      where: { code: d.code },
+      update: { name: d.name, isActive: d.isActive },
+      create: d,
+    });
+  }
+
+  // SupportTicket waiting_customer: ticketScenarios içinde zaten mevcut (2 örnek) → eklenmedi.
+
+  // --- 29g. eLogo geçmiş faturaları: Invoice + ElogoInvoice + SellerUploadedInvoice (SADECE DB kaydı) ---
+  const elogoYear = new Date().getFullYear();
+  const genElogoNumber = () =>
+    `TRD${elogoYear}${String(Math.floor(Math.random() * 1e10)).padStart(10, "0")}`;
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+
+  const invoiceSaleOrders = corpSales.map((s) => s.order);
+  const elogoStatuses = [
+    ElogoInvoiceStatus.sent,
+    ElogoInvoiceStatus.signed,
+    ElogoInvoiceStatus.sent,
+  ];
+  for (let i = 0; i < invoiceSaleOrders.length; i++) {
+    const o = invoiceSaleOrders[i];
+    const subtotal = Number(o.subtotal);
+    const taxAmount = round2(subtotal - subtotal / 1.2); // KDV %20 dahil
+    const issuedAt = daysAgoDate(30 - i * 5);
+
+    // Sipariş makbuzu (buyer-facing Invoice).
+    await prisma.invoice.create({
+      data: {
+        invoiceNumber: `FTR-${elogoYear}-${randomUUID().slice(0, 8).toUpperCase()}`,
+        orderId: o.id,
+        buyerId: o.buyerId,
+        sellerId: o.sellerId,
+        subtotal,
+        taxAmount,
+        shippingCost: Number(o.shippingCost),
+        total: Number(o.totalAmount),
+        status: "issued",
+        issuedAt,
+      },
+    });
+
+    // Tarodan'ın KENDİ komisyon gelir e-Arşiv faturası (recipient = satıcı).
+    const commissionGross = Number(o.commissionAmount);
+    const net = round2(commissionGross / 1.2);
+    await prisma.elogoInvoice.create({
+      data: {
+        type: ElogoInvoiceType.commission,
+        sourceId: o.id,
+        recipientUserId: o.sellerId,
+        recipientVknTckn: "1234567890",
+        recipientName: "Miniatür Dünyası Ticaret A.Ş.",
+        documentType: "EARCHIVE",
+        sendType: "ELEKTRONIK",
+        invoiceNumber: genElogoNumber(),
+        ettn: randomUUID(),
+        netAmount: net,
+        taxAmount: round2(net * 0.2),
+        total: round2(net * 1.2),
+        vatRate: 20,
+        status: elogoStatuses[i] ?? ElogoInvoiceStatus.sent,
+        elogoRefId: `${Math.floor(Math.random() * 1e6)}`,
+        elogoResultCode: 0,
+        elogoResultMsg: "İşlem başarılı",
+        issuedAt,
+        sentAt: issuedAt,
+      },
+    });
+  }
+
+  // Kurumsal satıcının siparişe ELLE yüklediği ürün faturası PDF'i (1 adet).
+  if (invoiceSaleOrders[0]) {
+    const o = invoiceSaleOrders[0];
+    await prisma.sellerUploadedInvoice.upsert({
+      where: { orderId: o.id },
+      update: {},
+      create: {
+        orderId: o.id,
+        sellerId: o.sellerId,
+        buyerId: o.buyerId,
+        pdfKey: `documents/seller-invoices/${o.id}/${randomUUID()}.pdf`,
+        fileName: `fatura-${o.orderNumber}.pdf`,
+        fileSize: 84213,
+        uploadedAt: daysAgoDate(28),
+      },
+    });
+  }
+
+  console.log(
+    `✅ Chunk B: order/offer/trade/product/finance/content/eLogo states created (${stateProductCount} state products, held-hold order ${frozenHeldHoldInfo})`,
+  );
+
+  // ==========================================================================
   // Summary
   // ==========================================================================
   console.log("\n🎉 COMPREHENSIVE Database seed completed successfully!");
@@ -5398,6 +6720,15 @@ async function main() {
   );
   console.log(
     "   │ Buyer Only        │ deniz@demo.com         │ Demo123!      │",
+  );
+  console.log(
+    `   │ ${"Corporate Seller".padEnd(18)}│ ${"kurumsal@demo.com".padEnd(23)}│ ${"Demo123!".padEnd(14)}│`,
+  );
+  console.log(
+    `   │ ${"Banned User".padEnd(18)}│ ${"banned@demo.com".padEnd(23)}│ ${"Demo123!".padEnd(14)}│`,
+  );
+  console.log(
+    `   │ ${"New (empty) User".padEnd(18)}│ ${"yeni@demo.com".padEnd(23)}│ ${"Demo123!".padEnd(14)}│`,
   );
   console.log(
     "   └─────────────────────────────────────────────────────────────┘",
