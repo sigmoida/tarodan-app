@@ -35,7 +35,7 @@ services:
       - "3001:3001"
     healthcheck:
       # API'nin global '/api' prefix'i var → health /api/health'te.
-      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/api/health"]
       interval: 15s
       timeout: 5s
       retries: 4
@@ -58,13 +58,13 @@ services:
       REDIS_HOST: tarodan-redis
       REDIS_PORT: 6379
       ELASTICSEARCH_NODE: http://tarodan-elasticsearch:9200
-      WORKER_HEALTH_PORT: 3003
+      WORKER_HEALTH_PORT: 3005
       CRONS_VIA_BULL: "true"
       MONEY_CRONS_VIA_BULL: "true"
     ports:
-      - "3003:3003"
+      - "3005:3005"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3003/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3005/health"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -89,7 +89,7 @@ services:
     ports:
       - "3004:3004"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3004/healthz"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3004/healthz"]
       interval: 15s
       timeout: 5s
       retries: 3

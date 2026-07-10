@@ -46,7 +46,8 @@ export function startWorkerHealth(logger: Logger): () => Promise<void> {
   void beat();
   const timer = setInterval(() => void beat(), HEARTBEAT_INTERVAL_MS);
 
-  const port = Number(process.env.WORKER_HEALTH_PORT) || 3003;
+  // 3005 (3003 DEĞİL): monitoring yığınındaki Grafana host 3003'ü kullanıyor, çakışmasın.
+  const port = Number(process.env.WORKER_HEALTH_PORT) || 3005;
   const server: Server = createServer((req, res) => {
     if (req.url !== "/health" && req.url !== "/") {
       res.writeHead(404);
