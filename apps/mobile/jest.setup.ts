@@ -43,6 +43,19 @@ jest.mock('@expo/vector-icons', () => {
   };
 });
 
+// @react-native-google-signin: native TurboModule (RNGoogleSignin) testte kayıtlı
+// değil → import anında "could not be found" ile suite load'u patlıyordu. No-op mock.
+jest.mock('@react-native-google-signin/google-signin', () => ({
+  GoogleSignin: {
+    configure: jest.fn(),
+    hasPlayServices: jest.fn(() => Promise.resolve(true)),
+    signIn: jest.fn(() => Promise.resolve({ idToken: 'test-id-token' })),
+    signOut: jest.fn(() => Promise.resolve()),
+  },
+  statusCodes: {},
+  GoogleSigninButton: () => null,
+}));
+
 // appAlert: native Alert.alert yerine geçen temalı dialog (AlertDialogHost testte
 // mount edilmez) → global jest.fn mock. Testler `appAlert as jest.Mock` ile erişir.
 jest.mock('@tarodan/ui-native', () => ({
