@@ -40,8 +40,8 @@ jest.mock('@/stores/guestStore', () => ({
     canShowPrompt: () => false,
   }),
 }));
-jest.mock('@/stores/favoritesStore', () => ({
-  useFavoritesStore: () => ({
+jest.mock('@/hooks/useFavorites', () => ({
+  useFavorites: () => ({
     addToFavorites: jest.fn(),
     removeFromFavorites: jest.fn(),
     isInFavorites: () => false,

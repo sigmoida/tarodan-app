@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { qk } from '@/lib/query';
-import { useFavoritesStore } from '@/stores/favoritesStore';
+import { useFavorites } from '@/hooks/useFavorites';
 import { invalidateProductLists } from '../_lib/invalidate';
 import type { Product } from '../_lib/types';
 
@@ -12,9 +12,8 @@ type Notify = (message: string, type: 'success' | 'error') => void;
  * Favori (beğeni) durumu + toggle. Beğeni sayısı server likeCount'undan
  * senkronlanır ve optimistic güncellenir.
  *
- * NOT: Şimdilik `favoritesStore` (fetch eden zustand) üzerinden çalışır —
- * davranış korunur. Store'un query hook'una göçü Faz 1'de bu hook'un içinde
- * izole kalır (çağıran ekran değişmez).
+ * Favoriler `useFavorites` (React Query) üzerinden gelir — davranış korunur;
+ * bu hook'un dışına (çağıran ekrana) hiçbir değişiklik sızmaz.
  */
 export function useProductFavorite({
   product,
@@ -29,7 +28,7 @@ export function useProductFavorite({
 }) {
   const queryClient = useQueryClient();
   const { addToFavorites, removeFromFavorites, isInFavorites, fetchFavorites } =
-    useFavoritesStore();
+    useFavorites();
 
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoriteCount, setFavoriteCount] = useState(0);
@@ -40,7 +39,6 @@ export function useProductFavorite({
     if (isAuthenticated && productId) {
       fetchFavorites().then(() => setIsFavorite(isInFavorites(productId)));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, productId]);
 
   // Beğeni sayısını server likeCount'undan senkronla.

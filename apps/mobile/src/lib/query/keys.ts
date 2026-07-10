@@ -125,6 +125,10 @@ export const qk = {
     unread: ['notifications-unread'] as const,
   },
 
+  favorites: {
+    all: ['favorites'] as const,
+  },
+
   addresses: {
     mine: ['my-addresses'] as const,
   },

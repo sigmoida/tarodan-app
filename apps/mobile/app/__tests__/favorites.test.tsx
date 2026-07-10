@@ -27,8 +27,8 @@ jest.mock('../../src/stores/authStore', () => ({
   useAuthStore: () => ({ isAuthenticated: mockState.isAuthenticated }),
 }));
 
-jest.mock('../../src/stores/favoritesStore', () => ({
-  useFavoritesStore: () => ({
+jest.mock('../../src/hooks/useFavorites', () => ({
+  useFavorites: () => ({
     items: mockState.items,
     isLoading: false,
     error: null,
