@@ -32,7 +32,7 @@ export function SellerTabs({ f }: { f: SellerProfileController }) {
           onPress={() => f.setActiveTab('listings')}
         >
           <Ionicons name="grid-outline" size={20} color={activeTab === 'listings' ? colors.primary[600]! : colors.text.muted} />
-          <Text style={[styles.tabText, activeTab === 'listings' && styles.tabTextActive]}>
+          <Text numberOfLines={1} style={[styles.tabText, activeTab === 'listings' && styles.tabTextActive]}>
             İlanlar ({products.length})
           </Text>
         </TouchableOpacity>
@@ -41,7 +41,7 @@ export function SellerTabs({ f }: { f: SellerProfileController }) {
           onPress={() => f.setActiveTab('reviews')}
         >
           <Ionicons name="star-outline" size={20} color={activeTab === 'reviews' ? colors.primary[600]! : colors.text.muted} />
-          <Text style={[styles.tabText, activeTab === 'reviews' && styles.tabTextActive]}>
+          <Text numberOfLines={1} style={[styles.tabText, activeTab === 'reviews' && styles.tabTextActive]}>
             Değerlendirmeler ({reviews.length})
           </Text>
         </TouchableOpacity>
@@ -50,7 +50,7 @@ export function SellerTabs({ f }: { f: SellerProfileController }) {
           onPress={() => f.setActiveTab('collections')}
         >
           <Ionicons name="albums-outline" size={20} color={activeTab === 'collections' ? colors.primary[600]! : colors.text.muted} />
-          <Text style={[styles.tabText, activeTab === 'collections' && styles.tabTextActive]}>
+          <Text numberOfLines={1} style={[styles.tabText, activeTab === 'collections' && styles.tabTextActive]}>
             Koleksiyonlar ({collections.length})
           </Text>
         </TouchableOpacity>

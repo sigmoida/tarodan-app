@@ -165,11 +165,13 @@ export const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
-    flexDirection: 'row',
+    minWidth: 0,
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    gap: 4,
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
@@ -177,7 +179,8 @@ export const styles = StyleSheet.create({
     borderBottomColor: colors.primary[600]!,
   },
   tabText: {
-    fontSize: 14,
+    fontSize: 12,
+    textAlign: 'center',
     color: colors.text.muted,
   },
   tabTextActive: {
