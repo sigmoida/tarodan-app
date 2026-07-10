@@ -12,7 +12,7 @@ import {
   isPremiumTier,
   type Subscription,
   type MembershipTier,
-} from '../subscriptionStore';
+} from '../subscription';
 
 const makeSub = (over: Partial<Subscription> = {}): Subscription => ({
   id: 's1',

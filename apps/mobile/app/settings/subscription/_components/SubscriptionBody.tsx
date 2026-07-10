@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { Card, Button, Chip, Divider, Text, theme } from '@tarodan/ui-native';
 
-import { formatBillingPeriod } from '../../../../src/stores/subscriptionStore';
+import { formatBillingPeriod } from '../_lib/subscription';
 import { styles } from '../_lib/styles';
 import type { SubscriptionController } from '../_hooks/useSubscription';
 

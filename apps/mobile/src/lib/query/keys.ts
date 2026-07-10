@@ -133,6 +133,11 @@ export const qk = {
     following: ['following'] as const,
   },
 
+  subscription: {
+    current: ['subscription-current'] as const,
+    billing: ['billing-history'] as const,
+  },
+
   addresses: {
     mine: ['my-addresses'] as const,
   },

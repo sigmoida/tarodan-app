@@ -1,34 +1,29 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { appAlert } from '@tarodan/ui-native';
 import { useAuthStore } from '../../../../src/stores/authStore';
+import { membershipApi, paymentsApi } from '../../../../src/services/api';
+import { qk } from '../../../../src/lib/query';
+import { useTranslation } from '../../../../src/i18n';
 import {
-  useSubscriptionStore,
   isSubscriptionActive,
   getDaysUntilRenewal,
   getSubscriptionStatusText,
-} from '../../../../src/stores/subscriptionStore';
-import { useTranslation } from '../../../../src/i18n';
+  type Subscription,
+  type BillingHistory,
+} from '../_lib/subscription';
 
 /**
- * Subscription settings controller — owns the subscription-store bindings, the
- * focus fetch, error→snackbar effect, cancel/reactivate handlers, and the
- * derived premium/status values. Lifted verbatim from the monolith.
+ * Subscription settings controller. Faz 1'de subscriptionStore (fetch eden
+ * zustand) buraya, tek server-state disiplinine (TanStack Query) taşındı: abonelik
+ * + fatura geçmişi query'leri, iptal/yeniden-aktifleştir mutation'ları, focus
+ * refetch, snackbar ve türetilmiş premium/durum değerleri. Davranış korunur.
  */
 export function useSubscription() {
   const { t } = useTranslation();
   const { isAuthenticated } = useAuthStore();
-  const {
-    subscription,
-    billingHistory,
-    isLoading,
-    error,
-    fetchSubscription,
-    fetchBillingHistory,
-    cancelSubscription,
-    reactivateSubscription,
-    clearError,
-  } = useSubscriptionStore();
+  const queryClient = useQueryClient();
 
   const [snackbar, setSnackbar] = useState<{
     visible: boolean;
@@ -36,21 +31,78 @@ export function useSubscription() {
     variant?: 'default' | 'success' | 'danger';
   }>({ visible: false, message: '' });
 
+  const subscriptionQuery = useQuery<Subscription | null>({
+    queryKey: qk.subscription.current,
+    enabled: isAuthenticated,
+    queryFn: async () => {
+      try {
+        const response = await membershipApi.getCurrentMembership();
+        return (response.data as any)?.data ?? response.data ?? null;
+      } catch {
+        // Abonelik yoksa null (ücretsiz kademe).
+        return null;
+      }
+    },
+  });
+
+  const billingQuery = useQuery<BillingHistory[]>({
+    queryKey: qk.subscription.billing,
+    enabled: isAuthenticated,
+    queryFn: async () => {
+      try {
+        // Backend'de henüz billing-history endpoint'i yok. Geçici olarak ödemelerden çek.
+        const response = await paymentsApi.getMyPayments({ status: 'paid', limit: 50 });
+        const list = (response.data as any)?.data ?? response.data ?? [];
+        return Array.isArray(list) ? list : [];
+      } catch {
+        return [];
+      }
+    },
+  });
+
+  const subscription = subscriptionQuery.data ?? null;
+  const billingHistory = billingQuery.data ?? [];
+  const isLoading = subscriptionQuery.isLoading;
+
   useFocusEffect(
     useCallback(() => {
       if (isAuthenticated) {
-        fetchSubscription();
-        fetchBillingHistory();
+        subscriptionQuery.refetch();
+        billingQuery.refetch();
       }
     }, [isAuthenticated])
   );
 
-  useEffect(() => {
-    if (error) {
-      setSnackbar({ visible: true, message: error, variant: 'danger' });
-      clearError();
-    }
-  }, [error]);
+  const cancelMutation = useMutation({
+    mutationFn: () => membershipApi.cancel(),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: qk.subscription.current });
+      setSnackbar({ visible: true, message: 'Abonelik iptal edildi', variant: 'success' });
+    },
+    onError: (error: any) => {
+      setSnackbar({
+        visible: true,
+        message: error?.response?.data?.message || 'Abonelik iptal edilemedi',
+        variant: 'danger',
+      });
+    },
+  });
+
+  const reactivateMutation = useMutation({
+    // Backend'de "reactivate" endpoint'i yok; auto-renew açma ile benzer davranış.
+    mutationFn: () => membershipApi.setAutoRenew(true),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: qk.subscription.current });
+      setSnackbar({ visible: true, message: 'Abonelik yeniden aktifleştirildi!', variant: 'success' });
+    },
+    onError: (error: any) => {
+      setSnackbar({
+        visible: true,
+        message: error?.response?.data?.message || 'Abonelik yenilenemedi',
+        variant: 'danger',
+      });
+    },
+  });
 
   const handleCancel = () => {
     appAlert(
@@ -61,27 +113,13 @@ export function useSubscription() {
         {
           text: 'İptal Et',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              await cancelSubscription();
-              setSnackbar({ visible: true, message: 'Abonelik iptal edildi', variant: 'success' });
-            } catch (e) {
-              // Error handled by store
-            }
-          },
+          onPress: () => cancelMutation.mutate(),
         },
       ]
     );
   };
 
-  const handleReactivate = async () => {
-    try {
-      await reactivateSubscription();
-      setSnackbar({ visible: true, message: 'Abonelik yeniden aktifleştirildi!', variant: 'success' });
-    } catch (e) {
-      // Error handled by store
-    }
-  };
+  const handleReactivate = () => reactivateMutation.mutate();
 
   // Web ile aynı mantık (profile/membership/page.tsx): yalnızca AKTİF ve ücretli
   // (free olmayan) üyelik "premium" sayılır. Backend her kullanıcıya aktif bir

@@ -1,9 +1,13 @@
 /**
  * J107 · Abonelik ayarları ekranı UI dilimleri.
  * J108 · İptal butonu görünürlüğü (premium aktif → "Aboneliği İptal Et",
- *        iptal edilmiş → "Yeniden Aktifleştir").
+ *        iptal edilmiş → downgrade uyarısı).
  * Yalnız MOBİL-UI: render durumları, buton/aksiyon görünürlüğü, misafir gate,
  * navigasyon wiring. Backend abonelik (tahsilat/webhook) backendOnly.
+ *
+ * Faz 1: subscriptionStore React Query'ye taşındı; bu test artık store yerine
+ * API katmanını (membershipApi/paymentsApi) mock'lar ve gerçek controller +
+ * türetme mantığını (isPremium/isCancelled/daysLeft) uçtan uca sürer.
  */
 import React from 'react';
 import { screen, fireEvent } from '@testing-library/react-native';
@@ -25,29 +29,22 @@ jest.mock('../../../src/stores/authStore', () => ({
   useAuthStore: () => mockAuthState,
 }));
 
-// subscriptionStore — saf yardımcıları KORU, yalnız hook'u (store) mock'la.
-let mockStoreState: any;
-jest.mock('../../../src/stores/subscriptionStore', () => {
-  const actual = jest.requireActual('../../../src/stores/subscriptionStore');
-  return {
-    ...actual,
-    useSubscriptionStore: () => mockStoreState,
-  };
-});
+// API katmanı — controller'ın query/mutation'larını besler.
+jest.mock('../../../src/services/api', () => ({
+  membershipApi: {
+    getCurrentMembership: jest.fn().mockResolvedValue({ data: null }),
+    cancel: jest.fn().mockResolvedValue({ data: {} }),
+    setAutoRenew: jest.fn().mockResolvedValue({ data: {} }),
+  },
+  paymentsApi: {
+    getMyPayments: jest.fn().mockResolvedValue({ data: [] }),
+  },
+}));
 
+import { membershipApi } from '../../../src/services/api';
 import SubscriptionSettingsScreen from '../subscription';
 
-const baseStore = () => ({
-  subscription: null,
-  billingHistory: [],
-  isLoading: false,
-  error: null,
-  fetchSubscription: jest.fn(),
-  fetchBillingHistory: jest.fn(),
-  cancelSubscription: jest.fn().mockResolvedValue(undefined),
-  reactivateSubscription: jest.fn().mockResolvedValue(undefined),
-  clearError: jest.fn(),
-});
+const mockGetMembership = membershipApi.getCurrentMembership as jest.Mock;
 
 const activePremiumSub = {
   id: 's1',
@@ -66,7 +63,7 @@ describe('J107 · abonelik ayarları (settings/subscription)', () => {
   beforeEach(() => {
     resetRouterMocks();
     mockAuthState = { isAuthenticated: true };
-    mockStoreState = baseStore();
+    mockGetMembership.mockReset().mockResolvedValue({ data: null });
   });
 
   it('misafir (oturum kapalı) → giriş yap gate gösterir', () => {
@@ -75,55 +72,50 @@ describe('J107 · abonelik ayarları (settings/subscription)', () => {
     expect(screen.getByText('Giriş Yapın')).toBeOnTheScreen();
   });
 
-  it('ücretsiz kullanıcı → "Premium\'a Yükselt" CTA gösterir', () => {
+  it('ücretsiz kullanıcı → "Premium\'a Yükselt" CTA gösterir', async () => {
     renderWithProviders(<SubscriptionSettingsScreen />);
-    expect(screen.getByText("Premium'a Yükselt")).toBeOnTheScreen();
+    expect(await screen.findByText("Premium'a Yükselt")).toBeOnTheScreen();
   });
 
-  it('regresyon: AKTİF ücretsiz üyelik premium gibi gösterilmemeli', () => {
+  it('regresyon: AKTİF ücretsiz üyelik premium gibi gösterilmemeli', async () => {
     // Backend her kullanıcıya status=active bir ücretsiz üyelik açar (~100 yıl
     // geçerli). Eskiden isPremium yalnız isSubscriptionActive'e bakıyordu; bu
     // yüzden ücretsiz kullanıcılar bile "Premium Üyelik" görüyordu. Artık tier
     // tipi de kontrol edildiği için ücretsiz üyelik premium sayılmamalı.
-    mockStoreState = {
-      ...baseStore(),
-      subscription: {
+    mockGetMembership.mockResolvedValue({
+      data: {
         ...activePremiumSub,
         tierId: 'free',
         tier: { type: 'free', name: 'Ücretsiz Üyelik' },
         currentPeriodEnd: new Date(Date.now() + 365 * 86400000).toISOString(),
       },
-    };
+    });
     renderWithProviders(<SubscriptionSettingsScreen />);
-    expect(screen.getByText('Ücretsiz Üyelik')).toBeOnTheScreen();
+    expect(await screen.findByText('Ücretsiz Üyelik')).toBeOnTheScreen();
     expect(screen.getByText("Premium'a Yükselt")).toBeOnTheScreen();
     // Premium'a özel aksiyonlar görünmemeli
     expect(screen.queryByText('Aboneliği İptal Et')).toBeNull();
   });
 
-  it('J108.1 premium aktif → "Aboneliği İptal Et" görünür', () => {
-    mockStoreState = { ...baseStore(), subscription: activePremiumSub };
+  it('J108.1 premium aktif → "Aboneliği İptal Et" görünür', async () => {
+    mockGetMembership.mockResolvedValue({ data: activePremiumSub });
     renderWithProviders(<SubscriptionSettingsScreen />);
-    expect(screen.getByText('Aboneliği İptal Et')).toBeOnTheScreen();
+    expect(await screen.findByText('Aboneliği İptal Et')).toBeOnTheScreen();
     expect(screen.getByText('Premium Üyelik')).toBeOnTheScreen();
   });
 
-  it('J108.2 iptal edilmiş (dönem içi) abonelik → downgrade uyarısı gösterir, iptal butonu yok', () => {
-    // Ekran mantığı: isPremium = active && dönem sonu gelecekte. cancelled status
-    // active olmadığından premium aksiyon kartı render edilmez; bunun yerine
-    // dönem sonu uyarısı gösterilir.
-    mockStoreState = {
-      ...baseStore(),
-      subscription: { ...activePremiumSub, status: 'cancelled' },
-    };
+  it('J108.2 iptal edilmiş (dönem içi) abonelik → downgrade uyarısı gösterir, iptal butonu yok', async () => {
+    mockGetMembership.mockResolvedValue({
+      data: { ...activePremiumSub, status: 'cancelled' },
+    });
     renderWithProviders(<SubscriptionSettingsScreen />);
-    expect(screen.getByText(/gün sonra sona erecek/)).toBeOnTheScreen();
+    expect(await screen.findByText(/gün sonra sona erecek/)).toBeOnTheScreen();
     expect(screen.queryByText('Aboneliği İptal Et')).toBeNull();
   });
 
-  it('ücretsiz CTA → /upgrade ekranına yönlendirir', () => {
+  it('ücretsiz CTA → /upgrade ekranına yönlendirir', async () => {
     renderWithProviders(<SubscriptionSettingsScreen />);
-    fireEvent.press(screen.getByText("Premium'a Yükselt"));
+    fireEvent.press(await screen.findByText("Premium'a Yükselt"));
     expect(pushMock).toHaveBeenCalledWith('/upgrade');
   });
 });
