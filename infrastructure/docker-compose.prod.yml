@@ -193,6 +193,7 @@ services:
     container_name: tarodan-api
     restart: unless-stopped
     environment:
+      PROCESS_ROLE: api
       NODE_ENV: production
       PORT: 3001
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
@@ -235,6 +236,14 @@ services:
         condition: service_healthy
     networks:
       - tarodan-network
+    healthcheck:
+      # API'nin global '/api' prefix'i var → health /api/health'te. 127.0.0.1 (IPv4):
+      # app 0.0.0.0 dinliyor, container ici 'localhost' ::1 (IPv6) cozulup reddedilir.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 40s
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.api.rule=Host(`api.${DOMAIN}`)"
@@ -242,7 +251,7 @@ services:
       - "traefik.http.routers.api.tls.certresolver=letsencrypt"
       - "traefik.http.routers.api.middlewares=rate-limit,security-headers,compress"
       - "traefik.http.services.api.loadbalancer.server.port=3001"
-      - "traefik.http.services.api.loadbalancer.healthCheck.path=/health"
+      - "traefik.http.services.api.loadbalancer.healthCheck.path=/api/health"
       - "traefik.http.services.api.loadbalancer.healthCheck.interval=10s"
     deploy:
       resources:
@@ -288,6 +297,8 @@ services:
       # Cron dual-mode flag'leri (Faz A/B rollout'unda acilir; worker ile API ayni olmali).
       CRONS_VIA_BULL: ${CRONS_VIA_BULL:-false}
       MONEY_CRONS_VIA_BULL: ${MONEY_CRONS_VIA_BULL:-false}
+      # Worker health/heartbeat portu (Docker healthcheck + izleme). Grafana 3003 kullandigi icin 3005.
+      WORKER_HEALTH_PORT: 3005
     depends_on:
       postgres:
         condition: service_healthy
@@ -295,12 +306,58 @@ services:
         condition: service_healthy
     networks:
       - tarodan-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3005/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     deploy:
       resources:
         limits:
           memory: 1G
         reservations:
           memory: 256M
+
+  # Bull Board — BAGIMSIZ kuyruk/is izleme paneli (api/worker'dan bagimsiz calisir).
+  # API cokse de ayakta kalir. Tarayicidan queues.${DOMAIN} ile erisilir (Basic Auth).
+  bullboard:
+    image: ${REGISTRY:-ghcr.io/sigmoida}/tarodan-api:${IMAGE_TAG:-latest}
+    container_name: tarodan-bullboard
+    restart: unless-stopped
+    environment:
+      PROCESS_ROLE: bullboard
+      NODE_ENV: production
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      BULLBOARD_PORT: 3004
+      BULLBOARD_USER: ${BULLBOARD_USER:-admin}
+      # ⚠ Prod'da MUTLAKA guclu bir BULLBOARD_PASS set et (yoksa admin/admin).
+      BULLBOARD_PASS: ${BULLBOARD_PASS:-admin}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - tarodan-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3004/healthz"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bullboard.rule=Host(`queues.${DOMAIN}`)"
+      - "traefik.http.routers.bullboard.entrypoints=websecure"
+      - "traefik.http.routers.bullboard.tls.certresolver=letsencrypt"
+      - "traefik.http.services.bullboard.loadbalancer.server.port=3004"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
 
   # Web Frontend (Replicas: 2)
   web:
