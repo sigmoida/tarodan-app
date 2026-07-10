@@ -200,6 +200,10 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
+      # Cron dual-mode flag'leri: worker ile AYNI olmali (yoksa biri in-process,
+      # digeri Bull calistirip cift-cron olur). Rollout'ta ikisi birlikte acilir.
+      CRONS_VIA_BULL: ${CRONS_VIA_BULL:-false}
+      MONEY_CRONS_VIA_BULL: ${MONEY_CRONS_VIA_BULL:-false}
       ELASTICSEARCH_URL: http://elasticsearch:9200
       SENDGRID_API_KEY: ${SENDGRID_API_KEY}
       IYZICO_API_KEY: ${IYZICO_API_KEY}
@@ -252,13 +256,22 @@ services:
     image: ${REGISTRY:-ghcr.io/sigmoida}/tarodan-api:${IMAGE_TAG:-latest}
     container_name: tarodan-worker
     restart: unless-stopped
-    command: node dist/worker.js
+    # Rol entrypoint.sh icinde PROCESS_ROLE ile secilir; `node dist/worker` orada
+    # calisir. Eski `command: node dist/worker.js` ise YARAMIYORDU (entrypoint
+    # argumanlari yoksayip her zaman dist/main calistiriyordu).
     environment:
+      PROCESS_ROLE: worker
       NODE_ENV: production
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
+      # Worker artik is-mantigi cron'larini (payout/payment/refund/surat) calistiriyor;
+      # bu yuzden API ile ayni gizli anahtarlara ihtiyaci var.
+      JWT_SECRET: ${JWT_SECRET}
+      IYZICO_API_KEY: ${IYZICO_API_KEY}
+      IYZICO_SECRET_KEY: ${IYZICO_SECRET_KEY}
+      SENTRY_DSN: ${SENTRY_DSN}
       SENDGRID_API_KEY: ${SENDGRID_API_KEY}
       ELASTICSEARCH_URL: http://elasticsearch:9200
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
@@ -266,6 +279,15 @@ services:
       AWS_REGION: ${AWS_REGION:-eu-west-1}
       S3_BUCKET: ${S3_BUCKET}
       S3_ENV_PREFIX: ${S3_ENV_PREFIX:-prod}
+      # Surat Kargo (sync-surat-tracking cron'u artik worker'da kosar).
+      SURAT_CARGO_ENABLED: ${SURAT_CARGO_ENABLED:-false}
+      SURAT_SOAP_MODE: ${SURAT_SOAP_MODE:-stub}
+      SURAT_KARGO_TEST_MODE: ${SURAT_KARGO_TEST_MODE:-true}
+      SURAT_KARGO_CARI_KODU: ${SURAT_KARGO_CARI_KODU}
+      SURAT_KARGO_SIFRE: ${SURAT_KARGO_SIFRE}
+      # Cron dual-mode flag'leri (Faz A/B rollout'unda acilir; worker ile API ayni olmali).
+      CRONS_VIA_BULL: ${CRONS_VIA_BULL:-false}
+      MONEY_CRONS_VIA_BULL: ${MONEY_CRONS_VIA_BULL:-false}
     depends_on:
       postgres:
         condition: service_healthy
