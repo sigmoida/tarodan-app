@@ -17,7 +17,16 @@
 `.github/workflows/staging-reset.yml` → SSH ile staging VPS'e bağlanıp
 `scripts/staging-reset-remote.sh` çalıştırır: önce pg_dump yedeği (opsiyonel,
 `skip_backup`), sonra api+worker durdurulur, `prisma migrate reset --force` +
-derlenmiş seed koşulur, redis flush edilir, container'lar geri açılır.
+derlenmiş seed koşulur, redis flush + bayat ES index'leri (products,
+collections) silinir, container'lar geri açılır — API açılışta boş index'leri
+taze DB'den kendisi doldurur (`syncIndexIfEmpty`).
+
+> **Dev notu:** Lokalde `pnpm db:reset` sonrası Elasticsearch bayat kalır ve
+> liste sayıları eski görünür. Hızlı çözüm:
+> `curl http://localhost:3001/api/search/dev/reindex` (+ `.../dev/reindex-collections`),
+> ya da 5dk'lık delta / saatlik reconcile cron'unu bekle. Listede görünen sayı
+> = `active` + `sold` ürünler (sold "Stok bitti" olarak listelenir); pending/
+> rejected/suspended/reserved indexlenmez.
 
 ### Prod guard'ları (üçü de geçmeden reset yok)
 

@@ -81,7 +81,14 @@ if [ -n "$REDIS_PASSWORD" ]; then
   docker exec tarodan-redis redis-cli -a "$REDIS_PASSWORD" FLUSHALL >/dev/null 2>&1 || log "redis flush failed (non-fatal)"
 fi
 
+# Elasticsearch is stale after a wipe too: delete the app indices while the api
+# is down — on boot, syncIndexIfEmpty repopulates empty indices from the fresh
+# DB automatically (the periodic sync would otherwise leave stale listings for
+# up to an hour). Best effort: worst case the hourly reconcile converges.
+log "dropping stale elasticsearch indices (products, collections)..."
+docker exec tarodan-elasticsearch curl -s -X DELETE "localhost:9200/products,collections" >/dev/null 2>&1 || log "es index drop failed (non-fatal)"
+
 log "starting api + worker..."
 docker compose -f "$COMPOSE_FILE" up -d api worker
 
-log "staging reset + seed complete. (Elasticsearch reindex happens via the app's own sync.)"
+log "staging reset + seed complete. (Elasticsearch reindexes itself on api boot.)"
