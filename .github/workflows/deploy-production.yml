@@ -1,16 +1,28 @@
 name: Deploy Production
 
+# When CI (ci.yml) succeeds on the master branch, trigger the Coolify
+# production applications (api/web/admin) via their deploy webhook.
+# environment: production => the "Required reviewers" set under
+# Settings > Environments > production make the deploy pass through a MANUAL
+# APPROVAL gate.
+#
+# The "Auto Deploy" toggle for the production apps MUST be OFF in Coolify.
+#
+# NOTE: workflow_run-triggered workflows only run from the version on the
+# repo's DEFAULT branch. This file must be merged into the default branch,
+# otherwise it never triggers.
+#
+# Required repo secrets:
+#   COOLIFY_URL          -> https://coolify.your-domain.com
+#   COOLIFY_TOKEN        -> Coolify API token (deploy-capable)
+#   COOLIFY_PROD_UUIDS   -> production app UUIDs, comma-separated: uuidApi,uuidWeb,uuidAdmin
+
 on:
   workflow_run:
-    workflows: [Build Images]
+    workflows: [CI]
     types: [completed]
     branches: [master]
   workflow_dispatch:
-    inputs:
-      image_tag:
-        description: 'Image tag to deploy (e.g. sha-abc123def456 or latest)'
-        required: false
-        default: 'latest'
 
 concurrency:
   group: deploy-production
@@ -18,51 +30,23 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy to Production
+    name: Trigger Coolify (production)
+    # Manual dispatch, or master CI finished GREEN.
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    # `production` environment has required reviewers => manual approval gate.
+    timeout-minutes: 25
+    # The `production` environment has required reviewers => manual approval gate.
     environment: production
     steps:
-      - name: Resolve image tag
-        id: tag
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ github.event.inputs.image_tag }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=sha-${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
-          fi
-
-      # TEMP: read-only keşif — sunucunun gerçek deploy düzenini öğrenmek için. Sonra kaldırılacak.
-      - name: Discover server layout (read-only)
-        uses: appleboy/ssh-action@v1
+      - uses: actions/checkout@v4
+      # Triggers the deploy AND waits for the result — a failed Coolify deploy
+      # fails this job, so it shows up as a failed check + GitHub failure email.
+      - name: Deploy to Coolify (production) and wait
+        uses: ./.github/actions/coolify-deploy
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USERNAME }}
-          password: ${{ secrets.SERVER_PASSWORD }}
-          command_timeout: 5m
-          script: |
-            echo "===== whoami / pwd ====="; whoami; pwd
-            echo "===== ls /opt ====="; ls -la /opt 2>/dev/null || echo "yok"
-            echo "===== ls /root ====="; ls -la /root 2>/dev/null || echo "yok"
-            echo "===== ls /home ====="; ls -la /home 2>/dev/null || echo "yok"
-            echo "===== docker ps ====="; docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}' 2>/dev/null || echo "docker yok/erişim yok"
-            echo "===== compose dosyaları (find) ====="; find /opt /root /home /srv -maxdepth 3 -iname 'docker-compose*.y*ml' 2>/dev/null || true
-            echo "===== git repo'ları (.git) ====="; find /opt /root /home /srv -maxdepth 3 -type d -name '.git' 2>/dev/null || true
-            echo "===== tarodan içeren dizinler ====="; find /opt /root /home /srv -maxdepth 3 -iname '*tarodan*' 2>/dev/null || true
-
-      - name: Backup DB then deploy over SSH
-        if: false  # keşif turunda deploy'u atla
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USERNAME }}
-          password: ${{ secrets.SERVER_PASSWORD }}
-          command_timeout: 30m
-          script: |
-            set -e
-            cd /opt/tarodan
-            git fetch origin master && git checkout master && git pull --ff-only
-            echo "==> Pre-deploy DB backup"
-            bash scripts/backup.sh || { echo "Backup failed — aborting deploy"; exit 1; }
-            ./scripts/deploy-remote.sh ${{ steps.tag.outputs.tag }}
+          coolify-url: ${{ secrets.COOLIFY_URL }}
+          coolify-token: ${{ secrets.COOLIFY_TOKEN }}
+          uuids: ${{ secrets.COOLIFY_PROD_UUIDS }}
+      - name: Report failure
+        if: failure()
+        run: echo "::error::Production deploy failed — check the logs above (Coolify deployment did not finish successfully)."
