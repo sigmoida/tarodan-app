@@ -5,6 +5,7 @@ import { MonitoringModule } from "../monitoring/monitoring.module";
 import { BullRootModule } from "./bull-root.module";
 import { WorkerModule } from "./worker.module";
 import { SchedulerModule } from "./scheduler.module";
+import { SentryModule } from "../modules/sentry";
 
 /**
  * Worker process'inin KÖK modülü (worker.ts bunu yükler; API AppModule'ü yükler).
@@ -29,6 +30,8 @@ import { SchedulerModule } from "./scheduler.module";
     }),
     PrismaModule,
     MonitoringModule,
+    // Sentry: DSN varsa worker hatalarını (Bull job fail dahil) merkezi alarma gönderir.
+    SentryModule,
     BullRootModule,
     WorkerModule,
     SchedulerModule,

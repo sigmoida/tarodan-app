@@ -1,4 +1,5 @@
 import type { Job } from "bull";
+import * as Sentry from "@sentry/node";
 
 export interface CronRunSummary {
   /** Tek satır insan-okur özet (PII İÇERMEZ — sayaç/durum). */
@@ -57,6 +58,15 @@ export async function runTrackedJob(
     return { ok: true, durationMs, summary: res.summary, stats: res.stats };
   } catch (e: any) {
     log(`✗ ERROR (${Date.now() - started}ms): ${e?.message ?? e}`);
+    // Sentry'ye bildir — Bull hata yolu → otomatik alarm. DSN tanımlı DEĞİLSE
+    // Sentry init olmadığından bu güvenle no-op'tur (davranışı değiştirmez).
+    try {
+      Sentry.captureException(e instanceof Error ? e : new Error(String(e)), {
+        tags: { cronJob: jobName },
+      });
+    } catch {
+      /* Sentry init değilse/hata verirse cron'u bozma */
+    }
     throw e; // Bull job'u "failed" yapsın, Hata sekmesi stack göstersin.
   }
 }
