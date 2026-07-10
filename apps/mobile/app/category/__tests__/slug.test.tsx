@@ -10,7 +10,7 @@ import { renderWithProviders } from '../../../src/test-utils';
 
 let mockParams: Record<string, string> = { slug: 'arabalar' };
 jest.mock('expo-router', () => ({
-  router: { push: jest.fn(), back: jest.fn() },
+  router: { push: jest.fn(), back: jest.fn(), canGoBack: jest.fn(() => false), replace: jest.fn() },
   useLocalSearchParams: () => mockParams,
 }));
 import { router } from 'expo-router';
@@ -76,6 +76,7 @@ describe('J12 · Kategori liste', () => {
   it('J12.4 geri butonu router.back çağırır', async () => {
     getBySlug.mockResolvedValue({ data: { category: { id: 'c1', name: 'Arabalar' } } });
     getAll.mockResolvedValue({ data: { data: [] } });
+    (router.canGoBack as jest.Mock).mockReturnValue(true);
     renderWithProviders(<CategoryScreen />);
     await screen.findByText('Arabalar');
 
