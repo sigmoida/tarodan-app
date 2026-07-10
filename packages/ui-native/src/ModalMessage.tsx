@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Text, StyleSheet } from 'react-native';
-import { theme } from './theme';
-import { appAlert } from './AlertDialog';
+import { theme } from './lib/theme';
+import { appAlert } from './components/AlertDialog';
 
 const { colors, spacing, typography } = theme;
 

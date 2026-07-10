@@ -67,11 +67,10 @@ describe('MakeOfferModal', () => {
     fireEvent.changeText(screen.getByTestId('offer-amount-input'), '100'); // < 195
     fireEvent.press(screen.getByTestId('offer-submit-button'));
 
+    // Hata artık modal-içi ModalMessage ile gösteriliyor (appAlert modal açıkken
+    // iOS'u dondurduğu için; useModalMessage primitive'i). testID="modal-message".
     await waitFor(() =>
-      expect(appAlert).toHaveBeenCalledWith(
-        'Düşük Tutar',
-        expect.stringContaining('Minimum teklif'),
-      ),
+      expect(screen.getByText(/Minimum teklif/)).toBeOnTheScreen(),
     );
     expect(createMock).not.toHaveBeenCalled();
   });
