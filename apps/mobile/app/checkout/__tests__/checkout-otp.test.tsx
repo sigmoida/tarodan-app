@@ -83,7 +83,7 @@ jest.mock('../../../src/components/common', () => {
 });
 
 // API mock'ları — jest.fn() inline, sonra modülden referans alınır.
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   ordersApi: {
     checkout: jest.fn(),
     checkoutGuest: jest.fn(() =>
@@ -114,7 +114,7 @@ jest.mock('../../../src/stores/authStore', () => ({
   useAuthStore: () => ({ isAuthenticated: false, user: null }),
 }));
 
-import { ordersApi } from '../../../src/services/api';
+import { ordersApi } from '@/lib/api';
 import { useCartStore } from '../../../src/stores/cartStore';
 import { replaceMock } from '../../../src/test-utils/router-mock';
 import CheckoutScreen from '../index';

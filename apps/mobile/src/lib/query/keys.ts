@@ -125,6 +125,14 @@ export const qk = {
     unread: ['notifications-unread'] as const,
   },
 
+  addresses: {
+    mine: ['my-addresses'] as const,
+  },
+
+  checkout: {
+    quote: (sig: string) => ['checkout-quote', sig] as const,
+  },
+
   support: {
     tickets: ['support-tickets'] as const,
   },

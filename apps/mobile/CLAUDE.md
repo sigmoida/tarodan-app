@@ -248,6 +248,17 @@ into section components (`HomeHeader`, `HomeSections` exporting Hero/Categories/
 Brands/Scales/FeaturedCollector/BoostedRail/PopularProducts/ProductsGrid/
 Collections, plus `CompanyOfWeekSection`), each self-gating on its data.
 
+**Sixth worked example — `app/checkout/` (multi-step form, payment flow).** The
+1376-line checkout (→ ~105-line `index.tsx`) is a 3-step guest/auth checkout with
+OTP, idempotency, and a delicate PayTR/bypass/stockout branch. The key discipline:
+the payment-critical logic (`proceedCheckout`, guest-OTP, validation, payload
+builders) was **extracted verbatim** into one controller hook (`useCheckout`) — a
+lift, never a rewrite — and the screen just composes step sections
+(`Step1Address`/`Step2Payment`/`Step3Confirm`), `CheckoutProgress`, `OrderSummary`,
+`AddressSelector`, `OtpModal`. Pure helpers live in `_lib/{validation,constants,
+types}`. When a flow is this risky, prefer one big verbatim controller hook over
+clever re-decomposition of the logic itself.
+
 ## 13. Verification
 
 - `npx tsc --noEmit` introduces **no new errors** beyond the tracked baseline.

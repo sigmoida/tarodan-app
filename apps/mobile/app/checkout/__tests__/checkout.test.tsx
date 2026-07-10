@@ -18,7 +18,7 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 jest.mock('expo-router', () => require('../../../src/test-utils/router-mock').routerMock);
 
 // API inline mock — ağ yok, deterministik. Checkout'un kullandığı tüm api'lar.
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   ordersApi: { directBuy: jest.fn(), createGuest: jest.fn() },
   paymentsApi: {
     getPaymentMethods: jest.fn(() => Promise.resolve({ data: [] })),
