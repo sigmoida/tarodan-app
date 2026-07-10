@@ -96,6 +96,11 @@ const randomFutureDate = (daysAhead: number) => {
 
 const SEED_ASSETS_PREFIX = process.env.SEED_ASSETS_PREFIX || "seed-assets";
 
+/** SEED_SKIP_IMAGES=1/true: tüm görsel adımlarını atla (S3 erişimi gerektirmez). */
+const SKIP_IMAGES = ["1", "true"].includes(
+  (process.env.SEED_SKIP_IMAGES || "").toLowerCase(),
+);
+
 /** photos/products/<img> dosya adından seed-assets taban adını türetir (slug ile aynı kural). */
 const seedAssetBase = (imgFile: string) =>
   imgFile.replace(/^product-/, "").replace(/\.png$/, "");
@@ -3221,58 +3226,66 @@ async function main() {
   console.log(`✅ ${discountCount} ürüne indirim uygulandı (%10–30)`);
 
   // ==========================================================================
-  // 11. Create Product Images (upload to S3 or use placeholder)
+  // 11. Create Product Images (S3→S3 copy from seed-assets)
+  //
+  // SEED_SKIP_IMAGES=1: skip ALL image work (no storage init, no S3 calls);
+  // image keys stay empty. Used by e2e where images are irrelevant and no
+  // real S3 credentials exist.
   // ==========================================================================
-  console.log("Creating product images...");
+  let storageService: StorageService | null = null;
 
-  // Initialize StorageService
-  const storageService = initStorageService();
-  let isStorageAvailable = false;
-
-  // Initialize storage service if available
-  if (!storageService) {
-    throw new Error(
-      "StorageService not initialized - cannot seed product images. Ensure AWS credentials are configured.",
+  if (SKIP_IMAGES) {
+    console.log(
+      "⏭️  SEED_SKIP_IMAGES set — skipping product images (no S3 access needed)",
     );
+  } else {
+    console.log("Creating product images...");
+
+    storageService = initStorageService();
+    if (!storageService) {
+      throw new Error(
+        "StorageService not initialized - cannot seed product images. Ensure AWS credentials are configured.",
+      );
+    }
+    await storageService.onModuleInit();
+    if (!storageService.isStorageAvailable()) {
+      throw new Error(
+        "S3 storage not available - cannot seed product images. Ensure S3 bucket is accessible.",
+      );
+    }
+    console.log(
+      "✅ S3 storage available, copying product images from seed-assets...",
+    );
+
+    // Delete all existing product images first (for upsert scenario)
+    const productIds = products.map((p) => p.id);
+    await prisma.productImage.deleteMany({
+      where: { productId: { in: productIds } },
+    });
+
+    // Prepare all image copy tasks - fail loudly on any error
+    const svc = storageService;
+    const imageUploadTasks = products.map(async (product, i) => {
+      const imgFile = productData[i].img;
+      const { cardKey, detailKey } = await copySeedProductImages(
+        svc,
+        imgFile,
+        product.id,
+      );
+      return {
+        productId: product.id,
+        cardKey,
+        detailKey,
+        sortOrder: 0,
+      };
+    });
+
+    const imageData = await Promise.all(imageUploadTasks);
+    await prisma.productImage.createMany({
+      data: imageData,
+    });
+    console.log(`✅ Created product images (${imageData.length} S3→S3 copies)`);
   }
-  await storageService.onModuleInit();
-  isStorageAvailable = storageService.isStorageAvailable();
-  if (!isStorageAvailable) {
-    throw new Error(
-      "S3 storage not available - cannot seed product images. Ensure S3 bucket is accessible.",
-    );
-  }
-  console.log(
-    "✅ S3 storage available, copying product images from seed-assets...",
-  );
-
-  // Delete all existing product images first (for upsert scenario)
-  const productIds = products.map((p) => p.id);
-  await prisma.productImage.deleteMany({
-    where: { productId: { in: productIds } },
-  });
-
-  // Prepare all image copy tasks - fail loudly on any error
-  const imageUploadTasks = products.map(async (product, i) => {
-    const imgFile = productData[i].img;
-    const { cardKey, detailKey } = await copySeedProductImages(
-      storageService,
-      imgFile,
-      product.id,
-    );
-    return {
-      productId: product.id,
-      cardKey,
-      detailKey,
-      sortOrder: 0,
-    };
-  });
-
-  const imageData = await Promise.all(imageUploadTasks);
-  await prisma.productImage.createMany({
-    data: imageData,
-  });
-  console.log(`✅ Created product images (${imageData.length} S3→S3 copies)`);
 
   // ==========================================================================
   // 12. Create Collections (one per category + thematic)
@@ -3405,10 +3418,10 @@ async function main() {
       ? (categories.find((c) => c.slug === cd.catSlug)?.id ?? null)
       : null;
 
-    const coverKey = await copySeedCollectionCover(
-      storageService!,
-      cd.coverFile,
-    );
+    // SEED_SKIP_IMAGES: kapak kopyalanmaz, coverImageKey null kalır
+    const coverKey = storageService
+      ? await copySeedCollectionCover(storageService, cd.coverFile)
+      : null;
 
     const existingBySlug = await prisma.collection.findFirst({
       where: { slug: cd.slug, userId: cd.user.id },
