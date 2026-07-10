@@ -1,12 +1,12 @@
 import { Stack } from 'expo-router';
-import { TarodanColors } from '../../../src/theme';
+import { theme } from '@tarodan/ui-native';
 
 export default function ListingLayout() {
   return (
     <Stack
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: TarodanColors.background },
+        contentStyle: { backgroundColor: theme.colors.white },
       }}
     />
   );

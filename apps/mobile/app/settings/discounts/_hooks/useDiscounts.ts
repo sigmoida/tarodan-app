@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { appAlert } from '@tarodan/ui-native';
-import { useAuthStore } from '../../../../src/stores/authStore';
-import { discountsApi, productsApi } from '../../../../src/services/api';
-import { useRefresh } from '../../../../src/hooks/useRefresh';
+import { useAuthStore } from '@/stores/authStore';
+import { discountsApi, productsApi } from '@/services/api';
+import { useRefresh } from '@/hooks/useRefresh';
 import { initialForm, type Discount, type MyProduct } from '../_lib/types';
 
 /**

@@ -7,12 +7,12 @@
 import React from 'react';
 import { TextInput } from 'react-native';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
-jest.mock('../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   supportApi: { createTicket: jest.fn() },
 }));
-import { supportApi } from '../../src/services/api';
+import { supportApi } from '@/services/api';
 const mockCreateTicket = supportApi.createTicket as jest.Mock;
 
 jest.mock('expo-router', () => ({
@@ -26,11 +26,11 @@ let mockAuth: { isAuthenticated: boolean; user: any } = {
   isAuthenticated: true,
   user: { displayName: 'Ayşe', email: 'ayse@test.com' },
 };
-jest.mock('../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => mockAuth,
 }));
 
-jest.mock('../../src/i18n', () => ({
+jest.mock('@/i18n', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 

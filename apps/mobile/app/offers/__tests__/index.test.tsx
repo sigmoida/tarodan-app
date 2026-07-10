@@ -5,14 +5,14 @@
  */
 import React from 'react';
 import { screen, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: jest.fn(() => false) },
   useLocalSearchParams: () => ({}),
 }));
 
-jest.mock('../../../src/i18n', () => ({
+jest.mock('@/i18n', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 
@@ -25,7 +25,7 @@ jest.mock('@/lib/api', () => ({
 import { offersApi } from '@/lib/api';
 
 let mockAuth = { isAuthenticated: true, isLoading: false };
-jest.mock('../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => mockAuth,
 }));
 

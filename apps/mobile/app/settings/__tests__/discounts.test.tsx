@@ -9,20 +9,20 @@ import React from 'react';
 import { appAlert } from '@tarodan/ui-native';
 import { TextInput } from 'react-native';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
-import { resetRouterMocks, pushMock } from '../../../src/test-utils/router-mock';
+import { renderWithProviders } from '@/test-utils';
+import { resetRouterMocks, pushMock } from '@/test-utils/router-mock';
 
-jest.mock('expo-router', () => require('../../../src/test-utils/router-mock').routerMock);
+jest.mock('expo-router', () => require('@/test-utils/router-mock').routerMock);
 
 let mockAuthState: any = {
   isAuthenticated: true,
   user: { id: 'u1', isSeller: true },
 };
-jest.mock('../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => mockAuthState,
 }));
 
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   discountsApi: {
     getAll: jest.fn(),
     create: jest.fn(),
@@ -31,7 +31,7 @@ jest.mock('../../../src/services/api', () => ({
   },
   productsApi: { getMyListings: jest.fn() },
 }));
-import { discountsApi, productsApi } from '../../../src/services/api';
+import { discountsApi, productsApi } from '@/services/api';
 const mockGetAll = discountsApi.getAll as jest.Mock;
 const mockGetListings = productsApi.getMyListings as jest.Mock;
 

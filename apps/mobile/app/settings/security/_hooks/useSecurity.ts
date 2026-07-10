@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { appAlert, useModalMessage, alertAfterClose } from '@tarodan/ui-native';
-import { useAuthStore } from '../../../../src/stores/authStore';
-import { authApi } from '../../../../src/services/api';
-import { useTranslation } from '../../../../src/i18n';
+import { useAuthStore } from '@/stores/authStore';
+import { authApi } from '@/services/api';
+import { useTranslation } from '@/i18n';
 
 /**
  * Güvenlik ekranı controller'ı — şifre değiştirme, 2FA kurulum/kapat/yedek-kod,

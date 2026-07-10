@@ -6,27 +6,27 @@
  */
 import React from 'react';
 import { screen, fireEvent } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
-import { pushMock as mockPush, resetRouterMocks } from '../../../src/test-utils/router-mock';
+import { pushMock as mockPush, resetRouterMocks } from '@/test-utils/router-mock';
 
 jest.mock('expo-router', () => ({
-  ...require('../../../src/test-utils/router-mock').routerMock,
+  ...require('@/test-utils/router-mock').routerMock,
   useFocusEffect: jest.fn(),
   useLocalSearchParams: () => ({}),
 }));
 
-jest.mock('../../../src/i18n', () => ({
+jest.mock('@/i18n', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 
 let mockAuth: any = { isAuthenticated: true, user: { id: 'me' }, limits: { maxMessagesPerDay: 50 } };
-jest.mock('../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => mockAuth,
 }));
 
 let mockMessages: any;
-jest.mock('../../../src/stores/messagesStore', () => ({
+jest.mock('@/stores/messagesStore', () => ({
   useMessagesStore: () => mockMessages,
 }));
 

@@ -15,8 +15,8 @@ import { router, useFocusEffect } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useAuthStore } from '../../src/stores/authStore';
-import { useTranslation } from '../../src/i18n';
+import { useAuthStore } from '@/stores/authStore';
+import { useTranslation } from '@/i18n';
 
 const { colors } = theme;
 

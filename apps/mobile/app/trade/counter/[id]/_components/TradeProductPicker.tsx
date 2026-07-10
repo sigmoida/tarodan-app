@@ -3,8 +3,8 @@ import { View, Pressable, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, Text, theme } from '@tarodan/ui-native';
 
-import { formatPrice } from '../../../../../src/utils/format';
-import { transformImageUrl } from '../../../../../src/utils/imageUrl';
+import { formatPrice } from '@/utils/format';
+import { transformImageUrl } from '@/utils/imageUrl';
 import { styles } from '../_lib/styles';
 import { itemId, type TradeItem } from '../_lib/types';
 

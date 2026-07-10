@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { userApi, collectionsApi, membershipApi } from '../../../src/services/api';
-import { useAuthStore } from '../../../src/stores/authStore';
+import { userApi, collectionsApi, membershipApi } from '@/services/api';
+import { useAuthStore } from '@/stores/authStore';
 import type { ProfileCollection } from '../_lib/profileConstants';
 
 /**

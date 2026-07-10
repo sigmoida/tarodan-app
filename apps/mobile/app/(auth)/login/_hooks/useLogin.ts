@@ -4,10 +4,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { appAlert } from '@tarodan/ui-native';
-import { authApi } from '../../../../src/services/api';
-import { signInWithGoogle } from '../../../../src/services/googleSignin';
-import { signInWithApple, isAppleAvailable } from '../../../../src/services/appleSignin';
-import { useAuthStore } from '../../../../src/stores/authStore';
+import { authApi } from '@/services/api';
+import { signInWithGoogle } from '@/services/googleSignin';
+import { signInWithApple, isAppleAvailable } from '@/services/appleSignin';
+import { useAuthStore } from '@/stores/authStore';
 import { loginSchema, type LoginForm } from '../_lib/schema';
 
 /**

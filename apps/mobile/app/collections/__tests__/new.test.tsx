@@ -6,21 +6,21 @@
  */
 import React from 'react';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
-import { resetRouterMocks } from '../../../src/test-utils/router-mock';
+import { renderWithProviders } from '@/test-utils';
+import { resetRouterMocks } from '@/test-utils/router-mock';
 
-jest.mock('expo-router', () => require('../../../src/test-utils/router-mock').routerMock);
+jest.mock('expo-router', () => require('@/test-utils/router-mock').routerMock);
 
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   api: { post: jest.fn(), patch: jest.fn() },
 }));
-import { api } from '../../../src/services/api';
+import { api } from '@/services/api';
 
 let mockAuth: Record<string, unknown> = {
   isAuthenticated: true,
   limits: { canCreateCollections: true },
 };
-jest.mock('../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => mockAuth,
 }));
 

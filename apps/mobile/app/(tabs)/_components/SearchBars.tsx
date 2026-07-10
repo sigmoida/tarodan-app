@@ -3,7 +3,7 @@ import { View, ScrollView, TouchableOpacity, Pressable, Animated } from 'react-n
 import { Ionicons } from '@expo/vector-icons';
 import { Chip, Input, Text, theme } from '@tarodan/ui-native';
 
-import { SORT_OPTIONS } from '../../../src/utils/productFilters';
+import { SORT_OPTIONS } from '@/utils/productFilters';
 import { styles } from '../_lib/searchStyles';
 import { SearchSuggestions } from './SearchSuggestions';
 import type { SearchController } from '../_hooks/useSearch';

@@ -4,10 +4,10 @@ import { Card, Text, theme } from '@tarodan/ui-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { userApi, ordersApi, productsApi } from '../../src/services/api';
-import { ScreenHeader, EmptyState, ScreenLoader } from '../../src/components/common';
-import { formatPrice } from '../../src/utils/format';
-import { useAuthStore } from '../../src/stores/authStore';
+import { userApi, ordersApi, productsApi } from '@/services/api';
+import { ScreenHeader, EmptyState, ScreenLoader } from '@/components/common';
+import { formatPrice } from '@/utils/format';
+import { useAuthStore } from '@/stores/authStore';
 
 const { colors } = theme;
 

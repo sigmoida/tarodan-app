@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, Button, IconButton, Text, theme } from '@tarodan/ui-native';
 
-import { useTranslation } from '../../../../src/i18n';
+import { useTranslation } from '@/i18n';
 import { styles } from '../_lib/styles';
 import type { Address } from '../_lib/types';
 

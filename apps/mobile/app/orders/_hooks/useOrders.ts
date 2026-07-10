@@ -1,9 +1,9 @@
 import { useState, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { ordersApi } from '../../../src/services/api';
-import { useAuthStore } from '../../../src/stores/authStore';
-import { apiStatusToUi, uiFilterToApiStatusParam } from '../../../src/utils/orderStatus';
+import { ordersApi } from '@/services/api';
+import { useAuthStore } from '@/stores/authStore';
+import { apiStatusToUi, uiFilterToApiStatusParam } from '@/utils/orderStatus';
 import {
   normalizeOrder,
   type Order,

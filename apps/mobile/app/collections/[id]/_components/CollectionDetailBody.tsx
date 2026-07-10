@@ -4,8 +4,8 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Avatar, Button, Chip, Divider, Text, theme } from '@tarodan/ui-native';
 
-import { ThemedRefreshControl } from '../../../../src/components/common';
-import { transformImageUrl } from '../../../../src/utils/imageUrl';
+import { ThemedRefreshControl } from '@/components/common';
+import { transformImageUrl } from '@/utils/imageUrl';
 import { styles } from '../_lib/collectionStyles';
 import type { CollectionDetailController } from '../_hooks/useCollectionDetail';
 

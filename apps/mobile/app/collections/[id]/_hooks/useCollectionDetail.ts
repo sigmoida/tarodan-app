@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { Share } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
-import { api, collectionsApi } from '../../../../src/services/api';
-import { useRefresh } from '../../../../src/hooks/useRefresh';
-import { useAuthStore } from '../../../../src/stores/authStore';
-import { buildShareContent, collectionShareUrl } from '../../../../src/utils/share';
+import { api, collectionsApi } from '@/services/api';
+import { useRefresh } from '@/hooks/useRefresh';
+import { useAuthStore } from '@/stores/authStore';
+import { buildShareContent, collectionShareUrl } from '@/utils/share';
 
 /**
  * Collection detail controller — owns the collection query, optimistic like,

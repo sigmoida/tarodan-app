@@ -5,17 +5,17 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import * as SplashScreen from 'expo-splash-screen';
 import Constants from 'expo-constants';
 import { theme, AlertDialogHost } from '@tarodan/ui-native';
-import { useAuthStore } from '../src/stores/authStore';
-import { useMessagesStore } from '../src/stores/messagesStore';
-import { connectSocket, disconnectSocket } from '../src/services/socket';
+import { useAuthStore } from '@/stores/authStore';
+import { useMessagesStore } from '@/stores/messagesStore';
+import { connectSocket, disconnectSocket } from '@/services/socket';
 // Paylaşılan QueryClient — logout'ta resetUserStores aynı örneği temizler.
-import { queryClient } from '../src/lib/queryClient';
-import { registerForPushNotifications, setupPushNotificationRouting } from '../src/services/push';
-import { LanguageProvider } from '../src/i18n';
-import { initSentry } from '../src/services/sentry';
-import AnimatedSplash from '../src/components/AnimatedSplash';
-import BusinessMembershipGuard from '../src/components/BusinessMembershipGuard';
-import { ErrorBoundary } from '../src/components/ErrorBoundary';
+import { queryClient } from '@/lib/queryClient';
+import { registerForPushNotifications, setupPushNotificationRouting } from '@/services/push';
+import { LanguageProvider } from '@/i18n';
+import { initSentry } from '@/services/sentry';
+import AnimatedSplash from '@/components/AnimatedSplash';
+import BusinessMembershipGuard from '@/components/BusinessMembershipGuard';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const { colors } = theme;
 

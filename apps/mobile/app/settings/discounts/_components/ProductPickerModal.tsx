@@ -3,7 +3,7 @@ import { View, ScrollView, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Modal, Button, Spinner, Text, theme } from '@tarodan/ui-native';
 
-import { formatPrice } from '../../../../src/utils/format';
+import { formatPrice } from '@/utils/format';
 import { styles } from '../_lib/styles';
 import type { DiscountsController } from '../_hooks/useDiscounts';
 

@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Button, ScreenHeader, Text, theme } from '@tarodan/ui-native';
 
-import { getUpgradeMessage } from '../../../../src/utils/membershipLimits';
+import { getUpgradeMessage } from '@/utils/membershipLimits';
 import { styles } from '../_lib/styles';
 import type { NewTradeController } from '../_hooks/useNewTrade';
 

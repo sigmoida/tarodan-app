@@ -3,10 +3,10 @@ import { View, Pressable, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, Text, theme } from '@tarodan/ui-native';
 
-import { getImageUrl as getImageUrlFromUtils } from '../../../src/utils/imageUrl';
-import { isProductOutOfStock } from '../../../src/utils/productPrice';
-import { OutOfStockOverlay } from '../../../src/components/product';
-import { asLabel } from '../../../src/utils/format';
+import { getImageUrl as getImageUrlFromUtils } from '@/utils/imageUrl';
+import { isProductOutOfStock } from '@/utils/productPrice';
+import { OutOfStockOverlay } from '@/components/product';
+import { asLabel } from '@/utils/format';
 import { styles } from '../_lib/searchStyles';
 
 const { colors } = theme;

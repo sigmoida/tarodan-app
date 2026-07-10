@@ -4,7 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme, Text, Spinner, Divider, ScreenHeader } from '@tarodan/ui-native';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { ratingsApi } from '../../../src/services/api';
+import { ratingsApi } from '@/services/api';
 
 const { colors } = theme;
 

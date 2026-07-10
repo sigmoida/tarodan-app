@@ -1,4 +1,4 @@
-import { DEFAULT_COUNTRY_CODE } from '../../../../src/utils/phone';
+import { DEFAULT_COUNTRY_CODE } from '@/utils/phone';
 
 export interface Address {
   id: string;

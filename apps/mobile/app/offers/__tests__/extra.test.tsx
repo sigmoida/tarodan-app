@@ -7,14 +7,14 @@
  */
 import React from 'react';
 import { screen, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: jest.fn(() => false) },
   useLocalSearchParams: () => ({ id: 'offer-1' }),
 }));
 
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   offersApi: {
     getOne: jest.fn(),
     accept: jest.fn(),
@@ -23,10 +23,10 @@ jest.mock('../../../src/services/api', () => ({
     counter: jest.fn(),
   },
 }));
-import { offersApi } from '../../../src/services/api';
+import { offersApi } from '@/services/api';
 
 let mockUser: { id: string } | null = { id: 'seller-1' };
-jest.mock('../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({ user: mockUser }),
 }));
 

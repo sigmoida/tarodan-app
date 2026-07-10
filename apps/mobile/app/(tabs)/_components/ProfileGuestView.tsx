@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Snackbar, Text, theme } from '@tarodan/ui-native';
 
-import { SignupPrompt } from '../../../src/components/SignupPrompt';
+import { SignupPrompt } from '@/components/SignupPrompt';
 import { styles } from '../_lib/profileStyles';
 import { benefitTints } from '../_lib/profileConstants';
 import type { ProfileController } from '../_hooks/useProfile';

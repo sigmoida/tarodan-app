@@ -6,25 +6,25 @@
  */
 import React from 'react';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
-import { resetRouterMocks, pushMock } from '../../../src/test-utils/router-mock';
+import { renderWithProviders } from '@/test-utils';
+import { resetRouterMocks, pushMock } from '@/test-utils/router-mock';
 
-jest.mock('expo-router', () => require('../../../src/test-utils/router-mock').routerMock);
+jest.mock('expo-router', () => require('@/test-utils/router-mock').routerMock);
 
-jest.mock('../../../src/i18n', () => ({
+jest.mock('@/i18n', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 
 let mockAuthState: any = { isAuthenticated: true, user: {} };
-jest.mock('../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => mockAuthState,
 }));
 
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   api: { get: jest.fn() },
   membershipApi: { getCurrentMembership: jest.fn(), getTiers: jest.fn() },
 }));
-import { membershipApi } from '../../../src/services/api';
+import { membershipApi } from '@/services/api';
 const mockGetMembership = membershipApi.getCurrentMembership as jest.Mock;
 const mockGetTiers = membershipApi.getTiers as jest.Mock;
 

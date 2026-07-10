@@ -17,14 +17,14 @@ import {
   VStack,
   theme,
 } from '@tarodan/ui-native';
-import { authApi } from '../../src/services/api';
+import { authApi } from '@/services/api';
 import {
   displayNameSchema,
   emailSchema,
   strongPasswordSchema,
   isAdult,
-} from '../../src/utils/validation';
-import { BrandLogo } from '../../src/components/BrandLogo';
+} from '@/utils/validation';
+import { BrandLogo } from '@/components/BrandLogo';
 
 const { colors } = theme;
 

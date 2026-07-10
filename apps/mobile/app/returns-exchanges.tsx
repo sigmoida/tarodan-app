@@ -2,8 +2,8 @@ import { View, ScrollView, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme, Text, Card, ScreenHeader } from '@tarodan/ui-native';
-import { useTranslation } from '../src/i18n';
-import { RETURN_REQUEST_DAYS, REFUND_PAYOUT_DAYS } from '../src/constants/legalFacts';
+import { useTranslation } from '@/i18n';
+import { RETURN_REQUEST_DAYS, REFUND_PAYOUT_DAYS } from '@/constants/legalFacts';
 
 const { colors } = theme;
 

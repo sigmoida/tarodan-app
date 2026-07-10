@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { appAlert } from '@tarodan/ui-native';
-import { useAuthStore } from '../../../src/stores/authStore';
-import { membershipApi } from '../../../src/services/api';
-import { useTranslation } from '../../../src/i18n';
+import { useAuthStore } from '@/stores/authStore';
+import { membershipApi } from '@/services/api';
+import { useTranslation } from '@/i18n';
 import {
   TIER_ORDER,
   TIER_FEATURES,

@@ -1,10 +1,10 @@
 import { useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '../../../../src/services/api';
-import { useRefresh } from '../../../../src/hooks/useRefresh';
-import { useAuthStore } from '../../../../src/stores/authStore';
-import { useTranslation } from '../../../../src/i18n';
+import { api } from '@/services/api';
+import { useRefresh } from '@/hooks/useRefresh';
+import { useAuthStore } from '@/stores/authStore';
+import { useTranslation } from '@/i18n';
 import type { Analytics } from '../_lib/types';
 
 /**

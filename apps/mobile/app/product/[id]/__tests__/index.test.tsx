@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { screen, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: jest.fn(() => false) },

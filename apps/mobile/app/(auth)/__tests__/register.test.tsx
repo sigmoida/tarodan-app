@@ -5,15 +5,15 @@
  */
 import React from 'react';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
-import { routerMock, resetRouterMocks } from '../../../src/test-utils/router-mock';
+import { renderWithProviders } from '@/test-utils';
+import { routerMock, resetRouterMocks } from '@/test-utils/router-mock';
 
-jest.mock('expo-router', () => require('../../../src/test-utils/router-mock').routerMock);
+jest.mock('expo-router', () => require('@/test-utils/router-mock').routerMock);
 
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   authApi: { register: jest.fn() },
 }));
-import { authApi } from '../../../src/services/api';
+import { authApi } from '@/services/api';
 import RegisterScreen from '../register';
 
 const mockRegister = authApi.register as jest.Mock;

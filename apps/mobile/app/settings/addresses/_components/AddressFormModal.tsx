@@ -3,7 +3,7 @@ import { View, ScrollView, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Modal, Button, Input, Text, theme } from '@tarodan/ui-native';
 
-import { CityDistrictSelector, PhoneInput } from '../../../../src/components/common';
+import { CityDistrictSelector, PhoneInput } from '@/components/common';
 import { styles } from '../_lib/styles';
 import type { AddressesController } from '../_hooks/useAddresses';
 

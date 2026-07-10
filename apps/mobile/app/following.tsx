@@ -3,8 +3,8 @@ import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme, Text, Card, Avatar, Button, Spinner, ScreenHeader } from '@tarodan/ui-native';
-import { useFollowing, FollowedSeller } from '../src/hooks/useFollowing';
-import { useAuthStore } from '../src/stores/authStore';
+import { useFollowing, FollowedSeller } from '@/hooks/useFollowing';
+import { useAuthStore } from '@/stores/authStore';
 
 const { colors } = theme;
 

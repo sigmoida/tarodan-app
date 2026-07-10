@@ -7,7 +7,7 @@
  */
 import React from 'react';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 let mockParams: Record<string, string> = { id: 'col-1' };
 const mockPush = jest.fn();
@@ -17,17 +17,17 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
 }));
 
-jest.mock('../../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   api: { get: jest.fn() },
   collectionsApi: { like: jest.fn(), unlike: jest.fn() },
 }));
-import { api, collectionsApi } from '../../../../src/services/api';
+import { api, collectionsApi } from '@/services/api';
 
 let mockAuth: Record<string, unknown> = {
   isAuthenticated: true,
   user: { id: 'owner-1', membershipTier: 'free' },
 };
-jest.mock('../../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => mockAuth,
 }));
 

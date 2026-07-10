@@ -3,8 +3,8 @@ import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
 import { theme, Text } from '@tarodan/ui-native';
-import { ScreenHeader } from '../../src/components/common';
-import { useLanguage, localeNames, localeFlags, Locale } from '../../src/i18n';
+import { ScreenHeader } from '@/components/common';
+import { useLanguage, localeNames, localeFlags, Locale } from '@/i18n';
 
 const { colors } = theme;
 

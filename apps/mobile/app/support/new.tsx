@@ -3,10 +3,10 @@ import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme, Text, Card, Chip, Snackbar, Input, Textarea, Button, ScreenHeader } from '@tarodan/ui-native';
-import { useAuthStore } from '../../src/stores/authStore';
-import { useTranslation } from '../../src/i18n';
-import { supportApi } from '../../src/services/api';
-import { SUPPORT_EMAIL } from '../../src/constants/legalFacts';
+import { useAuthStore } from '@/stores/authStore';
+import { useTranslation } from '@/i18n';
+import { supportApi } from '@/services/api';
+import { SUPPORT_EMAIL } from '@/constants/legalFacts';
 
 const { colors } = theme;
 

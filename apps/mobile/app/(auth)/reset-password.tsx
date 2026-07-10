@@ -12,8 +12,8 @@ import {
   VStack,
   theme,
 } from '@tarodan/ui-native';
-import { authApi } from '../../src/services/api';
-import { useTranslation } from '../../src/i18n';
+import { authApi } from '@/services/api';
+import { useTranslation } from '@/i18n';
 
 const { colors, radius, spacing } = theme;
 

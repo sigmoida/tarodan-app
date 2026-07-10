@@ -5,14 +5,14 @@
  */
 import React from 'react';
 import { screen, fireEvent } from '@testing-library/react-native';
-import { renderWithProviders } from '../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), back: jest.fn(), replace: jest.fn() },
   Stack: { Screen: () => null },
 }));
 
-jest.mock('../../src/i18n', () => ({
+jest.mock('@/i18n', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 

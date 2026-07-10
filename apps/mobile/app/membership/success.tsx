@@ -4,8 +4,8 @@ import { theme, Button, Text } from '@tarodan/ui-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAuthStore } from '../../src/stores/authStore';
-import { paymentsApi } from '../../src/services/api';
+import { useAuthStore } from '@/stores/authStore';
+import { paymentsApi } from '@/services/api';
 
 const { colors } = theme;
 

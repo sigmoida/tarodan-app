@@ -3,11 +3,11 @@ import { ScrollView, Platform } from 'react-native';
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { appAlert } from '@tarodan/ui-native';
-import { useMessagesStore } from '../../../../src/stores/messagesStore';
-import { useAuthStore } from '../../../../src/stores/authStore';
-import { detectViolations, getViolationMessage } from '../../../../src/utils/contentFilter';
-import { mediaApi, userApi } from '../../../../src/services/api';
-import { getSocket } from '../../../../src/services/socket';
+import { useMessagesStore } from '@/stores/messagesStore';
+import { useAuthStore } from '@/stores/authStore';
+import { detectViolations, getViolationMessage } from '@/utils/contentFilter';
+import { mediaApi, userApi } from '@/services/api';
+import { getSocket } from '@/services/socket';
 import { groupMessagesByDate } from '../_lib/helpers';
 
 /**

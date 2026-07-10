@@ -3,7 +3,7 @@ import { FAB, Button, Spinner, Text, ScreenHeader, theme } from '@tarodan/ui-nat
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { BoostModal } from '../../../src/components/product/BoostModal';
+import { BoostModal } from '@/components/product/BoostModal';
 import { styles } from './_lib/styles';
 import { useMyListings } from './_hooks/useMyListings';
 import {

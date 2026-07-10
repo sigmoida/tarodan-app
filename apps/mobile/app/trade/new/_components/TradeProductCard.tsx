@@ -3,9 +3,9 @@ import { View, Pressable, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, theme } from '@tarodan/ui-native';
 
-import { getImageUrl } from '../../../../src/utils/imageUrl';
-import { getProductEffectivePrice } from '../../../../src/utils/productPrice';
-import { formatPrice } from '../../../../src/utils/format';
+import { getImageUrl } from '@/utils/imageUrl';
+import { getProductEffectivePrice } from '@/utils/productPrice';
+import { formatPrice } from '@/utils/format';
 import { styles } from '../_lib/styles';
 import type { Product } from '../_lib/types';
 

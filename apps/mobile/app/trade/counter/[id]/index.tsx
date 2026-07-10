@@ -1,7 +1,7 @@
 import { View } from 'react-native';
 import { Snackbar } from '@tarodan/ui-native';
 
-import { ScreenHeader, ScreenLoader, ErrorState } from '../../../../src/components/common';
+import { ScreenHeader, ScreenLoader, ErrorState } from '@/components/common';
 import { styles } from './_lib/styles';
 import { useTradeCounter } from './_hooks/useTradeCounter';
 import { TradeCounterBody } from './_components/TradeCounterBody';

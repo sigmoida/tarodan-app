@@ -2,8 +2,8 @@ import React from 'react';
 import { View, ScrollView, Image as RNImage } from 'react-native';
 import { Avatar, Spinner, Text } from '@tarodan/ui-native';
 
-import { parseMessageContent } from '../../../../src/utils/contentFilter';
-import { resolveImageUrl } from '../../../../src/utils/imageUrl';
+import { parseMessageContent } from '@/utils/contentFilter';
+import { resolveImageUrl } from '@/utils/imageUrl';
 import { styles } from '../_lib/styles';
 import { formatTime, getMessageStatus } from '../_lib/helpers';
 import type { MessageThreadController } from '../_hooks/useMessageThread';

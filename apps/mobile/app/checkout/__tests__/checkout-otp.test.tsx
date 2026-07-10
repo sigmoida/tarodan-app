@@ -11,7 +11,7 @@
  */
 import React from 'react';
 import { screen, fireEvent, waitFor, act } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 // AsyncStorage native modülü test ortamında null; resmi jest mock'u kullan.
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -19,16 +19,16 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 );
 
 // expo-router mock
-jest.mock('expo-router', () => require('../../../src/test-utils/router-mock').routerMock);
+jest.mock('expo-router', () => require('@/test-utils/router-mock').routerMock);
 
 // Tüm common components barrel'ı mock et:
 // - CityDistrictSelector → testID'li TextInput'larla replace (modal picker'ı geçer)
 // - PhoneInput → testID'li TextInput mock'u
 // - ScreenHeader ve diğerleri: gerçek implementasyon (requireActual)
-jest.mock('../../../src/components/common', () => {
+jest.mock('@/components/common', () => {
   const React = require('react');
   const { View, TextInput } = require('react-native');
-  const actual = jest.requireActual('../../../src/components/common');
+  const actual = jest.requireActual('@/components/common');
 
   const MockCityDistrictSelector = ({
     city,
@@ -110,13 +110,13 @@ jest.mock('@/lib/api', () => ({
 }));
 
 // Konuk akışı: isAuthenticated=false
-jest.mock('../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({ isAuthenticated: false, user: null }),
 }));
 
 import { ordersApi } from '@/lib/api';
-import { useCartStore } from '../../../src/stores/cartStore';
-import { replaceMock } from '../../../src/test-utils/router-mock';
+import { useCartStore } from '@/stores/cartStore';
+import { replaceMock } from '@/test-utils/router-mock';
 import CheckoutScreen from '../index';
 
 const SAMPLE_ITEM = {

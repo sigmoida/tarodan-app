@@ -5,14 +5,14 @@
  */
 import React from 'react';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 jest.mock('expo-router', () => ({
-  ...require('../../src/test-utils/router-mock').routerMock,
+  ...require('@/test-utils/router-mock').routerMock,
   useFocusEffect: jest.fn(),
 }));
 
-jest.mock('../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({ isAuthenticated: true }),
 }));
 
@@ -20,7 +20,7 @@ const fetchFollowing = jest.fn();
 const unfollowSeller = jest.fn();
 let mockState: any;
 
-jest.mock('../../src/hooks/useFollowing', () => ({
+jest.mock('@/hooks/useFollowing', () => ({
   useFollowing: () => mockState,
 }));
 

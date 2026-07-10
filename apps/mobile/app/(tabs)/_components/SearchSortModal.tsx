@@ -3,7 +3,7 @@ import { View, Modal, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Radio, Text, theme } from '@tarodan/ui-native';
 
-import { SORT_OPTIONS } from '../../../src/utils/productFilters';
+import { SORT_OPTIONS } from '@/utils/productFilters';
 import { styles } from '../_lib/searchStyles';
 import type { SearchController } from '../_hooks/useSearch';
 

@@ -8,22 +8,22 @@
 import React from 'react';
 import { appAlert } from '@tarodan/ui-native';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 jest.mock('expo-router', () => ({
-  ...require('../../../src/test-utils/router-mock').routerMock,
+  ...require('@/test-utils/router-mock').routerMock,
   useFocusEffect: jest.fn(),
 }));
 
-jest.mock('../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({ isAuthenticated: true, limits: { maxAddresses: 10 } }),
 }));
 
-jest.mock('../../../src/i18n', () => ({
+jest.mock('@/i18n', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   api: {
     get: jest.fn().mockResolvedValue({ data: [] }),
     post: jest.fn(),
@@ -31,7 +31,7 @@ jest.mock('../../../src/services/api', () => ({
     delete: jest.fn(),
   },
 }));
-import { api } from '../../../src/services/api';
+import { api } from '@/services/api';
 const post = api.post as jest.Mock;
 
 import AddressesScreen from '../addresses';

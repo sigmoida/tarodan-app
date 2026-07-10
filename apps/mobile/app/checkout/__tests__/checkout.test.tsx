@@ -7,7 +7,7 @@
  */
 import React from 'react';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 // AsyncStorage native modülü test ortamında null; resmi jest mock'u kullan.
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -15,7 +15,7 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 );
 
 // expo-router mock (login.test kalıbı)
-jest.mock('expo-router', () => require('../../../src/test-utils/router-mock').routerMock);
+jest.mock('expo-router', () => require('@/test-utils/router-mock').routerMock);
 
 // API inline mock — ağ yok, deterministik. Checkout'un kullandığı tüm api'lar.
 jest.mock('@/lib/api', () => ({
@@ -33,11 +33,11 @@ jest.mock('@/lib/api', () => ({
 }));
 
 // Konuk akışı: misafir kullanıcı → adres formu inline görünür (testID gerektirmez).
-jest.mock('../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({ isAuthenticated: false, user: null }),
 }));
 
-import { useCartStore } from '../../../src/stores/cartStore';
+import { useCartStore } from '@/stores/cartStore';
 import CheckoutScreen from '../index';
 
 const seedCart = (items: any[]) => {

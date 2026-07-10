@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 let mockParams: Record<string, string> = { paymentId: 'pay-1' };
 jest.mock('expo-router', () => ({
@@ -13,7 +13,7 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
 }));
 
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   paymentsApi: {
     confirmFailed: jest.fn(() => Promise.resolve(null)),
     getStatus: jest.fn(),
@@ -21,7 +21,7 @@ jest.mock('../../../src/services/api', () => ({
     retry: jest.fn(),
   },
 }));
-import { paymentsApi } from '../../../src/services/api';
+import { paymentsApi } from '@/services/api';
 import { router } from 'expo-router';
 
 import PaymentFailScreen from '../fail';

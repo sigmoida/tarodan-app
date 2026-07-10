@@ -7,21 +7,21 @@
  */
 import React from 'react';
 import { screen, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), replace: jest.fn(), back: jest.fn() },
   useFocusEffect: jest.fn(),
 }));
 
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   ordersApi: { getAll: jest.fn(), getSellerEarnings: jest.fn(), markAsPreparing: jest.fn() },
   shippingApi: { createShipment: jest.fn(), updateTracking: jest.fn() },
 }));
-import { ordersApi } from '../../../src/services/api';
+import { ordersApi } from '@/services/api';
 
 let mockAuth = { isAuthenticated: true };
-jest.mock('../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => mockAuth,
 }));
 

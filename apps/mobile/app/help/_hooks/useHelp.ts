@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { supportApi } from '../../../src/services/api';
-import { useAuthStore } from '../../../src/stores/authStore';
-import { useTranslation } from '../../../src/i18n';
+import { supportApi } from '@/services/api';
+import { useAuthStore } from '@/stores/authStore';
+import { useTranslation } from '@/i18n';
 import { FAQ_CATEGORIES } from '../_lib/faq';
 
 /**

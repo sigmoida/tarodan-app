@@ -5,7 +5,7 @@ import { Pressable } from 'react-native';
 import { router } from 'expo-router';
 import { HStack, Screen, Text, VStack, theme } from '@tarodan/ui-native';
 
-import { BrandLogo } from '../../../src/components/BrandLogo';
+import { BrandLogo } from '@/components/BrandLogo';
 import { styles } from './_lib/styles';
 import { useLogin } from './_hooks/useLogin';
 import { LoginCard } from './_components/LoginCard';

@@ -8,10 +8,10 @@
  */
 import React from 'react';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 // i18n: provider olmadan t() passthrough (son segmenti döndürür).
-jest.mock('../../../src/i18n', () => ({
+jest.mock('@/i18n', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
     language: 'tr',
@@ -49,7 +49,7 @@ jest.mock('@/components/common', () => ({
 
 // Bu ekran useAuthStore().user'a göre initiator/receiver ayrımı yapar.
 let mockUser: { id: string } | null = { id: 'user-receiver' };
-jest.mock('../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({ user: mockUser }),
 }));
 

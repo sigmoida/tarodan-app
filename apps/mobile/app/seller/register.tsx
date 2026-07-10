@@ -3,8 +3,8 @@ import { View, StyleSheet, ScrollView } from 'react-native';
 import { Button, Text, theme } from '@tarodan/ui-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { ScreenHeader, EmptyState } from '../../src/components/common';
-import { useAuthStore } from '../../src/stores/authStore';
+import { ScreenHeader, EmptyState } from '@/components/common';
+import { useAuthStore } from '@/stores/authStore';
 
 const { colors } = theme;
 

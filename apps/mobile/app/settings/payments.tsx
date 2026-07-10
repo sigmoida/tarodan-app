@@ -4,10 +4,10 @@ import { Card, Chip, Snackbar, Spinner, Text, theme, appAlert } from '@tarodan/u
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ScreenHeader, EmptyState } from '../../src/components/common';
-import { useAuthStore } from '../../src/stores/authStore';
-import { paymentsApi } from '../../src/services/api';
-import { formatPrice } from '../../src/utils/format';
+import { ScreenHeader, EmptyState } from '@/components/common';
+import { useAuthStore } from '@/stores/authStore';
+import { paymentsApi } from '@/services/api';
+import { formatPrice } from '@/utils/format';
 
 const { colors } = theme;
 

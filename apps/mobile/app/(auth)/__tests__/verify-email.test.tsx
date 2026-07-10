@@ -5,7 +5,7 @@
 import React from 'react';
 import { TextInput } from 'react-native';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
@@ -20,14 +20,14 @@ let mockAuth: { isAuthenticated: boolean; user: { email?: string } | null } = {
   isAuthenticated: false,
   user: null,
 };
-jest.mock('../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => mockAuth,
 }));
 
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   authApi: { verifyEmail: jest.fn(), resendVerification: jest.fn() },
 }));
-import { authApi } from '../../../src/services/api';
+import { authApi } from '@/services/api';
 
 import VerifyEmailScreen from '../verify-email';
 

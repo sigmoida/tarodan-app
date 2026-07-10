@@ -3,10 +3,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { appAlert } from '@tarodan/ui-native';
 // listingsApi → productsApi (parite migrasyonu); userApi.getMyProducts → productsApi.getMyListings
-import { productsApi as listingsApi, tradesApi, productsApi } from '../../../../src/services/api';
-import { useAuthStore } from '../../../../src/stores/authStore';
-import { getProductEffectivePrice } from '../../../../src/utils/productPrice';
-import { formatApiErrorMessage } from '../../../../src/utils/formatApiErrorMessage';
+import { productsApi as listingsApi, tradesApi, productsApi } from '@/services/api';
+import { useAuthStore } from '@/stores/authStore';
+import { getProductEffectivePrice } from '@/utils/productPrice';
+import { formatApiErrorMessage } from '@/utils/formatApiErrorMessage';
 import { firstQueryParam, type Product } from '../_lib/types';
 
 /**

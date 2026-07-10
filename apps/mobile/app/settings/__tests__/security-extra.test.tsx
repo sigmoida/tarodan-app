@@ -10,22 +10,22 @@ import { appAlert } from '@tarodan/ui-native';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 
 // expo-router — paylaşılan router-mock
-jest.mock('expo-router', () => require('../../../src/test-utils/router-mock').routerMock);
-import { replaceMock, resetRouterMocks } from '../../../src/test-utils/router-mock';
+jest.mock('expo-router', () => require('@/test-utils/router-mock').routerMock);
+import { replaceMock, resetRouterMocks } from '@/test-utils/router-mock';
 
 // i18n — anahtarı aynen döndür
-jest.mock('../../../src/i18n', () => ({
+jest.mock('@/i18n', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 
 // Oturum açık kullanıcı; logout izlenebilir
 const mockLogout = jest.fn();
-jest.mock('../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({ isAuthenticated: true, logout: mockLogout }),
 }));
 
 // API — fn'ler factory içinde, sonra import
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   authApi: {
     getTwoFactorStatus: jest.fn(() => Promise.resolve({ data: { isEnabled: false } })),
     setupTwoFactor: jest.fn(),
@@ -36,7 +36,7 @@ jest.mock('../../../src/services/api', () => ({
     logoutAll: jest.fn(),
   },
 }));
-import { authApi } from '../../../src/services/api';
+import { authApi } from '@/services/api';
 import SecuritySettingsScreen from '../security';
 
 const mockLogoutAll = authApi.logoutAll as jest.Mock;

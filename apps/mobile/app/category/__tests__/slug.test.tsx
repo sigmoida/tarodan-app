@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 let mockParams: Record<string, string> = { slug: 'arabalar' };
 jest.mock('expo-router', () => ({
@@ -15,11 +15,11 @@ jest.mock('expo-router', () => ({
 }));
 import { router } from 'expo-router';
 
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   categoriesApi: { getBySlug: jest.fn() },
   productsApi: { getAll: jest.fn() },
 }));
-import { categoriesApi, productsApi } from '../../../src/services/api';
+import { categoriesApi, productsApi } from '@/services/api';
 
 import CategoryScreen from '../[slug]';
 

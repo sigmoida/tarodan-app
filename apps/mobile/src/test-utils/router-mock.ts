@@ -1,6 +1,6 @@
 /**
  * expo-router mock'u. Test dosyasında:
- *   jest.mock('expo-router', () => require('../../src/test-utils/router-mock').routerMock);
+ *   jest.mock('expo-router', () => require('@/test-utils/router-mock').routerMock);
  * sonra: import { pushMock } from '...'; expect(pushMock).toHaveBeenCalledWith('/checkout');
  * beforeEach içinde resetRouterMocks() çağır.
  */

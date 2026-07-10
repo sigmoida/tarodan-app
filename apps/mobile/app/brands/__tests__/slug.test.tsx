@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import { screen, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 let mockParams: Record<string, string> = { slug: 'hot-wheels' };
 jest.mock('expo-router', () => ({
@@ -14,11 +14,11 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
 }));
 
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   brandsApi: { findBySlug: jest.fn() },
   productsApi: { getAll: jest.fn() },
 }));
-import { brandsApi, productsApi } from '../../../src/services/api';
+import { brandsApi, productsApi } from '@/services/api';
 
 import BrandDetailScreen from '../[slug]';
 

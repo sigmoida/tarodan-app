@@ -3,13 +3,13 @@ import { View, StyleSheet, Image } from 'react-native';
 
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { manufacturersApi, productsApi } from '../../src/services/api';
+import { manufacturersApi, productsApi } from '@/services/api';
 import { theme, Text } from '@tarodan/ui-native';
-import { ScreenHeader } from '../../src/components/common';
+import { ScreenHeader } from '@/components/common';
 const { colors } = theme;
-import { ProductGrid } from '../../src/components/product';
-import type { ProductCardProduct } from '../../src/components/product';
-import { resolveImageUrl } from '../../src/utils/imageUrl';
+import { ProductGrid } from '@/components/product';
+import type { ProductCardProduct } from '@/components/product';
+import { resolveImageUrl } from '@/utils/imageUrl';
 
 interface Manufacturer {
   id: string;

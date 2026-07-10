@@ -11,12 +11,11 @@ import {
   Text,
   theme,
 } from '@tarodan/ui-native';
-import { notificationsApi } from '../../src/services/api';
-import { TarodanColors } from '../../src/theme';
-import { formatRelativeDate } from '../../src/utils/format';
-import { useAuthStore } from '../../src/stores/authStore';
-import { resolveImageUrl } from '../../src/utils/imageUrl';
-import { toMobileRoute } from '../../src/utils/notificationRoute';
+import { notificationsApi } from '@/services/api';
+import { formatRelativeDate } from '@/utils/format';
+import { useAuthStore } from '@/stores/authStore';
+import { resolveImageUrl } from '@/utils/imageUrl';
+import { toMobileRoute } from '@/utils/notificationRoute';
 
 const { colors } = theme;
 
@@ -56,15 +55,15 @@ function getIconForType(type: string): { icon: IoniconName; color: string; bg: s
   switch (type) {
     // ---- Siparişler ----
     case 'order_created':
-      return { icon: 'cart', color: TarodanColors.primary, bg: TarodanColors.primaryLight };
+      return { icon: 'cart', color: theme.colors.primary[500], bg: theme.colors.primary[50] };
     case 'order_paid':
     case 'payment_received':
-      return { icon: 'card', color: TarodanColors.success, bg: TarodanColors.successLight };
+      return { icon: 'card', color: theme.colors.success[500], bg: theme.colors.success[100] };
     case 'order_shipped':
     case 'trade_shipped':
     case 'order_delivered_confirm':
     case 'refund_return_opened':
-      return { icon: 'cube', color: TarodanColors.info, bg: TarodanColors.infoLight };
+      return { icon: 'cube', color: theme.colors.info[500], bg: theme.colors.info[100] };
     case 'order_delivered':
     case 'order_completed':
     case 'order_auto_completed':
@@ -72,9 +71,9 @@ function getIconForType(type: string): { icon: IoniconName; color: string; bg: s
     case 'product_approved':
     case 'product_sold':
     case 'refund_approved':
-      return { icon: 'checkmark-circle', color: TarodanColors.success, bg: TarodanColors.successLight };
+      return { icon: 'checkmark-circle', color: theme.colors.success[500], bg: theme.colors.success[100] };
     case 'order_force_completed_by_admin':
-      return { icon: 'shield-checkmark', color: TarodanColors.info, bg: TarodanColors.infoLight };
+      return { icon: 'shield-checkmark', color: theme.colors.info[500], bg: theme.colors.info[100] };
     case 'order_cancelled':
     case 'order_cancelled_out_of_stock':
     case 'offer_cancelled_out_of_stock':
@@ -83,15 +82,15 @@ function getIconForType(type: string): { icon: IoniconName; color: string; bg: s
     case 'trade_rejected':
     case 'trade_auto_cancelled':
     case 'reservation_expired':
-      return { icon: 'close-circle', color: TarodanColors.error, bg: TarodanColors.errorLight };
+      return { icon: 'close-circle', color: theme.colors.danger[500], bg: theme.colors.danger[100] };
     case 'order_refunded':
     case 'refund_completed':
     case 'seller_did_not_ship_refunded':
     case 'payment_released':
-      return { icon: 'cash', color: TarodanColors.success, bg: TarodanColors.successLight };
+      return { icon: 'cash', color: theme.colors.success[500], bg: theme.colors.success[100] };
     case 'refund_rejected':
     case 'refund_cancelled':
-      return { icon: 'arrow-undo', color: TarodanColors.error, bg: TarodanColors.errorLight };
+      return { icon: 'arrow-undo', color: theme.colors.danger[500], bg: theme.colors.danger[100] };
     case 'order_preparing_deadline_warning':
     case 'order_reservation_released':
     case 'offer_expired':
@@ -100,73 +99,73 @@ function getIconForType(type: string): { icon: IoniconName; color: string; bg: s
     case 'listing_expiring':
     case 'listing_expired':
     case 'refund_disputed':
-      return { icon: 'time', color: TarodanColors.warning, bg: TarodanColors.warningLight };
+      return { icon: 'time', color: theme.colors.warning[500], bg: theme.colors.warning[100] };
 
     // ---- Teklifler ----
     case 'offer_received':
-      return { icon: 'pricetag', color: TarodanColors.accent, bg: TarodanColors.accentLight };
+      return { icon: 'pricetag', color: theme.colors.success[500], bg: theme.colors.success[100] };
     case 'offer_counter':
-      return { icon: 'pricetags', color: TarodanColors.accent, bg: TarodanColors.accentLight };
+      return { icon: 'pricetags', color: theme.colors.success[500], bg: theme.colors.success[100] };
     case 'offer_accepted':
-      return { icon: 'thumbs-up', color: TarodanColors.success, bg: TarodanColors.successLight };
+      return { icon: 'thumbs-up', color: theme.colors.success[500], bg: theme.colors.success[100] };
     case 'offer_rejected':
     case 'offer_auto_rejected':
-      return { icon: 'thumbs-down', color: TarodanColors.error, bg: TarodanColors.errorLight };
+      return { icon: 'thumbs-down', color: theme.colors.danger[500], bg: theme.colors.danger[100] };
 
     // ---- Takaslar ----
     case 'trade_received':
     case 'trade_counter':
-      return { icon: 'swap-horizontal', color: TarodanColors.badgeTrade, bg: TarodanColors.accentBlueLite };
+      return { icon: 'swap-horizontal', color: theme.colors.info[500], bg: theme.colors.info[100] };
     case 'trade_accepted':
     case 'trade_completed':
-      return { icon: 'swap-horizontal', color: TarodanColors.success, bg: TarodanColors.successLight };
+      return { icon: 'swap-horizontal', color: theme.colors.success[500], bg: theme.colors.success[100] };
 
     // ---- Mesaj ----
     case 'new_message':
-      return { icon: 'chatbubbles', color: TarodanColors.info, bg: TarodanColors.infoLight };
+      return { icon: 'chatbubbles', color: theme.colors.info[500], bg: theme.colors.info[100] };
 
     // ---- Favori / stok ----
     case 'price_drop':
-      return { icon: 'trending-down', color: TarodanColors.success, bg: TarodanColors.successLight };
+      return { icon: 'trending-down', color: theme.colors.success[500], bg: theme.colors.success[100] };
     case 'wishlist_item_sold':
     case 'wishlist_sold':
-      return { icon: 'heart-dislike', color: TarodanColors.error, bg: TarodanColors.errorLight };
+      return { icon: 'heart-dislike', color: theme.colors.danger[500], bg: theme.colors.danger[100] };
     case 'back_in_stock':
-      return { icon: 'refresh-circle', color: TarodanColors.success, bg: TarodanColors.successLight };
+      return { icon: 'refresh-circle', color: theme.colors.success[500], bg: theme.colors.success[100] };
 
     // ---- Sosyal ----
     case 'new_follower':
-      return { icon: 'person-add', color: TarodanColors.primary, bg: TarodanColors.primaryLight };
+      return { icon: 'person-add', color: theme.colors.primary[500], bg: theme.colors.primary[50] };
     case 'seller_new_listing':
-      return { icon: 'add-circle', color: TarodanColors.info, bg: TarodanColors.infoLight };
+      return { icon: 'add-circle', color: theme.colors.info[500], bg: theme.colors.info[100] };
     case 'collection_liked':
     case 'product_liked':
-      return { icon: 'heart', color: TarodanColors.primary, bg: TarodanColors.primaryLight };
+      return { icon: 'heart', color: theme.colors.primary[500], bg: theme.colors.primary[50] };
 
     // ---- Değerlendirme ----
     case 'review_received':
-      return { icon: 'star', color: TarodanColors.star, bg: TarodanColors.warningLight };
+      return { icon: 'star', color: theme.colors.warning[500], bg: theme.colors.warning[100] };
 
     // ---- Üyelik / öne çıkarma / kampanya ----
     case 'membership_upgraded':
-      return { icon: 'ribbon', color: TarodanColors.success, bg: TarodanColors.successLight };
+      return { icon: 'ribbon', color: theme.colors.success[500], bg: theme.colors.success[100] };
     case 'listing_views_milestone':
-      return { icon: 'eye', color: TarodanColors.info, bg: TarodanColors.infoLight };
+      return { icon: 'eye', color: theme.colors.info[500], bg: theme.colors.info[100] };
     case 'boost_expired':
-      return { icon: 'rocket', color: TarodanColors.accent, bg: TarodanColors.accentLight };
+      return { icon: 'rocket', color: theme.colors.success[500], bg: theme.colors.success[100] };
     case 'promotion':
-      return { icon: 'gift', color: TarodanColors.accent, bg: TarodanColors.accentLight };
+      return { icon: 'gift', color: theme.colors.success[500], bg: theme.colors.success[100] };
     case 'special_offer':
-      return { icon: 'diamond', color: TarodanColors.accent, bg: TarodanColors.accentLight };
+      return { icon: 'diamond', color: theme.colors.success[500], bg: theme.colors.success[100] };
 
     // ---- Genel ----
     case 'welcome':
-      return { icon: 'sparkles', color: TarodanColors.primary, bg: TarodanColors.primaryLight };
+      return { icon: 'sparkles', color: theme.colors.primary[500], bg: theme.colors.primary[50] };
     case 'system_announcement':
-      return { icon: 'megaphone', color: TarodanColors.info, bg: TarodanColors.infoLight };
+      return { icon: 'megaphone', color: theme.colors.info[500], bg: theme.colors.info[100] };
 
     default:
-      return { icon: 'notifications', color: TarodanColors.primary, bg: TarodanColors.primaryLight };
+      return { icon: 'notifications', color: theme.colors.primary[500], bg: theme.colors.primary[50] };
   }
 }
 
@@ -400,8 +399,8 @@ export default function NotificationsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            colors={[TarodanColors.primary]}
-            tintColor={TarodanColors.primary}
+            colors={[theme.colors.primary[500]]}
+            tintColor={theme.colors.primary[500]}
           />
         }
         ListEmptyComponent={
@@ -426,7 +425,7 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: theme.colors.gray[50],
   },
   header: {
     paddingHorizontal: 16,
@@ -464,15 +463,15 @@ const styles = StyleSheet.create({
   item: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: theme.colors.white,
     padding: 14,
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: TarodanColors.border,
+    borderColor: theme.colors.border.DEFAULT,
   },
   itemUnread: {
-    backgroundColor: TarodanColors.primaryLight,
-    borderColor: TarodanColors.primary,
+    backgroundColor: theme.colors.primary[50],
+    borderColor: theme.colors.primary[500],
   },
   iconContainer: {
     width: 40,
@@ -487,7 +486,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 6,
     marginRight: 12,
-    backgroundColor: TarodanColors.surfaceVariant,
+    backgroundColor: theme.colors.gray[50],
   },
   content: {
     flex: 1,
@@ -496,7 +495,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: theme.colors.primary[500],
     marginLeft: 8,
     marginTop: 6,
   },

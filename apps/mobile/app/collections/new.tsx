@@ -8,9 +8,9 @@ import { z } from 'zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { api } from '../../src/services/api';
-import { useAuthStore } from '../../src/stores/authStore';
-import { getUpgradeMessage } from '../../src/utils/membershipLimits';
+import { api } from '@/services/api';
+import { useAuthStore } from '@/stores/authStore';
+import { getUpgradeMessage } from '@/utils/membershipLimits';
 
 const { colors } = theme;
 

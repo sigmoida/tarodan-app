@@ -2,7 +2,7 @@ import { View, ScrollView, StyleSheet } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme, Text, Button } from '@tarodan/ui-native';
-import { useAuthStore } from '../src/stores/authStore';
+import { useAuthStore } from '@/stores/authStore';
 
 const { colors } = theme;
 

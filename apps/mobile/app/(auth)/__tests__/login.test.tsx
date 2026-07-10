@@ -3,17 +3,17 @@
  */
 import React from 'react';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
-import { resetRouterMocks, replaceMock, backMock, canGoBackMock } from '../../../src/test-utils/router-mock';
+import { renderWithProviders } from '@/test-utils';
+import { resetRouterMocks, replaceMock, backMock, canGoBackMock } from '@/test-utils/router-mock';
 
-jest.mock('expo-router', () => require('../../../src/test-utils/router-mock').routerMock);
+jest.mock('expo-router', () => require('@/test-utils/router-mock').routerMock);
 
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   authApi: { login: jest.fn(), getProfile: jest.fn(), resendVerification: jest.fn() },
 }));
-import { authApi } from '../../../src/services/api';
+import { authApi } from '@/services/api';
 
-jest.mock('../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({ login: jest.fn() }),
 }));
 

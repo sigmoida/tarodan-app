@@ -1,12 +1,3 @@
-import { QueryClient } from '@tanstack/react-query';
-
-// Tek paylaşılan QueryClient — _layout'taki provider ve logout temizliği
-// (resetUserStores) aynı örneği kullansın diye modül seviyesinde.
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5,
-      retry: 2,
-    },
-  },
-});
+// Geriye-uyumluluk shim'i. Kanonik konum: `@/lib/query/client`.
+// Yeni kod doğrudan `@/lib/query/client` (veya `@/lib/query`) üzerinden import etmeli.
+export { queryClient } from './query/client';

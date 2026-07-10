@@ -10,10 +10,10 @@ import {
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 
-import { productsApi, searchApi } from '../../../src/services/api';
-import { useRecentSearchesStore } from '../../../src/stores/recentSearchesStore';
-import { useCartStore } from '../../../src/stores/cartStore';
-import { useProductFilterOptions } from '../../../src/hooks/useProductFilterOptions';
+import { productsApi, searchApi } from '@/services/api';
+import { useRecentSearchesStore } from '@/stores/recentSearchesStore';
+import { useCartStore } from '@/stores/cartStore';
+import { useProductFilterOptions } from '@/hooks/useProductFilterOptions';
 import {
   EMPTY_FILTERS,
   buildListParams,
@@ -21,7 +21,7 @@ import {
   extractListings,
   extractMeta,
   type ProductFilters,
-} from '../../../src/utils/productFilters';
+} from '@/utils/productFilters';
 import { PAGE_SIZE, COLLAPSIBLE_ESTIMATE, conditionLabel } from '../_lib/searchConstants';
 
 /**

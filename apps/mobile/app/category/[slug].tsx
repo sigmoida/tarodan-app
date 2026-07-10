@@ -4,13 +4,13 @@ import { theme, Chip, Spinner, Text, Input, Modal, ScreenHeader } from '@tarodan
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { productsApi, categoriesApi } from '../../src/services/api';
-import { SCALES } from '../../src/theme';
-import { getImageUrl as getImageUrlFromUtils } from '../../src/utils/imageUrl';
-import { isProductTradeOpen } from '../../src/utils/isProductTradeOpen';
-import { isProductOutOfStock } from '../../src/utils/productPrice';
-import { OutOfStockOverlay } from '../../src/components/product';
-import { safeString } from '../../src/utils/safeString';
+import { productsApi, categoriesApi } from '@/services/api';
+import { SCALES } from '@/theme';
+import { getImageUrl as getImageUrlFromUtils } from '@/utils/imageUrl';
+import { isProductTradeOpen } from '@/utils/isProductTradeOpen';
+import { isProductOutOfStock } from '@/utils/productPrice';
+import { OutOfStockOverlay } from '@/components/product';
+import { safeString } from '@/utils/safeString';
 
 const { colors } = theme;
 const { width } = Dimensions.get('window');

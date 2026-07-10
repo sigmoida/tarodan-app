@@ -9,7 +9,7 @@
  */
 import React from 'react';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 // AsyncStorage native modülü test ortamında null; resmi jest mock'u.
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -19,25 +19,25 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 // expo-router — paylaşılan router-mock + sellerId paramını inline döndür.
 let mockParams: Record<string, string> = {};
 jest.mock('expo-router', () => {
-  const rm = require('../../../src/test-utils/router-mock').routerMock;
+  const rm = require('@/test-utils/router-mock').routerMock;
   return { ...rm, useLocalSearchParams: () => mockParams };
 });
-import { replaceMock, backMock, resetRouterMocks } from '../../../src/test-utils/router-mock';
+import { replaceMock, backMock, resetRouterMocks } from '@/test-utils/router-mock';
 
 // API — profil ucu inline mock
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   api: { get: jest.fn() },
 }));
-import { api } from '../../../src/services/api';
+import { api } from '@/services/api';
 
 // i18n — anahtarı aynen döndür
-jest.mock('../../../src/i18n', () => ({
+jest.mock('@/i18n', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 
 // messagesStore — createThread izlenebilir; canSendMessage true
 const mockCreateThread = jest.fn();
-jest.mock('../../../src/stores/messagesStore', () => ({
+jest.mock('@/stores/messagesStore', () => ({
   useMessagesStore: () => ({
     canSendMessage: () => true,
     createThread: mockCreateThread,
@@ -45,7 +45,7 @@ jest.mock('../../../src/stores/messagesStore', () => ({
 }));
 
 // authStore — limits
-jest.mock('../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({ limits: { maxMessagesPerDay: 50 } }),
 }));
 

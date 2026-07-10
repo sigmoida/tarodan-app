@@ -3,8 +3,8 @@ import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme, Text, ScreenHeader } from '@tarodan/ui-native';
-import { useTranslation } from '../src/i18n';
-import { RETURN_REQUEST_DAYS, DAMAGE_REPORT_DAYS, COMMISSION_SUMMARY } from '../src/constants/legalFacts';
+import { useTranslation } from '@/i18n';
+import { RETURN_REQUEST_DAYS, DAMAGE_REPORT_DAYS, COMMISSION_SUMMARY } from '@/constants/legalFacts';
 
 const { colors } = theme;
 

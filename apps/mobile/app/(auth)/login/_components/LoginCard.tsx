@@ -5,7 +5,7 @@ import { Controller } from 'react-hook-form';
 import { router } from 'expo-router';
 import { Alert as UIAlert, Button, HStack, Input, Text, theme } from '@tarodan/ui-native';
 
-import { isGoogleConfigured } from '../../../../src/services/googleSignin';
+import { isGoogleConfigured } from '@/services/googleSignin';
 import { styles } from '../_lib/styles';
 import type { LoginController } from '../_hooks/useLogin';
 

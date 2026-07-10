@@ -5,11 +5,11 @@
  */
 import React from 'react';
 import { screen, fireEvent } from '@testing-library/react-native';
-import { renderWithProviders } from '../../src/test-utils';
-import { pushMock, resetRouterMocks } from '../../src/test-utils/router-mock';
+import { renderWithProviders } from '@/test-utils';
+import { pushMock, resetRouterMocks } from '@/test-utils/router-mock';
 
 jest.mock('expo-router', () => {
-  const rm = require('../../src/test-utils/router-mock').routerMock;
+  const rm = require('@/test-utils/router-mock').routerMock;
   return { ...rm, useFocusEffect: (cb: any) => cb() };
 });
 
@@ -23,11 +23,11 @@ const mockState = {
   isInCart: jest.fn().mockReturnValue(false),
 };
 
-jest.mock('../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({ isAuthenticated: mockState.isAuthenticated }),
 }));
 
-jest.mock('../../src/hooks/useFavorites', () => ({
+jest.mock('@/hooks/useFavorites', () => ({
   useFavorites: () => ({
     items: mockState.items,
     isLoading: false,
@@ -38,7 +38,7 @@ jest.mock('../../src/hooks/useFavorites', () => ({
   }),
 }));
 
-jest.mock('../../src/stores/cartStore', () => ({
+jest.mock('@/stores/cartStore', () => ({
   useCartStore: () => ({
     addItem: mockState.addItem,
     removeByProductId: mockState.removeByProductId,

@@ -4,8 +4,8 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Avatar, Badge, Text, theme } from '@tarodan/ui-native';
 
-import { buildAvatarUrl } from '../../../src/services/api';
-import { resolveImageUrl } from '../../../src/utils/imageUrl';
+import { buildAvatarUrl } from '@/services/api';
+import { resolveImageUrl } from '@/utils/imageUrl';
 import { styles } from '../_lib/profileStyles';
 import { quickActionItems, quickActionTint } from '../_lib/profileConstants';
 import type { ProfileController } from '../_hooks/useProfile';

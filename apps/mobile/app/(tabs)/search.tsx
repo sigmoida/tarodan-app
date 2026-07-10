@@ -2,7 +2,7 @@ import { View, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Spinner, Text, theme } from '@tarodan/ui-native';
 
-import ProductFilterSheet from '../../src/components/ProductFilterSheet';
+import ProductFilterSheet from '@/components/ProductFilterSheet';
 import { styles } from './_lib/searchStyles';
 import { useSearch } from './_hooks/useSearch';
 import { SearchBars } from './_components/SearchBars';

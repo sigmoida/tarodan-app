@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
-import { userApi, productsApi, ratingsApi, collectionsApi } from '../../../../src/services/api';
-import { useRefresh } from '../../../../src/hooks/useRefresh';
-import { useFollowing } from '../../../../src/hooks/useFollowing';
-import { useAuthStore } from '../../../../src/stores/authStore';
+import { userApi, productsApi, ratingsApi, collectionsApi } from '@/services/api';
+import { useRefresh } from '@/hooks/useRefresh';
+import { useFollowing } from '@/hooks/useFollowing';
+import { useAuthStore } from '@/stores/authStore';
 
 /**
  * Seller profile controller — owns the 5 public-profile queries (seller,

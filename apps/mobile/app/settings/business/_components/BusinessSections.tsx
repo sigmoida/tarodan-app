@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Card, theme } from '@tarodan/ui-native';
 
-import { resolveImageUrl } from '../../../../src/utils/imageUrl';
+import { resolveImageUrl } from '@/utils/imageUrl';
 import { styles } from '../_lib/styles';
 import type { TabType } from '../_lib/types';
 import { StatCard, ProductRow, CollectionRow } from './BusinessRows';

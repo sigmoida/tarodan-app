@@ -2,7 +2,7 @@ import { View, ScrollView } from 'react-native';
 import { Spinner, Text, ScreenHeader, EmptyState } from '@tarodan/ui-native';
 import { router } from 'expo-router';
 
-import { ThemedRefreshControl } from '../../../src/components/common';
+import { ThemedRefreshControl } from '@/components/common';
 import { styles } from './_lib/styles';
 import { useSellerProfile } from './_hooks/useSellerProfile';
 import { SellerProfileCard } from './_components/SellerProfileCard';

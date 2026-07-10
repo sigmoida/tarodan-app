@@ -3,10 +3,10 @@ import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme, Text, Card, IconButton, Button, Spinner, Snackbar, ScreenHeader } from '@tarodan/ui-native';
-import { useFavorites, WishlistItem } from '../src/hooks/useFavorites';
-import { useAuthStore } from '../src/stores/authStore';
-import { useCartStore } from '../src/stores/cartStore';
-import { getImageUrl as getImageUrlFromUtils } from '../src/utils/imageUrl';
+import { useFavorites, WishlistItem } from '@/hooks/useFavorites';
+import { useAuthStore } from '@/stores/authStore';
+import { useCartStore } from '@/stores/cartStore';
+import { getImageUrl as getImageUrlFromUtils } from '@/utils/imageUrl';
 
 const { colors } = theme;
 

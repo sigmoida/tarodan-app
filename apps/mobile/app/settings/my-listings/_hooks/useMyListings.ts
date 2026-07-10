@@ -2,9 +2,9 @@ import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { theme, appAlert } from '@tarodan/ui-native';
-import { productsApi } from '../../../../src/services/api';
-import { useAuthStore } from '../../../../src/stores/authStore';
-import { useTranslation } from '../../../../src/i18n';
+import { productsApi } from '@/services/api';
+import { useAuthStore } from '@/stores/authStore';
+import { useTranslation } from '@/i18n';
 import type { Listing, FilterType } from '../_lib/types';
 
 const { colors } = theme;

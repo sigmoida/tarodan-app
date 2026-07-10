@@ -4,9 +4,9 @@ import { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '@tarodan/ui-native';
-import { useMessagesStore } from '../../src/stores/messagesStore';
-import { useAuthStore } from '../../src/stores/authStore';
-import { useTranslation } from '../../src/i18n';
+import { useMessagesStore } from '@/stores/messagesStore';
+import { useAuthStore } from '@/stores/authStore';
+import { useTranslation } from '@/i18n';
 
 const { colors } = theme;
 

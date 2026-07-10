@@ -4,8 +4,8 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Card, Chip, Divider, Text, Input, Textarea, theme } from '@tarodan/ui-native';
 
-import { ThemedRefreshControl } from '../../../../../src/components/common';
-import { formatPrice } from '../../../../../src/utils/format';
+import { ThemedRefreshControl } from '@/components/common';
+import { formatPrice } from '@/utils/format';
 import { styles } from '../_lib/styles';
 import { TradeProductPicker } from './TradeProductPicker';
 import type { TradeCounterController } from '../_hooks/useTradeCounter';

@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import { screen, fireEvent, waitFor, within } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 let mockParams: Record<string, string> = { id: 'order-1' };
 jest.mock('expo-router', () => ({

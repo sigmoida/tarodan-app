@@ -2,10 +2,10 @@ import { useState, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { appAlert } from '@tarodan/ui-native';
-import { useAuthStore } from '../../../../src/stores/authStore';
-import { membershipApi, paymentsApi } from '../../../../src/services/api';
-import { qk } from '../../../../src/lib/query';
-import { useTranslation } from '../../../../src/i18n';
+import { useAuthStore } from '@/stores/authStore';
+import { membershipApi, paymentsApi } from '@/services/api';
+import { qk } from '@/lib/query';
+import { useTranslation } from '@/i18n';
 import {
   isSubscriptionActive,
   getDaysUntilRenewal,

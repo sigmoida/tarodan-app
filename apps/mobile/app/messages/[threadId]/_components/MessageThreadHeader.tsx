@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Avatar, IconButton, Alert as UIAlert, Text, theme } from '@tarodan/ui-native';
 
-import ReportModal from '../../../../src/components/ReportModal';
+import ReportModal from '@/components/ReportModal';
 import { styles } from '../_lib/styles';
 import type { MessageThreadController } from '../_hooks/useMessageThread';
 

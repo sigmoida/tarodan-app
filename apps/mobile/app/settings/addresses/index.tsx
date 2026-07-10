@@ -3,7 +3,7 @@ import { Button, FAB, Spinner, Text, ScreenHeader, theme } from '@tarodan/ui-nat
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { ThemedRefreshControl } from '../../../src/components/common';
+import { ThemedRefreshControl } from '@/components/common';
 import { styles } from './_lib/styles';
 import { useAddresses } from './_hooks/useAddresses';
 import { AddressCard } from './_components/AddressCard';

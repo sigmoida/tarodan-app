@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { router } from 'expo-router';
 import { appAlert } from '@tarodan/ui-native';
-import { userApi } from '../../../src/services/api';
-import { useAuthStore } from '../../../src/stores/authStore';
-import { getRestrictionMessage, GuestAction } from '../../../src/utils/guestRestrictions';
+import { userApi } from '@/services/api';
+import { useAuthStore } from '@/stores/authStore';
+import { getRestrictionMessage, GuestAction } from '@/utils/guestRestrictions';
 
 /**
  * Profile actions controller — logout, account deletion, and the guest

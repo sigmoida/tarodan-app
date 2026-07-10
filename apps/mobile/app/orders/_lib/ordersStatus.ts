@@ -1,5 +1,5 @@
 import type { BadgeVariant } from '@tarodan/ui-native';
-import { apiStatusToUi, type UiOrderStatus } from '../../../src/utils/orderStatus';
+import { apiStatusToUi, type UiOrderStatus } from '@/utils/orderStatus';
 
 export interface Order {
   id: string;

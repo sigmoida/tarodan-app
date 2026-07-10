@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { screen, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: jest.fn(() => false) },
@@ -15,14 +15,14 @@ jest.mock('expo-router', () => ({
   },
 }));
 
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   api: { get: jest.fn() },
   paymentsApi: { getMyPayments: jest.fn() },
 }));
-import { api } from '../../../src/services/api';
+import { api } from '@/services/api';
 
 let mockIsAuthenticated = true;
-jest.mock('../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({ isAuthenticated: mockIsAuthenticated }),
 }));
 

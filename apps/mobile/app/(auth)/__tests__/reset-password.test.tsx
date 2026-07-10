@@ -5,7 +5,7 @@
 import React from 'react';
 import { TextInput } from 'react-native';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 const inputs = () => screen.UNSAFE_getAllByType(TextInput);
 const setPasswords = (pw: string, confirm: string) => {
@@ -23,14 +23,14 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
 }));
 
-jest.mock('../../../src/i18n', () => ({
+jest.mock('@/i18n', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   authApi: { resetPassword: jest.fn() },
 }));
-import { authApi } from '../../../src/services/api';
+import { authApi } from '@/services/api';
 
 import ResetPasswordScreen from '../reset-password';
 

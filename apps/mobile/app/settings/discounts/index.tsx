@@ -1,7 +1,7 @@
 import { View, ScrollView } from 'react-native';
 import { Chip, FAB, Snackbar, ScreenHeader, EmptyState, ScreenLoader } from '@tarodan/ui-native';
 
-import { ThemedRefreshControl } from '../../../src/components/common';
+import { ThemedRefreshControl } from '@/components/common';
 import { styles } from './_lib/styles';
 import { FILTERS } from './_lib/types';
 import { useDiscounts } from './_hooks/useDiscounts';

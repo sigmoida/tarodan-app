@@ -2,7 +2,7 @@ import { View, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import { Button, Spinner, Snackbar, Text, ScreenHeader, theme } from '@tarodan/ui-native';
 import { router } from 'expo-router';
 
-import RatingModal from '../../src/components/RatingModal';
+import RatingModal from '@/components/RatingModal';
 import { styles } from './_lib/ordersStyles';
 import type { Order } from './_lib/ordersStatus';
 import { useOrders } from './_hooks/useOrders';

@@ -5,7 +5,7 @@ import {
   SUPPORT_EMAIL,
   SUPPORT_PHONE,
   SUPPORT_WHATSAPP,
-} from '../../../src/constants/legalFacts';
+} from '@/constants/legalFacts';
 
 export const FAQ_CATEGORIES = [
   {

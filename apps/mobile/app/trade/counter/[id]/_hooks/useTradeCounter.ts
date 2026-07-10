@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { appAlert } from '@tarodan/ui-native';
-import { tradesApi, productsApi } from '../../../../../src/services/api';
-import { useRefresh } from '../../../../../src/hooks/useRefresh';
-import { useAuthStore } from '../../../../../src/stores/authStore';
+import { tradesApi, productsApi } from '@/services/api';
+import { useRefresh } from '@/hooks/useRefresh';
+import { useAuthStore } from '@/stores/authStore';
 import { itemId, offerSignature, type Trade, type TradeItem } from '../_lib/types';
 
 /**

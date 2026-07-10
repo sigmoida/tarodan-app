@@ -3,10 +3,10 @@ import { View, StyleSheet, BackHandler } from 'react-native';
 import { Button, Spinner, Text, theme, appAlert } from '@tarodan/ui-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { paymentsApi } from '../../src/services/api';
-import { ScreenHeader, ErrorState } from '../../src/components/common';
-import { captureException } from '../../src/services/sentry';
-import CardPaymentForm from '../../src/components/CardPaymentForm';
+import { paymentsApi } from '@/services/api';
+import { ScreenHeader, ErrorState } from '@/components/common';
+import { captureException } from '@/services/sentry';
+import CardPaymentForm from '@/components/CardPaymentForm';
 
 const { colors } = theme;
 

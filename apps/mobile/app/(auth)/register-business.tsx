@@ -16,11 +16,11 @@ import {
   theme,
   appAlert,
 } from '@tarodan/ui-native';
-import { authApi } from '../../src/services/api';
-import { useAuthStore } from '../../src/stores/authStore';
-import { PhoneInput } from '../../src/components/common';
-import { BrandLogo } from '../../src/components/BrandLogo';
-import { DEFAULT_COUNTRY_CODE, normalizePhoneForPayload } from '../../src/utils/phone';
+import { authApi } from '@/services/api';
+import { useAuthStore } from '@/stores/authStore';
+import { PhoneInput } from '@/components/common';
+import { BrandLogo } from '@/components/BrandLogo';
+import { DEFAULT_COUNTRY_CODE, normalizePhoneForPayload } from '@/utils/phone';
 
 const { colors, spacing, radius } = theme;
 

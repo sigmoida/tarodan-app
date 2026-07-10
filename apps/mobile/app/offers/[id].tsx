@@ -4,12 +4,12 @@ import { Button, Modal, Input, Text, theme, appAlert } from '@tarodan/ui-native'
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { offersApi } from '../../src/services/api';
-import { ScreenHeader, ScreenLoader, ErrorState, ThemedRefreshControl } from '../../src/components/common';
-import { useRefresh } from '../../src/hooks/useRefresh';
-import { formatPrice, formatOfferStatus, formatRelativeDate } from '../../src/utils/format';
-import { transformImageUrl } from '../../src/utils/imageUrl';
-import { useAuthStore } from '../../src/stores/authStore';
+import { offersApi } from '@/services/api';
+import { ScreenHeader, ScreenLoader, ErrorState, ThemedRefreshControl } from '@/components/common';
+import { useRefresh } from '@/hooks/useRefresh';
+import { formatPrice, formatOfferStatus, formatRelativeDate } from '@/utils/format';
+import { transformImageUrl } from '@/utils/imageUrl';
+import { useAuthStore } from '@/stores/authStore';
 
 const { colors } = theme;
 

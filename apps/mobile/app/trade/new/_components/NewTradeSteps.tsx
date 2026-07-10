@@ -4,10 +4,10 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Card, Chip, Divider, Spinner, Text, Input, Textarea, theme } from '@tarodan/ui-native';
 
-import { TradeAddressPicker } from '../../../../src/components/common';
-import { getImageUrl } from '../../../../src/utils/imageUrl';
-import { getProductEffectivePrice } from '../../../../src/utils/productPrice';
-import { formatPrice } from '../../../../src/utils/format';
+import { TradeAddressPicker } from '@/components/common';
+import { getImageUrl } from '@/utils/imageUrl';
+import { getProductEffectivePrice } from '@/utils/productPrice';
+import { formatPrice } from '@/utils/format';
 import { styles } from '../_lib/styles';
 import { TradeProductCard } from './TradeProductCard';
 import type { Product } from '../_lib/types';

@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import { screen, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 let mockParams: Record<string, string> = { id: 'pay-1', orderId: 'order-1', paymentUrl: 'https://www.paytr.com/odeme/guvenli/abc123' };
 jest.mock('expo-router', () => ({
@@ -15,7 +15,7 @@ jest.mock('expo-router', () => ({
   useFocusEffect: () => {},
 }));
 
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   paymentsApi: {
     initiate: jest.fn(),
     initiateGuest: jest.fn(),
@@ -25,7 +25,7 @@ jest.mock('../../../src/services/api', () => ({
     bypassComplete: jest.fn(),
   },
 }));
-import { paymentsApi } from '../../../src/services/api';
+import { paymentsApi } from '@/services/api';
 
 // WebView'i source prop'unu testID ile yansıtan basit bir stub'a indir.
 let lastWebViewSource: any = null;
@@ -41,7 +41,7 @@ jest.mock('react-native-webview', () => {
   };
 });
 
-jest.mock('../../../src/services/sentry', () => ({ captureException: jest.fn() }));
+jest.mock('@/services/sentry', () => ({ captureException: jest.fn() }));
 
 import PaymentWebViewScreen from '../[id]';
 

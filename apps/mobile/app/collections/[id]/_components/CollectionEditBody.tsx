@@ -5,7 +5,7 @@ import { Controller } from 'react-hook-form';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Switch, Snackbar, IconButton, Text, Input, Textarea, theme } from '@tarodan/ui-native';
 
-import { resolveImageUrl } from '../../../../src/utils/imageUrl';
+import { resolveImageUrl } from '@/utils/imageUrl';
 import { styles } from '../_lib/collectionEditStyles';
 import type { CollectionEditController } from '../_hooks/useCollectionEdit';
 

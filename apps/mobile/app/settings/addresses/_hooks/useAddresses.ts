@@ -2,11 +2,11 @@ import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { appAlert } from '@tarodan/ui-native';
-import { normalizePhoneForPayload, splitPhone } from '../../../../src/utils/phone';
-import { useRefresh } from '../../../../src/hooks/useRefresh';
-import { api } from '../../../../src/services/api';
-import { useAuthStore } from '../../../../src/stores/authStore';
-import { useTranslation } from '../../../../src/i18n';
+import { normalizePhoneForPayload, splitPhone } from '@/utils/phone';
+import { useRefresh } from '@/hooks/useRefresh';
+import { api } from '@/services/api';
+import { useAuthStore } from '@/stores/authStore';
+import { useTranslation } from '@/i18n';
 import { EMPTY_FORM, type Address, type AddressForm } from '../_lib/types';
 
 /**

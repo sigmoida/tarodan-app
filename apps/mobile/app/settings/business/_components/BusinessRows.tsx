@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '@tarodan/ui-native';
 
-import { resolveImageUrl } from '../../../../src/utils/imageUrl';
+import { resolveImageUrl } from '@/utils/imageUrl';
 import { styles } from '../_lib/styles';
 import type { ProductStats, CollectionStats } from '../_lib/types';
 

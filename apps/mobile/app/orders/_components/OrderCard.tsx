@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Card, StatusBadge, Text, theme } from '@tarodan/ui-native';
 
-import { getOrderProductImageUri } from '../../../src/utils/orderProductImage';
+import { getOrderProductImageUri } from '@/utils/orderProductImage';
 import { styles } from '../_lib/ordersStyles';
 import {
   uiOrderStatusConfig,

@@ -4,9 +4,9 @@ import { theme, Avatar, Chip, Spinner, Text, Input, ScreenHeader } from '@taroda
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { api } from '../../src/services/api';
-import { useAuthStore } from '../../src/stores/authStore';
-import { transformImageUrl } from '../../src/utils/imageUrl';
+import { api } from '@/services/api';
+import { useAuthStore } from '@/stores/authStore';
+import { transformImageUrl } from '@/utils/imageUrl';
 
 const { colors } = theme;
 const { width } = Dimensions.get('window');

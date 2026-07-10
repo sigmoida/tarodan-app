@@ -1,4 +1,4 @@
-import type { Message } from '../../../../src/stores/messagesStore';
+import type { Message } from '@/stores/messagesStore';
 
 export const formatTime = (dateString: string) => {
   const date = new Date(dateString);

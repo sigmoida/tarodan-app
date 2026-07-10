@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
-import ListingForm from '../../../src/components/listing/ListingForm';
+import ListingForm from '@/components/listing/ListingForm';
 
 // İlan düzenleme ekranı. Form mantığı ortak <ListingForm> bileşeninde (create ile aynı).
 export default function EditListingScreen() {

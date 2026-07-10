@@ -11,26 +11,26 @@
  */
 import React from 'react';
 import { screen, fireEvent } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
-import { resetRouterMocks, pushMock } from '../../../src/test-utils/router-mock';
+import { renderWithProviders } from '@/test-utils';
+import { resetRouterMocks, pushMock } from '@/test-utils/router-mock';
 
 jest.mock('expo-router', () => {
-  const rm = require('../../../src/test-utils/router-mock').routerMock;
+  const rm = require('@/test-utils/router-mock').routerMock;
   return { ...rm, useFocusEffect: (cb: any) => cb() };
 });
 
-jest.mock('../../../src/i18n', () => ({
+jest.mock('@/i18n', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 
 // authStore — varsayılan: oturum açık. Test içinde override edilebilir.
 let mockAuthState = { isAuthenticated: true };
-jest.mock('../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => mockAuthState,
 }));
 
 // API katmanı — controller'ın query/mutation'larını besler.
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   membershipApi: {
     getCurrentMembership: jest.fn().mockResolvedValue({ data: null }),
     cancel: jest.fn().mockResolvedValue({ data: {} }),
@@ -41,7 +41,7 @@ jest.mock('../../../src/services/api', () => ({
   },
 }));
 
-import { membershipApi } from '../../../src/services/api';
+import { membershipApi } from '@/services/api';
 import SubscriptionSettingsScreen from '../subscription';
 
 const mockGetMembership = membershipApi.getCurrentMembership as jest.Mock;

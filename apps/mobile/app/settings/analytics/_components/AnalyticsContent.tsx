@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Card, Button, Text, theme } from '@tarodan/ui-native';
 
-import { ThemedRefreshControl } from '../../../../src/components/common';
+import { ThemedRefreshControl } from '@/components/common';
 import { styles } from '../_lib/styles';
 import { getDayLabels, getMaxValue } from '../_lib/types';
 import type { AnalyticsController } from '../_hooks/useAnalytics';

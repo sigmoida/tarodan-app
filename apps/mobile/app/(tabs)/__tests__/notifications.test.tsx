@@ -9,19 +9,19 @@
  */
 import React from 'react';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
-import { resetRouterMocks, pushMock, routerMock } from '../../../src/test-utils/router-mock';
+import { renderWithProviders } from '@/test-utils';
+import { resetRouterMocks, pushMock, routerMock } from '@/test-utils/router-mock';
 
 // useFocusEffect mount'ta callback'i bir kez çalıştırsın (gerçek davranış).
 jest.mock('expo-router', () => ({
-  ...require('../../../src/test-utils/router-mock').routerMock,
+  ...require('@/test-utils/router-mock').routerMock,
   useFocusEffect: (cb: () => void) => {
     const React = require('react');
     React.useEffect(cb, []);
   },
 }));
 
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   notificationsApi: {
     getAll: jest.fn(),
     getUnreadCount: jest.fn(),
@@ -29,10 +29,10 @@ jest.mock('../../../src/services/api', () => ({
     markAllAsRead: jest.fn(),
   },
 }));
-import { notificationsApi } from '../../../src/services/api';
+import { notificationsApi } from '@/services/api';
 
 let mockAuthed = true;
-jest.mock('../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({ isAuthenticated: mockAuthed }),
 }));
 

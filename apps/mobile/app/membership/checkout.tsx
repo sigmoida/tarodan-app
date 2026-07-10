@@ -3,9 +3,9 @@ import { View, ScrollView, StyleSheet } from 'react-native';
 import { theme, Button, Card, Text, ScreenHeader, appAlert } from '@tarodan/ui-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuthStore } from '../../src/stores/authStore';
-import { membershipApi, paymentsApi } from '../../src/services/api';
-import { captureException } from '../../src/services/sentry';
+import { useAuthStore } from '@/stores/authStore';
+import { membershipApi, paymentsApi } from '@/services/api';
+import { captureException } from '@/services/sentry';
 
 const { colors } = theme;
 

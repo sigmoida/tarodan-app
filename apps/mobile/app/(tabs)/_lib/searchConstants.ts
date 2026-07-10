@@ -1,5 +1,5 @@
 import { Dimensions } from 'react-native';
-import { CONDITION_OPTIONS } from '../../../src/utils/productFilters';
+import { CONDITION_OPTIONS } from '@/utils/productFilters';
 
 const { width } = Dimensions.get('window');
 
