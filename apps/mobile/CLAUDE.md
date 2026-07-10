@@ -235,6 +235,19 @@ file each. `useOrderActions` is the controller (refund/cancel/pay mutations + re
 modal form state + evidence picker + snackbar); `useOrderInvoices` owns the two
 invoice queries + download handlers.
 
+**Fifth worked example — `app/(tabs)/index.tsx` (display-heavy, huge stylesheet).**
+The 1774-line home screen (→ ~103-line `index.tsx`) is display-only (8 queries, no
+mutations, many sections). Two techniques for this shape: (1) the ~890-line
+`StyleSheet` was moved **verbatim** to `_lib/styles.ts` and imported by every
+section (a shared route-local stylesheet — the one place we don't colocate styles
+per-component, because it's a single cohesive sheet and re-typing it per section
+is pure transcription risk); (2) data lives in focused query hooks (`useHomeData`
+= the 6 content queries, `useHomeBadges` = cart/fav/msg/notif counts + store
+effects, `useHomeGuestPrompt`), navigation in `_lib/nav.ts`, and the JSX splits
+into section components (`HomeHeader`, `HomeSections` exporting Hero/Categories/
+Brands/Scales/FeaturedCollector/BoostedRail/PopularProducts/ProductsGrid/
+Collections, plus `CompanyOfWeekSection`), each self-gating on its data.
+
 ## 13. Verification
 
 - `npx tsc --noEmit` introduces **no new errors** beyond the tracked baseline.

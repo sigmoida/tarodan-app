@@ -30,6 +30,7 @@ export const qk = {
     /** Liste ekranlarının (home/arama/öne-çıkanlar) prefix root'ları — beğeni/
      * görüntülenme değişince hepsi tazelensin diye tek yerde. */
     searchAll: ['products-search'] as const,
+    boosted: ['products', 'boosted'] as const,
     featuredBusiness: ['featured-business'] as const,
     featuredCollector: ['featured-collector'] as const,
     myListings: (filters?: Filters) => ['my-listings', filters] as const,
@@ -53,6 +54,7 @@ export const qk = {
     all: ['collections'] as const,
     list: (filters?: Filters) => ['collections', 'list', filters] as const,
     detail: (id: string) => ['collection', id] as const,
+    browse: ['collections', 'browse'] as const,
     mine: ['my-collections'] as const,
     liked: ['liked-collections'] as const,
     picker: ['collection-picker'] as const,
@@ -117,6 +119,10 @@ export const qk = {
     ratings: (id: string) => ['seller-ratings', id] as const,
     ratingStats: (id: string) => ['seller-rating-stats', id] as const,
     collections: (id: string) => ['seller-collections', id] as const,
+  },
+
+  notifications: {
+    unread: ['notifications-unread'] as const,
   },
 
   support: {
