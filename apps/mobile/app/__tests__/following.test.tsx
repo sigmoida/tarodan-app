@@ -20,8 +20,8 @@ const fetchFollowing = jest.fn();
 const unfollowSeller = jest.fn();
 let mockState: any;
 
-jest.mock('../../src/stores/followStore', () => ({
-  useFollowStore: () => mockState,
+jest.mock('../../src/hooks/useFollowing', () => ({
+  useFollowing: () => mockState,
 }));
 
 import FollowingScreen from '../following';

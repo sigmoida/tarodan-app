@@ -129,6 +129,10 @@ export const qk = {
     all: ['favorites'] as const,
   },
 
+  follow: {
+    following: ['following'] as const,
+  },
+
   addresses: {
     mine: ['my-addresses'] as const,
   },
