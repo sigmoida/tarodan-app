@@ -1,5 +1,5 @@
 import { Stack } from 'expo-router';
-import { TarodanColors } from '../../src/theme';
+import { theme } from '@tarodan/ui-native';
 
 export default function MembershipLayout() {
   return (
@@ -7,7 +7,7 @@ export default function MembershipLayout() {
       screenOptions={{
         headerShown: false,
         contentStyle: {
-          backgroundColor: TarodanColors.background,
+          backgroundColor: theme.colors.white,
         },
       }}
     />
