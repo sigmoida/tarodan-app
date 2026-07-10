@@ -92,6 +92,16 @@ export function SellerProfileCard({ f }: { f: SellerProfileController }) {
       {/* Bio */}
       {seller.bio && <Text style={styles.bio}>{seller.bio}</Text>}
 
+      {/* Follow Button — web seller header paritesi */}
+      <Button
+        variant={f.isFollowingSeller ? 'secondary' : 'outline'}
+        title={f.isFollowingSeller ? 'Takip Ediliyor' : 'Takip Et'}
+        onPress={f.handleToggleFollow}
+        style={styles.messageButton}
+        icon={f.isFollowingSeller ? 'checkmark' : 'person-add-outline'}
+        isLoading={f.followBusy}
+      />
+
       {/* Message Button */}
       <Button
         variant="primary"

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { userApi, productsApi, ratingsApi, collectionsApi } from '../../../../src/services/api';
 import { useRefresh } from '../../../../src/hooks/useRefresh';
+import { useFollowing } from '../../../../src/hooks/useFollowing';
 import { useAuthStore } from '../../../../src/stores/authStore';
 
 /**
@@ -13,7 +14,9 @@ import { useAuthStore } from '../../../../src/stores/authStore';
 export function useSellerProfile() {
   const { id } = useLocalSearchParams();
   const { isAuthenticated } = useAuthStore();
+  const { isFollowing, followSeller, unfollowSeller } = useFollowing();
   const [activeTab, setActiveTab] = useState<'listings' | 'reviews' | 'collections'>('listings');
+  const [followBusy, setFollowBusy] = useState(false);
 
   const { data: apiSeller, isLoading, refetch: refetchSeller } = useQuery({
     queryKey: ['seller', id],
@@ -112,6 +115,26 @@ export function useSellerProfile() {
     router.push(`/messages/new?sellerId=${id}`);
   };
 
+  const isFollowingSeller = isFollowing(String(id));
+
+  const handleToggleFollow = async () => {
+    if (!isAuthenticated) {
+      router.push('/(auth)/login');
+      return;
+    }
+    if (followBusy) return;
+    setFollowBusy(true);
+    try {
+      if (isFollowingSeller) {
+        await unfollowSeller(String(id));
+      } else {
+        await followSeller(String(id));
+      }
+    } finally {
+      setFollowBusy(false);
+    }
+  };
+
   return {
     isAuthenticated,
     isLoading,
@@ -125,6 +148,9 @@ export function useSellerProfile() {
     refreshing,
     onRefresh,
     handleMessage,
+    isFollowingSeller,
+    followBusy,
+    handleToggleFollow,
   };
 }
 

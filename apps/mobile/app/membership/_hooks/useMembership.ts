@@ -151,7 +151,10 @@ export function useMembership() {
   const handleTierAction = (tier: TierType) => {
     if (tier === 'free' || tier === currentTier) return;
     if (tierIndex(tier) < tierIndex(currentTier)) {
-      appAlert('Bilgi', 'Alt plana geçiş şu anda desteklenmiyor.');
+      appAlert(
+        'Alt plana geçiş',
+        'Mevcut üyelik döneminiz sürerken daha düşük bir plana geçemezsiniz. Üyeliğinizi iptal edip dönem sonunda ücretsiz plana düştükten sonra istediğiniz plana geçebilirsiniz.',
+      );
       return;
     }
     router.push(`/membership/checkout?tier=${tier}&period=${billingPeriod}`);
