@@ -1,5 +1,5 @@
-import { Logger } from '@nestjs/common';
-import type { Queue } from 'bull';
+import { Logger } from "@nestjs/common";
+import type { Queue } from "bull";
 
 /**
  * Cron'ların Bull repeatable'a kademeli taşınması için ortak yardımcılar.
@@ -9,7 +9,7 @@ import type { Queue } from 'bull';
  * Para-kritik cron'lar ileride taşınırken kendi ayrı guard'larını da ekler.
  */
 export function cronsViaBull(): boolean {
-  return process.env.CRONS_VIA_BULL === 'true';
+  return process.env.CRONS_VIA_BULL === "true";
 }
 
 /**
@@ -17,7 +17,7 @@ export function cronsViaBull(): boolean {
  * aç/kapa: sorun çıkarsa yalnız para tarafı geri alınır, güvenli 10 etkilenmez.
  */
 export function moneyCronsViaBull(): boolean {
-  return process.env.MONEY_CRONS_VIA_BULL === 'true';
+  return process.env.MONEY_CRONS_VIA_BULL === "true";
 }
 
 /**
@@ -26,7 +26,7 @@ export function moneyCronsViaBull(): boolean {
  * ör. `'0 3 * * *'` = 03:00 UTC = 06:00 İstanbul → günlük işler yanlış saatte.
  * Tüm zamanlar Türkiye yerel saatine göre yazıldığı için burada pinliyoruz.
  */
-export const SCHEDULED_CRON_TZ = 'Europe/Istanbul';
+export const SCHEDULED_CRON_TZ = "Europe/Istanbul";
 
 /**
  * Repeatable cron'lar için tekrar-deneme politikası.
@@ -39,6 +39,12 @@ export const SCHEDULED_CRON_TZ = 'Europe/Istanbul';
  * İsteyen çağıran (idempotent, okuma-ağırlıklı iş) `opts.attempts` ile artırabilir.
  */
 const DEFAULT_CRON_ATTEMPTS = 1;
+
+/**
+ * Bu PROCESS'te `enabled` olarak kaydı yapılan iş adları. Orphan temizliği
+ * (cleanupOrphanRepeatables) bunun DIŞINDA kalan repeatable'ları siler.
+ */
+const registeredJobNames = new Set<string>();
 
 export interface RepeatableCronOptions {
   /** Tekrar-deneme sayısı (default 1 — bkz. DEFAULT_CRON_ATTEMPTS). */
@@ -89,11 +95,50 @@ export async function registerRepeatableCron(
           attempts,
         },
       );
-      logger.log(`Bull repeatable kayıtlı: '${jobName}' (${cron}, tz=${tz}, attempts=${attempts}).`);
+      logger.log(
+        `Bull repeatable kayıtlı: '${jobName}' (${cron}, tz=${tz}, attempts=${attempts}).`,
+      );
+      registeredJobNames.add(jobName);
     } else if (existing.some((r) => r.name === jobName)) {
       logger.log(`Bull repeatable temizlendi (flag kapalı): '${jobName}'.`);
     }
   } catch (e: any) {
-    logger.error(`Bull repeatable sync başarısız ('${jobName}', non-fatal): ${e.message}`);
+    logger.error(
+      `Bull repeatable sync başarısız ('${jobName}', non-fatal): ${e.message}`,
+    );
+  }
+}
+
+/**
+ * Redis'teki ÖLÜ repeatable key'lerini temizler: bu process'te `enabled` olarak
+ * kaydedilen işlerin (registeredJobNames) DIŞINDA kalan tüm repeatable'ları siler.
+ * Bir iş yeniden adlandırılır/silinirse helper'ın isim-bazlı self-heal'i eskiyi
+ * bulamaz; bu süpürme onları toplar.
+ *
+ * ⚠ SADECE tüm işleri kaydeden process'te (worker) çağrılmalı — aksi halde o
+ * process'in bilmediği CANLI bir job'un key'i silinir. OnApplicationBootstrap'te
+ * (tüm onModuleInit registration'larından SONRA) çağır.
+ */
+export async function cleanupOrphanRepeatables(
+  queue: Queue,
+  logger: Logger,
+): Promise<void> {
+  try {
+    const existing = await queue.getRepeatableJobs();
+    let removed = 0;
+    for (const r of existing) {
+      if (!registeredJobNames.has(r.name)) {
+        await queue.removeRepeatableByKey(r.key);
+        removed++;
+        logger.warn(`Orphan repeatable temizlendi: '${r.name}' (${r.cron}).`);
+      }
+    }
+    if (removed > 0) {
+      logger.log(`Orphan repeatable süpürme: ${removed} kayıt temizlendi.`);
+    }
+  } catch (e: any) {
+    logger.error(
+      `Orphan repeatable süpürme başarısız (non-fatal): ${e.message}`,
+    );
   }
 }

@@ -33,6 +33,7 @@ import { SearchScheduledProcessor } from "../modules/search/search-scheduled.pro
 import { ScheduledNotificationProcessor } from "../modules/admin/scheduled-notification.processor";
 import { ElogoScheduledProcessor } from "../modules/elogo/elogo-scheduled.processor";
 import { FeaturedScheduledProcessor } from "../modules/user/featured-scheduled.processor";
+import { ScheduledJanitorService } from "./scheduled-janitor.service";
 
 /**
  * WORKER-ONLY: 'scheduled' kuyruğunun TÜM cron processor'larını tek yerde toplar.
@@ -80,6 +81,8 @@ import { FeaturedScheduledProcessor } from "../modules/user/featured-scheduled.p
     ScheduledNotificationProcessor,
     ElogoScheduledProcessor,
     FeaturedScheduledProcessor,
+    // Worker-only: ölü repeatable key'lerini bootstrap'ta süpürür (H4).
+    ScheduledJanitorService,
   ],
 })
 export class SchedulerModule {}
