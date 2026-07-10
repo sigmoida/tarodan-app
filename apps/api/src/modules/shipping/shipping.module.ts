@@ -1,16 +1,15 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { ScheduleModule } from '@nestjs/schedule';
-import { BullModule } from '@nestjs/bull';
-import { ShippingController } from './shipping.controller';
-import { ShippingService } from './shipping.service';
-import { ShippingSchedulerService } from './shipping-scheduler.service';
-import { ShippingScheduledProcessor } from './shipping-scheduled.processor';
-import { QUEUE_NAMES } from '../../workers/constants';
-import { PrismaModule } from '../../prisma';
-import { PaymentModule } from '../payment/payment.module';
-import { SuratCargoModule } from '../surat-cargo/surat-cargo.module';
-import { NotificationModule } from '../notification/notification.module';
+import { Module } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
+import { ScheduleModule } from "@nestjs/schedule";
+import { BullModule } from "@nestjs/bull";
+import { ShippingController } from "./shipping.controller";
+import { ShippingService } from "./shipping.service";
+import { ShippingSchedulerService } from "./shipping-scheduler.service";
+import { QUEUE_NAMES } from "../../workers/constants";
+import { PrismaModule } from "../../prisma";
+import { PaymentModule } from "../payment/payment.module";
+import { SuratCargoModule } from "../surat-cargo/surat-cargo.module";
+import { NotificationModule } from "../notification/notification.module";
 
 @Module({
   imports: [
@@ -24,7 +23,7 @@ import { NotificationModule } from '../notification/notification.module';
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [ShippingController],
-  providers: [ShippingService, ShippingSchedulerService, ShippingScheduledProcessor],
-  exports: [ShippingService],
+  providers: [ShippingService, ShippingSchedulerService],
+  exports: [ShippingService, ShippingSchedulerService],
 })
 export class ShippingModule {}
