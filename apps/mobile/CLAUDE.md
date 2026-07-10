@@ -223,6 +223,18 @@ status-conditional JSX splits into `TradeStatusHeader` / `TradeShippingSection` 
 helpers. `[id].tsx` became the folder `[id]/index.tsx` (expo-router resolves the
 directory) — colocated tests importing `../[id]` keep working.
 
+**Fourth worked example — `app/orders/[id]/` (many small cards + derived-heavy).**
+The 1709-line order detail (→ ~145-line `index.tsx`) shows the pattern when a screen
+is a long stack of small status-gated cards. A pure `_lib/derive.ts` computes the
+~15 derived booleans/dates (isPaid, isPostShipment, isCancelled, showTrackingCard,
+payoutReleaseDate, isPastRefundWindow, …) once; each presentational card
+**self-gates** (returns `null` when its condition is false) so `index.tsx` is a flat
+list of `<Order*Card>`s with no inline conditionals. Related tiny cards are grouped
+per file (`OrderInfoCards`, `OrderActionCards`, `OrderInvoiceCards`) rather than one
+file each. `useOrderActions` is the controller (refund/cancel/pay mutations + refund
+modal form state + evidence picker + snackbar); `useOrderInvoices` owns the two
+invoice queries + download handlers.
+
 ## 13. Verification
 
 - `npx tsc --noEmit` introduces **no new errors** beyond the tracked baseline.

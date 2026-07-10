@@ -14,13 +14,17 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
 }));
 
-jest.mock('../../../src/services/api', () => ({
+// Yeni mimaride hook'lar `@/lib/api`'den import ediyor (services/api artık barrel).
+jest.mock('@/lib/api', () => ({
   api: { get: jest.fn() },
   ordersApi: { cancel: jest.fn(), confirm: jest.fn(), confirmReceipt: jest.fn() },
   refundsApi: { create: jest.fn(), cancel: jest.fn() },
   mediaApi: { uploadRefundEvidence: jest.fn() },
+  paymentsApi: { initiate: jest.fn(), bypassComplete: jest.fn() },
+  elogoInvoicesApi: { byOrder: jest.fn(() => Promise.resolve({ data: null })), pdf: jest.fn() },
+  sellerInvoiceApi: { status: jest.fn(() => Promise.resolve({ data: null })), download: jest.fn() },
 }));
-import { api } from '../../../src/services/api';
+import { api } from '@/lib/api';
 
 import OrderDetailScreen from '../[id]';
 

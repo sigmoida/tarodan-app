@@ -63,6 +63,8 @@ export const qk = {
     all: ['orders'] as const,
     list: (filters?: Filters) => ['orders', 'list', filters] as const,
     detail: (id: string) => ['order', id] as const,
+    elogoInvoice: (id: string) => ['elogo-invoice', id] as const,
+    sellerInvoice: (id: string) => ['seller-invoice', id] as const,
     sellerPending: ['seller-pending-orders'] as const,
   },
 
