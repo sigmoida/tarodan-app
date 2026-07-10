@@ -2,11 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [development]
+    # master included: on a development->master merge the CI push-run executes so
+    # deploy-production.yml (workflow_run: CI success) can be triggered.
+    branches: [development, master]
   pull_request:
     branches: [development, master, main]
   schedule:
-    # Her gece 02:00 UTC — tam senaryo paketi (2293) shardlı koşar (e2e-scenarios-full).
+    # Every night at 02:00 UTC — the full scenario suite (2293) runs sharded (e2e-scenarios-full).
     - cron: '0 2 * * *'
   workflow_dispatch:
     inputs:
@@ -118,7 +120,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
-      # Mail testleri (doğrulama/şifre e-postaları) için SMTP yakalayıcı.
+      # SMTP catcher for mail tests (verification/password emails).
       mailhog:
         image: mailhog/mailhog:latest
         ports:
@@ -134,12 +136,12 @@ jobs:
         with:
           turbo-cache: 'false'
       - run: pnpm --filter @tarodan/api test:e2e:setup
-      # Mevcut paket (72 spec). Yeni senaryo paketi (test/e2e/scenarios) burada HARİÇ —
-      # o paket e2e-scenarios-smoke (PR, P0) ve e2e-scenarios-full (nightly, shard) ile koşar.
+      # Existing suite (72 specs). The new scenario suite (test/e2e/scenarios) is EXCLUDED here —
+      # it runs via e2e-scenarios-smoke (PR, P0) and e2e-scenarios-full (nightly, sharded).
       - run: pnpm --filter @tarodan/api exec jest --config ./test/jest-e2e.json --runInBand --testPathIgnorePatterns=/node_modules/ --testPathIgnorePatterns=test/e2e/scenarios/
 
   e2e-scenarios-smoke:
-    name: E2E Senaryolar — P0 Smoke (PR gate)
+    name: E2E Scenarios — P0 Smoke (PR gate)
     needs: [type-check, build]
     runs-on: ubuntu-latest
 
@@ -194,12 +196,12 @@ jobs:
         with:
           turbo-cache: 'false'
       - run: pnpm --filter @tarodan/api test:e2e:setup
-      # Yalnız senaryo paketi + yalnız P0 testleri (test adında [P0] geçenler).
+      # Only the scenario suite + only P0 tests (those with [P0] in the test name).
       - run: pnpm --filter @tarodan/api exec jest --config ./test/jest-e2e.json --runInBand --testPathPattern 'test/e2e/scenarios/' -t '\[P0\]'
 
   e2e-scenarios-full:
-    name: E2E Senaryolar — Tam Paket (nightly/manuel, shardlı)
-    # Otomatik PR/push'ta atlanır; yalnız nightly schedule veya manuel run_scenarios_full=true.
+    name: E2E Scenarios — Full Suite (nightly/manual, sharded)
+    # Skipped on automatic PR/push; only nightly schedule or manual run_scenarios_full=true.
     if: ${{ github.event_name == 'schedule' || github.event.inputs.run_scenarios_full == 'true' }}
     needs: [type-check, build]
     runs-on: ubuntu-latest
@@ -260,11 +262,11 @@ jobs:
         with:
           turbo-cache: 'false'
       - run: pnpm --filter @tarodan/api test:e2e:setup
-      # Senaryo paketini 10 shard'a böl (her shard kendi job + kendi servis container'ları).
+      # Split the scenario suite into 10 shards (each shard = its own job + its own service containers).
       - run: pnpm --filter @tarodan/api exec jest --config ./test/jest-e2e.json --runInBand --testPathPattern 'test/e2e/scenarios/' --shard=${{ matrix.shard }}/10
 
   scenario-coverage:
-    name: Senaryo Kapsam Raporu (gate)
+    name: Scenario Coverage Report (gate)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -272,21 +274,21 @@ jobs:
         with:
           prisma: 'false'
           turbo-cache: 'false'
-      # manifest.json'ı HTML konsoldan yeniden üret ve commit'le senkron olduğunu doğrula.
-      # HTML repoya eklenmemişse (untracked) bu adım atlanır; manifest.json zaten committed kaynak.
-      - name: Manifest senkron mu?
+      # Regenerate manifest.json from the HTML console and verify it is in sync with the commit.
+      # If the HTML is not tracked in the repo (untracked) this step is skipped; manifest.json is the committed source.
+      - name: Is the manifest in sync?
         run: |
           if [ -f Tarodan-Test-Konsolu.html ]; then
             node scripts/extract-scenarios.mjs
             git diff --exit-code apps/api/test/scenarios/manifest.json \
-              || echo '::warning::manifest.json node ile yeniden üretilince farklı (kozmetik) — committed manifest kullanılıyor.'
+              || echo '::warning::manifest.json differs (cosmetic) when regenerated with node — using the committed manifest.'
           else
-            echo 'Tarodan-Test-Konsolu.html yok — manifest senkron kontrolü atlandı.'
+            echo 'Tarodan-Test-Konsolu.html not found — manifest sync check skipped.'
           fi
-      # Kapsam raporunu üret (rapor-only; suite'i bloke etmez).
-      - name: Kapsam raporu
-        run: node scripts/scenario-coverage.mjs || echo '::warning::kapsam raporu üretilemedi'
-      - name: Raporu arşivle
+      # Generate the coverage report (report-only; does not block the suite).
+      - name: Coverage report
+        run: node scripts/scenario-coverage.mjs || echo '::warning::coverage report could not be generated'
+      - name: Archive report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
@@ -296,12 +298,12 @@ jobs:
 
   web-e2e:
     name: Web E2E (Playwright)
-    # Şimdilik SADECE elle: Actions → Run workflow → run_web_e2e=true. Otomatik (push/PR)
-    # tetiklerde atlanır (ağır suite her commit'i yavaşlatmasın).
+    # For now MANUAL only: Actions → Run workflow → run_web_e2e=true. Skipped on automatic
+    # (push/PR) triggers (so the heavy suite doesn't slow down every commit).
     if: ${{ github.event.inputs.run_web_e2e == 'true' }}
     needs: [type-check, build]
     runs-on: ubuntu-latest
-    # 136 journey sıralı koşuyor (workers=1, retries=2) + trace/video arşivi → uzun sürebilir.
+    # 136 journeys run sequentially (workers=1, retries=2) + trace/video archive → can take a while.
     timeout-minutes: 90
 
     services:
@@ -343,7 +345,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
-      # Mail testleri (doğrulama/şifre e-postaları) için SMTP yakalayıcı.
+      # SMTP catcher for mail tests (verification/password emails).
       mailhog:
         image: mailhog/mailhog:latest
         ports:
@@ -351,7 +353,7 @@ jobs:
           - 8025:8025
 
     env:
-      # Playwright config'in webServer'a geçirdiği değerlerle aynı; CI servis portlarına işaret eder.
+      # Same values the Playwright config passes to webServer; points at the CI service ports.
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tarodan_test?schema=public
       MAILHOG_URL: http://localhost:8025
 
@@ -360,11 +362,11 @@ jobs:
       - uses: ./.github/actions/setup-workspace
         with:
           turbo-cache: 'false'
-      # Playwright tarayıcısı + OS bağımlılıkları (Chromium yeterli — config tek proje).
+      # Playwright browser + OS dependencies (Chromium is enough — config is single-project).
       - name: Install Playwright browser
         run: pnpm --filter @tarodan/web exec playwright install --with-deps chromium
-      # Suite kendi webServer'larını (api :3001, web :3000) başlatır ve global-setup test DB'yi
-      # sıfırlayıp seed'ler. CI=true olduğu için mevcut server'ı reuse etmez.
+      # The suite starts its own webServers (api :3001, web :3000) and global-setup resets and
+      # seeds the test DB. Because CI=true it does not reuse an existing server.
       - name: Run Playwright journeys
         run: pnpm --filter @tarodan/web test:e2e
       - name: Upload Playwright report
@@ -417,9 +419,9 @@ jobs:
           prisma: 'false'
           turbo-cache: 'false'
       - name: Audit dependencies (critical fails)
-        # Yalnızca critical açıklar CI'ı düşürür. Mevcut high'ların çoğu transitive
-        # (NestJS/Apollo/expo/prisma) ve major upgrade gerektirir; risk almak yerine
-        # critical gate'i koruyoruz. high'lar Dependabot üzerinden takip edilir.
+        # Only critical vulnerabilities fail CI. Most current highs are transitive
+        # (NestJS/Apollo/expo/prisma) and require major upgrades; rather than take the
+        # risk we keep the critical gate. Highs are tracked via Dependabot.
         run: pnpm audit --audit-level=critical
 
   secret-scan:
