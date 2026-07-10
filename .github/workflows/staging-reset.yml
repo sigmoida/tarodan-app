@@ -1,0 +1,56 @@
+# Manual button (+ optional weekly cron) that resets the STAGING database to
+# the known-clean seeded state. SSHes into the staging VPS and runs the
+# triple-guarded scripts/staging-reset-remote.sh — the script itself refuses
+# to run on anything that looks like production (see its header).
+#
+# Required GitHub environment "staging" secrets:
+#   STAGING_HOST, STAGING_USERNAME, STAGING_SSH_KEY
+# Optional repo/environment variable:
+#   STAGING_WEEKLY_RESET=true  → enables the Monday-morning scheduled reset.
+name: Staging Reset
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type STAGING (all caps) to confirm wiping the staging DB"
+        required: true
+        type: string
+      skip_backup:
+        description: "Skip the pre-reset pg_dump backup"
+        required: false
+        type: boolean
+        default: false
+  schedule:
+    # Mondays 03:00 UTC (06:00 TRT). No-op unless STAGING_WEEKLY_RESET == 'true'.
+    - cron: "0 3 * * 1"
+
+concurrency:
+  group: staging-reset
+  cancel-in-progress: false
+
+jobs:
+  reset:
+    name: Reset + seed staging
+    runs-on: ubuntu-latest
+    environment: staging
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.confirm == 'STAGING') ||
+      (github.event_name == 'schedule' && vars.STAGING_WEEKLY_RESET == 'true')
+    steps:
+      - name: Reset + seed over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USERNAME }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          command_timeout: 30m
+          script: |
+            set -euo pipefail
+            cd /opt/tarodan
+            git fetch origin development
+            git checkout development
+            git pull --ff-only origin development
+            RESET_CONFIRM=STAGING \
+            SKIP_BACKUP=${{ (github.event_name == 'workflow_dispatch' && inputs.skip_backup) && '1' || '0' }} \
+              bash scripts/staging-reset-remote.sh
