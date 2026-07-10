@@ -40,6 +40,7 @@
     "prisma:studio": "prisma studio",
     "seed:edge:auth": "ts-node -r tsconfig-paths/register prisma/seed-edge/auth-states.ts",
     "add-images": "ts-node -r tsconfig-paths/register scripts/add-images-to-products.ts",
+    "seed:assets:build": "dotenv -e .env -- ts-node -r tsconfig-paths/register scripts/build-seed-assets.ts",
     "fix-premium-trade": "ts-node -r tsconfig-paths/register scripts/fix-premium-trade.ts",
     "fix-user-membership": "ts-node -r tsconfig-paths/register scripts/fix-user-membership.ts",
     "release-reserved": "ts-node -r tsconfig-paths/register scripts/release-reserved-products.ts",
