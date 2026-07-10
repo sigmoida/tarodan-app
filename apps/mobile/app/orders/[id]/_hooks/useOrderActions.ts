@@ -12,9 +12,17 @@ import type { OrderDetail } from '../_lib/types';
 
 type SnackVariant = 'success' | 'danger' | 'default';
 
-const errMsg = (err: any, fallback: string): string => {
+// Ödeme akışının (initiate) hata formu: array ise join'le, sonra string değilse fallback.
+const joinMsg = (err: any, fallback: string): string => {
   const raw = err?.response?.data?.message;
   const msg = Array.isArray(raw) ? raw.join(', ') : raw || fallback;
+  return typeof msg === 'string' ? msg : fallback;
+};
+
+// refund/cancelRefund/cancelOrder'ın ORİJİNAL hata formu: string mesajı göster,
+// array/eksik mesajda genel fallback göster (parite — array'i join'leME).
+const strMsg = (err: any, fallback: string): string => {
+  const msg = err?.response?.data?.message || fallback;
   return typeof msg === 'string' ? msg : fallback;
 };
 
@@ -77,7 +85,7 @@ export function useOrderActions(id: string, order: OrderDetail | undefined) {
     },
     onError: (err: any) => {
       captureException(err, { level: 'error', tags: { flow: 'refund.create' }, extra: { orderId: id, reason: refundReason } });
-      notify(errMsg(err, 'İade talebi oluşturulamadı.'), 'danger');
+      notify(strMsg(err, 'İade talebi oluşturulamadı.'), 'danger');
     },
   });
 
@@ -89,7 +97,7 @@ export function useOrderActions(id: string, order: OrderDetail | undefined) {
     },
     onError: (err: any) => {
       captureException(err, { level: 'error', tags: { flow: 'refund.cancel' }, extra: { orderId: id } });
-      notify(errMsg(err, 'İptal başarısız.'), 'danger');
+      notify(strMsg(err, 'İptal başarısız.'), 'danger');
     },
   });
 
@@ -101,7 +109,7 @@ export function useOrderActions(id: string, order: OrderDetail | undefined) {
     },
     onError: (err: any) => {
       captureException(err, { level: 'error', tags: { flow: 'order.cancel' }, extra: { orderId: id } });
-      notify(errMsg(err, 'Sipariş iptal edilemedi.'), 'danger');
+      notify(strMsg(err, 'Sipariş iptal edilemedi.'), 'danger');
     },
   });
 
@@ -126,7 +134,7 @@ export function useOrderActions(id: string, order: OrderDetail | undefined) {
     },
     onError: (err: any) => {
       captureException(err, { level: 'error', tags: { flow: 'order.payInitiate' }, extra: { orderId: id } });
-      notify(errMsg(err, 'Ödeme başlatılamadı. Lütfen tekrar deneyin.'), 'danger');
+      notify(joinMsg(err, 'Ödeme başlatılamadı. Lütfen tekrar deneyin.'), 'danger');
     },
   });
 
