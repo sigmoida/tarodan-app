@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { createHash } from 'crypto';
-import { deflateRawSync } from 'zlib';
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { createHash } from "crypto";
+import { deflateRawSync } from "zlib";
 import type {
   ElogoDocumentStatus,
   ElogoSendDocumentParams,
@@ -9,7 +9,7 @@ import type {
   ElogoSession,
   ElogoSoapCallOptions,
   ElogoUserCheckResult,
-} from './elogo.types';
+} from "./elogo.types";
 
 /**
  * eLogo PostBoxService (SOAP) soyutlaması.
@@ -25,7 +25,10 @@ import type {
  */
 export abstract class ElogoSoapClient {
   abstract login(options: ElogoSoapCallOptions): Promise<ElogoSession>;
-  abstract logout(sessionId: string, options: ElogoSoapCallOptions): Promise<void>;
+  abstract logout(
+    sessionId: string,
+    options: ElogoSoapCallOptions,
+  ): Promise<void>;
   abstract checkUser(
     identifiers: string[],
     sessionId: string,
@@ -89,23 +92,26 @@ export class StubElogoSoapClient extends ElogoSoapClient {
   }
 
   private simulate(): void {
-    const sim = this.configService.get<string>('ELOGO_STUB_THROW', '')?.trim().toUpperCase();
-    if (sim === 'TIMEOUT') {
-      const err = new Error('ETIMEDOUT');
-      (err as NodeJS.ErrnoException).code = 'ETIMEDOUT';
+    const sim = this.configService
+      .get<string>("ELOGO_STUB_THROW", "")
+      ?.trim()
+      .toUpperCase();
+    if (sim === "TIMEOUT") {
+      const err = new Error("ETIMEDOUT");
+      (err as NodeJS.ErrnoException).code = "ETIMEDOUT";
       throw err;
     }
-    if (sim === 'NETWORK') {
-      const err = new Error('ECONNRESET');
-      (err as NodeJS.ErrnoException).code = 'ECONNRESET';
+    if (sim === "NETWORK") {
+      const err = new Error("ECONNRESET");
+      (err as NodeJS.ErrnoException).code = "ECONNRESET";
       throw err;
     }
-    if (sim === 'HTTP_5XX') {
-      const err = new Error('HTTP 500');
+    if (sim === "HTTP_5XX") {
+      const err = new Error("HTTP 500");
       (err as any).statusCode = 500;
       throw err;
     }
-    if (sim === 'SOAP_FAULT') throw new Error('SOAP Fault: server');
+    if (sim === "SOAP_FAULT") throw new Error("SOAP Fault: server");
   }
 
   async login(_options: ElogoSoapCallOptions): Promise<ElogoSession> {
@@ -115,7 +121,10 @@ export class StubElogoSoapClient extends ElogoSoapClient {
     return { sessionId: `G;stub-session-${this.loginCount}`, acquiredAt: 0 };
   }
 
-  async logout(sessionId: string, _options: ElogoSoapCallOptions): Promise<void> {
+  async logout(
+    sessionId: string,
+    _options: ElogoSoapCallOptions,
+  ): Promise<void> {
     this.logger.debug(`Stub eLogo logout session=${sessionId}`);
   }
 
@@ -126,8 +135,10 @@ export class StubElogoSoapClient extends ElogoSoapClient {
   ): Promise<ElogoUserCheckResult[]> {
     this.simulate();
     this.checkUserCalls.push(identifiers);
-    const eInvoiceVkns = (this.configService.get<string>('ELOGO_STUB_EINVOICE_VKNS', '') || '')
-      .split(',')
+    const eInvoiceVkns = (
+      this.configService.get<string>("ELOGO_STUB_EINVOICE_VKNS", "") || ""
+    )
+      .split(",")
       .map((v) => v.trim())
       .filter(Boolean);
     return identifiers.map((identifier) => {
@@ -135,7 +146,9 @@ export class StubElogoSoapClient extends ElogoSoapClient {
       return {
         identifier,
         isEInvoiceUser,
-        eInvoicePkAlias: isEInvoiceUser ? 'urn:mail:defaultpk@elogo.com.tr' : undefined,
+        eInvoicePkAlias: isEInvoiceUser
+          ? "urn:mail:defaultpk@elogo.com.tr"
+          : undefined,
       };
     });
   }
@@ -150,7 +163,13 @@ export class StubElogoSoapClient extends ElogoSoapClient {
     this.logger.debug(
       `Stub eLogo sendDocument type=${params.documentType} uuid=${params.documentUuid}`,
     );
-    return { success: true, documentUuid: params.documentUuid, code: 1, description: 'OK (stub)', refId: this.sentDocuments.length };
+    return {
+      success: true,
+      documentUuid: params.documentUuid,
+      code: 1,
+      description: "OK (stub)",
+      refId: this.sentDocuments.length,
+    };
   }
 
   async getDocumentStatus(
@@ -160,7 +179,13 @@ export class StubElogoSoapClient extends ElogoSoapClient {
     _options: ElogoSoapCallOptions,
   ): Promise<ElogoDocumentStatus> {
     this.simulate();
-    return { documentUuid, status: 2, code: 1300, description: 'BASARIYLA TAMAMLANDI (stub)', isCancel: false };
+    return {
+      documentUuid,
+      status: 2,
+      code: 1300,
+      description: "BASARIYLA TAMAMLANDI (stub)",
+      isCancel: false,
+    };
   }
 
   async cancelEArchive(
@@ -172,44 +197,55 @@ export class StubElogoSoapClient extends ElogoSoapClient {
     this.simulate();
     this.cancelCalls.push({ uuid, elementId });
     this.logger.debug(`Stub eLogo cancelEArchive uuid=${uuid}`);
-    return { success: true, documentUuid: uuid, code: 1, description: 'CANCEL OK (stub)' };
+    return {
+      success: true,
+      documentUuid: uuid,
+      code: 1,
+      description: "CANCEL OK (stub)",
+    };
   }
 
-  async getEArchiveInvoicePdf(uuid: string, _sessionId: string, _options: ElogoSoapCallOptions): Promise<Buffer | null> {
+  async getEArchiveInvoicePdf(
+    uuid: string,
+    _sessionId: string,
+    _options: ElogoSoapCallOptions,
+  ): Promise<Buffer | null> {
     this.simulate();
     this.logger.debug(`Stub eLogo getEArchiveInvoicePdf uuid=${uuid}`);
-    return Buffer.from(`%PDF-1.4 stub e-arsiv ${uuid}`, 'utf8');
+    return Buffer.from(`%PDF-1.4 stub e-arsiv ${uuid}`, "utf8");
   }
 }
 
 // ─── SOAP / XML / ZIP yardımcıları ─────────────────────────────────────────────
 
-const TEM = 'http://tempuri.org/';
-const EFAT = 'http://schemas.datacontract.org/2004/07/eFaturaWebService';
-const ARR = 'http://schemas.microsoft.com/2003/10/Serialization/Arrays';
+const TEM = "http://tempuri.org/";
+const EFAT = "http://schemas.datacontract.org/2004/07/eFaturaWebService";
+const ARR = "http://schemas.microsoft.com/2003/10/Serialization/Arrays";
 
 function escapeXml(str: string): string {
   return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }
 
 function extractTag(xml: string, tag: string): string | null {
-  const m = xml.match(new RegExp(`<(?:\\w+:)?${tag}[^>]*>([\\s\\S]*?)</(?:\\w+:)?${tag}>`, 'i'));
+  const m = xml.match(
+    new RegExp(`<(?:\\w+:)?${tag}[^>]*>([\\s\\S]*?)</(?:\\w+:)?${tag}>`, "i"),
+  );
   return m ? m[1].trim() : null;
 }
 
 function throwIfSoapFault(xml: string): void {
-  const fault = extractTag(xml, 'faultstring');
+  const fault = extractTag(xml, "faultstring");
   if (fault) throw new Error(`SOAP Fault: ${fault}`);
 }
 
 /** paramList ("Name=Value" dizisi) → <arr:string> öğeleri. */
 function paramListXml(params: string[]): string {
-  return params.map((p) => `<arr:string>${escapeXml(p)}</arr:string>`).join('');
+  return params.map((p) => `<arr:string>${escapeXml(p)}</arr:string>`).join("");
 }
 
 // CRC-32 (ZIP için gerekli)
@@ -224,13 +260,14 @@ const CRC_TABLE = (() => {
 })();
 function crc32(buf: Buffer): number {
   let c = 0xffffffff;
-  for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+  for (let i = 0; i < buf.length; i++)
+    c = CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
   return (c ^ 0xffffffff) >>> 0;
 }
 
 /** Tek dosyalık, bağımsız (deps'siz) ZIP üretir (deflate / yöntem 8). */
 function makeZip(fileName: string, content: Buffer): Buffer {
-  const nameBuf = Buffer.from(fileName, 'utf8');
+  const nameBuf = Buffer.from(fileName, "utf8");
   const crc = crc32(content);
   const compressed = deflateRawSync(content);
   const localHeader = Buffer.alloc(30);
@@ -288,8 +325,8 @@ function todayIso(): string {
 
 // ─── Live SOAP client ──────────────────────────────────────────────────────────
 
-const DEFAULT_SOAP_URL = 'https://pb.elogo.com.tr/PostBoxService.svc';
-const CONTRACT = 'IPostBoxService';
+const DEFAULT_SOAP_URL = "https://pb.elogo.com.tr/PostBoxService.svc";
+const CONTRACT = "IPostBoxService";
 
 /** Üretim SOAP client — gerçek eLogo PostBoxService'e XML POST eder. */
 @Injectable()
@@ -301,19 +338,23 @@ export class LiveElogoSoapClient extends ElogoSoapClient {
   }
 
   private get url(): string {
-    return this.configService.get<string>('ELOGO_SOAP_URL', DEFAULT_SOAP_URL);
+    return this.configService.get<string>("ELOGO_SOAP_URL", DEFAULT_SOAP_URL);
   }
 
   private creds(): { userName: string; password: string } {
-    const userName = this.configService.get<string>('ELOGO_WS_USERNAME', '');
-    const password = this.configService.get<string>('ELOGO_WS_PASSWORD', '');
+    const userName = this.configService.get<string>("ELOGO_WS_USERNAME", "");
+    const password = this.configService.get<string>("ELOGO_WS_PASSWORD", "");
     if (!userName || !password) {
-      throw new Error('ELOGO_WS_USERNAME or ELOGO_WS_PASSWORD not configured');
+      throw new Error("ELOGO_WS_USERNAME or ELOGO_WS_PASSWORD not configured");
     }
     return { userName, password };
   }
 
-  private async post(operation: string, bodyInner: string, options: ElogoSoapCallOptions): Promise<string> {
+  private async post(
+    operation: string,
+    bodyInner: string,
+    options: ElogoSoapCallOptions,
+  ): Promise<string> {
     const soapXml =
       `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="${TEM}" xmlns:arr="${ARR}" xmlns:efat="${EFAT}">` +
       `<soapenv:Header/><soapenv:Body>${bodyInner}</soapenv:Body></soapenv:Envelope>`;
@@ -321,18 +362,18 @@ export class LiveElogoSoapClient extends ElogoSoapClient {
     const timer = setTimeout(() => controller.abort(), options.timeoutMs);
     try {
       const response = await fetch(this.url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/xml; charset=utf-8', SOAPAction: `${TEM}${CONTRACT}/${operation}` },
+        method: "POST",
+        headers: {
+          "Content-Type": "text/xml; charset=utf-8",
+          SOAPAction: `${TEM}${CONTRACT}/${operation}`,
+        },
         body: soapXml,
         signal: controller.signal,
       });
       if (response.status >= 500) {
-        const text = await response.text().catch(() => '');
-        try {
-          throwIfSoapFault(text);
-        } catch (e) {
-          throw e;
-        }
+        const text = await response.text().catch(() => "");
+        // SOAP fault gövdesi varsa onu fırlat; yoksa ham HTTP hatasını fırlat.
+        throwIfSoapFault(text);
         const err = new Error(`HTTP ${response.status}`);
         (err as any).statusCode = response.status;
         throw err;
@@ -341,9 +382,9 @@ export class LiveElogoSoapClient extends ElogoSoapClient {
       throwIfSoapFault(text);
       return text;
     } catch (error: any) {
-      if (error.name === 'AbortError') {
-        const err = new Error('ETIMEDOUT');
-        (err as NodeJS.ErrnoException).code = 'ETIMEDOUT';
+      if (error.name === "AbortError") {
+        const err = new Error("ETIMEDOUT");
+        (err as NodeJS.ErrnoException).code = "ETIMEDOUT";
         throw err;
       }
       throw error;
@@ -362,19 +403,28 @@ export class LiveElogoSoapClient extends ElogoSoapClient {
       `<efat:userName>${escapeXml(userName)}</efat:userName>` +
       `<efat:version>1.0</efat:version>` +
       `</tem:login></tem:Login>`;
-    const xml = await this.post('Login', inner, options);
-    const sessionId = extractTag(xml, 'sessionID');
-    const result = extractTag(xml, 'LoginResult');
-    if (!sessionId || result === 'false') {
-      throw new Error(`eLogo login başarısız (LoginResult=${result}). Yanıt: ${xml.slice(0, 400)}`);
+    const xml = await this.post("Login", inner, options);
+    const sessionId = extractTag(xml, "sessionID");
+    const result = extractTag(xml, "LoginResult");
+    if (!sessionId || result === "false") {
+      throw new Error(
+        `eLogo login başarısız (LoginResult=${result}). Yanıt: ${xml.slice(0, 400)}`,
+      );
     }
-    this.logger.log('eLogo login başarılı');
+    this.logger.log("eLogo login başarılı");
     return { sessionId, acquiredAt: 0 };
   }
 
-  async logout(sessionId: string, options: ElogoSoapCallOptions): Promise<void> {
+  async logout(
+    sessionId: string,
+    options: ElogoSoapCallOptions,
+  ): Promise<void> {
     try {
-      await this.post('Logout', `<tem:Logout><tem:sessionID>${escapeXml(sessionId)}</tem:sessionID></tem:Logout>`, options);
+      await this.post(
+        "Logout",
+        `<tem:Logout><tem:sessionID>${escapeXml(sessionId)}</tem:sessionID></tem:Logout>`,
+        options,
+      );
     } catch (err: any) {
       this.logger.warn(`eLogo logout hatası (yutuldu): ${err.message}`);
     }
@@ -390,15 +440,15 @@ export class LiveElogoSoapClient extends ElogoSoapClient {
     for (const identifier of identifiers) {
       const inner =
         `<tem:GetValidateGIBUser><tem:sessionID>${escapeXml(sessionId)}</tem:sessionID>` +
-        `<tem:paramList>${paramListXml([`VKN=${identifier}`, 'DOCUMENTTYPE=0'])}</tem:paramList>` +
+        `<tem:paramList>${paramListXml([`VKN=${identifier}`, "DOCUMENTTYPE=0"])}</tem:paramList>` +
         `</tem:GetValidateGIBUser>`;
-      const xml = await this.post('GetValidateGIBUser', inner, options);
+      const xml = await this.post("GetValidateGIBUser", inner, options);
       const kv = parseKeyValues(xml);
       results.push({
         identifier,
-        isEInvoiceUser: kv['ISGIBUSER'] === '1',
-        eInvoicePkAlias: kv['EINVOICEPKALIAS'] || undefined,
-        registerTime: kv['REGISTERTIME'] || undefined,
+        isEInvoiceUser: kv["ISGIBUSER"] === "1",
+        eInvoicePkAlias: kv["EINVOICEPKALIAS"] || undefined,
+        registerTime: kv["REGISTERTIME"] || undefined,
       });
     }
     return results;
@@ -410,16 +460,20 @@ export class LiveElogoSoapClient extends ElogoSoapClient {
     options: ElogoSoapCallOptions,
   ): Promise<ElogoSendResult> {
     const innerXmlName = `${params.documentNumber || params.documentUuid}.xml`;
-    const zip = makeZip(innerXmlName, Buffer.from(params.ublXml, 'utf8'));
-    const base64 = zip.toString('base64');
-    const md5 = createHash('md5').update(zip).digest('hex').toUpperCase();
+    const zip = makeZip(innerXmlName, Buffer.from(params.ublXml, "utf8"));
+    const base64 = zip.toString("base64");
+    const md5 = createHash("md5").update(zip).digest("hex").toUpperCase();
     const fileName = `${params.documentUuid}.zip`;
 
-    const pl: string[] = [`DOCUMENTTYPE=${params.documentType}`, `SIGNED=${params.signed ? 1 : 0}`];
+    const pl: string[] = [
+      `DOCUMENTTYPE=${params.documentType}`,
+      `SIGNED=${params.signed ? 1 : 0}`,
+    ];
     if (params.alias) pl.push(`ALIAS=${params.alias}`);
     if (params.xsltUuid) pl.push(`XSLTUUID=${params.xsltUuid}`);
     if (params.extraParams?.length) pl.push(...params.extraParams);
-    if (process.env.ELOGO_DEBUG) this.logger.debug(`paramList: ${JSON.stringify(pl)}`);
+    if (process.env.ELOGO_DEBUG)
+      this.logger.debug(`paramList: ${JSON.stringify(pl)}`);
 
     const inner =
       `<tem:SendDocument><tem:sessionID>${escapeXml(sessionId)}</tem:sessionID>` +
@@ -431,10 +485,10 @@ export class LiveElogoSoapClient extends ElogoSoapClient {
       `<efat:hash>${md5}</efat:hash>` +
       `</tem:document></tem:SendDocument>`;
 
-    const xml = await this.post('SendDocument', inner, options);
-    const code = Number(extractTag(xml, 'resultCode') ?? NaN);
-    const description = extractTag(xml, 'resultMsg') || undefined;
-    const refId = Number(extractTag(xml, 'refId') ?? NaN);
+    const xml = await this.post("SendDocument", inner, options);
+    const code = Number(extractTag(xml, "resultCode") ?? NaN);
+    const description = extractTag(xml, "resultMsg") || undefined;
+    const refId = Number(extractTag(xml, "refId") ?? NaN);
     return {
       success: code === 1,
       documentUuid: params.documentUuid,
@@ -455,13 +509,13 @@ export class LiveElogoSoapClient extends ElogoSoapClient {
       `<tem:uuid>${escapeXml(documentUuid)}</tem:uuid>` +
       `<tem:paramList>${paramListXml([`DOCUMENTTYPE=${documentType}`])}</tem:paramList>` +
       `</tem:GetDocumentStatus>`;
-    const xml = await this.post('GetDocumentStatus', inner, options);
+    const xml = await this.post("GetDocumentStatus", inner, options);
     return {
       documentUuid,
-      status: Number(extractTag(xml, 'status') ?? NaN),
-      code: Number(extractTag(xml, 'code') ?? NaN) || undefined,
-      description: extractTag(xml, 'description') || undefined,
-      isCancel: extractTag(xml, 'isCancel') === 'true',
+      status: Number(extractTag(xml, "status") ?? NaN),
+      code: Number(extractTag(xml, "code") ?? NaN) || undefined,
+      description: extractTag(xml, "description") || undefined,
+      isCancel: extractTag(xml, "isCancel") === "true",
     };
   }
 
@@ -471,7 +525,7 @@ export class LiveElogoSoapClient extends ElogoSoapClient {
     sessionId: string,
     options: ElogoSoapCallOptions,
   ): Promise<ElogoSendResult> {
-    const pl = ['DOCUMENTTYPE=CANCELEARCHIVEINVOICE', `UUID=${uuid}`];
+    const pl = ["DOCUMENTTYPE=CANCELEARCHIVEINVOICE", `UUID=${uuid}`];
     if (elementId) pl.push(`ELEMENTID=${elementId}`);
     // İptalde UBL gönderilmez; boş document. ⚠️ DOĞRULANACAK (test ortamı).
     const inner =
@@ -483,13 +537,13 @@ export class LiveElogoSoapClient extends ElogoSoapClient {
       `<efat:fileName>cancel-${escapeXml(uuid)}.zip</efat:fileName>` +
       `<efat:hash></efat:hash>` +
       `</tem:document></tem:SendDocument>`;
-    const xml = await this.post('SendDocument', inner, options);
-    const code = Number(extractTag(xml, 'resultCode') ?? NaN);
+    const xml = await this.post("SendDocument", inner, options);
+    const code = Number(extractTag(xml, "resultCode") ?? NaN);
     return {
       success: code === 1,
       documentUuid: uuid,
       code: Number.isNaN(code) ? undefined : code,
-      description: extractTag(xml, 'resultMsg') || undefined,
+      description: extractTag(xml, "resultMsg") || undefined,
     };
   }
 
@@ -505,13 +559,15 @@ export class LiveElogoSoapClient extends ElogoSoapClient {
       `<tem:allInvoicesOrJustSigned>true</tem:allInvoicesOrJustSigned>` +
       `<tem:isCanceled>false</tem:isCanceled>` +
       `</tem:getEArchiveInvoicePdfData>`;
-    const xml = await this.post('getEArchiveInvoicePdfData', inner, options);
+    const xml = await this.post("getEArchiveInvoicePdfData", inner, options);
     // Yanıttaki en büyük base64 bloğu = PDF.
-    const blobs = [...xml.matchAll(/>([A-Za-z0-9+/=]{500,})</g)].map((m) => m[1]);
+    const blobs = [...xml.matchAll(/>([A-Za-z0-9+/=]{500,})</g)].map(
+      (m) => m[1],
+    );
     if (!blobs.length) return null;
     const b64 = blobs.sort((a, b) => b.length - a.length)[0];
-    const buf = Buffer.from(b64, 'base64');
-    return buf.slice(0, 5).toString('latin1') === '%PDF-' ? buf : buf; // PDF beklenir; yine de döndür
+    const buf = Buffer.from(b64, "base64");
+    return buf.slice(0, 5).toString("latin1") === "%PDF-" ? buf : buf; // PDF beklenir; yine de döndür
   }
 }
 
