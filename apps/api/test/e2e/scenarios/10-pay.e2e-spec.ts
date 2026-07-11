@@ -1942,6 +1942,7 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
 
     scenario("PAY-120", async () => {
       // total_amount kuruş cinsindendir (amount×100) → eşleşir, completed.
+      // Beklenen tutar = order.totalAmount (ürün + kargo + buyerFee), yalnız ürün fiyatı değil.
       const { buyer, product, addr } = await makeBuyerSellerProduct({
         price: 300,
       });
@@ -1951,13 +1952,17 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
         .set(authHeader(buyer))
         .send({ orderId, card: validCard() })
         .expect(201);
+      const order = await getPrisma().order.findUnique({
+        where: { id: orderId },
+      });
+      const total = Number(order!.totalAmount);
       const payment = await lastPayment(orderId);
-      // amount = 300 → 30000 kuruş.
-      await successCallback(orderId, 30000).expect(200);
+      // total kuruş cinsinden (total×100) tam eşleşir → completed.
+      await successCallback(orderId, Math.round(total * 100)).expect(200);
       expect((await lastPayment(orderId))?.status).toBe(
         PaymentStatus.completed,
       );
-      expect(Number(payment?.amount)).toBe(300);
+      expect(Number(payment?.amount)).toBeCloseTo(total, 2);
     });
 
     scenario("PAY-121", async () => {
@@ -1988,7 +1993,12 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
         .set(authHeader(buyer))
         .send({ orderId, card: validCard() })
         .expect(201);
-      await successCallback(orderId, 30003).expect(200);
+      const order = await getPrisma().order.findUnique({
+        where: { id: orderId },
+      });
+      const total = Number(order!.totalAmount);
+      // Beklenenden 0.03 TL (3 kuruş) fazla → tolerans (0.05 TL) içi → completed.
+      await successCallback(orderId, Math.round(total * 100) + 3).expect(200);
       expect((await lastPayment(orderId))?.status).toBe(
         PaymentStatus.completed,
       );
