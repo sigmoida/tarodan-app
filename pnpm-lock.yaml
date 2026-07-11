@@ -7,6 +7,7 @@ settings:
 overrides:
   fast-xml-parser: '>=5.3.4'
   handlebars: '>=4.7.9'
+  shell-quote: '>=1.8.4'
 
 packageExtensionsChecksum: 0e0a8e4a9700ab210346b72ca18e8950
 
@@ -4966,7 +4967,7 @@ packages:
     peerDependencies:
       react-hook-form: ^7.0.0
     dependencies:
-      react-hook-form: 7.71.1(react@19.1.0)
+      react-hook-form: 7.71.1(react@18.3.1)
 
   /@humanwhocodes/config-array@0.13.0:
     resolution: {integrity: sha512-DZLEEqFWQFiyK6h5YIeynKx7JlvCYWL0cImfSRXZ9l4Sg2efkFGTuFf6vzXjK1cq6IYkU+Eg/JizXw+TD2vRNw==}
@@ -12828,7 +12829,7 @@ packages:
       sanitize-filename: 1.6.3
       semver: 7.7.3
       serialize-error: 8.1.0
-      shell-quote: 1.8.3
+      shell-quote: 1.10.0
       signal-exit: 3.0.7
       stream-json: 1.9.1
       strip-ansi: 6.0.1
@@ -18921,7 +18922,7 @@ packages:
   /react-devtools-core@6.1.5:
     resolution: {integrity: sha512-ePrwPfxAnB+7hgnEr8vpKxL9cmnp7F322t8oqcPshbIQQhDKgFDW4tjhF2wjVbdXF9O/nyuy3sQWd9JGpiLPvA==}
     dependencies:
-      shell-quote: 1.8.3
+      shell-quote: 1.10.0
       ws: 7.5.10
     transitivePeerDependencies:
       - bufferutil
@@ -19990,8 +19991,8 @@ packages:
     resolution: {integrity: sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A==}
     engines: {node: '>=8'}
 
-  /shell-quote@1.8.3:
-    resolution: {integrity: sha512-ObmnIF4hXNg1BqhnHmgbDETF8dLPCggZWBjkQfhZpbszZnYur5DUljTcCHii5LC3J5E0yeO/1LIMyH+UvHQgyw==}
+  /shell-quote@1.10.0:
+    resolution: {integrity: sha512-w1aiOKwKuRgtwAReIIj89puqg+I7GvX4IbLrvmhXbzQsj1+Zwi4VO3+fa6ZF91TWSjIxoEkKnMeHcLEODK5ZXA==}
     engines: {node: '>= 0.4'}
 
   /side-channel-list@1.0.0:
