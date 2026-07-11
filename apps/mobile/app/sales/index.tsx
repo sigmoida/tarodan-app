@@ -131,8 +131,8 @@ export default function SalesScreen() {
 
   /**
    * Backend'de tek "status update" endpoint'i yok; iki ayrı akış:
-   *   - "processing"  → POST /orders/:id/prepare         (markAsPreparing)
-   *   - "shipped"     → POST /shipping  + PATCH /shipping/:id/tracking
+   *   - "processing"  → POST /orders/:id/prepare              (markAsPreparing)
+   *   - "shipped"     → GET /shipping/order/:id + PATCH /shipping/:id/tracking
    * Bu mutasyon hangi durumun istendiğine göre doğru endpoint'i çağırır.
    */
   const updateStatusMutation = useMutation({
@@ -141,12 +141,21 @@ export default function SalesScreen() {
         return ordersApi.markAsPreparing(orderId);
       }
       if (status === 'shipped') {
-        const created = await shippingApi.createShipment({ orderId, provider: 'surat' });
-        const shipment = (created.data as any)?.data ?? (created.data as any);
+        // Fiziksel siparişlerde shipment ödeme anında OTOMATİK oluşur; tekrar POST /shipping
+        // "zaten var" (400) döndürür. Mevcut shipment'i çekip takip numarasını işleriz; hiç
+        // yoksa (eski/edge sipariş) bir kez oluştururuz.
+        let shipment: { id?: string } | undefined;
+        try {
+          const existing = await shippingApi.getOrderShipments(orderId);
+          shipment = (existing.data as any)?.data ?? (existing.data as any);
+        } catch {
+          const created = await shippingApi.createShipment({ orderId, provider: 'surat' });
+          shipment = (created.data as any)?.data ?? (created.data as any);
+        }
         if (trackingNumber && shipment?.id) {
           await shippingApi.updateTracking(shipment.id, { trackingNumber });
         }
-        return created;
+        return shipment;
       }
       throw new Error(`Desteklenmeyen sipariş durumu: ${status}`);
     },

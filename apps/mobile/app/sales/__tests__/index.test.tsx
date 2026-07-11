@@ -16,7 +16,7 @@ jest.mock('expo-router', () => ({
 
 jest.mock('@/services/api', () => ({
   ordersApi: { getAll: jest.fn(), getSellerEarnings: jest.fn(), markAsPreparing: jest.fn() },
-  shippingApi: { createShipment: jest.fn(), updateTracking: jest.fn() },
+  shippingApi: { getOrderShipments: jest.fn(), createShipment: jest.fn(), updateTracking: jest.fn() },
 }));
 import { ordersApi } from '@/services/api';
 
