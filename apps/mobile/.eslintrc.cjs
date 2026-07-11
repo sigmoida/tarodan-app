@@ -63,7 +63,7 @@ const BAN_RAW_COLOR = {
 
 module.exports = {
   root: false,
-  extends: ['../../.eslintrc.cjs'],
+  extends: ['../../.eslintrc.cjs', 'plugin:react-hooks/recommended'],
   rules: {
     ...BAN_PAPER,
     ...BAN_RAW_COLOR,

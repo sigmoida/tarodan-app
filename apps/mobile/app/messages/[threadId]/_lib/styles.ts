@@ -1,5 +1,5 @@
-import { StyleSheet } from 'react-native';
-import { theme } from '@tarodan/ui-native';
+import { StyleSheet } from "react-native";
+import { theme } from "@tarodan/ui-native";
 
 const { colors } = theme;
 
@@ -14,16 +14,16 @@ export const styles = StyleSheet.create({
     paddingTop: 50,
     paddingBottom: 12,
     paddingHorizontal: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   backButton: {
     padding: 8,
   },
   headerContent: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginLeft: 8,
   },
   headerInfo: {
@@ -32,7 +32,7 @@ export const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     color: colors.white,
   },
   headerSubtitle: {
@@ -40,8 +40,8 @@ export const styles = StyleSheet.create({
     color: colors.overlay.white85,
   },
   productBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: colors.surface.DEFAULT,
     padding: 12,
     borderBottomWidth: 1,
@@ -55,8 +55,8 @@ export const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   messagesList: {
     flex: 1,
@@ -68,8 +68,8 @@ export const styles = StyleSheet.create({
     padding: 16,
   },
   dateDivider: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginVertical: 16,
   },
   dateDividerLine: {
@@ -83,21 +83,21 @@ export const styles = StyleSheet.create({
     color: colors.text.muted,
   },
   messageRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: 8,
   },
   messageRowOwn: {
-    justifyContent: 'flex-end',
+    justifyContent: "flex-end",
   },
   messageRowOther: {
-    justifyContent: 'flex-start',
+    justifyContent: "flex-start",
   },
   avatarPlaceholder: {
     width: 36,
     marginRight: 8,
   },
   messageBubble: {
-    maxWidth: '75%',
+    maxWidth: "75%",
     padding: 12,
     borderRadius: 16,
   },
@@ -110,8 +110,8 @@ export const styles = StyleSheet.create({
     borderBottomLeftRadius: 4,
   },
   messageImagesWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 6,
     marginBottom: 6,
   },
@@ -132,10 +132,10 @@ export const styles = StyleSheet.create({
     color: colors.text.heading,
   },
   messageFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 4,
-    justifyContent: 'flex-end',
+    justifyContent: "flex-end",
   },
   messageTime: {
     fontSize: 11,
@@ -151,14 +151,14 @@ export const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.overlay.white70,
   },
-  // Okundu → çift mavi çentik (web text-sky-400 parity).
+  // Okundu → çift mavi çentik (bilgi/okundu durumu → info token).
   messageStatusRead: {
-    color: '#38BDF8',
-    fontWeight: '700',
+    color: colors.info[400]!,
+    fontWeight: "700",
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
+    flexDirection: "row",
+    alignItems: "flex-end",
     padding: 12,
     backgroundColor: colors.surface.DEFAULT,
     borderTopWidth: 1,
@@ -183,8 +183,8 @@ export const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     backgroundColor: colors.primary[600]!,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   sendButtonDisabled: {
     backgroundColor: colors.surface.alt,
@@ -194,16 +194,16 @@ export const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     backgroundColor: colors.surface.alt,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 8,
   },
   attachButtonDisabled: {
     opacity: 0.5,
   },
   pendingImageBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 8,
     backgroundColor: colors.surface.DEFAULT,

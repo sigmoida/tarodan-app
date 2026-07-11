@@ -10,15 +10,15 @@
  * Gap (henüz uygulanmamış/buglı) senaryolar otomatik `it.skip` olur ve
  * docs/TEST-KNOWN-GAPS.md'de listelidir.
  */
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import { readFileSync } from "fs";
+import { join } from "path";
 
 interface ManifestScenario {
   id: string;
   prefix: string;
   title: string;
   tur: string;
-  pri: 'P0' | 'P1' | 'P2';
+  pri: "P0" | "P1" | "P2";
   steps: string;
   exp: string;
   gap: boolean;
@@ -31,9 +31,11 @@ interface Manifest {
 }
 
 const MANIFEST: Manifest = JSON.parse(
-  readFileSync(join(__dirname, '..', 'scenarios', 'manifest.json'), 'utf8'),
+  readFileSync(join(__dirname, "..", "scenarios", "manifest.json"), "utf8"),
 );
-const BY_ID = new Map<string, ManifestScenario>(MANIFEST.scenarios.map((s) => [s.id, s]));
+const BY_ID = new Map<string, ManifestScenario>(
+  MANIFEST.scenarios.map((s) => [s.id, s]),
+);
 
 function nameFor(m: ManifestScenario): string {
   return `${m.id} [${m.pri}] ${m.title}`;
@@ -60,7 +62,11 @@ function scenarioImpl(id: string, fn: TestFn, timeoutMs?: number): void {
   const m = getScenario(id);
   const name = nameFor(m);
   if (m.gap) {
-    it.skip(`${name} — SKIP(gap: ${m.gapRefs.join('; ') || 'bilinen eksik'})`, fn as any, timeoutMs);
+    it.skip(
+      `${name} — SKIP(gap: ${m.gapRefs.join("; ") || "bilinen eksik"})`,
+      fn as any,
+      timeoutMs,
+    );
     return;
   }
   it(name, fn as any, timeoutMs);
@@ -74,7 +80,8 @@ export function scenarioSkip(id: string, reason: string): void {
 
 function scenarioOnly(id: string, fn: TestFn, timeoutMs?: number): void {
   const m = getScenario(id);
-  // eslint-disable-next-line jest/no-focused-tests
+  // scenario.only() = tek senaryoya odaklanma yardımcısı (hata ayıklama). jest eslint
+  // eklentisi kök config'te yüklü değil → jest/no-focused-tests kuralı aktif değil.
   it.only(nameFor(m), fn as any, timeoutMs);
 }
 
