@@ -179,6 +179,11 @@ describe("16 — Vergi & Fatura (TAX)", () => {
         }),
       );
 
+    // Ödeme anındaki otomatik PDF makbuzu koddan kaldırıldı (eLogo e-Arşiv'e geçildi; test
+    // ortamında ELOGO_ENABLED yok → no-op). Fatura testlerinin "ödenmiş sipariş faturalıdır"
+    // varsayımını korumak için faturayı burada idempotent üretiriz (lazy GET ile aynı public yol).
+    await generateInvoice(buyRes.body.orderId);
+
     return { orderId: buyRes.body.orderId, paymentId: payment!.id };
   }
 
@@ -189,10 +194,36 @@ describe("16 — Vergi & Fatura (TAX)", () => {
    * çağrı InvoiceService.generateAndSendInvoice — ödenmiş siparişte lazy-generate ile aynıdır.
    */
   async function generateInvoice(orderId: string): Promise<void> {
+    // Idempotent: fatura zaten varsa tekrar üretme (generateForOrder existence-check YAPMAZ →
+    // ikinci çağrı mükerrer satır açardı). Böylece buyAndPay + explicit çağrı çakışmaz.
+    const existing = await getPrisma().invoice.findFirst({
+      where: { orderId },
+    });
+    if (existing) return;
     const { InvoiceService } =
       await import("../../../src/modules/invoice/invoice.service");
     const invoiceService = ctx.module.get(InvoiceService);
     await invoiceService.generateAndSendInvoice(orderId);
+  }
+
+  /**
+   * moderator rolüne izin matrisinde (admin_role_permissions) verilen izinleri tanımla.
+   * Tax GET uçları @Roles(...,moderator) olsa da RolesGuard ikinci katmanda izin matrisini
+   * uygular; moderator varsayılanında 'tax' yoktur. Yazma uçları @Roles(super_admin) ile rol
+   * katmanında bloklandığından bu grant yalnızca OKUMA'yı açar. Ayar beforeEach'te truncate
+   * edilir → sadece ilgili teste etki eder. (Test env'de guard cache kapalı → anında etkili.)
+   */
+  async function grantModeratorPermissions(perms: string[]): Promise<void> {
+    const value = JSON.stringify({ moderator: perms });
+    await getPrisma().platformSetting.upsert({
+      where: { settingKey: "admin_role_permissions" },
+      update: { settingValue: value, settingType: "json" },
+      create: {
+        settingKey: "admin_role_permissions",
+        settingValue: value,
+        settingType: "json",
+      },
+    });
   }
 
   /** Alıcı + satıcı + ürün + alıcı adresi üret. */
@@ -619,7 +650,6 @@ describe("16 — Vergi & Fatura (TAX)", () => {
         data: {
           businessStatus: "approved" as any,
           taxId: null,
-          sellerType: "business" as any,
         },
       });
       await seedTaxRegionWithDefaultRate({ rate: 20 });
@@ -629,7 +659,7 @@ describe("16 — Vergi & Fatura (TAX)", () => {
         .get(`/api/orders/${orderId}`)
         .set(authHeader(buyer))
         .expect(200);
-      expect(res.body.taxAmount).toBe(0);
+      expect(res.body.pricing.taxAmount).toBe(0);
     });
 
     scenario("TAX-015", async () => {
@@ -654,7 +684,7 @@ describe("16 — Vergi & Fatura (TAX)", () => {
         .get(`/api/orders/${orderId}`)
         .set(authHeader(buyer))
         .expect(200);
-      expect(res.body.taxAmount).toBe(200);
+      expect(res.body.pricing.taxAmount).toBe(200);
     });
 
     scenario("TAX-016", async () => {
@@ -685,7 +715,7 @@ describe("16 — Vergi & Fatura (TAX)", () => {
         .expect(201);
 
       // offerAmount 500 * 20% = 100.
-      expect(orderRes.body.taxAmount).toBe(100);
+      expect(orderRes.body.pricing.taxAmount).toBe(100);
       // Bireysel karşılık: taxId kaldırılınca 0 olurdu (resolveSellerTax davranışı TAX-013'te kanıtlı).
     });
 
@@ -704,7 +734,10 @@ describe("16 — Vergi & Fatura (TAX)", () => {
         quantity: 1,
       });
 
-      const guestEmail = "guest-tax-17@test.com";
+      // Benzersiz e-posta: send-verification-code rate-limit'i (maxSends/window) Redis'te
+      // e-posta bazlı tutulur; truncateAll Redis'i temizlemez → sabit e-posta ile ard arda
+      // koşularda 400 alınırdı. Tekil e-posta ile her koşu temiz başlar.
+      const guestEmail = `guest-tax-17-${Date.now()}@test.com`;
       await request(server())
         .post("/api/orders/guest/send-verification-code")
         .send({ email: guestEmail })
@@ -732,7 +765,7 @@ describe("16 — Vergi & Fatura (TAX)", () => {
         })
         .expect(201);
       // Kurumsal satıcı → 1000 * 20% = 200.
-      expect(res.body.taxAmount).toBe(200);
+      expect(res.body.pricing.taxAmount).toBe(200);
     });
 
     scenario("TAX-018", async () => {
@@ -768,9 +801,8 @@ describe("16 — Vergi & Fatura (TAX)", () => {
         price: 1000,
       });
       const { orderId } = await buyAndPay(buyer, product.id, addr.id);
-      await generateInvoice(orderId);
 
-      // DB'de en az bir issued fatura oluşmalı.
+      // DB'de en az bir issued fatura oluşmalı (buyAndPay faturayı üretir).
       const prisma = getPrisma();
       const invoice = await prisma.invoice.findFirst({ where: { orderId } });
       expect(invoice).toBeTruthy();
@@ -1342,7 +1374,6 @@ describe("16 — Vergi & Fatura (TAX)", () => {
       });
       const stranger = await createUser(ctx.module);
       const { orderId } = await buyAndPay(buyer, product.id, addr.id);
-      await generateInvoice(orderId);
       const prisma = getPrisma();
       const invoice = await prisma.invoice.findFirst({ where: { orderId } });
       await request(server())
@@ -1362,7 +1393,6 @@ describe("16 — Vergi & Fatura (TAX)", () => {
       await makeCorporate(seller.id, "1234567890");
       await seedTaxRegionWithDefaultRate({ rate: 20 });
       const { orderId } = await buyAndPay(buyer, product.id, addr.id);
-      await generateInvoice(orderId);
       const prisma = getPrisma();
       const invoice = await prisma.invoice.findFirst({ where: { orderId } });
       expect(Number(invoice!.subtotal)).toBe(1000);
@@ -1623,6 +1653,9 @@ describe("16 — Vergi & Fatura (TAX)", () => {
         email: "tax-mod-read@test.com",
         role: AdminRole.moderator,
       });
+      // moderator'a 'tax' okuma izni tanımla (GET uçları @Roles moderator'ı kabul eder,
+      // izin matrisi 'tax' ister). Yazma @Roles(super_admin) ile ayrıca bloklu.
+      await grantModeratorPermissions(["tax"]);
       await request(server())
         .get("/api/admin/tax/regions")
         .set(authHeader(moderator))
@@ -1996,6 +2029,8 @@ describe("16 — Vergi & Fatura (TAX)", () => {
         email: "report-mod@test.com",
         role: AdminRole.moderator,
       });
+      // Rapor GET'i @Roles moderator'ı kabul eder; izin matrisi 'tax' ister.
+      await grantModeratorPermissions(["tax"]);
       await request(server())
         .get("/api/admin/tax/report")
         .set(authHeader(moderator))
