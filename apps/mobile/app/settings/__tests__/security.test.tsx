@@ -14,17 +14,17 @@ jest.mock('expo-router', () => ({
 }));
 
 // Oturum açık kullanıcı
-jest.mock('../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({ isAuthenticated: true, logout: jest.fn() }),
 }));
 
 // i18n — anahtarı aynen döndür
-jest.mock('../../../src/i18n', () => ({
+jest.mock('@/i18n', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 
 // API — mock fn'leri factory İÇİNDE tanımla (out-of-scope ref yok), sonra import et.
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   authApi: {
     getTwoFactorStatus: jest.fn(),
     setupTwoFactor: jest.fn(),
@@ -35,7 +35,7 @@ jest.mock('../../../src/services/api', () => ({
     logoutAll: jest.fn(),
   },
 }));
-import { authApi } from '../../../src/services/api';
+import { authApi } from '@/services/api';
 const mockGetTwoFactorStatus = authApi.getTwoFactorStatus as jest.Mock;
 
 describe('SecuritySettingsScreen — 2FA durumu', () => {

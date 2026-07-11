@@ -5,12 +5,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { theme, Button, Card, Spinner, Snackbar, Switch, Divider, Text, appAlert } from '@tarodan/ui-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { ScreenHeader, ThemedRefreshControl } from '../../src/components/common';
-import { useRefresh } from '../../src/hooks/useRefresh';
-import { membershipApi } from '../../src/services/api';
+import { ScreenHeader, ThemedRefreshControl } from '@/components/common';
+import { useRefresh } from '@/hooks/useRefresh';
+import { membershipApi } from '@/services/api';
 
 const { colors } = theme;
-import { captureException } from '../../src/services/sentry';
+import { captureException } from '@/services/sentry';
 
 /**
  * Üyelik yönetim ekranı.

@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 let mockParams: Record<string, string> = { productId: 'prod-1' };
 jest.mock('expo-router', () => ({
@@ -18,8 +18,8 @@ import { router } from 'expo-router';
 const pushMock = router.push as jest.Mock;
 
 // i18n: gerçek TR mesajlarını {param} interpolasyonu ile çözen hafif t().
-jest.mock('../../../../src/i18n', () => {
-  const tr = require('../../../../src/i18n/messages/tr.json');
+jest.mock('@/i18n', () => {
+  const tr = require('@/i18n/messages/tr.json');
   const get = (path: string) =>
     path.split('.').reduce((o: any, k) => (o == null ? undefined : o[k]), tr);
   return {
@@ -38,10 +38,10 @@ jest.mock('../../../../src/i18n', () => {
   };
 });
 
-jest.mock('../../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   productsApi: { getOne: jest.fn(), getSimilar: jest.fn() },
 }));
-import { productsApi } from '../../../../src/services/api';
+import { productsApi } from '@/services/api';
 
 import ProductUnavailableScreen from '../[productId]';
 

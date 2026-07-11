@@ -5,8 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { paymentsApi } from '../../src/services/api';
-import { formatPrice } from '../../src/utils/format';
+import { paymentsApi } from '@/services/api';
+import { formatPrice } from '@/utils/format';
 
 const { colors } = theme;
 

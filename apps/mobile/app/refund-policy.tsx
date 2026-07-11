@@ -1,14 +1,14 @@
 import { View, ScrollView, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { theme, Text, ScreenHeader } from '@tarodan/ui-native';
-import { useTranslation } from '../src/i18n';
+import { useTranslation } from '@/i18n';
 import {
   RETURN_REQUEST_DAYS,
   REFUND_PAYOUT_DAYS,
   DAMAGE_REPORT_DAYS,
   SUPPORT_EMAIL,
   SUPPORT_PHONE,
-} from '../src/constants/legalFacts';
+} from '@/constants/legalFacts';
 
 const { colors } = theme;
 

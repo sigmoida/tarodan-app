@@ -7,7 +7,7 @@
 import React from 'react';
 import { TextInput } from 'react-native';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), back: jest.fn(), replace: jest.fn() },
@@ -15,12 +15,12 @@ jest.mock('expo-router', () => ({
 import { router } from 'expo-router';
 const mockPush = router.push as jest.Mock;
 
-jest.mock('../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   supportApi: { guestContact: jest.fn() },
 }));
-import { supportApi } from '../../src/services/api';
+import { supportApi } from '@/services/api';
 
-jest.mock('../../src/i18n', () => ({
+jest.mock('@/i18n', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 

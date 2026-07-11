@@ -18,13 +18,13 @@ import { z } from 'zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { userApi, mediaApi } from '../../src/services/api';
-import { useAuthStore } from '../../src/stores/authStore';
-import { MembershipBadgeCard } from '../../src/components/PremiumBadge';
-import { useTranslation } from '../../src/i18n';
-import { resolveImageUrl } from '../../src/utils/imageUrl';
-import { PhoneInput } from '../../src/components/common';
-import { normalizePhoneForPayload, splitPhone } from '../../src/utils/phone';
+import { userApi, mediaApi } from '@/services/api';
+import { useAuthStore } from '@/stores/authStore';
+import { MembershipBadgeCard } from '@/components/PremiumBadge';
+import { useTranslation } from '@/i18n';
+import { resolveImageUrl } from '@/utils/imageUrl';
+import { PhoneInput } from '@/components/common';
+import { normalizePhoneForPayload, splitPhone } from '@/utils/phone';
 
 const { colors, radius } = theme;
 

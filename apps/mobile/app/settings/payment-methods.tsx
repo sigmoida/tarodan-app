@@ -3,9 +3,9 @@ import { View, ScrollView, StyleSheet, Pressable, RefreshControl } from 'react-n
 import { Card, Spinner, Text, theme, appAlert } from '@tarodan/ui-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ScreenHeader, EmptyState } from '../../src/components/common';
-import { useAuthStore } from '../../src/stores/authStore';
-import { membershipApi } from '../../src/services/api';
+import { ScreenHeader, EmptyState } from '@/components/common';
+import { useAuthStore } from '@/stores/authStore';
+import { membershipApi } from '@/services/api';
 
 const { colors } = theme;
 

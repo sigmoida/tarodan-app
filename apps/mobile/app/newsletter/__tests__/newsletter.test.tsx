@@ -9,7 +9,7 @@ import React from 'react';
 import { appAlert } from '@tarodan/ui-native';
 import { TextInput } from 'react-native';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 let mockParams: Record<string, string> = {};
 jest.mock('expo-router', () => ({
@@ -20,10 +20,10 @@ import { router } from 'expo-router';
 const mockPush = router.push as jest.Mock;
 const mockReplace = router.replace as jest.Mock;
 
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   guestApi: { post: jest.fn(), get: jest.fn() },
 }));
-import { guestApi } from '../../../src/services/api';
+import { guestApi } from '@/services/api';
 
 import NewsletterScreen from '../index';
 import NewsletterUnsubscribeScreen from '../unsubscribe';

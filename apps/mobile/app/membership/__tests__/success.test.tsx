@@ -5,21 +5,21 @@
  */
 import React from 'react';
 import { screen, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
-import { resetRouterMocks } from '../../../src/test-utils/router-mock';
+import { renderWithProviders } from '@/test-utils';
+import { resetRouterMocks } from '@/test-utils/router-mock';
 
 let mockParams: Record<string, string | undefined> = {};
 jest.mock('expo-router', () => ({
-  ...require('../../../src/test-utils/router-mock').routerMock,
+  ...require('@/test-utils/router-mock').routerMock,
   useLocalSearchParams: () => mockParams,
 }));
 
 const mockRefreshUserData = jest.fn().mockResolvedValue(undefined);
-jest.mock('../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({ refreshUserData: mockRefreshUserData }),
 }));
 
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   paymentsApi: { verify: jest.fn().mockResolvedValue({ data: { completed: true } }) },
 }));
 

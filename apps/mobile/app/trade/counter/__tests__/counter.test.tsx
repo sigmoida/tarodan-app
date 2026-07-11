@@ -8,7 +8,7 @@
 import React from 'react';
 import { appAlert } from '@tarodan/ui-native';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 let mockParams: Record<string, string> = { id: 'trade-1' };
 jest.mock('expo-router', () => ({
@@ -16,14 +16,14 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
 }));
 
-jest.mock('../../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   tradesApi: { getOne: jest.fn(), counter: jest.fn() },
   productsApi: { getAll: jest.fn() },
 }));
-import { tradesApi, productsApi } from '../../../../src/services/api';
+import { tradesApi, productsApi } from '@/services/api';
 
 let mockUser: { id: string } | null = { id: 'user-initiator' };
-jest.mock('../../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({ user: mockUser }),
 }));
 

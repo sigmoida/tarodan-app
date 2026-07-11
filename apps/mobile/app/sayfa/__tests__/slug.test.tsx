@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import { screen, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 let mockParams: Record<string, string> = { slug: 'gizlilik' };
 jest.mock('expo-router', () => ({
@@ -19,10 +19,10 @@ jest.mock('react-native-webview', () => ({
   WebView: () => null,
 }));
 
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   pagesApi: { getBySlug: jest.fn() },
 }));
-import { pagesApi } from '../../../src/services/api';
+import { pagesApi } from '@/services/api';
 
 import CMSPageScreen from '../[slug]';
 

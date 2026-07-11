@@ -6,12 +6,12 @@
  */
 import React from 'react';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
-import { resetRouterMocks } from '../../../src/test-utils/router-mock';
+import { resetRouterMocks } from '@/test-utils/router-mock';
 
 jest.mock('expo-router', () => ({
-  ...require('../../../src/test-utils/router-mock').routerMock,
+  ...require('@/test-utils/router-mock').routerMock,
   useFocusEffect: jest.fn(),
   useLocalSearchParams: () => ({ threadId: 't1' }),
 }));
@@ -22,12 +22,12 @@ jest.mock('expo-image-picker', () => ({
   MediaTypeOptions: { Images: 'Images' },
 }));
 
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   mediaApi: { uploadMessageImage: jest.fn() },
 }));
 
 let mockAuth: any = { user: { id: 'me' }, limits: { maxMessagesPerDay: 50 } };
-jest.mock('../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => mockAuth,
 }));
 
@@ -35,7 +35,7 @@ let mockStore: any;
 const mockSendMessage = jest.fn();
 const useMessagesStoreMock: any = () => mockStore;
 useMessagesStoreMock.getState = () => mockStore;
-jest.mock('../../../src/stores/messagesStore', () => ({
+jest.mock('@/stores/messagesStore', () => ({
   useMessagesStore: useMessagesStoreMock,
 }));
 

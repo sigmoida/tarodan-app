@@ -13,8 +13,8 @@ import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { supportApi } from '../../src/services/api';
-import { useAuthStore } from '../../src/stores/authStore';
+import { supportApi } from '@/services/api';
+import { useAuthStore } from '@/stores/authStore';
 
 const { colors } = theme;
 

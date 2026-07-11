@@ -3,8 +3,8 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TouchableOpacity } from 'react-native';
 import { theme, Text, Card, ScreenHeader } from '@tarodan/ui-native';
-import { useTranslation } from '../src/i18n';
-import { SUPPORT_EMAIL } from '../src/constants/legalFacts';
+import { useTranslation } from '@/i18n';
+import { SUPPORT_EMAIL } from '@/constants/legalFacts';
 
 const { colors } = theme;
 

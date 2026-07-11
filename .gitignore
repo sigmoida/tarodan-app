@@ -68,3 +68,6 @@ PayTR IFrame API/
 
 # Cursor IDE ayar/plan dosyaları — repoya girmez (içerik junk/cursor-plans altına taşındı)
 .cursor/
+
+# Claude Code skills lockfile (local)
+skills-lock.json

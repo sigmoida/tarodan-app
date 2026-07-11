@@ -3,16 +3,16 @@ import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme, Text, Card, IconButton, Button, Spinner, Snackbar, ScreenHeader } from '@tarodan/ui-native';
-import { useFavoritesStore, WishlistItem } from '../src/stores/favoritesStore';
-import { useAuthStore } from '../src/stores/authStore';
-import { useCartStore } from '../src/stores/cartStore';
-import { getImageUrl as getImageUrlFromUtils } from '../src/utils/imageUrl';
+import { useFavorites, WishlistItem } from '@/hooks/useFavorites';
+import { useAuthStore } from '@/stores/authStore';
+import { useCartStore } from '@/stores/cartStore';
+import { getImageUrl as getImageUrlFromUtils } from '@/utils/imageUrl';
 
 const { colors } = theme;
 
 export default function FavoritesScreen() {
   const { isAuthenticated } = useAuthStore();
-  const { items, isLoading, error, fetchFavorites, removeFromFavorites, getFavoriteCount } = useFavoritesStore();
+  const { items, isLoading, error, fetchFavorites, removeFromFavorites, getFavoriteCount } = useFavorites();
   const { addItem: addToCart, removeByProductId, isInCart } = useCartStore();
   const [refreshing, setRefreshing] = useState(false);
   const [snackbar, setSnackbar] = useState({ visible: false, message: '' });

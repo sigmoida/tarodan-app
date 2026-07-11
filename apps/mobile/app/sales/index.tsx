@@ -17,9 +17,9 @@ import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { ordersApi, shippingApi } from '../../src/services/api';
-import { useAuthStore } from '../../src/stores/authStore';
-import { getOrderProductImageUri } from '../../src/utils/orderProductImage';
+import { ordersApi, shippingApi } from '@/services/api';
+import { useAuthStore } from '@/stores/authStore';
+import { getOrderProductImageUri } from '@/utils/orderProductImage';
 
 const { colors } = theme;
 

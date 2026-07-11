@@ -4,8 +4,8 @@ import { theme, Button, Input, Snackbar, Spinner, Text } from '@tarodan/ui-nativ
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { productsApi, collectionsApi } from '../../../src/services/api';
-import { resolveImageUrl } from '../../../src/utils/imageUrl';
+import { productsApi, collectionsApi } from '@/services/api';
+import { resolveImageUrl } from '@/utils/imageUrl';
 
 const { colors } = theme;
 

@@ -1,8 +1,7 @@
 import React, { useMemo } from 'react';
 import { FlatList, StyleSheet, View, RefreshControl, Dimensions, ListRenderItemInfo } from 'react-native';
-import { TarodanColors } from '../../theme';
 import { ProductCard, ProductCardProduct, ProductCardLayout } from './ProductCard';
-import { EmptyState, ScreenLoader, ErrorState } from '@tarodan/ui-native';
+import { EmptyState, ScreenLoader, ErrorState, theme } from '@tarodan/ui-native';
 
 interface ProductGridProps {
   items: ProductCardProduct[];
@@ -132,8 +131,8 @@ export function ProductGrid({
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={[TarodanColors.primary]}
-            tintColor={TarodanColors.primary}
+            colors={[theme.colors.primary[500]]}
+            tintColor={theme.colors.primary[500]}
           />
         ) : undefined
       }

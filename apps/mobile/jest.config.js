@@ -28,6 +28,16 @@ module.exports = {
     // yazıp düşürmemek için spread — top-level moduleNameMapper preset'inkini
     // değiştirir, merge etmez).
     ...(require('jest-expo/jest-preset').moduleNameMapper ?? {}),
+    // Path alias `@/*` → `src/*`. Metro (Expo SDK 54) tsconfig `paths`'i runtime'da
+    // otomatik çözer; Jest çözmez, bu yüzden burada elle eşliyoruz. tsconfig.json ile
+    // tek kaynak.
+    '^@/(.*)$': '<rootDir>/src/$1',
+    // `@tarodan/shared` ui-native'in dependency'si (ui-native Badge/status-configs
+    // onu import ediyor) ama son `pnpm install`'dan sonra eklendiği için mobile'da
+    // symlink oluşmadı → Jest çözemiyor. Workspace kaynağına elle eşle (paket
+    // tamamen self-contained; dış importu yok). Kalıcı çözüm: `pnpm install`.
+    '^@tarodan/shared$': '<rootDir>/../../packages/shared/src/index.ts',
+    '^@tarodan/shared/(.*)$': '<rootDir>/../../packages/shared/src/$1',
     // React tekil örnek zorlaması — pnpm monorepo'da birden fazla React kopyası
     // (root 18.3.1 vs apps/mobile 19.1.0, + @testing-library/react-test-renderer
     // iç kopyaları) dispatcher uyumsuzluğu/render crash'ine yol açıyor. Tüm

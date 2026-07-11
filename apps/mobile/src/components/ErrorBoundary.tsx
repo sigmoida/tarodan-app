@@ -1,7 +1,6 @@
 import React, { Component, ReactNode } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../theme';
 import { theme } from '@tarodan/ui-native';
 import { captureException } from '../services/sentry';
 
@@ -52,7 +51,7 @@ export class ErrorBoundary extends Component<Props, State> {
 function FallbackScreen({ error, onRetry }: { error: Error | null; onRetry: () => void }) {
   return (
     <View style={styles.container}>
-      <Ionicons name="warning-outline" size={64} color={TarodanColors.error} />
+      <Ionicons name="warning-outline" size={64} color={theme.colors.danger[500]} />
       <Text style={styles.title}>Bir şeyler ters gitti</Text>
       <Text style={styles.subtitle}>Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.</Text>
       {__DEV__ && error && (
@@ -74,7 +73,7 @@ function FallbackScreen({ error, onRetry }: { error: Error | null; onRetry: () =
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.background,
+    backgroundColor: theme.colors.white,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
@@ -82,13 +81,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '700',
-    color: TarodanColors.textPrimary,
+    color: theme.colors.gray[900],
     marginTop: 16,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: theme.colors.gray[600],
     textAlign: 'center',
     marginTop: 8,
     lineHeight: 20,
@@ -110,7 +109,7 @@ const styles = StyleSheet.create({
     marginTop: 24,
     paddingVertical: 12,
     paddingHorizontal: 32,
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: theme.colors.primary[500],
     borderRadius: 8,
   },
   buttonText: {

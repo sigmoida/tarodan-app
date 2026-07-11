@@ -2,8 +2,8 @@ import { View, StyleSheet } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme, Text, Button } from '@tarodan/ui-native';
-import { useAuthStore } from '../src/stores/authStore';
-import { resetBannedRedirect } from '../src/services/api';
+import { useAuthStore } from '@/stores/authStore';
+import { resetBannedRedirect } from '@/services/api';
 
 const { colors } = theme;
 

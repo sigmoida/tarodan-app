@@ -5,11 +5,11 @@
  */
 import React from 'react';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
-jest.mock('expo-router', () => require('../../../src/test-utils/router-mock').routerMock);
+jest.mock('expo-router', () => require('@/test-utils/router-mock').routerMock);
 
-jest.mock('../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({
     user: { displayName: 'Test', email: 't@b.com', membershipTier: 'free' },
     isAuthenticated: true,
@@ -17,15 +17,15 @@ jest.mock('../../../src/stores/authStore', () => ({
   }),
 }));
 
-jest.mock('../../../src/i18n', () => ({
+jest.mock('@/i18n', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   userApi: { updateProfile: jest.fn() },
   mediaApi: { uploadAvatar: jest.fn() },
 }));
-import { userApi } from '../../../src/services/api';
+import { userApi } from '@/services/api';
 const updateProfile = userApi.updateProfile as jest.Mock;
 
 import EditProfileScreen from '../edit-profile';

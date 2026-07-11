@@ -13,10 +13,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import type { BadgeVariant } from '@tarodan/ui-native';
-import { ordersApi } from '../../../src/services/api';
-import { apiStatusToUi, type UiOrderStatus } from '../../../src/utils/orderStatus';
-import { getOrderProductImageUri } from '../../../src/utils/orderProductImage';
-import { formatPrice } from '../../../src/utils/format';
+import { ordersApi } from '@/services/api';
+import { apiStatusToUi, type UiOrderStatus } from '@/utils/orderStatus';
+import { getOrderProductImageUri } from '@/utils/orderProductImage';
+import { formatPrice } from '@/utils/format';
 
 const { colors, radius } = theme;
 

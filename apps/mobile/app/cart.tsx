@@ -4,11 +4,11 @@ import { Button, IconButton, Divider, Text, theme, ScreenHeader } from '@tarodan
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { ordersApi } from '../src/services/api';
-import { useCartStore, maxAllowedQty } from '../src/stores/cartStore';
-import { useAuthStore } from '../src/stores/authStore';
-import { transformImageUrl } from '../src/utils/imageUrl';
-import { asLabel } from '../src/utils/format';
+import { ordersApi } from '@/services/api';
+import { useCartStore, maxAllowedQty } from '@/stores/cartStore';
+import { useAuthStore } from '@/stores/authStore';
+import { transformImageUrl } from '@/utils/imageUrl';
+import { asLabel } from '@/utils/format';
 
 const { colors } = theme;
 

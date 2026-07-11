@@ -9,12 +9,11 @@ import {
   RefreshControl,
   Image,
 } from 'react-native';
-import { ScreenHeader, appAlert } from '@tarodan/ui-native';
+import { ScreenHeader, appAlert, theme } from '@tarodan/ui-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { TarodanColors } from '../../src/theme';
-import { useAuthStore } from '../../src/stores/authStore';
-import { paymentsApi } from '../../src/services/api';
+import { useAuthStore } from '@/stores/authStore';
+import { paymentsApi } from '@/services/api';
 
 interface Payment {
   id: string;
@@ -30,13 +29,13 @@ interface Payment {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
-  completed: { label: 'Tamamlandı', color: TarodanColors.success, icon: 'checkmark-circle' },
-  paid: { label: 'Tamamlandı', color: TarodanColors.success, icon: 'checkmark-circle' },
-  failed: { label: 'Başarısız', color: TarodanColors.error, icon: 'close-circle' },
-  pending: { label: 'Bekliyor', color: TarodanColors.warning, icon: 'time' },
+  completed: { label: 'Tamamlandı', color: theme.colors.success[500], icon: 'checkmark-circle' },
+  paid: { label: 'Tamamlandı', color: theme.colors.success[500], icon: 'checkmark-circle' },
+  failed: { label: 'Başarısız', color: theme.colors.danger[500], icon: 'close-circle' },
+  pending: { label: 'Bekliyor', color: theme.colors.warning[500], icon: 'time' },
   // İade edilen ödeme "Bekliyor" değil, açıkça "İade Edildi" gösterilmeli (web ile tutarlı).
-  refunded: { label: 'İade Edildi', color: TarodanColors.warning, icon: 'arrow-undo' },
-  refund_requested: { label: 'İade Sürecinde', color: TarodanColors.warning, icon: 'time' },
+  refunded: { label: 'İade Edildi', color: theme.colors.warning[500], icon: 'arrow-undo' },
+  refund_requested: { label: 'İade Sürecinde', color: theme.colors.warning[500], icon: 'time' },
 };
 
 function formatDate(dateStr: string): string {
@@ -151,7 +150,7 @@ export default function PaymentHistoryScreen() {
       <View style={styles.container}>
         <ScreenHeader title="Ödeme Geçmişi" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
         <View style={styles.centeredContainer}>
-          <Ionicons name="log-in-outline" size={48} color={TarodanColors.textTertiary} />
+          <Ionicons name="log-in-outline" size={48} color={theme.colors.gray[400]} />
           <Text style={styles.emptyTitle}>Giriş Yapın</Text>
           <Text style={styles.emptySubtitle}>Ödeme geçmişinizi görmek için giriş yapın</Text>
           <TouchableOpacity style={styles.loginButton} onPress={() => router.push('/(auth)/login')}>
@@ -168,7 +167,7 @@ export default function PaymentHistoryScreen() {
 
       {isLoading ? (
         <View style={styles.centeredContainer}>
-          <ActivityIndicator size="large" color={TarodanColors.primary} />
+          <ActivityIndicator size="large" color={theme.colors.primary[500]} />
         </View>
       ) : (
         <FlatList
@@ -181,14 +180,14 @@ export default function PaymentHistoryScreen() {
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={() => fetchPayments(true)}
-              colors={[TarodanColors.primary]}
-              tintColor={TarodanColors.primary}
+              colors={[theme.colors.primary[500]]}
+              tintColor={theme.colors.primary[500]}
             />
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconCircle}>
-                <Ionicons name="receipt-outline" size={48} color={TarodanColors.textTertiary} />
+                <Ionicons name="receipt-outline" size={48} color={theme.colors.gray[400]} />
               </View>
               <Text style={styles.emptyTitle}>Ödeme geçmişiniz bulunmuyor</Text>
               <Text style={styles.emptySubtitle}>Yaptığınız ödemeler burada listelenecektir</Text>
@@ -203,7 +202,7 @@ export default function PaymentHistoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: TarodanColors.backgroundSecondary,
+    backgroundColor: theme.colors.gray[50],
   },
   centeredContainer: {
     flex: 1,
@@ -223,7 +222,7 @@ const styles = StyleSheet.create({
   paymentItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TarodanColors.background,
+    backgroundColor: theme.colors.white,
     borderRadius: 12,
     padding: 16,
   },
@@ -240,7 +239,7 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 8,
     marginRight: 12,
-    backgroundColor: TarodanColors.backgroundTertiary,
+    backgroundColor: theme.colors.gray[100],
   },
   paymentInfo: {
     flex: 1,
@@ -249,16 +248,16 @@ const styles = StyleSheet.create({
   paymentDescription: {
     fontSize: 15,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: theme.colors.gray[900],
     marginBottom: 2,
   },
   paymentDate: {
     fontSize: 13,
-    color: TarodanColors.textSecondary,
+    color: theme.colors.gray[600],
   },
   paymentMethod: {
     fontSize: 12,
-    color: TarodanColors.textTertiary,
+    color: theme.colors.gray[400],
     marginTop: 2,
   },
   paymentRight: {
@@ -267,7 +266,7 @@ const styles = StyleSheet.create({
   paymentAmount: {
     fontSize: 15,
     fontWeight: 'bold',
-    color: TarodanColors.textPrimary,
+    color: theme.colors.gray[900],
     marginBottom: 4,
   },
   statusBadge: {
@@ -290,7 +289,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: TarodanColors.backgroundTertiary,
+    backgroundColor: theme.colors.gray[100],
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -298,24 +297,24 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: TarodanColors.textPrimary,
+    color: theme.colors.gray[900],
     marginTop: 8,
     marginBottom: 6,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: TarodanColors.textSecondary,
+    color: theme.colors.gray[600],
     textAlign: 'center',
   },
   loginButton: {
     marginTop: 20,
-    backgroundColor: TarodanColors.primary,
+    backgroundColor: theme.colors.primary[500],
     paddingHorizontal: 32,
     paddingVertical: 12,
     borderRadius: 10,
   },
   loginButtonText: {
-    color: TarodanColors.textOnPrimary,
+    color: theme.colors.white,
     fontSize: 15,
     fontWeight: '600',
   },

@@ -1,4 +1,4 @@
-import ListingForm from '../../src/components/listing/ListingForm';
+import ListingForm from '@/components/listing/ListingForm';
 
 // Yeni ilan oluşturma ekranı. Form mantığı ortak <ListingForm> bileşeninde;
 // create + edit aynı kaynağı kullanır (web paritesi).

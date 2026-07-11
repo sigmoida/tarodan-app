@@ -4,9 +4,9 @@ import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { collectionsApi } from '../../src/services/api';
-import { useAuthStore } from '../../src/stores/authStore';
-import { useTranslation } from '../../src/i18n';
+import { collectionsApi } from '@/services/api';
+import { useAuthStore } from '@/stores/authStore';
+import { useTranslation } from '@/i18n';
 
 const { colors } = theme;
 

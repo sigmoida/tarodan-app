@@ -4,10 +4,10 @@ import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { api } from '../../src/services/api';
-import { useAuthStore } from '../../src/stores/authStore';
-import { useTranslation } from '../../src/i18n';
-import { resolveImageUrl } from '../../src/utils/imageUrl';
+import { api } from '@/services/api';
+import { useAuthStore } from '@/stores/authStore';
+import { useTranslation } from '@/i18n';
+import { resolveImageUrl } from '@/utils/imageUrl';
 
 const { colors, radius } = theme;
 

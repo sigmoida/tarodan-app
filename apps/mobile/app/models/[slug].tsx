@@ -4,12 +4,12 @@ import { theme, Spinner, Text, EmptyState } from '@tarodan/ui-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { ScreenHeader, ThemedRefreshControl } from '../../src/components/common';
-import { useRefresh } from '../../src/hooks/useRefresh';
-import { CONDITIONS } from '../../src/theme';
-import { carModelsApi, productsApi } from '../../src/services/api';
-import { transformImageUrl } from '../../src/utils/imageUrl';
-import { formatPrice } from '../../src/utils/format';
+import { ScreenHeader, ThemedRefreshControl } from '@/components/common';
+import { useRefresh } from '@/hooks/useRefresh';
+import { CONDITIONS } from '@/theme';
+import { carModelsApi, productsApi } from '@/services/api';
+import { transformImageUrl } from '@/utils/imageUrl';
+import { formatPrice } from '@/utils/format';
 
 const { colors } = theme;
 const { width } = Dimensions.get('window');

@@ -90,6 +90,12 @@ export {
 	type AlertDialogButton,
 	type AlertDialogOptions,
 } from './components/AlertDialog';
+export {
+	useModalMessage,
+	ModalMessage,
+	alertAfterClose,
+	type ModalMessageState,
+} from './ModalMessage';
 export { Spinner, type SpinnerProps } from './components/Spinner';
 export { Avatar, type AvatarProps } from './components/Avatar';
 export { StatusBadge, type StatusBadgeProps } from './components/StatusBadge';

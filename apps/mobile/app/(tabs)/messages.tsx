@@ -3,10 +3,10 @@ import { Avatar, Badge, Input, Spinner, Text, theme, ScreenHeader } from '@tarod
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useMessagesStore, MessageThread } from '../../src/stores/messagesStore';
-import { useAuthStore } from '../../src/stores/authStore';
-import { formatMessagePreview } from '../../src/utils/contentFilter';
-import { useTranslation } from '../../src/i18n';
+import { useMessagesStore, MessageThread } from '@/stores/messagesStore';
+import { useAuthStore } from '@/stores/authStore';
+import { formatMessagePreview } from '@/utils/contentFilter';
+import { useTranslation } from '@/i18n';
 
 const { colors } = theme;
 

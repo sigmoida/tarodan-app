@@ -5,15 +5,15 @@
  */
 import React from 'react';
 import { screen, fireEvent } from '@testing-library/react-native';
-import { renderWithProviders } from '../../src/test-utils';
-import { resetRouterMocks, pushMock, replaceMock } from '../../src/test-utils/router-mock';
-import { useCartStore } from '../../src/stores/cartStore';
+import { renderWithProviders } from '@/test-utils';
+import { resetRouterMocks, pushMock, replaceMock } from '@/test-utils/router-mock';
+import { useCartStore } from '@/stores/cartStore';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
 
-jest.mock('expo-router', () => require('../../src/test-utils/router-mock').routerMock);
+jest.mock('expo-router', () => require('@/test-utils/router-mock').routerMock);
 
 import CartScreen from '../cart';
 

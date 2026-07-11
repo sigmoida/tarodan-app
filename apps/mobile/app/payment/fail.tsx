@@ -4,7 +4,7 @@ import { Button, Spinner, Text, theme } from '@tarodan/ui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { paymentsApi } from '../../src/services/api';
+import { paymentsApi } from '@/services/api';
 
 const { colors } = theme;
 

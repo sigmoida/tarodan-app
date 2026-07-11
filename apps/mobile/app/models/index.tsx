@@ -4,10 +4,10 @@ import { theme, Chip, Spinner, Text, Input, EmptyState } from '@tarodan/ui-nativ
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { ScreenHeader, ThemedRefreshControl } from '../../src/components/common';
-import { useRefresh } from '../../src/hooks/useRefresh';
-import { carModelsApi } from '../../src/services/api';
-import { transformImageUrl } from '../../src/utils/imageUrl';
+import { ScreenHeader, ThemedRefreshControl } from '@/components/common';
+import { useRefresh } from '@/hooks/useRefresh';
+import { carModelsApi } from '@/services/api';
+import { transformImageUrl } from '@/utils/imageUrl';
 
 const { colors } = theme;
 

@@ -11,11 +11,11 @@ import {
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { ordersApi } from '../../src/services/api';
-import { ScreenHeader, ThemedRefreshControl } from '../../src/components/common';
-import { useRefresh } from '../../src/hooks/useRefresh';
-import { formatPrice, formatOrderStatus, formatRelativeDate } from '../../src/utils/format';
-import { transformImageUrl } from '../../src/utils/imageUrl';
+import { ordersApi } from '@/services/api';
+import { ScreenHeader, ThemedRefreshControl } from '@/components/common';
+import { useRefresh } from '@/hooks/useRefresh';
+import { formatPrice, formatOrderStatus, formatRelativeDate } from '@/utils/format';
+import { transformImageUrl } from '@/utils/imageUrl';
 
 const { colors } = theme;
 

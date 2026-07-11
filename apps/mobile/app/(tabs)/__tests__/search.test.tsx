@@ -5,28 +5,28 @@
  */
 import React from 'react';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
-import { resetRouterMocks, pushMock } from '../../../src/test-utils/router-mock';
+import { renderWithProviders } from '@/test-utils';
+import { resetRouterMocks, pushMock } from '@/test-utils/router-mock';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
 
-jest.mock('expo-router', () => require('../../../src/test-utils/router-mock').routerMock);
+jest.mock('expo-router', () => require('@/test-utils/router-mock').routerMock);
 
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   productsApi: { getAll: jest.fn() },
   searchApi: { autocompleteRich: jest.fn() },
 }));
-import { productsApi } from '../../../src/services/api';
+import { productsApi } from '@/services/api';
 
 // Filtre seçenekleri ağ çağrısı yapmasın (mobil-UI testi backend-bağımsız).
-jest.mock('../../../src/hooks/useProductFilterOptions', () => ({
+jest.mock('@/hooks/useProductFilterOptions', () => ({
   useProductFilterOptions: () => ({ manufacturers: [], brands: [], categories: [] }),
 }));
 
 // Ağır filtre sheet'i render dışı bırak (kendi testi var).
-jest.mock('../../../src/components/ProductFilterSheet', () => () => null);
+jest.mock('@/components/ProductFilterSheet', () => () => null);
 
 import SearchScreen from '../search';
 

@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
@@ -14,11 +14,11 @@ jest.mock('expo-router', () => ({
   useFocusEffect: (cb: any) => cb(),
 }));
 
-jest.mock('../../../src/i18n', () => ({
+jest.mock('@/i18n', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 
-jest.mock('../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({
     user: { listingCount: 2, membershipTier: 'free' },
     limits: { maxListings: 10 },
@@ -27,13 +27,13 @@ jest.mock('../../../src/stores/authStore', () => ({
 }));
 
 // BoostModal native bağımlılıklarını izole et — UI dilimi dışı.
-jest.mock('../../../src/components/product/BoostModal', () => ({
+jest.mock('@/components/product/BoostModal', () => ({
   BoostModal: () => null,
 }));
 
 const mockGetMyListings = jest.fn();
 const mockGetMyStats = jest.fn();
-jest.mock('../../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   productsApi: {
     getMyListings: (...a: any[]) => mockGetMyListings(...a),
     getMyStats: (...a: any[]) => mockGetMyStats(...a),

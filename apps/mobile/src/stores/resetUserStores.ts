@@ -1,6 +1,5 @@
 import { queryClient } from '../lib/queryClient';
 import { useCartStore } from './cartStore';
-import { useFavoritesStore } from './favoritesStore';
 import { useMessagesStore } from './messagesStore';
 
 /**
@@ -9,14 +8,13 @@ import { useMessagesStore } from './messagesStore';
  * kalmış gibi görünmeye devam eder.
  *
  * Dikkat: favoriler için clearFavorites() ÇAĞRILMAZ — o DELETE /wishlist ile
- * sunucudaki listeyi de siler. Burada yalnızca yerel state temizlenir.
+ * sunucudaki listeyi de siler. Favori listesi artık React Query cache'inde;
+ * aşağıdaki queryClient.clear() onu da (yerel olarak) temizler.
  */
 export function resetUserStores(): void {
   // Sepet: persist'li store — clearCart AsyncStorage'a da boş yazar.
   useCartStore.getState().clearCart();
   useCartStore.getState().clearBuyNow();
-
-  useFavoritesStore.setState({ items: [], error: null, isLoading: false });
 
   useMessagesStore.setState({
     threads: [],

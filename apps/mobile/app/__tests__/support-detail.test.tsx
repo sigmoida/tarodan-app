@@ -8,7 +8,7 @@
 import React from 'react';
 import { TextInput } from 'react-native';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: jest.fn(() => false) },
@@ -16,18 +16,18 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ id: 'ticket-1' }),
 }));
 
-jest.mock('../../src/services/api', () => ({
+jest.mock('@/services/api', () => ({
   supportApi: { getTicket: jest.fn(), addMessage: jest.fn() },
 }));
-import { supportApi } from '../../src/services/api';
+import { supportApi } from '@/services/api';
 const getTicketMock = supportApi.getTicket as jest.Mock;
 const addMessageMock = supportApi.addMessage as jest.Mock;
 
-jest.mock('../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({ isAuthenticated: true }),
 }));
 
-jest.mock('../../src/services/sentry', () => ({ captureException: jest.fn() }));
+jest.mock('@/services/sentry', () => ({ captureException: jest.fn() }));
 
 import SupportTicketDetailScreen from '../support/[id]';
 

@@ -4,9 +4,9 @@ import { Stack, useLocalSearchParams, router } from 'expo-router';
 import { Button, Spinner, Text, theme, ScreenHeader } from '@tarodan/ui-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { ProductCard, type ProductCardProduct } from '../../../src/components/product/ProductCard';
-import { productsApi } from '../../../src/services/api';
-import { useTranslation } from '../../../src/i18n';
+import { ProductCard, type ProductCardProduct } from '@/components/product/ProductCard';
+import { productsApi } from '@/services/api';
+import { useTranslation } from '@/i18n';
 
 const { colors } = theme;
 

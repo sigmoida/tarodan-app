@@ -12,13 +12,13 @@ import { useState, useMemo } from 'react';
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { productsApi } from '../src/services/api';
-import { getImageUrl as getImageUrlFromUtils } from '../src/utils/imageUrl';
-import { isProductOutOfStock } from '../src/utils/productPrice';
-import { OutOfStockOverlay } from '../src/components/product';
-import { asLabel } from '../src/utils/format';
-import ProductFilterSheet from '../src/components/ProductFilterSheet';
-import { useProductFilterOptions } from '../src/hooks/useProductFilterOptions';
+import { productsApi } from '@/services/api';
+import { getImageUrl as getImageUrlFromUtils } from '@/utils/imageUrl';
+import { isProductOutOfStock } from '@/utils/productPrice';
+import { OutOfStockOverlay } from '@/components/product';
+import { asLabel } from '@/utils/format';
+import ProductFilterSheet from '@/components/ProductFilterSheet';
+import { useProductFilterOptions } from '@/hooks/useProductFilterOptions';
 import {
   EMPTY_FILTERS,
   SORT_OPTIONS,
@@ -28,7 +28,7 @@ import {
   extractListings,
   extractMeta,
   type ProductFilters,
-} from '../src/utils/productFilters';
+} from '@/utils/productFilters';
 
 const { colors, spacing } = theme;
 const { width } = Dimensions.get('window');

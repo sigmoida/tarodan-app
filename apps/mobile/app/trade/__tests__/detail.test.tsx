@@ -8,10 +8,10 @@
  */
 import React from 'react';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { renderWithProviders } from '../../../src/test-utils';
+import { renderWithProviders } from '@/test-utils';
 
 // i18n: provider olmadan t() passthrough (son segmenti döndürür).
-jest.mock('../../../src/i18n', () => ({
+jest.mock('@/i18n', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
     language: 'tr',
@@ -26,7 +26,8 @@ jest.mock('expo-router', () => ({
 import { router } from 'expo-router';
 const mockPush = router.push as jest.Mock;
 
-jest.mock('../../../src/services/api', () => ({
+// Yeni mimaride hook'lar `@/lib/api`'den import ediyor (services/api artık barrel).
+jest.mock('@/lib/api', () => ({
   tradesApi: {
     getOne: jest.fn(),
     accept: jest.fn(),
@@ -37,11 +38,18 @@ jest.mock('../../../src/services/api', () => ({
   },
   paymentsApi: { initiateTradeCash: jest.fn() },
 }));
-import { tradesApi, paymentsApi } from '../../../src/services/api';
+import { tradesApi, paymentsApi } from '@/lib/api';
+
+// TradeAddressPicker (gerçek adres-çeken child) jsdom'da render'da patlıyor;
+// bu testler buton görünürlüğü/wiring'i ölçüyor, picker kapsam dışı — izole et.
+jest.mock('@/components/common', () => ({
+  ...jest.requireActual('@/components/common'),
+  TradeAddressPicker: () => null,
+}));
 
 // Bu ekran useAuthStore().user'a göre initiator/receiver ayrımı yapar.
 let mockUser: { id: string } | null = { id: 'user-receiver' };
-jest.mock('../../../src/stores/authStore', () => ({
+jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({ user: mockUser }),
 }));
 
