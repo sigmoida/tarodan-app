@@ -3,10 +3,11 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  ConflictException,
   Logger,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { OrderStatus, RatingStatus, TradeStatus } from '@prisma/client';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { OrderStatus, RatingStatus, TradeStatus, Prisma } from "@prisma/client";
 import {
   CreateUserRatingDto,
   CreateProductRatingDto,
@@ -14,12 +15,12 @@ import {
   ProductRatingResponseDto,
   UserRatingStatsDto,
   ProductRatingStatsDto,
-} from './dto';
-import { CacheService } from '../cache/cache.service';
-import { NotificationService } from '../notification/notification.service';
-import { NotificationType } from '../notification/dto';
-import { StorageService } from '../storage/storage.service';
-import { ModerationAiClient } from '../moderation/moderation-ai.client';
+} from "./dto";
+import { CacheService } from "../cache/cache.service";
+import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto";
+import { StorageService } from "../storage/storage.service";
+import { ModerationAiClient } from "../moderation/moderation-ai.client";
 
 @Injectable()
 export class RatingService {
@@ -39,15 +40,25 @@ export class RatingService {
     ctx?: { entityType: string; entityId?: string; userId?: string },
   ): Promise<void> {
     if (!comment?.trim() || !this.moderationAi.isEnabled) return;
-    await this.moderationAi.assertTextClean(comment, ctx ? { ...ctx, field: 'comment', label: 'yorum' } : undefined);
+    await this.moderationAi.assertTextClean(
+      comment,
+      ctx ? { ...ctx, field: "comment", label: "yorum" } : undefined,
+    );
   }
 
-  private async resolveAvatarUrl(avatarUrl: string | null | undefined): Promise<string | null> {
+  private async resolveAvatarUrl(
+    avatarUrl: string | null | undefined,
+  ): Promise<string | null> {
     if (!avatarUrl) return null;
-    if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) return avatarUrl;
+    if (avatarUrl.startsWith("http://") || avatarUrl.startsWith("https://"))
+      return avatarUrl;
     if (this.storageService) {
       try {
-        return await this.storageService.getPresignedDownloadUrl('avatars', avatarUrl, 86400);
+        return await this.storageService.getPresignedDownloadUrl(
+          "avatars",
+          avatarUrl,
+          86400,
+        );
       } catch {
         return null;
       }
@@ -64,7 +75,7 @@ export class RatingService {
   ): Promise<UserRatingResponseDto> {
     // Cannot rate yourself
     if (giverId === dto.receiverId) {
-      throw new BadRequestException('Kendinizi puanlayamazsınız');
+      throw new BadRequestException("Kendinizi puanlayamazsınız");
     }
 
     // Verify receiver exists
@@ -73,17 +84,17 @@ export class RatingService {
     });
 
     if (!receiver) {
-      throw new NotFoundException('Kullanıcı bulunamadı');
+      throw new NotFoundException("Kullanıcı bulunamadı");
     }
 
     // Must have either orderId or tradeId
     if (!dto.orderId && !dto.tradeId) {
-      throw new BadRequestException('Sipariş veya takas ID gerekli');
+      throw new BadRequestException("Sipariş veya takas ID gerekli");
     }
 
     // Yorum metni denetimi (küfür/uygunsuz) — event log'a yaz
     await this.assertCleanComment(dto.comment, {
-      entityType: 'user',
+      entityType: "user",
       entityId: dto.receiverId,
       userId: giverId,
     });
@@ -95,23 +106,30 @@ export class RatingService {
       });
 
       if (!order) {
-        throw new NotFoundException('Sipariş bulunamadı');
+        throw new NotFoundException("Sipariş bulunamadı");
       }
 
       // Üyelik/dijital siparişler (sanal ürün + platform satıcısı) puanlanamaz
-      if (order.orderNumber?.startsWith('MEM-')) {
-        throw new BadRequestException('Üyelik siparişleri için değerlendirme yapılamaz');
+      if (order.orderNumber?.startsWith("MEM-")) {
+        throw new BadRequestException(
+          "Üyelik siparişleri için değerlendirme yapılamaz",
+        );
       }
 
       // Allow rating only for delivered or completed orders (must receive before rating)
-      const allowedStatuses: OrderStatus[] = [OrderStatus.completed, OrderStatus.delivered];
+      const allowedStatuses: OrderStatus[] = [
+        OrderStatus.completed,
+        OrderStatus.delivered,
+      ];
       if (!allowedStatuses.includes(order.status)) {
-        throw new BadRequestException('Sadece teslim edilmiş siparişler puanlanabilir');
+        throw new BadRequestException(
+          "Sadece teslim edilmiş siparişler puanlanabilir",
+        );
       }
 
       // Giver must be buyer or seller
       if (order.buyerId !== giverId && order.sellerId !== giverId) {
-        throw new ForbiddenException('Bu siparişi puanlama yetkiniz yok');
+        throw new ForbiddenException("Bu siparişi puanlama yetkiniz yok");
       }
 
       // Receiver must be the other party
@@ -119,7 +137,7 @@ export class RatingService {
         (order.buyerId === giverId && order.sellerId !== dto.receiverId) ||
         (order.sellerId === giverId && order.buyerId !== dto.receiverId)
       ) {
-        throw new BadRequestException('Geçersiz alıcı');
+        throw new BadRequestException("Geçersiz alıcı");
       }
 
       // Check if already rated
@@ -128,7 +146,7 @@ export class RatingService {
       });
 
       if (existingRating) {
-        throw new BadRequestException('Bu sipariş için zaten puan verdiniz');
+        throw new BadRequestException("Bu sipariş için zaten puan verdiniz");
       }
     }
 
@@ -138,24 +156,27 @@ export class RatingService {
       });
 
       if (!trade) {
-        throw new NotFoundException('Takas bulunamadı');
+        throw new NotFoundException("Takas bulunamadı");
       }
 
       if (trade.status !== TradeStatus.completed) {
-        throw new BadRequestException('Sadece tamamlanmış takaslar puanlanabilir');
+        throw new BadRequestException(
+          "Sadece tamamlanmış takaslar puanlanabilir",
+        );
       }
 
       // Giver must be initiator or receiver
       if (trade.initiatorId !== giverId && trade.receiverId !== giverId) {
-        throw new ForbiddenException('Bu takası puanlama yetkiniz yok');
+        throw new ForbiddenException("Bu takası puanlama yetkiniz yok");
       }
 
       // Receiver must be the other party
       if (
-        (trade.initiatorId === giverId && trade.receiverId !== dto.receiverId) ||
+        (trade.initiatorId === giverId &&
+          trade.receiverId !== dto.receiverId) ||
         (trade.receiverId === giverId && trade.initiatorId !== dto.receiverId)
       ) {
-        throw new BadRequestException('Geçersiz alıcı');
+        throw new BadRequestException("Geçersiz alıcı");
       }
 
       // Check if already rated
@@ -164,27 +185,42 @@ export class RatingService {
       });
 
       if (existingRating) {
-        throw new BadRequestException('Bu takas için zaten puan verdiniz');
+        throw new BadRequestException("Bu takas için zaten puan verdiniz");
       }
     }
 
-    const rating = await this.prisma.rating.create({
-      data: {
-        giverId,
-        receiverId: dto.receiverId,
-        orderId: dto.orderId,
-        tradeId: dto.tradeId,
-        score: dto.score,
-        comment: dto.comment,
-        // Post-moderasyon: değerlendirme anında yayınlanır (profilde hemen görünür),
-        // admin uygunsuzsa panelden kaldırabilir/rejected yapabilir.
-        status: RatingStatus.approved,
-      },
-      include: {
-        giver: { select: { id: true, displayName: true, avatarUrl: true } },
-        receiver: { select: { id: true, displayName: true } },
-      },
-    });
+    let rating;
+    try {
+      rating = await this.prisma.rating.create({
+        data: {
+          giverId,
+          receiverId: dto.receiverId,
+          orderId: dto.orderId,
+          tradeId: dto.tradeId,
+          score: dto.score,
+          comment: dto.comment,
+          // Post-moderasyon: değerlendirme anında yayınlanır (profilde hemen görünür),
+          // admin uygunsuzsa panelden kaldırabilir/rejected yapabilir.
+          status: RatingStatus.approved,
+        },
+        include: {
+          giver: { select: { id: true, displayName: true, avatarUrl: true } },
+          receiver: { select: { id: true, displayName: true } },
+        },
+      });
+    } catch (e) {
+      // Eşzamanlı ikinci puan: unique (giverId, orderId/tradeId) ihlali → 500 yerine
+      // temiz 409. Var-olan kontrolü ile yarışı kaybeden istek buraya düşer.
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === "P2002"
+      ) {
+        throw new ConflictException(
+          "Bu sipariş/takas için zaten puan verdiniz",
+        );
+      }
+      throw e;
+    }
 
     // Invalidate product caches for this seller (receiver) so rating updates show
     await this.cache.delPattern(`products:detail:*`);
@@ -196,7 +232,7 @@ export class RatingService {
         dto.receiverId,
         NotificationType.REVIEW_RECEIVED,
         {
-          reviewerName: rating.giver?.displayName || 'Bir kullanıcı',
+          reviewerName: rating.giver?.displayName || "Bir kullanıcı",
           score: dto.score,
           orderId: dto.orderId,
           tradeId: dto.tradeId,
@@ -204,17 +240,17 @@ export class RatingService {
       );
       await this.notificationService.sendTemplateEmailToUser(
         dto.receiverId,
-        'review-received-seller',
+        "review-received-seller",
         {
-          sellerName: rating.receiver?.displayName || '',
-          reviewerName: rating.giver?.displayName || 'Bir kullanıcı',
+          sellerName: rating.receiver?.displayName || "",
+          reviewerName: rating.giver?.displayName || "Bir kullanıcı",
           rating: dto.score,
           comment: dto.comment || undefined,
         },
       );
     } catch (error) {
       // Don't fail if notification fails
-      this.logger.warn('Failed to send review notification');
+      this.logger.warn("Failed to send review notification");
     }
 
     return this.mapUserRatingToDto(rating);
@@ -234,33 +270,40 @@ export class RatingService {
     });
 
     if (!order) {
-      throw new NotFoundException('Sipariş bulunamadı');
+      throw new NotFoundException("Sipariş bulunamadı");
     }
 
     // Üyelik/dijital siparişler (sanal ürün + platform satıcısı) puanlanamaz
-    if (order.orderNumber?.startsWith('MEM-')) {
-      throw new BadRequestException('Üyelik siparişleri için değerlendirme yapılamaz');
+    if (order.orderNumber?.startsWith("MEM-")) {
+      throw new BadRequestException(
+        "Üyelik siparişleri için değerlendirme yapılamaz",
+      );
     }
 
     if (order.buyerId !== userId) {
-      throw new ForbiddenException('Sadece alıcı ürünü puanlayabilir');
+      throw new ForbiddenException("Sadece alıcı ürünü puanlayabilir");
     }
 
     if (order.productId !== dto.productId) {
-      throw new BadRequestException('Siparişteki ürün eşleşmiyor');
+      throw new BadRequestException("Siparişteki ürün eşleşmiyor");
     }
 
     // Yorum metni denetimi (başlık + yorum, küfür/uygunsuz) — event log'a yaz
-    await this.assertCleanComment(`${dto.title ?? ''} ${dto.review ?? ''}`, {
-      entityType: 'product',
+    await this.assertCleanComment(`${dto.title ?? ""} ${dto.review ?? ""}`, {
+      entityType: "product",
       entityId: dto.productId,
       userId,
     });
 
     // Allow rating only for delivered or completed orders (must receive before rating)
-    const allowedStatuses: OrderStatus[] = [OrderStatus.completed, OrderStatus.delivered];
+    const allowedStatuses: OrderStatus[] = [
+      OrderStatus.completed,
+      OrderStatus.delivered,
+    ];
     if (!allowedStatuses.includes(order.status)) {
-      throw new BadRequestException('Sadece teslim edilmiş siparişler puanlanabilir');
+      throw new BadRequestException(
+        "Sadece teslim edilmiş siparişler puanlanabilir",
+      );
     }
 
     // Check if already rated
@@ -269,27 +312,43 @@ export class RatingService {
     });
 
     if (existingRating) {
-      throw new BadRequestException('Bu sipariş için zaten ürün puanı verdiniz');
+      throw new BadRequestException(
+        "Bu sipariş için zaten ürün puanı verdiniz",
+      );
     }
 
-    const rating = await this.prisma.productRating.create({
-      data: {
-        productId: dto.productId,
-        userId,
-        orderId: dto.orderId,
-        score: dto.score,
-        title: dto.title,
-        review: dto.review,
-        images: dto.images || [],
-        isVerifiedPurchase: true,
-        // Post-moderasyon: ürün değerlendirmesi anında yayınlanır; admin sonradan kaldırabilir.
-        status: RatingStatus.approved,
-      },
-      include: {
-        product: { select: { id: true, title: true } },
-        user: { select: { id: true, displayName: true } },
-      },
-    });
+    let rating;
+    try {
+      rating = await this.prisma.productRating.create({
+        data: {
+          productId: dto.productId,
+          userId,
+          orderId: dto.orderId,
+          score: dto.score,
+          title: dto.title,
+          review: dto.review,
+          images: dto.images || [],
+          isVerifiedPurchase: true,
+          // Post-moderasyon: ürün değerlendirmesi anında yayınlanır; admin sonradan kaldırabilir.
+          status: RatingStatus.approved,
+        },
+        include: {
+          product: { select: { id: true, title: true } },
+          user: { select: { id: true, displayName: true } },
+        },
+      });
+    } catch (e) {
+      // Eşzamanlı ikinci ürün puanı: unique (orderId) ihlali → 500 yerine temiz 409.
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === "P2002"
+      ) {
+        throw new ConflictException(
+          "Bu sipariş için zaten ürün puanı verdiniz",
+        );
+      }
+      throw e;
+    }
 
     // Invalidate product cache so rating updates show immediately
     await this.cache.del(`products:detail:${dto.productId}`);
@@ -331,11 +390,16 @@ export class RatingService {
     userId: string,
     page?: number,
     pageSize?: number,
-  ): Promise<{ ratings: UserRatingResponseDto[]; total: number; page: number; pageSize: number }> {
+  ): Promise<{
+    ratings: UserRatingResponseDto[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }> {
     // Ensure valid pagination values
     const safePage = Math.max(1, Number(page) || 1);
     const safePageSize = Math.min(100, Math.max(1, Number(pageSize) || 20));
-    
+
     const [ratings, total] = await Promise.all([
       this.prisma.rating.findMany({
         where: { receiverId: userId, status: RatingStatus.approved },
@@ -351,11 +415,13 @@ export class RatingService {
           giver: { select: { id: true, displayName: true, avatarUrl: true } },
           receiver: { select: { id: true, displayName: true } },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip: (safePage - 1) * safePageSize,
         take: safePageSize,
       }),
-      this.prisma.rating.count({ where: { receiverId: userId, status: RatingStatus.approved } }),
+      this.prisma.rating.count({
+        where: { receiverId: userId, status: RatingStatus.approved },
+      }),
     ]);
 
     const resolvedRatings = await Promise.all(
@@ -382,19 +448,34 @@ export class RatingService {
     pageSize?: number,
     sortBy?: string,
     score?: number,
-  ): Promise<{ ratings: ProductRatingResponseDto[]; total: number; page: number; pageSize: number }> {
+  ): Promise<{
+    ratings: ProductRatingResponseDto[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }> {
     // Ensure valid pagination values
     const safePage = Math.max(1, Number(page) || 1);
     const safePageSize = Math.min(100, Math.max(1, Number(pageSize) || 20));
 
     // Build orderBy based on sortBy parameter
-    let orderBy: any = { createdAt: 'desc' };
+    let orderBy: any = { createdAt: "desc" };
     switch (sortBy) {
-      case 'oldest': orderBy = { createdAt: 'asc' }; break;
-      case 'highest': orderBy = { score: 'desc' }; break;
-      case 'lowest': orderBy = { score: 'asc' }; break;
-      case 'helpful': orderBy = { helpfulCount: 'desc' }; break;
-      default: orderBy = { createdAt: 'desc' }; break;
+      case "oldest":
+        orderBy = { createdAt: "asc" };
+        break;
+      case "highest":
+        orderBy = { score: "desc" };
+        break;
+      case "lowest":
+        orderBy = { score: "asc" };
+        break;
+      case "helpful":
+        orderBy = { helpfulCount: "desc" };
+        break;
+      default:
+        orderBy = { createdAt: "desc" };
+        break;
     }
 
     // Build where clause with optional score filter
@@ -464,7 +545,9 @@ export class RatingService {
   // ==========================================================================
   // GET PRODUCT RATING STATS
   // ==========================================================================
-  async getProductRatingStats(productId: string): Promise<ProductRatingStatsDto> {
+  async getProductRatingStats(
+    productId: string,
+  ): Promise<ProductRatingStatsDto> {
     const ratings = await this.prisma.productRating.findMany({
       where: { productId, status: RatingStatus.approved },
       select: { score: true },
@@ -492,13 +575,15 @@ export class RatingService {
   // ==========================================================================
   // MARK HELPFUL
   // ==========================================================================
-  async markProductRatingHelpful(ratingId: string): Promise<ProductRatingResponseDto> {
+  async markProductRatingHelpful(
+    ratingId: string,
+  ): Promise<ProductRatingResponseDto> {
     const existing = await this.prisma.productRating.findUnique({
       where: { id: ratingId },
       select: { status: true },
     });
     if (!existing || existing.status !== RatingStatus.approved) {
-      throw new NotFoundException('Yorum bulunamadı');
+      throw new NotFoundException("Yorum bulunamadı");
     }
     const rating = await this.prisma.productRating.update({
       where: { id: ratingId, status: RatingStatus.approved },
@@ -515,33 +600,42 @@ export class RatingService {
   // ==========================================================================
   // HELPER METHODS
   // ==========================================================================
-  private mapUserRatingToDto(rating: any, resolvedGiverAvatar?: string | null): UserRatingResponseDto {
+  private mapUserRatingToDto(
+    rating: any,
+    resolvedGiverAvatar?: string | null,
+  ): UserRatingResponseDto {
     return {
       id: rating.id,
       giverId: rating.giverId,
-      giverName: rating.giver?.displayName || '',
+      giverName: rating.giver?.displayName || "",
       receiverId: rating.receiverId,
-      receiverName: rating.receiver?.displayName || '',
+      receiverName: rating.receiver?.displayName || "",
       orderId: rating.orderId || undefined,
       tradeId: rating.tradeId || undefined,
       score: rating.score,
       comment: rating.comment || undefined,
       createdAt: rating.createdAt,
-      giver: rating.giver ? {
-        id: rating.giver.id,
-        displayName: rating.giver.displayName || '',
-        avatarUrl: resolvedGiverAvatar ?? rating.giver.avatarUrl ?? undefined,
-      } : undefined,
+      giver: rating.giver
+        ? {
+            id: rating.giver.id,
+            displayName: rating.giver.displayName || "",
+            avatarUrl:
+              resolvedGiverAvatar ?? rating.giver.avatarUrl ?? undefined,
+          }
+        : undefined,
     };
   }
 
-  private mapProductRatingToDto(rating: any, resolvedAvatarUrl?: string | null): ProductRatingResponseDto {
+  private mapProductRatingToDto(
+    rating: any,
+    resolvedAvatarUrl?: string | null,
+  ): ProductRatingResponseDto {
     return {
       id: rating.id,
       productId: rating.productId,
-      productTitle: rating.product?.title || '',
+      productTitle: rating.product?.title || "",
       userId: rating.userId,
-      userName: rating.user?.displayName || '',
+      userName: rating.user?.displayName || "",
       orderId: rating.orderId,
       score: rating.score,
       title: rating.title || undefined,
@@ -550,11 +644,13 @@ export class RatingService {
       isVerifiedPurchase: rating.isVerifiedPurchase,
       helpfulCount: rating.helpfulCount,
       createdAt: rating.createdAt,
-      user: rating.user ? {
-        id: rating.user.id,
-        displayName: rating.user.displayName || '',
-        avatarUrl: resolvedAvatarUrl ?? rating.user.avatarUrl ?? undefined,
-      } : undefined,
+      user: rating.user
+        ? {
+            id: rating.user.id,
+            displayName: rating.user.displayName || "",
+            avatarUrl: resolvedAvatarUrl ?? rating.user.avatarUrl ?? undefined,
+          }
+        : undefined,
     };
   }
 }
