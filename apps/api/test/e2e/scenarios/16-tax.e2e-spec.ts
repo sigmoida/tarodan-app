@@ -18,9 +18,11 @@
  *   - Sipariş KDV'si resolveSellerTax: seller.businessStatus==='approved' && taxId
  *     dolu değilse 0 (order.service.ts:353). createUser business alanı set etmez →
  *     kurumsal satıcı prisma ile inline güncellenir.
- *   - Ödeme başarılı callback → PaymentService.processSuccessfulPayment →
- *     invoiceService.generateAndSendInvoice (payment.service.ts:1925): Invoice DB
- *     kaydı + alıcı/satıcı e-postası (MailHog).
+ *   - Ödeme anındaki otomatik PDF makbuzu KALDIRILDI (payment-fulfillment.service.ts:633/1113
+ *     yorum satırı) — Tarodan eLogo e-Arşiv'e geçti (sipariş tamamlanınca kesilir; test ortamında
+ *     ELOGO_ENABLED yok → no-op). Invoice DB kaydı + alıcı/satıcı e-postası artık lazy üretilir:
+ *     GET /invoices/order/:orderId veya InvoiceService.generateAndSendInvoice (bkz. generateInvoice
+ *     yardımcısı, TAX-095 deseni).
  *   - Fatura uçları invoice.controller.ts: GET /invoices (JwtAuthGuard, type=buyer|seller),
  *     GET /invoices/order/:orderId (ParseUUIDPipe, lazy generate), .../public (paymentId zorunlu),
  *     POST /invoices/generate/:orderId (JwtAuthGuard, default 201), download/:id(/public).
@@ -178,6 +180,19 @@ describe("16 — Vergi & Fatura (TAX)", () => {
       );
 
     return { orderId: buyRes.body.orderId, paymentId: payment!.id };
+  }
+
+  /**
+   * Fatura üretimini InvoiceService üzerinden doğrudan koştur (TAX-095 deseni).
+   * Ödeme anındaki otomatik makbuz KALDIRILDI (eLogo e-Arşiv sipariş tamamlanınca kesilir;
+   * test ortamında ELOGO_ENABLED yok → no-op). Fatura kaydını/e-postasını üreten public
+   * çağrı InvoiceService.generateAndSendInvoice — ödenmiş siparişte lazy-generate ile aynıdır.
+   */
+  async function generateInvoice(orderId: string): Promise<void> {
+    const { InvoiceService } =
+      await import("../../../src/modules/invoice/invoice.service");
+    const invoiceService = ctx.module.get(InvoiceService);
+    await invoiceService.generateAndSendInvoice(orderId);
   }
 
   /** Alıcı + satıcı + ürün + alıcı adresi üret. */
@@ -753,6 +768,7 @@ describe("16 — Vergi & Fatura (TAX)", () => {
         price: 1000,
       });
       const { orderId } = await buyAndPay(buyer, product.id, addr.id);
+      await generateInvoice(orderId);
 
       // DB'de en az bir issued fatura oluşmalı.
       const prisma = getPrisma();
@@ -1326,6 +1342,7 @@ describe("16 — Vergi & Fatura (TAX)", () => {
       });
       const stranger = await createUser(ctx.module);
       const { orderId } = await buyAndPay(buyer, product.id, addr.id);
+      await generateInvoice(orderId);
       const prisma = getPrisma();
       const invoice = await prisma.invoice.findFirst({ where: { orderId } });
       await request(server())
@@ -1345,6 +1362,7 @@ describe("16 — Vergi & Fatura (TAX)", () => {
       await makeCorporate(seller.id, "1234567890");
       await seedTaxRegionWithDefaultRate({ rate: 20 });
       const { orderId } = await buyAndPay(buyer, product.id, addr.id);
+      await generateInvoice(orderId);
       const prisma = getPrisma();
       const invoice = await prisma.invoice.findFirst({ where: { orderId } });
       expect(Number(invoice!.subtotal)).toBe(1000);
