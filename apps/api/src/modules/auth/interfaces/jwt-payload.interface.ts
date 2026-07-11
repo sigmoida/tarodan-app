@@ -4,7 +4,8 @@ export interface JwtPayload {
   isSeller: boolean;
   isAdmin?: boolean;
   role?: string; // Admin role if applicable
-  type: 'access' | 'refresh';
+  type: "access" | "refresh";
+  jti?: string; // Benzersiz token kimliği — aynı saniyedeki rotasyonda bile tekil token üretir
   iat?: number;
   exp?: number;
 }
