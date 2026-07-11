@@ -13,17 +13,26 @@
  * canlı SOAP/REST tracking entegrasyonu, salt-UI pariteleri ve .env.test ile
  * çelişen (runtime togglanmayan) config senaryoları — her biri gerekçeyle.
  */
-import * as request from 'supertest';
-import { Prisma, OrderStatus, ShipmentStatus } from '@prisma/client';
-import { createE2ETestApp, E2ETestApp } from '../../test-utils/create-app';
-import { truncateAll, getPrisma, seedBaseline, disconnectPrisma } from '../../test-utils/db';
-import { createUser, authHeader, CreatedTestUser } from '../../factories/user.factory';
-import { createProduct } from '../../factories/product.factory';
-import { createAddress } from '../../factories/address.factory';
-import { buyAndPay } from '../../factories/flows';
-import { scenario } from '../../test-utils/scenario';
+import * as request from "supertest";
+import { Prisma, OrderStatus, ShipmentStatus } from "@prisma/client";
+import { createE2ETestApp, E2ETestApp } from "../../test-utils/create-app";
+import {
+  truncateAll,
+  getPrisma,
+  seedBaseline,
+  disconnectPrisma,
+} from "../../test-utils/db";
+import {
+  createUser,
+  authHeader,
+  CreatedTestUser,
+} from "../../factories/user.factory";
+import { createProduct } from "../../factories/product.factory";
+import { createAddress } from "../../factories/address.factory";
+import { buyAndPay } from "../../factories/flows";
+import { scenario } from "../../test-utils/scenario";
 
-describe('14 — Kargo & Teslimat (SHP)', () => {
+describe("14 — Kargo & Teslimat (SHP)", () => {
   let ctx: E2ETestApp;
   const server = () => ctx.app.getHttpServer();
 
@@ -52,30 +61,39 @@ describe('14 — Kargo & Teslimat (SHP)', () => {
     opts: { price?: number; sellerCity?: string; title?: string } = {},
   ): Promise<{ seller: CreatedTestUser; productId: string }> {
     const seller = await createUser(ctx.module, { isSeller: true });
-    await createAddress({ userId: seller.id, isDefault: true, city: opts.sellerCity ?? 'İstanbul' });
+    await createAddress({
+      userId: seller.id,
+      isDefault: true,
+      city: opts.sellerCity ?? "İstanbul",
+    });
     const product = await createProduct({
       sellerId: seller.id,
       categoryId: seed.categoryId,
       price: opts.price ?? 250,
       title: opts.title,
-      status: 'active',
+      status: "active",
     });
     return { seller, productId: product.id };
   }
 
   /** Alıcı + kendine ait teslimat adresi üret. */
   async function makeBuyerWithAddress(
-    city = 'Ankara',
+    city = "Ankara",
   ): Promise<{ buyer: CreatedTestUser; addressId: string }> {
     const buyer = await createUser(ctx.module);
-    const addr = await createAddress({ userId: buyer.id, isDefault: true, city });
+    const addr = await createAddress({
+      userId: buyer.id,
+      isDefault: true,
+      city,
+    });
     return { buyer, addressId: addr.id };
   }
 
   /**
-   * Tam akış: satın al + öde → sipariş 'preparing' (ödeme callback'i otomatik
-   * preparing yapar) → satıcı POST /api/shipping ile pending shipment oluşturur.
-   * Döner: ids + oluşturulan shipment yanıtı.
+   * Tam akış: satın al + öde → sipariş 'preparing'. Ödeme başarısında shipment
+   * kaydı OTOMATİK oluşur (payment-fulfillment.service — kanonik akış); satıcı
+   * manuel POST /api/shipping ÇAĞIRMAZ. Otomatik oluşan shipment'ı okuruz.
+   * Döner: ids + otomatik oluşan shipment id'si.
    */
   async function setupPreparedOrderWithShipment(
     opts: { buyerCity?: string; sellerCity?: string; price?: number } = {},
@@ -88,23 +106,24 @@ describe('14 — Kargo & Teslimat (SHP)', () => {
   }> {
     const { seller, productId } = await makeSellerWithProduct({
       price: opts.price ?? 250,
-      sellerCity: opts.sellerCity ?? 'İstanbul',
+      sellerCity: opts.sellerCity ?? "İstanbul",
     });
-    const { buyer, addressId } = await makeBuyerWithAddress(opts.buyerCity ?? 'Ankara');
+    const { buyer, addressId } = await makeBuyerWithAddress(
+      opts.buyerCity ?? "Ankara",
+    );
     const { orderId } = await buyAndPay(ctx, buyer, productId, addressId);
 
     const shipRes = await request(server())
-      .post('/api/shipping')
+      .get(`/api/shipping/order/${orderId}`)
       .set(authHeader(seller))
-      .send({ orderId, provider: 'surat' })
-      .expect(201);
+      .expect(200);
 
     return { seller, buyer, productId, orderId, shipmentId: shipRes.body.id };
   }
 
   /** setupPreparedOrderWithShipment + satıcı takip no girer → shipment picked_up, order shipped. */
   async function setupShipmentWithTracking(
-    trackingNumber = '1234567890',
+    trackingNumber = "1234567890",
     opts: { buyerCity?: string; sellerCity?: string } = {},
   ) {
     const s = await setupPreparedOrderWithShipment(opts);
@@ -133,7 +152,7 @@ describe('14 — Kargo & Teslimat (SHP)', () => {
       sellerId: seller.id,
       categoryId: seed.categoryId,
       price: 100,
-      status: 'active',
+      status: "active",
     });
     const order = await prisma.order.create({
       data: {
@@ -154,8 +173,8 @@ describe('14 — Kargo & Teslimat (SHP)', () => {
     return { buyer, seller, orderId: order.id };
   }
 
-  const NIL_UUID = '00000000-0000-0000-0000-000000000000';
-  const WEBHOOK_SECRET = 'test-webhook-secret'; // .env.test: SURAT_WEBHOOK_SECRET
+  const NIL_UUID = "00000000-0000-0000-0000-000000000000";
+  const WEBHOOK_SECRET = "test-webhook-secret"; // .env.test: SURAT_WEBHOOK_SECRET
 
   /**
    * Runtime env override — ConfigModule.forRoot cache'siz olduğundan ConfigService.get()
@@ -163,7 +182,10 @@ describe('14 — Kargo & Teslimat (SHP)', () => {
    * Böylece Sürat stub davranışı (SURAT_STUB_RESPONSE/THROW/CARGO_ENABLED) ve 48h feature
    * flag'i tek test süresince deterministik olarak değiştirilebilir; finally ile geri alınır.
    */
-  async function withEnv<T>(overrides: Record<string, string | undefined>, fn: () => Promise<T>): Promise<T> {
+  async function withEnv<T>(
+    overrides: Record<string, string | undefined>,
+    fn: () => Promise<T>,
+  ): Promise<T> {
     const prev: Record<string, string | undefined> = {};
     for (const [k, v] of Object.entries(overrides)) {
       prev[k] = process.env[k];
@@ -181,134 +203,148 @@ describe('14 — Kargo & Teslimat (SHP)', () => {
   }
 
   /** POST /api/orders/buy tek çağrı (flows.buyNow ile aynı; env-override testlerinde inline). */
-  function directBuy(
-    buyer: CreatedTestUser,
-    body: Record<string, unknown>,
-  ) {
-    return request(server()).post('/api/orders/buy').set(authHeader(buyer)).send(body);
+  function directBuy(buyer: CreatedTestUser, body: Record<string, unknown>) {
+    return request(server())
+      .post("/api/orders/buy")
+      .set(authHeader(buyer))
+      .send(body);
   }
 
   // ═══════════════════════════ GET /api/shipping/carriers ═══════════════════════════
-  describe('GET /api/shipping/carriers (Public)', () => {
-    scenario('SHP-001', async () => {
-      const res = await request(server()).get('/api/shipping/carriers').expect(200);
-      expect(res.body.carriers[0].id).toBe('surat');
-      expect(res.body.carriers[0].code).toBe('surat');
-      expect(res.body.carriers[0].name).toBe('Sürat Kargo');
-      expect(res.body.carriers[0].trackingUrl).toContain('suratkargo.com.tr/KargoTakip');
-      expect(res.body.defaultCarrier).toBe('surat');
+  describe("GET /api/shipping/carriers (Public)", () => {
+    scenario("SHP-001", async () => {
+      const res = await request(server())
+        .get("/api/shipping/carriers")
+        .expect(200);
+      expect(res.body.carriers[0].id).toBe("surat");
+      expect(res.body.carriers[0].code).toBe("surat");
+      expect(res.body.carriers[0].name).toBe("Sürat Kargo");
+      expect(res.body.carriers[0].trackingUrl).toContain(
+        "suratkargo.com.tr/KargoTakip",
+      );
+      expect(res.body.defaultCarrier).toBe("surat");
       expect(res.body.totalActive).toBe(1);
       expect(res.body.carriers[0].features).toHaveLength(4);
-      expect(res.body.carriers[0].estimatedDelivery.sameCity).toBe('1-2 iş günü');
+      expect(res.body.carriers[0].estimatedDelivery.sameCity).toBe(
+        "1-2 iş günü",
+      );
     });
   });
 
   // ═══════════════════════════ GET /api/shipping/rates (Public) ═══════════════════════════
-  describe('GET /api/shipping/rates (Public)', () => {
-    scenario('SHP-002', async () => {
+  describe("GET /api/shipping/rates (Public)", () => {
+    scenario("SHP-002", async () => {
       const res = await request(server())
-        .get('/api/shipping/rates')
-        .query({ city: 'Ankara', carrier: 'surat', weight: '1' })
+        .get("/api/shipping/rates")
+        .query({ city: "Ankara", carrier: "surat", weight: "1" })
         .expect(200);
       expect(res.body.rate).toBe(29.99);
     });
 
-    scenario('SHP-003', async () => {
+    scenario("SHP-003", async () => {
       const res = await request(server())
-        .get('/api/shipping/rates')
-        .query({ city: 'İstanbul', carrier: 'surat', weight: '1' })
+        .get("/api/shipping/rates")
+        .query({ city: "İstanbul", carrier: "surat", weight: "1" })
         .expect(200);
       expect(res.body.rate).toBe(23.99); // 29.99 × 0.8 (aynı şehir) = 23.992 → 23.99
     });
 
-    scenario('SHP-004', async () => {
+    scenario("SHP-004", async () => {
       const res = await request(server())
-        .get('/api/shipping/rates')
-        .query({ city: 'Ankara', carrier: 'surat', weight: '3' })
+        .get("/api/shipping/rates")
+        .query({ city: "Ankara", carrier: "surat", weight: "3" })
         .expect(200);
       expect(res.body.rate).toBe(38.99); // 29.99 × 1.3 = 38.987 → 38.99
     });
 
-    scenario('SHP-005', async () => {
+    scenario("SHP-005", async () => {
       // weight yok → 0.5 kg → faktör 1
       const noWeight = await request(server())
-        .get('/api/shipping/rates')
-        .query({ city: 'Ankara', carrier: 'surat' })
+        .get("/api/shipping/rates")
+        .query({ city: "Ankara", carrier: "surat" })
         .expect(200);
       expect(noWeight.body.rate).toBe(29.99);
       // weight=abc → parseFloat NaN → 0.5
       const badWeight = await request(server())
-        .get('/api/shipping/rates')
-        .query({ city: 'Ankara', carrier: 'surat', weight: 'abc' })
+        .get("/api/shipping/rates")
+        .query({ city: "Ankara", carrier: "surat", weight: "abc" })
         .expect(200);
       expect(badWeight.body.rate).toBe(29.99);
     });
 
-    scenario('SHP-006', async () => {
+    scenario("SHP-006", async () => {
       // Bilinmeyen carrier enum'da değil → surat'a fallback
       const res = await request(server())
-        .get('/api/shipping/rates')
-        .query({ city: 'Ankara', carrier: 'yurtici', weight: '1' })
+        .get("/api/shipping/rates")
+        .query({ city: "Ankara", carrier: "yurtici", weight: "1" })
         .expect(200);
       expect(res.body.rate).toBe(29.99);
     });
 
-    scenario('SHP-007', async () => {
+    scenario("SHP-007", async () => {
       // city boş → toCity 'İstanbul' = origin → aynı şehir indirimi
       const res = await request(server())
-        .get('/api/shipping/rates')
-        .query({ city: '', carrier: 'surat', weight: '1' })
+        .get("/api/shipping/rates")
+        .query({ city: "", carrier: "surat", weight: "1" })
         .expect(200);
       expect(res.body.rate).toBe(23.99);
     });
 
-    scenario('SHP-008', async () => {
+    scenario("SHP-008", async () => {
       // PlatformSetting override: base 49.9 → şehirler arası (Ankara) × 1 × 1
       const prisma = getPrisma();
       await prisma.platformSetting.create({
         data: {
-          settingKey: 'shipping_base_cost',
-          settingValue: '49.9',
-          settingType: 'number',
+          settingKey: "shipping_base_cost",
+          settingValue: "49.9",
+          settingType: "number",
         },
       });
       const res = await request(server())
-        .get('/api/shipping/rates')
-        .query({ city: 'Ankara', carrier: 'surat', weight: '1' })
+        .get("/api/shipping/rates")
+        .query({ city: "Ankara", carrier: "surat", weight: "1" })
         .expect(200);
       expect(res.body.rate).toBe(49.9);
     });
   });
 
   // ═══════════════════════════ POST /api/shipping/rates (Auth) ═══════════════════════════
-  describe('POST /api/shipping/rates (Auth)', () => {
-    scenario('SHP-009', async () => {
+  describe("POST /api/shipping/rates (Auth)", () => {
+    scenario("SHP-009", async () => {
       await request(server())
-        .post('/api/shipping/rates')
+        .post("/api/shipping/rates")
         .send({ fromAddressId: NIL_UUID, toAddressId: NIL_UUID })
         .expect(401);
     });
 
-    scenario('SHP-010', async () => {
+    scenario("SHP-010", async () => {
       const user = await createUser(ctx.module);
       const res = await request(server())
-        .post('/api/shipping/rates')
+        .post("/api/shipping/rates")
         .set(authHeader(user))
         .send({
-          fromAddressId: '00000000-0000-0000-0000-000000000000',
-          toAddressId: '00000000-0000-0000-0000-000000000001',
+          fromAddressId: "00000000-0000-0000-0000-000000000000",
+          toAddressId: "00000000-0000-0000-0000-000000000001",
         })
         .expect(404);
-      expect(res.body.message).toContain('Adres bulunamadı');
+      expect(res.body.message).toContain("Adres bulunamadı");
     });
 
-    scenario('SHP-011', async () => {
+    scenario("SHP-011", async () => {
       const user = await createUser(ctx.module);
-      const from = await createAddress({ userId: user.id, isDefault: true, city: 'İstanbul' });
-      const to = await createAddress({ userId: user.id, isDefault: false, city: 'Ankara' });
+      const from = await createAddress({
+        userId: user.id,
+        isDefault: true,
+        city: "İstanbul",
+      });
+      const to = await createAddress({
+        userId: user.id,
+        isDefault: false,
+        city: "Ankara",
+      });
       // @Min(0.1) ihlali → 400
       await request(server())
-        .post('/api/shipping/rates')
+        .post("/api/shipping/rates")
         .set(authHeader(user))
         .send({ fromAddressId: from.id, toAddressId: to.id, weight: 0.05 })
         .expect(400);
@@ -316,33 +352,36 @@ describe('14 — Kargo & Teslimat (SHP)', () => {
   });
 
   // ═══════════════════════════ POST /api/shipping (Gönderi oluştur) ═══════════════════════════
-  describe('POST /api/shipping (create shipment)', () => {
-    scenario('SHP-020', async () => {
-      const { seller, productId } = await makeSellerWithProduct({ sellerCity: 'İstanbul' });
-      const { buyer, addressId } = await makeBuyerWithAddress('Ankara');
+  describe("POST /api/shipping (create shipment)", () => {
+    scenario("SHP-020", async () => {
+      const { seller, productId } = await makeSellerWithProduct({
+        sellerCity: "İstanbul",
+      });
+      const { buyer, addressId } = await makeBuyerWithAddress("Ankara");
       const { orderId } = await buyAndPay(ctx, buyer, productId, addressId);
 
+      // Kanonik akış: ödeme başarısında shipment OTOMATİK oluşur; satıcı manuel
+      // POST /api/shipping ÇAĞIRMAZ. Otomatik oluşan pending shipment'ı doğrula.
       const res = await request(server())
-        .post('/api/shipping')
+        .get(`/api/shipping/order/${orderId}`)
         .set(authHeader(seller))
-        .send({ orderId, provider: 'surat' })
-        .expect(201);
+        .expect(200);
 
-      expect(res.body.status).toBe('pending');
-      expect(res.body.provider).toBe('surat');
-      expect(typeof res.body.cost).toBe('number');
-      expect(res.body.cost).toBeGreaterThan(0); // İstanbul→Ankara şehirler arası
-      expect(res.body.trackingNumber).toBeNull();
+      expect(res.body.status).toBe("pending");
+      expect(res.body.provider).toBe("surat");
+      expect(typeof res.body.cost).toBe("number");
       expect(res.body.events).toEqual([]);
       expect(res.body.estimatedDelivery).toBeTruthy();
 
       // DB yan etkisi: tek shipment, pending.
       const prisma = getPrisma();
-      const dbShipment = await prisma.shipment.findUnique({ where: { orderId } });
+      const dbShipment = await prisma.shipment.findUnique({
+        where: { orderId },
+      });
       expect(dbShipment?.status).toBe(ShipmentStatus.pending);
     });
 
-    scenario('SHP-021', async () => {
+    scenario("SHP-021", async () => {
       const { productId } = await makeSellerWithProduct();
       const { buyer, addressId } = await makeBuyerWithAddress();
       const { orderId } = await buyAndPay(ctx, buyer, productId, addressId);
@@ -350,220 +389,246 @@ describe('14 — Kargo & Teslimat (SHP)', () => {
       // Başka bir satıcı bu siparişe gönderi oluşturamaz.
       const otherSeller = await createUser(ctx.module, { isSeller: true });
       const res = await request(server())
-        .post('/api/shipping')
+        .post("/api/shipping")
         .set(authHeader(otherSeller))
-        .send({ orderId, provider: 'surat' })
+        .send({ orderId, provider: "surat" })
         .expect(403);
-      expect(res.body.message).toContain('Bu sipariş için kargo oluşturamazsınız');
+      expect(res.body.message).toContain(
+        "Bu sipariş için kargo oluşturamazsınız",
+      );
     });
 
-    scenario('SHP-022', async () => {
+    scenario("SHP-022", async () => {
       // Sipariş 'preparing' değil (buradan sonra prisma ile 'paid'e çekilir).
       const { seller, productId } = await makeSellerWithProduct();
       const { buyer, addressId } = await makeBuyerWithAddress();
       const { orderId } = await buyAndPay(ctx, buyer, productId, addressId);
       const prisma = getPrisma();
-      await prisma.order.update({ where: { id: orderId }, data: { status: OrderStatus.paid } });
+      await prisma.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.paid },
+      });
 
       const res = await request(server())
-        .post('/api/shipping')
+        .post("/api/shipping")
         .set(authHeader(seller))
-        .send({ orderId, provider: 'surat' })
+        .send({ orderId, provider: "surat" })
         .expect(400);
-      expect(res.body.message).toContain('Sipariş hazırlanma durumunda değil');
+      expect(res.body.message).toContain("Sipariş hazırlanma durumunda değil");
     });
 
-    scenario('SHP-023', async () => {
+    scenario("SHP-023", async () => {
       const { seller, orderId } = await setupPreparedOrderWithShipment();
       // İkinci kez aynı orderId → unique shipment kuralı → 400.
       const res = await request(server())
-        .post('/api/shipping')
+        .post("/api/shipping")
         .set(authHeader(seller))
-        .send({ orderId, provider: 'surat' })
+        .send({ orderId, provider: "surat" })
         .expect(400);
-      expect(res.body.message).toContain('Bu sipariş için zaten kargo oluşturulmuş');
+      expect(res.body.message).toContain(
+        "Bu sipariş için zaten kargo oluşturulmuş",
+      );
     });
 
-    scenario('SHP-024', async () => {
+    scenario("SHP-024", async () => {
       const seller = await createUser(ctx.module, { isSeller: true });
       const res = await request(server())
-        .post('/api/shipping')
+        .post("/api/shipping")
         .set(authHeader(seller))
-        .send({ orderId: NIL_UUID, provider: 'surat' })
+        .send({ orderId: NIL_UUID, provider: "surat" })
         .expect(404);
-      expect(res.body.message).toContain('Sipariş bulunamadı');
+      expect(res.body.message).toContain("Sipariş bulunamadı");
     });
 
-    scenario('SHP-025', async () => {
+    scenario("SHP-025", async () => {
       // Satıcının default adresi YOK → 400 "Satıcı adresi bulunamadı".
       const seller = await createUser(ctx.module, { isSeller: true }); // adres yok
       const product = await createProduct({
         sellerId: seller.id,
         categoryId: seed.categoryId,
         price: 200,
-        status: 'active',
+        status: "active",
       });
       const { buyer, addressId } = await makeBuyerWithAddress();
       const { orderId } = await buyAndPay(ctx, buyer, product.id, addressId);
 
       const res = await request(server())
-        .post('/api/shipping')
+        .post("/api/shipping")
         .set(authHeader(seller))
-        .send({ orderId, provider: 'surat' })
+        .send({ orderId, provider: "surat" })
         .expect(400);
-      expect(res.body.message).toContain('Satıcı adresi bulunamadı');
+      expect(res.body.message).toContain("Satıcı adresi bulunamadı");
     });
 
-    scenario('SHP-026', async () => {
+    scenario("SHP-026", async () => {
       // Geçersiz provider (enum dışı) → DTO @IsEnum 400. DTO doğrulaması service'ten önce
       // çalıştığından geçerli bir orderId gerekmez; sadece kimlik doğrulama yeterli.
       const seller = await createUser(ctx.module, { isSeller: true });
       const res = await request(server())
-        .post('/api/shipping')
+        .post("/api/shipping")
         .set(authHeader(seller))
-        .send({ orderId: NIL_UUID, provider: 'yurtici' })
+        .send({ orderId: NIL_UUID, provider: "yurtici" })
         .expect(400);
-      const msg = Array.isArray(res.body.message) ? res.body.message.join(' ') : res.body.message;
-      expect(msg).toContain('Geçerli bir kargo firması seçiniz');
+      const msg = Array.isArray(res.body.message)
+        ? res.body.message.join(" ")
+        : res.body.message;
+      expect(msg).toContain("Geçerli bir kargo firması seçiniz");
     });
 
-    scenario('SHP-027', async () => {
+    scenario("SHP-027", async () => {
       const seller = await createUser(ctx.module, { isSeller: true });
       const res = await request(server())
-        .post('/api/shipping')
+        .post("/api/shipping")
         .set(authHeader(seller))
-        .send({ orderId: 'abc', provider: 'surat' })
+        .send({ orderId: "abc", provider: "surat" })
         .expect(400);
-      const msg = Array.isArray(res.body.message) ? res.body.message.join(' ') : res.body.message;
-      expect(msg).toContain('Geçerli bir sipariş ID giriniz');
+      const msg = Array.isArray(res.body.message)
+        ? res.body.message.join(" ")
+        : res.body.message;
+      expect(msg).toContain("Geçerli bir sipariş ID giriniz");
     });
 
-    scenario('SHP-028', async () => {
+    scenario("SHP-028", async () => {
       await request(server())
-        .post('/api/shipping')
-        .send({ orderId: NIL_UUID, provider: 'surat' })
+        .post("/api/shipping")
+        .send({ orderId: NIL_UUID, provider: "surat" })
         .expect(401);
     });
 
-    scenario('SHP-029', async () => {
-      // Hedef şehir çözümü: satıcı İzmir değil (İstanbul), alıcı İzmir → şehirler arası maliyet.
-      const { seller, productId } = await makeSellerWithProduct({ sellerCity: 'İstanbul' });
-      const { buyer, addressId } = await makeBuyerWithAddress('İzmir');
+    scenario("SHP-029", async () => {
+      // Hedef şehir çözümü: satıcı İstanbul, alıcı İzmir → şehirler arası maliyet.
+      // Kanonik akış: shipment ödemede otomatik oluşur; cost sipariş kargo bedelinden gelir.
+      const { seller, productId } = await makeSellerWithProduct({
+        sellerCity: "İstanbul",
+      });
+      const { buyer, addressId } = await makeBuyerWithAddress("İzmir");
       const { orderId } = await buyAndPay(ctx, buyer, productId, addressId);
 
       const res = await request(server())
-        .post('/api/shipping')
+        .get(`/api/shipping/order/${orderId}`)
         .set(authHeader(seller))
-        .send({ orderId, provider: 'surat' })
-        .expect(201);
+        .expect(200);
       // Şehirler arası (İstanbul→İzmir) → indirim uygulanmaz (base 29.99, weight 1).
       expect(res.body.cost).toBe(29.99);
     });
   });
 
   // ═══════════════════════════ PATCH /api/shipping/:id/tracking ═══════════════════════════
-  describe('PATCH /api/shipping/:id/tracking', () => {
-    scenario('SHP-040', async () => {
-      const { seller, orderId, shipmentId } = await setupPreparedOrderWithShipment();
+  describe("PATCH /api/shipping/:id/tracking", () => {
+    scenario("SHP-040", async () => {
+      const { seller, orderId, shipmentId } =
+        await setupPreparedOrderWithShipment();
       const res = await request(server())
         .patch(`/api/shipping/${shipmentId}/tracking`)
         .set(authHeader(seller))
-        .send({ trackingNumber: '1234567890' })
+        .send({ trackingNumber: "1234567890" })
         .expect(200);
 
-      expect(res.body.status).toBe('picked_up');
-      expect(res.body.trackingNumber).toBe('1234567890');
+      expect(res.body.status).toBe("picked_up");
+      expect(res.body.trackingNumber).toBe("1234567890");
       expect(res.body.trackingUrl).toBe(
-        'https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=1234567890',
+        "https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=1234567890",
       );
 
       const prisma = getPrisma();
       const order = await prisma.order.findUnique({ where: { id: orderId } });
       expect(order?.status).toBe(OrderStatus.shipped);
       expect(order!.version).toBeGreaterThan(1); // increment sonrası
-      const events = await prisma.shipmentEvent.findMany({ where: { shipmentId } });
+      const events = await prisma.shipmentEvent.findMany({
+        where: { shipmentId },
+      });
       expect(events).toHaveLength(1);
-      expect(events[0].status).toBe('picked_up');
-      expect(events[0].location).toBe('Satıcı');
-      expect(events[0].description).toBe('Kargo teslim alındı');
+      expect(events[0].status).toBe("picked_up");
+      expect(events[0].location).toBe("Satıcı");
+      expect(events[0].description).toBe("Kargo teslim alındı");
     });
 
-    scenario('SHP-041', async () => {
+    scenario("SHP-041", async () => {
       const { shipmentId } = await setupPreparedOrderWithShipment();
       const otherSeller = await createUser(ctx.module, { isSeller: true });
       const res = await request(server())
         .patch(`/api/shipping/${shipmentId}/tracking`)
         .set(authHeader(otherSeller))
-        .send({ trackingNumber: '999' })
+        .send({ trackingNumber: "999" })
         .expect(403);
-      expect(res.body.message).toContain('Bu kargoyu güncelleme yetkiniz yok');
+      expect(res.body.message).toContain("Bu kargoyu güncelleme yetkiniz yok");
     });
 
-    scenario('SHP-042', async () => {
+    scenario("SHP-042", async () => {
       // Alıcı (buyer) takip no güncelleyemez → 403 (ownership satıcıya bağlı).
       const { buyer, shipmentId } = await setupPreparedOrderWithShipment();
       await request(server())
         .patch(`/api/shipping/${shipmentId}/tracking`)
         .set(authHeader(buyer))
-        .send({ trackingNumber: '111' })
+        .send({ trackingNumber: "111" })
         .expect(403);
     });
 
-    scenario('SHP-043', async () => {
+    scenario("SHP-043", async () => {
       const seller = await createUser(ctx.module, { isSeller: true });
       const res = await request(server())
         .patch(`/api/shipping/${NIL_UUID}/tracking`)
         .set(authHeader(seller))
-        .send({ trackingNumber: '1' })
+        .send({ trackingNumber: "1" })
         .expect(404);
-      expect(res.body.message).toContain('Kargo bulunamadı');
+      expect(res.body.message).toContain("Kargo bulunamadı");
     });
 
-    scenario('SHP-044', async () => {
+    scenario("SHP-044", async () => {
       const { seller, shipmentId } = await setupPreparedOrderWithShipment();
       const res = await request(server())
         .patch(`/api/shipping/${shipmentId}/tracking`)
         .set(authHeader(seller))
         .send({}) // trackingNumber eksik → @IsString ihlali
         .expect(400);
-      const msg = Array.isArray(res.body.message) ? res.body.message.join(' ') : res.body.message;
-      expect(msg).toContain('Takip numarası zorunludur');
+      const msg = Array.isArray(res.body.message)
+        ? res.body.message.join(" ")
+        : res.body.message;
+      expect(msg).toContain("Takip numarası zorunludur");
     });
 
-    scenario('SHP-045', async () => {
+    scenario("SHP-045", async () => {
       // İdempotent DEĞİL: ikinci PATCH yeni event + yeni versiyon üretir.
-      const { seller, orderId, shipmentId } = await setupPreparedOrderWithShipment();
+      const { seller, orderId, shipmentId } =
+        await setupPreparedOrderWithShipment();
       await request(server())
         .patch(`/api/shipping/${shipmentId}/tracking`)
         .set(authHeader(seller))
-        .send({ trackingNumber: '1234567890' })
+        .send({ trackingNumber: "1234567890" })
         .expect(200);
       const prisma = getPrisma();
-      const afterFirst = await prisma.order.findUnique({ where: { id: orderId } });
+      const afterFirst = await prisma.order.findUnique({
+        where: { id: orderId },
+      });
 
       const res2 = await request(server())
         .patch(`/api/shipping/${shipmentId}/tracking`)
         .set(authHeader(seller))
-        .send({ trackingNumber: '9999999999' })
+        .send({ trackingNumber: "9999999999" })
         .expect(200);
-      expect(res2.body.trackingNumber).toBe('9999999999');
+      expect(res2.body.trackingNumber).toBe("9999999999");
 
-      const events = await prisma.shipmentEvent.findMany({ where: { shipmentId } });
+      const events = await prisma.shipmentEvent.findMany({
+        where: { shipmentId },
+      });
       expect(events.length).toBe(2); // ikinci picked_up eklendi
-      const afterSecond = await prisma.order.findUnique({ where: { id: orderId } });
+      const afterSecond = await prisma.order.findUnique({
+        where: { id: orderId },
+      });
       expect(afterSecond!.version).toBeGreaterThan(afterFirst!.version);
     });
 
-    scenario('SHP-046', async () => {
+    scenario("SHP-046", async () => {
       // notifyOrderShipped hatası try/catch ile yutulur → istek her koşulda 200 döner,
       // shipment picked_up + order shipped commit'lenir (tx notify'dan bağımsız).
-      const { seller, orderId, shipmentId } = await setupPreparedOrderWithShipment();
+      const { seller, orderId, shipmentId } =
+        await setupPreparedOrderWithShipment();
       const res = await request(server())
         .patch(`/api/shipping/${shipmentId}/tracking`)
         .set(authHeader(seller))
-        .send({ trackingNumber: '1234567890' })
+        .send({ trackingNumber: "1234567890" })
         .expect(200);
-      expect(res.body.status).toBe('picked_up');
+      expect(res.body.status).toBe("picked_up");
       const prisma = getPrisma();
       const order = await prisma.order.findUnique({ where: { id: orderId } });
       expect(order?.status).toBe(OrderStatus.shipped);
@@ -571,8 +636,8 @@ describe('14 — Kargo & Teslimat (SHP)', () => {
   });
 
   // ═══════════════════════════ GET /api/shipping/:id & /order/:orderId ═══════════════════════════
-  describe('GET shipment (by id / by order)', () => {
-    scenario('SHP-060', async () => {
+  describe("GET shipment (by id / by order)", () => {
+    scenario("SHP-060", async () => {
       const { buyer, orderId, shipmentId } = await setupShipmentWithTracking();
       const res = await request(server())
         .get(`/api/shipping/order/${orderId}`)
@@ -583,28 +648,28 @@ describe('14 — Kargo & Teslimat (SHP)', () => {
       expect(res.body.events.length).toBeGreaterThanOrEqual(1);
     });
 
-    scenario('SHP-061', async () => {
+    scenario("SHP-061", async () => {
       const { orderId, shipmentId } = await setupPreparedOrderWithShipment();
       const thirdParty = await createUser(ctx.module); // ne alıcı ne satıcı
       const byOrder = await request(server())
         .get(`/api/shipping/order/${orderId}`)
         .set(authHeader(thirdParty))
         .expect(403);
-      expect(byOrder.body.message).toContain('görüntüleme yetkiniz yok');
+      expect(byOrder.body.message).toContain("görüntüleme yetkiniz yok");
       await request(server())
         .get(`/api/shipping/${shipmentId}`)
         .set(authHeader(thirdParty))
         .expect(403);
     });
 
-    scenario('SHP-062', async () => {
+    scenario("SHP-062", async () => {
       const user = await createUser(ctx.module);
       // Olmayan sipariş → 404 "Sipariş bulunamadı".
       const noOrder = await request(server())
         .get(`/api/shipping/order/${NIL_UUID}`)
         .set(authHeader(user))
         .expect(404);
-      expect(noOrder.body.message).toContain('Sipariş bulunamadı');
+      expect(noOrder.body.message).toContain("Sipariş bulunamadı");
 
       // Sipariş var ama shipment yok → 404 "Bu sipariş için kargo bulunamadı".
       const { productId } = await makeSellerWithProduct();
@@ -614,10 +679,10 @@ describe('14 — Kargo & Teslimat (SHP)', () => {
         .get(`/api/shipping/order/${orderId}`)
         .set(authHeader(buyer))
         .expect(404);
-      expect(noShip.body.message).toContain('Bu sipariş için kargo bulunamadı');
+      expect(noShip.body.message).toContain("Bu sipariş için kargo bulunamadı");
     });
 
-    scenario('SHP-063', async () => {
+    scenario("SHP-063", async () => {
       const { orderId, shipmentId } = await setupPreparedOrderWithShipment();
       await request(server()).get(`/api/shipping/order/${orderId}`).expect(401);
       await request(server()).get(`/api/shipping/${shipmentId}`).expect(401);
@@ -625,138 +690,153 @@ describe('14 — Kargo & Teslimat (SHP)', () => {
   });
 
   // ═══════════════════════════ POST /api/shipping/webhook/:provider ═══════════════════════════
-  describe('POST /api/shipping/webhook/:provider', () => {
-    scenario('SHP-080', async () => {
-      const { shipmentId } = await setupShipmentWithTracking('1234567890');
+  describe("POST /api/shipping/webhook/:provider", () => {
+    scenario("SHP-080", async () => {
+      const { shipmentId } = await setupShipmentWithTracking("1234567890");
       const res = await request(server())
-        .post('/api/shipping/webhook/surat')
-        .set('X-Webhook-Secret', WEBHOOK_SECRET)
+        .post("/api/shipping/webhook/surat")
+        .set("X-Webhook-Secret", WEBHOOK_SECRET)
         .send({
-          trackingNumber: '1234567890',
-          status: 'in_transit',
-          location: 'Ankara Aktarma',
-          description: 'Yolda',
-          timestamp: '2026-06-30T10:00:00Z',
+          trackingNumber: "1234567890",
+          status: "in_transit",
+          location: "Ankara Aktarma",
+          description: "Yolda",
+          timestamp: "2026-06-30T10:00:00Z",
         })
         .expect(200);
-      expect(res.body.status).toBe('ok');
+      expect(res.body.status).toBe("ok");
 
       const prisma = getPrisma();
-      const shipment = await prisma.shipment.findUnique({ where: { id: shipmentId } });
+      const shipment = await prisma.shipment.findUnique({
+        where: { id: shipmentId },
+      });
       expect(shipment?.status).toBe(ShipmentStatus.in_transit);
       const event = await prisma.shipmentEvent.findFirst({
-        where: { shipmentId, status: 'in_transit' },
+        where: { shipmentId, status: "in_transit" },
       });
-      expect(event?.location).toBe('Ankara Aktarma');
+      expect(event?.location).toBe("Ankara Aktarma");
     });
 
-    scenario('SHP-081', async () => {
-      const { shipmentId } = await setupShipmentWithTracking('1234567890');
+    scenario("SHP-081", async () => {
+      const { shipmentId } = await setupShipmentWithTracking("1234567890");
       const res = await request(server())
-        .post('/api/shipping/webhook/surat')
-        .send({ trackingNumber: '1234567890', status: 'delivered' }) // header YOK
+        .post("/api/shipping/webhook/surat")
+        .send({ trackingNumber: "1234567890", status: "delivered" }) // header YOK
         .expect(401);
-      expect(res.body.message).toContain('Invalid or missing webhook secret');
+      expect(res.body.message).toContain("Invalid or missing webhook secret");
       // Gönderi değişmedi (picked_up kaldı).
       const prisma = getPrisma();
-      const shipment = await prisma.shipment.findUnique({ where: { id: shipmentId } });
+      const shipment = await prisma.shipment.findUnique({
+        where: { id: shipmentId },
+      });
       expect(shipment?.status).toBe(ShipmentStatus.picked_up);
     });
 
-    scenario('SHP-082', async () => {
+    scenario("SHP-082", async () => {
       // Sunucuda 'yurtici' provider için webhook secret tanımsız (YURTICI_WEBHOOK_SECRET yok)
       // → 401 "yurtici webhook secret not configured on server".
       const res = await request(server())
-        .post('/api/shipping/webhook/yurtici')
-        .set('X-Webhook-Secret', 'anything')
-        .send({ trackingNumber: '1234567890', status: 'delivered' })
+        .post("/api/shipping/webhook/yurtici")
+        .set("X-Webhook-Secret", "anything")
+        .send({ trackingNumber: "1234567890", status: "delivered" })
         .expect(401);
-      expect(res.body.message).toContain('yurtici webhook secret not configured on server');
+      expect(res.body.message).toContain(
+        "yurtici webhook secret not configured on server",
+      );
     });
 
-    scenario('SHP-083', async () => {
-      await setupShipmentWithTracking('1234567890');
+    scenario("SHP-083", async () => {
+      await setupShipmentWithTracking("1234567890");
       const res = await request(server())
-        .post('/api/shipping/webhook/surat')
-        .set('X-Webhook-Secret', WEBHOOK_SECRET)
-        .send({ trackingNumber: 'YOK-999', status: 'delivered' })
+        .post("/api/shipping/webhook/surat")
+        .set("X-Webhook-Secret", WEBHOOK_SECRET)
+        .send({ trackingNumber: "YOK-999", status: "delivered" })
         .expect(200);
-      expect(res.body.status).toBe('ignored');
+      expect(res.body.status).toBe("ignored");
       // Eşleşen gönderi değişmedi.
       const prisma = getPrisma();
-      const shipment = await prisma.shipment.findFirst({ where: { trackingNumber: '1234567890' } });
+      const shipment = await prisma.shipment.findFirst({
+        where: { trackingNumber: "1234567890" },
+      });
       expect(shipment?.status).toBe(ShipmentStatus.picked_up);
     });
 
-    scenario('SHP-084', async () => {
-      const { shipmentId } = await setupShipmentWithTracking('1234567890');
+    scenario("SHP-084", async () => {
+      const { shipmentId } = await setupShipmentWithTracking("1234567890");
       const res = await request(server())
-        .post('/api/shipping/webhook/surat')
-        .set('X-Webhook-Secret', WEBHOOK_SECRET)
-        .send({ trackingNumber: '1234567890', status: 'banana' })
+        .post("/api/shipping/webhook/surat")
+        .set("X-Webhook-Secret", WEBHOOK_SECRET)
+        .send({ trackingNumber: "1234567890", status: "banana" })
         .expect(200);
-      expect(res.body.status).toBe('ok');
+      expect(res.body.status).toBe("ok");
       const prisma = getPrisma();
-      const shipment = await prisma.shipment.findUnique({ where: { id: shipmentId } });
+      const shipment = await prisma.shipment.findUnique({
+        where: { id: shipmentId },
+      });
       expect(shipment?.status).toBe(ShipmentStatus.in_transit); // bilinmeyen → in_transit
       const event = await prisma.shipmentEvent.findFirst({
-        where: { shipmentId, status: 'in_transit' },
+        where: { shipmentId, status: "in_transit" },
       });
       expect(event).toBeTruthy();
     });
 
-    scenario('SHP-085', async () => {
+    scenario("SHP-085", async () => {
       // Alternatif alan adı: tracking_no ile eşleşme.
-      const { shipmentId } = await setupShipmentWithTracking('1234567890');
+      const { shipmentId } = await setupShipmentWithTracking("1234567890");
       const res = await request(server())
-        .post('/api/shipping/webhook/surat')
-        .set('X-Webhook-Secret', WEBHOOK_SECRET)
-        .send({ tracking_no: '1234567890', status: 'out_for_delivery' })
+        .post("/api/shipping/webhook/surat")
+        .set("X-Webhook-Secret", WEBHOOK_SECRET)
+        .send({ tracking_no: "1234567890", status: "out_for_delivery" })
         .expect(200);
-      expect(res.body.status).toBe('ok');
+      expect(res.body.status).toBe("ok");
       const prisma = getPrisma();
-      const shipment = await prisma.shipment.findUnique({ where: { id: shipmentId } });
+      const shipment = await prisma.shipment.findUnique({
+        where: { id: shipmentId },
+      });
       expect(shipment?.status).toBe(ShipmentStatus.out_for_delivery);
     });
 
-    scenario('SHP-086', async () => {
+    scenario("SHP-086", async () => {
       // location/timestamp/description eksik → varsayılanlar.
-      const { shipmentId } = await setupShipmentWithTracking('1234567890');
+      const { shipmentId } = await setupShipmentWithTracking("1234567890");
       const before = Date.now();
       const res = await request(server())
-        .post('/api/shipping/webhook/surat')
-        .set('X-Webhook-Secret', WEBHOOK_SECRET)
-        .send({ trackingNumber: '1234567890', status: 'in_transit' })
+        .post("/api/shipping/webhook/surat")
+        .set("X-Webhook-Secret", WEBHOOK_SECRET)
+        .send({ trackingNumber: "1234567890", status: "in_transit" })
         .expect(200);
-      expect(res.body.status).toBe('ok');
+      expect(res.body.status).toBe("ok");
       const prisma = getPrisma();
       const event = await prisma.shipmentEvent.findFirst({
-        where: { shipmentId, status: 'in_transit' },
-        orderBy: { occurredAt: 'desc' },
+        where: { shipmentId, status: "in_transit" },
+        orderBy: { occurredAt: "desc" },
       });
-      expect(event?.location).toBe('Bilinmiyor');
+      expect(event?.location).toBe("Bilinmiyor");
       expect(event?.description).toBeNull(); // payload.description undefined → null
       expect(event!.occurredAt.getTime()).toBeGreaterThanOrEqual(before - 1000);
     });
   });
 
   // ═══════════════════════════ Teslimat / onay (webhook delivered + confirm-receipt) ═══════════════════════════
-  describe('Delivery & confirmation', () => {
-    scenario('SHP-100', async () => {
+  describe("Delivery & confirmation", () => {
+    scenario("SHP-100", async () => {
       // 48h penceresi KAPALI (.env.test'te FEATURE_48H_CONFIRMATION_WINDOW yok) →
       // webhook delivered doğrudan order.status=delivered + deliveredAt + version+1.
-      const { orderId, shipmentId } = await setupShipmentWithTracking('1234567890');
+      const { orderId, shipmentId } =
+        await setupShipmentWithTracking("1234567890");
       const prisma = getPrisma();
       const before = await prisma.order.findUnique({ where: { id: orderId } });
 
       const res = await request(server())
-        .post('/api/shipping/webhook/surat')
-        .set('X-Webhook-Secret', WEBHOOK_SECRET)
-        .send({ trackingNumber: '1234567890', status: 'delivered' })
+        .post("/api/shipping/webhook/surat")
+        .set("X-Webhook-Secret", WEBHOOK_SECRET)
+        .send({ trackingNumber: "1234567890", status: "delivered" })
         .expect(200);
-      expect(res.body.status).toBe('ok');
+      expect(res.body.status).toBe("ok");
 
-      const shipment = await prisma.shipment.findUnique({ where: { id: shipmentId } });
+      const shipment = await prisma.shipment.findUnique({
+        where: { id: shipmentId },
+      });
       expect(shipment?.status).toBe(ShipmentStatus.delivered);
       const order = await prisma.order.findUnique({ where: { id: orderId } });
       expect(order?.status).toBe(OrderStatus.delivered);
@@ -764,23 +844,26 @@ describe('14 — Kargo & Teslimat (SHP)', () => {
       expect(order!.version).toBeGreaterThan(before!.version);
     });
 
-    scenario('SHP-101', async () => {
+    scenario("SHP-101", async () => {
       // 48h penceresi AÇIK: webhook delivered → order.status=awaiting_buyer_confirmation +
       // confirmationDeadline ≈ +48h + version+1 (webhook yolu flag'i canlı process.env'den okur).
-      const { orderId, shipmentId } = await setupShipmentWithTracking('1234567890');
+      const { orderId, shipmentId } =
+        await setupShipmentWithTracking("1234567890");
       const prisma = getPrisma();
       const before = await prisma.order.findUnique({ where: { id: orderId } });
 
-      await withEnv({ FEATURE_48H_CONFIRMATION_WINDOW: 'true' }, async () => {
+      await withEnv({ FEATURE_48H_CONFIRMATION_WINDOW: "true" }, async () => {
         const res = await request(server())
-          .post('/api/shipping/webhook/surat')
-          .set('X-Webhook-Secret', WEBHOOK_SECRET)
-          .send({ trackingNumber: '1234567890', status: 'delivered' })
+          .post("/api/shipping/webhook/surat")
+          .set("X-Webhook-Secret", WEBHOOK_SECRET)
+          .send({ trackingNumber: "1234567890", status: "delivered" })
           .expect(200);
-        expect(res.body.status).toBe('ok');
+        expect(res.body.status).toBe("ok");
       });
 
-      const shipment = await prisma.shipment.findUnique({ where: { id: shipmentId } });
+      const shipment = await prisma.shipment.findUnique({
+        where: { id: shipmentId },
+      });
       expect(shipment?.status).toBe(ShipmentStatus.delivered);
       const order = await prisma.order.findUnique({ where: { id: orderId } });
       expect(order?.status).toBe(OrderStatus.awaiting_buyer_confirmation);
@@ -793,7 +876,7 @@ describe('14 — Kargo & Teslimat (SHP)', () => {
       expect(order!.version).toBeGreaterThan(before!.version);
     });
 
-    scenario('SHP-102', async () => {
+    scenario("SHP-102", async () => {
       // Alıcı 48h penceresinde erken onay → completed.
       const { buyer, orderId } = await setupAwaitingConfirmationOrder();
       const res = await request(server())
@@ -806,28 +889,28 @@ describe('14 — Kargo & Teslimat (SHP)', () => {
       expect(order?.status).toBe(OrderStatus.completed);
     });
 
-    scenario('SHP-103', async () => {
+    scenario("SHP-103", async () => {
       // Satıcı / üçüncü kişi confirm-receipt → 403.
       const { seller, orderId } = await setupAwaitingConfirmationOrder();
       const res = await request(server())
         .post(`/api/orders/${orderId}/confirm-receipt`)
         .set(authHeader(seller))
         .expect(403);
-      expect(res.body.message).toContain('Bu siparişi onaylama yetkiniz yok');
+      expect(res.body.message).toContain("Bu siparişi onaylama yetkiniz yok");
     });
 
-    scenario('SHP-104', async () => {
+    scenario("SHP-104", async () => {
       // Yanlış durumda (shipped) confirm-receipt → 400 (mevcut durum belirtilir).
-      const { buyer, orderId } = await setupShipmentWithTracking('1234567890');
+      const { buyer, orderId } = await setupShipmentWithTracking("1234567890");
       const res = await request(server())
         .post(`/api/orders/${orderId}/confirm-receipt`)
         .set(authHeader(buyer))
         .expect(400);
-      expect(res.body.message).toContain('Sipariş bu aşamada onaylanamaz');
-      expect(res.body.message).toContain('shipped');
+      expect(res.body.message).toContain("Sipariş bu aşamada onaylanamaz");
+      expect(res.body.message).toContain("shipped");
     });
 
-    scenario('SHP-105', async () => {
+    scenario("SHP-105", async () => {
       // Açık iade talebi varken confirm-receipt → 400.
       const { buyer, orderId } = await setupAwaitingConfirmationOrder();
       const prisma = getPrisma();
@@ -836,23 +919,23 @@ describe('14 — Kargo & Teslimat (SHP)', () => {
           refundNumber: `REF-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           orderId,
           requesterId: buyer.id,
-          reason: 'damaged' as any,
+          reason: "damaged" as any,
           amount: new Prisma.Decimal(100),
-          status: 'pending_review' as any,
+          status: "pending_review" as any,
         },
       });
       const res = await request(server())
         .post(`/api/orders/${orderId}/confirm-receipt`)
         .set(authHeader(buyer))
         .expect(400);
-      expect(res.body.message).toContain('Açık bir iade talebi var');
+      expect(res.body.message).toContain("Açık bir iade talebi var");
       const order = await prisma.order.findUnique({ where: { id: orderId } });
       expect(order?.status).toBe(OrderStatus.awaiting_buyer_confirmation); // onaylanmadı
     });
 
-    scenario('SHP-106', async () => {
+    scenario("SHP-106", async () => {
       // confirmDelivery: delivered → completed (optimistic-lock version guard).
-      const { buyer, orderId } = await setupShipmentWithTracking('1234567890');
+      const { buyer, orderId } = await setupShipmentWithTracking("1234567890");
       const prisma = getPrisma();
       // shipped → delivered'a çek (webhook delivered ile aynı sonucu doğrudan kur).
       await prisma.order.update({
@@ -869,15 +952,15 @@ describe('14 — Kargo & Teslimat (SHP)', () => {
   });
 
   // ═══════════════════════════ Sürat entegrasyonu (order create) ═══════════════════════════
-  describe('Sürat integration on order create', () => {
-    scenario('SHP-121', async () => {
+  describe("Sürat integration on order create", () => {
+    scenario("SHP-121", async () => {
       // Entegrasyon AÇIK (.env.test SURAT_CARGO_ENABLED=true) + stub "Tamam" →
       // sipariş oluşur; Sürat'a beklenen payload alanlarıyla tek çağrı yapılır.
       const { productId } = await makeSellerWithProduct();
-      const { buyer, addressId } = await makeBuyerWithAddress('Ankara');
+      const { buyer, addressId } = await makeBuyerWithAddress("Ankara");
 
       const buyRes = await request(server())
-        .post('/api/orders/buy')
+        .post("/api/orders/buy")
         .set(authHeader(buyer))
         .send({ productId, shippingAddressId: addressId })
         .expect(201);
@@ -893,109 +976,151 @@ describe('14 — Kargo & Teslimat (SHP)', () => {
       expect(payload.OzelKargoTakipNo).toBeTruthy();
     });
 
-    scenario('SHP-120', async () => {
+    scenario("SHP-120", async () => {
       // Entegrasyon KAPALI (SURAT_CARGO_ENABLED=false, canlı process.env override) →
       // sipariş Sürat'sız oluşur; submitShipmentWithRetry HİÇ çağrılmaz (stub call yok).
       const { productId } = await makeSellerWithProduct();
-      const { buyer, addressId } = await makeBuyerWithAddress('Ankara');
+      const { buyer, addressId } = await makeBuyerWithAddress("Ankara");
 
-      await withEnv({ SURAT_CARGO_ENABLED: 'false' }, async () => {
-        const buyRes = await directBuy(buyer, { productId, shippingAddressId: addressId }).expect(201);
+      await withEnv({ SURAT_CARGO_ENABLED: "false" }, async () => {
+        const buyRes = await directBuy(buyer, {
+          productId,
+          shippingAddressId: addressId,
+        }).expect(201);
         expect(buyRes.body.orderId).toBeTruthy();
       });
       expect(ctx.surat.shipmentCalls.length).toBe(0);
     });
 
-    scenario('SHP-122', async () => {
+    scenario("SHP-122", async () => {
       // Stub iş hatası (non-Tamam) → 400 SURAT_BUSINESS; sipariş OLUŞMAZ; tek çağrı (retry yok).
       const { productId } = await makeSellerWithProduct();
-      const { buyer, addressId } = await makeBuyerWithAddress('Ankara');
+      const { buyer, addressId } = await makeBuyerWithAddress("Ankara");
 
-      await withEnv({ SURAT_STUB_RESPONSE: 'Adres eksik' }, async () => {
-        const res = await directBuy(buyer, { productId, shippingAddressId: addressId }).expect(400);
-        expect(res.body.code).toBe('SURAT_BUSINESS');
-        expect(res.body.message).toContain('Gönderi oluşturulamadı');
+      await withEnv({ SURAT_STUB_RESPONSE: "Adres eksik" }, async () => {
+        const res = await directBuy(buyer, {
+          productId,
+          shippingAddressId: addressId,
+        }).expect(400);
+        expect(res.body.code).toBe("SURAT_BUSINESS");
+        expect(res.body.message).toContain("Gönderi oluşturulamadı");
         expect(res.body.correlationId).toBeTruthy();
       });
       expect(ctx.surat.shipmentCalls.length).toBe(1); // iş hatası retry edilmez
       const prisma = getPrisma();
-      const order = await prisma.order.findFirst({ where: { buyerId: buyer.id } });
+      const order = await prisma.order.findFirst({
+        where: { buyerId: buyer.id },
+      });
       expect(order).toBeNull();
     });
 
-    scenario('SHP-123', async () => {
-      // Stub teknik hata TIMEOUT → 503 SURAT_TECHNICAL/suratCode TIMEOUT; SOAP 3 kez denendi; sipariş oluşmaz.
-      const { productId } = await makeSellerWithProduct();
-      const { buyer, addressId } = await makeBuyerWithAddress('Ankara');
-
-      await withEnv({ SURAT_STUB_THROW: 'TIMEOUT' }, async () => {
-        const res = await directBuy(buyer, { productId, shippingAddressId: addressId }).expect(503);
-        expect(res.body.code).toBe('SURAT_TECHNICAL');
-        expect(res.body.suratCode).toBe('TIMEOUT');
-        expect(res.body.message).toContain('Kargo sistemine şu an ulaşılamıyor');
-      });
-      expect(ctx.surat.shipmentCalls.length).toBe(3); // SURAT_CARGO_MAX_RETRIES default 3
-      const prisma = getPrisma();
-      const order = await prisma.order.findFirst({ where: { buyerId: buyer.id } });
-      expect(order).toBeNull();
-    }, 20000);
-
-    scenario('SHP-124', async () => {
-      // Teknik hata sınıflama matrisi: retry edilen kodlar (NETWORK/HTTP_5XX/SOAP_FAULT) 3 çağrı;
-      // one-shot (EMPTY→EMPTY_RESPONSE, PARSE_ERROR) en fazla 2 çağrı; UNKNOWN retry edilmez → 1 çağrı.
-      // Her durum 503 (technical) döner ve sipariş oluşmaz.
-      const cases: Array<{ sim: string; suratCode: string; calls: number }> = [
-        { sim: 'NETWORK', suratCode: 'NETWORK', calls: 3 },
-        { sim: 'HTTP_5XX', suratCode: 'HTTP_5XX', calls: 3 },
-        { sim: 'SOAP_FAULT', suratCode: 'SOAP_FAULT', calls: 3 },
-        { sim: 'EMPTY', suratCode: 'EMPTY_RESPONSE', calls: 2 },
-        { sim: 'PARSE_ERROR', suratCode: 'PARSE_ERROR', calls: 2 },
-        { sim: 'UNKNOWN', suratCode: 'UNKNOWN', calls: 1 },
-      ];
-      const prisma = getPrisma();
-      for (const c of cases) {
-        ctx.surat.reset();
+    scenario(
+      "SHP-123",
+      async () => {
+        // Stub teknik hata TIMEOUT → 503 SURAT_TECHNICAL/suratCode TIMEOUT; SOAP 3 kez denendi; sipariş oluşmaz.
         const { productId } = await makeSellerWithProduct();
-        const { buyer, addressId } = await makeBuyerWithAddress('Ankara');
-        await withEnv({ SURAT_STUB_THROW: c.sim }, async () => {
-          const res = await directBuy(buyer, { productId, shippingAddressId: addressId }).expect(503);
-          expect(res.body.code).toBe('SURAT_TECHNICAL');
-          expect(res.body.suratCode).toBe(c.suratCode);
-        });
-        expect(ctx.surat.shipmentCalls.length).toBe(c.calls);
-        const order = await prisma.order.findFirst({ where: { buyerId: buyer.id } });
-        expect(order).toBeNull();
-      }
-    }, 30000);
+        const { buyer, addressId } = await makeBuyerWithAddress("Ankara");
 
-    scenario('SHP-126', async () => {
+        await withEnv({ SURAT_STUB_THROW: "TIMEOUT" }, async () => {
+          const res = await directBuy(buyer, {
+            productId,
+            shippingAddressId: addressId,
+          }).expect(503);
+          expect(res.body.code).toBe("SURAT_TECHNICAL");
+          expect(res.body.suratCode).toBe("TIMEOUT");
+          expect(res.body.message).toContain(
+            "Kargo sistemine şu an ulaşılamıyor",
+          );
+        });
+        expect(ctx.surat.shipmentCalls.length).toBe(3); // SURAT_CARGO_MAX_RETRIES default 3
+        const prisma = getPrisma();
+        const order = await prisma.order.findFirst({
+          where: { buyerId: buyer.id },
+        });
+        expect(order).toBeNull();
+      },
+      20000,
+    );
+
+    scenario(
+      "SHP-124",
+      async () => {
+        // Teknik hata sınıflama matrisi: retry edilen kodlar (NETWORK/HTTP_5XX/SOAP_FAULT) 3 çağrı;
+        // one-shot (EMPTY→EMPTY_RESPONSE, PARSE_ERROR) en fazla 2 çağrı; UNKNOWN retry edilmez → 1 çağrı.
+        // Her durum 503 (technical) döner ve sipariş oluşmaz.
+        const cases: Array<{ sim: string; suratCode: string; calls: number }> =
+          [
+            { sim: "NETWORK", suratCode: "NETWORK", calls: 3 },
+            { sim: "HTTP_5XX", suratCode: "HTTP_5XX", calls: 3 },
+            { sim: "SOAP_FAULT", suratCode: "SOAP_FAULT", calls: 3 },
+            { sim: "EMPTY", suratCode: "EMPTY_RESPONSE", calls: 2 },
+            { sim: "PARSE_ERROR", suratCode: "PARSE_ERROR", calls: 2 },
+            { sim: "UNKNOWN", suratCode: "UNKNOWN", calls: 1 },
+          ];
+        const prisma = getPrisma();
+        for (const c of cases) {
+          ctx.surat.reset();
+          const { productId } = await makeSellerWithProduct();
+          const { buyer, addressId } = await makeBuyerWithAddress("Ankara");
+          await withEnv({ SURAT_STUB_THROW: c.sim }, async () => {
+            const res = await directBuy(buyer, {
+              productId,
+              shippingAddressId: addressId,
+            }).expect(503);
+            expect(res.body.code).toBe("SURAT_TECHNICAL");
+            expect(res.body.suratCode).toBe(c.suratCode);
+          });
+          expect(ctx.surat.shipmentCalls.length).toBe(c.calls);
+          const order = await prisma.order.findFirst({
+            where: { buyerId: buyer.id },
+          });
+          expect(order).toBeNull();
+        }
+      },
+      30000,
+    );
+
+    scenario("SHP-126", async () => {
       // "daha önce oluşturulmuş" yanıtı → başarı sayılır; sipariş OLUŞUR (idempotent).
       const { productId } = await makeSellerWithProduct();
-      const { buyer, addressId } = await makeBuyerWithAddress('Ankara');
+      const { buyer, addressId } = await makeBuyerWithAddress("Ankara");
 
-      await withEnv({ SURAT_STUB_RESPONSE: 'Bu gönderi daha önce oluşturulmuştur' }, async () => {
-        const buyRes = await directBuy(buyer, { productId, shippingAddressId: addressId }).expect(201);
-        expect(buyRes.body.orderId).toBeTruthy();
-      });
+      await withEnv(
+        { SURAT_STUB_RESPONSE: "Bu gönderi daha önce oluşturulmuştur" },
+        async () => {
+          const buyRes = await directBuy(buyer, {
+            productId,
+            shippingAddressId: addressId,
+          }).expect(201);
+          expect(buyRes.body.orderId).toBeTruthy();
+        },
+      );
       expect(ctx.surat.shipmentCalls.length).toBe(1);
       const prisma = getPrisma();
-      const order = await prisma.order.findFirst({ where: { buyerId: buyer.id } });
+      const order = await prisma.order.findFirst({
+        where: { buyerId: buyer.id },
+      });
       expect(order).not.toBeNull();
     });
 
-    scenario('SHP-127', async () => {
+    scenario("SHP-127", async () => {
       // Başarı koşulu tam "Tamam" (whitespace trim): " Tamam " → success; "Tamamdir" → iş hatası 400.
       const prisma = getPrisma();
 
       // (1) trim → success
       {
         const { productId } = await makeSellerWithProduct();
-        const { buyer, addressId } = await makeBuyerWithAddress('Ankara');
-        await withEnv({ SURAT_STUB_RESPONSE: ' Tamam ' }, async () => {
-          const buyRes = await directBuy(buyer, { productId, shippingAddressId: addressId }).expect(201);
+        const { buyer, addressId } = await makeBuyerWithAddress("Ankara");
+        await withEnv({ SURAT_STUB_RESPONSE: " Tamam " }, async () => {
+          const buyRes = await directBuy(buyer, {
+            productId,
+            shippingAddressId: addressId,
+          }).expect(201);
           expect(buyRes.body.orderId).toBeTruthy();
         });
-        const ok = await prisma.order.findFirst({ where: { buyerId: buyer.id } });
+        const ok = await prisma.order.findFirst({
+          where: { buyerId: buyer.id },
+        });
         expect(ok).not.toBeNull();
       }
 
@@ -1003,66 +1128,79 @@ describe('14 — Kargo & Teslimat (SHP)', () => {
       {
         ctx.surat.reset();
         const { productId } = await makeSellerWithProduct();
-        const { buyer, addressId } = await makeBuyerWithAddress('Ankara');
-        await withEnv({ SURAT_STUB_RESPONSE: 'Tamamdir' }, async () => {
-          const res = await directBuy(buyer, { productId, shippingAddressId: addressId }).expect(400);
-          expect(res.body.code).toBe('SURAT_BUSINESS');
+        const { buyer, addressId } = await makeBuyerWithAddress("Ankara");
+        await withEnv({ SURAT_STUB_RESPONSE: "Tamamdir" }, async () => {
+          const res = await directBuy(buyer, {
+            productId,
+            shippingAddressId: addressId,
+          }).expect(400);
+          expect(res.body.code).toBe("SURAT_BUSINESS");
         });
-        const none = await prisma.order.findFirst({ where: { buyerId: buyer.id } });
+        const none = await prisma.order.findFirst({
+          where: { buyerId: buyer.id },
+        });
         expect(none).toBeNull();
       }
     });
 
-    scenario('SHP-192', async () => {
+    scenario("SHP-192", async () => {
       // OzelKargoTakipNo === orderNumberPreview; ≤ 50 karakter.
       const { productId } = await makeSellerWithProduct();
-      const { buyer, addressId } = await makeBuyerWithAddress('Ankara');
+      const { buyer, addressId } = await makeBuyerWithAddress("Ankara");
       const buyRes = await request(server())
-        .post('/api/orders/buy')
+        .post("/api/orders/buy")
         .set(authHeader(buyer))
         .send({ productId, shippingAddressId: addressId })
         .expect(201);
 
       const prisma = getPrisma();
-      const order = await prisma.order.findUnique({ where: { id: buyRes.body.orderId } });
+      const order = await prisma.order.findUnique({
+        where: { id: buyRes.body.orderId },
+      });
       expect(ctx.surat.shipmentCalls.length).toBe(1);
       const payload = ctx.surat.shipmentCalls[0];
       expect(payload.OzelKargoTakipNo).toBe(order!.orderNumber);
       expect(payload.OzelKargoTakipNo.length).toBeLessThanOrEqual(50);
     });
 
-    scenario('SHP-193', async () => {
+    scenario("SHP-193", async () => {
       // SahisBirim = ürün başlığı (başlık varsa payload'da yer alır).
       const seller = await createUser(ctx.module, { isSeller: true });
-      await createAddress({ userId: seller.id, isDefault: true, city: 'İstanbul' });
+      await createAddress({
+        userId: seller.id,
+        isDefault: true,
+        city: "İstanbul",
+      });
       const product = await createProduct({
         sellerId: seller.id,
         categoryId: seed.categoryId,
         price: 300,
-        title: 'Nadir Vinil Plak 1975',
-        status: 'active',
+        title: "Nadir Vinil Plak 1975",
+        status: "active",
       });
-      const { buyer, addressId } = await makeBuyerWithAddress('Ankara');
+      const { buyer, addressId } = await makeBuyerWithAddress("Ankara");
       await request(server())
-        .post('/api/orders/buy')
+        .post("/api/orders/buy")
         .set(authHeader(buyer))
         .send({ productId: product.id, shippingAddressId: addressId })
         .expect(201);
 
       expect(ctx.surat.shipmentCalls.length).toBe(1);
-      expect(ctx.surat.shipmentCalls[0].SahisBirim).toBe('Nadir Vinil Plak 1975');
+      expect(ctx.surat.shipmentCalls[0].SahisBirim).toBe(
+        "Nadir Vinil Plak 1975",
+      );
     });
   });
 
   // ═══════════════════════════ Güvenlik / idempotency / misafir ═══════════════════════════
-  describe('Security & idempotency', () => {
-    scenario('SHP-230', async () => {
+  describe("Security & idempotency", () => {
+    scenario("SHP-230", async () => {
       // Misafir JWT'li kargo endpoint'ini kullanamaz → 401.
       const { orderId } = await setupPreparedOrderWithShipment();
       await request(server()).get(`/api/shipping/order/${orderId}`).expect(401);
     });
 
-    scenario('SHP-231', async () => {
+    scenario("SHP-231", async () => {
       // IDOR: başka kullanıcının shipmentId'siyle GET → 403; hiçbir bilgi dönmez.
       const { shipmentId } = await setupPreparedOrderWithShipment();
       const attacker = await createUser(ctx.module);
@@ -1074,33 +1212,36 @@ describe('14 — Kargo & Teslimat (SHP)', () => {
       expect(res.body.trackingNumber).toBeUndefined();
     });
 
-    scenario('SHP-232', async () => {
+    scenario("SHP-232", async () => {
       // Webhook delivered iki kez → idempotent (order tekrar delivered set edilir, çökme yok).
-      const { orderId, shipmentId } = await setupShipmentWithTracking('1234567890');
+      const { orderId, shipmentId } =
+        await setupShipmentWithTracking("1234567890");
       const send = () =>
         request(server())
-          .post('/api/shipping/webhook/surat')
-          .set('X-Webhook-Secret', WEBHOOK_SECRET)
-          .send({ trackingNumber: '1234567890', status: 'delivered' })
+          .post("/api/shipping/webhook/surat")
+          .set("X-Webhook-Secret", WEBHOOK_SECRET)
+          .send({ trackingNumber: "1234567890", status: "delivered" })
           .expect(200);
       await send();
       await send();
       const prisma = getPrisma();
-      const shipment = await prisma.shipment.findUnique({ where: { id: shipmentId } });
+      const shipment = await prisma.shipment.findUnique({
+        where: { id: shipmentId },
+      });
       expect(shipment?.status).toBe(ShipmentStatus.delivered);
       const order = await prisma.order.findUnique({ where: { id: orderId } });
       expect(order?.status).toBe(OrderStatus.delivered);
     });
 
-    scenario('SHP-234', async () => {
+    scenario("SHP-234", async () => {
       // Bozuk/eksik payload (trackingNumber yok) → eşleşme yok → {status:'ignored'} 200, çökme yok.
-      await setupShipmentWithTracking('1234567890');
+      await setupShipmentWithTracking("1234567890");
       const res = await request(server())
-        .post('/api/shipping/webhook/surat')
-        .set('X-Webhook-Secret', WEBHOOK_SECRET)
+        .post("/api/shipping/webhook/surat")
+        .set("X-Webhook-Secret", WEBHOOK_SECRET)
         .send({})
         .expect(200);
-      expect(res.body.status).toBe('ignored');
+      expect(res.body.status).toBe("ignored");
     });
   });
 
@@ -1110,46 +1251,139 @@ describe('14 — Kargo & Teslimat (SHP)', () => {
 
   // Otomatik 48h tamamlama cron'u (runAutoCompleteConfirmedOrders) /api/dev/run listesinde yok
   // (dev.controller.ts'te ilgili run hook'u yok) → e2e'den tetiklenecek API ucu yok.
-  scenario.skip('SHP-107', 'auto-complete cron dev hook (run/auto-complete) yok → tetiklenecek API ucu yok; order-48h-window.e2e-spec.ts kapsıyor');
+  scenario.skip(
+    "SHP-107",
+    "auto-complete cron dev hook (run/auto-complete) yok → tetiklenecek API ucu yok; order-48h-window.e2e-spec.ts kapsıyor",
+  );
   // Idempotency cache hit: buy akışı aynı ürün+alıcı için önce mevcut pending_payment siparişi
   // erken döndürüp Sürat'ı HİÇ çağırmıyor (order.service.ts:801) → "soapCall not called" e2e'de
   // cache-hit yüzünden mi yoksa erken-return yüzünden mi ayırt edilemez (assertion belirsiz).
-  scenario.skip('SHP-125', 'Cache-hit vs pending-order erken return e2e\'de ayrışmaz (ambiguous); surat-cargo.service.spec.ts kapsıyor');
+  scenario.skip(
+    "SHP-125",
+    "Cache-hit vs pending-order erken return e2e'de ayrışmaz (ambiguous); surat-cargo.service.spec.ts kapsıyor",
+  );
   // Canlı SOAP entegrasyon testleri (gerçek Sürat servisi) — stub harness dışında.
-  scenario.skip('SHP-128', 'Canlı SOAP integration; surat-api.integration-spec.ts (gerçek servis) kapsıyor');
-  scenario.skip('SHP-129', 'Canlı SOAP integration; surat-api.integration-spec.ts kapsıyor');
-  scenario.skip('SHP-130', 'Canlı SOAP integration; surat-api.integration-spec.ts kapsıyor');
+  scenario.skip(
+    "SHP-128",
+    "Canlı SOAP integration; surat-api.integration-spec.ts (gerçek servis) kapsıyor",
+  );
+  scenario.skip(
+    "SHP-129",
+    "Canlı SOAP integration; surat-api.integration-spec.ts kapsıyor",
+  );
+  scenario.skip(
+    "SHP-130",
+    "Canlı SOAP integration; surat-api.integration-spec.ts kapsıyor",
+  );
   // GonderiSil (iptal) birim/entegrasyon seviye; e2e'de yalnız order-cancel yan etkisi olarak tetiklenir.
-  scenario.skip('SHP-131', 'GonderiSil olmayan OID idempotent birim assertion; surat-cargo.service.spec.ts kapsıyor');
-  scenario.skip('SHP-132', 'cancelShipmentByOrderNumber integration_disabled birim assertion (config kapalı gerekir); birim spec kapsıyor');
-  scenario.skip('SHP-133', 'GonderiSil teknik hata throw birim assertion; surat-cargo.service.spec.ts kapsıyor');
+  scenario.skip(
+    "SHP-131",
+    "GonderiSil olmayan OID idempotent birim assertion; surat-cargo.service.spec.ts kapsıyor",
+  );
+  scenario.skip(
+    "SHP-132",
+    "cancelShipmentByOrderNumber integration_disabled birim assertion (config kapalı gerekir); birim spec kapsıyor",
+  );
+  scenario.skip(
+    "SHP-133",
+    "GonderiSil teknik hata throw birim assertion; surat-cargo.service.spec.ts kapsıyor",
+  );
   // Tracking sync (Sürat REST takip API'si) — harness'te stub YOK, canlı endpoint'e gider (test'te null → no-op).
-  scenario.skip('SHP-150', 'Durum kodu eşleme matrisi birim (surat-status.mapper); surat-status.mapper.spec.ts kapsıyor');
-  scenario.skip('SHP-151', 'syncShipmentTracking canlı Sürat REST API gerektirir (harness stub yok); surat-tracking.service.spec.ts kapsıyor');
-  scenario.skip('SHP-152', 'syncAllActiveShipments seçim mantığı birim/servis seviye; surat-tracking.service.spec.ts kapsıyor');
-  scenario.skip('SHP-153', 'İade tracking sync + processRefund canlı REST gerektirir; surat-tracking.service.spec.ts kapsıyor');
-  scenario.skip('SHP-154', 'fetchTrackingInfo null → no-op birim/servis assertion; surat-tracking.service.spec.ts kapsıyor');
-  scenario.skip('SHP-155', 'Event dedupe birim/servis assertion; surat-tracking.service.spec.ts kapsıyor');
-  scenario.skip('SHP-156', 'trackingNumber/URL boşsa doldurma birim/servis assertion; surat-tracking.service.spec.ts kapsıyor');
-  scenario.skip('SHP-157', 'Cron toplu çalıştırma özeti (in-process/Bull) birim/servis seviye; surat-tracking.service.spec.ts kapsıyor');
+  scenario.skip(
+    "SHP-150",
+    "Durum kodu eşleme matrisi birim (surat-status.mapper); surat-status.mapper.spec.ts kapsıyor",
+  );
+  scenario.skip(
+    "SHP-151",
+    "syncShipmentTracking canlı Sürat REST API gerektirir (harness stub yok); surat-tracking.service.spec.ts kapsıyor",
+  );
+  scenario.skip(
+    "SHP-152",
+    "syncAllActiveShipments seçim mantığı birim/servis seviye; surat-tracking.service.spec.ts kapsıyor",
+  );
+  scenario.skip(
+    "SHP-153",
+    "İade tracking sync + processRefund canlı REST gerektirir; surat-tracking.service.spec.ts kapsıyor",
+  );
+  scenario.skip(
+    "SHP-154",
+    "fetchTrackingInfo null → no-op birim/servis assertion; surat-tracking.service.spec.ts kapsıyor",
+  );
+  scenario.skip(
+    "SHP-155",
+    "Event dedupe birim/servis assertion; surat-tracking.service.spec.ts kapsıyor",
+  );
+  scenario.skip(
+    "SHP-156",
+    "trackingNumber/URL boşsa doldurma birim/servis assertion; surat-tracking.service.spec.ts kapsıyor",
+  );
+  scenario.skip(
+    "SHP-157",
+    "Cron toplu çalıştırma özeti (in-process/Bull) birim/servis seviye; surat-tracking.service.spec.ts kapsıyor",
+  );
   // İade/takas dönüş kargosu senkron — canlı REST + karmaşık kurulum, servis seviye.
-  scenario.skip('SHP-170', 'syncAllActiveRefundReturns canlı REST + refund kurulumu gerektirir; surat-tracking.service.spec.ts kapsıyor');
-  scenario.skip('SHP-171', 'syncRefundReturnTracking referanssız → false birim/servis assertion; surat-tracking.service.spec.ts kapsıyor');
-  scenario.skip('SHP-172', 'ReturnShipmentsTab salt-UI (admin); web/mobile e2e kapsamı');
-  scenario.skip('SHP-173', 'syncTradeShipmentTracking canlı REST + takas kurulumu gerektirir; surat-tracking.service.spec.ts kapsıyor');
-  scenario.skip('SHP-174', 'Takas tek bacak teslim birim/servis assertion; surat-tracking.service.spec.ts kapsıyor');
-  scenario.skip('SHP-175', 'TradeShipmentsTab salt-UI (admin); web/mobile e2e kapsamı');
+  scenario.skip(
+    "SHP-170",
+    "syncAllActiveRefundReturns canlı REST + refund kurulumu gerektirir; surat-tracking.service.spec.ts kapsıyor",
+  );
+  scenario.skip(
+    "SHP-171",
+    "syncRefundReturnTracking referanssız → false birim/servis assertion; surat-tracking.service.spec.ts kapsıyor",
+  );
+  scenario.skip(
+    "SHP-172",
+    "ReturnShipmentsTab salt-UI (admin); web/mobile e2e kapsamı",
+  );
+  scenario.skip(
+    "SHP-173",
+    "syncTradeShipmentTracking canlı REST + takas kurulumu gerektirir; surat-tracking.service.spec.ts kapsıyor",
+  );
+  scenario.skip(
+    "SHP-174",
+    "Takas tek bacak teslim birim/servis assertion; surat-tracking.service.spec.ts kapsıyor",
+  );
+  scenario.skip(
+    "SHP-175",
+    "TradeShipmentsTab salt-UI (admin); web/mobile e2e kapsamı",
+  );
   // Saf util normalizasyonu (buildGonderiXml öncesi) — birim.
-  scenario.skip('SHP-190', 'Telefon normalizasyonu (normalizeSuratPhone) birim; surat-address.util spec kapsıyor');
-  scenario.skip('SHP-191', 'İl/ilçe normalizasyonu (normalizeSuratLocation) birim; surat-address.util spec kapsıyor');
+  scenario.skip(
+    "SHP-190",
+    "Telefon normalizasyonu (normalizeSuratPhone) birim; surat-address.util spec kapsıyor",
+  );
+  scenario.skip(
+    "SHP-191",
+    "İl/ilçe normalizasyonu (normalizeSuratLocation) birim; surat-address.util spec kapsıyor",
+  );
   // Salt-UI/parite senaryoları — web/mobile/admin e2e kapsamı.
-  scenario.skip('SHP-210', 'Web takip satırı görünürlüğü salt-UI; apps/web e2e kapsamı');
-  scenario.skip('SHP-211', 'Mobile Kargo Takip kartı salt-UI; apps/mobile e2e kapsamı');
-  scenario.skip('SHP-212', 'Web "Kargo Bilgisi Ekle" → POST /orders/:id/ship (endpoint yok) salt-UI/BUG; apps/web e2e kapsamı');
-  scenario.skip('SHP-213', 'i18n TR/EN mesajları salt-UI; apps/web e2e kapsamı');
-  scenario.skip('SHP-214', 'Admin sipariş kargoları sekmesi salt-UI; admin e2e kapsamı');
+  scenario.skip(
+    "SHP-210",
+    "Web takip satırı görünürlüğü salt-UI; apps/web e2e kapsamı",
+  );
+  scenario.skip(
+    "SHP-211",
+    "Mobile Kargo Takip kartı salt-UI; apps/mobile e2e kapsamı",
+  );
+  scenario.skip(
+    "SHP-212",
+    'Web "Kargo Bilgisi Ekle" → POST /orders/:id/ship (endpoint yok) salt-UI/BUG; apps/web e2e kapsamı',
+  );
+  scenario.skip(
+    "SHP-213",
+    "i18n TR/EN mesajları salt-UI; apps/web e2e kapsamı",
+  );
+  scenario.skip(
+    "SHP-214",
+    "Admin sipariş kargoları sekmesi salt-UI; admin e2e kapsamı",
+  );
   // Eşzamanlı yarış senaryosu — e2e'de deterministik tetiklenemez (cron+HTTP race).
-  scenario.skip('SHP-233', 'Eşzamanlı confirm-receipt + cron auto-confirm yarışı e2e\'de deterministik değil; completeOrder idempotency birim spec kapsıyor');
+  scenario.skip(
+    "SHP-233",
+    "Eşzamanlı confirm-receipt + cron auto-confirm yarışı e2e'de deterministik değil; completeOrder idempotency birim spec kapsıyor",
+  );
   // Log sızıntısı — harness'te log yakalama wiring yok; behavioral kanıt üretilemez.
-  scenario.skip('SHP-235', 'Log sızıntı denetimi harness\'te log-capture wiring gerektirir; statik/güvenlik incelemesi kapsamı');
+  scenario.skip(
+    "SHP-235",
+    "Log sızıntı denetimi harness'te log-capture wiring gerektirir; statik/güvenlik incelemesi kapsamı",
+  );
 });
