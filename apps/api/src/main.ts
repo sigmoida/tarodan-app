@@ -75,16 +75,23 @@ async function bootstrap() {
     // Security
     app.use(helmet());
 
-    // CORS - Development'ta tüm origin'lere izin ver (mobil için)
-    const isDevelopment = process.env.NODE_ENV !== "production";
+    // CORS is driven by an explicit allowlist in EVERY environment (#69), so a
+    // non-production host (e.g. staging) never reflects an arbitrary origin
+    // together with credentials. Native mobile clients send no Origin header
+    // and are unaffected. Set CORS_ORIGINS (comma-separated) per deployed
+    // environment; local dev falls back to the localhost apps.
+    const corsOrigins = process.env.CORS_ORIGINS?.split(",")
+      .map((o) => o.trim())
+      .filter(Boolean);
     app.enableCors({
-      origin: isDevelopment
-        ? true // Development'ta tüm origin'lere izin ver
-        : process.env.CORS_ORIGINS?.split(",") || [
-            "http://localhost:3000",
-            "http://localhost:3001",
-            "http://localhost:3002",
-          ],
+      origin:
+        corsOrigins && corsOrigins.length > 0
+          ? corsOrigins
+          : [
+              "http://localhost:3000",
+              "http://localhost:3001",
+              "http://localhost:3002",
+            ],
       credentials: true,
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       // Tarayıcı/Axios bazen Cache-Control, Pragma vb. ekliyor; hepsine izin ver ki CORS preflight geçsin
@@ -117,10 +124,13 @@ async function bootstrap() {
       exclude: [{ path: "callback", method: RequestMethod.POST }],
     });
 
-    // Swagger documentation — prod'da KAPALI (tüm endpoint şemasını/payload'larını
-    // herkese açar). Sadece non-production'da; staging gerekiyorsa ENABLE_SWAGGER=true.
+    // Swagger exposes the full endpoint schema/payloads, so it is OFF on every
+    // deployed environment (including staging) unless ENABLE_SWAGGER=true; it
+    // stays on for local development only (#69 — no longer driven by the
+    // negation of `production`).
     const swaggerEnabled =
-      isDevelopment || process.env.ENABLE_SWAGGER === "true";
+      process.env.NODE_ENV === "development" ||
+      process.env.ENABLE_SWAGGER === "true";
     if (swaggerEnabled) {
       const config = new DocumentBuilder()
         .setTitle("Tarodan API")
@@ -140,7 +150,7 @@ async function bootstrap() {
       SwaggerModule.setup("api/docs", app, document);
       logger.log("Swagger docs available at /api/docs");
     } else {
-      logger.log("Swagger docs disabled (production)");
+      logger.log("Swagger docs disabled (set ENABLE_SWAGGER=true to enable)");
     }
 
     // Graceful shutdown (#64): on a rolling deploy the orchestrator (Coolify)
