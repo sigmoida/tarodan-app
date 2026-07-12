@@ -1,14 +1,14 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { PassportStrategy } from '@nestjs/passport';
-import { ExtractJwt, Strategy } from 'passport-jwt';
-import { Request } from 'express';
-import { JwtPayload, RequestUser } from '../interfaces';
-import { PrismaService } from '../../../prisma';
-import { COOKIE_NAMES, readCookie } from '../utils/auth-cookies';
+import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { PassportStrategy } from "@nestjs/passport";
+import { ExtractJwt, Strategy } from "passport-jwt";
+import { Request } from "express";
+import { JwtPayload, RequestUser } from "../interfaces";
+import { PrismaService } from "../../../prisma";
+import { COOKIE_NAMES, readCookie } from "../utils/auth-cookies";
 
 @Injectable()
-export class AdminJwtStrategy extends PassportStrategy(Strategy, 'admin-jwt') {
+export class AdminJwtStrategy extends PassportStrategy(Strategy, "admin-jwt") {
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
@@ -20,14 +20,14 @@ export class AdminJwtStrategy extends PassportStrategy(Strategy, 'admin-jwt') {
         ExtractJwt.fromAuthHeaderAsBearerToken(),
       ]),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('ADMIN_JWT_SECRET') || configService.get<string>('JWT_SECRET'),
+      secretOrKey: configService.getOrThrow<string>("ADMIN_JWT_SECRET"),
     });
   }
 
   async validate(payload: JwtPayload): Promise<RequestUser> {
     // Verify it's an access token and is admin
-    if (payload.type !== 'access' || !payload.isAdmin) {
-      throw new UnauthorizedException('Geçersiz admin token');
+    if (payload.type !== "access" || !payload.isAdmin) {
+      throw new UnauthorizedException("Geçersiz admin token");
     }
 
     // Check if admin user exists and is active – select only User columns that exist in DB
@@ -49,7 +49,9 @@ export class AdminJwtStrategy extends PassportStrategy(Strategy, 'admin-jwt') {
     });
 
     if (!adminUser || !adminUser.user) {
-      throw new UnauthorizedException('Admin kullanıcı bulunamadı veya deaktif');
+      throw new UnauthorizedException(
+        "Admin kullanıcı bulunamadı veya deaktif",
+      );
     }
 
     return {
