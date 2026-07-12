@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../prisma';
-import { CacheService } from '../cache/cache.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { PrismaService } from "../../prisma";
+import { CacheService } from "../cache/cache.service";
 import {
   PaymentStatus,
   PaymentHoldStatus,
@@ -10,22 +10,22 @@ import {
   SubscriptionStatus,
   TradeStatus,
   OfferStatus,
-} from '@prisma/client';
-import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
-import { safeDecrementReserved } from '../product/helpers/product-availability.helper';
+} from "@prisma/client";
+import { getProductStatusFromQuantity } from "../product/helpers/product-status.helper";
+import { safeDecrementReserved } from "../product/helpers/product-availability.helper";
 import {
   computeRelevanceScore,
   RELEVANCE_PREMIUM_BONUS,
-} from '../product/helpers/relevance-score';
-import { EventService } from '../events';
-import { InvoiceService } from '../invoice/invoice.service';
-import { ElogoInvoicingService } from '../elogo';
-import { ProductLockService } from '../product/product-lock.service';
-import { NotificationService } from '../notification/notification.service';
-import { CommissionLedgerService } from '../commission/commission-ledger.service';
-import { ModuleRef } from '@nestjs/core';
-import { PaymentCommonService } from './payment-common.service';
-import { PaymentRefundService } from './payment-refund.service';
+} from "../product/helpers/relevance-score";
+import { EventService } from "../events";
+import { InvoiceService } from "../invoice/invoice.service";
+import { ElogoInvoicingService } from "../elogo";
+import { ProductLockService } from "../product/product-lock.service";
+import { NotificationService } from "../notification/notification.service";
+import { CommissionLedgerService } from "../commission/commission-ledger.service";
+import { ModuleRef } from "@nestjs/core";
+import { PaymentCommonService } from "./payment-common.service";
+import { PaymentRefundService } from "./payment-refund.service";
 
 @Injectable()
 export class PaymentFulfillmentService {
@@ -86,7 +86,7 @@ export class PaymentFulfillmentService {
       const auditHistory = (
         (payment.metadata as any)?.auditHistory || []
       ).concat({
-        action: 'payment.completed',
+        action: "payment.completed",
         timestamp: new Date().toISOString(),
         oldStatus,
         newStatus: PaymentStatus.completed,
@@ -135,7 +135,7 @@ export class PaymentFulfillmentService {
 
       // Update order status to PREPARING with shipping deadline for the seller
       const preparingDays = parseInt(
-        this.configService.get('PREPARING_DEADLINE_DAYS') || '3',
+        this.configService.get("PREPARING_DEADLINE_DAYS") || "3",
         10,
       );
       const preparingDeadline = new Date();
@@ -152,10 +152,10 @@ export class PaymentFulfillmentService {
 
       // Check if this is a membership order (productId starts with "membership-")
       const isMembershipOrder =
-        payment.order?.productId?.startsWith('membership-') ?? false;
+        payment.order?.productId?.startsWith("membership-") ?? false;
       // Boost (öne çıkarma) siparişi mi? (productId "boost-" ile başlar)
       const isBoostOrder =
-        payment.order?.productId?.startsWith('boost-') ?? false;
+        payment.order?.productId?.startsWith("boost-") ?? false;
       const productIdsToInvalidate: string[] = [];
 
       if (isMembershipOrder) {
@@ -176,7 +176,7 @@ export class PaymentFulfillmentService {
 
           // Premium (free olmayan) üyelik aktifleşti: satıcının boost'suz aktif ilanlarını
           // premium kademesine (rankTier=1) yükselt. Boost'lu (2) ürünlere dokunma.
-          if (membership.tier.type !== 'free') {
+          if (membership.tier.type !== "free") {
             await tx.product.updateMany({
               where: {
                 sellerId: payment.order.buyerId,
@@ -195,10 +195,10 @@ export class PaymentFulfillmentService {
           await tx.membershipPayment.updateMany({
             where: {
               membershipId: membership.id,
-              status: 'pending',
+              status: "pending",
             },
             data: {
-              status: 'completed',
+              status: "completed",
               providerPaymentId: transactionId || payment.providerPaymentId,
             },
           });
@@ -238,7 +238,7 @@ export class PaymentFulfillmentService {
             where: { orderId: { in: ids }, status: PaymentStatus.pending },
             data: {
               status: PaymentStatus.failed,
-              failureReason: 'Üyelik başka ödeme ile tamamlandı',
+              failureReason: "Üyelik başka ödeme ile tamamlandı",
             },
           });
           this.logger.log(
@@ -273,7 +273,7 @@ export class PaymentFulfillmentService {
           );
           await tx.productBoost.update({
             where: { id: boost.id },
-            data: { status: 'active', startsAt, endsAt },
+            data: { status: "active", startsAt, endsAt },
           });
           await tx.product.update({
             where: { id: boost.productId },
@@ -314,7 +314,7 @@ export class PaymentFulfillmentService {
         });
 
         if (!product) {
-          throw new Error('Product not found');
+          throw new Error("Product not found");
         }
 
         const orderQty = payment.order?.quantity ?? 1;
@@ -371,7 +371,7 @@ export class PaymentFulfillmentService {
             await this.productLockService.invalidatePendingOrdersForProduct(
               tx,
               payment.order.productId,
-              'Stok tükendi',
+              "Stok tükendi",
             );
           const offerResult =
             await this.productLockService.invalidateRelatedOffers(
@@ -413,7 +413,7 @@ export class PaymentFulfillmentService {
       });
 
       if (!order) {
-        throw new Error('Order not found after payment');
+        throw new Error("Order not found after payment");
       }
 
       // Only create payment hold for regular product orders (not membership/boost orders)
@@ -468,7 +468,7 @@ export class PaymentFulfillmentService {
     }
 
     // Handle auto-refund: payment succeeded but order was already cancelled (race with cron)
-    if ('autoRefundRequired' in result && result.autoRefundRequired) {
+    if ("autoRefundRequired" in result && result.autoRefundRequired) {
       const refundOrderId = (result as any).orderId;
       const refundPaymentId = (result as any).paymentId;
       this.logger.warn(
@@ -520,7 +520,7 @@ export class PaymentFulfillmentService {
           );
       await notify.catch((err) =>
         this.logger.warn(
-          `stockout-notify (${isUnpaidOffer ? 'offer' : 'order'}) failed for ${o.buyerId}: ${err.message}`,
+          `stockout-notify (${isUnpaidOffer ? "offer" : "order"}) failed for ${o.buyerId}: ${err.message}`,
         ),
       );
     }
@@ -552,8 +552,8 @@ export class PaymentFulfillmentService {
 
     // Emit order.paid event AFTER transaction commits (only for regular product orders, not membership/boost)
     // This publishes jobs to email, push, and shipping queues
-    const isMembershipOrder = resultOrder.productId.startsWith('membership-');
-    const isBoostOrder = resultOrder.productId.startsWith('boost-');
+    const isMembershipOrder = resultOrder.productId.startsWith("membership-");
+    const isBoostOrder = resultOrder.productId.startsWith("boost-");
 
     // Ürün listesi cache'ini temizle:
     // - Boost: öne çıkarma sıralamayı etkiler.
@@ -561,7 +561,7 @@ export class PaymentFulfillmentService {
     //   listelerde "stokta yok" olarak sona kayar; sıralama/görünürlük değişir.
     // Membership siparişleri ürün listelerini etkilemez.
     if (!isMembershipOrder) {
-      await this.cache.delPattern('products:list:*').catch(() => {});
+      await this.cache.delPattern("products:list:*").catch(() => {});
     }
 
     if (!isMembershipOrder && !isBoostOrder) {
@@ -570,7 +570,7 @@ export class PaymentFulfillmentService {
 
         // Check if this is a guest order and get actual buyer info
         const isGuestOrder =
-          resultOrder.buyer.email === 'guest@tarodan.system' ||
+          resultOrder.buyer.email === "guest@tarodan.system" ||
           shippingAddressData?.isGuestOrder;
         const actualBuyerEmail = isGuestOrder
           ? shippingAddressData?.guestEmail ||
@@ -580,7 +580,7 @@ export class PaymentFulfillmentService {
         const actualBuyerName = isGuestOrder
           ? shippingAddressData?.guestName ||
             shippingAddressData?.fullName ||
-            'Misafir Müşteri'
+            "Misafir Müşteri"
           : resultOrder.buyer.displayName || resultOrder.buyer.email;
 
         this.logger.log(
@@ -605,15 +605,15 @@ export class PaymentFulfillmentService {
           transactionId:
             transactionId || payment.providerPaymentId || payment.id,
           shippingAddress: {
-            fullName: shippingAddressData?.fullName || '',
-            phone: shippingAddressData?.phone || '',
-            address: shippingAddressData?.address || '',
-            city: shippingAddressData?.city || '',
-            district: shippingAddressData?.district || '',
-            zipCode: shippingAddressData?.zipCode || '',
+            fullName: shippingAddressData?.fullName || "",
+            phone: shippingAddressData?.phone || "",
+            address: shippingAddressData?.address || "",
+            city: shippingAddressData?.city || "",
+            district: shippingAddressData?.district || "",
+            zipCode: shippingAddressData?.zipCode || "",
           },
           isGuestOrder,
-          buyerSystemEmail: resultOrder.buyer.email || '',
+          buyerSystemEmail: resultOrder.buyer.email || "",
         });
 
         this.logger.log(
@@ -648,7 +648,7 @@ export class PaymentFulfillmentService {
             providerPaymentId:
               transactionId || payment.providerPaymentId || undefined,
           },
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           select: { id: true },
         });
         // membershipPayment kaydı varsa ondan; YOKSA (mevcut akış MEM- order + tier upgrade
@@ -688,8 +688,8 @@ export class PaymentFulfillmentService {
           await this.prisma.shipment.create({
             data: {
               orderId: resultOrder.id,
-              provider: 'surat',
-              status: 'pending',
+              provider: "surat",
+              status: "pending",
               // Sürat'a OzelKargoTakipNo olarak sipariş numarası gönderiliyor; aynısını
               // takip numarası olarak DB'ye de yazıyoruz ki UI'da gösterilsin.
               trackingNumber: resultOrder.orderNumber,
@@ -743,7 +743,7 @@ export class PaymentFulfillmentService {
         const auditHistory = (
           (payment.metadata as any)?.auditHistory || []
         ).concat({
-          action: 'payment.completed',
+          action: "payment.completed",
           timestamp: new Date().toISOString(),
           oldStatus,
           newStatus: PaymentStatus.completed,
@@ -780,7 +780,7 @@ export class PaymentFulfillmentService {
         );
 
         const preparingDays = parseInt(
-          this.configService.get('PREPARING_DEADLINE_DAYS') || '3',
+          this.configService.get("PREPARING_DEADLINE_DAYS") || "3",
           10,
         );
         const preparingDeadline = new Date();
@@ -858,7 +858,7 @@ export class PaymentFulfillmentService {
               await this.productLockService.invalidatePendingOrdersForProduct(
                 tx,
                 order.productId,
-                'Stok tükendi',
+                "Stok tükendi",
               );
             const offerResult =
               await this.productLockService.invalidateRelatedOffers(
@@ -946,7 +946,7 @@ export class PaymentFulfillmentService {
     for (const productId of result.productIdsToInvalidate) {
       await this.cache.del(`products:detail:${productId}`);
     }
-    await this.cache.delPattern('products:list:*').catch(() => {});
+    await this.cache.delPattern("products:list:*").catch(() => {});
 
     // Stockout kaskad bildirimleri (tx sonrası; tek bildirimle alıcı başına)
     const notifiedBuyers = new Set<string>();
@@ -1007,13 +1007,13 @@ export class PaymentFulfillmentService {
         const firstOrder = result.aliveOrders[0];
         const firstAddr = firstOrder.shippingAddress as any;
         const groupIsGuest =
-          firstOrder.buyer.email === 'guest@tarodan.system' ||
+          firstOrder.buyer.email === "guest@tarodan.system" ||
           firstAddr?.isGuestOrder;
         const groupBuyerEmail = groupIsGuest
           ? firstAddr?.guestEmail || firstAddr?.email || firstOrder.buyer.email
           : firstOrder.buyer.email;
         const groupBuyerName = groupIsGuest
-          ? firstAddr?.guestName || firstAddr?.fullName || 'Misafir Müşteri'
+          ? firstAddr?.guestName || firstAddr?.fullName || "Misafir Müşteri"
           : firstOrder.buyer.displayName || firstOrder.buyer.email;
         const group = await this.prisma.checkoutGroup.findUnique({
           where: { id: payment.checkoutGroupId },
@@ -1037,15 +1037,15 @@ export class PaymentFulfillmentService {
             totalAmount: Number(o.totalAmount),
           })),
           shippingAddress: {
-            fullName: firstAddr?.fullName || '',
-            phone: firstAddr?.phone || '',
-            address: firstAddr?.address || '',
-            city: firstAddr?.city || '',
-            district: firstAddr?.district || '',
-            zipCode: firstAddr?.zipCode || '',
+            fullName: firstAddr?.fullName || "",
+            phone: firstAddr?.phone || "",
+            address: firstAddr?.address || "",
+            city: firstAddr?.city || "",
+            district: firstAddr?.district || "",
+            zipCode: firstAddr?.zipCode || "",
           },
           isGuestOrder: groupIsGuest,
-          buyerSystemEmail: firstOrder.buyer.email || '',
+          buyerSystemEmail: firstOrder.buyer.email || "",
           representativeOrderNumber: firstOrder.orderNumber,
         });
       } catch (error) {
@@ -1060,7 +1060,7 @@ export class PaymentFulfillmentService {
       try {
         const shippingAddressData = resultOrder.shippingAddress as any;
         const isGuestOrder =
-          resultOrder.buyer.email === 'guest@tarodan.system' ||
+          resultOrder.buyer.email === "guest@tarodan.system" ||
           shippingAddressData?.isGuestOrder;
         const actualBuyerEmail = isGuestOrder
           ? shippingAddressData?.guestEmail ||
@@ -1070,7 +1070,7 @@ export class PaymentFulfillmentService {
         const actualBuyerName = isGuestOrder
           ? shippingAddressData?.guestName ||
             shippingAddressData?.fullName ||
-            'Misafir Müşteri'
+            "Misafir Müşteri"
           : resultOrder.buyer.displayName || resultOrder.buyer.email;
 
         await this.eventService.emitOrderPaid({
@@ -1091,15 +1091,15 @@ export class PaymentFulfillmentService {
           transactionId:
             transactionId || payment.providerPaymentId || payment.id,
           shippingAddress: {
-            fullName: shippingAddressData?.fullName || '',
-            phone: shippingAddressData?.phone || '',
-            address: shippingAddressData?.address || '',
-            city: shippingAddressData?.city || '',
-            district: shippingAddressData?.district || '',
-            zipCode: shippingAddressData?.zipCode || '',
+            fullName: shippingAddressData?.fullName || "",
+            phone: shippingAddressData?.phone || "",
+            address: shippingAddressData?.address || "",
+            city: shippingAddressData?.city || "",
+            district: shippingAddressData?.district || "",
+            zipCode: shippingAddressData?.zipCode || "",
           },
           isGuestOrder,
-          buyerSystemEmail: resultOrder.buyer.email || '',
+          buyerSystemEmail: resultOrder.buyer.email || "",
           // Sepet akışı: alıcı onayı grup başına tek kez gönderildi → burada atla.
           skipBuyer: true,
         });
@@ -1122,8 +1122,8 @@ export class PaymentFulfillmentService {
           await this.prisma.shipment.create({
             data: {
               orderId: resultOrder.id,
-              provider: 'surat',
-              status: 'pending',
+              provider: "surat",
+              status: "pending",
               trackingNumber: resultOrder.orderNumber,
               cost: Number(resultOrder.shippingCost),
               estimatedDelivery,
@@ -1159,10 +1159,10 @@ export class PaymentFulfillmentService {
   ): Promise<boolean> {
     // Platform ayarı: takas kargo süresi (gün). Varsayılan 7 gün.
     const shippingDaysSetting = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: 'trade_shipping_deadline_days' },
+      where: { settingKey: "trade_shipping_deadline_days" },
     });
     const shippingDays =
-      parseInt(shippingDaysSetting?.settingValue ?? '7', 10) || 7;
+      parseInt(shippingDaysSetting?.settingValue ?? "7", 10) || 7;
 
     const result = await this.prisma.$transaction(async (tx) => {
       const claimed = await tx.payment.updateMany({
@@ -1257,13 +1257,13 @@ export class PaymentFulfillmentService {
       // imports Payment; Payment can't statically import Trade).
       try {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { TradeService } = require('../trade/trade.service');
+        const { TradeService } = require("../trade/trade.service");
         const tradeService = this.moduleRef.get(TradeService, {
           strict: false,
         });
         if (
           tradeService &&
-          typeof tradeService.createInboundTradeShipments === 'function'
+          typeof tradeService.createInboundTradeShipments === "function"
         ) {
           tradeService
             .createInboundTradeShipments(result.trade.id)
@@ -1293,13 +1293,22 @@ export class PaymentFulfillmentService {
   async processFailedPayment(payment: any, reason: string) {
     const oldStatus = payment.status;
 
-    await this.prisma.payment.update({
-      where: { id: payment.id },
+    // Only a still-pending payment may be marked failed. A replayed or late
+    // `failed` callback must never flip an already-`completed` payment back to
+    // `failed` — mirror the success path's conditional claim (#71).
+    const flipped = await this.prisma.payment.updateMany({
+      where: { id: payment.id, status: PaymentStatus.pending },
       data: {
         status: PaymentStatus.failed,
         failureReason: reason,
       },
     });
+    if (flipped.count === 0) {
+      this.logger.warn(
+        `processFailedPayment skipped: payment ${payment.id} is not pending (status=${oldStatus})`,
+      );
+      return;
+    }
 
     // Trade cash payments don't have order/product to release
     if (payment.tradeCashPaymentId && !payment.orderId) {
@@ -1343,7 +1352,7 @@ export class PaymentFulfillmentService {
       }
 
       await this.paymentCommon.logPaymentAction(
-        'failed',
+        "failed",
         payment.id,
         undefined,
         undefined,
@@ -1380,7 +1389,7 @@ export class PaymentFulfillmentService {
 
     // Log payment failure
     await this.paymentCommon.logPaymentAction(
-      'failed',
+      "failed",
       payment.id,
       payment.orderId,
       undefined,
