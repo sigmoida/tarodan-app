@@ -1,7 +1,13 @@
-import { Injectable, Logger, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { MembershipService } from '../membership/membership.service';
-import { ProductStatus } from '@prisma/client';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { MembershipService } from "../membership/membership.service";
+import { ProductStatus } from "@prisma/client";
 
 /**
  * ProductStatsService — ilan sayacı ve satıcı istatistikleri (leaf; prisma +
@@ -15,7 +21,7 @@ export class ProductStatsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly membershipService: MembershipService,
-  ) { }
+  ) {}
 
   /**
    * Get active listing count for a seller
@@ -25,7 +31,13 @@ export class ProductStatsService {
     return this.prisma.product.count({
       where: {
         sellerId,
-        status: { in: [ProductStatus.active, ProductStatus.pending, ProductStatus.reserved] },
+        status: {
+          in: [
+            ProductStatus.active,
+            ProductStatus.pending,
+            ProductStatus.reserved,
+          ],
+        },
       },
     });
   }
@@ -48,11 +60,13 @@ export class ProductStatsService {
     });
 
     if (!product) {
-      throw new NotFoundException('Ürün bulunamadı');
+      throw new NotFoundException("Ürün bulunamadı");
     }
 
     if (product.sellerId !== sellerId) {
-      throw new ForbiddenException('Bu ürünün istatistiklerini görme yetkiniz yok');
+      throw new ForbiddenException(
+        "Bu ürünün istatistiklerini görme yetkiniz yok",
+      );
     }
 
     return {
@@ -72,33 +86,57 @@ export class ProductStatsService {
   async getSellerListingStats(sellerId: string) {
     try {
       if (!sellerId) {
-        throw new BadRequestException('Satıcı kimliği bulunamadı');
+        throw new BadRequestException("Satıcı kimliği bulunamadı");
       }
 
       // Get all listing counts by status (exclude inactive, draft, deleted)
-      const [pending, active, reserved, sold, rejected, inactive, deleted, total, all] = await Promise.all([
-        this.prisma.product.count({ where: { sellerId, status: ProductStatus.pending } }),
-        this.prisma.product.count({ where: { sellerId, status: ProductStatus.active } }),
-        this.prisma.product.count({ where: { sellerId, status: ProductStatus.reserved } }),
-        this.prisma.product.count({ where: { sellerId, status: ProductStatus.sold } }),
-        this.prisma.product.count({ where: { sellerId, status: ProductStatus.rejected } }),
-        this.prisma.product.count({ where: { sellerId, status: ProductStatus.inactive } }),
+      const [
+        pending,
+        active,
+        reserved,
+        sold,
+        rejected,
+        inactive,
+        deleted,
+        total,
+        all,
+      ] = await Promise.all([
+        this.prisma.product.count({
+          where: { sellerId, status: ProductStatus.pending },
+        }),
+        this.prisma.product.count({
+          where: { sellerId, status: ProductStatus.active },
+        }),
+        this.prisma.product.count({
+          where: { sellerId, status: ProductStatus.reserved },
+        }),
+        this.prisma.product.count({
+          where: { sellerId, status: ProductStatus.sold },
+        }),
+        this.prisma.product.count({
+          where: { sellerId, status: ProductStatus.rejected },
+        }),
+        this.prisma.product.count({
+          where: { sellerId, status: ProductStatus.inactive },
+        }),
         // Kaldırılan (yönetici/satıcı silmesi) — ayrı sayaç.
-        this.prisma.product.count({ where: { sellerId, status: ProductStatus.deleted } }),
+        this.prisma.product.count({
+          where: { sellerId, status: ProductStatus.deleted },
+        }),
         // Total should exclude inactive and deleted listings (limit/usage card uses this)
         this.prisma.product.count({
           where: {
             sellerId,
-            status: { notIn: [ProductStatus.inactive, ProductStatus.deleted] }
-          }
+            status: { notIn: [ProductStatus.inactive, ProductStatus.deleted] },
+          },
         }),
         // "Tümü" sayacı: deleted hariç (inactive DAHİL). Liste "Tümü"
         // filtresi (findSellerProducts: notIn[deleted]) ile birebir.
         this.prisma.product.count({
           where: {
             sellerId,
-            status: { notIn: [ProductStatus.deleted] }
-          }
+            status: { notIn: [ProductStatus.deleted] },
+          },
         }),
       ]);
 
@@ -132,8 +170,8 @@ export class ProductStatsService {
         limits: {
           tierName: limits.tierName,
           tierType: limits.tierType,
-          maxFreeListings: limits.maxFreeListings,       // Tier's total max free listings
-          maxTotalListings: limits.maxTotalListings,     // Tier's total max listings
+          maxFreeListings: limits.maxFreeListings, // Tier's total max free listings
+          maxTotalListings: limits.maxTotalListings, // Tier's total max listings
           remainingFreeListings: limits.remainingFreeListings,
           remainingTotalListings: limits.remainingTotalListings,
           maxImagesPerListing: limits.maxImages,
@@ -145,20 +183,26 @@ export class ProductStatsService {
         // Quick summary for UI
         summary: {
           used: activeListings,
-          max: maxLimit,                  // Use maxFreeListings for free tier, maxTotalListings for others
+          max: maxLimit, // Use maxFreeListings for free tier, maxTotalListings for others
           remaining: remainingLimit,
           canCreate: limits.canCreateListing,
-          percentUsed: maxLimit > 0
-            ? Math.round((activeListings / maxLimit) * 100)
-            : 0,
+          percentUsed:
+            maxLimit > 0 ? Math.round((activeListings / maxLimit) * 100) : 0,
         },
       };
     } catch (error) {
-      this.logger.error(`Error in getSellerListingStats for sellerId ${sellerId}:`, error);
-      if (error instanceof BadRequestException || error instanceof NotFoundException || error instanceof ForbiddenException) {
+      this.logger.error(
+        `Error in getSellerListingStats for sellerId ${sellerId}:`,
+        error,
+      );
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
-      throw new BadRequestException(`İlan istatistikleri alınamadı: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`);
+      throw new BadRequestException("İlan istatistikleri alınamadı");
     }
   }
 }
