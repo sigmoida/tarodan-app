@@ -16,7 +16,7 @@
   "devDependencies": {
     "@tarodan/eslint-config": "workspace:*",
     "@tarodan/tsconfig": "workspace:*",
-    "tailwindcss": "^3.4.0",
-    "typescript": "^5.3.2"
+    "tailwindcss": "^4.3.2",
+    "typescript": "^7.0.2"
   }
 }
