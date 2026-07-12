@@ -68,7 +68,7 @@ export class MediaController {
   }
 
   @Post("upload/multiple")
-  @UseInterceptors(FilesInterceptor("files", 10))
+  @UseInterceptors(FilesInterceptor("files", 10, UPLOAD_MULTER_OPTIONS))
   async uploadMultipleFiles(
     @Request() req: any,
     @UploadedFiles() files: Express.Multer.File[],
@@ -88,7 +88,7 @@ export class MediaController {
   }
 
   @Post("upload/product")
-  @UseInterceptors(FilesInterceptor("images", 15))
+  @UseInterceptors(FilesInterceptor("images", 15, UPLOAD_MULTER_OPTIONS))
   async uploadProductImages(
     @Request() req: any,
     @UploadedFiles() files: Express.Multer.File[],
