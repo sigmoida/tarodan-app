@@ -633,10 +633,11 @@ export class AuthService {
       if (error instanceof UnauthorizedException) {
         throw error;
       }
-      this.logger.error("Login failed");
-      throw new BadRequestException(
-        `Giriş işlemi sırasında bir hata oluştu: ${error instanceof Error ? error.message : String(error)}`,
+      this.logger.error(
+        "Login failed",
+        error instanceof Error ? error.stack : String(error),
       );
+      throw new BadRequestException("Giriş işlemi sırasında bir hata oluştu");
     }
   }
 
