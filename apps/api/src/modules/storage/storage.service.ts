@@ -18,6 +18,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import * as crypto from "crypto";
+import { fromBuffer as fileTypeFromBuffer } from "file-type";
 
 export interface UploadResult {
   key: string;
@@ -198,6 +199,11 @@ export class StorageService implements OnModuleInit {
         throw new BadRequestException(
           "Geçersiz dosya tipi. Sadece JPEG, PNG, WebP, GIF desteklenir.",
         );
+      }
+      // The client Content-Type is spoofable — verify the real bytes (#71).
+      const sniffed = await fileTypeFromBuffer(buffer);
+      if (!sniffed || !ALLOWED_IMAGE_TYPES.includes(sniffed.mime)) {
+        throw new BadRequestException("Dosya içeriği geçerli bir resim değil.");
       }
     }
 

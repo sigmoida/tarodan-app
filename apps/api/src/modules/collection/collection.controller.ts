@@ -17,6 +17,7 @@ import {
   Logger,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
+import { UPLOAD_MULTER_OPTIONS } from "../../common/upload/multer-options";
 import { CollectionService } from "./collection.service";
 import { MediaService } from "../media/media.service";
 import { StorageService } from "../storage/storage.service";
@@ -285,7 +286,7 @@ export class CollectionController {
    * For custom products, image file can be uploaded
    */
   @Post(":id/items")
-  @UseInterceptors(FileInterceptor("image"))
+  @UseInterceptors(FileInterceptor("image", UPLOAD_MULTER_OPTIONS))
   async addItemToCollection(
     @Param("id") id: string,
     @Request() req: any,
@@ -368,7 +369,7 @@ export class CollectionController {
    * PATCH /collections/:id/cover
    */
   @Patch(":id/cover")
-  @UseInterceptors(FileInterceptor("cover"))
+  @UseInterceptors(FileInterceptor("cover", UPLOAD_MULTER_OPTIONS))
   async updateCollectionCover(
     @Param("id") id: string,
     @Request() req: any,
