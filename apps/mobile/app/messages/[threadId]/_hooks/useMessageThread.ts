@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { ScrollView, Platform } from 'react-native';
+import { FlatList, Platform } from 'react-native';
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { appAlert } from '@tarodan/ui-native';
@@ -39,7 +39,7 @@ export function useMessageThread() {
   const [showReportModal, setShowReportModal] = useState(false);
   // İlk açılışta liste en alta konumlanana dek gizli tutulur (zıplama görünmesin).
   const [isPositioned, setIsPositioned] = useState(false);
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<FlatList>(null);
 
   const messageLimit = limits?.maxMessagesPerDay || 50;
   const isUnlimited = messageLimit === -1;

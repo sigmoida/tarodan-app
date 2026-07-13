@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, Dimensions, RefreshControl } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Dimensions, RefreshControl, FlatList } from 'react-native';
 import { AppImage } from '@/components/AppImage';
 import { theme, Chip, Spinner, Text, Input, Modal, ScreenHeader } from '@tarodan/ui-native';
 import { useQuery } from '@tanstack/react-query';
@@ -200,19 +200,22 @@ export default function CategoryScreen() {
           <Text style={styles.emptySubtitle}>Bu kategoride henüz ürün yok</Text>
         </View>
       ) : (
-        <ScrollView
+        <FlatList
+          data={products as any[]}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => renderProductCard(item)}
+          numColumns={2}
+          columnWrapperStyle={styles.productsGrid}
           style={styles.productsContainer}
           contentContainerStyle={styles.productsContent}
+          ListHeaderComponent={
+            <Text style={styles.resultsCount}>{products.length} ürün bulundu</Text>
+          }
+          ListFooterComponent={<View style={{ height: 100 }} />}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary[600]!]} />
           }
-        >
-          <Text style={styles.resultsCount}>{products.length} ürün bulundu</Text>
-          <View style={styles.productsGrid}>
-            {products.map((item: any) => renderProductCard(item))}
-          </View>
-          <View style={{ height: 100 }} />
-        </ScrollView>
+        />
       )}
     </View>
   );

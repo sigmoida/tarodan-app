@@ -1,4 +1,4 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, FlatList, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
 import { AppImage } from '@/components/AppImage';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
@@ -118,15 +118,26 @@ export default function FavoritesScreen() {
           <Button variant="primary" title="Ürünleri Keşfet" onPress={() => router.push('/(tabs)/search')} style={styles.browseButton} />
         </View>
       ) : (
-        <ScrollView
+        <FlatList
+          data={items}
+          keyExtractor={(item) => item.id}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary[600]!]} />
           }
-        >
-          {items.map((item) => (
-            <Card key={item.id} padding={0} style={styles.card}>
+          ListFooterComponent={
+            <>
+              {/* Recommendations Section */}
+              <View style={styles.recommendationsSection}>
+                <Text variant="h3" style={styles.sectionTitle}>Beğenebileceğiniz</Text>
+                <Button variant="outline" title="Daha Fazla Ürün Keşfet" style={{ alignSelf: 'center' }} onPress={() => router.push('/(tabs)/search')} />
+              </View>
+              <View style={{ height: 100 }} />
+            </>
+          }
+          renderItem={({ item }) => (
+            <Card padding={0} style={styles.card}>
               {/* Aksiyon butonları navigasyon TouchableOpacity'sinin DIŞINDA (kardeş) —
                   iç içe dokunulabilirlerde ebeveyn dokunuşu yutabiliyor (sepet ekranı deseni). */}
               <View style={styles.cardContent}>
@@ -182,16 +193,8 @@ export default function FavoritesScreen() {
                 </View>
               </View>
             </Card>
-          ))}
-
-          {/* Recommendations Section */}
-          <View style={styles.recommendationsSection}>
-            <Text variant="h3" style={styles.sectionTitle}>Beğenebileceğiniz</Text>
-            <Button variant="outline" title="Daha Fazla Ürün Keşfet" style={{ alignSelf: 'center' }} onPress={() => router.push('/(tabs)/search')} />
-          </View>
-
-          <View style={{ height: 100 }} />
-        </ScrollView>
+          )}
+        />
       )}
 
       {/* Snackbar */}

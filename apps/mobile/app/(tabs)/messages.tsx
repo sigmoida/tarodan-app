@@ -1,4 +1,4 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, FlatList, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
 import { Avatar, Badge, Input, Spinner, Text, theme, ScreenHeader } from '@tarodan/ui-native';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
@@ -154,19 +154,20 @@ export default function MessagesTabScreen() {
           </Text>
         </View>
       ) : (
-        <ScrollView
+        <FlatList
+          data={filteredThreads}
+          keyExtractor={(thread) => thread.id}
           style={styles.threadsList}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary[600]!]} />
           }
-        >
-          {filteredThreads.map((thread) => {
+          ListFooterComponent={<View style={{ height: 100 }} />}
+          renderItem={({ item: thread }) => {
             const other = safeGetOther(thread);
             const hasUnread = thread.unreadCount > 0;
 
             return (
               <TouchableOpacity
-                key={thread.id}
                 style={[styles.threadItem, hasUnread && styles.threadItemUnread]}
                 onPress={() => router.push(`/messages/${thread.id}`)}
               >
@@ -229,10 +230,8 @@ export default function MessagesTabScreen() {
                 )}
               </TouchableOpacity>
             );
-          })}
-
-          <View style={{ height: 100 }} />
-        </ScrollView>
+          }}
+        />
       )}
     </View>
   );
