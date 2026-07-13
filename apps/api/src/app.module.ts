@@ -1,8 +1,9 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
+import { validateEnv } from "./config/env.validation";
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
-import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
+import { APP_GUARD, APP_INTERCEPTOR, APP_FILTER } from "@nestjs/core";
 import { PrismaModule } from "./prisma";
 import { DevModule } from "./modules/dev/dev.module";
 import { AuthModule, JwtAuthGuard, BannedUserGuard } from "./modules/auth";
@@ -92,6 +93,7 @@ import { PagesModule } from "./modules/pages";
 
 import { EventEmitterModule } from "@nestjs/event-emitter";
 import { ErrorLogInterceptor } from "./common/interceptors/error-log.interceptor";
+import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 
 @Module({
   imports: [
@@ -111,7 +113,8 @@ import { ErrorLogInterceptor } from "./common/interceptors/error-log.interceptor
       envFilePath:
         process.env.NODE_ENV === "test"
           ? [".env.test"]
-          : [".env.local", ".env", "env.txt"],
+          : [".env.local", ".env"],
+      validate: validateEnv,
     }),
 
     // Rate limiting
@@ -248,6 +251,12 @@ import { ErrorLogInterceptor } from "./common/interceptors/error-log.interceptor
     {
       provide: APP_INTERCEPTOR,
       useClass: ErrorLogInterceptor,
+    },
+    // Global exception filter — maps Prisma errors to clean 4xx and sanitizes
+    // any unhandled 5xx so no internal detail leaks to clients (#70).
+    {
+      provide: APP_FILTER,
+      useClass: AllExceptionsFilter,
     },
   ],
 })

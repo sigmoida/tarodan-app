@@ -3,11 +3,11 @@ import {
   NotFoundException,
   BadRequestException,
   Logger,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { EventService } from '../events/event.service';
-import { AdminAuditService } from './admin-audit.service';
-import { Prisma } from '@prisma/client';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { EventService } from "../events/event.service";
+import { AdminAuditService } from "./admin-audit.service";
+import { Prisma } from "@prisma/client";
 
 /**
  * Bildirim admin operasyonları (geçmiş, toplu gönderim, zamanlama) —
@@ -61,17 +61,19 @@ export class AdminNotificationService {
       const matchingUsers = await this.prisma.user.findMany({
         where: {
           OR: [
-            { displayName: { contains: trimmedSearch, mode: 'insensitive' } },
-            { email: { contains: trimmedSearch, mode: 'insensitive' } },
+            { displayName: { contains: trimmedSearch, mode: "insensitive" } },
+            { email: { contains: trimmedSearch, mode: "insensitive" } },
           ],
         },
         select: { id: true },
       });
       const matchingUserIds = matchingUsers.map((u) => u.id);
       where.OR = [
-        { title: { contains: trimmedSearch, mode: 'insensitive' } },
-        { body: { contains: trimmedSearch, mode: 'insensitive' } },
-        ...(matchingUserIds.length > 0 ? [{ userId: { in: matchingUserIds } }] : []),
+        { title: { contains: trimmedSearch, mode: "insensitive" } },
+        { body: { contains: trimmedSearch, mode: "insensitive" } },
+        ...(matchingUserIds.length > 0
+          ? [{ userId: { in: matchingUserIds } }]
+          : []),
       ];
     }
 
@@ -79,22 +81,22 @@ export class AdminNotificationService {
       this.prisma.notificationLog.count({ where }),
       this.prisma.notificationLog.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
       }),
     ]);
 
     // Get user info for logs
-    const userIds = [...new Set(logs.map(l => l.userId))];
+    const userIds = [...new Set(logs.map((l) => l.userId))];
     const users = await this.prisma.user.findMany({
       where: { id: { in: userIds } },
       select: { id: true, displayName: true, email: true },
     });
-    const userMap = new Map(users.map(u => [u.id, u]));
+    const userMap = new Map(users.map((u) => [u.id, u]));
 
     return {
-      data: logs.map(l => ({
+      data: logs.map((l) => ({
         ...l,
         user: userMap.get(l.userId) || null,
       })),
@@ -105,43 +107,48 @@ export class AdminNotificationService {
   /**
    * Send notification to users
    */
-  async sendNotification(adminId: string, dto: {
-    title: string;
-    body: string;
-    channels: string[];
-    targetType: 'all' | 'segment' | 'user_ids';
-    userIds?: string[];
-    segmentCriteria?: Record<string, any>;
-    data?: Record<string, any>;
-  }) {
+  async sendNotification(
+    adminId: string,
+    dto: {
+      title: string;
+      body: string;
+      channels: string[];
+      targetType: "all" | "segment" | "user_ids";
+      userIds?: string[];
+      segmentCriteria?: Record<string, any>;
+      data?: Record<string, any>;
+    },
+  ) {
     let targetUserIds: string[] = [];
 
     try {
-      if (dto.targetType === 'user_ids') {
+      if (dto.targetType === "user_ids") {
         targetUserIds = dto.userIds || [];
-      } else if (dto.targetType === 'all') {
+      } else if (dto.targetType === "all") {
         const users = await this.prisma.user.findMany({
           where: { isBanned: false },
           select: { id: true },
         });
-        targetUserIds = users.map(u => u.id);
-      } else if (dto.targetType === 'segment' && dto.segmentCriteria) {
+        targetUserIds = users.map((u) => u.id);
+      } else if (dto.targetType === "segment" && dto.segmentCriteria) {
         const where: Prisma.UserWhereInput = { isBanned: false };
         if (dto.segmentCriteria.isSeller !== undefined) {
           where.isSeller = dto.segmentCriteria.isSeller;
         }
         if (dto.segmentCriteria.membershipTier) {
-          where.membership = { tier: { type: dto.segmentCriteria.membershipTier as any } };
+          where.membership = {
+            tier: { type: dto.segmentCriteria.membershipTier as any },
+          };
         }
         const users = await this.prisma.user.findMany({
           where,
           select: { id: true },
         });
-        targetUserIds = users.map(u => u.id);
+        targetUserIds = users.map((u) => u.id);
       }
 
       if (targetUserIds.length === 0) {
-        throw new BadRequestException('Hedef kullanıcı bulunamadı');
+        throw new BadRequestException("Hedef kullanıcı bulunamadı");
       }
 
       // Create notification logs - always include in_app for user visibility
@@ -160,26 +167,26 @@ export class AdminNotificationService {
         // Always create an in_app entry so users see it in their notification center
         notificationLogs.push({
           userId,
-          channel: 'in_app',
-          type: 'admin_broadcast',
+          channel: "in_app",
+          type: "admin_broadcast",
           title: dto.title,
           body: dto.body,
           data: dto.data || ({} as any),
-          status: 'sent',
+          status: "sent",
           sentAt: new Date(),
         });
 
         // Create entries for other selected channels (for tracking/audit)
         for (const channel of dto.channels) {
-          if (channel !== 'in_app') {
+          if (channel !== "in_app") {
             notificationLogs.push({
               userId,
               channel,
-              type: 'admin_broadcast',
+              type: "admin_broadcast",
               title: dto.title,
               body: dto.body,
               data: dto.data || ({} as any),
-              status: 'pending',
+              status: "pending",
             });
           }
         }
@@ -195,14 +202,14 @@ export class AdminNotificationService {
       }
 
       // Trigger broadcast events (handles queues for Email/Push and creates In-App logs)
-      // Note: emitAdminBroadcast handles its own In-App log creation to ensure consistency, 
+      // Note: emitAdminBroadcast handles its own In-App log creation to ensure consistency,
       // but we created logs above for consistency with the audit log and historical tracking.
       await this.eventService.emitAdminBroadcast({
         userIds: targetUserIds,
         title: dto.title,
         body: dto.body,
         channels: dto.channels,
-        data: dto.data
+        data: dto.data,
       });
 
       // Update the logs we created to 'sent' status since we just emitted them
@@ -212,30 +219,32 @@ export class AdminNotificationService {
           channel: { in: dto.channels },
           title: dto.title,
           body: dto.body,
-          status: 'pending'
+          status: "pending",
         },
         data: {
-          status: 'sent',
-          sentAt: new Date()
-        }
+          status: "sent",
+          sentAt: new Date(),
+        },
       });
 
       // Log the action
       await this.audit.createAuditLog(
         adminId,
-        'notification_send',
-        'NotificationLog',
-        'bulk',
+        "notification_send",
+        "NotificationLog",
+        "bulk",
         null,
         {
           targetCount: targetUserIds.length,
           channels: dto.channels,
           title: dto.title,
-          targetType: dto.targetType
-        }
+          targetType: dto.targetType,
+        },
       );
 
-      this.logger.log(`Admin ${adminId} sent notification to ${targetUserIds.length} users via ${dto.channels.join(', ')}`);
+      this.logger.log(
+        `Admin ${adminId} sent notification to ${targetUserIds.length} users via ${dto.channels.join(", ")}`,
+      );
 
       return {
         success: true,
@@ -244,27 +253,33 @@ export class AdminNotificationService {
         message: `Bildirim ${targetUserIds.length} kullanıcıya gönderildi`,
       };
     } catch (error) {
-      this.logger.error(`Failed to send notification: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to send notification: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof BadRequestException) throw error;
-      throw new BadRequestException(`Bildirim gönderilemedi: ${error.message}`);
+      throw new BadRequestException("Bildirim gönderilemedi");
     }
   }
 
   /**
    * Schedule a notification
    */
-  async scheduleNotification(adminId: string, dto: {
-    title: string;
-    body: string;
-    channels: string[];
-    targetType: 'all' | 'segment' | 'user_ids';
-    userIds?: string[];
-    segmentCriteria?: Record<string, any>;
-    scheduledFor: string;
-  }) {
+  async scheduleNotification(
+    adminId: string,
+    dto: {
+      title: string;
+      body: string;
+      channels: string[];
+      targetType: "all" | "segment" | "user_ids";
+      userIds?: string[];
+      segmentCriteria?: Record<string, any>;
+      scheduledFor: string;
+    },
+  ) {
     const scheduledDate = new Date(dto.scheduledFor);
     if (scheduledDate <= new Date()) {
-      throw new BadRequestException('Zamanlama tarihi gelecekte olmalıdır');
+      throw new BadRequestException("Zamanlama tarihi gelecekte olmalıdır");
     }
 
     const scheduled = await this.prisma.scheduledNotification.create({
@@ -273,18 +288,28 @@ export class AdminNotificationService {
         body: dto.body,
         channels: dto.channels,
         targetType: dto.targetType,
-        targetData: dto.targetType === 'user_ids'
-          ? (dto.userIds as any)
-          : (dto.segmentCriteria as any) || Prisma.JsonNull,
+        targetData:
+          dto.targetType === "user_ids"
+            ? (dto.userIds as any)
+            : (dto.segmentCriteria as any) || Prisma.JsonNull,
         scheduledFor: scheduledDate,
         createdBy: adminId,
-        status: 'pending',
+        status: "pending",
       },
     });
 
-    await this.audit.createAuditLog(adminId, 'notification_schedule', 'ScheduledNotification', scheduled.id, null, scheduled);
+    await this.audit.createAuditLog(
+      adminId,
+      "notification_schedule",
+      "ScheduledNotification",
+      scheduled.id,
+      null,
+      scheduled,
+    );
 
-    this.logger.log(`Notification scheduled for ${dto.scheduledFor} by admin ${adminId}`);
+    this.logger.log(
+      `Notification scheduled for ${dto.scheduledFor} by admin ${adminId}`,
+    );
 
     return scheduled;
   }
@@ -292,7 +317,11 @@ export class AdminNotificationService {
   /**
    * Get scheduled notifications
    */
-  async getScheduledNotifications(query?: { page?: number; limit?: number; status?: string }) {
+  async getScheduledNotifications(query?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+  }) {
     const { page = 1, limit = 20 } = query || {};
     const where: Prisma.ScheduledNotificationWhereInput = {};
 
@@ -304,7 +333,7 @@ export class AdminNotificationService {
       this.prisma.scheduledNotification.count({ where }),
       this.prisma.scheduledNotification.findMany({
         where,
-        orderBy: { scheduledFor: 'asc' },
+        orderBy: { scheduledFor: "asc" },
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -325,21 +354,29 @@ export class AdminNotificationService {
     });
 
     if (!existing) {
-      throw new NotFoundException('Zamanlanmış bildirim bulunamadı');
+      throw new NotFoundException("Zamanlanmış bildirim bulunamadı");
     }
 
-    if (existing.status !== 'pending') {
-      throw new BadRequestException('Sadece bekleyen bildirimler iptal edilebilir');
+    if (existing.status !== "pending") {
+      throw new BadRequestException(
+        "Sadece bekleyen bildirimler iptal edilebilir",
+      );
     }
 
     const updated = await this.prisma.scheduledNotification.update({
       where: { id: notificationId },
-      data: { status: 'cancelled' },
+      data: { status: "cancelled" },
     });
 
-    await this.audit.createAuditLog(adminId, 'notification_cancel', 'ScheduledNotification', notificationId, existing, updated);
+    await this.audit.createAuditLog(
+      adminId,
+      "notification_cancel",
+      "ScheduledNotification",
+      notificationId,
+      existing,
+      updated,
+    );
 
     return { success: true };
   }
-
 }

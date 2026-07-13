@@ -1,12 +1,13 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../prisma';
-import { PaymentProvider, PayTRCallbackDto } from './dto';
-import { PaymentStatus, OrderStatus } from '@prisma/client';
-import { PayTRService } from '../payment-providers/paytr.service';
-import { PaymentCommonService } from './payment-common.service';
-import { PaymentFulfillmentService } from './payment-fulfillment.service';
-import { PaymentReconciliationService } from './payment-reconciliation.service';
+import { Injectable, NotFoundException, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { PrismaService } from "../../prisma";
+import { PaymentProvider, PayTRCallbackDto } from "./dto";
+import { PaymentStatus, OrderStatus } from "@prisma/client";
+import { PayTRService } from "../payment-providers/paytr.service";
+import { PaymentCommonService } from "./payment-common.service";
+import { PaymentFulfillmentService } from "./payment-fulfillment.service";
+import { PaymentReconciliationService } from "./payment-reconciliation.service";
+import { CacheService } from "../cache/cache.service";
 
 @Injectable()
 export class PaymentCallbackService {
@@ -19,7 +20,33 @@ export class PaymentCallbackService {
     private readonly paymentCommon: PaymentCommonService,
     private readonly paymentFulfillment: PaymentFulfillmentService,
     private readonly paymentReconciliation: PaymentReconciliationService,
+    private readonly cache: CacheService,
   ) {}
+
+  /**
+   * Rate-limit the outbound PayTR durum-sorgu triggered by a hash-mismatch
+   * callback, per merchant_oid (#71). Without this, an attacker who knows a
+   * pending merchant_oid can replay bad-hash callbacks and amplify each one into
+   * an outbound request to PayTR. Returns true when the call is allowed.
+   */
+  private async allowHashMismatchInquiry(
+    merchantOid: string,
+  ): Promise<boolean> {
+    const windowSec = parseInt(
+      this.configService.get("PAYTR_HASH_MISMATCH_WINDOW_SEC") || "60",
+      10,
+    );
+    const maxPerWindow = parseInt(
+      this.configService.get("PAYTR_HASH_MISMATCH_MAX_PER_WINDOW") || "5",
+      10,
+    );
+    const key = `paytr:hashmismatch:${merchantOid}`;
+    const count = await this.cache.incr(key);
+    if (count === 1) {
+      await this.cache.set(key, count, { ttl: windowSec });
+    }
+    return count <= maxPerWindow;
+  }
 
   /**
    * Resolve payment row for PayTR callback (merchant_oid matches providerConversationId, orderId, or token substring).
@@ -58,7 +85,7 @@ export class PaymentCallbackService {
       payment = await this.prisma.payment.findFirst({
         where: {
           metadata: {
-            path: ['merchantOidHistory'],
+            path: ["merchantOidHistory"],
             array_contains: merchantOid,
           },
         },
@@ -82,21 +109,21 @@ export class PaymentCallbackService {
       this.logger.error(
         `PayTR callback invalid hash and no payment row: merchant_oid=${dto.merchant_oid} status=${dto.status}`,
       );
-      throw new NotFoundException('Payment not found');
+      throw new NotFoundException("Payment not found");
     }
 
     if (payment.provider !== PaymentProvider.paytr) {
       this.logger.error(
         `PayTR hash mismatch: payment=${payment.id} provider=${payment.provider} merchant_oid=${dto.merchant_oid}`,
       );
-      return 'OK';
+      return "OK";
     }
 
     if (payment.status !== PaymentStatus.pending) {
       this.logger.error(
         `PayTR hash mismatch: payment=${payment.id} status=${payment.status} merchant_oid=${dto.merchant_oid}`,
       );
-      return 'OK';
+      return "OK";
     }
 
     if (
@@ -107,29 +134,38 @@ export class PaymentCallbackService {
       this.logger.error(
         `PayTR hash mismatch: payment=${payment.id} orderStatus=${payment.order.status} merchant_oid=${dto.merchant_oid}`,
       );
-      return 'OK';
+      return "OK";
     }
 
     const tolerance = parseFloat(
-      this.configService.get('PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL') || '0.05',
+      this.configService.get("PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL") || "0.05",
     );
     const oid =
-      (payment.providerConversationId || dto.merchant_oid || '').trim() ||
+      (payment.providerConversationId || dto.merchant_oid || "").trim() ||
       dto.merchant_oid.trim();
 
+    // Cap the outbound durum-sorgu per merchant_oid so replayed bad-hash
+    // callbacks cannot amplify into unbounded outbound requests (#71).
+    if (!(await this.allowHashMismatchInquiry(dto.merchant_oid))) {
+      this.logger.warn(
+        `PayTR hash mismatch: durum-sorgu rate-limited payment=${payment.id} merchant_oid=${dto.merchant_oid}`,
+      );
+      return "OK";
+    }
+
     let inquiry = await this.paytrService.queryPaymentStatus(oid);
-    if (!inquiry.ok && oid.includes('-')) {
+    if (!inquiry.ok && oid.includes("-")) {
       inquiry = await this.paytrService.queryPaymentStatus(
-        oid.replace(/-/g, ''),
+        oid.replace(/-/g, ""),
       );
     }
 
     if (!inquiry.ok) {
       const fail = inquiry as { ok: false; errNo?: string; errMsg?: string };
       this.logger.error(
-        `PayTR hash mismatch: durum-sorgu failed payment=${payment.id} merchant_oid=${dto.merchant_oid} oid=${oid} err=${fail.errMsg ?? fail.errNo ?? 'unknown'} ourAmount=${Number(payment.amount)}`,
+        `PayTR hash mismatch: durum-sorgu failed payment=${payment.id} merchant_oid=${dto.merchant_oid} oid=${oid} err=${fail.errMsg ?? fail.errNo ?? "unknown"} ourAmount=${Number(payment.amount)}`,
       );
-      return 'OK';
+      return "OK";
     }
 
     const ourAmount = Number(payment.amount);
@@ -137,11 +173,11 @@ export class PaymentCallbackService {
       this.logger.error(
         `PayTR hash mismatch: amount mismatch payment=${payment.id} merchant_oid=${dto.merchant_oid} paytr=${inquiry.paymentTotalTl} ours=${ourAmount}`,
       );
-      return 'OK';
+      return "OK";
     }
 
     const txnRef =
-      inquiry.paymentDate != null && inquiry.paymentDate !== ''
+      inquiry.paymentDate != null && inquiry.paymentDate !== ""
         ? `paytr:${oid}:${inquiry.paymentDate}`
         : `paytr:${oid}`;
 
@@ -154,7 +190,7 @@ export class PaymentCallbackService {
         `PayTR hash mismatch recovered via durum-sorgu payment=${payment.id} merchant_oid=${dto.merchant_oid} dtoStatus=${dto.status}`,
       );
     }
-    return 'OK';
+    return "OK";
   }
 
   /**
@@ -162,20 +198,20 @@ export class PaymentCallbackService {
    * POST /payments/callback/paytr
    */
   async handlePayTRCallback(dto: PayTRCallbackDto) {
-    this.logger.log('PayTR callback received');
+    this.logger.log("PayTR callback received");
 
     // PayTR keeps retrying unless we reply with literal "OK". Always return
     // "OK" — even on bad/missing payloads — and just log the issue.
     if (!dto.merchant_oid || !dto.status || !dto.total_amount || !dto.hash) {
       this.logger.warn(
-        `PayTR callback missing required fields: merchant_oid=${dto.merchant_oid} status=${dto.status} total_amount=${dto.total_amount} hash=${dto.hash ? 'present' : 'missing'}`,
+        `PayTR callback missing required fields: merchant_oid=${dto.merchant_oid} status=${dto.status} total_amount=${dto.total_amount} hash=${dto.hash ? "present" : "missing"}`,
       );
-      return 'OK';
+      return "OK";
     }
 
     const isValid = this.paytrService.verifyCallback({
       merchant_oid: dto.merchant_oid,
-      status: dto.status as 'success' | 'failed',
+      status: dto.status as "success" | "failed",
       total_amount: dto.total_amount,
       hash: dto.hash,
       failed_reason_code: dto.failed_reason_code,
@@ -192,16 +228,16 @@ export class PaymentCallbackService {
       this.logger.warn(
         `PayTR callback: payment not found for merchant_oid=${dto.merchant_oid}`,
       );
-      return 'OK';
+      return "OK";
     }
 
-    if (dto.status === 'success') {
+    if (dto.status === "success") {
       // Y16: Hash geçerli (otantik PayTR) olsa bile tutarı doğrula. PayTR beklenenden
       // farklı bir tutar bildirirse (ör. kısmi capture veya gevşek eşleşme), siparişi
       // YANLIŞ tutarla completed yapmayalım. Tolerans dışıysa logla ve tamamlama —
       // para PayTR'da kalır, sipariş pending kalır ve reconcile/manuel inceleme ele alır.
       const toleranceTl = parseFloat(
-        this.configService.get('PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL') || '0.05',
+        this.configService.get("PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL") || "0.05",
       );
       const expectedKurus = Math.round(Number(payment.amount) * 100);
       const callbackKurus = parseInt(dto.total_amount, 10);
@@ -211,7 +247,7 @@ export class PaymentCallbackService {
             `beklenen ${expectedKurus} kuruş, gelen ${callbackKurus} kuruş — ` +
             `ödeme TAMAMLANMADI, manuel inceleme gerekir`,
         );
-        return 'OK';
+        return "OK";
       }
       await this.paymentFulfillment.processSuccessfulPayment(
         payment,
@@ -234,10 +270,10 @@ export class PaymentCallbackService {
     } else {
       await this.paymentFulfillment.processFailedPayment(
         payment,
-        dto.failed_reason_msg || 'PayTR payment failed',
+        dto.failed_reason_msg || "PayTR payment failed",
       );
     }
 
-    return 'OK';
+    return "OK";
   }
 }

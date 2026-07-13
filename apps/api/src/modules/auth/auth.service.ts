@@ -633,10 +633,11 @@ export class AuthService {
       if (error instanceof UnauthorizedException) {
         throw error;
       }
-      this.logger.error("Login failed");
-      throw new BadRequestException(
-        `Giriş işlemi sırasında bir hata oluştu: ${error instanceof Error ? error.message : String(error)}`,
+      this.logger.error(
+        "Login failed",
+        error instanceof Error ? error.stack : String(error),
       );
+      throw new BadRequestException("Giriş işlemi sırasında bir hata oluştu");
     }
   }
 
@@ -907,9 +908,7 @@ export class AuthService {
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(accessPayload, {
-        secret:
-          this.configService.get<string>("ADMIN_JWT_SECRET") ||
-          this.configService.get<string>("JWT_SECRET"),
+        secret: this.configService.getOrThrow<string>("ADMIN_JWT_SECRET"),
         expiresIn:
           this.configService.get<string>("ADMIN_JWT_EXPIRES_IN") || "15m",
       }),
