@@ -195,6 +195,11 @@ export function useSearch() {
     },
     getNextPageParam: (last) =>
       last.meta.page < last.meta.totalPages ? last.meta.page + 1 : undefined,
+    // Bound resident pages (#76): image-heavy feed — react-query trims trailing
+    // pages past this window instead of holding every scrolled page for gcTime.
+    maxPages: 5,
+    getPreviousPageParam: (first) =>
+      first.meta.page > 1 ? first.meta.page - 1 : undefined,
   });
 
   const products: any[] = useMemo(

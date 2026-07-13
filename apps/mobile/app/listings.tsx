@@ -98,6 +98,10 @@ export default function ListingsScreen() {
     },
     getNextPageParam: (last) =>
       last.meta.page < last.meta.totalPages ? last.meta.page + 1 : undefined,
+    // Bound resident pages (#76) — image-heavy list, trim trailing pages.
+    maxPages: 5,
+    getPreviousPageParam: (first) =>
+      first.meta.page > 1 ? first.meta.page - 1 : undefined,
   });
 
   const listings: any[] = useMemo(
