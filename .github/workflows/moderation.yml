@@ -40,8 +40,8 @@ jobs:
       run:
         working-directory: services/ai-moderation
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
       - name: Install ruff
@@ -61,7 +61,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Deploy moderation to Coolify (staging) and wait
         uses: ./.github/actions/coolify-deploy
         with:
@@ -81,7 +81,7 @@ jobs:
     # The `production` environment has required reviewers => manual approval gate.
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Deploy moderation to Coolify (production) and wait
         uses: ./.github/actions/coolify-deploy
         with:

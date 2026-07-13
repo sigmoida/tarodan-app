@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # Triggers the deploy AND waits for the result — a failed Coolify deploy
       # fails this job, so it shows up as a failed check + GitHub failure email.
       - name: Deploy to Coolify (staging) and wait
