@@ -495,6 +495,13 @@ jobs:
 
   secret-scan:
     name: Secret Scan
+    # gitleaks-action requires a paid license for org-owned repos, passed via
+    # the GITLEAKS_LICENSE secret. Dependabot-triggered runs execute with a
+    # restricted context that cannot read repo secrets, so the action dies with
+    # "missing gitleaks license" before it even scans the diff — a false red on
+    # every Dependabot PR. Skip the scan for Dependabot; its bumps touch only
+    # manifests/lockfiles, and human PRs still get scanned normally.
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
