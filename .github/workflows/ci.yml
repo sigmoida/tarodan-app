@@ -60,7 +60,7 @@ jobs:
       - name: Lint (affected on PR, all on push)
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            pnpm lint -- "--filter=...[${{ github.event.pull_request.base.sha }}]"
+            pnpm turbo run lint "--filter=...[${{ github.event.pull_request.base.sha }}]"
           else
             pnpm lint
           fi
@@ -76,7 +76,7 @@ jobs:
       - name: Type Check (affected on PR, all on push)
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            pnpm typecheck -- "--filter=...[${{ github.event.pull_request.base.sha }}]"
+            pnpm turbo run typecheck "--filter=...[${{ github.event.pull_request.base.sha }}]"
           else
             pnpm typecheck
           fi
@@ -92,7 +92,7 @@ jobs:
       - name: Build (affected on PR, all on push)
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            pnpm build -- "--filter=...[${{ github.event.pull_request.base.sha }}]"
+            pnpm turbo run build "--filter=...[${{ github.event.pull_request.base.sha }}]"
           else
             pnpm build
           fi
