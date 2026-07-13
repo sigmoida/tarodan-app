@@ -2,9 +2,11 @@
 
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
+import { useWebList } from "@/hooks/useWebResource";
 import type { Trade } from "../_lib/types";
+
+const RESOURCE = "trades";
 
 const SHIPPED_STATUSES = [
   "initiator_shipped",
@@ -17,9 +19,10 @@ const SHIPPED_STATUSES = [
  * statuses so it's grouped client-side. Replaces the page's inline `useQuery`.
  */
 export function useTrades(statusFilter: string | null, enabled: boolean) {
-  const query = useQuery({
-    queryKey: ["trades", statusFilter],
-    queryFn: async (): Promise<Trade[]> => {
+  const query = useWebList<Trade[]>({
+    resource: RESOURCE,
+    params: statusFilter,
+    fetcher: async () => {
       const params: Record<string, string> = { pageSize: "100" };
       if (statusFilter && statusFilter !== "shipped") {
         params.status = statusFilter;
@@ -32,7 +35,7 @@ export function useTrades(statusFilter: string | null, enabled: boolean) {
       return trades;
     },
     enabled,
-    meta: { page: "trades" },
+    query: { meta: { page: "trades" } },
   });
 
   return { trades: query.data ?? [], isLoading: query.isLoading };

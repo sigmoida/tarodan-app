@@ -1,67 +1,59 @@
 /** @format */
 
-'use client';
+"use client";
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
-import { bankAccountApi } from '@/lib/api';
-import { normalizeIban } from '../_lib/iban';
-import type { BankAccountValues } from '../_lib/schemas';
+import { bankAccountApi } from "@/lib/api";
+import { useWebList } from "@/hooks/useWebResource";
+import { useWebMutation } from "@/hooks/useWebMutation";
+import { normalizeIban } from "../_lib/iban";
+import type { BankAccountValues } from "../_lib/schemas";
 
 export interface BankAccount {
-	id: string;
-	accountHolder: string;
-	iban: string;
-	tcKimlikNo?: string | null;
-	taxId?: string | null;
-	isVerified: boolean;
+  id: string;
+  accountHolder: string;
+  iban: string;
+  tcKimlikNo?: string | null;
+  taxId?: string | null;
+  isVerified: boolean;
 }
 
-const KEY = ['bank-account'];
+const RESOURCE = "bank-account";
 
 export function useBankAccount(enabled: boolean) {
-	const query = useQuery({
-		queryKey: KEY,
-		queryFn: async (): Promise<BankAccount | null> => {
-			const res = await bankAccountApi.get();
-			return res.data || null;
-		},
-		enabled,
-		meta: { page: 'bank-account' },
-	});
-	return { account: query.data ?? null, isLoading: query.isLoading };
+  const query = useWebList<BankAccount | null>({
+    resource: RESOURCE,
+    fetcher: async () => {
+      const res = await bankAccountApi.get();
+      return res.data || null;
+    },
+    enabled,
+    query: { meta: { page: "bank-account" } },
+  });
+  return { account: query.data ?? null, isLoading: query.isLoading };
 }
 
 export function useSaveBankAccount() {
-	const queryClient = useQueryClient();
-	return useMutation({
-		mutationFn: async (values: BankAccountValues) => {
-			await bankAccountApi.upsert({
-				accountHolder: values.accountHolder.trim(),
-				iban: normalizeIban(values.iban),
-				...(values.tcKimlikNo ? { tcKimlikNo: values.tcKimlikNo } : {}),
-				...(values.taxId ? { taxId: values.taxId } : {}),
-			});
-		},
-		onSuccess: async () => {
-			toast.success('Banka hesabı kaydedildi');
-			await queryClient.invalidateQueries({ queryKey: KEY });
-		},
-		onError: (err: any) => {
-			const msg = err?.response?.data?.message || 'Kaydetme başarısız';
-			toast.error(Array.isArray(msg) ? msg[0] : msg);
-		},
-	});
+  return useWebMutation(
+    async (values: BankAccountValues) => {
+      await bankAccountApi.upsert({
+        accountHolder: values.accountHolder.trim(),
+        iban: normalizeIban(values.iban),
+        ...(values.tcKimlikNo ? { tcKimlikNo: values.tcKimlikNo } : {}),
+        ...(values.taxId ? { taxId: values.taxId } : {}),
+      });
+    },
+    {
+      invalidates: [RESOURCE],
+      successMessage: "Banka hesabı kaydedildi",
+      errorMessage: "Kaydetme başarısız",
+    },
+  );
 }
 
 export function useDeleteBankAccount() {
-	const queryClient = useQueryClient();
-	return useMutation({
-		mutationFn: () => bankAccountApi.delete(),
-		onSuccess: async () => {
-			toast.success('Banka hesabı silindi');
-			await queryClient.invalidateQueries({ queryKey: KEY });
-		},
-		onError: (err: any) => toast.error(err?.response?.data?.message || 'Silme başarısız'),
-	});
+  return useWebMutation(() => bankAccountApi.delete(), {
+    invalidates: [RESOURCE],
+    successMessage: "Banka hesabı silindi",
+    errorMessage: "Silme başarısız",
+  });
 }

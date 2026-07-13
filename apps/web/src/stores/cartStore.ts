@@ -1,7 +1,7 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import { hasAuthMarker } from "@/lib/authMarker";
+import { cartApi, listingsApi } from "@/lib/api";
 
 // Cart item from backend API
 interface CartItem {
@@ -74,32 +74,60 @@ interface LegacyCartItem {
   };
 }
 
+/** Pull a human message off an axios error (message may be a string or array). */
+function cartErrorMessage(error: unknown, fallback: string): string {
+  const msg = (error as { response?: { data?: { message?: unknown } } })
+    ?.response?.data?.message;
+  if (Array.isArray(msg)) return msg.join(", ");
+  if (typeof msg === "string") return msg;
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+}
+
+/** Apply a fresh backend cart calculation to the store. */
+function calcState(data: CartResponse) {
+  const calc = data.calculation;
+  return {
+    cart: data,
+    items: calc.items,
+    subtotal: calc.subtotal,
+    totalDiscount: calc.totalDiscount,
+    shippingCost: calc.shippingCost,
+    grandTotal: calc.grandTotal,
+    itemCount: calc.itemCount,
+    appliedCouponCode: calc.appliedCouponCode || null,
+    appliedDiscounts: calc.appliedDiscounts,
+    warnings: calc.warnings,
+    isLoading: false,
+  };
+}
+
 interface CartState {
   // Main cart data
   cart: CartResponse | null;
   items: CartItem[];
-  
+
   // Calculated totals
   subtotal: number;
   totalDiscount: number;
   shippingCost: number;
   grandTotal: number;
   itemCount: number;
-  
+
   // Coupon state
   appliedCouponCode: string | null;
   appliedDiscounts: AppliedDiscount[];
-  
+
   // UI states
   isLoading: boolean;
   error: string | null;
   warnings: string[];
-  
+
   // Giriş durumu işaretçisi (authStore set eder). Gerçek token DEĞİL; sadece "girişli mi"
-  // bilgisi — auth artık httpOnly cookie ile taşınır, sepet fetch'leri credentials:'include' kullanır.
+  // bilgisi — auth artık httpOnly cookie ile taşınır, sepet çağrıları `/gateway` proxy'sinden geçer.
   authToken: string | null;
   setAuthToken: (token: string | null) => void;
-  
+
   // API methods
   fetchCart: () => Promise<void>;
   addToCart: (productId: string, quantity?: number) => Promise<void>;
@@ -108,16 +136,23 @@ interface CartState {
   applyCoupon: (code: string) => Promise<{ success: boolean; error?: string }>;
   removeCoupon: () => Promise<void>;
   clearCart: () => Promise<void>;
-  
+
   // Legacy method for backwards compatibility
-  addToCartLegacy: (item: Omit<LegacyCartItem, 'id' | 'quantity'>) => Promise<void>;
-  
+  addToCartLegacy: (
+    item: Omit<LegacyCartItem, "id" | "quantity">,
+  ) => Promise<void>;
+
   // Offline fallback (when not logged in)
   offlineItems: LegacyCartItem[];
-  addToOfflineCart: (item: Omit<LegacyCartItem, 'id' | 'quantity'>) => void;
+  addToOfflineCart: (item: Omit<LegacyCartItem, "id" | "quantity">) => void;
   removeFromOfflineCart: (productId: string) => void;
   clearOfflineCart: () => void;
   syncOfflineCart: () => Promise<void>;
+}
+
+/** "Am I logged in?" — the store flag if set, else the server-owned marker cookie. */
+function isAuthed(authToken: string | null): boolean {
+  return !!(authToken ?? (hasAuthMarker() ? "1" : null));
 }
 
 export const useCartStore = create<CartState>()(
@@ -137,166 +172,125 @@ export const useCartStore = create<CartState>()(
       warnings: [],
       authToken: null,
       offlineItems: [],
-      
+
       setAuthToken: (token) => {
         set({ authToken: token });
         if (token) {
-          get().syncOfflineCart().then(() => get().fetchCart());
+          get()
+            .syncOfflineCart()
+            .then(() => get().fetchCart());
         }
       },
-      
+
       fetchCart: async () => {
-        const token = get().authToken ?? (typeof window !== 'undefined' && localStorage.getItem('tarodan_authed') === '1' ? '1' : null);
-        if (!token) {
+        if (!isAuthed(get().authToken)) {
           // Use offline cart
           const offlineItems = get().offlineItems;
-          const total = offlineItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-          const itemCount = offlineItems.reduce((sum, item) => sum + item.quantity, 0);
-          set({ 
-            subtotal: total, 
-            grandTotal: total, 
+          const total = offlineItems.reduce(
+            (sum, item) => sum + item.price * item.quantity,
+            0,
+          );
+          const itemCount = offlineItems.reduce(
+            (sum, item) => sum + item.quantity,
+            0,
+          );
+          set({
+            subtotal: total,
+            grandTotal: total,
             itemCount,
             shippingCost: total >= 500 ? 0 : 29.99,
           });
           return;
         }
-        
+
         set({ isLoading: true, error: null });
-        
+
         try {
-          const response = await fetch(`${API_URL}/api/cart`, {
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          });
-          
-          if (!response.ok) {
-            throw new Error('Sepet yüklenirken hata oluştu');
-          }
-          
-          const data: CartResponse = await response.json();
-          const calc = data.calculation;
-          
-          set({
-            cart: data,
-            items: calc.items,
-            subtotal: calc.subtotal,
-            totalDiscount: calc.totalDiscount,
-            shippingCost: calc.shippingCost,
-            grandTotal: calc.grandTotal,
-            itemCount: calc.itemCount,
-            appliedCouponCode: calc.appliedCouponCode || null,
-            appliedDiscounts: calc.appliedDiscounts,
-            warnings: calc.warnings,
-            isLoading: false,
-          });
+          const { data } = await cartApi.get();
+          set(calcState(data as CartResponse));
         } catch (error) {
-          set({ 
-            isLoading: false, 
-            error: error instanceof Error ? error.message : 'Hata oluştu',
+          set({
+            isLoading: false,
+            error: cartErrorMessage(error, "Sepet yüklenirken hata oluştu"),
           });
         }
       },
-      
+
       addToCart: async (productId, quantity = 1) => {
-        const id = typeof productId === 'string' ? productId : (productId as any)?.productId;
+        const id =
+          typeof productId === "string"
+            ? productId
+            : (productId as any)?.productId;
         if (!id) {
-          console.warn('addToCart: productId is required');
+          console.warn("addToCart: productId is required");
           return;
         }
-        const token = get().authToken ?? (typeof window !== 'undefined' && localStorage.getItem('tarodan_authed') === '1' ? '1' : null);
-        
-        if (!token) {
+
+        if (!isAuthed(get().authToken)) {
           set({ isLoading: true, error: null });
           try {
-            const res = await fetch(`${API_URL}/api/products/${id}`);
-            if (!res.ok) throw new Error('Ürün bilgisi alınamadı');
-            const product = await res.json();
-            
+            const { data: product } = await listingsApi.getOne(id);
+
             get().addToOfflineCart({
               productId: product.id,
               title: product.title,
               price: product.salePrice ?? product.price,
-              imageUrl: product.images?.[0]?.cardUrl ?? product.images?.[0]?.detailUrl ?? product.images?.[0]?.url ?? product.imageUrl ?? '',
+              imageUrl:
+                product.images?.[0]?.cardUrl ??
+                product.images?.[0]?.detailUrl ??
+                product.images?.[0]?.url ??
+                product.imageUrl ??
+                "",
               seller: {
-                id: product.sellerId || product.seller?.id || '',
-                displayName: product.sellerName || product.seller?.displayName || product.seller?.name || 'Satıcı',
+                id: product.sellerId || product.seller?.id || "",
+                displayName:
+                  product.sellerName ||
+                  product.seller?.displayName ||
+                  product.seller?.name ||
+                  "Satıcı",
               },
             });
             set({ isLoading: false });
           } catch (error) {
             set({
               isLoading: false,
-              error: error instanceof Error ? error.message : 'Hata oluştu',
+              error: cartErrorMessage(error, "Ürün bilgisi alınamadı"),
             });
           }
           return;
         }
-        
+
         set({ isLoading: true, error: null });
-        
+
         try {
-          const response = await fetch(`${API_URL}/api/cart/items`, {
-            method: 'POST',
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ productId: id, quantity }),
-          });
-          
-          if (!response.ok) {
-            let errorData: { message?: string | string[] } = {};
-            try {
-              errorData = await response.json();
-            } catch {
-              /* ignore */
-            }
-            const raw = errorData.message;
-            const text = Array.isArray(raw)
-              ? raw.join(', ')
-              : typeof raw === 'string'
-                ? raw
-                : `Sepete eklenirken hata oluştu (${response.status})`;
-            throw new Error(text);
-          }
-          
-          const data: CartResponse = await response.json();
-          const calc = data.calculation;
-          
-          set({
-            cart: data,
-            items: calc.items,
-            subtotal: calc.subtotal,
-            totalDiscount: calc.totalDiscount,
-            shippingCost: calc.shippingCost,
-            grandTotal: calc.grandTotal,
-            itemCount: calc.itemCount,
-            appliedCouponCode: calc.appliedCouponCode || null,
-            appliedDiscounts: calc.appliedDiscounts,
-            warnings: calc.warnings,
-            isLoading: false,
-          });
+          const { data } = await cartApi.addItem(id, quantity);
+          set(calcState(data as CartResponse));
         } catch (error) {
-          set({ 
-            isLoading: false, 
-            error: error instanceof Error ? error.message : 'Hata oluştu',
-          });
-          throw error;
+          const status = (error as { response?: { status?: number } })?.response
+            ?.status;
+          const message = cartErrorMessage(
+            error,
+            `Sepete eklenirken hata oluştu (${status ?? ""})`,
+          );
+          set({ isLoading: false, error: message });
+          throw new Error(message);
         }
       },
-      
+
       removeFromCart: async (productId) => {
-        const token = get().authToken ?? (typeof window !== 'undefined' && localStorage.getItem('tarodan_authed') === '1' ? '1' : null);
-        
-        const id = typeof productId === 'string' ? productId : (productId as any)?.productId;
+        const id =
+          typeof productId === "string"
+            ? productId
+            : (productId as any)?.productId;
         if (!id) return;
-        
-        if (!token) {
+
+        if (!isAuthed(get().authToken)) {
           const offlineItems = get().offlineItems;
-          const newItems = offlineItems.filter(i => i.productId !== id);
-          const total = newItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+          const newItems = offlineItems.filter((i) => i.productId !== id);
+          const total = newItems.reduce(
+            (sum, i) => sum + i.price * i.quantity,
+            0,
+          );
           const itemCount = newItems.reduce((sum, i) => sum + i.quantity, 0);
           set({
             offlineItems: newItems,
@@ -307,39 +301,16 @@ export const useCartStore = create<CartState>()(
           });
           return;
         }
-        
+
         set({ isLoading: true, error: null });
-        
+
         try {
-          const response = await fetch(`${API_URL}/api/cart/items/${id}`, {
-            method: 'DELETE',
-            credentials: 'include',
-          });
-          
-          if (!response.ok) {
-            throw new Error('Ürün kaldırılırken hata oluştu');
-          }
-          
-          const data: CartResponse = await response.json();
-          const calc = data.calculation;
-          
-          set({
-            cart: data,
-            items: calc.items,
-            subtotal: calc.subtotal,
-            totalDiscount: calc.totalDiscount,
-            shippingCost: calc.shippingCost,
-            grandTotal: calc.grandTotal,
-            itemCount: calc.itemCount,
-            appliedCouponCode: calc.appliedCouponCode || null,
-            appliedDiscounts: calc.appliedDiscounts,
-            warnings: calc.warnings,
-            isLoading: false,
-          });
+          const { data } = await cartApi.removeItem(id);
+          set(calcState(data as CartResponse));
         } catch (error) {
           set({
             isLoading: false,
-            error: error instanceof Error ? error.message : 'Hata oluştu',
+            error: cartErrorMessage(error, "Ürün kaldırılırken hata oluştu"),
           });
         }
       },
@@ -347,157 +318,70 @@ export const useCartStore = create<CartState>()(
       // NOT: updateQuantity, addToCart'ın aksine hatayı YENİDEN FIRLATIR — sepet
       // sayfasındaki stepper backend'in adet/stok reddini toast ile gösterebilsin diye.
       updateQuantity: async (productId, quantity) => {
-        const token = get().authToken ?? (typeof window !== 'undefined' && localStorage.getItem('tarodan_authed') === '1' ? '1' : null);
-        if (!token) return;
-        
+        if (!isAuthed(get().authToken)) return;
+
         set({ isLoading: true, error: null });
-        
+
         try {
-          const response = await fetch(`${API_URL}/api/cart/items/${productId}`, {
-            method: 'PATCH',
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ quantity }),
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'Miktar güncellenirken hata oluştu');
-          }
-          
-          const data: CartResponse = await response.json();
-          const calc = data.calculation;
-          
-          set({
-            cart: data,
-            items: calc.items,
-            subtotal: calc.subtotal,
-            totalDiscount: calc.totalDiscount,
-            shippingCost: calc.shippingCost,
-            grandTotal: calc.grandTotal,
-            itemCount: calc.itemCount,
-            appliedCouponCode: calc.appliedCouponCode || null,
-            appliedDiscounts: calc.appliedDiscounts,
-            warnings: calc.warnings,
-            isLoading: false,
-          });
+          const { data } = await cartApi.updateItem(productId, quantity);
+          set(calcState(data as CartResponse));
         } catch (error) {
-          set({
-            isLoading: false,
-            error: error instanceof Error ? error.message : 'Hata oluştu',
-          });
-          throw error;
+          const message = cartErrorMessage(
+            error,
+            "Miktar güncellenirken hata oluştu",
+          );
+          set({ isLoading: false, error: message });
+          throw new Error(message);
         }
       },
 
       applyCoupon: async (code) => {
-        const token = get().authToken ?? (typeof window !== 'undefined' && localStorage.getItem('tarodan_authed') === '1' ? '1' : null);
-        if (!token) {
-          return { success: false, error: 'Giriş yapmanız gerekiyor' };
+        if (!isAuthed(get().authToken)) {
+          return { success: false, error: "Giriş yapmanız gerekiyor" };
         }
-        
+
         set({ isLoading: true, error: null });
-        
+
         try {
-          const response = await fetch(`${API_URL}/api/cart/coupon`, {
-            method: 'POST',
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ code }),
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json();
-            set({ isLoading: false });
-            return { success: false, error: errorData.message || 'Kupon uygulanamadı' };
-          }
-          
-          const data: CartResponse = await response.json();
-          const calc = data.calculation;
-          
-          set({
-            cart: data,
-            items: calc.items,
-            subtotal: calc.subtotal,
-            totalDiscount: calc.totalDiscount,
-            shippingCost: calc.shippingCost,
-            grandTotal: calc.grandTotal,
-            itemCount: calc.itemCount,
-            appliedCouponCode: calc.appliedCouponCode || null,
-            appliedDiscounts: calc.appliedDiscounts,
-            warnings: calc.warnings,
-            isLoading: false,
-          });
-          
+          const { data } = await cartApi.applyCoupon(code);
+          set(calcState(data as CartResponse));
           return { success: true };
         } catch (error) {
           set({ isLoading: false });
-          return { 
-            success: false, 
-            error: error instanceof Error ? error.message : 'Hata oluştu',
+          return {
+            success: false,
+            error: cartErrorMessage(error, "Kupon uygulanamadı"),
           };
         }
       },
-      
+
       removeCoupon: async () => {
-        const { authToken } = get();
-        if (!authToken) return;
-        
+        if (!isAuthed(get().authToken)) return;
+
         set({ isLoading: true, error: null });
-        
+
         try {
-          const response = await fetch(`${API_URL}/api/cart/coupon`, {
-            method: 'DELETE',
-            credentials: 'include',
-          });
-          
-          if (!response.ok) {
-            throw new Error('Kupon kaldırılırken hata oluştu');
-          }
-          
-          const data: CartResponse = await response.json();
-          const calc = data.calculation;
-          
-          set({
-            cart: data,
-            items: calc.items,
-            subtotal: calc.subtotal,
-            totalDiscount: calc.totalDiscount,
-            shippingCost: calc.shippingCost,
-            grandTotal: calc.grandTotal,
-            itemCount: calc.itemCount,
-            appliedCouponCode: null,
-            appliedDiscounts: calc.appliedDiscounts,
-            warnings: calc.warnings,
-            isLoading: false,
-          });
+          const { data } = await cartApi.removeCoupon();
+          set({ ...calcState(data as CartResponse), appliedCouponCode: null });
         } catch (error) {
-          set({ 
-            isLoading: false, 
-            error: error instanceof Error ? error.message : 'Hata oluştu',
+          set({
+            isLoading: false,
+            error: cartErrorMessage(error, "Kupon kaldırılırken hata oluştu"),
           });
         }
       },
-      
+
       clearCart: async () => {
-        const token = get().authToken ?? (typeof window !== 'undefined' && localStorage.getItem('tarodan_authed') === '1' ? '1' : null);
-        if (!token) {
+        if (!isAuthed(get().authToken)) {
           set({ offlineItems: [], subtotal: 0, grandTotal: 0, itemCount: 0 });
           return;
         }
-        
+
         set({ isLoading: true, error: null });
-        
+
         try {
-          await fetch(`${API_URL}/api/cart`, {
-            method: 'DELETE',
-            credentials: 'include',
-          });
-          
+          await cartApi.clear();
+
           set({
             cart: null,
             items: [],
@@ -512,32 +396,33 @@ export const useCartStore = create<CartState>()(
             isLoading: false,
           });
         } catch (error) {
-          set({ 
-            isLoading: false, 
-            error: error instanceof Error ? error.message : 'Hata oluştu',
+          set({
+            isLoading: false,
+            error: cartErrorMessage(error, "Sepet temizlenirken hata oluştu"),
           });
         }
       },
-      
+
       // Legacy method for backwards compatibility
       addToCartLegacy: async (item) => {
-        const { authToken } = get();
-        if (authToken) {
+        if (isAuthed(get().authToken)) {
           await get().addToCart(item.productId);
         } else {
           get().addToOfflineCart(item);
         }
       },
-      
+
       // Offline cart methods
       addToOfflineCart: (item) => {
         const offlineItems = get().offlineItems;
-        const existingIndex = offlineItems.findIndex(i => i.productId === item.productId);
-        
+        const existingIndex = offlineItems.findIndex(
+          (i) => i.productId === item.productId,
+        );
+
         let newItems: LegacyCartItem[];
         if (existingIndex >= 0) {
-          newItems = offlineItems.map((i, idx) => 
-            idx === existingIndex ? { ...i, quantity: i.quantity + 1 } : i
+          newItems = offlineItems.map((i, idx) =>
+            idx === existingIndex ? { ...i, quantity: i.quantity + 1 } : i,
           );
         } else {
           const newItem: LegacyCartItem = {
@@ -547,24 +432,32 @@ export const useCartStore = create<CartState>()(
           };
           newItems = [...offlineItems, newItem];
         }
-        
-        const total = newItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+
+        const total = newItems.reduce(
+          (sum, i) => sum + i.price * i.quantity,
+          0,
+        );
         const itemCount = newItems.reduce((sum, i) => sum + i.quantity, 0);
-        
-        set({ 
-          offlineItems: newItems, 
-          subtotal: total, 
+
+        set({
+          offlineItems: newItems,
+          subtotal: total,
           grandTotal: total + (total >= 500 ? 0 : 29.99),
           itemCount,
           shippingCost: total >= 500 ? 0 : 29.99,
         });
       },
-      
+
       removeFromOfflineCart: (productId) => {
-        const newItems = get().offlineItems.filter((i) => i.productId !== productId);
-        const total = newItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+        const newItems = get().offlineItems.filter(
+          (i) => i.productId !== productId,
+        );
+        const total = newItems.reduce(
+          (sum, i) => sum + i.price * i.quantity,
+          0,
+        );
         const itemCount = newItems.reduce((sum, i) => sum + i.quantity, 0);
-        const shipping = newItems.length === 0 ? 0 : (total >= 500 ? 0 : 29.99);
+        const shipping = newItems.length === 0 ? 0 : total >= 500 ? 0 : 29.99;
         set({
           offlineItems: newItems,
           subtotal: total,
@@ -575,29 +468,34 @@ export const useCartStore = create<CartState>()(
       },
 
       clearOfflineCart: () => {
-        set({ offlineItems: [], subtotal: 0, grandTotal: 0, itemCount: 0, shippingCost: 0 });
+        set({
+          offlineItems: [],
+          subtotal: 0,
+          grandTotal: 0,
+          itemCount: 0,
+          shippingCost: 0,
+        });
       },
-      
+
       syncOfflineCart: async () => {
-        const token = get().authToken ?? (typeof window !== 'undefined' && localStorage.getItem('tarodan_authed') === '1' ? '1' : null);
         const { offlineItems } = get();
-        if (!token || offlineItems.length === 0) return;
-        
+        if (!isAuthed(get().authToken) || offlineItems.length === 0) return;
+
         // Add each offline item to backend cart
         for (const item of offlineItems) {
           try {
             await get().addToCart(item.productId, item.quantity);
           } catch (error) {
-            console.error('Failed to sync item:', item.productId, error);
+            console.error("Failed to sync item:", item.productId, error);
           }
         }
-        
+
         // Clear offline cart after sync
         set({ offlineItems: [] });
       },
     }),
     {
-      name: 'cart-storage',
+      name: "cart-storage",
       // authToken'ı KALICI yapma — hassas olmasa da girişli durumu authStore bootstrap'ı belirler.
       // itemCount'u kalıcı yap: sayfa yenilemede fetchCart() tamamlanana kadar
       // rozet "0"/boş görünmesin (son bilinen değer anında gösterilir, sonra senkronlanır).
@@ -605,8 +503,8 @@ export const useCartStore = create<CartState>()(
         offlineItems: state.offlineItems,
         itemCount: state.itemCount,
       }),
-    }
-  )
+    },
+  ),
 );
 
 // Export for backwards compatibility

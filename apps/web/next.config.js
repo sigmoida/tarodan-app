@@ -23,6 +23,26 @@ function getCacheHeaders() {
   ];
 }
 
+/**
+ * App-level security headers, applied to every route so they travel with the app
+ * regardless of the reverse proxy. NOTE: no Content-Security-Policy here on
+ * purpose — a real CSP for this app (Google OAuth, Sentry, S3 images, inline
+ * styles) needs nonces + a report-only rollout and is tracked separately.
+ */
+const SECURITY_HEADERS = [
+  { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  {
+    key: 'Strict-Transport-Security',
+    value: 'max-age=63072000; includeSubDomains; preload',
+  },
+  {
+    key: 'Permissions-Policy',
+    value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()',
+  },
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // standalone yalnızca prod build için; Next 14.2 dev-server'ı bu monorepo'da
@@ -58,7 +78,7 @@ const nextConfig = {
     missingSuspenseWithCSRBailout: false,
   },
   async headers() {
-    return getCacheHeaders();
+    return [{ source: '/(.*)', headers: SECURITY_HEADERS }, ...getCacheHeaders()];
   },
   images: {
     remotePatterns: [

@@ -1,30 +1,28 @@
 /** @format */
 
-'use client';
+"use client";
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
-import { membershipApi, type SavedCard } from '@/lib/api';
+import { membershipApi, type SavedCard } from "@/lib/api";
+import { useWebList } from "@/hooks/useWebResource";
+import { useWebMutation } from "@/hooks/useWebMutation";
+
+const RESOURCE = "saved-cards";
 
 /** The user's saved cards (PayTR vault). */
 export function useSavedCards(enabled: boolean) {
-	const query = useQuery({
-		queryKey: ['saved-cards'],
-		queryFn: async (): Promise<SavedCard[]> => (await membershipApi.listCards()).data,
-		enabled,
-	});
-	return { cards: query.data ?? [], isLoading: query.isLoading };
+  const query = useWebList<SavedCard[]>({
+    resource: RESOURCE,
+    fetcher: async () => (await membershipApi.listCards()).data,
+    enabled,
+  });
+  return { cards: query.data ?? [], isLoading: query.isLoading };
 }
 
 /** Delete a saved card — owns toast + invalidation. */
 export function useDeleteCard() {
-	const queryClient = useQueryClient();
-	return useMutation({
-		mutationFn: (cardId: string) => membershipApi.deleteCard(cardId),
-		onSuccess: () => {
-			toast.success('Kart silindi');
-			queryClient.invalidateQueries({ queryKey: ['saved-cards'] });
-		},
-		onError: (e: any) => toast.error(e?.response?.data?.message || 'Kart silinemedi'),
-	});
+  return useWebMutation((cardId: string) => membershipApi.deleteCard(cardId), {
+    invalidates: [RESOURCE],
+    successMessage: "Kart silindi",
+    errorMessage: "Kart silinemedi",
+  });
 }
