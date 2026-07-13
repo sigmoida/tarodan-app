@@ -19,6 +19,9 @@ on:
     workflows: [CI]
     types: [completed]
     branches: [development]
+  # Manual trigger — deploy staging on demand (also used to test the Coolify
+  # webhook in isolation without waiting for a development merge + CI run).
+  workflow_dispatch:
 
 concurrency:
   group: deploy-staging
@@ -27,8 +30,8 @@ concurrency:
 jobs:
   deploy:
     name: Trigger Coolify (staging)
-    # Only deploy if CI finished GREEN. Failed/cancelled -> never triggers.
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    # Manual dispatch, or development CI finished GREEN. Failed/cancelled CI -> never triggers.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
