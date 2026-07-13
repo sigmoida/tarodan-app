@@ -76,8 +76,45 @@ jobs:
       - uses: ./.github/actions/setup-workspace
       - run: pnpm --filter @tarodan/api test
 
+  # Single required PR check (#119). Aggregates the fast jobs so branch protection
+  # points at ONE stable context: heavy E2E can move off the PR gate and (later)
+  # affected-filtering can skip unchanged jobs without breaking a required check.
+  # 'skipped' counts as pass (a skipped fast job means "nothing to run here");
+  # only 'failure'/'cancelled' fail the gate.
+  ci-gate:
+    name: CI Gate
+    runs-on: ubuntu-latest
+    if: ${{ always() }}
+    needs: [lint, type-check, build, unit-test]
+    steps:
+      - name: Require fast checks to pass
+        run: |
+          fail=0
+          for pair in \
+            "Lint=${{ needs.lint.result }}" \
+            "TypeCheck=${{ needs.type-check.result }}" \
+            "Build=${{ needs.build.result }}" \
+            "UnitTests=${{ needs.unit-test.result }}"; do
+            name="${pair%%=*}"; result="${pair#*=}"
+            if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
+              echo "::error::$name = $result"
+              fail=1
+            else
+              echo "$name = $result"
+            fi
+          done
+          if [ "$fail" -ne 0 ]; then
+            echo "CI Gate failed: a required fast check did not pass."
+            exit 1
+          fi
+          echo "CI Gate passed."
+
   e2e-test:
     name: E2E Tests
+    # Heavy E2E moved OFF the PR gate (#119): runs on push to development/master
+    # (per-merge validation) and manual dispatch, but NOT on pull_request. A red
+    # result on a development push is attributable to that single merge.
+    if: ${{ github.event_name != 'pull_request' }}
     needs: [type-check, build]
     runs-on: ubuntu-latest
 
@@ -142,6 +179,9 @@ jobs:
 
   e2e-scenarios-smoke:
     name: E2E Scenarios — P0 Smoke (PR gate)
+    # Moved OFF the PR gate (#119): runs on push to development/master and manual
+    # dispatch, not on pull_request. PRs are gated by the fast checks via CI Gate.
+    if: ${{ github.event_name != 'pull_request' }}
     needs: [type-check, build]
     runs-on: ubuntu-latest
 
