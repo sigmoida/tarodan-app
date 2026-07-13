@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, Image, Pressable } from 'react-native';
+import { View, Pressable } from 'react-native';
 import { Card, Text, theme } from '@tarodan/ui-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getImageUrl as getImageUrlFromUtils } from '@/utils/imageUrl';
+import { AppImage } from '@/components/AppImage';
 import { isProductOutOfStock } from '@/utils/productPrice';
 import { OutOfStockOverlay } from '@/components/product';
 import { styles } from '../_lib/styles';
@@ -20,7 +20,6 @@ export function ProductCard({
   inCart: boolean;
   onPress: (id: string) => void;
 }) {
-  const imageUrl = getImageUrlFromUtils(item.images);
   const isTradeEnabled = item.isTradeEnabled || item.trade_available;
   const viewCount = item.viewCount || item.views || 0;
   const brandLabel =
@@ -37,8 +36,9 @@ export function ProductCard({
     >
       <Card style={styles.productCard} padding={0}>
         <View style={styles.productImageContainer}>
-          <Image
-            source={{ uri: imageUrl }}
+          <AppImage
+            source={item.images}
+            variant="card"
             style={[styles.productImage, isProductOutOfStock(item) && { opacity: 0.45 }]}
             resizeMode="cover"
           />

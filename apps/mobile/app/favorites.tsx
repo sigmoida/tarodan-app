@@ -1,4 +1,5 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Image, RefreshControl } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
+import { AppImage } from '@/components/AppImage';
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -59,9 +60,6 @@ export default function FavoritesScreen() {
     setSnackbar({ visible: true, message: 'Sepete eklendi' });
   };
 
-  const getImageUrl = (product: WishlistItem['product']) => {
-    return getImageUrlFromUtils(product.images);
-  };
 
   const formatPrice = (price: number) => {
     return `₺${(price ?? 0).toLocaleString('tr-TR')}`;
@@ -136,8 +134,9 @@ export default function FavoritesScreen() {
                   style={styles.cardMain}
                   onPress={() => router.push(`/product/${item.productId}`)}
                 >
-                  <Image
-                    source={{ uri: getImageUrl(item.product) }}
+                  <AppImage
+                    source={item.product.images}
+                    variant="card"
                     style={styles.productImage}
                   />
                   <View style={styles.productInfo}>
