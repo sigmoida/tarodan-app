@@ -19,7 +19,7 @@
 		"@tarodan/brand": "workspace:*",
 		"@tarodan/design-tokens": "workspace:*",
 		"@tarodan/shared": "workspace:*",
-		"@radix-ui/react-accordion": "^1.2.0",
+		"@radix-ui/react-accordion": "^1.2.16",
 		"@radix-ui/react-dropdown-menu": "^2.0.6",
 		"@radix-ui/react-navigation-menu": "^1.2.0",
 		"@radix-ui/react-select": "^2.0.0",
