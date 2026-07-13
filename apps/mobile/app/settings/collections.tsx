@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '@/services/api';
+import { qk } from '@/lib/query';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n';
 import { resolveImageUrl } from '@/utils/imageUrl';
@@ -21,7 +22,7 @@ export default function CollectionsScreen() {
   const canCreateCollections = limits?.canCreateCollections || false;
 
   const { data: collectionsData, isLoading, refetch } = useQuery({
-    queryKey: ['myCollections'],
+    queryKey: qk.collections.mine,
     queryFn: async () => {
       try {
         const response = await api.get('/collections/me');

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { userApi, productsApi, ratingsApi, collectionsApi } from '@/services/api';
+import { qk } from '@/lib/query';
 import { useRefresh } from '@/hooks/useRefresh';
 import { useFollowing } from '@/hooks/useFollowing';
 import { useAuthStore } from '@/stores/authStore';
@@ -13,13 +14,14 @@ import { useAuthStore } from '@/stores/authStore';
  */
 export function useSellerProfile() {
   const { id } = useLocalSearchParams();
+  const sellerId = String(id ?? '');
   const { isAuthenticated } = useAuthStore();
   const { isFollowing, followSeller, unfollowSeller } = useFollowing();
   const [activeTab, setActiveTab] = useState<'listings' | 'reviews' | 'collections'>('listings');
   const [followBusy, setFollowBusy] = useState(false);
 
   const { data: apiSeller, isLoading, refetch: refetchSeller } = useQuery({
-    queryKey: ['seller', id],
+    queryKey: qk.seller.detail(sellerId),
     queryFn: async () => {
       try {
         // Web `userApi.getPublicProfile` ile aynı: GET /users/:id/profile
@@ -34,7 +36,7 @@ export function useSellerProfile() {
   });
 
   const { data: sellerProducts, refetch: refetchProducts } = useQuery({
-    queryKey: ['seller-products', id],
+    queryKey: qk.seller.products(sellerId),
     queryFn: async () => {
       try {
         const response = await productsApi.getAll({ sellerId: id });
@@ -49,7 +51,7 @@ export function useSellerProfile() {
 
   // Web `apps/web/src/app/seller/[id]/page.tsx:181-193` paritesi
   const { data: ratingStats, refetch: refetchStats } = useQuery({
-    queryKey: ['seller-rating-stats', id],
+    queryKey: qk.seller.ratingStats(sellerId),
     queryFn: async () => {
       try {
         const response = await ratingsApi.getUserStats(String(id));
@@ -62,7 +64,7 @@ export function useSellerProfile() {
   });
 
   const { data: ratingList, refetch: refetchRatings } = useQuery({
-    queryKey: ['seller-ratings', id],
+    queryKey: qk.seller.ratings(sellerId),
     queryFn: async () => {
       try {
         const response = await ratingsApi.getUserRatings(String(id), { limit: 20 });
@@ -79,7 +81,7 @@ export function useSellerProfile() {
 
   // Satıcının herkese açık koleksiyonları (backend başkası bakınca yalnızca public döner)
   const { data: sellerCollections, refetch: refetchCollections } = useQuery({
-    queryKey: ['seller-collections', id],
+    queryKey: qk.seller.collections(sellerId),
     queryFn: async () => {
       try {
         const response = await collectionsApi.getUserCollections(String(id), { pageSize: 50 });

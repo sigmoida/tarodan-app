@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { appAlert } from '@tarodan/ui-native';
 import { useAuthStore } from '@/stores/authStore';
 import { discountsApi, productsApi } from '@/services/api';
+import { qk } from '@/lib/query';
 import { useRefresh } from '@/hooks/useRefresh';
 import { initialForm, type Discount, type MyProduct } from '../_lib/types';
 
@@ -23,7 +24,7 @@ export function useDiscounts() {
   );
 
   const discountsQuery = useQuery({
-    queryKey: ['my-discounts'],
+    queryKey: qk.membership.discounts,
     queryFn: async () => {
       const response = await discountsApi.getAll({ limit: 100 });
       const data: any = response.data;
@@ -34,7 +35,7 @@ export function useDiscounts() {
   });
 
   const productsQuery = useQuery({
-    queryKey: ['my-products-for-discount'],
+    queryKey: qk.membership.discountProducts,
     queryFn: async () => {
       try {
         const response = await productsApi.getMyListings({ limit: 100, status: 'active' });
@@ -73,7 +74,7 @@ export function useDiscounts() {
       return discountsApi.create(payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-discounts'] });
+      queryClient.invalidateQueries({ queryKey: qk.membership.discounts });
       setFormOpen(false);
       setForm(initialForm());
       setSnackbar({ visible: true, message: form.id ? 'İndirim güncellendi' : 'İndirim oluşturuldu' });
@@ -86,7 +87,7 @@ export function useDiscounts() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => discountsApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-discounts'] });
+      queryClient.invalidateQueries({ queryKey: qk.membership.discounts });
       setSnackbar({ visible: true, message: 'İndirim silindi' });
     },
     onError: (e: any) => {
@@ -98,7 +99,7 @@ export function useDiscounts() {
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
       discountsApi.update(id, { isActive }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-discounts'] });
+      queryClient.invalidateQueries({ queryKey: qk.membership.discounts });
     },
   });
 

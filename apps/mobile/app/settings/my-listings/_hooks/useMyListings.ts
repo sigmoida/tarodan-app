@@ -3,6 +3,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { theme, appAlert } from '@tarodan/ui-native';
 import { productsApi } from '@/services/api';
+import { qk } from '@/lib/query';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n';
 import type { Listing, FilterType } from '../_lib/types';
@@ -30,7 +31,7 @@ export function useMyListings() {
   );
 
   const { data: listingsData, isLoading, isError, refetch } = useQuery({
-    queryKey: ['my-listings', filter],
+    queryKey: qk.products.myListings(filter),
     queryFn: async () => {
       const params: any = { limit: 100 };
       if (filter !== 'all') {
@@ -48,7 +49,7 @@ export function useMyListings() {
   // Önceden sayaçlar o an çekili (filtrelenmiş + sayfalı) listeden hesaplanıyordu →
   // filtreye basınca değişiyor, çok ilanı olanda tavanlanıyordu. Artık tek sunucu agregatı.
   const { data: statsResp } = useQuery({
-    queryKey: ['my-listings-stats'],
+    queryKey: qk.products.myListingsStats,
     queryFn: () => productsApi.getMyStats(),
     retry: 1,
   });
@@ -73,9 +74,9 @@ export function useMyListings() {
       return productsApi.update(listingId, { status: 'inactive' });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-listings'] });
-      queryClient.invalidateQueries({ queryKey: ['my-listings-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['user-stats'] });
+      queryClient.invalidateQueries({ queryKey: qk.products.myListingsAll });
+      queryClient.invalidateQueries({ queryKey: qk.products.myListingsStats });
+      queryClient.invalidateQueries({ queryKey: qk.user.statsAll });
       refreshUserData();
       appAlert('Başarılı', 'İlan deaktif edildi');
     },
@@ -90,9 +91,9 @@ export function useMyListings() {
       return productsApi.update(listingId, { status: 'active' });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-listings'] });
-      queryClient.invalidateQueries({ queryKey: ['my-listings-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['user-stats'] });
+      queryClient.invalidateQueries({ queryKey: qk.products.myListingsAll });
+      queryClient.invalidateQueries({ queryKey: qk.products.myListingsStats });
+      queryClient.invalidateQueries({ queryKey: qk.user.statsAll });
       refreshUserData();
       appAlert('Başarılı', 'İlan incelemeye gönderildi. Onaylandığında yeniden yayına girer.');
     },
@@ -107,9 +108,9 @@ export function useMyListings() {
       return productsApi.delete(listingId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-listings'] });
-      queryClient.invalidateQueries({ queryKey: ['my-listings-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['user-stats'] });
+      queryClient.invalidateQueries({ queryKey: qk.products.myListingsAll });
+      queryClient.invalidateQueries({ queryKey: qk.products.myListingsStats });
+      queryClient.invalidateQueries({ queryKey: qk.user.statsAll });
       refreshUserData();
       setDeleteDialogVisible(false);
       setSelectedListing(null);
@@ -126,9 +127,9 @@ export function useMyListings() {
       return productsApi.update(listingId, { status: 'active', relist: true });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-listings'] });
-      queryClient.invalidateQueries({ queryKey: ['my-listings-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['user-stats'] });
+      queryClient.invalidateQueries({ queryKey: qk.products.myListingsAll });
+      queryClient.invalidateQueries({ queryKey: qk.products.myListingsStats });
+      queryClient.invalidateQueries({ queryKey: qk.user.statsAll });
       refreshUserData();
       appAlert('Başarılı', 'İlan incelemeye gönderildi. Onaylandığında yeniden yayına girer.');
     },
@@ -141,7 +142,7 @@ export function useMyListings() {
   useFocusEffect(
     useCallback(() => {
       refetch();
-      queryClient.invalidateQueries({ queryKey: ['my-listings-stats'] });
+      queryClient.invalidateQueries({ queryKey: qk.products.myListingsStats });
       refreshUserData();
     }, [])
   );
@@ -149,7 +150,7 @@ export function useMyListings() {
   const onRefresh = async () => {
     setRefreshing(true);
     await refetch();
-    queryClient.invalidateQueries({ queryKey: ['my-listings-stats'] });
+    queryClient.invalidateQueries({ queryKey: qk.products.myListingsStats });
     await refreshUserData();
     setRefreshing(false);
   };
