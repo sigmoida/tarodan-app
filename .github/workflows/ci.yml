@@ -46,7 +46,7 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-workspace
         with:
           prisma: 'false'
@@ -56,7 +56,7 @@ jobs:
     name: Type Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-workspace
       - run: pnpm typecheck
 
@@ -64,7 +64,7 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-workspace
       - run: pnpm build
 
@@ -72,7 +72,7 @@ jobs:
     name: Unit Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-workspace
       - run: pnpm --filter @tarodan/api test
 
@@ -131,7 +131,7 @@ jobs:
       MAILHOG_URL: http://localhost:8025
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-workspace
         with:
           turbo-cache: 'false'
@@ -191,7 +191,7 @@ jobs:
       MAILHOG_URL: http://localhost:8025
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-workspace
         with:
           turbo-cache: 'false'
@@ -257,7 +257,7 @@ jobs:
       MAILHOG_URL: http://localhost:8025
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-workspace
         with:
           turbo-cache: 'false'
@@ -269,7 +269,7 @@ jobs:
     name: Scenario Coverage Report (gate)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-workspace
         with:
           prisma: 'false'
@@ -290,7 +290,7 @@ jobs:
         run: node scripts/scenario-coverage.mjs || echo '::warning::coverage report could not be generated'
       - name: Archive report
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: scenario-coverage
           path: docs/SCENARIO-COVERAGE.md
@@ -358,7 +358,7 @@ jobs:
       MAILHOG_URL: http://localhost:8025
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-workspace
         with:
           turbo-cache: 'false'
@@ -371,7 +371,7 @@ jobs:
         run: pnpm --filter @tarodan/web test:e2e
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: |
@@ -387,21 +387,21 @@ jobs:
     env:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-workspace
         with:
           turbo-cache: 'false'
       - name: Run API tests with coverage
         run: pnpm --filter @tarodan/api test:cov
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: api-coverage
           path: apps/api/coverage/
           retention-days: 14
       - name: Upload to Codecov (skipped if no token)
         if: ${{ env.CODECOV_TOKEN != '' }}
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ env.CODECOV_TOKEN }}
           files: apps/api/coverage/lcov.info
@@ -413,7 +413,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-workspace
         with:
           prisma: 'false'
@@ -428,11 +428,11 @@ jobs:
     name: Secret Scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
@@ -443,7 +443,7 @@ jobs:
     needs: [e2e-test]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-workspace
         with:
           turbo-cache: 'false'
