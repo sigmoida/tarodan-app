@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
-
+import { ScheduleModule } from "@nestjs/schedule";
 import { validateEnv } from "./config/env.validation";
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { APP_GUARD, APP_INTERCEPTOR, APP_FILTER } from "@nestjs/core";
@@ -97,6 +97,12 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 
 @Module({
   imports: [
+    // Task scheduling — registered ONCE at the root (#71). ScheduleModule.forRoot()
+    // is global, so this single registration lets the scheduler discover @Cron on
+    // any provider across all feature modules (previously each of 11 modules called
+    // forRoot() redundantly).
+    ScheduleModule.forRoot(),
+
     // Configuration
     ConfigModule.forRoot({
       isGlobal: true,
