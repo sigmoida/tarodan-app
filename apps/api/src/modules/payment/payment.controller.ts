@@ -11,8 +11,6 @@ import {
   HttpCode,
   HttpStatus,
   Req,
-  NotFoundException,
-  ForbiddenException,
   UnauthorizedException,
   Logger,
   GoneException,
@@ -39,8 +37,6 @@ import {
   PaymentResponseDto,
   PaymentInitResponseDto,
   PaymentHoldResponseDto,
-  RefundPaymentDto,
-  RefundPaymentResponseDto,
   CancelPaymentResponseDto,
   RetryPaymentResponseDto,
   DirectPaymentDto,
@@ -417,43 +413,17 @@ export class PaymentController {
     return this.paymentService.cancelPayment(paymentId, userId);
   }
 
-  /**
-   * POST /payments/refund - Refund a payment
-   */
-  @Post("refund")
-  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests per minute
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: "Refund a completed payment" })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: "Payment refunded successfully",
-    type: RefundPaymentResponseDto,
-  })
-  @ApiResponse({
-    status: HttpStatus.BAD_REQUEST,
-    description: "Invalid order or payment not refundable",
-  })
-  @ApiResponse({
-    status: HttpStatus.NOT_FOUND,
-    description: "Payment not found",
-  })
-  async refundPayment(
-    @CurrentUser("id") userId: string,
-    @Body() dto: RefundPaymentDto,
-  ): Promise<RefundPaymentResponseDto> {
-    // Verify user owns the order (kapsülleme: private prisma'ya erişmek yerine servis metodu)
-    const order = await this.paymentService.findOrderParties(dto.orderId);
-
-    if (!order) {
-      throw new NotFoundException("Sipariş bulunamadı");
-    }
-
-    // Only buyer can request refund (seller cannot initiate refund)
-    if (order.buyerId !== userId) {
-      throw new ForbiddenException("Sadece alıcı iade talebi oluşturabilir");
-    }
-
-    return this.paymentService.processRefund(dto.orderId, dto.refundAmount);
-  }
+  // POST /payments/refund KALDIRILDI (güvenlik, issue #61: buyer self-refund).
+  // Bu doğrudan uç order.status kapısı OLMADAN processRefund çağırıyordu; yalnız
+  // "alıcı mı" ve "completed payout yok" kontrolleri vardı. Escrow payout teslimden
+  // ~15 gün sonra tetiklendiği için alıcı, kargo teslim edildikten sonra tam iade
+  // alıp malı da tutabiliyordu (state machine bypass'ı: cooling-off / iade penceresi
+  // / iade-kargosu-geri-teslim kontrolleri atlanıyordu).
+  //
+  // Alıcı iadeleri artık YALNIZCA RefundController üzerinden yürür:
+  //   POST /orders/:orderId/refund-requests → RefundService state machine.
+  // Kargo-öncesi (preparing/paid) iptal orada createInstantRefund ile anında iade
+  // edilir; iade tutarını SUNUCU hesaplar (client refundAmount'a güvenilmez).
+  // processRefund paylaşılan executor olarak KALIR (admin/cron/sürat/RefundService
+  // çağırır) — yalnız buyer-facing doğrudan uç kaldırıldı.
 }

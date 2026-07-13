@@ -1476,49 +1476,48 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
     });
 
     scenario("PAY-091", async () => {
-      // POST /payments/refund: satıcı → 403 (sadece alıcı).
+      // POST /payments/refund KALDIRILDI (#61) → route yok → satıcı için de 404
+      // (eskiden 403 idi; artık authz'a ulaşmadan önce 404).
       const { buyer, seller, product, addr } = await makeBuyerSellerProduct({
         price: 300,
       });
       const orderId = await buyAndPayDirect(buyer, product.id, addr.id);
-      const res = await request(server())
+      await request(server())
         .post("/api/payments/refund")
         .set(authHeader(seller))
         .send({ orderId })
-        .expect(403);
-      expect(JSON.stringify(res.body)).toContain(
-        "Sadece alıcı iade talebi oluşturabilir",
-      );
+        .expect(404);
     });
 
     scenario("PAY-092", async () => {
-      // Tamamlanmış ödeme yoksa → 404.
+      // #61 REGRESYON: alıcı GEÇERLİ ödenmiş siparişini bu uçtan self-refund EDEMEZ →
+      // route kaldırıldığından 404 (eskiden anında tam iade dönüyordu). Ödeme dokunulmaz.
+      // Meşru iade yolu artık POST /orders/:id/refund-requests (12-ref kapsıyor).
       const { buyer, product, addr } = await makeBuyerSellerProduct({
         price: 300,
       });
-      const orderId = await buyNow(buyer, product.id, addr.id); // ödenmemiş
-      const res = await request(server())
+      const orderId = await buyAndPayDirect(buyer, product.id, addr.id);
+      await request(server())
         .post("/api/payments/refund")
         .set(authHeader(buyer))
         .send({ orderId })
         .expect(404);
-      expect(JSON.stringify(res.body)).toContain(
-        "Tamamlanmış ödeme bulunamadı",
+      expect((await lastPayment(orderId))?.status).toBe(
+        PaymentStatus.completed,
       );
     });
 
     scenario("PAY-093", async () => {
-      // İade tutarı üst sınırı aşamaz → 400.
+      // #61: client-supplied refundAmount ile bile self-refund yok → route kaldırıldı → 404.
       const { buyer, product, addr } = await makeBuyerSellerProduct({
         price: 200,
       });
       const orderId = await buyAndPayDirect(buyer, product.id, addr.id);
-      const res = await request(server())
+      await request(server())
         .post("/api/payments/refund")
         .set(authHeader(buyer))
         .send({ orderId, refundAmount: 100000 })
-        .expect(400);
-      expect(JSON.stringify(res.body)).toContain("üst sınırı");
+        .expect(404);
     });
 
     scenario("PAY-094", async () => {

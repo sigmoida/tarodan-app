@@ -74,8 +74,6 @@ export const paymentsApi = {
       `/payments/${paymentId}/bypass-complete`,
       cardNumber ? { cardNumber } : {},
     ),
-  refund: (orderId: string, refundAmount?: number) =>
-    api.post('/payments/refund', { orderId, refundAmount }),
   retry: (paymentId: string) =>
     api.post(`/payments/${paymentId}/retry`),
   /**
