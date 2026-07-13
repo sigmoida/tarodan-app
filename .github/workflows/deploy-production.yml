@@ -38,7 +38,7 @@ jobs:
     # The `production` environment has required reviewers => manual approval gate.
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # Triggers the deploy AND waits for the result — a failed Coolify deploy
       # fails this job, so it shows up as a failed check + GitHub failure email.
       - name: Deploy to Coolify (production) and wait
