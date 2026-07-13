@@ -1,4 +1,10 @@
-import { colors as baseColors, radius, spacing, typography } from '@tarodan/design-tokens';
+import {
+  colors as baseColors,
+  radius,
+  spacing,
+  typography,
+  type ColorScale,
+} from '@tarodan/design-tokens';
 
 /**
  * Alpha overlay sabitleri — `rgba(...)` literal'lerinin yerine kullan.
@@ -20,8 +26,16 @@ const overlay = {
   black70: 'rgba(0,0,0,0.70)',
 } as const;
 
+// design-tokens'ta `danger/success/info/warning` `Partial<ColorScale>` olarak
+// tipli (literal'de 50..900 tam tanımlı ama tip gevşek), bu yüzden RN
+// StyleSheet'inde `theme.colors.success[500]` `string | undefined` çıkıyordu.
+// Değerlerin hepsi mevcut — tam `ColorScale`'e daraltıyoruz.
 const colors = {
   ...baseColors,
+  danger: baseColors.danger as ColorScale,
+  success: baseColors.success as ColorScale,
+  info: baseColors.info as ColorScale,
+  warning: baseColors.warning as ColorScale,
   overlay,
 };
 
