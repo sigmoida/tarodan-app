@@ -11,7 +11,7 @@
  *   şimdiki commit'te paket bağımlılığı eklemiyoruz).
  * - Fallback: bilinmeyen key → TR sürümünü dene → yoksa key'i göster.
  */
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import trMessages from './messages/tr.json';
 import enMessages from './messages/en.json';
@@ -69,29 +69,35 @@ export function LanguageProvider({ children, defaultLocale = 'tr' }: LanguagePro
       });
   }, []);
 
-  const setLocale = async (newLocale: Locale) => {
+  const setLocale = useCallback(async (newLocale: Locale) => {
     setLocaleState(newLocale);
     try {
       await AsyncStorage.setItem(LOCALE_STORAGE_KEY, newLocale);
     } catch {
       // Storage may be unavailable in some test environments — keep in-memory state.
     }
-  };
+  }, []);
 
-  const t = (key: string, params?: Record<string, string | number>): string => {
-    const value = getNestedValue(messages[locale], key);
-    if (value !== undefined) return interpolate(value, params);
-    const fallback = getNestedValue(messages.tr, key);
-    if (fallback !== undefined) return interpolate(fallback, params);
-    if (__DEV__) console.warn(`[i18n] missing key: ${key}`);
-    return key;
-  };
-
-  return (
-    <LanguageContext.Provider value={{ locale, setLocale, t, messages: messages[locale] }}>
-      {children}
-    </LanguageContext.Provider>
+  const t = useCallback(
+    (key: string, params?: Record<string, string | number>): string => {
+      const value = getNestedValue(messages[locale], key);
+      if (value !== undefined) return interpolate(value, params);
+      const fallback = getNestedValue(messages.tr, key);
+      if (fallback !== undefined) return interpolate(fallback, params);
+      if (__DEV__) console.warn(`[i18n] missing key: ${key}`);
+      return key;
+    },
+    [locale],
   );
+
+  // Provider value memoized so every text consumer doesn't re-render on unrelated
+  // provider renders (#75). Identity changes only when locale/t/setLocale change.
+  const value = useMemo(
+    () => ({ locale, setLocale, t, messages: messages[locale] }),
+    [locale, setLocale, t],
+  );
+
+  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }
 
 export function useLanguage() {

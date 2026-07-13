@@ -9,7 +9,7 @@ import { styles } from '../_lib/styles';
 
 const { colors } = theme;
 
-export function ProductCard({
+function ProductCardBase({
   item,
   index,
   inCart,
@@ -83,3 +83,5 @@ export function ProductCard({
     </Pressable>
   );
 }
+
+export const ProductCard = React.memo(ProductCardBase);

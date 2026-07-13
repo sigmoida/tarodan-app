@@ -3,17 +3,16 @@ import {
   FlatList,
   StyleSheet,
   TouchableOpacity,
-  Image,
   Dimensions,
   Modal,
 } from 'react-native';
 import { theme, Text, Input, Chip, Spinner, Radio, ScreenHeader } from '@tarodan/ui-native';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { productsApi } from '@/services/api';
-import { getImageUrl as getImageUrlFromUtils } from '@/utils/imageUrl';
+import { AppImage } from '@/components/AppImage';
 import { isProductOutOfStock } from '@/utils/productPrice';
 import { OutOfStockOverlay } from '@/components/product';
 import { asLabel } from '@/utils/format';
@@ -132,7 +131,8 @@ export default function ListingsScreen() {
   if (filters.limited) activeChips.push({ key: 'lim', label: 'Limited', onRemove: () => setFilters({ ...filters, limited: false }) });
   if (filters.set) activeChips.push({ key: 'set', label: 'Set', onRemove: () => setFilters({ ...filters, set: false }) });
 
-  const renderProductCard = ({ item }: { item: any }) => {
+  // Stable renderItem (#75) — no changing deps, so referentially constant.
+  const renderProductCard = useCallback(({ item }: { item: any }) => {
     const isTradeEnabled = item.isTradeEnabled || item.trade_available || item.tradeAvailable;
     return (
       <TouchableOpacity
@@ -140,8 +140,9 @@ export default function ListingsScreen() {
         onPress={() => router.push(`/product/${item.id}`)}
       >
         <View style={styles.productImageContainer}>
-          <Image
-            source={{ uri: getImageUrlFromUtils(item.images) }}
+          <AppImage
+            source={item.images}
+            variant="card"
             style={[styles.productImage, isProductOutOfStock(item) && { opacity: 0.45 }]}
           />
           {isProductOutOfStock(item) && <OutOfStockOverlay />}
@@ -166,7 +167,7 @@ export default function ListingsScreen() {
         </View>
       </TouchableOpacity>
     );
-  };
+  }, []);
 
   return (
     <View style={styles.container}>

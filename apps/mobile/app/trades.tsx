@@ -83,6 +83,14 @@ export default function TradesScreen() {
     else router.replace('/(tabs)');
   };
 
+  // Stable renderItem (#75) — memoized TradeCard bails out unless the row changes.
+  const renderTrade = useCallback(
+    ({ item }: { item: (typeof tradesList)[number] }) => (
+      <TradeCard trade={item} currentUserId={user?.id} />
+    ),
+    [user?.id],
+  );
+
   if (!isAuthenticated) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.surface.DEFAULT }}>
@@ -163,7 +171,7 @@ export default function TradesScreen() {
           contentContainerStyle={{ padding: spacing[4], paddingTop: spacing[2] }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => <TradeCard trade={item} currentUserId={user?.id} />}
+          renderItem={renderTrade}
           ListEmptyComponent={
             <VStack gap={3} align="center" style={{ marginTop: spacing[10] }}>
               <Ionicons name="swap-horizontal" size={56} color={colors.border.strong} />

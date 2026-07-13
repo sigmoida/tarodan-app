@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { View, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Spinner, Text, theme } from '@tarodan/ui-native';
@@ -18,6 +19,18 @@ const { colors, spacing } = theme;
  */
 export default function SearchScreen() {
   const f = useSearch();
+
+  // Stable renderItem (#75) — memoized SearchResultCard bails out on unchanged rows.
+  const renderResult = useCallback(
+    ({ item }: { item: any }) => (
+      <SearchResultCard
+        item={item}
+        cartProductIds={f.cartProductIds}
+        onPress={f.handleProductPress}
+      />
+    ),
+    [f.cartProductIds, f.handleProductPress],
+  );
 
   return (
     <View style={styles.container}>
@@ -46,13 +59,7 @@ export default function SearchScreen() {
             contentContainerStyle={[styles.listContent, { paddingTop: f.headerHeight }]}
             columnWrapperStyle={styles.listRow}
             keyExtractor={(item, index) => `${item.id}-${index}`}
-            renderItem={({ item }) => (
-              <SearchResultCard
-                item={item}
-                cartProductIds={f.cartProductIds}
-                onPress={f.handleProductPress}
-              />
-            )}
+            renderItem={renderResult}
             showsVerticalScrollIndicator={false}
             onScroll={f.handleResultsScroll}
             scrollEventThrottle={16}

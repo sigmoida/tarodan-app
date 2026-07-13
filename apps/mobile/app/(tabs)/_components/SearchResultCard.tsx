@@ -12,7 +12,7 @@ import { styles } from '../_lib/searchStyles';
 const { colors } = theme;
 
 /** A single product card in the 2-column search results grid. */
-export function SearchResultCard({
+function SearchResultCardBase({
   item,
   cartProductIds,
   onPress,
@@ -125,3 +125,5 @@ export function SearchResultCard({
     </Pressable>
   );
 }
+
+export const SearchResultCard = React.memo(SearchResultCardBase);

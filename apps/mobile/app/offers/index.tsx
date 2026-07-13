@@ -43,6 +43,29 @@ export default function OffersScreen() {
   const estimatedNetByOfferId = useCommissionPreview(offers, activeTab);
   const { accept, reject, cancel, pendingOfferId } = useOfferActions();
 
+  // Stable renderItem (#75) — memoized OfferCard skips rows that didn't change.
+  const renderOffer = useCallback(
+    ({ item }: { item: Offer }) => (
+      <OfferCard
+        offer={item}
+        tab={activeTab}
+        estimatedNet={
+          activeTab === 'received' && item.status === 'pending' && !item.buyerMustAccept
+            ? estimatedNetByOfferId[item.id]
+            : undefined
+        }
+        isPending={pendingOfferId === item.id}
+        t={t}
+        onAccept={accept}
+        onReject={reject}
+        onCancel={cancel}
+        onOpenCounter={setCounterOffer}
+        onOpenBuyerCounter={setBuyerCounterOffer}
+      />
+    ),
+    [activeTab, estimatedNetByOfferId, pendingOfferId, t, accept, reject, cancel],
+  );
+
   if (authLoading) {
     return (
       <SafeAreaView style={styles.centered}>
@@ -79,24 +102,7 @@ export default function OffersScreen() {
         <FlatList
           data={offers}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <OfferCard
-              offer={item}
-              tab={activeTab}
-              estimatedNet={
-                activeTab === 'received' && item.status === 'pending' && !item.buyerMustAccept
-                  ? estimatedNetByOfferId[item.id]
-                  : undefined
-              }
-              isPending={pendingOfferId === item.id}
-              t={t}
-              onAccept={accept}
-              onReject={reject}
-              onCancel={cancel}
-              onOpenCounter={setCounterOffer}
-              onOpenBuyerCounter={setBuyerCounterOffer}
-            />
-          )}
+          renderItem={renderOffer}
           ListEmptyComponent={<OffersEmpty tab={activeTab} />}
           contentContainerStyle={offers.length === 0 ? { flex: 1 } : styles.listContent}
           refreshControl={

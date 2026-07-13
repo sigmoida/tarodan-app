@@ -69,7 +69,7 @@ function resolveImageSrc(product: ProductCardProduct): string {
   return FALLBACK_IMG;
 }
 
-export function ProductCard({
+function ProductCardBase({
   product,
   layout = 'grid',
   tag,
@@ -456,5 +456,7 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
 });
+
+export const ProductCard = React.memo(ProductCardBase);
 
 export default ProductCard;
