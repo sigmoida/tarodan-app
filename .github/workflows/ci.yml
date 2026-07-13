@@ -46,27 +46,56 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth 0 so Turbo can diff the working tree against the PR base
+      # commit for affected-package detection (#171).
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/setup-workspace
         with:
           prisma: 'false'
-      - run: pnpm lint
+      # On a PR: only lint packages changed since the base (+ their dependents).
+      # On push (development/master): lint everything. Turbo replays unchanged
+      # packages from cache, so even the full run is fast.
+      - name: Lint (affected on PR, all on push)
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            pnpm lint -- "--filter=...[${{ github.event.pull_request.base.sha }}]"
+          else
+            pnpm lint
+          fi
 
   type-check:
     name: Type Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/setup-workspace
-      - run: pnpm typecheck
+      - name: Type Check (affected on PR, all on push)
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            pnpm typecheck -- "--filter=...[${{ github.event.pull_request.base.sha }}]"
+          else
+            pnpm typecheck
+          fi
 
   build:
     name: Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/setup-workspace
-      - run: pnpm build
+      - name: Build (affected on PR, all on push)
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            pnpm build -- "--filter=...[${{ github.event.pull_request.base.sha }}]"
+          else
+            pnpm build
+          fi
 
   unit-test:
     name: Unit Tests
