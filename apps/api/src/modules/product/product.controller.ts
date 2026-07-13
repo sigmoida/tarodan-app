@@ -17,7 +17,7 @@ import {
   Req,
   Logger,
   Header,
-} from '@nestjs/common';
+} from "@nestjs/common";
 import {
   ApiTags,
   ApiOperation,
@@ -25,10 +25,10 @@ import {
   ApiBearerAuth,
   ApiParam,
   ApiQuery,
-} from '@nestjs/swagger';
-import { Request } from 'express';
-import { ProductService } from './product.service';
-import { ProductBoostService } from './product-boost.service';
+} from "@nestjs/swagger";
+import { Request } from "express";
+import { ProductService } from "./product.service";
+import { ProductBoostService } from "./product-boost.service";
 import {
   CreateProductDto,
   UpdateProductDto,
@@ -36,19 +36,19 @@ import {
   ProductResponseDto,
   PaginatedProductsDto,
   InitiateBoostDto,
-} from './dto';
-import { PaymentProvider } from '../payment/dto';
-import { JwtAuthGuard, Public, CurrentUser } from '../auth';
+} from "./dto";
+import { PaymentProvider } from "../payment/dto";
+import { JwtAuthGuard, Public, CurrentUser } from "../auth";
 
-@ApiTags('products')
-@Controller('products')
+@ApiTags("products")
+@Controller("products")
 export class ProductController {
   private readonly logger = new Logger(ProductController.name);
 
   constructor(
     private readonly productService: ProductService,
     private readonly productBoostService: ProductBoostService,
-  ) { }
+  ) {}
 
   /**
    * GET /products
@@ -56,19 +56,22 @@ export class ProductController {
    */
   @Get()
   @Public()
-  @Header('Cache-Control', 'no-store, no-cache, must-revalidate')
-  @Header('Pragma', 'no-cache')
-  @ApiOperation({ summary: 'Ürün listesi' })
+  @Header("Cache-Control", "no-store, no-cache, must-revalidate")
+  @Header("Pragma", "no-cache")
+  @ApiOperation({ summary: "Ürün listesi" })
   @ApiResponse({
     status: 200,
-    description: 'Ürün listesi',
+    description: "Ürün listesi",
     type: PaginatedProductsDto,
   })
   async findAll(@Query() query: ProductQueryDto) {
     try {
       return await this.productService.findAll(query);
     } catch (err) {
-      this.logger.error('findAll failed', err instanceof Error ? err.stack : String(err));
+      this.logger.error(
+        "findAll failed",
+        err instanceof Error ? err.stack : String(err),
+      );
       return {
         data: [],
         meta: {
@@ -85,16 +88,23 @@ export class ProductController {
    * GET /products/popular
    * Anasayfa Popüler İlanlar – sadece view count'a göre, indirim filtresi yok
    */
-  @Get('popular')
+  @Get("popular")
   @Public()
-  @Header('Cache-Control', 'no-store, no-cache, must-revalidate')
-  @ApiOperation({ summary: 'Popüler ilanlar (görüntülenme sayısına göre)' })
-  @ApiResponse({ status: 200, description: 'Popüler ürün listesi', type: PaginatedProductsDto })
+  @Header("Cache-Control", "no-store, no-cache, must-revalidate")
+  @ApiOperation({ summary: "Popüler ilanlar (görüntülenme sayısına göre)" })
+  @ApiResponse({
+    status: 200,
+    description: "Popüler ürün listesi",
+    type: PaginatedProductsDto,
+  })
   async getPopular(
-    @Query('limit') limit?: number,
-    @Query('page') page?: number,
+    @Query("limit") limit?: number,
+    @Query("page") page?: number,
   ) {
-    return this.productService.findPopular(Number(limit) || 20, Number(page) || 1);
+    return this.productService.findPopular(
+      Number(limit) || 20,
+      Number(page) || 1,
+    );
   }
 
   /**
@@ -103,11 +113,11 @@ export class ProductController {
    * Optional ?manufacturer=<slug> adds manufacturer-scoped attribute groups
    * (e.g. Hot Wheels Segment/Assortment/Wheel Type/etc.) to customAttributes.
    */
-  @Get('filters')
+  @Get("filters")
   @Public()
-  @ApiOperation({ summary: 'Filtre seçenekleri (Categoriler, Markalar, vb.)' })
-  @ApiResponse({ status: 200, description: 'Filtre listeleri' })
-  async getFilters(@Query('manufacturer') manufacturer?: string) {
+  @ApiOperation({ summary: "Filtre seçenekleri (Categoriler, Markalar, vb.)" })
+  @ApiResponse({ status: 200, description: "Filtre listeleri" })
+  async getFilters(@Query("manufacturer") manufacturer?: string) {
     return this.productService.getFilters(manufacturer);
   }
 
@@ -117,11 +127,13 @@ export class ProductController {
    * Always includes global groups (manufacturerSlug=null) PLUS manufacturer-scoped groups.
    * Used by listing creation forms to render conditional fields.
    */
-  @Get('attribute-groups')
+  @Get("attribute-groups")
   @Public()
-  @ApiOperation({ summary: 'Manufacturer-aware attribute group listesi (form için)' })
-  @ApiResponse({ status: 200, description: 'Form alan grupları' })
-  async getAttributeGroups(@Query('manufacturer') manufacturer?: string) {
+  @ApiOperation({
+    summary: "Manufacturer-aware attribute group listesi (form için)",
+  })
+  @ApiResponse({ status: 200, description: "Form alan grupları" })
+  async getAttributeGroups(@Query("manufacturer") manufacturer?: string) {
     return this.productService.getAttributeGroupsForManufacturer(manufacturer);
   }
 
@@ -130,10 +142,10 @@ export class ProductController {
    * Boost (öne çıkarma) süreleri ve fiyatları (admin'den ayarlanabilir)
    * NOTE: ':id' rotasından önce tanımlanmalı (statik segment çakışmasını önlemek için)
    */
-  @Get('boost/pricing')
+  @Get("boost/pricing")
   @Public()
-  @ApiOperation({ summary: 'Boost süre/fiyat listesi' })
-  @ApiResponse({ status: 200, description: 'Boost fiyatlandırması' })
+  @ApiOperation({ summary: "Boost süre/fiyat listesi" })
+  @ApiResponse({ status: 200, description: "Boost fiyatlandırması" })
   async getBoostPricing() {
     return this.productBoostService.getPricing();
   }
@@ -142,12 +154,12 @@ export class ProductController {
    * GET /products/boost/my
    * Kullanıcının boost (öne çıkarma) geçmişi ve aktif boost'ları
    */
-  @Get('boost/my')
+  @Get("boost/my")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Boost geçmişim' })
-  @ApiResponse({ status: 200, description: 'Kullanıcının boost kayıtları' })
-  async getMyBoosts(@CurrentUser('id') userId: string) {
+  @ApiOperation({ summary: "Boost geçmişim" })
+  @ApiResponse({ status: 200, description: "Kullanıcının boost kayıtları" })
+  async getMyBoosts(@CurrentUser("id") userId: string) {
     return this.productBoostService.getMyBoosts(userId);
   }
 
@@ -155,17 +167,17 @@ export class ProductController {
    * GET /products/my
    * Get seller's own products (all statuses)
    */
-  @Get('my')
+  @Get("my")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Kendi ürünlerim' })
+  @ApiOperation({ summary: "Kendi ürünlerim" })
   @ApiResponse({
     status: 200,
-    description: 'Satıcının kendi ürünleri',
+    description: "Satıcının kendi ürünleri",
     type: PaginatedProductsDto,
   })
   async findMyProducts(
-    @CurrentUser('id') sellerId: string,
+    @CurrentUser("id") sellerId: string,
     @Query() query: ProductQueryDto,
   ) {
     return this.productService.findSellerProducts(sellerId, query);
@@ -176,66 +188,89 @@ export class ProductController {
    * Get seller's listing statistics and membership limits
    * IMPORTANT: This route must be defined BEFORE 'my/:id' to avoid route conflicts
    */
-  @Get('my/stats')
+  @Get("my/stats")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'İlan istatistikleri ve limitleri',
-    description: 'Kullanıcının ilan sayıları, üyelik limitleri ve kalan haklarını döner'
+    summary: "İlan istatistikleri ve limitleri",
+    description:
+      "Kullanıcının ilan sayıları, üyelik limitleri ve kalan haklarını döner",
   })
   @ApiResponse({
     status: 200,
-    description: 'İlan istatistikleri',
+    description: "İlan istatistikleri",
     schema: {
-      type: 'object',
+      type: "object",
       properties: {
         counts: {
-          type: 'object',
+          type: "object",
           properties: {
-            pending: { type: 'number', description: 'Bekleyen ilanlar' },
-            active: { type: 'number', description: 'Aktif ilanlar' },
-            reserved: { type: 'number', description: 'Rezerve ilanlar' },
-            sold: { type: 'number', description: 'Satılmış ilanlar' },
-            rejected: { type: 'number', description: 'Reddedilen ilanlar' },
-            total: { type: 'number', description: 'Toplam ilanlar' },
-            activeListings: { type: 'number', description: 'Limite sayılan ilanlar (pending+active+reserved)' },
+            pending: { type: "number", description: "Bekleyen ilanlar" },
+            active: { type: "number", description: "Aktif ilanlar" },
+            reserved: { type: "number", description: "Rezerve ilanlar" },
+            sold: { type: "number", description: "Satılmış ilanlar" },
+            rejected: { type: "number", description: "Reddedilen ilanlar" },
+            total: { type: "number", description: "Toplam ilanlar" },
+            activeListings: {
+              type: "number",
+              description: "Limite sayılan ilanlar (pending+active+reserved)",
+            },
           },
         },
         limits: {
-          type: 'object',
+          type: "object",
           properties: {
-            tierName: { type: 'string', description: 'Üyelik adı' },
-            tierType: { type: 'string', description: 'Üyelik tipi' },
-            maxTotalListings: { type: 'number', description: 'Maksimum ilan hakkı' },
-            remainingTotalListings: { type: 'number', description: 'Kalan ilan hakkı' },
-            canCreateListing: { type: 'boolean', description: 'İlan oluşturabilir mi?' },
+            tierName: { type: "string", description: "Üyelik adı" },
+            tierType: { type: "string", description: "Üyelik tipi" },
+            maxTotalListings: {
+              type: "number",
+              description: "Maksimum ilan hakkı",
+            },
+            remainingTotalListings: {
+              type: "number",
+              description: "Kalan ilan hakkı",
+            },
+            canCreateListing: {
+              type: "boolean",
+              description: "İlan oluşturabilir mi?",
+            },
           },
         },
         summary: {
-          type: 'object',
+          type: "object",
           properties: {
-            used: { type: 'number', description: 'Kullanılan ilan sayısı' },
-            max: { type: 'number', description: 'Maksimum ilan sayısı' },
-            remaining: { type: 'number', description: 'Kalan ilan hakkı' },
-            canCreate: { type: 'boolean', description: 'İlan oluşturabilir mi?' },
-            percentUsed: { type: 'number', description: 'Kullanım yüzdesi' },
+            used: { type: "number", description: "Kullanılan ilan sayısı" },
+            max: { type: "number", description: "Maksimum ilan sayısı" },
+            remaining: { type: "number", description: "Kalan ilan hakkı" },
+            canCreate: {
+              type: "boolean",
+              description: "İlan oluşturabilir mi?",
+            },
+            percentUsed: { type: "number", description: "Kullanım yüzdesi" },
           },
         },
       },
     },
   })
-  async getMyListingStats(@CurrentUser('id') sellerId: string) {
+  async getMyListingStats(@CurrentUser("id") sellerId: string) {
     if (!sellerId) {
-      throw new BadRequestException('Kullanıcı kimliği bulunamadı');
+      throw new BadRequestException("Kullanıcı kimliği bulunamadı");
     }
     try {
       return await this.productService.getSellerListingStats(sellerId);
     } catch (error) {
-      if (error instanceof BadRequestException || error instanceof NotFoundException || error instanceof ForbiddenException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
-      this.logger.error('getMyListingStats failed');
-      throw new BadRequestException(`İlan istatistikleri alınamadı: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`);
+      this.logger.error(
+        "getMyListingStats failed",
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new BadRequestException("İlan istatistikleri alınamadı");
     }
   }
 
@@ -243,17 +278,17 @@ export class ProductController {
    * GET /products/my/:id
    * Get seller's own product by ID (all statuses: active, inactive, sold, reserved, etc.)
    */
-  @Get('my/:id')
+  @Get("my/:id")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Kendi ürünüm (düzenleme için)' })
-  @ApiParam({ name: 'id', description: 'Product UUID' })
-  @ApiResponse({ status: 200, description: 'Ürün detayı' })
-  @ApiResponse({ status: 404, description: 'Ürün bulunamadı' })
-  @ApiResponse({ status: 403, description: 'Bu ürün size ait değil' })
+  @ApiOperation({ summary: "Kendi ürünüm (düzenleme için)" })
+  @ApiParam({ name: "id", description: "Product UUID" })
+  @ApiResponse({ status: 200, description: "Ürün detayı" })
+  @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
+  @ApiResponse({ status: 403, description: "Bu ürün size ait değil" })
   async findMyProductById(
-    @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser('id') userId: string,
+    @Param("id", ParseUUIDPipe) id: string,
+    @CurrentUser("id") userId: string,
   ) {
     return this.productService.findMyProductById(id, userId);
   }
@@ -262,22 +297,29 @@ export class ProductController {
    * GET /products/:id
    * Get single product (public, but only shows active products)
    */
-  @Get(':id')
+  @Get(":id")
   @Public()
-  @ApiOperation({ summary: 'Ürün detayı' })
-  @ApiParam({ name: 'id', description: 'Product ID (UUID format)' })
+  @ApiOperation({ summary: "Ürün detayı" })
+  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
   @ApiResponse({
     status: 200,
-    description: 'Ürün detayı',
+    description: "Ürün detayı",
     type: ProductResponseDto,
   })
-  @ApiResponse({ status: 400, description: 'Geçersiz ürün ID formatı' })
-  @ApiResponse({ status: 404, description: 'Ürün bulunamadı' })
+  @ApiResponse({ status: 400, description: "Geçersiz ürün ID formatı" })
+  @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   async findOne(
-    @Param('id', new ParseUUIDPipe({
-      errorHttpStatusCode: 400,
-      exceptionFactory: () => new BadRequestException('Geçersiz ürün ID formatı. UUID formatında olmalıdır (örn: a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11)'),
-    })) id: string,
+    @Param(
+      "id",
+      new ParseUUIDPipe({
+        errorHttpStatusCode: 400,
+        exceptionFactory: () =>
+          new BadRequestException(
+            "Geçersiz ürün ID formatı. UUID formatında olmalıdır (örn: a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11)",
+          ),
+      }),
+    )
+    id: string,
   ) {
     return this.productService.findOne(id);
   }
@@ -287,16 +329,21 @@ export class ProductController {
    * Aynı kategoriden, aktif ve stoklu ürünler. Stockout sonrası
    * "alternatif ürünler" sayfası tarafından kullanılır.
    */
-  @Get(':id/similar')
+  @Get(":id/similar")
   @Public()
-  @ApiOperation({ summary: 'Benzer ürünler (aynı kategori, aktif)' })
-  @ApiParam({ name: 'id', description: 'Product ID (UUID)' })
+  @ApiOperation({ summary: "Benzer ürünler (aynı kategori, aktif)" })
+  @ApiParam({ name: "id", description: "Product ID (UUID)" })
   async getSimilar(
-    @Param('id', new ParseUUIDPipe({
-      errorHttpStatusCode: 400,
-      exceptionFactory: () => new BadRequestException('Geçersiz ürün ID formatı'),
-    })) id: string,
-    @Query('limit') limit?: string,
+    @Param(
+      "id",
+      new ParseUUIDPipe({
+        errorHttpStatusCode: 400,
+        exceptionFactory: () =>
+          new BadRequestException("Geçersiz ürün ID formatı"),
+      }),
+    )
+    id: string,
+    @Query("limit") limit?: string,
   ) {
     const n = limit ? Math.min(parseInt(limit, 10) || 12, 24) : 12;
     return this.productService.findSimilarProducts(id, n);
@@ -309,16 +356,16 @@ export class ProductController {
   @Post()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Yeni ürün oluştur' })
+  @ApiOperation({ summary: "Yeni ürün oluştur" })
   @ApiResponse({
     status: 201,
-    description: 'Ürün oluşturuldu',
+    description: "Ürün oluşturuldu",
     type: ProductResponseDto,
   })
-  @ApiResponse({ status: 400, description: 'Geçersiz veri' })
-  @ApiResponse({ status: 403, description: 'Satıcı hesabı gerekli' })
+  @ApiResponse({ status: 400, description: "Geçersiz veri" })
+  @ApiResponse({ status: 403, description: "Satıcı hesabı gerekli" })
   async create(
-    @CurrentUser('id') sellerId: string,
+    @CurrentUser("id") sellerId: string,
     @Body() dto: CreateProductDto,
   ) {
     return this.productService.create(sellerId, dto);
@@ -328,26 +375,31 @@ export class ProductController {
    * PATCH /products/:id
    * Update product (owner only)
    */
-  @Patch(':id')
+  @Patch(":id")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Ürün güncelle' })
-  @ApiParam({ name: 'id', description: 'Product ID (UUID format)' })
+  @ApiOperation({ summary: "Ürün güncelle" })
+  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
   @ApiResponse({
     status: 200,
-    description: 'Ürün güncellendi',
+    description: "Ürün güncellendi",
     type: ProductResponseDto,
   })
-  @ApiResponse({ status: 400, description: 'Geçersiz ürün ID formatı' })
-  @ApiResponse({ status: 403, description: 'Yetkiniz yok' })
-  @ApiResponse({ status: 404, description: 'Ürün bulunamadı' })
-  @ApiResponse({ status: 409, description: 'Concurrent update conflict' })
+  @ApiResponse({ status: 400, description: "Geçersiz ürün ID formatı" })
+  @ApiResponse({ status: 403, description: "Yetkiniz yok" })
+  @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
+  @ApiResponse({ status: 409, description: "Concurrent update conflict" })
   async update(
-    @Param('id', new ParseUUIDPipe({
-      errorHttpStatusCode: 400,
-      exceptionFactory: () => new BadRequestException('Geçersiz ürün ID formatı'),
-    })) id: string,
-    @CurrentUser('id') sellerId: string,
+    @Param(
+      "id",
+      new ParseUUIDPipe({
+        errorHttpStatusCode: 400,
+        exceptionFactory: () =>
+          new BadRequestException("Geçersiz ürün ID formatı"),
+      }),
+    )
+    id: string,
+    @CurrentUser("id") sellerId: string,
     @Body() dto: UpdateProductDto,
   ) {
     return this.productService.update(id, sellerId, dto);
@@ -357,20 +409,31 @@ export class ProductController {
    * POST /products/:id/boost/initiate
    * İlanı öne çıkar (boost): süre seç → ödeme başlat. Sahiplik + aktiflik doğrulanır.
    */
-  @Post(':id/boost/initiate')
+  @Post(":id/boost/initiate")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'İlanı öne çıkar (boost satın al)' })
-  @ApiParam({ name: 'id', description: 'Product ID (UUID format)' })
-  @ApiResponse({ status: 201, description: 'Boost ödemesi başlatıldı (paymentUrl döner)' })
-  @ApiResponse({ status: 400, description: 'Geçersiz süre / ilan uygun değil' })
-  @ApiResponse({ status: 403, description: 'Sadece kendi ilanınızı öne çıkarabilirsiniz' })
+  @ApiOperation({ summary: "İlanı öne çıkar (boost satın al)" })
+  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiResponse({
+    status: 201,
+    description: "Boost ödemesi başlatıldı (paymentUrl döner)",
+  })
+  @ApiResponse({ status: 400, description: "Geçersiz süre / ilan uygun değil" })
+  @ApiResponse({
+    status: 403,
+    description: "Sadece kendi ilanınızı öne çıkarabilirsiniz",
+  })
   async initiateBoost(
-    @Param('id', new ParseUUIDPipe({
-      errorHttpStatusCode: 400,
-      exceptionFactory: () => new BadRequestException('Geçersiz ürün ID formatı'),
-    })) id: string,
-    @CurrentUser('id') userId: string,
+    @Param(
+      "id",
+      new ParseUUIDPipe({
+        errorHttpStatusCode: 400,
+        exceptionFactory: () =>
+          new BadRequestException("Geçersiz ürün ID formatı"),
+      }),
+    )
+    id: string,
+    @CurrentUser("id") userId: string,
     @Body() dto: InitiateBoostDto,
     @Req() req: Request,
   ) {
@@ -388,21 +451,26 @@ export class ProductController {
    * DELETE /products/:id
    * Delete product (owner only)
    */
-  @Delete(':id')
+  @Delete(":id")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Ürün sil' })
-  @ApiParam({ name: 'id', description: 'Product ID (UUID format)' })
-  @ApiResponse({ status: 200, description: 'Ürün silindi' })
-  @ApiResponse({ status: 400, description: 'Geçersiz ürün ID formatı' })
-  @ApiResponse({ status: 403, description: 'Yetkiniz yok' })
-  @ApiResponse({ status: 404, description: 'Ürün bulunamadı' })
+  @ApiOperation({ summary: "Ürün sil" })
+  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiResponse({ status: 200, description: "Ürün silindi" })
+  @ApiResponse({ status: 400, description: "Geçersiz ürün ID formatı" })
+  @ApiResponse({ status: 403, description: "Yetkiniz yok" })
+  @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   async remove(
-    @Param('id', new ParseUUIDPipe({
-      errorHttpStatusCode: 400,
-      exceptionFactory: () => new BadRequestException('Geçersiz ürün ID formatı'),
-    })) id: string,
-    @CurrentUser('id') sellerId: string,
+    @Param(
+      "id",
+      new ParseUUIDPipe({
+        errorHttpStatusCode: 400,
+        exceptionFactory: () =>
+          new BadRequestException("Geçersiz ürün ID formatı"),
+      }),
+    )
+    id: string,
+    @CurrentUser("id") sellerId: string,
   ) {
     return this.productService.remove(id, sellerId);
   }
@@ -415,30 +483,35 @@ export class ProductController {
    * POST /products/:id/like
    * Like a product
    */
-  @Post(':id/like')
+  @Post(":id/like")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Ürünü beğen' })
-  @ApiParam({ name: 'id', description: 'Product ID (UUID format)' })
+  @ApiOperation({ summary: "Ürünü beğen" })
+  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
   @ApiResponse({
     status: 201,
-    description: 'Ürün beğenildi',
+    description: "Ürün beğenildi",
     schema: {
-      type: 'object',
+      type: "object",
       properties: {
-        liked: { type: 'boolean', example: true },
-        likeCount: { type: 'number', example: 42 },
+        liked: { type: "boolean", example: true },
+        likeCount: { type: "number", example: 42 },
       },
     },
   })
-  @ApiResponse({ status: 400, description: 'Zaten beğenilmiş' })
-  @ApiResponse({ status: 404, description: 'Ürün bulunamadı' })
+  @ApiResponse({ status: 400, description: "Zaten beğenilmiş" })
+  @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   async likeProduct(
-    @Param('id', new ParseUUIDPipe({
-      errorHttpStatusCode: 400,
-      exceptionFactory: () => new BadRequestException('Geçersiz ürün ID formatı'),
-    })) id: string,
-    @CurrentUser('id') userId: string,
+    @Param(
+      "id",
+      new ParseUUIDPipe({
+        errorHttpStatusCode: 400,
+        exceptionFactory: () =>
+          new BadRequestException("Geçersiz ürün ID formatı"),
+      }),
+    )
+    id: string,
+    @CurrentUser("id") userId: string,
   ) {
     return this.productService.likeProduct(id, userId);
   }
@@ -447,30 +520,35 @@ export class ProductController {
    * DELETE /products/:id/unlike
    * Remove like from a product
    */
-  @Delete(':id/unlike')
+  @Delete(":id/unlike")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Beğeniyi kaldır' })
-  @ApiParam({ name: 'id', description: 'Product ID (UUID format)' })
+  @ApiOperation({ summary: "Beğeniyi kaldır" })
+  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
   @ApiResponse({
     status: 200,
-    description: 'Beğeni kaldırıldı',
+    description: "Beğeni kaldırıldı",
     schema: {
-      type: 'object',
+      type: "object",
       properties: {
-        liked: { type: 'boolean', example: false },
-        likeCount: { type: 'number', example: 41 },
+        liked: { type: "boolean", example: false },
+        likeCount: { type: "number", example: 41 },
       },
     },
   })
-  @ApiResponse({ status: 400, description: 'Beğenilmemiş' })
-  @ApiResponse({ status: 404, description: 'Ürün bulunamadı' })
+  @ApiResponse({ status: 400, description: "Beğenilmemiş" })
+  @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   async unlikeProduct(
-    @Param('id', new ParseUUIDPipe({
-      errorHttpStatusCode: 400,
-      exceptionFactory: () => new BadRequestException('Geçersiz ürün ID formatı'),
-    })) id: string,
-    @CurrentUser('id') userId: string,
+    @Param(
+      "id",
+      new ParseUUIDPipe({
+        errorHttpStatusCode: 400,
+        exceptionFactory: () =>
+          new BadRequestException("Geçersiz ürün ID formatı"),
+      }),
+    )
+    id: string,
+    @CurrentUser("id") userId: string,
   ) {
     return this.productService.unlikeProduct(id, userId);
   }
@@ -479,72 +557,87 @@ export class ProductController {
    * POST /products/:id/view
    * Increment view count (public, but rate limited per user)
    */
-  @Post(':id/view')
+  @Post(":id/view")
   @Public()
-  @ApiOperation({ summary: 'Görüntülenme sayısını artır' })
-  @ApiParam({ name: 'id', description: 'Product ID (UUID format)' })
+  @ApiOperation({ summary: "Görüntülenme sayısını artır" })
+  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
   @ApiResponse({
     status: 201,
-    description: 'Görüntülenme sayısı artırıldı',
+    description: "Görüntülenme sayısı artırıldı",
     schema: {
-      type: 'object',
+      type: "object",
       properties: {
-        viewCount: { type: 'number', example: 156 },
+        viewCount: { type: "number", example: 156 },
       },
     },
   })
-  @ApiResponse({ status: 404, description: 'Ürün bulunamadı' })
+  @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   async incrementViewCount(
-    @Param('id', new ParseUUIDPipe({
-      errorHttpStatusCode: 400,
-      exceptionFactory: () => new BadRequestException('Geçersiz ürün ID formatı'),
-    })) id: string,
-    @CurrentUser('id') userId?: string,
+    @Param(
+      "id",
+      new ParseUUIDPipe({
+        errorHttpStatusCode: 400,
+        exceptionFactory: () =>
+          new BadRequestException("Geçersiz ürün ID formatı"),
+      }),
+    )
+    id: string,
+    @CurrentUser("id") userId?: string,
     @Ip() ip?: string,
-    @Headers('user-agent') userAgent?: string,
+    @Headers("user-agent") userAgent?: string,
     @Req() req?: any,
   ) {
     // Get real IP from headers if behind proxy
     const clientIp =
-      req?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() ||
-      req?.headers?.['x-real-ip'] ||
+      req?.headers?.["x-forwarded-for"]?.split(",")[0]?.trim() ||
+      req?.headers?.["x-real-ip"] ||
       ip ||
-      'unknown';
-    return this.productService.incrementViewCount(id, userId, clientIp, userAgent);
+      "unknown";
+    return this.productService.incrementViewCount(
+      id,
+      userId,
+      clientIp,
+      userAgent,
+    );
   }
 
   /**
    * GET /products/:id/stats
    * Get product stats (seller only)
    */
-  @Get(':id/stats')
+  @Get(":id/stats")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Ürün istatistikleri (satıcı için)' })
-  @ApiParam({ name: 'id', description: 'Product ID (UUID format)' })
+  @ApiOperation({ summary: "Ürün istatistikleri (satıcı için)" })
+  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
   @ApiResponse({
     status: 200,
-    description: 'Ürün istatistikleri',
+    description: "Ürün istatistikleri",
     schema: {
-      type: 'object',
+      type: "object",
       properties: {
-        id: { type: 'string' },
-        title: { type: 'string' },
-        viewCount: { type: 'number' },
-        likeCount: { type: 'number' },
-        offersCount: { type: 'number' },
-        ordersCount: { type: 'number' },
+        id: { type: "string" },
+        title: { type: "string" },
+        viewCount: { type: "number" },
+        likeCount: { type: "number" },
+        offersCount: { type: "number" },
+        ordersCount: { type: "number" },
       },
     },
   })
-  @ApiResponse({ status: 403, description: 'Yetkiniz yok' })
-  @ApiResponse({ status: 404, description: 'Ürün bulunamadı' })
+  @ApiResponse({ status: 403, description: "Yetkiniz yok" })
+  @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   async getProductStats(
-    @Param('id', new ParseUUIDPipe({
-      errorHttpStatusCode: 400,
-      exceptionFactory: () => new BadRequestException('Geçersiz ürün ID formatı'),
-    })) id: string,
-    @CurrentUser('id') sellerId: string,
+    @Param(
+      "id",
+      new ParseUUIDPipe({
+        errorHttpStatusCode: 400,
+        exceptionFactory: () =>
+          new BadRequestException("Geçersiz ürün ID formatı"),
+      }),
+    )
+    id: string,
+    @CurrentUser("id") sellerId: string,
   ) {
     return this.productService.getProductStats(id, sellerId);
   }
@@ -553,27 +646,32 @@ export class ProductController {
    * GET /products/:id/liked
    * Check if user has liked a product
    */
-  @Get(':id/liked')
+  @Get(":id/liked")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Kullanıcı bu ürünü beğenmiş mi?' })
-  @ApiParam({ name: 'id', description: 'Product ID (UUID format)' })
+  @ApiOperation({ summary: "Kullanıcı bu ürünü beğenmiş mi?" })
+  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
   @ApiResponse({
     status: 200,
-    description: 'Beğeni durumu',
+    description: "Beğeni durumu",
     schema: {
-      type: 'object',
+      type: "object",
       properties: {
-        liked: { type: 'boolean' },
+        liked: { type: "boolean" },
       },
     },
   })
   async isProductLiked(
-    @Param('id', new ParseUUIDPipe({
-      errorHttpStatusCode: 400,
-      exceptionFactory: () => new BadRequestException('Geçersiz ürün ID formatı'),
-    })) id: string,
-    @CurrentUser('id') userId: string,
+    @Param(
+      "id",
+      new ParseUUIDPipe({
+        errorHttpStatusCode: 400,
+        exceptionFactory: () =>
+          new BadRequestException("Geçersiz ürün ID formatı"),
+      }),
+    )
+    id: string,
+    @CurrentUser("id") userId: string,
   ) {
     const liked = await this.productService.isProductLikedByUser(id, userId);
     return { liked };
