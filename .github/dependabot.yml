@@ -1,21 +1,32 @@
 version: 2
 updates:
+  # npm — ONE grouped PR per week for ALL minor/patch bumps (prod + dev together).
+  # Major upgrades are ignored: they are breaking (typescript, prisma, @nestjs/*,
+  # eslint, jest, tailwindcss, next, …) and are done deliberately by hand, not via
+  # Dependabot. This keeps the weekly npm noise to a single, always-green PR.
   - package-ecosystem: npm
     directory: "/"
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     groups:
-      dev-dependencies:
-        dependency-type: development
-        # Only bundle minor/patch bumps into the grouped PR. Major bumps
-        # (typescript, eslint, jest, prisma, @nestjs/*, tailwindcss, @babel/*, …)
-        # are breaking and each gets its own PR, so a single major upgrade never
-        # drags the whole group red and blocks the safe updates.
+      npm-minor-patch:
+        patterns:
+          - "*"
         update-types:
           - minor
           - patch
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
+  # github-actions — ONE grouped PR per week for all action bumps.
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      github-actions-all:
+        patterns:
+          - "*"
