@@ -1,6 +1,11 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import * as crypto from 'crypto';
+import {
+  Injectable,
+  BadRequestException,
+  HttpException,
+  Logger,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import * as crypto from "crypto";
 
 // =============================================================================
 // PAYTR API TYPES
@@ -28,35 +33,47 @@ export interface PayTRPaymentRequest {
   merchantOid: string;
   email: string;
   paymentAmount: number; // in kuruş
-  paymentType: 'card' | 'eft';
+  paymentType: "card" | "eft";
   installmentCount: number;
-  currency: 'TL' | 'EUR' | 'USD' | 'GBP' | 'RUB';
-  testMode: '0' | '1';
-  noInstallment: '0' | '1';
-  maxInstallment: '0' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12';
+  currency: "TL" | "EUR" | "USD" | "GBP" | "RUB";
+  testMode: "0" | "1";
+  noInstallment: "0" | "1";
+  maxInstallment:
+    | "0"
+    | "2"
+    | "3"
+    | "4"
+    | "5"
+    | "6"
+    | "7"
+    | "8"
+    | "9"
+    | "10"
+    | "11"
+    | "12";
   userName: string;
   userAddress: string;
   userPhone: string;
   merchantOkUrl: string;
   merchantFailUrl: string;
   userBasket: string; // Base64 encoded JSON array
-  debugOn: '0' | '1';
-  lang: 'tr' | 'en';
+  debugOn: "0" | "1";
+  lang: "tr" | "en";
   userIp: string;
   timeoutLimit?: string;
-  cardType?: 'bonus' | 'axess' | 'maximum' | 'world' | 'cardfinans' | 'paraf';
-  syncMode?: '0' | '1';
+  cardType?: "bonus" | "axess" | "maximum" | "world" | "cardfinans" | "paraf";
+  syncMode?: "0" | "1";
 }
 
 export interface PayTRIframeResponse {
-  status: 'success' | 'failed';
+  status: "success" | "failed";
   reason?: string;
   token?: string;
 }
 
 export interface PayTRCallbackData {
   merchant_oid: string;
-  status: 'success' | 'failed';
+  status: "success" | "failed";
   total_amount: string;
   hash: string;
   failed_reason_code?: string;
@@ -73,7 +90,7 @@ export interface PayTRRefundRequest {
 }
 
 export interface PayTRRefundResponse {
-  status: 'success' | 'error';
+  status: "success" | "error";
   err_no?: string;
   err_msg?: string;
   merchant_oid?: string;
@@ -97,9 +114,9 @@ export type PayTRStatusInquiryResult =
 
 /** PAYTR_TEST_MODE: true / 1 / yes → test */
 export function parsePaytrTestMode(raw: string | undefined): boolean {
-  if (raw === undefined || raw === '') return true;
+  if (raw === undefined || raw === "") return true;
   const v = String(raw).trim().toLowerCase();
-  return v === '1' || v === 'true' || v === 'yes';
+  return v === "1" || v === "true" || v === "yes";
 }
 
 // =============================================================================
@@ -116,26 +133,41 @@ export class PayTRService {
   private readonly testMode: boolean;
 
   constructor(private readonly configService: ConfigService) {
-    this.merchantId = (this.configService.get('PAYTR_MERCHANT_ID', '') || '').trim();
-    this.merchantKey = (this.configService.get('PAYTR_MERCHANT_KEY', '') || '').trim();
-    this.merchantSalt = (this.configService.get('PAYTR_MERCHANT_SALT', '') || '').trim();
-    this.baseUrl = 'https://www.paytr.com/odeme';
-    this.testMode = parsePaytrTestMode(this.configService.get('PAYTR_TEST_MODE'));
+    this.merchantId = (
+      this.configService.get("PAYTR_MERCHANT_ID", "") || ""
+    ).trim();
+    this.merchantKey = (
+      this.configService.get("PAYTR_MERCHANT_KEY", "") || ""
+    ).trim();
+    this.merchantSalt = (
+      this.configService.get("PAYTR_MERCHANT_SALT", "") || ""
+    ).trim();
+    this.baseUrl = "https://www.paytr.com/odeme";
+    this.testMode = parsePaytrTestMode(
+      this.configService.get("PAYTR_TEST_MODE"),
+    );
 
-    const customCallback = (this.configService.get('PAYTR_CALLBACK_URL', '') || '').trim();
-    const apiUrl = (this.configService.get('API_URL', 'http://localhost:3001') || '').replace(/\/$/, '');
-    const effectiveCallback = customCallback || `${apiUrl}/api/payments/callback/paytr`;
-    this.logger.log(`PayTR callback (panel Bildirim URL): ${effectiveCallback}`);
-    if (effectiveCallback.includes('localhost')) {
+    const customCallback = (
+      this.configService.get("PAYTR_CALLBACK_URL", "") || ""
+    ).trim();
+    const apiUrl = (
+      this.configService.get("API_URL", "http://localhost:3001") || ""
+    ).replace(/\/$/, "");
+    const effectiveCallback =
+      customCallback || `${apiUrl}/api/payments/callback/paytr`;
+    this.logger.log(
+      `PayTR callback (panel Bildirim URL): ${effectiveCallback}`,
+    );
+    if (effectiveCallback.includes("localhost")) {
       this.logger.warn(
-        'PayTR genelde localhost bildirim kabul etmez; ngrok ve PAYTR_CALLBACK_URL kullanın, panelde aynı URL tanımlı olsun.',
+        "PayTR genelde localhost bildirim kabul etmez; ngrok ve PAYTR_CALLBACK_URL kullanın, panelde aynı URL tanımlı olsun.",
       );
     }
 
     if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
-      this.logger.warn('⚠️ PayTR API credentials not configured');
+      this.logger.warn("⚠️ PayTR API credentials not configured");
     } else {
-      this.logger.log(`PayTR test mode: ${this.testMode ? 'ON' : 'OFF'}`);
+      this.logger.log(`PayTR test mode: ${this.testMode ? "ON" : "OFF"}`);
     }
   }
 
@@ -143,7 +175,7 @@ export class PayTRService {
   // yanıt vermezse istek undici varsayılan ~300s'ye kadar askıda kalıp kullanıcı
   // isteğini bloke eder. (Retry, çift-submit riski nedeniyle bilinçli eklenmedi.)
   private readonly httpTimeoutMs = parseInt(
-    this.configService.get('PAYTR_HTTP_TIMEOUT_MS') || '20000',
+    this.configService.get("PAYTR_HTTP_TIMEOUT_MS") || "20000",
     10,
   );
 
@@ -169,20 +201,22 @@ export class PayTRService {
    * PayTR merchant durum sorgu: merchant_oid için başarılı ödeme var mı ve tutarlar.
    * Token: base64(HMAC-SHA256(merchant_id + merchant_oid + merchant_salt, merchant_key))
    */
-  async queryPaymentStatus(merchantOid: string): Promise<PayTRStatusInquiryResult> {
+  async queryPaymentStatus(
+    merchantOid: string,
+  ): Promise<PayTRStatusInquiryResult> {
     if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
-      this.logger.warn('PayTR status inquiry skipped: credentials missing');
-      return { ok: false, errMsg: 'PayTR not configured' };
+      this.logger.warn("PayTR status inquiry skipped: credentials missing");
+      return { ok: false, errMsg: "PayTR not configured" };
     }
     if (!merchantOid?.trim()) {
-      return { ok: false, errMsg: 'merchant_oid required' };
+      return { ok: false, errMsg: "merchant_oid required" };
     }
 
     const hashStr = this.merchantId + merchantOid + this.merchantSalt;
     const paytrToken = crypto
-      .createHmac('sha256', this.merchantKey)
+      .createHmac("sha256", this.merchantKey)
       .update(hashStr)
-      .digest('base64');
+      .digest("base64");
 
     const formData = new URLSearchParams({
       merchant_id: this.merchantId,
@@ -191,10 +225,10 @@ export class PayTRService {
     });
 
     try {
-      const response = await fetch('https://www.paytr.com/odeme/durum-sorgu', {
-        method: 'POST',
+      const response = await fetch("https://www.paytr.com/odeme/durum-sorgu", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          "Content-Type": "application/x-www-form-urlencoded",
         },
         body: formData.toString(),
         signal: AbortSignal.timeout(this.httpTimeoutMs),
@@ -202,7 +236,9 @@ export class PayTRService {
 
       const rawText = await response.text();
       if (!rawText?.trim()) {
-        this.logger.error(`PayTR durum-sorgu boş yanıt HTTP ${response.status}`);
+        this.logger.error(
+          `PayTR durum-sorgu boş yanıt HTTP ${response.status}`,
+        );
         return { ok: false, errMsg: `Empty response HTTP ${response.status}` };
       }
 
@@ -210,29 +246,35 @@ export class PayTRService {
       try {
         data = JSON.parse(rawText) as Record<string, unknown>;
       } catch {
-        this.logger.error(`PayTR durum-sorgu JSON değil: ${rawText.slice(0, 200)}`);
-        return { ok: false, errMsg: 'Invalid JSON from PayTR' };
+        this.logger.error(
+          `PayTR durum-sorgu JSON değil: ${rawText.slice(0, 200)}`,
+        );
+        return { ok: false, errMsg: "Invalid JSON from PayTR" };
       }
 
       const statusVal = (data.status ?? data.Status) as string | undefined;
-      if (statusVal !== 'success') {
+      if (statusVal !== "success") {
         return {
           ok: false,
           errNo: data.err_no != null ? String(data.err_no) : undefined,
-          errMsg: String(data.err_msg ?? 'PayTR status inquiry failed'),
+          errMsg: String(data.err_msg ?? "PayTR status inquiry failed"),
         };
       }
 
       const paymentTotalTl = PayTRService.parsePaytrMoneyString(
-        (data.payment_total as string | undefined) ?? (data.PaymentTotal as string | undefined),
+        (data.payment_total as string | undefined) ??
+          (data.PaymentTotal as string | undefined),
       );
       const paymentAmountTl = PayTRService.parsePaytrMoneyString(
-        (data.payment_amount as string | undefined) ?? (data.PaymentAmount as string | undefined),
+        (data.payment_amount as string | undefined) ??
+          (data.PaymentAmount as string | undefined),
       );
 
       if (paymentTotalTl === null) {
-        this.logger.warn(`PayTR durum-sorgu payment_total parse edilemedi: ${JSON.stringify(data)}`);
-        return { ok: false, errMsg: 'Could not parse payment_total' };
+        this.logger.warn(
+          `PayTR durum-sorgu payment_total parse edilemedi: ${JSON.stringify(data)}`,
+        );
+        return { ok: false, errMsg: "Could not parse payment_total" };
       }
       const amountTl = paymentAmountTl ?? paymentTotalTl;
 
@@ -242,7 +284,7 @@ export class PayTRService {
           ? String(paymentDateRaw)
           : undefined;
 
-      const currency = String(data.currency ?? data.Currency ?? 'TL');
+      const currency = String(data.currency ?? data.Currency ?? "TL");
 
       return {
         ok: true,
@@ -253,14 +295,17 @@ export class PayTRService {
       };
     } catch (error: any) {
       this.logger.error(`PayTR durum-sorgu hatası: ${error?.message}`);
-      return { ok: false, errMsg: error?.message || 'PayTR status inquiry error' };
+      return {
+        ok: false,
+        errMsg: error?.message || "PayTR status inquiry error",
+      };
     }
   }
 
   /** PayTR dökümanındaki gibi ondalık ayırıcı virgül olabilir (örn. "10,8") */
   static parsePaytrMoneyString(value: string | undefined): number | null {
     if (value === undefined || value === null) return null;
-    const s = String(value).trim().replace(/\s/g, '').replace(',', '.');
+    const s = String(value).trim().replace(/\s/g, "").replace(",", ".");
     const n = parseFloat(s);
     return Number.isFinite(n) ? n : null;
   }
@@ -275,14 +320,14 @@ export class PayTRService {
   verifyCallback(callback: PayTRCallbackData): boolean {
     const hashStr = `${callback.merchant_oid}${this.merchantSalt}${callback.status}${callback.total_amount}`;
     const expectedHash = crypto
-      .createHmac('sha256', this.merchantKey)
+      .createHmac("sha256", this.merchantKey)
       .update(hashStr)
-      .digest('base64');
+      .digest("base64");
 
     // Wave 4: sabit-zamanlı karşılaştırma (timing yan-kanalına karşı defense-in-depth).
     // timingSafeEqual eşit uzunluk ister → farklı uzunlukta erken false.
     const expected = Buffer.from(expectedHash);
-    const received = Buffer.from(callback.hash || '');
+    const received = Buffer.from(callback.hash || "");
     return (
       expected.length === received.length &&
       crypto.timingSafeEqual(expected, received)
@@ -302,7 +347,7 @@ export class PayTRService {
   } {
     return {
       orderId: callback.merchant_oid,
-      isSuccess: callback.status === 'success',
+      isSuccess: callback.status === "success",
       amount: parseInt(callback.total_amount, 10) / 100, // Convert from kuruş to TL
       errorCode: callback.failed_reason_code,
       errorMessage: callback.failed_reason_msg,
@@ -321,7 +366,9 @@ export class PayTRService {
     merchantOid: string,
     amount: number, // in TL
   ): Promise<PayTRRefundResponse> {
-    const oid = merchantOid.includes('-') ? merchantOid.replace(/-/g, '') : merchantOid;
+    const oid = merchantOid.includes("-")
+      ? merchantOid.replace(/-/g, "")
+      : merchantOid;
     // ÖNEMLİ: PayTR İade API return_amount = ONDALIK TL ("10.25"), KURUŞ DEĞİL.
     // Resmi İade doc: "Ayraç olarak yalnızca bir nokta (.) gönderilmelidir. Örnek: 10.25".
     // Kuruş (×100) göndermek 100 KAT fazla iadeye = maddi kayba yol açar (createDirectPayment
@@ -340,10 +387,10 @@ export class PayTRService {
     });
 
     try {
-      const response = await fetch('https://www.paytr.com/odeme/iade', {
-        method: 'POST',
+      const response = await fetch("https://www.paytr.com/odeme/iade", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          "Content-Type": "application/x-www-form-urlencoded",
         },
         body: formData.toString(),
         signal: AbortSignal.timeout(this.httpTimeoutMs),
@@ -352,17 +399,18 @@ export class PayTRService {
       const rawText = await response.text();
       const data = this.parsePaytrJson<PayTRRefundResponse>(rawText);
       if (!data) {
-        throw new BadRequestException('PayTR iade yanıtı geçersiz/boş');
+        throw new BadRequestException("PayTR iade yanıtı geçersiz/boş");
       }
 
-      if (data.status !== 'success') {
-        throw new BadRequestException(data.err_msg || 'PayTR iade başarısız');
+      if (data.status !== "success") {
+        throw new BadRequestException(data.err_msg || "PayTR iade başarısız");
       }
 
       return data;
     } catch (error: any) {
-      this.logger.error('PayTR refund error:', error);
-      throw new BadRequestException(error.message || 'PayTR iade hatası');
+      this.logger.error("PayTR refund error:", error);
+      if (error instanceof HttpException) throw error;
+      throw new BadRequestException("PayTR iade hatası");
     }
   }
 
@@ -406,23 +454,26 @@ export class PayTRService {
     });
 
     try {
-      const response = await fetch('https://www.paytr.com/odeme/api/bin-detail', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+      const response = await fetch(
+        "https://www.paytr.com/odeme/api/bin-detail",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: formData.toString(),
+          signal: AbortSignal.timeout(this.httpTimeoutMs),
         },
-        body: formData.toString(),
-        signal: AbortSignal.timeout(this.httpTimeoutMs),
-      });
+      );
 
       const rawText = await response.text();
       const data = this.parsePaytrJson(rawText);
       if (!data) {
-        throw new BadRequestException('PayTR taksit yanıtı geçersiz/boş');
+        throw new BadRequestException("PayTR taksit yanıtı geçersiz/boş");
       }
 
-      if (data.status !== 'success') {
-        throw new BadRequestException('Taksit bilgileri alınamadı');
+      if (data.status !== "success") {
+        throw new BadRequestException("Taksit bilgileri alınamadı");
       }
 
       // Parse installment options
@@ -434,15 +485,16 @@ export class PayTRService {
             count: i,
             totalAmount: parseFloat(data[key].total) / 100,
             monthlyAmount: parseFloat(data[key].monthly) / 100,
-            rate: parseFloat(data[key].rate || '0'),
+            rate: parseFloat(data[key].rate || "0"),
           });
         }
       }
 
       return { installments };
     } catch (error: any) {
-      this.logger.error('PayTR installment check error:', error);
-      throw new BadRequestException(error.message || 'Taksit bilgisi alınamadı');
+      this.logger.error("PayTR installment check error:", error);
+      if (error instanceof HttpException) throw error;
+      throw new BadRequestException("Taksit bilgisi alınamadı");
     }
   }
 
@@ -480,9 +532,11 @@ export class PayTRService {
       /** Kullanıcının zaten bir utoken'ı varsa yeni kart eklerken birlikte gönderilir. */
       utoken?: string;
     },
-  ): Promise<{ status: 'success'; threeDSHtml?: string }> {
+  ): Promise<{ status: "success"; threeDSHtml?: string }> {
     if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
-      throw new BadRequestException('PayTR yapılandırılmamış (merchant bilgileri eksik)');
+      throw new BadRequestException(
+        "PayTR yapılandırılmamış (merchant bilgileri eksik)",
+      );
     }
 
     // ÖNEMLİ: Direkt API /odeme payment_amount = ONDALIK TL ("462.81"), KURUŞ DEĞİL.
@@ -490,20 +544,22 @@ export class PayTRService {
     // PayTR'nin 100 KATI tutar çekmesine yol açar (panelde "46.281,00 TL", callback total_amount
     // ×100). chargeRecurring de aynı /odeme'yi ONDALIK TL ile çağırır — tutarlı.
     const paymentAmountStr = amount.toFixed(2); // ONDALIK TL
-    const paymentType = 'card';
+    const paymentType = "card";
     // Tek çekim için '0' gönderilir (Direkt API kuralı)
     const installmentCount = String(
-      options?.installmentCount && options.installmentCount > 1 ? options.installmentCount : 0,
+      options?.installmentCount && options.installmentCount > 1
+        ? options.installmentCount
+        : 0,
     );
-    const currency = 'TL';
-    const testModeStr = this.testMode ? '1' : '0';
-    const non3d = options?.non3d ? '1' : '0';
+    const currency = "TL";
+    const testModeStr = this.testMode ? "1" : "0";
+    const non3d = options?.non3d ? "1" : "0";
 
-    const successBase = `${this.configService.get('FRONTEND_URL')}/payment/success`;
+    const successBase = `${this.configService.get("FRONTEND_URL")}/payment/success`;
     const merchantOkUrl = options?.successQueryParams
       ? `${successBase}?${options.successQueryParams}`
       : successBase;
-    const merchantFailUrl = `${this.configService.get('FRONTEND_URL')}/payment/fail`;
+    const merchantFailUrl = `${this.configService.get("FRONTEND_URL")}/payment/fail`;
 
     // Direkt API token:
     // hashStr = merchant_id + user_ip + merchant_oid + email + payment_amount
@@ -520,21 +576,28 @@ export class PayTRService {
       testModeStr +
       non3d;
     const paytrToken = crypto
-      .createHmac('sha256', this.merchantKey)
+      .createHmac("sha256", this.merchantKey)
       .update(hashStr + this.merchantSalt)
-      .digest('base64');
+      .digest("base64");
 
-    const expiryYear2 = card.expireYear.length === 4 ? card.expireYear.slice(-2) : card.expireYear;
+    const expiryYear2 =
+      card.expireYear.length === 4
+        ? card.expireYear.slice(-2)
+        : card.expireYear;
     // Direkt API basket: ONDALIK TL birim fiyat ("50.00") — resmi örnek kodla birebir
     // (payment_amount ile aynı birim). Kuruş GÖNDERME (×100 hatasına yol açar).
     const basketJson = JSON.stringify(
-      basketItems.map((item) => [item.name, Number(item.price).toFixed(2), item.quantity]),
+      basketItems.map((item) => [
+        item.name,
+        Number(item.price).toFixed(2),
+        item.quantity,
+      ]),
     );
     const userBasket = basketJson
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
 
     const formData = new URLSearchParams({
       merchant_id: this.merchantId,
@@ -549,8 +612,8 @@ export class PayTRService {
       non_3d: non3d,
       paytr_token: paytrToken,
       cc_owner: card.holderName,
-      card_number: card.number.replace(/\s/g, ''),
-      expiry_month: card.expireMonth.padStart(2, '0'),
+      card_number: card.number.replace(/\s/g, ""),
+      expiry_month: card.expireMonth.padStart(2, "0"),
       expiry_year: expiryYear2,
       cvv: card.cvv,
       merchant_ok_url: merchantOkUrl,
@@ -559,26 +622,26 @@ export class PayTRService {
       user_address: buyer.address,
       user_phone: buyer.phone,
       user_basket: userBasket,
-      debug_on: this.testMode ? '1' : '0',
-      client_lang: 'tr',
+      debug_on: this.testMode ? "1" : "0",
+      client_lang: "tr",
       // /odeme doğrulayıcısı bu alanları da zorunlu tutuyor (iframe ortak şeması)
-      no_installment: '0',
-      max_installment: '0',
-      lang: 'tr',
-      timeout_limit: '30',
+      no_installment: "0",
+      max_installment: "0",
+      lang: "tr",
+      timeout_limit: "30",
     });
 
     // CAPI kart saklama: store_card=1 → ödeme bildiriminde (Bildirim URL) utoken döner.
     // Kullanıcının mevcut utoken'ı varsa yeni kart onunla ilişkilendirilir.
-    if (options?.storeCard) formData.set('store_card', '1');
-    if (options?.utoken) formData.set('utoken', options.utoken);
+    if (options?.storeCard) formData.set("store_card", "1");
+    if (options?.utoken) formData.set("utoken", options.utoken);
 
     let rawText: string;
     let httpStatus: number;
     try {
       const response = await fetch(this.baseUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: formData.toString(),
         signal: AbortSignal.timeout(this.httpTimeoutMs),
       });
@@ -586,19 +649,25 @@ export class PayTRService {
       rawText = await response.text();
     } catch (error: any) {
       this.logger.error(`PayTR direct API connection error: ${error?.message}`);
-      throw new BadRequestException('PayTR bağlantı hatası, lütfen tekrar deneyin.');
+      throw new BadRequestException(
+        "PayTR bağlantı hatası, lütfen tekrar deneyin.",
+      );
     }
 
-    const trimmed = (rawText || '').trim();
+    const trimmed = (rawText || "").trim();
     if (!trimmed) {
       this.logger.error(`PayTR direct API boş yanıt. HTTP ${httpStatus}`);
-      throw new BadRequestException(`PayTR yanıt vermedi (HTTP ${httpStatus}).`);
+      throw new BadRequestException(
+        `PayTR yanıt vermedi (HTTP ${httpStatus}).`,
+      );
     }
 
     // Hata yanıtları JSON'dır (bazen kısa bir HTML kabuğun İÇİNE gömülü gelir);
     // gerçek 3D yanıtı banka formunu içeren büyük bir HTML sayfasıdır.
-    const embeddedError = trimmed.slice(0, 3000).match(/\{"status"\s*:\s*"failed".*?\}/);
-    const jsonText = trimmed.startsWith('{') ? trimmed : embeddedError?.[0];
+    const embeddedError = trimmed
+      .slice(0, 3000)
+      .match(/\{"status"\s*:\s*"failed".*?\}/);
+    const jsonText = trimmed.startsWith("{") ? trimmed : embeddedError?.[0];
     if (jsonText) {
       let data: any;
       try {
@@ -606,30 +675,39 @@ export class PayTRService {
       } catch {
         data = null;
       }
-      if (data?.status === 'success') {
+      if (data?.status === "success") {
         // non_3d=1: çekim anında yapıldı; sonuç ayrıca Bildirim URL'ine düşer.
-        return { status: 'success' };
+        return { status: "success" };
       }
-      let reason: string = data?.err_msg || data?.reason || 'PayTR ödemeyi reddetti';
+      let reason: string =
+        data?.err_msg || data?.reason || "PayTR ödemeyi reddetti";
       if (/paytr_token/i.test(reason)) {
         // Bu hata pratikte mağazada Direkt API yetkisinin tanımlı olmamasında da
         // dönüyor — istemci bu mesajla iframe akışına düşer.
         reason =
-          'PayTR kart ödemesi bu mağaza için doğrulanamadı (Direkt API yetkisi gerekli olabilir).';
+          "PayTR kart ödemesi bu mağaza için doğrulanamadı (Direkt API yetkisi gerekli olabilir).";
       }
-      this.logger.warn(`PayTR direct API failed oid=${merchantOid}: ${data?.reason || reason}`);
+      this.logger.warn(
+        `PayTR direct API failed oid=${merchantOid}: ${data?.reason || reason}`,
+      );
       throw new BadRequestException(reason);
     }
 
     const lower = trimmed.slice(0, 500).toLowerCase();
-    if (lower.includes('<html') || lower.includes('<!doctype') || lower.includes('<form')) {
-      return { status: 'success', threeDSHtml: rawText };
+    if (
+      lower.includes("<html") ||
+      lower.includes("<!doctype") ||
+      lower.includes("<form")
+    ) {
+      return { status: "success", threeDSHtml: rawText };
     }
 
     this.logger.error(
       `PayTR direct API beklenmeyen yanıt oid=${merchantOid} HTTP ${httpStatus}: ${trimmed.slice(0, 300)}`,
     );
-    throw new BadRequestException('PayTR beklenmeyen yanıt döndü; kart bilgilerinizi kontrol edin.');
+    throw new BadRequestException(
+      "PayTR beklenmeyen yanıt döndü; kart bilgilerinizi kontrol edin.",
+    );
   }
 
   // ==========================================================================
@@ -654,16 +732,22 @@ export class PayTRService {
     buyer: PayTRBuyer;
     basketItems: PayTRBasketItem[];
     cvv?: string;
-  }): Promise<{ status: 'success' | 'failed' | 'wait_callback'; reason?: string; tryAgain?: boolean }> {
+  }): Promise<{
+    status: "success" | "failed" | "wait_callback";
+    reason?: string;
+    tryAgain?: boolean;
+  }> {
     if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
-      throw new BadRequestException('PayTR yapılandırılmamış (merchant bilgileri eksik)');
+      throw new BadRequestException(
+        "PayTR yapılandırılmamış (merchant bilgileri eksik)",
+      );
     }
     const paymentAmount = params.amount.toFixed(2); // ONDALIK TL (recurring kuruş kabul etmez)
-    const paymentType = 'card';
-    const installmentCount = '0';
-    const currency = 'TL';
-    const testModeStr = this.testMode ? '1' : '0';
-    const non3d = '1';
+    const paymentType = "card";
+    const installmentCount = "0";
+    const currency = "TL";
+    const testModeStr = this.testMode ? "1" : "0";
+    const non3d = "1";
 
     // hashStr = mid + ip + oid + email + amount + payment_type + installment + currency + test_mode + non_3d
     const hashStr =
@@ -678,13 +762,17 @@ export class PayTRService {
       testModeStr +
       non3d;
     const paytrToken = crypto
-      .createHmac('sha256', this.merchantKey)
+      .createHmac("sha256", this.merchantKey)
       .update(hashStr + this.merchantSalt)
-      .digest('base64');
+      .digest("base64");
 
     // Recurring sepeti: düz JSON, ondalık fiyat (örnek kodla uyumlu — iframe base64'ünden farklı)
     const userBasket = JSON.stringify(
-      params.basketItems.map((i) => [i.name, Number(i.price).toFixed(2), i.quantity]),
+      params.basketItems.map((i) => [
+        i.name,
+        Number(i.price).toFixed(2),
+        i.quantity,
+      ]),
     );
 
     const form = new URLSearchParams({
@@ -697,26 +785,26 @@ export class PayTRService {
       currency,
       test_mode: testModeStr,
       non_3d: non3d,
-      merchant_ok_url: `${this.configService.get('FRONTEND_URL')}/payment/success`,
-      merchant_fail_url: `${this.configService.get('FRONTEND_URL')}/payment/fail`,
+      merchant_ok_url: `${this.configService.get("FRONTEND_URL")}/payment/success`,
+      merchant_fail_url: `${this.configService.get("FRONTEND_URL")}/payment/fail`,
       user_name: `${params.buyer.name} ${params.buyer.surname}`,
       user_address: params.buyer.address,
       user_phone: params.buyer.phone,
       user_basket: userBasket,
-      debug_on: this.testMode ? '1' : '0',
-      client_lang: 'tr',
+      debug_on: this.testMode ? "1" : "0",
+      client_lang: "tr",
       installment_count: installmentCount,
       utoken: params.utoken,
       ctoken: params.ctoken,
-      recurring_payment: '1',
+      recurring_payment: "1",
       paytr_token: paytrToken,
     });
-    if (params.cvv) form.set('cvv', params.cvv);
+    if (params.cvv) form.set("cvv", params.cvv);
 
     try {
       const response = await fetch(this.baseUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: form.toString(),
         signal: AbortSignal.timeout(this.httpTimeoutMs),
       });
@@ -731,17 +819,27 @@ export class PayTRService {
         this.logger.error(
           `PayTR recurring boş/geçersiz yanıt oid=${params.merchantOid}: ${rawText?.slice(0, 200)}`,
         );
-        return { status: 'failed', reason: 'PayTR geçersiz/boş yanıt', tryAgain: true };
+        return {
+          status: "failed",
+          reason: "PayTR geçersiz/boş yanıt",
+          tryAgain: true,
+        };
       }
       return {
-        status: data.status as 'success' | 'failed' | 'wait_callback',
+        status: data.status as "success" | "failed" | "wait_callback",
         reason: data.reason || data.err_msg,
         tryAgain: data.try_again,
       };
     } catch (error: any) {
-      this.logger.error(`PayTR recurring hata oid=${params.merchantOid}: ${error?.message}`);
+      this.logger.error(
+        `PayTR recurring hata oid=${params.merchantOid}: ${error?.message}`,
+      );
       // Ağ/timeout → geçici kabul et, tekrar denenebilir.
-      return { status: 'failed', reason: error?.message || 'bağlantı hatası', tryAgain: true };
+      return {
+        status: "failed",
+        reason: error?.message || "bağlantı hatası",
+        tryAgain: true,
+      };
     }
   }
 
@@ -762,37 +860,44 @@ export class PayTRService {
     }>
   > {
     if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
-      throw new BadRequestException('PayTR yapılandırılmamış (merchant bilgileri eksik)');
+      throw new BadRequestException(
+        "PayTR yapılandırılmamış (merchant bilgileri eksik)",
+      );
     }
     const paytrToken = crypto
-      .createHmac('sha256', this.merchantKey)
+      .createHmac("sha256", this.merchantKey)
       .update(utoken + this.merchantSalt)
-      .digest('base64');
+      .digest("base64");
     const form = new URLSearchParams({
       merchant_id: this.merchantId,
       utoken,
       paytr_token: paytrToken,
     });
     try {
-      const response = await fetch('https://www.paytr.com/odeme/capi/list', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      const response = await fetch("https://www.paytr.com/odeme/capi/list", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: form.toString(),
         signal: AbortSignal.timeout(this.httpTimeoutMs),
       });
       const rawText = await response.text();
       const data = this.parsePaytrJson<any>(rawText);
       // Hata: {status:'error', err_msg}. Eşleşme yoksa boş JSON. Başarı: kart dizisi.
-      if (!data || data.status === 'error') {
-        if (data?.status === 'error') this.logger.warn(`PayTR capi/list error: ${data.err_msg}`);
+      if (!data || data.status === "error") {
+        if (data?.status === "error")
+          this.logger.warn(`PayTR capi/list error: ${data.err_msg}`);
         return [];
       }
-      const cards = Array.isArray(data) ? data : Array.isArray(data.cards) ? data.cards : [];
+      const cards = Array.isArray(data)
+        ? data
+        : Array.isArray(data.cards)
+          ? data.cards
+          : [];
       return cards
         .map((c: any) => ({
           ctoken: c.ctoken,
           last4: c.last_4,
-          requireCvv: String(c.require_cvv) === '1',
+          requireCvv: String(c.require_cvv) === "1",
           month: c.month,
           year: c.year,
           brand: c.c_brand,
@@ -815,12 +920,14 @@ export class PayTRService {
     ctoken: string,
   ): Promise<{ status: string; reason?: string }> {
     if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
-      throw new BadRequestException('PayTR yapılandırılmamış (merchant bilgileri eksik)');
+      throw new BadRequestException(
+        "PayTR yapılandırılmamış (merchant bilgileri eksik)",
+      );
     }
     const paytrToken = crypto
-      .createHmac('sha256', this.merchantKey)
+      .createHmac("sha256", this.merchantKey)
       .update(ctoken + utoken + this.merchantSalt)
-      .digest('base64');
+      .digest("base64");
     const form = new URLSearchParams({
       merchant_id: this.merchantId,
       ctoken,
@@ -828,18 +935,20 @@ export class PayTRService {
       paytr_token: paytrToken,
     });
     try {
-      const response = await fetch('https://www.paytr.com/odeme/capi/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      const response = await fetch("https://www.paytr.com/odeme/capi/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: form.toString(),
         signal: AbortSignal.timeout(this.httpTimeoutMs),
       });
       const rawText = await response.text();
-      const data = this.parsePaytrJson<{ status?: string; err_msg?: string }>(rawText);
-      return { status: data?.status || 'error', reason: data?.err_msg };
+      const data = this.parsePaytrJson<{ status?: string; err_msg?: string }>(
+        rawText,
+      );
+      return { status: data?.status || "error", reason: data?.err_msg };
     } catch (error: any) {
       this.logger.error(`PayTR capi/delete hata: ${error?.message}`);
-      return { status: 'error', reason: error?.message };
+      return { status: "error", reason: error?.message };
     }
   }
 
@@ -852,9 +961,9 @@ export class PayTRService {
    */
   private generateHash(data: string): string {
     return crypto
-      .createHmac('sha256', this.merchantKey)
+      .createHmac("sha256", this.merchantKey)
       .update(data)
-      .digest('base64');
+      .digest("base64");
   }
 
   // ==========================================================================
@@ -873,9 +982,11 @@ export class PayTRService {
     transferName: string;
     transferIban: string;
   }): Promise<{ status: string; err_no?: string; err_msg?: string }> {
-    const submerchantAmountKurus = Math.round(params.submerchantAmount * 100).toString();
+    const submerchantAmountKurus = Math.round(
+      params.submerchantAmount * 100,
+    ).toString();
     const totalAmountKurus = Math.round(params.totalAmount * 100).toString();
-    const oid = params.merchantOid.replace(/-/g, '');
+    const oid = params.merchantOid.replace(/-/g, "");
 
     const hashStr =
       this.merchantId +
@@ -888,9 +999,9 @@ export class PayTRService {
       this.merchantSalt;
 
     const paytrToken = crypto
-      .createHmac('sha256', this.merchantKey)
+      .createHmac("sha256", this.merchantKey)
       .update(hashStr)
-      .digest('base64');
+      .digest("base64");
 
     const postData = new URLSearchParams({
       merchant_id: this.merchantId,
@@ -905,23 +1016,28 @@ export class PayTRService {
 
     try {
       const response = await fetch(`${this.baseUrl}/platform/transfer`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: postData,
         signal: AbortSignal.timeout(this.httpTimeoutMs),
       });
       const rawText = await response.text();
-      const parsed =
-        this.parsePaytrJson<{ status: string; err_no?: string; err_msg?: string }>(rawText) ?? {
-          status: 'failed',
-          err_msg: 'PayTR geçersiz/boş yanıt',
-        };
+      const parsed = this.parsePaytrJson<{
+        status: string;
+        err_no?: string;
+        err_msg?: string;
+      }>(rawText) ?? {
+        status: "failed",
+        err_msg: "PayTR geçersiz/boş yanıt",
+      };
       this.logger.log(
-        `Platform transfer ${params.transId}: status=${parsed.status}${parsed.err_msg ? ` err=${parsed.err_msg}` : ''}`,
+        `Platform transfer ${params.transId}: status=${parsed.status}${parsed.err_msg ? ` err=${parsed.err_msg}` : ""}`,
       );
       return parsed;
     } catch (error: any) {
-      this.logger.error(`Platform transfer failed for ${params.transId}: ${error.message}`);
+      this.logger.error(
+        `Platform transfer failed for ${params.transId}: ${error.message}`,
+      );
       throw new BadRequestException(
         `PayTR platform transfer başarısız: ${error.message}`,
       );
@@ -939,9 +1055,9 @@ export class PayTRService {
       this.merchantId + params.startDate + params.endDate + this.merchantSalt;
 
     const paytrToken = crypto
-      .createHmac('sha256', this.merchantKey)
+      .createHmac("sha256", this.merchantKey)
       .update(hashStr)
-      .digest('base64');
+      .digest("base64");
 
     const postData = new URLSearchParams({
       merchant_id: this.merchantId,
@@ -951,14 +1067,17 @@ export class PayTRService {
     }).toString();
 
     try {
-      const response = await fetch('https://www.paytr.com/odeme/geri-donen-transfer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: postData,
-        signal: AbortSignal.timeout(this.httpTimeoutMs),
-      });
+      const response = await fetch(
+        "https://www.paytr.com/odeme/geri-donen-transfer",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: postData,
+          signal: AbortSignal.timeout(this.httpTimeoutMs),
+        },
+      );
       const rawText = await response.text();
-      return this.parsePaytrJson(rawText) ?? { status: 'failed' };
+      return this.parsePaytrJson(rawText) ?? { status: "failed" };
     } catch (error: any) {
       this.logger.error(`Get returned transfers failed: ${error.message}`);
       throw new BadRequestException(
@@ -977,9 +1096,9 @@ export class PayTRService {
     const hashStr = this.merchantId + params.transId + this.merchantSalt;
 
     const paytrToken = crypto
-      .createHmac('sha256', this.merchantKey)
+      .createHmac("sha256", this.merchantKey)
       .update(hashStr)
-      .digest('base64');
+      .digest("base64");
 
     const transInfo = params.transfers.map((t) => ({
       amount: Math.round(t.amount * 100).toString(),
@@ -995,14 +1114,17 @@ export class PayTRService {
     }).toString();
 
     try {
-      const response = await fetch('https://www.paytr.com/odeme/hesaptan-gonder', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: postData,
-        signal: AbortSignal.timeout(this.httpTimeoutMs),
-      });
+      const response = await fetch(
+        "https://www.paytr.com/odeme/hesaptan-gonder",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: postData,
+          signal: AbortSignal.timeout(this.httpTimeoutMs),
+        },
+      );
       const rawText = await response.text();
-      return this.parsePaytrJson(rawText) ?? { status: 'failed' };
+      return this.parsePaytrJson(rawText) ?? { status: "failed" };
     } catch (error: any) {
       this.logger.error(`Resend returned transfers failed: ${error.message}`);
       throw new BadRequestException(
@@ -1010,5 +1132,4 @@ export class PayTRService {
       );
     }
   }
-
 }
