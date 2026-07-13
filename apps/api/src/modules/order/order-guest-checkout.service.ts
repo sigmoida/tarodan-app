@@ -215,8 +215,8 @@ export class OrderGuestCheckoutService {
       // Price is ALWAYS derived server-side — NEVER from the client. A guest was
       // previously able to submit `dto.price: 1` on this public route and pay ~1 TL
       // for any item (the PayTR amount-check validates against this same tampered
-      // total). Direct buy → the product's own (sale) price; accepted offer → the
-      // offer amount.
+      // total). Direct buy -> the product's own (sale) price; accepted offer -> the
+      // offer amount (set below).
       let finalPrice = Number(product.salePrice ?? product.price);
 
       if (dto.offerId) {
