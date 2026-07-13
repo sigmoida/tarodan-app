@@ -38,9 +38,26 @@ runs:
         set -euo pipefail
 
         echo "Triggering Coolify deploy for: $UUIDS"
-        resp="$(curl -fsSL --retry 3 --retry-delay 10 \
+        # Capture the HTTP status AND body separately (no -f) so a non-2xx from
+        # Coolify surfaces the actual message instead of a bare "curl: (22) 403".
+        # A 401 = bad/expired token; 403 = token authenticated but lacks the
+        # deploy scope or belongs to a different team than the app UUIDs; an HTML
+        # body usually means a WAF/Cloudflare in front of Coolify blocked us.
+        body_file="$(mktemp)"
+        http_code="$(curl -sS --retry 3 --retry-delay 10 \
           -H "Authorization: Bearer $COOLIFY_TOKEN" \
+          -o "$body_file" -w '%{http_code}' \
           "$COOLIFY_URL/api/v1/deploy?uuid=$UUIDS&force=false")"
+        echo "Coolify deploy trigger -> HTTP $http_code"
+        if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+          echo "::error::Coolify deploy trigger returned HTTP $http_code"
+          echo "----- response body -----"
+          cat "$body_file" || true
+          echo
+          echo "-------------------------"
+          exit 1
+        fi
+        resp="$(cat "$body_file")"
         echo "$resp" | jq .
 
         # Collect the deployment UUID(s) Coolify queued (one per app).
