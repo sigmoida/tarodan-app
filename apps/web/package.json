@@ -40,7 +40,7 @@
     "@tarodan/design-tokens": "workspace:*",
     "@tarodan/types": "workspace:*",
     "@tarodan/ui": "workspace:*",
-    "axios": "^1.6.2",
+    "axios": "^1.18.1",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "framer-motion": "^10.16.16",
