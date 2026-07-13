@@ -8,6 +8,13 @@ updates:
     groups:
       dev-dependencies:
         dependency-type: development
+        # Only bundle minor/patch bumps into the grouped PR. Major bumps
+        # (typescript, eslint, jest, prisma, @nestjs/*, tailwindcss, @babel/*, …)
+        # are breaking and each gets its own PR, so a single major upgrade never
+        # drags the whole group red and blocks the safe updates.
+        update-types:
+          - minor
+          - patch
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
