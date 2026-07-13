@@ -1,602 +1,69 @@
-import {
-  View,
-  ScrollView,
-  StyleSheet,
-  FlatList,
-  RefreshControl,
-} from "react-native";
-import { AppImage } from "@/components/AppImage";
-import {
-  Button,
-  Card,
-  Chip,
-  Spinner,
-  Modal,
-  Input,
-  Text,
-  StatusBadge,
-  theme,
-  ScreenHeader,
-  appAlert,
-} from "@tarodan/ui-native";
-import type { BadgeVariant } from "@tarodan/ui-native";
-import { useState, useCallback } from "react";
-import { router, useFocusEffect } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
-import { Ionicons } from "@expo/vector-icons";
-import { ordersApi } from "@/services/api";
-import { useAuthStore } from "@/stores/authStore";
-import { getOrderProductImageUri } from "@/utils/orderProductImage";
-import { useUpdateOrderStatus } from "./_hooks/useUpdateOrderStatus";
+import { View, FlatList, RefreshControl } from 'react-native';
+import { Button, Spinner, Text, theme, ScreenHeader } from '@tarodan/ui-native';
+import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useSales } from './_hooks/useSales';
+import { useSaleActions } from './_hooks/useSaleActions';
+import { styles } from './_lib/styles';
+import { SalesAuthGate } from './_components/SalesAuthGate';
+import { SalesEarnings } from './_components/SalesEarnings';
+import { SalesFilterChips } from './_components/SalesFilterChips';
+import { SaleCard } from './_components/SaleCard';
+import { ShipDialog } from './_modals/ShipDialog';
 
 const { colors } = theme;
 
-// TÜM OrderStatus enum değerlerini kapsar (eksik durum = StatusBadge ham enum
-// gösterir, örn. "refunded"). Etiketler alıcı orders/[id] uiOrderStatusConfig ile
-// tutarlı; yalnız 'paid' satıcıya aksiyon-odaklı. preparing→processing normalize
-// edildiğinden ikisi de var.
-const salesStatusConfig: Record<
-  string,
-  { label: string; variant: BadgeVariant }
-> = {
-  pending_payment: { label: "Ödeme Bekliyor", variant: "warning" },
-  paid: { label: "Ödendi - Hazırla", variant: "success" },
-  preparing: { label: "Hazırlanıyor", variant: "info" },
-  processing: { label: "Hazırlanıyor", variant: "info" },
-  shipped: { label: "Kargoda", variant: "primary" },
-  delivered: { label: "Teslim Edildi", variant: "success" },
-  awaiting_buyer_confirmation: { label: "Onay Bekleniyor", variant: "info" },
-  completed: { label: "Tamamlandı", variant: "success" },
-  cancelled: { label: "İptal Edildi", variant: "danger" },
-  refund_requested: { label: "İade Sürecinde", variant: "danger" },
-  refunded: { label: "İade Edildi", variant: "secondary" },
-};
-
-interface Sale {
-  id: string;
-  orderNumber: string;
-  // Backend ham OrderStatus enum'u; sadece preparing→processing normalize edilir.
-  status: string;
-  // Kargo öncesi iptalde status 'refunded' olur ama bu 'iptal' der → rozet/filtre
-  // "İptal Edildi" göstersin (alıcı orders/index ile tutarlı).
-  cancellationType?: string | null;
-  totalAmount: number;
-  product: {
-    id: string;
-    title: string;
-    images?: Array<{ url: string }>;
-    imageUrl?: string | null;
-  };
-  buyer: {
-    id: string;
-    displayName: string;
-  };
-  // Adressiz satış olabilir (örn. eski/eksik kayıt) → opsiyonel, render korumalı.
-  shippingAddress?: {
-    fullName: string;
-    address: string;
-    city: string;
-  } | null;
-  createdAt: string;
-}
-
-type FilterType =
-  | "all"
-  | "paid"
-  | "processing"
-  | "shipped"
-  | "completed"
-  | "cancelled";
-
-// Rozet/filtre durumu: cancellationType='iptal' → 'cancelled' (status 'refunded'
-// olsa bile "İade" deme); aksi halde siparişin kendi durumu. Alıcı orders/index
-// badgeStatusOf ile tutarlı.
-const saleBadgeStatus = (sale: Sale): string =>
-  sale.cancellationType === "iptal" ? "cancelled" : sale.status;
-
 export default function SalesScreen() {
-  const { isAuthenticated } = useAuthStore();
-  const [filter, setFilter] = useState<FilterType>("all");
-  const [refreshing, setRefreshing] = useState(false);
-  const [shipDialog, setShipDialog] = useState<{
-    visible: boolean;
-    order: Sale | null;
-  }>({
-    visible: false,
-    order: null,
-  });
-  const [trackingNumber, setTrackingNumber] = useState("");
+  const s = useSales();
+  const actions = useSaleActions();
 
-  // Fetch sales
-  const {
-    data: salesData,
-    isLoading,
-    refetch,
-  } = useQuery({
-    queryKey: ["orders", "seller", filter],
-    queryFn: async () => {
-      try {
-        const params: any = { role: "seller", limit: 100 };
-        if (filter !== "all") {
-          // Mobil UI 'processing' adını kullanır; backend enum'u 'preparing'. Sınırda çevir.
-          // 'cancelled' filtresi hem iptal (cancelled) hem para-iadesi (refunded) getirir.
-          params.status =
-            filter === "processing"
-              ? "preparing"
-              : filter === "cancelled"
-                ? "cancelled,refunded"
-                : filter;
-        }
-        const response = await ordersApi.getAll(params);
-        const raw = (response.data as any)?.data || response.data || [];
-        // Backend 'preparing' → mobil 'processing' (badge/aksiyon/filtre tek isimle çalışsın).
-        return (Array.isArray(raw) ? raw : []).map((o: any) =>
-          o?.status === "preparing" ? { ...o, status: "processing" } : o,
-        );
-      } catch (error) {
-        console.log("Failed to fetch sales");
-        return [];
-      }
-    },
-    enabled: isAuthenticated,
-  });
-
-  const sales: Sale[] = salesData || [];
-
-  // Kazanç özeti — AKTİF FİLTREDEN BAĞIMSIZ sunucu agregatı. Önceden totalEarnings/
-  // pendingEarnings filtrelenmiş + sayfalı `sales` listesinden hesaplanıyordu → 'paid'
-  // filtresine basınca toplam kazanç 0'a düşüyordu. Artık tüm siparişler üzerinden tek sorgu.
-  const { data: earningsResp } = useQuery({
-    queryKey: ["orders", "seller", "earnings"],
-    queryFn: () => ordersApi.getSellerEarnings(),
-    enabled: isAuthenticated,
-  });
-  const totalEarnings = earningsResp?.data?.totalEarnings ?? 0;
-  const pendingEarnings = earningsResp?.data?.pendingEarnings ?? 0;
-
-  // Sipariş durumu mutasyonu (processing/shipped) → _hooks/useUpdateOrderStatus.
-  // Snackbar + invalidate hook'a ait; buradan yalnız UI reset (modal kapat, input temizle).
-  const updateStatusMutation = useUpdateOrderStatus(() => {
-    setShipDialog({ visible: false, order: null });
-    setTrackingNumber("");
-  });
-
-  // Refresh on focus
-  useFocusEffect(
-    useCallback(() => {
-      if (isAuthenticated) {
-        refetch();
-      }
-    }, [isAuthenticated]),
-  );
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
-  };
-
-  const getStatusLabel = (status: FilterType) => {
-    if (status === "all") return "Tümü";
-    if (status === "cancelled") return "İptal / İade";
-    return salesStatusConfig[status]?.label ?? status;
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("tr-TR", {
-      day: "numeric",
-      month: "short",
-    });
-  };
-
-  const formatPrice = (price: number) => {
-    return `₺${price.toLocaleString("tr-TR")}`;
-  };
-
-  const handleMarkAsProcessing = (order: Sale) => {
-    appAlert(
-      "Siparişi Hazırlıyor Olarak İşaretle",
-      "Siparişi hazırlamaya başladığınızı onaylıyor musunuz?",
-      [
-        { text: "İptal", style: "cancel" },
-        {
-          text: "Onayla",
-          onPress: () =>
-            updateStatusMutation.mutate({
-              orderId: order.id,
-              status: "processing",
-            }),
-        },
-      ],
-    );
-  };
-
-  const handleShip = () => {
-    if (!trackingNumber.trim()) {
-      appAlert("Hata", "Takip numarası giriniz");
-      return;
-    }
-    if (shipDialog.order) {
-      updateStatusMutation.mutate({
-        orderId: shipDialog.order.id,
-        status: "shipped",
-        trackingNumber: trackingNumber.trim(),
-      });
-    }
-  };
-
-  // totalEarnings / pendingEarnings yukarıda sunucu agregatından (filtreden bağımsız) geliyor.
-
-  // Not authenticated or not a seller
-  if (!isAuthenticated) {
-    return (
-      <View style={styles.centeredContainer}>
-        <Ionicons
-          name="storefront-outline"
-          size={64}
-          color={colors.primary[600]!}
-        />
-        <Text variant="h2" style={styles.title}>
-          Satışlarım
-        </Text>
-        <Text variant="body" tone="muted" style={styles.subtitle}>
-          Satışlarınızı görmek için giriş yapın
-        </Text>
-        <Button
-          variant="primary"
-          title="Giriş Yap"
-          onPress={() => router.push("/(auth)/login")}
-          style={{ alignSelf: "center" }}
-        />
-      </View>
-    );
+  if (!s.isAuthenticated) {
+    return <SalesAuthGate />;
   }
-
-  const filteredSales = sales.filter((sale) => {
-    if (filter === "all") return true;
-    const ui = saleBadgeStatus(sale);
-    if (filter === "cancelled") return ui === "cancelled" || ui === "refunded";
-    return ui === filter;
-  });
 
   return (
     <View style={styles.container}>
       <ScreenHeader
         title="Satışlarım"
-        onBack={() =>
-          router.canGoBack() ? router.back() : router.replace("/(tabs)")
-        }
+        onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
       />
 
-      {/* Earnings Summary */}
-      <Card variant="elevated" style={styles.earningsCard}>
-        <View style={styles.earningsContent}>
-          <View style={styles.earningItem}>
-            <Text variant="caption" style={styles.earningLabel}>
-              Tamamlanan
-            </Text>
-            <Text variant="h3" style={styles.earningValue}>
-              {formatPrice(totalEarnings)}
-            </Text>
-          </View>
-          <View style={styles.earningDivider} />
-          <View style={styles.earningItem}>
-            <Text variant="caption" style={styles.earningLabel}>
-              Bekleyen
-            </Text>
-            <Text variant="h3" style={styles.earningValuePending}>
-              {formatPrice(pendingEarnings)}
-            </Text>
-          </View>
-        </View>
-      </Card>
+      <SalesEarnings totalEarnings={s.totalEarnings} pendingEarnings={s.pendingEarnings} />
 
-      {/* Filter Chips */}
-      <View style={styles.filterContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {(
-            [
-              "all",
-              "paid",
-              "processing",
-              "shipped",
-              "completed",
-              "cancelled",
-            ] as FilterType[]
-          ).map((f) => (
-            <Chip
-              key={f}
-              label={getStatusLabel(f)}
-              selected={filter === f}
-              variant="primary"
-              onPress={() => setFilter(f)}
-              style={styles.filterChip}
-            />
-          ))}
-        </ScrollView>
-      </View>
+      <SalesFilterChips filter={s.filter} onSelect={s.setFilter} />
 
-      {/* Sales */}
-      {isLoading && sales.length === 0 ? (
+      {s.isLoading && s.sales.length === 0 ? (
         <View style={styles.loadingContainer}>
           <Spinner size="lg" />
         </View>
-      ) : filteredSales.length === 0 ? (
+      ) : s.filteredSales.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="cart-outline" size={80} color={colors.text.subtle} />
-          <Text variant="h3" style={styles.emptyTitle}>
-            Henüz satışınız yok
-          </Text>
+          <Text variant="h3" style={styles.emptyTitle}>Henüz satışınız yok</Text>
           <Text variant="body" tone="muted" style={styles.emptySubtitle}>
             İlan oluşturarak satışa başlayın
           </Text>
           <Button
             variant="primary"
             title="İlan Oluştur"
-            onPress={() => router.push("/(tabs)/sell")}
-            style={{ alignSelf: "center" }}
+            onPress={() => router.push('/(tabs)/sell')}
+            style={{ alignSelf: 'center' }}
           />
         </View>
       ) : (
         <FlatList
-          data={filteredSales}
+          data={s.filteredSales}
           keyExtractor={(sale) => sale.id}
           style={styles.salesList}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={[colors.primary[600]!]}
-            />
+            <RefreshControl refreshing={s.refreshing} onRefresh={s.onRefresh} colors={[colors.primary[600]!]} />
           }
           ListFooterComponent={<View style={{ height: 100 }} />}
-          renderItem={({ item: sale }) => (
-            <Card variant="elevated" style={styles.saleCard}>
-              <View style={styles.saleHeader}>
-                <Text variant="caption" style={styles.orderNumber}>
-                  #{sale.orderNumber}
-                </Text>
-                <StatusBadge
-                  status={saleBadgeStatus(sale)}
-                  config={salesStatusConfig}
-                  size="sm"
-                />
-              </View>
-
-              <View style={styles.saleContent}>
-                <AppImage
-                  source={getOrderProductImageUri(sale.product, "card")}
-                  style={styles.productImage}
-                />
-                <View style={styles.saleInfo}>
-                  <Text variant="label" numberOfLines={1}>
-                    {sale.product.title}
-                  </Text>
-                  <Text variant="caption" style={styles.buyerName}>
-                    Alıcı: {sale.buyer.displayName}
-                  </Text>
-                  {sale.shippingAddress?.city ? (
-                    <Text
-                      variant="caption"
-                      style={styles.addressText}
-                      numberOfLines={1}
-                    >
-                      📍 {sale.shippingAddress.city}
-                    </Text>
-                  ) : null}
-                </View>
-                <View style={styles.priceSection}>
-                  <Text variant="h3" style={styles.price}>
-                    {formatPrice(sale.totalAmount)}
-                  </Text>
-                  <Text variant="caption" style={styles.dateText}>
-                    {formatDate(sale.createdAt)}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Action Buttons */}
-              {sale.status === "paid" && (
-                <View style={styles.actionButtons}>
-                  <Button
-                    variant="primary"
-                    title="Hazırlanıyor Olarak İşaretle"
-                    onPress={() => handleMarkAsProcessing(sale)}
-                    isLoading={
-                      updateStatusMutation.isPending &&
-                      updateStatusMutation.variables?.orderId === sale.id
-                    }
-                  />
-                </View>
-              )}
-
-              {sale.status === "processing" && (
-                <View style={styles.actionButtons}>
-                  <Button
-                    variant="primary"
-                    title="Kargoya Ver"
-                    onPress={() =>
-                      setShipDialog({ visible: true, order: sale })
-                    }
-                  />
-                </View>
-              )}
-            </Card>
-          )}
+          renderItem={({ item: sale }) => <SaleCard sale={sale} actions={actions} />}
         />
       )}
 
-      {/* Ship Dialog */}
-      <Modal
-        isOpen={shipDialog.visible}
-        onClose={() => setShipDialog({ visible: false, order: null })}
-        title="Kargo Bilgisi"
-      >
-        <Text variant="body" style={{ marginBottom: 16 }}>
-          {shipDialog.order?.product.title}
-        </Text>
-        <Input
-          label="Kargo Takip Numarası"
-          value={trackingNumber}
-          onChangeText={setTrackingNumber}
-          placeholder="Örn: 1234567890"
-        />
-        <View style={styles.dialogActions}>
-          <Button
-            variant="ghost"
-            title="İptal"
-            onPress={() => setShipDialog({ visible: false, order: null })}
-          />
-          <Button
-            variant="primary"
-            title="Kargoya Verildi"
-            onPress={handleShip}
-            isLoading={updateStatusMutation.isPending}
-          />
-        </View>
-      </Modal>
+      <ShipDialog actions={actions} />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.surface.alt,
-  },
-  centeredContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 32,
-    backgroundColor: colors.surface.DEFAULT,
-  },
-  title: {
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  subtitle: {
-    textAlign: "center",
-    marginBottom: 24,
-  },
-  earningsCard: {
-    margin: 16,
-    marginBottom: 8,
-  },
-  earningsContent: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  earningItem: {
-    flex: 1,
-    alignItems: "center",
-  },
-  earningLabel: {
-    color: colors.text.muted,
-    marginBottom: 4,
-  },
-  earningValue: {
-    color: colors.success[600]!,
-    fontWeight: "bold",
-  },
-  earningValuePending: {
-    color: colors.warning[600]!,
-    fontWeight: "bold",
-  },
-  earningDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: colors.border.DEFAULT,
-  },
-  filterContainer: {
-    backgroundColor: colors.surface.DEFAULT,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.DEFAULT,
-  },
-  filterChip: {
-    marginRight: 8,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 32,
-  },
-  emptyTitle: {
-    marginTop: 16,
-    marginBottom: 8,
-    color: colors.text.heading,
-  },
-  emptySubtitle: {
-    textAlign: "center",
-    marginBottom: 24,
-  },
-  salesList: {
-    flex: 1,
-    padding: 16,
-  },
-  saleCard: {
-    marginBottom: 12,
-  },
-  saleHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  orderNumber: {
-    color: colors.text.muted,
-  },
-  saleContent: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  productImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    backgroundColor: colors.surface.alt,
-  },
-  saleInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  buyerName: {
-    color: colors.text.muted,
-    marginTop: 2,
-  },
-  addressText: {
-    color: colors.text.muted,
-    marginTop: 2,
-  },
-  priceSection: {
-    alignItems: "flex-end",
-  },
-  price: {
-    color: colors.primary[700]!,
-    fontWeight: "bold",
-  },
-  dateText: {
-    color: colors.text.muted,
-    marginTop: 2,
-  },
-  actionButtons: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.DEFAULT,
-  },
-  dialogActions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 8,
-    marginTop: 16,
-  },
-});
