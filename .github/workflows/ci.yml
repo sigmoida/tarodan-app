@@ -401,7 +401,7 @@ jobs:
           retention-days: 14
       - name: Upload to Codecov (skipped if no token)
         if: ${{ env.CODECOV_TOKEN != '' }}
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ env.CODECOV_TOKEN }}
           files: apps/api/coverage/lcov.info
