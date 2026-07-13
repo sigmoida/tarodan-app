@@ -623,21 +623,23 @@ export class OrderCheckoutGroupService {
         },
         { timeout: 60000 },
       );
-    } catch (e) {
-      // Eşzamanlı aynı idempotencyKey (çift-tık): replay kontrolü ile grup create
-      // arasında yarış → idempotency_key unique → P2002 (eski davranış 500). Kazananın
-      // grubunu replay olarak dön → çift-tık idempotent şekilde aynı grubu 201 ile alır.
+    } catch (error) {
+      // Two concurrent requests with the same idempotencyKey: the unique
+      // constraint on CheckoutGroup.idempotencyKey lets only one win; the loser
+      // hits P2002. Return the winner's group as an idempotent replay instead of
+      // surfacing a 500. For a guest, buyerId is the shared system-guest user, so
+      // it must not scope the replay lookup — pass undefined.
       if (
-        e instanceof Prisma.PrismaClientKnownRequestError &&
-        e.code === "P2002"
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
       ) {
         const replayed = await this.findCheckoutGroupReplay(
           dto.idempotencyKey,
-          buyerId,
+          isGuest ? undefined : buyerId,
         );
         if (replayed) return replayed;
       }
-      throw e;
+      throw error;
     }
 
     // Cache invalidation + order.created eventleri (tx dışı; hata sipariş oluşumunu bozmaz)

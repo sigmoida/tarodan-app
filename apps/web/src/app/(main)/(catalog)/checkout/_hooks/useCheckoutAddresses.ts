@@ -1,10 +1,10 @@
 /** @format */
 
-'use client';
+"use client";
 
-import { useQuery } from '@tanstack/react-query';
-import { addressesApi } from '@/lib/api';
-import type { Address } from '../_lib/types';
+import { addressesApi } from "@/lib/api";
+import { useWebList } from "@/hooks/useWebResource";
+import type { Address } from "../_lib/types";
 
 /**
  * The signed-in user's saved addresses. Replaces the manual `fetchAddresses`
@@ -12,23 +12,20 @@ import type { Address } from '../_lib/types';
  * context, and writes invalidate `['checkout-addresses']`.
  */
 export function useCheckoutAddresses(isAuthenticated: boolean) {
-	const query = useQuery({
-		queryKey: ['checkout-addresses'],
-		queryFn: async (): Promise<Address[]> => {
-			const response = await addressesApi.getAll();
-			const list =
-				response.data?.addresses ||
-				response.data?.data ||
-				response.data ||
-				[];
-			return Array.isArray(list) ? list : [];
-		},
-		enabled: isAuthenticated,
-	});
+  const query = useWebList<Address[]>({
+    resource: "checkout-addresses",
+    fetcher: async () => {
+      const response = await addressesApi.getAll();
+      const list =
+        response.data?.addresses || response.data?.data || response.data || [];
+      return Array.isArray(list) ? list : [];
+    },
+    enabled: isAuthenticated,
+  });
 
-	return {
-		addresses: query.data ?? [],
-		addressesLoading: query.isLoading && isAuthenticated,
-		addressesError: query.isError,
-	};
+  return {
+    addresses: query.data ?? [],
+    addressesLoading: query.isLoading && isAuthenticated,
+    addressesError: query.isError,
+  };
 }

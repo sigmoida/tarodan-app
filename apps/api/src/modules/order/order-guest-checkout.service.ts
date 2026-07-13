@@ -212,8 +212,12 @@ export class OrderGuestCheckoutService {
         throw new BadRequestException("Bu ürün stokta bulunmamaktadır");
       }
 
-      // Get price (from offer or direct buy price)
-      let finalPrice = dto.price || Number(product.price);
+      // Price is ALWAYS derived server-side — NEVER from the client. A guest was
+      // previously able to submit `dto.price: 1` on this public route and pay ~1 TL
+      // for any item (the PayTR amount-check validates against this same tampered
+      // total). Direct buy → the product's own (sale) price; accepted offer → the
+      // offer amount.
+      let finalPrice = Number(product.salePrice ?? product.price);
 
       if (dto.offerId) {
         const offer = await tx.offer.findUnique({

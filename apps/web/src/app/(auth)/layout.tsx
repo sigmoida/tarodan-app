@@ -1,7 +1,5 @@
-import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/server/session';
-import QueryProvider from '@/components/QueryProvider';
+import type { Metadata } from "next";
+import QueryProvider from "@/components/QueryProvider";
 
 /** Auth pages are never indexable — one layout-level guard so a new page can't
  *  forget it (individual pages may still override title/description). */
@@ -11,24 +9,23 @@ export const metadata: Metadata = {
 
 /**
  * Layout for unauthenticated pages (login, register, forgot/reset password,
- * verify email). Server Component: if a valid session already exists, bounce to
- * the marketplace before rendering — one server-side guard replacing the
- * inconsistent per-page `useEffect` redirects (and fixing login, which had none).
+ * verify email). Pure passthrough — deliberately NOT async.
  *
- * The shared brand frame (logo header + gradient + footer) moves here as each
- * page is thinned onto `AuthCard` + extracted form components; until then the
- * pages carry their own frame, so this layout stays a passthrough.
+ * The "already logged in → go home" bounce used to live here as
+ * `await getSession(); if (session) redirect('/')`. That made this an async
+ * layout that SUSPENDED on a network call, and after login the Server Action
+ * revalidates `/login`, re-running it and re-streaming a BLANK document before
+ * the redirect landed on home. The bounce now happens at the edge in
+ * `middleware.ts` (guestOnlyPaths) — before render, only on real navigations —
+ * so there's no async layout, no post-login redirect here, and no blank.
+ *
+ * Keeps a single QueryClient for the group — the auth forms use TanStack
+ * mutations and (main)'s provider doesn't wrap this route group.
  */
-export default async function AuthLayout({
+export default function AuthLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getSession();
-  if (session) redirect('/');
-
-  // Server shell (auth gate + noindex) that provides a single QueryClient to the
-  // whole group — the auth forms use TanStack mutations and (main)'s provider
-  // doesn't wrap this route group.
   return <QueryProvider>{children}</QueryProvider>;
 }
