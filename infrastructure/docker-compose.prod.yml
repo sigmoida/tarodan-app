@@ -238,7 +238,7 @@ services:
       - "traefik.http.routers.api.tls.certresolver=letsencrypt"
       - "traefik.http.routers.api.middlewares=rate-limit,security-headers,compress"
       - "traefik.http.services.api.loadbalancer.server.port=3001"
-      - "traefik.http.services.api.loadbalancer.healthCheck.path=/health/ready"
+      - "traefik.http.services.api.loadbalancer.healthCheck.path=/api/health/ready"
       - "traefik.http.services.api.loadbalancer.healthCheck.interval=10s"
     deploy:
       resources:
