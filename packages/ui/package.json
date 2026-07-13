@@ -31,7 +31,7 @@
 		"tailwind-merge": "^2.1.0"
 	},
 	"devDependencies": {
-		"@hookform/resolvers": "^3.3.4",
+		"@hookform/resolvers": "^5.4.0",
 		"@tarodan/eslint-config": "workspace:*",
 		"@tarodan/tsconfig": "workspace:*",
 		"@types/react": "^18.2.42",
