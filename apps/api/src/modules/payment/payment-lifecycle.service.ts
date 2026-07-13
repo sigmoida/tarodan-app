@@ -4,15 +4,15 @@ import {
   BadRequestException,
   ForbiddenException,
   Logger,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../prisma';
-import { PaymentStatus, OrderStatus, ProductStatus } from '@prisma/client';
-import { PayTRService } from '../payment-providers/paytr.service';
-import { EventService } from '../events';
-import { Request } from 'express';
-import { PaymentCommonService } from './payment-common.service';
-import { PaymentFulfillmentService } from './payment-fulfillment.service';
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { PrismaService } from "../../prisma";
+import { PaymentStatus, OrderStatus, ProductStatus } from "@prisma/client";
+import { PayTRService } from "../payment-providers/paytr.service";
+import { EventService } from "../events";
+import { Request } from "express";
+import { PaymentCommonService } from "./payment-common.service";
+import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 
 @Injectable()
 export class PaymentLifecycleService {
@@ -46,25 +46,25 @@ export class PaymentLifecycleService {
     });
 
     if (!payment) {
-      throw new NotFoundException('Ödeme bulunamadı');
+      throw new NotFoundException("Ödeme bulunamadı");
     }
 
     // Grup ödemesi retry'ı initiate üzerinden yapılır (payment satırı yeniden kullanılır)
     if (!payment.order) {
       throw new BadRequestException(
-        'Bu ödeme bir sipariş grubuna ait. Lütfen ödemeyi sipariş grubuyla yeniden başlatın.',
+        "Bu ödeme bir sipariş grubuna ait. Lütfen ödemeyi sipariş grubuyla yeniden başlatın.",
       );
     }
 
     // Verify user owns the order
     if (payment.order.buyerId !== userId && payment.order.sellerId !== userId) {
-      throw new ForbiddenException('Bu ödemeyi tekrar deneme yetkiniz yok');
+      throw new ForbiddenException("Bu ödemeyi tekrar deneme yetkiniz yok");
     }
 
     // Only allow retrying failed payments
     if (payment.status !== PaymentStatus.failed) {
       throw new BadRequestException(
-        'Sadece başarısız ödemeler tekrar denenebilir',
+        "Sadece başarısız ödemeler tekrar denenebilir",
       );
     }
 
@@ -78,7 +78,7 @@ export class PaymentLifecycleService {
       });
       if (!product || product.status !== ProductStatus.active) {
         throw new BadRequestException(
-          'Ürün artık satışta değil veya başka alıcıya satıldı. Lütfen ilanlar sayfasından tekrar sipariş oluşturun.',
+          "Ürün artık satışta değil veya başka alıcıya satıldı. Lütfen ilanlar sayfasından tekrar sipariş oluşturun.",
         );
       }
       await this.prisma.$transaction([
@@ -102,7 +102,7 @@ export class PaymentLifecycleService {
       });
     } else if (order.status !== OrderStatus.pending_payment) {
       throw new BadRequestException(
-        'Sipariş durumu ödeme tekrarına uygun değil',
+        "Sipariş durumu ödeme tekrarına uygun değil",
       );
     }
 
@@ -119,7 +119,7 @@ export class PaymentLifecycleService {
           retriedAt: new Date().toISOString(),
           auditHistory: [
             {
-              action: 'payment.retried',
+              action: "payment.retried",
               timestamp: new Date().toISOString(),
               originalPaymentId: paymentId,
               userId,
@@ -131,7 +131,7 @@ export class PaymentLifecycleService {
 
     // Log retry action on original payment
     await this.paymentCommon.logPaymentAction(
-      'retried',
+      "retried",
       paymentId,
       payment.orderId,
       undefined,
@@ -182,7 +182,7 @@ export class PaymentLifecycleService {
     });
 
     if (!payment) {
-      throw new NotFoundException('Ödeme bulunamadı');
+      throw new NotFoundException("Ödeme bulunamadı");
     }
 
     // Grup ödemesi: erişim grup üzerinden doğrulanır, tüm siparişler bırakılır
@@ -192,34 +192,34 @@ export class PaymentLifecycleService {
         select: { buyerId: true },
       });
       if (!group || group.buyerId !== userId) {
-        throw new ForbiddenException('Bu ödemeyi iptal etme yetkiniz yok');
+        throw new ForbiddenException("Bu ödemeyi iptal etme yetkiniz yok");
       }
       if (payment.status !== PaymentStatus.pending) {
         throw new BadRequestException(
-          'Sadece bekleyen ödemeler iptal edilebilir',
+          "Sadece bekleyen ödemeler iptal edilebilir",
         );
       }
       await this.paymentFulfillment.processFailedPayment(
         payment,
-        'Kullanıcı tarafından iptal edildi',
+        "Kullanıcı tarafından iptal edildi",
       );
       this.logger.log(`Group payment ${paymentId} cancelled by user ${userId}`);
       return {
         success: true,
         paymentId: payment.id,
-        message: 'Ödeme başarıyla iptal edildi',
+        message: "Ödeme başarıyla iptal edildi",
       };
     }
 
     // Verify user owns the order
     if (payment.order.buyerId !== userId && payment.order.sellerId !== userId) {
-      throw new ForbiddenException('Bu ödemeyi iptal etme yetkiniz yok');
+      throw new ForbiddenException("Bu ödemeyi iptal etme yetkiniz yok");
     }
 
     // Only allow canceling pending payments
     if (payment.status !== PaymentStatus.pending) {
       throw new BadRequestException(
-        'Sadece bekleyen ödemeler iptal edilebilir',
+        "Sadece bekleyen ödemeler iptal edilebilir",
       );
     }
 
@@ -230,7 +230,7 @@ export class PaymentLifecycleService {
       where: { id: paymentId },
       data: {
         status: PaymentStatus.failed,
-        failureReason: 'Kullanıcı tarafından iptal edildi',
+        failureReason: "Kullanıcı tarafından iptal edildi",
       },
     });
 
@@ -243,14 +243,14 @@ export class PaymentLifecycleService {
 
     // Log payment cancellation
     await this.paymentCommon.logPaymentAction(
-      'cancelled',
+      "cancelled",
       paymentId,
       payment.orderId,
       undefined,
       oldStatus,
       PaymentStatus.failed,
       {
-        reason: 'Kullanıcı tarafından iptal edildi',
+        reason: "Kullanıcı tarafından iptal edildi",
         userId,
       },
     );
@@ -266,7 +266,7 @@ export class PaymentLifecycleService {
         buyerName: payment.order.buyer.displayName || payment.order.buyer.email,
         amount: Number(payment.amount),
         provider: payment.provider,
-        failureReason: 'Kullanıcı tarafından iptal edildi',
+        failureReason: "Kullanıcı tarafından iptal edildi",
       });
 
       this.logger.log(`payment.failed event emitted for payment ${payment.id}`);
@@ -278,7 +278,7 @@ export class PaymentLifecycleService {
     return {
       success: true,
       paymentId: payment.id,
-      message: 'Ödeme başarıyla iptal edildi',
+      message: "Ödeme başarıyla iptal edildi",
     };
   }
 
@@ -299,7 +299,7 @@ export class PaymentLifecycleService {
     }
     await this.paymentFulfillment.processFailedPayment(
       payment,
-      'Fail sayfasından onay - rezervasyon serbest bırakıldı',
+      "Fail sayfasından onay - rezervasyon serbest bırakıldı",
     );
     return { released: true };
   }
@@ -321,52 +321,52 @@ export class PaymentLifecycleService {
     });
 
     if (!payment) {
-      return { completed: false, status: 'not_found' };
+      return { completed: false, status: "not_found" };
     }
 
     if (payment.status === PaymentStatus.completed) {
-      return { completed: true, status: 'already_completed' };
+      return { completed: true, status: "already_completed" };
     }
 
     if (payment.status !== PaymentStatus.pending) {
       return { completed: false, status: payment.status };
     }
 
-    if (payment.provider !== 'paytr') {
-      return { completed: false, status: 'unsupported_provider' };
+    if (payment.provider !== "paytr") {
+      return { completed: false, status: "unsupported_provider" };
     }
 
-    const oid = (payment.providerConversationId || '').trim();
+    const oid = (payment.providerConversationId || "").trim();
     if (!oid) {
-      return { completed: false, status: 'no_provider_oid' };
+      return { completed: false, status: "no_provider_oid" };
     }
 
     let inquiry = await this.paytrService.queryPaymentStatus(oid);
-    if (!inquiry.ok && oid.includes('-')) {
+    if (!inquiry.ok && oid.includes("-")) {
       inquiry = await this.paytrService.queryPaymentStatus(
-        oid.replace(/-/g, ''),
+        oid.replace(/-/g, ""),
       );
     }
 
     if (!inquiry.ok) {
-      return { completed: false, status: 'paytr_not_found' };
+      return { completed: false, status: "paytr_not_found" };
     }
 
     // O16: Tolerans eşiğini tüm yollarda BİRLEŞTİR (eskiden burada 0.01, reconcile/mismatch'te
     // 0.05 idi → aynı ödeme için tutarsız kabul/ret). Tek config: PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL.
     const tolerance = parseFloat(
-      this.configService.get('PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL') || '0.05',
+      this.configService.get("PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL") || "0.05",
     );
     const ourAmount = Number(payment.amount);
     if (Math.abs(inquiry.paymentTotalTl - ourAmount) > tolerance) {
       this.logger.warn(
         `verifyPaymentFromClient amount mismatch payment=${payment.id} oid=${oid} paytr=${inquiry.paymentTotalTl} ours=${ourAmount}`,
       );
-      return { completed: false, status: 'amount_mismatch' };
+      return { completed: false, status: "amount_mismatch" };
     }
 
     const txnRef =
-      inquiry.paymentDate != null && inquiry.paymentDate !== ''
+      inquiry.paymentDate != null && inquiry.paymentDate !== ""
         ? `paytr:${oid}:${inquiry.paymentDate}`
         : `paytr:${oid}`;
 
@@ -378,8 +378,8 @@ export class PaymentLifecycleService {
       this.logger.log(
         `verifyPaymentFromClient completed payment=${payment.id} oid=${oid}`,
       );
-      return { completed: true, status: 'completed_now' };
+      return { completed: true, status: "completed_now" };
     }
-    return { completed: false, status: 'process_skipped' };
+    return { completed: false, status: "process_skipped" };
   }
 }

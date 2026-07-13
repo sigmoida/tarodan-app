@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { theme, Text, Button, Modal, Input, Textarea, Spinner, useModalMessage, ModalMessage } from '@tarodan/ui-native';
 import { collectionsApi } from '../../services/api';
+import { qk } from '@/lib/query';
 import { transformImageUrl } from '../../utils/imageUrl';
 
 const { colors } = theme;
@@ -50,7 +51,7 @@ export default function AddToCollectionModal({
   const [newPublic, setNewPublic] = useState(true);
 
   const myCollectionsQuery = useQuery({
-    queryKey: ['my-collections'],
+    queryKey: qk.collections.mine,
     queryFn: async () => {
       const response = await collectionsApi.getMyCollections();
       // /collections/me => { collections: [...], total, page, pageSize }
@@ -65,15 +66,14 @@ export default function AddToCollectionModal({
   const collections = myCollectionsQuery.data ?? [];
 
   // Koleksiyon ekleme/oluşturma sonrası TÜM koleksiyon görünümlerini tazele:
-  // modal listesi (my-collections), ayarlar listesi (myCollections),
-  // profil garajı + sayaç (profile-collections) ve koleksiyon detayı.
-  // Tek tek invalidate edilmezse profildeki "Koleksiyon" sayısı bayat kalıyordu.
+  // liste (qk.collections.mine — artık ayarlar listesi de bu anahtarı kullanıyor,
+  // eski ['myCollections'] adası #78'de birleştirildi), profil garajı + sayaç
+  // (profile-collections) ve koleksiyon detayı.
   const invalidateCollectionQueries = (collectionId?: string) => {
-    queryClient.invalidateQueries({ queryKey: ['my-collections'] });
-    queryClient.invalidateQueries({ queryKey: ['myCollections'] });
+    queryClient.invalidateQueries({ queryKey: qk.collections.mine });
     queryClient.invalidateQueries({ queryKey: ['profile-collections'] });
     if (collectionId) {
-      queryClient.invalidateQueries({ queryKey: ['collection', collectionId] });
+      queryClient.invalidateQueries({ queryKey: qk.collections.detail(collectionId) });
     }
   };
 

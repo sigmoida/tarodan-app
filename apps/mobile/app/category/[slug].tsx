@@ -1,12 +1,12 @@
 import { useState, useCallback } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Dimensions, RefreshControl } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Dimensions, RefreshControl, FlatList } from 'react-native';
+import { AppImage } from '@/components/AppImage';
 import { theme, Chip, Spinner, Text, Input, Modal, ScreenHeader } from '@tarodan/ui-native';
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { productsApi, categoriesApi } from '@/services/api';
 import { SCALES } from '@/theme';
-import { getImageUrl as getImageUrlFromUtils } from '@/utils/imageUrl';
 import { isProductTradeOpen } from '@/utils/isProductTradeOpen';
 import { isProductOutOfStock } from '@/utils/productPrice';
 import { OutOfStockOverlay } from '@/components/product';
@@ -75,9 +75,6 @@ export default function CategoryScreen() {
     setRefreshing(false);
   }, [refetch]);
 
-  const getImageUrl = (item: any) => {
-    return getImageUrlFromUtils(item.images);
-  };
 
   const getSortLabel = () => {
     return SORT_OPTIONS.find(o => o.id === sortBy)?.name || 'Sırala';
@@ -93,8 +90,9 @@ export default function CategoryScreen() {
         onPress={() => router.push(`/product/${item.id}`)}
       >
         <View style={styles.productImageContainer}>
-          <Image
-            source={{ uri: getImageUrl(item) }}
+          <AppImage
+            source={item.images}
+            variant="card"
             style={[styles.productImage, isProductOutOfStock(item) && { opacity: 0.45 }]}
           />
           {isProductOutOfStock(item) && <OutOfStockOverlay />}
@@ -202,19 +200,22 @@ export default function CategoryScreen() {
           <Text style={styles.emptySubtitle}>Bu kategoride henüz ürün yok</Text>
         </View>
       ) : (
-        <ScrollView
+        <FlatList
+          data={products as any[]}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => renderProductCard(item)}
+          numColumns={2}
+          columnWrapperStyle={styles.productsGrid}
           style={styles.productsContainer}
           contentContainerStyle={styles.productsContent}
+          ListHeaderComponent={
+            <Text style={styles.resultsCount}>{products.length} ürün bulundu</Text>
+          }
+          ListFooterComponent={<View style={{ height: 100 }} />}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary[600]!]} />
           }
-        >
-          <Text style={styles.resultsCount}>{products.length} ürün bulundu</Text>
-          <View style={styles.productsGrid}>
-            {products.map((item: any) => renderProductCard(item))}
-          </View>
-          <View style={{ height: 100 }} />
-        </ScrollView>
+        />
       )}
     </View>
   );

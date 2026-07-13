@@ -5,6 +5,7 @@ import { appAlert } from '@tarodan/ui-native';
 import { normalizePhoneForPayload, splitPhone } from '@/utils/phone';
 import { useRefresh } from '@/hooks/useRefresh';
 import { api } from '@/services/api';
+import { qk } from '@/lib/query';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n';
 import { EMPTY_FORM, type Address, type AddressForm } from '../_lib/types';
@@ -28,7 +29,7 @@ export function useAddresses() {
 
   // Fetch addresses
   const { data: addressesData, isLoading, refetch } = useQuery({
-    queryKey: ['addresses'],
+    queryKey: qk.user.addresses,
     queryFn: async () => {
       try {
         const response = await api.get('/users/me/addresses');
@@ -72,7 +73,7 @@ export function useAddresses() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['addresses'] });
+      queryClient.invalidateQueries({ queryKey: qk.user.addresses });
       setDialogVisible(false);
       resetForm();
       appAlert('Başarılı', editingAddress ? 'Adres güncellendi' : 'Adres eklendi');
@@ -89,7 +90,7 @@ export function useAddresses() {
       return api.delete(`/users/me/addresses/${addressId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['addresses'] });
+      queryClient.invalidateQueries({ queryKey: qk.user.addresses });
       appAlert('Başarılı', 'Adres silindi');
     },
     onError: (err: any) => {
@@ -104,7 +105,7 @@ export function useAddresses() {
       return api.patch(`/users/me/addresses/${addressId}/default`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['addresses'] });
+      queryClient.invalidateQueries({ queryKey: qk.user.addresses });
     },
   });
 

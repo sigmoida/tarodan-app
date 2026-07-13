@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { View, StyleSheet, Image, TouchableOpacity, Pressable } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
+import { AppImage } from '@/components/AppImage';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { theme, Text } from '@tarodan/ui-native';
@@ -58,16 +59,17 @@ interface ProductCardProps {
 const FALLBACK_IMG = 'https://placehold.co/400x400/FFF7ED/f97316?text=Tarodan';
 
 function resolveImageSrc(product: ProductCardProduct): string {
-  if (product.imageUrl) return transformImageUrl(product.imageUrl);
+  // Liste hücresi → 'card' varyantı (thumbnail), tam-res değil (#73).
+  if (product.imageUrl) return transformImageUrl(product.imageUrl, 'card');
   if (Array.isArray(product.images) && product.images.length > 0) {
     const first = product.images[0] as any;
-    if (typeof first === 'string') return transformImageUrl(first);
-    return transformImageUrl(first?.cardUrl || first?.url || null);
+    if (typeof first === 'string') return transformImageUrl(first, 'card');
+    return transformImageUrl(first?.cardUrl || first?.url || null, 'card');
   }
   return FALLBACK_IMG;
 }
 
-export function ProductCard({
+function ProductCardBase({
   product,
   layout = 'grid',
   tag,
@@ -99,8 +101,8 @@ export function ProductCard({
     return (
       <TouchableOpacity style={styles.listCard} onPress={handlePress} activeOpacity={0.85}>
         <View style={styles.listImageWrap}>
-          <Image
-            source={{ uri: imgSrc }}
+          <AppImage
+            source={imgSrc}
             style={[styles.listImage, isOutOfStock && styles.imageDimmed]}
             onError={() => setImgSrc(FALLBACK_IMG)}
           />
@@ -154,8 +156,8 @@ export function ProductCard({
   return (
     <Pressable style={({ pressed }) => [styles.gridCard, pressed && { opacity: 0.85 }]} onPress={handlePress}>
       <View style={styles.gridImageWrap}>
-        <Image
-          source={{ uri: imgSrc }}
+        <AppImage
+          source={imgSrc}
           style={[styles.gridImage, isOutOfStock && styles.imageDimmed]}
           onError={() => setImgSrc(FALLBACK_IMG)}
         />
@@ -454,5 +456,7 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
 });
+
+export const ProductCard = React.memo(ProductCardBase);
 
 export default ProductCard;

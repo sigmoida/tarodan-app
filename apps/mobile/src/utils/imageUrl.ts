@@ -44,10 +44,16 @@ function webAssetHost(): string {
   return 'http://localhost:3000';
 }
 
-// Bir nesne verildiğinde görsel alanını seçme önceliği.
-const IMAGE_FIELDS = [
-  'detailUrl',
-  'cardUrl',
+/**
+ * Görsel boyut varyantı. Liste hücreleri küçük olduğundan `card` (thumbnail)
+ * yüklemeli; galeri/detay ekranı `detail` (tam çözünürlük) yüklemeli.
+ * Küçük hücrede tam-res yüklemek cihaz RAM'inin en büyük tüketicisi (bkz. #73).
+ */
+export type ImageVariant = 'card' | 'detail';
+
+// Bir nesne verildiğinde görsel alanını seçme önceliği — varyanta göre değişen
+// tek fark ilk iki alanın sırası (cardUrl ↔ detailUrl). Kalan zincir ortak.
+const REST_FIELDS = [
   'coverImageUrl',
   'imageUrl',
   'avatarUrl',
@@ -61,12 +67,16 @@ const IMAGE_FIELDS = [
   'src',
 ] as const;
 
-function pickFromObject(obj: Record<string, unknown>): unknown {
+const CARD_FIELDS = ['cardUrl', 'detailUrl', ...REST_FIELDS] as const;
+const DETAIL_FIELDS = ['detailUrl', 'cardUrl', ...REST_FIELDS] as const;
+
+function pickFromObject(obj: Record<string, unknown>, variant: ImageVariant): unknown {
   // Bir entity (ürün/ilan) ise önce images dizisinin ilk elemanı.
   const images = obj.images;
   if (Array.isArray(images) && images.length > 0) return images[0];
 
-  for (const field of IMAGE_FIELDS) {
+  const fields = variant === 'card' ? CARD_FIELDS : DETAIL_FIELDS;
+  for (const field of fields) {
     const value = obj[field];
     if (typeof value === 'string' && value.trim()) return value;
     if (value && typeof value === 'object') return value; // iç içe görsel objesi
@@ -77,17 +87,20 @@ function pickFromObject(obj: Record<string, unknown>): unknown {
 /**
  * Her şekildeki görsel girdisini render edilebilir mutlak bir uri'ye çevirir.
  * Geçersiz/boş ise placeholder döner (asla undefined döndürmez).
+ *
+ * @param variant `card` → küçük hücreler için thumbnail (cardUrl önce);
+ *   `detail` (varsayılan) → galeri/detay için tam çözünürlük (detailUrl önce).
  */
-export function resolveImageUrl(input: unknown): string {
+export function resolveImageUrl(input: unknown, variant: ImageVariant = 'detail'): string {
   if (input == null) return IMAGE_PLACEHOLDER;
 
   if (Array.isArray(input)) {
-    return input.length > 0 ? resolveImageUrl(input[0]) : IMAGE_PLACEHOLDER;
+    return input.length > 0 ? resolveImageUrl(input[0], variant) : IMAGE_PLACEHOLDER;
   }
 
   if (typeof input === 'object') {
-    const picked = pickFromObject(input as Record<string, unknown>);
-    return picked === undefined ? IMAGE_PLACEHOLDER : resolveImageUrl(picked);
+    const picked = pickFromObject(input as Record<string, unknown>, variant);
+    return picked === undefined ? IMAGE_PLACEHOLDER : resolveImageUrl(picked, variant);
   }
 
   if (typeof input !== 'string') return IMAGE_PLACEHOLDER;
@@ -123,10 +136,13 @@ export function resolveAvatarSource(input: unknown): string | undefined {
  * Geriye dönük uyumlu alias'lar. Mevcut çağrılar otomatik sağlamlaşır.
  * @deprecated Yeni kodda `resolveImageUrl` kullanın.
  */
-export const transformImageUrl = (url: unknown): string => resolveImageUrl(url);
+export const transformImageUrl = (url: unknown, variant: ImageVariant = 'detail'): string =>
+  resolveImageUrl(url, variant);
 
 /**
  * Geriye dönük uyumlu alias — dizi/obje/string hepsini kabul eder.
+ * Liste hücrelerinde `getImageUrl(x, 'card')` çağırarak thumbnail yükleyin.
  * @deprecated Yeni kodda `resolveImageUrl` kullanın.
  */
-export const getImageUrl = (images: unknown): string => resolveImageUrl(images);
+export const getImageUrl = (images: unknown, variant: ImageVariant = 'detail'): string =>
+  resolveImageUrl(images, variant);

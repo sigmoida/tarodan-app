@@ -1,9 +1,9 @@
 import React from 'react';
-import { View, Pressable, Image } from 'react-native';
+import { View, Pressable } from 'react-native';
+import { AppImage } from '@/components/AppImage';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, Text, theme } from '@tarodan/ui-native';
 
-import { getImageUrl as getImageUrlFromUtils } from '@/utils/imageUrl';
 import { isProductOutOfStock } from '@/utils/productPrice';
 import { OutOfStockOverlay } from '@/components/product';
 import { asLabel } from '@/utils/format';
@@ -12,7 +12,7 @@ import { styles } from '../_lib/searchStyles';
 const { colors } = theme;
 
 /** A single product card in the 2-column search results grid. */
-export function SearchResultCard({
+function SearchResultCardBase({
   item,
   cartProductIds,
   onPress,
@@ -21,7 +21,6 @@ export function SearchResultCard({
   cartProductIds: Set<string>;
   onPress: (productId: string) => void;
 }) {
-  const imageUrl = getImageUrlFromUtils(item.images);
   const ratingAvg = item.rating?.average ? Number(item.rating.average) : 0;
   const ratingCount = item.rating?.count ?? item.reviewCount ?? 0;
   const price = item.price ?? item.salePrice ?? null;
@@ -38,8 +37,9 @@ export function SearchResultCard({
     >
       <Card style={styles.productCard} padding={0}>
         <View style={styles.imageWrap}>
-          <Image
-            source={{ uri: imageUrl }}
+          <AppImage
+            source={item.images}
+            variant="card"
             style={[styles.productImage, isProductOutOfStock(item) && { opacity: 0.45 }]}
             resizeMode="cover"
           />
@@ -125,3 +125,5 @@ export function SearchResultCard({
     </Pressable>
   );
 }
+
+export const SearchResultCard = React.memo(SearchResultCardBase);

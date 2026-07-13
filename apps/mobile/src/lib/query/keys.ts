@@ -33,7 +33,7 @@ export const qk = {
     boosted: ['products', 'boosted'] as const,
     featuredBusiness: ['featured-business'] as const,
     featuredCollector: ['featured-collector'] as const,
-    myListings: (filters?: Filters) => ['my-listings', filters] as const,
+    myListings: (filters?: Filters | string) => ['my-listings', filters] as const,
     myListingsStats: ['my-listings-stats'] as const,
     myFeatured: ['my-featured-listings'] as const,
     listings: (filters?: Filters) => ['listings', filters] as const,
@@ -94,6 +94,7 @@ export const qk = {
     all: ['membership'] as const,
     me: ['membership-me'] as const,
     discounts: ['my-discounts'] as const,
+    discountProducts: ['my-products-for-discount'] as const,
     eligibleForFeatured: ['eligible-for-featured'] as const,
   },
 
@@ -105,6 +106,8 @@ export const qk = {
   user: {
     detail: (id: string) => ['user', id] as const,
     stats: (id?: string) => ['user-stats', id] as const,
+    /** Prefix root — invalidate every user-stats variant (with/without id). */
+    statsAll: ['user-stats'] as const,
     trust: ['me-trust'] as const,
     bankAccount: ['bank-account'] as const,
     addresses: ['addresses'] as const,

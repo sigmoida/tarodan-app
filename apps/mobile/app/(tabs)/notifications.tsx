@@ -247,7 +247,7 @@ export default function NotificationsScreen() {
     else router.replace('/(tabs)');
   };
 
-  const handlePress = async (notification: Notification) => {
+  const handlePress = useCallback(async (notification: Notification) => {
     const isUnread = !(notification.read || notification.isRead);
     if (isUnread) {
       try {
@@ -275,7 +275,7 @@ export default function NotificationsScreen() {
       (notification.link ? toMobileRoute(notification.link) : null) ??
       routeForNotification(notification);
     if (target) router.push(target as any);
-  };
+  }, []);
 
   const handleMarkAllAsRead = async () => {
     try {
@@ -287,7 +287,7 @@ export default function NotificationsScreen() {
     }
   };
 
-  const renderItem = ({ item }: { item: Notification }) => {
+  const renderItem = useCallback(({ item }: { item: Notification }) => {
     const isUnread = !(item.read || item.isRead);
     const { icon, color, bg } = getIconForType(item.type);
     return (
@@ -322,7 +322,7 @@ export default function NotificationsScreen() {
         {isUnread ? <View style={styles.dot} /> : null}
       </TouchableOpacity>
     );
-  };
+  }, [handlePress]);
 
   if (!isAuthenticated) {
     return (

@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { PaymentStatus } from '@prisma/client';
-import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { PaymentStatus } from "@prisma/client";
+import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 
 /**
  * Ödeme grupları arasında paylaşılan yardımcılar (order/trade split'lerindeki
@@ -21,15 +21,18 @@ export class PaymentCommonService {
    * Cancel any active Surat shipment for an order. Best-effort: errors are logged
    * but don't block the calling flow. Used when an order is cancelled or refunded.
    */
-  async cancelSuratShipmentIfExists(orderId: string, orderNumber: string): Promise<void> {
+  async cancelSuratShipmentIfExists(
+    orderId: string,
+    orderNumber: string,
+  ): Promise<void> {
     try {
       const shipment = await this.prisma.shipment.findFirst({
-        where: { orderId, provider: 'surat' },
+        where: { orderId, provider: "surat" },
       });
       if (!shipment) return;
 
       // Halihazırda 'cancelled' ise yapacak bir şey yok.
-      if (shipment.status === 'cancelled') {
+      if (shipment.status === "cancelled") {
         this.logger.log(
           `Skip Surat cancel: shipment ${shipment.id} already cancelled`,
         );
@@ -40,11 +43,11 @@ export class PaymentCommonService {
       // çağrısı atmanın anlamı yok; ancak sipariş iptal edildiği için yerel
       // kargo kaydını yine de 'cancelled' yaparak veriyi tutarlı tutuyoruz
       // (aksi halde iptal edilen siparişte kargo "Teslim Edildi" görünüyordu).
-      const terminalStatuses = ['delivered', 'returned', 'failed'];
+      const terminalStatuses = ["delivered", "returned", "failed"];
       if (terminalStatuses.includes(shipment.status)) {
         await this.prisma.shipment.update({
           where: { id: shipment.id },
-          data: { status: 'cancelled' as any },
+          data: { status: "cancelled" as any },
         });
         this.logger.log(
           `Surat shipment locally marked cancelled (was ${shipment.status}) for order ${orderNumber}`,
@@ -52,11 +55,12 @@ export class PaymentCommonService {
         return;
       }
 
-      const result = await this.suratCargoService.cancelShipmentByOrderNumber(orderNumber);
+      const result =
+        await this.suratCargoService.cancelShipmentByOrderNumber(orderNumber);
       if (result.ok) {
         await this.prisma.shipment.update({
           where: { id: shipment.id },
-          data: { status: 'cancelled' as any },
+          data: { status: "cancelled" as any },
         });
         this.logger.log(`Surat shipment cancelled for order ${orderNumber}`);
       } else {
@@ -98,28 +102,28 @@ export class PaymentCommonService {
             data: {
               adminUserId,
               action: `payment.${action}`,
-              entityType: 'Payment',
+              entityType: "Payment",
               entityId: paymentId,
               oldValue: oldStatus
                 ? {
-                  status: oldStatus,
-                  paymentId,
-                  orderId,
-                  ...metadata,
-                }
+                    status: oldStatus,
+                    paymentId,
+                    orderId,
+                    ...metadata,
+                  }
                 : null,
               newValue: newStatus
                 ? {
-                  status: newStatus,
-                  paymentId,
-                  orderId,
-                  ...metadata,
-                }
+                    status: newStatus,
+                    paymentId,
+                    orderId,
+                    ...metadata,
+                  }
                 : {
-                  paymentId,
-                  orderId,
-                  ...metadata,
-                },
+                    paymentId,
+                    orderId,
+                    ...metadata,
+                  },
             },
           });
         }
@@ -145,7 +149,7 @@ export class PaymentCommonService {
           where: { id: paymentId },
           data: {
             metadata: {
-              ...(payment.metadata as any || {}),
+              ...((payment.metadata as any) || {}),
               auditHistory,
             },
           },
@@ -157,7 +161,6 @@ export class PaymentCommonService {
     }
   }
 
-
   /**
    * Payment'a merchant_oid (providerConversationId) atar — PayTR çağrısı YAPMAZ.
    * iframe kaldırıldıktan sonra ödeme niyeti (initiate) bir conversation id taşımalı ki
@@ -165,8 +168,11 @@ export class PaymentCommonService {
    * taşır (kullanıcı eski oid'le öderse callback yine eşleşir). process-direct daha sonra
    * kendi oid'iyle bunu tazeler (aynı history mantığı).
    */
-  async assignMerchantOid(paymentId: string, baseOidRaw: string): Promise<string> {
-    const baseOid = String(baseOidRaw).replace(/-/g, '');
+  async assignMerchantOid(
+    paymentId: string,
+    baseOidRaw: string,
+  ): Promise<string> {
+    const baseOid = String(baseOidRaw).replace(/-/g, "");
     const merchantOid = `${baseOid}T${Date.now().toString().slice(-6)}`;
     const current = await this.prisma.payment.findUnique({
       where: { id: paymentId },

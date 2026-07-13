@@ -70,6 +70,10 @@ export default function ProductReviewsScreen() {
       const loaded = allPages.reduce((sum, p) => sum + p.items.length, 0);
       return loaded < lastPage.total ? lastPage.page + 1 : undefined;
     },
+    // Bound resident pages (#76) — page number drives paging, safe under trimming.
+    maxPages: 5,
+    getPreviousPageParam: (firstPage) =>
+      firstPage.page > 1 ? firstPage.page - 1 : undefined,
   });
 
   const reviews: Review[] = (data?.pages ?? []).flatMap((p) => p.items);

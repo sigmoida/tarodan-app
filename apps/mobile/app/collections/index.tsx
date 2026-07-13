@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, FlatList, Image, Dimensions, RefreshControl } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, FlatList, Image, Dimensions, RefreshControl } from 'react-native';
 import { theme, Avatar, Chip, Spinner, Text, Input, ScreenHeader } from '@tarodan/ui-native';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
@@ -119,7 +119,15 @@ export default function CollectionsScreen() {
         />
       </View>
 
-      <ScrollView
+      {/* Virtualized (#74): the grid IS the scroll container — no more FlatList
+          nested in a ScrollView (killed virtualization + the RN warning). The
+          section title is the header, the info card + spacer are the footer. */}
+      <FlatList
+        data={isLoading ? [] : filteredCollections}
+        renderItem={renderCollection}
+        keyExtractor={(item) => item.id}
+        numColumns={2}
+        columnWrapperStyle={styles.collectionRow}
         style={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -130,56 +138,50 @@ export default function CollectionsScreen() {
             tintColor={colors.primary[600]!}
           />
         }
-      >
-        {/* Collections Grid */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📚 Koleksiyonlar</Text>
-          {isLoading ? (
+        ListHeaderComponent={
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>📚 Koleksiyonlar</Text>
+          </View>
+        }
+        ListEmptyComponent={
+          isLoading ? (
             <Spinner size="lg" />
           ) : (
-            <FlatList
-              data={filteredCollections}
-              renderItem={renderCollection}
-              keyExtractor={(item) => item.id}
-              numColumns={2}
-              columnWrapperStyle={styles.collectionRow}
-              scrollEnabled={false}
-              ListEmptyComponent={
-                <View style={styles.emptyContainer}>
-                  <Ionicons name="albums-outline" size={64} color={colors.gray[500]} />
-                  <Text style={styles.emptyTitle}>Koleksiyon Bulunamadı</Text>
-                  <Text style={styles.emptySubtitle}>
-                    Farklı arama terimleri deneyin
-                  </Text>
-                </View>
-              }
-            />
-          )}
-        </View>
-
-        {/* Info Card — premium/business üyelere gösterme */}
-        {!isPremiumMember && (
-          <View style={styles.infoCard}>
-            <Ionicons name="information-circle" size={24} color={colors.info[600]!} />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoTitle}>Digital Garage Nedir?</Text>
-              <Text style={styles.infoText}>
-                Koleksiyonunuzu sergileyin, diğer koleksiyonerleri keşfedin ve ilham alın.
-                Premium üyeler kendi garajlarını oluşturabilir.
+            <View style={styles.emptyContainer}>
+              <Ionicons name="albums-outline" size={64} color={colors.gray[500]} />
+              <Text style={styles.emptyTitle}>Koleksiyon Bulunamadı</Text>
+              <Text style={styles.emptySubtitle}>
+                Farklı arama terimleri deneyin
               </Text>
-              <TouchableOpacity
-                style={styles.infoButton}
-                onPress={() => router.push(isAuthenticated ? '/upgrade' : '/(auth)/login')}
-              >
-                <Text style={styles.infoButtonText}>Premium Üye Ol</Text>
-                <Ionicons name="arrow-forward" size={16} color={colors.primary[600]!} />
-              </TouchableOpacity>
             </View>
-          </View>
-        )}
-
-        <View style={{ height: 40 }} />
-      </ScrollView>
+          )
+        }
+        ListFooterComponent={
+          <>
+            {/* Info Card — premium/business üyelere gösterme */}
+            {!isPremiumMember && (
+              <View style={styles.infoCard}>
+                <Ionicons name="information-circle" size={24} color={colors.info[600]!} />
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoTitle}>Digital Garage Nedir?</Text>
+                  <Text style={styles.infoText}>
+                    Koleksiyonunuzu sergileyin, diğer koleksiyonerleri keşfedin ve ilham alın.
+                    Premium üyeler kendi garajlarını oluşturabilir.
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.infoButton}
+                    onPress={() => router.push(isAuthenticated ? '/upgrade' : '/(auth)/login')}
+                  >
+                    <Text style={styles.infoButtonText}>Premium Üye Ol</Text>
+                    <Ionicons name="arrow-forward" size={16} color={colors.primary[600]!} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+            <View style={{ height: 40 }} />
+          </>
+        }
+      />
     </View>
   );
 }

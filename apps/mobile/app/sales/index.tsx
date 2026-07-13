@@ -2,9 +2,10 @@ import {
   View,
   ScrollView,
   StyleSheet,
-  Image,
+  FlatList,
   RefreshControl,
 } from "react-native";
+import { AppImage } from "@/components/AppImage";
 import {
   Button,
   Card,
@@ -337,7 +338,9 @@ export default function SalesScreen() {
           />
         </View>
       ) : (
-        <ScrollView
+        <FlatList
+          data={filteredSales}
+          keyExtractor={(sale) => sale.id}
           style={styles.salesList}
           refreshControl={
             <RefreshControl
@@ -346,9 +349,9 @@ export default function SalesScreen() {
               colors={[colors.primary[600]!]}
             />
           }
-        >
-          {filteredSales.map((sale) => (
-            <Card key={sale.id} variant="elevated" style={styles.saleCard}>
+          ListFooterComponent={<View style={{ height: 100 }} />}
+          renderItem={({ item: sale }) => (
+            <Card variant="elevated" style={styles.saleCard}>
               <View style={styles.saleHeader}>
                 <Text variant="caption" style={styles.orderNumber}>
                   #{sale.orderNumber}
@@ -361,8 +364,8 @@ export default function SalesScreen() {
               </View>
 
               <View style={styles.saleContent}>
-                <Image
-                  source={{ uri: getOrderProductImageUri(sale.product) }}
+                <AppImage
+                  source={getOrderProductImageUri(sale.product, "card")}
                   style={styles.productImage}
                 />
                 <View style={styles.saleInfo}>
@@ -419,10 +422,8 @@ export default function SalesScreen() {
                 </View>
               )}
             </Card>
-          ))}
-
-          <View style={{ height: 100 }} />
-        </ScrollView>
+          )}
+        />
       )}
 
       {/* Ship Dialog */}

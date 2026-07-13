@@ -3,11 +3,14 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface GuestState {
-  // View tracking
+  // View tracking (reset daily — see viewCountsDate)
   productViewCount: number;
   listingViewCount: number;
   searchCount: number;
-  
+  /** Gün damgası; yeni günde view sayaçları sıfırlanır (#76 — yoksa +1'ler
+   *  sonsuza dek birikip eşik gating'ini kalıcı tetikliyordu). */
+  viewCountsDate: string | null;
+
   // Prompt tracking
   lastPromptShown: string | null;
   promptsShownToday: number;
@@ -33,20 +36,48 @@ export const useGuestStore = create<GuestState>()(
       productViewCount: 0,
       listingViewCount: 0,
       searchCount: 0,
+      viewCountsDate: null,
       lastPromptShown: null,
       promptsShownToday: 0,
       lastPromptDate: null,
 
       incrementProductView: () => {
-        set((state) => ({ productViewCount: state.productViewCount + 1 }));
+        const today = new Date().toDateString();
+        set((state) => {
+          const fresh = state.viewCountsDate !== today;
+          return {
+            viewCountsDate: today,
+            productViewCount: (fresh ? 0 : state.productViewCount) + 1,
+            listingViewCount: fresh ? 0 : state.listingViewCount,
+            searchCount: fresh ? 0 : state.searchCount,
+          };
+        });
       },
 
       incrementListingView: () => {
-        set((state) => ({ listingViewCount: state.listingViewCount + 1 }));
+        const today = new Date().toDateString();
+        set((state) => {
+          const fresh = state.viewCountsDate !== today;
+          return {
+            viewCountsDate: today,
+            listingViewCount: (fresh ? 0 : state.listingViewCount) + 1,
+            productViewCount: fresh ? 0 : state.productViewCount,
+            searchCount: fresh ? 0 : state.searchCount,
+          };
+        });
       },
 
       incrementSearch: () => {
-        set((state) => ({ searchCount: state.searchCount + 1 }));
+        const today = new Date().toDateString();
+        set((state) => {
+          const fresh = state.viewCountsDate !== today;
+          return {
+            viewCountsDate: today,
+            searchCount: (fresh ? 0 : state.searchCount) + 1,
+            productViewCount: fresh ? 0 : state.productViewCount,
+            listingViewCount: fresh ? 0 : state.listingViewCount,
+          };
+        });
       },
 
       setLastPromptShown: (promptType: string) => {

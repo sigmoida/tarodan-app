@@ -28,7 +28,7 @@ export interface OfferCardProps {
   onOpenBuyerCounter: (offer: Offer) => void;
 }
 
-export function OfferCard({
+function OfferCardBase({
   offer,
   tab,
   estimatedNet,
@@ -394,3 +394,5 @@ const styles = StyleSheet.create({
   orderBtn: { backgroundColor: colors.primary[600]! },
   payBtn: { backgroundColor: colors.success[600]! },
 });
+
+export const OfferCard = React.memo(OfferCardBase);

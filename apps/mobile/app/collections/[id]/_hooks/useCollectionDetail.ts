@@ -3,6 +3,7 @@ import { Share } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
 import { api, collectionsApi } from '@/services/api';
+import { qk } from '@/lib/query';
 import { useRefresh } from '@/hooks/useRefresh';
 import { useAuthStore } from '@/stores/authStore';
 import { buildShareContent, collectionShareUrl } from '@/utils/share';
@@ -87,7 +88,7 @@ export function useCollectionDetail() {
       }
       queryClient.invalidateQueries({ queryKey: ['collections'] });
       queryClient.invalidateQueries({ queryKey: ['liked-collections'] });
-      queryClient.invalidateQueries({ queryKey: ['myCollections'] });
+      queryClient.invalidateQueries({ queryKey: qk.collections.mine });
       // ['collection', id] cache'ini taze tut ki tekrar girince stale (eski isLiked/likeCount)
       // gelmesin. Cache'i elle güncelliyoruz (viewCount backend'de tekilleştirildiği için
       // refetch de güvenli olurdu; yine de gereksiz istekten kaçınıyoruz).

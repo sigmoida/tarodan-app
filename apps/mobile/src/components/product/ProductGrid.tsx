@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useCallback } from 'react';
 import { FlatList, StyleSheet, View, RefreshControl, Dimensions, ListRenderItemInfo } from 'react-native';
 import { ProductCard, ProductCardProduct, ProductCardLayout } from './ProductCard';
 import { EmptyState, ScreenLoader, ErrorState, theme } from '@tarodan/ui-native';
@@ -69,22 +69,28 @@ export function ProductGrid({
 }: ProductGridProps) {
   const columns = layout === 'list' ? 1 : numColumns;
 
-  const renderItem = ({ item }: ListRenderItemInfo<ProductCardProduct>) => (
-    <View
-      style={[
-        layout === 'list' ? styles.listItemWrap : styles.gridItemWrap,
-        layout === 'grid' && { width: `${100 / columns}%` },
-      ]}
-    >
-      <ProductCard
-        product={item}
-        layout={layout}
-        onPress={onItemPress ? () => onItemPress(item) : undefined}
-        onToggleFavorite={onToggleFavorite ? () => onToggleFavorite(item) : undefined}
-        isFavorite={favoriteIds?.has(item.id) ?? false}
-        compact={columns >= 3}
-      />
-    </View>
+  // Stable renderItem (#75) so FlatList can bail out rows when data is unchanged;
+  // combined with a React.memo'd ProductCard this stops every row re-rendering on
+  // parent re-renders (pull-to-refresh, favorite toggle, tab switch).
+  const renderItem = useCallback(
+    ({ item }: ListRenderItemInfo<ProductCardProduct>) => (
+      <View
+        style={[
+          layout === 'list' ? styles.listItemWrap : styles.gridItemWrap,
+          layout === 'grid' && { width: `${100 / columns}%` },
+        ]}
+      >
+        <ProductCard
+          product={item}
+          layout={layout}
+          onPress={onItemPress ? () => onItemPress(item) : undefined}
+          onToggleFavorite={onToggleFavorite ? () => onToggleFavorite(item) : undefined}
+          isFavorite={favoriteIds?.has(item.id) ?? false}
+          compact={columns >= 3}
+        />
+      </View>
+    ),
+    [layout, columns, onItemPress, onToggleFavorite, favoriteIds],
   );
 
   if (errorMessage) {

@@ -1,19 +1,29 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../prisma';
-import { PaymentStatus, PaymentHoldStatus, OrderStatus, ProductStatus, TradeStatus, OfferStatus } from '@prisma/client';
-import { getProductStatusFromQuantity, getReservedAwareStatus } from '../product/helpers/product-status.helper';
-import { safeDecrementReserved } from '../product/helpers/product-availability.helper';
-import { CacheService } from '../cache/cache.service';
-import { PayTRService } from '../payment-providers/paytr.service';
-import { InvoiceService } from '../invoice/invoice.service';
-import { NotificationService } from '../notification/notification.service';
-import { NotificationType } from '../notification/dto/notification.dto';
-import { CommissionLedgerService } from '../commission/commission-ledger.service';
-import { PaymentRefundService } from './payment-refund.service';
-import { EventService } from '../events';
-import { PaymentCommonService } from './payment-common.service';
-import { PaymentFulfillmentService } from './payment-fulfillment.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { PrismaService } from "../../prisma";
+import {
+  PaymentStatus,
+  PaymentHoldStatus,
+  OrderStatus,
+  ProductStatus,
+  TradeStatus,
+  OfferStatus,
+} from "@prisma/client";
+import {
+  getProductStatusFromQuantity,
+  getReservedAwareStatus,
+} from "../product/helpers/product-status.helper";
+import { safeDecrementReserved } from "../product/helpers/product-availability.helper";
+import { CacheService } from "../cache/cache.service";
+import { PayTRService } from "../payment-providers/paytr.service";
+import { InvoiceService } from "../invoice/invoice.service";
+import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto/notification.dto";
+import { CommissionLedgerService } from "../commission/commission-ledger.service";
+import { PaymentRefundService } from "./payment-refund.service";
+import { EventService } from "../events";
+import { PaymentCommonService } from "./payment-common.service";
+import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 
 // Takasta reservedQuantity, takas KABUL edildiğinde (checkAndReserve) artar ve
 // ancak tamamlanma / iptal / red / iade-teslim adımlarında geri verilir. Bu
@@ -107,7 +117,7 @@ export class PaymentReconciliationService {
     // takılı iade YALNIZ para tarafını etkiler; envanter piyasadan silinmez.
     if (failed > 0) {
       this.logger.warn(
-        `REFUND_MANUAL_REVIEW: ${failed} sipariş için otomatik para iadesi hâlâ başarısız — manuel inceleme gerekli: ${failedIds.join(', ')}`,
+        `REFUND_MANUAL_REVIEW: ${failed} sipariş için otomatik para iadesi hâlâ başarısız — manuel inceleme gerekli: ${failedIds.join(", ")}`,
       );
     }
     return { refunded, failed };
@@ -134,15 +144,15 @@ export class PaymentReconciliationService {
         where: { ctoken: c.ctoken },
         create: {
           userId,
-          provider: 'paytr',
+          provider: "paytr",
           utoken,
           ctoken: c.ctoken,
-          last4: c.last4 || '____',
+          last4: c.last4 || "____",
           brand: c.brand,
           expMonth: c.month,
           expYear: c.year,
           requireCvv: c.requireCvv ?? false,
-          status: 'active',
+          status: "active",
           mandateAcceptedAt: new Date(),
           mandateIp: mandate?.ip,
           mandateTermsVersion: mandate?.termsVersion,
@@ -154,13 +164,15 @@ export class PaymentReconciliationService {
           expMonth: c.month,
           expYear: c.year,
           requireCvv: c.requireCvv ?? false,
-          status: 'active',
+          status: "active",
         },
       });
       saved++;
     }
     if (saved > 0) {
-      this.logger.log(`SavedCard senkron: user=${userId} ${saved} kart kaydedildi/güncellendi`);
+      this.logger.log(
+        `SavedCard senkron: user=${userId} ${saved} kart kaydedildi/güncellendi`,
+      );
     }
     return saved;
   }
@@ -188,8 +200,8 @@ export class PaymentReconciliationService {
         invoices: { none: {} },
         NOT: {
           OR: [
-            { productId: { startsWith: 'membership-' } },
-            { productId: { startsWith: 'boost-' } },
+            { productId: { startsWith: "membership-" } },
+            { productId: { startsWith: "boost-" } },
           ],
         },
       },
@@ -213,7 +225,7 @@ export class PaymentReconciliationService {
    */
   async releaseExpiredOrderReservations(): Promise<{ count: number }> {
     const timeoutMinutes = parseInt(
-      this.configService.get('PAYMENT_TIMEOUT_MINUTES') || '5',
+      this.configService.get("PAYMENT_TIMEOUT_MINUTES") || "5",
       10,
     );
     const cutoff = new Date();
@@ -235,7 +247,11 @@ export class PaymentReconciliationService {
     });
 
     let released = 0;
-    const dispatched: { buyerId: string; orderId: string; productTitle: string }[] = [];
+    const dispatched: {
+      buyerId: string;
+      orderId: string;
+      productTitle: string;
+    }[] = [];
     for (const order of expiredOrders) {
       if (!order.productId) continue;
       try {
@@ -243,7 +259,11 @@ export class PaymentReconciliationService {
           await tx.$queryRaw`SELECT id FROM orders WHERE id = ${order.id} FOR UPDATE`;
           const freshOrder = await tx.order.findUnique({
             where: { id: order.id },
-            select: { status: true, reservationReleasedAt: true, quantity: true },
+            select: {
+              status: true,
+              reservationReleasedAt: true,
+              quantity: true,
+            },
           });
           if (
             !freshOrder ||
@@ -287,11 +307,15 @@ export class PaymentReconciliationService {
         dispatched.push({
           buyerId: order.buyerId,
           orderId: order.id,
-          productTitle: order.product?.title ?? 'Ürün',
+          productTitle: order.product?.title ?? "Ürün",
         });
-        this.logger.log(`Released reservation for order ${order.orderNumber} (product ${order.productId})`);
+        this.logger.log(
+          `Released reservation for order ${order.orderNumber} (product ${order.productId})`,
+        );
       } catch (error: any) {
-        this.logger.error(`Failed to release expired order ${order.id}: ${error?.message}`);
+        this.logger.error(
+          `Failed to release expired order ${order.id}: ${error?.message}`,
+        );
       }
     }
 
@@ -299,7 +323,9 @@ export class PaymentReconciliationService {
       await this.notificationService
         .notifyReservationReleased(d.buyerId, d.orderId, d.productTitle)
         .catch((err) =>
-          this.logger.warn(`reservation-released notify failed for ${d.buyerId}: ${err.message}`),
+          this.logger.warn(
+            `reservation-released notify failed for ${d.buyerId}: ${err.message}`,
+          ),
         );
     }
 
@@ -381,7 +407,9 @@ export class PaymentReconciliationService {
           // Sayacı yanlışlıkla "reserved" yaptıysa ve stok varsa active'e döndür;
           // gerçekten satılmış/pasif (quantity 0) ürünlere dokunma.
           const nextStatus =
-            product.status === ProductStatus.reserved && held === 0 && (product.quantity == null || remaining > 0)
+            product.status === ProductStatus.reserved &&
+            held === 0 &&
+            (product.quantity == null || remaining > 0)
               ? ProductStatus.active
               : undefined;
 
@@ -396,12 +424,14 @@ export class PaymentReconciliationService {
         });
         await this.cache.del(`products:detail:${id}`).catch(() => undefined);
       } catch (error: any) {
-        this.logger.error(`reconcileReservedQuantities failed for ${id}: ${error?.message}`);
+        this.logger.error(
+          `reconcileReservedQuantities failed for ${id}: ${error?.message}`,
+        );
       }
     }
 
     if (fixed > 0) {
-      await this.cache.delPattern('products:list:*').catch(() => undefined);
+      await this.cache.delPattern("products:list:*").catch(() => undefined);
     }
     return { count: fixed };
   }
@@ -430,7 +460,11 @@ export class PaymentReconciliationService {
     });
 
     let cancelled = 0;
-    const dispatched: { buyerId: string; orderId: string; productTitle: string }[] = [];
+    const dispatched: {
+      buyerId: string;
+      orderId: string;
+      productTitle: string;
+    }[] = [];
     for (const order of expired) {
       try {
         await this.prisma.$transaction(async (tx) => {
@@ -469,7 +503,7 @@ export class PaymentReconciliationService {
             where: { id: order.id },
             data: {
               status: OrderStatus.cancelled,
-              cancelReason: 'Ödeme süresi (24 saat) doldu',
+              cancelReason: "Ödeme süresi (24 saat) doldu",
             },
           });
 
@@ -484,7 +518,8 @@ export class PaymentReconciliationService {
             where: { orderId: order.id, status: PaymentStatus.pending },
             data: {
               status: PaymentStatus.failed,
-              failureReason: 'Sipariş 24 saat içinde ödenmediği için iptal edildi',
+              failureReason:
+                "Sipariş 24 saat içinde ödenmediği için iptal edildi",
             },
           });
 
@@ -511,7 +546,8 @@ export class PaymentReconciliationService {
                 },
                 data: {
                   status: PaymentStatus.failed,
-                  failureReason: 'Sipariş 24 saat içinde ödenmediği için iptal edildi',
+                  failureReason:
+                    "Sipariş 24 saat içinde ödenmediği için iptal edildi",
                 },
               });
             }
@@ -524,11 +560,13 @@ export class PaymentReconciliationService {
         dispatched.push({
           buyerId: order.buyerId,
           orderId: order.id,
-          productTitle: order.product?.title ?? 'Ürün',
+          productTitle: order.product?.title ?? "Ürün",
         });
         this.logger.log(`Expired unpaid order ${order.orderNumber} (24h TTL)`);
       } catch (err: any) {
-        this.logger.error(`expireUnpaidOrders failed for ${order.id}: ${err.message}`);
+        this.logger.error(
+          `expireUnpaidOrders failed for ${order.id}: ${err.message}`,
+        );
       }
     }
 
@@ -536,7 +574,9 @@ export class PaymentReconciliationService {
       await this.notificationService
         .notifyOrderPaymentExpired(d.buyerId, d.orderId, d.productTitle)
         .catch((err) =>
-          this.logger.warn(`order-expired notify failed for ${d.buyerId}: ${err.message}`),
+          this.logger.warn(
+            `order-expired notify failed for ${d.buyerId}: ${err.message}`,
+          ),
         );
       // Sipariş iptali e-postaları (alıcı+satıcı). Asla throw etmez.
       await this.notificationService.sendOrderCancelledEmails(d.orderId);
@@ -551,7 +591,10 @@ export class PaymentReconciliationService {
    * 1. Warn: Send notification to seller 24h before deadline (once only).
    * 2. Cancel: Auto-cancel + refund orders past deadline, re-stock product.
    */
-  async handleExpiredPreparingOrders(): Promise<{ warned: number; cancelled: number }> {
+  async handleExpiredPreparingOrders(): Promise<{
+    warned: number;
+    cancelled: number;
+  }> {
     const now = new Date();
     const warningWindow = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24h from now
 
@@ -572,13 +615,24 @@ export class PaymentReconciliationService {
     for (const order of approachingDeadline) {
       try {
         const deadlineStr = order.preparingDeadline
-          ? order.preparingDeadline.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-          : '';
+          ? order.preparingDeadline.toLocaleDateString("tr-TR", {
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "";
 
         await this.notificationService.createInAppNotification(
           order.sellerId,
           NotificationType.ORDER_PREPARING_DEADLINE_WARNING,
-          { orderId: order.id, orderNumber: order.orderNumber, deadline: deadlineStr, productTitle: order.product.title },
+          {
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            deadline: deadlineStr,
+            productTitle: order.product.title,
+          },
         );
 
         await this.prisma.order.update({
@@ -587,9 +641,13 @@ export class PaymentReconciliationService {
         });
 
         warned++;
-        this.logger.log(`Preparing deadline warning sent to seller ${order.sellerId} for order ${order.orderNumber}`);
+        this.logger.log(
+          `Preparing deadline warning sent to seller ${order.sellerId} for order ${order.orderNumber}`,
+        );
       } catch (err: any) {
-        this.logger.error(`Failed to warn seller for order ${order.id}: ${err.message}`);
+        this.logger.error(
+          `Failed to warn seller for order ${order.id}: ${err.message}`,
+        );
       }
     }
 
@@ -626,7 +684,8 @@ export class PaymentReconciliationService {
             where: { id: order.id },
             data: {
               status: OrderStatus.cancelled,
-              cancelReason: 'Satıcı belirlenen süre içinde kargoya vermediği için otomatik iptal edildi',
+              cancelReason:
+                "Satıcı belirlenen süre içinde kargoya vermediği için otomatik iptal edildi",
               version: { increment: 1 },
             },
           });
@@ -642,16 +701,18 @@ export class PaymentReconciliationService {
           // (sadece pending/earned) nedeniyle waived satıra dokunmaz.
           await this.commissionLedger.markWaived(
             order.id,
-            'seller_did_not_ship',
+            "seller_did_not_ship",
             tx,
           );
 
           // Re-stock: increment quantity and recalculate status
-          const newQuantity = order.product.quantity !== null ? order.product.quantity + 1 : null;
+          const newQuantity =
+            order.product.quantity !== null ? order.product.quantity + 1 : null;
           await tx.product.update({
             where: { id: order.product.id },
             data: {
-              quantity: order.product.quantity !== null ? { increment: 1 } : undefined,
+              quantity:
+                order.product.quantity !== null ? { increment: 1 } : undefined,
               status: getProductStatusFromQuantity(newQuantity),
             },
           });
@@ -660,7 +721,9 @@ export class PaymentReconciliationService {
         // Process refund via PayTR (outside transaction — calls external API)
         try {
           await this.paymentRefund.processRefund(order.id);
-          this.logger.log(`Refund processed for expired preparing order ${order.orderNumber}`);
+          this.logger.log(
+            `Refund processed for expired preparing order ${order.orderNumber}`,
+          );
         } catch (refundError: any) {
           this.logger.error(
             `REFUND FAILED for expired preparing order ${order.orderNumber}: ${refundError.message}. MANUAL INTERVENTION REQUIRED.`,
@@ -687,44 +750,56 @@ export class PaymentReconciliationService {
           `Auto-cancelled expired preparing order ${order.orderNumber} (seller: ${order.sellerId}, product: ${order.product.id})`,
         );
       } catch (err: any) {
-        this.logger.error(`Failed to auto-cancel expired preparing order ${order.id}: ${err.message}`);
+        this.logger.error(
+          `Failed to auto-cancel expired preparing order ${order.id}: ${err.message}`,
+        );
       }
     }
 
     return { warned, cancelled };
   }
 
-
-
   /**
    * PayTR callback sunucuya ulaşmadan ödeme başarılı olduysa: durum-sorgu ile doğrula ve tamamla (1.4).
    * PAYTR_RECONCILIATION_ENABLED=false ile kapatılabilir.
    */
-  async reconcilePendingPaytrPayments(): Promise<{ checked: number; completed: number }> {
-    const enabled = this.configService.get('PAYTR_RECONCILIATION_ENABLED');
-    if (enabled === 'false' || enabled === '0') {
+  async reconcilePendingPaytrPayments(): Promise<{
+    checked: number;
+    completed: number;
+  }> {
+    const enabled = this.configService.get("PAYTR_RECONCILIATION_ENABLED");
+    if (enabled === "false" || enabled === "0") {
       return { checked: 0, completed: 0 };
     }
 
     const minAgeMin = parseInt(
-      this.configService.get('PAYTR_RECONCILIATION_MIN_AGE_MINUTES') || '3',
+      this.configService.get("PAYTR_RECONCILIATION_MIN_AGE_MINUTES") || "3",
       10,
     );
-    const batch = parseInt(this.configService.get('PAYTR_RECONCILIATION_BATCH_LIMIT') || '40', 10);
-    const tolerance = parseFloat(this.configService.get('PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL') || '0.05');
+    const batch = parseInt(
+      this.configService.get("PAYTR_RECONCILIATION_BATCH_LIMIT") || "40",
+      10,
+    );
+    const tolerance = parseFloat(
+      this.configService.get("PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL") || "0.05",
+    );
 
     const cutoff = new Date();
     cutoff.setMinutes(cutoff.getMinutes() - minAgeMin);
 
     const candidates = await this.prisma.payment.findMany({
       where: {
-        provider: 'paytr',
+        provider: "paytr",
         status: PaymentStatus.pending,
         providerConversationId: { not: null },
         OR: [
           { order: { status: OrderStatus.pending_payment } },
           // Grup ödemesi: gruptaki en az bir sipariş hâlâ ödeme bekliyorsa
-          { checkoutGroup: { orders: { some: { status: OrderStatus.pending_payment } } } },
+          {
+            checkoutGroup: {
+              orders: { some: { status: OrderStatus.pending_payment } },
+            },
+          },
         ],
         createdAt: { lt: cutoff },
       },
@@ -732,7 +807,7 @@ export class PaymentReconciliationService {
         order: { select: { id: true, status: true, totalAmount: true } },
       },
       take: batch,
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: "asc" },
     });
 
     let checked = 0;
@@ -771,30 +846,42 @@ export class PaymentReconciliationService {
 
         const orderStillPayable = full?.orderId
           ? full.order?.status === OrderStatus.pending_payment
-          : full?.checkoutGroup?.orders.some((o) => o.status === OrderStatus.pending_payment) ?? false;
+          : (full?.checkoutGroup?.orders.some(
+              (o) => o.status === OrderStatus.pending_payment,
+            ) ?? false);
 
-        if (!full || full.status !== PaymentStatus.pending || !orderStillPayable) {
+        if (
+          !full ||
+          full.status !== PaymentStatus.pending ||
+          !orderStillPayable
+        ) {
           continue;
         }
 
         const txnRef =
-          inquiry.paymentDate != null && inquiry.paymentDate !== ''
+          inquiry.paymentDate != null && inquiry.paymentDate !== ""
             ? `paytr:${oid}:${inquiry.paymentDate}`
             : `paytr:${oid}`;
 
-        const did = await this.paymentFulfillment.processSuccessfulPayment(full, txnRef);
+        const did = await this.paymentFulfillment.processSuccessfulPayment(
+          full,
+          txnRef,
+        );
         if (did) {
           completed++;
-          this.logger.log(`PayTR reconcile completed payment ${row.id} oid=${oid}`);
+          this.logger.log(
+            `PayTR reconcile completed payment ${row.id} oid=${oid}`,
+          );
         }
       } catch (error: any) {
-        this.logger.error(`PayTR reconcile failed payment ${row.id}: ${error?.message}`);
+        this.logger.error(
+          `PayTR reconcile failed payment ${row.id}: ${error?.message}`,
+        );
       }
     }
 
     return { checked, completed };
   }
-
 
   /**
    * Cancel expired pending payments
@@ -811,7 +898,7 @@ export class PaymentReconciliationService {
     // Stok zaten 5dk'da releaseExpiredOrderReservations ile boşaldığı için bu
     // gecikme stok'u bağlamaz; sadece terk edilen payment satırı daha geç failed olur.
     const timeoutMinutes = parseInt(
-      this.configService.get('PAYMENT_FAIL_TIMEOUT_MINUTES') || '35',
+      this.configService.get("PAYMENT_FAIL_TIMEOUT_MINUTES") || "35",
       10,
     );
     const timeoutDate = new Date();
@@ -824,7 +911,10 @@ export class PaymentReconciliationService {
     const staleProcessing = new Date();
     staleProcessing.setMinutes(staleProcessing.getMinutes() - 5);
     await this.prisma.payment.updateMany({
-      where: { status: PaymentStatus.processing, updatedAt: { lt: staleProcessing } },
+      where: {
+        status: PaymentStatus.processing,
+        updatedAt: { lt: staleProcessing },
+      },
       data: { status: PaymentStatus.pending },
     });
 
@@ -877,7 +967,9 @@ export class PaymentReconciliationService {
           ? payment.order.status === OrderStatus.pending_payment &&
             payment.order.paymentExpiresAt > now
           : payment.checkoutGroup!.orders.some(
-              (o) => o.status === OrderStatus.pending_payment && o.paymentExpiresAt > now,
+              (o) =>
+                o.status === OrderStatus.pending_payment &&
+                o.paymentExpiresAt > now,
             );
 
         // H3: Atomik CAS — yalnızca HÂLÂ `pending` olan ödemeyi `failed` yap.
@@ -899,12 +991,22 @@ export class PaymentReconciliationService {
         if (!orderStillAlive) {
           // Order has been cancelled (or 24h passed): release stock + cleanup.
           if (payment.order) {
-            await this.paymentFulfillment.releaseProductForFailedPayment(payment.orderId);
-            await this.paymentCommon.cancelSuratShipmentIfExists(payment.orderId, payment.order.orderNumber);
+            await this.paymentFulfillment.releaseProductForFailedPayment(
+              payment.orderId,
+            );
+            await this.paymentCommon.cancelSuratShipmentIfExists(
+              payment.orderId,
+              payment.order.orderNumber,
+            );
           } else {
             for (const groupOrder of payment.checkoutGroup!.orders) {
-              await this.paymentFulfillment.releaseProductForFailedPayment(groupOrder.id);
-              await this.paymentCommon.cancelSuratShipmentIfExists(groupOrder.id, groupOrder.orderNumber);
+              await this.paymentFulfillment.releaseProductForFailedPayment(
+                groupOrder.id,
+              );
+              await this.paymentCommon.cancelSuratShipmentIfExists(
+                groupOrder.id,
+                groupOrder.orderNumber,
+              );
             }
           }
         }
@@ -918,14 +1020,17 @@ export class PaymentReconciliationService {
               orderNumber: payment.order.orderNumber,
               buyerId: payment.order.buyerId,
               buyerEmail: payment.order.buyer.email,
-              buyerName: payment.order.buyer.displayName || payment.order.buyer.email,
+              buyerName:
+                payment.order.buyer.displayName || payment.order.buyer.email,
               amount: Number(payment.amount),
               provider: payment.provider,
               failureReason: `Ödeme ${timeoutMinutes} dakika içinde tamamlanmadığı için otomatik olarak iptal edildi`,
             });
           } catch (error) {
             // Log but don't fail
-            this.logger.error(`Failed to emit payment.failed event for payment ${payment.id}: ${error}`);
+            this.logger.error(
+              `Failed to emit payment.failed event for payment ${payment.id}: ${error}`,
+            );
           }
         }
 
@@ -934,7 +1039,9 @@ export class PaymentReconciliationService {
           `Cancelled expired payment ${payment.id} for ${payment.order ? `order ${payment.order.orderNumber}` : `group ${payment.checkoutGroupId}`}`,
         );
       } catch (error: any) {
-        this.logger.error(`Failed to cancel expired payment ${payment.id}: ${error.message}`);
+        this.logger.error(
+          `Failed to cancel expired payment ${payment.id}: ${error.message}`,
+        );
       }
     }
 

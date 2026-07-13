@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { productsApi, collectionsApi } from '@/services/api';
+import { qk } from '@/lib/query';
 import { resolveImageUrl } from '@/utils/imageUrl';
 
 const { colors } = theme;
@@ -122,7 +123,7 @@ export default function AddCollectionItemsScreen() {
       // Detay/liste ekranlarını tazele (sahip olduğu için viewCount artmaz).
       queryClient.invalidateQueries({ queryKey: ['collection', collectionId] });
       queryClient.invalidateQueries({ queryKey: ['collections'] });
-      queryClient.invalidateQueries({ queryKey: ['myCollections'] });
+      queryClient.invalidateQueries({ queryKey: qk.collections.mine });
     } catch (e: any) {
       // Başarısız mutasyonu geri al: katmandan düş, sunucu haritası geçerli olsun.
       setOverlay((o) => {

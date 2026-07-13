@@ -1,34 +1,34 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigService } from '@nestjs/config';
-import { ModuleRef } from '@nestjs/core';
-import { PaymentService } from './payment.service';
-import { PaymentQueryService } from './payment-query.service';
-import { PaymentCommonService } from './payment-common.service';
-import { PaymentRefundService } from './payment-refund.service';
-import { PaymentReconciliationService } from './payment-reconciliation.service';
-import { PaymentInitiationService } from './payment-initiation.service';
-import { PaymentCallbackService } from './payment-callback.service';
-import { PaymentFulfillmentService } from './payment-fulfillment.service';
-import { PaymentLifecycleService } from './payment-lifecycle.service';
-import { PrismaService } from '../../prisma';
-import { CacheService } from '../cache/cache.service';
-import { PayTRService } from '../payment-providers/paytr.service';
-import { EventService } from '../events';
-import { InvoiceService } from '../invoice/invoice.service';
-import { ElogoInvoicingService } from '../elogo';
-import { ProductLockService } from '../product/product-lock.service';
-import { NotificationService } from '../notification/notification.service';
-import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
-import { CommissionLedgerService } from '../commission/commission-ledger.service';
-import { StorageService } from '../storage/storage.service';
-import { PaymentStatus } from '@prisma/client';
+import { Test, TestingModule } from "@nestjs/testing";
+import { ConfigService } from "@nestjs/config";
+import { ModuleRef } from "@nestjs/core";
+import { PaymentService } from "./payment.service";
+import { PaymentQueryService } from "./payment-query.service";
+import { PaymentCommonService } from "./payment-common.service";
+import { PaymentRefundService } from "./payment-refund.service";
+import { PaymentReconciliationService } from "./payment-reconciliation.service";
+import { PaymentInitiationService } from "./payment-initiation.service";
+import { PaymentCallbackService } from "./payment-callback.service";
+import { PaymentFulfillmentService } from "./payment-fulfillment.service";
+import { PaymentLifecycleService } from "./payment-lifecycle.service";
+import { PrismaService } from "../../prisma";
+import { CacheService } from "../cache/cache.service";
+import { PayTRService } from "../payment-providers/paytr.service";
+import { EventService } from "../events";
+import { InvoiceService } from "../invoice/invoice.service";
+import { ElogoInvoicingService } from "../elogo";
+import { ProductLockService } from "../product/product-lock.service";
+import { NotificationService } from "../notification/notification.service";
+import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
+import { CommissionLedgerService } from "../commission/commission-ledger.service";
+import { StorageService } from "../storage/storage.service";
+import { PaymentStatus } from "@prisma/client";
 
 /**
  * B3: PayTR çift-iade koruması. refundInProgressAt marker'ı PayTR çağrısından önce
  * yazılır; marker zaten varsa (önceki denemede PayTR çağrılmış ama persist başarısız
  * olmuş) PayTR tekrar çağrılmaz, yalnız persist-recovery denenir.
  */
-describe('PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade koruması', () => {
+describe("PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade koruması", () => {
   let service: PaymentService;
 
   const mockTx = {
@@ -46,7 +46,7 @@ describe('PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
 
   const mockPaytr = { createRefund: jest.fn() };
 
-  const TRADE_ID = '550e8400-e29b-41d4-a716-446655440000';
+  const TRADE_ID = "550e8400-e29b-41d4-a716-446655440000";
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -102,19 +102,19 @@ describe('PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
   });
 
   const basePayment = (metadata: Record<string, unknown>) => ({
-    id: 'pay-1',
+    id: "pay-1",
     amount: 99.5,
-    provider: 'paytr',
+    provider: "paytr",
     status: PaymentStatus.completed,
-    providerConversationId: 'ORDER123',
-    tradeCashPaymentId: 'tcp-1',
+    providerConversationId: "ORDER123",
+    tradeCashPaymentId: "tcp-1",
     metadata,
-    tradeCashPayment: { id: 'tcp-1', tradeId: TRADE_ID, totalAmount: 99.5 },
+    tradeCashPayment: { id: "tcp-1", tradeId: TRADE_ID, totalAmount: 99.5 },
   });
 
-  it('marker yokken: önce marker yazar, sonra PayTR iadesini çağırır', async () => {
+  it("marker yokken: önce marker yazar, sonra PayTR iadesini çağırır", async () => {
     mockPrisma.payment.findFirst.mockResolvedValue(basePayment({ foo: 1 }));
-    mockPaytr.createRefund.mockResolvedValue({ status: 'success' });
+    mockPaytr.createRefund.mockResolvedValue({ status: "success" });
 
     const r = await service.refundTradeCashPaymentIfCompleted(TRADE_ID);
 
@@ -122,7 +122,7 @@ describe('PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
     // marker, PayTR çağrısından önce kalıcı yazılmalı (prisma.payment.update, tx dışı)
     expect(mockPrisma.payment.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'pay-1' },
+        where: { id: "pay-1" },
         data: expect.objectContaining({
           metadata: expect.objectContaining({
             refundInProgressAt: expect.any(String),
@@ -130,12 +130,12 @@ describe('PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
         }),
       }),
     );
-    expect(mockPaytr.createRefund).toHaveBeenCalledWith('ORDER123', 99.5);
+    expect(mockPaytr.createRefund).toHaveBeenCalledWith("ORDER123", 99.5);
   });
 
-  it('marker varken: PayTR tekrar ÇAĞRILMAZ, yalnız persist-recovery denenir', async () => {
+  it("marker varken: PayTR tekrar ÇAĞRILMAZ, yalnız persist-recovery denenir", async () => {
     mockPrisma.payment.findFirst.mockResolvedValue(
-      basePayment({ refundInProgressAt: '2026-06-29T00:00:00.000Z' }),
+      basePayment({ refundInProgressAt: "2026-06-29T00:00:00.000Z" }),
     );
 
     const r = await service.refundTradeCashPaymentIfCompleted(TRADE_ID);
@@ -150,9 +150,9 @@ describe('PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
     );
   });
 
-  it('marker yazımı başarısızsa PayTR çağrılmadan abort eder', async () => {
+  it("marker yazımı başarısızsa PayTR çağrılmadan abort eder", async () => {
     mockPrisma.payment.findFirst.mockResolvedValue(basePayment({ foo: 1 }));
-    mockPrisma.payment.update.mockRejectedValueOnce(new Error('db down'));
+    mockPrisma.payment.update.mockRejectedValueOnce(new Error("db down"));
 
     await expect(
       service.refundTradeCashPaymentIfCompleted(TRADE_ID),
@@ -161,25 +161,25 @@ describe('PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
   });
 
   // G5: çift-iade idempotency guard'ları — PayTR ASLA çağrılmamalı.
-  it('G5: tradeCashPayment.refundedAt zaten doluysa iade atlanır (already_refunded)', async () => {
+  it("G5: tradeCashPayment.refundedAt zaten doluysa iade atlanır (already_refunded)", async () => {
     mockPrisma.payment.findFirst.mockResolvedValue(null); // refundedAt:null filtresi eşleşmez
     const r = await service.refundTradeCashPaymentIfCompleted(TRADE_ID);
     expect(r.refunded).toBe(false);
-    expect(r.skippedReason).toBe('no_completed_paytr_payment');
+    expect(r.skippedReason).toBe("no_completed_paytr_payment");
     expect(mockPaytr.createRefund).not.toHaveBeenCalled();
   });
 
-  it('G5: PayoutTransfer processing/completed varsa iade atlanır (payout_already_in_progress)', async () => {
+  it("G5: PayoutTransfer processing/completed varsa iade atlanır (payout_already_in_progress)", async () => {
     mockPrisma.payment.findFirst.mockResolvedValue(basePayment({ foo: 1 }));
     mockPrisma.payoutTransfer.findFirst.mockResolvedValue({
-      id: 'po-1',
-      status: 'completed',
+      id: "po-1",
+      status: "completed",
     });
 
     const r = await service.refundTradeCashPaymentIfCompleted(TRADE_ID);
 
     expect(r.refunded).toBe(false);
-    expect(r.skippedReason).toBe('payout_already_in_progress');
+    expect(r.skippedReason).toBe("payout_already_in_progress");
     expect(mockPaytr.createRefund).not.toHaveBeenCalled();
   });
 
@@ -188,7 +188,7 @@ describe('PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
   it('D3: PayTR "henüz bildirilmemiş" hatası → "1-2 dakika sonra tekrar deneyin" mesajına çevrilir', async () => {
     mockPrisma.payment.findFirst.mockResolvedValue(basePayment({ foo: 1 }));
     mockPaytr.createRefund.mockRejectedValue(
-      new Error('odeme henuz siteye bildirilmemis'),
+      new Error("odeme henuz siteye bildirilmemis"),
     );
 
     await expect(

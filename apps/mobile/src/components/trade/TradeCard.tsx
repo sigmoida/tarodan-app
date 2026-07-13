@@ -147,7 +147,7 @@ export interface TradeCardProps {
   onPress?: () => void;
 }
 
-export function TradeCard({ trade, currentUserId, onPress }: TradeCardProps) {
+function TradeCardBase({ trade, currentUserId, onPress }: TradeCardProps) {
   const statusInfo = getTradeStatusInfo(trade.status);
   const isSent = !!currentUserId && trade.initiatorId === currentUserId;
 
@@ -333,4 +333,5 @@ const styles = StyleSheet.create({
   },
 });
 
+export const TradeCard = React.memo(TradeCardBase);
 export default TradeCard;

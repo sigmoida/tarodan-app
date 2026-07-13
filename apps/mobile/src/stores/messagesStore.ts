@@ -2,6 +2,10 @@ import { create } from 'zustand';
 import { messagesApi } from '../services/api';
 import { useAuthStore } from './authStore';
 
+// Cap the live message array (#76) — a long-lived thread appended without bound.
+// Keep the most-recent N; older ones are still on the server (re-fetched on open).
+const MAX_THREAD_MESSAGES = 200;
+
 export interface MessageThread {
   id: string;
   participant1Id: string;
@@ -245,7 +249,7 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
       // Add new message to the list
       const newMessage = response.data;
       set(state => ({
-        messages: [...state.messages, newMessage],
+        messages: [...state.messages, newMessage].slice(-MAX_THREAD_MESSAGES),
         dailyMessageCount: state.dailyMessageCount + 1,
       }));
 
@@ -364,9 +368,11 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
     if (isOpen) {
       const exists = state.messages.some((m: any) => m.id === message.id);
       if (!exists) {
-        const next = [...state.messages, message].sort(
-          (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-        );
+        const next = [...state.messages, message]
+          .sort(
+            (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+          )
+          .slice(-MAX_THREAD_MESSAGES);
         set({ messages: next });
       }
     }
