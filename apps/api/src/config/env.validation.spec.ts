@@ -25,9 +25,13 @@ describe("validateEnv", () => {
     expect(() => validateEnv({ ...prodBase })).not.toThrow();
   });
 
-  it("preserves unrelated env vars (passthrough)", () => {
+  it("strips unrelated env vars from its return (they resolve live from process.env)", () => {
+    // The returned object becomes ConfigModule's validated layer, which wins over
+    // process.env. Unrelated vars must NOT be captured here, or a runtime change
+    // (e.g. a test setting process.env.PAYMENT_BYPASS) would be shadowed by the
+    // boot-time snapshot. Validated keys are still returned; the rest are dropped.
     const out = validateEnv({ ...prodBase, REDIS_HOST: "localhost" });
-    expect(out.REDIS_HOST).toBe("localhost");
+    expect(out.REDIS_HOST).toBeUndefined();
     expect(out.JWT_SECRET).toBe(strongSecrets.JWT_SECRET);
   });
 

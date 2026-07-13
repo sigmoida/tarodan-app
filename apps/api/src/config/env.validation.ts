@@ -16,8 +16,15 @@ import { z } from "zod";
  *    mutually distinct, free of the known committed placeholder, and the
  *    active payment provider (PayTR) keys must be present.
  *
- * `.passthrough()` keeps every other env var untouched — this only *adds*
- * guarantees for the keys below; it does not strip the rest of the config.
+ * The schema `.strip()`s unknown keys from the RETURNED object on purpose: the
+ * value returned here becomes ConfigModule's validated layer, which takes
+ * precedence over `process.env` in `ConfigService.get()`. If we passed every var
+ * through, that boot-time snapshot would shadow any var set at runtime — e.g.
+ * a test doing `process.env.PAYMENT_BYPASS = 'true'` in `beforeAll` would be
+ * silently overridden by the frozen `false` captured at import. Returning only
+ * the validated keys leaves all other vars to resolve live from `process.env`
+ * (env files are still loaded there by ConfigModule), so this only *adds*
+ * guarantees for the keys below without hijacking the rest of the config.
  */
 
 const KNOWN_PLACEHOLDER = /change-in-production/i;
@@ -42,7 +49,7 @@ const envSchema = z
     PAYTR_MERCHANT_KEY: z.string().optional(),
     PAYTR_MERCHANT_SALT: z.string().optional(),
   })
-  .passthrough()
+  .strip()
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== "production") return;
 
