@@ -20,6 +20,12 @@ updates:
       - dependency-name: "*"
         update-types:
           - version-update:semver-major
+      # next (and its lint config) are upgraded by hand, like majors: a Next
+      # minor tightened the build (missingSuspenseWithCSRBailout) and broke the
+      # whole grouped bump. Keep them out of the group so the weekly minor/patch
+      # PR stays green; bump Next deliberately with the required code fixes.
+      - dependency-name: "next"
+      - dependency-name: "eslint-config-next"
   # github-actions — ONE grouped PR per week for all action bumps.
   - package-ecosystem: github-actions
     directory: "/"
