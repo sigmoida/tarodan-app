@@ -22,8 +22,10 @@ COPY apps/web/package.json ./apps/web/
 # Install dependencies (shamefully-hoist: flat node_modules, no symlinks)
 RUN pnpm install --frozen-lockfile --shamefully-hoist
 
-# Copy photos for seed data (static product images)
-COPY photos ./photos
+# Manufacturer logos only — sync-brand-assets.mjs copies them into public/
+# at prebuild. Demo product/collection/hero images live in S3 (seed-assets/),
+# not in the repo or this image.
+COPY photos/logolar ./photos/logolar
 
 # Copy app source
 COPY apps/web ./apps/web
@@ -51,9 +53,8 @@ RUN addgroup --system --gid 1001 nodejs && \
 # Copy standalone build (outputFileTracingRoot creates monorepo-aware output)
 COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
+# public/ already contains photos/logolar via sync-brand-assets.mjs (prebuild)
 COPY --from=builder /app/apps/web/public ./apps/web/public
-# Copy product/collection photos into public (Docker COPY guarantees this works)
-COPY --from=builder /app/photos ./apps/web/public/photos
 
 # Set ownership
 RUN chown -R nextjs:nodejs /app

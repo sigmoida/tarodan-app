@@ -1,9 +1,10 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import Image from 'next/image';
-import { usePathname } from 'next/navigation';
-import { useTranslation } from '@/i18n';
+import Link from "next/link";
+import { heroImageUrl } from "@/lib/assetCdn";
+import Image from "next/image";
+import { usePathname } from "next/navigation";
+import { useTranslation } from "@/i18n";
 
 /**
  * Shared two-panel hero frame for every auth screen. One column = brand logo +
@@ -17,7 +18,7 @@ import { useTranslation } from '@/i18n';
 interface Hero {
   image: string;
   /** Which side the hero panel sits on at `lg+` — the form takes the other. */
-  side: 'left' | 'right';
+  side: "left" | "right";
   titleTr: string;
   titleEn: string;
   subtitleTr: string;
@@ -28,43 +29,49 @@ interface Hero {
 /** First matching prefix wins — keep `/register/business` before `/register`. */
 const HERO_BY_PATH: Array<{ prefix: string; hero: Hero }> = [
   {
-    prefix: '/register/business',
+    prefix: "/register/business",
     hero: {
-      image: '/photos/hero/hero-trading.png',
-      side: 'right',
-      titleTr: 'İşini Vitrine Taşı',
-      titleEn: 'Put Your Business Center Stage',
-      subtitleTr: 'Şirket hesabıyla binlerce koleksiyonere ulaş, ilanlarını tek yerden yönet.',
+      image: heroImageUrl("hero-trading.png"),
+      side: "right",
+      titleTr: "İşini Vitrine Taşı",
+      titleEn: "Put Your Business Center Stage",
+      subtitleTr:
+        "Şirket hesabıyla binlerce koleksiyonere ulaş, ilanlarını tek yerden yönet.",
       subtitleEn:
-        'Reach thousands of collectors and manage every listing from one business account.',
+        "Reach thousands of collectors and manage every listing from one business account.",
     },
   },
   {
-    prefix: '/register',
+    prefix: "/register",
     hero: {
-      image: '/photos/hero/hero-hot-wheels.png',
-      side: 'left',
-      titleTr: 'Koleksiyonun Başlasın',
-      titleEn: 'Let the Collection Begin',
-      subtitleTr: 'Ücretsiz katıl, ilk modelini bugün keşfet.',
-      subtitleEn: 'Join free and discover your first model today.',
+      image: heroImageUrl("hero-hot-wheels.png"),
+      side: "left",
+      titleTr: "Koleksiyonun Başlasın",
+      titleEn: "Let the Collection Begin",
+      subtitleTr: "Ücretsiz katıl, ilk modelini bugün keşfet.",
+      subtitleEn: "Join free and discover your first model today.",
       stats: true,
     },
   },
 ];
 
 const DEFAULT_HERO: Hero = {
-  image: '/photos/hero/hero-marketplace.png',
-  side: 'right',
-  titleTr: 'Koleksiyonun Kalbi Burada',
-  titleEn: 'Where Collections Come Alive',
-  subtitleTr: 'Binlerce diecast model, tek adres. Aradığını bul, koleksiyonunu büyüt.',
-  subtitleEn: 'Thousands of diecast models, one place. Find it, own it, grow it.',
+  image: heroImageUrl("hero-marketplace.png"),
+  side: "right",
+  titleTr: "Koleksiyonun Kalbi Burada",
+  titleEn: "Where Collections Come Alive",
+  subtitleTr:
+    "Binlerce diecast model, tek adres. Aradığını bul, koleksiyonunu büyüt.",
+  subtitleEn:
+    "Thousands of diecast models, one place. Find it, own it, grow it.",
   stats: true,
 };
 
 function heroFor(pathname: string): Hero {
-  return HERO_BY_PATH.find((h) => pathname.startsWith(h.prefix))?.hero ?? DEFAULT_HERO;
+  return (
+    HERO_BY_PATH.find((h) => pathname.startsWith(h.prefix))?.hero ??
+    DEFAULT_HERO
+  );
 }
 
 export default function AuthHeroLayout({
@@ -74,14 +81,14 @@ export default function AuthHeroLayout({
 }) {
   const { locale } = useTranslation();
   const pathname = usePathname();
-  const hero = heroFor(pathname ?? '/login');
-  const en = locale === 'en';
-  const heroLeft = hero.side === 'left';
+  const hero = heroFor(pathname ?? "/login");
+  const en = locale === "en";
+  const heroLeft = hero.side === "left";
 
   const stats = [
-    { v: '10K+', l: en ? 'Listings' : 'İlan' },
-    { v: '5K+', l: en ? 'Members' : 'Üye' },
-    { v: '2K+', l: en ? 'Trades' : 'Takas' },
+    { v: "10K+", l: en ? "Listings" : "İlan" },
+    { v: "5K+", l: en ? "Members" : "Üye" },
+    { v: "2K+", l: en ? "Trades" : "Takas" },
   ];
 
   return (
@@ -89,7 +96,7 @@ export default function AuthHeroLayout({
       {/* Form column */}
       <div
         className={`flex flex-1 flex-col bg-surface-elevated ${
-          heroLeft ? 'lg:order-2' : 'lg:order-1'
+          heroLeft ? "lg:order-2" : "lg:order-1"
         }`}
       >
         <header className="p-6">
@@ -110,8 +117,8 @@ export default function AuthHeroLayout({
 
         <footer className="p-6 text-center">
           <p className="text-sm text-subtle">
-            © {new Date().getFullYear()} Tarodan.{' '}
-            {en ? 'All rights reserved.' : 'Tüm hakları saklıdır.'}
+            © {new Date().getFullYear()} Tarodan.{" "}
+            {en ? "All rights reserved." : "Tüm hakları saklıdır."}
           </p>
         </footer>
       </div>
@@ -119,7 +126,7 @@ export default function AuthHeroLayout({
       {/* Per-route hero panel (lg+), side driven by config */}
       <div
         className={`relative hidden flex-1 overflow-hidden lg:flex ${
-          heroLeft ? 'lg:order-1' : 'lg:order-2'
+          heroLeft ? "lg:order-1" : "lg:order-2"
         }`}
       >
         <Image
@@ -148,8 +155,12 @@ export default function AuthHeroLayout({
                 <div key={s.l} className="flex items-center gap-8">
                   {i > 0 && <div className="h-8 w-px bg-inverted/25" />}
                   <div>
-                    <p className="text-2xl font-bold text-inverted drop-shadow">{s.v}</p>
-                    <p className="text-xs uppercase tracking-wide text-inverted/60">{s.l}</p>
+                    <p className="text-2xl font-bold text-inverted drop-shadow">
+                      {s.v}
+                    </p>
+                    <p className="text-xs uppercase tracking-wide text-inverted/60">
+                      {s.l}
+                    </p>
                   </div>
                 </div>
               ))}

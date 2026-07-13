@@ -1,17 +1,32 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger } from '@nestjs/common';
-import { createHash, randomInt, randomUUID, timingSafeEqual } from 'crypto';
-import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../prisma';
-import { CacheService } from '../cache/cache.service';
-import { GuestCheckoutDto, GuestSendVerificationCodeDto, GuestCheckoutGroupDto } from './dto';
-import { OrderStatus, OfferStatus, ProductStatus, Prisma } from '@prisma/client';
-import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
-import { NotificationService } from '../notification/notification.service';
-import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
-import { OrderPricingService } from './order-pricing.service';
-import { OrderCommonService } from './order-common.service';
-import { OrderCheckoutCommonService } from './order-checkout-common.service';
-import { OrderCheckoutGroupService } from './order-checkout-group.service';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+  Logger,
+} from "@nestjs/common";
+import { createHash, randomInt, randomUUID, timingSafeEqual } from "crypto";
+import { ConfigService } from "@nestjs/config";
+import { PrismaService } from "../../prisma";
+import { CacheService } from "../cache/cache.service";
+import {
+  GuestCheckoutDto,
+  GuestSendVerificationCodeDto,
+  GuestCheckoutGroupDto,
+} from "./dto";
+import {
+  OrderStatus,
+  OfferStatus,
+  ProductStatus,
+  Prisma,
+} from "@prisma/client";
+import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
+import { NotificationService } from "../notification/notification.service";
+import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
+import { OrderPricingService } from "./order-pricing.service";
+import { OrderCommonService } from "./order-common.service";
+import { OrderCheckoutCommonService } from "./order-checkout-common.service";
+import { OrderCheckoutGroupService } from "./order-checkout-group.service";
 
 /**
  * Misafir checkout + e-posta OTP alt sistemi: sendGuestCheckoutVerificationCode,
@@ -39,7 +54,9 @@ export class OrderGuestCheckoutService {
    * Misafir checkout öncesi e-posta OTP gönderir (Redis + e-posta).
    * expectedCheckoutCount: sepetteki misafir sipariş satırı sayısı (her başarılı guest checkout bir hak tüketir).
    */
-  async sendGuestCheckoutVerificationCode(dto: GuestSendVerificationCodeDto): Promise<{
+  async sendGuestCheckoutVerificationCode(
+    dto: GuestSendVerificationCodeDto,
+  ): Promise<{
     success: boolean;
     expiresInSeconds: number;
   }> {
@@ -51,19 +68,28 @@ export class OrderGuestCheckoutService {
     await this.assertGuestEmailNotRegistered(normEmail);
 
     const windowSec = parseInt(
-      this.configService.get<string>('GUEST_CHECKOUT_OTP_SEND_WINDOW_SEC', '900'),
+      this.configService.get<string>(
+        "GUEST_CHECKOUT_OTP_SEND_WINDOW_SEC",
+        "900",
+      ),
       10,
     );
     const maxSends = parseInt(
-      this.configService.get<string>('GUEST_CHECKOUT_OTP_MAX_SEND_PER_WINDOW', '3'),
+      this.configService.get<string>(
+        "GUEST_CHECKOUT_OTP_MAX_SEND_PER_WINDOW",
+        "3",
+      ),
       10,
     );
     const ttlSec = parseInt(
-      this.configService.get<string>('GUEST_CHECKOUT_OTP_TTL_SEC', '600'),
+      this.configService.get<string>("GUEST_CHECKOUT_OTP_TTL_SEC", "600"),
       10,
     );
     const maxVerifyAttempts = parseInt(
-      this.configService.get<string>('GUEST_CHECKOUT_OTP_MAX_VERIFY_ATTEMPTS', '5'),
+      this.configService.get<string>(
+        "GUEST_CHECKOUT_OTP_MAX_VERIFY_ATTEMPTS",
+        "5",
+      ),
       10,
     );
 
@@ -74,7 +100,7 @@ export class OrderGuestCheckoutService {
     const recentSends = prevSends.filter((t) => now - t < windowMs);
     if (recentSends.length >= maxSends) {
       throw new BadRequestException(
-        'Çok fazla kod isteği gönderildi. Lütfen bir süre sonra tekrar deneyin.',
+        "Çok fazla kod isteği gönderildi. Lütfen bir süre sonra tekrar deneyin.",
       );
     }
     recentSends.push(now);
@@ -85,16 +111,17 @@ export class OrderGuestCheckoutService {
       Math.max(1, dto.expectedCheckoutCount ?? 1),
     );
     const codeNum = randomInt(0, 1_000_000);
-    const code = String(codeNum).padStart(6, '0');
+    const code = String(codeNum).padStart(6, "0");
     const h = this.hashGuestCheckoutOtp(normEmail, code);
 
-    const sendResult = await this.notificationService.sendGuestCheckoutVerificationCode(
-      normEmail,
-      code,
-      ttlSec,
-    );
+    const sendResult =
+      await this.notificationService.sendGuestCheckoutVerificationCode(
+        normEmail,
+        code,
+        ttlSec,
+      );
     if (!sendResult.success) {
-      throw new BadRequestException('Doğrulama kodu e-postası gönderilemedi');
+      throw new BadRequestException("Doğrulama kodu e-postası gönderilemedi");
     }
 
     const otpKey = this.guestCheckoutOtpKey(normEmail);
@@ -113,7 +140,9 @@ export class OrderGuestCheckoutService {
    */
   async checkoutGuest(dto: GuestCheckoutGroupDto) {
     // İdempotensi OTP tüketiminden ÖNCE: replay yeni kod istememeli
-    const replayed = await this.group.findCheckoutGroupReplay(dto.idempotencyKey);
+    const replayed = await this.group.findCheckoutGroupReplay(
+      dto.idempotencyKey,
+    );
     if (replayed) {
       return replayed;
     }
@@ -122,7 +151,7 @@ export class OrderGuestCheckoutService {
     await this.consumeGuestCheckoutOtp(normEmail, dto.emailVerificationCode);
 
     if (!dto.shippingAddress) {
-      throw new BadRequestException('Teslimat adresi gereklidir');
+      throw new BadRequestException("Teslimat adresi gereklidir");
     }
 
     const guestUser = await this.getOrCreateSystemGuestUser();
@@ -158,45 +187,45 @@ export class OrderGuestCheckoutService {
         FOR UPDATE
       `;
       if (!lockedRows?.length) {
-        throw new NotFoundException('Ürün bulunamadı');
+        throw new NotFoundException("Ürün bulunamadı");
       }
 
       const product = await tx.product.findUnique({
         where: { id: dto.productId },
         include: {
-          images: { take: 1, orderBy: { sortOrder: 'asc' } },
+          images: { take: 1, orderBy: { sortOrder: "asc" } },
           seller: { select: { id: true, email: true, displayName: true } },
         },
       });
 
       if (!product) {
-        throw new NotFoundException('Ürün bulunamadı');
+        throw new NotFoundException("Ürün bulunamadı");
       }
 
       if (product.status !== ProductStatus.active) {
-        throw new BadRequestException('Bu ürün satışta değil');
+        throw new BadRequestException("Bu ürün satışta değil");
       }
 
       // Adet bazlı stok: müsait adet >= 1
       const available = getAvailableQuantity(product);
       if (available !== null && available < 1) {
-        throw new BadRequestException('Bu ürün stokta bulunmamaktadır');
+        throw new BadRequestException("Bu ürün stokta bulunmamaktadır");
       }
 
       // Get price (from offer or direct buy price)
       let finalPrice = dto.price || Number(product.price);
-      
+
       if (dto.offerId) {
         const offer = await tx.offer.findUnique({
           where: { id: dto.offerId },
         });
 
         if (!offer || offer.productId !== dto.productId) {
-          throw new BadRequestException('Geçersiz teklif');
+          throw new BadRequestException("Geçersiz teklif");
         }
 
         if (offer.status !== OfferStatus.accepted) {
-          throw new BadRequestException('Teklif kabul edilmemiş');
+          throw new BadRequestException("Teklif kabul edilmemiş");
         }
 
         finalPrice = Number(offer.amount);
@@ -204,7 +233,7 @@ export class OrderGuestCheckoutService {
 
       // Get or create a system guest user for all guest orders
       // This avoids unique constraint issues - actual guest info stored in shippingAddress
-      const SYSTEM_GUEST_EMAIL = 'guest@tarodan.system';
+      const SYSTEM_GUEST_EMAIL = "guest@tarodan.system";
       let systemGuestUser = await tx.user.findUnique({
         where: { email: SYSTEM_GUEST_EMAIL },
       });
@@ -213,8 +242,8 @@ export class OrderGuestCheckoutService {
         systemGuestUser = await tx.user.create({
           data: {
             email: SYSTEM_GUEST_EMAIL,
-            displayName: 'GUEST_SYSTEM',
-            passwordHash: '',
+            displayName: "GUEST_SYSTEM",
+            passwordHash: "",
             isVerified: false,
             isSeller: false,
           },
@@ -225,19 +254,25 @@ export class OrderGuestCheckoutService {
 
       // Validate shipping address for guest checkout
       if (!dto.shippingAddress?.fullName?.trim()) {
-        throw new BadRequestException('Teslimat adresi için ad soyad gereklidir');
+        throw new BadRequestException(
+          "Teslimat adresi için ad soyad gereklidir",
+        );
       }
       if (!dto.shippingAddress?.phone?.trim()) {
-        throw new BadRequestException('Teslimat adresi için telefon numarası gereklidir');
+        throw new BadRequestException(
+          "Teslimat adresi için telefon numarası gereklidir",
+        );
       }
       if (!dto.shippingAddress?.city?.trim()) {
-        throw new BadRequestException('Teslimat adresi için şehir gereklidir');
+        throw new BadRequestException("Teslimat adresi için şehir gereklidir");
       }
       if (!dto.shippingAddress?.district?.trim()) {
-        throw new BadRequestException('Teslimat adresi için ilçe gereklidir');
+        throw new BadRequestException("Teslimat adresi için ilçe gereklidir");
       }
       if (!dto.shippingAddress?.address?.trim()) {
-        throw new BadRequestException('Teslimat adresi için açık adres gereklidir');
+        throw new BadRequestException(
+          "Teslimat adresi için açık adres gereklidir",
+        );
       }
 
       // Calculate commission with category-based matching (3.3)
@@ -249,12 +284,23 @@ export class OrderGuestCheckoutService {
       );
 
       // Calculate shipping cost (free shipping for orders >= 500 TL)
-      const shippingCost = await this.orderPricing.calculateShippingCost(finalPrice);
+      const shippingCost =
+        await this.orderPricing.calculateShippingCost(finalPrice);
       // KDV + stopaj: kurumsal satıcı ise ürün fiyatı üzerinden
-      const { taxAmount: guestTaxAmount, withholdingTaxAmount: guestWithholdingAmount } =
-        await this.checkoutCommon.resolveSellerTaxes(product.sellerId, product.categoryId, finalPrice);
+      const {
+        taxAmount: guestTaxAmount,
+        withholdingTaxAmount: guestWithholdingAmount,
+      } = await this.checkoutCommon.resolveSellerTaxes(
+        product.sellerId,
+        product.categoryId,
+        finalPrice,
+      );
       // Buyer fee + KDV eklenir (stopaj satıcı payout'undan kesilir)
-      const totalAmount = finalPrice + shippingCost + commissionResult.buyerFeeAmount + guestTaxAmount;
+      const totalAmount =
+        finalPrice +
+        shippingCost +
+        commissionResult.buyerFeeAmount +
+        guestTaxAmount;
 
       // Generate order number
       const orderNumber = await this.checkoutCommon.generateOrderNumber();
@@ -262,9 +308,9 @@ export class OrderGuestCheckoutService {
       const guestSuratKey =
         dto.idempotencyKey?.trim() ||
         this.checkoutCommon.buildSuratIdempotencyKey([
-          dto.email?.trim() || '',
+          dto.email?.trim() || "",
           dto.productId,
-          dto.offerId || '',
+          dto.offerId || "",
           `${dto.shippingAddress.city}|${dto.shippingAddress.phone}|${dto.shippingAddress.address}`,
         ]);
 
@@ -297,12 +343,18 @@ export class OrderGuestCheckoutService {
       if (this.suratCargoService.isIntegrationEnabled()) {
         guestShippingJson.suratIdempotencyKey = guestSuratKey;
       }
-      if (dto.billingAddress?.fullName?.trim() && dto.billingAddress?.city?.trim() && dto.billingAddress?.address?.trim()) {
+      if (
+        dto.billingAddress?.fullName?.trim() &&
+        dto.billingAddress?.city?.trim() &&
+        dto.billingAddress?.address?.trim()
+      ) {
         (guestShippingJson as any).billingAddress = {
           fullName: dto.billingAddress.fullName.trim(),
-          phone: dto.billingAddress.phone?.trim() || dto.shippingAddress.phone.trim(),
+          phone:
+            dto.billingAddress.phone?.trim() ||
+            dto.shippingAddress.phone.trim(),
           city: dto.billingAddress.city.trim(),
-          district: dto.billingAddress.district?.trim() || '',
+          district: dto.billingAddress.district?.trim() || "",
           address: dto.billingAddress.address.trim(),
           zipCode: dto.billingAddress.zipCode?.trim() || null,
         };
@@ -341,14 +393,24 @@ export class OrderGuestCheckoutService {
         include: {
           product: {
             include: {
-              images: { take: 1, orderBy: { sortOrder: 'asc' } },
+              images: { take: 1, orderBy: { sortOrder: "asc" } },
             },
           },
           buyer: {
-            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+            select: {
+              id: true,
+              displayName: true,
+              isVerified: true,
+              avatarUrl: true,
+            },
           },
           seller: {
-            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+            select: {
+              id: true,
+              displayName: true,
+              isVerified: true,
+              avatarUrl: true,
+            },
           },
         },
       });
@@ -390,7 +452,7 @@ export class OrderGuestCheckoutService {
   }
 
   private async getOrCreateSystemGuestUser() {
-    const SYSTEM_GUEST_EMAIL = 'guest@tarodan.system';
+    const SYSTEM_GUEST_EMAIL = "guest@tarodan.system";
     const existing = await this.prisma.user.findUnique({
       where: { email: SYSTEM_GUEST_EMAIL },
     });
@@ -398,8 +460,8 @@ export class OrderGuestCheckoutService {
     return this.prisma.user.create({
       data: {
         email: SYSTEM_GUEST_EMAIL,
-        displayName: 'GUEST_SYSTEM',
-        passwordHash: '',
+        displayName: "GUEST_SYSTEM",
+        passwordHash: "",
         isVerified: false,
         isSeller: false,
       },
@@ -417,17 +479,19 @@ export class OrderGuestCheckoutService {
    * Sistem misafir kullanıcısı (guest@tarodan.system) bu kontrole takılmaz —
    * onun e-postası normalize edilmiş bir kullanıcı e-postasıyla eşleşmez.
    */
-  private async assertGuestEmailNotRegistered(normEmail: string): Promise<void> {
+  private async assertGuestEmailNotRegistered(
+    normEmail: string,
+  ): Promise<void> {
     const existing = await this.prisma.user.findFirst({
-      where: { email: { equals: normEmail, mode: 'insensitive' } },
+      where: { email: { equals: normEmail, mode: "insensitive" } },
       select: { id: true },
     });
     if (existing) {
       // ConflictException (409) + makine-okunur kod → frontend giriş'e yönlendirir.
       throw new ConflictException({
-        code: 'EMAIL_ALREADY_REGISTERED',
+        code: "EMAIL_ALREADY_REGISTERED",
         message:
-          'Bu e-posta adresi zaten kayıtlı. Lütfen giriş yapıp alışverişe devam edin.',
+          "Bu e-posta adresi zaten kayıtlı. Lütfen giriş yapıp alışverişe devam edin.",
       });
     }
   }
@@ -441,20 +505,19 @@ export class OrderGuestCheckoutService {
   }
 
   private guestCheckoutOtpPepper(): string {
-    return (
-      this.configService.get<string>('GUEST_CHECKOUT_OTP_SECRET') ||
-      this.configService.get<string>('JWT_SECRET') ||
-      'guest-checkout-otp-dev-only'
-    );
+    return this.configService.getOrThrow<string>("GUEST_CHECKOUT_OTP_SECRET");
   }
 
   private hashGuestCheckoutOtp(normEmail: string, code: string): string {
-    return createHash('sha256')
-      .update(`${this.guestCheckoutOtpPepper()}:${normEmail}:${code}`, 'utf8')
-      .digest('hex');
+    return createHash("sha256")
+      .update(`${this.guestCheckoutOtpPepper()}:${normEmail}:${code}`, "utf8")
+      .digest("hex");
   }
 
-  private async consumeGuestCheckoutOtp(normEmail: string, code: string): Promise<void> {
+  private async consumeGuestCheckoutOtp(
+    normEmail: string,
+    code: string,
+  ): Promise<void> {
     const otpKey = this.guestCheckoutOtpKey(normEmail);
     const record = await this.cache.get<{
       h: string;
@@ -464,18 +527,22 @@ export class OrderGuestCheckoutService {
     }>(otpKey);
 
     if (!record?.h) {
-      throw new BadRequestException('Doğrulama kodu geçersiz veya süresi dolmuş');
+      throw new BadRequestException(
+        "Doğrulama kodu geçersiz veya süresi dolmuş",
+      );
     }
 
     const maxWrong = record.v ?? 5;
     if (record.a >= maxWrong) {
       await this.cache.del(otpKey);
-      throw new BadRequestException('Çok fazla hatalı deneme. Yeni kod isteyin.');
+      throw new BadRequestException(
+        "Çok fazla hatalı deneme. Yeni kod isteyin.",
+      );
     }
 
     const expectedHex = this.hashGuestCheckoutOtp(normEmail, code.trim());
-    const aBuf = Buffer.from(record.h, 'hex');
-    const bBuf = Buffer.from(expectedHex, 'hex');
+    const aBuf = Buffer.from(record.h, "hex");
+    const bBuf = Buffer.from(expectedHex, "hex");
     const match =
       aBuf.length === bBuf.length &&
       aBuf.length > 0 &&
@@ -490,14 +557,18 @@ export class OrderGuestCheckoutService {
       } else if (ttlLeft > 0) {
         await this.cache.set(otpKey, record, { ttl: ttlLeft });
       }
-      throw new BadRequestException('Doğrulama kodu hatalı');
+      throw new BadRequestException("Doğrulama kodu hatalı");
     }
 
     record.c -= 1;
     if (record.c <= 0) {
       await this.cache.del(otpKey);
     } else if (ttlLeft > 0) {
-      await this.cache.set(otpKey, { h: record.h, a: 0, c: record.c, v: maxWrong }, { ttl: ttlLeft });
+      await this.cache.set(
+        otpKey,
+        { h: record.h, a: 0, c: record.c, v: maxWrong },
+        { ttl: ttlLeft },
+      );
     } else {
       await this.cache.del(otpKey);
     }

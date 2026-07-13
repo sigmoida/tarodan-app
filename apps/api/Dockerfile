@@ -21,8 +21,6 @@ COPY apps/api/prisma ./apps/api/prisma/
 # Install dependencies (shamefully-hoist: flat node_modules, no symlinks)
 RUN pnpm install --frozen-lockfile --shamefully-hoist
 
-# Copy photos for seed data
-COPY photos ./photos
 
 # Copy app source
 COPY apps/api ./apps/api
@@ -62,7 +60,6 @@ COPY --from=builder --chown=nestjs:nodejs /app/apps/api/dist-seed ./dist-seed
 COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/apps/api/package.json ./package.json
 COPY --from=builder --chown=nestjs:nodejs /app/apps/api/prisma ./prisma
-COPY --from=builder --chown=nestjs:nodejs /app/photos ./photos
 
 # Copy entrypoint script (runs migrations before starting)
 COPY --chown=nestjs:nodejs apps/api/entrypoint.sh ./entrypoint.sh

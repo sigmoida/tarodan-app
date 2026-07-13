@@ -51,7 +51,7 @@ docs/IMAGE_GENERATION_PROMPTS.md
 docs/MVP_IMAGE_PLAN.md
 scripts/generate-images.mjs
 
-# Seed tarafından photos/ kopyalanır; kaynak photos/ root'ta
+# Üretilen web asset'leri: sync-brand-assets.mjs photos/logolar'ı kopyalar (kaynak repo kökünde)
 apps/web/public/photos/
 
 # @tarodan/brand tarafından üretilen marka logoları (sync:brand / predev / prebuild)

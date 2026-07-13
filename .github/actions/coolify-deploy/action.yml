@@ -1,0 +1,81 @@
+name: 'Coolify Deploy'
+description: >-
+  Trigger a Coolify deploy for one or more apps (comma-separated UUIDs) and WAIT
+  for the result. Fails the job if any deployment ends in failed/error/cancelled,
+  so a broken deploy surfaces as a failed GitHub check (and a failure notification).
+
+inputs:
+  coolify-url:
+    description: 'Base URL of the Coolify instance (e.g. https://coolify.example.com)'
+    required: true
+  coolify-token:
+    description: 'Coolify API token (deploy-capable)'
+    required: true
+  uuids:
+    description: 'Comma-separated app UUIDs to deploy'
+    required: true
+  timeout-seconds:
+    description: 'Max seconds to wait per deployment before giving up'
+    required: false
+    default: '1200'
+  poll-interval:
+    description: 'Seconds between status polls'
+    required: false
+    default: '10'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Trigger deploy and wait for result
+      shell: bash
+      env:
+        COOLIFY_URL: ${{ inputs.coolify-url }}
+        COOLIFY_TOKEN: ${{ inputs.coolify-token }}
+        UUIDS: ${{ inputs.uuids }}
+        TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
+        POLL_INTERVAL: ${{ inputs.poll-interval }}
+      run: |
+        set -euo pipefail
+
+        echo "Triggering Coolify deploy for: $UUIDS"
+        resp="$(curl -fsSL --retry 3 --retry-delay 10 \
+          -H "Authorization: Bearer $COOLIFY_TOKEN" \
+          "$COOLIFY_URL/api/v1/deploy?uuid=$UUIDS&force=false")"
+        echo "$resp" | jq .
+
+        # Collect the deployment UUID(s) Coolify queued (one per app).
+        mapfile -t DEPLOY_UUIDS < <(echo "$resp" | jq -r '.deployments[].deployment_uuid')
+        if [ "${#DEPLOY_UUIDS[@]}" -eq 0 ]; then
+          echo "::error::No deployment_uuid returned — deploy was not queued."
+          exit 1
+        fi
+
+        max_polls=$(( TIMEOUT_SECONDS / POLL_INTERVAL ))
+        fail=0
+        for du in "${DEPLOY_UUIDS[@]}"; do
+          echo "::group::Waiting for deployment $du"
+          done_flag=0
+          for i in $(seq 1 "$max_polls"); do
+            status="$(curl -fsSL -H "Authorization: Bearer $COOLIFY_TOKEN" \
+              "$COOLIFY_URL/api/v1/deployments/$du" | jq -r '.status // "unknown"')"
+            echo "[$i/$max_polls] $du -> $status"
+            case "$status" in
+              finished|success)
+                echo "✓ $du succeeded"; done_flag=1; break ;;
+              failed|error|cancelled*|failed*)
+                echo "::error::deployment $du ended: $status"; fail=1; done_flag=1; break ;;
+            esac
+            sleep "$POLL_INTERVAL"
+          done
+          if [ "$done_flag" -eq 0 ]; then
+            echo "::error::deployment $du did not finish within ${TIMEOUT_SECONDS}s"
+            fail=1
+          fi
+          echo "::endgroup::"
+        done
+
+        if [ "$fail" -ne 0 ]; then
+          echo "::error::One or more Coolify deployments failed."
+          exit 1
+        fi
+        echo "All deployments finished successfully."

@@ -8,7 +8,6 @@
     "postbuild": "prisma generate",
     "build:seed": "rimraf dist-seed && tsc -p tsconfig.seed.json && node -e \"require('fs').cpSync('prisma/data','dist-seed/prisma/data',{recursive:true})\"",
     "seed:prod": "node dist-seed/prisma/seed.js",
-    "db:reset:prod": "prisma migrate reset --force --skip-seed --schema=prisma/schema.prisma && node dist-seed/prisma/seed.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "predev": "prisma generate",
@@ -40,6 +39,7 @@
     "prisma:studio": "prisma studio",
     "seed:edge:auth": "ts-node -r tsconfig-paths/register prisma/seed-edge/auth-states.ts",
     "add-images": "ts-node -r tsconfig-paths/register scripts/add-images-to-products.ts",
+    "seed:assets:build": "dotenv -e .env -- ts-node -r tsconfig-paths/register scripts/build-seed-assets.ts",
     "fix-premium-trade": "ts-node -r tsconfig-paths/register scripts/fix-premium-trade.ts",
     "fix-user-membership": "ts-node -r tsconfig-paths/register scripts/fix-user-membership.ts",
     "release-reserved": "ts-node -r tsconfig-paths/register scripts/release-reserved-products.ts",
@@ -73,12 +73,15 @@
     "@sentry/tracing": "^7.91.0",
     "@tarodan/types": "workspace:*",
     "apollo-server-express": "^3.13.0",
+    "apple-signin-auth": "^1.7.3",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^2.4.3",
     "bull": "^4.12.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",
     "express": "^4.18.2",
+    "file-type": "^16.5.4",
+    "google-auth-library": "^10.7.0",
     "graphql": "^16.12.0",
     "helmet": "^8.1.0",
     "ioredis": "^5.3.2",
@@ -89,12 +92,11 @@
     "reflect-metadata": "^0.1.14",
     "rxjs": "^7.8.1",
     "sharp": "^0.34.5",
-    "google-auth-library": "^10.7.0",
-    "apple-signin-auth": "^1.7.3",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@nestjs/cli": "^10.2.1",
+    "@nestjs/cli": "^10.4.9",
     "@nestjs/schematics": "^10.0.3",
     "@nestjs/testing": "^10.3.0",
     "@types/bcrypt": "^6.0.0",
@@ -141,6 +143,9 @@
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "moduleNameMapper": {
+      "^@tarodan/types$": "<rootDir>/../../../packages/types/src/index.ts"
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"

@@ -1,0 +1,46 @@
+name: Deploy Staging
+
+# When CI (ci.yml) succeeds on the development branch, trigger the Coolify
+# staging applications (api/web/admin) via their deploy webhook.
+# The "Auto Deploy" toggle for these apps MUST be OFF in Coolify — deploys are
+# no longer triggered by push, only from here when CI is green.
+#
+# NOTE: workflow_run-triggered workflows only run from the version on the
+# repo's DEFAULT branch. This file must be merged into the default branch,
+# otherwise it never triggers.
+#
+# Required repo secrets:
+#   COOLIFY_URL            -> https://coolify.your-domain.com
+#   COOLIFY_TOKEN          -> Coolify API token (deploy-capable)
+#   COOLIFY_STAGING_UUIDS  -> staging app UUIDs, comma-separated: uuidApi,uuidWeb,uuidAdmin
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [development]
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Trigger Coolify (staging)
+    # Only deploy if CI finished GREEN. Failed/cancelled -> never triggers.
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      # Triggers the deploy AND waits for the result — a failed Coolify deploy
+      # fails this job, so it shows up as a failed check + GitHub failure email.
+      - name: Deploy to Coolify (staging) and wait
+        uses: ./.github/actions/coolify-deploy
+        with:
+          coolify-url: ${{ secrets.COOLIFY_URL }}
+          coolify-token: ${{ secrets.COOLIFY_TOKEN }}
+          uuids: ${{ secrets.COOLIFY_STAGING_UUIDS }}
+      - name: Report failure
+        if: failure()
+        run: echo "::error::Staging deploy failed — check the logs above (Coolify deployment did not finish successfully)."

@@ -1,5 +1,11 @@
-import { View, ScrollView, StyleSheet, FlatList, RefreshControl } from 'react-native';
-import { AppImage } from '@/components/AppImage';
+import {
+  View,
+  ScrollView,
+  StyleSheet,
+  FlatList,
+  RefreshControl,
+} from "react-native";
+import { AppImage } from "@/components/AppImage";
 import {
   Button,
   Card,
@@ -12,15 +18,16 @@ import {
   theme,
   ScreenHeader,
   appAlert,
-} from '@tarodan/ui-native';
-import type { BadgeVariant } from '@tarodan/ui-native';
-import { useState, useCallback } from 'react';
-import { router, useFocusEffect } from 'expo-router';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Ionicons } from '@expo/vector-icons';
-import { ordersApi, shippingApi } from '@/services/api';
-import { useAuthStore } from '@/stores/authStore';
-import { getOrderProductImageUri } from '@/utils/orderProductImage';
+} from "@tarodan/ui-native";
+import type { BadgeVariant } from "@tarodan/ui-native";
+import { useState, useCallback } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
+import { Ionicons } from "@expo/vector-icons";
+import { ordersApi } from "@/services/api";
+import { useAuthStore } from "@/stores/authStore";
+import { getOrderProductImageUri } from "@/utils/orderProductImage";
+import { useUpdateOrderStatus } from "./_hooks/useUpdateOrderStatus";
 
 const { colors } = theme;
 
@@ -28,18 +35,21 @@ const { colors } = theme;
 // gösterir, örn. "refunded"). Etiketler alıcı orders/[id] uiOrderStatusConfig ile
 // tutarlı; yalnız 'paid' satıcıya aksiyon-odaklı. preparing→processing normalize
 // edildiğinden ikisi de var.
-const salesStatusConfig: Record<string, { label: string; variant: BadgeVariant }> = {
-  pending_payment: { label: 'Ödeme Bekliyor', variant: 'warning' },
-  paid: { label: 'Ödendi - Hazırla', variant: 'success' },
-  preparing: { label: 'Hazırlanıyor', variant: 'info' },
-  processing: { label: 'Hazırlanıyor', variant: 'info' },
-  shipped: { label: 'Kargoda', variant: 'primary' },
-  delivered: { label: 'Teslim Edildi', variant: 'success' },
-  awaiting_buyer_confirmation: { label: 'Onay Bekleniyor', variant: 'info' },
-  completed: { label: 'Tamamlandı', variant: 'success' },
-  cancelled: { label: 'İptal Edildi', variant: 'danger' },
-  refund_requested: { label: 'İade Sürecinde', variant: 'danger' },
-  refunded: { label: 'İade Edildi', variant: 'secondary' },
+const salesStatusConfig: Record<
+  string,
+  { label: string; variant: BadgeVariant }
+> = {
+  pending_payment: { label: "Ödeme Bekliyor", variant: "warning" },
+  paid: { label: "Ödendi - Hazırla", variant: "success" },
+  preparing: { label: "Hazırlanıyor", variant: "info" },
+  processing: { label: "Hazırlanıyor", variant: "info" },
+  shipped: { label: "Kargoda", variant: "primary" },
+  delivered: { label: "Teslim Edildi", variant: "success" },
+  awaiting_buyer_confirmation: { label: "Onay Bekleniyor", variant: "info" },
+  completed: { label: "Tamamlandı", variant: "success" },
+  cancelled: { label: "İptal Edildi", variant: "danger" },
+  refund_requested: { label: "İade Sürecinde", variant: "danger" },
+  refunded: { label: "İade Edildi", variant: "secondary" },
 };
 
 interface Sale {
@@ -70,47 +80,61 @@ interface Sale {
   createdAt: string;
 }
 
-type FilterType = 'all' | 'paid' | 'processing' | 'shipped' | 'completed' | 'cancelled';
+type FilterType =
+  | "all"
+  | "paid"
+  | "processing"
+  | "shipped"
+  | "completed"
+  | "cancelled";
 
 // Rozet/filtre durumu: cancellationType='iptal' → 'cancelled' (status 'refunded'
 // olsa bile "İade" deme); aksi halde siparişin kendi durumu. Alıcı orders/index
 // badgeStatusOf ile tutarlı.
 const saleBadgeStatus = (sale: Sale): string =>
-  sale.cancellationType === 'iptal' ? 'cancelled' : sale.status;
+  sale.cancellationType === "iptal" ? "cancelled" : sale.status;
 
 export default function SalesScreen() {
   const { isAuthenticated } = useAuthStore();
-  const queryClient = useQueryClient();
-  const [filter, setFilter] = useState<FilterType>('all');
+  const [filter, setFilter] = useState<FilterType>("all");
   const [refreshing, setRefreshing] = useState(false);
-  const [shipDialog, setShipDialog] = useState<{ visible: boolean; order: Sale | null }>({
+  const [shipDialog, setShipDialog] = useState<{
+    visible: boolean;
+    order: Sale | null;
+  }>({
     visible: false,
     order: null,
   });
-  const [trackingNumber, setTrackingNumber] = useState('');
+  const [trackingNumber, setTrackingNumber] = useState("");
 
   // Fetch sales
-  const { data: salesData, isLoading, refetch } = useQuery({
-    queryKey: ['orders', 'seller', filter],
+  const {
+    data: salesData,
+    isLoading,
+    refetch,
+  } = useQuery({
+    queryKey: ["orders", "seller", filter],
     queryFn: async () => {
       try {
-        const params: any = { role: 'seller', limit: 100 };
-        if (filter !== 'all') {
+        const params: any = { role: "seller", limit: 100 };
+        if (filter !== "all") {
           // Mobil UI 'processing' adını kullanır; backend enum'u 'preparing'. Sınırda çevir.
           // 'cancelled' filtresi hem iptal (cancelled) hem para-iadesi (refunded) getirir.
           params.status =
-            filter === 'processing' ? 'preparing'
-            : filter === 'cancelled' ? 'cancelled,refunded'
-            : filter;
+            filter === "processing"
+              ? "preparing"
+              : filter === "cancelled"
+                ? "cancelled,refunded"
+                : filter;
         }
         const response = await ordersApi.getAll(params);
         const raw = (response.data as any)?.data || response.data || [];
         // Backend 'preparing' → mobil 'processing' (badge/aksiyon/filtre tek isimle çalışsın).
         return (Array.isArray(raw) ? raw : []).map((o: any) =>
-          o?.status === 'preparing' ? { ...o, status: 'processing' } : o,
+          o?.status === "preparing" ? { ...o, status: "processing" } : o,
         );
       } catch (error) {
-        console.log('Failed to fetch sales');
+        console.log("Failed to fetch sales");
         return [];
       }
     },
@@ -123,43 +147,18 @@ export default function SalesScreen() {
   // pendingEarnings filtrelenmiş + sayfalı `sales` listesinden hesaplanıyordu → 'paid'
   // filtresine basınca toplam kazanç 0'a düşüyordu. Artık tüm siparişler üzerinden tek sorgu.
   const { data: earningsResp } = useQuery({
-    queryKey: ['orders', 'seller', 'earnings'],
+    queryKey: ["orders", "seller", "earnings"],
     queryFn: () => ordersApi.getSellerEarnings(),
     enabled: isAuthenticated,
   });
   const totalEarnings = earningsResp?.data?.totalEarnings ?? 0;
   const pendingEarnings = earningsResp?.data?.pendingEarnings ?? 0;
 
-  /**
-   * Backend'de tek "status update" endpoint'i yok; iki ayrı akış:
-   *   - "processing"  → POST /orders/:id/prepare         (markAsPreparing)
-   *   - "shipped"     → POST /shipping  + PATCH /shipping/:id/tracking
-   * Bu mutasyon hangi durumun istendiğine göre doğru endpoint'i çağırır.
-   */
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ orderId, status, trackingNumber }: { orderId: string; status: string; trackingNumber?: string }) => {
-      if (status === 'processing' || status === 'preparing') {
-        return ordersApi.markAsPreparing(orderId);
-      }
-      if (status === 'shipped') {
-        const created = await shippingApi.createShipment({ orderId, provider: 'surat' });
-        const shipment = (created.data as any)?.data ?? (created.data as any);
-        if (trackingNumber && shipment?.id) {
-          await shippingApi.updateTracking(shipment.id, { trackingNumber });
-        }
-        return created;
-      }
-      throw new Error(`Desteklenmeyen sipariş durumu: ${status}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      setShipDialog({ visible: false, order: null });
-      setTrackingNumber('');
-      appAlert('Başarılı', 'Sipariş durumu güncellendi');
-    },
-    onError: (e: any) => {
-      appAlert('Hata', e?.response?.data?.message || e?.message || 'Durum güncellenemedi');
-    },
+  // Sipariş durumu mutasyonu (processing/shipped) → _hooks/useUpdateOrderStatus.
+  // Snackbar + invalidate hook'a ait; buradan yalnız UI reset (modal kapat, input temizle).
+  const updateStatusMutation = useUpdateOrderStatus(() => {
+    setShipDialog({ visible: false, order: null });
+    setTrackingNumber("");
   });
 
   // Refresh on focus
@@ -168,7 +167,7 @@ export default function SalesScreen() {
       if (isAuthenticated) {
         refetch();
       }
-    }, [isAuthenticated])
+    }, [isAuthenticated]),
   );
 
   const onRefresh = async () => {
@@ -178,45 +177,49 @@ export default function SalesScreen() {
   };
 
   const getStatusLabel = (status: FilterType) => {
-    if (status === 'all') return 'Tümü';
-    if (status === 'cancelled') return 'İptal / İade';
+    if (status === "all") return "Tümü";
+    if (status === "cancelled") return "İptal / İade";
     return salesStatusConfig[status]?.label ?? status;
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('tr-TR', {
-      day: 'numeric',
-      month: 'short',
+    return new Date(dateString).toLocaleDateString("tr-TR", {
+      day: "numeric",
+      month: "short",
     });
   };
 
   const formatPrice = (price: number) => {
-    return `₺${price.toLocaleString('tr-TR')}`;
+    return `₺${price.toLocaleString("tr-TR")}`;
   };
 
   const handleMarkAsProcessing = (order: Sale) => {
     appAlert(
-      'Siparişi Hazırlıyor Olarak İşaretle',
-      'Siparişi hazırlamaya başladığınızı onaylıyor musunuz?',
+      "Siparişi Hazırlıyor Olarak İşaretle",
+      "Siparişi hazırlamaya başladığınızı onaylıyor musunuz?",
       [
-        { text: 'İptal', style: 'cancel' },
+        { text: "İptal", style: "cancel" },
         {
-          text: 'Onayla',
-          onPress: () => updateStatusMutation.mutate({ orderId: order.id, status: 'processing' })
+          text: "Onayla",
+          onPress: () =>
+            updateStatusMutation.mutate({
+              orderId: order.id,
+              status: "processing",
+            }),
         },
-      ]
+      ],
     );
   };
 
   const handleShip = () => {
     if (!trackingNumber.trim()) {
-      appAlert('Hata', 'Takip numarası giriniz');
+      appAlert("Hata", "Takip numarası giriniz");
       return;
     }
     if (shipDialog.order) {
       updateStatusMutation.mutate({
         orderId: shipDialog.order.id,
-        status: 'shipped',
+        status: "shipped",
         trackingNumber: trackingNumber.trim(),
       });
     }
@@ -228,38 +231,62 @@ export default function SalesScreen() {
   if (!isAuthenticated) {
     return (
       <View style={styles.centeredContainer}>
-        <Ionicons name="storefront-outline" size={64} color={colors.primary[600]!} />
-        <Text variant="h2" style={styles.title}>Satışlarım</Text>
+        <Ionicons
+          name="storefront-outline"
+          size={64}
+          color={colors.primary[600]!}
+        />
+        <Text variant="h2" style={styles.title}>
+          Satışlarım
+        </Text>
         <Text variant="body" tone="muted" style={styles.subtitle}>
           Satışlarınızı görmek için giriş yapın
         </Text>
-        <Button variant="primary" title="Giriş Yap" onPress={() => router.push('/(auth)/login')} style={{ alignSelf: 'center' }} />
+        <Button
+          variant="primary"
+          title="Giriş Yap"
+          onPress={() => router.push("/(auth)/login")}
+          style={{ alignSelf: "center" }}
+        />
       </View>
     );
   }
 
-  const filteredSales = sales.filter(sale => {
-    if (filter === 'all') return true;
+  const filteredSales = sales.filter((sale) => {
+    if (filter === "all") return true;
     const ui = saleBadgeStatus(sale);
-    if (filter === 'cancelled') return ui === 'cancelled' || ui === 'refunded';
+    if (filter === "cancelled") return ui === "cancelled" || ui === "refunded";
     return ui === filter;
   });
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Satışlarım" onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
+      <ScreenHeader
+        title="Satışlarım"
+        onBack={() =>
+          router.canGoBack() ? router.back() : router.replace("/(tabs)")
+        }
+      />
 
       {/* Earnings Summary */}
       <Card variant="elevated" style={styles.earningsCard}>
         <View style={styles.earningsContent}>
           <View style={styles.earningItem}>
-            <Text variant="caption" style={styles.earningLabel}>Tamamlanan</Text>
-            <Text variant="h3" style={styles.earningValue}>{formatPrice(totalEarnings)}</Text>
+            <Text variant="caption" style={styles.earningLabel}>
+              Tamamlanan
+            </Text>
+            <Text variant="h3" style={styles.earningValue}>
+              {formatPrice(totalEarnings)}
+            </Text>
           </View>
           <View style={styles.earningDivider} />
           <View style={styles.earningItem}>
-            <Text variant="caption" style={styles.earningLabel}>Bekleyen</Text>
-            <Text variant="h3" style={styles.earningValuePending}>{formatPrice(pendingEarnings)}</Text>
+            <Text variant="caption" style={styles.earningLabel}>
+              Bekleyen
+            </Text>
+            <Text variant="h3" style={styles.earningValuePending}>
+              {formatPrice(pendingEarnings)}
+            </Text>
           </View>
         </View>
       </Card>
@@ -267,7 +294,16 @@ export default function SalesScreen() {
       {/* Filter Chips */}
       <View style={styles.filterContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {(['all', 'paid', 'processing', 'shipped', 'completed', 'cancelled'] as FilterType[]).map((f) => (
+          {(
+            [
+              "all",
+              "paid",
+              "processing",
+              "shipped",
+              "completed",
+              "cancelled",
+            ] as FilterType[]
+          ).map((f) => (
             <Chip
               key={f}
               label={getStatusLabel(f)}
@@ -288,11 +324,18 @@ export default function SalesScreen() {
       ) : filteredSales.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="cart-outline" size={80} color={colors.text.subtle} />
-          <Text variant="h3" style={styles.emptyTitle}>Henüz satışınız yok</Text>
+          <Text variant="h3" style={styles.emptyTitle}>
+            Henüz satışınız yok
+          </Text>
           <Text variant="body" tone="muted" style={styles.emptySubtitle}>
             İlan oluşturarak satışa başlayın
           </Text>
-          <Button variant="primary" title="İlan Oluştur" onPress={() => router.push('/(tabs)/sell')} style={{ alignSelf: 'center' }} />
+          <Button
+            variant="primary"
+            title="İlan Oluştur"
+            onPress={() => router.push("/(tabs)/sell")}
+            style={{ alignSelf: "center" }}
+          />
         </View>
       ) : (
         <FlatList
@@ -300,7 +343,11 @@ export default function SalesScreen() {
           keyExtractor={(sale) => sale.id}
           style={styles.salesList}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary[600]!]} />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[colors.primary[600]!]}
+            />
           }
           ListFooterComponent={<View style={{ height: 100 }} />}
           renderItem={({ item: sale }) => (
@@ -309,21 +356,31 @@ export default function SalesScreen() {
                 <Text variant="caption" style={styles.orderNumber}>
                   #{sale.orderNumber}
                 </Text>
-                <StatusBadge status={saleBadgeStatus(sale)} config={salesStatusConfig} size="sm" />
+                <StatusBadge
+                  status={saleBadgeStatus(sale)}
+                  config={salesStatusConfig}
+                  size="sm"
+                />
               </View>
 
               <View style={styles.saleContent}>
                 <AppImage
-                  source={getOrderProductImageUri(sale.product, 'card')}
+                  source={getOrderProductImageUri(sale.product, "card")}
                   style={styles.productImage}
                 />
                 <View style={styles.saleInfo}>
-                  <Text variant="label" numberOfLines={1}>{sale.product.title}</Text>
+                  <Text variant="label" numberOfLines={1}>
+                    {sale.product.title}
+                  </Text>
                   <Text variant="caption" style={styles.buyerName}>
                     Alıcı: {sale.buyer.displayName}
                   </Text>
                   {sale.shippingAddress?.city ? (
-                    <Text variant="caption" style={styles.addressText} numberOfLines={1}>
+                    <Text
+                      variant="caption"
+                      style={styles.addressText}
+                      numberOfLines={1}
+                    >
                       📍 {sale.shippingAddress.city}
                     </Text>
                   ) : null}
@@ -339,23 +396,28 @@ export default function SalesScreen() {
               </View>
 
               {/* Action Buttons */}
-              {sale.status === 'paid' && (
+              {sale.status === "paid" && (
                 <View style={styles.actionButtons}>
                   <Button
                     variant="primary"
                     title="Hazırlanıyor Olarak İşaretle"
                     onPress={() => handleMarkAsProcessing(sale)}
-                    isLoading={updateStatusMutation.isPending && updateStatusMutation.variables?.orderId === sale.id}
+                    isLoading={
+                      updateStatusMutation.isPending &&
+                      updateStatusMutation.variables?.orderId === sale.id
+                    }
                   />
                 </View>
               )}
 
-              {sale.status === 'processing' && (
+              {sale.status === "processing" && (
                 <View style={styles.actionButtons}>
                   <Button
                     variant="primary"
                     title="Kargoya Ver"
-                    onPress={() => setShipDialog({ visible: true, order: sale })}
+                    onPress={() =>
+                      setShipDialog({ visible: true, order: sale })
+                    }
                   />
                 </View>
               )}
@@ -404,8 +466,8 @@ const styles = StyleSheet.create({
   },
   centeredContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 32,
     backgroundColor: colors.surface.DEFAULT,
   },
@@ -414,7 +476,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   subtitle: {
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: 24,
   },
   earningsCard: {
@@ -422,12 +484,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   earningsContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   earningItem: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: "center",
   },
   earningLabel: {
     color: colors.text.muted,
@@ -435,11 +497,11 @@ const styles = StyleSheet.create({
   },
   earningValue: {
     color: colors.success[600]!,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   earningValuePending: {
     color: colors.warning[600]!,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   earningDivider: {
     width: 1,
@@ -458,13 +520,13 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 32,
   },
   emptyTitle: {
@@ -473,7 +535,7 @@ const styles = StyleSheet.create({
     color: colors.text.heading,
   },
   emptySubtitle: {
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: 24,
   },
   salesList: {
@@ -484,17 +546,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   saleHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 12,
   },
   orderNumber: {
     color: colors.text.muted,
   },
   saleContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   productImage: {
     width: 60,
@@ -515,11 +577,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   priceSection: {
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
   },
   price: {
     color: colors.primary[700]!,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   dateText: {
     color: colors.text.muted,
@@ -532,8 +594,8 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border.DEFAULT,
   },
   dialogActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
+    flexDirection: "row",
+    justifyContent: "flex-end",
     gap: 8,
     marginTop: 16,
   },
