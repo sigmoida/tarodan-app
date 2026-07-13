@@ -13,7 +13,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: theme.spacing[8],
     backgroundColor: colors.surface.DEFAULT,
   },
   headerCount: {
@@ -21,20 +21,20 @@ export const styles = StyleSheet.create({
     opacity: 0.8,
   },
   title: {
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: theme.spacing[4],
+    marginBottom: theme.spacing[2],
   },
   subtitle: {
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
     color: colors.text.muted,
   },
   limitBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.warning[50]!,
-    padding: 12,
-    gap: 8,
+    padding: theme.spacing[3],
+    gap: theme.spacing[2],
   },
   limitText: {
     flex: 1,
@@ -54,24 +54,24 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: theme.spacing[8],
   },
   emptyTitle: {
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: theme.spacing[4],
+    marginBottom: theme.spacing[2],
     color: colors.text.heading,
   },
   emptySubtitle: {
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
     color: colors.text.muted,
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: theme.spacing[4],
   },
   searchCard: {
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
     backgroundColor: colors.surface.DEFAULT,
   },
   cardHeader: {
@@ -85,19 +85,19 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   searchName: {
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
   },
   queryText: {
     color: colors.text.heading,
-    marginTop: 8,
+    marginTop: theme.spacing[2],
     fontStyle: 'italic',
   },
   filtersText: {
     color: colors.text.muted,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   divider: {
-    marginVertical: 12,
+    marginVertical: theme.spacing[3],
   },
   cardFooter: {
     flexDirection: 'row',
@@ -113,13 +113,13 @@ export const styles = StyleSheet.create({
   notifyToggle: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: theme.spacing[3],
+    paddingTop: theme.spacing[3],
     borderTopWidth: 1,
     borderTopColor: colors.border.DEFAULT,
   },
   notifyText: {
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
     color: colors.text.muted,
     fontSize: 13,
   },

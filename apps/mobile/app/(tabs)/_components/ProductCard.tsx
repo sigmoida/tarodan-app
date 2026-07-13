@@ -61,21 +61,21 @@ function ProductCardBase({
           )}
           <View style={styles.likesContainer}>
             <Ionicons name="eye-outline" size={14} color={colors.text.muted} />
-            <Text variant="caption" tone="muted" style={{ marginLeft: 2 }}>{viewCount}</Text>
+            <Text variant="caption" tone="muted" style={{ marginLeft: theme.spacing[0.5] }}>{viewCount}</Text>
           </View>
           {inCart && (
             <View style={styles.inCartPill}>
               <Ionicons name="checkmark-circle" size={13} color={colors.white} />
-              <Text variant="caption" tone="inverted" weight="bold" style={{ marginLeft: 4 }}>Sepette</Text>
+              <Text variant="caption" tone="inverted" weight="bold" style={{ marginLeft: theme.spacing[1] }}>Sepette</Text>
             </View>
           )}
         </View>
         <View style={styles.productContent}>
           <Text variant="bodySm" weight="semibold" numberOfLines={2}>{item.title}</Text>
           {metaLabel ? (
-            <Text variant="caption" tone="muted" style={{ marginTop: 2 }}>{metaLabel}</Text>
+            <Text variant="caption" tone="muted" style={{ marginTop: theme.spacing[0.5] }}>{metaLabel}</Text>
           ) : null}
-          <Text variant="h3" tone="primary" style={{ marginTop: 4 }}>
+          <Text variant="h3" tone="primary" style={{ marginTop: theme.spacing[1] }}>
             ₺{item.price?.toLocaleString('tr-TR') || 0}
           </Text>
         </View>

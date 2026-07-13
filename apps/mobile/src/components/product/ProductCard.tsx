@@ -173,7 +173,7 @@ function ProductCardBase({
           {product.isBoosted || product.boostedUntil ? (
             <View style={[styles.badge, styles.boostBadge]}>
               <Ionicons name="rocket" size={10} color={colors.white} />
-              <Text style={[styles.badgeText, { marginLeft: 4 }]}>SPONSORLU</Text>
+              <Text style={[styles.badgeText, { marginLeft: theme.spacing[1] }]}>SPONSORLU</Text>
             </View>
           ) : null}
           {onSale && discountPct > 0 ? (
@@ -189,13 +189,13 @@ function ProductCardBase({
           {product.isLimited ? (
             <View style={[styles.badge, styles.limitedBadge]}>
               <Ionicons name="star" size={10} color={colors.white} />
-              <Text style={[styles.badgeText, { marginLeft: 4 }]}>LIMITED</Text>
+              <Text style={[styles.badgeText, { marginLeft: theme.spacing[1] }]}>LIMITED</Text>
             </View>
           ) : null}
           {product.isTradeEnabled ? (
             <View style={[styles.badge, styles.tradeBadge]}>
               <Ionicons name="swap-horizontal" size={10} color={colors.white} />
-              <Text style={[styles.badgeText, { marginLeft: 4 }]}>TAKAS</Text>
+              <Text style={[styles.badgeText, { marginLeft: theme.spacing[1] }]}>TAKAS</Text>
             </View>
           ) : null}
         </View>
@@ -232,7 +232,7 @@ function ProductCardBase({
         ) : null}
       </View>
 
-      <View style={[styles.gridBody, compact && { padding: 8 }]}>
+      <View style={[styles.gridBody, compact && { padding: theme.spacing[2] }]}>
         <Text style={[styles.title, compact && { fontSize: 13 }]} numberOfLines={2}>
           {product.title}
         </Text>
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   gridBody: {
-    padding: 10,
+    padding: theme.spacing[2.5],
   },
 
   // ========== LIST ==========
@@ -283,13 +283,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border.DEFAULT,
-    padding: 10,
-    gap: 12,
+    padding: theme.spacing[2.5],
+    gap: theme.spacing[3],
   },
   listImageWrap: {
     width: 110,
     height: 110,
-    borderRadius: 8,
+    borderRadius: theme.radius.xl,
     overflow: 'hidden',
     backgroundColor: colors.surface.alt,
   },
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
-    marginTop: 8,
+    marginTop: theme.spacing[2],
   },
 
   // ========== TEXT ==========
@@ -318,19 +318,19 @@ const styles = StyleSheet.create({
   meta: {
     fontSize: 12,
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   price: {
     fontSize: 16,
     fontWeight: '800',
     color: colors.primary[700]!,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   priceOld: {
     fontSize: 12,
     color: colors.gray[400],
     textDecorationLine: 'line-through',
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
 
   // ========== OUT OF STOCK ==========
@@ -352,9 +352,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.5,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+    paddingHorizontal: theme.spacing[3],
+    paddingVertical: theme.spacing[1.5],
+    borderRadius: theme.radius.lg,
     overflow: 'hidden',
   },
 
@@ -364,7 +364,7 @@ const styles = StyleSheet.create({
     top: 8,
     left: 8,
     flexDirection: 'column',
-    gap: 4,
+    gap: theme.spacing[1],
     alignItems: 'flex-start',
   },
   topRightStack: {
@@ -372,15 +372,15 @@ const styles = StyleSheet.create({
     top: 8,
     right: 8,
     flexDirection: 'column',
-    gap: 4,
+    gap: theme.spacing[1],
     alignItems: 'flex-end',
   },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: theme.spacing[2],
     paddingVertical: 3,
-    borderRadius: 4,
+    borderRadius: theme.radius.md,
   },
   badgeText: {
     color: colors.white,
@@ -420,11 +420,11 @@ const styles = StyleSheet.create({
     left: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: theme.spacing[1],
     backgroundColor: colors.primary[600]!,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: theme.spacing[2],
+    paddingVertical: theme.spacing[1],
+    borderRadius: theme.radius.xl,
     shadowColor: colors.black,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
@@ -441,19 +441,19 @@ const styles = StyleSheet.create({
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
-    marginTop: 4,
+    gap: theme.spacing[0.5],
+    marginTop: theme.spacing[1],
   },
   ratingText: {
     fontSize: 12,
     fontWeight: '600',
     color: colors.text.heading,
-    marginLeft: 2,
+    marginLeft: theme.spacing[0.5],
   },
   ratingCount: {
     fontSize: 11,
     color: colors.text.muted,
-    marginLeft: 2,
+    marginLeft: theme.spacing[0.5],
   },
 });
 

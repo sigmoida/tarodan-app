@@ -156,7 +156,7 @@ export function Step3Confirm({ c }: { c: Ctrl }) {
         </View>
       ))}
 
-      <Divider style={{ marginVertical: 12 }} />
+      <Divider style={{ marginVertical: theme.spacing[3] }} />
 
       <View style={styles.securityNotice}>
         <Ionicons name="shield-checkmark" size={20} color={colors.success[600]!} />

@@ -14,20 +14,20 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: theme.spacing[8],
     backgroundColor: colors.surface.DEFAULT,
   },
   title: {
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: theme.spacing[4],
+    marginBottom: theme.spacing[2],
   },
   subtitle: {
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
   },
   earningsCard: {
-    margin: 16,
-    marginBottom: 8,
+    margin: theme.spacing[4],
+    marginBottom: theme.spacing[2],
   },
   earningsContent: {
     flexDirection: 'row',
@@ -39,7 +39,7 @@ export const styles = StyleSheet.create({
   },
   earningLabel: {
     color: colors.text.muted,
-    marginBottom: 4,
+    marginBottom: theme.spacing[1],
   },
   earningValue: {
     color: colors.success[600]!,
@@ -56,13 +56,13 @@ export const styles = StyleSheet.create({
   },
   filterContainer: {
     backgroundColor: colors.surface.DEFAULT,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: theme.spacing[3],
+    paddingHorizontal: theme.spacing[4],
     borderBottomWidth: 1,
     borderBottomColor: colors.border.DEFAULT,
   },
   filterChip: {
-    marginRight: 8,
+    marginRight: theme.spacing[2],
   },
   loadingContainer: {
     flex: 1,
@@ -73,29 +73,29 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: theme.spacing[8],
   },
   emptyTitle: {
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: theme.spacing[4],
+    marginBottom: theme.spacing[2],
     color: colors.text.heading,
   },
   emptySubtitle: {
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
   },
   salesList: {
     flex: 1,
-    padding: 16,
+    padding: theme.spacing[4],
   },
   saleCard: {
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
   },
   saleHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
   },
   orderNumber: {
     color: colors.text.muted,
@@ -107,20 +107,20 @@ export const styles = StyleSheet.create({
   productImage: {
     width: 60,
     height: 60,
-    borderRadius: 8,
+    borderRadius: theme.radius.xl,
     backgroundColor: colors.surface.alt,
   },
   saleInfo: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
   },
   buyerName: {
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   addressText: {
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   priceSection: {
     alignItems: 'flex-end',
@@ -131,18 +131,18 @@ export const styles = StyleSheet.create({
   },
   dateText: {
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   actionButtons: {
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: theme.spacing[3],
+    paddingTop: theme.spacing[3],
     borderTopWidth: 1,
     borderTopColor: colors.border.DEFAULT,
   },
   dialogActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 8,
-    marginTop: 16,
+    gap: theme.spacing[2],
+    marginTop: theme.spacing[4],
   },
 });

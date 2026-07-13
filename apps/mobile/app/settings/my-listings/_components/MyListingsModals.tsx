@@ -66,7 +66,7 @@ export function MyListingsModals({ f }: { f: MyListingsController }) {
         onClose={() => f.setDeleteDialogVisible(false)}
         title="İlanı Sil"
       >
-        <Text style={{ marginBottom: 16, color: colors.text.body }}>
+        <Text style={{ marginBottom: theme.spacing[4], color: colors.text.body }}>
           "{f.selectedListing?.title}" ilanını silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
         </Text>
         <View style={styles.dialogActions}>

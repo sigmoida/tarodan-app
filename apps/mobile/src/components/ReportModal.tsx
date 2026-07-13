@@ -202,12 +202,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 14,
     fontWeight: '500',
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     color: colors.text.heading,
   },
   sectionTitle: {
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: theme.spacing[4],
+    marginBottom: theme.spacing[2],
     color: colors.text.heading,
     fontSize: 14,
     fontWeight: '600',
@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
   reasonItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: theme.spacing[3],
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border.DEFAULT,
   },
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary[50]!,
   },
   reasonText: {
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
     color: colors.text.heading,
   },
   input: {
@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
   },
   charCount: {
     textAlign: 'right',
-    marginTop: 4,
+    marginTop: theme.spacing[1],
     fontSize: 12,
     color: colors.text.muted,
   },
@@ -239,10 +239,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.warning[50]!,
-    padding: 12,
-    marginTop: 16,
-    borderRadius: 8,
-    gap: 8,
+    padding: theme.spacing[3],
+    marginTop: theme.spacing[4],
+    borderRadius: theme.radius.xl,
+    gap: theme.spacing[2],
   },
   warningText: {
     flex: 1,
@@ -252,16 +252,16 @@ const styles = StyleSheet.create({
   errorText: {
     textAlign: 'center',
     color: colors.danger[600]!,
-    marginTop: 16,
+    marginTop: theme.spacing[4],
   },
   successBox: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.success[50]!,
-    padding: 12,
-    marginTop: 16,
-    borderRadius: 8,
-    gap: 8,
+    padding: theme.spacing[3],
+    marginTop: theme.spacing[4],
+    borderRadius: theme.radius.xl,
+    gap: theme.spacing[2],
   },
   successText: {
     flex: 1,
@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 8,
-    marginTop: 12,
+    gap: theme.spacing[2],
+    marginTop: theme.spacing[3],
   },
 });

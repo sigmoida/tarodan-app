@@ -149,7 +149,7 @@ export function BusinessTabContent({ f }: { f: BusinessController }) {
           <Text style={styles.emptyText}>Henüz ürün istatistiği yok</Text>
         )}
 
-        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>En Çok Beğenilen Ürünler</Text>
+        <Text style={[styles.sectionTitle, { marginTop: theme.spacing[6] }]}>En Çok Beğenilen Ürünler</Text>
         {stats.topProducts?.byLikes?.length > 0 ? (
           stats.topProducts.byLikes.map((product, index) => (
             <ProductRow key={product.id} product={product} index={index} metric="likes" />

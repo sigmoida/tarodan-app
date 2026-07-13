@@ -69,7 +69,7 @@ export default function BusinessRejectedScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surface.DEFAULT },
-  content: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  content: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: theme.spacing[6] },
   iconCircle: {
     width: 80,
     height: 80,
@@ -77,15 +77,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.danger[100]!,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
   },
   title: { fontWeight: 'bold', color: colors.text.heading, textAlign: 'center' },
-  text: { marginTop: 12, textAlign: 'center', color: colors.text.muted },
-  subText: { marginTop: 8, textAlign: 'center', color: colors.text.muted },
+  text: { marginTop: theme.spacing[3], textAlign: 'center', color: colors.text.muted },
+  subText: { marginTop: theme.spacing[2], textAlign: 'center', color: colors.text.muted },
   strong: { color: colors.text.heading },
   infoBox: {
-    marginTop: 24,
-    padding: 16,
+    marginTop: theme.spacing[6],
+    padding: theme.spacing[4],
     borderRadius: 12,
     backgroundColor: colors.danger[50]!,
     borderWidth: 1,
@@ -93,5 +93,5 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   infoText: { color: colors.danger[700]!, lineHeight: 20 },
-  button: { marginTop: 16, alignSelf: 'stretch' },
+  button: { marginTop: theme.spacing[4], alignSelf: 'stretch' },
 });

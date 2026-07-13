@@ -29,7 +29,7 @@ export function AddressSelector({
   return (
     <View>
       {isAuthenticated && addresses.length > 0 ? (
-        <View style={{ marginBottom: 12 }}>
+        <View style={{ marginBottom: theme.spacing[3] }}>
           {addresses.map((a) => (
             <TouchableOpacity
               key={a.id}
@@ -54,7 +54,7 @@ export function AddressSelector({
             <Radio checked={selectedId === 'new'} onChange={() => setSelectedId('new')} />
             <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
               <Ionicons name="add-circle-outline" size={18} color={colors.primary[600]!} />
-              <Text style={[styles.addressTitle, { marginLeft: 8 }]}>Yeni Adres Ekle</Text>
+              <Text style={[styles.addressTitle, { marginLeft: theme.spacing[2] }]}>Yeni Adres Ekle</Text>
             </View>
           </TouchableOpacity>
         </View>

@@ -19,7 +19,7 @@ export const styles = StyleSheet.create({
   },
   brandHeader: {
     alignItems: 'center',
-    gap: 8,
+    gap: theme.spacing[2],
   },
   headerTitle: {
     color: colors.white,
@@ -35,7 +35,7 @@ export const styles = StyleSheet.create({
     width: '100%',
     backgroundColor: colors.surface.elevated,
     borderRadius: 20,
-    padding: 20,
+    padding: theme.spacing[5],
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
     shadowColor: colors.black,

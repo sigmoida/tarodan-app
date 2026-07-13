@@ -33,7 +33,7 @@ export default function TabLayout() {
           backgroundColor: colors.surface.DEFAULT,
           borderTopColor: colors.border.subtle,
           borderTopWidth: 1,
-          paddingTop: 8,
+          paddingTop: theme.spacing[2],
           paddingBottom: tabBarBottom,
           height: 56 + tabBarBottom,
           elevation: 10,
@@ -45,7 +45,7 @@ export default function TabLayout() {
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '600',
-          marginTop: 2,
+          marginTop: theme.spacing[0.5],
         },
         headerShown: false,
       }}

@@ -69,7 +69,7 @@ export function AuthRequiredSheet({
 const styles = StyleSheet.create({
   body: {
     alignItems: 'center',
-    gap: 8,
+    gap: theme.spacing[2],
   },
   iconCircle: {
     width: 72,
@@ -78,11 +78,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary[50]!,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   message: {
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: theme.spacing[5],
   },
   fullWidth: {
     width: '100%',

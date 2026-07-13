@@ -264,35 +264,35 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: theme.spacing[4],
   },
   card: {
-    marginTop: 16,
-    padding: 16,
+    marginTop: theme.spacing[4],
+    padding: theme.spacing[4],
     backgroundColor: colors.surface.DEFAULT,
   },
   hint: {
     color: colors.text.muted,
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
   },
   input: {
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
   },
   updateWarning: {
     color: colors.text.muted,
-    marginTop: 8,
-    marginBottom: 4,
+    marginTop: theme.spacing[2],
+    marginBottom: theme.spacing[1],
   },
   submitButton: {
-    marginTop: 16,
+    marginTop: theme.spacing[4],
   },
   deleteButton: {
-    marginTop: 8,
+    marginTop: theme.spacing[2],
   },
   centered: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 16,
+    gap: theme.spacing[4],
   },
 });

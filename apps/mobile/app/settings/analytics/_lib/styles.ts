@@ -13,16 +13,16 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: theme.spacing[8],
     backgroundColor: colors.surface.DEFAULT,
   },
   title: {
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: theme.spacing[4],
+    marginBottom: theme.spacing[2],
   },
   subtitle: {
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
     color: colors.text.muted,
   },
   loadingContainer: {
@@ -37,12 +37,12 @@ export const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: theme.spacing[4],
   },
   overviewRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
+    gap: theme.spacing[3],
+    marginBottom: theme.spacing[3],
   },
   overviewCard: {
     flex: 1,
@@ -50,37 +50,37 @@ export const styles = StyleSheet.create({
   },
   overviewContent: {
     alignItems: 'center',
-    padding: 8,
+    padding: theme.spacing[2],
   },
   overviewValue: {
-    marginTop: 8,
+    marginTop: theme.spacing[2],
     fontWeight: 'bold',
     color: colors.text.heading,
   },
   overviewLabel: {
     color: colors.text.muted,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
     textAlign: 'center',
   },
   chartCard: {
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
     backgroundColor: colors.surface.DEFAULT,
   },
   chartHeader: {
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   simpleChart: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
     height: 120,
-    paddingHorizontal: 8,
+    paddingHorizontal: theme.spacing[2],
   },
   chartBar: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-end',
-    marginHorizontal: 4,
+    marginHorizontal: theme.spacing[1],
   },
   bar: {
     width: 24,
@@ -89,29 +89,29 @@ export const styles = StyleSheet.create({
     minHeight: 4,
   },
   barLabel: {
-    marginTop: 8,
+    marginTop: theme.spacing[2],
     fontSize: 11,
     color: colors.text.muted,
   },
   chartFooter: {
-    marginTop: 16,
+    marginTop: theme.spacing[4],
     alignItems: 'center',
   },
   chartTotal: {
     color: colors.text.muted,
   },
   card: {
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
     backgroundColor: colors.surface.DEFAULT,
   },
   sectionTitle: {
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
     color: colors.text.heading,
   },
   listingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: theme.spacing[3],
     borderBottomWidth: 1,
     borderBottomColor: colors.border.DEFAULT,
   },
@@ -126,15 +126,15 @@ export const styles = StyleSheet.create({
   listingStats: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   listingStat: {
-    marginLeft: 4,
+    marginLeft: theme.spacing[1],
     fontSize: 12,
     color: colors.text.muted,
   },
   premiumCard: {
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
     backgroundColor: colors.primary[50]!,
     borderWidth: 1,
     borderColor: colors.primary[200]!,
@@ -142,22 +142,22 @@ export const styles = StyleSheet.create({
   premiumHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   premiumTitle: {
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
     color: colors.primary[600]!,
   },
   premiumText: {
     color: colors.text.muted,
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   premiumFeatures: {
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   premiumFeature: {
     color: colors.text.heading,
-    marginVertical: 2,
+    marginVertical: theme.spacing[0.5],
   },
   premiumButton: {
     backgroundColor: colors.primary[600]!,
@@ -166,10 +166,10 @@ export const styles = StyleSheet.create({
   premiumSectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   premiumSectionTitle: {
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
     color: colors.primary[600]!,
     fontWeight: '600',
   },
@@ -180,10 +180,10 @@ export const styles = StyleSheet.create({
   metricItem: {
     flex: 1,
     alignItems: 'center',
-    padding: 12,
+    padding: theme.spacing[3],
     backgroundColor: colors.surface.alt,
     borderRadius: radius.lg,
-    marginHorizontal: 4,
+    marginHorizontal: theme.spacing[1],
   },
   metricValue: {
     fontWeight: 'bold',
@@ -191,14 +191,14 @@ export const styles = StyleSheet.create({
   },
   metricLabel: {
     color: colors.text.muted,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
     textAlign: 'center',
   },
   revenueHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   revenueLabel: {
     color: colors.text.muted,
@@ -220,7 +220,7 @@ export const styles = StyleSheet.create({
   revenueBarValue: {
     fontSize: 10,
     color: colors.text.muted,
-    marginBottom: 4,
+    marginBottom: theme.spacing[1],
   },
   revenueBarFill: {
     width: 32,
@@ -229,26 +229,26 @@ export const styles = StyleSheet.create({
     minHeight: 4,
   },
   revenueBarLabel: {
-    marginTop: 8,
+    marginTop: theme.spacing[2],
     fontSize: 11,
     color: colors.text.muted,
   },
   tradeStats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: 16,
+    paddingVertical: theme.spacing[4],
   },
   tradeStat: {
     alignItems: 'center',
   },
   tradeStatValue: {
-    marginTop: 8,
+    marginTop: theme.spacing[2],
     fontWeight: 'bold',
     color: colors.text.heading,
   },
   tradeStatLabel: {
     color: colors.text.muted,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   successRateCircle: {
     width: 64,
@@ -266,32 +266,32 @@ export const styles = StyleSheet.create({
   collectionStats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: 16,
+    paddingVertical: theme.spacing[4],
   },
   collectionStat: {
     alignItems: 'center',
   },
   collectionStatValue: {
-    marginTop: 8,
+    marginTop: theme.spacing[2],
     fontWeight: 'bold',
     color: colors.text.heading,
   },
   collectionStatLabel: {
     color: colors.text.muted,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
     textAlign: 'center',
   },
   performerItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: theme.spacing[3],
     borderBottomWidth: 1,
     borderBottomColor: colors.border.DEFAULT,
   },
   conversionBadge: {
     backgroundColor: colors.success[50]!,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: theme.spacing[2],
+    paddingVertical: theme.spacing[1],
     borderRadius: radius.lg,
   },
   conversionText: {

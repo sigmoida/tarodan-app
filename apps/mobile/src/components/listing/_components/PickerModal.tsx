@@ -80,7 +80,7 @@ export function PickerModal({
           )}
 
           {loading ? (
-            <ActivityIndicator size="large" color={colors.primary[600]!} style={{ marginTop: 32 }} />
+            <ActivityIndicator size="large" color={colors.primary[600]!} style={{ marginTop: theme.spacing[8] }} />
           ) : (
             <FlatList
               data={filtered}

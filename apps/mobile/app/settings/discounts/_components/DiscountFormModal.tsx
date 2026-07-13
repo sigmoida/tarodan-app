@@ -18,7 +18,7 @@ export function DiscountFormModal({ f }: { f: DiscountsController }) {
       title={form.id ? 'İndirimi Düzenle' : 'Yeni İndirim'}
     >
       <ScrollView style={styles.dialogScroll}>
-        <View style={{ paddingVertical: 8 }}>
+        <View style={{ paddingVertical: theme.spacing[2] }}>
           <Input
             label="İndirim Adı *"
             value={form.name}

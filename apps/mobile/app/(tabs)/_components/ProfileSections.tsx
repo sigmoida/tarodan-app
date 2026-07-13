@@ -28,7 +28,7 @@ export function ProfileCard({ f }: SectionProps) {
       />
       <View style={styles.profileInfo}>
         <Text variant="h3">{user?.displayName}</Text>
-        <Text variant="bodySm" tone="muted" style={{ marginTop: 2 }}>
+        <Text variant="bodySm" tone="muted" style={{ marginTop: theme.spacing[0.5] }}>
           {user?.email}
         </Text>
         {f.isPaidTier && (
@@ -121,7 +121,7 @@ export function ProfileStatsGrid({ f }: SectionProps) {
       <TouchableOpacity style={styles.statItem}>
         <View style={styles.ratingRow}>
           <Ionicons name="star" size={16} color={colors.warning[500]!} />
-          <Text variant="h2" tone="primary" style={{ marginLeft: 4 }}>
+          <Text variant="h2" tone="primary" style={{ marginLeft: theme.spacing[1] }}>
             {stats?.rating || '-'}
           </Text>
         </View>
@@ -180,7 +180,7 @@ export function ProfileGarageSection({ f }: SectionProps) {
               <Text variant="label" numberOfLines={1} style={{ marginTop: spacing[2] }}>
                 {c.name}
               </Text>
-              <Text variant="caption" tone="muted" style={{ marginTop: 2 }}>
+              <Text variant="caption" tone="muted" style={{ marginTop: theme.spacing[0.5] }}>
                 {c.itemCount ?? 0} araç
               </Text>
             </TouchableOpacity>

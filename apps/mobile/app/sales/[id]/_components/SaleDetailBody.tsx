@@ -121,7 +121,7 @@ export function SaleDetailBody({ f }: { f: SaleDetailController }) {
               icon="cube"
               title="Sürat'ta Takip Et"
               onPress={f.handleTrack}
-              style={{ marginTop: 8 }}
+              style={{ marginTop: theme.spacing[2] }}
             />
           </>
         ) : (
@@ -158,7 +158,7 @@ export function SaleDetailBody({ f }: { f: SaleDetailController }) {
             <Text style={[styles.kvValue, { color: colors.danger[600]! }]}>- {formatPrice(withholding)}</Text>
           </View>
         ) : null}
-        <Divider style={{ marginVertical: 8 }} />
+        <Divider style={{ marginVertical: theme.spacing[2] }} />
         <View style={styles.kvRow}>
           <Text style={[styles.kvLabel, { fontWeight: '700' }]}>{net != null ? 'Net Kazanç' : 'Toplam'}</Text>
           <Text style={[styles.kvValue, { fontSize: 18, fontWeight: '800', color: colors.primary[600]! }]}>

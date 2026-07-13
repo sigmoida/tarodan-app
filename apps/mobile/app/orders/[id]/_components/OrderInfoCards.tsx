@@ -86,7 +86,7 @@ export function OrderPayPendingCard({
         isLoading={payPending}
         title={`Ödeme Yap · ${formatPrice(order.totalAmount)}`}
         onPress={onPay}
-        style={{ marginTop: 12 }}
+        style={{ marginTop: theme.spacing[3] }}
       />
     </Card>
   );
@@ -123,17 +123,17 @@ export function OrderTrackingCard({ order, view }: { order: OrderDetail; view: O
 }
 
 const styles = StyleSheet.create({
-  card: { marginBottom: 12 },
-  sectionTitle: { marginBottom: 12, color: colors.text.heading },
+  card: { marginBottom: theme.spacing[3] },
+  sectionTitle: { marginBottom: theme.spacing[3], color: colors.text.heading },
   confirmNote: { textAlign: 'center', color: colors.text.muted },
-  escrowHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  escrowHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing[2], marginBottom: theme.spacing[1.5] },
   escrowHeaderText: { flex: 1, color: colors.text.heading },
   escrowText: { color: colors.text.muted, lineHeight: 18 },
-  cancelledHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  cancelledHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing[2], marginBottom: theme.spacing[1.5] },
   cancelledHeaderText: { flex: 1, color: colors.text.heading },
   trackingHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   trackingRow: { flexDirection: 'row', alignItems: 'center' },
-  trackingInfo: { flex: 1, marginLeft: 12 },
-  trackLink: { color: colors.primary[600]!, marginTop: 4 },
-  trackingDeliveredText: { color: colors.text.muted, marginTop: 4 },
+  trackingInfo: { flex: 1, marginLeft: theme.spacing[3] },
+  trackLink: { color: colors.primary[600]!, marginTop: theme.spacing[1] },
+  trackingDeliveredText: { color: colors.text.muted, marginTop: theme.spacing[1] },
 });

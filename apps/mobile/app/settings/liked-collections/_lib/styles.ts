@@ -18,7 +18,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 12,
+    marginTop: theme.spacing[3],
     fontSize: 14,
     color: colors.text.muted,
   },
@@ -26,27 +26,27 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: theme.spacing[8],
   },
   emptyTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: colors.text.heading,
-    marginTop: 16,
+    marginTop: theme.spacing[4],
   },
   emptySubtitle: {
     fontSize: 14,
     color: colors.text.muted,
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: theme.spacing[2],
     lineHeight: 20,
   },
   loginButton: {
-    marginTop: 24,
+    marginTop: theme.spacing[6],
     backgroundColor: colors.primary[600]!,
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingHorizontal: theme.spacing[8],
+    paddingVertical: theme.spacing[3],
+    borderRadius: theme.radius.xl,
   },
   loginButtonText: {
     color: colors.white,
@@ -54,11 +54,11 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
   },
   retryButton: {
-    marginTop: 24,
+    marginTop: theme.spacing[6],
     backgroundColor: colors.primary[600]!,
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingHorizontal: theme.spacing[8],
+    paddingVertical: theme.spacing[3],
+    borderRadius: theme.radius.xl,
   },
   retryButtonText: {
     color: colors.white,
@@ -66,11 +66,11 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
   },
   browseButton: {
-    marginTop: 24,
+    marginTop: theme.spacing[6],
     backgroundColor: colors.primary[600]!,
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingHorizontal: theme.spacing[8],
+    paddingVertical: theme.spacing[3],
+    borderRadius: theme.radius.xl,
   },
   browseButtonText: {
     color: colors.white,
@@ -80,7 +80,7 @@ export const styles = StyleSheet.create({
   collectionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: 8,
+    padding: theme.spacing[2],
   },
   collectionCard: {
     width: '48%',
@@ -108,32 +108,32 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    padding: 8,
+    padding: theme.spacing[2],
   },
   collectionStats: {
     flexDirection: 'row',
     backgroundColor: colors.overlay.black50,
     borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: theme.spacing[2],
+    paddingVertical: theme.spacing[1],
   },
   collectionStat: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 8,
+    marginRight: theme.spacing[2],
   },
   collectionStatText: {
     fontSize: 11,
     color: colors.white,
-    marginLeft: 4,
+    marginLeft: theme.spacing[1],
   },
   unlikeButton: {
     backgroundColor: colors.overlay.black50,
-    borderRadius: 16,
-    padding: 6,
+    borderRadius: theme.radius['3xl'],
+    padding: theme.spacing[1.5],
   },
   collectionInfo: {
-    padding: 12,
+    padding: theme.spacing[3],
   },
   collectionName: {
     fontSize: 14,
@@ -143,6 +143,6 @@ export const styles = StyleSheet.create({
   ownerName: {
     fontSize: 12,
     color: colors.text.muted,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
 });

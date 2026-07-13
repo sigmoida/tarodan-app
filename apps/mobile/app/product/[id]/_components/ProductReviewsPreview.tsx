@@ -58,16 +58,16 @@ export function ProductReviewsPreview({
 }
 
 const styles = StyleSheet.create({
-  section: { marginBottom: 8 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  sectionTitle: { fontSize: 18, fontWeight: '600', color: colors.text.heading, marginBottom: 12 },
+  section: { marginBottom: theme.spacing[2] },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing[3] },
+  sectionTitle: { fontSize: 18, fontWeight: '600', color: colors.text.heading, marginBottom: theme.spacing[3] },
   seeAll: { fontSize: 14, color: colors.primary[600]!, fontWeight: '500' },
-  reviewCard: { backgroundColor: colors.gray[50], borderRadius: 8, padding: 12, marginBottom: 8 },
-  reviewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  reviewCard: { backgroundColor: colors.gray[50], borderRadius: theme.radius.xl, padding: theme.spacing[3], marginBottom: theme.spacing[2] },
+  reviewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing[2] },
   reviewerName: { fontSize: 14, fontWeight: '600', color: colors.text.heading },
-  ratingStars: { flexDirection: 'row', gap: 2 },
-  reviewTitle: { fontSize: 14, fontWeight: '700', color: colors.text.heading, marginBottom: 2 },
+  ratingStars: { flexDirection: 'row', gap: theme.spacing[0.5] },
+  reviewTitle: { fontSize: 14, fontWeight: '700', color: colors.text.heading, marginBottom: theme.spacing[0.5] },
   reviewComment: { fontSize: 14, color: colors.text.heading, lineHeight: 20 },
-  reviewDate: { fontSize: 12, color: colors.text.muted, marginTop: 8 },
+  reviewDate: { fontSize: 12, color: colors.text.muted, marginTop: theme.spacing[2] },
   noReviews: { fontSize: 14, color: colors.text.muted, fontStyle: 'italic' },
 });

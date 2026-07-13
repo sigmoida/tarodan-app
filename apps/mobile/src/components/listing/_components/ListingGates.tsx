@@ -41,7 +41,7 @@ export function ListingGates({ f }: { f: ListingFormController }) {
     return (
       <SafeAreaView style={styles.centered}>
         <Ionicons name="alert-circle-outline" size={64} color={colors.danger[600]!} />
-        <Text style={[styles.authText, { marginTop: 16 }]}>İlan bulunamadı</Text>
+        <Text style={[styles.authText, { marginTop: theme.spacing[4] }]}>İlan bulunamadı</Text>
         <TouchableOpacity style={styles.primaryButton} onPress={() => router.back()}>
           <Text style={styles.primaryButtonText}>Geri Dön</Text>
         </TouchableOpacity>
@@ -61,7 +61,7 @@ export function ListingGates({ f }: { f: ListingFormController }) {
         </View>
         <View style={styles.centered}>
           <Ionicons name="lock-closed-outline" size={56} color={colors.warning[600]!} />
-          <Text style={[styles.authText, { marginTop: 16 }]}>
+          <Text style={[styles.authText, { marginTop: theme.spacing[4] }]}>
             Bu ilan rezerve durumda olduğu için düzenlenemez.
           </Text>
         </View>

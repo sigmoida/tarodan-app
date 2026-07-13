@@ -15,8 +15,8 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scrollBody: {
-    padding: 16,
-    gap: 12,
+    padding: theme.spacing[4],
+    gap: theme.spacing[3],
   },
   card: {
     backgroundColor: colors.surface.DEFAULT,
@@ -29,10 +29,10 @@ export const styles = StyleSheet.create({
   tierBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: theme.spacing[1.5],
     backgroundColor: colors.primary[50]!,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: theme.spacing[2.5],
+    paddingVertical: theme.spacing[1.5],
     borderRadius: 999,
   },
   tierText: {
@@ -42,7 +42,7 @@ export const styles = StyleSheet.create({
   activeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: theme.spacing[1],
   },
   activeText: {
     color: colors.success[600]!,
@@ -52,11 +52,11 @@ export const styles = StyleSheet.create({
   cancelledNote: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
-    marginTop: 12,
-    padding: 10,
+    gap: theme.spacing[2],
+    marginTop: theme.spacing[3],
+    padding: theme.spacing[2.5],
     backgroundColor: colors.warning[50]!,
-    borderRadius: 10,
+    borderRadius: theme.radius['2xl'],
   },
   cancelledNoteText: {
     flex: 1,
@@ -67,7 +67,7 @@ export const styles = StyleSheet.create({
   kvRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 4,
+    paddingVertical: theme.spacing[1],
   },
   kvLabel: {
     color: colors.text.muted,
@@ -81,12 +81,12 @@ export const styles = StyleSheet.create({
   autoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: theme.spacing[3],
   },
   autoTitle: {
     fontWeight: '700',
     color: colors.text.heading,
-    marginBottom: 2,
+    marginBottom: theme.spacing[0.5],
   },
   autoSub: {
     fontSize: 12,
@@ -96,20 +96,20 @@ export const styles = StyleSheet.create({
   helperText: {
     fontSize: 13,
     color: colors.text.muted,
-    marginTop: 12,
+    marginTop: theme.spacing[3],
     lineHeight: 18,
   },
   actionBtn: {
-    borderRadius: 10,
+    borderRadius: theme.radius['2xl'],
   },
   helpBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
-    padding: 12,
+    gap: theme.spacing[2],
+    padding: theme.spacing[3],
     backgroundColor: colors.info[50]!,
-    borderRadius: 10,
-    marginTop: 4,
+    borderRadius: theme.radius['2xl'],
+    marginTop: theme.spacing[1],
   },
   helpText: {
     flex: 1,

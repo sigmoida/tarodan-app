@@ -68,7 +68,7 @@ export function OfferDetailActions({ f }: { f: OfferDetailController }) {
           isLoading={cancelMutation.isPending}
           icon="trash-outline"
           fullWidth
-          style={{ ...styles.actionBtn, borderColor: colors.danger[600]!, margin: 16 }}
+          style={{ ...styles.actionBtn, borderColor: colors.danger[600]!, margin: theme.spacing[4] }}
           textStyle={{ color: colors.danger[600]! }}
         >
           Teklifi İptal Et

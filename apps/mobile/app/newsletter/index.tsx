@@ -93,13 +93,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface.DEFAULT,
   },
   scrollBody: {
-    padding: 24,
-    gap: 10,
+    padding: theme.spacing[6],
+    gap: theme.spacing[2.5],
   },
   iconWrap: {
     alignItems: 'center',
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: theme.spacing[4],
+    marginBottom: theme.spacing[2],
   },
   title: {
     fontSize: 22,
@@ -111,14 +111,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.text.muted,
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     lineHeight: 20,
   },
   input: {
     backgroundColor: colors.surface.DEFAULT,
   },
   btn: {
-    borderRadius: 10,
-    marginTop: 8,
+    borderRadius: theme.radius['2xl'],
+    marginTop: theme.spacing[2],
   },
 });

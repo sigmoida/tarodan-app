@@ -82,7 +82,7 @@ export function TradeAddressPicker({ onChange, label }: Props) {
       ) : null}
 
       {loading ? (
-        <ActivityIndicator color={colors.primary[600]!} style={{ marginVertical: 16 }} />
+        <ActivityIndicator color={colors.primary[600]!} style={{ marginVertical: theme.spacing[4] }} />
       ) : (
         <>
           {addresses.map((a) => {
@@ -98,7 +98,7 @@ export function TradeAddressPicker({ onChange, label }: Props) {
                   name={active ? 'radio-button-on' : 'radio-button-off'}
                   size={20}
                   color={active ? colors.primary[600]! : colors.text.muted}
-                  style={{ marginTop: 2 }}
+                  style={{ marginTop: theme.spacing[0.5] }}
                 />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.name}>
@@ -135,14 +135,14 @@ export function TradeAddressPicker({ onChange, label }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { gap: 8 },
-  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  container: { gap: theme.spacing[2] },
+  labelRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing[1.5], marginBottom: theme.spacing[1] },
   label: { fontSize: 14, fontWeight: '600', color: colors.text.heading },
   card: {
     flexDirection: 'row',
-    gap: 10,
-    padding: 12,
-    borderRadius: 10,
+    gap: theme.spacing[2.5],
+    padding: theme.spacing[3],
+    borderRadius: theme.radius['2xl'],
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
     backgroundColor: colors.surface.DEFAULT,
@@ -150,16 +150,16 @@ const styles = StyleSheet.create({
   cardActive: { borderColor: colors.primary[500]!, backgroundColor: colors.primary[50]! },
   name: { fontSize: 14, fontWeight: '600', color: colors.text.heading },
   default: { fontSize: 12, color: colors.primary[600]!, fontWeight: '500' },
-  sub: { fontSize: 13, color: colors.text.muted, marginTop: 2 },
+  sub: { fontSize: 13, color: colors.text.muted, marginTop: theme.spacing[0.5] },
   addr: { fontSize: 12, color: colors.text.subtle, marginTop: 1 },
-  empty: { fontSize: 13, color: colors.text.muted, paddingVertical: 8 },
+  empty: { fontSize: 13, color: colors.text.muted, paddingVertical: theme.spacing[2] },
   addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 10,
+    gap: theme.spacing[1.5],
+    paddingVertical: theme.spacing[2.5],
+    borderRadius: theme.radius['2xl'],
     backgroundColor: colors.primary[50]!,
   },
   addBtnText: { fontSize: 14, fontWeight: '600', color: colors.primary[600]! },

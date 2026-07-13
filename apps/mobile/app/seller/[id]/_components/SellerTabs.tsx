@@ -13,9 +13,9 @@ const { colors } = theme;
 // Küçük boş-durum yardımcı bileşeni.
 function TabEmpty({ icon, text }: { icon: React.ComponentProps<typeof Ionicons>['name']; text: string }) {
   return (
-    <View style={{ alignItems: 'center', padding: 32 }}>
+    <View style={{ alignItems: 'center', padding: theme.spacing[8] }}>
       <Ionicons name={icon} size={48} color={colors.text.subtle} />
-      <Text style={{ color: colors.text.muted, marginTop: 8, fontSize: 14 }}>{text}</Text>
+      <Text style={{ color: colors.text.muted, marginTop: theme.spacing[2], fontSize: 14 }}>{text}</Text>
     </View>
   );
 }

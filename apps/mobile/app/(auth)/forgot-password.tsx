@@ -42,7 +42,7 @@ export default function ForgotPasswordScreen() {
             <Text variant="h3" align="center">
               Email Gönderildi
             </Text>
-            <Text variant="bodySm" tone="muted" align="center" style={{ marginTop: 8, marginBottom: 16 }}>
+            <Text variant="bodySm" tone="muted" align="center" style={{ marginTop: theme.spacing[2], marginBottom: theme.spacing[4] }}>
               Şifre sıfırlama linki email adresinize gönderildi. Lütfen gelen kutunuzu kontrol edin.
             </Text>
             <Button
@@ -69,7 +69,7 @@ export default function ForgotPasswordScreen() {
           <Text variant="h3" align="center">
             Şifremi Unuttum
           </Text>
-          <Text variant="bodySm" tone="muted" align="center" style={{ marginTop: 8, marginBottom: 16 }}>
+          <Text variant="bodySm" tone="muted" align="center" style={{ marginTop: theme.spacing[2], marginBottom: theme.spacing[4] }}>
             Email adresinizi girin, şifre sıfırlama linki göndereceğiz
           </Text>
 
@@ -92,7 +92,7 @@ export default function ForgotPasswordScreen() {
           />
 
           {forgotMutation.isError ? (
-            <Text variant="bodySm" tone="danger" align="center" style={{ marginBottom: 8 }}>
+            <Text variant="bodySm" tone="danger" align="center" style={{ marginBottom: theme.spacing[2] }}>
               Bir hata oluştu. Lütfen tekrar deneyin.
             </Text>
           ) : null}
@@ -108,7 +108,7 @@ export default function ForgotPasswordScreen() {
             disabled={forgotMutation.isPending}
           />
 
-          <Button variant="ghost" fullWidth title="Geri Dön" onPress={() => router.back()} style={{ marginTop: 4 }} />
+          <Button variant="ghost" fullWidth title="Geri Dön" onPress={() => router.back()} style={{ marginTop: theme.spacing[1] }} />
         </View>
       </VStack>
     </Screen>
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     width: '100%',
     backgroundColor: colors.surface.elevated,
     borderRadius: 20,
-    padding: 20,
+    padding: theme.spacing[5],
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
     shadowColor: colors.black,

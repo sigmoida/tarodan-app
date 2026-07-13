@@ -10,14 +10,14 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.surface.alt,
   },
   limitCard: {
-    margin: 16,
-    marginBottom: 8,
+    margin: theme.spacing[4],
+    marginBottom: theme.spacing[2],
   },
   limitHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   upgradeLink: {
     color: colors.primary[600]!,
@@ -29,13 +29,13 @@ export const styles = StyleSheet.create({
   },
   filterContainer: {
     backgroundColor: colors.white,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: theme.spacing[3],
+    paddingHorizontal: theme.spacing[4],
     borderBottomWidth: 1,
     borderBottomColor: colors.border.DEFAULT,
   },
   chipRow: {
-    gap: 8,
+    gap: theme.spacing[2],
   },
   loadingContainer: {
     flex: 1,
@@ -44,14 +44,14 @@ export const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: theme.spacing[4],
   },
   listingCard: {
     backgroundColor: colors.white,
     borderRadius: radius.lg,
-    padding: 12,
+    padding: theme.spacing[3],
     flexDirection: 'row',
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
     elevation: 2,
     shadowColor: colors.black,
     shadowOffset: { width: 0, height: 2 },
@@ -66,7 +66,7 @@ export const styles = StyleSheet.create({
   },
   listingInfo: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
   },
   listingHeader: {
     flexDirection: 'row',
@@ -83,36 +83,36 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: colors.primary[600]!,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   listingStats: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: theme.spacing[2],
     flexWrap: 'wrap',
   },
   stat: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: theme.spacing[4],
   },
   statText: {
     fontSize: 12,
     color: colors.text.muted,
-    marginLeft: 4,
+    marginLeft: theme.spacing[1],
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: theme.spacing[2],
+    paddingVertical: theme.spacing[1],
     borderRadius: radius.lg,
   },
   statusDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    marginRight: 4,
+    marginRight: theme.spacing[1],
   },
   statusText: {
     fontSize: 12,
@@ -121,17 +121,17 @@ export const styles = StyleSheet.create({
   expiryWarning: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 6,
+    marginTop: theme.spacing[1.5],
   },
   expiryText: {
     fontSize: 11,
     color: colors.warning[600]!,
-    marginLeft: 4,
+    marginLeft: theme.spacing[1],
   },
   dateText: {
     fontSize: 11,
     color: colors.text.subtle,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   emptyState: {
     alignItems: 'center',
@@ -142,12 +142,12 @@ export const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: colors.text.heading,
-    marginTop: 16,
+    marginTop: theme.spacing[4],
   },
   emptyDesc: {
     fontSize: 14,
     color: colors.text.muted,
-    marginTop: 8,
+    marginTop: theme.spacing[2],
     textAlign: 'center',
   },
   fab: {
@@ -158,8 +158,8 @@ export const styles = StyleSheet.create({
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    gap: 12,
+    paddingVertical: theme.spacing[3],
+    gap: theme.spacing[3],
   },
   menuItemText: {
     fontSize: 15,
@@ -168,7 +168,7 @@ export const styles = StyleSheet.create({
   dialogActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 8,
-    marginTop: 12,
+    gap: theme.spacing[2],
+    marginTop: theme.spacing[3],
   },
 });

@@ -13,11 +13,11 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: theme.spacing[8],
   },
   subtitle: {
     textAlign: 'center',
-    marginVertical: 16,
+    marginVertical: theme.spacing[4],
     color: colors.text.muted,
   },
   loadingContainer: {
@@ -27,10 +27,10 @@ export const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: theme.spacing[4],
   },
   planCard: {
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     backgroundColor: colors.surface.DEFAULT,
     borderWidth: 2,
     borderColor: colors.primary[200]!,
@@ -45,14 +45,14 @@ export const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   statusChip: {
-    marginTop: 8,
+    marginTop: theme.spacing[2],
     alignSelf: 'flex-start',
   },
   divider: {
-    marginVertical: 16,
+    marginVertical: theme.spacing[4],
   },
   planDetails: {
-    gap: 8,
+    gap: theme.spacing[2],
   },
   detailRow: {
     flexDirection: 'row',
@@ -66,18 +66,18 @@ export const styles = StyleSheet.create({
   },
   upgradePrompt: {
     color: colors.text.muted,
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     textAlign: 'center',
   },
   upgradeButton: {
     alignSelf: 'stretch',
   },
   card: {
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     backgroundColor: colors.surface.DEFAULT,
   },
   sectionTitle: {
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     color: colors.text.heading,
   },
   featuresGrid: {
@@ -87,7 +87,7 @@ export const styles = StyleSheet.create({
   featureItem: {
     width: '33%',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   featureIcon: {
     width: 40,
@@ -96,7 +96,7 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.primary[50]!,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: theme.spacing[1],
   },
   featureText: {
     textAlign: 'center',
@@ -105,7 +105,7 @@ export const styles = StyleSheet.create({
   billingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: theme.spacing[3],
     borderBottomWidth: 1,
     borderBottomColor: colors.border.DEFAULT,
   },
@@ -114,24 +114,24 @@ export const styles = StyleSheet.create({
   },
   billingDate: {
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   billingAmount: {
     alignItems: 'flex-end',
-    marginRight: 8,
+    marginRight: theme.spacing[2],
   },
   amount: {
     color: colors.text.heading,
     fontWeight: 'bold',
   },
   paymentStatusChip: {
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    gap: 12,
+    paddingVertical: theme.spacing[3],
+    gap: theme.spacing[3],
   },
   actionTextWrap: {
     flex: 1,
@@ -142,10 +142,10 @@ export const styles = StyleSheet.create({
   },
   actionDesc: {
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   warningCard: {
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     backgroundColor: colors.warning[50]!,
     borderWidth: 1,
     borderColor: colors.warning[200]!,
@@ -160,20 +160,20 @@ export const styles = StyleSheet.create({
   },
   warningText: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
   },
   warningDesc: {
     color: colors.text.muted,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   helpLink: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
+    padding: theme.spacing[4],
   },
   helpText: {
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
     color: colors.primary[600]!,
     fontWeight: '500',
   },

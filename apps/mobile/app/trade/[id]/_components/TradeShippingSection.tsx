@@ -94,7 +94,7 @@ export function TradeShippingSection({
           <Card style={{ ...styles.card, ...styles.inboundCard }} testID="trade-inbound-card">
             <View style={styles.shippingRow}>
               <MaterialCommunityIcons name="truck-fast-outline" size={22} color={colors.primary[600]!} />
-              <Text variant="label" style={{ ...styles.sectionTitle, marginBottom: 0, flex: 1 }}>
+              <Text variant="label" style={{ ...styles.sectionTitle, marginBottom: theme.spacing[0], flex: 1 }}>
                 {t('trade.warehouseShipping.title')}
               </Text>
             </View>
@@ -135,7 +135,7 @@ export function TradeShippingSection({
         <Card style={{ ...styles.card, ...styles.inboundCard }} testID="trade-outbound-card">
           <View style={styles.shippingRow}>
             <MaterialCommunityIcons name="truck-delivery-outline" size={22} color={colors.info[600]!} />
-            <Text variant="label" style={{ ...styles.sectionTitle, marginBottom: 0, flex: 1 }}>Kargonuz Yolda</Text>
+            <Text variant="label" style={{ ...styles.sectionTitle, marginBottom: theme.spacing[0], flex: 1 }}>Kargonuz Yolda</Text>
           </View>
           {myFromWarehouseShipment ? (
             <View style={styles.inboundShipBox}>
@@ -164,7 +164,7 @@ export function TradeShippingSection({
             </View>
           )}
           {otherFromWarehouseShipment ? (
-            <View style={[styles.inboundShipBox, { marginTop: 8 }]}>
+            <View style={[styles.inboundShipBox, { marginTop: theme.spacing[2] }]}>
               <Text variant="caption" style={styles.messageSender}>Karşı tarafın kargosu</Text>
               <Text variant="bodySm" numberOfLines={1}>{carrierLabel(otherFromWarehouseShipment)}</Text>
               <View style={styles.inboundChipRow}>
@@ -180,7 +180,7 @@ export function TradeShippingSection({
         <Card style={{ ...styles.card, ...styles.inboundCard }} testID="trade-return-card">
           <View style={styles.shippingRow}>
             <MaterialCommunityIcons name="truck-fast-outline" size={22} color={colors.warning[600]!} />
-            <Text variant="label" style={{ ...styles.sectionTitle, marginBottom: 0, flex: 1 }}>İade Kargosu</Text>
+            <Text variant="label" style={{ ...styles.sectionTitle, marginBottom: theme.spacing[0], flex: 1 }}>İade Kargosu</Text>
           </View>
           <View style={styles.inboundShipBox}>
             <View style={styles.trackingCodeRow}>
@@ -208,18 +208,18 @@ export function TradeShippingSection({
 }
 
 const styles = StyleSheet.create({
-  card: { margin: 16, marginTop: 0, backgroundColor: colors.surface.DEFAULT },
-  sectionTitle: { marginBottom: 12, color: colors.text.heading },
-  shippingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  card: { margin: theme.spacing[4], marginTop: theme.spacing[0], backgroundColor: colors.surface.DEFAULT },
+  sectionTitle: { marginBottom: theme.spacing[3], color: colors.text.heading },
+  shippingRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing[2], marginBottom: theme.spacing[2] },
   shippingText: { flex: 1 },
-  trackButton: { marginTop: 8 },
-  protectionDesc: { color: colors.text.muted, marginTop: 2 },
-  messageSender: { color: colors.primary[600]!, fontWeight: '500', marginBottom: 4 },
+  trackButton: { marginTop: theme.spacing[2] },
+  protectionDesc: { color: colors.text.muted, marginTop: theme.spacing[0.5] },
+  messageSender: { color: colors.primary[600]!, fontWeight: '500', marginBottom: theme.spacing[1] },
   inboundCard: { borderWidth: 1, borderColor: colors.border.DEFAULT },
   inboundShipBox: {
-    marginTop: 12,
-    padding: 12,
-    borderRadius: 8,
+    marginTop: theme.spacing[3],
+    padding: theme.spacing[3],
+    borderRadius: theme.radius.xl,
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
     backgroundColor: colors.surface.alt,
@@ -229,18 +229,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: colors.text.heading,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
-  inboundChipRow: { flexDirection: 'row', marginTop: 8 },
-  trackingCodeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  inboundChipRow: { flexDirection: 'row', marginTop: theme.spacing[2] },
+  trackingCodeRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing[2], marginTop: theme.spacing[1] },
   copyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 8,
+    gap: theme.spacing[1],
+    paddingHorizontal: theme.spacing[2],
+    paddingVertical: theme.spacing[1.5],
+    borderRadius: theme.radius.xl,
     backgroundColor: colors.primary[50]!,
   },
-  inboundShipHint: { color: colors.text.muted, marginTop: 8 },
+  inboundShipHint: { color: colors.text.muted, marginTop: theme.spacing[2] },
 });

@@ -31,7 +31,7 @@ export function OtpModal({
 }) {
   return (
     <Modal isOpen={visible} onClose={onClose} title="E-posta Doğrulama">
-      <Text style={{ marginBottom: 12, color: colors.text.muted }}>
+      <Text style={{ marginBottom: theme.spacing[3], color: colors.text.muted }}>
         {email} adresine gönderilen 6 haneli kodu girin.
       </Text>
       <Input

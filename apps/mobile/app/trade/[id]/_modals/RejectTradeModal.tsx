@@ -21,7 +21,7 @@ export function RejectTradeModal({
 }) {
   return (
     <Modal isOpen={visible} onClose={() => !isPending && onClose()} title="Takası Reddet">
-      <Text variant="caption" tone="muted" style={{ marginBottom: 12 }}>
+      <Text variant="caption" tone="muted" style={{ marginBottom: theme.spacing[3] }}>
         Bu takas teklifini reddetmek üzeresiniz. İsterseniz bir sebep ekleyebilirsiniz (opsiyonel).
       </Text>
       <Input
@@ -31,7 +31,7 @@ export function RejectTradeModal({
         multiline
         numberOfLines={3}
         placeholder="Örn. Teklif uygun değil"
-        containerStyle={{ marginBottom: 12 }}
+        containerStyle={{ marginBottom: theme.spacing[3] }}
         inputStyle={{ minHeight: 80 }}
       />
       <View style={styles.modalActions}>
@@ -49,5 +49,5 @@ export function RejectTradeModal({
 }
 
 const styles = StyleSheet.create({
-  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 8 },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: theme.spacing[3], marginTop: theme.spacing[2] },
 });

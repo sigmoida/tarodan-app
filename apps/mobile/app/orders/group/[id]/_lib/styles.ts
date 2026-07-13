@@ -13,17 +13,17 @@ export const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
-    gap: 12,
+    padding: theme.spacing[6],
+    gap: theme.spacing[3],
   },
   errorText: {
     color: colors.text.muted,
   },
   body: {
-    padding: 16,
+    padding: theme.spacing[4],
   },
   card: {
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
   },
   headerRow: {
     flexDirection: 'row',
@@ -33,8 +33,8 @@ export const styles = StyleSheet.create({
   totalRow: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border.DEFAULT,
-    marginTop: 10,
-    paddingTop: 8,
+    marginTop: theme.spacing[2.5],
+    paddingTop: theme.spacing[2],
   },
   muted: {
     color: colors.text.muted,
@@ -47,12 +47,12 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 12,
-    paddingBottom: 8,
+    padding: theme.spacing[3],
+    paddingBottom: theme.spacing[2],
   },
   itemContent: {
     flexDirection: 'row',
-    paddingHorizontal: 12,
+    paddingHorizontal: theme.spacing[3],
   },
   productImage: {
     width: 72,
@@ -62,16 +62,16 @@ export const styles = StyleSheet.create({
   },
   itemInfo: {
     flex: 1,
-    marginLeft: 12,
-    gap: 2,
+    marginLeft: theme.spacing[3],
+    gap: theme.spacing[0.5],
   },
   shipmentRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    margin: 12,
-    marginTop: 10,
-    padding: 10,
+    gap: theme.spacing[1.5],
+    margin: theme.spacing[3],
+    marginTop: theme.spacing[2.5],
+    padding: theme.spacing[2.5],
     borderRadius: radius.md,
     backgroundColor: colors.surface.alt,
   },
@@ -83,7 +83,7 @@ export const styles = StyleSheet.create({
   noteRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
+    gap: theme.spacing[2],
   },
   noteText: {
     flex: 1,
@@ -93,10 +93,10 @@ export const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginHorizontal: 12,
-    marginBottom: 12,
-    paddingTop: 4,
+    gap: theme.spacing[1.5],
+    marginHorizontal: theme.spacing[3],
+    marginBottom: theme.spacing[3],
+    paddingTop: theme.spacing[1],
   },
   actionText: {
     flex: 1,

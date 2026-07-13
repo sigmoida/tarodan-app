@@ -11,24 +11,24 @@ export const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: theme.spacing[4],
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
     color: colors.text.heading,
-    marginBottom: 12,
-    marginTop: 16,
+    marginBottom: theme.spacing[3],
+    marginTop: theme.spacing[4],
   },
   card: {
     backgroundColor: colors.surface.DEFAULT,
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 8,
+    paddingVertical: theme.spacing[2],
   },
   settingInfo: {
     flexDirection: 'row',
@@ -36,7 +36,7 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   settingText: {
-    marginLeft: 16,
+    marginLeft: theme.spacing[4],
     flex: 1,
   },
   settingTitle: {
@@ -47,12 +47,12 @@ export const styles = StyleSheet.create({
   settingSubtitle: {
     fontSize: 13,
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   infoText: {
     fontSize: 13,
     color: colors.text.muted,
-    marginTop: 12,
+    marginTop: theme.spacing[3],
     lineHeight: 18,
   },
   tipsCard: {
@@ -61,27 +61,27 @@ export const styles = StyleSheet.create({
   tipItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
   },
   tipText: {
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
     fontSize: 14,
     color: colors.text.heading,
   },
   dialogInput: {
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
   },
   dialogText: {
     fontSize: 14,
     color: colors.text.muted,
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     lineHeight: 20,
   },
   secretContainer: {
     backgroundColor: colors.gray[100],
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
+    padding: theme.spacing[3],
+    borderRadius: theme.radius.xl,
+    marginBottom: theme.spacing[4],
   },
   secretText: {
     fontFamily: 'monospace',
@@ -92,14 +92,14 @@ export const styles = StyleSheet.create({
   dialogActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 8,
-    marginTop: 8,
+    gap: theme.spacing[2],
+    marginTop: theme.spacing[2],
   },
   verifiedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 8,
+    gap: theme.spacing[1.5],
+    marginTop: theme.spacing[2],
   },
   verifiedText: {
     color: colors.success[600]!,

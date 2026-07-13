@@ -10,14 +10,14 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.surface.alt,
   },
   scrollBody: {
-    padding: 16,
-    gap: 14,
+    padding: theme.spacing[4],
+    gap: theme.spacing[3.5],
   },
   welcomeCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    padding: 14,
+    gap: theme.spacing[3],
+    padding: theme.spacing[3.5],
     backgroundColor: colors.primary[50]!,
     borderRadius: 12,
     borderWidth: 1,
@@ -31,13 +31,13 @@ export const styles = StyleSheet.create({
   welcomeSubtitle: {
     fontSize: 12,
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   upgradeBtn: {
     backgroundColor: colors.primary[600]!,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: theme.spacing[3],
+    paddingVertical: theme.spacing[1.5],
+    borderRadius: theme.radius.xl,
   },
   upgradeBtnText: {
     color: colors.white,
@@ -47,23 +47,23 @@ export const styles = StyleSheet.create({
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: theme.spacing[2.5],
   },
   statCard: {
     flexBasis: '48%',
     backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
-    padding: 14,
+    padding: theme.spacing[3.5],
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border.DEFAULT,
   },
   statIconWrap: {
     width: 36,
     height: 36,
-    borderRadius: 8,
+    borderRadius: theme.radius.xl,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   statValue: {
     fontSize: 20,
@@ -73,7 +73,7 @@ export const styles = StyleSheet.create({
   statLabel: {
     fontSize: 12,
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   actionsCard: {
     backgroundColor: colors.surface.DEFAULT,
@@ -82,7 +82,7 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: colors.text.heading,
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
   },
   quickGrid: {
     flexDirection: 'row',
@@ -91,7 +91,7 @@ export const styles = StyleSheet.create({
   quickAction: {
     width: '33.333%',
     alignItems: 'center',
-    padding: 8,
+    padding: theme.spacing[2],
   },
   quickIconWrap: {
     width: 48,
@@ -99,7 +99,7 @@ export const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
+    marginBottom: theme.spacing[1.5],
   },
   quickLabel: {
     fontSize: 11,
@@ -113,7 +113,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: theme.spacing[1.5],
   },
   summaryLabel: {
     fontSize: 13,

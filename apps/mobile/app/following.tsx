@@ -95,7 +95,7 @@ export default function FollowingScreen() {
                       <Text style={styles.statText}>{seller.listingCount} ilan</Text>
                       {seller.rating && (
                         <>
-                          <Ionicons name="star" size={14} color={colors.warning[500]!} style={{ marginLeft: 12 }} />
+                          <Ionicons name="star" size={14} color={colors.warning[500]!} style={{ marginLeft: theme.spacing[3] }} />
                           <Text style={styles.statText}>{seller.rating.toFixed(1)}</Text>
                         </>
                       )}
@@ -133,16 +133,16 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: theme.spacing[8],
     backgroundColor: colors.surface.DEFAULT,
   },
   title: {
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: theme.spacing[4],
+    marginBottom: theme.spacing[2],
   },
   subtitle: {
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
     color: colors.text.muted,
   },
   loadingContainer: {
@@ -154,51 +154,51 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: theme.spacing[8],
   },
   emptyTitle: {
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: theme.spacing[4],
+    marginBottom: theme.spacing[2],
     color: colors.text.heading,
   },
   emptySubtitle: {
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
     color: colors.text.muted,
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: theme.spacing[4],
   },
   sellerCard: {
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
     backgroundColor: colors.surface.DEFAULT,
   },
   sellerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: theme.spacing[3],
   },
   sellerInfo: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
   },
   sellerStats: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   statText: {
-    marginLeft: 4,
+    marginLeft: theme.spacing[1],
     color: colors.text.muted,
     fontSize: 12,
   },
   followedDate: {
     color: colors.text.subtle,
     fontSize: 11,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   actions: {
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
   },
 });

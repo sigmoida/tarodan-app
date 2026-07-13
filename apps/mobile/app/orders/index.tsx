@@ -37,7 +37,7 @@ export default function OrdersScreen() {
           <Text style={styles.emptySubtitle}>
             Siparişler yüklenemedi. Lütfen tekrar deneyin.
           </Text>
-          <Button variant="primary" title="Yenile" onPress={() => f.refetch()} style={StyleSheet.flatten([styles.emptyButton, { marginTop: 12 }])} />
+          <Button variant="primary" title="Yenile" onPress={() => f.refetch()} style={StyleSheet.flatten([styles.emptyButton, { marginTop: theme.spacing[3] }])} />
         </View>
       ) : f.isLoading && f.entries.length === 0 ? (
         <View style={styles.loadingContainer}>

@@ -11,10 +11,10 @@ export const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: theme.spacing[4],
   },
   planCard: {
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
     borderWidth: 2,
     backgroundColor: colors.surface.DEFAULT,
   },
@@ -22,7 +22,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   planName: {
     fontSize: 20,
@@ -32,7 +32,7 @@ export const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
     color: colors.text.heading,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   planPeriod: {
     fontSize: 14,
@@ -40,8 +40,8 @@ export const styles = StyleSheet.create({
     color: colors.text.muted,
   },
   popularBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingHorizontal: theme.spacing[3],
+    paddingVertical: theme.spacing[1],
     borderRadius: 12,
   },
   popularBadgeText: {
@@ -50,19 +50,19 @@ export const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   featuresCompact: {
-    gap: 8,
+    gap: theme.spacing[2],
   },
   featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   featureText: {
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
     fontSize: 14,
     color: colors.text.heading,
   },
   moreFeatures: {
-    marginLeft: 24,
+    marginLeft: theme.spacing[6],
     fontSize: 13,
     color: colors.text.muted,
     fontStyle: 'italic',
@@ -71,16 +71,16 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: colors.text.heading,
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
   },
   paymentCard: {
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
     backgroundColor: colors.surface.DEFAULT,
   },
   paymentOption: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
+    gap: theme.spacing[2],
   },
   paymentOptionText: {
     flex: 1,
@@ -89,13 +89,13 @@ export const styles = StyleSheet.create({
     color: colors.text.muted,
   },
   summaryCard: {
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     backgroundColor: colors.surface.DEFAULT,
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   summaryLabel: {
     fontSize: 14,
@@ -108,12 +108,12 @@ export const styles = StyleSheet.create({
   vatNote: {
     fontSize: 12,
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   divider: {
     height: 1,
     backgroundColor: colors.border.DEFAULT,
-    marginVertical: 12,
+    marginVertical: theme.spacing[3],
   },
   totalLabel: {
     fontSize: 16,
@@ -129,7 +129,7 @@ export const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.text.muted,
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     lineHeight: 18,
   },
   termsLink: {

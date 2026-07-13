@@ -57,15 +57,15 @@ const styles = StyleSheet.create({
   imageIndicators: {
     flexDirection: 'row',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: theme.spacing[3],
     backgroundColor: colors.white,
   },
   indicator: {
     width: 8,
     height: 8,
-    borderRadius: 4,
+    borderRadius: theme.radius.md,
     backgroundColor: colors.border.DEFAULT,
-    marginHorizontal: 4,
+    marginHorizontal: theme.spacing[1],
   },
   indicatorActive: { backgroundColor: colors.primary[600]!, width: 24 },
 });

@@ -98,7 +98,7 @@ export function AnalyticsContent({ f }: { f: AnalyticsController }) {
               <View style={styles.listingStats}>
                 <Ionicons name="eye" size={14} color={colors.text.muted} />
                 <Text style={styles.listingStat}>{listing.views}</Text>
-                <Ionicons name="heart" size={14} color={colors.text.muted} style={{ marginLeft: 12 }} />
+                <Ionicons name="heart" size={14} color={colors.text.muted} style={{ marginLeft: theme.spacing[3] }} />
                 <Text style={styles.listingStat}>{listing.favorites}</Text>
               </View>
             </View>

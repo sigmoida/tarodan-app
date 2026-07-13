@@ -69,7 +69,7 @@ export function SecuritySections({ f }: { f: SecurityController }) {
               f.regenMsg.clear();
               f.setShowRegenerateDialog(true);
             }}
-            style={{ marginTop: 12 }}
+            style={{ marginTop: theme.spacing[3] }}
           />
         ) : null}
       </Card>
@@ -104,7 +104,7 @@ export function SecuritySections({ f }: { f: SecurityController }) {
               f.setShowPhoneDialog(true);
             }}
             testID="phone-verify-button"
-            style={{ marginTop: 12 }}
+            style={{ marginTop: theme.spacing[3] }}
           />
         )}
       </Card>

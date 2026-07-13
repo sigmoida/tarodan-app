@@ -31,7 +31,7 @@ export default function FavoritesScreen() {
     return (
       <View style={styles.centeredContainer}>
         <Spinner size="lg" />
-        <Text style={{ marginTop: 16 }}>Favoriler yükleniyor...</Text>
+        <Text style={{ marginTop: theme.spacing[4] }}>Favoriler yükleniyor...</Text>
       </View>
     );
   }
@@ -40,9 +40,9 @@ export default function FavoritesScreen() {
     return (
       <View style={styles.centeredContainer}>
         <Ionicons name="cloud-offline-outline" size={64} color={colors.text.subtle} />
-        <Text style={{ marginTop: 16, fontSize: 16, fontWeight: '600', color: colors.text.heading }}>Yüklenemedi</Text>
-        <Text style={{ marginTop: 8, color: colors.text.subtle, textAlign: 'center' }}>Favorileriniz yüklenirken bir hata oluştu.</Text>
-        <Button variant="primary" title="Tekrar Dene" onPress={() => f.fetchFavorites()} style={{ marginTop: 16, alignSelf: 'center' }} />
+        <Text style={{ marginTop: theme.spacing[4], fontSize: 16, fontWeight: '600', color: colors.text.heading }}>Yüklenemedi</Text>
+        <Text style={{ marginTop: theme.spacing[2], color: colors.text.subtle, textAlign: 'center' }}>Favorileriniz yüklenirken bir hata oluştu.</Text>
+        <Button variant="primary" title="Tekrar Dene" onPress={() => f.fetchFavorites()} style={{ marginTop: theme.spacing[4], alignSelf: 'center' }} />
       </View>
     );
   }

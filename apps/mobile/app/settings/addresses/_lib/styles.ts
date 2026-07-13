@@ -13,7 +13,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: theme.spacing[8],
     backgroundColor: colors.surface.DEFAULT,
   },
   headerCount: {
@@ -21,12 +21,12 @@ export const styles = StyleSheet.create({
     opacity: 0.8,
   },
   title: {
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: theme.spacing[4],
+    marginBottom: theme.spacing[2],
   },
   subtitle: {
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
     color: colors.text.muted,
   },
   loadingContainer: {
@@ -38,31 +38,31 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: theme.spacing[8],
   },
   emptyTitle: {
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: theme.spacing[4],
+    marginBottom: theme.spacing[2],
     color: colors.text.heading,
   },
   emptySubtitle: {
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
     color: colors.text.muted,
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: theme.spacing[4],
   },
   addressCard: {
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
     backgroundColor: colors.surface.DEFAULT,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   titleRow: {
     flexDirection: 'row',
@@ -70,15 +70,15 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   addressTitle: {
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
     fontWeight: '600',
   },
   defaultBadge: {
     backgroundColor: colors.success[50]!,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: theme.spacing[2],
+    paddingVertical: theme.spacing[0.5],
     borderRadius: radius.sm,
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
   },
   defaultBadgeText: {
     color: colors.success[700]!,
@@ -90,11 +90,11 @@ export const styles = StyleSheet.create({
   },
   addressDetail: {
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   defaultButton: {
     alignSelf: 'flex-start',
-    marginTop: 8,
+    marginTop: theme.spacing[2],
   },
   fab: {
     position: 'absolute',
@@ -110,16 +110,16 @@ export const styles = StyleSheet.create({
   defaultCheckbox: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: theme.spacing[2],
   },
   checkboxLabel: {
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
     color: colors.text.heading,
   },
   dialogActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 8,
-    marginTop: 12,
+    gap: theme.spacing[2],
+    marginTop: theme.spacing[3],
   },
 });

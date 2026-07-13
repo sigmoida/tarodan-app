@@ -67,7 +67,7 @@ export default function PaymentsScreen() {
       ) : (
         <ScrollView
           style={styles.list}
-          contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+          contentContainerStyle={{ padding: theme.spacing[4], paddingBottom: theme.spacing[8] }}
           refreshControl={
             <RefreshControl
               refreshing={f.paymentsQuery.isFetching}

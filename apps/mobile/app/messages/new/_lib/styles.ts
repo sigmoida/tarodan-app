@@ -11,70 +11,70 @@ export const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: theme.spacing[4],
   },
   sectionTitle: {
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
     color: colors.text.heading,
   },
   recipientSection: {
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
   },
   loadingContainer: {
-    padding: 16,
+    padding: theme.spacing[4],
     alignItems: 'center',
   },
   searchResults: {
-    marginTop: 8,
-    borderRadius: 8,
+    marginTop: theme.spacing[2],
+    borderRadius: theme.radius.xl,
     backgroundColor: colors.surface.alt,
     overflow: 'hidden',
   },
   userItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: theme.spacing[3],
     borderBottomWidth: 1,
     borderBottomColor: colors.border.DEFAULT,
   },
   userInfo: {
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
   },
   sellerBadge: {
     color: colors.primary[600]!,
   },
   noResults: {
     textAlign: 'center',
-    marginTop: 16,
+    marginTop: theme.spacing[4],
     color: colors.text.muted,
   },
   selectedRecipient: {
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
   },
   recipientCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: theme.spacing[3],
     backgroundColor: colors.surface.alt,
-    borderRadius: 8,
+    borderRadius: theme.radius.xl,
   },
   recipientName: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
   },
   productSection: {
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
   },
   productCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: theme.spacing[3],
     backgroundColor: colors.primary[50]!,
-    borderRadius: 8,
+    borderRadius: theme.radius.xl,
   },
   productTitle: {
     flex: 1,
-    marginHorizontal: 8,
+    marginHorizontal: theme.spacing[2],
     color: colors.text.heading,
   },
   productPrice: {
@@ -87,8 +87,8 @@ export const styles = StyleSheet.create({
   messageInputContainer: {
     flex: 1,
     backgroundColor: colors.surface.alt,
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing[3],
     minHeight: 150,
   },
   messageInput: {
@@ -101,16 +101,16 @@ export const styles = StyleSheet.create({
     textAlign: 'right',
     fontSize: 12,
     color: colors.text.muted,
-    marginTop: 8,
+    marginTop: theme.spacing[2],
   },
   limitWarning: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.warning[50]!,
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 12,
-    gap: 8,
+    padding: theme.spacing[3],
+    borderRadius: theme.radius.xl,
+    marginTop: theme.spacing[3],
+    gap: theme.spacing[2],
   },
   limitWarningText: {
     flex: 1,
@@ -122,12 +122,12 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
   },
   footer: {
-    padding: 16,
+    padding: theme.spacing[4],
     borderTopWidth: 1,
     borderTopColor: colors.border.DEFAULT,
     backgroundColor: colors.surface.DEFAULT,
   },
   sendButton: {
-    borderRadius: 8,
+    borderRadius: theme.radius.xl,
   },
 });

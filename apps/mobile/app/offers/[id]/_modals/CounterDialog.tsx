@@ -9,7 +9,7 @@ const { colors } = theme;
 export function CounterDialog({ f }: { f: OfferDetailController }) {
   return (
     <Modal isOpen={f.counterDialog} onClose={() => f.setCounterDialog(false)} title="Karşı Teklif">
-      <Text style={{ marginBottom: 12, color: colors.text.muted }}>
+      <Text style={{ marginBottom: theme.spacing[3], color: colors.text.muted }}>
         Karşı teklif tutarınızı girin.
       </Text>
       <Input

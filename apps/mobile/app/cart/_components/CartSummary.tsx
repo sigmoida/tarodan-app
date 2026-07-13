@@ -26,7 +26,7 @@ export function CartSummary({ f }: { f: CartController }) {
           <Text style={styles.summaryLabel}>Kargo</Text>
           <Text style={styles.summaryValue}>Ödeme adımında hesaplanır</Text>
         </View>
-        <Divider style={{ marginVertical: 12 }} />
+        <Divider style={{ marginVertical: theme.spacing[3] }} />
         <View style={styles.summaryRow}>
           <Text style={styles.totalLabel}>Toplam</Text>
           <Text style={styles.totalValue}>₺{f.total.toLocaleString('tr-TR')}</Text>

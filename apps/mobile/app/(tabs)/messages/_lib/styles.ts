@@ -13,25 +13,25 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: theme.spacing[8],
   },
   headerBadge: {
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
   },
   title: {
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: theme.spacing[4],
+    marginBottom: theme.spacing[2],
   },
   subtitle: {
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
     color: colors.text.muted,
   },
   loginButton: {
     backgroundColor: colors.primary[600]!,
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingHorizontal: theme.spacing[8],
+    paddingVertical: theme.spacing[3],
+    borderRadius: theme.radius.xl,
   },
   loginButtonText: {
     color: colors.white,
@@ -41,8 +41,8 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.warning[50]!,
-    padding: 12,
-    gap: 8,
+    padding: theme.spacing[3],
+    gap: theme.spacing[2],
   },
   limitText: {
     flex: 1,
@@ -55,7 +55,7 @@ export const styles = StyleSheet.create({
     fontSize: 13,
   },
   searchContainer: {
-    padding: 12,
+    padding: theme.spacing[3],
     backgroundColor: colors.surface.DEFAULT,
   },
   loadingContainer: {
@@ -67,11 +67,11 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: theme.spacing[8],
   },
   emptyTitle: {
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: theme.spacing[4],
+    marginBottom: theme.spacing[2],
     color: colors.text.heading,
   },
   emptySubtitle: {
@@ -84,7 +84,7 @@ export const styles = StyleSheet.create({
   threadItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    padding: theme.spacing[4],
     borderBottomWidth: 1,
     borderBottomColor: colors.border.DEFAULT,
     backgroundColor: colors.surface.DEFAULT,
@@ -101,14 +101,14 @@ export const styles = StyleSheet.create({
     right: 0,
     width: 12,
     height: 12,
-    borderRadius: 6,
+    borderRadius: theme.radius.lg,
     backgroundColor: colors.primary[600]!,
     borderWidth: 2,
     borderColor: colors.surface.DEFAULT,
   },
   threadContent: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
   },
   threadHeader: {
     flexDirection: 'row',
@@ -121,27 +121,27 @@ export const styles = StyleSheet.create({
   },
   threadTime: {
     color: colors.text.muted,
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
   },
   productRef: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   productRefText: {
     color: colors.primary[600]!,
-    marginLeft: 4,
+    marginLeft: theme.spacing[1],
     fontSize: 12,
   },
   lastMessage: {
     color: colors.text.muted,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   unreadText: {
     fontWeight: '600',
     color: colors.text.heading,
   },
   unreadBadge: {
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
   },
 });

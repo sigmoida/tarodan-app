@@ -113,35 +113,35 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 20,
+    padding: theme.spacing[5],
   },
   lastUpdated: {
     fontSize: 13,
     color: colors.text.muted,
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: colors.text.heading,
-    marginTop: 24,
-    marginBottom: 12,
+    marginTop: theme.spacing[6],
+    marginBottom: theme.spacing[3],
   },
   paragraph: {
     fontSize: 14,
     color: colors.text.muted,
     lineHeight: 22,
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
   },
   listItem: {
     fontSize: 14,
     color: colors.text.muted,
     lineHeight: 24,
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
   },
   contactInfo: {
     fontSize: 14,
     color: colors.primary[600]!,
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
 });

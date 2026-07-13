@@ -241,9 +241,9 @@ const styles = StyleSheet.create({
   safeNotice: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    gap: theme.spacing[1.5],
+    paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing[2],
     backgroundColor: colors.success[50]!,
   },
   safeNoticeText: {
@@ -255,15 +255,15 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding: theme.spacing[6],
   },
   loadingText: {
-    marginTop: 12,
+    marginTop: theme.spacing[3],
     color: colors.text.muted,
   },
   errorWrap: {
     flex: 1,
-    paddingVertical: 16,
+    paddingVertical: theme.spacing[4],
     alignItems: 'center',
   },
 });

@@ -30,7 +30,7 @@ export function OrderTrackResult({ order }: { order: OrderStatus }) {
         </View>
       </View>
 
-      <Divider style={{ marginVertical: 16 }} />
+      <Divider style={{ marginVertical: theme.spacing[4] }} />
 
       {/* Product Info */}
       <View style={styles.productSection}>

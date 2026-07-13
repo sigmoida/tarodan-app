@@ -258,7 +258,7 @@ export default function CardPaymentForm({ target, amount, onSuccess, onFail, rec
   if (threeDSHtml) {
     return (
       <View style={styles.webviewWrap}>
-        <Pressable onPress={() => { setThreeDSHtml(null); setProcessing(false); }} style={{ padding: 12, alignSelf: 'flex-end' }}>
+        <Pressable onPress={() => { setThreeDSHtml(null); setProcessing(false); }} style={{ padding: theme.spacing[3], alignSelf: 'flex-end' }}>
           <Text style={{ color: colors.primary[600]!, fontWeight: '600' }}>Vazgeç</Text>
         </Pressable>
         <WebView
@@ -406,27 +406,27 @@ export default function CardPaymentForm({ target, amount, onSuccess, onFail, rec
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, gap: 12 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  center: { paddingVertical: 32, alignItems: 'center' },
-  list: { gap: 10 },
+  container: { padding: theme.spacing[4], gap: theme.spacing[3] },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing[2], marginBottom: theme.spacing[1] },
+  center: { paddingVertical: theme.spacing[8], alignItems: 'center' },
+  list: { gap: theme.spacing[2.5] },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    padding: 12,
+    gap: theme.spacing[2.5],
+    padding: theme.spacing[3],
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.gray[200]!,
   },
   rowActive: { borderColor: colors.primary[500]!, backgroundColor: colors.primary[50]! },
   cardLabel: { flex: 1, fontWeight: '600' },
-  cvvInline: { width: 80, marginBottom: 0 },
-  newCard: { gap: 10, paddingTop: 4 },
-  expRow: { flexDirection: 'row', gap: 10 },
-  expField: { flex: 1, marginBottom: 0 },
-  payBtn: { marginTop: 8 },
-  secure: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 4 },
+  cvvInline: { width: 80, marginBottom: theme.spacing[0] },
+  newCard: { gap: theme.spacing[2.5], paddingTop: theme.spacing[1] },
+  expRow: { flexDirection: 'row', gap: theme.spacing[2.5] },
+  expField: { flex: 1, marginBottom: theme.spacing[0] },
+  payBtn: { marginTop: theme.spacing[2] },
+  secure: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: theme.spacing[1.5], marginTop: theme.spacing[1] },
   secureText: { flexShrink: 1 },
   webviewWrap: { flex: 1, minHeight: 480, overflow: 'hidden' },
 });

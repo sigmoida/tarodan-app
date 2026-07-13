@@ -494,7 +494,7 @@ const styles = StyleSheet.create({
     gap: spacing[2],
     paddingVertical: spacing[2],
     paddingHorizontal: spacing[2],
-    borderRadius: 8,
+    borderRadius: theme.radius.xl,
   },
   radioRowSelected: { backgroundColor: colors.primary[50]! },
   chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },

@@ -59,9 +59,9 @@ const REPUTATION_CONFIG: Record<ReputationLevel, {
 };
 
 const SIZE_CONFIG = {
-  small: { iconSize: 16, fontSize: 10, padding: 4 },
-  medium: { iconSize: 20, fontSize: 12, padding: 6 },
-  large: { iconSize: 28, fontSize: 14, padding: 10 },
+  small: { iconSize: 16, fontSize: 10, padding: theme.spacing[1] },
+  medium: { iconSize: 20, fontSize: 12, padding: theme.spacing[1.5] },
+  large: { iconSize: 28, fontSize: 14, padding: theme.spacing[2.5] },
 };
 
 export const ReputationBadge: React.FC<ReputationBadgeProps> = ({
@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 12,
-    gap: 4,
+    gap: theme.spacing[1],
   },
   label: {
     fontWeight: '600',
@@ -298,23 +298,23 @@ const styles = StyleSheet.create({
   recognitionBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: theme.spacing[2],
+    paddingVertical: theme.spacing[1],
+    borderRadius: theme.radius.xl,
     borderWidth: 1,
     backgroundColor: colors.surface.DEFAULT,
-    marginRight: 6,
-    marginBottom: 6,
+    marginRight: theme.spacing[1.5],
+    marginBottom: theme.spacing[1.5],
   },
   recognitionLabel: {
     fontSize: 10,
     fontWeight: '500',
-    marginLeft: 4,
+    marginLeft: theme.spacing[1],
   },
   scoreContainer: {
     backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
-    padding: 12,
+    padding: theme.spacing[3],
   },
   scoreHeader: {
     flexDirection: 'row',
@@ -324,31 +324,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   ratingText: {
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
     fontSize: 18,
     fontWeight: 'bold',
     color: colors.text.heading,
   },
   reviewCount: {
-    marginLeft: 4,
+    marginLeft: theme.spacing[1],
     fontSize: 12,
     color: colors.text.muted,
   },
   levelContainer: {
-    marginTop: 8,
+    marginTop: theme.spacing[2],
   },
   recognitionsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginTop: 8,
+    marginTop: theme.spacing[2],
   },
   breakdownContainer: {
-    paddingVertical: 8,
+    paddingVertical: theme.spacing[2],
   },
   breakdownRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   breakdownLabel: {
     width: 100,
@@ -359,14 +359,14 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 8,
     backgroundColor: colors.border.DEFAULT,
-    borderRadius: 4,
-    marginHorizontal: 8,
+    borderRadius: theme.radius.md,
+    marginHorizontal: theme.spacing[2],
     overflow: 'hidden',
   },
   breakdownBar: {
     height: '100%',
     backgroundColor: colors.warning[500]!,
-    borderRadius: 4,
+    borderRadius: theme.radius.md,
   },
   breakdownValue: {
     width: 30,

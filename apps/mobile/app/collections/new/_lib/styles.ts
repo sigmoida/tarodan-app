@@ -13,23 +13,23 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: theme.spacing[8],
   },
   subtitle: {
     textAlign: 'center',
-    marginVertical: 16,
+    marginVertical: theme.spacing[4],
     color: colors.text.muted,
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: theme.spacing[4],
   },
   coverImageContainer: {
     width: '100%',
     height: 180,
     borderRadius: 12,
     overflow: 'hidden',
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     backgroundColor: colors.surface.DEFAULT,
   },
   coverImage: {
@@ -46,7 +46,7 @@ export const styles = StyleSheet.create({
     borderRadius: 12,
   },
   coverImageText: {
-    marginTop: 8,
+    marginTop: theme.spacing[2],
     color: colors.text.muted,
   },
   removeCoverButton: {
@@ -56,25 +56,25 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.overlay.black50,
   },
   card: {
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     backgroundColor: colors.surface.DEFAULT,
-    padding: 16,
+    padding: theme.spacing[4],
     borderRadius: 12,
   },
   sectionTitle: {
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     color: colors.text.heading,
   },
   templatesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: theme.spacing[2],
   },
   templateItem: {
     width: '30%',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
+    padding: theme.spacing[3],
+    borderRadius: theme.radius.xl,
     borderWidth: 2,
     borderColor: colors.border.DEFAULT,
     backgroundColor: colors.surface.alt,
@@ -85,14 +85,14 @@ export const styles = StyleSheet.create({
   },
   templateIcon: {
     fontSize: 24,
-    marginBottom: 4,
+    marginBottom: theme.spacing[1],
   },
   templateName: {
     textAlign: 'center',
     color: colors.text.heading,
   },
   input: {
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
   },
   privacyOption: {
     flexDirection: 'row',
@@ -105,7 +105,7 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   privacyText: {
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
   },
   privacyDesc: {
     color: colors.text.muted,
@@ -113,21 +113,21 @@ export const styles = StyleSheet.create({
   privateNote: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: theme.spacing[3],
+    paddingTop: theme.spacing[3],
     borderTopWidth: 1,
     borderTopColor: colors.border.DEFAULT,
   },
   privateNoteText: {
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
     color: colors.text.muted,
   },
   tipCard: {
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     backgroundColor: colors.warning[50]!,
     borderWidth: 1,
     borderColor: colors.warning[200]!,
-    padding: 16,
+    padding: theme.spacing[4],
     borderRadius: 12,
   },
   tipContent: {
@@ -136,48 +136,48 @@ export const styles = StyleSheet.create({
   },
   tipText: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
   },
   tipDesc: {
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   submitButton: {
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   premiumRequired: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: theme.spacing[8],
     backgroundColor: colors.surface.DEFAULT,
   },
   premiumTitle: {
-    marginTop: 24,
+    marginTop: theme.spacing[6],
     textAlign: 'center',
     color: colors.text.heading,
   },
   premiumSubtitle: {
-    marginTop: 8,
+    marginTop: theme.spacing[2],
     textAlign: 'center',
     color: colors.text.muted,
   },
   premiumFeatures: {
-    marginTop: 24,
+    marginTop: theme.spacing[6],
     alignSelf: 'flex-start',
     width: '100%',
   },
   premiumFeature: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 8,
+    marginVertical: theme.spacing[2],
   },
   premiumFeatureText: {
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
     color: colors.text.heading,
   },
   upgradeButton: {
-    marginTop: 24,
+    marginTop: theme.spacing[6],
     width: '100%',
   },
 });

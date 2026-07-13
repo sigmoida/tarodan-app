@@ -47,9 +47,9 @@ export default function MyListingsScreen() {
       ) : f.isError ? (
         <View style={styles.loadingContainer}>
           <Ionicons name="cloud-offline-outline" size={64} color={colors.text.subtle} />
-          <Text style={{ fontSize: 18, fontWeight: '600', marginTop: 16, color: colors.text.heading }}>Yüklenemedi</Text>
-          <Text style={{ color: colors.text.subtle, marginTop: 8, textAlign: 'center' }}>İlanlarınız yüklenirken bir hata oluştu.</Text>
-          <Button variant="primary" title="Tekrar Dene" onPress={() => f.refetch()} style={{ marginTop: 16 }} />
+          <Text style={{ fontSize: 18, fontWeight: '600', marginTop: theme.spacing[4], color: colors.text.heading }}>Yüklenemedi</Text>
+          <Text style={{ color: colors.text.subtle, marginTop: theme.spacing[2], textAlign: 'center' }}>İlanlarınız yüklenirken bir hata oluştu.</Text>
+          <Button variant="primary" title="Tekrar Dene" onPress={() => f.refetch()} style={{ marginTop: theme.spacing[4] }} />
         </View>
       ) : (
         <ScrollView

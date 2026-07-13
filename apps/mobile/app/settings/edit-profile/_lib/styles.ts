@@ -13,7 +13,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 16,
+    gap: theme.spacing[4],
   },
   saveButton: {
     color: colors.white,
@@ -22,11 +22,11 @@ export const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: theme.spacing[4],
   },
   avatarSection: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   avatar: {
     width: 100,
@@ -40,53 +40,53 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.primary[600]!,
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: theme.radius['3xl'],
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: colors.surface.elevated,
   },
   membershipSection: {
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   card: {
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     backgroundColor: colors.surface.DEFAULT,
   },
   sectionTitle: {
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     color: colors.text.heading,
   },
   input: {
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
   },
   hintText: {
     color: colors.text.muted,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   warningText: {
     color: colors.primary[600]!,
     marginTop: -6,
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   premiumFeatureHeader: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   premiumFeatureTitle: {
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
     color: colors.primary[700]!,
   },
   businessHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   tierBadge: {
     backgroundColor: colors.primary[50]!,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: theme.spacing[2.5],
+    paddingVertical: theme.spacing[1],
     borderRadius: radius.full ?? 999,
   },
   tierBadgeText: {
@@ -97,14 +97,14 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.info[50]!,
     borderWidth: 1,
     borderColor: colors.info[100]!,
-    padding: 12,
+    padding: theme.spacing[3],
     borderRadius: radius.md,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   infoBoxText: {
     color: colors.info[700]!,
   },
   submitButton: {
-    marginTop: 8,
+    marginTop: theme.spacing[2],
   },
 });

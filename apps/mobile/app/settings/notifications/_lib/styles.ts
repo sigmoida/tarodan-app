@@ -13,7 +13,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: theme.spacing[8],
     backgroundColor: colors.surface.DEFAULT,
   },
   saveButton: {
@@ -21,12 +21,12 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
   },
   title: {
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: theme.spacing[4],
+    marginBottom: theme.spacing[2],
   },
   subtitle: {
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
     color: colors.text.muted,
   },
   loadingContainer: {
@@ -36,42 +36,42 @@ export const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: theme.spacing[4],
   },
   card: {
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     backgroundColor: colors.surface.DEFAULT,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   sectionTitle: {
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
   },
   divider: {
-    marginVertical: 8,
+    marginVertical: theme.spacing[2],
   },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: theme.spacing[3],
   },
   settingContent: {
     flex: 1,
-    marginHorizontal: 12,
+    marginHorizontal: theme.spacing[3],
   },
   settingDescription: {
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   infoBox: {
     flexDirection: 'row',
     backgroundColor: colors.info[50]!,
-    padding: 12,
+    padding: theme.spacing[3],
     borderRadius: radius.md,
-    gap: 8,
+    gap: theme.spacing[2],
   },
   infoText: {
     flex: 1,

@@ -72,7 +72,7 @@ export function OrderPriceSummary({ order, isMembershipOrder }: { order: OrderDe
           </View>
         </>
       )}
-      <Divider style={{ marginVertical: 8 }} />
+      <Divider style={{ marginVertical: theme.spacing[2] }} />
       <View style={styles.priceRow}>
         <Text variant="h3">Toplam</Text>
         <Text variant="h3" style={styles.totalPrice}>{formatPrice(order.totalAmount)}</Text>
@@ -82,9 +82,9 @@ export function OrderPriceSummary({ order, isMembershipOrder }: { order: OrderDe
 }
 
 const styles = StyleSheet.create({
-  card: { marginBottom: 12 },
-  sectionTitle: { marginBottom: 12, color: colors.text.heading },
-  addressText: { color: colors.text.muted, marginTop: 2 },
-  priceRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  card: { marginBottom: theme.spacing[3] },
+  sectionTitle: { marginBottom: theme.spacing[3], color: colors.text.heading },
+  addressText: { color: colors.text.muted, marginTop: theme.spacing[0.5] },
+  priceRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: theme.spacing[2] },
   totalPrice: { color: colors.primary[600]!, fontWeight: 'bold' },
 });

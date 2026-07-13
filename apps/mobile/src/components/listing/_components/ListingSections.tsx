@@ -118,7 +118,7 @@ export function ListingHeaderBanners({ f }: SectionProps) {
           <Text style={styles.reactivateTitle}>Bu ilan satıldı</Text>
           <Text style={styles.hint}>Stok girerek ilanı yeniden satışa açabilirsiniz.</Text>
           <TextInput
-            style={[styles.input, { marginTop: 10 }]}
+            style={[styles.input, { marginTop: theme.spacing[2.5] }]}
             value={f.reactivateQuantity}
             onChangeText={f.setReactivateQuantity}
             placeholder="Stok miktarı"
@@ -126,7 +126,7 @@ export function ListingHeaderBanners({ f }: SectionProps) {
             keyboardType="number-pad"
           />
           <TouchableOpacity
-            style={[styles.submitButton, { marginTop: 12 }, f.reactivating && styles.submitButtonDisabled]}
+            style={[styles.submitButton, { marginTop: theme.spacing[3] }, f.reactivating && styles.submitButtonDisabled]}
             onPress={f.handleReactivate}
             disabled={f.reactivating}
           >
@@ -224,7 +224,7 @@ export function ListingBasicInfoSection({ f }: SectionProps) {
       />
       <Text style={styles.charCount}>{f.title.length}/200</Text>
 
-      <Text style={[styles.label, { marginTop: 16 }]}>Açıklama</Text>
+      <Text style={[styles.label, { marginTop: theme.spacing[4] }]}>Açıklama</Text>
       <TextInput
         style={[styles.input, styles.textArea]}
         value={f.description}
@@ -265,7 +265,7 @@ export function ListingDetailsSection({ f }: SectionProps) {
         <Text style={styles.pickerArrow}>›</Text>
       </TouchableOpacity>
 
-      <Text style={[styles.label, { marginTop: 16 }]}>
+      <Text style={[styles.label, { marginTop: theme.spacing[4] }]}>
         Durum <Text style={styles.required}>*</Text>
       </Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
@@ -282,7 +282,7 @@ export function ListingDetailsSection({ f }: SectionProps) {
         ))}
       </ScrollView>
 
-      <Text style={[styles.label, { marginTop: 16 }]}>Marka</Text>
+      <Text style={[styles.label, { marginTop: theme.spacing[4] }]}>Marka</Text>
       <TouchableOpacity
         style={styles.pickerButton}
         onPress={() => {
@@ -297,7 +297,7 @@ export function ListingDetailsSection({ f }: SectionProps) {
         <Text style={styles.pickerArrow}>›</Text>
       </TouchableOpacity>
 
-      <Text style={[styles.label, { marginTop: 16 }]}>Model</Text>
+      <Text style={[styles.label, { marginTop: theme.spacing[4] }]}>Model</Text>
       <TouchableOpacity
         style={[styles.pickerButton, !f.brandId && styles.pickerDisabled]}
         onPress={() => f.setShowModelPicker(true)}
@@ -315,7 +315,7 @@ export function ListingDetailsSection({ f }: SectionProps) {
         <Text style={styles.pickerArrow}>›</Text>
       </TouchableOpacity>
 
-      <Text style={[styles.label, { marginTop: 16 }]}>Ölçek</Text>
+      <Text style={[styles.label, { marginTop: theme.spacing[4] }]}>Ölçek</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
         {f.effectiveScales.map((s) => (
           <TouchableOpacity
@@ -328,7 +328,7 @@ export function ListingDetailsSection({ f }: SectionProps) {
         ))}
       </ScrollView>
 
-      <Text style={[styles.label, { marginTop: 16 }]}>Malzeme</Text>
+      <Text style={[styles.label, { marginTop: theme.spacing[4] }]}>Malzeme</Text>
       <TouchableOpacity style={styles.pickerButton} onPress={() => f.setShowMaterialPicker(true)}>
         <Text style={f.selectedMaterial ? styles.pickerValue : styles.pickerPlaceholder}>
           {f.selectedMaterial?.label || 'Malzeme Seçin'}
@@ -336,7 +336,7 @@ export function ListingDetailsSection({ f }: SectionProps) {
         <Text style={styles.pickerArrow}>›</Text>
       </TouchableOpacity>
 
-      <Text style={[styles.label, { marginTop: 16 }]}>Üretici</Text>
+      <Text style={[styles.label, { marginTop: theme.spacing[4] }]}>Üretici</Text>
       <TouchableOpacity
         style={styles.pickerButton}
         onPress={() => {
@@ -350,7 +350,7 @@ export function ListingDetailsSection({ f }: SectionProps) {
         <Text style={styles.pickerArrow}>›</Text>
       </TouchableOpacity>
 
-      <Text style={[styles.label, { marginTop: 16 }]}>Çıkış Yılı</Text>
+      <Text style={[styles.label, { marginTop: theme.spacing[4] }]}>Çıkış Yılı</Text>
       <TouchableOpacity style={styles.pickerButton} onPress={() => f.setShowYearPicker(true)}>
         <Text style={f.year ? styles.pickerValue : styles.pickerPlaceholder}>{f.year || 'Yıl Seçin'}</Text>
         <Text style={styles.pickerArrow}>›</Text>
@@ -367,7 +367,7 @@ export function ListingDetailsSection({ f }: SectionProps) {
             : `${selected.length} seçili`;
         return (
           <View key={group.slug}>
-            <Text style={[styles.label, { marginTop: 16 }]}>{group.name}</Text>
+            <Text style={[styles.label, { marginTop: theme.spacing[4] }]}>{group.name}</Text>
             <TouchableOpacity style={styles.pickerButton} onPress={() => f.setShowAttrGroupPicker(group.slug)}>
               <Text style={selected.length > 0 ? styles.pickerValue : styles.pickerPlaceholder}>{summary}</Text>
               <Text style={styles.pickerArrow}>›</Text>
@@ -415,7 +415,7 @@ export function ListingOptionsSection({ f }: SectionProps) {
         )}
       </View>
 
-      <View style={[styles.toggleRow, styles.toggleRowDisabled, { marginTop: 12 }]}>
+      <View style={[styles.toggleRow, styles.toggleRowDisabled, { marginTop: theme.spacing[3] }]}>
         <View style={{ flex: 1 }}>
           <Text style={styles.toggleLabel}>Set / Paket</Text>
           <Text style={styles.toggleHint}>Tek ilanda birden fazla model (örn. 5'li paket)</Text>
@@ -429,7 +429,7 @@ export function ListingOptionsSection({ f }: SectionProps) {
       </View>
 
       {f.isSet && (
-        <View style={{ marginTop: 12 }}>
+        <View style={{ marginTop: theme.spacing[3] }}>
           <Text style={styles.label}>Set Parça Sayısı</Text>
           <TextInput
             style={styles.input}
@@ -448,7 +448,7 @@ export function ListingOptionsSection({ f }: SectionProps) {
 
       {/* Pre-order (edit only) */}
       {f.isEdit && (
-        <View style={[styles.toggleRow, styles.toggleRowDisabled, { marginTop: 12 }]}>
+        <View style={[styles.toggleRow, styles.toggleRowDisabled, { marginTop: theme.spacing[3] }]}>
           <View style={{ flex: 1 }}>
             <Text style={styles.toggleLabel}>Ön Sipariş</Text>
             <Text style={styles.toggleHint}>Ürün henüz elinizde değilse ön sipariş olarak işaretleyin</Text>
@@ -464,7 +464,7 @@ export function ListingOptionsSection({ f }: SectionProps) {
 
       {/* Status (edit only, active/inactive) */}
       {f.isEdit && (f.status === 'active' || f.status === 'inactive') && (
-        <View style={{ marginTop: 16 }}>
+        <View style={{ marginTop: theme.spacing[4] }}>
           <Text style={styles.label}>İlan Durumu</Text>
           <View style={styles.chipRow}>
             <TouchableOpacity
@@ -506,7 +506,7 @@ export function ListingPricingSection({ f }: SectionProps) {
         keyboardType="decimal-pad"
       />
 
-      <Text style={[styles.label, { marginTop: 16 }]}>Stok Miktarı</Text>
+      <Text style={[styles.label, { marginTop: theme.spacing[4] }]}>Stok Miktarı</Text>
       <TextInput
         style={styles.input}
         value={f.quantity}
@@ -540,7 +540,7 @@ export function ListingPricingSection({ f }: SectionProps) {
           {f.discountPercent > 0 && (
             <Text style={styles.discountPercent}>%{f.discountPercent} indirim</Text>
           )}
-          <View style={{ marginTop: 12 }}>
+          <View style={{ marginTop: theme.spacing[3] }}>
             <DateField
               label="İndirim Başlangıcı"
               value={f.saleStartDate}
@@ -563,7 +563,7 @@ export function ListingPricingSection({ f }: SectionProps) {
         <View style={styles.commissionCard}>
           <Text style={styles.commissionTitle}>Tahmini (satış başına)</Text>
           {f.commissionLoading ? (
-            <ActivityIndicator size="small" color={colors.text.subtle} style={{ marginTop: 4 }} />
+            <ActivityIndicator size="small" color={colors.text.subtle} style={{ marginTop: theme.spacing[1] }} />
           ) : f.commissionPreview ? (
             <View style={styles.commissionRow}>
               <Text style={styles.commissionFee}>

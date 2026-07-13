@@ -18,7 +18,7 @@ function ItemSide({ label, items }: { label: string; items: TradeItem[] }) {
   return (
     <>
       <Text variant="overline" tone="muted" style={styles.sideLabel}>{label}</Text>
-      <View style={{ gap: 8 }}>
+      <View style={{ gap: theme.spacing[2] }}>
         {items.length > 0 ? (
           items.map((item) => <CompareItemRow key={item.id} item={item} onPress={() => openProduct(item)} />)
         ) : (
@@ -68,19 +68,19 @@ export function TradeItemsCompare({
 }
 
 const styles = StyleSheet.create({
-  card: { margin: 16, marginTop: 0, backgroundColor: colors.surface.DEFAULT },
-  sideLabel: { marginBottom: 10 },
+  card: { margin: theme.spacing[4], marginTop: theme.spacing[0], backgroundColor: colors.surface.DEFAULT },
+  sideLabel: { marginBottom: theme.spacing[2.5] },
   cmpTotalRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: theme.spacing[3],
+    paddingTop: theme.spacing[3],
     borderTopWidth: 1,
     borderTopColor: colors.border.DEFAULT,
   },
   cmpTotalValue: { color: colors.primary[700]!, fontWeight: 'bold' },
-  arrowRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 16 },
+  arrowRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing[2], marginVertical: theme.spacing[4] },
   arrowLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border.DEFAULT },
   arrowCircle: {
     width: 36,

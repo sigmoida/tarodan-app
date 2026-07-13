@@ -33,11 +33,11 @@ const styles = StyleSheet.create({
   cmpItemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: theme.spacing[3],
     backgroundColor: colors.surface.alt,
-    borderRadius: 8,
-    padding: 8,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing[2],
   },
-  cmpThumb: { width: 52, height: 52, borderRadius: 6, backgroundColor: colors.border.subtle },
+  cmpThumb: { width: 52, height: 52, borderRadius: theme.radius.lg, backgroundColor: colors.border.subtle },
   itemInfo: { flex: 1 },
 });

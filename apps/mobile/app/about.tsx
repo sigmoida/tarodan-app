@@ -68,12 +68,12 @@ export default function AboutScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surface.alt },
-  content: { padding: 16 },
-  header: { alignItems: 'center', paddingVertical: 32 },
-  title: { fontWeight: 'bold', color: colors.text.heading, marginTop: 12 },
-  subtitle: { color: colors.text.muted, marginTop: 4, textAlign: 'center' },
-  card: { marginBottom: 16, backgroundColor: colors.surface.DEFAULT },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  sectionTitle: { fontWeight: '600', marginLeft: 8, color: colors.text.heading },
+  content: { padding: theme.spacing[4] },
+  header: { alignItems: 'center', paddingVertical: theme.spacing[8] },
+  title: { fontWeight: 'bold', color: colors.text.heading, marginTop: theme.spacing[3] },
+  subtitle: { color: colors.text.muted, marginTop: theme.spacing[1], textAlign: 'center' },
+  card: { marginBottom: theme.spacing[4], backgroundColor: colors.surface.DEFAULT },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing[3] },
+  sectionTitle: { fontWeight: '600', marginLeft: theme.spacing[2], color: colors.text.heading },
   text: { color: colors.text.muted, lineHeight: 22 },
 });

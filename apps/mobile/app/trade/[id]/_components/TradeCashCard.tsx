@@ -31,15 +31,15 @@ export function TradeCashCard({
           <Text variant="caption" tone="muted">Nakit Fark</Text>
           <Text variant="h2" style={styles.cashBig}>{formatPrice(Math.abs(Number(trade.cashAmount ?? 0)))}</Text>
           {cashCommission > 0 && cashTotal > 0 ? (
-            <Text variant="caption" tone="muted" style={{ marginTop: 2 }}>
+            <Text variant="caption" tone="muted" style={{ marginTop: theme.spacing[0.5] }}>
               Komisyon dahil toplam: {formatPrice(cashTotal)}
             </Text>
           ) : null}
-          <Text variant="caption" tone="muted" style={{ marginTop: 2 }}>
+          <Text variant="caption" tone="muted" style={{ marginTop: theme.spacing[0.5] }}>
             {trade.cashPayerId === userId ? 'Bu tutarı siz ödeyeceksiniz' : `${otherPartyName} ödeyecek`}
           </Text>
         </View>
-        <View style={{ alignItems: 'flex-end', gap: 6 }}>
+        <View style={{ alignItems: 'flex-end', gap: theme.spacing[1.5] }}>
           <MaterialCommunityIcons name="cash-multiple" size={28} color={colors.success[600]!} />
           {cashPaid ? (
             <View style={styles.paidChip}>
@@ -54,16 +54,16 @@ export function TradeCashCard({
 }
 
 const styles = StyleSheet.create({
-  card: { margin: 16, marginTop: 0, backgroundColor: colors.surface.DEFAULT },
+  card: { margin: theme.spacing[4], marginTop: theme.spacing[0], backgroundColor: colors.surface.DEFAULT },
   cashCard: { backgroundColor: colors.success[50]!, borderWidth: 1, borderColor: colors.success[200]! },
-  cashHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  cashBig: { color: colors.success[700]!, fontWeight: 'bold', marginTop: 2 },
+  cashHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing[3] },
+  cashBig: { color: colors.success[700]!, fontWeight: 'bold', marginTop: theme.spacing[0.5] },
   paidChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: theme.spacing[1],
     backgroundColor: colors.success[100]!,
-    paddingHorizontal: 8,
+    paddingHorizontal: theme.spacing[2],
     paddingVertical: 3,
     borderRadius: 999,
   },

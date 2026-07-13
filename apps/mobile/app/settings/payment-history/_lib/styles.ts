@@ -11,23 +11,23 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: theme.spacing[8],
   },
   listContent: {
-    padding: 16,
+    padding: theme.spacing[4],
   },
   emptyListContainer: {
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: theme.spacing[8],
   },
   paymentItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.white,
     borderRadius: 12,
-    padding: 16,
+    padding: theme.spacing[4],
   },
   statusIconContainer: {
     width: 44,
@@ -35,24 +35,24 @@ export const styles = StyleSheet.create({
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: theme.spacing[3],
   },
   productImage: {
     width: 44,
     height: 44,
-    borderRadius: 8,
-    marginRight: 12,
+    borderRadius: theme.radius.xl,
+    marginRight: theme.spacing[3],
     backgroundColor: theme.colors.gray[100],
   },
   paymentInfo: {
     flex: 1,
-    marginRight: 12,
+    marginRight: theme.spacing[3],
   },
   paymentDescription: {
     fontSize: 15,
     fontWeight: '600',
     color: theme.colors.gray[900],
-    marginBottom: 2,
+    marginBottom: theme.spacing[0.5],
   },
   paymentDate: {
     fontSize: 13,
@@ -61,7 +61,7 @@ export const styles = StyleSheet.create({
   paymentMethod: {
     fontSize: 12,
     color: theme.colors.gray[400],
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   paymentRight: {
     alignItems: 'flex-end',
@@ -70,12 +70,12 @@ export const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: 'bold',
     color: theme.colors.gray[900],
-    marginBottom: 4,
+    marginBottom: theme.spacing[1],
   },
   statusBadge: {
-    paddingHorizontal: 8,
+    paddingHorizontal: theme.spacing[2],
     paddingVertical: 3,
-    borderRadius: 10,
+    borderRadius: theme.radius['2xl'],
   },
   statusBadgeText: {
     fontSize: 11,
@@ -86,7 +86,7 @@ export const styles = StyleSheet.create({
   },
   emptyContainer: {
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: theme.spacing[10],
   },
   emptyIconCircle: {
     width: 80,
@@ -95,14 +95,14 @@ export const styles = StyleSheet.create({
     backgroundColor: theme.colors.gray[100],
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   emptyTitle: {
     fontSize: 17,
     fontWeight: '600',
     color: theme.colors.gray[900],
-    marginTop: 8,
-    marginBottom: 6,
+    marginTop: theme.spacing[2],
+    marginBottom: theme.spacing[1.5],
   },
   emptySubtitle: {
     fontSize: 14,
@@ -110,11 +110,11 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
   loginButton: {
-    marginTop: 20,
+    marginTop: theme.spacing[5],
     backgroundColor: theme.colors.primary[500],
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 10,
+    paddingHorizontal: theme.spacing[8],
+    paddingVertical: theme.spacing[3],
+    borderRadius: theme.radius['2xl'],
   },
   loginButtonText: {
     color: theme.colors.white,

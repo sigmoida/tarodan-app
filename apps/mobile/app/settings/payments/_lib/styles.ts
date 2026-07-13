@@ -16,9 +16,9 @@ export const styles = StyleSheet.create({
     borderBottomColor: colors.border.subtle,
   },
   filterRow: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 8,
+    paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing[3],
+    gap: theme.spacing[2],
   },
   filterChip: {
     // Chip variant handles bg/fg states
@@ -33,14 +33,14 @@ export const styles = StyleSheet.create({
   },
   paymentCard: {
     backgroundColor: colors.surface.DEFAULT,
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
     borderWidth: 1,
     borderColor: colors.border.subtle,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   orderNumber: {
     fontSize: 13,
@@ -51,7 +51,7 @@ export const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: colors.text.heading,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   amount: {
     fontSize: 18,
@@ -61,16 +61,16 @@ export const styles = StyleSheet.create({
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 6,
+    gap: theme.spacing[2.5],
+    marginBottom: theme.spacing[1.5],
   },
   statusChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: theme.spacing[2],
+    paddingVertical: theme.spacing[1],
     borderRadius: 12,
-    gap: 4,
+    gap: theme.spacing[1],
   },
   statusText: {
     fontSize: 12,
@@ -79,7 +79,7 @@ export const styles = StyleSheet.create({
   providerWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: theme.spacing[1],
   },
   providerText: {
     fontSize: 12,
@@ -89,16 +89,16 @@ export const styles = StyleSheet.create({
   dateText: {
     fontSize: 12,
     color: colors.text.subtle,
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   failureBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: theme.spacing[1.5],
     backgroundColor: colors.danger[50]!,
-    padding: 8,
-    borderRadius: 6,
-    marginBottom: 8,
+    padding: theme.spacing[2],
+    borderRadius: theme.radius.lg,
+    marginBottom: theme.spacing[2],
   },
   failureText: {
     flex: 1,
@@ -107,17 +107,17 @@ export const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
-    gap: 8,
-    marginTop: 4,
+    gap: theme.spacing[2],
+    marginTop: theme.spacing[1],
     flexWrap: 'wrap',
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+    gap: theme.spacing[1],
+    paddingVertical: theme.spacing[1.5],
+    paddingHorizontal: theme.spacing[3],
+    borderRadius: theme.radius.xl,
     borderWidth: 1,
   },
   cancelButton: {

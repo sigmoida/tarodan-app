@@ -51,8 +51,8 @@ export function OrderStatusCard({ order, view }: { order: OrderDetail; view: Ord
 }
 
 const styles = StyleSheet.create({
-  card: { marginBottom: 12 },
-  statusHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  card: { marginBottom: theme.spacing[3] },
+  statusHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing[4] },
   orderNumber: { color: colors.text.muted },
-  timeline: { marginTop: 8 },
+  timeline: { marginTop: theme.spacing[2] },
 });

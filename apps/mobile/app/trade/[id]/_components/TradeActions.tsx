@@ -55,7 +55,7 @@ export function TradeActions({
       {/* Pending: Accept/Reject/Counter for receiver */}
       {trade.status === 'pending' && isReceiver && (
         <>
-          <View style={{ marginBottom: 12 }}>
+          <View style={{ marginBottom: theme.spacing[3] }}>
             <TradeAddressPicker label="Teslimat Adresi" onChange={actions.setTradeAddressId} />
           </View>
           <Button
@@ -108,7 +108,7 @@ export function TradeActions({
         !cashPaid && (
           <View style={styles.payCta}>
             <Text variant="label" style={{ color: colors.primary[800]! }}>Ödemenizi Tamamlayın</Text>
-            <Text variant="caption" tone="muted" style={{ marginTop: 2, marginBottom: 10 }}>
+            <Text variant="caption" tone="muted" style={{ marginTop: theme.spacing[0.5], marginBottom: theme.spacing[2.5] }}>
               Takas kabul edildi. Devam etmek için nakit fark ödemesini tamamlayın.
             </Text>
             <Button
@@ -169,16 +169,16 @@ export function TradeActions({
 }
 
 const styles = StyleSheet.create({
-  actions: { padding: 16, gap: 12 },
-  actionButton: { borderRadius: 8, alignSelf: 'stretch' },
-  actionRow: { flexDirection: 'row', gap: 12 },
+  actions: { padding: theme.spacing[4], gap: theme.spacing[3] },
+  actionButton: { borderRadius: theme.radius.xl, alignSelf: 'stretch' },
+  actionRow: { flexDirection: 'row', gap: theme.spacing[3] },
   actionItem: { flex: 1 },
-  confirmReceiptHint: { color: colors.text.muted, textAlign: 'center', marginTop: 4 },
+  confirmReceiptHint: { color: colors.text.muted, textAlign: 'center', marginTop: theme.spacing[1] },
   payCta: {
     backgroundColor: colors.primary[50]!,
     borderWidth: 1,
     borderColor: colors.primary[100]!,
     borderRadius: 12,
-    padding: 14,
+    padding: theme.spacing[3.5],
   },
 });

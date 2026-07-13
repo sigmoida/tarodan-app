@@ -43,23 +43,23 @@ const SIZE_CONFIG = {
   small: {
     iconSize: 14,
     fontSize: 10,
-    padding: 4,
-    borderRadius: 8,
-    gap: 2,
+    padding: theme.spacing[1],
+    borderRadius: theme.radius.xl,
+    gap: theme.spacing[0.5],
   },
   medium: {
     iconSize: 18,
     fontSize: 12,
-    padding: 6,
-    borderRadius: 10,
-    gap: 4,
+    padding: theme.spacing[1.5],
+    borderRadius: theme.radius['2xl'],
+    gap: theme.spacing[1],
   },
   large: {
     iconSize: 24,
     fontSize: 14,
-    padding: 8,
+    padding: theme.spacing[2],
     borderRadius: 12,
-    gap: 6,
+    gap: theme.spacing[1.5],
   },
 };
 
@@ -213,7 +213,7 @@ export const MembershipBadgeCard: React.FC<MembershipBadgeCardProps> = ({
             name="checkmark-circle"
             size={18}
             color={colors.success[600]!}
-            style={{ marginLeft: 4 }}
+            style={{ marginLeft: theme.spacing[1] }}
           />
         )}
       </View>
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
   inlineContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 4,
+    marginLeft: theme.spacing[1],
   },
   inlineIcon: {
     marginHorizontal: 1,
@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
   cardContainer: {
     backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
-    padding: 12,
+    padding: theme.spacing[3],
     borderWidth: 1,
   },
   cardHeader: {
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cardTitle: {
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
     fontWeight: '600',
     fontSize: 14,
   },
@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    marginTop: 8,
+    marginTop: theme.spacing[2],
   },
   upgradeLinkText: {
     color: colors.primary[600]!,

@@ -10,30 +10,30 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.surface.DEFAULT,
   },
   searchBar: {
-    padding: 16,
-    paddingBottom: 8,
+    padding: theme.spacing[4],
+    paddingBottom: theme.spacing[2],
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: theme.spacing[8],
   },
   emptyText: {
-    marginTop: 12,
+    marginTop: theme.spacing[3],
     color: colors.text.muted,
     textAlign: 'center',
   },
   list: {
-    paddingHorizontal: 16,
+    paddingHorizontal: theme.spacing[4],
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.gray[50],
     borderRadius: 12,
-    padding: 10,
-    marginBottom: 10,
+    padding: theme.spacing[2.5],
+    marginBottom: theme.spacing[2.5],
   },
   rowContent: {
     flexDirection: 'row',
@@ -43,13 +43,13 @@ export const styles = StyleSheet.create({
   thumb: {
     width: 56,
     height: 56,
-    borderRadius: 8,
+    borderRadius: theme.radius.xl,
     backgroundColor: colors.border.DEFAULT,
   },
   rowInfo: {
     flex: 1,
-    marginLeft: 12,
-    marginRight: 8,
+    marginLeft: theme.spacing[3],
+    marginRight: theme.spacing[2],
   },
   rowTitle: {
     fontSize: 14,
@@ -60,7 +60,7 @@ export const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: colors.primary[600]!,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   toggleBtn: {
     width: 40,

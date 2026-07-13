@@ -27,8 +27,8 @@ export function TradeMessages({ trade }: { trade: Trade }) {
 }
 
 const styles = StyleSheet.create({
-  card: { margin: 16, marginTop: 0, backgroundColor: colors.surface.DEFAULT },
-  sectionTitle: { marginBottom: 12, color: colors.text.heading },
-  messageBox: { backgroundColor: colors.surface.alt, padding: 12, borderRadius: 8, marginBottom: 8 },
-  messageSender: { color: colors.primary[600]!, fontWeight: '500', marginBottom: 4 },
+  card: { margin: theme.spacing[4], marginTop: theme.spacing[0], backgroundColor: colors.surface.DEFAULT },
+  sectionTitle: { marginBottom: theme.spacing[3], color: colors.text.heading },
+  messageBox: { backgroundColor: colors.surface.alt, padding: theme.spacing[3], borderRadius: theme.radius.xl, marginBottom: theme.spacing[2] },
+  messageSender: { color: colors.primary[600]!, fontWeight: '500', marginBottom: theme.spacing[1] },
 });

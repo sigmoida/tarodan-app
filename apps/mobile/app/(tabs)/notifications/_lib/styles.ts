@@ -16,8 +16,8 @@ export const styles = StyleSheet.create({
     backgroundColor: theme.colors.gray[50],
   },
   header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing[3],
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -33,17 +33,17 @@ export const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: theme.spacing[2],
   },
   backBtn: {
     marginLeft: -4,
-    marginRight: 2,
-    padding: 2,
+    marginRight: theme.spacing[0.5],
+    padding: theme.spacing[0.5],
   },
-  titleSpacing: { marginBottom: 4 },
-  messageSpacing: { marginBottom: 6 },
+  titleSpacing: { marginBottom: theme.spacing[1] },
+  messageSpacing: { marginBottom: theme.spacing[1.5] },
   list: {
-    padding: 16,
+    padding: theme.spacing[4],
   },
   emptyList: {
     flexGrow: 1,
@@ -52,7 +52,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     backgroundColor: theme.colors.white,
-    padding: 14,
+    padding: theme.spacing[3.5],
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.colors.border.DEFAULT,
@@ -67,13 +67,13 @@ export const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: theme.spacing[3],
   },
   thumb: {
     width: 40,
     height: 40,
-    borderRadius: 6,
-    marginRight: 12,
+    borderRadius: theme.radius.lg,
+    marginRight: theme.spacing[3],
     backgroundColor: theme.colors.gray[50],
   },
   content: {
@@ -82,9 +82,9 @@ export const styles = StyleSheet.create({
   dot: {
     width: 8,
     height: 8,
-    borderRadius: 4,
+    borderRadius: theme.radius.md,
     backgroundColor: theme.colors.primary[500],
-    marginLeft: 8,
-    marginTop: 6,
+    marginLeft: theme.spacing[2],
+    marginTop: theme.spacing[1.5],
   },
 });

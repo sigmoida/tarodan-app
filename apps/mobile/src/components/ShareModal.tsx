@@ -286,45 +286,45 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
 const styles = StyleSheet.create({
   urlContainer: {
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   urlLabel: {
     color: colors.text.muted,
-    marginBottom: 4,
+    marginBottom: theme.spacing[1],
     fontSize: 12,
   },
   urlBox: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface.alt,
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing[3],
   },
   urlText: {
     flex: 1,
     color: colors.text.heading,
-    marginRight: 8,
+    marginRight: theme.spacing[2],
     fontSize: 12,
   },
   divider: {
-    marginVertical: 12,
+    marginVertical: theme.spacing[3],
   },
   qrToggle: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: theme.spacing[2],
   },
   qrToggleText: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
     color: colors.text.heading,
   },
   qrContainer: {
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: theme.spacing[4],
   },
   qrCode: {
-    padding: 16,
+    padding: theme.spacing[4],
     backgroundColor: colors.white,
     borderRadius: 12,
     shadowColor: colors.black,
@@ -334,13 +334,13 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   qrHint: {
-    marginTop: 12,
+    marginTop: theme.spacing[3],
     color: colors.text.muted,
     textAlign: 'center',
     fontSize: 12,
   },
   sectionTitle: {
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
     color: colors.text.heading,
     fontSize: 14,
     fontWeight: '600',
@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
   shareOption: {
     width: '30%',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   shareIcon: {
     width: 48,
@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: theme.spacing[1],
   },
   shareLabel: {
     textAlign: 'center',
@@ -369,17 +369,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   shareButton: {
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
   },
   embedLink: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    marginBottom: 8,
+    paddingVertical: theme.spacing[3],
+    marginBottom: theme.spacing[2],
   },
   embedText: {
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
     color: colors.primary[600]!,
     fontSize: 12,
   },

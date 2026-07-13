@@ -60,7 +60,7 @@ export function OrderSellerInvoiceCard({
             title="Satıcı Faturasını Görüntüle / İndir"
           />
           {sellerInvoice.canUpload && (
-            <Text variant="caption" style={{ color: colors.text.muted, marginTop: 8 }}>
+            <Text variant="caption" style={{ color: colors.text.muted, marginTop: theme.spacing[2] }}>
               Faturayı değiştirmek için tarodan.com sipariş sayfasını kullanın.
             </Text>
           )}
@@ -75,7 +75,7 @@ export function OrderSellerInvoiceCard({
 }
 
 const styles = StyleSheet.create({
-  card: { marginBottom: 12 },
-  sectionTitle: { marginBottom: 12, color: colors.text.heading },
-  hint: { color: colors.text.muted, marginBottom: 8 },
+  card: { marginBottom: theme.spacing[3] },
+  sectionTitle: { marginBottom: theme.spacing[3], color: colors.text.heading },
+  hint: { color: colors.text.muted, marginBottom: theme.spacing[2] },
 });

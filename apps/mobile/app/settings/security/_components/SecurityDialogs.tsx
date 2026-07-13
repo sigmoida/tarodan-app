@@ -92,7 +92,7 @@ export function SecurityDialogs({ f }: { f: SecurityController }) {
       {/* Phone Verification Dialog */}
       <Modal isOpen={f.showPhoneDialog} onClose={() => { f.setShowPhoneDialog(false); f.setPhoneMsg(null); }} title="Telefon Doğrulama">
         {f.phoneStep === 'enter' ? (
-          <View style={{ gap: 12 }}>
+          <View style={{ gap: theme.spacing[3] }}>
             <Input
               label="Telefon numarası"
               value={f.phoneInput}
@@ -105,7 +105,7 @@ export function SecurityDialogs({ f }: { f: SecurityController }) {
             <Button title="Kod Gönder" onPress={f.handleSendPhoneCode} disabled={f.loading || !f.phoneInput} isLoading={f.loading} />
           </View>
         ) : (
-          <View style={{ gap: 12 }}>
+          <View style={{ gap: theme.spacing[3] }}>
             <Input
               label="Doğrulama kodu"
               value={f.phoneCode}
@@ -128,7 +128,7 @@ export function SecurityDialogs({ f }: { f: SecurityController }) {
           <Text
             testID="phone-message"
             style={{
-              marginTop: 12,
+              marginTop: theme.spacing[3],
               textAlign: 'center',
               color: f.phoneMsg.type === 'error' ? colors.danger[600]! : colors.text.muted,
             }}

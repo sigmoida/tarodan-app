@@ -20,7 +20,7 @@ export function ProductPickerModal({ f }: { f: DiscountsController }) {
     >
       <ScrollView style={styles.dialogScroll}>
         {f.productsQuery.isLoading ? (
-          <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+          <View style={{ paddingVertical: theme.spacing[6], alignItems: 'center' }}>
             <Spinner size="lg" />
           </View>
         ) : f.products.length === 0 ? (
@@ -44,7 +44,7 @@ export function ProductPickerModal({ f }: { f: DiscountsController }) {
                   size={22}
                   color={checked ? colors.primary[600]! : colors.text.subtle}
                 />
-                <View style={{ flex: 1, marginLeft: 12 }}>
+                <View style={{ flex: 1, marginLeft: theme.spacing[3] }}>
                   <Text style={styles.productTitle} numberOfLines={1}>
                     {p.title}
                   </Text>

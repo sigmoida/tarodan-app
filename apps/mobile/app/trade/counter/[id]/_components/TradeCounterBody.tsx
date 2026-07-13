@@ -111,7 +111,7 @@ export function TradeCounterBody({ f }: { f: TradeCounterController }) {
             </Text>
           </View>
         ) : null}
-        <Divider style={{ marginVertical: 8 }} />
+        <Divider style={{ marginVertical: theme.spacing[2] }} />
         <Text style={styles.summaryHint}>
           {f.selectedMine.length} ürün vereceksiniz, {f.selectedTheirs.length} ürün alacaksınız.
         </Text>

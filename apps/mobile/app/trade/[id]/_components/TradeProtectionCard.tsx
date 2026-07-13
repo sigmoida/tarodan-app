@@ -25,13 +25,13 @@ export function TradeProtectionCard({ status }: { status: string }) {
 
 const styles = StyleSheet.create({
   protectionCard: {
-    margin: 16,
-    marginTop: 0,
+    margin: theme.spacing[4],
+    marginTop: theme.spacing[0],
     backgroundColor: colors.success[50]!,
     borderWidth: 1,
     borderColor: colors.success[200]!,
   },
   protectionContent: { flexDirection: 'row', alignItems: 'center' },
-  protectionTextContainer: { flex: 1, marginLeft: 12 },
-  protectionDesc: { color: colors.text.muted, marginTop: 2 },
+  protectionTextContainer: { flex: 1, marginLeft: theme.spacing[3] },
+  protectionDesc: { color: colors.text.muted, marginTop: theme.spacing[0.5] },
 });

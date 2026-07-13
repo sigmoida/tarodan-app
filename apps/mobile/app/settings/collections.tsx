@@ -165,21 +165,21 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: theme.spacing[4],
   },
   infoBanner: {
     backgroundColor: colors.surface.DEFAULT,
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: theme.radius['3xl'],
+    padding: theme.spacing[5],
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: theme.spacing[5],
     borderLeftWidth: 4,
     borderLeftColor: colors.primary[600]!,
   },
   infoBannerText: {
     flex: 1,
-    marginLeft: 16,
+    marginLeft: theme.spacing[4],
   },
   infoBannerTitle: {
     fontSize: 16,
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
   infoBannerDesc: {
     fontSize: 13,
     color: colors.text.muted,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   collectionsGrid: {
     flexDirection: 'row',
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
     width: '48%',
     backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     overflow: 'hidden',
     elevation: 2,
     shadowColor: colors.black,
@@ -220,11 +220,11 @@ const styles = StyleSheet.create({
   },
   privateBadge: {
     backgroundColor: colors.overlay.black50,
-    padding: 6,
+    padding: theme.spacing[1.5],
     borderRadius: 12,
   },
   collectionInfo: {
-    padding: 12,
+    padding: theme.spacing[3],
   },
   collectionName: {
     fontSize: 14,
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
   collectionMeta: {
     fontSize: 12,
     color: colors.text.muted,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   fab: {
     position: 'absolute',
@@ -252,14 +252,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
+    padding: theme.spacing[4],
+    marginBottom: theme.spacing[5],
     borderLeftWidth: 4,
     borderLeftColor: colors.warning[500]!,
   },
   premiumNoticeText: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
   },
   premiumNoticeTitle: {
     fontSize: 15,
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
   premiumNoticeDesc: {
     fontSize: 12,
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   emptyState: {
     alignItems: 'center',
@@ -280,12 +280,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: colors.text.heading,
-    marginTop: 16,
+    marginTop: theme.spacing[4],
   },
   emptyDesc: {
     fontSize: 14,
     color: colors.text.muted,
-    marginTop: 8,
+    marginTop: theme.spacing[2],
     textAlign: 'center',
   },
 });

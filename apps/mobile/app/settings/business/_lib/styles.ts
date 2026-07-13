@@ -16,28 +16,28 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.surface.DEFAULT,
   },
   loadingText: {
-    marginTop: 12,
+    marginTop: theme.spacing[3],
     color: colors.text.muted,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: theme.spacing[6],
   },
   errorText: {
     fontSize: 16,
     color: colors.danger[600]!,
     textAlign: 'center',
-    marginTop: 16,
-    marginBottom: 24,
+    marginTop: theme.spacing[4],
+    marginBottom: theme.spacing[6],
   },
   content: {
     flex: 1,
   },
   companyHeader: {
-    padding: 16,
-    margin: 16,
+    padding: theme.spacing[4],
+    margin: theme.spacing[4],
     borderRadius: radius.xl,
     borderWidth: 1,
     borderColor: colors.primary[200]!,
@@ -63,13 +63,13 @@ export const styles = StyleSheet.create({
     fontSize: 32,
   },
   companyDetails: {
-    marginLeft: 16,
+    marginLeft: theme.spacing[4],
     flex: 1,
   },
   companyNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: theme.spacing[2],
   },
   companyName: {
     fontSize: 20,
@@ -79,11 +79,11 @@ export const styles = StyleSheet.create({
   companyTitle: {
     fontSize: 14,
     color: colors.primary[600]!,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   tabsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
+    paddingHorizontal: theme.spacing[4],
     borderBottomWidth: 1,
     borderBottomColor: colors.border.DEFAULT,
   },
@@ -92,8 +92,8 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    gap: 6,
+    paddingVertical: theme.spacing[3],
+    gap: theme.spacing[1.5],
   },
   tabActive: {
     borderBottomWidth: 2,
@@ -109,19 +109,19 @@ export const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   tabContent: {
-    padding: 16,
+    padding: theme.spacing[4],
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 16,
+    gap: theme.spacing[3],
+    marginBottom: theme.spacing[4],
   },
   statCard: {
     width: '47%',
     backgroundColor: colors.white,
     borderRadius: radius.lg,
-    padding: 16,
+    padding: theme.spacing[4],
     borderLeftWidth: 4,
     alignItems: 'center',
   },
@@ -129,20 +129,20 @@ export const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: colors.text.heading,
-    marginTop: 8,
+    marginTop: theme.spacing[2],
   },
   statLabel: {
     fontSize: 12,
     color: colors.text.muted,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   revenueCard: {
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     borderRadius: radius.lg,
     overflow: 'hidden',
   },
   revenueGradient: {
-    padding: 20,
+    padding: theme.spacing[5],
   },
   revenueLabel: {
     fontSize: 14,
@@ -153,10 +153,10 @@ export const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
     color: colors.text.heading,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   weeklyCard: {
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     borderRadius: radius.lg,
   },
   collectionStatsCard: {
@@ -166,12 +166,12 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: colors.text.heading,
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
   },
   weeklyStatsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginTop: 8,
+    marginTop: theme.spacing[2],
   },
   weeklyStat: {
     alignItems: 'center',
@@ -180,20 +180,20 @@ export const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: colors.text.heading,
-    marginTop: 8,
+    marginTop: theme.spacing[2],
   },
   weeklyStatLabel: {
     fontSize: 12,
     color: colors.text.muted,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   productRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.white,
     borderRadius: radius.lg,
-    padding: 12,
-    marginBottom: 8,
+    padding: theme.spacing[3],
+    marginBottom: theme.spacing[2],
   },
   productRank: {
     width: 28,
@@ -202,7 +202,7 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.surface.alt,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: theme.spacing[3],
   },
   productRankText: {
     fontSize: 12,
@@ -213,7 +213,7 @@ export const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: radius.md,
-    marginRight: 12,
+    marginRight: theme.spacing[3],
   },
   productImagePlaceholder: {
     backgroundColor: colors.surface.alt,
@@ -231,7 +231,7 @@ export const styles = StyleSheet.create({
   productPrice: {
     fontSize: 12,
     color: colors.primary[600]!,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   productStats: {
     alignItems: 'flex-end',
@@ -239,7 +239,7 @@ export const styles = StyleSheet.create({
   productStatItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: theme.spacing[1],
   },
   productStatText: {
     fontSize: 12,
@@ -248,6 +248,6 @@ export const styles = StyleSheet.create({
   emptyText: {
     textAlign: 'center',
     color: colors.text.muted,
-    paddingVertical: 24,
+    paddingVertical: theme.spacing[6],
   },
 });

@@ -45,13 +45,13 @@ export function OrderSellerCard({ order }: { order: OrderDetail }) {
 }
 
 const styles = StyleSheet.create({
-  card: { marginBottom: 12 },
+  card: { marginBottom: theme.spacing[3] },
   productCard: { flexDirection: 'row' },
   productImage: { width: 80, height: 80, borderRadius: radius.md, backgroundColor: colors.surface.alt },
-  productInfo: { flex: 1, marginLeft: 12 },
-  conditionText: { color: colors.text.muted, marginTop: 4 },
-  productPrice: { color: colors.primary[600]!, fontWeight: 'bold', marginTop: 4 },
+  productInfo: { flex: 1, marginLeft: theme.spacing[3] },
+  conditionText: { color: colors.text.muted, marginTop: theme.spacing[1] },
+  productPrice: { color: colors.primary[600]!, fontWeight: 'bold', marginTop: theme.spacing[1] },
   sellerCard: { flexDirection: 'row', alignItems: 'center' },
-  sellerInfo: { flex: 1, marginLeft: 12 },
+  sellerInfo: { flex: 1, marginLeft: theme.spacing[3] },
   sellerLink: { color: colors.primary[600]! },
 });

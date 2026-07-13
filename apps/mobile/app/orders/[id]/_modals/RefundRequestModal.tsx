@@ -90,7 +90,7 @@ export function RefundRequestModal({
           onChangeText={setDescription}
           multiline
           numberOfLines={4}
-          containerStyle={{ marginTop: 12 }}
+          containerStyle={{ marginTop: theme.spacing[3] }}
           inputStyle={{ minHeight: 80 }}
         />
 
@@ -133,11 +133,11 @@ export function RefundRequestModal({
 }
 
 const styles = StyleSheet.create({
-  refundModalHint: { color: colors.text.muted, marginBottom: 12 },
-  refundModalLabel: { color: colors.text.heading, fontWeight: '600', marginTop: 8, marginBottom: 4 },
-  refundModalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 16 },
-  qtySection: { marginTop: 4, marginBottom: 4 },
-  qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 8 },
+  refundModalHint: { color: colors.text.muted, marginBottom: theme.spacing[3] },
+  refundModalLabel: { color: colors.text.heading, fontWeight: '600', marginTop: theme.spacing[2], marginBottom: theme.spacing[1] },
+  refundModalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: theme.spacing[2], marginTop: theme.spacing[4] },
+  qtySection: { marginTop: theme.spacing[1], marginBottom: theme.spacing[1] },
+  qtyRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing[4], marginTop: theme.spacing[2] },
   qtyBtn: {
     width: 40,
     height: 40,
@@ -150,9 +150,9 @@ const styles = StyleSheet.create({
   },
   qtyBtnDisabled: { opacity: 0.4 },
   qtyValue: { minWidth: 32, textAlign: 'center', color: colors.text.heading },
-  evidenceSection: { marginTop: 12 },
-  evidenceHint: { color: colors.text.muted, marginBottom: 8 },
-  evidenceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  evidenceSection: { marginTop: theme.spacing[3] },
+  evidenceHint: { color: colors.text.muted, marginBottom: theme.spacing[2] },
+  evidenceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing[2] },
   evidenceThumbWrap: { width: 72, height: 72, borderRadius: radius.md, overflow: 'visible' },
   evidenceThumb: { width: 72, height: 72, borderRadius: radius.md, backgroundColor: colors.gray[100] },
   evidenceRemove: {
@@ -179,5 +179,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.surface.alt,
   },
-  evidenceAddText: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
+  evidenceAddText: { fontSize: 11, color: colors.text.muted, marginTop: theme.spacing[0.5] },
 });

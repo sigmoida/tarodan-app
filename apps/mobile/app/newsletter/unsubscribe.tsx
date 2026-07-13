@@ -124,14 +124,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface.DEFAULT,
   },
   scrollBody: {
-    padding: 24,
-    gap: 10,
+    padding: theme.spacing[6],
+    gap: theme.spacing[2.5],
     alignItems: 'stretch',
   },
   iconWrap: {
     alignItems: 'center',
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: theme.spacing[4],
+    marginBottom: theme.spacing[2],
   },
   title: {
     fontSize: 22,
@@ -144,13 +144,13 @@ const styles = StyleSheet.create({
     color: colors.text.muted,
     textAlign: 'center',
     lineHeight: 20,
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   input: {
     backgroundColor: colors.surface.DEFAULT,
   },
   btn: {
-    borderRadius: 10,
-    marginTop: 8,
+    borderRadius: theme.radius['2xl'],
+    marginTop: theme.spacing[2],
   },
 });

@@ -11,8 +11,8 @@ export const styles = StyleSheet.create({
   },
   searchWrap: {
     backgroundColor: colors.surface.DEFAULT,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing[2],
     borderBottomWidth: 1,
     borderBottomColor: colors.border.subtle,
   },
@@ -23,9 +23,9 @@ export const styles = StyleSheet.create({
     borderBottomColor: colors.border.subtle,
   },
   brandFilterRow: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 8,
+    paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing[3],
+    gap: theme.spacing[2],
   },
   loading: {
     flex: 1,
@@ -37,15 +37,15 @@ export const styles = StyleSheet.create({
   },
   brandSection: {
     backgroundColor: colors.surface.DEFAULT,
-    marginTop: 12,
-    paddingVertical: 12,
+    marginTop: theme.spacing[3],
+    paddingVertical: theme.spacing[3],
   },
   brandHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 12,
-    gap: 12,
+    paddingHorizontal: theme.spacing[4],
+    marginBottom: theme.spacing[3],
+    gap: theme.spacing[3],
   },
   brandLogo: {
     width: 36,
@@ -65,20 +65,20 @@ export const styles = StyleSheet.create({
   brandMeta: {
     fontSize: 12,
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   modelsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 12,
-    gap: 8,
+    paddingHorizontal: theme.spacing[3],
+    gap: theme.spacing[2],
   },
   modelCard: {
     width: '48%',
     backgroundColor: colors.gray[50],
-    borderRadius: 10,
+    borderRadius: theme.radius['2xl'],
     overflow: 'hidden',
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   modelImage: {
     width: '100%',
@@ -90,7 +90,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modelBody: {
-    padding: 10,
+    padding: theme.spacing[2.5],
   },
   modelName: {
     fontSize: 14,
@@ -100,12 +100,12 @@ export const styles = StyleSheet.create({
   modelYears: {
     fontSize: 11,
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   modelCount: {
     fontSize: 11,
     color: colors.primary[600]!,
     fontWeight: '600',
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
 });

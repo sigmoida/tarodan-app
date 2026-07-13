@@ -46,7 +46,7 @@ export function CurrentPlanCard({ f }: { f: MembershipManageController }) {
 
       {isPaid ? (
         <>
-          <Divider style={{ marginVertical: 12 }} />
+          <Divider style={{ marginVertical: theme.spacing[3] }} />
           <View style={styles.kvRow}>
             <Text style={styles.kvLabel}>Başlangıç</Text>
             <Text style={styles.kvValue}>{formatDate(data?.currentPeriodStart)}</Text>
@@ -65,7 +65,7 @@ export function CurrentPlanCard({ f }: { f: MembershipManageController }) {
             </View>
           ) : null}
 
-          <Divider style={{ marginVertical: 12 }} />
+          <Divider style={{ marginVertical: theme.spacing[3] }} />
 
           {/* Auto-renew toggle */}
           <View style={styles.autoRow}>

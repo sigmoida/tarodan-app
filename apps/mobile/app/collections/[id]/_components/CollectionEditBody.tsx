@@ -178,7 +178,7 @@ export function CollectionEditBody({ f }: { f: CollectionEditController }) {
           <Text variant="h3" style={styles.dangerTitle}>Tehlikeli Bölge</Text>
           <TouchableOpacity onPress={f.handleDelete} style={styles.dangerItem}>
             <Ionicons name="trash" size={24} color={colors.danger[600]!} />
-            <View style={{ flex: 1, marginLeft: 12 }}>
+            <View style={{ flex: 1, marginLeft: theme.spacing[3] }}>
               <Text style={styles.dangerItemTitle}>Koleksiyonu Sil</Text>
               <Text style={styles.dangerItemDesc}>Bu işlem geri alınamaz</Text>
             </View>
