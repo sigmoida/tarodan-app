@@ -1,8 +1,6 @@
 import { Module, NestModule, MiddlewareConsumer } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
-import { JwtModule } from "@nestjs/jwt";
-import { ScheduleModule } from "@nestjs/schedule";
-import { BullModule } from "@nestjs/bull";
+import { JwtModule } from "@nestjs/jwt";import { BullModule } from "@nestjs/bull";
 import { PaymentController } from "./payment.controller";
 import { PaytrCallbackAliasController } from "./paytr-callback-alias.controller";
 import { PaymentService } from "./payment.service";
@@ -32,9 +30,7 @@ import { ElogoModule } from "../elogo";
     ConfigModule,
     CacheModule,
     PaymentProvidersModule,
-    EventModule,
-    ScheduleModule.forRoot(),
-    InvoiceModule,
+    EventModule,    InvoiceModule,
     NotificationModule,
     PayoutModule,
     SuratCargoModule,

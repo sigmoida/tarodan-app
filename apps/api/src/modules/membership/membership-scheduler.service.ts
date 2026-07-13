@@ -5,11 +5,7 @@
  * - Membership expiration reminders
  */
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
-import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
-import {
-  moneyCronsViaBull,
-  registerRepeatableCron,
-} from "../../monitoring/bull-cron.helper";
+import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaService } from "../../prisma";
 import { InjectQueue } from "@nestjs/bull";
@@ -28,26 +24,22 @@ export class MembershipSchedulerService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    const on = moneyCronsViaBull();
     await registerRepeatableCron(
       this.scheduledQueue,
       "membership-expired-downgrades",
       "0 3 * * *",
-      on,
       this.logger,
     );
     await registerRepeatableCron(
       this.scheduledQueue,
       "membership-expiration-reminders",
       "0 9 * * *",
-      on,
       this.logger,
     );
     await registerRepeatableCron(
       this.scheduledQueue,
       "membership-monthly-offers",
       "0 10 1 * *",
-      on,
       this.logger,
     );
     // Tier 3: kart çekimi (yalnız PAYTR_RECURRING_ENABLED iken gerçek çekim).
@@ -56,7 +48,6 @@ export class MembershipSchedulerService implements OnModuleInit {
       this.scheduledQueue,
       "membership-auto-renewals",
       "0 * * * *",
-      on,
       this.logger,
     );
   }
@@ -71,15 +62,7 @@ export class MembershipSchedulerService implements OnModuleInit {
    * tier=premium kalıyordu. canCreateTrade ham tier'ı okuduğu için süresi geçmiş
    * premium kullanıcı hâlâ takas yapabiliyordu. Bu cron o boşluğu kapatır.
    */
-  @TrackedCron("0 3 * * *") // Her gün 03:00
-  async processExpiredDowngrades() {
-    if (moneyCronsViaBull()) {
-      return;
-    }
-    return this.runProcessExpiredDowngrades();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+  /** Gerçek iş — Bull processor (ve manuel tetik) buradan çağırır. */
   async runProcessExpiredDowngrades(log: (msg: string) => void = () => {}) {
     try {
       const count = await this.membershipService.checkExpiredMemberships();
@@ -110,15 +93,7 @@ export class MembershipSchedulerService implements OnModuleInit {
    * Send monthly premium offer emails to free users
    * Runs on the 1st of every month at 10:00 AM
    */
-  @TrackedCron("0 10 1 * *") // 1st of every month at 10:00 AM
-  async sendMonthlyPremiumOffers() {
-    if (moneyCronsViaBull()) {
-      return;
-    }
-    return this.runSendMonthlyPremiumOffers();
-  }
-
-  /** Gerçek iş — in-process cron, Bull processor ve manuel tetik buradan çağırır. */
+  /** Gerçek iş — Bull processor ve manuel tetik buradan çağırır. */
   async runSendMonthlyPremiumOffers(log: (msg: string) => void = () => {}) {
     this.logger.log("Starting monthly premium offer email campaign...");
     log("Monthly premium offer campaign started");
@@ -231,15 +206,7 @@ export class MembershipSchedulerService implements OnModuleInit {
    * Runs every day at 09:00 AM
    * Sends reminders 7 days and 1 day before expiration
    */
-  @TrackedCron("0 9 * * *") // Every day at 09:00 AM
-  async sendExpirationReminders() {
-    if (moneyCronsViaBull()) {
-      return;
-    }
-    return this.runSendExpirationReminders();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+  /** Gerçek iş — Bull processor (ve manuel tetik) buradan çağırır. */
   async runSendExpirationReminders(log: (msg: string) => void = () => {}) {
     this.logger.log("Checking for expiring memberships...");
     log("Checking membership expiration reminders");
@@ -371,15 +338,7 @@ export class MembershipSchedulerService implements OnModuleInit {
    * Gerçek çekim YALNIZCA PAYTR_RECURRING_ENABLED=true iken yapılır; aksi halde
    * MembershipService.runAutoRenewals no-op döner (yetki + flag olmadan kör çekim yok).
    */
-  @TrackedCron("0 * * * *") // Her saat
-  async processAutoRenewals() {
-    if (moneyCronsViaBull()) {
-      return { renewed: 0 };
-    }
-    return this.runProcessAutoRenewals();
-  }
-
-  /** Gerçek iş — in-process cron, Bull processor ve manuel tetik buradan çağırır. */
+  /** Gerçek iş — Bull processor ve manuel tetik buradan çağırır. */
   async runProcessAutoRenewals(log: (msg: string) => void = () => {}) {
     try {
       const result = await this.membershipService.runAutoRenewals();

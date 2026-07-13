@@ -1,6 +1,4 @@
-import { Module } from "@nestjs/common";
-import { ScheduleModule } from "@nestjs/schedule";
-import { BullModule } from "@nestjs/bull";
+import { Module } from "@nestjs/common";import { BullModule } from "@nestjs/bull";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { ElogoService, ELOGO_SOAP_CLIENT } from "./elogo.service";
 import { ElogoInvoicingService } from "./elogo-invoicing.service";
@@ -23,9 +21,7 @@ import {
  */
 @Module({
   imports: [
-    ConfigModule,
-    ScheduleModule.forRoot(),
-    StorageModule,
+    ConfigModule,    StorageModule,
     TaxModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],

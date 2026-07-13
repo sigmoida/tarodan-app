@@ -1,11 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
-import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
-import {
-  cronsViaBull,
-  registerRepeatableCron,
-} from "../../monitoring/bull-cron.helper";
+import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaService } from "../../prisma";
 import { OfferStatus } from "@prisma/client";
@@ -34,24 +30,14 @@ export class OfferSchedulerService implements OnModuleInit {
       this.scheduledQueue,
       "expire-offers",
       "*/5 * * * *",
-      cronsViaBull(),
       this.logger,
     );
   }
 
   /**
    * Her 5 dakikada bir süresi dolmuş pending teklifleri expired'a çeker.
-   * Flag (CRONS_VIA_BULL) açıkken iş Bull repeatable'a taşınır; in-process no-op.
+   * Bull processor (ve manuel tetik) buradan çağırır.
    */
-  @TrackedCron("*/5 * * * *")
-  async handleExpiredOffers() {
-    if (cronsViaBull()) {
-      return;
-    }
-    return this.runHandleExpiredOffers();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
   async runHandleExpiredOffers(log: (msg: string) => void = () => {}) {
     try {
       const now = new Date();

@@ -5,11 +5,7 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
-import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
-import {
-  cronsViaBull,
-  registerRepeatableCron,
-} from "../../monitoring/bull-cron.helper";
+import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaService } from "../../prisma";
 import { AdminService } from "./admin.service";
@@ -30,7 +26,6 @@ export class ScheduledNotificationScheduler implements OnModuleInit {
       this.scheduledQueue,
       "process-scheduled-notifications",
       "0 * * * * *",
-      cronsViaBull(),
       this.logger,
     );
   }
@@ -38,15 +33,7 @@ export class ScheduledNotificationScheduler implements OnModuleInit {
   /**
    * Runs every minute to check for due scheduled notifications
    */
-  @TrackedCron("0 * * * * *") // Every minute at second 0
-  async processScheduledNotifications(): Promise<void> {
-    if (cronsViaBull()) {
-      return;
-    }
-    await this.runProcessScheduledNotifications();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+  /** Gerçek iş — Bull processor (ve manuel tetik) buradan çağırır. */
   async runProcessScheduledNotifications(
     log: (msg: string) => void = () => {},
   ): Promise<{ summary: string; stats: Record<string, number> }> {

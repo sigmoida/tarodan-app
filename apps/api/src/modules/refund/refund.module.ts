@@ -1,9 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { JwtModule } from "@nestjs/jwt";
-import { ConfigService } from "@nestjs/config";
-import { ScheduleModule } from "@nestjs/schedule";
-import { BullModule } from "@nestjs/bull";
+import { ConfigService } from "@nestjs/config";import { BullModule } from "@nestjs/bull";
 import { PrismaModule } from "../../prisma";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PaymentModule } from "../payment/payment.module";
@@ -21,9 +19,7 @@ import { RefundSchedulerService } from "./refund-scheduler.service";
     SuratCargoModule,
     StorageModule,
     PaymentModule,
-    NotificationModule,
-    ScheduleModule.forRoot(),
-    BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
+    NotificationModule,    BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({

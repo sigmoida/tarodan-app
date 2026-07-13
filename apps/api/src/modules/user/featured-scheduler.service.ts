@@ -1,16 +1,12 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
-import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
-import {
-  cronsViaBull,
-  registerRepeatableCron,
-} from "../../monitoring/bull-cron.helper";
+import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import type { CronRunSummary } from "../../monitoring/cron-run.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { UserService } from "./user.service";
 
-/** In-process cron ile Bull repeatable'ın aynı zamanlamayı paylaşması için tek kaynak. */
+/** Bull repeatable kaydının zamanlaması (tek kaynak). */
 const FEATURED_REFRESH_CRON = "15 3 * * *";
 
 /**
@@ -22,8 +18,8 @@ const FEATURED_REFRESH_CRON = "15 3 * * *";
  * Cadence: günde bir (gece 03:15). Skor 7 günlük kayan pencere kullandığı için
  * günlük tazeleme "haftalık" anlamı korurken kazananın bayatlamasını önler.
  *
- * Dual-mode: `CRONS_VIA_BULL` açıkken günlük tazeleme Bull repeatable üzerinden
- * (FeaturedScheduledProcessor) tek-sefer koşar; kapalıyken in-process @TrackedCron.
+ * Günlük tazeleme Bull repeatable üzerinden (FeaturedScheduledProcessor) worker'da
+ * tek-sefer koşar.
  */
 @Injectable()
 export class FeaturedSchedulerService implements OnModuleInit {
@@ -38,26 +34,19 @@ export class FeaturedSchedulerService implements OnModuleInit {
     // Açılışta snapshot yoksa ilk değerin oluşması için bir kez hesapla.
     // (Okuma tarafında da fallback var; bu sadece ilk isteği hızlandırır.)
     await this.refresh("startup");
-    // Günlük tazelemeyi flag durumuna göre Bull repeatable'a senkronla.
+    // Günlük tazelemeyi Bull repeatable olarak kaydet (worker tüketir).
     await registerRepeatableCron(
       this.scheduledQueue,
       "featured-daily-refresh",
       FEATURED_REFRESH_CRON,
-      cronsViaBull(),
       this.logger,
     );
   }
 
-  /** Her gün 03:15'te haftalık kazananları yeniden hesaplar. */
-  @TrackedCron(FEATURED_REFRESH_CRON)
-  async handleDailyRefresh() {
-    if (cronsViaBull()) {
-      return;
-    }
-    await this.runDailyRefresh();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+  /**
+   * Her gün 03:15'te haftalık kazananları yeniden hesaplar.
+   * Gerçek iş — Bull processor (ve manuel tetik) buradan çağırır.
+   */
   async runDailyRefresh(
     log: (msg: string) => void = () => {},
   ): Promise<CronRunSummary> {

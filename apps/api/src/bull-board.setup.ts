@@ -4,8 +4,6 @@ import { Module } from 'module';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Request, Response, NextFunction } from 'express';
 import { QUEUE_NAMES } from './workers/constants';
-import { CronTrackerService } from './monitoring/cron-tracker.service';
-import type { CronRunRecord } from './monitoring/cron-tracker.service';
 
 const BASE_PATH = '/admin/queues';
 
@@ -136,97 +134,10 @@ export function setupBullBoard(app: NestExpressApplication, logger: Logger): voi
     logger.log(
       `Bull Board hazır: http://localhost:${process.env.PORT || 3000}${BASE_PATH} (${adapters.length} kuyruk)`,
     );
-
-    // --- Cron dashboard (/admin/jobs) — aynı Basic Auth arkasında ---
-    mountCronDashboard(app, auth, logger);
   } catch (err) {
     // İzleme aracı API'yi asla düşürmez.
     logger.error(
       `Bull Board mount başarısız (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
     );
   }
-}
-
-const JOBS_PATH = '/admin/jobs';
-
-/**
- * 22 @TrackedCron işini tek ekranda gösterir: son durum, son çalışma, süre,
- * hata, toplam çalışma/başarısızlık. Bull Board ile aynı Basic Auth'u paylaşır.
- *   - GET /admin/jobs       -> HTML tablo (3 sn'de bir otomatik yenilenir)
- *   - GET /admin/jobs/api   -> JSON (programatik erişim / Sentry karşılaştırma)
- */
-function mountCronDashboard(
-  app: NestExpressApplication,
-  auth: (req: Request, res: Response, next: NextFunction) => void,
-  logger: Logger,
-): void {
-  let tracker: CronTrackerService | null = null;
-  try {
-    tracker = app.get(CronTrackerService, { strict: false });
-  } catch {
-    logger.warn('Cron dashboard: CronTrackerService çözülemedi, /admin/jobs atlandı.');
-    return;
-  }
-  if (!tracker) return;
-
-  app.use(JOBS_PATH, auth, (req: Request, res: Response) => {
-    const records = tracker!.list();
-    if (req.path === '/api' || req.path === '/api/') {
-      res.json({ count: records.length, jobs: records });
-      return;
-    }
-    res.set('Content-Type', 'text/html; charset=utf-8').send(renderCronHtml(records));
-  });
-
-  logger.log(
-    `Cron dashboard hazır: http://localhost:${process.env.PORT || 3000}${JOBS_PATH}`,
-  );
-}
-
-function esc(s: string): string {
-  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
-}
-
-function renderCronHtml(records: CronRunRecord[]): string {
-  const color: Record<string, string> = {
-    success: '#1a7f37',
-    failed: '#cf222e',
-    running: '#9a6700',
-    idle: '#57606a',
-  };
-  const rows = records
-    .map((r) => {
-      const c = color[r.status] ?? '#57606a';
-      return `<tr>
-        <td><code>${esc(r.job)}</code></td>
-        <td><code>${esc(r.schedule)}</code></td>
-        <td><b style="color:${c}">${esc(r.status.toUpperCase())}</b></td>
-        <td>${r.lastStartedAt ? esc(r.lastStartedAt.replace('T', ' ').slice(0, 19)) : '—'}</td>
-        <td>${r.lastDurationMs != null ? r.lastDurationMs + ' ms' : '—'}</td>
-        <td>${r.runs}</td>
-        <td style="color:${r.failures ? '#cf222e' : 'inherit'}">${r.failures}</td>
-        <td style="color:#cf222e">${r.lastError ? esc(r.lastError) : ''}</td>
-      </tr>`;
-    })
-    .join('');
-  const empty = records.length
-    ? ''
-    : '<tr><td colspan="8" style="color:#57606a">Henüz cron çalışmadı (kayıtlar ilk tetiklenmede görünür).</td></tr>';
-  return `<!doctype html><html lang="tr"><head><meta charset="utf-8">
-<meta http-equiv="refresh" content="3">
-<title>Tarodan Cron Jobs</title>
-<style>
-  body{font:14px/1.5 -apple-system,system-ui,sans-serif;margin:24px;color:#1f2328}
-  h1{font-size:18px} .sub{color:#57606a;margin-bottom:16px}
-  table{border-collapse:collapse;width:100%} th,td{padding:6px 10px;border-bottom:1px solid #d0d7de;text-align:left;vertical-align:top}
-  th{font-size:12px;text-transform:uppercase;color:#57606a} code{background:#f6f8fa;padding:1px 5px;border-radius:4px}
-  a{color:#0969da}
-</style></head><body>
-<h1>⏱️ Cron Jobs — Tarodan</h1>
-<div class="sub">${records.length} izlenen iş • 3 sn'de bir otomatik yenilenir • <a href="/admin/queues">Kuyruklar (Bull Board) →</a></div>
-<table>
-  <tr><th>İş</th><th>Schedule</th><th>Durum</th><th>Son çalışma</th><th>Süre</th><th>Çalışma</th><th>Hata</th><th>Son hata mesajı</th></tr>
-  ${rows}${empty}
-</table>
-</body></html>`;
 }

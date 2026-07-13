@@ -148,11 +148,10 @@ export class SearchService implements OnModuleInit {
     return this.collection.searchCollections(options);
   }
 
-  // Taşındı: search-sync.service.ts — periyodik ES↔DB senkron. @TrackedCron/@Cron
-  // dekoratörlü giriş noktaları (handlePeriodicSync/handleHourlyReconcile) alt
-  // serviste yaşar ve ScheduleModule onları orada keşfeder — facade'de tekrar
-  // tanımlanmaz (çift kayıt olmaması için). Yalnızca processor'ın çağırdığı
-  // run* metotları facade'den delege edilir.
+  // Taşındı: search-sync.service.ts — periyodik ES↔DB senkron. Bu işler Bull
+  // repeatable olarak (SearchCommonService kaydeder, SearchScheduledProcessor
+  // worker'da tüketir) koşar. Facade yalnız processor'ın çağırdığı run* metotlarını
+  // alt servise delege eder.
 
   async runHandlePeriodicSync(log: (msg: string) => void = () => {}) {
     return this.sync.runHandlePeriodicSync(log);

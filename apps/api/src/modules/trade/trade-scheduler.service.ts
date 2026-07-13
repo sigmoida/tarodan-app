@@ -1,11 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
-import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
-import {
-  moneyCronsViaBull,
-  registerRepeatableCron,
-} from "../../monitoring/bull-cron.helper";
+import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { TradeService } from "./trade.service";
 
@@ -29,7 +25,6 @@ export class TradeSchedulerService implements OnModuleInit {
       this.scheduledQueue,
       "trade-expired",
       "*/5 * * * *",
-      moneyCronsViaBull(),
       this.logger,
     );
   }
@@ -37,15 +32,7 @@ export class TradeSchedulerService implements OnModuleInit {
   /**
    * Her 5 dakikada bir süresi dolmuş takasları kontrol eder ve iptal eder.
    */
-  @TrackedCron("*/5 * * * *")
-  async handleExpiredTrades() {
-    if (moneyCronsViaBull()) {
-      return;
-    }
-    return this.runHandleExpiredTrades();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+  /** Gerçek iş — Bull processor (ve manuel tetik) buradan çağırır. */
   async runHandleExpiredTrades(log: (msg: string) => void = () => {}) {
     try {
       // 1) Cancel trades that passed their deadlines

@@ -6,7 +6,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
-import { cronsViaBull, registerRepeatableCron } from '../../monitoring/bull-cron.helper';
+import { registerRepeatableCron } from '../../monitoring/bull-cron.helper';
 import { QUEUE_NAMES } from '../../workers/constants';
 import { PrismaService } from '../../prisma';
 import { Client } from '@elastic/elasticsearch';
@@ -132,21 +132,19 @@ export class SearchCommonService implements OnModuleInit {
     await this.ensureIndexExists();
     await this.ensureCollectionsIndexExists();
 
-    // Cron'ları Bull repeatable'a senkronla (flag açıksa kaydet, kapalıysa temizle).
-    // NOT: cron ifadeleri search-sync.service.ts'teki @TrackedCron ile AYNI olmalı
-    // (periodic = EVERY_5_MINUTES, hourly = EVERY_HOUR).
+    // Cron'ları Bull repeatable olarak kaydet (worker tüketir). NOT: cron ifadeleri
+    // search-sync.service.ts'teki run* işleriyle aynı cadence'i temsil etmeli
+    // (periodic = 5 dk, hourly = saatlik).
     await registerRepeatableCron(
       this.scheduledQueue,
       'search-periodic-sync',
       '0 */5 * * * *',
-      cronsViaBull(),
       this.logger,
     );
     await registerRepeatableCron(
       this.scheduledQueue,
       'search-hourly-reconcile',
       '0 0 * * * *',
-      cronsViaBull(),
       this.logger,
     );
   }

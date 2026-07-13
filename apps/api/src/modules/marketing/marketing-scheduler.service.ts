@@ -8,11 +8,7 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
-import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
-import {
-  cronsViaBull,
-  registerRepeatableCron,
-} from "../../monitoring/bull-cron.helper";
+import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaService } from "../../prisma";
 import { SmtpProvider } from "../notification/providers/smtp.provider";
@@ -35,19 +31,16 @@ export class MarketingSchedulerService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    const on = cronsViaBull();
     await registerRepeatableCron(
       this.scheduledQueue,
       "marketing-weekly",
       "0 9 * * 1",
-      on,
       this.logger,
     );
     await registerRepeatableCron(
       this.scheduledQueue,
       "marketing-monthly",
       "0 10 1 * *",
-      on,
       this.logger,
     );
   }
@@ -56,15 +49,7 @@ export class MarketingSchedulerService implements OnModuleInit {
    * Send weekly newsletter to users who accept marketing emails
    * Runs every Monday at 9:00 AM
    */
-  @TrackedCron("0 9 * * 1") // Every Monday at 9:00 AM
-  async sendWeeklyNewsletter() {
-    if (cronsViaBull()) {
-      return;
-    }
-    return this.runSendWeeklyNewsletter();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+  /** Gerçek iş — Bull processor (ve manuel tetik) buradan çağırır. */
   async runSendWeeklyNewsletter(log: (msg: string) => void = () => {}) {
     this.logger.log("Starting weekly newsletter email campaign...");
     log("Weekly newsletter campaign started");
@@ -187,15 +172,7 @@ export class MarketingSchedulerService implements OnModuleInit {
    * Send monthly promotional emails
    * Runs on the 1st of every month at 10:00 AM
    */
-  @TrackedCron("0 10 1 * *") // 1st of every month at 10:00 AM
-  async sendMonthlyPromotions() {
-    if (cronsViaBull()) {
-      return;
-    }
-    return this.runSendMonthlyPromotions();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+  /** Gerçek iş — Bull processor (ve manuel tetik) buradan çağırır. */
   async runSendMonthlyPromotions(log: (msg: string) => void = () => {}) {
     this.logger.log("Starting monthly promotional email campaign...");
 

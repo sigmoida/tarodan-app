@@ -1,6 +1,4 @@
-import { Module } from "@nestjs/common";
-import { ScheduleModule } from "@nestjs/schedule";
-import { BullModule } from "@nestjs/bull";
+import { Module } from "@nestjs/common";import { BullModule } from "@nestjs/bull";
 import { AdminCommissionController } from "./admin-commission.controller";
 import { AdminUserController } from "./admin-user.controller";
 import { AdminProductController } from "./admin-product.controller";
@@ -79,9 +77,7 @@ import { OrderModule } from "../order/order.module";
 import { ElogoModule } from "../elogo/elogo.module";
 
 @Module({
-  imports: [
-    ScheduleModule.forRoot(),
-    PrismaModule,
+  imports: [    PrismaModule,
     AuthModule,
     PaymentModule,
     MessagingModule,

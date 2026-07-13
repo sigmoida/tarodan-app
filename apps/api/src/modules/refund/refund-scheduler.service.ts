@@ -1,12 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
-import { CronExpression } from "@nestjs/schedule";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
-import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
-import {
-  moneyCronsViaBull,
-  registerRepeatableCron,
-} from "../../monitoring/bull-cron.helper";
+import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { RefundService } from "./refund.service";
 
@@ -24,20 +19,11 @@ export class RefundSchedulerService implements OnModuleInit {
       this.scheduledQueue,
       "refund-crons",
       "0 */10 * * * *",
-      moneyCronsViaBull(),
       this.logger,
     );
   }
 
-  @TrackedCron(CronExpression.EVERY_10_MINUTES)
-  async handleRefundCrons() {
-    if (moneyCronsViaBull()) {
-      return;
-    }
-    return this.runRefundCrons();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+  /** Gerçek iş — Bull processor (ve manuel tetik) buradan çağırır. */
   async runRefundCrons(log: (msg: string) => void = () => {}) {
     const opened = await this.openReturnShipmentsForDeliveredOrders(log);
     const finalized = await this.finalizeReturnedShipments(log);

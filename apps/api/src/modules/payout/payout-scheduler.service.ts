@@ -1,11 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
-import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
-import {
-  moneyCronsViaBull,
-  registerRepeatableCron,
-} from "../../monitoring/bull-cron.helper";
+import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PayoutService } from "./payout.service";
 
@@ -19,12 +15,10 @@ export class PayoutSchedulerService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    const on = moneyCronsViaBull();
     await registerRepeatableCron(
       this.scheduledQueue,
       "payout-check-returned",
       "0 6 * * *",
-      on,
       this.logger,
     );
     // Tier 3: gerçek PayTR transfer. Bull tek-sefer garantisi = çift-ödeme kilidi.
@@ -32,23 +26,14 @@ export class PayoutSchedulerService implements OnModuleInit {
       this.scheduledQueue,
       "payout-process",
       "*/15 * * * *",
-      on,
       this.logger,
     );
   }
 
   /**
    * Every 15 minutes: process pending payouts via PayTR Platform Transfer.
+   * Bull processor (ve manuel tetik) buradan çağırır.
    */
-  @TrackedCron("*/15 * * * *")
-  async handleProcessPayouts() {
-    if (moneyCronsViaBull()) {
-      return;
-    }
-    return this.runProcessPayouts();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
   async runProcessPayouts(log: (msg: string) => void = () => {}) {
     try {
       // 1) Move retry_pending → pending if nextRetryAt has passed
@@ -97,16 +82,8 @@ export class PayoutSchedulerService implements OnModuleInit {
 
   /**
    * Daily at 06:00: check for returned transfers from PayTR.
+   * Bull processor (ve manuel tetik) buradan çağırır.
    */
-  @TrackedCron("0 6 * * *")
-  async handleCheckReturnedTransfers() {
-    if (moneyCronsViaBull()) {
-      return;
-    }
-    return this.runCheckReturnedTransfers();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
   async runCheckReturnedTransfers(log: (msg: string) => void = () => {}) {
     try {
       const returned = await this.payoutService.checkReturnedTransfers();

@@ -1,6 +1,4 @@
-import { Module } from "@nestjs/common";
-import { ScheduleModule } from "@nestjs/schedule";
-import { BullModule } from "@nestjs/bull";
+import { Module } from "@nestjs/common";import { BullModule } from "@nestjs/bull";
 import { UserService } from "./user.service";
 import { UserCommonService } from "./user-common.service";
 import { UserProfileService } from "./user-profile.service";
@@ -19,9 +17,7 @@ import { ModerationModule } from "../moderation/moderation.module";
 import { QUEUE_NAMES } from "../../workers/constants";
 
 @Module({
-  imports: [
-    ScheduleModule.forRoot(),
-    NotificationModule,
+  imports: [    NotificationModule,
     StorageModule,
     RatingModule,
     ModerationModule,

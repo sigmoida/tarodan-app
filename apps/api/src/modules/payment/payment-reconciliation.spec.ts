@@ -206,14 +206,14 @@ describe.skip('PaymentSchedulerService handleExpiredPayments order', () => {
     };
     const mockEventService = {};
 
-    const mockScheduledQueue = {} as any; // Bull yolu kullanılmıyor (flag kapalı)
+    const mockScheduledQueue = {} as any; // onModuleInit çağrılmadığı için queue kullanılmaz
     const scheduler = new PaymentSchedulerService(
       paymentService as any,
       mockProductLockService as any,
       mockEventService as any,
       mockScheduledQueue,
     );
-    await scheduler.handleExpiredPayments();
+    await scheduler.runHandleExpiredPayments();
 
     expect(order).toEqual(['reconcile', 'release', 'cancel']);
   });

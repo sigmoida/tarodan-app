@@ -1,17 +1,12 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { CronExpression } from "@nestjs/schedule";
-import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
-import { cronsViaBull } from "../../monitoring/bull-cron.helper";
 import { PrismaService } from "../../prisma";
 import { SearchCommonService } from "./search-common.service";
 import { SearchProductService } from "./search-product.service";
 
 /**
- * Periyodik ES↔DB senkron alt servisi (search.service.ts'ten birebir taşındı):
- * handlePeriodicSync (@TrackedCron), runHandlePeriodicSync, handleHourlyReconcile
- * (@Cron) ve deltaSync. @Cron/@TrackedCron dekoratörleri metotla birlikte taşındı
- * — ScheduleModule herhangi bir provider üzerindeki @Cron'u keşfeder, bu servis de
- * provider olduğu için kayıt korunur (ifade birebir aynı). indexProduct/removeProduct
+ * Periyodik ES↔DB senkron alt servisi: runHandlePeriodicSync, runHandleHourlyReconcile
+ * ve deltaSync. Bu işler Bull repeatable olarak (SearchCommonService kaydeder,
+ * SearchScheduledProcessor worker'da tüketir) tek-sefer koşar. indexProduct/removeProduct
  * için SearchProductService'e, client/where-builder'lar için SearchCommonService'e delege eder.
  */
 @Injectable()
@@ -26,15 +21,7 @@ export class SearchSyncService {
 
   // ──────────────────────────── Periodic Sync ────────────────────────────
 
-  @TrackedCron(CronExpression.EVERY_5_MINUTES)
-  async handlePeriodicSync() {
-    if (cronsViaBull()) {
-      return;
-    }
-    return this.runHandlePeriodicSync();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+  /** Gerçek iş — Bull processor buradan çağırır. */
   async runHandlePeriodicSync(log: (msg: string) => void = () => {}) {
     if (!this.common.isAvailable()) {
       log("Elasticsearch unreachable, skipped");
@@ -84,15 +71,7 @@ export class SearchSyncService {
    * bazlı drift hiç yakalanmaz. Bu yüzden sayıdan bağımsız, saatlik tam reconcile
    * çalıştırıp yetim/eksik dokümanları her durumda eşitliyoruz.
    */
-  @TrackedCron(CronExpression.EVERY_HOUR)
-  async handleHourlyReconcile() {
-    if (cronsViaBull()) {
-      return;
-    }
-    return this.runHandleHourlyReconcile();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+  /** Gerçek iş — Bull processor buradan çağırır. */
   async runHandleHourlyReconcile(log: (msg: string) => void = () => {}) {
     if (!this.common.isAvailable()) {
       log("Elasticsearch unreachable, skipped");

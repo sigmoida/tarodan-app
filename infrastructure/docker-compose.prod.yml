@@ -201,10 +201,6 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
-      # Cron dual-mode flag'leri: worker ile AYNI olmali (yoksa biri in-process,
-      # digeri Bull calistirip cift-cron olur). Rollout'ta ikisi birlikte acilir.
-      CRONS_VIA_BULL: ${CRONS_VIA_BULL:-false}
-      MONEY_CRONS_VIA_BULL: ${MONEY_CRONS_VIA_BULL:-false}
       ELASTICSEARCH_URL: http://elasticsearch:9200
       SENDGRID_API_KEY: ${SENDGRID_API_KEY}
       IYZICO_API_KEY: ${IYZICO_API_KEY}
@@ -294,9 +290,6 @@ services:
       SURAT_KARGO_TEST_MODE: ${SURAT_KARGO_TEST_MODE:-true}
       SURAT_KARGO_CARI_KODU: ${SURAT_KARGO_CARI_KODU}
       SURAT_KARGO_SIFRE: ${SURAT_KARGO_SIFRE}
-      # Cron dual-mode flag'leri (Faz A/B rollout'unda acilir; worker ile API ayni olmali).
-      CRONS_VIA_BULL: ${CRONS_VIA_BULL:-false}
-      MONEY_CRONS_VIA_BULL: ${MONEY_CRONS_VIA_BULL:-false}
       # Worker health/heartbeat portu (Docker healthcheck + izleme). Grafana 3003 kullandigi icin 3005.
       WORKER_HEALTH_PORT: 3005
     depends_on:

@@ -2,16 +2,12 @@ import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { CronExpression } from "@nestjs/schedule";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
-import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
-import {
-  cronsViaBull,
-  registerRepeatableCron,
-} from "../../monitoring/bull-cron.helper";
+import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import type { CronRunSummary } from "../../monitoring/cron-run.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { ElogoInvoicingService } from "./elogo-invoicing.service";
 
-/** In-process cron ile Bull repeatable'ın aynı zamanlamayı paylaşması için tek kaynak. */
+/** Bull repeatable kaydının zamanlaması (tek kaynak). */
 const ELOGO_RETRY_CRON = CronExpression.EVERY_30_MINUTES;
 
 /**
@@ -19,8 +15,7 @@ const ELOGO_RETRY_CRON = CronExpression.EVERY_30_MINUTES;
  * pending/failed kalan kayıtları periyodik olarak yeniden gönderir (aynı numara/ETTN).
  * Servis kapalıysa (ELOGO_ENABLED=false) no-op.
  *
- * Dual-mode: `CRONS_VIA_BULL` açıkken iş Bull repeatable üzerinden
- * (ElogoScheduledProcessor) tek-sefer koşar; kapalıyken in-process @TrackedCron.
+ * İş Bull repeatable üzerinden (ElogoScheduledProcessor) worker'da tek-sefer koşar.
  */
 @Injectable()
 export class ElogoSchedulerService implements OnModuleInit {
@@ -36,20 +31,11 @@ export class ElogoSchedulerService implements OnModuleInit {
       this.scheduledQueue,
       "elogo-retry-pending",
       ELOGO_RETRY_CRON,
-      cronsViaBull(),
       this.logger,
     );
   }
 
-  @TrackedCron(ELOGO_RETRY_CRON)
-  async retryPending(): Promise<void> {
-    if (cronsViaBull()) {
-      return;
-    }
-    await this.runRetryPending();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+  /** Gerçek iş — Bull processor (ve manuel tetik) buradan çağırır. */
   async runRetryPending(
     log: (msg: string) => void = () => {},
   ): Promise<CronRunSummary> {

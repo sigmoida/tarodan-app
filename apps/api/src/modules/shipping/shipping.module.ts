@@ -1,7 +1,5 @@
 import { Module } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
-import { ScheduleModule } from "@nestjs/schedule";
-import { BullModule } from "@nestjs/bull";
+import { ConfigModule } from "@nestjs/config";import { BullModule } from "@nestjs/bull";
 import { ShippingController } from "./shipping.controller";
 import { ShippingService } from "./shipping.service";
 import { ShippingSchedulerService } from "./shipping-scheduler.service";
@@ -14,9 +12,7 @@ import { NotificationModule } from "../notification/notification.module";
 @Module({
   imports: [
     PrismaModule,
-    ConfigModule,
-    ScheduleModule.forRoot(),
-    PaymentModule,
+    ConfigModule,    PaymentModule,
     SuratCargoModule,
     NotificationModule,
     // Cron'ların Bull repeatable'a taşınması için paylaşılan kuyruk.

@@ -39,16 +39,12 @@ import { createUser, createAdminUser, authHeader } from '../../factories/user.fa
 import { createProduct } from '../../factories/product.factory';
 import { scenario } from '../../test-utils/scenario';
 import { CacheService } from '../../../src/modules/cache/cache.service';
-import { CronTrackerService } from '../../../src/monitoring/cron-tracker.service';
 
 describe('23 — Platform: i18n, Sağlık, Cache, GraphQL, Monitoring (OPS)', () => {
   let ctx: E2ETestApp;
   let baseline: { categoryId: string; brandId: string; manufacturerId: string };
   const server = () => ctx.app.getHttpServer();
   const cache = () => ctx.module.get(CacheService);
-  // CronTrackerService @Global + exported → track()/list() DI'dan doğrudan çağrılabilir
-  // (dashboard yalnız main.ts'te mount edilir; izleme mantığı burada servis düzeyinde test edilir).
-  const cronTracker = () => ctx.module.get(CronTrackerService);
 
   // ErrorLogInterceptor 5xx/4xx kaydını FIRE-AND-FORGET yazar (intercept() logError'ı
   // await ETMEZ → HTTP yanıtı DB write'tan önce döner). Cache.del de servis içinde
@@ -594,53 +590,10 @@ describe('23 — Platform: i18n, Sağlık, Cache, GraphQL, Monitoring (OPS)', ()
   });
 
   // ─────────────────────── Cron tracker (izleme) ───────────────────────
-  // NOT: /admin/jobs dashboard yalnız main.ts'te mount edilir (harness'te YOK), ancak
-  // senaryoların ASIL iddiası CronTrackerService'in kayıt/rethrow davranışıdır. Servis
-  // @Global + exported olduğundan DI'dan doğrudan çağrılıp doğrulanır (dashboard sadece
-  // okuma kanalı). Job adları benzersiz tutulur → paylaşılan singleton'da çakışma olmaz.
-  describe('Cron tracker → CronTrackerService', () => {
-    scenario('OPS-072', async () => {
-      // Başarılı işi kaydeder: status=success, runs≥1, lastDurationMs sayısal, lastError=null,
-      // lastStartedAt/lastFinishedAt ISO. track() orijinal sonucu döndürmeli.
-      const tracker = cronTracker();
-      const job = `ops-072-job-${Date.now()}`;
-      const schedule = '0 * * * *';
-      const result = await tracker.track(job, schedule, async () => {
-        await new Promise((r) => setTimeout(r, 5));
-        return 'done';
-      });
-      expect(result).toBe('done'); // sonuç birebir döner (davranış korunur)
-
-      const rec = tracker.list().find((r) => r.job === job);
-      expect(rec).toBeDefined();
-      expect(rec!.status).toBe('success');
-      expect(rec!.schedule).toBe(schedule);
-      expect(rec!.runs).toBeGreaterThanOrEqual(1);
-      expect(typeof rec!.lastDurationMs).toBe('number');
-      expect(rec!.lastError).toBeNull();
-      expect(new Date(rec!.lastStartedAt!).toString()).not.toBe('Invalid Date');
-      expect(new Date(rec!.lastFinishedAt!).toString()).not.toBe('Invalid Date');
-    });
-
-    scenario('OPS-073', async () => {
-      // Başarısız işi kaydeder VE hatayı aynen rethrow eder: status=failed, failures≥1,
-      // lastError dolu; orijinal hata davranışı bozulmaz (throw yukarı gider).
-      const tracker = cronTracker();
-      const job = `ops-073-job-${Date.now()}`;
-      const boom = new Error('cron patladı');
-      await expect(
-        tracker.track(job, '*/5 * * * *', async () => {
-          throw boom;
-        }),
-      ).rejects.toThrow('cron patladı'); // rethrow — davranış korunur
-
-      const rec = tracker.list().find((r) => r.job === job);
-      expect(rec).toBeDefined();
-      expect(rec!.status).toBe('failed');
-      expect(rec!.failures).toBeGreaterThanOrEqual(1);
-      expect(rec!.lastError).toBe('cron patladı');
-    });
-  });
+  // CronTracker + in-process @Cron kaldırıldı; cron izleme artık Bull Board üzerinden.
+  // Bu senaryolar silinen CronTrackerService'i doğruluyordu → uygulanamaz.
+  scenario.skip('OPS-072', 'CronTrackerService kaldırıldı — cron izleme Bull Board üzerinden yapılır.');
+  scenario.skip('OPS-073', 'CronTrackerService kaldırıldı — cron izleme Bull Board üzerinden yapılır.');
 
   // ══════════════════════════════ SKIP'LER ══════════════════════════════
   // Saf-Web/UI parite (API'den doğrulanamaz — localStorage/DOM/tarayıcı dili).

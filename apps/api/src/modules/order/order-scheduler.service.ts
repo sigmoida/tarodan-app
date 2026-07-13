@@ -1,11 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
-import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
-import {
-  moneyCronsViaBull,
-  registerRepeatableCron,
-} from "../../monitoring/bull-cron.helper";
+import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { ConfigService } from "@nestjs/config";
 import { OrderStatus, TradeStatus, PaymentStatus } from "@prisma/client";
@@ -40,14 +36,12 @@ export class OrderSchedulerService implements OnModuleInit {
       this.scheduledQueue,
       "order-auto-complete",
       "*/10 * * * *",
-      moneyCronsViaBull(),
       this.logger,
     );
     await registerRepeatableCron(
       this.scheduledQueue,
       "process-delivered-orders",
       "*/2 * * * *",
-      moneyCronsViaBull(),
       this.logger,
     );
   }
@@ -57,15 +51,7 @@ export class OrderSchedulerService implements OnModuleInit {
    * Spec: Bölüm 6.3.
    * Feature flag korumalı: FEATURE_48H_CONFIRMATION_WINDOW=true gerekli.
    */
-  @TrackedCron("*/10 * * * *")
-  async autoCompleteConfirmedOrders(): Promise<void> {
-    if (moneyCronsViaBull()) {
-      return;
-    }
-    await this.runAutoCompleteConfirmedOrders();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+  /** Gerçek iş — Bull processor (ve manuel tetik) buradan çağırır. */
   async runAutoCompleteConfirmedOrders(log: (msg: string) => void = () => {}) {
     if (
       this.configService.get<string>("FEATURE_48H_CONFIRMATION_WINDOW") !==
@@ -141,12 +127,6 @@ export class OrderSchedulerService implements OnModuleInit {
    *      `delivered` siparişler 'completed'e geçer (fatura zaten kesilmiş).
    * Tüm teslim yollarını (webhook + worker) yakalar; idempotent.
    */
-  @TrackedCron("*/2 * * * *")
-  async processDeliveredOrders(): Promise<void> {
-    if (moneyCronsViaBull()) return;
-    await this.runProcessDeliveredOrders();
-  }
-
   async runProcessDeliveredOrders(log: (msg: string) => void = () => {}) {
     // 1) Faturası kesilmemiş teslim EDİLMİŞ veya TAMAMLANMIŞ siparişler → teslim faturalarını kes.
     // NOT: deliveredAt bazı teslim yollarında NULL kalabiliyor + sipariş hızla `completed`'e

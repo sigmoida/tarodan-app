@@ -1,6 +1,4 @@
-import { Module } from "@nestjs/common";
-import { ScheduleModule } from "@nestjs/schedule";
-import { BullModule } from "@nestjs/bull";
+import { Module } from "@nestjs/common";import { BullModule } from "@nestjs/bull";
 import { PayoutService } from "./payout.service";
 import { PayoutSchedulerService } from "./payout-scheduler.service";
 import { QUEUE_NAMES } from "../../workers/constants";
@@ -12,9 +10,7 @@ import { NotificationModule } from "../notification/notification.module";
   imports: [
     PrismaModule,
     PaymentProvidersModule,
-    NotificationModule,
-    ScheduleModule.forRoot(),
-    BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
+    NotificationModule,    BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   providers: [PayoutService, PayoutSchedulerService],
   exports: [PayoutService, PayoutSchedulerService],

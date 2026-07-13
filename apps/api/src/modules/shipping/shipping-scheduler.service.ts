@@ -1,11 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
-import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
-import {
-  cronsViaBull,
-  registerRepeatableCron,
-} from "../../monitoring/bull-cron.helper";
+import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { SuratTrackingService } from "../surat-cargo/surat-tracking.service";
 
@@ -23,24 +19,14 @@ export class ShippingSchedulerService implements OnModuleInit {
       this.scheduledQueue,
       "sync-surat-tracking",
       "*/30 * * * *",
-      cronsViaBull(),
       this.logger,
     );
   }
 
   /**
    * Every 30 minutes: sync tracking status for all active Sürat shipments.
-   * Flag (CRONS_VIA_BULL) açıkken iş Bull repeatable'a taşınır; in-process no-op.
+   * Bull processor (ve manuel tetik) buradan çağırır.
    */
-  @TrackedCron("*/30 * * * *")
-  async syncSuratTracking() {
-    if (cronsViaBull()) {
-      return;
-    }
-    return this.runSyncSuratTracking();
-  }
-
-  /** Gerçek iş — hem in-process cron hem Bull processor buradan çağırır. */
   async runSyncSuratTracking(log: (msg: string) => void = () => {}) {
     const stats = {
       shipmentSynced: 0,

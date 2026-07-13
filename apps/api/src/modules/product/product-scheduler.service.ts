@@ -1,11 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
-import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
-import {
-  cronsViaBull,
-  registerRepeatableCron,
-} from "../../monitoring/bull-cron.helper";
+import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaService } from "../../prisma";
 import { ProductStatus, MembershipTierType } from "@prisma/client";
@@ -44,38 +40,30 @@ export class ProductSchedulerService implements OnModuleInit {
     @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
   ) {}
 
-  /**
-   * Flag (CRONS_VIA_BULL) açıkken expireBoosts'u Bull repeatable job'una bağla.
-   * Flag kapalıyken hiçbir şey yapma — eski in-process @Cron çalışmaya devam eder.
-   */
+  /** Ürün zamanlı işlerini Bull repeatable olarak kaydeder (worker tüketir). */
   async onModuleInit(): Promise<void> {
-    const on = cronsViaBull();
     await registerRepeatableCron(
       this.scheduledQueue,
       "expire-boosts",
       "*/15 * * * *",
-      on,
       this.logger,
     );
     await registerRepeatableCron(
       this.scheduledQueue,
       "update-popularity",
       "0 3 * * *",
-      on,
       this.logger,
     );
     await registerRepeatableCron(
       this.scheduledQueue,
       "expire-old-listings",
       "0 4 * * *",
-      on,
       this.logger,
     );
     await registerRepeatableCron(
       this.scheduledQueue,
       "send-expiration-warnings",
       "0 10 * * *",
-      on,
       this.logger,
     );
   }
@@ -114,15 +102,7 @@ export class ProductSchedulerService implements OnModuleInit {
    * - qualityScore: foto sayısı + açıklama + satıcı güven puanı (sıralamada kullanılır)
    * - rankTier reconcile: aktif boost → 2; ücretli (free olmayan) üyeli satıcı → 1; standart → 0
    */
-  @TrackedCron("0 3 * * *") // Every day at 03:00 AM
-  async updatePopularityScores() {
-    if (cronsViaBull()) {
-      return;
-    }
-    return this.runUpdatePopularityScores();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+  /** Gerçek iş — Bull processor (ve manuel tetik) buradan çağırır. */
   async runUpdatePopularityScores(log: (msg: string) => void = () => {}) {
     this.logger.log("Starting popularity + quality score update...");
     log("Popularity/quality score update started");
@@ -268,7 +248,7 @@ export class ProductSchedulerService implements OnModuleInit {
    * Can be called by admin endpoints
    */
   async manualUpdatePopularityScores(): Promise<{ updated: number }> {
-    await this.updatePopularityScores();
+    await this.runUpdatePopularityScores();
     const count = await this.prisma.product.count({
       where: {
         status: ProductStatus.active,
@@ -283,19 +263,9 @@ export class ProductSchedulerService implements OnModuleInit {
    * - İlgili ProductBoost kayıtlarını 'expired' yapar.
    * - Uzun süredir 'pending' kalan (ödenmemiş) boost'ları 'failed' yapar.
    */
-  @TrackedCron("*/15 * * * *") // Her 15 dakikada
-  async expireBoosts() {
-    // Flag açıkken bu iş Bull repeatable'a taşındı; in-process cron no-op olur
-    // (çift çalışmayı önler). Flag kapalıyken eski davranış birebir devam eder.
-    if (cronsViaBull()) {
-      return;
-    }
-    return this.runExpireBoosts();
-  }
-
   /**
-   * Boost süresi dolanları düşüren GERÇEK iş. Hem in-process cron hem Bull
-   * processor buradan çağırır — mantık tek kaynakta, davranış birebir korunur.
+   * Boost süresi dolanları düşüren GERÇEK iş. Bull processor (ve manuel tetik)
+   * buradan çağırır — mantık tek kaynakta.
    */
   async runExpireBoosts(log: (msg: string) => void = () => {}) {
     try {
@@ -415,15 +385,7 @@ export class ProductSchedulerService implements OnModuleInit {
    * Runs every day at 04:00 AM
    * Sets active listings older than 60 days to inactive status
    */
-  @TrackedCron("0 4 * * *") // Every day at 04:00 AM
-  async expireOldListings() {
-    if (cronsViaBull()) {
-      return;
-    }
-    return this.runExpireOldListings();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+  /** Gerçek iş — Bull processor (ve manuel tetik) buradan çağırır. */
   async runExpireOldListings(log: (msg: string) => void = () => {}) {
     this.logger.log("Starting listing expiration check...");
 
@@ -546,15 +508,7 @@ export class ProductSchedulerService implements OnModuleInit {
    * Send expiration warnings to sellers
    * Runs every day at 10:00 AM
    */
-  @TrackedCron("0 10 * * *") // Every day at 10:00 AM
-  async sendExpirationWarnings() {
-    if (cronsViaBull()) {
-      return;
-    }
-    return this.runSendExpirationWarnings();
-  }
-
-  /** Gerçek iş — in-process cron ve Bull processor buradan çağırır. */
+  /** Gerçek iş — Bull processor (ve manuel tetik) buradan çağırır. */
   async runSendExpirationWarnings(log: (msg: string) => void = () => {}) {
     this.logger.log("Checking for listings expiring soon...");
 

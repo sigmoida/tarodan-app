@@ -1,7 +1,5 @@
 import { Module } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
-import { ScheduleModule } from "@nestjs/schedule";
-import { BullModule } from "@nestjs/bull";
+import { ConfigModule } from "@nestjs/config";import { BullModule } from "@nestjs/bull";
 import { OfferController } from "./offer.controller";
 import { OfferService } from "./offer.service";
 import { OfferSchedulerService } from "./offer-scheduler.service";
@@ -15,9 +13,7 @@ import { OrderModule } from "../order/order.module";
 import { ProductModule } from "../product/product.module";
 
 @Module({
-  imports: [
-    ScheduleModule.forRoot(),
-    PrismaModule,
+  imports: [    PrismaModule,
     ConfigModule,
     CacheModule,
     EventModule,

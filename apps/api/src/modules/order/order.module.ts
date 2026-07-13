@@ -1,6 +1,4 @@
-import { Module } from "@nestjs/common";
-import { ScheduleModule } from "@nestjs/schedule";
-import { BullModule } from "@nestjs/bull";
+import { Module } from "@nestjs/common";import { BullModule } from "@nestjs/bull";
 import { OrderController } from "./order.controller";
 import { OrderService } from "./order.service";
 import { OrderPricingService } from "./order-pricing.service";
@@ -29,9 +27,7 @@ import { TaxModule } from "../tax/tax.module";
 import { ElogoModule } from "../elogo";
 
 @Module({
-  imports: [
-    ScheduleModule.forRoot(),
-    PrismaModule,
+  imports: [    PrismaModule,
     EventModule,
     NotificationModule,
     DiscountModule,

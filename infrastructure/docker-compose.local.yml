@@ -28,8 +28,6 @@ services:
       REDIS_HOST: tarodan-redis
       REDIS_PORT: 6379
       ELASTICSEARCH_NODE: http://tarodan-elasticsearch:9200
-      CRONS_VIA_BULL: "true"
-      MONEY_CRONS_VIA_BULL: "true"
       BULLBOARD_ENABLED: "false" # panel ayrı bullboard container'ında
     ports:
       - "3001:3001"
@@ -59,8 +57,6 @@ services:
       REDIS_PORT: 6379
       ELASTICSEARCH_NODE: http://tarodan-elasticsearch:9200
       WORKER_HEALTH_PORT: 3005
-      CRONS_VIA_BULL: "true"
-      MONEY_CRONS_VIA_BULL: "true"
     ports:
       - "3005:3005"
     healthcheck:

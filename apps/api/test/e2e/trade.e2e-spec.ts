@@ -574,9 +574,8 @@ describe('Trade Flow (Safe-Trade Warehouse Escrow) (E2E)', () => {
       });
 
       const scheduler = ctx.app.get(TradeSchedulerService);
-      // runHandleExpiredTrades = gerçek iş metodu. handleExpiredTrades() @TrackedCron
-      // wrapper'ıdır ve cron-modu guard'ı (moneyCronsViaBull) nedeniyle doğrudan
-      // çağrıda iş yapmaz; testler raw metodu çağırmalı.
+      // runHandleExpiredTrades = gerçek iş metodu (Bull processor bunu çağırır).
+      // Testler cron zamanlamasını beklemeden bu metodu doğrudan çağırır.
       await scheduler.runHandleExpiredTrades();
 
       const after = await prisma.trade.findUnique({ where: { id: created.body.id } });

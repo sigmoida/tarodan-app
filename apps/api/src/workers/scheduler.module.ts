@@ -43,10 +43,9 @@ import { ScheduledJanitorService } from "./scheduled-janitor.service";
  * (Bull tek-teslim garantisi zaten çift-çalışmayı önler; bu ayrım "temizlik +
  * ölçek" içindir: API sadece HTTP, cron yükü worker'da.)
  *
- * Scheduler SERVİSLERİ hâlâ feature modüllerinde durur (dual-mode @TrackedCron +
- * onModuleInit registration orada). Buradaki processor'lar onları feature
- * modüllerinden inject eder — o yüzden feature modülleri scheduler servislerini
- * export ETMELİ.
+ * Scheduler SERVİSLERİ feature modüllerinde durur (repeatable kaydı = onModuleInit
+ * orada). Buradaki processor'lar onları feature modüllerinden inject edip run*
+ * metotlarını çağırır — o yüzden feature modülleri scheduler servislerini export ETMELİ.
  */
 @Module({
   imports: [

@@ -1,7 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { PrismaModule } from "../prisma/prisma.module";
-import { MonitoringModule } from "../monitoring/monitoring.module";
 import { BullRootModule } from "./bull-root.module";
 import { WorkerModule } from "./worker.module";
 import { SchedulerModule } from "./scheduler.module";
@@ -29,7 +28,6 @@ import { SentryModule } from "../modules/sentry";
           : [".env.local", ".env", "env.txt"],
     }),
     PrismaModule,
-    MonitoringModule,
     // Sentry: DSN varsa worker hatalarını (Bull job fail dahil) merkezi alarma gönderir.
     SentryModule,
     BullRootModule,
