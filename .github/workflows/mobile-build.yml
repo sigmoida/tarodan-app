@@ -41,7 +41,7 @@ jobs:
         with:
           prisma: 'false'
           turbo-cache: 'false'
-      - uses: expo/expo-github-action@v8
+      - uses: expo/expo-github-action@v9
         if: steps.guard.outputs.skip == 'false'
         with:
           eas-version: latest
