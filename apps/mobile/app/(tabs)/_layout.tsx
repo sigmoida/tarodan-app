@@ -83,7 +83,7 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="messages"
+        name="messages/index"
         options={{
           title: t('message.messages'),
           tabBarAccessibilityLabel: t('message.messages'),
@@ -119,7 +119,7 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="notifications"
+        name="notifications/index"
         options={{
           href: null,
         }}
