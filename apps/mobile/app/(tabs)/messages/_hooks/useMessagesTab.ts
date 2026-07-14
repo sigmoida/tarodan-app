@@ -2,37 +2,33 @@ import { useState, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { useMessagesStore, type MessageThread } from '@/stores/messagesStore';
 import { useAuthStore } from '@/stores/authStore';
+import { useThreadsQuery, useUnreadCountQuery } from '@/hooks/messaging';
 
 /**
- * Messages-tab controller — owns the threads fetch (focus + refresh), the search
- * filter, the safe participant resolver and the unread/limit derivations. Lifted
- * verbatim from the monolithic screen (§12).
+ * Messages-tab controller — threads/unread artık React Query (#77); focus'ta
+ * refetch, search filter, güvenli participant resolver ve limit türevleri burada.
+ * getOtherParticipant + dailyMessageCount hâlâ client store'dan (§8).
  */
 export function useMessagesTab() {
   const { isAuthenticated, user, limits } = useAuthStore();
-  const {
-    threads,
-    isLoading,
-    hasLoadedThreads,
-    fetchThreads,
-    getUnreadCount,
-    getOtherParticipant,
-    dailyMessageCount,
-  } = useMessagesStore();
+  const getOtherParticipant = useMessagesStore((s) => s.getOtherParticipant);
+  const dailyMessageCount = useMessagesStore((s) => s.dailyMessageCount);
+  const { data: threads = [], isLoading, isFetched: hasLoadedThreads, refetch } = useThreadsQuery();
+  const { data: unreadCount = 0 } = useUnreadCountQuery();
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   useFocusEffect(
     useCallback(() => {
       if (isAuthenticated) {
-        fetchThreads();
+        refetch();
       }
-    }, [isAuthenticated]),
+    }, [isAuthenticated, refetch]),
   );
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchThreads();
+    await refetch();
     setRefreshing(false);
   };
 
@@ -62,7 +58,6 @@ export function useMessagesTab() {
     );
   });
 
-  const unreadCount = getUnreadCount();
   const messageLimit = limits?.maxMessagesPerDay || 50;
   const isUnlimited = messageLimit === -1;
 

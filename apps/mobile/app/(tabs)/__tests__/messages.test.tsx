@@ -25,9 +25,18 @@ jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => mockAuth,
 }));
 
+// Store artık client-only (getOtherParticipant + dailyMessageCount); selector-aware (#77).
 let mockMessages: any;
 jest.mock('@/stores/messagesStore', () => ({
-  useMessagesStore: () => mockMessages,
+  useMessagesStore: (sel?: any) => (sel ? sel(mockMessages) : mockMessages),
+}));
+
+// threads/unread artık React Query (#77) — hook'lar mock'lanır.
+let mockThreadsQuery: any;
+let mockUnread: any;
+jest.mock('@/hooks/messaging', () => ({
+  useThreadsQuery: () => mockThreadsQuery,
+  useUnreadCountQuery: () => mockUnread,
 }));
 
 import MessagesTabScreen from '../messages';
@@ -50,15 +59,15 @@ function thread(overrides: Record<string, unknown> = {}) {
 
 function makeStore(overrides: Record<string, unknown> = {}) {
   return {
-    threads: [],
-    isLoading: false,
-    hasLoadedThreads: true,
-    fetchThreads: jest.fn(),
-    getUnreadCount: () => 0,
     getOtherParticipant: (t: any) => (t.participant1Id === 'me' ? t.participant2 : t.participant1),
     dailyMessageCount: 0,
     ...overrides,
   };
+}
+
+/** threads query mock — data + isFetched (hasLoadedThreads) + refetch. */
+function makeThreadsQuery(threads: any[] = []) {
+  return { data: threads, isLoading: false, isFetched: true, refetch: jest.fn() };
 }
 
 describe('J16 · mesaj konuşma listesi', () => {
@@ -66,6 +75,8 @@ describe('J16 · mesaj konuşma listesi', () => {
     resetRouterMocks();
     mockAuth = { isAuthenticated: true, user: { id: 'me' }, limits: { maxMessagesPerDay: 50 } };
     mockMessages = makeStore();
+    mockThreadsQuery = makeThreadsQuery([]);
+    mockUnread = { data: 0 };
   });
 
   it('J16.1 misafir kullanıcıya giriş yap çağrısı gösterir', () => {
@@ -77,14 +88,14 @@ describe('J16 · mesaj konuşma listesi', () => {
   });
 
   it('J16.2 thread yoksa boş durum gösterir', () => {
-    mockMessages = makeStore({ threads: [] });
+    mockThreadsQuery = makeThreadsQuery([]);
     renderWithProviders(<MessagesTabScreen />);
     expect(screen.getByText('Henüz mesaj yok')).toBeOnTheScreen();
     expect(screen.getByText('Bir satıcıyla iletişime geçerek başlayın')).toBeOnTheScreen();
   });
 
   it('J16.3 thread render eder ve tıklayınca thread ekranına gider', () => {
-    mockMessages = makeStore({ threads: [thread()] });
+    mockThreadsQuery = makeThreadsQuery([thread()]);
     renderWithProviders(<MessagesTabScreen />);
     expect(screen.getByText('Ayşe')).toBeOnTheScreen();
     expect(screen.getByText('Deri Ceket')).toBeOnTheScreen();
@@ -93,20 +104,23 @@ describe('J16 · mesaj konuşma listesi', () => {
   });
 
   it('J16.4 limite yaklaşınca günlük mesaj banner gösterir', () => {
-    mockMessages = makeStore({ threads: [thread()], dailyMessageCount: 45 });
+    mockMessages = makeStore({ dailyMessageCount: 45 });
+    mockThreadsQuery = makeThreadsQuery([thread()]);
     renderWithProviders(<MessagesTabScreen />);
     expect(screen.getByText('Günlük mesaj: 45/50')).toBeOnTheScreen();
   });
 
   it('J16.5 limit dolunca Premium yükseltme bağlantısı gösterir', () => {
-    mockMessages = makeStore({ threads: [thread()], dailyMessageCount: 50 });
+    mockMessages = makeStore({ dailyMessageCount: 50 });
+    mockThreadsQuery = makeThreadsQuery([thread()]);
     renderWithProviders(<MessagesTabScreen />);
     fireEvent.press(screen.getByText("Premium'a Geç"));
     expect(mockPush).toHaveBeenCalledWith('/upgrade');
   });
 
   it('J16.6 limit uzaktayken banner gizli', () => {
-    mockMessages = makeStore({ threads: [thread()], dailyMessageCount: 5 });
+    mockMessages = makeStore({ dailyMessageCount: 5 });
+    mockThreadsQuery = makeThreadsQuery([thread()]);
     renderWithProviders(<MessagesTabScreen />);
     expect(screen.queryByText(/Günlük mesaj:/)).toBeNull();
   });

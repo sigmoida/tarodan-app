@@ -31,12 +31,24 @@ jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => mockAuth,
 }));
 
+// Store client-only (getOtherParticipant/canSendMessage/setCurrentThreadId); selector-aware (#77).
 let mockStore: any;
-const mockSendMessage = jest.fn();
-const useMessagesStoreMock: any = () => mockStore;
+const useMessagesStoreMock: any = (sel?: any) => (sel ? sel(mockStore) : mockStore);
 useMessagesStoreMock.getState = () => mockStore;
 jest.mock('@/stores/messagesStore', () => ({
   useMessagesStore: useMessagesStoreMock,
+}));
+
+// thread/messages artık React Query, send/markRead mutation (#77).
+let mockThreadQuery: any;
+let mockMessagesQuery: any;
+const mockSendMessage = jest.fn();
+const mockMarkAsRead = jest.fn();
+jest.mock('@/hooks/messaging', () => ({
+  useThreadQuery: () => mockThreadQuery,
+  useMessagesQuery: () => mockMessagesQuery,
+  useSendMessage: () => ({ mutateAsync: mockSendMessage }),
+  useMarkAsRead: () => ({ mutate: mockMarkAsRead }),
 }));
 
 import MessageThreadScreen from '../[threadId]';
@@ -57,39 +69,39 @@ function message(overrides: Record<string, unknown> = {}) {
 
 function makeStore(overrides: Record<string, unknown> = {}) {
   return {
-    currentThread: {
-      id: 't1',
-      participant1Id: 'me',
-      participant2Id: 'u2',
-      participant1: { id: 'me', displayName: 'Ben' },
-      participant2: { id: 'u2', displayName: 'Ayşe' },
-      product: { id: 'p1', title: 'Deri Ceket' },
-      unreadCount: 0,
-    },
-    messages: [],
-    isLoadingMessages: false,
-    error: null,
-    fetchThread: jest.fn(),
-    fetchMessages: jest.fn(),
-    sendMessage: mockSendMessage,
-    markAsRead: jest.fn(),
     getOtherParticipant: (t: any) => t.participant2,
     canSendMessage: () => true,
+    setCurrentThreadId: jest.fn(),
     dailyMessageCount: 0,
     ...overrides,
   };
 }
 
+const CURRENT_THREAD = {
+  id: 't1',
+  participant1Id: 'me',
+  participant2Id: 'u2',
+  participant1: { id: 'me', displayName: 'Ben' },
+  participant2: { id: 'u2', displayName: 'Ayşe' },
+  product: { id: 'p1', title: 'Deri Ceket' },
+  unreadCount: 0,
+};
+const makeThreadQuery = (thread: any = CURRENT_THREAD) => ({ data: thread });
+const makeMessagesQuery = (messages: any[] = []) => ({ data: messages, isLoading: false });
+
 describe('J103 · mesaj thread render & gönderim', () => {
   beforeEach(() => {
     resetRouterMocks();
     mockSendMessage.mockReset().mockResolvedValue(true);
+    mockMarkAsRead.mockReset();
     mockAuth = { user: { id: 'me' }, limits: { maxMessagesPerDay: 50 } };
     mockStore = makeStore();
+    mockThreadQuery = makeThreadQuery();
+    mockMessagesQuery = makeMessagesQuery([]);
   });
 
   it('J103.1 thread başlığı (karşı taraf) ve mesaj içeriği render eder', () => {
-    mockStore = makeStore({ messages: [message()] });
+    mockMessagesQuery = makeMessagesQuery([message()]);
     renderWithProviders(<MessageThreadScreen />);
     expect(screen.getAllByText('Ayşe').length).toBeGreaterThan(0);
     expect(screen.getByText('Selam')).toBeOnTheScreen();
@@ -107,7 +119,9 @@ describe('J103 · mesaj thread render & gönderim', () => {
     fireEvent.changeText(screen.getByPlaceholderText('Mesajınızı yazın...'), 'Merhaba');
     const sendBtn = screen.UNSAFE_getByProps({ name: 'send' }).parent;
     fireEvent.press(sendBtn);
-    await waitFor(() => expect(mockSendMessage).toHaveBeenCalledWith('t1', 'Merhaba'));
+    await waitFor(() =>
+      expect(mockSendMessage).toHaveBeenCalledWith({ threadId: 't1', content: 'Merhaba' }),
+    );
   });
 });
 
@@ -115,8 +129,11 @@ describe('J104 · içerik filtresi & mesaj limiti (UI göstergesi)', () => {
   beforeEach(() => {
     resetRouterMocks();
     mockSendMessage.mockReset().mockResolvedValue(true);
+    mockMarkAsRead.mockReset();
     mockAuth = { user: { id: 'me' }, limits: { maxMessagesPerDay: 50 } };
     mockStore = makeStore();
+    mockThreadQuery = makeThreadQuery();
+    mockMessagesQuery = makeMessagesQuery([]);
   });
 
   it('J104.1 telefon numarası içeren mesaj engellenir + uyarı gösterilir', async () => {

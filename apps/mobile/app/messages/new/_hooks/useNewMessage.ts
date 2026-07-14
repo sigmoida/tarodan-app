@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import { useMessagesStore } from '@/stores/messagesStore';
+import { useCreateThread } from '@/hooks/messaging';
 import { useAuthStore } from '@/stores/authStore';
 import type { User } from '../_lib/types';
 
@@ -19,7 +20,8 @@ export function useNewMessage() {
     productId?: string;
     productTitle?: string;
   }>();
-  const { canSendMessage, createThread } = useMessagesStore();
+  const canSendMessage = useMessagesStore((s) => s.canSendMessage);
+  const createThread = useCreateThread();
   const { limits } = useAuthStore();
 
   // Recipient can arrive as `sellerId` (seller/product context) or `receiverId` (trade context).
@@ -96,11 +98,14 @@ export function useNewMessage() {
     const isUuid =
       !!productId &&
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(productId);
-    const threadId = await createThread(selectedUser.id, messageText.trim(), isUuid ? productId : undefined);
-
-    if (threadId) {
-      router.replace(`/messages/${threadId}`);
-    } else {
+    try {
+      const thread = await createThread.mutateAsync({
+        recipientId: selectedUser.id,
+        content: messageText.trim(),
+        productId: isUuid ? productId : undefined,
+      });
+      router.replace(`/messages/${thread.id}`);
+    } catch {
       setSending(false);
     }
   };

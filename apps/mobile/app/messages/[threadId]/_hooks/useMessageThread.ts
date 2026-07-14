@@ -5,30 +5,27 @@ import * as ImagePicker from 'expo-image-picker';
 import { appAlert } from '@tarodan/ui-native';
 import { useMessagesStore } from '@/stores/messagesStore';
 import { useAuthStore } from '@/stores/authStore';
+import { useThreadQuery, useMessagesQuery, useSendMessage, useMarkAsRead } from '@/hooks/messaging';
 import { detectViolations, getViolationMessage } from '@/utils/contentFilter';
 import { mediaApi, userApi } from '@/services/api';
 import { getSocket } from '@/services/socket';
 import { groupMessagesByDate } from '../_lib/helpers';
 
 /**
- * Message-thread controller — owns the messagesStore bindings, input/image/limit
- * state, focus fetch + socket join/leave, scroll positioning, and the send/
- * attach/block/header-menu handlers. Lifted verbatim from the monolith.
+ * Message-thread controller — thread/messages artık React Query (#77), send/markRead
+ * mutation hook'ları. Aktif thread `setCurrentThreadId` ile store'a yazılır (socket
+ * köprüsü açık/kapalı ayrımı için). getOtherParticipant + canSendMessage client store.
  */
 export function useMessageThread() {
   const { threadId } = useLocalSearchParams<{ threadId: string }>();
   const { user, limits } = useAuthStore();
-  const {
-    currentThread,
-    messages,
-    isLoadingMessages,
-    fetchThread,
-    fetchMessages,
-    sendMessage,
-    markAsRead,
-    getOtherParticipant,
-    canSendMessage,
-  } = useMessagesStore();
+  const getOtherParticipant = useMessagesStore((s) => s.getOtherParticipant);
+  const canSendMessage = useMessagesStore((s) => s.canSendMessage);
+  const setCurrentThreadId = useMessagesStore((s) => s.setCurrentThreadId);
+  const { data: currentThread = null } = useThreadQuery(threadId);
+  const { data: messages = [], isLoading: isLoadingMessages } = useMessagesQuery(threadId);
+  const sendMessage = useSendMessage();
+  const markAsRead = useMarkAsRead();
 
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
@@ -45,18 +42,22 @@ export function useMessageThread() {
   const isUnlimited = messageLimit === -1;
   const canSend = canSendMessage();
 
-  // Fetch thread and messages on mount
+  // Thread/messages query'leri enabled:threadId ile kendiliğinden çeker. Focus'ta:
+  // aktif thread'i işaretle (socket köprüsü için), okundu yap, socket odasına gir.
   useFocusEffect(
     useCallback(() => {
       if (threadId) {
-        fetchThread(threadId);
-        fetchMessages(threadId);
-        markAsRead(threadId);
+        setCurrentThreadId(threadId);
+        markAsRead.mutate(threadId);
         getSocket()?.emit('join:thread', { threadId });
       }
       return () => {
-        if (threadId) getSocket()?.emit('leave:thread', { threadId });
+        if (threadId) {
+          getSocket()?.emit('leave:thread', { threadId });
+          setCurrentThreadId(null);
+        }
       };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [threadId])
   );
 
@@ -149,14 +150,14 @@ export function useMessageThread() {
         }
       }
 
-      const success = await sendMessage(threadId, content);
-      if (success) {
+      try {
+        await sendMessage.mutateAsync({ threadId, content });
         setInputText('');
         setPendingImage(null);
-      } else {
+      } catch (e: any) {
         appAlert(
           'Mesaj gönderilemedi',
-          useMessagesStore.getState().error || 'Lütfen tekrar deneyin.'
+          e?.message || e?.response?.data?.message || 'Lütfen tekrar deneyin.'
         );
       }
     } finally {

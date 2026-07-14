@@ -1,10 +1,14 @@
 import { create } from 'zustand';
-import { messagesApi } from '../services/api';
 import { useAuthStore } from './authStore';
 
-// Cap the live message array (#76) — a long-lived thread appended without bound.
-// Keep the most-recent N; older ones are still on the server (re-fetched on open).
-const MAX_THREAD_MESSAGES = 200;
+/**
+ * #77 (CLAUDE.md §8): mesajlaşmanın server-state'i (threads/messages/unread) artık
+ * React Query'de — bkz `@/hooks/messaging` (queries/mutations) + `@/lib/messaging`
+ * (cache köprüsü, normalize). Bu store SADECE client/UI state tutar:
+ *   - `currentThreadId`: açık thread — socket köprüsünün aktif thread'i bilmesi için,
+ *   - `dailyMessageCount`/`dailyMessageLimit`: ücretsiz üye günlük mesaj limiti sayacı.
+ * Tipler (MessageThread/Message) burada kalır; tüm tüketiciler buradan import eder.
+ */
 
 export interface MessageThread {
   id: string;
@@ -48,369 +52,42 @@ export interface Message {
   updatedAt: string;
 }
 
-/**
- * API mesajı normalize: backend `readAt` dolu döndürdüğünde (karşı taraf okudu)
- * görüntü durumu 'read' olur. Tik mantığı `status` üzerinden sürüldüğü için
- * okundu çift mavi çentik bu sayede ilk yüklemede de doğru görünür.
- */
-function normalizeMessage(m: any): Message {
-  if (m && m.readAt && m.status !== 'pending_approval' && m.status !== 'rejected') {
-    return { ...m, status: 'read' };
-  }
-  return m;
-}
+const FREE_DAILY_MESSAGE_LIMIT = 50;
 
 interface MessagesState {
-  threads: MessageThread[];
-  currentThread: MessageThread | null;
-  // Açık olan thread'in id'si — thread değişiminde stale mesajları temizlemek için.
+  /** Açık thread'in id'si — socket köprüsü (useMessagingSocket) açık/kapalı ayrımı için. */
   currentThreadId: string | null;
-  messages: Message[];
-  isLoading: boolean;
-  // İlk fetchThreads tamamlandı mı — tab açılışında boş ekran/spinner çakmasını önler.
-  hasLoadedThreads: boolean;
-  isLoadingMessages: boolean;
-  error: string | null;
   dailyMessageCount: number;
   dailyMessageLimit: number;
-  // Tüm thread'lerdeki toplam okunmamış — sayfalamadan bağımsız sunucu agregatı (header rozeti).
-  totalUnreadCount: number;
 
-  // Actions
-  fetchThreads: () => Promise<void>;
-  fetchUnreadCount: () => Promise<void>;
-  fetchThread: (threadId: string) => Promise<void>;
-  fetchMessages: (threadId: string, page?: number) => Promise<void>;
-  sendMessage: (threadId: string, content: string) => Promise<boolean>;
-  createThread: (recipientId: string, content: string, productId?: string) => Promise<string | null>;
-  markAsRead: (threadId: string) => Promise<void>;
-  applyMessagesRead: (threadId: string, messageIds: string[]) => void;
-  applyIncomingMessage: (threadId: string, message: any) => void;
+  // Actions (client-only)
+  setCurrentThreadId: (threadId: string | null) => void;
+  incrementDailyCount: () => void;
+  resetDailyCount: () => void;
 
-  // Helpers
-  getUnreadCount: () => number;
+  // Helpers (saf — authStore okur, fetch YOK)
   canSendMessage: () => boolean;
   getOtherParticipant: (thread: MessageThread) => { id: string; displayName: string; avatarUrl?: string };
 }
 
-/**
- * API thread'leri düz alanlarla döndürür (participant1Id/Name/AvatarUrl,
- * participant2...). Web (apps/web messages/page.tsx) bunu otherUser'a çevirir.
- * Mobil getOtherParticipant nested participant1/participant2 objesi beklediği
- * için burada düz alanları nesneye normalize ediyoruz — yoksa isim 'Kullanıcı'
- * görünür. Hem fetchThreads hem fetchThread bu helper'ı kullanır.
- */
-function normalizeThread(t: any): MessageThread {
-  if (!t || typeof t !== 'object') return t;
-  const participant1 =
-    t.participant1 && typeof t.participant1 === 'object'
-      ? t.participant1
-      : {
-          id: t.participant1Id || t.sender?.id || '',
-          displayName: t.participant1Name || t.sender?.displayName || 'Kullanıcı',
-          avatarUrl: t.participant1AvatarUrl || t.sender?.avatarUrl || undefined,
-        };
-  const participant2 =
-    t.participant2 && typeof t.participant2 === 'object'
-      ? t.participant2
-      : {
-          id: t.participant2Id || t.otherUser?.id || t.receiver?.id || '',
-          displayName:
-            t.participant2Name || t.otherUser?.displayName || t.receiver?.displayName || 'Kullanıcı',
-          avatarUrl:
-            t.participant2AvatarUrl || t.otherUser?.avatarUrl || t.receiver?.avatarUrl || undefined,
-        };
-  return {
-    ...t,
-    participant1Id: t.participant1Id || participant1.id,
-    participant2Id: t.participant2Id || participant2.id,
-    participant1,
-    participant2,
-    unreadCount: t.unreadCount || 0,
-  };
-}
-
-const FREE_DAILY_MESSAGE_LIMIT = 50;
-
 export const useMessagesStore = create<MessagesState>((set, get) => ({
-  threads: [],
-  currentThread: null,
   currentThreadId: null,
-  messages: [],
-  isLoading: false,
-  hasLoadedThreads: false,
-  isLoadingMessages: false,
-  error: null,
   dailyMessageCount: 0,
   dailyMessageLimit: FREE_DAILY_MESSAGE_LIMIT,
-  totalUnreadCount: 0,
 
-  // Web ile aynı endpoint: GET /messages/threads
-  fetchThreads: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      // Thread listesi (sayfalı) + toplam okunmamış (sayfalama bağımsız) paralel.
-      const [response, unreadRes] = await Promise.all([
-        messagesApi.getThreads(),
-        messagesApi.getUnreadCount().catch(() => null),
-      ]);
-      const threadsData = response.data?.threads || response.data?.data || response.data || [];
-
-      // Normalize thread data — düz API alanlarını nested participant objesine çevir.
-      const normalizedThreads = (Array.isArray(threadsData) ? threadsData : []).map(normalizeThread);
-
-      // Backend toplam okunmamış; ulaşılamazsa yüklü sayfadan türet (fallback).
-      const c = (unreadRes?.data as any)?.count;
-      set({
-        threads: normalizedThreads,
-        isLoading: false,
-        hasLoadedThreads: true,
-        totalUnreadCount: typeof c === 'number'
-          ? c
-          : normalizedThreads.reduce((t, th) => t + (th.unreadCount || 0), 0),
-      });
-    } catch (error: any) {
-      console.error('Failed to fetch threads:', error);
-      set({ error: 'Mesajlar yüklenemedi', isLoading: false, hasLoadedThreads: true, threads: [] });
-    }
-  },
-
-  // Sadece toplam okunmamış sayısını tazele (tab rozeti için, thread listesi gerekmeden).
-  fetchUnreadCount: async () => {
-    try {
-      const res = await messagesApi.getUnreadCount();
-      const c = (res.data as any)?.count;
-      if (typeof c === 'number') set({ totalUnreadCount: c });
-    } catch {
-      // sessiz geç — mevcut değer korunur
-    }
-  },
-
-  // Web ile aynı endpoint: GET /messages/threads/:id
-  fetchThread: async (threadId: string) => {
-    // Farklı thread'e geçildiyse eski kişinin adı/avatarı header'da görünmesin.
-    if (get().currentThread?.id !== threadId) {
-      set({ currentThread: null });
-    }
-    try {
-      const response = await messagesApi.getThread(threadId);
-      const raw = (response.data as any)?.data ?? response.data;
-      set({ currentThread: raw ? normalizeThread(raw) : null });
-    } catch (error: any) {
-      console.error('Failed to fetch thread:', error);
-      set({ error: 'Mesaj konusu yüklenemedi' });
-    }
-  },
-
-  // Web ile aynı endpoint: GET /messages/threads/:id/messages
-  fetchMessages: async (threadId: string, page: number = 1) => {
-    // Thread değiştiyse önceki konuşmanın mesajları bir an bile görünmesin;
-    // aynı thread'de sessiz yenileme (mevcut mesajlar ekranda kalır).
-    if (get().currentThreadId !== threadId) {
-      set({ messages: [], currentThreadId: threadId, isLoadingMessages: true });
-    } else {
-      set({ isLoadingMessages: true });
-    }
-    try {
-      const response = await messagesApi.getMessages(threadId, { page, pageSize: 50 });
-      const messagesData = response.data?.messages || response.data?.data || response.data || [];
-
-      // API mesajları en yeni → en eski döndürür (createdAt desc). Sohbet ekranı
-      // (en eski üstte, en yeni altta) ve scrollToEnd doğru çalışsın diye web
-      // (apps/web messages/page.tsx:211) ile aynı şekilde artan sıraya çeviriyoruz.
-      const sorted = (Array.isArray(messagesData) ? messagesData : [])
-        .slice()
-        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-        .map(normalizeMessage);
-
-      set({
-        messages: sorted,
-        isLoadingMessages: false,
-      });
-    } catch (error: any) {
-      console.error('Failed to fetch messages:', error);
-      set({ error: 'Mesajlar yüklenemedi', isLoadingMessages: false, messages: [] });
-    }
-  },
-
-  // Web ile aynı endpoint: POST /messages/threads/:id/messages
-  sendMessage: async (threadId: string, content: string) => {
-    const { dailyMessageCount, dailyMessageLimit, canSendMessage } = get();
-    
-    // Check daily limit for free members
-    if (!canSendMessage()) {
-      set({ error: 'Günlük mesaj limitine ulaştınız' });
-      return false;
-    }
-
-    try {
-      const response = await messagesApi.sendMessage(threadId, content);
-      
-      // Add new message to the list
-      const newMessage = response.data;
-      set(state => ({
-        messages: [...state.messages, newMessage].slice(-MAX_THREAD_MESSAGES),
-        dailyMessageCount: state.dailyMessageCount + 1,
-      }));
-
-      // Update thread's last message
-      set(state => ({
-        threads: state.threads.map(thread => 
-          thread.id === threadId 
-            ? { 
-                ...thread, 
-                lastMessage: { 
-                  content, 
-                  senderId: newMessage.senderId, 
-                  createdAt: newMessage.createdAt 
-                },
-                updatedAt: newMessage.createdAt,
-              }
-            : thread
-        ),
-      }));
-
-      return true;
-    } catch (error: any) {
-      console.error('Failed to send message:', error);
-      set({ error: error.response?.data?.message || 'Mesaj gönderilemedi' });
-      return false;
-    }
-  },
-
-  // Web ile aynı endpoint: POST /messages/threads
-  createThread: async (recipientId: string, content: string, productId?: string) => {
-    const { canSendMessage } = get();
-    
-    if (!canSendMessage()) {
-      set({ error: 'Günlük mesaj limitine ulaştınız' });
-      return null;
-    }
-
-    try {
-      const response = await messagesApi.createThread({ 
-        participantId: recipientId, 
-        productId 
-      });
-      const newThread = response.data;
-
-      // Send the first message
-      if (content) {
-        await messagesApi.sendMessage(newThread.id, content);
-      }
-
-      // Backend findOrCreate yaptığı için mevcut thread dönebilir; aynı id'yi
-      // ikinci kez eklemek listede duplicate key hatasına yol açar — dedupe et.
-      set(state => ({
-        threads: [
-          newThread,
-          ...state.threads.filter(t => t.id !== newThread.id),
-        ],
-        dailyMessageCount: state.dailyMessageCount + 1,
-      }));
-
-      return newThread.id;
-    } catch (error: any) {
-      console.error('Failed to create thread:', error);
-      set({ error: error.response?.data?.message || 'Mesaj gönderilemedi' });
-      return null;
-    }
-  },
-
-  // Web ile aynı endpoint: POST /messages/threads/:id/read
-  markAsRead: async (threadId: string) => {
-    set(state => {
-      const prevUnread = state.threads.find(t => t.id === threadId)?.unreadCount || 0;
-      // NOT: Mesajların `status`'una DOKUNMA. Thread'i açmak yalnız okunmamış
-      // sayacını sıfırlar; kendi gönderdiğim mesajın "okundu" tiki sadece karşı
-      // taraf okuyunca (socket message:read veya yüklemede readAt) maviye döner.
-      return {
-        threads: state.threads.map(thread =>
-          thread.id === threadId ? { ...thread, unreadCount: 0 } : thread
-        ),
-        // Header rozetini de senkron tut (optimistik düşüş).
-        totalUnreadCount: Math.max(0, state.totalUnreadCount - prevUnread),
-      };
-    });
-
-    // NOT: Burada fetchUnreadCount ile yeniden senkronlama YAPMA. Okundu
-    // işaretleme sunucuda fetchMessages (getThreadMessages) ile yapılıyor;
-    // hemen unread-count çekmek o işlem bitmeden stale değeri geri yazıp
-    // optimistik düşüşü bozuyordu (rozet 1'e geri dönüyordu). Optimistik düşüş
-    // güvenilir: thread.unreadCount sunucudan (liste) doğru gelir ve canlı
-    // gelen mesajlarda applyIncomingMessage ile artırılır.
-    try {
-      await messagesApi.markAsRead(threadId);
-    } catch {
-      // POST /threads/:id/read henüz yok (404) — yerel state zaten güncellendi.
-    }
-  },
-
-  /**
-   * Karşı taraf mesajlarımı okudu (socket message:read). Verilen id'lere sahip
-   * mesajları 'read' yapar → gönderen tarafta çift mavi çentik canlı görünür.
-   */
-  applyMessagesRead: (threadId: string, messageIds: string[]) => {
-    const ids = new Set(messageIds);
-    set(state => ({
-      messages: state.messages.map(msg =>
-        msg.threadId === threadId && ids.has(msg.id)
-          ? { ...msg, status: 'read' as const, readAt: new Date().toISOString() }
-          : msg
-      ),
-    }));
-  },
-
-  applyIncomingMessage: (threadId, message) => {
-    const state = get();
-    const isOpen = state.currentThreadId === threadId;
-    // Açık thread ise mesaj listesine id-dedupe ile ekle, createdAt'e göre sırala
-    if (isOpen) {
-      const exists = state.messages.some((m: any) => m.id === message.id);
-      if (!exists) {
-        const next = [...state.messages, message]
-          .sort(
-            (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-          )
-          .slice(-MAX_THREAD_MESSAGES);
-        set({ messages: next });
-      }
-    }
-    // Açık olmayan thread'e başkasından mesaj geldiyse okunmamış sayaçlarını
-    // canlı artır (yoksa rozet ancak sunucu fetch'iyle güncellenir ve markAsRead
-    // optimistik düşüşü thread.unreadCount'u 0 görüp rozeti takabilir).
-    const myId = useAuthStore.getState().user?.id;
-    const fromOther = message?.senderId && message.senderId !== myId;
-    const bumpUnread = !isOpen && fromOther;
-    set({
-      threads: get().threads.map((t: any) =>
-        t.id === threadId
-          ? {
-              ...t,
-              lastMessage: message,
-              lastMessageAt: message.createdAt,
-              unreadCount: bumpUnread ? (t.unreadCount || 0) + 1 : t.unreadCount,
-            }
-          : t,
-      ),
-      ...(bumpUnread ? { totalUnreadCount: get().totalUnreadCount + 1 } : {}),
-    });
-  },
-
-  getUnreadCount: () => {
-    // Sayfalama bağımsız sunucu toplamı; thread sayfasının kısmi toplamı değil.
-    return get().totalUnreadCount;
-  },
+  setCurrentThreadId: (threadId) => set({ currentThreadId: threadId }),
+  incrementDailyCount: () => set((state) => ({ dailyMessageCount: state.dailyMessageCount + 1 })),
+  resetDailyCount: () => set({ dailyMessageCount: 0 }),
 
   canSendMessage: () => {
-    const { dailyMessageCount, dailyMessageLimit } = get();
+    const { dailyMessageCount } = get();
     const { limits } = useAuthStore.getState();
-    
-    // Premium users have unlimited messages
+
+    // Premium üyeler sınırsız
     if (limits?.maxMessagesPerDay === -1) {
       return true;
     }
-    
+
     const limit = limits?.maxMessagesPerDay || FREE_DAILY_MESSAGE_LIMIT;
     return dailyMessageCount < limit;
   },
@@ -418,19 +95,17 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
   getOtherParticipant: (thread: MessageThread) => {
     const { user } = useAuthStore.getState();
     const currentUserId = user?.id;
-    
-    // Güvenli varsayılan değer
-    const defaultParticipant = { 
-      id: '', 
-      displayName: 'Kullanıcı', 
-      avatarUrl: undefined 
+
+    const defaultParticipant = {
+      id: '',
+      displayName: 'Kullanıcı',
+      avatarUrl: undefined,
     };
-    
-    // Thread yoksa varsayılan dön
+
     if (!thread) {
       return defaultParticipant;
     }
-    
+
     // API'den otherUser olarak gelebilir
     if ((thread as any).otherUser) {
       const otherUser = (thread as any).otherUser;
@@ -440,8 +115,8 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
         avatarUrl: otherUser.avatarUrl || otherUser.avatar || undefined,
       };
     }
-    
-    // Participant1 ve Participant2 ile kontrol
+
+    // Participant1 / Participant2 ile çöz
     if (thread.participant1Id === currentUserId) {
       if (!thread.participant2) return defaultParticipant;
       return {
@@ -450,7 +125,7 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
         avatarUrl: thread.participant2.avatarUrl,
       };
     }
-    
+
     if (!thread.participant1) return defaultParticipant;
     return {
       id: thread.participant1.id || '',

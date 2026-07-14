@@ -35,13 +35,16 @@ jest.mock('@/i18n', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 
-// messagesStore — createThread izlenebilir; canSendMessage true
-const mockCreateThread = jest.fn();
+// messagesStore — client-only (canSendMessage); selector-aware mock (#77).
+const mockStore = { canSendMessage: () => true };
 jest.mock('@/stores/messagesStore', () => ({
-  useMessagesStore: () => ({
-    canSendMessage: () => true,
-    createThread: mockCreateThread,
-  }),
+  useMessagesStore: (sel?: any) => (sel ? sel(mockStore) : mockStore),
+}));
+
+// createThread artık React Query mutation hook'u (#77) — mutateAsync izlenir.
+const mockCreateThread = jest.fn();
+jest.mock('@/hooks/messaging', () => ({
+  useCreateThread: () => ({ mutateAsync: mockCreateThread }),
 }));
 
 // authStore — limits
@@ -92,7 +95,7 @@ describe('J103 · yeni mesaj (konuşma oluştur)', () => {
     getMock.mockResolvedValue({
       data: { data: { id: 'u-2', displayName: 'Ahmet Satıcı' } },
     });
-    mockCreateThread.mockResolvedValue('thread-9');
+    mockCreateThread.mockResolvedValue({ id: 'thread-9' });
     renderWithProviders(<NewMessageScreen />);
     await waitFor(() => expect(screen.getByText('Ahmet Satıcı')).toBeOnTheScreen());
 
@@ -103,7 +106,11 @@ describe('J103 · yeni mesaj (konuşma oluştur)', () => {
     fireEvent.press(screen.getByText('Gönder'));
 
     await waitFor(() =>
-      expect(mockCreateThread).toHaveBeenCalledWith('u-2', 'Merhaba', undefined),
+      expect(mockCreateThread).toHaveBeenCalledWith({
+        recipientId: 'u-2',
+        content: 'Merhaba',
+        productId: undefined,
+      }),
     );
     await waitFor(() =>
       expect(replaceMock).toHaveBeenCalledWith('/messages/thread-9'),
