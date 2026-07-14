@@ -16,7 +16,7 @@ const fmtTL = (n: number) =>
 
 export default function ConfirmStep() {
   const {
-    locale,
+    t,
     isAuthenticated,
     checkoutItems,
     addresses,
@@ -32,10 +32,7 @@ export default function ConfirmStep() {
       : null;
 
   return (
-    <SectionCard
-      title={locale === "en" ? "Order Summary" : "Sipariş Özeti"}
-      className="p-6"
-    >
+    <SectionCard title={t("checkout.orderSummary")} className="p-6">
       {/* Order Items */}
       <div className="space-y-4 mb-6">
         {checkoutItems.map((item) => (
@@ -74,7 +71,7 @@ export default function ConfirmStep() {
       {deliveryAddr && (
         <div className="mb-6 p-4 bg-surface rounded">
           <p className="text-sm text-muted mb-1">
-            {locale === "en" ? "Delivery Address" : "Teslimat Adresi"}
+            {t("checkout.shippingAddress")}
           </p>
           <p className="font-medium">
             {deliveryAddr.fullName}, {deliveryAddr.address},{" "}
@@ -85,12 +82,8 @@ export default function ConfirmStep() {
 
       {/* Payment Method */}
       <div className="mb-6 p-4 bg-surface rounded">
-        <p className="text-sm text-muted mb-1">
-          {locale === "en" ? "Payment Method" : "Ödeme Yöntemi"}
-        </p>
-        <p className="font-medium">
-          {locale === "en" ? "Pay with PayTR" : "PayTR ile Öde"}
-        </p>
+        <p className="text-sm text-muted mb-1">{t("checkout.paymentMethod")}</p>
+        <p className="font-medium">{t("checkout.payWithPaytr")}</p>
       </div>
 
       {/* Security Notice */}

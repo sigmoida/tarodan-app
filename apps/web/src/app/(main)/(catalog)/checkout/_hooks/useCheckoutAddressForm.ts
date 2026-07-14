@@ -134,7 +134,7 @@ export function useCheckoutAddressForm({
         // Refresh the address list, then select the newly created address.
         await invalidateAddresses();
         setSelectedAddressId(createdAddress.id);
-        toast.success(locale === "en" ? "Address added" : "Adres eklendi");
+        toast.success(t("address.addressAdded"));
       } else {
         await invalidateAddresses();
         toast.error(

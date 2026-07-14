@@ -17,7 +17,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { api, collectionsApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import toast from "react-hot-toast";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 import { Button } from "@tarodan/ui";
 
@@ -55,7 +55,6 @@ export default function LikedCollectionsClient() {
   const [mounted, setMounted] = useState(false);
   const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
   const t = useTranslations();
-  const locale = useLocale();
 
   useEffect(() => {
     setMounted(true);
@@ -119,7 +118,7 @@ export default function LikedCollectionsClient() {
       <div className="min-h-screen bg-surface text-heading flex flex-col">
         <div className="flex-1 flex items-center justify-center py-24">
           <div className="animate-pulse text-muted text-sm">
-            {locale === "en" ? "Loading..." : "Yükleniyor..."}
+            {t("common.loading")}
           </div>
         </div>
       </div>
@@ -270,8 +269,7 @@ export default function LikedCollectionsClient() {
                         </div>
                       )}
                       <div className="absolute bottom-1.5 right-1.5 bg-heading/60 px-1.5 py-0.5 rounded text-2xs text-inverted">
-                        {collection.itemCount || 0}{" "}
-                        {locale === "en" ? "items" : "ürün"}
+                        {collection.itemCount || 0} {t("collection.items")}
                       </div>
                     </div>
                   </Link>

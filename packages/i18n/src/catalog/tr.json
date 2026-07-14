@@ -92,7 +92,10 @@
     "show": "Göster",
     "home": "Ana Sayfa",
     "listings": "İlanlar",
-    "category": "Kategori"
+    "category": "Kategori",
+    "learnMore": "Detaylı bilgi",
+    "removed": "Kaldırıldı",
+    "dateLocale": "tr-TR"
   },
   "nav": {
     "home": "Ana Sayfa",
@@ -437,7 +440,32 @@
     "discountAmount": "İndirim Tutarı",
     "deactivateDesc": "Deactivated listings are not visible in search but are not deleted.",
     "adding": "Ekleniyor...",
-    "removing": "Kaldırılıyor..."
+    "removing": "Kaldırılıyor...",
+    "productsFound": "ürün bulundu",
+    "sortHighestRating": "En Yüksek Puan",
+    "sortLowestRating": "En Düşük Puan",
+    "searchTypes": "Tür ara...",
+    "searchModels": "Model ara...",
+    "searchScale": "Ölçek ara...",
+    "searchMaterial": "Malzeme ara...",
+    "searchManufacturers": "Üretici ara...",
+    "vehicleType": "Araç Türü",
+    "material": "Malzeme",
+    "manufacturer": "Üretici",
+    "options": "Seçenekler",
+    "view360": "360° Görüntüle",
+    "pause": "Durdur",
+    "autoRotate": "Otomatik Döndür",
+    "stock": "Stok",
+    "detailsSection": "Özellikler",
+    "technicalDetails": "Teknik özellikler",
+    "copyLink": "Linki Kopyala",
+    "thisIsYourListing": "Bu sizin ilanınız",
+    "clearFilter": "Filtreyi temizle",
+    "failedToCreateListing": "İlan oluşturulamadı",
+    "quantityDefaultHint": "Boş bırakırsanız 1 adet",
+    "available": "adet",
+    "detailsSuffix": "detayları"
   },
   "cart": {
     "myCart": "Sepetim",
@@ -549,7 +577,8 @@
     "clickAddNewAddress": "Lütfen \"Yeni Adres Ekle\" butonuna tıklayarak teslimat adresinizi girin",
     "selectShippingAddress": "Lütfen teslimat adresinizi seçin",
     "invalidAddressAddNew": "Seçilen adres geçersiz, lütfen yeni bir adres ekleyin",
-    "enterShippingAddress": "Lütfen teslimat adresini girin"
+    "enterShippingAddress": "Lütfen teslimat adresini girin",
+    "payWithPaytr": "PayTR ile Öde"
   },
   "order": {
     "myOrders": "Siparişlerim",
@@ -584,7 +613,10 @@
     "trackingNumber": "Takip Numarası",
     "shippingCompany": "Kargo Firması",
     "retryPayment": "Ödemeyi Tekrarla",
-    "paymentRetried": "Ödeme tekrarlandı"
+    "paymentRetried": "Ödeme tekrarlandı",
+    "order": "Sipariş",
+    "product": "Ürün",
+    "carrier": "Firma"
   },
   "trade": {
     "myTrades": "Takaslarım",
@@ -714,7 +746,9 @@
     "pendingOffers": "Bekleyen Teklifler",
     "receivedOffers": "Gelen Teklifler",
     "sentOffers": "Gönderilen Teklifler",
-    "myOffers": "Teklifler"
+    "myOffers": "Teklifler",
+    "minimumOffer": "Minimum teklif",
+    "yourOfferAmount": "Teklif Tutarınız (TL)"
   },
   "message": {
     "messages": "Mesajlar",
@@ -862,7 +896,9 @@
     "deleteCollectionConfirm": "Bu koleksiyonu silmek istediğinize emin misiniz? Bu işlem geri alınamaz ve koleksiyonunuzdaki tüm ürünler koleksiyondan kaldırılacaktır.",
     "deleting": "Siliniyor...",
     "yesDelete": "Evet, Sil",
-    "characters": "karakter"
+    "characters": "karakter",
+    "collection": "Koleksiyon",
+    "removeProduct": "Ürünü kaldır"
   },
   "notification": {
     "notifications": "Bildirimler",
@@ -946,7 +982,8 @@
     "packaging": "Paketleme",
     "sellerComment": "Satıcı Hakkında Yorumunuz (Opsiyonel)",
     "sellerCommentPlaceholder": "Satıcıyla ilgili deneyiminizi paylaşın...",
-    "submit": "Değerlendir"
+    "submit": "Değerlendir",
+    "mostHelpful": "En Faydalı"
   },
   "footer": {
     "about": "Hakkımızda",
@@ -1055,7 +1092,12 @@
     "passwordNumber": "Rakam gerekli",
     "confirmPassword": "Şifreyi onaylayın",
     "birthDateRequired": "Lütfen doğum tarihinizi girin",
-    "minAge18": "Kayıt olmak için 18 yaşından büyük olmalısınız."
+    "minAge18": "Kayıt olmak için 18 yaşından büyük olmalısınız.",
+    "enterAmount": "Bir tutar girin",
+    "enterValidAmount": "Geçerli bir tutar girin",
+    "max500Chars": "En fazla 500 karakter",
+    "enterOrderNumber": "Sipariş numarası girin",
+    "offerBelowPrice": "Teklif fiyattan düşük olmalı"
   },
   "time": {
     "justNow": "Az önce",
@@ -1215,7 +1257,8 @@
     "following": "Takip Ediliyor",
     "follow": "Takip Et",
     "report": "Raporla",
-    "noActiveListings": "Bu satıcının henüz aktif ilanı yok."
+    "noActiveListings": "Bu satıcının henüz aktif ilanı yok.",
+    "viewProfile": "Profili Gör"
   },
   "sellerDashboard": {
     "title": "Satıcı Panosu",

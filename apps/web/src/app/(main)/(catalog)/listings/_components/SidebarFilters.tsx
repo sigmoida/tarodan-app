@@ -72,7 +72,7 @@ export default function SidebarFilters({
   // Shown when a search filters an option list down to nothing.
   const noResults = (
     <p className="px-2 py-3 text-sm text-muted text-center">
-      {locale === "en" ? "No results" : "Bulunamadı"}
+      {t("common.noResults")}
     </p>
   );
 
@@ -120,14 +120,12 @@ export default function SidebarFilters({
       >
         {/* Araç Türü (Category) */}
         <AccordionItem value="category">
-          <AccordionTrigger>
-            {locale === "en" ? "Vehicle Type" : "Araç Türü"}
-          </AccordionTrigger>
+          <AccordionTrigger>{t("product.vehicleType")}</AccordionTrigger>
           <AccordionContent>
             {searchBox(
               categorySearch,
               setCategorySearch,
-              locale === "en" ? "Search types..." : "Tür ara...",
+              t("product.searchTypes"),
             )}
             {filteredCategories.length === 0 ? (
               noResults
@@ -154,15 +152,11 @@ export default function SidebarFilters({
 
         {/* Marka */}
         <AccordionItem value="brand">
-          <AccordionTrigger>
-            {locale === "en" ? "Brand" : "Marka"}
-          </AccordionTrigger>
+          <AccordionTrigger>{t("product.brand")}</AccordionTrigger>
           <AccordionContent>
             <Input
               type="text"
-              placeholder={
-                locale === "en" ? "Search brands..." : "Marka ara..."
-              }
+              placeholder={t("brands.searchPlaceholder")}
               value={brandSearch}
               onChange={(e) => setBrandSearch(e.target.value)}
               inputSize="sm"
@@ -196,9 +190,7 @@ export default function SidebarFilters({
           <AccordionContent>
             <Input
               type="text"
-              placeholder={
-                locale === "en" ? "Search models..." : "Model ara..."
-              }
+              placeholder={t("product.searchModels")}
               value={modelSearch}
               onChange={(e) => setModelSearch(e.target.value)}
               inputSize="sm"
@@ -226,15 +218,9 @@ export default function SidebarFilters({
 
         {/* Ölçek */}
         <AccordionItem value="scale">
-          <AccordionTrigger>
-            {locale === "en" ? "Scale" : "Ölçek"}
-          </AccordionTrigger>
+          <AccordionTrigger>{t("product.scale")}</AccordionTrigger>
           <AccordionContent>
-            {searchBox(
-              scaleSearch,
-              setScaleSearch,
-              locale === "en" ? "Search scale..." : "Ölçek ara...",
-            )}
+            {searchBox(scaleSearch, setScaleSearch, t("product.searchScale"))}
             {filteredScales.length === 0 ? (
               noResults
             ) : (
@@ -260,14 +246,12 @@ export default function SidebarFilters({
 
         {/* Malzeme (Material) */}
         <AccordionItem value="material">
-          <AccordionTrigger>
-            {locale === "en" ? "Material" : "Malzeme"}
-          </AccordionTrigger>
+          <AccordionTrigger>{t("product.material")}</AccordionTrigger>
           <AccordionContent>
             {searchBox(
               materialSearch,
               setMaterialSearch,
-              locale === "en" ? "Search material..." : "Malzeme ara...",
+              t("product.searchMaterial"),
             )}
             {filteredMaterials.length === 0 ? (
               noResults
@@ -294,15 +278,11 @@ export default function SidebarFilters({
 
         {/* Üretici */}
         <AccordionItem value="manufacturer">
-          <AccordionTrigger>
-            {locale === "en" ? "Manufacturer" : "Üretici"}
-          </AccordionTrigger>
+          <AccordionTrigger>{t("product.manufacturer")}</AccordionTrigger>
           <AccordionContent>
             <Input
               type="text"
-              placeholder={
-                locale === "en" ? "Search manufacturers..." : "Üretici ara..."
-              }
+              placeholder={t("product.searchManufacturers")}
               value={manufacturerSearch}
               onChange={(e) => setManufacturerSearch(e.target.value)}
               inputSize="sm"
@@ -430,9 +410,7 @@ export default function SidebarFilters({
 
         {/* Fiyat */}
         <AccordionItem value="price">
-          <AccordionTrigger>
-            {locale === "en" ? "Price" : "Fiyat"}
-          </AccordionTrigger>
+          <AccordionTrigger>{t("product.price")}</AccordionTrigger>
           <AccordionContent>
             <div className="space-y-2">
               <div className="flex gap-2 items-center">
@@ -500,9 +478,7 @@ export default function SidebarFilters({
 
         {/* Diğer Seçenekler */}
         <AccordionItem value="options">
-          <AccordionTrigger>
-            {locale === "en" ? "Options" : "Seçenekler"}
-          </AccordionTrigger>
+          <AccordionTrigger>{t("product.options")}</AccordionTrigger>
           <AccordionContent>
             <label className="flex items-center gap-3 px-2 py-2 rounded cursor-pointer hover:bg-surface">
               <Checkbox

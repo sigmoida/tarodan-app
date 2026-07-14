@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { useCart } from "@/hooks/useCart";
 import { useAuthStore } from "@/stores/authStore";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Container } from "@/components/layout/Container";
@@ -31,7 +31,6 @@ export default function CartClient() {
   } = useCart();
   const { isAuthenticated } = useAuthStore();
   const t = useTranslations();
-  const locale = useLocale();
 
   const buyerFee = useBuyerFee(items);
 
@@ -108,7 +107,7 @@ export default function CartClient() {
     <PageShell>
       <PageHeader
         title={t("cart.myCart")}
-        description={`${lines.length} ${locale === "en" ? "items" : "ürün"}`}
+        description={`${lines.length} ${t("collection.items")}`}
       />
 
       <div className="grid lg:grid-cols-3 gap-8">

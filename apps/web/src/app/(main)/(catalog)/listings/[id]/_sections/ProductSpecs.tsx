@@ -59,7 +59,7 @@ export default function ProductSpecs() {
         ? "Unlimited"
         : "Sınırsız"
       : available > 0
-        ? `${available} ${locale === "en" ? "available" : "adet"}`
+        ? `${available} ${t("product.available")}`
         : t("product.stockFinished");
 
   const infoRows: Array<{ label: string; value: ReactNode }> = [];
@@ -78,12 +78,12 @@ export default function ProductSpecs() {
   }
   infoRows.push({ label: t("product.scale"), value: scaleValue });
   infoRows.push({
-    label: locale === "en" ? "Material" : "Malzeme",
+    label: t("product.material"),
     value: materialValue,
   });
   if (listing.manufacturer) {
     infoRows.push({
-      label: locale === "en" ? "Manufacturer" : "Üretici",
+      label: t("product.manufacturer"),
       value: listing.manufacturer.name,
     });
   }
@@ -95,17 +95,17 @@ export default function ProductSpecs() {
   }
   if (listing.condition) {
     infoRows.push({
-      label: locale === "en" ? "Condition" : "Durum",
+      label: t("product.condition"),
       value: formatCondition(listing.condition, locale),
     });
   }
   infoRows.push({
-    label: locale === "en" ? "Year" : "Yıl",
+    label: t("product.year"),
     value: listing.year ?? "—",
   });
   if (hasQuantity) {
     infoRows.push({
-      label: locale === "en" ? "Stock" : "Stok",
+      label: t("product.stock"),
       value: stockValue,
     });
   }
@@ -120,7 +120,7 @@ export default function ProductSpecs() {
   return (
     <div className="space-y-6 mb-6">
       {/* Details — brand / scale / material / … row by row */}
-      <SectionCard title={locale === "en" ? "Details" : "Özellikler"}>
+      <SectionCard title={t("product.detailsSection")}>
         <dl className="divide-y divide-border">
           {infoRows.map((row) => (
             <DetailRow key={row.label} label={row.label} value={row.value} />
@@ -130,9 +130,7 @@ export default function ProductSpecs() {
 
       {/* Technical details — its own card, row by row */}
       {hasTechnical && (
-        <SectionCard
-          title={locale === "en" ? "Technical details" : "Teknik özellikler"}
-        >
+        <SectionCard title={t("product.technicalDetails")}>
           <dl className="divide-y divide-border">
             {listing.carModel && (
               <DetailRow label="Model" value={listing.carModel.name} />

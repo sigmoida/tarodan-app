@@ -45,6 +45,7 @@ function useNewListingValue() {
     refreshUser,
   } = useAuthStore();
   const locale = useLocale();
+  const t = useTranslations();
   const CONDITIONS = getConditions(locale);
 
   const form = useZodForm(newListingSchema(locale), {
@@ -197,8 +198,7 @@ function useNewListingValue() {
         error.response?.data?.error ??
         error.message;
       const msg = Array.isArray(raw) ? raw.join(" • ") : raw;
-      const fallback =
-        locale === "en" ? "Failed to create listing" : "İlan oluşturulamadı";
+      const fallback = t("product.failedToCreateListing");
       toast.error(typeof msg === "string" && msg ? msg : fallback);
     }
   };
