@@ -9,7 +9,7 @@
  * renderer'lardan gelir (invoice-email.renderer). Dış çağıranlar
  * (payment.service, payment-reconciliation.service) etkilenmez.
  */
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma';
 import { StorageService } from '../storage/storage.service';
@@ -195,6 +195,28 @@ export class InvoiceService {
       pdfUrl: resolvedPdfUrl || '',
       htmlContent,
     };
+  }
+
+  /**
+   * Güvenlik (#63): Fatura oluşturmanın sahiplik-korumalı HTTP giriş noktası.
+   * `generateForOrder` paylaşılan executor olarak sahiplik kontrolü YAPMAZ (iç çağıranlar:
+   * lazy-gen getByOrderId + sistem e-posta akışı generateAndSendInvoice); bu yüzden IDOR
+   * guard'ı burada, uçta durur — yalnız siparişin tarafı (alıcı/satıcı) fatura üretebilir.
+   * Sahipler faturayı zaten GET /invoices/order/:orderId üzerinden (lazy üretimle) alır;
+   * bu uç sahip/idari elle üretim içindir. Yetkisiz kullanıcı → 403.
+   */
+  async generateForOrderAsUser(orderId: string, requesterId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { buyerId: true, sellerId: true },
+    });
+    if (!order) {
+      throw new NotFoundException('Sipariş bulunamadı');
+    }
+    if (order.buyerId !== requesterId && order.sellerId !== requesterId) {
+      throw new ForbiddenException('Bu siparişin faturasını oluşturma yetkiniz yok');
+    }
+    return this.generateForOrder(orderId);
   }
 
   /**

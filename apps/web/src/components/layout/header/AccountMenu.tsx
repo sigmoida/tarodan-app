@@ -157,7 +157,7 @@ export default function AccountMenu({
                     </p>
                     <p className="text-xs text-muted truncate">{user?.email}</p>
                     {membershipTier !== "free" && (
-                      <span className="inline-block mt-1 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-warning-100 text-warning-700 rounded">
+                      <span className="inline-block mt-1 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide bg-warning-100 text-warning-700 rounded">
                         {membershipTier}
                       </span>
                     )}

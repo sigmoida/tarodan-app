@@ -1,29 +1,32 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Badge, Button } from '@tarodan/ui';
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Badge, Button } from "@tarodan/ui";
 import {
   PencilIcon,
   GlobeAltIcon,
   ExclamationTriangleIcon,
-} from '@heroicons/react/24/outline';
-import { adminApi } from '@/lib/api';
-import { AdminPage } from '@/components/page/AdminPage';
-import { PageHeader } from '@/components/AdminList';
-import { SectionCard } from '@/components/detail/SectionCard';
+} from "@heroicons/react/24/outline";
+import { adminApi } from "@/lib/api";
+import { AdminPage } from "@/components/page/AdminPage";
+import { PageHeader } from "@/components/AdminList";
+import { SectionCard } from "@/components/detail/SectionCard";
 import {
   PREDEFINED_PAGES,
+  PAGES_QUERY_KEY,
   type PredefinedSlug,
   type StaticPage,
-} from './_lib/content';
-import { PageEditorModal } from './_modals/PageEditorModal';
+} from "./_lib/content";
+import { PageEditorModal } from "./_modals/PageEditorModal";
 
 export default function PagesPage() {
   const [editSlug, setEditSlug] = useState<PredefinedSlug | null>(null);
 
-  const { data: pageMap = {}, isLoading } = useQuery<Record<string, StaticPage>>({
-    queryKey: ['admin', 'pages'],
+  const { data: pageMap = {}, isLoading } = useQuery<
+    Record<string, StaticPage>
+  >({
+    queryKey: PAGES_QUERY_KEY,
     queryFn: async () => {
       const res = await adminApi.getPages();
       const pages: StaticPage[] = res.data?.data ?? [];
@@ -48,15 +51,19 @@ export default function PagesPage() {
             const existing = pageMap[page.slug];
             const badge = existing ? (
               <Badge
-                variant={existing.isPublished ? 'success' : 'secondary'}
+                variant={existing.isPublished ? "success" : "secondary"}
                 size="sm"
                 className="inline-flex items-center gap-1"
               >
                 <GlobeAltIcon className="h-3 w-3" />
-                {existing.isPublished ? 'Yayında' : 'Taslak'}
+                {existing.isPublished ? "Yayında" : "Taslak"}
               </Badge>
             ) : (
-              <Badge variant="warning" size="sm" className="inline-flex items-center gap-1">
+              <Badge
+                variant="warning"
+                size="sm"
+                className="inline-flex items-center gap-1"
+              >
                 <ExclamationTriangleIcon className="h-3 w-3" />
                 İçerik yok
               </Badge>
@@ -76,7 +83,7 @@ export default function PagesPage() {
                     leftIcon={<PencilIcon className="h-4 w-4" />}
                     onClick={() => setEditSlug(page.slug)}
                   >
-                    {existing ? 'Düzenle' : 'İçerik Oluştur'}
+                    {existing ? "Düzenle" : "İçerik Oluştur"}
                   </Button>
                 }
               >

@@ -115,7 +115,7 @@ export default function Header() {
                       <Link href="/profile/messages">
                         <ChatBubbleLeftRightIcon className="w-6 h-6" />
                         {unreadMessageCount > 0 && (
-                          <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-danger-500 text-inverted text-[10px] font-semibold rounded-full">
+                          <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-danger-500 text-inverted text-2xs font-semibold rounded-full">
                             {unreadMessageCount > 99
                               ? "99+"
                               : unreadMessageCount}

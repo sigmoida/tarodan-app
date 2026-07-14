@@ -1,9 +1,24 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { collectionsApi } from '@/lib/api';
-import toast from 'react-hot-toast';
-import { Button, Checkbox, Input, Select, Textarea } from '@tarodan/ui';
+import { z } from "zod";
+import toast from "react-hot-toast";
+import {
+  FormModal,
+  FormInput,
+  FormTextarea,
+  FormSelect,
+  FormCheckbox,
+  useZodForm,
+} from "@tarodan/ui/form";
+import { collectionsApi } from "@/lib/api";
+
+const schema = z.object({
+  name: z.string().trim().min(1, "İsim zorunlu"),
+  description: z.string().trim().optional().or(z.literal("")),
+  categoryId: z.string().optional().or(z.literal("")),
+  isPublic: z.boolean(),
+});
+type CreateCollectionValues = z.infer<typeof schema>;
 
 export default function CreateCollectionModal({
   onClose,
@@ -14,97 +29,69 @@ export default function CreateCollectionModal({
   onCreated: (collectionId?: string) => void;
   flatCategories: { id: string; name: string; slug: string }[];
 }) {
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [isPublic, setIsPublic] = useState(true);
-  const [loading, setLoading] = useState(false);
+  const form = useZodForm(schema, {
+    defaultValues: {
+      name: "",
+      description: "",
+      categoryId: "",
+      isPublic: true,
+    },
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
+  const onSubmit = async (v: CreateCollectionValues) => {
     try {
       const { data } = await collectionsApi.create({
-        name,
-        description,
-        isPublic,
-        ...(categoryId ? { categoryId } : {}),
+        name: v.name,
+        description: v.description,
+        isPublic: v.isPublic,
+        ...(v.categoryId ? { categoryId: v.categoryId } : {}),
       });
-      const createdId = data?.id;
-      onCreated(createdId);
+      onCreated(data?.id);
     } catch (error: any) {
-      if (process.env.NODE_ENV === 'development') console.error('Create collection error:', error);
-      const errorMessage = error.response?.data?.message || 'Koleksiyon oluşturulamadı';
+      if (process.env.NODE_ENV === "development")
+        console.error("Create collection error:", error);
+      const errorMessage =
+        error.response?.data?.message || "Koleksiyon oluşturulamadı";
       toast.error(errorMessage);
-      if (errorMessage.includes('üyeliğiniz') || errorMessage.includes('yetkiniz yok')) {
-        setTimeout(() => { window.location.href = '/membership'; }, 2000);
+      if (
+        errorMessage.includes("üyeliğiniz") ||
+        errorMessage.includes("yetkiniz yok")
+      ) {
+        setTimeout(() => {
+          window.location.href = "/membership";
+        }, 2000);
       }
-    } finally {
-      setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-heading/50">
-      <div className="bg-surface-elevated rounded p-6 w-full max-w-md shadow-xl">
-        <h2 className="text-lg font-bold mb-4 text-heading">Yeni Koleksiyon</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs text-muted mb-1 font-medium uppercase tracking-wide">İsim</label>
-            <Input type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 bg-surface-elevated border border-border rounded text-sm text-heading placeholder-subtle focus:outline-none focus:border-primary-400"
-              placeholder="Hot Wheels Koleksiyonum"
-              required />
-          </div>
-          <div>
-            <label className="block text-xs text-muted mb-1 font-medium uppercase tracking-wide">Açıklama</label>
-            <Textarea value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2 bg-surface-elevated border border-border rounded text-sm text-heading placeholder-subtle focus:outline-none focus:border-primary-400"
-              placeholder="Koleksiyon hakkında..."
-              rows={3} />
-          </div>
-          <div>
-            <label className="block text-xs text-muted mb-1 font-medium uppercase tracking-wide">Kategori</label>
-            <Select
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              selectSize="sm"
-            >
-              <option value="">Kategori seçin (isteğe bağlı)</option>
-              {flatCategories.map((cat) => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
-              ))}
-            </Select>
-          </div>
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="isPublic"
-              checked={isPublic}
-              onChange={(e) => setIsPublic(e.target.checked)}
-              label="Herkese açık koleksiyon"
-            />
-          </div>
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" size="md" className="flex-1" onClick={onClose}>
-              İptal
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              size="md"
-              className="flex-1"
-              disabled={loading || !name}
-              isLoading={loading}
-            >
-              {loading ? 'Oluşturuluyor...' : 'Oluştur'}
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <FormModal
+      open
+      onClose={onClose}
+      title="Yeni Koleksiyon"
+      form={form}
+      onSubmit={onSubmit}
+      submitLabel="Oluştur"
+      maxWidth="max-w-md"
+    >
+      <FormInput
+        name="name"
+        label="İsim"
+        placeholder="Hot Wheels Koleksiyonum"
+      />
+      <FormTextarea
+        name="description"
+        label="Açıklama"
+        placeholder="Koleksiyon hakkında..."
+        rows={3}
+      />
+      <FormSelect
+        name="categoryId"
+        label="Kategori"
+        placeholder="Kategori seçin (isteğe bağlı)"
+        options={flatCategories.map((c) => ({ value: c.id, label: c.name }))}
+      />
+      <FormCheckbox name="isPublic" label="Herkese açık koleksiyon" />
+    </FormModal>
   );
 }
