@@ -4,6 +4,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { appAlert } from '@tarodan/ui-native';
+import { useZodForm } from '@tarodan/ui-native/form';
+import { listingFormSchema, emptyListingFormValues } from '../_lib/schema';
 
 import { useAuthStore } from '../../../stores/authStore';
 import { api, productsApi, categoriesApi, bankAccountApi } from '@/lib/api';
@@ -56,11 +58,18 @@ export function useListingForm({ mode, productId }: ListingFormProps) {
     if (productId) queryClient.invalidateQueries({ queryKey: ['product', productId] });
   };
 
-  // Shared form state
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('');
-  const [quantity, setQuantity] = useState('1');
+  // #81 (hibrit): text alanları useZodForm'da; watch/setValue köprüsüyle mevcut
+  // f.title/f.setTitle sözleşmesi korunur (section'lar değişmez), zod validasyon
+  // submit'te form.trigger() ile devreye girer. Diğer alanlar useState kalır.
+  const form = useZodForm(listingFormSchema, { defaultValues: emptyListingFormValues });
+  const title = form.watch('title');
+  const setTitle = (v: string) => form.setValue('title', v);
+  const description = form.watch('description');
+  const setDescription = (v: string) => form.setValue('description', v);
+  const price = form.watch('price');
+  const setPrice = (v: string) => form.setValue('price', v);
+  const quantity = form.watch('quantity');
+  const setQuantity = (v: string) => form.setValue('quantity', v);
   // Aktif takas/sipariş rezervasyonu (quantity − availableQuantity); alıcıların
   // gördüğü "satışta" sayısının fiziksel stoktan neden düşük olduğunu açıklar.
   const [reservedQty, setReservedQty] = useState(0);
@@ -74,7 +83,8 @@ export function useListingForm({ mode, productId }: ListingFormProps) {
   const [year, setYear] = useState('');
   const [isTradeEnabled, setIsTradeEnabled] = useState(false);
   const [isSet, setIsSet] = useState(false);
-  const [bundleSize, setBundleSize] = useState('');
+  const bundleSize = form.watch('bundleSize');
+  const setBundleSize = (v: string) => form.setValue('bundleSize', v);
 
   // Edit-only state
   const [status, setStatus] = useState('active');
@@ -542,12 +552,11 @@ export function useListingForm({ mode, productId }: ListingFormProps) {
   };
 
   const validate = (): boolean => {
-    if (!title || title.length < 5) {
-      appAlert('Hata', 'Başlık en az 5 karakter olmalıdır.');
-      return false;
-    }
-    if (!price || isNaN(Number(price)) || Number(price) < 1) {
-      appAlert('Hata', 'Geçerli bir fiyat giriniz.');
+    // title + price kuralları artık zod schema'da (senkron safeParse — field sırası
+    // title→price korunur). category/image schema-dışı olduğu için manuel kalır.
+    const result = listingFormSchema.safeParse(form.getValues());
+    if (!result.success) {
+      appAlert('Hata', result.error.issues[0]?.message || 'Lütfen alanları kontrol edin.');
       return false;
     }
     if (!categoryId) {
