@@ -23,7 +23,7 @@ import {
 import { useTranslation } from "@/i18n";
 import { collectionsApi, wishlistApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
-import { useCartStore } from "@/stores/cartStore";
+import { useCart } from "@/hooks/useCart";
 import { useAuthStore } from "@/stores/authStore";
 import { useAuthGate } from "@/hooks/useAuthGate";
 import { getCardImageUrl } from "../_lib/images";
@@ -44,9 +44,9 @@ function useListingDetailValue() {
     offlineItems,
     removeFromCart,
     removeFromOfflineCart,
-    fetchCart,
+    refetch: fetchCart,
     isLoading: cartLoading,
-  } = useCartStore();
+  } = useCart();
   const { isAuthenticated, user, limits } = useAuthStore();
   const { requireAuth, authModal } = useAuthGate();
 

@@ -8,7 +8,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { api, ratingsApi, mediaApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
-import { useCartStore } from "@/stores/cartStore";
+import { useCart } from "@/hooks/useCart";
 import { useTranslation } from "@/i18n";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
@@ -116,7 +116,7 @@ export function useCancelOrder() {
 export function useReorder() {
   const router = useRouter();
   const { t, locale } = useTranslation();
-  const addToCart = useCartStore((s) => s.addToCart);
+  const { addToCart } = useCart();
   return async (order: Order) => {
     const productId = getOrderProductId(order);
     if (!productId) {

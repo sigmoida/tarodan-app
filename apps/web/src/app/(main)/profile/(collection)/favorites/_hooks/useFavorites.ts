@@ -9,7 +9,7 @@ import toast from "react-hot-toast";
 import { wishlistApi, listingsApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { useAuthStore } from "@/stores/authStore";
-import { useCartStore } from "@/stores/cartStore";
+import { useCart } from "@/hooks/useCart";
 import { useTranslation } from "@/i18n";
 import type { WishlistItem } from "../_lib/types";
 
@@ -22,7 +22,7 @@ export function useFavorites() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
-  const { addToCart } = useCartStore();
+  const { addToCart } = useCart();
   const { t } = useTranslation();
 
   const sharedIds = useMemo(() => {

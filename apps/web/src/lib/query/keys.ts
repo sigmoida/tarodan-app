@@ -149,6 +149,10 @@ export const queryKeys = {
   myCollections: {
     list: () => ["my-collections"] as const,
   },
+  cart: {
+    /** The authenticated cart. One invalidate refreshes it after every write. */
+    all: () => ["cart"] as const,
+  },
   checkout: {
     addresses: () => ["checkout-addresses"] as const,
     successOrder: (orderId: string) =>
