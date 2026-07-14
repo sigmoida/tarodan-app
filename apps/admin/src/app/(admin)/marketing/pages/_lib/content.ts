@@ -1,15 +1,46 @@
+/**
+ * Query key for the static-pages list. Shared by the list page and the editor
+ * modal's invalidate so the two-part key (`['admin', 'pages']`) isn't hand-typed
+ * in both places. It predates and doesn't fit the resource-based `adminKeys`
+ * registry (custom `admin` namespace), so it lives here.
+ */
+export const PAGES_QUERY_KEY = ["admin", "pages"] as const;
+
 export const PREDEFINED_PAGES = [
-  { slug: 'about', title: 'Hakkımızda', url: '/about', description: 'Platform tanıtımı, vizyon ve misyon.' },
-  { slug: 'faq', title: 'Sık Sorulan Sorular', url: '/faq', description: 'Kullanıcıların en çok sorduğu sorular ve cevaplar.' },
-  { slug: 'privacy', title: 'Gizlilik Politikası', url: '/privacy', description: 'KVKK / GDPR kapsamında kişisel veri işleme politikası.' },
-  { slug: 'terms', title: 'Kullanım Koşulları', url: '/terms', description: 'Platformun kullanım şartları ve hükümleri.' },
+  {
+    slug: "about",
+    title: "Hakkımızda",
+    url: "/about",
+    description: "Platform tanıtımı, vizyon ve misyon.",
+  },
+  {
+    slug: "faq",
+    title: "Sık Sorulan Sorular",
+    url: "/faq",
+    description: "Kullanıcıların en çok sorduğu sorular ve cevaplar.",
+  },
+  {
+    slug: "privacy",
+    title: "Gizlilik Politikası",
+    url: "/privacy",
+    description: "KVKK / GDPR kapsamında kişisel veri işleme politikası.",
+  },
+  {
+    slug: "terms",
+    title: "Kullanım Koşulları",
+    url: "/terms",
+    description: "Platformun kullanım şartları ve hükümleri.",
+  },
 ] as const;
 
-export type PredefinedSlug = (typeof PREDEFINED_PAGES)[number]['slug'];
+export type PredefinedSlug = (typeof PREDEFINED_PAGES)[number]["slug"];
 
-export const DEFAULT_CONTENT: Record<PredefinedSlug, { title: string; content: string }> = {
+export const DEFAULT_CONTENT: Record<
+  PredefinedSlug,
+  { title: string; content: string }
+> = {
   about: {
-    title: 'Hakkımızda',
+    title: "Hakkımızda",
     content: `<h2>TARODAN Nedir?</h2>
 <p>TARODAN, Türkiye'nin diecast model araba koleksiyoncuları için özel olarak tasarlanmış çevrimiçi pazaryeridir. Platformumuz, koleksiyoncuları bir araya getirerek model arabalarını güvenle alıp satmalarını ve takas yapmalarını sağlamaktadır.</p>
 
@@ -31,7 +62,7 @@ export const DEFAULT_CONTENT: Record<PredefinedSlug, { title: string; content: s
 <p>Sorularınız için <a href="/contact">iletişim sayfamızı</a> ziyaret edebilirsiniz.</p>`,
   },
   faq: {
-    title: 'Sık Sorulan Sorular',
+    title: "Sık Sorulan Sorular",
     content: `<h2>Genel</h2>
 
 <h3>TARODAN nedir?</h3>
@@ -90,7 +121,7 @@ export const DEFAULT_CONTENT: Record<PredefinedSlug, { title: string; content: s
 <p>Evet, tüm kişisel verileriniz şifrelenmiş şekilde saklanır. KVKK ve GDPR uyumlu çalışıyoruz. Detaylar için <a href="/privacy">Gizlilik Politikamızı</a> inceleyebilirsiniz.</p>`,
   },
   privacy: {
-    title: 'Gizlilik Politikası',
+    title: "Gizlilik Politikası",
     content: `<p><em>Son güncelleme: Ocak 2026</em></p>
 
 <h2>1. Giriş</h2>
@@ -141,7 +172,7 @@ export const DEFAULT_CONTENT: Record<PredefinedSlug, { title: string; content: s
 <p>Gizlilik politikamız veya kişisel verilerinizle ilgili sorularınız için <a href="/contact">iletişim sayfamız</a> üzerinden bize ulaşabilirsiniz.</p>`,
   },
   terms: {
-    title: 'Kullanım Koşulları',
+    title: "Kullanım Koşulları",
     content: `<p><em>Son güncelleme: Ocak 2026</em></p>
 
 <h2>1. Kabul</h2>

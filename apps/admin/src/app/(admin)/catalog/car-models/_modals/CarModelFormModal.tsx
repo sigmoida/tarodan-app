@@ -1,11 +1,18 @@
-'use client';
+"use client";
 
-import { useQuery } from '@tanstack/react-query';
-import { FormModal, FormInput, FormSelect, FormCheckbox, useZodForm } from '@tarodan/ui/form';
-import { adminApi } from '@/lib/api';
-import { useAdminMutation } from '@/hooks/useAdminMutation';
-import { carModelSchema, type CarModelFormValues } from '../_lib/schema';
-import type { Brand, CarModel } from '../_lib/types';
+import { useQuery } from "@tanstack/react-query";
+import {
+  FormModal,
+  FormInput,
+  FormSelect,
+  FormCheckbox,
+  useZodForm,
+} from "@tarodan/ui/form";
+import { adminApi } from "@/lib/api";
+import { adminKeys } from "@/lib/query/keys";
+import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { carModelSchema, type CarModelFormValues } from "../_lib/schema";
+import type { Brand, CarModel } from "../_lib/types";
 
 /**
  * Shared create/edit car-model modal — used by both /catalog/car-models and the
@@ -28,7 +35,7 @@ export function CarModelFormModal({
   const isEdit = Boolean(model);
 
   const { data: brands = [] } = useQuery<Brand[]>({
-    queryKey: ['brands', 'options'],
+    queryKey: adminKeys.options("brands"),
     queryFn: async () => (await adminApi.getBrands()).data?.data ?? [],
   });
 
@@ -37,11 +44,17 @@ export function CarModelFormModal({
       ? {
           brandId: model.brandId,
           name: model.name,
-          yearStart: model.yearStart != null ? String(model.yearStart) : '',
-          yearEnd: model.yearEnd != null ? String(model.yearEnd) : '',
+          yearStart: model.yearStart != null ? String(model.yearStart) : "",
+          yearEnd: model.yearEnd != null ? String(model.yearEnd) : "",
           isActive: model.isActive,
         }
-      : { brandId: defaultBrandId ?? '', name: '', yearStart: '', yearEnd: '', isActive: true },
+      : {
+          brandId: defaultBrandId ?? "",
+          name: "",
+          yearStart: "",
+          yearEnd: "",
+          isActive: true,
+        },
   });
 
   const save = useAdminMutation(
@@ -57,8 +70,8 @@ export function CarModelFormModal({
         : adminApi.createCarModel({ ...payload, brandId: v.brandId });
     },
     {
-      invalidates: ['car-models', 'brands'],
-      successMessage: isEdit ? 'Model güncellendi' : 'Model oluşturuldu',
+      invalidates: ["car-models", "brands"],
+      successMessage: isEdit ? "Model güncellendi" : "Model oluşturuldu",
       onSuccess: onClose,
     },
   );
@@ -67,11 +80,11 @@ export function CarModelFormModal({
     <FormModal
       open={open}
       onClose={onClose}
-      title={isEdit ? 'Modeli Düzenle' : 'Yeni Model Ekle'}
+      title={isEdit ? "Modeli Düzenle" : "Yeni Model Ekle"}
       form={form}
       onSubmit={(v) => save.mutate(v)}
       isSubmitting={save.isPending}
-      submitLabel={isEdit ? 'Güncelle' : 'Ekle'}
+      submitLabel={isEdit ? "Güncelle" : "Ekle"}
     >
       <FormSelect
         name="brandId"
@@ -83,10 +96,20 @@ export function CarModelFormModal({
       <FormInput name="name" label="Model Adı" placeholder="Örn: M4, 911 GT3" />
       <div className="flex gap-4">
         <div className="flex-1">
-          <FormInput name="yearStart" label="Başlangıç Yılı" type="number" placeholder="2014" />
+          <FormInput
+            name="yearStart"
+            label="Başlangıç Yılı"
+            type="number"
+            placeholder="2014"
+          />
         </div>
         <div className="flex-1">
-          <FormInput name="yearEnd" label="Bitiş Yılı" type="number" placeholder="Boş = devam ediyor" />
+          <FormInput
+            name="yearEnd"
+            label="Bitiş Yılı"
+            type="number"
+            placeholder="Boş = devam ediyor"
+          />
         </div>
       </div>
       <FormCheckbox name="isActive" label="Aktif" />

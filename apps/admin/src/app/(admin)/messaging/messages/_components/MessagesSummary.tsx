@@ -1,9 +1,10 @@
-'use client';
+"use client";
 
-import { useQuery } from '@tanstack/react-query';
-import { useSearchParams } from 'next/navigation';
-import { adminApi } from '@/lib/api';
-import { mapFilterToApiStatus } from '../_lib/types';
+import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
+import { adminApi } from "@/lib/api";
+import { adminKeys } from "@/lib/query/keys";
+import { mapFilterToApiStatus } from "../_lib/types";
 
 /**
  * Page-level header subtitle — live total (respecting the active status filter),
@@ -12,12 +13,12 @@ import { mapFilterToApiStatus } from '../_lib/types';
  */
 export function MessagesSummary() {
   const searchParams = useSearchParams();
-  const search = searchParams.get('q') ?? '';
+  const search = searchParams.get("q") ?? "";
   // Default filter is "pending" (initialFilters) — cleared from the URL when active.
-  const status = searchParams.get('status') ?? 'pending';
+  const status = searchParams.get("status") ?? "pending";
 
   const { data: total } = useQuery({
-    queryKey: ['messages-count', { search, status }],
+    queryKey: adminKeys.count("messages", { search, status }),
     queryFn: async () => {
       const res = await adminApi.getMessages({
         page: 1,
@@ -32,13 +33,13 @@ export function MessagesSummary() {
   });
 
   const t = total ?? 0;
-  if (status === 'approved') return <>{t} onaylanmış mesaj</>;
-  if (status === 'rejected') return <>{t} reddedilen mesaj</>;
-  if (status === 'all') return <>Toplam {t} mesaj</>;
+  if (status === "approved") return <>{t} onaylanmış mesaj</>;
+  if (status === "rejected") return <>{t} reddedilen mesaj</>;
+  if (status === "all") return <>Toplam {t} mesaj</>;
   return (
     <>
-      {t} mesaj onay bekliyor — bekleyen mesajları onaylayın, reddedin veya göndereni
-      yasaklayın
+      {t} mesaj onay bekliyor — bekleyen mesajları onaylayın, reddedin veya
+      göndereni yasaklayın
     </>
   );
 }
