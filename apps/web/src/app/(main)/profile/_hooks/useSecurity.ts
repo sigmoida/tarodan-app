@@ -5,7 +5,7 @@
 import toast from "react-hot-toast";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
 import type { ChangePasswordValues } from "../_lib/schemas";
@@ -43,26 +43,23 @@ export function useChangePassword() {
 
 /** SMS phone-verification: send a code, then verify it. */
 export function usePhoneVerification() {
-  const locale = useLocale();
+  const t = useTranslations();
   const refreshUser = useAuthStore((s) => s.refreshUser);
 
   const sendCode = useWebMutation(
     (phone: string) => api.post("/auth/phone/send-code", { phone }),
     {
-      errorMessage: locale === "en" ? "Failed" : "Gönderilemedi",
-      onSuccess: () =>
-        toast.success(locale === "en" ? "Code sent" : "Kod gönderildi"),
+      errorMessage: t("profile.sendCodeFailed"),
+      onSuccess: () => toast.success(t("profile.codeSent")),
     },
   );
 
   const verify = useWebMutation(
     (code: string) => api.post("/auth/phone/verify", { code }),
     {
-      errorMessage: locale === "en" ? "Invalid code" : "Kod hatalı",
+      errorMessage: t("profile.invalidCode"),
       onSuccess: async () => {
-        toast.success(
-          locale === "en" ? "Phone verified" : "Telefon doğrulandı",
-        );
+        toast.success(t("profile.phoneVerified"));
         await refreshUser();
       },
     },

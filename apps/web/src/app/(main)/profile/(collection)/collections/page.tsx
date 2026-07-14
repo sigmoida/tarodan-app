@@ -56,7 +56,9 @@ export default function MyCollectionsPage() {
     <PageShell className="pb-16">
       <PageHeader
         title={t("collection.myCollections")}
-        description={`${myCollections.length} ${locale === "en" ? "collections" : "koleksiyon"}`}
+        description={t("collection.collectionsCount", {
+          count: myCollections.length,
+        })}
         actions={
           mounted && isAuthenticated ? (
             <Button

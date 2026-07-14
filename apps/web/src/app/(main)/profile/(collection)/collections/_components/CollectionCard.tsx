@@ -6,7 +6,7 @@ import Link from "next/link";
 import { EyeIcon, HeartIcon } from "@heroicons/react/24/outline";
 import { Badge } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import type { Collection } from "../_lib/types";
 
 export default function CollectionCard({
@@ -15,7 +15,6 @@ export default function CollectionCard({
   collection: Collection;
 }) {
   const t = useTranslations();
-  const locale = useLocale();
 
   return (
     <Link
@@ -59,7 +58,7 @@ export default function CollectionCard({
         )}
         <div className="mt-2 flex items-center justify-between text-2xs text-subtle">
           <span className="font-medium">
-            {collection.itemCount} {locale === "en" ? "items" : "ürün"}
+            {collection.itemCount} {t("collection.items")}
           </span>
           <div className="flex items-center gap-2">
             {collection.viewCount !== undefined && (

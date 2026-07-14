@@ -81,6 +81,8 @@ export function useMessaging(enabled: boolean) {
     queryFn: async (): Promise<MessageThread[]> => {
       const response = await messagesApi.getThreads();
       const rawThreads = response.data.data || response.data.threads || [];
+      const userLabel = t("common.user");
+      const productLabel = t("order.product");
       return rawThreads.map((t: any) => {
         if (t.otherUser) return t;
         const isParticipant1 = t.participant1Id === user?.id;
@@ -89,8 +91,8 @@ export function useMessaging(enabled: boolean) {
           otherUser: {
             id: isParticipant1 ? t.participant2Id : t.participant1Id,
             displayName: isParticipant1
-              ? t.participant2Name || (locale === "en" ? "User" : "Kullanıcı")
-              : t.participant1Name || (locale === "en" ? "User" : "Kullanıcı"),
+              ? t.participant2Name || userLabel
+              : t.participant1Name || userLabel,
             avatarUrl: isParticipant1
               ? t.participant2AvatarUrl || null
               : t.participant1AvatarUrl || null,
@@ -104,7 +106,7 @@ export function useMessaging(enabled: boolean) {
           product: t.productId
             ? {
                 id: t.productId,
-                title: t.productTitle || (locale === "en" ? "Product" : "Ürün"),
+                title: t.productTitle || productLabel,
                 imageUrl: t.productImage,
               }
             : undefined,
@@ -189,7 +191,7 @@ export function useMessaging(enabled: boolean) {
       try {
         const productResponse = await listingsApi.getOne(productId);
         const product = productResponse.data.product || productResponse.data;
-        productTitle = product.title || (locale === "en" ? "Product" : "Ürün");
+        productTitle = product.title || t("order.product");
       } catch (error) {
         if (process.env.NODE_ENV === "development")
           console.error("Failed to fetch product:", error);
@@ -250,14 +252,14 @@ export function useMessaging(enabled: boolean) {
           displayName:
             newThread.otherUser?.displayName ||
             otherName ||
-            (locale === "en" ? "Seller" : "Satıcı"),
+            t("product.seller"),
           avatarUrl: newThread.otherUser?.avatarUrl || otherAvatar,
         },
         unreadCount: 0,
         product: productId
           ? {
               id: productId,
-              title: productTitle || (locale === "en" ? "Product" : "Ürün"),
+              title: productTitle || t("order.product"),
             }
           : undefined,
       };
@@ -403,13 +405,13 @@ export function useMessaging(enabled: boolean) {
       : { passed: true };
     if (!filterResult.passed) {
       const proceed = await confirm({
-        title: locale === "en" ? "Content warning" : "İçerik uyarısı",
+        title: t("message.contentWarning"),
         description:
           locale === "en"
             ? `${filterResult.warning} Do you still want to send it?`
             : `${filterResult.warning} Yine de göndermek istiyor musunuz?`,
-        confirmLabel: locale === "en" ? "Send" : "Gönder",
-        cancelLabel: locale === "en" ? "Cancel" : "Vazgeç",
+        confirmLabel: t("common.send"),
+        cancelLabel: t("trade.dispute.cancelCta"),
       });
       if (!proceed) return;
     }
