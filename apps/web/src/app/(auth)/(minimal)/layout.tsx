@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import Image from 'next/image';
-import { useLocale, useTranslations } from "next-intl";
+import Link from "next/link";
+import Image from "next/image";
+import { useTranslations } from "next-intl";
 
 /**
  * Minimal auth frame for the transactional flows (forgot / reset password,
@@ -16,8 +16,7 @@ export default function AuthMinimalLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const locale = useLocale();
-  const en = locale === 'en';
+  const t = useTranslations();
 
   return (
     <div className="flex min-h-screen flex-col bg-surface-elevated">
@@ -39,8 +38,7 @@ export default function AuthMinimalLayout({
 
       <footer className="p-6 text-center">
         <p className="text-sm text-subtle">
-          © {new Date().getFullYear()} Tarodan.{' '}
-          {en ? 'All rights reserved.' : 'Tüm hakları saklıdır.'}
+          © {new Date().getFullYear()} Tarodan. {t("footer.copyright")}
         </p>
       </footer>
     </div>

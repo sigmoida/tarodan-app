@@ -1,24 +1,31 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/stores/authStore';
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/stores/authStore";
 import { useLocale, useTranslations } from "next-intl";
-import { Button, Spinner } from '@tarodan/ui';
-import { Form, FormInput, FormCheckbox, FormError, useZodForm } from '@tarodan/ui/form';
-import { registerSchema, type RegisterValues } from '../_lib/auth';
-import { GoogleSignInButton } from './GoogleSignInButton';
-import { useRegister } from '../_hooks/useRegister';
-import { AuthCard } from './AuthCard';
-import { PasswordChecklist } from './PasswordChecklist';
+import { Button, Spinner } from "@tarodan/ui";
+import {
+  Form,
+  FormInput,
+  FormCheckbox,
+  FormError,
+  useZodForm,
+} from "@tarodan/ui/form";
+import { registerSchema, type RegisterValues } from "../_lib/auth";
+import { GoogleSignInButton } from "./GoogleSignInButton";
+import { useRegister } from "../_hooks/useRegister";
+import { AuthCard } from "./AuthCard";
+import { PasswordChecklist } from "./PasswordChecklist";
 
 export function RegisterForm() {
   const router = useRouter();
   const t = useTranslations();
   const locale = useLocale();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
-  const { registrationSuccess, registeredEmail, submit, resendVerification } = useRegister();
+  const { registrationSuccess, registeredEmail, submit, resendVerification } =
+    useRegister();
 
   // authStore ilk client render'da (giriş yapmamış kullanıcı) isLoading=false
   // verirken server isLoading=true verir; bu fark hydration hatasına yol
@@ -29,12 +36,12 @@ export function RegisterForm() {
 
   const form = useZodForm(registerSchema(locale), {
     defaultValues: {
-      displayName: '',
-      email: '',
-      phone: '',
-      birthDate: '',
-      password: '',
-      confirmPassword: '',
+      displayName: "",
+      email: "",
+      phone: "",
+      birthDate: "",
+      password: "",
+      confirmPassword: "",
       agreeTerms: false,
       acceptsMarketingEmails: false,
     },
@@ -44,7 +51,7 @@ export function RegisterForm() {
     submit({
       displayName: v.displayName,
       email: v.email,
-      phone: v.phone ?? '',
+      phone: v.phone ?? "",
       birthDate: v.birthDate,
       password: v.password,
       confirmPassword: v.confirmPassword,
@@ -55,12 +62,12 @@ export function RegisterForm() {
   const getMaxBirthDate = (): string => {
     const today = new Date();
     today.setFullYear(today.getFullYear() - 18);
-    return today.toISOString().split('T')[0];
+    return today.toISOString().split("T")[0];
   };
 
   useEffect(() => {
     if (isAuthenticated) {
-      router.push('/');
+      router.push("/");
     }
   }, [isAuthenticated, router]);
 
@@ -71,11 +78,11 @@ export function RegisterForm() {
   if (isAuthenticated) {
     return (
       <AuthCard
-        title={locale === 'en' ? 'Already signed in' : 'Zaten giriş yaptınız'}
-        description={locale === 'en' ? 'You are already logged in.' : 'Zaten giriş yapmışsınız.'}
+        title={t("auth.alreadySignedIn")}
+        description={t("auth.alreadyLoggedIn")}
       >
-        <Button className="w-full" onClick={() => router.push('/')}>
-          {locale === 'en' ? 'Go to Home' : 'Ana Sayfaya Dön'}
+        <Button className="w-full" onClick={() => router.push("/")}>
+          {t("auth.goToHome")}
         </Button>
       </AuthCard>
     );
@@ -84,32 +91,33 @@ export function RegisterForm() {
   if (registrationSuccess) {
     return (
       <AuthCard
-        title={locale === 'en' ? 'Almost There!' : 'Neredeyse Tamam!'}
+        title={t("auth.almostThere")}
         description={
           <>
-            {locale === 'en' ? 'We sent a verification link to ' : 'Doğrulama linki gönderildi: '}
+            {t("auth.verificationSentTo")}
             <span className="font-semibold text-body">{registeredEmail}</span>
           </>
         }
         footer={
-          <Link href="/verify-email" className="font-semibold text-primary-600 hover:text-primary-700">
-            {locale === 'en'
-              ? 'Need to verify later? Go to verification page'
-              : 'Daha sonra mı doğrulayacaksınız? Doğrulama sayfasına gidin'}
+          <Link
+            href="/verify-email"
+            className="font-semibold text-primary-600 hover:text-primary-700"
+          >
+            {t("auth.verifyLaterLink")}
           </Link>
         }
       >
         <div className="space-y-4">
-          <p className="text-sm text-muted">
-            {locale === 'en'
-              ? "Can't find it? Check your spam/junk folder. The verification link expires in 24 hours."
-              : 'Bulamıyor musunuz? Spam/Gereksiz klasörünü kontrol edin. Doğrulama linki 24 saat geçerlidir.'}
-          </p>
-          <Button className="w-full" onClick={() => router.push('/login')}>
-            {locale === 'en' ? 'Go to Login' : 'Giriş Sayfasına Git'}
+          <p className="text-sm text-muted">{t("auth.verificationSpamHint")}</p>
+          <Button className="w-full" onClick={() => router.push("/login")}>
+            {t("auth.goToLogin")}
           </Button>
-          <Button variant="secondary" className="w-full" onClick={resendVerification}>
-            {locale === 'en' ? 'Resend Verification Email' : 'Doğrulama E-postasını Tekrar Gönder'}
+          <Button
+            variant="secondary"
+            className="w-full"
+            onClick={resendVerification}
+          >
+            {t("auth.resendVerificationEmail")}
           </Button>
         </div>
       </AuthCard>
@@ -118,17 +126,23 @@ export function RegisterForm() {
 
   return (
     <AuthCard
-      title={t('auth.createAccount')}
-      description={locale === 'en' ? 'Join the collectors community' : 'Koleksiyonerler topluluğuna katılın'}
+      title={t("auth.createAccount")}
+      description={t("auth.joinCommunity")}
       footer={
         <>
-          {t('auth.hasAccount')}{' '}
-          <Link href="/login" className="font-semibold text-primary-600 hover:text-primary-700">
-            {t('common.login')}
+          {t("auth.hasAccount")}{" "}
+          <Link
+            href="/login"
+            className="font-semibold text-primary-600 hover:text-primary-700"
+          >
+            {t("common.login")}
           </Link>
           <span className="mt-3 block border-t border-border pt-3">
-            <Link href="/register/business" className="font-medium text-body hover:text-primary-600">
-              {locale === 'en' ? 'Open Business Account' : 'Şirket Hesabı Aç'}
+            <Link
+              href="/register/business"
+              className="font-medium text-body hover:text-primary-600"
+            >
+              {t("auth.openBusinessAccount")}
             </Link>
           </span>
         </>
@@ -137,16 +151,16 @@ export function RegisterForm() {
       <Form form={form} onSubmit={onSubmit} className="space-y-4">
         <FormInput
           name="displayName"
-          label={`${locale === 'en' ? 'Full Name' : 'Ad Soyad'} *`}
-          placeholder={locale === 'en' ? 'Your Full Name' : 'Adınız Soyadınız'}
+          label={`${t("checkout.fullName")} *`}
+          placeholder={t("auth.fullNamePlaceholder")}
           autoComplete="name"
         />
 
         <FormInput
           name="email"
           type="email"
-          label={`${t('auth.email')} *`}
-          placeholder={locale === 'en' ? 'example@email.com' : 'ornek@email.com'}
+          label={`${t("auth.email")} *`}
+          placeholder={t("auth.emailPlaceholder")}
           autoComplete="email"
         />
 
@@ -154,7 +168,7 @@ export function RegisterForm() {
           <FormInput
             name="phone"
             type="tel"
-            label={t('auth.phone')}
+            label={t("auth.phone")}
             placeholder="5XX XXX XX XX"
             autoComplete="tel"
           />
@@ -162,7 +176,7 @@ export function RegisterForm() {
           <FormInput
             name="birthDate"
             type="date"
-            label={`${t('auth.birthDate')} *`}
+            label={`${t("auth.birthDate")} *`}
             max={getMaxBirthDate()}
           />
         </div>
@@ -171,7 +185,7 @@ export function RegisterForm() {
           <FormInput
             name="password"
             type="password"
-            label={`${t('auth.password')} *`}
+            label={`${t("auth.password")} *`}
             placeholder="••••••••"
             autoComplete="new-password"
           />
@@ -179,51 +193,56 @@ export function RegisterForm() {
           <FormInput
             name="confirmPassword"
             type="password"
-            label={`${t('auth.confirmPassword')} *`}
+            label={`${t("auth.confirmPassword")} *`}
             placeholder="••••••••"
             autoComplete="new-password"
           />
         </div>
 
-        <PasswordChecklist password={form.watch('password')} locale={locale} />
+        <PasswordChecklist password={form.watch("password")} />
 
         <FormCheckbox
           name="agreeTerms"
           label={
             <span className="text-sm text-muted leading-snug">
-              {locale === 'en' ? (
-                <>
-                  I accept the{' '}
-                  <Link href="/terms" className="font-medium text-primary-600 hover:text-primary-700">Terms of Service</Link>
-                  {' '}and{' '}
-                  <Link href="/privacy" className="font-medium text-primary-600 hover:text-primary-700">Privacy Policy</Link>.
-                </>
-              ) : (
-                <>
-                  <Link href="/terms" className="font-medium text-primary-600 hover:text-primary-700">Kullanım Şartları</Link>
-                  {' '}ve{' '}
-                  <Link href="/privacy" className="font-medium text-primary-600 hover:text-primary-700">Gizlilik Politikası</Link>
-                  &apos;nı okudum ve kabul ediyorum.
-                </>
-              )}
+              {t.rich("auth.termsAgreeRich", {
+                terms: (chunks) => (
+                  <Link
+                    href="/terms"
+                    className="font-medium text-primary-600 hover:text-primary-700"
+                  >
+                    {chunks}
+                  </Link>
+                ),
+                privacy: (chunks) => (
+                  <Link
+                    href="/privacy"
+                    className="font-medium text-primary-600 hover:text-primary-700"
+                  >
+                    {chunks}
+                  </Link>
+                ),
+              })}
             </span>
           }
         />
 
         <FormCheckbox
           name="acceptsMarketingEmails"
-          label={locale === 'en'
-            ? 'I want to receive promotional emails and special offers.'
-            : 'Reklam ve kampanya e-postalarını almak istiyorum.'}
+          label={t("auth.marketingConsent")}
         />
 
         <FormError />
 
-        <Button type="submit" isLoading={form.formState.isSubmitting} className="w-full">
-          {t('common.register')}
+        <Button
+          type="submit"
+          isLoading={form.formState.isSubmitting}
+          className="w-full"
+        >
+          {t("common.register")}
         </Button>
 
-        <GoogleSignInButton onSuccess={() => router.push('/')} />
+        <GoogleSignInButton onSuccess={() => router.push("/")} />
       </Form>
     </AuthCard>
   );

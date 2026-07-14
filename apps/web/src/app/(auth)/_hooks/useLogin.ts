@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { useAuthStore } from "@/stores/authStore";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
 
 /** Resolve the post-login target: sessionStorage hint → ?redirect → home. */
@@ -40,7 +40,6 @@ function resolveRedirect(): string {
 export function useLogin() {
   const router = useRouter();
   const t = useTranslations();
-  const locale = useLocale();
   const { login } = useAuthStore();
 
   const [showVerificationBanner, setShowVerificationBanner] = useState(false);
@@ -108,11 +107,7 @@ export function useLogin() {
 
   const submit = (email: string, password: string) => {
     if (!email.trim() || !password.trim()) {
-      toast.error(
-        locale === "en"
-          ? "Email and password are required"
-          : "E-posta ve şifre gerekli",
-      );
+      toast.error(t("auth.emailPasswordRequired"));
       return;
     }
     return loginMutation.mutateAsync({ email, password }).catch(() => {});
@@ -121,25 +116,13 @@ export function useLogin() {
   const resendMutation = useMutation({
     mutationFn: (email: string) =>
       api.post("/auth/resend-verification", { email }),
-    onSuccess: () =>
-      toast.success(
-        locale === "en"
-          ? "Verification email sent!"
-          : "Doğrulama e-postası gönderildi!",
-      ),
-    onError: () =>
-      toast.error(
-        locale === "en" ? "Could not send email" : "E-posta gönderilemedi",
-      ),
+    onSuccess: () => toast.success(t("auth.verificationEmailSent")),
+    onError: () => toast.error(t("auth.couldNotSendEmail")),
   });
 
   const resendVerification = (email: string) => {
     if (!email.trim()) {
-      toast.error(
-        locale === "en"
-          ? "Please enter your email first"
-          : "Lütfen önce e-postanızı girin",
-      );
+      toast.error(t("auth.enterEmailFirst"));
       return;
     }
     resendMutation.mutate(email);
