@@ -1,6 +1,7 @@
 /** @format */
 
 import { Button, Modal, Textarea } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
 
 interface RejectTradeModalProps {
   open: boolean;
@@ -23,11 +24,12 @@ export default function RejectTradeModal({
   locale,
   cancelLabel,
 }: RejectTradeModalProps) {
+  const t = useTranslations();
   return (
     <Modal
       isOpen={open}
       onClose={onClose}
-      title={locale === "en" ? "Reject Trade" : "Takası Reddet"}
+      title={t("trade.rejectTradeTitle")}
       maxWidth="max-w-md"
     >
       <Textarea

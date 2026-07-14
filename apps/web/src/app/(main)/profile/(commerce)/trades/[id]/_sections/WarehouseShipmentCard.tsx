@@ -1,5 +1,6 @@
 /** @format */
 
+import { useTranslations } from "next-intl";
 import SectionCard from "@/components/ui/SectionCard";
 import ShipmentStatusChip from "../_components/ShipmentStatusChip";
 import type { Trade, TradeShipment } from "../_lib/types";
@@ -19,6 +20,7 @@ export default function WarehouseShipmentCard({
   myToWarehouseShipment,
   otherToWarehouseShipment,
 }: WarehouseShipmentCardProps) {
+  const t = useTranslations();
   if (
     trade.status !== "shipping_to_warehouse" ||
     !userId ||
@@ -46,7 +48,7 @@ export default function WarehouseShipmentCard({
          küçük bir satırla bilgi olarak yazılır. */}
       <div className="border border-border-subtle rounded-lg p-4">
         <p className="text-xs uppercase text-subtle mb-1">
-          {locale === "en" ? "Your shipment" : "Sizin gönderiniz"}
+          {t("trade.warehouseShipping.yourShipment")}
         </p>
         <p className="font-mono text-base font-bold text-heading break-all">
           {myToWarehouseShipment?.trackingNumber ?? "—"}

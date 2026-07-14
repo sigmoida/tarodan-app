@@ -1,19 +1,20 @@
 /** @format */
 
-'use client';
+"use client";
 
-import { Stepper, type StepperStep } from '@tarodan/ui';
-import type { Trade } from '../_lib/types';
+import { Stepper, type StepperStep } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
+import type { Trade } from "../_lib/types";
 
 const ACTIVE_STATUSES = [
-  'accepted',
-  'awaiting_payment',
-  'shipping_to_warehouse',
-  'at_warehouse',
-  'admin_reviewing',
-  'shipping_to_recipients',
-  'completed',
-  'returning',
+  "accepted",
+  "awaiting_payment",
+  "shipping_to_warehouse",
+  "at_warehouse",
+  "admin_reviewing",
+  "shipping_to_recipients",
+  "completed",
+  "returning",
 ];
 
 /**
@@ -28,18 +29,19 @@ export default function TradeProgressTimeline({
   trade: Trade;
   locale: string;
 }) {
+  const t = useTranslations();
   if (!ACTIVE_STATUSES.includes(trade.status)) return null;
 
   const hasCash = !!trade.cashAmount;
-  const isReturning = trade.status === 'returning';
+  const isReturning = trade.status === "returning";
 
   const steps: StepperStep[] = [
-    { label: locale === 'en' ? 'Accepted' : 'Kabul Edildi' },
-    ...(hasCash ? [{ label: locale === 'en' ? 'Payment' : 'Ödeme' }] : []),
-    { label: locale === 'en' ? 'Ship to Warehouse' : 'Depoya Kargolanıyor' },
-    { label: locale === 'en' ? 'At Warehouse' : 'Depoda' },
-    { label: locale === 'en' ? 'Shipping to You' : 'Size Kargolanıyor' },
-    { label: locale === 'en' ? 'Completed' : 'Tamamlandı' },
+    { label: t("trade.statusAccepted") },
+    ...(hasCash ? [{ label: t("checkout.step2") }] : []),
+    { label: t("trade.stepShipToWarehouse") },
+    { label: t("trade.tradeStatus.at_warehouse") },
+    { label: t("trade.stepShippingToYou") },
+    { label: t("trade.statusCompleted") },
   ];
   const order: Record<string, number> = {
     accepted: 0,
@@ -55,13 +57,13 @@ export default function TradeProgressTimeline({
   return (
     <div className="mb-6 rounded-lg border border-border bg-surface-elevated p-4 sm:p-6">
       <h3 className="mb-4 text-sm font-semibold text-heading">
-        {locale === 'en' ? 'Trade Progress' : 'Takas Aşamaları'}
+        {t("trade.tradeProgress")}
       </h3>
       {isReturning ? (
         <p className="rounded border border-warning-200 bg-warning-50 p-3 text-sm text-warning-700">
-          {locale === 'en'
-            ? 'Trade was rejected at warehouse. Items are being returned to senders.'
-            : 'Takas depoda reddedildi. Ürünler göndericilere iade ediliyor.'}
+          {locale === "en"
+            ? "Trade was rejected at warehouse. Items are being returned to senders."
+            : "Takas depoda reddedildi. Ürünler göndericilere iade ediliyor."}
         </p>
       ) : (
         <Stepper steps={steps} current={current} />

@@ -6,6 +6,9 @@ import Link from "next/link";
 import { CheckCircleIcon } from "@heroicons/react/24/outline";
 import type { Trade } from "../_lib/types";
 
+/** BCP-47 date-format locale for the active UI language. */
+const DATE_LOCALES: Record<string, string> = { en: "en-US", tr: "tr-TR" };
+
 export default function CompletedTradeSummary({
   trade,
   locale,
@@ -19,7 +22,7 @@ export default function CompletedTradeSummary({
 
   const fmtDate = (iso?: string) =>
     iso
-      ? new Date(iso).toLocaleDateString(locale === "en" ? "en-US" : "tr-TR", {
+      ? new Date(iso).toLocaleDateString(DATE_LOCALES[locale] ?? "tr-TR", {
           dateStyle: "medium",
         })
       : "—";

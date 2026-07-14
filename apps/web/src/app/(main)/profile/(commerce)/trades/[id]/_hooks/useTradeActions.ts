@@ -6,6 +6,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import toast from "react-hot-toast";
+import { useTranslations } from "next-intl";
 import { tradesApi, addressesApi, paymentsApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -33,6 +34,7 @@ export function useTradeActions({
 }: UseTradeActionsArgs) {
   const router = useRouter();
   const confirm = useConfirm();
+  const t = useTranslations();
 
   const [tradeAddressId, setTradeAddressId] = useState<string | null>(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -74,9 +76,7 @@ export function useTradeActions({
             data.paymentId as string,
           );
           if (bypassRes.data?.success) {
-            toast.success(
-              locale === "en" ? "Payment successful" : "Ödeme başarılı",
-            );
+            toast.success(t("payment.paymentSuccess"));
             await invalidateTrade();
             // Trade cash payment → direkt takas sayfasına dön, /orders'a uğrama
             router.push(`/profile/trades/${trade.id}?paid=1`);
@@ -98,9 +98,7 @@ export function useTradeActions({
         return;
       }
 
-      toast.error(
-        locale === "en" ? "Could not start payment" : "Ödeme başlatılamadı",
-      );
+      toast.error(t("payment.startFailed"));
     },
     onError: (err: any) => {
       toast.error(
@@ -145,9 +143,7 @@ export function useTradeActions({
 
   const handleShipSubmit = () => {
     if (!trade || !shipAddressId) {
-      toast.error(
-        locale === "en" ? "Please select an address" : "Lütfen adres seçin",
-      );
+      toast.error(t("trade.selectAddress"));
       return;
     }
     shipMutation.mutate(shipAddressId);
@@ -189,9 +185,7 @@ export function useTradeActions({
       return tradesApi.accept(trade.id, undefined, addressId);
     },
     onSuccess: async () => {
-      toast.success(
-        locale === "en" ? "Trade accepted!" : "Takas kabul edildi!",
-      );
+      toast.success(t("product.tradeAccepted"));
       await invalidateTrade();
     },
     onError: (error: any) => {
@@ -227,7 +221,7 @@ export function useTradeActions({
       return tradesApi.reject(trade.id, rejectReason.trim() || undefined);
     },
     onSuccess: async () => {
-      toast.success(locale === "en" ? "Trade rejected" : "Takas reddedildi");
+      toast.success(t("trade.tradeRejected"));
       setShowRejectModal(false);
       setRejectReason("");
       await invalidateTrade();
@@ -235,10 +229,7 @@ export function useTradeActions({
     onError: (error: any) => {
       if (process.env.NODE_ENV === "development")
         console.error("Failed to reject trade:", error);
-      toast.error(
-        error.response?.data?.message ||
-          (locale === "en" ? "Failed to reject trade" : "Takas reddedilemedi"),
-      );
+      toast.error(error.response?.data?.message || t("trade.rejectFailed"));
     },
   });
 
@@ -258,7 +249,7 @@ export function useTradeActions({
       );
     },
     onSuccess: async () => {
-      toast.success(locale === "en" ? "Trade cancelled" : "Takas iptal edildi");
+      toast.success(t("trade.tradeCancelled"));
       await invalidateTrade();
     },
     onError: (error: any) => {
@@ -278,13 +269,13 @@ export function useTradeActions({
 
     if (
       !(await confirm({
-        title: locale === "en" ? "Cancel trade" : "Takası iptal et",
+        title: t("trade.cancelConfirmTitle"),
         description:
           locale === "en"
             ? "Are you sure you want to cancel this trade?"
             : "Bu takası iptal etmek istediğinizden emin misiniz?",
-        confirmLabel: locale === "en" ? "Yes, cancel" : "Evet, iptal et",
-        cancelLabel: locale === "en" ? "No" : "Vazgeç",
+        confirmLabel: t("order.cancelConfirmYes"),
+        cancelLabel: t("order.cancelConfirmNo"),
         destructive: true,
       }))
     ) {

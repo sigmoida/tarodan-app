@@ -3,6 +3,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import type { Trade } from "../_lib/types";
 
 /**
@@ -10,7 +11,8 @@ import type { Trade } from "../_lib/types";
  * current status (response / payment / shipping). Ticks every second and
  * clears itself when no deadline applies.
  */
-export function useTradeCountdown(trade: Trade | null, locale: string) {
+export function useTradeCountdown(trade: Trade | null) {
+  const t = useTranslations();
   const [countdown, setCountdown] = useState<string | null>(null);
 
   useEffect(() => {
@@ -22,13 +24,13 @@ export function useTradeCountdown(trade: Trade | null, locale: string) {
 
     if (trade.status === "pending" && trade.responseDeadline) {
       deadline = trade.responseDeadline;
-      deadlineLabel = locale === "en" ? "Response Time" : "Yanıt Süresi";
+      deadlineLabel = t("seller.responseTime");
     } else if (
       (trade.status === "accepted" || trade.status === "awaiting_payment") &&
       trade.paymentDeadline
     ) {
       deadline = trade.paymentDeadline;
-      deadlineLabel = locale === "en" ? "Payment Time" : "Ödeme Süresi";
+      deadlineLabel = t("trade.paymentTime");
     } else if (
       [
         "initiator_shipped",
@@ -39,7 +41,7 @@ export function useTradeCountdown(trade: Trade | null, locale: string) {
       trade.shippingDeadline
     ) {
       deadline = trade.shippingDeadline;
-      deadlineLabel = locale === "en" ? "Shipping Time" : "Kargo Süresi";
+      deadlineLabel = t("trade.shippingTime");
     }
 
     if (!deadline) {
@@ -53,9 +55,7 @@ export function useTradeCountdown(trade: Trade | null, locale: string) {
       const diff = deadlineTime - now;
 
       if (diff <= 0) {
-        setCountdown(
-          `${deadlineLabel}: ${locale === "en" ? "Time Expired!" : "Süre Doldu!"}`,
-        );
+        setCountdown(`${deadlineLabel}: ${t("trade.timeExpired")}`);
         return;
       }
 
@@ -67,7 +67,7 @@ export function useTradeCountdown(trade: Trade | null, locale: string) {
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
       let timeStr = "";
-      if (days > 0) timeStr += `${days}${locale === "en" ? "d " : "g "}`;
+      if (days > 0) timeStr += `${days}${t("trade.dayShort")} `;
       timeStr += `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 
       setCountdown(`${deadlineLabel}: ${timeStr}`);

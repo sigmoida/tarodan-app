@@ -1,25 +1,25 @@
 /** @format */
 
 import { TruckIcon } from "@heroicons/react/24/outline";
+import { useTranslations } from "next-intl";
 import type { Trade, TradeShipment } from "../_lib/types";
 
 interface ReturnShipmentCardProps {
   trade: Trade;
-  locale: string;
   myReturnShipment?: TradeShipment;
 }
 
 export default function ReturnShipmentCard({
   trade,
-  locale,
   myReturnShipment,
 }: ReturnShipmentCardProps) {
+  const t = useTranslations();
   if (trade.status !== "returning" || !myReturnShipment) return null;
 
   return (
     <div className="card p-6 mb-6 bg-warning-50 border-warning-200">
       <h3 className="font-semibold text-warning-900 mb-2">
-        {locale === "en" ? "Return Shipment" : "İade Kargosu"}
+        {t("trade.returnShipment")}
       </h3>
       <p className="text-sm text-body">
         {myReturnShipment.carrier === "surat"
@@ -38,7 +38,7 @@ export default function ReturnShipmentCard({
             className="inline-flex items-center gap-1 mt-2 text-sm text-primary-600 hover:text-primary-700 font-medium"
           >
             <TruckIcon className="w-4 h-4" />
-            {locale === "en" ? "Track on Sürat" : "Sürat'ta Takip Et"}
+            {t("order.trackOnSurat")}
           </a>
         )}
     </div>

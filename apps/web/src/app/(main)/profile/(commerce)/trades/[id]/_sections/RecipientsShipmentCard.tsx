@@ -2,6 +2,7 @@
 
 import { TruckIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import { Button, Spinner } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
 import type { Trade, TradeShipment } from "../_lib/types";
 
 interface RecipientsShipmentCardProps {
@@ -23,6 +24,7 @@ export default function RecipientsShipmentCard({
   onConfirmReceipt,
   isActionLoading,
 }: RecipientsShipmentCardProps) {
+  const t = useTranslations();
   if (
     trade.status !== "shipping_to_recipients" ||
     !userId ||
@@ -34,14 +36,12 @@ export default function RecipientsShipmentCard({
   return (
     <div className="card p-6 mb-6 bg-info-50 border-info-200">
       <h2 className="text-lg font-semibold text-heading mb-4">
-        {locale === "en" ? "Your Shipment is on the Way" : "Kargonuz Yolda"}
+        {t("trade.shipmentOnWay")}
       </h2>
 
       {myFromWarehouseShipment ? (
         <div className="p-4 bg-surface-elevated rounded-lg border border-info-200 mb-4">
-          <p className="text-sm text-muted mb-1">
-            {locale === "en" ? "Shipped to you" : "Size gönderilen kargo"}
-          </p>
+          <p className="text-sm text-muted mb-1">{t("trade.shippedToYou")}</p>
           <p className="font-medium text-heading">
             {myFromWarehouseShipment.carrier === "surat"
               ? "Sürat Kargo"
@@ -59,7 +59,7 @@ export default function RecipientsShipmentCard({
                 className="inline-flex items-center gap-1 mt-2 text-sm text-primary-600 hover:text-primary-700 font-medium"
               >
                 <TruckIcon className="w-4 h-4" />
-                {locale === "en" ? "Track on Sürat" : "Sürat'ta Takip Et"}
+                {t("order.trackOnSurat")}
               </a>
             )}
         </div>
@@ -106,12 +106,12 @@ export default function RecipientsShipmentCard({
               size="sm"
               color="border-surface-elevated border-t-transparent"
             />
-            {locale === "en" ? "Processing..." : "İşleniyor..."}
+            {t("checkout.processing")}
           </>
         ) : (
           <>
             <CheckCircleIcon className="w-5 h-5" />
-            {locale === "en" ? "I Received It" : "Teslim Aldım"}
+            {t("trade.iReceivedIt")}
           </>
         )}
       </Button>

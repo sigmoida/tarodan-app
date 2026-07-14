@@ -21,13 +21,7 @@ const fmt = (n: number) =>
     maximumFractionDigits: 2,
   });
 
-function ItemColumn({
-  label,
-  items,
-}: {
-  label: string;
-  items: TradeItem[];
-}) {
+function ItemColumn({ label, items }: { label: string; items: TradeItem[] }) {
   const total = calculateTotalValue(items);
   return (
     <div className="md:col-span-1">
@@ -85,14 +79,14 @@ export default function TradeCard({
     pending: t("trade.statusPending"),
     accepted: t("trade.statusAccepted"),
     rejected: t("trade.statusRejected"),
-    initiator_shipped: locale === "en" ? "Initiator Shipped" : "Gönderen Kargoda",
-    receiver_shipped: locale === "en" ? "Receiver Shipped" : "Alıcı Kargoda",
-    both_shipped: locale === "en" ? "Both Shipped" : "Her İkisi Kargoda",
-    initiator_received: locale === "en" ? "Initiator Received" : "Gönderen Teslim Aldı",
-    receiver_received: locale === "en" ? "Receiver Received" : "Alıcı Teslim Aldı",
+    initiator_shipped: t("trade.statusInitiatorShipped"),
+    receiver_shipped: t("trade.statusReceiverShipped"),
+    both_shipped: t("trade.statusBothShipped"),
+    initiator_received: t("trade.statusInitiatorReceived"),
+    receiver_received: t("trade.statusReceiverReceived"),
     completed: t("trade.statusCompleted"),
     cancelled: t("trade.statusCancelled"),
-    disputed: locale === "en" ? "Disputed" : "Anlaşmazlık",
+    disputed: t("trade.statusDisputed"),
   };
 
   const isSent = trade.initiatorId === currentUserId;
@@ -109,7 +103,9 @@ export default function TradeCard({
     >
       <div className="flex items-start justify-between mb-5">
         <div className="flex-1">
-          <p className="text-xs text-muted mb-1 font-mono">#{trade.tradeNumber}</p>
+          <p className="text-xs text-muted mb-1 font-mono">
+            #{trade.tradeNumber}
+          </p>
           <p className="font-semibold text-heading text-lg">
             {isSent ? t("trade.sentTrades") : t("trade.receivedTrades")} •{" "}
             {otherUserName}
@@ -118,7 +114,10 @@ export default function TradeCard({
         <StatusBadge
           status={trade.status}
           config={tradeStatusConfig}
-          label={statusLabels[trade.status] || formatTradeStatus(trade.status, locale)}
+          label={
+            statusLabels[trade.status] ||
+            formatTradeStatus(trade.status, locale)
+          }
         />
       </div>
 
@@ -156,7 +155,7 @@ export default function TradeCard({
           })}
         </div>
         <div className="text-xs text-subtle">
-          {locale === "en" ? "Click to view details" : "Detayları görmek için tıklayın"}
+          {t("trade.clickToViewDetails")}
         </div>
       </div>
     </Link>

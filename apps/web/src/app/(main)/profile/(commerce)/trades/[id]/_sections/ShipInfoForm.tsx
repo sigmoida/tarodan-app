@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { TruckIcon } from "@heroicons/react/24/outline";
 import { Button, Select, Spinner } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
 
 interface ShipInfoFormProps {
   locale: string;
@@ -23,10 +24,11 @@ export default function ShipInfoForm({
   onSubmit,
   isActionLoading,
 }: ShipInfoFormProps) {
+  const t = useTranslations();
   return (
     <div className="card p-6 mb-6 bg-primary-50 border-primary-200">
       <h2 className="text-lg font-semibold text-heading mb-4">
-        {locale === "en" ? "Enter Shipping Info" : "Kargo Bilgisi Gir"}
+        {t("trade.enterShipInfo")}
       </h2>
       <p className="text-muted text-sm mb-4">
         {locale === "en"
@@ -36,7 +38,7 @@ export default function ShipInfoForm({
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-body mb-2">
-            {locale === "en" ? "Shipping address" : "Gönderim adresi"}
+            {t("trade.shippingAddress")}
           </label>
           <Select
             value={shipAddressId}
@@ -65,11 +67,9 @@ export default function ShipInfoForm({
                 ? "No saved addresses. Add one in "
                 : "Kayıtlı adres yok. "}
               <Link href="/profile" className="underline font-medium">
-                {locale === "en"
-                  ? "Profile → Addresses"
-                  : "Profil → Adresler"}
+                {locale === "en" ? "Profile → Addresses" : "Profil → Adresler"}
               </Link>
-              {locale === "en" ? "" : " bölümünden ekleyebilirsiniz."}
+              {t("trade.addressLinkSuffix")}
             </p>
           )}
         </div>
@@ -86,7 +86,7 @@ export default function ShipInfoForm({
                 size="sm"
                 color="border-surface-elevated border-t-transparent"
               />
-              {locale === "en" ? "Submitting..." : "Gönderiliyor..."}
+              {t("trade.submitting")}
             </>
           ) : (
             <>

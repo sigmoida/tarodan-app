@@ -23,6 +23,7 @@ export function useTradeQuery() {
   const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const locale = useLocale();
+  const t = useTranslations();
   const tradeId = params.id as string;
 
   useEffect(() => {
@@ -56,12 +57,10 @@ export function useTradeQuery() {
 
   useEffect(() => {
     if (tradeQuery.isError && tradeId) {
-      toast.error(
-        locale === "en" ? "Failed to load trade" : "Takas yüklenemedi",
-      );
+      toast.error(t("trade.tradeLoadFailed"));
       router.push("/profile/trades");
     }
-  }, [tradeQuery.isError, tradeId, locale, router]);
+  }, [tradeQuery.isError, tradeId, router, t]);
 
   const invalidateTrade = () =>
     Promise.all([
