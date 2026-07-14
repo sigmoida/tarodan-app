@@ -3,7 +3,7 @@
 "use client";
 
 import { useAuthStore } from "@/stores/authStore";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import { useTradeQuery } from "./useTradeQuery";
 import { useTradeShipments } from "./useTradeShipments";
 import { useTradeCountdown } from "./useTradeCountdown";
@@ -20,7 +20,8 @@ import { useCounterOfferEditor } from "./useCounterOfferEditor";
  */
 export function useTradeDetail() {
   const { user } = useAuthStore();
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
 
   const { trade, isLoading, invalidateTrade, tradeId } = useTradeQuery();
 

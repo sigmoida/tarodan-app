@@ -3,7 +3,7 @@
 import { useRef } from 'react';
 import { XMarkIcon, PhotoIcon } from '@heroicons/react/24/outline';
 import { Button, Input, IconButton } from '@tarodan/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 
 export default function MessageComposer({
   newMessage,
@@ -28,7 +28,8 @@ export default function MessageComposer({
   onRemoveAttachment: (index: number) => void;
   onSend: () => void;
 }) {
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (

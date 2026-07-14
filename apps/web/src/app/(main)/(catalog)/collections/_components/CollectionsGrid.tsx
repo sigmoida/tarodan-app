@@ -10,13 +10,14 @@ import {
   HeartIcon,
 } from "@heroicons/react/24/outline";
 import OptimizedImage from "@/components/OptimizedImage";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@tarodan/ui";
 import { useCollections } from "../_context/CollectionsContext";
 import CollectionVisibilityBadge from "./CollectionVisibilityBadge";
 
 export default function CollectionsGrid() {
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
   const {
     loading,
     displayedCollections,

@@ -29,7 +29,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { Badge, Button } from "@tarodan/ui";
 import UserAvatar from "@/components/UserAvatar";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import { useProfile } from "../_context/ProfileContext";
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
@@ -55,7 +55,7 @@ interface NavSection {
  * active-state highlighting + the badges the profile overview already loads.
  */
 export default function ProfileSidebar() {
-  const { t } = useTranslation();
+  const t = useTranslations();
   const pathname = usePathname();
   const {
     profile,

@@ -1,11 +1,11 @@
 'use client';
 
 import { Button } from '@tarodan/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { useListings } from '../_context/ListingsContext';
 
 export default function ListingsPagination() {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const { pagination, setCurrentPage } = useListings();
 
   if (pagination.totalPages <= 1) return null;

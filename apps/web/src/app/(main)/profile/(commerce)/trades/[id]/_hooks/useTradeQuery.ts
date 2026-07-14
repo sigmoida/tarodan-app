@@ -9,7 +9,7 @@ import toast from "react-hot-toast";
 import { useAuthStore } from "@/stores/authStore";
 import { tradesApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import type { Trade } from "../_lib/types";
 
 /**
@@ -22,7 +22,7 @@ export function useTradeQuery() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const tradeId = params.id as string;
 
   useEffect(() => {

@@ -1,14 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { useAuthStore } from '@/stores/authStore';
 import { DocPage } from '@/components/layout/DocPage';
 import SectionCard from '@/components/ui/SectionCard';
 import { SELL_BENEFITS, SELL_STEPS } from '../_lib/content';
 
 export default function SellClient() {
-	const { t } = useTranslation();
+	const t = useTranslations();
 	const { isAuthenticated } = useAuthStore();
 
 	return (
@@ -26,11 +26,11 @@ export default function SellClient() {
 									<Icon className='w-6 h-6 text-primary-600' />
 								</div>
 								<h3 className='font-semibold text-heading'>
-									{t(`sellOnWebsite.${titleKey}`)}
+									{t(`sellOnWebsite.${titleKey}` as Parameters<typeof t>[0])}
 								</h3>
 							</div>
 							<p className='text-muted text-sm'>
-								{t(`sellOnWebsite.${descKey}`)}
+								{t(`sellOnWebsite.${descKey}` as Parameters<typeof t>[0])}
 							</p>
 						</div>
 					))}
@@ -46,7 +46,7 @@ export default function SellClient() {
 							</div>
 							<div className='flex items-center gap-2 min-w-0'>
 								<Icon className='w-5 h-5 text-subtle flex-shrink-0' />
-								<p className='text-body'>{t(`sellOnWebsite.${textKey}`)}</p>
+								<p className='text-body'>{t(`sellOnWebsite.${textKey}` as Parameters<typeof t>[0])}</p>
 							</div>
 						</div>
 					))}

@@ -1,5 +1,7 @@
 /** @format */
 
+import type { Translate } from "@/types/i18n";
+
 import {
   CheckCircleIcon,
   XCircleIcon,
@@ -19,7 +21,7 @@ export default function TradeInfoBanners({
 }: {
   trade: Trade;
   locale: string;
-  t: (key: string) => string;
+  t: Translate;
 }) {
   return (
     <>

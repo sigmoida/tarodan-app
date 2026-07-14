@@ -5,7 +5,7 @@ import { Button, Spinner } from '@tarodan/ui';
 import { Form } from '@tarodan/ui/form';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import {
@@ -34,7 +34,7 @@ const TERMINAL_STATUSES = ['sold', 'reserved', 'inactive', 'deleted'];
 export default function EditListingClient() {
   const params = useParams();
   const router = useRouter();
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const id = params.id as string;
   const { isAuthenticated, isLoading: authLoading, limits } = useAuthStore();
 

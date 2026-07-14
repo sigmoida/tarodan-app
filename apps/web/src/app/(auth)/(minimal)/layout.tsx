@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 
 /**
  * Minimal auth frame for the transactional flows (forgot / reset password,
@@ -16,7 +16,7 @@ export default function AuthMinimalLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const en = locale === 'en';
 
   return (

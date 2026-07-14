@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, Modal } from "@tarodan/ui";
-import { useTranslation } from "@/i18n/LanguageContext";
+import { useLocale, useTranslations } from "next-intl";
 
 interface DeleteCollectionModalProps {
   show: boolean;
@@ -16,7 +16,7 @@ export default function DeleteCollectionModal({
   onCancel,
   onConfirm,
 }: DeleteCollectionModalProps) {
-  const { t } = useTranslation();
+  const t = useTranslations();
 
   return (
     <Modal

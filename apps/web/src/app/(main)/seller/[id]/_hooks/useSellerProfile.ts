@@ -10,7 +10,7 @@ import { api, listingsApi, ratingsApi, collectionsApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { useAuthStore } from "@/stores/authStore";
 import { useAuthGate } from "@/hooks/useAuthGate";
-import { useTranslation } from "@/i18n/LanguageContext";
+import { useLocale, useTranslations } from "next-intl";
 import type { Product } from "@/types/product";
 import type {
   Seller,
@@ -31,7 +31,8 @@ export function useSellerProfile() {
   const queryClient = useQueryClient();
   const { isAuthenticated, user } = useAuthStore();
   const { requireAuth, authModal } = useAuthGate();
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
 
   const [showReportModal, setShowReportModal] = useState(false);
 

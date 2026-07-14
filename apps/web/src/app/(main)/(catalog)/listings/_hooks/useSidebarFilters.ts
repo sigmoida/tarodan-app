@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query/keys";
-import { useTranslation } from "@/i18n/LanguageContext";
+import { useLocale, useTranslations } from "next-intl";
 import { categoriesApi, manufacturersApi, listingsApi } from "@/lib/api";
 import { SCALE_FALLBACK } from "@/lib/constants";
 import type { Filters } from "../_lib/params";
@@ -96,7 +96,8 @@ export function useSidebarFilters({
   filters: Filters;
   onFilterChange: (filters: Filters) => void;
 }) {
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
 
   const [customAttrSearch, setCustomAttrSearch] = useState<
     Record<string, string>

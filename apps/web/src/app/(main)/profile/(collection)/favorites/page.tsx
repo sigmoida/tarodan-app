@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useRequireAuth } from '../../_hooks/useRequireAuth';
@@ -24,7 +24,8 @@ function FavoritesSkeleton() {
 }
 
 export default function FavoritesPage() {
-	const { t, locale } = useTranslation();
+	const t = useTranslations();
+  const locale = useLocale();
 	const { ready } = useRequireAuth();
 
 	const {

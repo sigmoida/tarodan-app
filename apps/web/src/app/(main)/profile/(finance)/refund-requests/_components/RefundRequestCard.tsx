@@ -5,13 +5,13 @@
 import Link from 'next/link';
 import OptimizedImage from '@/components/OptimizedImage';
 import { Badge } from '@tarodan/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { formatTL } from '@/lib/format';
 import { statusMetaOf } from '../_lib/refund-status';
 import type { RefundRequest } from '../_lib/types';
 
 export default function RefundRequestCard({ request }: { request: RefundRequest }) {
-	const { locale } = useTranslation();
+	const locale = useLocale();
 	const meta = statusMetaOf(request.status);
 	const image = request.order?.product?.images?.[0];
 

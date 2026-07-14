@@ -12,7 +12,7 @@ import {
 import toast from "react-hot-toast";
 import { paymentsApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import {
   EMPTY_FILTERS,
   type PaymentFilterState,
@@ -69,7 +69,7 @@ export type PaymentActionType = "cancel" | "retry";
 /** Cancel a pending payment / retry a failed one. Owns toast + invalidation. */
 export function usePaymentAction() {
   const queryClient = useQueryClient();
-  const { t } = useTranslation();
+  const t = useTranslations();
 
   return useMutation({
     mutationFn: async ({

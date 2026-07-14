@@ -1,6 +1,6 @@
 'use client';
 
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { Button } from '@tarodan/ui';
 import { Form, FormInput, FormTextarea } from '@tarodan/ui/form';
 import { SectionCard } from '@/components/ui';
@@ -8,7 +8,7 @@ import { DocPage } from '@/components/layout/DocPage';
 import { useContactForm } from '../_hooks/useContactForm';
 
 export default function ContactClient() {
-	const { t } = useTranslation();
+	const t = useTranslations();
 	const { form, onSubmit, isSending } = useContactForm();
 
 	return (

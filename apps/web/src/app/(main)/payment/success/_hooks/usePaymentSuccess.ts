@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { paymentsApi, api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useLocale, useTranslations } from "next-intl";
 
 interface InvoiceDetails {
 	id: string;
@@ -24,7 +24,8 @@ export function usePaymentSuccess() {
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const { isAuthenticated, isLoading: authLoading } = useAuthStore();
-	const { t, locale } = useTranslation();
+	const t = useTranslations();
+  const locale = useLocale();
 
 	const paymentId = searchParams.get('paymentId');
 	const isGuestCheckout = searchParams.get('guest') === 'true';

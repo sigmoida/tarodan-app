@@ -1,5 +1,7 @@
 /** @format */
 
+import type { Translate } from "@/types/i18n";
+
 import Link from "next/link";
 import { CheckCircleIcon } from "@heroicons/react/24/outline";
 import type { Trade } from "../_lib/types";
@@ -11,7 +13,7 @@ export default function CompletedTradeSummary({
 }: {
   trade: Trade;
   locale: string;
-  t: (key: string) => string;
+  t: Translate;
 }) {
   if (trade.status !== "completed") return null;
 

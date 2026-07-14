@@ -5,7 +5,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { api } from "@/lib/api";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
 import type { Offer, OfferTab } from "../_lib/types";
@@ -37,7 +37,7 @@ type OfferActionType = "accept" | "reject" | "cancel";
 /** Accept / reject / cancel — one mutation; `pendingId` marks the in-flight offer. */
 export function useOfferAction() {
   const queryClient = useQueryClient();
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const mutation = useMutation({
     mutationFn: ({
       offerId,
@@ -75,7 +75,7 @@ type CounterMode = "buyer" | "seller";
 
 /** Buyer (lower) / seller counter offer. */
 export function useCounterOffer() {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   return useWebMutation(
     ({
       offerId,

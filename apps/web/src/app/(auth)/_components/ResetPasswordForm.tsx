@@ -3,14 +3,14 @@
 import Link from 'next/link';
 import { Button } from '@tarodan/ui';
 import { Form, FormInput, FormError, useZodForm } from '@tarodan/ui/form';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useLocale, useTranslations } from "next-intl";
 import { AuthCard } from './AuthCard';
 import { resetPasswordSchema, type ResetPasswordValues } from '../_lib/auth';
 import { useResetPassword } from '../_hooks/useResetPassword';
 import { PasswordChecklist } from './PasswordChecklist';
 
 export function ResetPasswordForm() {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const { token, success, submit } = useResetPassword();
 
   const form = useZodForm(resetPasswordSchema(locale), {

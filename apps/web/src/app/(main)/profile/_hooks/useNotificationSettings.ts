@@ -5,7 +5,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 
 export interface NotificationSettings {
 	emailNotifications: boolean;
@@ -47,7 +47,7 @@ export function useNotificationSettings(enabled: boolean) {
 /** Patch a single notification toggle, optimistically. */
 export function useUpdateSetting() {
 	const queryClient = useQueryClient();
-	const { locale } = useTranslation();
+	const locale = useLocale();
 	return useMutation({
 		mutationFn: async ({
 			key,

@@ -8,7 +8,7 @@ import { CheckBadgeIcon, StarIcon } from "@heroicons/react/24/solid";
 import OptimizedImage from "@/components/OptimizedImage";
 import UserAvatar from "@/components/UserAvatar";
 import { ButtonLink, ProductBadge, SectionCard } from "@/components/ui";
-import { useTranslation } from "@/i18n/LanguageContext";
+import { useLocale, useTranslations } from "next-intl";
 import { useHome } from "../context/HomeDataContext";
 import { getImageUrl } from "../lib/helpers";
 
@@ -33,7 +33,7 @@ function SpotlightSkeleton({ tiles }: { tiles: number }) {
 }
 
 export default function Spotlights() {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const {
     featuredCollectorToShow,
     companyOfWeek,

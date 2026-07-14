@@ -5,7 +5,7 @@
 import { LockClosedIcon } from '@heroicons/react/24/outline';
 import { ButtonLink } from '@/components/ui/ButtonLink';
 import { SectionCard } from '@/components/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 
 interface AppliedDiscount {
 	discountId: string;
@@ -33,7 +33,8 @@ export default function CartSummary({
 	grandTotal: number;
 	isAuthenticated: boolean;
 }) {
-	const { t, locale } = useTranslation();
+	const t = useTranslations();
+  const locale = useLocale();
 
 	// Automatic campaign discounts (those without a coupon code).
 	const autoDiscounts = (appliedDiscounts ?? []).filter((d) => !d.discountCode);

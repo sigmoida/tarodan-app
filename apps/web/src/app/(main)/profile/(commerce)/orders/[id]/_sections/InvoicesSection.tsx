@@ -6,7 +6,7 @@ import { useRef } from 'react';
 import toast from 'react-hot-toast';
 import { Button } from '@tarodan/ui';
 import { SectionCard } from '@/components/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import {
 	useDownloadElogoInvoice,
 	useDownloadSellerInvoice,
@@ -17,7 +17,7 @@ import {
 import type { OrderDetail } from '../_lib/types';
 
 export default function InvoicesSection({ order }: { order: OrderDetail }) {
-	const { locale } = useTranslation();
+	const locale = useLocale();
 	const orderId = order.id;
 
 	const elogoQuery = useElogoInvoice(orderId, order);

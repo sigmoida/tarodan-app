@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useLocale, useTranslations } from "next-intl";
 import { api } from '@/lib/api';
 
 interface RegisterInput {
@@ -24,7 +24,7 @@ interface RegisterInput {
  * resend-verification action.
  */
 export function useRegister() {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
 

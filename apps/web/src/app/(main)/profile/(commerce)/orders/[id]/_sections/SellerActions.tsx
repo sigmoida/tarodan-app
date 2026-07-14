@@ -6,12 +6,12 @@ import toast from 'react-hot-toast';
 import { TruckIcon } from '@heroicons/react/24/outline';
 import { Button } from '@tarodan/ui';
 import { SectionCard } from '@/components/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { useUpdateOrderStatus } from '../_hooks/useOrderDetail';
 import type { OrderDetail } from '../_lib/types';
 
 export default function SellerActions({ order }: { order: OrderDetail }) {
-	const { locale } = useTranslation();
+	const locale = useLocale();
 	const updateStatus = useUpdateOrderStatus(order.id);
 
 	if (!order.isSeller) return null;

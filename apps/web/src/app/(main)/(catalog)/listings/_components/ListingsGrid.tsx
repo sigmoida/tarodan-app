@@ -4,7 +4,7 @@
 
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { Button } from '@tarodan/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { ProductCard } from '@/components/ui';
 import { useListings } from '../_context/ListingsContext';
 
@@ -21,7 +21,8 @@ const getGridClass = (productLayout: string) =>
  * ProductCard self-derives its image, so no local image helper is needed.
  */
 export default function ListingsGrid() {
-	const { t, locale } = useTranslation();
+	const t = useTranslations();
+  const locale = useLocale();
 	const {
 		productLayout,
 		isLoading,

@@ -6,10 +6,11 @@ import { useRef, type Dispatch, type SetStateAction } from 'react';
 import toast from 'react-hot-toast';
 import { ordersApi, paymentsApi } from '@/lib/api';
 import { getFullPhoneNumber, normalizePhoneForPayload } from '@/lib/phone';
-import { useTranslation, type Locale } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
+import type { Locale } from "@tarodan/i18n";
 import type { Address, CheckoutItem } from '../_lib/types';
 
-type Translate = ReturnType<typeof useTranslation>['t'];
+type Translate = ReturnType<typeof useTranslations<never>>;
 
 /**
  * Checkout submission slice: the per-cart idempotency key and `handleCheckout` —

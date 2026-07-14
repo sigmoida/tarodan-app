@@ -168,7 +168,8 @@
     "enterEmail": "Enter your email address",
     "sendResetLink": "Send Reset Link",
     "backToLogin": "Back to Login",
-    "loginRequired": "Login Required"
+    "loginRequired": "Login Required",
+    "sessionExpired": "Your session has expired"
   },
   "brands": {
     "title": "Brands",
@@ -179,7 +180,8 @@
     "noResults": "No brands found.",
     "noProducts": "No active listings found for this brand.",
     "backToAll": "All Brands",
-    "website": "Website"
+    "website": "Website",
+    "activeListings": "Active listings"
   },
   "models": {
     "title": "Models",
@@ -348,7 +350,9 @@
     "discount": "Off",
     "originalPrice": "Original Price",
     "discountedPrice": "Discounted Price",
-    "discountAmount": "Discount Amount"
+    "discountAmount": "Discount Amount",
+    "adding": "Adding...",
+    "removing": "Removing..."
   },
   "cart": {
     "myCart": "My Cart",
@@ -1016,7 +1020,8 @@
     "loadFailed": "Failed to load addresses",
     "saveFailed": "Failed to save address",
     "defaultFailed": "Failed to set default address",
-    "cityDistrict": "City / District"
+    "cityDistrict": "City / District",
+    "deleteFailed": "Failed to delete address"
   },
   "contact": {
     "title": "Contact Us",

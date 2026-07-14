@@ -4,16 +4,15 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import {
-	useLanguage,
-	localeNames,
-	localeFlags,
-	type Locale,
-} from '@/i18n/LanguageContext';
+import { useRouter } from 'next/navigation';
+import { useLocale, useTranslations } from 'next-intl';
+import { locales, type Locale } from '@tarodan/i18n';
 import { Button, Select } from '@tarodan/ui';
 import { Container } from './Container';
 
-const LOCALES: Locale[] = ['tr', 'en'];
+const LOCALES: readonly Locale[] = locales;
+const LOCALE_NAMES: Record<Locale, string> = { tr: 'Türkçe', en: 'English' };
+const LOCALE_FLAGS: Record<Locale, string> = { tr: '🇹🇷', en: '🇬🇧' };
 
 const SOCIAL_LINKS = [
 	{ label: 'X', href: 'https://x.com' },
@@ -23,7 +22,17 @@ const SOCIAL_LINKS = [
 ];
 
 export default function Footer() {
-	const { t, locale, setLocale } = useLanguage();
+	const t = useTranslations();
+	const locale = useLocale();
+	const router = useRouter();
+
+	// next-intl "without routing": persist the choice in the cookie the request
+	// config reads, then refresh so server + client re-render in the new locale.
+	// (URL-based locale + a proper switcher navigation is #214.)
+	const changeLocale = (next: Locale) => {
+		document.cookie = `NEXT_LOCALE=${next}; path=/; max-age=31536000; samesite=lax`;
+		router.refresh();
+	};
 
 	const clearCookieConsent = () => {
 		localStorage.removeItem('cookie_consent');
@@ -201,13 +210,13 @@ export default function Footer() {
 					<div className='flex items-center gap-3'>
 						<Select
 							value={locale}
-							onChange={(e) => setLocale(e.target.value as Locale)}
+							onChange={(e) => changeLocale(e.target.value as Locale)}
 							selectSize='sm'
 							aria-label={locale === 'en' ? 'Language' : 'Dil'}
 							className='w-auto'>
 							{LOCALES.map((l) => (
 								<option key={l} value={l}>
-									{localeFlags[l]} {localeNames[l]}
+									{LOCALE_FLAGS[l]} {LOCALE_NAMES[l]}
 								</option>
 							))}
 						</Select>

@@ -17,7 +17,7 @@ import { Spinner } from '@tarodan/ui';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { SectionCard, MetricCard } from '@/components/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { useSellerDashboard } from '../_hooks/useSellerDashboard';
 
 const QUICK_ACTIONS = [
@@ -28,7 +28,7 @@ const QUICK_ACTIONS = [
 ] as const;
 
 export default function SellerDashboardClient() {
-	const { t } = useTranslation();
+	const t = useTranslations();
 	const { totalRevenue, activeCount, soldCount, pendingCount, isLoading } = useSellerDashboard();
 
 	return (

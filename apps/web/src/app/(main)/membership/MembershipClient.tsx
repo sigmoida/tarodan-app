@@ -4,7 +4,7 @@
 
 import { useMemo } from 'react';
 import { useAuthStore } from '@/stores/authStore';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { buildTiers, visibleTiers } from './_lib/tiers';
@@ -23,7 +23,7 @@ import RequiredBusinessBanner from './_sections/RequiredBusinessBanner';
  * /membership/me and shows the current-membership management + status banners.
  */
 export default function MembershipClient() {
-	const { t } = useTranslation();
+	const t = useTranslations();
 	const { isAuthenticated, user } = useAuthStore();
 	const { prices, limits } = useMembershipTiers();
 	const { membership } = useMyMembership(isAuthenticated);

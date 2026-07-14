@@ -5,10 +5,10 @@
 import { ShoppingCartIcon } from '@heroicons/react/24/outline';
 import { ButtonLink } from '@/components/ui/ButtonLink';
 import { PageShell } from '@/components/layout/PageShell';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 
 export default function EmptyCart() {
-	const { t } = useTranslation();
+	const t = useTranslations();
 	return (
 		<PageShell className='flex items-center justify-center'>
 			<div className='text-center'>

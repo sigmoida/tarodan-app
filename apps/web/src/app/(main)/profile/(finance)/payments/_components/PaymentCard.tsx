@@ -15,7 +15,7 @@ import {
 	AccordionContent,
 	ThumbnailStack,
 } from '@tarodan/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { formatTL } from '@/lib/format';
 import {
 	groupOrdersOf,
@@ -50,7 +50,8 @@ export default function PaymentCard({
 	onAction: PaymentActionCb;
 	pending: boolean;
 }) {
-	const { t, locale } = useTranslation();
+	const t = useTranslations();
+  const locale = useLocale();
 	const groupOrders = groupOrdersOf(payment);
 	const isGroup = groupOrders.length > 0;
 

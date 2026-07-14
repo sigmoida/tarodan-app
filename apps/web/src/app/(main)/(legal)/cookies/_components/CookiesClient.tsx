@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { Button, Checkbox } from '@tarodan/ui';
 import { DocPage } from '@/components/layout/DocPage';
 import SectionCard from '@/components/ui/SectionCard';
@@ -66,7 +66,7 @@ const DOC_LINKS = [
 ];
 
 export default function CookiesClient() {
-	const { t } = useTranslation();
+	const t = useTranslations();
 	const { preferences, togglePreference, savePreferences, acceptAll } =
 		useCookiePreferences();
 

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { EyeIcon, HeartIcon } from "@heroicons/react/24/outline";
 import { Badge } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import type { Collection } from "../_lib/types";
 
 export default function CollectionCard({
@@ -14,7 +14,8 @@ export default function CollectionCard({
 }: {
   collection: Collection;
 }) {
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
 
   return (
     <Link

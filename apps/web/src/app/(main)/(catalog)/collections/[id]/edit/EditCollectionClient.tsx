@@ -3,7 +3,7 @@
 import { Button, Spinner } from '@tarodan/ui';
 import { useAuthStore } from '@/stores/authStore';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useLocale, useTranslations } from "next-intl";
 import { useEditCollection } from './_hooks/useEditCollection';
 import { useCategoryOptions } from './_hooks/useCategoryOptions';
 import EditPageHeader from './_sections/EditPageHeader';
@@ -11,7 +11,7 @@ import CollectionForm from './_sections/CollectionForm';
 import DeleteCollectionModal from './_sections/DeleteCollectionModal';
 
 export default function EditCollectionClient() {
-  const { t } = useTranslation();
+  const t = useTranslations();
   const { isAuthenticated, user } = useAuthStore();
   const flatCategories = useCategoryOptions();
   const {

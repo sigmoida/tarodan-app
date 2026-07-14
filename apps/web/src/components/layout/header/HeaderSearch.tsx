@@ -14,7 +14,7 @@ import {
   TagIcon,
 } from "@heroicons/react/24/outline";
 import { Button, Chip, IconButton, Input, Spinner } from "@tarodan/ui";
-import { useTranslation } from "@/i18n/LanguageContext";
+import { useLocale, useTranslations } from "next-intl";
 import { isValidImageSrc } from "@/components/OptimizedImage";
 import { searchApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
@@ -434,7 +434,8 @@ function useNavSearch() {
  * rich categorized results). All state/logic lives in `useNavSearch`.
  */
 export default function HeaderSearch() {
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
   const {
     searchContainerRef,
     searchInputRef,

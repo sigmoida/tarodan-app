@@ -4,7 +4,7 @@
 
 import toast from "react-hot-toast";
 import { refundsApi } from "@/lib/api";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import { useWebItem, useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
 import type { RefundRequest } from "../_lib/types";
@@ -41,7 +41,7 @@ export function useRefundDetail(refundId: string, enabled: boolean) {
 
 /** Cancel a refund request — owns toast + invalidation. */
 export function useCancelRefund(refundId: string) {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   return useWebMutation(() => refundsApi.cancel(refundId), {
     invalidates: [DETAIL_RESOURCE, LIST_RESOURCE],
     errorMessage: "Hata",

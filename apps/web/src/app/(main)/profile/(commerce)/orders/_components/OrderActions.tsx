@@ -6,7 +6,7 @@ import { TruckIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { StarIcon } from '@heroicons/react/24/solid';
 import { Button } from '@tarodan/ui';
 import { ButtonLink } from '@/components/ui/ButtonLink';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import {
 	REVIEWABLE_STATUSES,
 	getOrderProductId,
@@ -50,7 +50,8 @@ export default function OrderActions({
 	onShip,
 	onReview,
 }: OrderActionsProps) {
-	const { t, locale } = useTranslation();
+	const t = useTranslations();
+  const locale = useLocale();
 
 	const shipped = hasShipped(order);
 	const cancelled = isCancelledOrder(order);

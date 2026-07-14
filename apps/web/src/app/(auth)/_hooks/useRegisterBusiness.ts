@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useLocale, useTranslations } from "next-intl";
 import { api } from '@/lib/api';
 
 interface RegisterBusinessInput {
@@ -25,7 +25,8 @@ interface RegisterBusinessInput {
  * mutation, plus the success-screen state and the resend-verification action.
  */
 export function useRegisterBusiness() {
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
 

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { RocketLaunchIcon } from '@heroicons/react/24/outline';
 import { Button, Input } from '@tarodan/ui';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useLocale, useTranslations } from "next-intl";
 import StatusScreen from '../_components/StatusScreen';
 import SocialLinks from '../_components/SocialLinks';
 
@@ -47,7 +47,7 @@ function Countdown() {
 }
 
 export default function ComingSoonPage() {
-  const { t } = useTranslation();
+  const t = useTranslations();
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
 

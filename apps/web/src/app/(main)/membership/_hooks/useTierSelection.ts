@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import type { MembershipDetails, Period } from '../_lib/types';
 
 interface Args {
@@ -31,7 +31,7 @@ export function useTierSelection({
 }: Args) {
 	const router = useRouter();
 	const searchParams = useSearchParams();
-	const { t } = useTranslation();
+	const t = useTranslations();
 	const [selectedPeriod, setSelectedPeriod] = useState<Period>('monthly');
 	const [selectedTier, setSelectedTier] = useState<string | null>(null);
 

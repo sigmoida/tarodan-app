@@ -6,12 +6,13 @@ import { Button } from '@tarodan/ui';
 import { Form, FormCheckbox, FormInput } from '@tarodan/ui/form';
 import { DocPage } from '@/components/layout/DocPage';
 import SectionCard from '@/components/ui/SectionCard';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useLocale, useTranslations } from "next-intl";
 import { useAuthStore } from '@/stores/authStore';
 import { useNewsletterSignup } from '../_hooks/useNewsletterSignup';
 
 export default function NewsletterClient() {
-	const { t, locale } = useTranslation();
+	const t = useTranslations();
+  const locale = useLocale();
 	const { isAuthenticated } = useAuthStore();
 	const { form, onSubmit, isSubmitting, success } = useNewsletterSignup();
 

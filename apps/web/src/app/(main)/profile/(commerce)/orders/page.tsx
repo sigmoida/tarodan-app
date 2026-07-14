@@ -9,7 +9,7 @@ import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useAuthStore } from '@/stores/authStore';
 import { useRequireAuth } from '../../_hooks/useRequireAuth';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import {
 	useOrders,
 	useOrderCounts,
@@ -26,7 +26,8 @@ import CancelOrderModal from './_modals/CancelOrderModal';
 
 export default function OrdersPage() {
 	const searchParams = useSearchParams();
-	const { t, locale } = useTranslation();
+	const t = useTranslations();
+  const locale = useLocale();
 	const { ready } = useRequireAuth();
 	const user = useAuthStore((s) => s.user);
 

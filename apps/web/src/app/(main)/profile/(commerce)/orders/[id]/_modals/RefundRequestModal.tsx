@@ -3,7 +3,7 @@
 import { Button, Input, Modal, Select, Spinner, Textarea } from "@/components/ui";
 import { useMutation } from "@tanstack/react-query";
 import { mediaApi, refundsApi, type RefundReason } from "@/lib/api";
-import { useTranslation } from "@/i18n/LanguageContext";
+import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 import toast from "react-hot-toast";
 
@@ -29,7 +29,7 @@ export default function RefundRequestModal({
   quantity = 1,
   onSuccess,
 }: Props) {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const [reason, setReason] = useState<RefundReason>("changed_mind");
   const [description, setDescription] = useState("");
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);

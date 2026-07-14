@@ -13,7 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Button, Spinner, StatusBadge, orderStatusConfig } from '@tarodan/ui';
 import { Form, FormInput, useZodForm } from '@tarodan/ui/form';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { ButtonLink } from '@/components/ui/ButtonLink';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -32,7 +32,7 @@ export default function TrackOrderClient() {
 			router.push('/');
 		}
 	};
-	const { locale } = useTranslation();
+	const locale = useLocale();
 	const {
 		order,
 		loading,

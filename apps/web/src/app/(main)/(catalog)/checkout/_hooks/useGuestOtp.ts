@@ -6,10 +6,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { ordersApi } from '@/lib/api';
-import { useTranslation, type Locale } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
+import type { Locale } from "@tarodan/i18n";
 import type { CheckoutItem } from '../_lib/types';
 
-type Translate = ReturnType<typeof useTranslation>['t'];
+type Translate = ReturnType<typeof useTranslations<never>>;
 
 /**
  * Guest checkout contact + email OTP slice. Owns the guest name/email/phone and

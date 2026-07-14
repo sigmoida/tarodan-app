@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { useAuthStore } from "@/stores/authStore";
-import { useTranslation } from "@/i18n/LanguageContext";
+import { useLocale, useTranslations } from "next-intl";
 import { api } from "@/lib/api";
 
 /** Resolve the post-login target: sessionStorage hint → ?redirect → home. */
@@ -39,7 +39,8 @@ function resolveRedirect(): string {
  */
 export function useLogin() {
   const router = useRouter();
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
   const { login } = useAuthStore();
 
   const [showVerificationBanner, setShowVerificationBanner] = useState(false);

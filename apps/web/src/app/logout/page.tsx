@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/authStore";
-import { useTranslation } from "@/i18n/LanguageContext";
+import { useLocale, useTranslations } from "next-intl";
 import { TransitionLoader } from "@/components/TransitionLoader";
 
 /** How long the loading screen stays up before landing on the home page. */
@@ -18,7 +18,7 @@ const LOGOUT_REDIRECT_DELAY_MS = 1200;
 export default function LogoutPage() {
   const router = useRouter();
   const logout = useAuthStore((s) => s.logout);
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const ran = useRef(false);
 
   useEffect(() => {

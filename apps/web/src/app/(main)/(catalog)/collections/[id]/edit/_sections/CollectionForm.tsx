@@ -3,7 +3,7 @@
 import { TrashIcon } from '@heroicons/react/24/outline';
 import { Button, Checkbox, Input, Select, Textarea } from '@tarodan/ui';
 import OptimizedImage from '@/components/OptimizedImage';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useLocale, useTranslations } from "next-intl";
 
 interface CollectionFormProps {
   name: string;
@@ -42,7 +42,7 @@ export default function CollectionForm({
   onCancel,
   onDelete,
 }: CollectionFormProps) {
-  const { t } = useTranslation();
+  const t = useTranslations();
 
   return (
     <div className="bg-surface-elevated rounded border border-border p-6 md:p-8">

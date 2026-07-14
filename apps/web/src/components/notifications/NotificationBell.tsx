@@ -10,7 +10,7 @@ import { Button, Spinner } from "@tarodan/ui";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { useAuthStore } from "@/stores/authStore";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 
 interface Notification {
   id: string;
@@ -27,7 +27,7 @@ interface Notification {
 export default function NotificationBell() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const { isAuthenticated } = useAuthStore();
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);

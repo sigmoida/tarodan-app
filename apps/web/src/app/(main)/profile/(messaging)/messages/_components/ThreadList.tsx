@@ -1,7 +1,7 @@
 'use client';
 
 import { Button, Spinner } from '@tarodan/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import type { MessageThread } from '../_lib/messages';
 import ThreadListItem from './ThreadListItem';
 
@@ -24,7 +24,8 @@ export default function ThreadList({
   onExpand: () => void;
   className?: string;
 }) {
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
 
   return (
     <div className={`${className} flex-col min-h-0 bg-surface-elevated border-r border-border`}>

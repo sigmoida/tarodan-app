@@ -4,7 +4,7 @@
 
 import { TruckIcon } from '@heroicons/react/24/outline';
 import { SectionCard } from '@/components/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import type { OrderDetail } from '../_lib/types';
 
 const SHIPPED_ORDER_STATUSES = [
@@ -33,7 +33,7 @@ const statusLabelMap: Record<string, { tr: string; en: string }> = {
  * sipariş durumu kargolanmış/teslim. İptal ya da teslim öncesi durumlarda gizli.
  */
 export default function ShippingInfoCard({ order }: { order: OrderDetail }) {
-	const { locale } = useTranslation();
+	const locale = useLocale();
 
 	const isIptalOrder = order.cancellationType === 'iptal';
 	if (

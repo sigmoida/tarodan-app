@@ -3,13 +3,13 @@
 import Link from 'next/link';
 import { StarIcon, ShieldCheckIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { Button } from '@tarodan/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { DocPage } from '@/components/layout/DocPage';
 import { GUIDES } from '../_lib/guides';
 import { useActiveGuide } from '../_hooks/useActiveGuide';
 
 export default function GuidesClient() {
-	const { t } = useTranslation();
+	const t = useTranslations();
 	const { activeGuide, setActiveGuide, currentGuide } = useActiveGuide();
 
 	return (

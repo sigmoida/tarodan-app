@@ -9,7 +9,7 @@ import toast from "react-hot-toast";
 import { api, ratingsApi, mediaApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { useCart } from "@/hooks/useCart";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
 import type { Order, OrderRole, OrderStatusFilter } from "../_lib/types";
@@ -61,7 +61,7 @@ export function useOrderCounts(enabled: boolean) {
 
 /** Seller adds tracking info → ships the order. */
 export function useShipOrder() {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   return useWebMutation(
     async ({
       orderId,
@@ -93,7 +93,7 @@ export function useShipOrder() {
 
 /** Buyer cancels a pre-shipment order. */
 export function useCancelOrder() {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   return useWebMutation(
     async ({ orderId, reason }: { orderId: string; reason?: string }) => {
       await api.post(`/orders/${orderId}/cancel`, {
@@ -115,7 +115,8 @@ export function useCancelOrder() {
 /** Re-add a finished order's product to the cart and jump to checkout. */
 export function useReorder() {
   const router = useRouter();
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
   const { addToCart } = useCart();
   return async (order: Order) => {
     const productId = getOrderProductId(order);
@@ -138,7 +139,7 @@ export function useReorder() {
 
 /** eLogo e-Arşiv invoice for an order (opens the PDF), with per-order loading. */
 export function useInvoiceDownload() {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const download = async (orderId: string) => {
@@ -204,7 +205,7 @@ export interface ReviewPayload {
 /** Product + seller rating for a delivered order (uploads photos first). */
 export function useSubmitReview() {
   const queryClient = useQueryClient();
-  const { t } = useTranslation();
+  const t = useTranslations();
   return useMutation({
     mutationFn: async (p: ReviewPayload) => {
       let imageUrls: string[] = [];

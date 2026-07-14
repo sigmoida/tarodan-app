@@ -1,12 +1,12 @@
 'use client';
 
 import { WrenchScrewdriverIcon } from '@heroicons/react/24/outline';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useLocale, useTranslations } from "next-intl";
 import StatusScreen from '../_components/StatusScreen';
 import SocialLinks from '../_components/SocialLinks';
 
 export default function MaintenancePage() {
-  const { t } = useTranslation();
+  const t = useTranslations();
   return (
     <StatusScreen
       icon={WrenchScrewdriverIcon}

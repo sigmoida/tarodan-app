@@ -6,11 +6,12 @@ import { Button } from '@tarodan/ui';
 import { Form, FormInput, FormTextarea } from '@tarodan/ui/form';
 import { DocPage } from '@/components/layout/DocPage';
 import SectionCard from '@/components/ui/SectionCard';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useLocale, useTranslations } from "next-intl";
 import { useUnsubscribe } from '../_hooks/useUnsubscribe';
 
 export default function UnsubscribeClient() {
-	const { t, locale } = useTranslation();
+	const t = useTranslations();
+  const locale = useLocale();
 	const { form, onSubmit, processing, unsubscribed, isSubmitting } =
 		useUnsubscribe();
 

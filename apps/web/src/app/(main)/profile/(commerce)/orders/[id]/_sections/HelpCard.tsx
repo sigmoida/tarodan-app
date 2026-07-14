@@ -4,10 +4,10 @@
 
 import Link from 'next/link';
 import { SectionCard } from '@/components/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 
 export default function HelpCard({ orderId }: { orderId: string }) {
-	const { locale } = useTranslation();
+	const locale = useLocale();
 
 	return (
 		<SectionCard title={locale === 'en' ? 'Help' : 'Yardım'}>

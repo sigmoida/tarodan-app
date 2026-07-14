@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { StatusBadge, orderStatusConfig } from '@tarodan/ui';
 import OptimizedImage from '@/components/OptimizedImage';
 import { formatDate } from '@/lib/format';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import {
 	formatTL,
 	getOrderPrimary,
@@ -26,7 +26,8 @@ interface OrderCardProps {
 }
 
 export default function OrderCard({ order, actions, compact }: OrderCardProps) {
-	const { t, locale } = useTranslation();
+	const t = useTranslations();
+  const locale = useLocale();
 	const display = getDisplayStatus(order, t, locale);
 	const { product, image } = getOrderPrimary(order);
 	const net = sellerNetOf(order);

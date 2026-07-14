@@ -1,6 +1,6 @@
 'use client';
 
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { useRequireAuth } from '../../_hooks/useRequireAuth';
 import { useMessaging } from './_hooks/useMessaging';
 import ThreadList from './_components/ThreadList';
@@ -10,7 +10,7 @@ import MessageComposer from './_components/MessageComposer';
 import EmptyConversation from './_components/EmptyConversation';
 
 export default function MessagesPage() {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const { ready } = useRequireAuth();
 
   const vm = useMessaging(ready);

@@ -3,7 +3,7 @@
 "use client";
 
 import { api } from "@/lib/api";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
 import type { Notification } from "../_lib/notifications";
@@ -25,7 +25,8 @@ const NOTIFICATION_INVALIDATES = [
  * and the header bell counters.
  */
 export function useNotifications(enabled: boolean) {
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
 
   const query = useWebList<Notification[]>({
     resource: RESOURCE,

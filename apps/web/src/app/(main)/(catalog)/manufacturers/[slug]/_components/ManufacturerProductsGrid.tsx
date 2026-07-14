@@ -4,7 +4,7 @@
 
 import Link from 'next/link';
 import { ArchiveBoxIcon } from '@heroicons/react/24/outline';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import ProductCard from '@/components/ui/ProductCard';
 import type { Product } from '@/types/product';
 
@@ -15,7 +15,7 @@ export default function ManufacturerProductsGrid({
 	products: Product[];
 	isLoading: boolean;
 }) {
-	const { t } = useTranslation();
+	const t = useTranslations();
 
 	return (
 		<div>

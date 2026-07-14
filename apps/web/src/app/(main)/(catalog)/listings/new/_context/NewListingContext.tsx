@@ -18,7 +18,7 @@ import toast from "react-hot-toast";
 import { listingsApi, bankAccountApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { useAuthStore } from "@/stores/authStore";
-import { useTranslation } from "@/i18n/LanguageContext";
+import { useLocale, useTranslations } from "next-intl";
 import {
   newListingSchema,
   emptyListingValues,
@@ -44,7 +44,7 @@ function useNewListingValue() {
     limits,
     refreshUser,
   } = useAuthStore();
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const CONDITIONS = getConditions(locale);
 
   const form = useZodForm(newListingSchema(locale), {

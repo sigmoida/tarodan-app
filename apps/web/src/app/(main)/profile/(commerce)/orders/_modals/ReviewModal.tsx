@@ -7,7 +7,7 @@ import { StarIcon } from '@heroicons/react/24/solid';
 import { StarIcon as StarOutlineIcon } from '@heroicons/react/24/outline';
 import { Button, Input, Modal, Textarea } from '@tarodan/ui';
 import OptimizedImage from '@/components/OptimizedImage';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { useSubmitReview } from '../_hooks/useOrders';
 import { getOrderPrimary, getOrderProductId, type Order } from '../_lib/types';
 
@@ -47,7 +47,8 @@ interface ReviewModalProps {
 
 /** Product + seller review for a delivered order (its own form + mutation). */
 export default function ReviewModal({ order, onClose }: ReviewModalProps) {
-	const { t, locale } = useTranslation();
+	const t = useTranslations();
+  const locale = useLocale();
 	const submitReview = useSubmitReview();
 
 	const [score, setScore] = useState(5);

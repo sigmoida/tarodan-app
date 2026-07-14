@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useLocale, useTranslations } from "next-intl";
 import { ButtonLink } from '@/components/ui/ButtonLink';
 import { Button } from '@tarodan/ui';
 import { HERO_SLIDES } from '../lib/heroSlides';
@@ -13,7 +13,7 @@ const AUTOPLAY_MS = 10000;
 const SWIPE_THRESHOLD = 50;
 
 export default function HeroSlider() {
-	const { locale } = useTranslation();
+	const locale = useLocale();
 	const slides = HERO_SLIDES[locale === 'en' ? 'en' : 'tr'];
 	const count = slides.length;
 

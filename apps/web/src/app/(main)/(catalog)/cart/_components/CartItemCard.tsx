@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { TrashIcon } from '@heroicons/react/24/outline';
 import { IconButton } from '@tarodan/ui';
 import { SectionCard } from '@/components/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import type { CartLineItem } from '../_lib/types';
 
 const PLACEHOLDER = 'https://via.placeholder.com/96';
@@ -19,7 +19,8 @@ const fmtTL = (n: number) =>
 	});
 
 export default function CartItemCard({ item }: { item: CartLineItem }) {
-	const { t, locale } = useTranslation();
+	const t = useTranslations();
+  const locale = useLocale();
 	const href = `/listings/${item.productId}`;
 	const hasDiscount =
 		item.originalPrice != null && item.originalPrice > item.price;

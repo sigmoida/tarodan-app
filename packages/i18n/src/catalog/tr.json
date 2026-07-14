@@ -168,7 +168,8 @@
     "enterEmail": "E-posta adresinizi girin",
     "sendResetLink": "Sıfırlama Linki Gönder",
     "backToLogin": "Girişe Dön",
-    "loginRequired": "Giriş Yapmanız Gerekiyor"
+    "loginRequired": "Giriş Yapmanız Gerekiyor",
+    "sessionExpired": "Oturumunuz sona erdi"
   },
   "brands": {
     "title": "Markalar",
@@ -179,7 +180,8 @@
     "noResults": "Marka bulunamadı.",
     "noProducts": "Bu markaya ait aktif ilan bulunamadı.",
     "backToAll": "Tüm Markalar",
-    "website": "Web Sitesi"
+    "website": "Web Sitesi",
+    "activeListings": "Aktif ilanlar"
   },
   "models": {
     "title": "Modeller",
@@ -348,7 +350,9 @@
     "originalPrice": "Orijinal Fiyat",
     "discountedPrice": "İndirimli Fiyat",
     "discountAmount": "İndirim Tutarı",
-    "deactivateDesc": "Deactivated listings are not visible in search but are not deleted."
+    "deactivateDesc": "Deactivated listings are not visible in search but are not deleted.",
+    "adding": "Ekleniyor...",
+    "removing": "Kaldırılıyor..."
   },
   "cart": {
     "myCart": "Sepetim",
@@ -1016,7 +1020,8 @@
     "loadFailed": "Adresler yüklenemedi",
     "saveFailed": "Adres kaydedilemedi",
     "defaultFailed": "Varsayılan adres ayarlanamadı",
-    "cityDistrict": "İl / İlçe"
+    "cityDistrict": "İl / İlçe",
+    "deleteFailed": "Adres silinemedi"
   },
   "contact": {
     "title": "İletişim",

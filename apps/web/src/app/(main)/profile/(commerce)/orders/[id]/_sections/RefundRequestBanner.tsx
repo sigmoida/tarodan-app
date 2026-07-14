@@ -6,7 +6,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { ArrowUturnLeftIcon, TruckIcon } from '@heroicons/react/24/outline';
 import { Button } from '@tarodan/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import type { OrderDetail } from '../_lib/types';
 
 const labelMap: Record<string, { tr: string; en: string }> = {
@@ -27,7 +27,7 @@ const labelMap: Record<string, { tr: string; en: string }> = {
 };
 
 export default function RefundRequestBanner({ order }: { order: OrderDetail }) {
-	const { locale } = useTranslation();
+	const locale = useLocale();
 	const rr = order.activeRefundRequest;
 	if (!rr) return null;
 

@@ -5,12 +5,12 @@
 import Link from 'next/link';
 import { SectionCard } from '@/components/ui';
 import UserAvatar from '@/components/UserAvatar';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import type { OrderDetail } from '../_lib/types';
 
 /** Karşı taraf kartı: alıcı görünümünde satıcı, satıcı görünümünde alıcı. */
 export default function PartyCard({ order }: { order: OrderDetail }) {
-	const { locale } = useTranslation();
+	const locale = useLocale();
 	const party = order.isBuyer ? order.seller : order.buyer;
 
 	return (

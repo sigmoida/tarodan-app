@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useLocale, useTranslations } from "next-intl";
 import { Button, Spinner } from '@tarodan/ui';
 import { Form, FormInput, FormCheckbox, FormError, useZodForm } from '@tarodan/ui/form';
 import { registerSchema, type RegisterValues } from '../_lib/auth';
@@ -15,7 +15,8 @@ import { PasswordChecklist } from './PasswordChecklist';
 
 export function RegisterForm() {
   const router = useRouter();
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { registrationSuccess, registeredEmail, submit, resendVerification } = useRegister();
 
