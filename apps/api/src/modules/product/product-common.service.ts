@@ -26,63 +26,175 @@ export class ProductCommonService {
   ) { }
 
   /**
-   * Format product response
+   * Format product response (tekil). N+1 giderme (#67): tekil = tek-elemanlı batch.
+   * Batch fetch + yanıt kurma tek otoritede (formatProductResponseMany / buildProductResponse)
+   * → liste ve tekil yol arasında şekil/değer drift'i imkânsız.
    */
   async formatProductResponse(product: any) {
-    // Get seller's active listings count
-    let sellerListingsCount = 0;
-    let sellerTotalSales = 0;
-    let sellerRating = null;
-    let sellerTotalRatings = 0;
-    let sellerIsPremium = false;
+    const [formatted] = await this.formatProductResponseMany([product]);
+    return formatted;
+  }
 
-    if (product.seller?.id) {
-      sellerListingsCount = await this.prisma.product.count({
-        where: {
-          sellerId: product.seller.id,
-          status: ProductStatus.active,
-        },
-      });
+  /**
+   * Format many products with BATCHED stats (#67). Eskiden her ürün için 4 per-seller
+   * sorgu (product.count/order.count/rating.aggregate/userMembership) + 1 per-product
+   * discount atılıyordu → 20'lik sayfa 80+ sorgu. Artık sayfa başına:
+   *   - benzersiz sellerId'ler için 4 grouped sorgu (product/order/rating groupBy + membership findMany)
+   *   - cached rating'i olmayan ürünler için 1 grouped productRating sorgusu
+   *   - tüm ürünler için 1 toplu discount çözümü (DiscountService.getEffectiveDisplayPriceMany)
+   * Değerler ve yanıt şekli birebir korunur (buildProductResponse aynı çıktıyı üretir).
+   */
+  async formatProductResponseMany(products: any[]): Promise<any[]> {
+    if (!products?.length) return [];
 
-      // Tamamlanmış satış adedi (user.service stats.totalSales ile aynı hesap)
-      sellerTotalSales = await this.prisma.order.count({
-        where: { sellerId: product.seller.id, status: 'completed' },
-      });
+    // ── 1) Satıcı istatistikleri (per-seller, grouped) ──────────────────────
+    const sellerIds = [
+      ...new Set(products.map((p) => p.seller?.id).filter(Boolean) as string[]),
+    ];
+    const sellerStats = new Map<
+      string,
+      {
+        listingsCount: number;
+        totalSales: number;
+        rating: number | null;
+        totalRatings: number;
+        isPremium: boolean;
+      }
+    >();
+    if (sellerIds.length) {
+      const [listings, sales, ratings, memberships] = await Promise.all([
+        this.prisma.product.groupBy({
+          by: ['sellerId'],
+          where: { sellerId: { in: sellerIds }, status: ProductStatus.active },
+          _count: true,
+        }),
+        this.prisma.order.groupBy({
+          by: ['sellerId'],
+          where: { sellerId: { in: sellerIds }, status: 'completed' },
+          _count: true,
+        }),
+        this.prisma.rating.groupBy({
+          by: ['receiverId'],
+          where: { receiverId: { in: sellerIds }, status: 'approved' },
+          _avg: { score: true },
+          _count: true,
+        }),
+        this.prisma.userMembership.findMany({
+          where: { userId: { in: sellerIds } },
+          select: {
+            userId: true,
+            status: true,
+            currentPeriodEnd: true,
+            tier: { select: { type: true } },
+          },
+        }),
+      ]);
+      const listingsMap = new Map(listings.map((r) => [r.sellerId, r._count]));
+      const salesMap = new Map(sales.map((r) => [r.sellerId, r._count]));
+      const ratingMap = new Map(ratings.map((r) => [r.receiverId, r]));
+      const membershipMap = new Map(memberships.map((m) => [m.userId, m]));
+      for (const sid of sellerIds) {
+        const rat = ratingMap.get(sid);
+        const hasRating = !!(rat && rat._count > 0 && rat._avg?.score);
+        sellerStats.set(sid, {
+          listingsCount: listingsMap.get(sid) ?? 0,
+          totalSales: salesMap.get(sid) ?? 0,
+          rating: hasRating ? Number(rat!._avg!.score!.toFixed(1)) : null,
+          totalRatings: hasRating ? rat!._count : 0,
+          isPremium: isPremiumEntitled(membershipMap.get(sid) ?? null),
+        });
+      }
+    }
 
-      // Get seller rating stats (only approved)
-      const sellerRatingStats = await this.prisma.rating.aggregate({
-        where: { receiverId: product.seller.id, status: 'approved' },
+    // ── 2) Ürün puanı (cached kolon yoksa grouped aggregate) ────────────────
+    const needRatingAgg = products
+      .filter((p) => !(p.averageRating != null && p.ratingCount != null))
+      .map((p) => p.id);
+    const productRatings = new Map<
+      string,
+      { average: number | null; count: number }
+    >();
+    if (needRatingAgg.length) {
+      const rows = await this.prisma.productRating.groupBy({
+        by: ['productId'],
+        where: { productId: { in: needRatingAgg }, status: 'approved' },
         _avg: { score: true },
         _count: true,
       });
-
-      if (sellerRatingStats._count > 0 && sellerRatingStats._avg?.score) {
-        sellerRating = Number(sellerRatingStats._avg.score.toFixed(1));
-        sellerTotalRatings = sellerRatingStats._count;
+      for (const r of rows) {
+        productRatings.set(r.productId, {
+          average: r._avg?.score ? Number(r._avg.score.toFixed(1)) : null,
+          count: r._count || 0,
+        });
       }
-
-      // Premium satıcı mı? (aktif, free olmayan üyelik)
-      const sellerMembership = await this.prisma.userMembership.findUnique({
-        where: { userId: product.seller.id },
-        select: { status: true, currentPeriodEnd: true, tier: { select: { type: true } } },
-      });
-      sellerIsPremium = isPremiumEntitled(sellerMembership);
     }
 
-    // Get product rating stats (use cached columns when available, else aggregate)
+    // ── 3) Kampanya indirimleri (tek toplu çözüm) ───────────────────────────
+    const discountItems = products
+      .map((p) => {
+        const sellerId = p.sellerId ?? p.seller?.id;
+        const categoryId = p.categoryId ?? p.category?.id;
+        if (!sellerId || !categoryId) return null;
+        return {
+          productId: p.id,
+          sellerId,
+          categoryId,
+          currentDisplayPrice: Number(p.price),
+        };
+      })
+      .filter(Boolean) as {
+      productId: string;
+      sellerId: string;
+      categoryId: string;
+      currentDisplayPrice: number;
+    }[];
+    const discountPrices = await this.discountService.getEffectiveDisplayPriceMany(
+      discountItems,
+    );
+
+    const pre = { sellerStats, productRatings, discountPrices };
+    return Promise.all(products.map((p) => this.buildProductResponse(p, pre)));
+  }
+
+  /**
+   * Saf yanıt kurucu: TÜM istatistikler önceden hesaplanmış (pre) map'lerden gelir;
+   * burada HİÇBİR DB sorgusu yoktur (yalnız avatar presign — DB değil). Eski
+   * formatProductResponse'un çıktısını birebir üretir.
+   */
+  private async buildProductResponse(
+    product: any,
+    pre: {
+      sellerStats: Map<
+        string,
+        {
+          listingsCount: number;
+          totalSales: number;
+          rating: number | null;
+          totalRatings: number;
+          isPremium: boolean;
+        }
+      >;
+      productRatings: Map<string, { average: number | null; count: number }>;
+      discountPrices: Map<string, number | null>;
+    },
+  ) {
+    const s = product.seller?.id ? pre.sellerStats.get(product.seller.id) : undefined;
+    const sellerListingsCount = s?.listingsCount ?? 0;
+    const sellerTotalSales = s?.totalSales ?? 0;
+    const sellerRating = s?.rating ?? null;
+    const sellerTotalRatings = s?.totalRatings ?? 0;
+    const sellerIsPremium = s?.isPremium ?? false;
+
+    // Get product rating stats (use cached columns when available, else precomputed aggregate)
     let ratingAverage: number | null = null;
     let ratingCount = 0;
     if (product.averageRating != null && product.ratingCount != null) {
       ratingAverage = Number(product.averageRating.toFixed(1));
       ratingCount = product.ratingCount;
     } else {
-      const ratingStats = await this.prisma.productRating.aggregate({
-        where: { productId: product.id, status: 'approved' },
-        _avg: { score: true },
-        _count: true,
-      });
-      ratingAverage = ratingStats._avg?.score ? Number(ratingStats._avg.score.toFixed(1)) : null;
-      ratingCount = ratingStats._count || 0;
+      const pr = pre.productRatings.get(product.id);
+      ratingAverage = pr?.average ?? null;
+      ratingCount = pr?.count ?? 0;
     }
 
     // A + oldPrice: price (A) = her zaman güncel satış fiyatı; oldPrice = indirim öncesi (çizili)
@@ -106,12 +218,7 @@ export class ProductCommonService {
       : null;
 
     if (sellerId && categoryId) {
-      const campaignPrice = await this.discountService.getEffectiveDisplayPrice(
-        product.id,
-        sellerId,
-        categoryId,
-        priceA,
-      );
+      const campaignPrice = pre.discountPrices.get(product.id) ?? null;
       if (campaignPrice != null && campaignPrice < priceA) {
         displayPrice = campaignPrice;
         displayOldPrice = priceA;
