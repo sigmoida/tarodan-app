@@ -268,7 +268,7 @@ export default function LikedCollectionsClient() {
                           🚗
                         </div>
                       )}
-                      <div className="absolute bottom-1.5 right-1.5 bg-heading/60 px-1.5 py-0.5 rounded text-[10px] text-inverted">
+                      <div className="absolute bottom-1.5 right-1.5 bg-heading/60 px-1.5 py-0.5 rounded text-2xs text-inverted">
                         {collection.itemCount || 0}{" "}
                         {locale === "en" ? "items" : "ürün"}
                       </div>
@@ -282,7 +282,7 @@ export default function LikedCollectionsClient() {
                       </h3>
                     </Link>
                     {collection.description && (
-                      <p className="text-subtle text-[10px] mt-0.5 line-clamp-1">
+                      <p className="text-subtle text-2xs mt-0.5 line-clamp-1">
                         {collection.description}
                       </p>
                     )}
@@ -294,9 +294,9 @@ export default function LikedCollectionsClient() {
                         }
                         avatarUrl={collection.user?.avatarUrl}
                         size="xs"
-                        className="!w-4 !h-4 !text-[8px]"
+                        className="!w-4 !h-4 !text-2xs"
                       />
-                      <span className="text-[10px] text-subtle">
+                      <span className="text-2xs text-subtle">
                         {collection.user?.displayName ||
                           collection.userName ||
                           t("collection.anonymous")}
@@ -304,7 +304,7 @@ export default function LikedCollectionsClient() {
                     </div>
 
                     <div className="mt-auto pt-2 flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-[10px] text-subtle">
+                      <div className="flex items-center gap-2 text-2xs text-subtle">
                         <span className="flex items-center gap-0.5">
                           <HeartIcon className="w-3 h-3" />
                           {collection.likeCount || 0}
@@ -317,7 +317,7 @@ export default function LikedCollectionsClient() {
                       <Button
                         variant="secondary"
                         onClick={() => handleUnlike(collection.id)}
-                        className="px-2 py-1 bg-danger-50 hover:bg-danger-100 text-danger-500 rounded text-[10px] font-medium transition-colors"
+                        className="px-2 py-1 bg-danger-50 hover:bg-danger-100 text-danger-500 rounded text-2xs font-medium transition-colors"
                       >
                         {t("collection.unlike")}
                       </Button>
