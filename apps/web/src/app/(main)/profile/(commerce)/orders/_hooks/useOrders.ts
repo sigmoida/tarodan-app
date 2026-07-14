@@ -93,7 +93,7 @@ export function useShipOrder() {
 
 /** Buyer cancels a pre-shipment order. */
 export function useCancelOrder() {
-  const locale = useLocale();
+  const t = useTranslations();
   return useWebMutation(
     async ({ orderId, reason }: { orderId: string; reason?: string }) => {
       await api.post(`/orders/${orderId}/cancel`, {
@@ -102,12 +102,8 @@ export function useCancelOrder() {
     },
     {
       invalidates: ["orders", "orders-counts"],
-      errorMessage:
-        locale === "en" ? "Could not cancel order" : "Sipariş iptal edilemedi",
-      onSuccess: () =>
-        toast.success(
-          locale === "en" ? "Order cancelled" : "Sipariş iptal edildi",
-        ),
+      errorMessage: t("order.cancelFailed"),
+      onSuccess: () => toast.success(t("order.orderCancelled")),
     },
   );
 }
@@ -116,7 +112,6 @@ export function useCancelOrder() {
 export function useReorder() {
   const router = useRouter();
   const t = useTranslations();
-  const locale = useLocale();
   const { addToCart } = useCart();
   return async (order: Order) => {
     const productId = getOrderProductId(order);
@@ -126,19 +121,17 @@ export function useReorder() {
     }
     try {
       await addToCart(productId, order.items?.[0]?.quantity ?? 1);
-      toast.success(locale === "en" ? "Added to cart" : "Sepete eklendi");
+      toast.success(t("cart.addedToCart"));
       router.push("/cart");
     } catch (err: any) {
-      toast.error(
-        err?.message ||
-          (locale === "en" ? "Could not add to cart" : "Sepete eklenemedi"),
-      );
+      toast.error(err?.message || t("cart.addToCartFailed"));
     }
   };
 }
 
 /** eLogo e-Arşiv invoice for an order (opens the PDF), with per-order loading. */
 export function useInvoiceDownload() {
+  const t = useTranslations();
   const locale = useLocale();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
@@ -159,7 +152,7 @@ export function useInvoiceDownload() {
       const url = res.data?.url;
       if (url) {
         window.open(url, "_blank", "noopener,noreferrer");
-        toast.success(locale === "en" ? "Invoice opened" : "Fatura açıldı");
+        toast.success(t("order.invoiceOpened"));
       } else {
         toast.error(
           locale === "en"
@@ -175,10 +168,7 @@ export function useInvoiceDownload() {
             : "Fatura henüz hazır değil",
         );
       } else {
-        toast.error(
-          err?.response?.data?.message ||
-            (locale === "en" ? "Download failed" : "İndirme başarısız"),
-        );
+        toast.error(err?.response?.data?.message || t("common.downloadFailed"));
       }
     } finally {
       setDownloadingId(null);

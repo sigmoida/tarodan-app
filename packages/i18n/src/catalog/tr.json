@@ -95,7 +95,12 @@
     "category": "Kategori",
     "learnMore": "Detaylı bilgi",
     "removed": "Kaldırıldı",
-    "dateLocale": "tr-TR"
+    "dateLocale": "tr-TR",
+    "copy": "Kopyala",
+    "copiedShort": "Kopyalandı",
+    "reason": "Sebep",
+    "downloadFailed": "İndirme başarısız",
+    "uploadFailed": "Yükleme başarısız"
   },
   "nav": {
     "home": "Ana Sayfa",
@@ -483,7 +488,9 @@
     "couponApplied": "Kupon Uygulandı",
     "removeCoupon": "Kuponu Kaldır",
     "couponApplyError": "Kupon uygulanamadı",
-    "couponLoginRequired": "Kupon kullanmak için giriş yapmanız gerekiyor"
+    "couponLoginRequired": "Kupon kullanmak için giriş yapmanız gerekiyor",
+    "addedToCart": "Sepete eklendi",
+    "addToCartFailed": "Sepete eklenemedi"
   },
   "favorites": {
     "myFavorites": "Favorilerim",
@@ -616,7 +623,58 @@
     "paymentRetried": "Ödeme tekrarlandı",
     "order": "Sipariş",
     "product": "Ürün",
-    "carrier": "Firma"
+    "carrier": "Firma",
+    "filterCancelled": "İptal edilenler",
+    "filterRefunds": "İadeler",
+    "unitTimes": "adet ×",
+    "productInfoUnavailable": "Ürün bilgisi yüklenemedi",
+    "buyer": "Alıcı",
+    "netToYou": "Net kazanç",
+    "viewRefundRequest": "İade Talebini Gör",
+    "requestRefund": "İade Talep Et",
+    "requestRefundTitle": "İade Talebi Oluştur",
+    "addShippingInfo": "Kargo Bilgisi Ekle",
+    "invoice": "Fatura",
+    "keepOrder": "Vazgeç",
+    "cancelFailed": "Sipariş iptal edilemedi",
+    "invoiceOpened": "Fatura açıldı",
+    "multiItemOrder": "Çoklu sipariş",
+    "loadFailed": "Sipariş yüklenemedi",
+    "trackOnSurat": "Sürat''ta Takip Et",
+    "refundRequest": "İade Talebi",
+    "trackReturn": "İade Kargosunu Takip Et",
+    "reportIssue": "Sipariş Sorunu Bildir",
+    "myRefundRequests": "İade Taleplerim",
+    "completePayment": "Ödemeyi tamamla",
+    "orderWasCancelled": "Bu sipariş iptal edildi",
+    "cancelledOn": "İptal tarihi: ",
+    "sellerActions": "Satıcı İşlemleri",
+    "markAsPreparing": "Hazırlanıyor Olarak İşaretle",
+    "cargoReference": "Kargo Referans Numarası",
+    "orderNumberCopied": "Sipariş numarası kopyalandı",
+    "pdfOnly": "Yalnız PDF yükleyebilirsiniz",
+    "maxPdfSize": "PDF en fazla 10 MB olabilir",
+    "invoiceNo": "No: ",
+    "sellerInvoice": "Satıcı Faturası",
+    "refundWindowClosed": "İade Süresi Doldu",
+    "cancelConfirmYes": "Evet, iptal et",
+    "cancelConfirmNo": "Vazgeç",
+    "refundRequestCreated": "İade talebi oluşturuldu",
+    "refundReasonChangedMind": "Vazgeçtim / fikrim değişti",
+    "refundReasonDamaged": "Hasarlı geldi",
+    "refundReasonWrongItem": "Yanlış ürün geldi",
+    "refundReasonMissingParts": "Eksik parça",
+    "quantityToRefund": "İade edilecek adet",
+    "quantityOne": "Adet: 1",
+    "submitRefund": "Talep Oluştur",
+    "productAmount": "Ürün Tutarı",
+    "vat": "KDV",
+    "platformFee": "Platform ücreti",
+    "platformDeduction": "Platform kesintisi",
+    "withholdingTax": "Stopaj (tevkifat)",
+    "unsupportedStatus": "Desteklenmeyen durum",
+    "invoiceNotReady": "Fatura henüz hazır değil",
+    "invoiceNotFound": "Fatura bulunamadı"
   },
   "trade": {
     "myTrades": "Takaslarım",
@@ -983,7 +1041,8 @@
     "sellerComment": "Satıcı Hakkında Yorumunuz (Opsiyonel)",
     "sellerCommentPlaceholder": "Satıcıyla ilgili deneyiminizi paylaşın...",
     "submit": "Değerlendir",
-    "mostHelpful": "En Faydalı"
+    "mostHelpful": "En Faydalı",
+    "photosLabel": "Fotoğraflar (opsiyonel, maks 5)"
   },
   "footer": {
     "about": "Hakkımızda",
@@ -1156,7 +1215,11 @@
     "saveFailed": "Adres kaydedilemedi",
     "defaultFailed": "Varsayılan adres ayarlanamadı",
     "cityDistrict": "İl / İlçe",
-    "deleteFailed": "Adres silinemedi"
+    "deleteFailed": "Adres silinemedi",
+    "deliveryAddress": "Teslimat Adresi",
+    "loadingAddresses": "Adresler yükleniyor...",
+    "backToSaved": "Kayıtlı adreslere dön",
+    "fullNamePlaceholder": "Ahmet Yılmaz"
   },
   "contact": {
     "title": "İletişim",
@@ -1239,7 +1302,10 @@
     "provider": "Sağlayıcı",
     "startDate": "Başlangıç Tarihi",
     "endDate": "Bitiş Tarihi",
-    "retry": "Tekrar Dene"
+    "retry": "Tekrar Dene",
+    "completeYourPayment": "Ödemenizi Tamamlayın",
+    "pay": "Ödeme Yap",
+    "startFailed": "Ödeme başlatılamadı"
   },
   "seller": {
     "sellerProfile": "Satıcı Profili",
@@ -1317,7 +1383,8 @@
     "open": "Açık",
     "inProgress": "İşlemde",
     "resolved": "Çözüldü",
-    "closed": "Kapatıldı"
+    "closed": "Kapatıldı",
+    "contactSupport": "Destek ile İletişime Geç"
   },
   "faq": {
     "title": "Sıkça Sorulan Sorular",
