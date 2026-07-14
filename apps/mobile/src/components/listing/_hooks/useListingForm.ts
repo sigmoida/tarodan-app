@@ -73,22 +73,35 @@ export function useListingForm({ mode, productId }: ListingFormProps) {
   // Aktif takas/sipariş rezervasyonu (quantity − availableQuantity); alıcıların
   // gördüğü "satışta" sayısının fiziksel stoktan neden düşük olduğunu açıklar.
   const [reservedQty, setReservedQty] = useState(0);
-  const [categoryId, setCategoryId] = useState('');
-  const [condition, setCondition] = useState('very_good');
-  const [brandId, setBrandId] = useState('');
-  const [carModelId, setCarModelId] = useState('');
-  const [scale, setScale] = useState('1:64');
-  const [material, setMaterial] = useState('');
-  const [manufacturerId, setManufacturerId] = useState('');
-  const [year, setYear] = useState('');
-  const [isTradeEnabled, setIsTradeEnabled] = useState(false);
-  const [isSet, setIsSet] = useState(false);
+  // #81: tüm form alanları useZodForm'da; watch/setValue köprüsü mevcut sözleşmeyi korur.
+  const categoryId = form.watch('categoryId');
+  const setCategoryId = (v: string) => form.setValue('categoryId', v);
+  const condition = form.watch('condition');
+  const setCondition = (v: string) => form.setValue('condition', v);
+  const brandId = form.watch('brandId');
+  const setBrandId = (v: string) => form.setValue('brandId', v);
+  const carModelId = form.watch('carModelId');
+  const setCarModelId = (v: string) => form.setValue('carModelId', v);
+  const scale = form.watch('scale');
+  const setScale = (v: string) => form.setValue('scale', v);
+  const material = form.watch('material');
+  const setMaterial = (v: string) => form.setValue('material', v);
+  const manufacturerId = form.watch('manufacturerId');
+  const setManufacturerId = (v: string) => form.setValue('manufacturerId', v);
+  const year = form.watch('year');
+  const setYear = (v: string) => form.setValue('year', v);
+  const isTradeEnabled = form.watch('isTradeEnabled');
+  const setIsTradeEnabled = (v: boolean) => form.setValue('isTradeEnabled', v);
+  const isSet = form.watch('isSet');
+  const setIsSet = (v: boolean) => form.setValue('isSet', v);
   const bundleSize = form.watch('bundleSize');
   const setBundleSize = (v: string) => form.setValue('bundleSize', v);
 
   // Edit-only state
-  const [status, setStatus] = useState('active');
-  const [isPreorder, setIsPreorder] = useState(false);
+  const status = form.watch('status');
+  const setStatus = (v: string) => form.setValue('status', v);
+  const isPreorder = form.watch('isPreorder');
+  const setIsPreorder = (v: boolean) => form.setValue('isPreorder', v);
   const [salePrice, setSalePrice] = useState('');
   const [saleStartDate, setSaleStartDate] = useState('');
   const [saleEndDate, setSaleEndDate] = useState('');
