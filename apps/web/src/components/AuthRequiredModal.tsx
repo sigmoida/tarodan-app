@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useRouter } from 'next/navigation';
-import { XMarkIcon, UserIcon, UserPlusIcon } from '@heroicons/react/24/outline';
-import { useTranslation } from '@/i18n/LanguageContext';import { Button } from '@tarodan/ui';
-
+import { useRouter } from "next/navigation";
+import { UserIcon, UserPlusIcon } from "@heroicons/react/24/outline";
+import { Button, Modal } from "@tarodan/ui";
+import { useTranslation } from "@/i18n/LanguageContext";
 
 interface AuthRequiredModalProps {
   isOpen: boolean;
@@ -25,79 +25,50 @@ export default function AuthRequiredModal({
   const router = useRouter();
   const { t } = useTranslation();
 
-  if (!isOpen) return null;
-
-  const handleLogin = () => {
-    onClose(); // Close modal first
-    const currentPath = redirectPath || window.location.pathname + window.location.search;
-    router.push(`/login?redirect=${encodeURIComponent(currentPath)}`);
-  };
-
-  const handleRegister = () => {
-    onClose(); // Close modal first
-    const currentPath = redirectPath || window.location.pathname + window.location.search;
-    router.push(`/register?redirect=${encodeURIComponent(currentPath)}`);
+  const go = (base: string) => {
+    onClose();
+    const currentPath =
+      redirectPath || window.location.pathname + window.location.search;
+    router.push(`${base}?redirect=${encodeURIComponent(currentPath)}`);
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 py-6 overflow-y-auto">
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-heading/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      
-      {/* Modal */}
-      <div className="relative bg-surface-elevated shadow-2xl max-w-sm sm:max-w-md w-full mx-auto overflow-hidden" style={{borderRadius:'6px'}}>
-        {/* Close button */}
-        <Button variant="secondary" onClick={onClose}
-          className="absolute top-3 right-3 p-1.5 hover:bg-surface-alt transition-colors z-10"
-          style={{borderRadius:'4px'}}>
-          <XMarkIcon className="w-5 h-5 text-subtle" />
-        </Button>
-
-        {/* Content */}
-        <div className="p-6 sm:p-8 text-center">
-          {/* Icon */}
-          <div className="w-16 h-16 mx-auto mb-5 bg-primary-50 flex items-center justify-center" style={{borderRadius:'50%'}}>
-            {icon || (
-              <UserIcon className="w-8 h-8 text-primary-500" />
-            )}
-          </div>
-
-          {/* Title */}
-          <h2 className="text-xl font-bold text-heading mb-2">
-            {title || t('auth.authRequired')}
-          </h2>
-
-          {/* Message */}
-          <p className="text-sm text-muted mb-6">
-            {message}
-          </p>
-
-          {/* Buttons */}
-          <div className="space-y-2.5">
-            <Button variant="secondary" onClick={handleLogin}
-              className="w-full py-2.5 px-4 bg-primary-500 text-inverted font-semibold text-sm hover:bg-primary-600 transition-colors flex items-center justify-center gap-2"
-              style={{borderRadius:'4px'}}>
-              <UserIcon className="w-4 h-4" />
-              {t('common.login')}
-            </Button>
-            
-            <Button variant="secondary" onClick={handleRegister}
-              className="w-full py-2.5 px-4 bg-surface-alt text-body font-semibold text-sm hover:bg-border-subtle transition-colors flex items-center justify-center gap-2"
-              style={{borderRadius:'4px'}}>
-              <UserPlusIcon className="w-4 h-4" />
-              {t('auth.freeSignUp')}
-            </Button>
-          </div>
-
-          {/* Benefits hint */}
-          <p className="mt-5 text-xs text-muted">
-            {t('auth.memberBenefits')}
-          </p>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      maxWidth="max-w-md"
+      zIndex="z-[200]"
+    >
+      <div className="pt-2 text-center">
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-primary-50">
+          {icon || <UserIcon className="h-8 w-8 text-primary-500" />}
         </div>
+
+        <h2 className="mb-2 text-xl font-bold text-heading">
+          {title || t("auth.authRequired")}
+        </h2>
+        <p className="mb-6 text-sm text-muted">{message}</p>
+
+        <div className="space-y-2.5">
+          <Button
+            className="w-full"
+            leftIcon={<UserIcon className="h-4 w-4" />}
+            onClick={() => go("/login")}
+          >
+            {t("common.login")}
+          </Button>
+          <Button
+            variant="secondary"
+            className="w-full"
+            leftIcon={<UserPlusIcon className="h-4 w-4" />}
+            onClick={() => go("/register")}
+          >
+            {t("auth.freeSignUp")}
+          </Button>
+        </div>
+
+        <p className="mt-5 text-xs text-muted">{t("auth.memberBenefits")}</p>
       </div>
-    </div>
+    </Modal>
   );
 }

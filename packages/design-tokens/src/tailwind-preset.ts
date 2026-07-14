@@ -1,5 +1,5 @@
-import type { Config } from 'tailwindcss';
-import { colors, radius, spacing, shadows, motion, typography } from './index';
+import type { Config } from "tailwindcss";
+import { colors, radius, spacing, shadows, motion, typography } from "./index";
 
 /**
  * Tarodan Design System — Shared Tailwind Preset (web adapter)
@@ -25,7 +25,7 @@ const toPx = (obj: Record<string, number>): Record<string, string> =>
  */
 const toRem = (obj: Record<string, number>): Record<string, string> =>
   Object.fromEntries(
-    Object.entries(obj).map(([k, v]) => [k, v === 0 ? '0px' : `${v / 16}rem`]),
+    Object.entries(obj).map(([k, v]) => [k, v === 0 ? "0px" : `${v / 16}rem`]),
   );
 
 const tarodanPreset: Partial<Config> = {
@@ -61,17 +61,24 @@ const tarodanPreset: Partial<Config> = {
       },
       borderColor: {
         border: colors.border.DEFAULT,
-        'border-strong': colors.border.strong,
-        'border-subtle': colors.border.subtle,
+        "border-strong": colors.border.strong,
+        "border-subtle": colors.border.subtle,
       },
       backgroundColor: {
         surface: colors.surface.DEFAULT,
-        'surface-alt': colors.surface.alt,
-        'surface-elevated': colors.surface.elevated,
+        "surface-alt": colors.surface.alt,
+        "surface-elevated": colors.surface.elevated,
       },
       fontFamily: {
         sans: [...typography.fontFamily.sans],
         display: [...typography.fontFamily.display],
+      },
+      // Only the sub-`xs` caption token is projected here; `xs`/`sm`/`base`/…
+      // keep Tailwind's defaults (same px values, with their tuned line-heights).
+      // This adds `text-2xs` (10px) so dense labels/badges stop hand-rolling
+      // arbitrary `text-[10px]` sizes.
+      fontSize: {
+        "2xs": `${typography.fontSize["2xs"] / 16}rem`,
       },
       borderRadius: toPx(radius),
       spacing: toRem(spacing),

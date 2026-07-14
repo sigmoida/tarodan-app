@@ -650,7 +650,7 @@ export default function HeaderSearch() {
                                     TL
                                   </p>
                                 </div>
-                                <span className="text-[11px] text-subtle font-medium px-2 py-0.5 bg-surface-alt rounded-full flex-shrink-0">
+                                <span className="text-2xs text-subtle font-medium px-2 py-0.5 bg-surface-alt rounded-full flex-shrink-0">
                                   {locale === "en" ? "Product" : "Ürün"}
                                 </span>
                               </Link>
@@ -693,7 +693,7 @@ export default function HeaderSearch() {
                               <span className="flex-1 text-sm text-heading font-medium truncate">
                                 {brand.name}
                               </span>
-                              <span className="text-[11px] text-primary-600 font-medium px-2 py-0.5 bg-primary-50 rounded-full flex-shrink-0">
+                              <span className="text-2xs text-primary-600 font-medium px-2 py-0.5 bg-primary-50 rounded-full flex-shrink-0">
                                 {locale === "en" ? "Brand" : "Marka"}
                               </span>
                             </Link>
@@ -731,7 +731,7 @@ export default function HeaderSearch() {
                                 <span className="flex-1 text-sm text-heading font-medium truncate">
                                   {cat.name}
                                 </span>
-                                <span className="text-[11px] text-info-600 font-medium px-2 py-0.5 bg-info-50 rounded-full flex-shrink-0">
+                                <span className="text-2xs text-info-600 font-medium px-2 py-0.5 bg-info-50 rounded-full flex-shrink-0">
                                   {locale === "en" ? "Category" : "Kategori"}
                                 </span>
                               </Link>
@@ -779,7 +779,7 @@ export default function HeaderSearch() {
                                 <span className="flex-1 text-sm text-heading font-medium truncate">
                                   {mfr.name}
                                 </span>
-                                <span className="text-[11px] text-primary-600 font-medium px-2 py-0.5 bg-primary-50 rounded-full flex-shrink-0">
+                                <span className="text-2xs text-primary-600 font-medium px-2 py-0.5 bg-primary-50 rounded-full flex-shrink-0">
                                   {locale === "en" ? "Manufacturer" : "Üretici"}
                                 </span>
                               </Link>
@@ -821,7 +821,7 @@ export default function HeaderSearch() {
                                 <span className="flex-1 text-sm text-heading font-medium truncate">
                                   {m.name}
                                 </span>
-                                <span className="text-[11px] text-success-600 font-medium px-2 py-0.5 bg-success-50 rounded-full flex-shrink-0">
+                                <span className="text-2xs text-success-600 font-medium px-2 py-0.5 bg-success-50 rounded-full flex-shrink-0">
                                   {locale === "en" ? "Model" : "Model"}
                                 </span>
                               </Link>
@@ -864,7 +864,7 @@ export default function HeaderSearch() {
                               <span className="flex-1 text-sm text-heading font-medium truncate">
                                 {s}
                               </span>
-                              <span className="text-[11px] text-warning-600 font-medium px-2 py-0.5 bg-warning-50 rounded-full flex-shrink-0">
+                              <span className="text-2xs text-warning-600 font-medium px-2 py-0.5 bg-warning-50 rounded-full flex-shrink-0">
                                 {locale === "en" ? "Scale" : "Ölçek"}
                               </span>
                             </Link>
@@ -910,7 +910,7 @@ export default function HeaderSearch() {
                                 <span className="flex-1 text-sm text-heading font-medium truncate">
                                   {mat.label}
                                 </span>
-                                <span className="text-[11px] text-muted font-medium px-2 py-0.5 bg-surface rounded-full flex-shrink-0">
+                                <span className="text-2xs text-muted font-medium px-2 py-0.5 bg-surface rounded-full flex-shrink-0">
                                   {locale === "en" ? "Material" : "Malzeme"}
                                 </span>
                               </Link>
@@ -958,7 +958,7 @@ export default function HeaderSearch() {
                                 <span className="flex-1 text-sm text-heading font-medium truncate">
                                   {cond.label}
                                 </span>
-                                <span className="text-[11px] text-success-600 font-medium px-2 py-0.5 bg-success-50 rounded-full flex-shrink-0">
+                                <span className="text-2xs text-success-600 font-medium px-2 py-0.5 bg-success-50 rounded-full flex-shrink-0">
                                   {locale === "en" ? "Condition" : "Durum"}
                                 </span>
                               </Link>
