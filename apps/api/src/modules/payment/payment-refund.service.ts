@@ -725,6 +725,85 @@ export class PaymentRefundService {
     );
   }
 
+  /**
+   * Tek kanonik TESLİM handler'ı. Bir sipariş teslim edildiğinde çağrılır — hangi
+   * yoldan gelirse gelsin (generic webhook, worker, Sürat poll cron, admin). İki işi
+   * ATOMIK bir mantıkta birleştirir:
+   *   1) Order.status/deliveredAt/confirmationDeadline'ı FEATURE_48H'e göre ayarlar,
+   *   2) escrow release'ini planlar (scheduleHoldReleaseOnDelivery) — satıcıya ödemenin
+   *      TEK tetikleyicisi budur; atlanırsa PaymentHold.releaseAt null kalır ve satıcı
+   *      hiç ödenmez.
+   *
+   * Idempotent + güvenli: yalnız HENÜZ teslim edilmemiş (deliveredAt null) ve terminal
+   * olmayan (completed/cancelled/refund_requested/refunded değil) bir siparişte ilerler.
+   * Böylece re-poll/replay deliveredAt'i TAŞIMAZ → releaseAt kaymaz; iptal/iade edilmiş
+   * sipariş yanlışlıkla "delivered"a çekilmez. Eski poll'un status=delivered ama
+   * deliveredAt=null bıraktığı takılı siparişler bir sonraki teslim çağrısında iyileşir.
+   *
+   * Bildirim ÇAĞIRANDA kalır (metod acted + use48h + confirmationDeadline + buyerId döner)
+   * ki teslim I/O'su alıcı bildirim çağrısını beklemesin ve mevcut çağıran davranışı korunsun.
+   */
+  async handleOrderDelivered(
+    orderId: string,
+    deliveredAt: Date,
+    tx?: Prisma.TransactionClient,
+  ): Promise<{
+    acted: boolean;
+    use48h: boolean;
+    confirmationDeadline: Date | null;
+    buyerId: string | null;
+  }> {
+    const db = tx ?? this.prisma;
+    const use48h =
+      this.configService.get<string>('FEATURE_48H_CONFIRMATION_WINDOW') === 'true';
+    const confirmationDeadline = use48h
+      ? new Date(deliveredAt.getTime() + 48 * 60 * 60 * 1000)
+      : null;
+    const targetStatus = use48h
+      ? OrderStatus.awaiting_buyer_confirmation
+      : OrderStatus.delivered;
+
+    const updated = await db.order.updateMany({
+      where: {
+        id: orderId,
+        deliveredAt: null,
+        status: {
+          notIn: [
+            OrderStatus.completed,
+            OrderStatus.cancelled,
+            OrderStatus.refund_requested,
+            OrderStatus.refunded,
+          ],
+        },
+      },
+      data: {
+        status: targetStatus,
+        deliveredAt,
+        confirmationDeadline,
+        version: { increment: 1 },
+      },
+    });
+
+    if (updated.count === 0) {
+      // Zaten teslim işlenmiş / teslim-uygun değil → no-op (replay-safe).
+      return { acted: false, use48h, confirmationDeadline: null, buyerId: null };
+    }
+
+    // Escrow saatini teslimden başlat — para akışının TEK tetikleyicisi.
+    await this.scheduleHoldReleaseOnDelivery(orderId, deliveredAt, tx);
+
+    const order = await db.order.findUnique({
+      where: { id: orderId },
+      select: { buyerId: true },
+    });
+    return {
+      acted: true,
+      use48h,
+      confirmationDeadline,
+      buyerId: order?.buyerId ?? null,
+    };
+  }
+
   async releaseHoldsDue(): Promise<{ count: number; tradeCashReleased: number }> {
     const now = new Date();
 
@@ -741,10 +820,12 @@ export class PaymentRefundService {
     });
 
     // Y1: Escrow yalnızca ürün en az sevk edildiyse VE açık bir iade/itiraz yoksa
-    // serbest bırakılmalı. releaseAt ödeme anında +7gün sabitlendiği için, teslim
-    // edilmemiş ya da iadesi açık bir siparişte süre dolsa bile parayı satıcıya
-    // BIRAKMAYIZ (held bırakmak, yanlış ödemekten güvenlidir). preparing'de takılan
-    // siparişler zaten handleExpiredPreparingOrders tarafından iptal+iade edilir.
+    // serbest bırakılmalı. releaseAt ödeme anında NULL'dır; yalnız teslimde
+    // handleOrderDelivered/scheduleHoldReleaseOnDelivery ile teslim+return+grace olarak
+    // set edilir. Bu yüzden aşağıdaki durum guard'ı ek bir güvenlik katmanıdır: teslim
+    // edilmemiş ya da iadesi açık bir siparişte (releaseAt bir şekilde geçmişte olsa bile)
+    // parayı satıcıya BIRAKMAYIZ (held bırakmak, yanlış ödemekten güvenlidir). preparing'de
+    // takılan siparişler zaten handleExpiredPreparingOrders tarafından iptal+iade edilir.
     const RELEASABLE_ORDER_STATUSES: OrderStatus[] = [
       OrderStatus.shipped,
       OrderStatus.delivered,
