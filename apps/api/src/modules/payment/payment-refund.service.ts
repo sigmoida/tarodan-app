@@ -363,12 +363,12 @@ export class PaymentRefundService {
           ledgerFullThreshold > 0
             ? Math.min(amountToRefund / ledgerFullThreshold, 1)
             : 1;
-        const ledgerRes = await this.commissionLedger.applyRefund(
-          orderId,
-          ledgerPortion,
-          tx,
-        );
-        if (ledgerRes.fullyRefunded) {
+        await this.commissionLedger.applyRefund(orderId, ledgerPortion, tx);
+        // e-Arşiv reverse tetiği ESKİ davranışla AYNI: tam iade tutarında tetiklenir —
+        // ledger'a BAĞLAMA. handleOrderRefund siparişin kesilmiş TÜM faturalarını geri
+        // alır (platform_sale gibi ledger'sız ama faturalı siparişlerde de gerekir);
+        // ledger.fullyRefunded'a bağlarsak ledger'sız tam iadede reverse atlanırdı.
+        if (amountToRefund >= ledgerFullThreshold) {
           einvoiceReverse = true;
         }
 
