@@ -733,6 +733,84 @@ describe('Refund flow (E2E)', () => {
     expect(ctx.paytr.refundCalls).toHaveLength(1);
   });
 
+  // RISK-2: processRefund crash-window çift-iade koruması (order-bazlı pre-marker)
+  it('RISK-2: processRefund PayTR çağrısından ÖNCE order-bazlı refundInProgress marker yazar', async () => {
+    const buyer = await createUser(ctx.module);
+    const seller = await createUser(ctx.module, { isSeller: true });
+    const product = await createProduct({
+      sellerId: seller.id,
+      categoryId: baseline.categoryId,
+      price: 110,
+      quantity: 1,
+    });
+    const addr = await createAddress({ userId: buyer.id });
+    await createAddress({ userId: seller.id });
+    const { orderId } = await buyAndPay(ctx, buyer, product.id, addr.id);
+
+    await request(ctx.app.getHttpServer())
+      .post(`/api/orders/${orderId}/cancel`)
+      .set(authHeader(buyer))
+      .send({ reason: 'vazgeçtim' })
+      .expect(200);
+
+    const prisma = getPrisma();
+    const paymentService = ctx.app.get(PaymentService);
+    await paymentService.processRefundedOrders();
+
+    // PayTR bir kez çağrıldı VE marker kalıcı yazıldı (bir sonraki tur için)
+    expect(ctx.paytr.refundCalls).toHaveLength(1);
+    const payment = await prisma.payment.findFirst({ where: { orderId } });
+    const meta = payment!.metadata as any;
+    expect(meta?.refundInProgressOrders?.[orderId]).toBeTruthy();
+    expect(payment!.status).toBe(PaymentStatus.refunded);
+  });
+
+  it('RISK-2: marker set (önceki tick PayTR sonrası çökmüş) → ikinci tur PayTR ÇAĞIRMAZ, yalnız persist-recovery yapar', async () => {
+    const buyer = await createUser(ctx.module);
+    const seller = await createUser(ctx.module, { isSeller: true });
+    const product = await createProduct({
+      sellerId: seller.id,
+      categoryId: baseline.categoryId,
+      price: 130,
+      quantity: 1,
+    });
+    const addr = await createAddress({ userId: buyer.id });
+    await createAddress({ userId: seller.id });
+    const { orderId } = await buyAndPay(ctx, buyer, product.id, addr.id);
+
+    await request(ctx.app.getHttpServer())
+      .post(`/api/orders/${orderId}/cancel`)
+      .set(authHeader(buyer))
+      .send({ reason: 'vazgeçtim' })
+      .expect(200);
+
+    const prisma = getPrisma();
+    const payment = await prisma.payment.findFirst({ where: { orderId } });
+    // Crash-window simülasyonu: önceki tick PayTR'yi çağırıp marker yazdı ama
+    // commit'i (status=refunded) persist edemeden çöktü → payment hâlâ completed.
+    await prisma.payment.update({
+      where: { id: payment!.id },
+      data: {
+        metadata: {
+          ...((payment!.metadata as object) || {}),
+          refundInProgressOrders: { [orderId]: new Date().toISOString() },
+        },
+      },
+    });
+    expect(ctx.paytr.refundCalls).toHaveLength(0);
+
+    const paymentService = ctx.app.get(PaymentService);
+    const res = await paymentService.processRefundedOrders();
+    expect(res.refunded).toBeGreaterThanOrEqual(1);
+
+    // KRİTİK: PayTR TEKRAR çağrılmadı → çift-iade önlendi; recovery yalnız persist etti
+    expect(ctx.paytr.refundCalls).toHaveLength(0);
+    const finalPay = await prisma.payment.findFirst({ where: { orderId } });
+    expect(finalPay!.status).toBe(PaymentStatus.refunded);
+    const finalOrder = await prisma.order.findUnique({ where: { id: orderId } });
+    expect(finalOrder!.status).toBe(OrderStatus.cancelled);
+  });
+
   it('J1: cooling-off iade onaylanınca alıcıya REFUND_APPROVED bildirimi gider', async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });

@@ -147,6 +147,17 @@ export class PaymentRefundService {
       // Call provider refund API
       let refundResult: any;
 
+      // RISK-2 (B3 deseni, order-bazlı): PayTR createRefund idempotency-key taşımaz;
+      // PayTR iadesi yapılıp commit (refundedOrders/status) persist edilemeden süreç
+      // çökerse sonraki cron tick'i aynı order'a 2. kez iade gönderir. Önlem: PayTR'den
+      // ÖNCE order-bazlı kalıcı marker yaz. Marker varsa PayTR'yi ATLA, yalnız persist-
+      // recovery (commit) yap. Order-bazlı çünkü grup ödemesinde kardeş order'lar aynı
+      // payment üzerinde meşru AYRI iadelerdir (payment-bazlı marker onları bloklardı).
+      const metaForMarker = (payment.metadata as Record<string, any>) || {};
+      const refundInProgressOrders: Record<string, string> =
+        (metaForMarker.refundInProgressOrders as Record<string, string>) || {};
+      const refundAlreadyInitiated = Boolean(refundInProgressOrders[orderId]);
+
       if (payment.provider === 'paytr') {
         // PAYMENT_BYPASS: dev/test modunda PayTR callback olmadan ödeme tamamlandığı
         // için PayTR tarafında oid kaydı yok. Refund'ı da bypass'la — DB'de payment
@@ -163,7 +174,45 @@ export class PaymentRefundService {
             return_amount: amountToRefund,
             bypass: true,
           };
+        } else if (refundAlreadyInitiated) {
+          // Önceki bir denemede marker yazılmış → PayTR çağrısı YAPILMIŞ kabul edilir.
+          // Çift-iadeyi önlemek için PayTR'yi atla, yalnız persist-recovery (commit) yap.
+          this.logger.warn(
+            `processRefund: refundInProgressOrders[${orderId}] zaten set — PayTR çağrısı ` +
+              `atlanıyor, yalnız persist-recovery (paymentId=${payment.id}).`,
+          );
+          refundResult = {
+            status: 'success',
+            err_msg: null,
+            return_amount: amountToRefund,
+            recovered: true,
+          };
         } else {
+          // Marker'ı PayTR'den ÖNCE kalıcı yaz. Yazım başarısızsa para hareketi olmadan
+          // abort et — çağıran güvenle tekrar deneyebilir (henüz PayTR'ye gidilmedi).
+          try {
+            await this.prisma.payment.update({
+              where: { id: payment.id },
+              data: {
+                metadata: {
+                  ...metaForMarker,
+                  refundInProgressOrders: {
+                    ...refundInProgressOrders,
+                    [orderId]: new Date().toISOString(),
+                  },
+                },
+              },
+            });
+          } catch (markerErr: any) {
+            this.logger.error(
+              `processRefund: refundInProgressOrders marker yazılamadı, PayTR çağrısı ` +
+                `yapılmadan abort (orderId=${orderId}, paymentId=${payment.id}): ${markerErr?.message}`,
+            );
+            throw new BadRequestException(
+              'İade başlatılamadı (geçici hata). Lütfen tekrar deneyin.',
+            );
+          }
+
           const paytrOid =
             payment.providerConversationId?.trim() ||
             orderId.replace(/-/g, '');
