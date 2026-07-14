@@ -19,7 +19,9 @@
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@tarodan/types": ["../../packages/types/src"],
+      "@tarodan/types/*": ["../../packages/types/src/*"]
     }
   },
   "include": ["src/**/*", "prisma/**/*"],
