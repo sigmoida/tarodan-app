@@ -11,3 +11,6 @@ export type { Locale } from "./locale";
 
 export { formatMessage } from "./format";
 export type { MessageValues } from "./format";
+
+export { messages, getMessages } from "./catalog";
+export type { Messages } from "./catalog";
