@@ -41,6 +41,7 @@ import { truncateAll, getPrisma, seedBaseline, disconnectPrisma } from '../../te
 import { createUser, createAdminUser, authHeader } from '../../factories/user.factory';
 import { scenario } from '../../test-utils/scenario';
 import { ProductSchedulerService } from '../../../src/modules/product/product-scheduler.service';
+import { PrismaService } from '../../../src/prisma';
 
 describe('04 — Ürün/İlan & Katalog (PRD)', () => {
   let ctx: E2ETestApp;
@@ -1747,6 +1748,42 @@ describe('04 — Ürün/İlan & Katalog (PRD)', () => {
       // SQL/UUID enjeksiyon: bozuk UUID path → 400; query categoryId @IsUUID → 400.
       await request(server()).get("/api/products/' OR 1=1--").expect(400);
       await request(server()).get("/api/products?categoryId=' OR '1'='1").expect(400);
+    });
+  });
+
+  describe('N+1 batch (perf) — #67', () => {
+    scenario('PRD-265', async () => {
+      // [P0] N+1 REGRESYON (#67): Aynı satıcının çok ürünü listelenirken satıcı
+      // istatistikleri ürün BAŞINA sorgulanmaz; sayfa başına TOPLU çekilir. Eski kod her
+      // ürün için userMembership.findUnique çağırıyordu (N kez). Artık tek toplu
+      // userMembership.findMany → findUnique HİÇ çağrılmaz. Yanıt şekli/değeri değişmez
+      // (04-prd/06-src/17-dsc senaryoları bunu ayrıca doğrular). Plain GET (arama yok) →
+      // PostgreSQL yolu → formatProductResponseMany.
+      const seller = await mkSeller();
+      const N = 4;
+      for (let i = 0; i < N; i++) {
+        await mkProduct({ sellerId: seller.id, price: 100 + i });
+      }
+
+      const appPrisma = ctx.module.get(PrismaService);
+      const findUniqueSpy = jest.spyOn(appPrisma.userMembership, 'findUnique');
+      const findManySpy = jest.spyOn(appPrisma.userMembership, 'findMany');
+      try {
+        const res = await request(server())
+          .get('/api/products?limit=20')
+          .expect(200);
+        const mine = res.body.data.filter(
+          (p: any) => p.sellerId === seller.id,
+        );
+        expect(mine.length).toBeGreaterThanOrEqual(N);
+        // Batch: per-ürün userMembership.findUnique ARTIK ÇAĞRILMAZ (N+1 giderildi).
+        expect(findUniqueSpy).not.toHaveBeenCalled();
+        // Satıcı premium durumu tek toplu findMany'den gelir.
+        expect(findManySpy).toHaveBeenCalled();
+      } finally {
+        findUniqueSpy.mockRestore();
+        findManySpy.mockRestore();
+      }
     });
   });
 });
