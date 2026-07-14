@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { appAlert } from '@tarodan/ui-native';
 import { useAuthStore } from '@/stores/authStore';
-import { paymentsApi } from '@/services/api';
+import { paymentsApi } from '@/lib/api';
 import type { Payment } from '../_lib/types';
 
 /**

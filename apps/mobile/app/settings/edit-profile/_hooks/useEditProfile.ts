@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
-import { userApi, mediaApi } from '@/services/api';
+import { userApi, mediaApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { normalizePhoneForPayload, splitPhone } from '@/utils/phone';
 import { createProfileSchema, type ProfileForm } from '../_lib/schema';

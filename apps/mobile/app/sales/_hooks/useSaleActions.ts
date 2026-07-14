@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { appAlert } from '@tarodan/ui-native';
-import { ordersApi, shippingApi } from '@/services/api';
+import { ordersApi, shippingApi } from '@/lib/api';
 import type { Sale } from '../_lib/types';
 
 /**

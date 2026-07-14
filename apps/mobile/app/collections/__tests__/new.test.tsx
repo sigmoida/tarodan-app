@@ -11,10 +11,10 @@ import { resetRouterMocks } from '@/test-utils/router-mock';
 
 jest.mock('expo-router', () => require('@/test-utils/router-mock').routerMock);
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   api: { post: jest.fn(), patch: jest.fn() },
 }));
-import { api } from '@/services/api';
+import { api } from '@/lib/api';
 
 let mockAuth: Record<string, unknown> = {
   isAuthenticated: true,

@@ -7,7 +7,7 @@ import { useMessagesStore } from '@/stores/messagesStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useThreadQuery, useMessagesQuery, useSendMessage, useMarkAsRead } from '@/hooks/messaging';
 import { detectViolations, getViolationMessage } from '@/utils/contentFilter';
-import { mediaApi, userApi } from '@/services/api';
+import { mediaApi, userApi } from '@/lib/api';
 import { getSocket } from '@/services/socket';
 import { groupMessagesByDate } from '../_lib/helpers';
 

@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ScreenHeader, EmptyState } from '@/components/common';
 import { useAuthStore } from '@/stores/authStore';
-import { membershipApi } from '@/services/api';
+import { membershipApi } from '@/lib/api';
 
 const { colors } = theme;
 

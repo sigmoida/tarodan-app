@@ -3,7 +3,7 @@ import { View, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-nat
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { theme, Text, Button, Modal, Input, Textarea, Spinner, useModalMessage, ModalMessage } from '@tarodan/ui-native';
-import { collectionsApi } from '../../services/api';
+import { collectionsApi } from '@/lib/api';
 import { qk } from '@/lib/query';
 import { transformImageUrl } from '../../utils/imageUrl';
 

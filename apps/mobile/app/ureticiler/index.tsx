@@ -4,7 +4,7 @@ import { View, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-nativ
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { manufacturersApi } from '@/services/api';
+import { manufacturersApi } from '@/lib/api';
 import { theme, Text, Input } from '@tarodan/ui-native';
 import { ScreenHeader, ScreenLoader, ErrorState, EmptyState } from '@/components/common';
 import { resolveImageUrl } from '@/utils/imageUrl';

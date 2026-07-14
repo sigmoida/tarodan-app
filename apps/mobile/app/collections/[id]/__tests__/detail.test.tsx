@@ -17,11 +17,11 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
 }));
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   api: { get: jest.fn() },
   collectionsApi: { like: jest.fn(), unlike: jest.fn() },
 }));
-import { api, collectionsApi } from '@/services/api';
+import { api, collectionsApi } from '@/lib/api';
 
 let mockAuth: Record<string, unknown> = {
   isAuthenticated: true,

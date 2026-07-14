@@ -6,7 +6,7 @@ import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { appAlert } from '@tarodan/ui-native';
 
 import { useAuthStore } from '../../../stores/authStore';
-import { api, productsApi, categoriesApi, bankAccountApi } from '../../../services/api';
+import { api, productsApi, categoriesApi, bankAccountApi } from '@/lib/api';
 import { FALLBACK_SCALES, FALLBACK_MATERIALS, BRAND_SLUGS, SCALE_SLUGS } from '../_lib/constants';
 import type {
   Category,

@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
-import { productsApi } from '@/services/api';
+import { productsApi } from '@/lib/api';
 import { useProductFilterOptions } from '@/hooks/useProductFilterOptions';
 import {
   EMPTY_FILTERS,

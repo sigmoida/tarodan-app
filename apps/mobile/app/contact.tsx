@@ -3,7 +3,7 @@ import { View, ScrollView, StyleSheet, TouchableOpacity, Linking } from 'react-n
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme, Button, Card, Snackbar, Text, Input, Textarea, ScreenHeader } from '@tarodan/ui-native';
-import { supportApi } from '@/services/api';
+import { supportApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
 import { SUPPORT_EMAIL, SUPPORT_PHONE, SUPPORT_WHATSAPP } from '@/constants/legalFacts';
 

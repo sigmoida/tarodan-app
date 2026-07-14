@@ -2,7 +2,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { authApi } from '@/services/api';
+import { authApi } from '@/lib/api';
 import { registerSchema, type RegisterForm } from '../_lib/schema';
 
 /**

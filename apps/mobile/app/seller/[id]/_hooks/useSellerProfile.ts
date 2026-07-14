@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
-import { userApi, productsApi, ratingsApi, collectionsApi } from '@/services/api';
+import { userApi, productsApi, ratingsApi, collectionsApi } from '@/lib/api';
 import { qk } from '@/lib/query';
 import { useRefresh } from '@/hooks/useRefresh';
 import { useFollowing } from '@/hooks/useFollowing';

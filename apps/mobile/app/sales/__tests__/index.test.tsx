@@ -14,7 +14,7 @@ jest.mock("expo-router", () => ({
   useFocusEffect: jest.fn(),
 }));
 
-jest.mock("@/services/api", () => ({
+jest.mock('@/lib/api', () => ({
   ordersApi: {
     getAll: jest.fn(),
     getSellerEarnings: jest.fn(),
@@ -26,7 +26,7 @@ jest.mock("@/services/api", () => ({
     updateTracking: jest.fn(),
   },
 }));
-import { ordersApi } from "@/services/api";
+import { ordersApi } from '@/lib/api';
 
 let mockAuth = { isAuthenticated: true };
 jest.mock("@/stores/authStore", () => ({

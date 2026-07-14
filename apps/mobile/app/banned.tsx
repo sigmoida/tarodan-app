@@ -3,7 +3,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme, Text, Button } from '@tarodan/ui-native';
 import { useAuthStore } from '@/stores/authStore';
-import { resetBannedRedirect } from '@/services/api';
+import { resetBannedRedirect } from '@/lib/api';
 
 const { colors } = theme;
 

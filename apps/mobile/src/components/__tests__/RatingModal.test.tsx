@@ -10,10 +10,10 @@ import { screen, fireEvent, waitFor } from '@testing-library/react-native';
 import RatingModal from '../RatingModal';
 import { renderWithProviders } from '../../test-utils';
 
-jest.mock('../../services/api', () => ({
+jest.mock('@/lib/api', () => ({
   api: { post: jest.fn(() => Promise.resolve({ data: {} })) },
 }));
-import { api } from '../../services/api';
+import { api } from '@/lib/api';
 
 let mockLimits: { maxReviewChars: number } | undefined = { maxReviewChars: 500 };
 jest.mock('../../stores/authStore', () => ({

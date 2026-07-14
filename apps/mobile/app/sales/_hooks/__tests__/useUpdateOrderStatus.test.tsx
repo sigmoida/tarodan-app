@@ -13,7 +13,7 @@ import { renderHook, act } from "@testing-library/react-native";
 
 jest.mock("@tarodan/ui-native", () => ({ appAlert: jest.fn() }));
 
-jest.mock("@/services/api", () => ({
+jest.mock('@/lib/api', () => ({
   ordersApi: { markAsPreparing: jest.fn() },
   shippingApi: {
     getOrderShipments: jest.fn(),
@@ -22,7 +22,7 @@ jest.mock("@/services/api", () => ({
   },
 }));
 
-import { ordersApi, shippingApi } from "@/services/api";
+import { ordersApi, shippingApi } from '@/lib/api';
 import { useUpdateOrderStatus } from "../useUpdateOrderStatus";
 
 const orders = ordersApi as unknown as { markAsPreparing: jest.Mock };

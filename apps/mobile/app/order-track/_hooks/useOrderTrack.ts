@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api } from '@/services/api';
+import { api } from '@/lib/api';
 import type { OrderStatus } from '../_lib/status';
 
 /**

@@ -20,10 +20,10 @@ import { router } from 'expo-router';
 const mockPush = router.push as jest.Mock;
 const mockReplace = router.replace as jest.Mock;
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   guestApi: { post: jest.fn(), get: jest.fn() },
 }));
-import { guestApi } from '@/services/api';
+import { guestApi } from '@/lib/api';
 
 import NewsletterScreen from '../index';
 import NewsletterUnsubscribeScreen from '../unsubscribe';

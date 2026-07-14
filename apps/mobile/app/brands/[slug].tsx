@@ -3,7 +3,7 @@ import { View, StyleSheet, Image } from 'react-native';
 
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { brandsApi, productsApi } from '@/services/api';
+import { brandsApi, productsApi } from '@/lib/api';
 import { theme, Text } from '@tarodan/ui-native';
 import { ScreenHeader } from '@/components/common';
 const { colors } = theme;

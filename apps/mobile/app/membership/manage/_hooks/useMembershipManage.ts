@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { appAlert } from '@tarodan/ui-native';
 import { useRefresh } from '@/hooks/useRefresh';
-import { membershipApi } from '@/services/api';
+import { membershipApi } from '@/lib/api';
 import { captureException } from '@/services/sentry';
 import { TIER_NAMES, type MembershipMe } from '../_lib/types';
 

@@ -17,7 +17,7 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '@tarodan/ui-native';
-import { productsApi } from '../../services/api';
+import { productsApi } from '@/lib/api';
 
 const { colors } = theme;
 

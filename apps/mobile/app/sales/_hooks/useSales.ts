@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { ordersApi } from '@/services/api';
+import { ordersApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import type { Sale, FilterType } from '../_lib/types';
 import { saleBadgeStatus } from '../_lib/status';

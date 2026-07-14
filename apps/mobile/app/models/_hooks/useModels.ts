@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { carModelsApi } from '@/services/api';
+import { carModelsApi } from '@/lib/api';
 import { useRefresh } from '@/hooks/useRefresh';
 import type { Brand, CarModel } from '../_lib/types';
 

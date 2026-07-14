@@ -5,7 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
-import { paymentsApi } from '@/services/api';
+import { paymentsApi } from '@/lib/api';
 
 const { colors } = theme;
 

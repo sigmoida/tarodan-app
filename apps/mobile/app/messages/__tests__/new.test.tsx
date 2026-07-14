@@ -25,10 +25,10 @@ jest.mock('expo-router', () => {
 import { replaceMock, backMock, resetRouterMocks } from '@/test-utils/router-mock';
 
 // API — profil ucu inline mock
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   api: { get: jest.fn() },
 }));
-import { api } from '@/services/api';
+import { api } from '@/lib/api';
 
 // i18n — anahtarı aynen döndür
 jest.mock('@/i18n', () => ({

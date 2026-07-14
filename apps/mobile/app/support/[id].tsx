@@ -16,7 +16,7 @@ import { useState, useCallback } from 'react';
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { supportApi } from '@/services/api';
+import { supportApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { captureException } from '@/services/sentry';
 

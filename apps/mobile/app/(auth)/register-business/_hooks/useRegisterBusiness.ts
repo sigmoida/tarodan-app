@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useMutation } from '@tanstack/react-query';
 import { appAlert } from '@tarodan/ui-native';
-import { authApi } from '@/services/api';
+import { authApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { DEFAULT_COUNTRY_CODE, normalizePhoneForPayload } from '@/utils/phone';
 import type { BusinessForm } from '../_lib/types';

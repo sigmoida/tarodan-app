@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Button, Input, Screen, Text, VStack, theme } from '@tarodan/ui-native';
-import { authApi } from '@/services/api';
+import { authApi } from '@/lib/api';
 import { BrandLogo } from '@/components/BrandLogo';
 
 const { colors } = theme;

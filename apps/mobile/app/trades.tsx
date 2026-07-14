@@ -11,7 +11,7 @@ import {
   VStack,
   theme,
 } from '@tarodan/ui-native';
-import { tradesApi } from '@/services/api';
+import { tradesApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { TradeCard, type TradeCardTrade } from '@/components/trade/TradeCard';
 

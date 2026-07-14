@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { productsApi, categoriesApi } from '@/services/api';
+import { productsApi, categoriesApi } from '@/lib/api';
 import { SORT_OPTIONS } from '../_lib/constants';
 
 /**

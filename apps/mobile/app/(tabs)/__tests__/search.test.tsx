@@ -14,11 +14,11 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 
 jest.mock('expo-router', () => require('@/test-utils/router-mock').routerMock);
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   productsApi: { getAll: jest.fn() },
   searchApi: { autocompleteRich: jest.fn() },
 }));
-import { productsApi } from '@/services/api';
+import { productsApi } from '@/lib/api';
 
 // Filtre seçenekleri ağ çağrısı yapmasın (mobil-UI testi backend-bağımsız).
 jest.mock('@/hooks/useProductFilterOptions', () => ({

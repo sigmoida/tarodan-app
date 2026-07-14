@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { appAlert } from '@tarodan/ui-native';
 import { useAuthStore } from '@/stores/authStore';
-import { membershipApi, paymentsApi } from '@/services/api';
+import { membershipApi, paymentsApi } from '@/lib/api';
 import { captureException } from '@/services/sentry';
 import { MEMBERSHIP_TIERS, DEFAULT_MONTHLY } from '../_lib/tiers';
 

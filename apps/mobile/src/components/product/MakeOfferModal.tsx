@@ -3,7 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation } from '@tanstack/react-query';
 import { theme, Text, Button, Modal, Input, Textarea, useModalMessage, ModalMessage } from '@tarodan/ui-native';
-import { offersApi } from '../../services/api';
+import { offersApi } from '@/lib/api';
 import { formatPrice } from '../../utils/format';
 
 const { colors } = theme;

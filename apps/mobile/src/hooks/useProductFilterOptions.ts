@@ -3,7 +3,7 @@
  * seçeneklerini yükler. Tüm filtre ekranları bu hook'u paylaşır.
  */
 import { useQuery } from '@tanstack/react-query';
-import { productsApi, categoriesApi } from '../services/api';
+import { productsApi, categoriesApi } from '@/lib/api';
 import { MATERIAL_FALLBACK, SCALE_FALLBACK } from '../utils/productFilters';
 
 export type FilterCategory = { id: string; name: string; slug: string };

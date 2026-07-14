@@ -19,10 +19,10 @@ jest.mock('react-native-webview', () => ({
   WebView: () => null,
 }));
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   pagesApi: { getBySlug: jest.fn() },
 }));
-import { pagesApi } from '@/services/api';
+import { pagesApi } from '@/lib/api';
 
 import CMSPageScreen from '../[slug]';
 

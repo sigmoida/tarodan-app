@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { appAlert } from '@tarodan/ui-native';
 import { useAuthStore } from '@/stores/authStore';
-import { paymentsApi } from '@/services/api';
+import { paymentsApi } from '@/lib/api';
 import type { Payment } from '../_lib/types';
 import { STATUS_CONFIG, formatDate, formatCurrency } from '../_lib/status';
 

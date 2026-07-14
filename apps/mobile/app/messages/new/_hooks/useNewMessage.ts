@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/services/api';
+import { api } from '@/lib/api';
 import { useMessagesStore } from '@/stores/messagesStore';
 import { useCreateThread } from '@/hooks/messaging';
 import { useAuthStore } from '@/stores/authStore';

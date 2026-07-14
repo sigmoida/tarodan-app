@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { appAlert } from '@tarodan/ui-native';
-import { offersApi } from '@/services/api';
+import { offersApi } from '@/lib/api';
 import { useRefresh } from '@/hooks/useRefresh';
 import { formatPrice } from '@/utils/format';
 import { useAuthStore } from '@/stores/authStore';

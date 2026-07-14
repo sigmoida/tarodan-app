@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
-import { notificationsApi } from '@/services/api';
+import { notificationsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { toMobileRoute } from '@/utils/notificationRoute';
 import type { Notification } from '../_lib/types';

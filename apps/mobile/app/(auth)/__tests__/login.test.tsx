@@ -8,10 +8,10 @@ import { resetRouterMocks, replaceMock, backMock, canGoBackMock } from '@/test-u
 
 jest.mock('expo-router', () => require('@/test-utils/router-mock').routerMock);
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   authApi: { login: jest.fn(), getProfile: jest.fn(), resendVerification: jest.fn() },
 }));
-import { authApi } from '@/services/api';
+import { authApi } from '@/lib/api';
 
 jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({ login: jest.fn() }),

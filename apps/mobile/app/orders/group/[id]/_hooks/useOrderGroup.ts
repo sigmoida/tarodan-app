@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { ordersApi } from '@/services/api';
+import { ordersApi } from '@/lib/api';
 import { apiStatusToUi } from '@/utils/orderStatus';
 import type { GroupDetail, GroupOrder } from '../_lib/types';
 

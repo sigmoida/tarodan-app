@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect } from 'expo-router';
 import { appAlert } from '@tarodan/ui-native';
-import { api } from '@/services/api';
+import { api } from '@/lib/api';
 import { useRefresh } from '@/hooks/useRefresh';
 import { useAuthStore } from '@/stores/authStore';
 import { DEFAULT_SETTINGS, type NotificationSettings } from '../_lib/types';

@@ -27,10 +27,10 @@ jest.mock('@/i18n', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   authApi: { resetPassword: jest.fn() },
 }));
-import { authApi } from '@/services/api';
+import { authApi } from '@/lib/api';
 
 import ResetPasswordScreen from '../reset-password';
 

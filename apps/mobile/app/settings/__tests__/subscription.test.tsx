@@ -30,7 +30,7 @@ jest.mock('@/stores/authStore', () => ({
 }));
 
 // API katmanı — controller'ın query/mutation'larını besler.
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   membershipApi: {
     getCurrentMembership: jest.fn().mockResolvedValue({ data: null }),
     cancel: jest.fn().mockResolvedValue({ data: {} }),
@@ -41,7 +41,7 @@ jest.mock('@/services/api', () => ({
   },
 }));
 
-import { membershipApi } from '@/services/api';
+import { membershipApi } from '@/lib/api';
 import SubscriptionSettingsScreen from '../subscription';
 
 const mockGetMembership = membershipApi.getCurrentMembership as jest.Mock;

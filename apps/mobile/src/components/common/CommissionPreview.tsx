@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { ordersApi } from '../../services/api';
+import { ordersApi } from '@/lib/api';
 import { theme, Spinner, Text } from '@tarodan/ui-native';
 import { formatPrice } from '../../utils/format';
 

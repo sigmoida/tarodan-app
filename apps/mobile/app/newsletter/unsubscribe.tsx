@@ -4,7 +4,7 @@ import { theme, Button, Input, Text, appAlert } from '@tarodan/ui-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
-import { guestApi } from '@/services/api';
+import { guestApi } from '@/lib/api';
 import { ScreenHeader } from '@/components/common';
 
 const { colors } = theme;

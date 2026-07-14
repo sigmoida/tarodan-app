@@ -3,7 +3,7 @@ import { View, ScrollView, Pressable, StyleSheet, ActivityIndicator } from 'reac
 import { WebView, WebViewNavigation } from 'react-native-webview';
 import { Button, Input, Checkbox, Text, theme, appAlert } from '@tarodan/ui-native';
 import { Ionicons } from '@expo/vector-icons';
-import { paymentsApi, membershipApi } from '../services/api';
+import { paymentsApi, membershipApi } from '@/lib/api';
 
 const { colors } = theme;
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { router } from 'expo-router';
-import { api } from '@/services/api';
+import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n';
 import type { BusinessStats, TabType } from '../_lib/types';

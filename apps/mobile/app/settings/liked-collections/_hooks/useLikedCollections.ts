@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { collectionsApi } from '@/services/api';
+import { collectionsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import type { LikedCollection } from '../_lib/types';
 

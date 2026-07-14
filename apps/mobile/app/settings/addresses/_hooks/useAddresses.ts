@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { appAlert } from '@tarodan/ui-native';
 import { normalizePhoneForPayload, splitPhone } from '@/utils/phone';
 import { useRefresh } from '@/hooks/useRefresh';
-import { api } from '@/services/api';
+import { api } from '@/lib/api';
 import { qk } from '@/lib/query';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n';

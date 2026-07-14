@@ -5,7 +5,7 @@ import { Button, Spinner, Text, theme, ScreenHeader } from '@tarodan/ui-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { ProductCard, type ProductCardProduct } from '@/components/product/ProductCard';
-import { productsApi } from '@/services/api';
+import { productsApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
 
 const { colors } = theme;

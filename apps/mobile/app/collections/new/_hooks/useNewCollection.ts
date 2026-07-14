@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
-import { api } from '@/services/api';
+import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { collectionSchema, type CollectionForm } from '../_lib/schema';
 import type { CollectionTemplate } from '../_lib/templates';

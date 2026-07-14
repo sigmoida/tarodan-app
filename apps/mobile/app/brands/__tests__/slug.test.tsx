@@ -14,11 +14,11 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
 }));
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   brandsApi: { findBySlug: jest.fn() },
   productsApi: { getAll: jest.fn() },
 }));
-import { brandsApi, productsApi } from '@/services/api';
+import { brandsApi, productsApi } from '@/lib/api';
 
 import BrandDetailScreen from '../[slug]';
 

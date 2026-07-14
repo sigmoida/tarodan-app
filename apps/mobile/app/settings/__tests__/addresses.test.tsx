@@ -23,7 +23,7 @@ jest.mock('@/i18n', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   api: {
     get: jest.fn().mockResolvedValue({ data: [] }),
     post: jest.fn(),
@@ -31,7 +31,7 @@ jest.mock('@/services/api', () => ({
     delete: jest.fn(),
   },
 }));
-import { api } from '@/services/api';
+import { api } from '@/lib/api';
 const post = api.post as jest.Mock;
 
 import AddressesScreen from '../addresses';

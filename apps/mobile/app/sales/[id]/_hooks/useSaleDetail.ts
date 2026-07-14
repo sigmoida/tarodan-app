@@ -1,7 +1,7 @@
 import { Linking } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { ordersApi } from '@/services/api';
+import { ordersApi } from '@/lib/api';
 import { useRefresh } from '@/hooks/useRefresh';
 import type { Order } from '../_lib/types';
 import { statusColor } from '../_lib/status';

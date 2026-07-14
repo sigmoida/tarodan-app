@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../services/api';
+import { api } from '@/lib/api';
 import { useAuthStore } from '../stores/authStore';
 import { theme, Text, Button, Modal, Input, Textarea } from '@tarodan/ui-native';
 

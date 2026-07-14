@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { userApi, ordersApi, productsApi } from '@/services/api';
+import { userApi, ordersApi, productsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import type { SellerStats } from '../_lib/types';
 

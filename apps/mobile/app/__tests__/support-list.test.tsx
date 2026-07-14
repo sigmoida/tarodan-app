@@ -16,10 +16,10 @@ jest.mock('expo-router', () => ({
 import { router } from 'expo-router';
 const mockPush = router.push as jest.Mock;
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   supportApi: { getMyTickets: jest.fn() },
 }));
-import { supportApi } from '@/services/api';
+import { supportApi } from '@/lib/api';
 const getMyTicketsMock = supportApi.getMyTickets as jest.Mock;
 
 let mockIsAuthenticated = true;

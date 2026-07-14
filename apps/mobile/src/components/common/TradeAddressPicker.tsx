@@ -3,7 +3,7 @@ import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-nat
 import { theme, Text } from '@tarodan/ui-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
-import { addressesApi } from '../../services/api';
+import { addressesApi } from '@/lib/api';
 
 const { colors } = theme;
 

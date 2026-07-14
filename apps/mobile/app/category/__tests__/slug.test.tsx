@@ -15,11 +15,11 @@ jest.mock('expo-router', () => ({
 }));
 import { router } from 'expo-router';
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   categoriesApi: { getBySlug: jest.fn() },
   productsApi: { getAll: jest.fn() },
 }));
-import { categoriesApi, productsApi } from '@/services/api';
+import { categoriesApi, productsApi } from '@/lib/api';
 
 import CategoryScreen from '../[slug]';
 

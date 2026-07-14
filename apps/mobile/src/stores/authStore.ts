@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
-import { authApi, userApi } from '../services/api';
+import { authApi, userApi } from '@/lib/api';
 import { setUser as setSentryUser, captureException } from '../services/sentry';
 
 // Membership tier types

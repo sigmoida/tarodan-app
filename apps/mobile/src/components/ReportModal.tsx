@@ -2,7 +2,7 @@ import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation } from '@tanstack/react-query';
-import { userReportsApi } from '../services/api';
+import { userReportsApi } from '@/lib/api';
 import { theme, Text, Button, Modal, Textarea } from '@tarodan/ui-native';
 
 const { colors } = theme;

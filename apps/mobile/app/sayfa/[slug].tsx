@@ -4,7 +4,7 @@ import { theme, Spinner, Text, ScreenHeader } from '@tarodan/ui-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
-import { pagesApi } from '@/services/api';
+import { pagesApi } from '@/lib/api';
 
 const { colors } = theme;
 

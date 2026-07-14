@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { appAlert, useModalMessage, alertAfterClose } from '@tarodan/ui-native';
 import { useAuthStore } from '@/stores/authStore';
-import { authApi } from '@/services/api';
+import { authApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
 
 /**

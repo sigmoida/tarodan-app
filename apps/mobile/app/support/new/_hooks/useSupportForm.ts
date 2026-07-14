@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuthStore } from '@/stores/authStore';
-import { supportApi } from '@/services/api';
+import { supportApi } from '@/lib/api';
 import { UUID_RE } from '../_lib/constants';
 
 /**

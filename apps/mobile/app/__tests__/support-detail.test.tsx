@@ -16,10 +16,10 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ id: 'ticket-1' }),
 }));
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   supportApi: { getTicket: jest.fn(), addMessage: jest.fn() },
 }));
-import { supportApi } from '@/services/api';
+import { supportApi } from '@/lib/api';
 const getTicketMock = supportApi.getTicket as jest.Mock;
 const addMessageMock = supportApi.addMessage as jest.Mock;
 

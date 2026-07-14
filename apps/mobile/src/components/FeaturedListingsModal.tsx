@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, ScrollView, StyleSheet, Image, Pressable } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { api } from '../services/api';
+import { api } from '@/lib/api';
 import { theme, Text, Button, Card, Chip, IconButton, Snackbar, Spinner, Divider, Modal, useModalMessage, ModalMessage } from '@tarodan/ui-native';
 import { resolveImageUrl } from '../utils/imageUrl';
 

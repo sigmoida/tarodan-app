@@ -10,10 +10,10 @@ import { routerMock, resetRouterMocks } from '@/test-utils/router-mock';
 
 jest.mock('expo-router', () => require('@/test-utils/router-mock').routerMock);
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   authApi: { register: jest.fn() },
 }));
-import { authApi } from '@/services/api';
+import { authApi } from '@/lib/api';
 import RegisterScreen from '../register';
 
 const mockRegister = authApi.register as jest.Mock;

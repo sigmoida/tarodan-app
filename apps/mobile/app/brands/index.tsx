@@ -3,7 +3,7 @@ import { View, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-nativ
 
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { brandsApi } from '@/services/api';
+import { brandsApi } from '@/lib/api';
 import { theme, Text, Input } from '@tarodan/ui-native';
 import { ScreenHeader, ScreenLoader, ErrorState, EmptyState } from '@/components/common';
 import { resolveImageUrl } from '@/utils/imageUrl';

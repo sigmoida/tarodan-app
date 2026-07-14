@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { productsApi, collectionsApi } from '@/services/api';
+import { productsApi, collectionsApi } from '@/lib/api';
 import { qk } from '@/lib/query';
 import { OPTIMISTIC, type Listing } from '../_lib/types';
 

@@ -13,7 +13,7 @@ import {
   theme,
   appAlert,
 } from '@tarodan/ui-native';
-import { authApi } from '@/services/api';
+import { authApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 
 const { colors, spacing } = theme;

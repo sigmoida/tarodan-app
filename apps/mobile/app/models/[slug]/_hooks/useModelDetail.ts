@@ -1,7 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { CONDITIONS } from '@/theme';
-import { carModelsApi, productsApi } from '@/services/api';
+import { carModelsApi, productsApi } from '@/lib/api';
 import { transformImageUrl } from '@/utils/imageUrl';
 import { useRefresh } from '@/hooks/useRefresh';
 import type { CarModelDetail, Product } from '../_lib/types';

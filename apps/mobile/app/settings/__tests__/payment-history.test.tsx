@@ -15,11 +15,11 @@ jest.mock('expo-router', () => ({
   },
 }));
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   api: { get: jest.fn() },
   paymentsApi: { getMyPayments: jest.fn() },
 }));
-import { api } from '@/services/api';
+import { api } from '@/lib/api';
 
 let mockIsAuthenticated = true;
 jest.mock('@/stores/authStore', () => ({
