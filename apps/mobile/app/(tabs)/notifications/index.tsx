@@ -57,6 +57,11 @@ export default function NotificationsScreen() {
         data={f.notifications}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
+        // #82: virtualizasyon ayarı — çok sayıda bildirimde bellek/kaydırma.
+        windowSize={7}
+        initialNumToRender={8}
+        maxToRenderPerBatch={10}
+        removeClippedSubviews
         style={styles.body}
         contentContainerStyle={f.notifications.length === 0 ? styles.emptyList : styles.list}
         refreshControl={

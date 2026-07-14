@@ -103,6 +103,11 @@ export default function OffersScreen() {
           data={offers}
           keyExtractor={(item) => item.id}
           renderItem={renderOffer}
+          // #82: virtualizasyon ayarı — uzun teklif listelerinde bellek/kaydırma.
+          windowSize={7}
+          initialNumToRender={8}
+          maxToRenderPerBatch={10}
+          removeClippedSubviews
           ListEmptyComponent={<OffersEmpty tab={activeTab} />}
           contentContainerStyle={offers.length === 0 ? { flex: 1 } : styles.listContent}
           refreshControl={
