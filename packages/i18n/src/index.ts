@@ -14,3 +14,5 @@ export type { MessageValues } from "./format";
 
 export { messages, getMessages } from "./catalog";
 export type { Messages } from "./catalog";
+
+export type { MessageKey } from "./generated/keys";
