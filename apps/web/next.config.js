@@ -12,8 +12,14 @@ function getCacheHeaders() {
   const oneDay = 'public, max-age=86400, stale-while-revalidate=3600';
   const oneWeek = 'public, max-age=604800, stale-while-revalidate=86400';
   const noindex = 'noindex, nofollow, noarchive, nosnippet, noimageindex';
+  // Pre-launch guard (#93): the site-wide X-Robots-Tag noindex is part of the
+  // same single switch as robots.ts + metadata.robots. Set
+  // NEXT_PUBLIC_ALLOW_INDEXING=true to drop it (and open indexing) everywhere.
+  const allowIndexing = process.env.NEXT_PUBLIC_ALLOW_INDEXING === 'true';
   return [
-    { source: '/:path*', headers: [{ key: 'X-Robots-Tag', value: noindex }] },
+    ...(allowIndexing
+      ? []
+      : [{ source: '/:path*', headers: [{ key: 'X-Robots-Tag', value: noindex }] }]),
     { source: '/favicon.ico', headers: [{ key: 'Cache-Control', value: oneDay }] },
     { source: '/tarodanfavicon.png', headers: [{ key: 'Cache-Control', value: oneWeek }] },
     { source: '/logo.svg', headers: [{ key: 'Cache-Control', value: oneWeek }] },
@@ -163,21 +169,41 @@ const nextConfig = {
   },
   async redirects() {
     return [
+      // Retired client-only "brands" showcase (#94): the live catalog surface is
+      // /manufacturers (RSC + generateMetadata). Redirect the old brand routes —
+      // and the /models chain that used to point at /brands — to it.
+      {
+        source: '/brands',
+        destination: '/manufacturers',
+        permanent: true,
+      },
+      {
+        source: '/brands/:slug',
+        destination: '/manufacturers/:slug',
+        permanent: true,
+      },
+      // Retired client-only category page (#94) → the live /listings grid, which
+      // resolves a category slug via its `category` param (params.ts).
+      {
+        source: '/category/:slug',
+        destination: '/listings?category=:slug',
+        permanent: true,
+      },
       {
         source: '/models',
-        destination: '/brands',
+        destination: '/manufacturers',
         permanent: true,
       },
       // Model detay sayfaları (/models/:slug) emekliye ayrıldı; öksüz kalmasın diye
-      // tüm alt yolları da /brands'e yönlendir.
+      // tüm alt yolları da /manufacturers'a yönlendir.
       {
         source: '/models/:path*',
-        destination: '/brands',
+        destination: '/manufacturers',
         permanent: true,
       },
       {
         source: '/modeller',
-        destination: '/brands',
+        destination: '/manufacturers',
         permanent: true,
       },
       // /guvenli-takas → /secure-swap (route slug İngilizce'ye çevrildi).
