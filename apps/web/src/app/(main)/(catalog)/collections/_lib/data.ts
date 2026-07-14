@@ -118,7 +118,7 @@ export async function fetchPublicCollectionsServer(
   try {
     const qs = new URLSearchParams(buildBrowseParams(sortBy, search, categoryId)).toString();
     const res = await fetch(`${API_BASE}/api/collections/browse?${qs}`, {
-      cache: 'no-store',
+      next: { revalidate: 60 },
     });
     if (!res.ok) return null;
     return unwrapPublicCollections(await res.json());
@@ -134,7 +134,7 @@ export async function fetchPublicCollectionsServer(
 export async function fetchCategoriesServer(): Promise<CategoryNode[] | null> {
   try {
     const res = await fetch(`${API_BASE}/api/categories?refresh=1`, {
-      cache: 'no-store',
+      next: { revalidate: 60 },
     });
     if (!res.ok) return null;
     return unwrapCategories(await res.json());

@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/authStore";
-import { useCartStore } from "@/stores/cartStore";
+import { useCart } from "@/hooks/useCart";
 import { messagesApi, api, wishlistApi } from "@/lib/api";
+import { queryKeys } from "@/lib/query/keys";
 
 /**
  * The shared header data hook: auth (from the auth store, gated behind hydration
@@ -33,14 +34,14 @@ export function useHeaderData() {
 
   const showAuthUI = mounted && isAuthenticated;
 
-  const { itemCount: cartCount, fetchCart } = useCartStore();
+  const { itemCount: cartCount, refetch: fetchCart } = useCart();
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [pendingOffersCount, setPendingOffersCount] = useState(0);
   const [pendingTradesCount, setPendingTradesCount] = useState(0);
 
   const wishlistQuery = useQuery({
-    queryKey: ["wishlist"],
+    queryKey: queryKeys.wishlist.all(),
     queryFn: async () => {
       const res = await wishlistApi.get();
       const data = res.data;
