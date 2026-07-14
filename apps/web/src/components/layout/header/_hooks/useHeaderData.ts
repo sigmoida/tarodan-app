@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/authStore";
 import { useCartStore } from "@/stores/cartStore";
 import { messagesApi, api, wishlistApi } from "@/lib/api";
+import { queryKeys } from "@/lib/query/keys";
 
 /**
  * The shared header data hook: auth (from the auth store, gated behind hydration
@@ -40,7 +41,7 @@ export function useHeaderData() {
   const [pendingTradesCount, setPendingTradesCount] = useState(0);
 
   const wishlistQuery = useQuery({
-    queryKey: ["wishlist"],
+    queryKey: queryKeys.wishlist.all(),
     queryFn: async () => {
       const res = await wishlistApi.get();
       const data = res.data;

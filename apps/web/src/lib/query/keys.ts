@@ -30,6 +30,8 @@ export const queryKeys = {
     ) => ["listings", filters, categoryId ?? "", page] as const,
     /** The listings filter facets (scales, brands, materials, …). */
     filters: () => ["listings", "filters"] as const,
+    /** The listings family root — one invalidate refreshes every grid page. */
+    all: () => ["listings"] as const,
   },
   home: {
     featured: () => ["home", "featured"] as const,
@@ -57,6 +59,8 @@ export const queryKeys = {
         categoryId || null,
       ] as const,
     mine: () => ["collections", "mine"] as const,
+    /** The collections family root — one invalidate refreshes every collections list. */
+    all: () => ["collections"] as const,
   },
   manufacturers: {
     /** The public manufacturers list — seeded by the server, read by the client. */
@@ -78,9 +82,6 @@ export const queryKeys = {
     all: () => ["categories", "all"] as const,
     collections: () => ["categories", "collections"] as const,
   },
-  wishlist: {
-    check: (id: string | number) => ["wishlist-check", String(id)] as const,
-  },
   profile: {
     /** The profile overview aggregate (stats + membership + pending counts). */
     overview: () => ["profile", "overview"] as const,
@@ -91,6 +92,87 @@ export const queryKeys = {
     tiers: () => ["membership", "tiers"] as const,
     /** The current user's membership (tier + status + period). */
     me: () => ["membership", "me"] as const,
+  },
+  // NOTE: every factory below returns the SAME array a call site used inline
+  // before the registry existed — do NOT change the string values, or an
+  // SSR-seeded cache (or a query and its invalidation) would drift apart.
+  seller: {
+    profile: (id: string) => ["seller", id] as const,
+    products: (id: string) => ["seller-products", id] as const,
+    follow: (id: string) => ["follow", id] as const,
+    reviews: (id: string) => ["seller-reviews", id] as const,
+    collections: (id: string) => ["seller-collections", id] as const,
+    ratingStats: (id: string) => ["seller-rating-stats", id] as const,
+  },
+  wishlist: {
+    /** The full wishlist list (invalidated after any favorite toggle). */
+    all: () => ["wishlist"] as const,
+    check: (id: string | number) => ["wishlist-check", String(id)] as const,
+    /** Shared wishlist by comma-joined ids (undefined preserved for parity). */
+    shared: (ids: string | undefined) => ["favorites-shared", ids] as const,
+  },
+  notifications: {
+    all: () => ["notifications"] as const,
+    unreadCount: () => ["notifications-unread-count"] as const,
+    bell: () => ["notifications-bell"] as const,
+  },
+  messages: {
+    settings: () => ["message-settings"] as const,
+    threads: () => ["message-threads"] as const,
+    thread: (id: string | undefined) => ["messages", id] as const,
+  },
+  orders: {
+    all: () => ["orders"] as const,
+    /** The single-order aggregate root (`['order']` also invalidates every sub-key). */
+    detail: () => ["order"] as const,
+    elogoInvoice: (id: string) => ["order", id, "elogo-invoice"] as const,
+    sellerInvoice: (id: string) => ["order", id, "seller-invoice"] as const,
+  },
+  trades: {
+    all: () => ["trades"] as const,
+    detail: (id: string) => ["trade", id] as const,
+  },
+  payments: {
+    all: () => ["profile-payments"] as const,
+    list: <TFilters>(page: number, filters: TFilters) =>
+      ["profile-payments", page, filters] as const,
+  },
+  collection: {
+    /** A single collection (edit route), keyed by id-or-slug. `['collection']`
+     *  with no arg is the family root used for broad invalidation. */
+    all: () => ["collection"] as const,
+    detail: (idOrSlug: string) => ["collection", idOrSlug] as const,
+  },
+  collectionsLiked: {
+    list: () => ["collections-liked"] as const,
+  },
+  myCollections: {
+    list: () => ["my-collections"] as const,
+  },
+  checkout: {
+    addresses: () => ["checkout-addresses"] as const,
+    successOrder: (orderId: string) =>
+      ["checkout-success-order", orderId] as const,
+    successInvoice: (orderId: string) =>
+      ["checkout-success-invoice", orderId] as const,
+  },
+  addresses: {
+    all: () => ["addresses"] as const,
+  },
+  listingEdit: {
+    detail: (id: string) => ["listing-edit", id] as const,
+  },
+  profileListings: {
+    all: () => ["profile-listings"] as const,
+  },
+  boost: {
+    pricing: () => ["boost-pricing"] as const,
+  },
+  bankAccount: {
+    detail: () => ["bank-account"] as const,
+  },
+  search: {
+    autocomplete: (query: string) => ["autocomplete-rich", query] as const,
   },
 } as const;
 

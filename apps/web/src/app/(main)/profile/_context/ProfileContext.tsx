@@ -89,7 +89,7 @@ function useProfileValue() {
   const enabled = mounted && !authLoading && !!isAuthenticated;
 
   const wishlistQuery = useQuery({
-    queryKey: ["wishlist"],
+    queryKey: queryKeys.wishlist.all(),
     queryFn: async () => {
       const res = await wishlistApi.get();
       const data = res.data;
