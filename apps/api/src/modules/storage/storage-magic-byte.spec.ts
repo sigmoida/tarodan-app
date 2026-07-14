@@ -59,4 +59,40 @@ describe("StorageService — upload magic-byte validation", () => {
       } as any),
     ).rejects.not.toThrow(/geçerli bir resim değil/);
   });
+
+  // #71 — documents/tickets buckets previously skipped content validation, so a
+  // spoofed "PDF" (e.g. a seller invoice upload) could smuggle active content in.
+  it("rejects a spoofed document (declared application/pdf, non-PDF/non-image bytes)", async () => {
+    const svc = makeService();
+    const fakePdf = Buffer.from(
+      "<html><script>alert(1)</script></html>",
+      "utf8",
+    );
+
+    await expect(
+      svc.uploadFile(fakePdf, {
+        bucket: "documents",
+        mimeType: "application/pdf",
+        filename: "evil.pdf",
+      } as any),
+    ).rejects.toThrow(/geçerli bir belge/);
+  });
+
+  it("passes magic-byte validation for a real PDF in the documents bucket", async () => {
+    const svc = makeService();
+    // "%PDF-1.4" header — file-type detects application/pdf, as a real
+    // server-generated invoice PDF would.
+    const pdf = Buffer.concat([
+      Buffer.from("%PDF-1.4\n", "ascii"),
+      Buffer.from("1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF", "ascii"),
+    ]);
+
+    await expect(
+      svc.uploadFile(pdf, {
+        bucket: "documents",
+        mimeType: "application/pdf",
+        filename: "invoice.pdf",
+      } as any),
+    ).rejects.not.toThrow(/geçerli bir belge/);
+  });
 });
