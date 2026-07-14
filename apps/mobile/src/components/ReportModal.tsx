@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation } from '@tanstack/react-query';
@@ -95,6 +95,15 @@ export default function ReportModal({
     },
   });
 
+  // #82: unmount sonrası setState uyarısını önle — kapatma timer'ını sakla + temizle.
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+    },
+    [],
+  );
+
   const handleClose = () => {
     setReason('');
     setDescription('');
@@ -108,7 +117,7 @@ export default function ReportModal({
       await reportMutation.mutateAsync();
       onSuccess?.();
       // Kullanıcıya başarı mesajını göster, ardından kapat
-      setTimeout(() => {
+      closeTimer.current = setTimeout(() => {
         handleClose();
       }, 1500);
     } catch (e) {
