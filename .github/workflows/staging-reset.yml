@@ -1,21 +1,40 @@
 # Manual button (+ optional weekly cron) that resets the STAGING database to
-# the known-clean seeded state. SSHes into the staging VPS and runs the
-# triple-guarded scripts/staging-reset-remote.sh — the script itself refuses
-# to run on anything that looks like production (see its header).
+# the known-clean seeded state on the COOLIFY-managed staging server. SSHes in
+# and, inside the Coolify api application container, runs prisma migrate reset +
+# the compiled seed (the automated form of the manual reset we run by hand),
+# then flushes Redis and restarts api so Elasticsearch reindexes.
+#
+# PROD GUARDS (in the inline script) — any failure aborts before touching data:
+#   1. RESET_CONFIRM=STAGING must be set.
+#   2. The api container's FRONTEND_URL/API_URL must be a *.staging.tarodan.shop
+#      host and must NOT be a bare production domain.
+#   3. Seeding WITH images is refused while S3_ENV_PREFIX=prod (would copy demo
+#      assets into production storage) — set S3_ENV_PREFIX=staging or skip images.
 #
 # Required GitHub environment "staging" secrets:
-#   STAGING_HOST, STAGING_USERNAME, STAGING_SSH_KEY
+#   STAGING_HOST, STAGING_USERNAME, STAGING_SSH_KEY   (SSH into the staging VPS)
+#   COOLIFY_STAGING_UUIDS                             (api,web,admin UUIDs; api = first)
 # Optional repo/environment variable:
-#   STAGING_WEEKLY_RESET=true  → enables the Monday-morning scheduled reset.
+#   STAGING_WEEKLY_RESET=true  -> enables the Monday-morning scheduled reset.
 name: Staging Reset
 
 on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: "Type STAGING (all caps) to confirm wiping the staging DB"
+        description: "Type STAGING (all caps) to confirm wiping + reseeding the staging DB"
         required: true
         type: string
+      dry_run:
+        description: "Dry run: discover the api container + run guards only, change nothing"
+        required: false
+        type: boolean
+        default: false
+      skip_images:
+        description: "Seed WITHOUT demo images (faster, no S3 writes)"
+        required: false
+        type: boolean
+        default: false
       skip_backup:
         description: "Skip the pre-reset pg_dump backup"
         required: false
@@ -31,26 +50,106 @@ concurrency:
 
 jobs:
   reset:
-    name: Reset + seed staging
+    name: Reset + seed staging (Coolify)
     runs-on: ubuntu-latest
     environment: staging
     if: >-
       (github.event_name == 'workflow_dispatch' && inputs.confirm == 'STAGING') ||
       (github.event_name == 'schedule' && vars.STAGING_WEEKLY_RESET == 'true')
     steps:
-      - name: Reset + seed over SSH
+      - name: Resolve api app UUID (first field of COOLIFY_STAGING_UUIDS)
+        id: uuid
+        env:
+          UUIDS: ${{ secrets.COOLIFY_STAGING_UUIDS }}
+        run: echo "api=$(echo "$UUIDS" | cut -d, -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Reset + seed over SSH (Coolify api container)
         uses: appleboy/ssh-action@v1
+        env:
+          RESET_CONFIRM: STAGING
+          API_UUID: ${{ steps.uuid.outputs.api }}
+          # Scheduled runs always do a full, image-inclusive reset with backup.
+          DRY_RUN: ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '1' || '0' }}
+          SKIP_BACKUP: ${{ (github.event_name == 'workflow_dispatch' && inputs.skip_backup) && '1' || '0' }}
+          SEED_SKIP_IMAGES: ${{ (github.event_name == 'workflow_dispatch' && inputs.skip_images) && '1' || '0' }}
         with:
           host: ${{ secrets.STAGING_HOST }}
           username: ${{ secrets.STAGING_USERNAME }}
           key: ${{ secrets.STAGING_SSH_KEY }}
           command_timeout: 30m
+          envs: RESET_CONFIRM,API_UUID,DRY_RUN,SKIP_BACKUP,SEED_SKIP_IMAGES
+          # Staging runs under Coolify: no docker-compose, DB/Redis/ES containers
+          # are named by their Coolify UUIDs. We target the Coolify api APPLICATION
+          # container and derive DATABASE_URL / REDIS_URL from its own env.
           script: |
             set -euo pipefail
-            cd /opt/tarodan
-            git fetch origin development
-            git checkout development
-            git pull --ff-only origin development
-            RESET_CONFIRM=STAGING \
-            SKIP_BACKUP=${{ (github.event_name == 'workflow_dispatch' && inputs.skip_backup) && '1' || '0' }} \
-              bash scripts/staging-reset-remote.sh
+            log() { echo "[staging-reset] $*"; }
+            die() { echo "[staging-reset] REFUSED: $*" >&2; exit 1; }
+
+            [ "${RESET_CONFIRM:-}" = "STAGING" ] || die "RESET_CONFIRM=STAGING not set."
+            [ -n "${API_UUID:-}" ] || die "API_UUID not set (first field of COOLIFY_STAGING_UUIDS)."
+
+            # --- Discover the Coolify api application container -----------------
+            API_CID="$(docker ps --filter "label=coolify.applicationId=$API_UUID" --format '{{.ID}}' | head -1)"
+            if [ -z "$API_CID" ]; then
+              API_CID="$(docker ps --filter "name=$API_UUID" --format '{{.ID}}' | head -1)"
+            fi
+            [ -n "$API_CID" ] || die "api container not found for UUID '$API_UUID'. Inspect: docker ps --format '{{.Names}}\t{{.Label \"coolify.applicationId\"}}'"
+            log "api container: $API_CID"
+
+            # --- Guard: staging fingerprint (never touch production) -----------
+            FRONTEND_URL="$(docker exec "$API_CID" printenv FRONTEND_URL 2>/dev/null || true)"
+            API_URL="$(docker exec "$API_CID" printenv API_URL 2>/dev/null || true)"
+            S3_ENV_PREFIX="$(docker exec "$API_CID" printenv S3_ENV_PREFIX 2>/dev/null || true)"
+            log "FRONTEND_URL=$FRONTEND_URL | API_URL=$API_URL | S3_ENV_PREFIX=${S3_ENV_PREFIX:-<unset>}"
+            case "$FRONTEND_URL $API_URL" in
+              *staging.tarodan.shop*) : ;;
+              *) die "api FRONTEND_URL/API_URL is not a staging host — refusing to wipe." ;;
+            esac
+            case "$FRONTEND_URL" in
+              https://tarodan.shop*|https://www.tarodan.shop*) die "production domain fingerprint on api — refusing." ;;
+            esac
+            if [ "${SEED_SKIP_IMAGES:-0}" != "1" ] && [ "$S3_ENV_PREFIX" = "prod" ]; then
+              die "seed WITH images but S3_ENV_PREFIX=prod would write demo assets into PROD storage. Set S3_ENV_PREFIX=staging or enable skip_images."
+            fi
+
+            if [ "${DRY_RUN:-0}" = "1" ]; then
+              log "DRY_RUN=1 — guards passed, api container discovered. No changes made."
+              exit 0
+            fi
+
+            # --- Optional pre-reset backup: pg_dump via the postgres container -
+            if [ "${SKIP_BACKUP:-0}" != "1" ]; then
+              DB_URL="$(docker exec "$API_CID" printenv DATABASE_URL)"
+              PG_HOST="$(printf '%s' "$DB_URL" | sed -E 's#^[a-z]+://[^@]+@([^:/]+).*#\1#')"
+              PG_USER="$(printf '%s' "$DB_URL" | sed -E 's#^[a-z]+://([^:]+):.*#\1#')"
+              PG_PASS="$(printf '%s' "$DB_URL" | sed -E 's#^[a-z]+://[^:]+:([^@]+)@.*#\1#')"
+              PG_DB="$(printf '%s' "$DB_URL" | sed -E 's#.*/([^/?]+)(\?.*)?$#\1#')"
+              if docker ps --format '{{.Names}}' | grep -qx "$PG_HOST"; then
+                TS="$(date +%Y%m%d-%H%M%S)"
+                BACKUP_DIR="$HOME/tarodan-staging-backups"; mkdir -p "$BACKUP_DIR"
+                log "pg_dump ($PG_HOST/$PG_DB) -> $BACKUP_DIR/staging-pre-reset-$TS.sql.gz"
+                if docker exec -e PGPASSWORD="$PG_PASS" "$PG_HOST" pg_dump -U "$PG_USER" "$PG_DB" | gzip > "$BACKUP_DIR/staging-pre-reset-$TS.sql.gz"; then
+                  ls -1t "$BACKUP_DIR"/staging-pre-reset-*.sql.gz 2>/dev/null | tail -n +6 | xargs -r rm -f
+                else
+                  log "pg_dump failed (non-fatal) — continuing."
+                fi
+              else
+                log "postgres container '$PG_HOST' not found by name; skipping backup (Coolify keeps its own DB backups)."
+              fi
+            fi
+
+            # --- Reset + seed inside the api container --------------------------
+            if [ "${SEED_SKIP_IMAGES:-0}" = "1" ]; then SEED_PREFIX="SEED_SKIP_IMAGES=1 "; IMG="skipped"; else SEED_PREFIX=""; IMG="included"; fi
+            log "prisma migrate reset --force + compiled seed (images: $IMG)..."
+            docker exec "$API_CID" sh -c "cd /app && npx prisma migrate reset --force --skip-seed --schema=prisma/schema.prisma && ${SEED_PREFIX}node dist-seed/prisma/seed.js"
+
+            # --- Flush Redis via the api container's own ioredis + REDIS_URL ---
+            log "flushing redis..."
+            docker exec "$API_CID" node -e "const R=require('ioredis');const r=new R(process.env.REDIS_URL);r.flushall().then(()=>{console.log('redis flushed');process.exit(0)}).catch(e=>{console.error('flush failed:',e.message);process.exit(0)})" || log "redis flush failed (non-fatal)"
+
+            # --- Refresh Elasticsearch: restart api so boot sync reconciles ----
+            log "restarting api so Elasticsearch reindexes from the fresh DB..."
+            docker restart "$API_CID" >/dev/null
+
+            log "staging reset + seed complete (images: $IMG). Elasticsearch reindexes on api boot."
