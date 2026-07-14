@@ -20,7 +20,11 @@ name: Deploy Staging
 #   COOLIFY_TOKEN          -> Coolify API token (deploy-capable)
 #   COOLIFY_STAGING_UUIDS  -> staging app UUIDs, comma-separated IN THIS ORDER:
 #                             uuidApi,uuidWeb,uuidAdmin  (order matters — the
-#                             `changes` job splits on it to pick per-app UUIDs)
+#                             coolify-deploy action maps the changed app names
+#                             to this list. The secret is passed as an action
+#                             INPUT, never a job output: GitHub redacts
+#                             secret-valued outputs, which silently empties them
+#                             and skips the deploy.)
 
 on:
   workflow_run:
@@ -43,7 +47,7 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     outputs:
-      uuids: ${{ steps.pick.outputs.uuids }}
+      apps: ${{ steps.pick.outputs.apps }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -53,15 +57,12 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha || github.ref }}
           fetch-depth: 0
       - id: pick
-        name: Pick UUIDs for the changed apps
+        name: Pick the changed apps
         env:
-          ALL_UUIDS: ${{ secrets.COOLIFY_STAGING_UUIDS }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
-          # COOLIFY_STAGING_UUIDS is "api,web,admin" — order is load-bearing.
-          IFS=',' read -r API_UUID WEB_UUID ADMIN_UUID _rest <<< "$ALL_UUIDS"
-          all() { printf '%s,%s,%s' "$API_UUID" "$WEB_UUID" "$ADMIN_UUID"; }
+          all() { printf 'api,web,admin'; }
 
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             echo "Manual dispatch -> deploy all three."
@@ -85,24 +86,28 @@ jobs:
             echo "$changed" | grep -qE '^apps/admin/' && want_admin=1 || true
 
             list=""
-            [ "$want_api" = 1 ]   && list="$list,$API_UUID"
-            [ "$want_web" = 1 ]   && list="$list,$WEB_UUID"
-            [ "$want_admin" = 1 ] && list="$list,$ADMIN_UUID"
+            [ "$want_api" = 1 ]   && list="$list,api"
+            [ "$want_web" = 1 ]   && list="$list,web"
+            [ "$want_admin" = 1 ] && list="$list,admin"
             sel="${list#,}"
           fi
 
-          echo "uuids=$sel" >> "$GITHUB_OUTPUT"
+          # `apps` holds NON-secret app names (api/web/admin). The name -> UUID
+          # mapping happens in the deploy job's action call: the UUID list is a
+          # secret and must not cross a job output, or GitHub redacts it (empty
+          # output -> deploy silently skipped).
+          echo "apps=$sel" >> "$GITHUB_OUTPUT"
           if [ -z "$sel" ]; then
             echo "No deployable app changed — deploy job will be skipped."
           else
-            echo "Deploying UUIDs: $sel"
+            echo "Deploying apps: $sel"
           fi
 
   deploy:
     name: Trigger Coolify (staging)
     needs: changes
     # Skip entirely when nothing deployable changed (e.g. docs/CI-only commit).
-    if: ${{ needs.changes.outputs.uuids != '' }}
+    if: ${{ needs.changes.outputs.apps != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -114,7 +119,10 @@ jobs:
         with:
           coolify-url: ${{ secrets.COOLIFY_URL }}
           coolify-token: ${{ secrets.COOLIFY_TOKEN }}
-          uuids: ${{ needs.changes.outputs.uuids }}
+          # Pass the secret UUID list + non-secret app names; the action maps
+          # names -> UUIDs internally (secret stays an INPUT, never an output).
+          all-uuids: ${{ secrets.COOLIFY_STAGING_UUIDS }}
+          apps: ${{ needs.changes.outputs.apps }}
       - name: Report failure
         if: failure()
         run: echo "::error::Staging deploy failed — check the logs above (Coolify deployment did not finish successfully)."
