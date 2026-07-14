@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/authStore";
-import { useCartStore } from "@/stores/cartStore";
+import { useCart } from "@/hooks/useCart";
 import { messagesApi, api, wishlistApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 
@@ -34,7 +34,7 @@ export function useHeaderData() {
 
   const showAuthUI = mounted && isAuthenticated;
 
-  const { itemCount: cartCount, fetchCart } = useCartStore();
+  const { itemCount: cartCount, refetch: fetchCart } = useCart();
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [pendingOffersCount, setPendingOffersCount] = useState(0);
