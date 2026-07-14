@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { api, ratingsApi, mediaApi } from "@/lib/api";
+import { queryKeys } from "@/lib/query/keys";
 import { useCartStore } from "@/stores/cartStore";
 import { useTranslation } from "@/i18n";
 import { useWebList } from "@/hooks/useWebResource";
@@ -238,7 +239,7 @@ export function useSubmitReview() {
     },
     onSuccess: async () => {
       toast.success(t("review.reviewSubmitted"));
-      await queryClient.invalidateQueries({ queryKey: ["orders"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.orders.all() });
     },
     onError: (error: any) => {
       toast.error(

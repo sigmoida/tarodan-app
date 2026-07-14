@@ -16,6 +16,7 @@ import type { UseFormReturn } from "react-hook-form";
 import { useZodForm } from "@tarodan/ui/form";
 import toast from "react-hot-toast";
 import { listingsApi, bankAccountApi } from "@/lib/api";
+import { queryKeys } from "@/lib/query/keys";
 import { useAuthStore } from "@/stores/authStore";
 import { useTranslation } from "@/i18n/LanguageContext";
 import {
@@ -36,8 +37,13 @@ import { useListingImageUpload } from "@/components/listings/form/useListingImag
 
 function useNewListingValue() {
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading, user, limits, refreshUser } =
-    useAuthStore();
+  const {
+    isAuthenticated,
+    isLoading: authLoading,
+    user,
+    limits,
+    refreshUser,
+  } = useAuthStore();
   const { locale } = useTranslation();
   const CONDITIONS = getConditions(locale);
 
@@ -53,7 +59,7 @@ function useNewListingValue() {
   const categoryId = watch("categoryId");
 
   const bankAccountQuery = useQuery({
-    queryKey: ["bank-account"],
+    queryKey: queryKeys.bankAccount.detail(),
     queryFn: async () => (await bankAccountApi.get()).data || null,
     enabled: isAuthenticated,
   });
@@ -115,7 +121,8 @@ function useNewListingValue() {
   const activeAttrManufacturer = useRef<string>("");
   useEffect(() => {
     if (manufacturerList.length === 0) return;
-    const newKey = manufacturerList.find((m) => m.id === manufacturerId)?.id ?? "";
+    const newKey =
+      manufacturerList.find((m) => m.id === manufacturerId)?.id ?? "";
     if (activeAttrManufacturer.current === newKey) return;
     if (
       activeAttrManufacturer.current !== "" &&
@@ -127,12 +134,13 @@ function useNewListingValue() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manufacturerId, manufacturerList]);
 
-  const { uploadingImages, handleFileUpload, removeImage } = useListingImageUpload({
-    form,
-    maxImages: limits?.maxImagesPerListing || 3,
-    imagePreviewUrls,
-    setImagePreviewUrls,
-  });
+  const { uploadingImages, handleFileUpload, removeImage } =
+    useListingImageUpload({
+      form,
+      maxImages: limits?.maxImagesPerListing || 3,
+      imagePreviewUrls,
+      setImagePreviewUrls,
+    });
 
   const onSubmit = async (values: NewListingValues) => {
     if (listingLimits && !listingLimits.canCreateListing) {

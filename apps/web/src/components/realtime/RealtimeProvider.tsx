@@ -1,10 +1,11 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import type { NotificationNewEvent, ThreadUpdatedEvent } from '@tarodan/types';
-import { useAuthStore } from '@/stores/authStore';
-import { getSocket, disconnectSocket } from '@/lib/socket';
+import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import type { NotificationNewEvent, ThreadUpdatedEvent } from "@tarodan/types";
+import { useAuthStore } from "@/stores/authStore";
+import { queryKeys } from "@/lib/query/keys";
+import { getSocket, disconnectSocket } from "@/lib/socket";
 
 /**
  * Global realtime listeners that must run on EVERY page (notification toast/badge,
@@ -26,20 +27,26 @@ export function RealtimeProvider({ children }: { children?: React.ReactNode }) {
     const socket = getSocket(token);
 
     const onNotification = (_n: NotificationNewEvent) => {
-      queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.notifications.unreadCount(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.notifications.all(),
+      });
     };
     const onThreadUpdated = (_p: ThreadUpdatedEvent) => {
-      queryClient.invalidateQueries({ queryKey: ['message-threads'] });
-      queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.messages.threads() });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.notifications.unreadCount(),
+      });
     };
 
-    socket.on('notification:new', onNotification);
-    socket.on('thread:updated', onThreadUpdated);
+    socket.on("notification:new", onNotification);
+    socket.on("thread:updated", onThreadUpdated);
 
     return () => {
-      socket.off('notification:new', onNotification);
-      socket.off('thread:updated', onThreadUpdated);
+      socket.off("notification:new", onNotification);
+      socket.off("thread:updated", onThreadUpdated);
     };
   }, [token, queryClient]);
 

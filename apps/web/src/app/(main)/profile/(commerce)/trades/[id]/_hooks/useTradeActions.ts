@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { tradesApi, addressesApi, paymentsApi } from "@/lib/api";
+import { queryKeys } from "@/lib/query/keys";
 import { useConfirm } from "@/components/ConfirmProvider";
 import type { Trade } from "../_lib/types";
 
@@ -39,7 +40,7 @@ export function useTradeActions({
   const [shipAddressId, setShipAddressId] = useState("");
 
   const addressesQuery = useQuery({
-    queryKey: ["addresses"],
+    queryKey: queryKeys.addresses.all(),
     queryFn: async () => {
       const res = await addressesApi.getAll();
       const list = res.data?.data ?? res.data?.addresses ?? res.data ?? [];
@@ -123,7 +124,9 @@ export function useTradeActions({
     },
     onSuccess: async () => {
       toast.success(
-        locale === "en" ? "Shipping info submitted" : "Kargo bilgisi gönderildi",
+        locale === "en"
+          ? "Shipping info submitted"
+          : "Kargo bilgisi gönderildi",
       );
       setShipAddressId("");
       await invalidateTrade();
@@ -157,7 +160,9 @@ export function useTradeActions({
     },
     onSuccess: async () => {
       toast.success(
-        locale === "en" ? "Receipt confirmed" : "Teslim alındı olarak işaretlendi",
+        locale === "en"
+          ? "Receipt confirmed"
+          : "Teslim alındı olarak işaretlendi",
       );
       await invalidateTrade();
     },

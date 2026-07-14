@@ -12,6 +12,7 @@ import {
   ratingsApi,
   mediaApi,
 } from "@/lib/api";
+import { queryKeys } from "@/lib/query/keys";
 import { useTranslation } from "@/i18n";
 import { useWebItem, useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
@@ -49,7 +50,7 @@ export function useElogoInvoice(
   order: OrderDetail | null | undefined,
 ) {
   return useQuery({
-    queryKey: ["order", orderId, "elogo-invoice"],
+    queryKey: queryKeys.orders.elogoInvoice(orderId),
     queryFn: async (): Promise<ElogoInvoice | null> => {
       try {
         const res = await api.get(`/elogo/invoices/by-order/${orderId}`);
@@ -68,7 +69,7 @@ export function useSellerInvoice(
   order: OrderDetail | null | undefined,
 ) {
   return useQuery({
-    queryKey: ["order", orderId, "seller-invoice"],
+    queryKey: queryKeys.orders.sellerInvoice(orderId),
     queryFn: async (): Promise<SellerInvoiceStatus | null> => {
       try {
         const res = await api.get(`/orders/${orderId}/seller-invoice`);
@@ -106,8 +107,10 @@ function useInvalidateOrder(_orderId: string) {
   const queryClient = useQueryClient();
   return () =>
     queryClient
-      .invalidateQueries({ queryKey: ["order"] })
-      .then(() => queryClient.invalidateQueries({ queryKey: ["orders"] }));
+      .invalidateQueries({ queryKey: queryKeys.orders.detail() })
+      .then(() =>
+        queryClient.invalidateQueries({ queryKey: queryKeys.orders.all() }),
+      );
 }
 
 /** Satıcı: paid → preparing, ya da alıcı onayı → completed. */
@@ -467,7 +470,7 @@ export function useUploadSellerInvoice(orderId: string) {
             : "Fatura yüklendi, alıcıya mail gönderildi",
       );
       await queryClient.invalidateQueries({
-        queryKey: ["order", orderId, "seller-invoice"],
+        queryKey: queryKeys.orders.sellerInvoice(orderId),
       });
     },
     onError: (err: any) => {

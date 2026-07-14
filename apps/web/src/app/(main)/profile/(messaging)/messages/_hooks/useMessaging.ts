@@ -1,24 +1,25 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef, useMemo } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
-import { messagesApi, listingsApi, api, mediaApi } from '@/lib/api';
-import { useAuthStore } from '@/stores/authStore';
-import { useConfirm } from '@/components/ConfirmProvider';
-import { useTranslation } from '@/i18n';
-import { useMessagingSocket } from '@/hooks/useMessagingSocket';
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import toast from "react-hot-toast";
+import { messagesApi, listingsApi, api, mediaApi } from "@/lib/api";
+import { queryKeys } from "@/lib/query/keys";
+import { useAuthStore } from "@/stores/authStore";
+import { useConfirm } from "@/components/ConfirmProvider";
+import { useTranslation } from "@/i18n";
+import { useMessagingSocket } from "@/hooks/useMessagingSocket";
 import {
   checkContentFilter,
   type Message,
   type MessageThread,
-} from '../_lib/messages';
+} from "../_lib/messages";
 
 const INITIAL_THREADS = 6;
 
 type Draft = { text: string; urls: string[] };
-const EMPTY_DRAFT: Draft = { text: '', urls: [] };
+const EMPTY_DRAFT: Draft = { text: "", urls: [] };
 
 /**
  * View-model for the two-pane chat: threads + active conversation + composer.
@@ -33,9 +34,13 @@ export function useMessaging(enabled: boolean) {
   const confirm = useConfirm();
   const { user } = useAuthStore();
 
-  const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
+  const [selectedThread, setSelectedThread] = useState<MessageThread | null>(
+    null,
+  );
   /** Taslak sohbet bazında: sohbet değişince yazı/resim eski sohbette kalır */
-  const [draftsByThreadId, setDraftsByThreadId] = useState<Record<string, Draft>>({});
+  const [draftsByThreadId, setDraftsByThreadId] = useState<
+    Record<string, Draft>
+  >({});
   const [sending, setSending] = useState(false);
   const [creatingThread, setCreatingThread] = useState(false);
   const [threadsExpanded, setThreadsExpanded] = useState(false);
@@ -45,8 +50,8 @@ export function useMessaging(enabled: boolean) {
   // Bildirim linkinden (/messages?thread=<id>) gelen thread'i bir kez otomatik açmak için.
   const autoSelectedThreadRef = useRef<string | null>(null);
 
-  const sellerId = searchParams.get('user');
-  const productId = searchParams.get('listing');
+  const sellerId = searchParams.get("user");
+  const productId = searchParams.get("listing");
 
   const currentDraft = selectedThread
     ? (draftsByThreadId[selectedThread.id] ?? EMPTY_DRAFT)
@@ -59,18 +64,19 @@ export function useMessaging(enabled: boolean) {
       : null;
 
   const messageSettingsQuery = useQuery({
-    queryKey: ['message-settings'],
+    queryKey: queryKeys.messages.settings(),
     queryFn: async () => {
-      const response = await api.get('/admin/settings/public');
+      const response = await api.get("/admin/settings/public");
       return response.data || {};
     },
     enabled,
-    meta: { page: 'message-settings' },
+    meta: { page: "message-settings" },
   });
-  const maxMessageLength = messageSettingsQuery.data?.max_message_length ?? 1000;
+  const maxMessageLength =
+    messageSettingsQuery.data?.max_message_length ?? 1000;
 
   const threadsQuery = useQuery({
-    queryKey: ['message-threads'],
+    queryKey: queryKeys.messages.threads(),
     queryFn: async (): Promise<MessageThread[]> => {
       const response = await messagesApi.getThreads();
       const rawThreads = response.data.data || response.data.threads || [];
@@ -81,48 +87,63 @@ export function useMessaging(enabled: boolean) {
           ...t,
           otherUser: {
             id: isParticipant1 ? t.participant2Id : t.participant1Id,
-            displayName: isParticipant1 ? (t.participant2Name || (locale === 'en' ? 'User' : 'Kullanıcı')) : (t.participant1Name || (locale === 'en' ? 'User' : 'Kullanıcı')),
-            avatarUrl: isParticipant1 ? (t.participant2AvatarUrl || null) : (t.participant1AvatarUrl || null),
+            displayName: isParticipant1
+              ? t.participant2Name || (locale === "en" ? "User" : "Kullanıcı")
+              : t.participant1Name || (locale === "en" ? "User" : "Kullanıcı"),
+            avatarUrl: isParticipant1
+              ? t.participant2AvatarUrl || null
+              : t.participant1AvatarUrl || null,
           },
-          lastMessage: t.lastMessage ? {
-            ...t.lastMessage,
-            isFromMe: t.lastMessage.senderId === user?.id,
-          } : undefined,
-          product: t.productId ? {
-            id: t.productId,
-            title: t.productTitle || (locale === 'en' ? 'Product' : 'Ürün'),
-            imageUrl: t.productImage,
-          } : undefined,
+          lastMessage: t.lastMessage
+            ? {
+                ...t.lastMessage,
+                isFromMe: t.lastMessage.senderId === user?.id,
+              }
+            : undefined,
+          product: t.productId
+            ? {
+                id: t.productId,
+                title: t.productTitle || (locale === "en" ? "Product" : "Ürün"),
+                imageUrl: t.productImage,
+              }
+            : undefined,
         };
       });
     },
     enabled,
-    meta: { page: 'message-threads' },
+    meta: { page: "message-threads" },
   });
   const threads = useMemo(() => threadsQuery.data ?? [], [threadsQuery.data]);
   const loading = threadsQuery.isLoading;
 
-  const visibleThreads = threadsExpanded ? threads : threads.slice(0, INITIAL_THREADS);
+  const visibleThreads = threadsExpanded
+    ? threads
+    : threads.slice(0, INITIAL_THREADS);
   const hasMoreThreads = threads.length > INITIAL_THREADS && !threadsExpanded;
   const remainingCount = threads.length - INITIAL_THREADS;
 
   const messagesQuery = useQuery({
-    queryKey: ['messages', selectedThread?.id],
+    queryKey: queryKeys.messages.thread(selectedThread?.id),
     queryFn: async (): Promise<Message[]> => {
       const response = await messagesApi.getMessages(selectedThread!.id);
       const messages = response.data.data || response.data.messages || [];
-      return [...messages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      return [...messages].sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      );
     },
     enabled: enabled && !!selectedThread?.id,
-    meta: { page: 'messages' },
+    meta: { page: "messages" },
   });
   const messages = messagesQuery.data ?? [];
 
-  const { typingUserIds } = useMessagingSocket({ activeThreadId: selectedThread?.id });
+  const { typingUserIds } = useMessagingSocket({
+    activeThreadId: selectedThread?.id,
+  });
 
   useEffect(() => {
     if (selectedThread?.id && messagesQuery.isSuccess) {
-      queryClient.invalidateQueries({ queryKey: ['message-threads'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.messages.threads() });
     }
   }, [selectedThread?.id, messagesQuery.isSuccess, queryClient]);
 
@@ -143,7 +164,7 @@ export function useMessaging(enabled: boolean) {
   // Yeni mesaj bildirimine tıklayınca gelinen /messages?thread=<id> linkindeki
   // sohbeti otomatik aç (bir kez; kullanıcı sonradan başka sohbet seçerse ezme).
   useEffect(() => {
-    const threadIdParam = searchParams.get('thread');
+    const threadIdParam = searchParams.get("thread");
     if (!threadIdParam || threads.length === 0) return;
     if (autoSelectedThreadRef.current === threadIdParam) return;
     const found = threads.find((thr) => thr.id === threadIdParam);
@@ -154,7 +175,7 @@ export function useMessaging(enabled: boolean) {
   }, [searchParams, threads]);
 
   const prefilledFor = (productTitle: string) =>
-    locale === 'en'
+    locale === "en"
       ? `Hi, I'd like to ask about the "${productTitle}" listing.\n\n`
       : `Merhaba, "${productTitle}" ilanı hakkında bilgi almak istiyorum.\n\n`;
 
@@ -162,21 +183,23 @@ export function useMessaging(enabled: boolean) {
     if (!sellerId || creatingThread) return;
 
     // Fetch product details if productId is provided
-    let productTitle = '';
+    let productTitle = "";
     if (productId) {
       try {
         const productResponse = await listingsApi.getOne(productId);
         const product = productResponse.data.product || productResponse.data;
-        productTitle = product.title || (locale === 'en' ? 'Product' : 'Ürün');
+        productTitle = product.title || (locale === "en" ? "Product" : "Ürün");
       } catch (error) {
-        if (process.env.NODE_ENV === 'development') console.error('Failed to fetch product:', error);
+        if (process.env.NODE_ENV === "development")
+          console.error("Failed to fetch product:", error);
       }
     }
 
     // Check if a thread already exists with this seller (and optionally product)
-    const existingThread = threads.find(t =>
-      t.otherUser?.id === sellerId &&
-      (!productId || t.product?.id === productId)
+    const existingThread = threads.find(
+      (t) =>
+        t.otherUser?.id === sellerId &&
+        (!productId || t.product?.id === productId),
     );
 
     if (existingThread) {
@@ -186,10 +209,16 @@ export function useMessaging(enabled: boolean) {
         setDraftsByThreadId((prev) => {
           const existing = prev[existingThread.id];
           if (existing?.text) return prev;
-          return { ...prev, [existingThread.id]: { text: prefilled, urls: existing?.urls ?? [] } };
+          return {
+            ...prev,
+            [existingThread.id]: {
+              text: prefilled,
+              urls: existing?.urls ?? [],
+            },
+          };
         });
       }
-      window.history.replaceState({}, '', '/profile/messages');
+      window.history.replaceState({}, "", "/profile/messages");
       return;
     }
 
@@ -207,44 +236,66 @@ export function useMessaging(enabled: boolean) {
       // Backend createThread yanıtı otherUser DEĞİL, participant1/2 şeklinde döner;
       // karşı taraf (sellerId) hangi participant ise onun adını/avatarını al.
       const sellerIsP1 = newThread.participant1Id === sellerId;
-      const otherName = sellerIsP1 ? newThread.participant1Name : newThread.participant2Name;
-      const otherAvatar = sellerIsP1 ? newThread.participant1AvatarUrl : newThread.participant2AvatarUrl;
+      const otherName = sellerIsP1
+        ? newThread.participant1Name
+        : newThread.participant2Name;
+      const otherAvatar = sellerIsP1
+        ? newThread.participant1AvatarUrl
+        : newThread.participant2AvatarUrl;
       const transformedThread: MessageThread = {
         id: newThread.id,
         otherUser: {
           id: sellerId,
-          displayName: newThread.otherUser?.displayName || otherName || (locale === 'en' ? 'Seller' : 'Satıcı'),
+          displayName:
+            newThread.otherUser?.displayName ||
+            otherName ||
+            (locale === "en" ? "Seller" : "Satıcı"),
           avatarUrl: newThread.otherUser?.avatarUrl || otherAvatar,
         },
         unreadCount: 0,
-        product: productId ? {
-          id: productId,
-          title: productTitle || (locale === 'en' ? 'Product' : 'Ürün'),
-        } : undefined,
+        product: productId
+          ? {
+              id: productId,
+              title: productTitle || (locale === "en" ? "Product" : "Ürün"),
+            }
+          : undefined,
       };
 
-      await queryClient.invalidateQueries({ queryKey: ['message-threads'] });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.messages.threads(),
+      });
       setSelectedThread(transformedThread);
       if (productTitle) {
         const prefilled = prefilledFor(productTitle);
-        setDraftsByThreadId((prev) => ({ ...prev, [transformedThread.id]: { text: prefilled, urls: [] } }));
+        setDraftsByThreadId((prev) => ({
+          ...prev,
+          [transformedThread.id]: { text: prefilled, urls: [] },
+        }));
       }
-      window.history.replaceState({}, '', '/profile/messages');
+      window.history.replaceState({}, "", "/profile/messages");
     } catch (error: any) {
-      if (process.env.NODE_ENV === 'development') console.error('Failed to create thread:', error);
+      if (process.env.NODE_ENV === "development")
+        console.error("Failed to create thread:", error);
       if (error.response?.status === 409) {
-        await queryClient.refetchQueries({ queryKey: ['message-threads'] });
-        const list = (queryClient.getQueryData(['message-threads']) as MessageThread[] | undefined) ?? [];
+        await queryClient.refetchQueries({
+          queryKey: queryKeys.messages.threads(),
+        });
+        const list =
+          (queryClient.getQueryData(queryKeys.messages.threads()) as
+            MessageThread[] | undefined) ?? [];
         const existingThread = list.find((t) => t.otherUser?.id === sellerId);
         if (existingThread) {
           setSelectedThread(existingThread);
           if (productTitle) {
             const prefilled = `Merhaba, "${productTitle}" ilanı hakkında bilgi almak istiyorum.\n\n`;
-            setDraftsByThreadId((prev) => ({ ...prev, [existingThread.id]: { text: prefilled, urls: [] } }));
+            setDraftsByThreadId((prev) => ({
+              ...prev,
+              [existingThread.id]: { text: prefilled, urls: [] },
+            }));
           }
         }
       } else {
-        toast.error(t('common.operationFailed'));
+        toast.error(t("common.operationFailed"));
       }
     } finally {
       setCreatingThread(false);
@@ -262,7 +313,10 @@ export function useMessaging(enabled: boolean) {
     if (!selectedThread) return;
     setDraftsByThreadId((prev) => ({
       ...prev,
-      [selectedThread.id]: { ...(prev[selectedThread.id] ?? EMPTY_DRAFT), text },
+      [selectedThread.id]: {
+        ...(prev[selectedThread.id] ?? EMPTY_DRAFT),
+        text,
+      },
     }));
   };
 
@@ -270,8 +324,12 @@ export function useMessaging(enabled: boolean) {
     const files = e.target.files;
     if (!files?.length || attaching || !selectedThread) return;
     const file = files[0];
-    if (!file.type.startsWith('image/')) {
-      toast.error(locale === 'en' ? 'Please select an image file' : 'Lütfen bir resim dosyası seçin');
+    if (!file.type.startsWith("image/")) {
+      toast.error(
+        locale === "en"
+          ? "Please select an image file"
+          : "Lütfen bir resim dosyası seçin",
+      );
       return;
     }
     setAttaching(true);
@@ -290,17 +348,17 @@ export function useMessaging(enabled: boolean) {
     } catch (err: any) {
       // Sunucu mesajını göster (örn. AI: "Yüklediğiniz resim uygun değildir")
       const raw = err?.response?.data?.message;
-      const msg = Array.isArray(raw) ? raw.join(' • ') : raw;
+      const msg = Array.isArray(raw) ? raw.join(" • ") : raw;
       toast.error(
-        typeof msg === 'string' && msg
+        typeof msg === "string" && msg
           ? msg
-          : locale === 'en'
-            ? 'Failed to upload image'
-            : 'Resim yüklenemedi',
+          : locale === "en"
+            ? "Failed to upload image"
+            : "Resim yüklenemedi",
       );
     } finally {
       setAttaching(false);
-      e.target.value = '';
+      e.target.value = "";
     }
   };
 
@@ -310,7 +368,9 @@ export function useMessaging(enabled: boolean) {
       ...prev,
       [selectedThread.id]: {
         ...(prev[selectedThread.id] ?? EMPTY_DRAFT),
-        urls: (prev[selectedThread.id]?.urls ?? []).filter((_, j) => j !== index),
+        urls: (prev[selectedThread.id]?.urls ?? []).filter(
+          (_, j) => j !== index,
+        ),
       },
     }));
   };
@@ -320,41 +380,55 @@ export function useMessaging(enabled: boolean) {
     const hasAttachments = attachedUrls.length > 0;
     if (!selectedThread || (!text && !hasAttachments) || sending) return;
 
-    const contentToSend = text + (hasAttachments ? '\n\n' + attachedUrls.map((u) => `[IMG:${u}]`).join('\n') : '');
+    const contentToSend =
+      text +
+      (hasAttachments
+        ? "\n\n" + attachedUrls.map((u) => `[IMG:${u}]`).join("\n")
+        : "");
 
     // Check message length (content includes attachment markers)
     if (contentToSend.length > maxMessageLength) {
       toast.error(
-        locale === 'en'
+        locale === "en"
           ? `Message cannot exceed ${maxMessageLength} characters. Current: ${newMessage.length}`
-          : `Mesaj ${maxMessageLength} karakteri aşamaz. Mevcut: ${newMessage.length}`
+          : `Mesaj ${maxMessageLength} karakteri aşamaz. Mevcut: ${newMessage.length}`,
       );
       return;
     }
 
     // Final content filter check (text only)
-    const filterResult = text ? checkContentFilter(text, locale) : { passed: true };
+    const filterResult = text
+      ? checkContentFilter(text, locale)
+      : { passed: true };
     if (!filterResult.passed) {
       const proceed = await confirm({
-        title: locale === 'en' ? 'Content warning' : 'İçerik uyarısı',
+        title: locale === "en" ? "Content warning" : "İçerik uyarısı",
         description:
-          locale === 'en'
+          locale === "en"
             ? `${filterResult.warning} Do you still want to send it?`
             : `${filterResult.warning} Yine de göndermek istiyor musunuz?`,
-        confirmLabel: locale === 'en' ? 'Send' : 'Gönder',
-        cancelLabel: locale === 'en' ? 'Cancel' : 'Vazgeç',
+        confirmLabel: locale === "en" ? "Send" : "Gönder",
+        cancelLabel: locale === "en" ? "Cancel" : "Vazgeç",
       });
       if (!proceed) return;
     }
 
     setSending(true);
     try {
-      const response = await messagesApi.sendMessage(selectedThread.id, contentToSend);
+      const response = await messagesApi.sendMessage(
+        selectedThread.id,
+        contentToSend,
+      );
       const sentMessage = response.data.message || response.data;
 
       // Check if message was filtered by backend
-      if (sentMessage.isFiltered || sentMessage.status === 'pending') {
-        toast(locale === 'en' ? 'Your message has been sent for review' : 'Mesajınız incelenmek üzere gönderildi', { icon: '⚠️' });
+      if (sentMessage.isFiltered || sentMessage.status === "pending") {
+        toast(
+          locale === "en"
+            ? "Your message has been sent for review"
+            : "Mesajınız incelenmek üzere gönderildi",
+          { icon: "⚠️" },
+        );
       }
 
       setDraftsByThreadId((prev) => {
@@ -363,18 +437,36 @@ export function useMessaging(enabled: boolean) {
         return next;
       });
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['messages', selectedThread.id] }),
-        queryClient.invalidateQueries({ queryKey: ['message-threads'] }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.messages.thread(selectedThread.id),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.messages.threads(),
+        }),
       ]);
 
       setTimeout(scrollChatToBottom, 80);
     } catch (error: any) {
       if (error.response?.data?.requiresApproval) {
-        toast(locale === 'en' ? 'Your message has been sent for review' : 'Mesajınız incelenmek üzere gönderildi', { icon: '⚠️' });
+        toast(
+          locale === "en"
+            ? "Your message has been sent for review"
+            : "Mesajınız incelenmek üzere gönderildi",
+          { icon: "⚠️" },
+        );
       } else if (error.response?.data?.filtered) {
-        toast.error(locale === 'en' ? 'Your message has been blocked due to inappropriate content' : 'Mesajınız uygunsuz içerik nedeniyle engellenmiştir');
+        toast.error(
+          locale === "en"
+            ? "Your message has been blocked due to inappropriate content"
+            : "Mesajınız uygunsuz içerik nedeniyle engellenmiştir",
+        );
       } else {
-        toast.error(error.response?.data?.message || (locale === 'en' ? 'Failed to send message' : 'Mesaj gönderilemedi'));
+        toast.error(
+          error.response?.data?.message ||
+            (locale === "en"
+              ? "Failed to send message"
+              : "Mesaj gönderilemedi"),
+        );
       }
     } finally {
       setSending(false);

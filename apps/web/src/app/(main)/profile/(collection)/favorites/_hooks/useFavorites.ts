@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { wishlistApi, listingsApi } from "@/lib/api";
+import { queryKeys } from "@/lib/query/keys";
 import { useAuthStore } from "@/stores/authStore";
 import { useCartStore } from "@/stores/cartStore";
 import { useTranslation } from "@/i18n";
@@ -32,7 +33,7 @@ export function useFavorites() {
   const isSharedView = sharedIds !== null && sharedIds.length > 0;
 
   const wishlistQuery = useQuery({
-    queryKey: ["wishlist"],
+    queryKey: queryKeys.wishlist.all(),
     queryFn: async (): Promise<WishlistItem[]> => {
       const response = await wishlistApi.get();
       const list =
@@ -46,7 +47,7 @@ export function useFavorites() {
   });
 
   const sharedProductsQuery = useQuery({
-    queryKey: ["favorites-shared", sharedIds?.join(",")],
+    queryKey: queryKeys.wishlist.shared(sharedIds?.join(",")),
     queryFn: async (): Promise<WishlistItem[]> => {
       if (!sharedIds?.length) return [];
       const results = await Promise.allSettled(
@@ -83,8 +84,8 @@ export function useFavorites() {
   });
 
   const items = isSharedView
-    ? sharedProductsQuery.data ?? []
-    : wishlistQuery.data ?? [];
+    ? (sharedProductsQuery.data ?? [])
+    : (wishlistQuery.data ?? []);
   const isLoading = isSharedView
     ? sharedProductsQuery.isLoading
     : wishlistQuery.isLoading;
@@ -94,14 +95,18 @@ export function useFavorites() {
     onSuccess: async (_data, productId) => {
       toast.success(t("product.removedFromFavorites"));
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["wishlist"] }),
-        queryClient.invalidateQueries({ queryKey: ["wishlist-check", productId] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.wishlist.all() }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.wishlist.check(productId),
+        }),
       ]);
     },
     onError: (error: any) => {
       if (process.env.NODE_ENV === "development")
         console.error("Failed to remove from favorites:", error);
-      toast.error(error?.response?.data?.message || t("common.operationFailed"));
+      toast.error(
+        error?.response?.data?.message || t("common.operationFailed"),
+      );
     },
   });
 
@@ -112,7 +117,9 @@ export function useFavorites() {
     } catch (error: any) {
       if (process.env.NODE_ENV === "development")
         console.error("Failed to add to cart:", error);
-      toast.error(error?.response?.data?.message || t("common.operationFailed"));
+      toast.error(
+        error?.response?.data?.message || t("common.operationFailed"),
+      );
     }
   };
 
