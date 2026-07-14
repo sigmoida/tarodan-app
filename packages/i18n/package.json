@@ -12,10 +12,11 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "codegen": "node scripts/gen-keys.mjs",
+    "build": "node scripts/gen-keys.mjs && tsup src/index.ts --format cjs,esm --dts",
     "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
     "lint": "eslint \"src/**/*.ts\"",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "node scripts/check-catalog.mjs && tsc --noEmit",
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
