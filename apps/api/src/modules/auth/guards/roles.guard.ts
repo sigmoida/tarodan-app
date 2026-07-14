@@ -76,6 +76,27 @@ function extractSegment(url: string): string {
   return parts[adminIdx + 1] ?? "";
 }
 
+// Kanonik admin route'ları (@Controller('admin')) içinde segmenti PERMISSION_MAP'e
+// KASITLI olarak eklenmemiş, yalnızca rol ile korunan mevcut route'lar. Bunlar
+// fail-open bırakılır ki mevcut (moderator dahil) erişimleri korunsun. Bu kümenin
+// DIŞINDAKİ, eşlenmemiş yeni bir admin segmenti fail-closed olur (aşağıya bakın).
+const ROLE_ONLY_ADMIN_SEGMENTS = new Set<string>([
+  "invoices",
+  "seller-invoices",
+  "trade-commission-rate",
+]);
+
+/**
+ * URL kanonik bir admin route'u mu: /api/admin/<segment>/... yani "admin" ilk
+ * path segmenti. Modül içine gömülü /api/support/admin/tickets gibi route'lar
+ * kanonik DEĞİLDİR ve fail-closed kapsamına alınmaz (mevcut davranış korunur).
+ */
+function isCanonicalAdminUrl(url: string): boolean {
+  const parts = url.split("?")[0].split("/").filter(Boolean);
+  const p = parts[0] === "api" ? parts.slice(1) : parts;
+  return p[0] === "admin";
+}
+
 function resolveUrlPermissions(_method: string, url: string): string[] | null {
   const seg = extractSegment(url);
   if (!seg) return null;
@@ -150,11 +171,30 @@ export class RolesGuard implements CanActivate {
     if (bypassMatrix) return true;
 
     // ── 3. İzin matrisi kontrolü ──────────────────────────────────────────
+    const url = req.originalUrl ?? req.url ?? "";
     const permKeys: string[] | null = explicitPermission
       ? [explicitPermission]
-      : resolveUrlPermissions(req.method, req.originalUrl ?? req.url ?? "");
+      : resolveUrlPermissions(req.method, url);
 
-    if (!permKeys || permKeys.length === 0) return true; // Bilinmeyen route — sadece rol yeterli
+    if (!permKeys || permKeys.length === 0) {
+      // Fail-closed: kanonik bir /api/admin/<segment> route'u PERMISSION_MAP'te
+      // eşlenmemişse (ve bilinen rol-only istisnalardan biri değilse) erişimi
+      // reddet. Aksi halde yeni eklenen ve izin haritasına yazılması unutulan
+      // bir admin route'u sessizce sadece-rol kontrolüne düşer ve moderator gibi
+      // roller izin matrisini atlayarak erişebilir. Kanonik olmayan
+      // (/module/admin/...) ve bilinen rol-only admin route'ları fail-open kalır.
+      const seg = extractSegment(url);
+      if (
+        seg &&
+        isCanonicalAdminUrl(url) &&
+        !ROLE_ONLY_ADMIN_SEGMENTS.has(seg)
+      ) {
+        throw new ForbiddenException(
+          "Bu admin işlemi için tanımlı bir izin bulunamadı; erişim reddedildi",
+        );
+      }
+      return true; // Bilinmeyen route — sadece rol yeterli
+    }
 
     const perms = await this.loadPermissions();
     const rolePerms = perms[user.role] ?? [];
