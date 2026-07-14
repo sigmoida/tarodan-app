@@ -169,21 +169,41 @@ const nextConfig = {
   },
   async redirects() {
     return [
+      // Retired client-only "brands" showcase (#94): the live catalog surface is
+      // /manufacturers (RSC + generateMetadata). Redirect the old brand routes —
+      // and the /models chain that used to point at /brands — to it.
+      {
+        source: '/brands',
+        destination: '/manufacturers',
+        permanent: true,
+      },
+      {
+        source: '/brands/:slug',
+        destination: '/manufacturers/:slug',
+        permanent: true,
+      },
+      // Retired client-only category page (#94) → the live /listings grid, which
+      // resolves a category slug via its `category` param (params.ts).
+      {
+        source: '/category/:slug',
+        destination: '/listings?category=:slug',
+        permanent: true,
+      },
       {
         source: '/models',
-        destination: '/brands',
+        destination: '/manufacturers',
         permanent: true,
       },
       // Model detay sayfaları (/models/:slug) emekliye ayrıldı; öksüz kalmasın diye
-      // tüm alt yolları da /brands'e yönlendir.
+      // tüm alt yolları da /manufacturers'a yönlendir.
       {
         source: '/models/:path*',
-        destination: '/brands',
+        destination: '/manufacturers',
         permanent: true,
       },
       {
         source: '/modeller',
-        destination: '/brands',
+        destination: '/manufacturers',
         permanent: true,
       },
       // /guvenli-takas → /secure-swap (route slug İngilizce'ye çevrildi).
