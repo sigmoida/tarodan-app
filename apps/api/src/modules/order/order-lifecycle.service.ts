@@ -681,7 +681,10 @@ export class OrderLifecycleService {
       }
     }
 
-    // Note: This will trigger seller payout release in PaymentModule
+    // NOT: confirmDelivery satıcı payout'unu TETİKLEMEZ. Payout tek otoriteden
+    // (releaseHoldsDue cron) ve yalnız releaseAt dolunca (=teslim+return+grace) yapılır;
+    // releaseAt teslimde handleOrderDelivered ile set edilir, alıcı onayıyla değil.
+    // Burada yalnız komisyon "earned" + e-Arşiv tetiklenir (muhasebe).
 
     // Sipariş tamamlandı = komisyon "earned" işaretle (completeOrder ile aynı muhasebe).
     // confirmDelivery doğrudan `completed`'e geçtiği için completeOrder'ı çağırmaz;
