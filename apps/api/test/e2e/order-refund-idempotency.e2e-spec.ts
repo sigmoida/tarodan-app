@@ -43,7 +43,13 @@ describe('Order refund idempotency (#85) [P0]', () => {
         createInAppNotification: async () => {},
         sendOrderCancelledEmails: async () => {},
       } as any, // notificationService
-      { markRefunded: async () => ({ updated: false }) } as any, // commissionLedger
+      {
+        // processRefund iade tx'inde ledger'ı işaretler. Kod tabanına göre markRefunded
+        // (tam) veya applyRefund (pro-rate, #88) çağrılabilir — ikisini de stub'la ki
+        // bu test #88 ile birlikte merge edildiğinde de kırılmasın (ileri-uyumlu).
+        markRefunded: async () => ({ updated: false }),
+        applyRefund: async () => ({ updated: false, fullyRefunded: false }),
+      } as any, // commissionLedger
       {
         handleOrderRefund: async () => {},
         issueCommissionInvoice: async () => {},
