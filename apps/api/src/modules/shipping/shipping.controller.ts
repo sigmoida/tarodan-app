@@ -13,6 +13,8 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Throttle } from '@nestjs/throttler';
+import { timingSafeEqual } from 'crypto';
 import {
   ApiTags,
   ApiOperation,
@@ -139,6 +141,10 @@ export class ShippingController {
    */
   @Post('webhook/:provider')
   @Public()
+  // #87: Public + statik secret'lı uç → replay/abuse'a karşı IP başına rate-limit.
+  // Cömert (legit kargo webhook'unu bloklamaz) ama replay-flood'u keser. Testte
+  // ThrottlerModule.skipIf ile atlanır (davranış fonksiyonel testleri etkilemez).
+  @Throttle({ default: { limit: 300, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Webhook for cargo provider status updates (requires X-Webhook-Secret header)' })
   @ApiParam({ name: 'provider', description: 'Provider name (surat)' })
@@ -156,10 +162,18 @@ export class ShippingController {
         `${provider} webhook secret not configured on server`,
       );
     }
-    if (!secretHeader || secretHeader !== expectedSecret) {
+    // #87: Sabit-zamanlı karşılaştırma — timing attack ile secret'ın sızmasını önler
+    // (uzunluk farkı da eşitsizliktir; timingSafeEqual eşit uzunluk gerektirir).
+    if (!secretHeader || !this.secretsMatch(secretHeader, expectedSecret)) {
       throw new UnauthorizedException('Invalid or missing webhook secret');
     }
     return this.shippingService.handleProviderWebhook(provider, payload);
+  }
+
+  private secretsMatch(provided: string, expected: string): boolean {
+    const a = Buffer.from(provided);
+    const b = Buffer.from(expected);
+    return a.length === b.length && timingSafeEqual(a, b);
   }
 
   /**
