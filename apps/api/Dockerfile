@@ -27,6 +27,7 @@ COPY apps/api ./apps/api
 
 # Build workspace packages that API imports at compile time
 RUN pnpm --filter @tarodan/types build
+RUN pnpm --filter @tarodan/i18n build
 
 # Generate Prisma client
 WORKDIR /app/apps/api

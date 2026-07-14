@@ -20,6 +20,8 @@
     "noFallthroughCasesInSwitch": true,
     "paths": {
       "@/*": ["src/*"],
+      "@tarodan/i18n": ["../../packages/i18n/src"],
+      "@tarodan/i18n/*": ["../../packages/i18n/src/*"],
       "@tarodan/types": ["../../packages/types/src"],
       "@tarodan/types/*": ["../../packages/types/src/*"]
     }

@@ -17,6 +17,7 @@
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-table": "^8.11.2",
     "@tarodan/auth": "workspace:*",
+    "@tarodan/i18n": "workspace:*",
     "@tarodan/design-tokens": "workspace:*",
     "@tarodan/ui": "workspace:*",
     "axios": "^1.18.1",

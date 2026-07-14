@@ -8,7 +8,9 @@
   },
   "setupFiles": ["<rootDir>/test/test-utils/load-env-integration.ts"],
   "moduleNameMapper": {
-    "^@/(.*)$": "<rootDir>/src/$1"
+    "^@/(.*)$": "<rootDir>/src/$1",
+    "^@tarodan/i18n$": "<rootDir>/../../packages/i18n/src/index.ts",
+    "^@tarodan/i18n/(.*)$": "<rootDir>/../../packages/i18n/src/$1.ts"
   },
   "testTimeout": 30000,
   "maxWorkers": 1,

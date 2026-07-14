@@ -1,0 +1,42 @@
+{
+  "name": "@tarodan/i18n",
+  "private": true,
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.mjs",
+      "require": "./dist/core.js"
+    },
+    "./locale": {
+      "types": "./dist/locale.d.ts",
+      "import": "./dist/locale.mjs",
+      "require": "./dist/locale.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/core.ts src/locale.ts --format cjs,esm --dts --clean",
+    "dev": "tsup src/index.ts src/core.ts src/locale.ts --format cjs,esm --dts --watch",
+    "lint": "eslint \"src/**/*.ts\"",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.cjs",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "intl-messageformat": "^10.7.18"
+  },
+  "devDependencies": {
+    "@tarodan/eslint-config": "workspace:*",
+    "@tarodan/tsconfig": "workspace:*",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.2"
+  }
+}

@@ -36,6 +36,7 @@
     "@sentry/nextjs": "^7.91.0",
     "@tanstack/react-query": "^5.101.2",
     "@tarodan/auth": "workspace:*",
+    "@tarodan/i18n": "workspace:*",
     "@tarodan/design-tokens": "workspace:*",
     "@tarodan/types": "workspace:*",
     "@tarodan/ui": "workspace:*",

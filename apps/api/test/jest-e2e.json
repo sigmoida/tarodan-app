@@ -4,12 +4,17 @@
   "testEnvironment": "node",
   "testRegex": "test/e2e/.*\\.e2e-spec\\.ts$",
   "transform": {
-    "^.+\\.(t|j)s$": ["ts-jest", { "tsconfig": "tsconfig.json", "isolatedModules": true }]
+    "^.+\\.(t|j)s$": [
+      "ts-jest",
+      { "tsconfig": "tsconfig.json", "isolatedModules": true }
+    ]
   },
   "setupFiles": ["<rootDir>/test/test-utils/load-env.ts"],
   "globalTeardown": "<rootDir>/test/test-utils/global-teardown.ts",
   "moduleNameMapper": {
     "^@/(.*)$": "<rootDir>/src/$1",
+    "^@tarodan/i18n$": "<rootDir>/../../packages/i18n/src/index.ts",
+    "^@tarodan/i18n/(.*)$": "<rootDir>/../../packages/i18n/src/$1.ts",
     "^@tarodan/types$": "<rootDir>/../../packages/types/src/index.ts"
   },
   "testTimeout": 60000,
