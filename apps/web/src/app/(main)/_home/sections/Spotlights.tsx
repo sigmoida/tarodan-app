@@ -91,7 +91,7 @@ export default function Spotlights() {
                     <p className="text-sm font-bold text-heading">
                       {formatCount(featuredCollectorToShow.viewCount)}
                     </p>
-                    <p className="text-[10px] text-muted">
+                    <p className="text-2xs text-muted">
                       {locale === "en" ? "Views" : "Görüntü"}
                     </p>
                   </div>
@@ -99,7 +99,7 @@ export default function Spotlights() {
                     <p className="text-sm font-bold text-heading">
                       {formatCount(featuredCollectorToShow.likeCount)}
                     </p>
-                    <p className="text-[10px] text-muted">
+                    <p className="text-2xs text-muted">
                       {locale === "en" ? "Likes" : "Beğeni"}
                     </p>
                   </div>
@@ -107,7 +107,7 @@ export default function Spotlights() {
                     <p className="text-sm font-bold text-heading">
                       {featuredCollectorToShow.itemCount || 0}
                     </p>
-                    <p className="text-[10px] text-muted">
+                    <p className="text-2xs text-muted">
                       {locale === "en" ? "Items" : "Araç"}
                     </p>
                   </div>
@@ -200,7 +200,7 @@ export default function Spotlights() {
                     <p className="text-sm font-bold text-heading">
                       {companyOfWeek.stats?.totalProducts || 0}
                     </p>
-                    <p className="text-[10px] text-muted">
+                    <p className="text-2xs text-muted">
                       {locale === "en" ? "Products" : "Ürün"}
                     </p>
                   </div>
@@ -208,7 +208,7 @@ export default function Spotlights() {
                     <p className="text-sm font-bold text-heading">
                       {companyOfWeek.stats?.totalSales || 0}
                     </p>
-                    <p className="text-[10px] text-muted">
+                    <p className="text-2xs text-muted">
                       {locale === "en" ? "Sales" : "Satış"}
                     </p>
                   </div>
@@ -216,7 +216,7 @@ export default function Spotlights() {
                     <p className="text-sm font-bold text-heading">
                       {formatCount(companyOfWeek.stats?.totalViews)}
                     </p>
-                    <p className="text-[10px] text-muted">
+                    <p className="text-2xs text-muted">
                       {locale === "en" ? "Views" : "Görüntü"}
                     </p>
                   </div>
@@ -224,7 +224,7 @@ export default function Spotlights() {
                     <p className="text-sm font-bold text-heading">
                       {formatCount(companyOfWeek.stats?.totalLikes)}
                     </p>
-                    <p className="text-[10px] text-muted">
+                    <p className="text-2xs text-muted">
                       {locale === "en" ? "Likes" : "Beğeni"}
                     </p>
                   </div>

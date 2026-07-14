@@ -1,21 +1,7 @@
-import type { StatusConfig } from "@tarodan/ui";
-
-// ─── ShipmentStatus enum mapping ─────────────────────────────────────────────
-// Orders (Shipment.status), trades (TradeShipment.status) and refunds
-// (RefundRequest.returnStatus) all use the same `ShipmentStatus` enum.
-export const shipmentStatusConfig: Record<string, StatusConfig> = {
-  pending: { label: "Beklemede", variant: "secondary" },
-  label_created: { label: "Etiket Oluşturuldu", variant: "secondary" },
-  picked_up: { label: "Alındı", variant: "info" },
-  in_transit: { label: "Yolda", variant: "info" },
-  at_delivery_branch: { label: "Şubede", variant: "info" },
-  out_for_delivery: { label: "Dağıtımda", variant: "info" },
-  delivered: { label: "Teslim Edildi", variant: "success" },
-  failed: { label: "Başarısız", variant: "danger" },
-  return_in_progress: { label: "İade Süreci", variant: "warning" },
-  returned: { label: "İade Edildi", variant: "secondary" },
-  cancelled: { label: "İptal", variant: "danger" },
-};
+// `shipmentStatusConfig` (ShipmentStatus enum → label/variant) is NOT defined
+// here — it lives in @tarodan/ui (shared status-configs) and is imported from
+// there wherever needed. A local fork used to sit here and had drifted from the
+// canonical labels/variants; it was removed.
 
 // Status filter options — shared by the Orders and Trades tabs.
 export const statusOptions: { value: string; label: string }[] = [

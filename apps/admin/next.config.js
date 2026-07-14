@@ -38,6 +38,9 @@ const nextConfig = {
   transpilePackages: ['@tarodan/ui', '@tarodan/design-tokens', '@tarodan/shared'],
   experimental: {
     outputFileTracingRoot: path.join(__dirname, '../../'),
+    // Tree-shake the 112 barrel imports from @heroicons/react to per-icon
+    // modules so unused icons don't ship (#102).
+    optimizePackageImports: ['@heroicons/react'],
     // Next 14.2 strictly requires a Suspense boundary around useSearchParams()
     // during prerender. Admin pages are user-specific and exported via
     // output: 'standalone' (server-rendered), so this strict bailout adds no
