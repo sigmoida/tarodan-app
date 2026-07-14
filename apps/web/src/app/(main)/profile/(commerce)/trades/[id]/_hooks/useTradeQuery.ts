@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { useAuthStore } from "@/stores/authStore";
 import { tradesApi } from "@/lib/api";
+import { queryKeys } from "@/lib/query/keys";
 import { useTranslation } from "@/i18n";
 import type { Trade } from "../_lib/types";
 
@@ -37,7 +38,7 @@ export function useTradeQuery() {
   }, [isAuthenticated, authLoading, locale, router, tradeId]);
 
   const tradeQuery = useQuery({
-    queryKey: ["trade", tradeId],
+    queryKey: queryKeys.trades.detail(tradeId),
     queryFn: async (): Promise<Trade> => {
       const response = await tradesApi.getOne(tradeId);
       return response.data.trade || response.data;
@@ -64,8 +65,10 @@ export function useTradeQuery() {
 
   const invalidateTrade = () =>
     Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["trade", tradeId] }),
-      queryClient.invalidateQueries({ queryKey: ["trades"] }),
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.trades.detail(tradeId),
+      }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.trades.all() }),
     ]);
 
   return { trade, isLoading, invalidateTrade, tradeId };

@@ -9,6 +9,7 @@ import toast from "react-hot-toast";
 import { Spinner, StatusBadge, orderStatusConfig } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { queryKeys } from "@/lib/query/keys";
 import RefundRequestModal from "./_modals/RefundRequestModal";
 import { useRequireAuth } from "../../../_hooks/useRequireAuth";
 import { useTranslation } from "@/i18n";
@@ -165,7 +166,9 @@ export default function OrderDetailPage() {
         phase={inferRefundPhase(order)}
         quantity={order.items?.[0]?.quantity ?? 1}
         onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["order"] });
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.orders.detail(),
+          });
         }}
       />
     </PageShell>

@@ -1,10 +1,11 @@
-'use client';
+"use client";
 
-import { useQuery } from '@tanstack/react-query';
-import { Select } from '@tarodan/ui';
-import { adminApi } from '@/lib/api';
-import { ResourceList, useFilter } from '@/components/list';
-import { productStatusOptions } from '../_lib/types';
+import { useQuery } from "@tanstack/react-query";
+import { Select } from "@tarodan/ui";
+import { adminApi } from "@/lib/api";
+import { adminKeys } from "@/lib/query/keys";
+import { ResourceList, useFilter } from "@/components/list";
+import { productStatusOptions } from "../_lib/types";
 
 interface Brand {
   id: string;
@@ -18,29 +19,35 @@ interface CarModel {
 
 /** Product list filters: status (static) + brand/model (dynamic, dependent). */
 export function ProductFilters() {
-  const [brandId, setBrandId] = useFilter('brandId');
-  const [carModelId, setCarModelId] = useFilter('carModelId');
+  const [brandId, setBrandId] = useFilter("brandId");
+  const [carModelId, setCarModelId] = useFilter("carModelId");
 
   const { data: brands = [] } = useQuery<Brand[]>({
-    queryKey: ['brands', 'options'],
+    queryKey: adminKeys.options("brands"),
     queryFn: async () => (await adminApi.getBrands()).data?.data ?? [],
   });
   const { data: models = [] } = useQuery<CarModel[]>({
-    queryKey: ['car-models', 'options'],
+    queryKey: adminKeys.options("car-models"),
     queryFn: async () => (await adminApi.getCarModels()).data?.data ?? [],
   });
 
-  const modelsForBrand = brandId ? models.filter((m) => m.brandId === brandId) : models;
+  const modelsForBrand = brandId
+    ? models.filter((m) => m.brandId === brandId)
+    : models;
 
   return (
     <>
-      <ResourceList.FilterSelect name="status" options={productStatusOptions} className="sm:w-48" />
+      <ResourceList.FilterSelect
+        name="status"
+        options={productStatusOptions}
+        className="sm:w-48"
+      />
       <Select
         bare
         value={brandId}
         onChange={(e) => {
           setBrandId(e.target.value);
-          setCarModelId('');
+          setCarModelId("");
         }}
         className="w-full sm:w-44"
       >

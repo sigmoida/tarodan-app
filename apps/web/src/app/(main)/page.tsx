@@ -36,9 +36,10 @@ export const metadata: Metadata = {
  * Server fetch for `/products` (public, no auth). Mirrors the client
  * `listingsApi.getAll` unwrap: raw is either an array or `{ data | products }`.
  * The client axios instance uses a relative `/api` baseURL that doesn't resolve
- * on the server, so we hit the absolute API URL directly. `no-store` matches the
- * client's `Cache-Control: no-cache`. Throws on non-OK so the caller skips
- * seeding that key and lets the client fetch it.
+ * on the server, so we hit the absolute API URL directly. ISR (`revalidate: 60`)
+ * lets the CDN serve the home rails from cache and revalidate at most once a
+ * minute (#98). Throws on non-OK so the caller skips seeding that key and lets
+ * the client fetch it.
  */
 async function fetchProducts(
 	params: Record<string, string | number | boolean>,
@@ -47,7 +48,7 @@ async function fetchProducts(
 		Object.entries(params).map(([k, v]) => [k, String(v)]),
 	).toString();
 	const res = await fetch(`${API_BASE}/api/products?${qs}`, {
-		cache: 'no-store',
+		next: { revalidate: 60 },
 	});
 	if (!res.ok) throw new Error(`products ${res.status}`);
 	return unwrapList(await res.json());
@@ -66,7 +67,7 @@ async function fetchDiscountedProducts(): Promise<unknown[]> {
 
 async function fetchManufacturers(): Promise<unknown[]> {
 	const res = await fetch(`${API_BASE}/api/manufacturers`, {
-		cache: 'no-store',
+		next: { revalidate: 60 },
 	});
 	if (!res.ok) throw new Error(`manufacturers ${res.status}`);
 	return unwrapList(await res.json());
@@ -74,7 +75,7 @@ async function fetchManufacturers(): Promise<unknown[]> {
 
 async function fetchTopCollections(): Promise<unknown[]> {
 	const res = await fetch(`${API_BASE}/api/users/top-collections?limit=20`, {
-		cache: 'no-store',
+		next: { revalidate: 60 },
 	});
 	if (!res.ok) throw new Error(`top-collections ${res.status}`);
 	return unwrapList(await res.json());
@@ -82,7 +83,7 @@ async function fetchTopCollections(): Promise<unknown[]> {
 
 /** featured-collector / featured-business: mirror the client's `data ?? null`. */
 async function fetchNullable(path: string): Promise<unknown> {
-	const res = await fetch(`${API_BASE}${path}`, { cache: 'no-store' });
+	const res = await fetch(`${API_BASE}${path}`, { next: { revalidate: 60 } });
 	if (!res.ok) throw new Error(`${path} ${res.status}`);
 	const raw = await res.json();
 	return raw ?? null;

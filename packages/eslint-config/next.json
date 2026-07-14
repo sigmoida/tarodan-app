@@ -39,6 +39,10 @@
       {
         "selector": "JSXAttribute[name.name='className'] Literal[value=/\\bbtn-(primary|secondary|danger)\\b/]",
         "message": "Use <Button variant=\"primary|secondary|danger\"> from '@tarodan/ui' instead of the .btn-* helper classes. The btn-* CSS helpers have been removed; they re-applied the component defaults and created variant/style mismatches."
+      },
+      {
+        "selector": "Property[key.name='queryKey'] > ArrayExpression > Literal",
+        "message": "Never hand-write a queryKey array. Use the central registry (web: queryKeys/webKeys in '@/lib/query/keys'; admin: adminKeys) so a query and its invalidation cannot drift, and SSR seeds match. A bare [variable] key is allowed."
       }
     ]
   }
