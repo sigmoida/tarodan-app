@@ -239,7 +239,10 @@ describe('04 — Ürün/İlan & Katalog (PRD)', () => {
 
       const prisma = getPrisma();
       const row = await prisma.product.findUnique({ where: { id: res.body.id } });
-      expect(row?.releaseDate?.toISOString().slice(0, 10)).toBe('2023-01-01');
+      // TZ-güvenli (#58): releaseDate = new Date(year, 0, 1) YEREL saatte kurulur;
+      // uygulama da getFullYear() ile YEREL okur (formatProductResponse) → yıl tutarlı.
+      // toISOString().slice(0,10) UTC'ye çevirip UTC+ TZ'de "2022-12-31"e kayıyordu.
+      expect(row?.releaseDate?.getFullYear()).toBe(2023);
       expect(row?.bundleSize).toBe(5);
       expect(row?.isSet).toBe(true);
       expect(row?.quantity).toBe(10);
@@ -1316,7 +1319,13 @@ describe('04 — Ürün/İlan & Katalog (PRD)', () => {
 
       const seller = await mkSeller();
       await mkProduct({ sellerId: seller.id, status: ProductStatus.active });
-      const full = await request(server()).get('/api/products?page=1&limit=20').expect(200);
+      // "Dolu" kontrolünü FARKLI bir cache anahtarıyla yap (#58): düz browse
+      // (?page&limit) sonucu yukarıda BOŞ olarak 120s TTL ile cache'lendi
+      // (findAll isListAllOrPopular cache). Aynı sorgu seed sonrası bayat boş
+      // dönerdi. sellerId filtresi ayrı anahtar → taze sorgu → yeni ürün görünür.
+      const full = await request(server())
+        .get(`/api/products?page=1&limit=20&sellerId=${seller.id}`)
+        .expect(200);
       expect(full.body.data.length).toBeGreaterThanOrEqual(1);
       expect(full.body.meta.total).toBeGreaterThanOrEqual(1);
     });
