@@ -55,7 +55,7 @@ export async function fetchCategoryServer(
   try {
     const res = await fetch(
       `${API_BASE}/api/categories/slug/${encodeURIComponent(slug)}`,
-      { cache: 'no-store' },
+      { next: { revalidate: 60 } },
     );
     if (!res.ok) return null;
     const cat = await res.json();
@@ -80,7 +80,7 @@ export async function fetchListingsServer(
       Object.entries(params).map(([k, v]) => [k, String(v)]),
     ).toString();
     const res = await fetch(`${API_BASE}/api/products?${qs}`, {
-      cache: 'no-store',
+      next: { revalidate: 60 },
     });
     if (!res.ok) return null;
     const raw = await res.json();

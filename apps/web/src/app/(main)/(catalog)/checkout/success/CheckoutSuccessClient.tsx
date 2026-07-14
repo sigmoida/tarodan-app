@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   CheckCircleIcon,
   EnvelopeIcon,
@@ -13,11 +13,11 @@ import {
   DocumentArrowDownIcon,
   TruckIcon,
   CalendarIcon,
-} from '@heroicons/react/24/outline';
-import { api } from '@/lib/api';
-import { useAuthStore } from '@/stores/authStore';
-import { Button } from '@tarodan/ui';
-
+} from "@heroicons/react/24/outline";
+import { api } from "@/lib/api";
+import { queryKeys } from "@/lib/query/keys";
+import { useAuthStore } from "@/stores/authStore";
+import { Button } from "@tarodan/ui";
 
 interface OrderDetails {
   id: string;
@@ -48,33 +48,34 @@ function getEstimatedDelivery(orderDate: string): string {
       businessDays++;
     }
   }
-  return date.toLocaleDateString('tr-TR', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
+  return date.toLocaleDateString("tr-TR", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
   });
 }
 
 function formatPrice(amount: number): string {
-  return new Intl.NumberFormat('tr-TR', {
-    style: 'currency',
-    currency: 'TRY',
+  return new Intl.NumberFormat("tr-TR", {
+    style: "currency",
+    currency: "TRY",
   }).format(amount);
 }
 
 export default function CheckoutSuccessClient() {
   const searchParams = useSearchParams();
-  const email = searchParams.get('email') || '';
-  const orderId = searchParams.get('orderId') || '';
-  const isGuest = searchParams.get('guest') === 'true';
+  const email = searchParams.get("email") || "";
+  const orderId = searchParams.get("orderId") || "";
+  const isGuest = searchParams.get("guest") === "true";
 
   const { isAuthenticated } = useAuthStore();
   const [downloading, setDownloading] = useState(false);
 
   const orderQuery = useQuery({
-    queryKey: ['checkout-success-order', orderId],
-    queryFn: async () => (await api.get(`/orders/${orderId}`)).data as OrderDetails,
+    queryKey: queryKeys.checkout.successOrder(orderId),
+    queryFn: async () =>
+      (await api.get(`/orders/${orderId}`)).data as OrderDetails,
     enabled: !!orderId && isAuthenticated && !isGuest,
   });
   const order = orderQuery.data ?? null;
@@ -82,7 +83,7 @@ export default function CheckoutSuccessClient() {
 
   // YENİ eLogo e-Arşiv faturası (yoksa null → buton çıkmaz; sipariş teslimde kesilir)
   const invoiceQuery = useQuery({
-    queryKey: ['checkout-success-invoice', orderId],
+    queryKey: queryKeys.checkout.successInvoice(orderId),
     queryFn: async () => {
       try {
         const res = await api.get(`/elogo/invoices/by-order/${orderId}`);
@@ -102,9 +103,9 @@ export default function CheckoutSuccessClient() {
     try {
       const res = await api.get(`/elogo/invoices/${invoice.id}/pdf`);
       const url = (res.data as any)?.url;
-      if (url) window.open(url, '_blank', 'noopener,noreferrer');
+      if (url) window.open(url, "_blank", "noopener,noreferrer");
     } catch (error) {
-      console.error('Failed to download invoice:', error);
+      console.error("Failed to download invoice:", error);
     } finally {
       setDownloading(false);
     }
@@ -134,12 +135,16 @@ export default function CheckoutSuccessClient() {
           {/* Order Summary - Dynamic */}
           {order && !loading && (
             <div className="bg-surface-elevated rounded-2xl shadow-sm border border-border-subtle p-6 mb-8 text-left">
-              <h2 className="font-semibold text-heading mb-4 text-center">Sipariş Özeti</h2>
+              <h2 className="font-semibold text-heading mb-4 text-center">
+                Sipariş Özeti
+              </h2>
 
               <div className="space-y-3">
                 <div className="flex justify-between items-center py-2 border-b border-border-subtle">
                   <span className="text-muted">Sipariş No:</span>
-                  <span className="font-semibold text-heading">{order.orderNumber}</span>
+                  <span className="font-semibold text-heading">
+                    {order.orderNumber}
+                  </span>
                 </div>
 
                 {order.product && (
@@ -161,11 +166,14 @@ export default function CheckoutSuccessClient() {
 
               {/* Invoice Download Button */}
               {invoice && (
-                <Button variant="secondary" onClick={handleDownloadInvoice}
+                <Button
+                  variant="secondary"
+                  onClick={handleDownloadInvoice}
                   disabled={downloading}
-                  className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-surface-alt text-body font-medium rounded-xl hover:bg-border-subtle transition-colors disabled:opacity-50">
+                  className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-surface-alt text-body font-medium rounded-xl hover:bg-border-subtle transition-colors disabled:opacity-50"
+                >
                   <DocumentArrowDownIcon className="w-5 h-5" />
-                  {downloading ? 'İndiriliyor...' : 'Faturayı İndir (PDF)'}
+                  {downloading ? "İndiriliyor..." : "Faturayı İndir (PDF)"}
                 </Button>
               )}
             </div>
@@ -176,11 +184,15 @@ export default function CheckoutSuccessClient() {
             <div className="bg-info-50 border border-info-100 rounded-2xl p-6 mb-8">
               <div className="flex items-center justify-center gap-3 mb-2">
                 <TruckIcon className="w-6 h-6 text-info-500" />
-                <span className="font-semibold text-heading">Tahmini Teslimat</span>
+                <span className="font-semibold text-heading">
+                  Tahmini Teslimat
+                </span>
               </div>
               <div className="flex items-center justify-center gap-2 text-info-700">
                 <CalendarIcon className="w-5 h-5" />
-                <span className="font-medium">{getEstimatedDelivery(order.createdAt)}</span>
+                <span className="font-medium">
+                  {getEstimatedDelivery(order.createdAt)}
+                </span>
               </div>
               <p className="text-sm text-muted mt-2">
                 *Teslimat süresi satıcı ve kargo firmasına göre değişebilir.
@@ -193,7 +205,9 @@ export default function CheckoutSuccessClient() {
             <div className="bg-surface-elevated rounded-2xl shadow-sm border border-border-subtle p-6 mb-8">
               <div className="flex items-center justify-center gap-3 mb-4">
                 <EnvelopeIcon className="w-6 h-6 text-primary-500" />
-                <span className="font-medium text-heading">Sipariş Onayı Gönderildi</span>
+                <span className="font-medium text-heading">
+                  Sipariş Onayı Gönderildi
+                </span>
               </div>
               <p className="text-muted">
                 Sipariş detaylarınız ve faturanız şu adrese gönderildi:

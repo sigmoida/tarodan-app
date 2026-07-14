@@ -20,7 +20,8 @@
     "noFallthroughCasesInSwitch": true,
     "paths": {
       "@/*": ["src/*"],
-      "@tarodan/types": ["../../packages/types/src/index.ts"]
+      "@tarodan/types": ["../../packages/types/src"],
+      "@tarodan/types/*": ["../../packages/types/src/*"]
     }
   },
   "include": ["src/**/*", "prisma/**/*"],

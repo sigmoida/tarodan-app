@@ -972,6 +972,41 @@ describe("16 — Vergi & Fatura (TAX)", () => {
         .expect(401);
     });
 
+    scenario("TAX-096", async () => {
+      // [P0] IDOR REGRESYON (#63): Bir kullanıcı BAŞKASININ siparişinin faturasını
+      // POST /invoices/generate ile üretip PII/PDF'ini OKUYAMAZ → 403 (fatura satırı da
+      // oluşmaz). Sahip taraflar (alıcı VE satıcı) yine üretebilir → 201. Eskiden uç
+      // userId almadan generateForOrder çağırıyordu → herhangi bir oturumlu kullanıcı
+      // karşı tarafın ad/e-posta/telefon/adres/vergi-no + PDF URL'ini alıyordu.
+      const { buyer, seller, product, addr } = await makeBuyerSellerProduct({
+        price: 200,
+      });
+      const { orderId } = await buyAndPay(buyer, product.id, addr.id);
+      const stranger = await createUser(ctx.module);
+      const prisma = getPrisma();
+
+      // İlgisiz kullanıcı → 403 ve fatura satırı OLUŞMAZ (PII/PDF sızmaz).
+      await prisma.invoice.deleteMany({ where: { orderId } });
+      await request(server())
+        .post(`/api/invoices/generate/${orderId}`)
+        .set(authHeader(stranger))
+        .expect(403);
+      expect(await prisma.invoice.count({ where: { orderId } })).toBe(0);
+
+      // Sahip alıcı → 201.
+      const buyerRes = await request(server())
+        .post(`/api/invoices/generate/${orderId}`)
+        .set(authHeader(buyer))
+        .expect(201);
+      expect(buyerRes.body.invoiceNumber).toBeTruthy();
+
+      // Sahip satıcı (siparişin diğer tarafı) → 201.
+      await request(server())
+        .post(`/api/invoices/generate/${orderId}`)
+        .set(authHeader(seller))
+        .expect(201);
+    });
+
     scenario("TAX-030", async () => {
       // "Alıcı bilgisi eksik siparişte üretim hatası" (invoice.service.ts:197-199 →
       // BadRequestException, 400). Order.buyerId/sellerId NOT NULL (schema) olduğundan

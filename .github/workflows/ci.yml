@@ -64,6 +64,12 @@ jobs:
           else
             pnpm lint
           fi
+      # Guard the split web + admin lib/api surfaces: no duplicate export /
+      # method names across the domain modules (#95). Fast, no build needed.
+      - name: API surface collision guards (web + admin)
+        run: |
+          pnpm --filter @tarodan/web test:api
+          pnpm --filter @tarodan/admin test:api
 
   type-check:
     name: Type Check

@@ -116,14 +116,17 @@ composition to the caller.
 Web mixes server and client data. Never `useState` + `useEffect` + `api` by hand.
 
 ### Server-fetched data (route classes 1 & 2)
+
 Fetch in the Server Component itself (or a colocated server helper), forwarding
 cookies for authed calls, and pass results down as props. Use Next `fetch`
 caching (`revalidate` / tags) for public, cacheable data. This is what puts
 content in the crawlable HTML.
 
 ### Client data & mutations (route class 3 + islands)
+
 TanStack Query (`lib/queryClient.ts`) + hooks in `src/hooks/`. Mirror the admin
 ergonomics as we refactor:
+
 - **Lists** → a query hook (pagination / debounced search / filters / URL sync),
   the web analogue of admin's `useAdminResource`.
 - **Writes** → a mutation hook that owns the toast + `invalidateQueries`, the web
@@ -134,13 +137,15 @@ ergonomics as we refactor:
   only open/close state.
 
 ### The API layer
-`lib/api.ts` (793 lines) is split into **`lib/api/*` by domain** (products,
-catalog, listings, orders, checkout, membership, messaging, auth, user, …) behind
-a thin `client` (axios, `withCredentials`, refresh interceptor) — exactly like
-admin's `lib/api/`. It must stay **isomorphic** (runs on server and client): the
-axios instance is fine client-side; server fetches use a small helper that
-forwards cookies. A collision guard (`pnpm test:api`) keeps the merged surface
-unique, as in admin.
+
+The API layer is **`lib/api/*`, split by domain** (products, catalog, collections,
+orders, payments, membership, messages, auth, user, cart, …), each module exporting
+a `xxxApi` object behind a thin `client` (axios, `withCredentials`, refresh
+interceptor) and re-exported from `lib/api/index.ts` — exactly like admin's
+`lib/api/`. It must stay **isomorphic** (runs on server and client): the axios
+instance is fine client-side; server fetches use a small helper that forwards
+cookies. A collision guard (`pnpm --filter @tarodan/web test:api`, run in CI's Lint
+job) keeps every export name unique across the modules, as in admin.
 
 ## 8. State (zustand) is client-only
 
@@ -162,6 +167,7 @@ One screen = one concern. A page that swaps between two distinct flows via a mod
 flag should be **two routes**.
 
 ### Folder shape per route (mirror admin)
+
 ```
 app/<route>/
   page.tsx                 # Server Component by default; thin
@@ -185,7 +191,7 @@ Change a shared rule in the package, not by overriding here.
 - `pnpm --filter @tarodan/web lint` clean — no raw `button/input/select/textarea`,
   no raw palette, semantic tokens only.
 - For SEO/data routes: confirm content is in the **server HTML** (view source),
-  `generateMetadata` resolves title/description, and interactive islands still
-  hydrate. For private routes: confirm `robots: noindex` and that authed server
-  fetches forward the cookie.
+`generateMetadata` resolves title/description, and interactive islands still
+hydrate. For private routes: confirm `robots: noindex` and that authed server
+fetches forward the cookie.
 </content>

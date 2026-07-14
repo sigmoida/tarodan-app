@@ -1,13 +1,19 @@
 "use client";
 
 import { Fragment, type ReactNode } from "react";
+import dynamic from "next/dynamic";
 import {
   useReactTable,
   getCoreRowModel,
   flexRender,
   type ColumnDef,
 } from "@tanstack/react-table";
-import { AnimatePresence, motion } from "framer-motion";
+
+// framer-motion is code-split (#102): it only loads on the few list pages that
+// pass `renderExpanded`, staying out of every other list bundle.
+const DataTableExpandRow = dynamic(() => import("./DataTableExpandRow"), {
+  ssr: false,
+});
 import {
   Spinner,
   Checkbox,
@@ -85,14 +91,18 @@ export function DataTable<T>({
 
   const rowIds = getRowId ? data.map((d) => getRowId(d)) : [];
   const allSelected =
-    selectable && rowIds.length > 0 && rowIds.every((id) => selectedIds.includes(id));
+    selectable &&
+    rowIds.length > 0 &&
+    rowIds.every((id) => selectedIds.includes(id));
   const colSpan = columns.length + (selectable ? 1 : 0);
 
   // Sizing system is opt-in: when columns come from the `col.*` factory (carry
   // meta), fixed-layout + colgroup + alignment kick in. Without meta (legacy raw
   // ColumnDef consumers) the table keeps its old behavior unchanged.
   const hasSizing = columns.some(
-    (c) => c.meta && (c.meta.minWidth != null || c.meta.grow != null || c.meta.align != null),
+    (c) =>
+      c.meta &&
+      (c.meta.minWidth != null || c.meta.grow != null || c.meta.align != null),
   );
   // Width basis: each column gets minWidth px; the table's min-width is their
   // sum. Above that threshold columns grow proportionally; below it the table
@@ -102,7 +112,8 @@ export function DataTable<T>({
   const tableMinWidth = hasSizing
     ? (selectable ? 44 : 0) + columns.reduce((sum, c) => sum + colMin(c), 0)
     : 0;
-  const alignOf = (align?: CellAlign) => (align ? ALIGN_CLASS[align] : undefined);
+  const alignOf = (align?: CellAlign) =>
+    align ? ALIGN_CLASS[align] : undefined;
 
   // Initial load (no data yet) shows a full spinner; on search/filter refetch the
   // existing rows are kept and slightly dimmed (keepPreviousData behavior).
@@ -138,7 +149,10 @@ export function DataTable<T>({
                   </TableHead>
                 )}
                 {hg.headers.map((h) => (
-                  <TableHead key={h.id} className={alignOf(h.column.columnDef.meta?.align)}>
+                  <TableHead
+                    key={h.id}
+                    className={alignOf(h.column.columnDef.meta?.align)}
+                  >
                     {h.isPlaceholder
                       ? null
                       : flexRender(h.column.columnDef.header, h.getContext())}
@@ -156,13 +170,19 @@ export function DataTable<T>({
           >
             {isInitialLoad ? (
               <TableRow>
-                <TableCell colSpan={colSpan} className="p-8 text-center text-muted">
+                <TableCell
+                  colSpan={colSpan}
+                  className="p-8 text-center text-muted"
+                >
                   <Spinner size="md" className="mx-auto" />
                 </TableCell>
               </TableRow>
             ) : data.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={colSpan} className="p-8 text-center text-muted">
+                <TableCell
+                  colSpan={colSpan}
+                  className="p-8 text-center text-muted"
+                >
                   <div className="flex flex-col items-center gap-3">
                     <span>{emptyText}</span>
                     {emptyAction}
@@ -193,7 +213,9 @@ export function DataTable<T>({
                       }
                       className={[
                         onRowClick ? "cursor-pointer" : "",
-                        selectable && selectedIds.includes(id) ? "bg-primary-500/5" : "",
+                        selectable && selectedIds.includes(id)
+                          ? "bg-primary-500/5"
+                          : "",
                         rowClassName?.(row.original) ?? "",
                       ]
                         .filter(Boolean)
@@ -213,27 +235,19 @@ export function DataTable<T>({
                           key={cell.id}
                           className={alignOf(cell.column.columnDef.meta?.align)}
                         >
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext(),
+                          )}
                         </TableCell>
                       ))}
                     </TableRow>
                     {renderExpanded && (
                       <TableRow className="!border-t-0 hover:bg-transparent">
                         <TableCell colSpan={colSpan} className="!p-0">
-                          <AnimatePresence initial={false}>
-                            {isExpanded && (
-                              <motion.div
-                                key="expanded"
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: "auto", opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.25, ease: "easeInOut" }}
-                                className="overflow-hidden"
-                              >
-                                {renderExpanded(row.original)}
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
+                          <DataTableExpandRow isExpanded={isExpanded}>
+                            {renderExpanded(row.original)}
+                          </DataTableExpandRow>
                         </TableCell>
                       </TableRow>
                     )}

@@ -180,9 +180,7 @@ export class ProductQueryService {
         },
       },
     });
-    const formattedProducts = await Promise.all(
-      products.map((p) => this.common.formatProductResponse(p)),
-    );
+    const formattedProducts = await this.common.formatProductResponseMany(products);
     return {
       data: formattedProducts,
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
@@ -297,9 +295,7 @@ export class ProductQueryService {
       ...products.filter((p) => !isInStock(p)),
     ];
 
-    const formattedProducts = await Promise.all(
-      pageOrdered.map((p) => this.common.formatProductResponse(p)),
-    );
+    const formattedProducts = await this.common.formatProductResponseMany(pageOrdered);
 
     // Tutarlılık: Postgres path ile aynı şekilde, discountOnly=true iken sadece
     // gerçekten indirimli ürünleri döndür.
@@ -502,9 +498,7 @@ export class ProductQueryService {
         : [];
     const products = [...inStockRows, ...outOfStockRows];
 
-    const formattedProducts = await Promise.all(
-      products.map((p) => this.common.formatProductResponse(p)),
-    );
+    const formattedProducts = await this.common.formatProductResponseMany(products);
 
     // discountOnly: WHERE kolayca "kampanya kapsamındaki" ürünleri geçirse de,
     // formatProductResponse kampanya fiyatını uygulayamayabilir (değer 0, tarih
@@ -725,9 +719,7 @@ export class ProductQueryService {
       },
     });
 
-    return Promise.all(
-      products.map((p) => this.common.formatProductResponse(p)),
-    );
+    return this.common.formatProductResponseMany(products);
   }
 
   /**
@@ -847,12 +839,11 @@ export class ProductQueryService {
       TERMINAL_STATUSES.includes(p.status);
     products.sort((a, b) => Number(isTerminal(a)) - Number(isTerminal(b)));
 
-    const formattedProducts = await Promise.all(
-      products.map(async (p) => ({
-        ...(await this.common.formatProductResponse(p)),
-        pendingOffersCount: p._count.offers,
-      })),
-    );
+    const formattedBase = await this.common.formatProductResponseMany(products);
+    const formattedProducts = formattedBase.map((f, i) => ({
+      ...f,
+      pendingOffersCount: products[i]._count.offers,
+    }));
 
     return {
       data: formattedProducts,

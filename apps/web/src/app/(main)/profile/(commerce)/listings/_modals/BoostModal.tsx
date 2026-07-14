@@ -6,6 +6,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { Button, Checkbox, Modal, Radio, Spinner } from "@tarodan/ui";
 import { api } from "@/lib/api";
+import { queryKeys } from "@/lib/query/keys";
 
 interface BoostOption {
   durationDays: number;
@@ -47,7 +48,7 @@ export default function BoostModal({
 
   // Pricing options — fetched only while the modal is open, cached across reopens.
   const pricingQuery = useQuery({
-    queryKey: ["boost-pricing"],
+    queryKey: queryKeys.boost.pricing(),
     queryFn: async (): Promise<BoostPricing> => {
       const res = await api.get("/products/boost/pricing");
       return res.data || {};
@@ -58,7 +59,9 @@ export default function BoostModal({
   });
 
   const options: BoostOption[] = pricingQuery.data?.options ?? [];
-  const enabled = pricingQuery.data ? pricingQuery.data.enabled !== false : true;
+  const enabled = pricingQuery.data
+    ? pricingQuery.data.enabled !== false
+    : true;
   const loadingPricing = open && pricingQuery.isLoading;
 
   useEffect(() => {
@@ -73,8 +76,8 @@ export default function BoostModal({
     setSelected(
       (cur) =>
         cur ??
-        (opts.find((o) => o.durationDays === 7)?.durationDays ??
-          opts[0].durationDays),
+        opts.find((o) => o.durationDays === 7)?.durationDays ??
+        opts[0].durationDays,
     );
   }, [pricingQuery.data]);
 
@@ -97,11 +100,16 @@ export default function BoostModal({
       }
     },
     onError: (error: any) =>
-      toast.error(error?.response?.data?.message || "Öne çıkarma başlatılamadı"),
+      toast.error(
+        error?.response?.data?.message || "Öne çıkarma başlatılamadı",
+      ),
   });
 
   const remainingDays = boostedUntil
-    ? Math.max(0, Math.ceil((new Date(boostedUntil).getTime() - Date.now()) / 86400000))
+    ? Math.max(
+        0,
+        Math.ceil((new Date(boostedUntil).getTime() - Date.now()) / 86400000),
+      )
     : 0;
   const hasActiveBoost = remainingDays > 0;
 
@@ -110,7 +118,12 @@ export default function BoostModal({
   };
 
   return (
-    <Modal isOpen={open} onClose={onClose} title="İlanı Öne Çıkar" maxWidth="max-w-md">
+    <Modal
+      isOpen={open}
+      onClose={onClose}
+      title="İlanı Öne Çıkar"
+      maxWidth="max-w-md"
+    >
       <p className="text-sm text-muted mb-4 line-clamp-2">
         <span className="font-medium text-heading">{listingTitle}</span> ilanını
         seçtiğiniz süre boyunca arama, kategori ve ana sayfa vitrininde üst
