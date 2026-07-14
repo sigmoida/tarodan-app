@@ -577,7 +577,39 @@ export class DiscountService {
     categoryId: string,
     currentDisplayPrice: number,
   ): Promise<number | null> {
+    // Tek ürün = tek-elemanlı batch. Matematik ve DB filtresi tek otoritede
+    // (getEffectiveDisplayPriceMany) → liste ile drift imkânsız.
+    const map = await this.getEffectiveDisplayPriceMany([
+      { productId, sellerId, categoryId, currentDisplayPrice },
+    ]);
+    return map.get(productId) ?? null;
+  }
+
+  /**
+   * N+1 giderme (#67): Bir sayfadaki tüm ürünler için etkin kampanya fiyatını TEK
+   * discount.findMany ile çözer. Aktif auto-discount'lar (kampanyalar) az sayıdadır;
+   * hepsini bir kez çekip her ürün için uygunluğu BELLEKTE değerlendiririz — best-price
+   * hesabı getEffectiveDisplayPrice'ın birebir aynısıdır (yalnız kaynak sorgu toplu).
+   * Dönen map: productId → indirimli görüntü fiyatı (indirim yoksa null).
+   */
+  async getEffectiveDisplayPriceMany(
+    items: {
+      productId: string;
+      sellerId: string;
+      categoryId: string;
+      currentDisplayPrice: number;
+    }[],
+  ): Promise<Map<string, number | null>> {
+    const result = new Map<string, number | null>();
+    if (!items.length) return result;
+
     const now = new Date();
+    const sellerIds = [...new Set(items.map((i) => i.sellerId).filter(Boolean))];
+    const categoryIds = [
+      ...new Set(items.map((i) => i.categoryId).filter(Boolean)),
+    ];
+    const productIds = items.map((i) => i.productId);
+
     const discounts = await this.prisma.discount.findMany({
       where: {
         isActive: true,
@@ -586,48 +618,48 @@ export class DiscountService {
         endDate: { gte: now },
         OR: [
           { scope: DiscountScope.global, sellerId: null },
-          { scope: DiscountScope.seller, sellerId },
-          { scope: DiscountScope.category, categoryId },
+          { scope: DiscountScope.seller, sellerId: { in: sellerIds } },
+          { scope: DiscountScope.category, categoryId: { in: categoryIds } },
           {
             scope: DiscountScope.product,
-            targetProductIds: { has: productId },
+            targetProductIds: { hasSome: productIds },
           },
         ],
       },
       orderBy: { priority: 'asc' },
     });
 
-    let bestPrice: number | null = null;
-    for (const d of discounts) {
-      const product = {
-        id: productId,
-        sellerId,
-        categoryId,
-      };
-      if (!this.isProductEligibleForDiscount(product, d)) continue;
+    for (const item of items) {
+      const { productId, sellerId, categoryId, currentDisplayPrice } = item;
+      const product = { id: productId, sellerId, categoryId };
+      let bestPrice: number | null = null;
+      for (const d of discounts) {
+        if (!this.isProductEligibleForDiscount(product, d)) continue;
 
-      let effectivePrice: number;
-      if (d.type === 'percentage') {
-        const discountAmount =
-          currentDisplayPrice * (Number(d.value) / 100);
-        const capped =
-          d.maxDiscountAmount != null
-            ? Math.min(discountAmount, Number(d.maxDiscountAmount))
-            : discountAmount;
-        effectivePrice = Math.max(0, currentDisplayPrice - capped);
-      } else {
-        effectivePrice = Math.max(
-          0,
-          currentDisplayPrice - Math.min(Number(d.value), currentDisplayPrice),
-        );
-      }
-      if (effectivePrice < currentDisplayPrice) {
-        if (bestPrice == null || effectivePrice < bestPrice) {
-          bestPrice = effectivePrice;
+        let effectivePrice: number;
+        if (d.type === 'percentage') {
+          const discountAmount = currentDisplayPrice * (Number(d.value) / 100);
+          const capped =
+            d.maxDiscountAmount != null
+              ? Math.min(discountAmount, Number(d.maxDiscountAmount))
+              : discountAmount;
+          effectivePrice = Math.max(0, currentDisplayPrice - capped);
+        } else {
+          effectivePrice = Math.max(
+            0,
+            currentDisplayPrice -
+              Math.min(Number(d.value), currentDisplayPrice),
+          );
+        }
+        if (effectivePrice < currentDisplayPrice) {
+          if (bestPrice == null || effectivePrice < bestPrice) {
+            bestPrice = effectivePrice;
+          }
         }
       }
+      result.set(productId, bestPrice);
     }
-    return bestPrice;
+    return result;
   }
 
   /**

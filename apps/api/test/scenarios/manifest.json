@@ -1,11 +1,11 @@
 {
   "meta": {
-    "total": 2293,
+    "total": 2294,
     "source": "Tarodan-Test-Konsolu.html (window.__DATA__)",
     "generated": "30.06.2026",
     "gapCount": 33,
     "byPri": {
-      "P0": 699,
+      "P0": 700,
       "P1": 984,
       "P2": 610
     }
@@ -33,7 +33,7 @@
       "code": "04",
       "prefix": "PRD",
       "title": "04 — Ürün/İlan & Katalog",
-      "count": 114
+      "count": 115
     },
     {
       "code": "05",
@@ -105,7 +105,7 @@
       "code": "16",
       "prefix": "TAX",
       "title": "16 — Vergi (KDV) & Fatura",
-      "count": 95
+      "count": 96
     },
     {
       "code": "17",
@@ -5425,6 +5425,19 @@
       "pri": "P2",
       "steps": "GET /api/products/' OR 1=1--; GET /api/products?categoryId=' OR '1'='1.",
       "exp": "Bozuk UUID path → 400 (ParseUUIDPipe); query categoryId @IsUUID('4') → 400; Prisma parametreli sorgu (injection yok) (product.controller.ts:277, dto/product-query.dto.ts:29).",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "PRD-265",
+      "code": "04",
+      "prefix": "PRD",
+      "domTitle": "04 — Ürün/İlan & Katalog",
+      "title": "N+1 batch: ürün listesinde satıcı istatistikleri ürün başına değil toplu çekilir (#67)",
+      "tur": "Performans",
+      "pri": "P0",
+      "steps": "1. Aynı satıcıdan N(=4) aktif ürün seed et. 2. userMembership.findUnique/findMany spy'la. 3. GET /api/products?limit=20.",
+      "exp": "N ürün döner; yanıt şekli/değeri DEĞİŞMEZ; per-ürün userMembership.findUnique HİÇ çağrılmaz (batch findMany 1 kez). Eskiden ürün başına 4 per-seller + 1 discount sorgu vardı → 20'lik sayfa 80+ sorgu. — product-common.service.ts formatProductResponseMany; discount.service.ts getEffectiveDisplayPriceMany",
       "gap": false,
       "gapRefs": []
     },
@@ -19660,6 +19673,19 @@
       "pri": "P1",
       "steps": "1. Ödeme tamamla; MailHog'da alıcı e-postasının adresini kontrol et.",
       "exp": "Alıcı e-postası shippingAddress.guestEmail'e; takip linki /track-order?orderNumber=...&email=... (login gerektirmez). — invoice.service.ts:356-376.",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "TAX-096",
+      "code": "16",
+      "prefix": "TAX",
+      "domTitle": "16 — Vergi (KDV) & Fatura",
+      "title": "IDOR: başkasının siparişinin faturası POST /invoices/generate ile üretilemez (#63)",
+      "tur": "Güvenlik / Yetki",
+      "pri": "P0",
+      "steps": "1. İlgisiz kullanıcı POST /api/invoices/generate/:orderId (başka birinin siparişi). 2. Sahip alıcı aynı çağrı. 3. Sahip satıcı aynı çağrı.",
+      "exp": "(1) HTTP 403, fatura satırı OLUŞMAZ (PII/PDF sızmaz). (2)(3) HTTP 201 (sahip taraflar üretebilir). — invoice.controller.ts generateInvoice → invoice.service.ts generateForOrderAsUser sahiplik guard'ı (#63)",
       "gap": false,
       "gapRefs": []
     },

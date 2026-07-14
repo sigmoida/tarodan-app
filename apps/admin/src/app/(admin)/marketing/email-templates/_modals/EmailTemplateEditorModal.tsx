@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { Modal, Button, Input, Textarea, IconButton } from '@tarodan/ui';
+import { useEffect, useRef, useState, useCallback } from "react";
+import { Modal, Button, Input, Textarea, IconButton } from "@tarodan/ui";
 import {
   XMarkIcon,
   PaperAirplaneIcon,
@@ -9,14 +9,15 @@ import {
   ArrowPathIcon,
   EnvelopeIcon,
   TrashIcon,
-} from '@heroicons/react/24/outline';
-import toast from 'react-hot-toast';
-import { adminApi } from '@/lib/api';
-import { useAdminMutation } from '@/hooks/useAdminMutation';
-import { useConfirm } from '@/provider/ConfirmProvider';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { SAMPLE_DATA } from '../_lib/sampleData';
-import { makeSourceData, type TemplateDetail } from '../_lib/types';
+} from "@heroicons/react/24/outline";
+import toast from "react-hot-toast";
+import { adminApi } from "@/lib/api";
+import { adminKeys } from "@/lib/query/keys";
+import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { useConfirm } from "@/provider/ConfirmProvider";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { SAMPLE_DATA } from "../_lib/sampleData";
+import { makeSourceData, type TemplateDetail } from "../_lib/types";
 
 export function EmailTemplateEditorModal({
   templateKey,
@@ -29,15 +30,21 @@ export function EmailTemplateEditorModal({
   const queryClient = useQueryClient();
 
   const [detail, setDetail] = useState<TemplateDetail | null>(null);
-  const [form, setForm] = useState({ name: '', subject: '', bodyHtml: '' });
-  const [testEmail, setTestEmail] = useState('');
+  const [form, setForm] = useState({ name: "", subject: "", bodyHtml: "" });
+  const [testEmail, setTestEmail] = useState("");
 
-  const [preview, setPreview] = useState<{ subject: string; html: string } | null>(null);
+  const [preview, setPreview] = useState<{
+    subject: string;
+    html: string;
+  } | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
-  const refreshList = () => queryClient.invalidateQueries({ queryKey: ['email-templates'] });
+  const refreshList = () =>
+    queryClient.invalidateQueries({
+      queryKey: adminKeys.all("email-templates"),
+    });
 
   const loadPreview = useCallback(
     async (draftHtml?: string, draftSubject?: string) => {
@@ -45,10 +52,14 @@ export function EmailTemplateEditorModal({
       setPreviewError(false);
       try {
         const sample = SAMPLE_DATA[templateKey] || {};
-        const res = await adminApi.previewEmailTemplate(templateKey, sample as Record<string, any>, {
-          html: draftHtml,
-          subject: draftSubject,
-        });
+        const res = await adminApi.previewEmailTemplate(
+          templateKey,
+          sample as Record<string, any>,
+          {
+            html: draftHtml,
+            subject: draftSubject,
+          },
+        );
         setPreview(res.data);
       } catch {
         setPreviewError(true);
@@ -60,14 +71,15 @@ export function EmailTemplateEditorModal({
   );
 
   const detailQuery = useQuery({
-    queryKey: ['email-template', templateKey],
-    queryFn: async () => (await adminApi.getEmailTemplate(templateKey)).data as TemplateDetail,
+    queryKey: ["email-template", templateKey],
+    queryFn: async () =>
+      (await adminApi.getEmailTemplate(templateKey)).data as TemplateDetail,
   });
 
   // Close the modal on load error (legacy behavior).
   useEffect(() => {
     if (detailQuery.isError) {
-      toast.error('Şablon yüklenemedi');
+      toast.error("Şablon yüklenemedi");
       onClose();
     }
   }, [detailQuery.isError, onClose]);
@@ -81,7 +93,11 @@ export function EmailTemplateEditorModal({
     setDetail(d);
     (async () => {
       if (d.bodyHtml) {
-        setForm({ name: d.name || templateKey, subject: d.subject || '', bodyHtml: d.bodyHtml });
+        setForm({
+          name: d.name || templateKey,
+          subject: d.subject || "",
+          bodyHtml: d.bodyHtml,
+        });
         loadPreview(d.bodyHtml, d.subject || undefined);
       } else {
         const sourceData = makeSourceData(SAMPLE_DATA[templateKey] || {});
@@ -92,8 +108,8 @@ export function EmailTemplateEditorModal({
         if (!alive) return;
         setForm({
           name: d.name || templateKey,
-          subject: d.subject || '',
-          bodyHtml: sourceRes.data?.html || '',
+          subject: d.subject || "",
+          bodyHtml: sourceRes.data?.html || "",
         });
         loadPreview();
       }
@@ -122,38 +138,45 @@ export function EmailTemplateEditorModal({
   };
 
   const onTabKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key !== 'Tab') return;
+    if (e.key !== "Tab") return;
     e.preventDefault();
     const ta = e.currentTarget;
     const start = ta.selectionStart;
     const end = ta.selectionEnd;
-    onBodyChange(ta.value.substring(0, start) + '  ' + ta.value.substring(end));
+    onBodyChange(ta.value.substring(0, start) + "  " + ta.value.substring(end));
     requestAnimationFrame(() => {
       ta.selectionStart = ta.selectionEnd = start + 2;
     });
   };
 
   const insertVar = (v: string) => {
-    const ta = document.getElementById('html-editor') as HTMLTextAreaElement | null;
+    const ta = document.getElementById(
+      "html-editor",
+    ) as HTMLTextAreaElement | null;
     if (!ta) return;
     const s = ta.selectionStart;
     const e = ta.selectionEnd;
     const ins = `{{${v}}}`;
-    onBodyChange(form.bodyHtml.substring(0, s) + ins + form.bodyHtml.substring(e));
+    onBodyChange(
+      form.bodyHtml.substring(0, s) + ins + form.bodyHtml.substring(e),
+    );
     requestAnimationFrame(() => {
       ta.selectionStart = ta.selectionEnd = s + ins.length;
       ta.focus();
     });
   };
 
-  const saveMut = useAdminMutation(() => adminApi.updateEmailTemplate(templateKey, form), {
-    successMessage: 'Şablon kaydedildi',
-    errorMessage: 'Kaydetme başarısız',
-    onSuccess: () => {
-      refreshList();
-      loadPreview(form.bodyHtml || undefined, form.subject || undefined);
+  const saveMut = useAdminMutation(
+    () => adminApi.updateEmailTemplate(templateKey, form),
+    {
+      successMessage: "Şablon kaydedildi",
+      errorMessage: "Kaydetme başarısız",
+      onSuccess: () => {
+        refreshList();
+        loadPreview(form.bodyHtml || undefined, form.subject || undefined);
+      },
     },
-  });
+  );
   const saving = saveMut.isPending;
   const onSave = () => saveMut.mutate();
 
@@ -163,38 +186,51 @@ export function EmailTemplateEditorModal({
         to: testEmail.trim(),
         templateData: (SAMPLE_DATA[templateKey] || {}) as Record<string, any>,
       }),
-    { successMessage: 'Test e-postası kuyruğa eklendi', errorMessage: 'Gönderilemedi' },
+    {
+      successMessage: "Test e-postası kuyruğa eklendi",
+      errorMessage: "Gönderilemedi",
+    },
   );
   const sendingTest = sendTestMut.isPending;
   const onSendTest = () => {
     if (!testEmail.trim()) {
-      toast.error('E-posta adresi girin');
+      toast.error("E-posta adresi girin");
       return;
     }
     sendTestMut.mutate();
   };
 
-  const resetMut = useAdminMutation(() => adminApi.resetEmailTemplate(templateKey), {
-    successMessage: 'Varsayılan şablona sıfırlandı',
-    errorMessage: 'Sıfırlama başarısız',
-    onSuccess: async () => {
-      setDetail((d) => (d ? { ...d, bodyHtml: null, subject: null, isCustom: false } : d));
-      refreshList();
-      const sourceData = makeSourceData(SAMPLE_DATA[templateKey] || {});
-      const sourceRes = await adminApi.previewEmailTemplate(
-        templateKey,
-        sourceData as Record<string, any>,
-      );
-      setForm((f) => ({ ...f, bodyHtml: sourceRes.data?.html || '', subject: '' }));
-      loadPreview();
+  const resetMut = useAdminMutation(
+    () => adminApi.resetEmailTemplate(templateKey),
+    {
+      successMessage: "Varsayılan şablona sıfırlandı",
+      errorMessage: "Sıfırlama başarısız",
+      onSuccess: async () => {
+        setDetail((d) =>
+          d ? { ...d, bodyHtml: null, subject: null, isCustom: false } : d,
+        );
+        refreshList();
+        const sourceData = makeSourceData(SAMPLE_DATA[templateKey] || {});
+        const sourceRes = await adminApi.previewEmailTemplate(
+          templateKey,
+          sourceData as Record<string, any>,
+        );
+        setForm((f) => ({
+          ...f,
+          bodyHtml: sourceRes.data?.html || "",
+          subject: "",
+        }));
+        loadPreview();
+      },
     },
-  });
+  );
   const resetting = resetMut.isPending;
   const onReset = async () => {
     const ok = await confirm({
-      title: 'Varsayılana sıfırla',
-      description: 'Özel şablon silinecek ve varsayılan sistem şablonuna dönülecek. Emin misiniz?',
-      confirmLabel: 'Sıfırla',
+      title: "Varsayılana sıfırla",
+      description:
+        "Özel şablon silinecek ve varsayılan sistem şablonuna dönülecek. Emin misiniz?",
+      confirmLabel: "Sıfırla",
       destructive: true,
     });
     if (!ok) return;
@@ -205,7 +241,7 @@ export function EmailTemplateEditorModal({
     if (detail?.variablesJson) {
       try {
         const o = JSON.parse(detail.variablesJson);
-        if (typeof o === 'object' && o !== null) return Object.keys(o);
+        if (typeof o === "object" && o !== null) return Object.keys(o);
       } catch {
         /* empty */
       }
@@ -248,7 +284,9 @@ export function EmailTemplateEditorModal({
         <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-1">
           {variables.length > 0 && (
             <div className="rounded-lg border border-primary-500/20 bg-primary-500/5 p-3">
-              <p className="mb-1.5 text-xs font-medium text-muted">Kullanılabilir değişkenler</p>
+              <p className="mb-1.5 text-xs font-medium text-muted">
+                Kullanılabilir değişkenler
+              </p>
               <div className="flex flex-wrap gap-1.5">
                 {variables.map((v) => (
                   <Button
@@ -283,7 +321,7 @@ export function EmailTemplateEditorModal({
               <span className="text-xs text-subtle">
                 {form.bodyHtml.length > 0
                   ? `${form.bodyHtml.length} karakter`
-                  : 'Boş (varsayılan kullanılır)'}
+                  : "Boş (varsayılan kullanılır)"}
               </span>
             </div>
             <Textarea
@@ -370,7 +408,12 @@ export function EmailTemplateEditorModal({
                 <Button
                   variant="secondary"
                   type="button"
-                  onClick={() => loadPreview(form.bodyHtml || undefined, form.subject || undefined)}
+                  onClick={() =>
+                    loadPreview(
+                      form.bodyHtml || undefined,
+                      form.subject || undefined,
+                    )
+                  }
                   className="mt-3"
                 >
                   Tekrar dene
@@ -381,8 +424,10 @@ export function EmailTemplateEditorModal({
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
               <div className="shrink-0 border-b border-border bg-surface-elevated px-4 py-2">
                 <p className="text-xs text-muted">
-                  <span className="font-medium">Konu:</span>{' '}
-                  <span className="text-heading">{preview.subject || '(konu yok)'}</span>
+                  <span className="font-medium">Konu:</span>{" "}
+                  <span className="text-heading">
+                    {preview.subject || "(konu yok)"}
+                  </span>
                 </p>
               </div>
               <iframe

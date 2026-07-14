@@ -1,26 +1,38 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Select } from '@tarodan/ui';
-import { AdminPage } from '@/components/page/AdminPage';
-import { PageLoading } from '@/components/PageLoading';
-import { PageHeader } from '@/components/AdminList';
-import { AdminTabs } from '@/components/AdminTabs';
+import dynamic from "next/dynamic";
+import { useState } from "react";
+import { Select } from "@tarodan/ui";
+import { AdminPage } from "@/components/page/AdminPage";
+import { PageLoading } from "@/components/PageLoading";
+import { PageHeader } from "@/components/AdminList";
+import { AdminTabs } from "@/components/AdminTabs";
 import {
   type DateRange,
   DATE_RANGE_OPTIONS,
   ANALYTICS_TABS,
-} from './_lib/types';
-import { useAnalytics } from './_lib/useAnalytics';
-import { AnalyticsExport } from './_components/AnalyticsExport';
-import { SalesTab } from './_components/SalesTab';
-import { UsersTab } from './_components/UsersTab';
-import { ProductsTab } from './_components/ProductsTab';
-import { TradesTab } from './_components/TradesTab';
+} from "./_lib/types";
+import { useAnalytics } from "./_lib/useAnalytics";
+import { AnalyticsExport } from "./_components/AnalyticsExport";
+// Each chart tab pulls in chart.js; only the active tab renders, so load them
+// lazily per-tab instead of shipping all charts in the analytics bundle (#102).
+const SalesTab = dynamic(
+  () => import("./_components/SalesTab").then((m) => m.SalesTab),
+  { ssr: false },
+);
+const UsersTab = dynamic(
+  () => import("./_components/UsersTab").then((m) => m.UsersTab),
+  { ssr: false },
+);
+const ProductsTab = dynamic(
+  () => import("./_components/ProductsTab").then((m) => m.ProductsTab),
+  { ssr: false },
+);
+import { TradesTab } from "./_components/TradesTab";
 
 export default function AnalyticsPage() {
-  const [dateRange, setDateRange] = useState<DateRange>('30d');
-  const [tab, setTab] = useState('sales');
+  const [dateRange, setDateRange] = useState<DateRange>("30d");
+  const [tab, setTab] = useState("sales");
   const { data, loading } = useAnalytics(dateRange);
 
   return (
@@ -46,10 +58,10 @@ export default function AnalyticsPage() {
         <PageLoading />
       ) : (
         <>
-          {tab === 'sales' && <SalesTab report={data.salesReport} />}
-          {tab === 'users' && <UsersTab report={data.userReport} />}
-          {tab === 'products' && <ProductsTab report={data.productReport} />}
-          {tab === 'trades' && <TradesTab report={data.tradeReport} />}
+          {tab === "sales" && <SalesTab report={data.salesReport} />}
+          {tab === "users" && <UsersTab report={data.userReport} />}
+          {tab === "products" && <ProductsTab report={data.productReport} />}
+          {tab === "trades" && <TradesTab report={data.tradeReport} />}
         </>
       )}
     </AdminPage>

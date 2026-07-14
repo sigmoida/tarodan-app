@@ -9,6 +9,7 @@ import {
   Button,
   Checkbox,
   Label,
+  Radio,
 } from "@tarodan/ui";
 
 /**
@@ -65,9 +66,8 @@ export function RefundPolicyCard({
   const [refundSellerCommission, setRefundSellerCommission] = useState(
     initial.refundSellerCommission,
   );
-  const [returnShippingPayer, setReturnShippingPayerState] = useState<
-    ReturnShippingPayer | null
-  >(initial.returnShippingPayer);
+  const [returnShippingPayer, setReturnShippingPayerState] =
+    useState<ReturnShippingPayer | null>(initial.returnShippingPayer);
 
   const [savingPolicy, setSavingPolicy] = useState(false);
   const [savingPayer, setSavingPayer] = useState(false);
@@ -83,7 +83,8 @@ export function RefundPolicyCard({
 
   const refundAmount = useMemo(() => {
     let total = 0;
-    if (refundProductAmount && order.subtotal != null) total += Number(order.subtotal);
+    if (refundProductAmount && order.subtotal != null)
+      total += Number(order.subtotal);
     if (refundShippingFee) total += Number(order.shippingCost);
     if (refundBuyerFee) total += Number(order.buyerFeeAmount);
     // refundSellerCommission is a seller charge — not added to the buyer's refund amount
@@ -163,7 +164,9 @@ export function RefundPolicyCard({
 
         <div className="rounded-md bg-info-50 p-3 text-sm">
           <div className="text-muted">Alıcıya iade edilecek tutar</div>
-          <div className="text-2xl font-bold text-info-700">{fmt(refundAmount)}</div>
+          <div className="text-2xl font-bold text-info-700">
+            {fmt(refundAmount)}
+          </div>
         </div>
 
         <div className="flex justify-end">
@@ -207,7 +210,9 @@ export function RefundPolicyCard({
           <div className="flex justify-end">
             <Button
               onClick={handleSavePayer}
-              disabled={!dirtyPayer || !returnShippingPayer || savingPayer || disabled}
+              disabled={
+                !dirtyPayer || !returnShippingPayer || savingPayer || disabled
+              }
             >
               {savingPayer ? "Kaydediliyor..." : "Tarafı Kaydet"}
             </Button>
@@ -260,14 +265,13 @@ function PayerRadio({
 }) {
   return (
     <label className="flex items-start gap-2 cursor-pointer">
-      <input
-        type="radio"
+      <Radio
         name="returnShippingPayer"
         value={value}
         checked={current === value}
         onChange={() => onChange(value)}
         disabled={disabled}
-        className="mt-0.5 cursor-pointer"
+        className="mt-0.5"
       />
       <span className="text-sm">
         <span className="font-medium">{label}</span>
