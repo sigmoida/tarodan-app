@@ -109,7 +109,7 @@ export async function fetchManufacturerProductsServer(
 	try {
 		const res = await fetch(
 			`${API_BASE}/api/products?manufacturerId=${encodeURIComponent(manufacturerId)}&limit=50`,
-			{ cache: 'no-store' },
+			{ next: { revalidate: 60 } },
 		);
 		if (!res.ok) return [];
 		return unwrapProducts(await res.json());
