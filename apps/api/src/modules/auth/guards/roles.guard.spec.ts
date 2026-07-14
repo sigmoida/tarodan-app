@@ -145,3 +145,83 @@ describe('RolesGuard — admin iade yüzeyi URL-segment izin kapısı', () => {
     });
   });
 });
+
+/**
+ * Fail-closed: kanonik /api/admin/<segment> route'u PERMISSION_MAP'te eşlenmemişse
+ * (ör. yeni eklenip izin haritasına yazılması unutulmuş) erişim reddedilir —
+ * moderator/admin sessizce sadece-rol kontrolüne düşemez. super_admin escape-hatch
+ * olarak geçer. Bilinen rol-only istisnalar (invoices, seller-invoices,
+ * trade-commission-rate) ve kanonik olmayan /module/admin/... route'ları fail-OPEN
+ * kalır (mevcut moderator erişimi korunur — MOD-045 regresyon koruması).
+ */
+describe('RolesGuard — eşlenmemiş admin route fail-closed', () => {
+  const makeGuard = () => {
+    const prisma = {
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
+    } as any;
+    return new RolesGuard(new Reflector(), prisma);
+  };
+
+  const ctx = (role: string, method: string, originalUrl: string): ExecutionContext => {
+    const req = { user: { isAdmin: true, role }, method, originalUrl };
+    const handler = () => undefined;
+    (handler as any)[ROLES_KEY] = ['super_admin', 'admin', 'moderator'];
+    return {
+      getHandler: () => handler,
+      getClass: () => class {},
+      switchToHttp: () => ({ getRequest: () => req }),
+    } as any;
+  };
+
+  const stub = (guard: RolesGuard) => {
+    jest
+      .spyOn((guard as any).reflector as Reflector, 'getAllAndOverride')
+      .mockImplementation((key: any, targets: any[]) => {
+        const h = targets[0];
+        if (key === ROLES_KEY) return h?.[ROLES_KEY];
+        return undefined;
+      });
+  };
+
+  const UNKNOWN = '/api/admin/brand-new-feature/abc';
+
+  it('moderator → eşlenmemiş kanonik admin route → 403 (fail-closed)', async () => {
+    const guard = makeGuard();
+    stub(guard);
+    await expect(guard.canActivate(ctx('moderator', 'GET', UNKNOWN))).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it('admin → eşlenmemiş kanonik admin route → 403 (fail-closed, super_admin değil)', async () => {
+    const guard = makeGuard();
+    stub(guard);
+    await expect(guard.canActivate(ctx('admin', 'POST', UNKNOWN))).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it('super_admin → eşlenmemiş kanonik admin route → izinli (escape-hatch)', async () => {
+    const guard = makeGuard();
+    stub(guard);
+    await expect(guard.canActivate(ctx('super_admin', 'GET', UNKNOWN))).resolves.toBe(true);
+  });
+
+  it.each([
+    ['invoices', '/api/admin/invoices'],
+    ['seller-invoices', '/api/admin/seller-invoices/abc'],
+    ['trade-commission-rate', '/api/admin/trade-commission-rate'],
+  ])('moderator → rol-only istisna (%s) → izinli (fail-open korunur)', async (_d, url) => {
+    const guard = makeGuard();
+    stub(guard);
+    await expect(guard.canActivate(ctx('moderator', 'GET', url))).resolves.toBe(true);
+  });
+
+  it('moderator → kanonik olmayan /module/admin/... (support tickets) → izinli (MOD-045 korunur)', async () => {
+    const guard = makeGuard();
+    stub(guard);
+    await expect(
+      guard.canActivate(ctx('moderator', 'PATCH', '/api/support/admin/tickets/abc/status')),
+    ).resolves.toBe(true);
+  });
+});
