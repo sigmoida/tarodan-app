@@ -202,12 +202,20 @@ export class ElogoInvoicingService {
   async issueCommissionInvoice(orderId: string): Promise<void> {
     const [order, ledger] = await Promise.all([
       this.prisma.order.findUnique({ where: { id: orderId }, select: { sellerId: true } }),
-      this.prisma.commissionLedger.findUnique({ where: { orderId }, select: { sellerCommission: true } }),
+      this.prisma.commissionLedger.findUnique({
+        where: { orderId },
+        select: { sellerCommission: true, refundedSellerCommission: true },
+      }),
     ]);
     if (!order || !ledger) return;
     // Platform kendi ürününü satıyorsa komisyon = kendine kesilemez → atla (yerine platform_sale).
     if (await this.isPlatformSeller(order.sellerId)) return;
-    await this.cut('commission', orderId, order.sellerId, Number(ledger.sellerCommission));
+    // #88: NET komisyon faturalanır (kısmi iade edilen kısım düşülür). İade yoksa
+    // refunded=0 → net=original (davranış aynı). Net ≤ 0 ise faturalanacak bir şey yok.
+    const netCommission =
+      Number(ledger.sellerCommission) - Number(ledger.refundedSellerCommission);
+    if (netCommission <= 0) return;
+    await this.cut('commission', orderId, order.sellerId, netCommission);
   }
 
   /**
@@ -235,13 +243,20 @@ export class ElogoInvoicingService {
   async issueServiceFeeInvoice(orderId: string): Promise<void> {
     const [order, ledger] = await Promise.all([
       this.prisma.order.findUnique({ where: { id: orderId }, select: { buyerId: true, sellerId: true } }),
-      this.prisma.commissionLedger.findUnique({ where: { orderId }, select: { buyerFee: true } }),
+      this.prisma.commissionLedger.findUnique({
+        where: { orderId },
+        select: { buyerFee: true, refundedBuyerFee: true },
+      }),
     ]);
     if (!order || !ledger) return;
     // Platform (Tarodan) KENDİ ürününü satıyorsa hizmet bedeli AYRI kesilmez — platform_sale faturası
     // zaten tam tutarı (buyer fee dahil) içerir. Aksi halde buyer fee çift faturalanır.
     if (await this.isPlatformSeller(order.sellerId)) return;
-    await this.cut('service_fee', orderId, order.buyerId, Number(ledger.buyerFee));
+    // #88: NET hizmet bedeli (kısmi iade düşülür). İade yoksa net=original.
+    const netBuyerFee =
+      Number(ledger.buyerFee) - Number(ledger.refundedBuyerFee);
+    if (netBuyerFee <= 0) return;
+    await this.cut('service_fee', orderId, order.buyerId, netBuyerFee);
   }
 
   /** Üyelik faturası → ÜYEYE (membershipPayment.amount). */
