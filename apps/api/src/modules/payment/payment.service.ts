@@ -130,6 +130,23 @@ export class PaymentService {
     );
   }
 
+  /**
+   * Tek kanonik teslim handler'ı — order durumunu (48h'e göre) ayarlar VE escrow
+   * release'ini planlar. Tüm teslim yolları (webhook/worker/Sürat poll/admin) bunu çağırır.
+   */
+  async handleOrderDelivered(
+    orderId: string,
+    deliveredAt: Date,
+    tx?: Prisma.TransactionClient,
+  ): Promise<{
+    acted: boolean;
+    use48h: boolean;
+    confirmationDeadline: Date | null;
+    buyerId: string | null;
+  }> {
+    return this.paymentRefund.handleOrderDelivered(orderId, deliveredAt, tx);
+  }
+
   async releaseHoldsDue(): Promise<{
     count: number;
     tradeCashReleased: number;
