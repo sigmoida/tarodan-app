@@ -1,0 +1,41 @@
+/** @format */
+
+"use client";
+
+import { Stepper, type StepperStep } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
+import {
+  REFUND_LIFECYCLE,
+  refundStatusPhase,
+  refundTerminalStatuses,
+} from "../../_lib/refund-status";
+
+/**
+ * Horizontal stepper showing which phase the refund is in — built on the shared
+ * `@tarodan/ui` Stepper (same component the checkout wizard uses), mirroring the
+ * admin refund detail. Terminal states render a red ✕ end-cap.
+ */
+export default function RefundStatusStepper({ status }: { status: string }) {
+  const t = useTranslations();
+  let steps: StepperStep[];
+  let current: number;
+
+  if (refundTerminalStatuses.has(status)) {
+    const endLabel =
+      status === "rejected" ? t("common.rejected") : t("order.statusCancelled");
+    steps = [
+      { label: t("refund.requestReceived") },
+      { label: endLabel, error: true },
+    ];
+    current = 1;
+  } else {
+    steps = REFUND_LIFECYCLE.map((labelKey) => ({ label: t(labelKey) }));
+    current = refundStatusPhase[status] ?? 0;
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-surface-elevated p-4 sm:p-6">
+      <Stepper steps={steps} current={current} />
+    </div>
+  );
+}

@@ -3,8 +3,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { Link, useRouter, usePathname } from "@/i18n/navigation";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
   MagnifyingGlassIcon,
@@ -14,7 +14,7 @@ import {
   TagIcon,
 } from "@heroicons/react/24/outline";
 import { Button, Chip, IconButton, Input, Spinner } from "@tarodan/ui";
-import { useTranslation } from "@/i18n/LanguageContext";
+import { useLocale, useTranslations } from "next-intl";
 import { isValidImageSrc } from "@/components/OptimizedImage";
 import { searchApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
@@ -434,7 +434,8 @@ function useNavSearch() {
  * rich categorized results). All state/logic lives in `useNavSearch`.
  */
 export default function HeaderSearch() {
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
   const {
     searchContainerRef,
     searchInputRef,
@@ -505,7 +506,7 @@ export default function HeaderSearch() {
                   <div className="px-4 pt-3 pb-2">
                     <div className="mb-2 flex items-center justify-between">
                       <span className="text-xs font-semibold uppercase tracking-wide text-muted">
-                        {locale === "en" ? "Recent Searches" : "Son Aramalar"}
+                        {t("search.recentSearches")}
                       </span>
                       <Button
                         variant="link"
@@ -513,7 +514,7 @@ export default function HeaderSearch() {
                         type="button"
                         onClick={clearSearches}
                       >
-                        {locale === "en" ? "Clear" : "Temizle"}
+                        {t("common.clear")}
                       </Button>
                     </div>
                     <div className="space-y-0.5">
@@ -537,7 +538,7 @@ export default function HeaderSearch() {
                               removeSearch(s);
                             }}
                             className="shrink-0 text-subtle opacity-0 transition-opacity hover:text-danger-500 group-hover:opacity-100"
-                            aria-label={locale === "en" ? "Remove" : "Kaldır"}
+                            aria-label={t("common.remove")}
                           >
                             <XMarkIcon className="h-4 w-4" />
                           </IconButton>
@@ -552,7 +553,7 @@ export default function HeaderSearch() {
                   className={`px-4 pb-3 ${recentSearches.length > 0 ? "border-t border-border-subtle pt-2" : "pt-3"}`}
                 >
                   <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted">
-                    {locale === "en" ? "Popular Searches" : "Popüler Aramalar"}
+                    {t("search.popularSearches")}
                   </span>
                   <div className="flex flex-wrap gap-2">
                     {POPULAR_SEARCHES[locale as "tr" | "en"]?.map((s) => (
@@ -573,11 +574,7 @@ export default function HeaderSearch() {
                   className="flex items-center justify-between px-4 py-2.5 text-sm text-muted hover:bg-primary-50 hover:text-primary-600 border-t border-border-subtle transition-colors"
                   onClick={() => setShowSearchDropdown(false)}
                 >
-                  <span>
-                    {locale === "en"
-                      ? "Browse all listings"
-                      : "Tüm ilanları gör"}
-                  </span>
+                  <span>{t("search.browseAllListings")}</span>
                   <ArrowRightIcon className="w-4 h-4" />
                 </Link>
               </div>
@@ -596,9 +593,7 @@ export default function HeaderSearch() {
                     {/* İlgili Sonuçlar başlığı */}
                     <div className="px-4 pt-3 pb-1">
                       <span className="text-xs font-semibold text-muted uppercase tracking-wide">
-                        {locale === "en"
-                          ? "Related Results"
-                          : "İlgili Sonuçlar"}
+                        {t("search.relatedResults")}
                       </span>
                     </div>
 
@@ -651,7 +646,7 @@ export default function HeaderSearch() {
                                   </p>
                                 </div>
                                 <span className="text-2xs text-subtle font-medium px-2 py-0.5 bg-surface-alt rounded-full flex-shrink-0">
-                                  {locale === "en" ? "Product" : "Ürün"}
+                                  {t("order.product")}
                                 </span>
                               </Link>
                             );
@@ -694,7 +689,7 @@ export default function HeaderSearch() {
                                 {brand.name}
                               </span>
                               <span className="text-2xs text-primary-600 font-medium px-2 py-0.5 bg-primary-50 rounded-full flex-shrink-0">
-                                {locale === "en" ? "Brand" : "Marka"}
+                                {t("product.brand")}
                               </span>
                             </Link>
                           );
@@ -732,7 +727,7 @@ export default function HeaderSearch() {
                                   {cat.name}
                                 </span>
                                 <span className="text-2xs text-info-600 font-medium px-2 py-0.5 bg-info-50 rounded-full flex-shrink-0">
-                                  {locale === "en" ? "Category" : "Kategori"}
+                                  {t("product.category")}
                                 </span>
                               </Link>
                             );
@@ -780,7 +775,7 @@ export default function HeaderSearch() {
                                   {mfr.name}
                                 </span>
                                 <span className="text-2xs text-primary-600 font-medium px-2 py-0.5 bg-primary-50 rounded-full flex-shrink-0">
-                                  {locale === "en" ? "Manufacturer" : "Üretici"}
+                                  {t("product.manufacturer")}
                                 </span>
                               </Link>
                             );
@@ -822,7 +817,7 @@ export default function HeaderSearch() {
                                   {m.name}
                                 </span>
                                 <span className="text-2xs text-success-600 font-medium px-2 py-0.5 bg-success-50 rounded-full flex-shrink-0">
-                                  {locale === "en" ? "Model" : "Model"}
+                                  {t("product.model")}
                                 </span>
                               </Link>
                             );
@@ -865,7 +860,7 @@ export default function HeaderSearch() {
                                 {s}
                               </span>
                               <span className="text-2xs text-warning-600 font-medium px-2 py-0.5 bg-warning-50 rounded-full flex-shrink-0">
-                                {locale === "en" ? "Scale" : "Ölçek"}
+                                {t("product.scale")}
                               </span>
                             </Link>
                           );
@@ -911,7 +906,7 @@ export default function HeaderSearch() {
                                   {mat.label}
                                 </span>
                                 <span className="text-2xs text-muted font-medium px-2 py-0.5 bg-surface rounded-full flex-shrink-0">
-                                  {locale === "en" ? "Material" : "Malzeme"}
+                                  {t("product.material")}
                                 </span>
                               </Link>
                             );
@@ -959,7 +954,7 @@ export default function HeaderSearch() {
                                   {cond.label}
                                 </span>
                                 <span className="text-2xs text-success-600 font-medium px-2 py-0.5 bg-success-50 rounded-full flex-shrink-0">
-                                  {locale === "en" ? "Condition" : "Durum"}
+                                  {t("product.condition")}
                                 </span>
                               </Link>
                             );
@@ -977,9 +972,7 @@ export default function HeaderSearch() {
                       !autoResults?.materials?.length &&
                       !autoResults?.conditions?.length && (
                         <div className="px-4 py-6 text-center text-sm text-muted">
-                          {locale === "en"
-                            ? "No results found"
-                            : "Sonuç bulunamadı"}
+                          {t("search.noResults")}
                         </div>
                       )}
 
@@ -992,7 +985,7 @@ export default function HeaderSearch() {
                     >
                       <span>
                         &ldquo;{debouncedQuery}&rdquo;{" "}
-                        {locale === "en" ? "search for" : "ile ara"}
+                        {t("search.searchAction")}
                       </span>
                       <ArrowRightIcon className="w-4 h-4" />
                     </Button>
