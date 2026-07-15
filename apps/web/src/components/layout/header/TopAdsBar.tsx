@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@tarodan/ui";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { Container } from "../Container";
 
 interface TopAd {
@@ -116,7 +116,7 @@ function useTopAds() {
  * next/image).
  */
 export default function TopAdsBar() {
-  const locale = useLocale();
+  const t = useTranslations();
   const {
     shouldShowAd,
     topAds,
@@ -131,12 +131,12 @@ export default function TopAdsBar() {
     <div
       className="w-full border-b border-border bg-surface-alt"
       role="region"
-      aria-label={locale === "en" ? "Sponsored" : "Reklam alanı"}
+      aria-label={t("product.sponsoredRegion")}
     >
       <Container className="px-4">
         <div className="flex h-9 items-center gap-3">
           <span className="flex-shrink-0 text-2xs font-medium uppercase tracking-wider text-subtle">
-            {locale === "en" ? "Sponsored" : "Sponsorlu"}
+            {t("product.sponsored")}
           </span>
           <div className="flex flex-1 min-w-0 items-center justify-center gap-6 overflow-x-auto scrollbar-hide">
             {topAds.map((ad) => (

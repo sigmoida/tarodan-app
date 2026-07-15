@@ -105,7 +105,8 @@
     "evidence": "Kanıt",
     "sales": "Satış",
     "signingOut": "Çıkış yapılıyor...",
-    "requestFailed": "İstek başarısız"
+    "requestFailed": "İstek başarısız",
+    "unknown": "Bilinmiyor"
   },
   "nav": {
     "home": "Ana Sayfa",
@@ -141,7 +142,10 @@
     "searchPlaceholderMobile": "Model, marka ara...",
     "loginToCreateListing": "İlan Vermek İçin Giriş Yapın",
     "loginToCreateListingMsg": "Koleksiyon ürünlerinizi satışa sunmak için giriş yapmanız gerekiyor.",
-    "loginForTrades": "Takas İşlemleri İçin Giriş Yapın"
+    "loginForTrades": "Takas İşlemleri İçin Giriş Yapın",
+    "vehicleTypes": "Araç Türleri",
+    "manufacturers": "Üreticiler",
+    "allManufacturers": "Tüm Üreticiler"
   },
   "auth": {
     "loginTitle": "Giriş Yap",
@@ -475,7 +479,45 @@
     "failedToCreateListing": "İlan oluşturulamadı",
     "quantityDefaultHint": "Boş bırakırsanız 1 adet",
     "available": "adet",
-    "detailsSuffix": "detayları"
+    "detailsSuffix": "detayları",
+    "sponsored": "Sponsorlu",
+    "sponsoredRegion": "Reklam alanı",
+    "model": "Model",
+    "pricing": "Fiyatlandırma",
+    "priceLabel": "Fiyat (₺) *",
+    "stockQuantity": "Stok Miktarı",
+    "estimatedPerSale": "Tahmini (satış başına)",
+    "calculating": "Hesaplanıyor...",
+    "platformDeduction": "Platform kesintisi",
+    "netToYou": "Net kazanç",
+    "productDetails": "Ürün Detayları",
+    "categoryRequired": "Kategori *",
+    "selectCategory": "Kategori Seçin",
+    "conditionRequired": "Durum *",
+    "selectBrand": "Marka Seçin",
+    "selectBrandFirst": "Önce marka seçin",
+    "noModelsForBrand": "Bu markaya ait model yok",
+    "selectModel": "Model Seçin",
+    "selectMaterial": "Malzeme seçin",
+    "selectManufacturer": "Üretici seçin",
+    "releaseYear": "Çıkış yılı",
+    "selectYear": "Yıl seçin",
+    "releaseYearHelper": "Modelin çıkış yılı (isteğe bağlı)",
+    "tradeEnabled": "Takas Aktif",
+    "upgradeArrow": "Premium''a Geç →",
+    "preorder": "Ön Sipariş",
+    "preorderHelper": "Ürün henüz stokta değil; çıkınca gönderilecek",
+    "setBundle": "Set / Paket",
+    "setBundleHelper": "Tek ilanda birden fazla model (örn. 5''li paket, garaj seti)",
+    "setPieceCount": "Set Parça Sayısı",
+    "setPiecePlaceholder": "örn. 5",
+    "setSizeHelper": "Setteki toplam parça sayısı. Her parçanın marka/model/renk gibi ayrıntılarını açıklamada belirtin.",
+    "clickToUpload": "Görsel yüklemek için tıklayın",
+    "uploaded": "yüklendi",
+    "maxImagesReached": "Maksimum görsel sayısına ulaştınız",
+    "uploadingImages": "Resimler yükleniyor...",
+    "setMinPieces": "Set için en az 2 parça girin",
+    "addPhoto": "En az bir fotoğraf ekleyin"
   },
   "cart": {
     "myCart": "Sepetim",
@@ -1028,7 +1070,9 @@
     "allRead": "Tüm bildirimler okundu olarak işaretlendi",
     "markRead": "Okundu işaretle",
     "unreadCount": "{count} okunmamış",
-    "markAllReadShort": "Tümünü oku"
+    "markAllReadShort": "Tümünü oku",
+    "newBadge": "yeni",
+    "viewAll": "Tüm bildirimleri gör"
   },
   "profile": {
     "profile": "Profil",
@@ -1141,7 +1185,19 @@
     "subscribe": "Abone Ol",
     "enterEmail": "E-posta adresinizi girin",
     "marketplace": "Pazar",
-    "description": "Tarodan, Türkiye''nin en büyük model araba koleksiyoncuları pazarıdır. Güvenle alın, satın ve takas yapın."
+    "description": "Tarodan, Türkiye''nin en büyük model araba koleksiyoncuları pazarıdır. Güvenle alın, satın ve takas yapın.",
+    "corporate": "Kurumsal",
+    "helpSupport": "Yardım & Destek",
+    "supportCenter": "Destek Merkezi",
+    "trustSafety": "Güven & Güvenlik",
+    "secureSwap": "Güvenli Takas",
+    "securityFeatures": "Güvenlik Özellikleri",
+    "sell": "Satış Yap",
+    "platformServiceFee": "Platform Hizmet Bedeli",
+    "cookieSettings": "Çerez Ayarları",
+    "appPromo": "Tarodan''ı cebinize taşıyın — mobil uygulamamızı indirin",
+    "downloadAppStore": "App Store''dan indirin",
+    "downloadGooglePlay": "Google Play''den indirin"
   },
   "home": {
     "hero": {
@@ -1201,7 +1257,9 @@
     "didYouMean": "Bunu mu demek istediniz?",
     "resultsFound": "sonuç bulundu",
     "filterResults": "Sonuçları Filtrele",
-    "searchPlaceholder": "Ürün, marka, kategori ara..."
+    "searchPlaceholder": "Ürün, marka, kategori ara...",
+    "popularSearches": "Popüler Aramalar",
+    "searchAction": "ile ara"
   },
   "error": {
     "pageNotFound": "Sayfa Bulunamadı",
@@ -1259,7 +1317,11 @@
       "hours": "{count} saat önce",
       "days": "{count} gün önce",
       "months": "{count} ay önce"
-    }
+    },
+    "now": "şimdi",
+    "minuteShort": "dk",
+    "hourShort": "sa",
+    "dayShort": "g"
   },
   "language": {
     "language": "Dil",
@@ -1863,5 +1925,26 @@
     "underAdminReview": "Admin İncelemesinde",
     "requestReceived": "Talep alındı",
     "whatsNext": "Sonraki Adım"
+  },
+  "report": {
+    "reportListing": "İlanı Raporla",
+    "reportUser": "Kullanıcıyı Raporla",
+    "reportCollection": "Koleksiyonu Raporla",
+    "reportMessage": "Mesajı Raporla",
+    "report": "Raporla",
+    "selectReason": "Lütfen bir neden seçin",
+    "submitFailed": "Rapor gönderilemedi",
+    "submitSuccess": "Rapor gönderildi. Ekibimiz inceleyecektir.",
+    "reporting": "Raporlanan:",
+    "detailsLabel": "Detaylar (isteğe bağlı, min 10 karakter)",
+    "detailsPlaceholder": "Daha fazla detay...",
+    "submit": "Raporu Gönder",
+    "reviewNotice": "Raporlar 24-48 saat içinde incelenir.",
+    "reasonSpam": "Spam / İstenmeyen İçerik",
+    "reasonInappropriate": "Uygunsuz İçerik",
+    "reasonHarassment": "Taciz / Kötüye Kullanım",
+    "reasonFakeProduct": "Sahte / Yanıltıcı Ürün",
+    "reasonScam": "Dolandırıcılık",
+    "reasonOther": "Diğer"
   }
 }

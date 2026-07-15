@@ -105,7 +105,8 @@
     "evidence": "Evidence",
     "sales": "Sales",
     "signingOut": "Signing out...",
-    "requestFailed": "Request failed"
+    "requestFailed": "Request failed",
+    "unknown": "Unknown"
   },
   "nav": {
     "home": "Home",
@@ -141,7 +142,10 @@
     "searchPlaceholderMobile": "Search model, brand...",
     "loginToCreateListing": "Login to Create Listing",
     "loginToCreateListingMsg": "You need to login to list your collection items for sale.",
-    "loginForTrades": "Login for Trade Operations"
+    "loginForTrades": "Login for Trade Operations",
+    "vehicleTypes": "Vehicle Types",
+    "manufacturers": "Manufacturers",
+    "allManufacturers": "All Manufacturers"
   },
   "auth": {
     "loginTitle": "Login",
@@ -475,7 +479,45 @@
     "failedToCreateListing": "Failed to create listing",
     "quantityDefaultHint": "Defaults to 1 if left empty",
     "available": "available",
-    "detailsSuffix": "details"
+    "detailsSuffix": "details",
+    "sponsored": "Sponsored",
+    "sponsoredRegion": "Sponsored",
+    "model": "Model",
+    "pricing": "Pricing",
+    "priceLabel": "Price (₺) *",
+    "stockQuantity": "Stock quantity",
+    "estimatedPerSale": "Estimated (per sale)",
+    "calculating": "Calculating...",
+    "platformDeduction": "Platform deduction",
+    "netToYou": "Net to you",
+    "productDetails": "Product Details",
+    "categoryRequired": "Category *",
+    "selectCategory": "Select category",
+    "conditionRequired": "Condition *",
+    "selectBrand": "Select brand",
+    "selectBrandFirst": "Select a brand first",
+    "noModelsForBrand": "No models for this brand",
+    "selectModel": "Select model",
+    "selectMaterial": "Select material",
+    "selectManufacturer": "Select manufacturer",
+    "releaseYear": "Release year",
+    "selectYear": "Select year",
+    "releaseYearHelper": "Model''s release year (optional)",
+    "tradeEnabled": "Trade enabled",
+    "upgradeArrow": "Upgrade →",
+    "preorder": "Preorder",
+    "preorderHelper": "Not in stock yet; ships once available",
+    "setBundle": "Set / Bundle",
+    "setBundleHelper": "Multiple models in one listing (e.g. 5-pack, garage set)",
+    "setPieceCount": "Number of pieces in set",
+    "setPiecePlaceholder": "e.g. 5",
+    "setSizeHelper": "Total number of pieces. Describe each piece''s brand/model/color in the description.",
+    "clickToUpload": "Click to upload images",
+    "uploaded": "uploaded",
+    "maxImagesReached": "Maximum number of images reached",
+    "uploadingImages": "Uploading images...",
+    "setMinPieces": "A set needs at least 2 pieces",
+    "addPhoto": "Please add at least one photo"
   },
   "cart": {
     "myCart": "My Cart",
@@ -1028,7 +1070,9 @@
     "allRead": "All notifications marked as read",
     "markRead": "Mark as read",
     "unreadCount": "{count} unread",
-    "markAllReadShort": "Mark all read"
+    "markAllReadShort": "Mark all read",
+    "newBadge": "new",
+    "viewAll": "View all notifications"
   },
   "profile": {
     "profile": "Profile",
@@ -1141,7 +1185,19 @@
     "subscribe": "Subscribe",
     "enterEmail": "Enter your email",
     "marketplace": "Marketplace",
-    "description": "Tarodan is Turkey''s largest model car marketplace. Buy, sell and trade diecast model cars."
+    "description": "Tarodan is Turkey''s largest model car marketplace. Buy, sell and trade diecast model cars.",
+    "corporate": "Corporate",
+    "helpSupport": "Help & Support",
+    "supportCenter": "Support Center",
+    "trustSafety": "Trust & Safety",
+    "secureSwap": "Secure Swap",
+    "securityFeatures": "Security Features",
+    "sell": "Sell",
+    "platformServiceFee": "Platform Service Fee",
+    "cookieSettings": "Cookie Settings",
+    "appPromo": "Take Tarodan with you — download our mobile app",
+    "downloadAppStore": "Download on the App Store",
+    "downloadGooglePlay": "Get it on Google Play"
   },
   "home": {
     "hero": {
@@ -1201,7 +1257,9 @@
     "didYouMean": "Did you mean?",
     "resultsFound": "results found",
     "filterResults": "Filter Results",
-    "searchPlaceholder": "Search products, brands, categories..."
+    "searchPlaceholder": "Search products, brands, categories...",
+    "popularSearches": "Popular Searches",
+    "searchAction": "search for"
   },
   "error": {
     "pageNotFound": "Page Not Found",
@@ -1259,7 +1317,11 @@
       "hours": "{count} hr ago",
       "days": "{count} day ago",
       "months": "{count} month ago"
-    }
+    },
+    "now": "now",
+    "minuteShort": "m",
+    "hourShort": "h",
+    "dayShort": "d"
   },
   "language": {
     "language": "Language",
@@ -1863,5 +1925,26 @@
     "underAdminReview": "Under admin review",
     "requestReceived": "Request received",
     "whatsNext": "What''s next?"
+  },
+  "report": {
+    "reportListing": "Report Listing",
+    "reportUser": "Report User",
+    "reportCollection": "Report Collection",
+    "reportMessage": "Report Message",
+    "report": "Report",
+    "selectReason": "Please select a reason",
+    "submitFailed": "Failed to submit report",
+    "submitSuccess": "Report submitted. Our team will review it.",
+    "reporting": "Reporting:",
+    "detailsLabel": "Details (optional, min 10 chars)",
+    "detailsPlaceholder": "More details...",
+    "submit": "Report",
+    "reviewNotice": "Reports are reviewed within 24-48 hours.",
+    "reasonSpam": "Spam",
+    "reasonInappropriate": "Inappropriate",
+    "reasonHarassment": "Harassment",
+    "reasonFakeProduct": "Fake Product",
+    "reasonScam": "Scam",
+    "reasonOther": "Other"
   }
 }

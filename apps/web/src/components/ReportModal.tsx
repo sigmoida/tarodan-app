@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { z } from "zod";
 import toast from "react-hot-toast";
+import { useTranslations } from "next-intl";
 import { Button, Modal, Radio } from "@tarodan/ui";
 import { Form, FormTextarea, useZodForm } from "@tarodan/ui/form";
 import { api } from "@/lib/api";
@@ -28,27 +29,14 @@ interface ReportModalProps {
 
 const REPORT_REASONS: {
   value: ReportReason;
-  labelTr: string;
-  labelEn: string;
+  labelKey: string;
 }[] = [
-  { value: "spam", labelTr: "Spam / İstenmeyen İçerik", labelEn: "Spam" },
-  {
-    value: "inappropriate_content",
-    labelTr: "Uygunsuz İçerik",
-    labelEn: "Inappropriate",
-  },
-  {
-    value: "harassment",
-    labelTr: "Taciz / Kötüye Kullanım",
-    labelEn: "Harassment",
-  },
-  {
-    value: "fake_product",
-    labelTr: "Sahte / Yanıltıcı Ürün",
-    labelEn: "Fake Product",
-  },
-  { value: "scam", labelTr: "Dolandırıcılık", labelEn: "Scam" },
-  { value: "other", labelTr: "Diğer", labelEn: "Other" },
+  { value: "spam", labelKey: "report.reasonSpam" },
+  { value: "inappropriate_content", labelKey: "report.reasonInappropriate" },
+  { value: "harassment", labelKey: "report.reasonHarassment" },
+  { value: "fake_product", labelKey: "report.reasonFakeProduct" },
+  { value: "scam", labelKey: "report.reasonScam" },
+  { value: "other", labelKey: "report.reasonOther" },
 ];
 
 const REASON_VALUES = REPORT_REASONS.map((r) => r.value) as [
@@ -62,21 +50,20 @@ export default function ReportModal({
   entityType,
   entityId,
   entityName,
-  locale = "tr",
 }: ReportModalProps) {
-  const en = locale === "en";
+  const t = useTranslations();
 
   const schema = useMemo(
     () =>
       z.object({
         reason: z.enum(REASON_VALUES, {
           errorMap: () => ({
-            message: en ? "Please select a reason" : "Lütfen bir neden seçin",
+            message: t("report.selectReason"),
           }),
         }),
         description: z.string().trim().max(500).optional().or(z.literal("")),
       }),
-    [en],
+    [t],
   );
   type ReportValues = z.infer<typeof schema>;
 
@@ -87,15 +74,15 @@ export default function ReportModal({
   const title = (() => {
     switch (entityType) {
       case "product":
-        return en ? "Report Listing" : "İlanı Raporla";
+        return t("report.reportListing");
       case "user":
-        return en ? "Report User" : "Kullanıcıyı Raporla";
+        return t("report.reportUser");
       case "collection":
-        return en ? "Report Collection" : "Koleksiyonu Raporla";
+        return t("report.reportCollection");
       case "message":
-        return en ? "Report Message" : "Mesajı Raporla";
+        return t("report.reportMessage");
       default:
-        return en ? "Report" : "Raporla";
+        return t("report.report");
     }
   })();
 
@@ -113,11 +100,7 @@ export default function ReportModal({
 
     try {
       await api.post("/user-reports", payload);
-      toast.success(
-        en
-          ? "Report submitted. Our team will review it."
-          : "Rapor gönderildi. Ekibimiz inceleyecektir.",
-      );
+      toast.success(t("report.submitSuccess"));
       form.reset({ description: "" });
       onClose();
     } catch (error: any) {
@@ -125,9 +108,7 @@ export default function ReportModal({
         console.error("Report submission failed:", error);
       const errorMsg = error.response?.data?.message;
       const displayMsg = Array.isArray(errorMsg) ? errorMsg[0] : errorMsg;
-      toast.error(
-        displayMsg || (en ? "Failed to submit report" : "Rapor gönderilemedi"),
-      );
+      toast.error(displayMsg || t("report.submitFailed"));
     }
   };
 
@@ -136,9 +117,7 @@ export default function ReportModal({
       <Form form={form} onSubmit={onSubmit} className="space-y-4">
         {entityName && (
           <div className="rounded-lg bg-surface p-2">
-            <p className="text-xs text-muted">
-              {en ? "Reporting:" : "Raporlanan:"}
-            </p>
+            <p className="text-xs text-muted">{t("report.reporting")}</p>
             <p className="truncate text-sm font-medium text-heading">
               {entityName}
             </p>
@@ -147,7 +126,7 @@ export default function ReportModal({
 
         <div>
           <label className="mb-2 block text-sm font-medium text-body">
-            {en ? "Reason" : "Neden"} <span className="text-danger-500">*</span>
+            {t("common.reason")} <span className="text-danger-500">*</span>
           </label>
           <div className="space-y-1.5">
             {REPORT_REASONS.map((r) => (
@@ -168,7 +147,7 @@ export default function ReportModal({
                   }
                 />
                 <span className="ml-2 text-body">
-                  {en ? r.labelEn : r.labelTr}
+                  {t(r.labelKey as Parameters<typeof t>[0])}
                 </span>
               </label>
             ))}
@@ -183,12 +162,8 @@ export default function ReportModal({
         <div>
           <FormTextarea
             name="description"
-            label={
-              en
-                ? "Details (optional, min 10 chars)"
-                : "Detaylar (isteğe bağlı, min 10 karakter)"
-            }
-            placeholder={en ? "More details..." : "Daha fazla detay..."}
+            label={t("report.detailsLabel")}
+            placeholder={t("report.detailsPlaceholder")}
             rows={2}
             maxLength={500}
           />
@@ -205,7 +180,7 @@ export default function ReportModal({
             className="flex-1"
             onClick={onClose}
           >
-            {en ? "Cancel" : "İptal"}
+            {t("common.cancel")}
           </Button>
           <Button
             type="submit"
@@ -214,14 +189,12 @@ export default function ReportModal({
             className="flex-1"
             isLoading={form.formState.isSubmitting}
           >
-            {en ? "Report" : "Raporu Gönder"}
+            {t("report.submit")}
           </Button>
         </div>
 
         <p className="text-center text-xs text-subtle">
-          {en
-            ? "Reports are reviewed within 24-48 hours."
-            : "Raporlar 24-48 saat içinde incelenir."}
+          {t("report.reviewNotice")}
         </p>
       </Form>
     </Modal>
