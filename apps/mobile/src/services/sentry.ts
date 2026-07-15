@@ -74,6 +74,21 @@ export function setUser(user: SentryUser | null): void {
 }
 
 /**
+ * Gerçek bir Sentry breadcrumb ekler (Sentry.addBreadcrumb) — captureMessage'ın
+ * aksine tam bir event GÖNDERMEZ, sadece bir sonraki hataya iliştirilecek iz
+ * bırakır. debug/info/warn log seviyeleri buraya akmalı, captureMessage'a değil.
+ */
+export function addBreadcrumb(breadcrumb: {
+  category?: string;
+  message: string;
+  level?: SeverityLevel;
+  data?: Record<string, unknown>;
+}): void {
+  if (!enabled) return;
+  Sentry.addBreadcrumb(breadcrumb);
+}
+
+/**
  * Performans iz kaydı: bir async işlemi sar, ne kadar sürdüğü Sentry'ye
  * raporlanır. Guard kapalıyken sadece fn'i çalıştırır.
  */

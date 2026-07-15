@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import { authApi, userApi } from '@/lib/api';
-import { setUser as setSentryUser, captureException } from '../services/sentry';
+import { logger } from '../services/logger';
 
 // Membership tier types
 export type MembershipTier = 'free' | 'basic' | 'premium' | 'business';
@@ -321,7 +321,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     console.log('🔐 Auth stored - Tier:', mappedUser.membershipTier);
     set({ isAuthenticated: true, token, user: mappedUser, limits });
     // Tag every subsequent Sentry event with the active user.
-    setSentryUser({
+    logger.setUser({
       id: mappedUser.id,
       email: mappedUser.email,
       username: mappedUser.displayName,
@@ -344,7 +344,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (error) {
       // Best-effort: report logout failures so we don't lose them silently
       // (no-op in dev/Expo Go).
-      captureException(error, { level: 'warning', tags: { flow: 'logout' } });
+      logger.captureException(error, { level: 'warning', tags: { flow: 'logout' } });
     }
     await SecureStore.deleteItemAsync('accessToken');
     await SecureStore.deleteItemAsync('refreshToken');
@@ -353,7 +353,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // Lazy require: messagesStore → authStore import zinciriyle döngü oluşmasın.
     const { resetUserStores } = require('./resetUserStores');
     resetUserStores();
-    setSentryUser(null);
+    logger.setUser(null);
   },
 
   loadToken: async () => {
@@ -405,7 +405,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             set({ isLoading: false });
           }
         } catch (autoLoginError) {
-          captureException(autoLoginError, {
+          logger.captureException(autoLoginError, {
             level: 'warning',
             tags: { flow: 'auth.maestroAutoLogin' },
           });
@@ -423,7 +423,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (error) {
       // Token invalid or expired — usually 401 (expected). Report only once,
       // tagged so dashboards can filter expected vs unexpected.
-      captureException(error, { level: 'warning', tags: { flow: 'auth.loadToken' } });
+      logger.captureException(error, { level: 'warning', tags: { flow: 'auth.loadToken' } });
       await SecureStore.deleteItemAsync('accessToken');
       await SecureStore.deleteItemAsync('refreshToken');
       set({ isAuthenticated: false, token: null, user: null, limits: null, isLoading: false });
@@ -448,7 +448,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ user: mappedUser, limits });
     } catch (error) {
       console.error('Failed to refresh user data:', error);
-      captureException(error, { level: 'warning', tags: { flow: 'auth.refreshUserData' } });
+      logger.captureException(error, { level: 'warning', tags: { flow: 'auth.refreshUserData' } });
     }
   },
 
