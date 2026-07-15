@@ -1,6 +1,6 @@
 'use client';
 
-import * as Sentry from '@sentry/nextjs';
+import { logger } from '@/lib/logger';
 
 /**
  * Wraps a dynamic import to log chunk load failures to Sentry and (in dev) console.
@@ -26,10 +26,7 @@ export function withChunkErrorLogging<P = Record<string, unknown>>(
         console.error(`Chunk failed for: ${componentName}`, err);
         console.groupEnd();
       }
-      Sentry.captureException(err, {
-        tags: { component: 'LazyLoad', componentName },
-        extra: { componentName },
-      });
+      logger.captureException(err, { component: 'LazyLoad', componentName });
       throw err;
     });
 }

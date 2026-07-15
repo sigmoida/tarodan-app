@@ -664,6 +664,9 @@ importers:
       '@tarodan/i18n':
         specifier: workspace:^
         version: link:../../packages/i18n
+      '@tarodan/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
       '@tarodan/types':
         specifier: workspace:*
         version: link:../../packages/types
