@@ -15,10 +15,10 @@ jest.mock('expo-router', () => ({
 import { router } from 'expo-router';
 const mockPush = router.push as jest.Mock;
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   supportApi: { guestContact: jest.fn() },
 }));
-import { supportApi } from '@/services/api';
+import { supportApi } from '@/lib/api';
 
 jest.mock('@/i18n', () => ({
   useTranslation: () => ({ t: (k: string) => k }),

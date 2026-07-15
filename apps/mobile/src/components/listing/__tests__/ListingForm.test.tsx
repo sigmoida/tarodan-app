@@ -27,7 +27,7 @@ jest.mock('expo-image-picker', () => ({
 }));
 
 const mockGet = jest.fn();
-jest.mock('../../../services/api', () => ({
+jest.mock('@/lib/api', () => ({
   api: { get: (...a: any[]) => mockGet(...a), post: jest.fn(), patch: jest.fn() },
   productsApi: {
     create: jest.fn(async () => ({ data: {} })),
@@ -44,7 +44,7 @@ jest.mock('../../../services/api', () => ({
     })),
   },
 }));
-import { api, productsApi } from '../../../services/api';
+import { api, productsApi } from '@/lib/api';
 
 jest.mock('../../../stores/authStore', () => ({
   useAuthStore: () => ({

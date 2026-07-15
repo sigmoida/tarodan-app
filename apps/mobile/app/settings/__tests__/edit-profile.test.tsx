@@ -21,11 +21,11 @@ jest.mock('@/i18n', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   userApi: { updateProfile: jest.fn() },
   mediaApi: { uploadAvatar: jest.fn() },
 }));
-import { userApi } from '@/services/api';
+import { userApi } from '@/lib/api';
 const updateProfile = userApi.updateProfile as jest.Mock;
 
 import EditProfileScreen from '../edit-profile';

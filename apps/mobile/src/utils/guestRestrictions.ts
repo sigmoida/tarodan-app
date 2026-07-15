@@ -1,6 +1,9 @@
 import { router } from 'expo-router';
 
-export type GuestAction = 
+// #82: bekleyen guest-yönlendirme timer'ı (modül-seviyesi — birikmeyi önler).
+let pendingRedirect: ReturnType<typeof setTimeout> | null = null;
+
+export type GuestAction =
   | 'favorites'
   | 'message'
   | 'trade'
@@ -82,13 +85,24 @@ export function handleGuestAction(
 
   const config = getRestrictionMessage(action);
   onShowSnackbar(config.message);
-  
-  // Delay redirect to show snackbar
-  setTimeout(() => {
+
+  // #82: modül-seviyesi timer — art arda çağrılarda birikmesin; önceki bekleyen
+  // yönlendirmeyi iptal et. Çağıran ekran unmount olursa cancelPendingGuestRedirect().
+  if (pendingRedirect) clearTimeout(pendingRedirect);
+  pendingRedirect = setTimeout(() => {
+    pendingRedirect = null;
     router.push(config.redirectTo);
   }, 1500);
-  
+
   return false;
+}
+
+/** Bekleyen guest yönlendirmesini iptal et (çağıran ekran unmount olduğunda). */
+export function cancelPendingGuestRedirect(): void {
+  if (pendingRedirect) {
+    clearTimeout(pendingRedirect);
+    pendingRedirect = null;
+  }
 }
 
 export function checkGuestAccess(

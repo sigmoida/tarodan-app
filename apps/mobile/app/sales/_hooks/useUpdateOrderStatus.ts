@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { appAlert } from "@tarodan/ui-native";
-import { ordersApi, shippingApi } from "@/services/api";
+import { ordersApi, shippingApi } from '@/lib/api';
 
 interface UpdateOrderStatusVars {
   orderId: string;

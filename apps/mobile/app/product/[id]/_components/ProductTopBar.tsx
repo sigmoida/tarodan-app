@@ -66,8 +66,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: 50,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingHorizontal: theme.spacing[4],
+    paddingBottom: theme.spacing[3],
   },
   headerButton: {
     width: 40,
@@ -77,5 +77,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerActions: { flexDirection: 'row', gap: 12 },
+  headerActions: { flexDirection: 'row', gap: theme.spacing[3] },
 });

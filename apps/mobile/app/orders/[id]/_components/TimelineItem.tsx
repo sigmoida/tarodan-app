@@ -41,14 +41,14 @@ export function TimelineItem({
 const styles = StyleSheet.create({
   timelineItem: { flexDirection: 'row' },
   timelineIcon: { alignItems: 'center', width: 32 },
-  iconCircle: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  iconCircle: { width: 32, height: 32, borderRadius: theme.radius['3xl'], justifyContent: 'center', alignItems: 'center' },
   iconCircleActive: { backgroundColor: colors.primary[600]! },
   iconCircleInactive: { backgroundColor: colors.surface.alt },
-  timelineLine: { width: 2, height: 32, marginVertical: 4 },
+  timelineLine: { width: 2, height: 32, marginVertical: theme.spacing[1] },
   timelineLineActive: { backgroundColor: colors.primary[600]! },
   timelineLineInactive: { backgroundColor: colors.surface.alt },
-  timelineContent: { flex: 1, marginLeft: 12, paddingBottom: 24 },
+  timelineContent: { flex: 1, marginLeft: theme.spacing[3], paddingBottom: theme.spacing[6] },
   activeLabel: { color: colors.text.heading, fontWeight: '500' },
   inactiveLabel: { color: colors.text.subtle },
-  timelineDate: { color: colors.text.muted, marginTop: 2 },
+  timelineDate: { color: colors.text.muted, marginTop: theme.spacing[0.5] },
 });

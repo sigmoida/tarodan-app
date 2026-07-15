@@ -21,7 +21,7 @@ jest.mock('expo-router', () => ({
   },
 }));
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   notificationsApi: {
     getAll: jest.fn(),
     getUnreadCount: jest.fn(),
@@ -29,7 +29,7 @@ jest.mock('@/services/api', () => ({
     markAllAsRead: jest.fn(),
   },
 }));
-import { notificationsApi } from '@/services/api';
+import { notificationsApi } from '@/lib/api';
 
 let mockAuthed = true;
 jest.mock('@/stores/authStore', () => ({

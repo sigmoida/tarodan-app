@@ -15,10 +15,10 @@ jest.mock('expo-router', () => ({
   Stack: { Screen: () => null },
 }));
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   api: { get: jest.fn(), patch: jest.fn(), delete: jest.fn() },
 }));
-import { api } from '@/services/api';
+import { api } from '@/lib/api';
 
 let mockAuth: Record<string, unknown> = { user: { id: 'owner-1' } };
 jest.mock('@/stores/authStore', () => ({

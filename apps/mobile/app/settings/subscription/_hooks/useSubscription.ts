@@ -3,7 +3,7 @@ import { useFocusEffect } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { appAlert } from '@tarodan/ui-native';
 import { useAuthStore } from '@/stores/authStore';
-import { membershipApi, paymentsApi } from '@/services/api';
+import { membershipApi, paymentsApi } from '@/lib/api';
 import { qk } from '@/lib/query';
 import { useTranslation } from '@/i18n';
 import {

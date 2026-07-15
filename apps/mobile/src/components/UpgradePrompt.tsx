@@ -144,7 +144,7 @@ export default function UpgradePrompt({
 
 const styles = StyleSheet.create({
   card: {
-    margin: 16,
+    margin: theme.spacing[4],
     backgroundColor: colors.surface.DEFAULT,
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   iconCircle: {
     width: 64,
@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
   },
   title: {
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
     color: colors.text.heading,
     fontSize: 16,
     fontWeight: '600',
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
   message: {
     textAlign: 'center',
     color: colors.text.muted,
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     fontSize: 14,
   },
   benefitContainer: {
@@ -184,30 +184,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.primary[50]!,
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
+    padding: theme.spacing[3],
+    borderRadius: theme.radius.xl,
+    marginBottom: theme.spacing[4],
   },
   benefitText: {
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
     color: colors.primary[600]!,
     fontWeight: '600',
   },
   features: {
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   featuresTitle: {
     color: colors.text.muted,
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
     fontSize: 12,
   },
   featureRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 4,
+    marginVertical: theme.spacing[1],
   },
   featureText: {
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
     color: colors.text.heading,
     fontSize: 13,
   },
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
   },
   priceNote: {
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: theme.spacing[2],
     color: colors.success[600]!,
     fontSize: 12,
     fontWeight: '500',
@@ -225,10 +225,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.primary[50]!,
-    padding: 12,
-    borderRadius: 8,
-    margin: 16,
-    gap: 8,
+    padding: theme.spacing[3],
+    borderRadius: theme.radius.xl,
+    margin: theme.spacing[4],
+    gap: theme.spacing[2],
   },
   compactText: {
     flex: 1,

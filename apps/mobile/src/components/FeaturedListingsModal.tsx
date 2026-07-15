@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, ScrollView, StyleSheet, Image, Pressable } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { api } from '../services/api';
+import { api } from '@/lib/api';
 import { theme, Text, Button, Card, Chip, IconButton, Snackbar, Spinner, Divider, Modal, useModalMessage, ModalMessage } from '@tarodan/ui-native';
 import { resolveImageUrl } from '../utils/imageUrl';
 
@@ -181,7 +181,7 @@ export const FeaturedListingsModal: React.FC<FeaturedListingsModalProps> = ({
         {pendingRemove && (
           <View style={styles.confirmBox}>
             <Text>{`"${pendingRemove.title}" öne çıkarmasını kaldırmak istiyor musunuz?`}</Text>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flexDirection: 'row', gap: theme.spacing[2] }}>
               <Button
                 variant="danger"
                 title="Kaldır"
@@ -200,7 +200,7 @@ export const FeaturedListingsModal: React.FC<FeaturedListingsModalProps> = ({
         </Text>
 
         {loadingFeatured ? (
-          <View style={{ marginVertical: 20 }}>
+          <View style={{ marginVertical: theme.spacing[5] }}>
             <Spinner size="lg" />
           </View>
         ) : featuredSlots?.length === 0 ? (
@@ -227,7 +227,7 @@ export const FeaturedListingsModal: React.FC<FeaturedListingsModalProps> = ({
                   <Text style={styles.productPrice}>
                     ₺{(slot.product?.price ?? 0).toLocaleString('tr-TR')}
                   </Text>
-                  <View style={{ alignSelf: 'flex-start', marginTop: 4 }}>
+                  <View style={{ alignSelf: 'flex-start', marginTop: theme.spacing[1] }}>
                     <Chip label={formatRemainingTime(slot.expiresAt)} variant="warning" size="sm" />
                   </View>
                 </View>
@@ -253,7 +253,7 @@ export const FeaturedListingsModal: React.FC<FeaturedListingsModalProps> = ({
             </Text>
 
             {loadingProducts ? (
-              <View style={{ marginVertical: 20 }}>
+              <View style={{ marginVertical: theme.spacing[5] }}>
                 <Spinner size="lg" />
               </View>
             ) : eligibleProducts?.length === 0 ? (
@@ -362,16 +362,16 @@ export const FeaturedListingsModal: React.FC<FeaturedListingsModalProps> = ({
 const styles = StyleSheet.create({
   headerIcon: {
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   slotsOverview: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing[3],
     backgroundColor: colors.primary[50]!,
-    marginVertical: 8,
+    marginVertical: theme.spacing[2],
     borderRadius: 12,
   },
   slotsInfo: {},
@@ -382,12 +382,12 @@ const styles = StyleSheet.create({
   },
   slotsIndicator: {
     flexDirection: 'row',
-    gap: 8,
+    gap: theme.spacing[2],
   },
   slotDot: {
     width: 20,
     height: 20,
-    borderRadius: 10,
+    borderRadius: theme.radius['2xl'],
     borderWidth: 2,
     borderColor: colors.primary[200]!,
     backgroundColor: 'transparent',
@@ -400,33 +400,33 @@ const styles = StyleSheet.create({
     maxHeight: 500,
   },
   confirmBox: {
-    gap: 8,
-    padding: 12,
+    gap: theme.spacing[2],
+    padding: theme.spacing[3],
     borderRadius: 12,
     backgroundColor: colors.danger[50]!,
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
   },
   sectionTitle: {
-    marginTop: 8,
-    marginBottom: 12,
+    marginTop: theme.spacing[2],
+    marginBottom: theme.spacing[3],
     color: colors.text.heading,
     fontSize: 14,
     fontWeight: '600',
   },
   emptyCard: {
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
     backgroundColor: colors.surface.alt,
   },
   emptyContent: {
     alignItems: 'center',
-    paddingVertical: 24,
+    paddingVertical: theme.spacing[6],
   },
   emptyText: {
-    marginTop: 8,
+    marginTop: theme.spacing[2],
     color: colors.text.muted,
   },
   featuredCard: {
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
     backgroundColor: colors.primary[50]!,
     borderWidth: 1,
     borderColor: colors.primary[200]!,
@@ -438,12 +438,12 @@ const styles = StyleSheet.create({
   productImage: {
     width: 60,
     height: 60,
-    borderRadius: 8,
+    borderRadius: theme.radius.xl,
     backgroundColor: colors.border.DEFAULT,
   },
   productInfo: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
   },
   productTitle: {
     color: colors.text.heading,
@@ -451,13 +451,13 @@ const styles = StyleSheet.create({
   productPrice: {
     color: colors.primary[700]!,
     fontWeight: '600',
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   divider: {
-    marginVertical: 16,
+    marginVertical: theme.spacing[4],
   },
   selectableCard: {
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
     borderWidth: 2,
     borderColor: 'transparent',
   },
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border.DEFAULT,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
+    marginRight: theme.spacing[2],
   },
   radioCircleSelected: {
     backgroundColor: colors.primary[600]!,
@@ -486,38 +486,38 @@ const styles = StyleSheet.create({
   selectableImage: {
     width: 50,
     height: 50,
-    borderRadius: 6,
+    borderRadius: theme.radius.lg,
     backgroundColor: colors.border.DEFAULT,
   },
   selectableInfo: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
   },
   addButton: {
-    marginTop: 12,
+    marginTop: theme.spacing[3],
   },
   fullCard: {
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
     backgroundColor: colors.success[50]!,
     borderWidth: 1,
     borderColor: colors.success[200]!,
   },
   fullContent: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: theme.spacing[5],
   },
   fullText: {
-    marginTop: 8,
+    marginTop: theme.spacing[2],
     color: colors.success[600]!,
     fontWeight: '600',
   },
   fullHint: {
-    marginTop: 4,
+    marginTop: theme.spacing[1],
     color: colors.text.muted,
     textAlign: 'center',
   },
   infoCard: {
-    marginTop: 16,
+    marginTop: theme.spacing[4],
     backgroundColor: colors.info[50]!,
     borderWidth: 1,
     borderColor: colors.info[200]!,
@@ -525,15 +525,15 @@ const styles = StyleSheet.create({
   infoHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   infoTitle: {
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
     color: colors.info[600]!,
     fontWeight: '600',
   },
   infoBullets: {
-    gap: 4,
+    gap: theme.spacing[1],
   },
   infoBullet: {
     fontSize: 12,

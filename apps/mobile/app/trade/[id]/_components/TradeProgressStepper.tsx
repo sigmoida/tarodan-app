@@ -85,5 +85,5 @@ const styles = StyleSheet.create({
   stepActive: { backgroundColor: colors.primary[600]!, borderWidth: 3, borderColor: colors.primary[100]! },
   stepFuture: { backgroundColor: colors.surface.alt, borderWidth: 1, borderColor: colors.border.DEFAULT },
   stepNum: { fontSize: 12, fontWeight: '600' },
-  stepLabel: { fontSize: 10, textAlign: 'center', marginTop: 6, lineHeight: 13 },
+  stepLabel: { fontSize: 10, textAlign: 'center', marginTop: theme.spacing[1.5], lineHeight: 13 },
 });

@@ -5,7 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
-import { paymentsApi } from '@/services/api';
+import { paymentsApi } from '@/lib/api';
 
 const { colors } = theme;
 
@@ -142,45 +142,45 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: theme.spacing[8],
   },
   iconContainer: {
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     color: colors.text.heading,
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
   },
   description: {
     fontSize: 15,
     color: colors.text.muted,
     textAlign: 'center',
     lineHeight: 22,
-    marginBottom: 32,
+    marginBottom: theme.spacing[8],
   },
   features: {
     width: '100%',
     backgroundColor: colors.surface.alt,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 32,
+    borderRadius: theme.radius['3xl'],
+    padding: theme.spacing[5],
+    marginBottom: theme.spacing[8],
   },
   featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   featureText: {
-    marginLeft: 16,
+    marginLeft: theme.spacing[4],
     fontSize: 15,
     color: colors.text.heading,
     fontWeight: '500',
   },
   buttons: {
     width: '100%',
-    gap: 12,
+    gap: theme.spacing[3],
   },
   primaryButton: {
     borderRadius: 12,

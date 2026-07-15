@@ -3,7 +3,7 @@ import { View, ScrollView, StyleSheet, TouchableOpacity, Linking } from 'react-n
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme, Button, Card, Snackbar, Text, Input, Textarea, ScreenHeader } from '@tarodan/ui-native';
-import { supportApi } from '@/services/api';
+import { supportApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
 import { SUPPORT_EMAIL, SUPPORT_PHONE, SUPPORT_WHATSAPP } from '@/constants/legalFacts';
 
@@ -190,24 +190,24 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: theme.spacing[4],
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
     color: colors.text.heading,
-    marginBottom: 12,
-    marginTop: 8,
+    marginBottom: theme.spacing[3],
+    marginTop: theme.spacing[2],
   },
   contactMethods: {
     backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
   },
   contactMethod: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    padding: theme.spacing[4],
     borderBottomWidth: 1,
     borderBottomColor: colors.border.DEFAULT,
   },
@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
   },
   contactMethodContent: {
     flex: 1,
-    marginLeft: 16,
+    marginLeft: theme.spacing[4],
   },
   contactMethodTitle: {
     fontSize: 14,
@@ -231,28 +231,28 @@ const styles = StyleSheet.create({
   contactMethodValue: {
     fontSize: 13,
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   formCard: {
     backgroundColor: colors.surface.DEFAULT,
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
   },
   input: {
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
     backgroundColor: colors.surface.DEFAULT,
   },
   submitButton: {
     borderRadius: 12,
-    marginTop: 8,
+    marginTop: theme.spacing[2],
   },
   hoursCard: {
     backgroundColor: colors.surface.DEFAULT,
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
   },
   hoursRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
   },
   hoursDay: {
     fontSize: 14,
@@ -272,12 +272,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface.DEFAULT,
-    padding: 16,
+    padding: theme.spacing[4],
     borderRadius: 12,
   },
   faqLinkText: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
     fontSize: 15,
     color: colors.primary[600]!,
     fontWeight: '500',

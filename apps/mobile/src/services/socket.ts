@@ -1,6 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import type { ServerToClientEvents, ClientToServerEvents } from '@tarodan/types';
-import { getApiBaseUrl } from './api';
+import { getApiBaseUrl } from '@/lib/api';
 
 export function socketRootUrl(apiUrl: string): string {
   return apiUrl.replace(/\/api\/?$/, '');

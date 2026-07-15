@@ -43,7 +43,7 @@ export default function LoginScreen() {
 
         <LoginCard f={f} />
 
-        <VStack gap={2} style={{ marginTop: 4 }}>
+        <VStack gap={2} style={{ marginTop: theme.spacing[1] }}>
           <HStack justify="center" wrap gap={2}>
             <Text variant="body" style={styles.footerText}>Hesabınız yok mu?</Text>
             <Text

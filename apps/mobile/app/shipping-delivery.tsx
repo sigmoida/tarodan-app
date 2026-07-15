@@ -67,8 +67,8 @@ export default function ShippingDeliveryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surface.alt },
-  content: { flex: 1, padding: 16 },
-  iconRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 12 },
+  content: { flex: 1, padding: theme.spacing[4] },
+  iconRow: { flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing[5], gap: theme.spacing[3] },
   iconCircle: {
     width: 56,
     height: 56,
@@ -78,17 +78,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pageTitle: { fontSize: 20, fontWeight: 'bold', color: colors.text.heading },
-  pageSubtitle: { fontSize: 14, color: colors.text.subtle, marginTop: 2 },
-  card: { backgroundColor: colors.surface.DEFAULT, marginBottom: 12, borderRadius: 12 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', color: colors.text.heading, marginBottom: 8 },
+  pageSubtitle: { fontSize: 14, color: colors.text.subtle, marginTop: theme.spacing[0.5] },
+  card: { backgroundColor: colors.surface.DEFAULT, marginBottom: theme.spacing[3], borderRadius: 12 },
+  sectionTitle: { fontSize: 16, fontWeight: '600', color: colors.text.heading, marginBottom: theme.spacing[2] },
   sectionContent: { fontSize: 14, color: colors.text.muted, lineHeight: 22 },
   trackLink: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface.DEFAULT,
-    padding: 16,
+    padding: theme.spacing[4],
     borderRadius: 12,
-    marginTop: 8,
+    marginTop: theme.spacing[2],
   },
-  trackLinkText: { flex: 1, marginLeft: 12, fontSize: 15, color: colors.primary[600]!, fontWeight: '500' },
+  trackLinkText: { flex: 1, marginLeft: theme.spacing[3], fontSize: 15, color: colors.primary[600]!, fontWeight: '500' },
 });

@@ -3,7 +3,7 @@ import { View, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-nativ
 
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { brandsApi } from '@/services/api';
+import { brandsApi } from '@/lib/api';
 import { theme, Text, Input } from '@tarodan/ui-native';
 import { ScreenHeader, ScreenLoader, ErrorState, EmptyState } from '@/components/common';
 import { resolveImageUrl } from '@/utils/imageUrl';
@@ -106,22 +106,22 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface.alt,
   },
   searchBar: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 4,
+    marginHorizontal: theme.spacing[4],
+    marginTop: theme.spacing[3],
+    marginBottom: theme.spacing[1],
   },
   list: {
-    padding: 16,
+    padding: theme.spacing[4],
   },
   row: {
-    gap: 12,
-    marginBottom: 12,
+    gap: theme.spacing[3],
+    marginBottom: theme.spacing[3],
   },
   card: {
     flex: 1,
     backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
-    padding: 12,
+    padding: theme.spacing[3],
     alignItems: 'center',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border.DEFAULT,
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface.alt,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   logo: {
     width: 48,
@@ -153,6 +153,6 @@ const styles = StyleSheet.create({
   count: {
     fontSize: 11,
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
 });

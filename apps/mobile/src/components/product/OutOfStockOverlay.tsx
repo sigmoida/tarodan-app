@@ -33,9 +33,9 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.5,
-    paddingHorizontal: 10,
+    paddingHorizontal: theme.spacing[2.5],
     paddingVertical: 5,
-    borderRadius: 6,
+    borderRadius: theme.radius.lg,
     overflow: 'hidden',
   },
 });

@@ -44,7 +44,7 @@ export function TradeStatusHeader({ trade, t, now }: { trade: Trade; t: TFn; now
           <View style={styles.descCard}>
             <Text variant="bodySm" tone="body">{statusDescription}</Text>
             {trade.cancelReason && (trade.status === 'cancelled' || trade.status === 'rejected') ? (
-              <Text variant="caption" tone="muted" style={{ marginTop: 4 }}>
+              <Text variant="caption" tone="muted" style={{ marginTop: theme.spacing[1] }}>
                 Sebep: {trade.cancelReason}
               </Text>
             ) : null}
@@ -79,7 +79,7 @@ export function TradeStatusHeader({ trade, t, now }: { trade: Trade; t: TFn; now
             <Ionicons name="checkmark-done-circle" size={28} color={colors.success[600]!} />
             <Text variant="h3" style={{ color: colors.success[700]!, flex: 1 }}>Takas Tamamlandı</Text>
           </View>
-          <Text variant="caption" tone="muted" style={{ marginBottom: 12 }}>
+          <Text variant="caption" tone="muted" style={{ marginBottom: theme.spacing[3] }}>
             Takas başarıyla tamamlandı. İyi günlerde kullanın!
           </Text>
           <View style={styles.summaryDateRow}>
@@ -114,7 +114,7 @@ export function TradeStatusHeader({ trade, t, now }: { trade: Trade; t: TFn; now
             </View>
             <View style={{ flex: 1 }}>
               <Text variant="label" style={{ color: colors.info[700]! }}>Ürünleriniz Tarodan Deposunda</Text>
-              <Text variant="caption" tone="muted" style={{ marginTop: 2 }}>
+              <Text variant="caption" tone="muted" style={{ marginTop: theme.spacing[0.5] }}>
                 Ekibimiz ürünleri inceliyor. İnceleme tamamlandığında bilgilendirileceksiniz.
               </Text>
             </View>
@@ -131,9 +131,9 @@ export function TradeStatusHeader({ trade, t, now }: { trade: Trade; t: TFn; now
             </View>
             <View style={{ flex: 1 }}>
               <Text variant="label" style={{ color: colors.warning[800]! }}>Takas Reddedildi</Text>
-              <Text variant="caption" tone="muted" style={{ marginTop: 2 }}>Ürünleriniz size iade ediliyor.</Text>
+              <Text variant="caption" tone="muted" style={{ marginTop: theme.spacing[0.5] }}>Ürünleriniz size iade ediliyor.</Text>
               {trade.cancelReason ? (
-                <Text variant="caption" tone="muted" style={{ marginTop: 4 }}>Sebep: {trade.cancelReason}</Text>
+                <Text variant="caption" tone="muted" style={{ marginTop: theme.spacing[1] }}>Sebep: {trade.cancelReason}</Text>
               ) : null}
             </View>
           </View>
@@ -147,19 +147,19 @@ const styles = StyleSheet.create({
   statusBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    marginHorizontal: 16,
-    marginTop: 16,
+    padding: theme.spacing[4],
+    marginHorizontal: theme.spacing[4],
+    marginTop: theme.spacing[4],
     borderRadius: 12,
-    gap: 8,
+    gap: theme.spacing[2],
   },
   statusText: { fontSize: 16, fontWeight: '600', flex: 1 },
-  card: { margin: 16, marginTop: 0, backgroundColor: colors.surface.DEFAULT },
+  card: { margin: theme.spacing[4], marginTop: theme.spacing[0], backgroundColor: colors.surface.DEFAULT },
   descCard: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    padding: 12,
-    borderRadius: 10,
+    marginHorizontal: theme.spacing[4],
+    marginTop: theme.spacing[3],
+    padding: theme.spacing[3],
+    borderRadius: theme.radius['2xl'],
     backgroundColor: colors.surface.DEFAULT,
     borderWidth: 1,
     borderColor: colors.border.subtle,
@@ -167,30 +167,30 @@ const styles = StyleSheet.create({
   countdownCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginHorizontal: 16,
-    marginTop: 12,
-    padding: 12,
-    borderRadius: 10,
+    gap: theme.spacing[2.5],
+    marginHorizontal: theme.spacing[4],
+    marginTop: theme.spacing[3],
+    padding: theme.spacing[3],
+    borderRadius: theme.radius['2xl'],
     backgroundColor: colors.primary[50]!,
     borderWidth: 1,
     borderColor: colors.primary[100]!,
   },
   countdownText: { fontSize: 18, fontWeight: '700', color: colors.primary[800]!, fontFamily: 'Courier' },
   completedCard: { backgroundColor: colors.success[50]!, borderWidth: 1, borderColor: colors.success[200]! },
-  completedHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+  completedHeader: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing[2.5], marginBottom: theme.spacing[2] },
   summaryDateRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 6,
+    paddingVertical: theme.spacing[1.5],
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.success[200]!,
   },
-  completedActions: { flexDirection: 'row', gap: 12, marginTop: 16 },
+  completedActions: { flexDirection: 'row', gap: theme.spacing[3], marginTop: theme.spacing[4] },
   infoBanner: { backgroundColor: colors.info[50]!, borderWidth: 1, borderColor: colors.info[200]! },
   warningBanner: { backgroundColor: colors.warning[50]!, borderWidth: 1, borderColor: colors.warning[200]! },
-  bannerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  bannerRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing[3] },
   bannerIconCircle: {
     width: 44,
     height: 44,

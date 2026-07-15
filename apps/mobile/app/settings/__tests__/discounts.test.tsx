@@ -22,7 +22,7 @@ jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => mockAuthState,
 }));
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   discountsApi: {
     getAll: jest.fn(),
     create: jest.fn(),
@@ -31,7 +31,7 @@ jest.mock('@/services/api', () => ({
   },
   productsApi: { getMyListings: jest.fn() },
 }));
-import { discountsApi, productsApi } from '@/services/api';
+import { discountsApi, productsApi } from '@/lib/api';
 const mockGetAll = discountsApi.getAll as jest.Mock;
 const mockGetListings = productsApi.getMyListings as jest.Mock;
 

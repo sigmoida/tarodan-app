@@ -10,15 +10,15 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.surface.alt,
   },
   scrollBody: {
-    padding: 16,
-    gap: 12,
+    padding: theme.spacing[4],
+    gap: theme.spacing[3],
   },
   noticeCard: {
     flexDirection: 'row',
-    gap: 8,
-    padding: 12,
+    gap: theme.spacing[2],
+    padding: theme.spacing[3],
     backgroundColor: colors.info[50]!,
-    borderRadius: 10,
+    borderRadius: theme.radius['2xl'],
   },
   noticeText: {
     flex: 1,
@@ -37,27 +37,27 @@ export const styles = StyleSheet.create({
   sectionSubtitle: {
     fontSize: 12,
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   emptyText: {
     fontSize: 13,
     color: colors.text.subtle,
-    marginTop: 8,
+    marginTop: theme.spacing[2],
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 10,
+    gap: theme.spacing[2.5],
+    marginTop: theme.spacing[2.5],
   },
   gridItem: {
     width: '47%',
     flexGrow: 1,
     backgroundColor: colors.surface.alt,
-    borderRadius: 10,
+    borderRadius: theme.radius['2xl'],
     borderWidth: 1,
     borderColor: 'transparent',
-    padding: 8,
+    padding: theme.spacing[2],
   },
   gridItemSelected: {
     borderColor: colors.primary[600]!,
@@ -66,7 +66,7 @@ export const styles = StyleSheet.create({
   gridImgWrap: {
     width: '100%',
     aspectRatio: 1,
-    borderRadius: 8,
+    borderRadius: theme.radius.xl,
     overflow: 'hidden',
     backgroundColor: colors.border.DEFAULT,
     position: 'relative',
@@ -81,7 +81,7 @@ export const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   checkBadge: {
-    margin: 6,
+    margin: theme.spacing[1.5],
     width: 24,
     height: 24,
     borderRadius: 12,
@@ -93,17 +93,17 @@ export const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: colors.text.heading,
-    marginTop: 6,
+    marginTop: theme.spacing[1.5],
   },
   productPrice: {
     fontSize: 13,
     fontWeight: '700',
     color: colors.primary[600]!,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   swapWrap: {
     alignItems: 'center',
-    marginVertical: 4,
+    marginVertical: theme.spacing[1],
   },
   swapCircle: {
     width: 40,
@@ -117,29 +117,29 @@ export const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.text.subtle,
     textAlign: 'right',
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   chipsRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginTop: 8,
+    gap: theme.spacing[2],
+    marginTop: theme.spacing[2],
   },
   chip: {
     flex: 1,
   },
   cashInput: {
-    marginTop: 10,
+    marginTop: theme.spacing[2.5],
     backgroundColor: colors.surface.DEFAULT,
   },
   messageInput: {
-    marginTop: 8,
+    marginTop: theme.spacing[2],
     backgroundColor: colors.surface.DEFAULT,
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 4,
+    paddingVertical: theme.spacing[1],
   },
   summaryLabel: {
     fontSize: 13,
@@ -156,7 +156,7 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
   submitBtn: {
-    borderRadius: 10,
-    marginTop: 8,
+    borderRadius: theme.radius['2xl'],
+    marginTop: theme.spacing[2],
   },
 });

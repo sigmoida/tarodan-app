@@ -107,19 +107,19 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 20,
+    padding: theme.spacing[5],
   },
   intro: {
     alignItems: 'center',
-    paddingVertical: 24,
-    marginBottom: 8,
+    paddingVertical: theme.spacing[6],
+    marginBottom: theme.spacing[2],
   },
   introTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: colors.text.heading,
-    marginTop: 12,
-    marginBottom: 8,
+    marginTop: theme.spacing[3],
+    marginBottom: theme.spacing[2],
   },
   introText: {
     fontSize: 14,
@@ -131,8 +131,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: colors.surface.alt,
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    padding: theme.spacing[4],
+    marginBottom: theme.spacing[3],
   },
   featureIcon: {
     width: 48,
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary[50]!,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 14,
+    marginRight: theme.spacing[3.5],
   },
   featureContent: {
     flex: 1,
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: colors.text.heading,
-    marginBottom: 4,
+    marginBottom: theme.spacing[1],
   },
   featureDesc: {
     fontSize: 13,
@@ -158,8 +158,8 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   footer: {
-    marginTop: 16,
-    padding: 16,
+    marginTop: theme.spacing[4],
+    padding: theme.spacing[4],
     backgroundColor: colors.surface.alt,
     borderRadius: 12,
     alignItems: 'center',
@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.text.muted,
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   contactInfo: {
     fontSize: 14,

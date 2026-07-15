@@ -52,16 +52,16 @@ export function TradeInfoCard({
 }
 
 const styles = StyleSheet.create({
-  card: { margin: 16, marginTop: 0, backgroundColor: colors.surface.DEFAULT },
-  tradeHeader: { marginBottom: 16 },
-  tradeHeaderTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  versionBadge: { backgroundColor: colors.primary[100]!, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  card: { margin: theme.spacing[4], marginTop: theme.spacing[0], backgroundColor: colors.surface.DEFAULT },
+  tradeHeader: { marginBottom: theme.spacing[4] },
+  tradeHeaderTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing[2] },
+  versionBadge: { backgroundColor: colors.primary[100]!, paddingHorizontal: theme.spacing[2], paddingVertical: 3, borderRadius: theme.radius.lg },
   versionBadgeText: { fontSize: 11, fontWeight: '700', color: colors.primary[700]! },
-  dateText: { color: colors.text.muted, marginTop: 4 },
+  dateText: { color: colors.text.muted, marginTop: theme.spacing[1] },
   otherParty: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 12,
+    paddingTop: theme.spacing[3],
     borderTopWidth: 1,
     borderTopColor: colors.border.DEFAULT,
   },
@@ -74,5 +74,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatarText: { color: colors.white, fontWeight: 'bold', fontSize: 16 },
-  otherPartyInfo: { flex: 1, marginLeft: 12 },
+  otherPartyInfo: { flex: 1, marginLeft: theme.spacing[3] },
 });

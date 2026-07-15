@@ -4,7 +4,7 @@ import { theme, Spinner, Text, ScreenHeader } from '@tarodan/ui-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
-import { pagesApi } from '@/services/api';
+import { pagesApi } from '@/lib/api';
 
 const { colors } = theme;
 
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 12,
+    gap: theme.spacing[3],
   },
   loadingText: {
     fontSize: 14,
@@ -191,24 +191,24 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
-    gap: 8,
+    padding: theme.spacing[6],
+    gap: theme.spacing[2],
   },
   errorTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.text.heading,
-    marginTop: 8,
+    marginTop: theme.spacing[2],
   },
   retryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.primary[600]!,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 10,
-    marginTop: 16,
-    gap: 8,
+    paddingHorizontal: theme.spacing[5],
+    paddingVertical: theme.spacing[3],
+    borderRadius: theme.radius['2xl'],
+    marginTop: theme.spacing[4],
+    gap: theme.spacing[2],
   },
   retryButtonText: {
     fontSize: 14,
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
   goBackLink: {
-    marginTop: 12,
+    marginTop: theme.spacing[3],
   },
   goBackText: {
     fontSize: 14,

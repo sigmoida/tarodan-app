@@ -11,10 +11,10 @@ import MakeOfferModal from '../MakeOfferModal';
 import { renderWithProviders } from '../../../test-utils';
 
 // API'yi mock'la — ağ yok, deterministik.
-jest.mock('../../../services/api', () => ({
+jest.mock('@/lib/api', () => ({
   offersApi: { create: jest.fn(() => Promise.resolve({ data: { id: 'offer-1' } })) },
 }));
-import { offersApi } from '../../../services/api';
+import { offersApi } from '@/lib/api';
 
 const createMock = offersApi.create as jest.Mock;
 

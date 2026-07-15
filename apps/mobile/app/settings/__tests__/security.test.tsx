@@ -24,7 +24,7 @@ jest.mock('@/i18n', () => ({
 }));
 
 // API — mock fn'leri factory İÇİNDE tanımla (out-of-scope ref yok), sonra import et.
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   authApi: {
     getTwoFactorStatus: jest.fn(),
     setupTwoFactor: jest.fn(),
@@ -35,7 +35,7 @@ jest.mock('@/services/api', () => ({
     logoutAll: jest.fn(),
   },
 }));
-import { authApi } from '@/services/api';
+import { authApi } from '@/lib/api';
 const mockGetTwoFactorStatus = authApi.getTwoFactorStatus as jest.Mock;
 
 describe('SecuritySettingsScreen — 2FA durumu', () => {

@@ -14,7 +14,7 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ id: 'offer-1' }),
 }));
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   offersApi: {
     getOne: jest.fn(),
     accept: jest.fn(),
@@ -23,7 +23,7 @@ jest.mock('@/services/api', () => ({
     counter: jest.fn(),
   },
 }));
-import { offersApi } from '@/services/api';
+import { offersApi } from '@/lib/api';
 
 let mockUser: { id: string } | null = { id: 'seller-1' };
 jest.mock('@/stores/authStore', () => ({

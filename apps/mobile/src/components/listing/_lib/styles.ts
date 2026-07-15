@@ -17,19 +17,19 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.surface.DEFAULT,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: theme.spacing[6],
   },
   authText: {
     fontSize: 16,
     color: colors.text.muted,
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     textAlign: 'center',
   },
   header: {
     backgroundColor: colors.primary[600]!,
     paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
+    paddingBottom: theme.spacing[4],
+    paddingHorizontal: theme.spacing[5],
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -43,8 +43,8 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
+    padding: theme.spacing[4],
+    paddingBottom: theme.spacing[10],
   },
   pageTitle: {
     fontSize: 22,
@@ -54,17 +54,17 @@ export const styles = StyleSheet.create({
   pageSubtitle: {
     fontSize: 14,
     color: colors.text.muted,
-    marginTop: 4,
-    marginBottom: 16,
+    marginTop: theme.spacing[1],
+    marginBottom: theme.spacing[4],
   },
 
   // Limits
   ibanBanner: {
-    margin: 16,
-    marginBottom: 0,
-    padding: 16,
+    margin: theme.spacing[4],
+    marginBottom: theme.spacing[0],
+    padding: theme.spacing[4],
     backgroundColor: colors.warning[50]!,
-    borderRadius: 10,
+    borderRadius: theme.radius['2xl'],
     borderWidth: 1,
     borderColor: colors.warning[300]!,
   },
@@ -72,19 +72,19 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.warning[800]!,
-    marginBottom: 4,
+    marginBottom: theme.spacing[1],
   },
   ibanBannerBody: {
     fontSize: 13,
     color: colors.warning[700]!,
-    marginBottom: 10,
+    marginBottom: theme.spacing[2.5],
     lineHeight: 18,
   },
   ibanBannerButton: {
     backgroundColor: colors.warning[600]!,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    borderRadius: theme.radius.xl,
+    paddingVertical: theme.spacing[2],
+    paddingHorizontal: theme.spacing[4],
     alignSelf: 'flex-start',
   },
   ibanBannerButtonText: {
@@ -94,15 +94,15 @@ export const styles = StyleSheet.create({
   },
   limitsPlaceholder: {
     backgroundColor: colors.gray[200],
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: theme.radius['2xl'],
+    padding: theme.spacing[4],
+    marginBottom: theme.spacing[4],
     alignItems: 'center',
   },
   limitsCard: {
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 16,
+    borderRadius: theme.radius['2xl'],
+    padding: theme.spacing[3],
+    marginBottom: theme.spacing[4],
     borderWidth: 1,
   },
   limitsOk: {
@@ -132,13 +132,13 @@ export const styles = StyleSheet.create({
   limitsRemaining: {
     fontSize: 12,
     color: colors.text.subtle,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   upgradeButton: {
     backgroundColor: colors.primary[600]!,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: theme.spacing[3.5],
+    paddingVertical: theme.spacing[2],
+    borderRadius: theme.radius.xl,
   },
   upgradeButtonText: {
     color: colors.white,
@@ -149,7 +149,7 @@ export const styles = StyleSheet.create({
     height: 6,
     backgroundColor: colors.gray[200],
     borderRadius: 3,
-    marginTop: 10,
+    marginTop: theme.spacing[2.5],
     overflow: 'hidden',
   },
   progressFill: {
@@ -168,15 +168,15 @@ export const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: colors.warning[800]!,
-    marginBottom: 4,
+    marginBottom: theme.spacing[1],
   },
 
   // Card
   card: {
     backgroundColor: colors.white,
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    padding: theme.spacing[4],
+    marginBottom: theme.spacing[4],
     borderWidth: 1,
     borderColor: colors.border.subtle,
     ...Platform.select({
@@ -196,7 +196,7 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.text.muted,
     letterSpacing: 1,
-    marginBottom: 14,
+    marginBottom: theme.spacing[3.5],
   },
 
   // Labels
@@ -204,7 +204,7 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.text.muted,
-    marginBottom: 6,
+    marginBottom: theme.spacing[1.5],
   },
   required: {
     color: colors.danger[600]!,
@@ -213,26 +213,26 @@ export const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.text.subtle,
     textAlign: 'right',
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   hint: {
     fontSize: 12,
     color: colors.text.subtle,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   reservedHint: {
     fontSize: 12,
     color: colors.warning[700]!,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
 
   // Inputs
   input: {
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    borderRadius: theme.radius['2xl'],
+    paddingHorizontal: theme.spacing[3.5],
+    paddingVertical: theme.spacing[3],
     fontSize: 15,
     color: colors.text.heading,
     backgroundColor: colors.white,
@@ -246,8 +246,8 @@ export const styles = StyleSheet.create({
   pickerButton: {
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
-    borderRadius: 10,
-    paddingHorizontal: 14,
+    borderRadius: theme.radius['2xl'],
+    paddingHorizontal: theme.spacing[3.5],
     paddingVertical: 13,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -271,21 +271,21 @@ export const styles = StyleSheet.create({
   pickerArrow: {
     fontSize: 20,
     color: colors.text.subtle,
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
   },
 
   // Chips
   chipRow: {
     flexDirection: 'row',
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   chip: {
-    paddingHorizontal: 16,
+    paddingHorizontal: theme.spacing[4],
     paddingVertical: 9,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
-    marginRight: 8,
+    marginRight: theme.spacing[2],
     backgroundColor: colors.white,
   },
   chipActive: {
@@ -314,7 +314,7 @@ export const styles = StyleSheet.create({
   },
   imageUploadIcon: {
     fontSize: 28,
-    marginBottom: 6,
+    marginBottom: theme.spacing[1.5],
   },
   imageUploadLabel: {
     fontSize: 14,
@@ -324,11 +324,11 @@ export const styles = StyleSheet.create({
   imageUploadCount: {
     fontSize: 12,
     color: colors.text.subtle,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   imageMaxReached: {
-    paddingVertical: 14,
-    borderRadius: 10,
+    paddingVertical: theme.spacing[3.5],
+    borderRadius: theme.radius['2xl'],
     borderWidth: 1,
     borderColor: colors.success[200]!,
     backgroundColor: colors.success[50]!,
@@ -339,13 +339,13 @@ export const styles = StyleSheet.create({
     color: colors.success[800]!,
   },
   imageRow: {
-    marginTop: 12,
+    marginTop: theme.spacing[3],
   },
   imageThumbWrap: {
     width: 88,
     height: 88,
-    marginRight: 10,
-    borderRadius: 10,
+    marginRight: theme.spacing[2.5],
+    borderRadius: theme.radius['2xl'],
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
@@ -359,9 +359,9 @@ export const styles = StyleSheet.create({
     bottom: 4,
     left: 4,
     backgroundColor: colors.primary[600]!,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+    paddingHorizontal: theme.spacing[1.5],
+    paddingVertical: theme.spacing[0.5],
+    borderRadius: theme.radius.md,
   },
   coverBadgeText: {
     color: colors.white,
@@ -389,8 +389,8 @@ export const styles = StyleSheet.create({
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 10,
+    padding: theme.spacing[3.5],
+    borderRadius: theme.radius['2xl'],
     borderWidth: 1,
   },
   toggleRowEnabled: {
@@ -409,7 +409,7 @@ export const styles = StyleSheet.create({
   toggleHint: {
     fontSize: 12,
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   upgradeLinkText: {
     fontSize: 13,
@@ -419,13 +419,13 @@ export const styles = StyleSheet.create({
 
   // Discount
   discountBox: {
-    marginTop: 16,
-    paddingTop: 16,
+    marginTop: theme.spacing[4],
+    paddingTop: theme.spacing[4],
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border.subtle,
   },
   discountPercent: {
-    marginTop: 6,
+    marginTop: theme.spacing[1.5],
     fontSize: 13,
     fontWeight: '600',
     color: colors.success[700]!,
@@ -433,10 +433,10 @@ export const styles = StyleSheet.create({
 
   // Commission
   commissionCard: {
-    marginTop: 16,
-    padding: 12,
+    marginTop: theme.spacing[4],
+    padding: theme.spacing[3],
     backgroundColor: colors.surface.alt,
-    borderRadius: 10,
+    borderRadius: theme.radius['2xl'],
     borderWidth: 1,
     borderColor: colors.border.subtle,
   },
@@ -446,7 +446,7 @@ export const styles = StyleSheet.create({
     color: colors.text.muted,
   },
   commissionRow: {
-    marginTop: 6,
+    marginTop: theme.spacing[1.5],
   },
   commissionFee: {
     fontSize: 13,
@@ -456,19 +456,19 @@ export const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: colors.success[800]!,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
 
   // Submit
   submitRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 4,
+    gap: theme.spacing[3],
+    marginTop: theme.spacing[1],
   },
   cancelButton: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 10,
+    paddingVertical: theme.spacing[3.5],
+    borderRadius: theme.radius['2xl'],
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
     alignItems: 'center',
@@ -481,8 +481,8 @@ export const styles = StyleSheet.create({
   },
   submitButton: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 10,
+    paddingVertical: theme.spacing[3.5],
+    borderRadius: theme.radius['2xl'],
     backgroundColor: colors.primary[600]!,
     alignItems: 'center',
     justifyContent: 'center',
@@ -499,10 +499,10 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    marginTop: 16,
-    paddingVertical: 14,
-    borderRadius: 10,
+    gap: theme.spacing[2],
+    marginTop: theme.spacing[4],
+    paddingVertical: theme.spacing[3.5],
+    borderRadius: theme.radius['2xl'],
     borderWidth: 1,
     borderColor: colors.danger[200]!,
     backgroundColor: colors.danger[50]!,
@@ -515,8 +515,8 @@ export const styles = StyleSheet.create({
   primaryButton: {
     backgroundColor: colors.primary[600]!,
     paddingHorizontal: 28,
-    paddingVertical: 14,
-    borderRadius: 10,
+    paddingVertical: theme.spacing[3.5],
+    borderRadius: theme.radius['2xl'],
   },
   primaryButtonText: {
     color: colors.white,
@@ -541,8 +541,8 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: theme.spacing[5],
+    paddingVertical: theme.spacing[4],
     borderBottomWidth: 1,
     borderBottomColor: colors.border.subtle,
   },
@@ -557,14 +557,14 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
   },
   modalSearch: {
-    marginHorizontal: 20,
-    marginTop: 12,
-    marginBottom: 8,
+    marginHorizontal: theme.spacing[5],
+    marginTop: theme.spacing[3],
+    marginBottom: theme.spacing[2],
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    borderRadius: theme.radius['2xl'],
+    paddingHorizontal: theme.spacing[3.5],
+    paddingVertical: theme.spacing[2.5],
     fontSize: 15,
     color: colors.text.heading,
     backgroundColor: colors.surface.alt,
@@ -573,8 +573,8 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingHorizontal: theme.spacing[5],
+    paddingVertical: theme.spacing[3.5],
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border.subtle,
   },
@@ -598,7 +598,7 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
     color: colors.text.subtle,
     fontSize: 14,
-    marginTop: 32,
-    marginBottom: 32,
+    marginTop: theme.spacing[8],
+    marginBottom: theme.spacing[8],
   },
 });

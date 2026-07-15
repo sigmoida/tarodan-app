@@ -77,7 +77,7 @@ export function HomeHeader({
         onChangeText={onChangeSearch}
         onSubmitEditing={onSearch}
         leftIconName="search"
-        containerStyle={{ marginBottom: 0 }}
+        containerStyle={{ marginBottom: theme.spacing[0] }}
       />
     </View>
   );

@@ -20,11 +20,11 @@ jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => mockAuthState,
 }));
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   api: { get: jest.fn() },
   membershipApi: { getCurrentMembership: jest.fn(), getTiers: jest.fn() },
 }));
-import { membershipApi } from '@/services/api';
+import { membershipApi } from '@/lib/api';
 const mockGetMembership = membershipApi.getCurrentMembership as jest.Mock;
 const mockGetTiers = membershipApi.getTiers as jest.Mock;
 

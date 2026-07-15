@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { theme, appAlert } from '@tarodan/ui-native';
-import { productsApi } from '@/services/api';
+import { productsApi } from '@/lib/api';
 import { qk } from '@/lib/query';
 import { useAuthStore } from '@/stores/authStore';
 import { useTranslation } from '@/i18n';

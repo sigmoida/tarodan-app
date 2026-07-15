@@ -103,6 +103,11 @@ export default function OffersScreen() {
           data={offers}
           keyExtractor={(item) => item.id}
           renderItem={renderOffer}
+          // #82: virtualizasyon ayarı — uzun teklif listelerinde bellek/kaydırma.
+          windowSize={7}
+          initialNumToRender={8}
+          maxToRenderPerBatch={10}
+          removeClippedSubviews
           ListEmptyComponent={<OffersEmpty tab={activeTab} />}
           contentContainerStyle={offers.length === 0 ? { flex: 1 } : styles.listContent}
           refreshControl={
@@ -127,9 +132,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: theme.spacing[6],
     backgroundColor: colors.surface.alt,
   },
-  listContent: { padding: 16, paddingBottom: 32 },
-  loadingText: { marginTop: 12, fontSize: 14, color: colors.text.muted },
+  listContent: { padding: theme.spacing[4], paddingBottom: theme.spacing[8] },
+  loadingText: { marginTop: theme.spacing[3], fontSize: 14, color: colors.text.muted },
 });

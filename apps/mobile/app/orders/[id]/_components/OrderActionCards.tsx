@@ -38,7 +38,7 @@ export function OrderCancelCard({
         onPress={onCancel}
         isLoading={cancelPending}
         disabled={cancelPending}
-        style={{ marginTop: 12, borderColor: colors.danger[600]! }}
+        style={{ marginTop: theme.spacing[3], borderColor: colors.danger[600]! }}
       />
     </Card>
   );
@@ -116,7 +116,7 @@ export function OrderRefundBanner({
                   `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(rr.returnTrackingNumber!)}`,
                 )
               }
-              style={{ marginTop: 8 }}
+              style={{ marginTop: theme.spacing[2] }}
             />
           ) : null}
         </View>
@@ -130,7 +130,7 @@ export function OrderRefundBanner({
           onPress={onCancelRefund}
           isLoading={cancelRefundPending}
           disabled={cancelRefundPending}
-          style={{ marginTop: 12, borderColor: colors.danger[600]! }}
+          style={{ marginTop: theme.spacing[3], borderColor: colors.danger[600]! }}
         />
       )}
     </Card>
@@ -179,7 +179,7 @@ export function OrderRefundActionCard({
         icon="return-up-back"
         title="İade Talep Et"
         onPress={onOpenRefund}
-        style={{ marginTop: 8 }}
+        style={{ marginTop: theme.spacing[2] }}
       />
     </Card>
   );
@@ -192,7 +192,7 @@ export function OrderHelpCard() {
       <Pressable onPress={() => router.push('/help')}>
         <View style={styles.helpCard}>
           <Ionicons name="help-circle" size={24} color={colors.primary[600]!} />
-          <Text style={{ flex: 1, marginLeft: 12 }}>Yardıma mı ihtiyacınız var?</Text>
+          <Text style={{ flex: 1, marginLeft: theme.spacing[3] }}>Yardıma mı ihtiyacınız var?</Text>
           <Ionicons name="chevron-forward" size={20} color={colors.text.muted} />
         </View>
       </Pressable>
@@ -201,19 +201,19 @@ export function OrderHelpCard() {
 }
 
 const styles = StyleSheet.create({
-  card: { marginBottom: 12 },
-  sectionTitle: { marginBottom: 12, color: colors.text.heading },
+  card: { marginBottom: theme.spacing[3] },
+  sectionTitle: { marginBottom: theme.spacing[3], color: colors.text.heading },
   confirmNote: { textAlign: 'center', color: colors.text.muted },
-  ratingButtons: { gap: 8 },
+  ratingButtons: { gap: theme.spacing[2] },
   rateButton: { borderColor: colors.primary[600]! },
-  ratedMessage: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 12 },
-  ratedText: { marginLeft: 8, color: colors.success[700]! },
-  refundHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  ratedMessage: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: theme.spacing[3] },
+  ratedText: { marginLeft: theme.spacing[2], color: colors.success[700]! },
+  refundHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing[2], marginBottom: theme.spacing[1] },
   refundHeaderText: { flex: 1, color: colors.text.heading },
-  refundMeta: { color: colors.text.muted, marginBottom: 6 },
+  refundMeta: { color: colors.text.muted, marginBottom: theme.spacing[1.5] },
   refundIntro: { color: colors.text.muted },
-  refundTrackingBox: { backgroundColor: colors.surface.alt, padding: 12, borderRadius: radius.md, marginTop: 8 },
-  refundTrackingHint: { color: colors.text.muted, marginBottom: 4 },
+  refundTrackingBox: { backgroundColor: colors.surface.alt, padding: theme.spacing[3], borderRadius: radius.md, marginTop: theme.spacing[2] },
+  refundTrackingHint: { color: colors.text.muted, marginBottom: theme.spacing[1] },
   refundTrackingNumber: { fontWeight: 'bold', color: colors.text.heading, fontSize: 16 },
   helpCard: { flexDirection: 'row', alignItems: 'center' },
 });

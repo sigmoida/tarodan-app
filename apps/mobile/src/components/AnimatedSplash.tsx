@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
   dot: {
     width: 8,
     height: 8,
-    borderRadius: 4,
+    borderRadius: theme.radius.md,
     backgroundColor: colors.white,
   },
 });

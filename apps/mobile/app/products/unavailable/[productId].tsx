@@ -5,7 +5,7 @@ import { Button, Spinner, Text, theme, ScreenHeader } from '@tarodan/ui-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { ProductCard, type ProductCardProduct } from '@/components/product/ProductCard';
-import { productsApi } from '@/services/api';
+import { productsApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
 
 const { colors } = theme;
@@ -94,7 +94,7 @@ export default function ProductUnavailableScreen() {
                   name="close-circle"
                   size={56}
                   color={colors.danger[600]!}
-                  style={{ marginBottom: 8 }}
+                  style={{ marginBottom: theme.spacing[2] }}
                 />
                 <Text testID="unavailable-hero-title" style={styles.heroTitle}>{t('stockout.page.title')}</Text>
                 <Text style={styles.heroBody}>
@@ -157,28 +157,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   content: {
-    padding: 16,
-    paddingBottom: 40,
+    padding: theme.spacing[4],
+    paddingBottom: theme.spacing[10],
   },
   hero: {
     backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: 24,
+    borderRadius: theme.radius['3xl'],
+    padding: theme.spacing[6],
     alignItems: 'center',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border.DEFAULT,
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
   },
   heroEmoji: {
     fontSize: 48,
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   heroTitle: {
     fontSize: 22,
     fontWeight: '700',
     color: colors.text.heading,
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   heroBody: {
     fontSize: 14,
@@ -187,22 +187,22 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   heroBtn: {
-    marginTop: 16,
-    borderRadius: 10,
+    marginTop: theme.spacing[4],
+    borderRadius: theme.radius['2xl'],
     alignSelf: 'stretch',
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: colors.text.heading,
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
   },
   emptyText: {
     fontSize: 14,
     color: colors.text.muted,
   },
   gridRow: {
-    gap: 12,
+    gap: theme.spacing[3],
   },
   gridItem: {
     flex: 1,

@@ -3,7 +3,7 @@ import { View, StyleSheet, Image } from 'react-native';
 
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { manufacturersApi, productsApi } from '@/services/api';
+import { manufacturersApi, productsApi } from '@/lib/api';
 import { theme, Text } from '@tarodan/ui-native';
 import { ScreenHeader } from '@/components/common';
 const { colors } = theme;
@@ -100,11 +100,11 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    padding: 16,
+    gap: theme.spacing[3],
+    padding: theme.spacing[4],
     backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border.DEFAULT,
   },
@@ -136,6 +136,6 @@ const styles = StyleSheet.create({
   count: {
     fontSize: 13,
     color: colors.text.muted,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
 });

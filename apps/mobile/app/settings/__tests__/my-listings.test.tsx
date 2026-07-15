@@ -33,7 +33,7 @@ jest.mock('@/components/product/BoostModal', () => ({
 
 const mockGetMyListings = jest.fn();
 const mockGetMyStats = jest.fn();
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   productsApi: {
     getMyListings: (...a: any[]) => mockGetMyListings(...a),
     getMyStats: (...a: any[]) => mockGetMyStats(...a),

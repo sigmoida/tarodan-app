@@ -48,7 +48,7 @@ export function Step1MyItems({ f }: StepProps) {
       </Text>
 
       {f.loadingMyProducts ? (
-        <View style={{ marginTop: 32 }}>
+        <View style={{ marginTop: theme.spacing[8] }}>
           <Spinner size="md" />
         </View>
       ) : f.myProducts?.length === 0 ? (
@@ -90,7 +90,7 @@ export function Step2TheirItems({ f }: StepProps) {
       </Text>
 
       {f.loadingTheirProducts ? (
-        <View style={{ marginTop: 32 }}>
+        <View style={{ marginTop: theme.spacing[8] }}>
           <Spinner size="md" />
         </View>
       ) : f.theirProducts?.length === 0 ? (
@@ -142,7 +142,7 @@ export function Step2TheirItems({ f }: StepProps) {
       </Card>
 
       <View style={styles.stepActions}>
-        <Button variant="outline" title="Geri" onPress={() => f.setStep(1)} style={{ marginRight: 12 }} />
+        <Button variant="outline" title="Geri" onPress={() => f.setStep(1)} style={{ marginRight: theme.spacing[3] }} />
         <Button
           variant="primary"
           title="Devam"
@@ -259,7 +259,7 @@ export function Step3Review({ f }: StepProps) {
       </Card>
 
       <View style={styles.stepActions}>
-        <Button variant="outline" title="Geri" onPress={() => f.setStep(2)} style={{ marginRight: 12 }} />
+        <Button variant="outline" title="Geri" onPress={() => f.setStep(2)} style={{ marginRight: theme.spacing[3] }} />
         <Button
           variant="primary"
           title="Teklifi Gönder"

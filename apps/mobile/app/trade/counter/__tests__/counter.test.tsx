@@ -16,11 +16,11 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
 }));
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   tradesApi: { getOne: jest.fn(), counter: jest.fn() },
   productsApi: { getAll: jest.fn() },
 }));
-import { tradesApi, productsApi } from '@/services/api';
+import { tradesApi, productsApi } from '@/lib/api';
 
 let mockUser: { id: string } | null = { id: 'user-initiator' };
 jest.mock('@/stores/authStore', () => ({

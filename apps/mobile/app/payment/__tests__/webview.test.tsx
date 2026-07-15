@@ -15,7 +15,7 @@ jest.mock('expo-router', () => ({
   useFocusEffect: () => {},
 }));
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   paymentsApi: {
     initiate: jest.fn(),
     initiateGuest: jest.fn(),
@@ -25,7 +25,7 @@ jest.mock('@/services/api', () => ({
     bypassComplete: jest.fn(),
   },
 }));
-import { paymentsApi } from '@/services/api';
+import { paymentsApi } from '@/lib/api';
 
 // WebView'i source prop'unu testID ile yansıtan basit bir stub'a indir.
 let lastWebViewSource: any = null;

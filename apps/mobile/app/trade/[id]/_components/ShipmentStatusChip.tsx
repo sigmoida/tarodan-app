@@ -33,8 +33,8 @@ const styles = StyleSheet.create({
   shipmentChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: theme.spacing[2.5],
+    paddingVertical: theme.spacing[1],
     borderRadius: 999,
     alignSelf: 'flex-start',
   },

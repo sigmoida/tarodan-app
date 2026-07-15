@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../services/api';
+import { api } from '@/lib/api';
 import { useAuthStore } from '../stores/authStore';
 import { theme, Text, Button, Modal, Input, Textarea } from '@tarodan/ui-native';
 
@@ -222,34 +222,34 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     color: colors.primary[600]!,
   },
   starsContainer: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
   },
   label: {
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
     color: colors.text.muted,
   },
   stars: {
     flexDirection: 'row',
-    gap: 8,
+    gap: theme.spacing[2],
   },
   starButton: {
-    padding: 4,
+    padding: theme.spacing[1],
   },
   ratingText: {
-    marginTop: 8,
+    marginTop: theme.spacing[2],
     fontSize: 14,
     color: colors.text.muted,
   },
   input: {
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   charCountContainer: {
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   charCount: {
     textAlign: 'right',
@@ -262,33 +262,33 @@ const styles = StyleSheet.create({
     color: colors.primary[600]!,
   },
   criteriaSection: {
-    marginTop: 8,
-    marginBottom: 16,
+    marginTop: theme.spacing[2],
+    marginBottom: theme.spacing[4],
   },
   criteriaTitle: {
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
     color: colors.text.muted,
     fontSize: 12,
   },
   criteriaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: theme.spacing[1],
   },
   criteriaText: {
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
     fontSize: 13,
     color: colors.text.heading,
   },
   errorText: {
     textAlign: 'center',
     color: colors.danger[600]!,
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   actions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 8,
-    marginTop: 12,
+    gap: theme.spacing[2],
+    marginTop: theme.spacing[3],
   },
 });

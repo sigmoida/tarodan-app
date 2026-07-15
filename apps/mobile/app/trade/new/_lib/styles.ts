@@ -13,18 +13,18 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: theme.spacing[8],
   },
   subtitle: {
     textAlign: 'center',
-    marginVertical: 16,
+    marginVertical: theme.spacing[4],
     color: colors.text.muted,
   },
   stepsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
+    paddingVertical: theme.spacing[4],
+    paddingHorizontal: theme.spacing[5],
     backgroundColor: colors.surface.DEFAULT,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.DEFAULT,
@@ -35,7 +35,7 @@ export const styles = StyleSheet.create({
   stepCircle: {
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: theme.radius['3xl'],
     backgroundColor: colors.border.DEFAULT,
     justifyContent: 'center',
     alignItems: 'center',
@@ -51,7 +51,7 @@ export const styles = StyleSheet.create({
     color: colors.white,
   },
   stepLabel: {
-    marginTop: 4,
+    marginTop: theme.spacing[1],
     fontSize: 12,
     color: colors.text.muted,
   },
@@ -61,10 +61,10 @@ export const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: theme.spacing[4],
   },
   sectionTitle: {
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     color: colors.text.heading,
   },
   productCard: {
@@ -72,8 +72,8 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
+    padding: theme.spacing[3],
+    marginBottom: theme.spacing[3],
     borderWidth: 2,
     borderColor: 'transparent',
   },
@@ -84,12 +84,12 @@ export const styles = StyleSheet.create({
   productImage: {
     width: 60,
     height: 60,
-    borderRadius: 8,
+    borderRadius: theme.radius.xl,
     backgroundColor: colors.border.DEFAULT,
   },
   productInfo: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
   },
   productTitle: {
     color: colors.text.heading,
@@ -97,7 +97,7 @@ export const styles = StyleSheet.create({
   productPrice: {
     color: colors.primary[600]!,
     fontWeight: '600',
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   checkbox: {
     width: 24,
@@ -113,29 +113,29 @@ export const styles = StyleSheet.create({
     borderColor: colors.primary[600]!,
   },
   emptyCard: {
-    marginTop: 32,
+    marginTop: theme.spacing[8],
     backgroundColor: colors.surface.DEFAULT,
   },
   emptyContent: {
     alignItems: 'center',
-    padding: 24,
+    padding: theme.spacing[6],
   },
   emptyText: {
     color: colors.text.muted,
-    marginVertical: 16,
+    marginVertical: theme.spacing[4],
     textAlign: 'center',
   },
   cashCard: {
-    marginTop: 16,
+    marginTop: theme.spacing[4],
     backgroundColor: colors.surface.DEFAULT,
   },
   cashTitle: {
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
   },
   cashDirectionRow: {
     flexDirection: 'row',
-    marginBottom: 12,
-    gap: 8,
+    marginBottom: theme.spacing[3],
+    gap: theme.spacing[2],
   },
   cashChip: {
     flex: 1,
@@ -146,30 +146,30 @@ export const styles = StyleSheet.create({
   stepActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    marginTop: 24,
+    marginTop: theme.spacing[6],
   },
   summaryCard: {
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
     backgroundColor: colors.surface.DEFAULT,
   },
   summaryTitle: {
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
     color: colors.text.heading,
   },
   summaryItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: theme.spacing[2],
   },
   summaryImage: {
     width: 40,
     height: 40,
-    borderRadius: 4,
+    borderRadius: theme.radius.md,
     backgroundColor: colors.border.DEFAULT,
   },
   summaryItemTitle: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
     color: colors.text.heading,
   },
   summaryItemPrice: {
@@ -177,7 +177,7 @@ export const styles = StyleSheet.create({
     fontWeight: '500',
   },
   summaryDivider: {
-    marginVertical: 12,
+    marginVertical: theme.spacing[3],
   },
   summaryTotal: {
     flexDirection: 'row',
@@ -189,15 +189,15 @@ export const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   messageInput: {
-    marginBottom: 4,
+    marginBottom: theme.spacing[1],
     backgroundColor: colors.surface.DEFAULT,
   },
   charCount: {
     textAlign: 'right',
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   protectionCard: {
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     backgroundColor: colors.success[50]!,
     borderWidth: 1,
     borderColor: colors.success[200]!,
@@ -208,45 +208,45 @@ export const styles = StyleSheet.create({
   },
   protectionText: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
   },
   protectionDesc: {
     color: colors.text.muted,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   premiumRequired: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: theme.spacing[8],
     backgroundColor: colors.surface.DEFAULT,
   },
   premiumTitle: {
-    marginTop: 24,
+    marginTop: theme.spacing[6],
     textAlign: 'center',
     color: colors.text.heading,
   },
   premiumSubtitle: {
-    marginTop: 8,
+    marginTop: theme.spacing[2],
     textAlign: 'center',
     color: colors.text.muted,
   },
   premiumFeatures: {
-    marginTop: 24,
+    marginTop: theme.spacing[6],
     alignSelf: 'flex-start',
     width: '100%',
   },
   premiumFeature: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 8,
+    marginVertical: theme.spacing[2],
   },
   premiumFeatureText: {
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
     color: colors.text.heading,
   },
   upgradeButton: {
-    marginTop: 24,
+    marginTop: theme.spacing[6],
     width: '100%',
   },
 });

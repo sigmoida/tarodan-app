@@ -10,7 +10,7 @@ import {
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 
-import { productsApi, searchApi } from '@/services/api';
+import { productsApi, searchApi } from '@/lib/api';
 import { useRecentSearchesStore } from '@/stores/recentSearchesStore';
 import { useCartStore } from '@/stores/cartStore';
 import { useProductFilterOptions } from '@/hooks/useProductFilterOptions';

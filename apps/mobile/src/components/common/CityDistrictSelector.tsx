@@ -223,7 +223,7 @@ export function CityDistrictSelector({
 
 const styles = StyleSheet.create({
   input: {
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
     backgroundColor: colors.surface.DEFAULT,
   },
   fakeInput: {
@@ -232,11 +232,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface.DEFAULT,
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
-    borderRadius: 4,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: theme.spacing[3.5],
+    paddingVertical: theme.spacing[2.5],
     minHeight: 56,
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
   },
   fakeInputError: {
     borderColor: colors.danger[600]!,
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
   fakeLabel: {
     fontSize: 11,
     color: colors.text.muted,
-    marginBottom: 2,
+    marginBottom: theme.spacing[0.5],
   },
   fakeValue: {
     fontSize: 15,
@@ -265,8 +265,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing[3.5],
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border.DEFAULT,
   },
@@ -276,15 +276,15 @@ const styles = StyleSheet.create({
     color: colors.text.heading,
   },
   sheetSearch: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing[3],
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing[3.5],
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border.subtle,
   },

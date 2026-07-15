@@ -9,10 +9,10 @@ import { resetRouterMocks, pushMock, backMock } from '@/test-utils/router-mock';
 
 jest.mock('expo-router', () => require('@/test-utils/router-mock').routerMock);
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   authApi: { forgotPassword: jest.fn() },
 }));
-import { authApi } from '@/services/api';
+import { authApi } from '@/lib/api';
 
 import ForgotPasswordScreen from '../forgot-password';
 

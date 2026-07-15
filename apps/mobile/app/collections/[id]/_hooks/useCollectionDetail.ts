@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Share } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, router } from 'expo-router';
-import { api, collectionsApi } from '@/services/api';
+import { api, collectionsApi } from '@/lib/api';
 import { qk } from '@/lib/query';
 import { useRefresh } from '@/hooks/useRefresh';
 import { useAuthStore } from '@/stores/authStore';

@@ -3,7 +3,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme, Text, Button } from '@tarodan/ui-native';
 import { useAuthStore } from '@/stores/authStore';
-import { resetBannedRedirect } from '@/services/api';
+import { resetBannedRedirect } from '@/lib/api';
 
 const { colors } = theme;
 
@@ -58,17 +58,17 @@ export default function BannedScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surface.DEFAULT },
-  content: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  title: { marginTop: 16, fontWeight: 'bold', color: colors.text.heading },
-  text: { marginTop: 8, textAlign: 'center', color: colors.text.muted },
+  content: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: theme.spacing[6] },
+  title: { marginTop: theme.spacing[4], fontWeight: 'bold', color: colors.text.heading },
+  text: { marginTop: theme.spacing[2], textAlign: 'center', color: colors.text.muted },
   reasonBox: {
-    marginTop: 16,
-    padding: 12,
-    borderRadius: 8,
+    marginTop: theme.spacing[4],
+    padding: theme.spacing[3],
+    borderRadius: theme.radius.xl,
     backgroundColor: colors.danger[50]!,
     alignSelf: 'stretch',
   },
   reasonLabel: { color: colors.danger[600]!, fontWeight: 'bold' },
-  reasonText: { marginTop: 4, color: colors.text.heading },
-  button: { marginTop: 16, alignSelf: 'stretch' },
+  reasonText: { marginTop: theme.spacing[1], color: colors.text.heading },
+  button: { marginTop: theme.spacing[4], alignSelf: 'stretch' },
 });

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { ordersApi } from '../../services/api';
+import { ordersApi } from '@/lib/api';
 import { theme, Spinner, Text } from '@tarodan/ui-native';
 import { formatPrice } from '../../utils/format';
 
@@ -119,17 +119,17 @@ export function CommissionPreview({ amount, categoryId, debounceMs = 500 }: Comm
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.primary[50]!,
-    borderRadius: 10,
-    padding: 12,
-    marginTop: 8,
+    borderRadius: theme.radius['2xl'],
+    padding: theme.spacing[3],
+    marginTop: theme.spacing[2],
     borderLeftWidth: 3,
     borderLeftColor: colors.primary[600]!,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
+    gap: theme.spacing[1.5],
+    marginBottom: theme.spacing[2],
   },
   headerText: {
     fontSize: 12,
@@ -152,8 +152,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   netRow: {
-    marginTop: 6,
-    paddingTop: 8,
+    marginTop: theme.spacing[1.5],
+    paddingTop: theme.spacing[2],
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.primary[200]!,
   },
@@ -170,12 +170,12 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 12,
     color: colors.text.muted,
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
   },
   errorText: {
     fontSize: 12,
     color: colors.text.subtle,
-    marginLeft: 6,
+    marginLeft: theme.spacing[1.5],
     flex: 1,
   },
 });

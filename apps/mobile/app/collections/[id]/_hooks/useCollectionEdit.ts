@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { appAlert } from '@tarodan/ui-native';
-import { api } from '@/services/api';
+import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { collectionSchema, type CollectionForm, type Collection } from '../_lib/collectionEditSchema';
 

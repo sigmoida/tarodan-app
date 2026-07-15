@@ -45,7 +45,7 @@ export function ProductInfo({
         {tradeOpen && (
           <View style={[styles.badge, { backgroundColor: colors.success[500]! }]}>
             <Ionicons name="swap-horizontal" size={14} color={colors.white} />
-            <Text style={[styles.badgeText, { marginLeft: 4 }]} numberOfLines={1}>
+            <Text style={[styles.badgeText, { marginLeft: theme.spacing[1] }]} numberOfLines={1}>
               Takas Açık
             </Text>
           </View>
@@ -225,17 +225,17 @@ export function ProductInfo({
 }
 
 const styles = StyleSheet.create({
-  badgeRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  badge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16 },
+  badgeRow: { flexDirection: 'row', gap: theme.spacing[2], marginBottom: theme.spacing[3] },
+  badge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: theme.spacing[2.5], paddingVertical: theme.spacing[1.5], borderRadius: theme.radius['3xl'] },
   badgeText: { color: colors.white, fontSize: 12, fontWeight: '600' },
-  title: { fontSize: 22, fontWeight: 'bold', color: colors.text.heading, marginBottom: 8 },
+  title: { fontSize: 22, fontWeight: 'bold', color: colors.text.heading, marginBottom: theme.spacing[2] },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    columnGap: 10,
-    rowGap: 4,
-    marginBottom: 12,
+    columnGap: theme.spacing[2.5],
+    rowGap: theme.spacing[1],
+    marginBottom: theme.spacing[3],
   },
   price: {
     fontSize: 28,
@@ -251,27 +251,27 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
     includeFontPadding: false,
   },
-  discountBadge: { backgroundColor: colors.danger[600]!, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  discountBadge: { backgroundColor: colors.danger[600]!, borderRadius: theme.radius.lg, paddingHorizontal: theme.spacing[2], paddingVertical: 3 },
   discountBadgeText: { color: colors.white, fontSize: 13, fontWeight: '800' },
-  headerRatingRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
+  headerRatingRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing[1], marginTop: theme.spacing[1.5] },
   headerRatingValue: { fontSize: 15, fontWeight: '700', color: colors.text.heading },
   headerRatingCount: { fontSize: 13, color: colors.text.muted },
-  quickInfo: { flexDirection: 'row', gap: 16 },
-  quickInfoItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  quickInfo: { flexDirection: 'row', gap: theme.spacing[4] },
+  quickInfoItem: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing[1] },
   quickInfoText: { fontSize: 13, color: colors.text.muted },
   reservedInfoBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
+    gap: theme.spacing[2],
     backgroundColor: colors.warning[50]!,
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 12,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing[2.5],
+    marginTop: theme.spacing[3],
   },
   reservedInfoText: { flex: 1, fontSize: 13, lineHeight: 18, color: colors.warning[700]! },
-  divider: { marginVertical: 16 },
-  actionGrid: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  actionItem: { flex: 1, alignItems: 'center', gap: 6 },
+  divider: { marginVertical: theme.spacing[4] },
+  actionGrid: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing[2] },
+  actionItem: { flex: 1, alignItems: 'center', gap: theme.spacing[1.5] },
   actionIconWrap: {
     width: 48,
     height: 48,
@@ -281,12 +281,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   actionLabel: { fontSize: 12, lineHeight: 16, color: colors.text.muted, fontWeight: '600', textAlign: 'center' },
-  section: { marginBottom: 8 },
-  sectionTitle: { fontSize: 18, fontWeight: '600', color: colors.text.heading, marginBottom: 12 },
+  section: { marginBottom: theme.spacing[2] },
+  sectionTitle: { fontSize: 18, fontWeight: '600', color: colors.text.heading, marginBottom: theme.spacing[3] },
   specGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-  specItem: { width: '50%', marginBottom: 12 },
-  specLabel: { fontSize: 13, color: colors.text.muted, marginBottom: 2 },
+  specItem: { width: '50%', marginBottom: theme.spacing[3] },
+  specLabel: { fontSize: 13, color: colors.text.muted, marginBottom: theme.spacing[0.5] },
   specValue: { fontSize: 15, fontWeight: '500', color: colors.text.heading },
   description: { fontSize: 15, lineHeight: 22, color: colors.text.heading },
-  readMore: { color: colors.primary[600]!, marginTop: 8, fontWeight: '500' },
+  readMore: { color: colors.primary[600]!, marginTop: theme.spacing[2], fontWeight: '500' },
 });

@@ -117,7 +117,7 @@ function OfferCardBase({
       {/* Message */}
       {offer.message ? (
         <View style={styles.messageBox}>
-          <Ionicons name="chatbubble-outline" size={14} color={colors.text.subtle} style={{ marginTop: 2 }} />
+          <Ionicons name="chatbubble-outline" size={14} color={colors.text.subtle} style={{ marginTop: theme.spacing[0.5] }} />
           <Text style={styles.messageText}>"{offer.message}"</Text>
         </View>
       ) : null}
@@ -227,7 +227,7 @@ function OfferCardBase({
       {offer.status === 'accepted' && offer.orderId && (
         offer.orderStatus === 'pending_payment' ? (
           <TouchableOpacity
-            style={[styles.actionBtn, styles.payBtn, { alignSelf: 'flex-start', marginTop: 12 }]}
+            style={[styles.actionBtn, styles.payBtn, { alignSelf: 'flex-start', marginTop: theme.spacing[3] }]}
             onPress={() =>
               router.push({
                 pathname: '/payment/[id]',
@@ -240,7 +240,7 @@ function OfferCardBase({
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
-            style={[styles.actionBtn, styles.orderBtn, { alignSelf: 'flex-start', marginTop: 12 }]}
+            style={[styles.actionBtn, styles.orderBtn, { alignSelf: 'flex-start', marginTop: theme.spacing[3] }]}
             onPress={() => router.push({ pathname: '/orders/[id]', params: { id: offer.orderId! } } as any)}
           >
             <Ionicons name="cube-outline" size={16} color={colors.white} />
@@ -256,38 +256,38 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface.elevated,
     borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
+    padding: theme.spacing[3.5],
+    marginBottom: theme.spacing[3],
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
   },
-  cardRow: { flexDirection: 'row', gap: 12 },
-  productImage: { width: 80, height: 80, borderRadius: 8, backgroundColor: colors.gray[100]! },
-  cardContent: { flex: 1, gap: 4 },
+  cardRow: { flexDirection: 'row', gap: theme.spacing[3] },
+  productImage: { width: 80, height: 80, borderRadius: theme.radius.xl, backgroundColor: colors.gray[100]! },
+  cardContent: { flex: 1, gap: theme.spacing[1] },
   productTitle: { fontSize: 15, fontWeight: '600', color: colors.text.heading, lineHeight: 20 },
-  originalPrice: { fontSize: 12, color: colors.text.subtle, marginTop: 2 },
+  originalPrice: { fontSize: 12, color: colors.text.subtle, marginTop: theme.spacing[0.5] },
   strikethrough: { textDecorationLine: 'line-through' },
 
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    gap: 4,
-    paddingHorizontal: 8,
+    gap: theme.spacing[1],
+    paddingHorizontal: theme.spacing[2],
     paddingVertical: 3,
-    borderRadius: 6,
-    marginTop: 4,
+    borderRadius: theme.radius.lg,
+    marginTop: theme.spacing[1],
   },
   statusText: { fontSize: 11, fontWeight: '600' },
   counterAlertBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginTop: 6,
+    gap: theme.spacing[1],
+    paddingHorizontal: theme.spacing[2],
+    paddingVertical: theme.spacing[1],
+    borderRadius: theme.radius.lg,
+    marginTop: theme.spacing[1.5],
     backgroundColor: colors.info[600]!,
   },
   counterAlertText: { fontSize: 11, fontWeight: '700', color: colors.white },
@@ -296,55 +296,55 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    gap: 10,
-    marginTop: 12,
+    gap: theme.spacing[2.5],
+    marginTop: theme.spacing[3],
   },
   amountBox: {
     backgroundColor: colors.primary[50]!,
     borderWidth: 1,
     borderColor: colors.primary[100]!,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderRadius: theme.radius.xl,
+    paddingHorizontal: theme.spacing[3],
+    paddingVertical: theme.spacing[2],
   },
-  amountLabel: { fontSize: 10, color: colors.text.subtle, marginBottom: 2 },
+  amountLabel: { fontSize: 10, color: colors.text.subtle, marginBottom: theme.spacing[0.5] },
   amountValue: { fontSize: 20, fontWeight: '700', color: colors.primary[600]! },
   netBox: {
     backgroundColor: colors.success[100]!,
     borderWidth: 1,
     borderColor: colors.success[300]!,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderRadius: theme.radius.xl,
+    paddingHorizontal: theme.spacing[3],
+    paddingVertical: theme.spacing[2],
     flex: 1,
     minWidth: 0,
   },
-  netLabel: { fontSize: 10, color: colors.text.subtle, marginBottom: 2 },
+  netLabel: { fontSize: 10, color: colors.text.subtle, marginBottom: theme.spacing[0.5] },
   netValue: { fontSize: 16, fontWeight: '700', color: colors.success[600]! },
   timeBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: theme.spacing[1],
     backgroundColor: colors.warning[100]!,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: theme.spacing[2.5],
+    paddingVertical: theme.spacing[1.5],
+    borderRadius: theme.radius.xl,
   },
   timeText: { fontSize: 12, fontWeight: '600', color: colors.warning[600]! },
 
-  userRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
-  avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.gray[100]! },
+  userRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing[2], marginTop: theme.spacing[3] },
+  avatar: { width: 32, height: 32, borderRadius: theme.radius['3xl'], backgroundColor: colors.gray[100]! },
   avatarPlaceholder: { justifyContent: 'center', alignItems: 'center' },
   userLabel: { fontSize: 10, color: colors.text.subtle },
   userName: { fontSize: 13, fontWeight: '600', color: colors.text.heading },
 
   messageBox: {
     flexDirection: 'row',
-    gap: 6,
+    gap: theme.spacing[1.5],
     backgroundColor: colors.surface.alt,
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 10,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing[2.5],
+    marginTop: theme.spacing[2.5],
   },
   messageText: {
     flex: 1,
@@ -357,34 +357,34 @@ const styles = StyleSheet.create({
   dateRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 10,
-    paddingTop: 10,
+    gap: theme.spacing[1.5],
+    marginTop: theme.spacing[2.5],
+    paddingTop: theme.spacing[2.5],
     borderTopWidth: 1,
     borderTopColor: colors.border.subtle,
   },
   dateText: { fontSize: 12, color: colors.text.subtle },
 
-  actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+  actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing[2], marginTop: theme.spacing[3] },
   waitingBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: theme.spacing[2],
     flex: 1,
     minWidth: '100%',
     backgroundColor: colors.warning[100]!,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingHorizontal: theme.spacing[3],
+    paddingVertical: theme.spacing[2.5],
+    borderRadius: theme.radius.xl,
   },
   waitingBannerText: { flex: 1, fontSize: 13, color: colors.warning[800]!, lineHeight: 18 },
   actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    paddingHorizontal: 14,
+    paddingHorizontal: theme.spacing[3.5],
     paddingVertical: 9,
-    borderRadius: 8,
+    borderRadius: theme.radius.xl,
   },
   actionBtnText: { color: colors.white, fontSize: 13, fontWeight: '600' },
   acceptBtn: { backgroundColor: colors.success[600]! },

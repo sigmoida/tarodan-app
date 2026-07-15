@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { appAlert } from '@tarodan/ui-native';
 import { useAuthStore } from '@/stores/authStore';
-import { membershipApi } from '@/services/api';
+import { membershipApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
 import {
   TIER_ORDER,

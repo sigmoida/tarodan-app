@@ -1,6 +1,7 @@
 // Data constants for the mobile catalog (scales / brands / conditions).
 // NOTE: the legacy `TarodanColors` hardcoded palette was removed — use
 // `theme.colors` from `@tarodan/ui-native` (design tokens) for colors.
+import { theme } from '@tarodan/ui-native';
 
 // Scale/Size Options matching web
 export const SCALES = [
@@ -37,11 +38,12 @@ export const BRANDS = [
   { id: 'schuco', name: 'Schuco', logoUrl: '/photos/logolar/logo-bmw-schuco-modell-car-toy-diecast-toy-model-car-model-building-siku-toys-png-clipart.jpg' },
 ];
 
-// Condition options
+// Condition options — renkler design token'larına bağlı (#82; eski hex palet kaldırıldı).
+// new/like_new = success (iyi durum), good = info, fair = warning, poor = danger.
 export const CONDITIONS = [
-  { id: 'new', name: 'Sıfır', color: '#00B894' },
-  { id: 'like_new', name: 'Az Kullanılmış', color: '#00CEC9' },
-  { id: 'good', name: 'İyi', color: '#0984E3' },
-  { id: 'fair', name: 'Orta', color: '#FDCB6E' },
-  { id: 'poor', name: 'Hasarlı', color: '#D63031' },
+  { id: 'new', name: 'Sıfır', color: theme.colors.success[500] },
+  { id: 'like_new', name: 'Az Kullanılmış', color: theme.colors.success[500] },
+  { id: 'good', name: 'İyi', color: theme.colors.info[500] },
+  { id: 'fair', name: 'Orta', color: theme.colors.warning[500] },
+  { id: 'poor', name: 'Hasarlı', color: theme.colors.danger[500] },
 ];

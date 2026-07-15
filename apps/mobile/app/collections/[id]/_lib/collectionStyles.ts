@@ -17,7 +17,7 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.surface.DEFAULT,
   },
   loadingText: {
-    marginTop: 16,
+    marginTop: theme.spacing[4],
     color: colors.text.muted,
   },
   coverImage: {
@@ -43,36 +43,36 @@ export const styles = StyleSheet.create({
   },
   headerActions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: theme.spacing[3],
   },
   content: {
     flex: 1,
   },
   infoSection: {
-    padding: 16,
+    padding: theme.spacing[4],
   },
   collectionName: {
     fontSize: 24,
     fontWeight: 'bold',
     color: colors.text.heading,
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   ownerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.gray[50],
-    padding: 12,
+    padding: theme.spacing[3],
     borderRadius: 12,
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   ownerInfo: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
   },
   ownerNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: theme.spacing[1.5],
   },
   ownerName: {
     fontSize: 16,
@@ -82,15 +82,15 @@ export const styles = StyleSheet.create({
   ownerSince: {
     fontSize: 12,
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     backgroundColor: colors.gray[50],
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    padding: theme.spacing[4],
+    marginBottom: theme.spacing[4],
   },
   statItem: {
     alignItems: 'center',
@@ -99,7 +99,7 @@ export const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: colors.text.heading,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   statLabel: {
     fontSize: 12,
@@ -110,11 +110,11 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.primary[50]!,
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    padding: theme.spacing[4],
+    marginBottom: theme.spacing[4],
   },
   valueInfo: {
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
   },
   valueLabel: {
     fontSize: 12,
@@ -129,19 +129,19 @@ export const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     color: colors.text.heading,
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   tagsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
+    gap: theme.spacing[2],
+    marginBottom: theme.spacing[4],
   },
   itemsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginVertical: 16,
+    marginVertical: theme.spacing[4],
   },
   itemsTitle: {
     fontSize: 18,
@@ -155,9 +155,9 @@ export const styles = StyleSheet.create({
   addItemBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    gap: theme.spacing[1],
+    paddingVertical: theme.spacing[1.5],
+    paddingHorizontal: theme.spacing[3],
     borderRadius: 20,
     borderWidth: 1.5,
     borderColor: colors.primary[600]!,
@@ -168,12 +168,12 @@ export const styles = StyleSheet.create({
     color: colors.primary[600]!,
   },
   itemsGrid: {
-    gap: 12,
+    gap: theme.spacing[3],
   },
   itemsEmpty: {
     alignItems: 'center',
-    paddingVertical: 32,
-    gap: 8,
+    paddingVertical: theme.spacing[8],
+    gap: theme.spacing[2],
   },
   itemsEmptyText: {
     color: colors.text.muted,
@@ -191,13 +191,13 @@ export const styles = StyleSheet.create({
   },
   itemInfo: {
     flex: 1,
-    padding: 12,
+    padding: theme.spacing[3],
   },
   itemTitle: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.text.heading,
-    marginBottom: 4,
+    marginBottom: theme.spacing[1],
   },
   itemMeta: {
     fontSize: 12,
@@ -206,30 +206,30 @@ export const styles = StyleSheet.create({
   itemYear: {
     fontSize: 12,
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   itemValue: {
     fontSize: 13,
     fontWeight: '600',
     color: colors.primary[600]!,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   itemNotes: {
     fontSize: 11,
     color: colors.text.muted,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
     fontStyle: 'italic',
   },
   guestNotice: {
     flexDirection: 'row',
     backgroundColor: colors.gray[50],
-    margin: 16,
+    margin: theme.spacing[4],
     borderRadius: 12,
-    padding: 16,
+    padding: theme.spacing[4],
   },
   noticeContent: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
   },
   noticeTitle: {
     fontSize: 16,
@@ -239,10 +239,10 @@ export const styles = StyleSheet.create({
   noticeText: {
     fontSize: 13,
     color: colors.text.muted,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
     lineHeight: 18,
   },
   noticeButton: {
-    marginTop: 12,
+    marginTop: theme.spacing[3],
   },
 });

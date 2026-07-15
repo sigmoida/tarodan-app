@@ -4,7 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme, Text, Spinner, Divider, ScreenHeader } from '@tarodan/ui-native';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { ratingsApi } from '@/services/api';
+import { ratingsApi } from '@/lib/api';
 
 const { colors } = theme;
 
@@ -190,10 +190,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: theme.spacing[8],
   },
   listContent: {
-    padding: 16,
+    padding: theme.spacing[4],
   },
   emptyContent: {
     flexGrow: 1,
@@ -201,16 +201,16 @@ const styles = StyleSheet.create({
   summary: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: theme.spacing[3],
     backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    padding: theme.spacing[4],
+    marginBottom: theme.spacing[3],
   },
   summaryScore: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: theme.spacing[1],
   },
   summaryScoreText: {
     fontSize: 22,
@@ -224,13 +224,13 @@ const styles = StyleSheet.create({
   reviewCard: {
     backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
-    padding: 16,
+    padding: theme.spacing[4],
   },
   reviewHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   reviewerName: {
     fontSize: 14,
@@ -239,13 +239,13 @@ const styles = StyleSheet.create({
   },
   ratingStars: {
     flexDirection: 'row',
-    gap: 2,
+    gap: theme.spacing[0.5],
   },
   reviewTitle: {
     fontSize: 14,
     fontWeight: '700',
     color: colors.text.heading,
-    marginBottom: 2,
+    marginBottom: theme.spacing[0.5],
   },
   reviewComment: {
     fontSize: 14,
@@ -255,19 +255,19 @@ const styles = StyleSheet.create({
   reviewDate: {
     fontSize: 12,
     color: colors.text.muted,
-    marginTop: 8,
+    marginTop: theme.spacing[2],
   },
   separator: {
-    marginVertical: 8,
+    marginVertical: theme.spacing[2],
     backgroundColor: 'transparent',
   },
   noReviews: {
     fontSize: 14,
     color: colors.text.muted,
     fontStyle: 'italic',
-    marginTop: 12,
+    marginTop: theme.spacing[3],
   },
   footer: {
-    paddingVertical: 16,
+    paddingVertical: theme.spacing[4],
   },
 });

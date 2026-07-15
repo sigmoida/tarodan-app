@@ -3,7 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation } from '@tanstack/react-query';
 import { theme, Text, Button, Modal, Input, Textarea, useModalMessage, ModalMessage } from '@tarodan/ui-native';
-import { offersApi } from '../../services/api';
+import { offersApi } from '@/lib/api';
 import { formatPrice } from '../../utils/format';
 
 const { colors } = theme;
@@ -158,15 +158,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.text.heading,
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   priceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 8,
+    paddingVertical: theme.spacing[2],
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border.DEFAULT,
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
   },
   priceLabel: {
     fontSize: 13,
@@ -178,16 +178,16 @@ const styles = StyleSheet.create({
     color: colors.text.heading,
   },
   input: {
-    marginBottom: 10,
+    marginBottom: theme.spacing[2.5],
   },
   discountInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: theme.spacing[1.5],
     backgroundColor: colors.success[50]!,
-    padding: 8,
-    borderRadius: 8,
-    marginBottom: 12,
+    padding: theme.spacing[2],
+    borderRadius: theme.radius.xl,
+    marginBottom: theme.spacing[3],
   },
   discountText: {
     flex: 1,
@@ -198,11 +198,11 @@ const styles = StyleSheet.create({
   warning: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 6,
+    gap: theme.spacing[1.5],
     backgroundColor: colors.info[50]!,
-    padding: 10,
-    borderRadius: 8,
-    marginTop: 4,
+    padding: theme.spacing[2.5],
+    borderRadius: theme.radius.xl,
+    marginTop: theme.spacing[1],
   },
   warningText: {
     flex: 1,
@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 8,
-    marginTop: 12,
+    gap: theme.spacing[2],
+    marginTop: theme.spacing[3],
   },
 });

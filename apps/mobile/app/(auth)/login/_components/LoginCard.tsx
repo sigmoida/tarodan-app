@@ -20,7 +20,7 @@ export function LoginCard({ f }: { f: LoginController }) {
       <Text variant="h3" align="center">
         Tekrar hoş geldiniz
       </Text>
-      <Text variant="bodySm" tone="muted" align="center" style={{ marginBottom: 16 }}>
+      <Text variant="bodySm" tone="muted" align="center" style={{ marginBottom: theme.spacing[4] }}>
         Hesabınıza giriş yapın
       </Text>
 
@@ -33,7 +33,7 @@ export function LoginCard({ f }: { f: LoginController }) {
             adresi henüz doğrulanmadı. Hesabınızı kullanmak için e-posta adresinize
             gönderilen bağlantıya tıklayın veya yeni bir bağlantı isteyin.
           </Text>
-          <HStack gap={2} style={{ marginTop: 8 }}>
+          <HStack gap={2} style={{ marginTop: theme.spacing[2] }}>
             <Button
               variant="outline"
               size="sm"
@@ -102,7 +102,7 @@ export function LoginCard({ f }: { f: LoginController }) {
           variant="bodySm"
           tone="danger"
           align="center"
-          style={{ marginBottom: 8 }}
+          style={{ marginBottom: theme.spacing[2] }}
         >
           {f.errorMessage || 'Giriş başarısız.'}
         </Text>
@@ -179,7 +179,7 @@ export function LoginCard({ f }: { f: LoginController }) {
         title="Misafir Olarak Devam Et"
         onPress={f.continueAsGuest}
         disabled={f.loginMutation.isPending}
-        style={{ marginTop: 12 }}
+        style={{ marginTop: theme.spacing[3] }}
       />
     </View>
   );

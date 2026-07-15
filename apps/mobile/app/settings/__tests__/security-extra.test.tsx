@@ -25,7 +25,7 @@ jest.mock('@/stores/authStore', () => ({
 }));
 
 // API — fn'ler factory içinde, sonra import
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   authApi: {
     getTwoFactorStatus: jest.fn(() => Promise.resolve({ data: { isEnabled: false } })),
     setupTwoFactor: jest.fn(),
@@ -36,7 +36,7 @@ jest.mock('@/services/api', () => ({
     logoutAll: jest.fn(),
   },
 }));
-import { authApi } from '@/services/api';
+import { authApi } from '@/lib/api';
 import SecuritySettingsScreen from '../security';
 
 const mockLogoutAll = authApi.logoutAll as jest.Mock;

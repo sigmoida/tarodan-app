@@ -12,22 +12,22 @@ export const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.primary[600]!,
     paddingTop: 50,
-    paddingBottom: 12,
-    paddingHorizontal: 8,
+    paddingBottom: theme.spacing[3],
+    paddingHorizontal: theme.spacing[2],
     flexDirection: "row",
     alignItems: "center",
   },
   backButton: {
-    padding: 8,
+    padding: theme.spacing[2],
   },
   headerContent: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
   },
   headerInfo: {
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
     flex: 1,
   },
   headerTitle: {
@@ -43,13 +43,13 @@ export const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: colors.surface.DEFAULT,
-    padding: 12,
+    padding: theme.spacing[3],
     borderBottomWidth: 1,
     borderBottomColor: colors.border.DEFAULT,
   },
   productBannerText: {
     flex: 1,
-    marginHorizontal: 8,
+    marginHorizontal: theme.spacing[2],
     color: colors.text.heading,
     fontSize: 13,
   },
@@ -65,12 +65,12 @@ export const styles = StyleSheet.create({
     opacity: 0,
   },
   messagesContent: {
-    padding: 16,
+    padding: theme.spacing[4],
   },
   dateDivider: {
     flexDirection: "row",
     alignItems: "center",
-    marginVertical: 16,
+    marginVertical: theme.spacing[4],
   },
   dateDividerLine: {
     flex: 1,
@@ -78,13 +78,13 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.border.DEFAULT,
   },
   dateDividerText: {
-    paddingHorizontal: 12,
+    paddingHorizontal: theme.spacing[3],
     fontSize: 12,
     color: colors.text.muted,
   },
   messageRow: {
     flexDirection: "row",
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   messageRowOwn: {
     justifyContent: "flex-end",
@@ -94,31 +94,31 @@ export const styles = StyleSheet.create({
   },
   avatarPlaceholder: {
     width: 36,
-    marginRight: 8,
+    marginRight: theme.spacing[2],
   },
   messageBubble: {
     maxWidth: "75%",
-    padding: 12,
-    borderRadius: 16,
+    padding: theme.spacing[3],
+    borderRadius: theme.radius['3xl'],
   },
   messageBubbleOwn: {
     backgroundColor: colors.primary[600]!,
-    borderBottomRightRadius: 4,
+    borderBottomRightRadius: theme.radius.md,
   },
   messageBubbleOther: {
     backgroundColor: colors.surface.DEFAULT,
-    borderBottomLeftRadius: 4,
+    borderBottomLeftRadius: theme.radius.md,
   },
   messageImagesWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 6,
-    marginBottom: 6,
+    gap: theme.spacing[1.5],
+    marginBottom: theme.spacing[1.5],
   },
   messageImage: {
     width: 160,
     height: 160,
-    borderRadius: 8,
+    borderRadius: theme.radius.xl,
     backgroundColor: colors.surface.alt,
   },
   messageText: {
@@ -134,7 +134,7 @@ export const styles = StyleSheet.create({
   messageFooter: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 4,
+    marginTop: theme.spacing[1],
     justifyContent: "flex-end",
   },
   messageTime: {
@@ -147,7 +147,7 @@ export const styles = StyleSheet.create({
     color: colors.text.muted,
   },
   messageStatus: {
-    marginLeft: 4,
+    marginLeft: theme.spacing[1],
     fontSize: 11,
     color: colors.overlay.white70,
   },
@@ -159,7 +159,7 @@ export const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
     alignItems: "flex-end",
-    padding: 12,
+    padding: theme.spacing[3],
     backgroundColor: colors.surface.DEFAULT,
     borderTopWidth: 1,
     borderTopColor: colors.border.DEFAULT,
@@ -168,9 +168,9 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.surface.alt,
     borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 8,
+    paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing[2],
+    marginRight: theme.spacing[2],
     maxHeight: 120,
   },
   textInput: {
@@ -196,7 +196,7 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.surface.alt,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 8,
+    marginRight: theme.spacing[2],
   },
   attachButtonDisabled: {
     opacity: 0.5,
@@ -204,8 +204,8 @@ export const styles = StyleSheet.create({
   pendingImageBar: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: theme.spacing[3],
+    paddingVertical: theme.spacing[2],
     backgroundColor: colors.surface.DEFAULT,
     borderTopWidth: 1,
     borderTopColor: colors.border.DEFAULT,
@@ -213,16 +213,16 @@ export const styles = StyleSheet.create({
   pendingImageThumb: {
     width: 56,
     height: 56,
-    borderRadius: 8,
+    borderRadius: theme.radius.xl,
     backgroundColor: colors.surface.alt,
   },
   pendingImageText: {
     flex: 1,
-    marginHorizontal: 12,
+    marginHorizontal: theme.spacing[3],
     fontSize: 14,
     color: colors.text.muted,
   },
   pendingImageRemove: {
-    padding: 4,
+    padding: theme.spacing[1],
   },
 });

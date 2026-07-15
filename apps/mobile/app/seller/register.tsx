@@ -124,17 +124,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface.alt,
   },
   scrollBody: {
-    padding: 16,
-    gap: 12,
-    paddingBottom: 40,
+    padding: theme.spacing[4],
+    gap: theme.spacing[3],
+    paddingBottom: theme.spacing[10],
   },
   infoCard: {
     flexDirection: 'row',
-    gap: 8,
+    gap: theme.spacing[2],
     alignItems: 'flex-start',
     backgroundColor: colors.success[50]!,
-    padding: 12,
-    borderRadius: 10,
+    padding: theme.spacing[3],
+    borderRadius: theme.radius['2xl'],
   },
   infoCardText: {
     flex: 1,
@@ -144,19 +144,19 @@ const styles = StyleSheet.create({
   benefitsCard: {
     backgroundColor: colors.primary[50]!,
     borderRadius: 12,
-    padding: 14,
-    gap: 8,
+    padding: theme.spacing[3.5],
+    gap: theme.spacing[2],
   },
   benefitsTitle: {
     fontSize: 15,
     fontWeight: '700',
     color: colors.primary[600]!,
-    marginBottom: 4,
+    marginBottom: theme.spacing[1],
   },
   benefitRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: theme.spacing[2],
   },
   benefitText: {
     flex: 1,
@@ -165,11 +165,11 @@ const styles = StyleSheet.create({
   },
   noteCard: {
     flexDirection: 'row',
-    gap: 8,
+    gap: theme.spacing[2],
     alignItems: 'flex-start',
     backgroundColor: colors.info[50]!,
-    padding: 12,
-    borderRadius: 10,
+    padding: theme.spacing[3],
+    borderRadius: theme.radius['2xl'],
   },
   noteText: {
     flex: 1,
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   submitBtn: {
-    borderRadius: 10,
-    marginTop: 8,
+    borderRadius: theme.radius['2xl'],
+    marginTop: theme.spacing[2],
   },
 });

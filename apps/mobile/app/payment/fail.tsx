@@ -4,7 +4,7 @@ import { Button, Spinner, Text, theme } from '@tarodan/ui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { paymentsApi } from '@/services/api';
+import { paymentsApi } from '@/lib/api';
 
 const { colors } = theme;
 
@@ -76,7 +76,7 @@ export default function PaymentFailScreen() {
         <Text style={styles.subtitle}>{reason}</Text>
 
         {loading ? (
-          <View style={{ marginTop: 24 }}>
+          <View style={{ marginTop: theme.spacing[6] }}>
             <Spinner size="md" />
           </View>
         ) : null}
@@ -136,11 +136,11 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
-    gap: 10,
+    padding: theme.spacing[6],
+    gap: theme.spacing[2.5],
   },
   iconWrap: {
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   title: {
     fontSize: 26,
@@ -156,13 +156,13 @@ const styles = StyleSheet.create({
   },
   hintCard: {
     flexDirection: 'row',
-    gap: 8,
+    gap: theme.spacing[2],
     alignItems: 'flex-start',
     width: '100%',
     backgroundColor: colors.info[50]!,
-    borderRadius: 10,
-    padding: 12,
-    marginTop: 16,
+    borderRadius: theme.radius['2xl'],
+    padding: theme.spacing[3],
+    marginTop: theme.spacing[4],
   },
   hintText: {
     flex: 1,
@@ -172,10 +172,10 @@ const styles = StyleSheet.create({
   },
   actions: {
     width: '100%',
-    marginTop: 24,
-    gap: 10,
+    marginTop: theme.spacing[6],
+    gap: theme.spacing[2.5],
   },
   btn: {
-    borderRadius: 10,
+    borderRadius: theme.radius['2xl'],
   },
 });

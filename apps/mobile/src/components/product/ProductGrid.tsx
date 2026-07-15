@@ -155,7 +155,7 @@ export function ProductGrid({
 
 const styles = StyleSheet.create({
   gridItemWrap: {
-    paddingHorizontal: 0,
+    paddingHorizontal: theme.spacing[0],
   },
   listItemWrap: {
     width: '100%',

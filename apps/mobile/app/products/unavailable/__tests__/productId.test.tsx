@@ -38,10 +38,10 @@ jest.mock('@/i18n', () => {
   };
 });
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   productsApi: { getOne: jest.fn(), getSimilar: jest.fn() },
 }));
-import { productsApi } from '@/services/api';
+import { productsApi } from '@/lib/api';
 
 import ProductUnavailableScreen from '../[productId]';
 

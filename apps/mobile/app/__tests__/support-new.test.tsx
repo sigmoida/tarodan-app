@@ -9,10 +9,10 @@ import { TextInput } from 'react-native';
 import { screen, fireEvent, waitFor } from '@testing-library/react-native';
 import { renderWithProviders } from '@/test-utils';
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   supportApi: { createTicket: jest.fn() },
 }));
-import { supportApi } from '@/services/api';
+import { supportApi } from '@/lib/api';
 const mockCreateTicket = supportApi.createTicket as jest.Mock;
 
 jest.mock('expo-router', () => ({

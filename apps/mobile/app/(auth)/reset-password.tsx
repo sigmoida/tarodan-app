@@ -12,7 +12,7 @@ import {
   VStack,
   theme,
 } from '@tarodan/ui-native';
-import { authApi } from '@/services/api';
+import { authApi } from '@/lib/api';
 import { useTranslation } from '@/i18n';
 
 const { colors, radius, spacing } = theme;

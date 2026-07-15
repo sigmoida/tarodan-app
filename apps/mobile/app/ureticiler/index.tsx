@@ -4,7 +4,7 @@ import { View, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-nativ
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { manufacturersApi } from '@/services/api';
+import { manufacturersApi } from '@/lib/api';
 import { theme, Text, Input } from '@tarodan/ui-native';
 import { ScreenHeader, ScreenLoader, ErrorState, EmptyState } from '@/components/common';
 import { resolveImageUrl } from '@/utils/imageUrl';
@@ -109,27 +109,27 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface.alt,
   },
   searchBar: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 4,
+    marginHorizontal: theme.spacing[4],
+    marginTop: theme.spacing[3],
+    marginBottom: theme.spacing[1],
   },
   list: {
-    padding: 16,
+    padding: theme.spacing[4],
   },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
-    padding: 12,
-    gap: 12,
+    padding: theme.spacing[3],
+    gap: theme.spacing[3],
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border.DEFAULT,
   },
   logoWrap: {
     width: 52,
     height: 52,
-    borderRadius: 10,
+    borderRadius: theme.radius['2xl'],
     backgroundColor: colors.surface.alt,
     alignItems: 'center',
     justifyContent: 'center',
@@ -154,6 +154,6 @@ const styles = StyleSheet.create({
   count: {
     fontSize: 12,
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
 });

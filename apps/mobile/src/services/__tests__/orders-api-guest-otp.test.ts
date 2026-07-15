@@ -1,4 +1,4 @@
-import { ordersApi, guestApi } from '../api';
+import { ordersApi, guestApi } from '@/lib/api';
 
 const mockPost = jest.fn(() => Promise.resolve({ data: { success: true, expiresInSeconds: 180 } }));
 

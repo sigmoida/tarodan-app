@@ -22,7 +22,7 @@ export default function MaintenanceScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surface.DEFAULT },
-  content: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  title: { marginTop: 16, fontWeight: 'bold', color: colors.text.heading },
-  text: { marginTop: 8, textAlign: 'center', color: colors.text.muted },
+  content: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: theme.spacing[6] },
+  title: { marginTop: theme.spacing[4], fontWeight: 'bold', color: colors.text.heading },
+  text: { marginTop: theme.spacing[2], textAlign: 'center', color: colors.text.muted },
 });

@@ -97,12 +97,12 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    padding: 24,
-    paddingTop: 80,
+    padding: theme.spacing[6],
+    paddingTop: theme.spacing[20],
   },
   iconContainer: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
   },
   iconCircle: {
     width: 100,
@@ -117,11 +117,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.text.heading,
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
   },
   orderIdContainer: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   orderIdLabel: {
     fontSize: 13,
@@ -131,32 +131,32 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: colors.primary[600]!,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   description: {
     fontSize: 15,
     color: colors.text.muted,
     textAlign: 'center',
     lineHeight: 22,
-    marginBottom: 32,
+    marginBottom: theme.spacing[8],
   },
   infoCard: {
-    marginBottom: 32,
+    marginBottom: theme.spacing[8],
     backgroundColor: colors.surface.alt,
   },
   infoItem: {
     flexDirection: 'row',
-    marginBottom: 20,
+    marginBottom: theme.spacing[5],
   },
   infoContent: {
     flex: 1,
-    marginLeft: 16,
+    marginLeft: theme.spacing[4],
   },
   infoTitle: {
     fontSize: 15,
     fontWeight: '600',
     color: colors.text.heading,
-    marginBottom: 4,
+    marginBottom: theme.spacing[1],
   },
   infoText: {
     fontSize: 13,
@@ -164,12 +164,12 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   buttons: {
-    gap: 12,
-    marginBottom: 24,
+    gap: theme.spacing[3],
+    marginBottom: theme.spacing[6],
   },
   primaryButton: {
     borderRadius: 12,
-    paddingVertical: 4,
+    paddingVertical: theme.spacing[1],
   },
   secondaryButton: {
     borderRadius: 12,

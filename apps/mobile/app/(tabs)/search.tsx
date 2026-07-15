@@ -60,6 +60,11 @@ export default function SearchScreen() {
             columnWrapperStyle={styles.listRow}
             keyExtractor={(item, index) => `${item.id}-${index}`}
             renderItem={renderResult}
+            // #82: virtualizasyon ayarı — sonsuz arama sonuçlarında bellek/kaydırma.
+            windowSize={7}
+            initialNumToRender={8}
+            maxToRenderPerBatch={10}
+            removeClippedSubviews
             showsVerticalScrollIndicator={false}
             onScroll={f.handleResultsScroll}
             scrollEventThrottle={16}

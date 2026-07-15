@@ -3,7 +3,7 @@ import { View, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-nat
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { theme, Text, Button, Modal, Input, Textarea, Spinner, useModalMessage, ModalMessage } from '@tarodan/ui-native';
-import { collectionsApi } from '../../services/api';
+import { collectionsApi } from '@/lib/api';
 import { qk } from '@/lib/query';
 import { transformImageUrl } from '../../utils/imageUrl';
 
@@ -279,24 +279,24 @@ const styles = StyleSheet.create({
     maxHeight: 380,
   },
   loading: {
-    paddingVertical: 32,
+    paddingVertical: theme.spacing[8],
     alignItems: 'center',
   },
   empty: {
     alignItems: 'center',
-    padding: 24,
+    padding: theme.spacing[6],
   },
   emptyText: {
     fontSize: 13,
     color: colors.text.muted,
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: theme.spacing[2],
   },
   createNewRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing[3.5],
     backgroundColor: colors.primary[50]!,
   },
   createIcon: {
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.surface.DEFAULT,
-    marginRight: 12,
+    marginRight: theme.spacing[3],
   },
   createText: {
     fontSize: 14,
@@ -316,19 +316,19 @@ const styles = StyleSheet.create({
   collectionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing[3.5],
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border.subtle,
   },
   cover: {
     width: 40,
     height: 40,
-    borderRadius: 8,
+    borderRadius: theme.radius.xl,
     backgroundColor: colors.surface.alt,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: theme.spacing[3],
     overflow: 'hidden',
   },
   coverImage: {
@@ -343,16 +343,16 @@ const styles = StyleSheet.create({
   collectionMeta: {
     fontSize: 12,
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   input: {
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
   },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 8,
+    gap: theme.spacing[2],
+    paddingVertical: theme.spacing[2],
   },
   toggleText: {
     flex: 1,
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 8,
-    marginTop: 12,
+    gap: theme.spacing[2],
+    marginTop: theme.spacing[3],
   },
 });

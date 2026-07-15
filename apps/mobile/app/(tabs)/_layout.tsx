@@ -1,27 +1,19 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '@tarodan/ui-native';
-import { useMessagesStore } from '@/stores/messagesStore';
-import { useAuthStore } from '@/stores/authStore';
+import { useUnreadCountQuery } from '@/hooks/messaging';
 import { useTranslation } from '@/i18n';
 
 const { colors } = theme;
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
-  const { getUnreadCount, fetchUnreadCount } = useMessagesStore();
-  const { isAuthenticated } = useAuthStore();
   const { t } = useTranslation();
-  const unreadCount = getUnreadCount();
-
-  // Tab-bar mesaj rozetini app açılışında doğru göster (messages sekmesi ziyaret
-  // edilmeden) — sayfalama bağımsız sunucu toplamı.
-  useEffect(() => {
-    if (isAuthenticated) fetchUnreadCount();
-  }, [isAuthenticated, fetchUnreadCount]);
+  // Tab-bar mesaj rozeti — sayfalama bağımsız sunucu toplamı (#77, React Query;
+  // enabled:isAuthenticated ile app açılışında messages sekmesi gerekmeden çeker).
+  const { data: unreadCount = 0 } = useUnreadCountQuery();
   const tabBarBottom = Math.max(insets.bottom, 8);
 
   return (
@@ -33,7 +25,7 @@ export default function TabLayout() {
           backgroundColor: colors.surface.DEFAULT,
           borderTopColor: colors.border.subtle,
           borderTopWidth: 1,
-          paddingTop: 8,
+          paddingTop: theme.spacing[2],
           paddingBottom: tabBarBottom,
           height: 56 + tabBarBottom,
           elevation: 10,
@@ -45,7 +37,7 @@ export default function TabLayout() {
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '600',
-          marginTop: 2,
+          marginTop: theme.spacing[0.5],
         },
         headerShown: false,
       }}
@@ -83,7 +75,7 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="messages"
+        name="messages/index"
         options={{
           title: t('message.messages'),
           tabBarAccessibilityLabel: t('message.messages'),
@@ -119,7 +111,7 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="notifications"
+        name="notifications/index"
         options={{
           href: null,
         }}

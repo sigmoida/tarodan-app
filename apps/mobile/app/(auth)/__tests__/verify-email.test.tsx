@@ -24,10 +24,10 @@ jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => mockAuth,
 }));
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   authApi: { verifyEmail: jest.fn(), resendVerification: jest.fn() },
 }));
-import { authApi } from '@/services/api';
+import { authApi } from '@/lib/api';
 
 import VerifyEmailScreen from '../verify-email';
 

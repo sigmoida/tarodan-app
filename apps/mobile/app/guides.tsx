@@ -156,25 +156,25 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 20,
+    padding: theme.spacing[5],
   },
   intro: {
     fontSize: 14,
     color: colors.text.muted,
     lineHeight: 22,
-    marginBottom: 20,
+    marginBottom: theme.spacing[5],
   },
   guideCard: {
     backgroundColor: colors.surface.alt,
     borderRadius: 12,
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
     overflow: 'hidden',
   },
   guideHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    padding: theme.spacing[4],
   },
   guideHeaderLeft: {
     flexDirection: 'row',
@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary[50]!,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: theme.spacing[3],
   },
   guideTitle: {
     fontSize: 15,
@@ -197,16 +197,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   guideContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingHorizontal: theme.spacing[4],
+    paddingBottom: theme.spacing[4],
     borderTopWidth: 1,
     borderTopColor: colors.border.DEFAULT,
-    paddingTop: 12,
+    paddingTop: theme.spacing[3],
   },
   stepRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 10,
+    marginBottom: theme.spacing[2.5],
   },
   stepNumber: {
     width: 24,
@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary[600]!,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+    marginRight: theme.spacing[2.5],
     marginTop: 1,
   },
   stepNumberText: {

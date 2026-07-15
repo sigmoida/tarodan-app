@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { userApi, collectionsApi, membershipApi } from '@/services/api';
+import { userApi, collectionsApi, membershipApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import type { ProfileCollection } from '../_lib/profileConstants';
 

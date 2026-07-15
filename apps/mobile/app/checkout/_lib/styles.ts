@@ -13,7 +13,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: theme.spacing[5],
     backgroundColor: colors.surface.DEFAULT,
   },
   progressStep: {
@@ -23,7 +23,7 @@ export const styles = StyleSheet.create({
   progressCircle: {
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: theme.radius['3xl'],
     backgroundColor: colors.border.DEFAULT,
     justifyContent: 'center',
     alignItems: 'center',
@@ -42,7 +42,7 @@ export const styles = StyleSheet.create({
   progressLabel: {
     fontSize: 12,
     color: colors.text.muted,
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
   },
   progressLabelActive: {
     color: colors.primary[600]!,
@@ -52,47 +52,47 @@ export const styles = StyleSheet.create({
     width: 30,
     height: 2,
     backgroundColor: colors.border.DEFAULT,
-    marginHorizontal: 8,
+    marginHorizontal: theme.spacing[2],
   },
   progressLineActive: {
     backgroundColor: colors.primary[600]!,
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: theme.spacing[4],
   },
   section: {
     backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    padding: theme.spacing[4],
+    marginBottom: theme.spacing[4],
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: colors.text.heading,
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
   },
   guestNotice: {
     flexDirection: 'row',
     backgroundColor: colors.warning[50]!,
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
+    padding: theme.spacing[3],
+    borderRadius: theme.radius.xl,
+    marginBottom: theme.spacing[4],
   },
   guestNoticeText: {
     flex: 1,
     fontSize: 13,
     color: colors.warning[600]!,
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
   },
   input: {
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
     backgroundColor: colors.surface.DEFAULT,
   },
   helperText: {
@@ -100,7 +100,7 @@ export const styles = StyleSheet.create({
     color: colors.text.muted,
   },
   loginLink: {
-    marginTop: 8,
+    marginTop: theme.spacing[2],
   },
   loginLinkText: {
     color: colors.primary[600]!,
@@ -109,10 +109,10 @@ export const styles = StyleSheet.create({
   optionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: theme.spacing[3],
     backgroundColor: colors.surface.alt,
     borderRadius: 12,
-    marginBottom: 10,
+    marginBottom: theme.spacing[2.5],
     borderWidth: 2,
     borderColor: 'transparent',
   },
@@ -122,7 +122,7 @@ export const styles = StyleSheet.create({
   },
   optionContent: {
     flex: 1,
-    marginLeft: 4,
+    marginLeft: theme.spacing[1],
   },
   optionTitle: {
     fontSize: 15,
@@ -132,7 +132,7 @@ export const styles = StyleSheet.create({
   optionDescription: {
     fontSize: 12,
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   optionPrice: {
     fontSize: 15,
@@ -142,11 +142,11 @@ export const styles = StyleSheet.create({
   savedAddressRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
+    gap: theme.spacing[3],
     backgroundColor: colors.surface.alt,
     borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
+    padding: theme.spacing[3],
+    marginBottom: theme.spacing[2],
     borderWidth: 2,
     borderColor: 'transparent',
   },
@@ -162,7 +162,7 @@ export const styles = StyleSheet.create({
   addressLine: {
     fontSize: 12,
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   defaultBadge: {
     fontSize: 11,
@@ -172,13 +172,13 @@ export const styles = StyleSheet.create({
   paytrNotice: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
-    padding: 12,
-    borderRadius: 10,
+    gap: theme.spacing[2],
+    padding: theme.spacing[3],
+    borderRadius: theme.radius['2xl'],
     backgroundColor: colors.success[50]!,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.success[600]!,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   paytrNoticeText: {
     flex: 1,
@@ -187,8 +187,8 @@ export const styles = StyleSheet.create({
     color: colors.success[800] ?? colors.success[600]!,
   },
   providerChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: theme.spacing[3.5],
+    paddingVertical: theme.spacing[2],
     borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
@@ -208,17 +208,17 @@ export const styles = StyleSheet.create({
   orderItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
   },
   orderItemImage: {
     width: 60,
     height: 60,
-    borderRadius: 8,
+    borderRadius: theme.radius.xl,
     backgroundColor: colors.surface.alt,
   },
   orderItemInfo: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
   },
   orderItemTitle: {
     fontSize: 14,
@@ -228,7 +228,7 @@ export const styles = StyleSheet.create({
   orderItemMeta: {
     fontSize: 12,
     color: colors.text.muted,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
   orderItemPrice: {
     fontSize: 16,
@@ -238,12 +238,12 @@ export const styles = StyleSheet.create({
   securityNotice: {
     flexDirection: 'row',
     backgroundColor: colors.success[50]!,
-    padding: 16,
+    padding: theme.spacing[4],
     borderRadius: 12,
   },
   securityContent: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
   },
   securityTitle: {
     fontSize: 14,
@@ -253,23 +253,23 @@ export const styles = StyleSheet.create({
   securityText: {
     fontSize: 13,
     color: colors.success[600]!,
-    marginTop: 4,
+    marginTop: theme.spacing[1],
   },
   orderSummary: {
     backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
-    padding: 16,
+    padding: theme.spacing[4],
   },
   orderSummaryTitle: {
     fontSize: 16,
     fontWeight: 'bold',
     color: colors.text.heading,
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   orderSummaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   orderSummaryLabel: {
     fontSize: 14,
@@ -291,7 +291,7 @@ export const styles = StyleSheet.create({
   },
   bottomBar: {
     backgroundColor: colors.surface.DEFAULT,
-    padding: 16,
+    padding: theme.spacing[4],
     borderTopWidth: 1,
     borderTopColor: colors.border.DEFAULT,
   },
@@ -300,25 +300,25 @@ export const styles = StyleSheet.create({
   },
   continueButton: {
     alignSelf: 'flex-end',
-    paddingHorizontal: 32,
+    paddingHorizontal: theme.spacing[8],
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.surface.alt,
-    padding: 20,
+    padding: theme.spacing[5],
   },
   emptyTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: colors.text.heading,
-    marginTop: 16,
+    marginTop: theme.spacing[4],
   },
   emptySubtitle: {
     fontSize: 14,
     color: colors.text.muted,
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: theme.spacing[2],
   },
 });

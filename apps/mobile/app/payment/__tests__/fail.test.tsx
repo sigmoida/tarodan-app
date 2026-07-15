@@ -13,7 +13,7 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
 }));
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   paymentsApi: {
     confirmFailed: jest.fn(() => Promise.resolve(null)),
     getStatus: jest.fn(),
@@ -21,7 +21,7 @@ jest.mock('@/services/api', () => ({
     retry: jest.fn(),
   },
 }));
-import { paymentsApi } from '@/services/api';
+import { paymentsApi } from '@/lib/api';
 import { router } from 'expo-router';
 
 import PaymentFailScreen from '../fail';

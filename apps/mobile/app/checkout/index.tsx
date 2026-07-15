@@ -26,7 +26,7 @@ export default function CheckoutScreen() {
           variant="primary"
           title="Alışverişe Başla"
           onPress={() => router.replace('/' as any)}
-          style={{ marginTop: 20, alignSelf: 'center' }}
+          style={{ marginTop: theme.spacing[5], alignSelf: 'center' }}
         />
       </View>
     );

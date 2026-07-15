@@ -16,14 +16,14 @@ export const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: theme.spacing[4],
   },
   coverImageContainer: {
     width: '100%',
     height: 160,
     borderRadius: 12,
     overflow: 'hidden',
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     backgroundColor: colors.surface.DEFAULT,
   },
   coverImage: {
@@ -40,7 +40,7 @@ export const styles = StyleSheet.create({
     borderRadius: 12,
   },
   coverImageText: {
-    marginTop: 8,
+    marginTop: theme.spacing[2],
     color: colors.text.muted,
   },
   coverOverlay: {
@@ -52,37 +52,37 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 8,
+    padding: theme.spacing[2],
   },
   coverOverlayText: {
     color: colors.white,
-    marginLeft: 8,
+    marginLeft: theme.spacing[2],
   },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     backgroundColor: colors.surface.DEFAULT,
-    padding: 16,
+    padding: theme.spacing[4],
     borderRadius: 12,
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   statItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: theme.spacing[1],
   },
   card: {
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     backgroundColor: colors.surface.DEFAULT,
-    padding: 16,
+    padding: theme.spacing[4],
     borderRadius: 12,
   },
   sectionTitle: {
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     color: colors.text.heading,
   },
   input: {
-    marginBottom: 12,
+    marginBottom: theme.spacing[3],
   },
   privacyOption: {
     flexDirection: 'row',
@@ -95,7 +95,7 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   privacyText: {
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
   },
   privacyDesc: {
     color: colors.text.muted,
@@ -104,20 +104,20 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   emptyItems: {
     alignItems: 'center',
-    padding: 24,
+    padding: theme.spacing[6],
   },
   emptyText: {
-    marginTop: 8,
+    marginTop: theme.spacing[2],
     color: colors.text.muted,
   },
   collectionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: theme.spacing[2],
     borderBottomWidth: 1,
     borderBottomColor: colors.border.DEFAULT,
   },
@@ -129,33 +129,33 @@ export const styles = StyleSheet.create({
   itemImage: {
     width: 50,
     height: 50,
-    borderRadius: 6,
+    borderRadius: theme.radius.lg,
     backgroundColor: colors.border.DEFAULT,
   },
   itemTitle: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
     color: colors.text.heading,
   },
   saveButton: {
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   dangerCard: {
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
     backgroundColor: colors.danger[50]!,
     borderWidth: 1,
     borderColor: colors.danger[200]!,
-    padding: 16,
+    padding: theme.spacing[4],
     borderRadius: 12,
   },
   dangerTitle: {
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
     color: colors.danger[600]!,
   },
   dangerItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: theme.spacing[2],
   },
   dangerItemTitle: {
     color: colors.danger[600]!,
@@ -164,6 +164,6 @@ export const styles = StyleSheet.create({
   dangerItemDesc: {
     color: colors.text.muted,
     fontSize: 12,
-    marginTop: 2,
+    marginTop: theme.spacing[0.5],
   },
 });

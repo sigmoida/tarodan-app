@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { appAlert } from '@tarodan/ui-native';
 import { useAuthStore } from '@/stores/authStore';
-import { discountsApi, productsApi } from '@/services/api';
+import { discountsApi, productsApi } from '@/lib/api';
 import { qk } from '@/lib/query';
 import { useRefresh } from '@/hooks/useRefresh';
 import { initialForm, type Discount, type MyProduct } from '../_lib/types';

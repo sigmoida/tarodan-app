@@ -19,7 +19,7 @@ jest.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({ refreshUserData: mockRefreshUserData }),
 }));
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/lib/api', () => ({
   paymentsApi: { verify: jest.fn().mockResolvedValue({ data: { completed: true } }) },
 }));
 

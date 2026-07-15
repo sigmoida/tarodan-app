@@ -35,7 +35,7 @@ export function OffersEmpty({ tab }: { tab: TabType }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: theme.spacing[8] },
   iconWrap: {
     width: 80,
     height: 80,
@@ -43,13 +43,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary[50]!,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   title: {
     fontSize: 18,
     fontWeight: '700',
     color: colors.text.heading,
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
     textAlign: 'center',
   },
   subtitle: {
@@ -57,16 +57,16 @@ const styles = StyleSheet.create({
     color: colors.text.muted,
     textAlign: 'center',
     lineHeight: 20,
-    marginBottom: 20,
+    marginBottom: theme.spacing[5],
   },
   browseBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: theme.spacing[1.5],
     backgroundColor: colors.primary[600]!,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 10,
+    paddingHorizontal: theme.spacing[5],
+    paddingVertical: theme.spacing[3],
+    borderRadius: theme.radius['2xl'],
   },
   browseBtnText: { color: colors.white, fontSize: 14, fontWeight: '600' },
 });

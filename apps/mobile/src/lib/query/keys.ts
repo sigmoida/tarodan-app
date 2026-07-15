@@ -124,6 +124,15 @@ export const qk = {
     collections: (id: string) => ['seller-collections', id] as const,
   },
 
+  messaging: {
+    /** Prefix root — invalidate every messaging query at once. */
+    all: ['messaging'] as const,
+    threads: ['messaging', 'threads'] as const,
+    thread: (id: string) => ['messaging', 'thread', id] as const,
+    messages: (threadId: string) => ['messaging', 'messages', threadId] as const,
+    unreadCount: ['messaging', 'unread-count'] as const,
+  },
+
   notifications: {
     unread: ['notifications-unread'] as const,
   },

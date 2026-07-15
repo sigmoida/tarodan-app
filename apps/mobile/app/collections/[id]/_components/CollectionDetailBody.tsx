@@ -150,7 +150,7 @@ export function CollectionDetailBody({ f }: { f: CollectionDetailController }) {
                   title="İlk ürünü ekle"
                   icon="add"
                   onPress={() => router.push(`/collections/${id}/add-items`)}
-                  style={{ marginTop: 12, alignSelf: 'center' }}
+                  style={{ marginTop: theme.spacing[3], alignSelf: 'center' }}
                 />
               )}
             </View>

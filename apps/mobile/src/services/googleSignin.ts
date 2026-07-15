@@ -1,5 +1,13 @@
 import { Platform } from 'react-native';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
+
+// [GEÇİCİ — refactor runtime doğrulaması için] Native RNGoogleSignin bu dev-client
+// build'inde bridgeless TurboModule olarak register olmuyor (iOS Google Sign-In
+// TestFlight'ta doğrulanacaktı). Top-level import login ekranı mount olur olmaz
+// getEnforcing ile patlıyordu → hiçbir ekran açılamıyordu. Lazy require ederek
+// modülü yalnızca signInWithGoogle çağrılınca yüklüyoruz.
+function getGoogleSignin(): any {
+  return require('@react-native-google-signin/google-signin').GoogleSignin;
+}
 
 // EXPO_PUBLIC_* değerleri build sırasında inline'lanır.
 const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
@@ -8,6 +16,7 @@ const IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 let configured = false;
 function ensureConfigured() {
   if (configured) return;
+  const GoogleSignin = getGoogleSignin();
   // Yalnızca tanımlı anahtarları geç: iOS'ta iosClientId (veya GoogleService-Info.plist)
   // yoksa configure() throw eder ("failed to determine clientID") → kırmızı ekran.
   GoogleSignin.configure({
@@ -34,6 +43,7 @@ export async function signInWithGoogle(): Promise<string> {
     throw new Error('Google girişi bu platformda yapılandırılmamış');
   }
   ensureConfigured();
+  const GoogleSignin = getGoogleSignin();
   await GoogleSignin.hasPlayServices();
   const result: any = await GoogleSignin.signIn();
   const idToken = result?.idToken ?? result?.data?.idToken;

@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { paymentsApi } from '@/services/api';
+import { paymentsApi } from '@/lib/api';
 import { formatPrice } from '@/utils/format';
 
 const { colors } = theme;
@@ -136,7 +136,7 @@ export default function PaymentSuccessScreen() {
         </Text>
 
         {loading ? (
-          <View style={{ marginTop: 24 }}>
+          <View style={{ marginTop: theme.spacing[6] }}>
             <Spinner size="md" />
           </View>
         ) : info ? (
@@ -225,11 +225,11 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
-    gap: 10,
+    padding: theme.spacing[6],
+    gap: theme.spacing[2.5],
   },
   iconWrap: {
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
   title: {
     fontSize: 26,
@@ -251,9 +251,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border.DEFAULT,
-    padding: 16,
-    marginTop: 16,
-    gap: 10,
+    padding: theme.spacing[4],
+    marginTop: theme.spacing[4],
+    gap: theme.spacing[2.5],
   },
   summaryRow: {
     flexDirection: 'row',
@@ -271,10 +271,10 @@ const styles = StyleSheet.create({
   },
   actions: {
     width: '100%',
-    marginTop: 24,
-    gap: 10,
+    marginTop: theme.spacing[6],
+    gap: theme.spacing[2.5],
   },
   btn: {
-    borderRadius: 10,
+    borderRadius: theme.radius['2xl'],
   },
 });

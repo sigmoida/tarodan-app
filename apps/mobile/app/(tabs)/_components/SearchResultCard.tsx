@@ -62,7 +62,7 @@ function SearchResultCardBase({
           {cartProductIds.has(item.id) && (
             <View style={styles.inCartPill}>
               <Ionicons name="checkmark-circle" size={12} color={colors.white} />
-              <Text variant="caption" tone="inverted" weight="bold" style={{ marginLeft: 4 }}>
+              <Text variant="caption" tone="inverted" weight="bold" style={{ marginLeft: theme.spacing[1] }}>
                 Sepette
               </Text>
             </View>
@@ -72,11 +72,11 @@ function SearchResultCardBase({
           <Text variant="bodySm" weight="semibold" numberOfLines={2}>
             {item.title}
           </Text>
-          <Text variant="caption" tone="muted" style={{ marginTop: 2 }}>
+          <Text variant="caption" tone="muted" style={{ marginTop: theme.spacing[0.5] }}>
             {asLabel(item.brand, 'Marka')} • {asLabel(item.scale, '1:64')}
           </Text>
           {ratingAvg > 0 ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 4 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing[0.5], marginTop: theme.spacing[1] }}>
               <Ionicons name="star" size={12} color={colors.warning[500]!} />
               <Text variant="caption" tone="muted">
                 {ratingAvg.toFixed(1)}
@@ -89,8 +89,8 @@ function SearchResultCardBase({
               flexDirection: 'row',
               alignItems: 'center',
               flexWrap: 'wrap',
-              gap: 6,
-              marginTop: 4,
+              gap: theme.spacing[1.5],
+              marginTop: theme.spacing[1],
             }}
           >
             <Text variant="h3" tone="primary">
@@ -109,8 +109,8 @@ function SearchResultCardBase({
               <View
                 style={{
                   backgroundColor: colors.danger[600]!,
-                  borderRadius: 4,
-                  paddingHorizontal: 4,
+                  borderRadius: theme.radius.md,
+                  paddingHorizontal: theme.spacing[1],
                   paddingVertical: 1,
                 }}
               >

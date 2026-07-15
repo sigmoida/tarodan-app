@@ -141,5 +141,5 @@ export default function OrderDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surface.alt },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  content: { flex: 1, padding: 16 },
+  content: { flex: 1, padding: theme.spacing[4] },
 });

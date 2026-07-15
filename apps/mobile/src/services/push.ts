@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { theme } from '@tarodan/ui-native';
-import { api } from './api';
+import { api } from '@/lib/api';
 import { toMobileRoute } from '../utils/notificationRoute';
 
 const { colors } = theme;

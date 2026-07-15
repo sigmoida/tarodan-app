@@ -13,7 +13,7 @@ import { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { supportApi } from '@/services/api';
+import { supportApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 
 const { colors } = theme;
@@ -170,18 +170,18 @@ export default function SupportTicketsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surface.alt },
-  centeredContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
-  title: { marginTop: 16, marginBottom: 8 },
-  subtitle: { textAlign: 'center', marginBottom: 24 },
-  newButtonWrap: { paddingHorizontal: 16, paddingTop: 12 },
+  centeredContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: theme.spacing[8] },
+  title: { marginTop: theme.spacing[4], marginBottom: theme.spacing[2] },
+  subtitle: { textAlign: 'center', marginBottom: theme.spacing[6] },
+  newButtonWrap: { paddingHorizontal: theme.spacing[4], paddingTop: theme.spacing[3] },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
-  emptyTitle: { marginTop: 16, marginBottom: 8 },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: theme.spacing[8] },
+  emptyTitle: { marginTop: theme.spacing[4], marginBottom: theme.spacing[2] },
   emptySubtitle: { textAlign: 'center' },
-  list: { flex: 1, paddingHorizontal: 16, paddingTop: 12 },
-  card: { marginBottom: 12 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  list: { flex: 1, paddingHorizontal: theme.spacing[4], paddingTop: theme.spacing[3] },
+  card: { marginBottom: theme.spacing[3] },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing[2] },
   muted: { color: colors.text.muted },
-  cardBody: { gap: 4 },
-  cardFooter: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 6 },
+  cardBody: { gap: theme.spacing[1] },
+  cardFooter: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: theme.spacing[1.5] },
 });
