@@ -1,21 +1,23 @@
 /** @format */
 
 import { getRequestConfig } from "next-intl/server";
-import { cookies } from "next/headers";
 import { getMessages, resolveLocale } from "@tarodan/i18n";
+import { routing } from "./routing";
 
 /**
- * next-intl request config, "without i18n routing" mode: the locale is resolved
- * from the `NEXT_LOCALE` cookie (no locale prefix in the URL), defaulting to
- * `tr` — the same visible default as the legacy `LanguageProvider`. Messages
- * come from the shared `@tarodan/i18n` catalog.
+ * next-intl request config, "with i18n routing" mode (#214): the locale is the
+ * `[locale]` URL segment, surfaced here as `requestLocale` (the middleware
+ * resolves it from the path — `/en/...` → `en`, prefix-free → `tr`). We narrow
+ * it through the shared `resolveLocale` so an unknown/absent value falls back to
+ * the default `tr` instead of throwing. Messages come from the shared
+ * `@tarodan/i18n` catalog.
  *
- * The locale switcher starts writing this cookie when call sites migrate (#213);
- * server-rendered translations + SEO (`hreflang`, path strategy) are #214. For
- * now this runs in parallel with the legacy client context (behaviour parity).
+ * Replaces the #212 cookie/no-routing setup: server components now render in the
+ * correct language on first paint (SSR/SSG), which is what unlocks `hreflang`,
+ * `<html lang>` and static generation for SEO routes.
  */
-export default getRequestConfig(async () => {
-  const cookieLocale = cookies().get("NEXT_LOCALE")?.value;
-  const locale = resolveLocale(cookieLocale);
+export default getRequestConfig(async ({ requestLocale }) => {
+  const requested = await requestLocale;
+  const locale = resolveLocale(requested ?? routing.defaultLocale);
   return { locale, messages: getMessages(locale) };
 });

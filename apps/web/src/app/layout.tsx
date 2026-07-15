@@ -1,19 +1,7 @@
 /** @format */
 
 import type { Metadata } from "next";
-import { Noto_Sans } from "next/font/google";
-import { NextIntlClientProvider } from "next-intl";
-import { getLocale, getMessages } from "next-intl/server";
-import { Toaster } from "react-hot-toast";
-import "./globals.css";
-import CookieConsentBanner from "@/components/CookieConsentBanner";
-import { GoogleOAuthProvider } from "@react-oauth/google";
 import { ALLOW_INDEXING } from "@/lib/seo";
-
-const notoSans = Noto_Sans({
-  subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "600", "700"],
-});
 
 export const metadata: Metadata = {
   metadataBase: new URL(
@@ -59,39 +47,18 @@ export const metadata: Metadata = {
 };
 
 /**
- * Root layout — the app-wide shell only: document, global metadata, and the
- * truly cross-cutting providers (i18n + Google OAuth) plus the global toast and
- * cookie banner. Visual chrome and route gating live in the route-group layouts
- * ((main) owns the storefront; (auth) owns the auth frame). Renders {children}
- * bare — no Navbar/Footer, no marketplace providers.
+ * Root layout — a pass-through required by the App Router. With locale in the
+ * URL (#214) the real document shell (`<html lang>`, `<body>`, fonts, and the
+ * cross-cutting i18n / OAuth / toast providers) lives in `app/[locale]/layout`,
+ * because only that segment can read the active `[locale]` param. This layer
+ * carries just the app-wide `metadata` (inherited by every route) and renders
+ * its children bare. The root `not-found.tsx` ships its own `<html>` since it
+ * renders above the locale layout.
  */
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // next-intl (cookie-resolved locale + shared catalog). Runs alongside the
-  // legacy LanguageProvider until call sites migrate (#213); the legacy context
-  // still drives visible strings for now.
-  const locale = await getLocale();
-  const messages = await getMessages();
-
-  return (
-    <html lang={locale}>
-      <body className={notoSans.className}>
-        <NextIntlClientProvider locale={locale} messages={messages}>
-          <GoogleOAuthProvider
-            clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
-          >
-            {children}
-            <CookieConsentBanner />
-            <Toaster
-              position="bottom-right"
-              toastOptions={{ style: { maxWidth: "360px" } }}
-            />
-          </GoogleOAuthProvider>
-        </NextIntlClientProvider>
-      </body>
-    </html>
-  );
+  return children;
 }

@@ -1,0 +1,75 @@
+import { notFound } from "next/navigation";
+import Link from "next/link";
+import type { Metadata } from "next";
+import { PageContent } from "./PageContent";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+interface StaticPage {
+  id: string;
+  slug: string;
+  title: string;
+  content: string;
+  metaTitle: string | null;
+  metaDescription: string | null;
+  metaKeywords: string | null;
+  updatedAt: string;
+}
+
+async function getPage(slug: string): Promise<StaticPage | null> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/pages/${encodeURIComponent(slug)}`,
+      {
+        next: { revalidate: 60 },
+      },
+    );
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+type Props = { params: Promise<{ slug: string }> };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params;
+  const page = await getPage(slug);
+  if (!page) return { title: "Sayfa Bulunamadı" };
+  return {
+    title: page.metaTitle || page.title,
+    description: page.metaDescription || undefined,
+    keywords: page.metaKeywords || undefined,
+    openGraph: {
+      title: page.metaTitle || page.title,
+      description: page.metaDescription || undefined,
+    },
+  };
+}
+
+export default async function StaticPageRoute({ params }: Props) {
+  const { slug } = await params;
+  const page = await getPage(slug);
+  if (!page) notFound();
+
+  return (
+    <div className="min-h-screen bg-surface">
+      <div className="max-w-4xl mx-auto px-4 py-12">
+        <nav className="mb-8 text-sm text-muted">
+          <Link href="/" className="hover:text-primary-600">
+            Ana Sayfa
+          </Link>
+          <span className="mx-2">/</span>
+          <span className="text-heading">{page.title}</span>
+        </nav>
+        <article className="bg-surface-elevated rounded-xl shadow-sm overflow-hidden">
+          <header className="border-b border-border-subtle px-6 py-8">
+            <h1 className="text-3xl font-bold text-heading">{page.title}</h1>
+          </header>
+          <PageContent content={page.content} />
+        </article>
+      </div>
+    </div>
+  );
+}
