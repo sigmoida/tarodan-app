@@ -1,16 +1,25 @@
-name: Mobile TestFlight (EAS Build + Submit)
+name: Mobile Release (EAS Build + Submit — iOS & Android)
 
-# EAS üzerinden iOS production build alır ve App Store Connect'e
-# (TestFlight'a) gönderir. Apple/EAS credential'ları EAS sunucusunda
-# tutulur; bu workflow yalnız EXPO_TOKEN'a ihtiyaç duyar.
+# Production mobile release. Triggered by a `mobile-v*` tag on master (e.g.
+# `mobile-v1.3.0`). Builds iOS + Android via EAS and submits to TestFlight +
+# Google Play internal track.
 #
-# Tetikleyiciler:
-#   - release/mobile-* branch'ine push (otomatik release akışı)
-#   - workflow_dispatch (manuel; build profile + submit toggle ile)
+# Versioning: the marketing version lives in app.json (`expo.version`) as the
+# reviewed source of truth; the release tag must MATCH it. CI verifies and fails
+# on mismatch — it never overwrites a committed value. Bump app.json in the
+# release PR, then tag to match. Build number / version code stay on EAS
+# auto-increment via `appVersionSource: remote`.
 #
-# Guard: EXPO_TOKEN secret'ı yoksa workflow sessizce no-op biter.
-# Bu, Apple/EAS hesapları kurulmadan önce repo'ya bu workflow'un
-# güvenle commit'lenmesine izin verir.
+# Triggers:
+#   - push of a `mobile-v*` tag  -> production release (build + submit)
+#   - workflow_dispatch          -> manual (choose profile + submit toggle)
+#
+# The job runs in the `production` GitHub Environment, so it passes through the
+# same manual-approval gate as deploy-production.yml.
+#
+# Guard: if EXPO_TOKEN is missing the workflow is a silent no-op — safe to keep
+# committed before the Apple/Google/EAS accounts are wired (see
+# apps/mobile/SECRETS_SETUP.md).
 
 on:
   workflow_dispatch:
@@ -24,23 +33,25 @@ on:
           - production
           - preview
       submit:
-        description: 'Build sonrası TestFlight submit yapılsın mı?'
+        description: 'Submit to the stores after build?'
         required: true
         default: true
         type: boolean
   push:
-    branches:
-      - 'release/mobile-*'
+    tags:
+      - 'mobile-v*'
 
 concurrency:
-  group: mobile-testflight-${{ github.ref }}
+  group: mobile-release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   build-and-submit:
-    name: EAS Build + TestFlight Submit
+    name: EAS Build + Submit (iOS & Android)
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Manual-approval gate — same `production` environment as deploy-production.yml.
+    environment: production
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v7
 
@@ -49,7 +60,7 @@ jobs:
         run: |
           if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::EXPO_TOKEN secret'ı yok — workflow no-op olarak biter (bkz. apps/mobile/SECRETS_SETUP.md)."
+            echo "::notice::EXPO_TOKEN is not set — workflow is a no-op (see apps/mobile/SECRETS_SETUP.md)."
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
@@ -78,53 +89,64 @@ jobs:
         if: steps.guard.outputs.skip != 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Resolve build profile
+      - name: Resolve profile, submit flag, and version
         if: steps.guard.outputs.skip != 'true'
-        id: profile
+        id: resolve
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "name=${{ inputs.profile }}" >> "$GITHUB_OUTPUT"
+            echo "profile=${{ inputs.profile }}" >> "$GITHUB_OUTPUT"
             echo "submit=${{ inputs.submit }}" >> "$GITHUB_OUTPUT"
+            echo "version=" >> "$GITHUB_OUTPUT"
           else
-            echo "name=production" >> "$GITHUB_OUTPUT"
+            # tag push: refs/tags/mobile-v1.3.0 -> 1.3.0
+            VERSION="${GITHUB_REF_NAME#mobile-v}"
+            echo "profile=production" >> "$GITHUB_OUTPUT"
             echo "submit=true" >> "$GITHUB_OUTPUT"
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "::notice::Releasing mobile version $VERSION from tag $GITHUB_REF_NAME"
           fi
 
-      - name: EAS build (iOS, ${{ steps.profile.outputs.name }})
+      - name: Verify tag matches app.json version
+        # The committed expo.version is the source of truth; the tag must match it.
+        # Never overwrite a reviewed value from CI. No-op on manual dispatch.
+        if: steps.guard.outputs.skip != 'true' && steps.resolve.outputs.version != ''
+        working-directory: apps/mobile
+        env:
+          TAG_VERSION: ${{ steps.resolve.outputs.version }}
+        run: |
+          APP_VERSION=$(node -p "require('./app.json').expo.version")
+          if [ "$APP_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Tag mobile-v$TAG_VERSION does not match app.json expo.version ($APP_VERSION). Bump app.json in a reviewed commit, then tag to match."
+            exit 1
+          fi
+          echo "✓ tag matches app.json expo.version $APP_VERSION"
+
+      - name: EAS build (iOS + Android, ${{ steps.resolve.outputs.profile }})
         if: steps.guard.outputs.skip != 'true'
         working-directory: apps/mobile
         run: |
           eas build \
-            --platform ios \
-            --profile ${{ steps.profile.outputs.name }} \
+            --platform all \
+            --profile ${{ steps.resolve.outputs.profile }} \
             --non-interactive \
-            --no-wait
+            --wait
 
-      - name: Wait for latest build to finish
-        if: steps.guard.outputs.skip != 'true'
-        working-directory: apps/mobile
-        run: |
-          eas build:list --platform ios --limit 1 --json --non-interactive > /tmp/eas-build.json
-          BUILD_ID=$(jq -r '.[0].id' /tmp/eas-build.json)
-          echo "Tracking build $BUILD_ID"
-          eas build:view "$BUILD_ID" --non-interactive
-          # poll
-          while true; do
-            STATUS=$(eas build:view "$BUILD_ID" --json --non-interactive | jq -r '.status')
-            echo "status=$STATUS"
-            case "$STATUS" in
-              FINISHED) echo "✓ build finished"; break ;;
-              ERRORED|CANCELED) echo "✗ build $STATUS"; exit 1 ;;
-            esac
-            sleep 30
-          done
-
-      - name: EAS submit to TestFlight
-        if: steps.guard.outputs.skip != 'true' && steps.profile.outputs.submit == 'true'
+      - name: EAS submit — iOS (TestFlight)
+        if: steps.guard.outputs.skip != 'true' && steps.resolve.outputs.submit == 'true'
         working-directory: apps/mobile
         run: |
           eas submit \
             --platform ios \
+            --profile production \
+            --latest \
+            --non-interactive
+
+      - name: EAS submit — Android (Play internal)
+        if: steps.guard.outputs.skip != 'true' && steps.resolve.outputs.submit == 'true'
+        working-directory: apps/mobile
+        run: |
+          eas submit \
+            --platform android \
             --profile production \
             --latest \
             --non-interactive

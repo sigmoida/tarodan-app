@@ -658,6 +658,9 @@ importers:
       '@tarodan/design-tokens':
         specifier: workspace:*
         version: link:../../packages/design-tokens
+      '@tarodan/i18n':
+        specifier: workspace:^
+        version: link:../../packages/i18n
       '@tarodan/types':
         specifier: workspace:*
         version: link:../../packages/types
@@ -682,6 +685,9 @@ importers:
       next:
         specifier: 14.2.35
         version: 14.2.35(@playwright/test@1.61.1)(react-dom@18.3.1)(react@18.3.1)
+      next-intl:
+        specifier: ^3
+        version: 3.26.5(next@14.2.35)(react@18.3.1)
       react:
         specifier: ^18.2.0
         version: 18.3.1
