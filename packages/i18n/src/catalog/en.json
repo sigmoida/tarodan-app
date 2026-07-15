@@ -111,7 +111,8 @@
     "cancelling": "Cancelling...",
     "opening": "Opening...",
     "uploading": "Uploading...",
-    "replace": "Replace"
+    "replace": "Replace",
+    "language": "Language"
   },
   "nav": {
     "home": "Home",
