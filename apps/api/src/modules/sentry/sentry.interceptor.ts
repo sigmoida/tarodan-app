@@ -12,6 +12,7 @@ import {
 import { Observable, throwError } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
 import * as Sentry from '@sentry/node';
+import { getAppLogger } from '../../common/logging/logger';
 
 @Injectable()
 export class SentryInterceptor implements NestInterceptor {
@@ -55,28 +56,21 @@ export class SentryInterceptor implements NestInterceptor {
         transaction.finish();
       }),
       catchError((error) => {
-        // Capture exception
-        Sentry.withScope((scope) => {
-          scope.setExtra('request', {
-            method,
-            url,
-            params,
-            query,
-          });
+        // Capture exception via the shared logger (bridges to SentryService, avoids double-capture)
+        const requestContext = { method, url, params, query };
 
-          if (error instanceof HttpException) {
-            const status = error.getStatus();
-            transaction.setHttpStatus(status);
+        if (error instanceof HttpException) {
+          const status = error.getStatus();
+          transaction.setHttpStatus(status);
 
-            // Only capture 5xx errors as exceptions
-            if (status >= 500) {
-              Sentry.captureException(error);
-            }
-          } else {
-            // Capture all non-HTTP exceptions
-            Sentry.captureException(error);
+          // Only capture 5xx errors as exceptions
+          if (status >= 500) {
+            getAppLogger().captureException(error, requestContext);
           }
-        });
+        } else {
+          // Capture all non-HTTP exceptions
+          getAppLogger().captureException(error, requestContext);
+        }
 
         transaction.finish();
         return throwError(() => error);
