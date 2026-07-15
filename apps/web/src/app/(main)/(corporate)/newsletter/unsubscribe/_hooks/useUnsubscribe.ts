@@ -16,6 +16,7 @@ import { unsubscribeSchema, type UnsubscribeValues } from "../_lib/schema";
  * derive from the query + mutation state.
  */
 export function useUnsubscribe() {
+  const t = useTranslations();
   const locale = useLocale();
   const token = useSearchParams().get("token");
 
@@ -32,8 +33,7 @@ export function useUnsubscribe() {
   useEffect(() => {
     if (tokenQuery.isSuccess)
       toast.success(
-        tokenQuery.data?.message ??
-          (locale === "en" ? "Unsubscribed" : "Abonelikten çıkıldı"),
+        tokenQuery.data?.message ?? t("marketing.newsletter.unsubscribedToast"),
       );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tokenQuery.isSuccess]);
@@ -41,9 +41,7 @@ export function useUnsubscribe() {
     if (tokenQuery.isError)
       toast.error(
         (tokenQuery.error as any)?.response?.data?.message ||
-          (locale === "en"
-            ? "Invalid or expired link"
-            : "Geçersiz veya süresi dolmuş link"),
+          t("mobile.tokenInvalid"),
       );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tokenQuery.isError]);
@@ -56,7 +54,7 @@ export function useUnsubscribe() {
     (values: UnsubscribeValues) =>
       api.post("/newsletter/unsubscribe", { email: values.email }),
     {
-      errorMessage: locale === "en" ? "Request failed" : "İstek başarısız",
+      errorMessage: t("common.requestFailed"),
       onSuccess: ({ data }) => toast.success(data.message),
     },
   );

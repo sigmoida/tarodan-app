@@ -102,7 +102,10 @@
     "downloadFailed": "Download failed",
     "uploadFailed": "Upload failed",
     "new": "New",
-    "evidence": "Evidence"
+    "evidence": "Evidence",
+    "sales": "Sales",
+    "signingOut": "Signing out...",
+    "requestFailed": "Request failed"
   },
   "nav": {
     "home": "Home",
@@ -676,7 +679,8 @@
     "withholdingTax": "Withholding tax",
     "unsupportedStatus": "Unsupported status",
     "invoiceNotReady": "Invoice not ready",
-    "invoiceNotFound": "Invoice not found"
+    "invoiceNotFound": "Invoice not found",
+    "refundReasonNotAsDescribed": "Not as described"
   },
   "trade": {
     "myTrades": "My Trades",
@@ -824,7 +828,8 @@
     "shippingTime": "Shipping Time",
     "timeExpired": "Time Expired!",
     "dayShort": "d",
-    "rejectTradeTitle": "Reject Trade"
+    "rejectTradeTitle": "Reject Trade",
+    "profileAddressesLink": "Profile → Addresses"
   },
   "offer": {
     "makeOffer": "Make Offer",
@@ -914,7 +919,9 @@
     "loginToContinue": "Please login to continue",
     "acceptTerms": "Please accept the terms of service",
     "fillCardInfo": "Please fill in all card information",
-    "invalidCardNumber": "Invalid card number"
+    "invalidCardNumber": "Invalid card number",
+    "scheduledChangeCancelled": "Scheduled change cancelled",
+    "cancelConfirmDesc": "Are you sure you want to cancel your membership? You can keep using your features until the end of the current period."
   },
   "collection": {
     "share": "Share",
@@ -1159,7 +1166,27 @@
     "qualityProductsDesc": "Quality products from verified sellers",
     "easyReturns": "Easy Returns",
     "easyReturnsDesc": "Return guarantee if not satisfied",
-    "banner": "Free shipping on orders over ₺500!"
+    "banner": "Free shipping on orders over ₺500!",
+    "viewAll": "View All",
+    "popularListings": "Popular Listings",
+    "beTheFirst": "Be the first!",
+    "deals": "Deals",
+    "noProductsOnSale": "No products on sale",
+    "checkBackLater": "Check back later!",
+    "featuredRailTitle": "Featured",
+    "collector": "Collector",
+    "items": "items",
+    "views": "views",
+    "topCollections": "Top Collections",
+    "collectorOfWeek": "Collector of the Week",
+    "statViews": "Views",
+    "statLikes": "Likes",
+    "statItems": "Items",
+    "statProducts": "Products",
+    "viewCollection": "View Collection",
+    "companyOfWeek": "Company of the Week",
+    "companyBioFallback": "Premium Diecast vehicle buying and selling",
+    "viewStore": "View Store"
   },
   "search": {
     "search": "Search",
@@ -1214,7 +1241,9 @@
     "enterValidAmount": "Enter a valid amount",
     "max500Chars": "Max 500 characters",
     "enterOrderNumber": "Enter order number",
-    "offerBelowPrice": "Offer must be lower than the price"
+    "offerBelowPrice": "Offer must be lower than the price",
+    "nameRequired": "Name is required",
+    "subjectRequired": "Subject is required"
   },
   "time": {
     "justNow": "Just now",
@@ -1365,7 +1394,31 @@
     "pay": "Pay",
     "startFailed": "Could not start payment",
     "statusPending": "Pending",
-    "statusProcessing": "Processing"
+    "statusProcessing": "Processing",
+    "detailsTitle": "Payment Details",
+    "amountLabel": "Payment Amount",
+    "transactionIdLabel": "Transaction ID",
+    "statusAwaitingConfirmation": "Awaiting confirmation",
+    "downloading": "Downloading...",
+    "downloadInvoice": "Download Invoice (PDF)",
+    "preparingInvoice": "Preparing Invoice...",
+    "completedTitle": "Payment Completed Successfully!",
+    "confirmingTitle": "Your Payment Is Being Confirmed",
+    "completedDesc": "Your payment has been received and your order is being prepared.",
+    "confirmingDesc": "We''ve received your payment request but it isn''t confirmed yet. You can check your order status from your orders page.",
+    "estimatedDelivery": "Estimated Delivery",
+    "deliveryDisclaimer": "*Delivery time may vary depending on the seller and shipping company.",
+    "informationLabel": "Information",
+    "orderEmailSent": "Order confirmation email has been sent. Track it from ",
+    "viewMyOrder": "View my order",
+    "trackMyOrder": "Track my order",
+    "failedDesc": "Your payment could not be completed. Please try again or choose a different payment method.",
+    "failureReasonsTitle": "Possible reasons for payment failure:",
+    "needHelp": "Need help?",
+    "supportPrompt": "If your payment issue persists, please contact ",
+    "supportTeam": "our support team",
+    "contactSuffix": ".",
+    "backToMyOrders": "Back to My Orders"
   },
   "seller": {
     "sellerProfile": "Seller Profile",
@@ -1384,7 +1437,15 @@
     "follow": "Follow",
     "report": "Report",
     "noActiveListings": "This seller has no active listings yet.",
-    "viewProfile": "View Profile"
+    "viewProfile": "View Profile",
+    "trust": "Trust",
+    "noReviewsDesc": "This seller has no reviews yet.",
+    "totalReviews": "total reviews",
+    "noCollections": "No collections yet",
+    "noCollectionsDesc": "This seller has no public collections.",
+    "newMember": "New member",
+    "monthsCount": "{count} months",
+    "yearsCount": "{count}+ years"
   },
   "sellerDashboard": {
     "title": "Seller Dashboard",
@@ -1695,7 +1756,10 @@
       "unsubscribeSuccess": "You have been unsubscribed. You will not receive further newsletter emails.",
       "unsubscribeTokenSuccess": "Your newsletter subscription has been cancelled.",
       "feedbackTitle": "Why are you leaving? (Optional)",
-      "feedbackPlaceholder": "Your feedback..."
+      "feedbackPlaceholder": "Your feedback...",
+      "subscribeAgain": "Subscribe again",
+      "unsubscribedToast": "Unsubscribed",
+      "subscriptionFailed": "Subscription failed"
     }
   },
   "stockout": {

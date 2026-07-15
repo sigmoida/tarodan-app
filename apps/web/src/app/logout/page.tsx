@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/authStore";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { TransitionLoader } from "@/components/TransitionLoader";
 
 /** How long the loading screen stays up before landing on the home page. */
@@ -18,7 +18,7 @@ const LOGOUT_REDIRECT_DELAY_MS = 1200;
 export default function LogoutPage() {
   const router = useRouter();
   const logout = useAuthStore((s) => s.logout);
-  const locale = useLocale();
+  const t = useTranslations();
   const ran = useRef(false);
 
   useEffect(() => {
@@ -33,9 +33,5 @@ export default function LogoutPage() {
     setTimeout(() => router.replace("/"), LOGOUT_REDIRECT_DELAY_MS);
   }, [logout, router]);
 
-  return (
-    <TransitionLoader
-      message={locale === "tr" ? "Çıkış yapılıyor..." : "Signing out..."}
-    />
-  );
+  return <TransitionLoader message={t("common.signingOut")} />;
 }

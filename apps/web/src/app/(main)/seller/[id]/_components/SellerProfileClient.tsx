@@ -94,7 +94,6 @@ export default function SellerProfileClient() {
         isFollowing={isFollowing}
         isOwnProfile={isOwnProfile}
         membershipDuration={membershipDuration}
-        locale={locale}
         onMessage={handleMessage}
         onFollow={handleFollow}
         onReport={handleReport}
@@ -135,7 +134,6 @@ export default function SellerProfileClient() {
       {tab === "listings" && (
         <ListingsTab
           products={products}
-          locale={locale}
           noActiveMessage={t("seller.noActiveListings")}
         />
       )}
@@ -153,7 +151,6 @@ export default function SellerProfileClient() {
         <CollectionsTab
           collections={collections}
           loading={collectionsLoading}
-          locale={locale}
         />
       )}
 
