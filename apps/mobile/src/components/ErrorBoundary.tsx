@@ -2,7 +2,7 @@ import React, { Component, ReactNode } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '@tarodan/ui-native';
-import { captureException } from '../services/sentry';
+import { logger } from '../services/logger';
 
 const { colors } = theme;
 
@@ -33,10 +33,10 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: { componentStack?: string }) {
-    captureException(error, {
+    logger.captureException(error, {
       level: 'error',
       tags: { boundary: 'app-root' },
-      extra: { componentStack: errorInfo.componentStack ?? 'n/a' },
+      componentStack: errorInfo.componentStack ?? 'n/a',
     });
   }
 

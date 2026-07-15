@@ -7,18 +7,29 @@ import {
   type Logger,
   type Sink,
 } from '@tarodan/logger';
-import { captureException, captureMessage, setUser } from './sentry';
+import { addBreadcrumb, captureException, setUser, type SeverityLevel } from './sentry';
 
 const LEVEL_MAP = { debug: 'debug', info: 'info', warn: 'warning', error: 'error' } as const;
 
 function sentryMobileSink(): Sink {
   return {
     log: (_e: LogEntry) => {},
-    captureException: (err: unknown, ctx?: Record<string, unknown>) =>
-      captureException(err, { extra: ctx }),
+    captureException: (err: unknown, ctx?: Record<string, unknown>) => {
+      const { tags, level, ...extra } = ctx ?? {};
+      captureException(err, {
+        ...(level ? { level: level as SeverityLevel } : {}),
+        ...(tags ? { tags: tags as Record<string, string> } : {}),
+        extra,
+      });
+    },
     setUser: (user: LogUser | null) => setUser(user),
     addBreadcrumb: (bc: Breadcrumb) =>
-      captureMessage(bc.message, bc.level ? LEVEL_MAP[bc.level] : 'info'),
+      addBreadcrumb({
+        category: bc.category,
+        message: bc.message,
+        level: bc.level ? LEVEL_MAP[bc.level] : undefined,
+        data: bc.data,
+      }),
   };
 }
 
