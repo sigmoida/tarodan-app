@@ -2,7 +2,7 @@
 
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { CreditCardIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
 import { Button, Checkbox, Spinner } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";

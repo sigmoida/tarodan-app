@@ -2,7 +2,7 @@
 
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { FolderPlusIcon } from "@heroicons/react/24/outline";
 import { Button, Modal } from "@tarodan/ui";
 

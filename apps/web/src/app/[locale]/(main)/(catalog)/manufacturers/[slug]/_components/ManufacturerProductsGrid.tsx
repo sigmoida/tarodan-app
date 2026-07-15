@@ -2,7 +2,7 @@
 
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { ArchiveBoxIcon } from "@heroicons/react/24/outline";
 import { useLocale, useTranslations } from "next-intl";
 import ProductCard from "@/components/ui/ProductCard";

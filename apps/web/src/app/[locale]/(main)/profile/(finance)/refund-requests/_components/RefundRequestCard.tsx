@@ -2,7 +2,7 @@
 
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import OptimizedImage from "@/components/OptimizedImage";
 import { Badge } from "@tarodan/ui";
 import { useTranslations } from "next-intl";

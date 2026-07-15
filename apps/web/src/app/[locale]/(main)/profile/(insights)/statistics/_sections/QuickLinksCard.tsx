@@ -1,6 +1,6 @@
 /** @format */
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import type { ComponentType, SVGProps } from "react";
 import {
   FireIcon,

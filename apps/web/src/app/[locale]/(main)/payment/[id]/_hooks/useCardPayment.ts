@@ -3,7 +3,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import toast from "react-hot-toast";
 import { useZodForm } from "@tarodan/ui/form";
 import { CVV_REGEX } from "@tarodan/ui";

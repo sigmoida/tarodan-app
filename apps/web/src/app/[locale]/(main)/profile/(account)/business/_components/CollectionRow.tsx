@@ -1,6 +1,6 @@
 /** @format */
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import OptimizedImage from "@/components/OptimizedImage";
 import { BookOpenIcon, EyeIcon, HeartIcon } from "@heroicons/react/24/outline";
 import type { CollectionStats } from "../_lib/types";

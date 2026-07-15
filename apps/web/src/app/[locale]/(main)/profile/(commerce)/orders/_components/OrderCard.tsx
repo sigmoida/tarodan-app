@@ -2,7 +2,7 @@
 
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { StatusBadge, orderStatusConfig } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";
 import { formatDate } from "@/lib/format";

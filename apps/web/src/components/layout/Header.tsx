@@ -3,10 +3,9 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { Link, usePathname } from "@/i18n/navigation";
 import Image from "next/image";
 import dynamic from "next/dynamic";
-import { usePathname } from "next/navigation";
 import {
   PlusIcon,
   ChatBubbleLeftRightIcon,

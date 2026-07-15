@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { useFormContext } from "react-hook-form";
 import {
   TagIcon,

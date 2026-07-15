@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
+import { useParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { useZodForm } from "@tarodan/ui/form";
 import { useAuthStore } from "@/stores/authStore";

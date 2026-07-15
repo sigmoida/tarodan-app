@@ -3,7 +3,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
+import { useSearchParams } from "next/navigation";
 import { FunnelIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { Button, Chip, Select } from "@tarodan/ui";
 import { useLocale, useTranslations } from "next-intl";

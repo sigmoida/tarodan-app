@@ -3,7 +3,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
+import { useSearchParams } from "next/navigation";
 import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import { SectionCard } from "@/components/ui";
 import { PageShell } from "@/components/layout/PageShell";

@@ -2,7 +2,7 @@
 
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
 import { StatusBadge, tradeStatusConfig } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";

@@ -1,6 +1,6 @@
 /** @format */
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { ArrowsRightLeftIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { Button, Input, Radio, Spinner, Textarea } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";

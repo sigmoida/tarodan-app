@@ -2,7 +2,8 @@
 
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { redirect } from "next/navigation";
+import { redirect } from "@/i18n/navigation";
+import { getLocale } from "next-intl/server";
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { getSession } from "@/lib/server/session";
 import { getServerQueryClient } from "@/lib/query/server";
@@ -35,12 +36,17 @@ export default async function ProfileLayout({
   children: ReactNode;
 }) {
   const session = await getSession();
-  if (!session) redirect("/login?redirect=/profile");
+  if (!session)
+    redirect({ href: "/login?redirect=/profile", locale: await getLocale() });
+  // `redirect` throws, so `session` is non-null past here — but next-intl's
+  // redirect return type doesn't let TS's control flow infer that (unlike
+  // next/navigation's), so narrow it explicitly.
+  const user = session!;
 
   const queryClient = getServerQueryClient();
   queryClient.setQueryData(
     queryKeys.profile.overview(),
-    buildOverviewSeed(session),
+    buildOverviewSeed(user),
   );
   const seeded = queryClient
     .getQueryCache()

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { useMutation } from "@tanstack/react-query";
 import type { UseFormReturn } from "react-hook-form";
 import toast from "react-hot-toast";

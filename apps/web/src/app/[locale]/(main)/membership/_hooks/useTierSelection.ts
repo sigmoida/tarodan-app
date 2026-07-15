@@ -3,7 +3,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
+import { useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { useLocale, useTranslations } from "next-intl";
 import type { MembershipDetails, Period } from "../_lib/types";

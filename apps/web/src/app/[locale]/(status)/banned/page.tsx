@@ -1,7 +1,8 @@
 "use client";
 
 import { Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
+import { useSearchParams } from "next/navigation";
 import { NoSymbolIcon } from "@heroicons/react/24/solid";
 import { Button } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";

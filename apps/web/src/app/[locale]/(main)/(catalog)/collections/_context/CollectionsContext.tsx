@@ -8,7 +8,8 @@ import {
   useMemo,
   type ReactNode,
 } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
+import { useSearchParams } from "next/navigation";
 import {
   useQuery,
   useQueryClient,
@@ -85,7 +86,9 @@ function useCollectionsValue(): CollectionsContextValue {
     if (id) params.set("categoryId", id);
     else params.delete("categoryId");
     const q = params.toString();
-    router.replace(q ? `?${q}` : "/collections", { scroll: false });
+    // Explicit pathname (not a bare `?query`): the locale-aware router prefixes
+    // the path, so it must be absolute to stay on /collections under /en.
+    router.replace(q ? `/collections?${q}` : "/collections", { scroll: false });
   };
 
   const { data: categoriesTree } = useQuery({

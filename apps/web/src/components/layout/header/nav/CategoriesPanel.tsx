@@ -2,7 +2,7 @@
 
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { NavigationMenuLink } from "@tarodan/ui";
 import { groupManufacturers, type ManufacturerRef } from "./config";

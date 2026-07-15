@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useMemo, Suspense } from "react";
+import { Link } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
 import {
   InboxArrowDownIcon,
   PaperAirplaneIcon,

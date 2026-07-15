@@ -2,7 +2,7 @@
 
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { EyeIcon, HeartIcon } from "@heroicons/react/24/outline";
 import { Spinner } from "@tarodan/ui";
 import { useTranslations } from "next-intl";

@@ -3,7 +3,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import toast from "react-hot-toast";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { STORAGE_KEY, type SavedSearch } from "../_lib/types";

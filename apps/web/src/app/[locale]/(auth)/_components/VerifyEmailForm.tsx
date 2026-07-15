@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { Button, Spinner } from "@tarodan/ui";
 import { Form, FormInput, FormError, useZodForm } from "@tarodan/ui/form";
 import { useLocale, useTranslations } from "next-intl";

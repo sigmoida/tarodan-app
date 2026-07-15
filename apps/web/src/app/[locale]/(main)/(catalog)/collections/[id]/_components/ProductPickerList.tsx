@@ -2,7 +2,7 @@
 
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { Button, Spinner } from "@tarodan/ui";
 import { getProductEffectivePrice } from "@/lib/productPrice";
 import { PRODUCT_PLACEHOLDER } from "../_lib/add-item";

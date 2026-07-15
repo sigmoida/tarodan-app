@@ -2,7 +2,7 @@
 
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { Button, Checkbox } from "@tarodan/ui";
 import { Form, FormInput, FormError, useZodForm } from "@tarodan/ui/form";

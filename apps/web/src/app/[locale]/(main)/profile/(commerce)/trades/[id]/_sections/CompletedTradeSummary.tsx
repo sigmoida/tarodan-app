@@ -2,7 +2,7 @@
 
 import type { Translate } from "@/types/i18n";
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { CheckCircleIcon } from "@heroicons/react/24/outline";
 import type { Trade } from "../_lib/types";
 

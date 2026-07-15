@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
+import { Link, useRouter } from "@/i18n/navigation";
+import { useSearchParams } from "next/navigation";
 import { ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { Button, Input, Radio, Spinner, Textarea } from "@tarodan/ui";

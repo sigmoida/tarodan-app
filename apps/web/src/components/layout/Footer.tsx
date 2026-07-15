@@ -2,9 +2,9 @@
 
 "use client";
 
-import Link from "next/link";
+import { Link, usePathname, useRouter } from "@/i18n/navigation";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { locales, type Locale } from "@tarodan/i18n";
 import { Button, Select } from "@tarodan/ui";
@@ -25,13 +25,17 @@ export default function Footer() {
   const t = useTranslations();
   const locale = useLocale();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  // next-intl "without routing": persist the choice in the cookie the request
-  // config reads, then refresh so server + client re-render in the new locale.
-  // (URL-based locale + a proper switcher navigation is #214.)
+  // URL-based locale (#214): navigate to the SAME page under the chosen locale's
+  // prefix (`/products` ⇄ `/en/products`), preserving the query string.
+  // `usePathname`/`router` come from `@/i18n/navigation`, so the pathname is
+  // locale-stripped and `replace` re-adds the target prefix (and syncs the
+  // NEXT_LOCALE cookie) — a real navigation, not just a cookie write + refresh.
   const changeLocale = (next: Locale) => {
-    document.cookie = `NEXT_LOCALE=${next}; path=/; max-age=31536000; samesite=lax`;
-    router.refresh();
+    const query = Object.fromEntries(searchParams.entries());
+    router.replace({ pathname, query }, { locale: next });
   };
 
   const clearCookieConsent = () => {

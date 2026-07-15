@@ -2,7 +2,7 @@
 
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { CheckIcon } from "@heroicons/react/24/outline";
 import { Badge, IconButton } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";

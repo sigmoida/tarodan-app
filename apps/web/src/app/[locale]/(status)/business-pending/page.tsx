@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { ClockIcon } from "@heroicons/react/24/outline";
 import { Button } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
