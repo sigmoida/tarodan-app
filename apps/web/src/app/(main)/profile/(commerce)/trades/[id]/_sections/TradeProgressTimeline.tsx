@@ -22,13 +22,7 @@ const ACTIVE_STATUSES = [
  * `@tarodan/ui` Stepper (same component the checkout wizard and refund status
  * use). The `returning` state swaps the stepper for a warning note.
  */
-export default function TradeProgressTimeline({
-  trade,
-  locale,
-}: {
-  trade: Trade;
-  locale: string;
-}) {
+export default function TradeProgressTimeline({ trade }: { trade: Trade }) {
   const t = useTranslations();
   if (!ACTIVE_STATUSES.includes(trade.status)) return null;
 
@@ -61,9 +55,7 @@ export default function TradeProgressTimeline({
       </h3>
       {isReturning ? (
         <p className="rounded border border-warning-200 bg-warning-50 p-3 text-sm text-warning-700">
-          {locale === "en"
-            ? "Trade was rejected at warehouse. Items are being returned to senders."
-            : "Takas depoda reddedildi. Ürünler göndericilere iade ediliyor."}
+          {t("trade.progressReturning")}
         </p>
       ) : (
         <Stepper steps={steps} current={current} />

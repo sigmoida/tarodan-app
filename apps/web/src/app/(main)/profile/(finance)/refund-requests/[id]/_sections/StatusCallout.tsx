@@ -79,11 +79,7 @@ export default function StatusCallout({
         icon={<CheckIcon className="h-6 w-6" />}
         title={t("refund.completedSuccess")}
       >
-        <p>
-          {locale === "en"
-            ? "Your money has been returned to the original payment method. It may take 1-3 business days to reflect on your statement."
-            : "Tutar ödediğiniz karta iade edildi. Banka ekstresinde görünmesi 1-3 iş günü sürebilir."}
-        </p>
+        <p>{t("refund.refundedBody")}</p>
         {refund.refundedAt && (
           <p className="mt-2 text-xs">
             {t("refund.refundedAt")}
@@ -103,11 +99,7 @@ export default function StatusCallout({
         icon={<XCircleIcon className="h-6 w-6" />}
         title={t("refund.requestRejected")}
       >
-        <p>
-          {locale === "en"
-            ? "If you disagree, please reach out to support."
-            : "Bu karara itiraz etmek için destek ekibimizle iletişime geçin."}
-        </p>
+        <p>{t("refund.rejectedBody")}</p>
       </Callout>
     );
   }
@@ -119,11 +111,7 @@ export default function StatusCallout({
         icon={<ExclamationTriangleIcon className="h-6 w-6" />}
         title={t("refund.underAdminReview")}
       >
-        <p>
-          {locale === "en"
-            ? "The seller disputed this request. Our admin team will review the case and reach out within 1-3 business days."
-            : "Satıcı bu talebe itiraz etti. Admin ekibimiz dosyayı 1-3 iş günü içinde inceleyip size dönecek."}
-        </p>
+        <p>{t("refund.disputedBody")}</p>
       </Callout>
     );
   }

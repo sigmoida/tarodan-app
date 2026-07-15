@@ -11,7 +11,6 @@ import type { Trade, TradeItem } from "../_lib/types";
 
 interface UseCounterOfferEditorArgs {
   trade: Trade | null;
-  locale: string;
   invalidateTrade: () => Promise<unknown>;
 }
 
@@ -24,7 +23,6 @@ interface UseCounterOfferEditorArgs {
  */
 export function useCounterOfferEditor({
   trade,
-  locale,
   invalidateTrade,
 }: UseCounterOfferEditorArgs) {
   const t = useTranslations();
@@ -60,21 +58,14 @@ export function useCounterOfferEditor({
       if (process.env.NODE_ENV === "development")
         console.error("Failed to send counter offer:", error);
       const errorMessage =
-        error.response?.data?.message ||
-        (locale === "en"
-          ? "Failed to send counter offer"
-          : "Karşı teklif gönderilemedi");
+        error.response?.data?.message || t("trade.counterOfferFailed");
 
       // Handle specific error for identical counter-offer
       if (
         errorMessage.includes("Önceki teklif ile aynı") ||
         errorMessage.includes("identical")
       ) {
-        toast.error(
-          locale === "en"
-            ? "This counter-offer is identical to the current trade. Please make changes before submitting."
-            : "Önceki teklif ile aynı. Değişiklik yapmadan karşı teklif gönderemezsiniz.",
-        );
+        toast.error(t("trade.counterOfferIdentical"));
       } else {
         toast.error(errorMessage);
       }
@@ -252,20 +243,12 @@ export function useCounterOfferEditor({
     if (!trade) return;
 
     if (selectedCounterProducts.length === 0) {
-      toast.error(
-        locale === "en"
-          ? "Please select at least one product to offer"
-          : "Lütfen en az bir ürün seçin",
-      );
+      toast.error(t("trade.selectAtLeastOneOffer"));
       return;
     }
 
     if (selectedCounterTargetProducts.length === 0) {
-      toast.error(
-        locale === "en"
-          ? "Please select at least one product you want"
-          : "Lütfen en az bir istediğiniz ürünü seçin",
-      );
+      toast.error(t("trade.selectAtLeastOneWant"));
       return;
     }
 
@@ -289,11 +272,7 @@ export function useCounterOfferEditor({
       newCashAmount === currentCashAmount;
 
     if (isIdentical) {
-      toast.error(
-        locale === "en"
-          ? "This counter-offer is identical to the current trade. Please make changes before submitting."
-          : "Önceki teklif ile aynı. Değişiklik yapmadan karşı teklif gönderemezsiniz.",
-      );
+      toast.error(t("trade.counterOfferIdentical"));
       return;
     }
 

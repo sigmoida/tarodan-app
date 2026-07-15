@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, Spinner } from "@tarodan/ui";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import type { MessageThread } from "../_lib/messages";
 import ThreadListItem from "./ThreadListItem";
 
@@ -25,7 +25,6 @@ export default function ThreadList({
   className?: string;
 }) {
   const t = useTranslations();
-  const locale = useLocale();
 
   return (
     <div
@@ -66,9 +65,7 @@ export default function ThreadList({
                 onClick={onExpand}
                 className="w-full py-2.5 text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
               >
-                {locale === "en"
-                  ? `More (${remainingCount})`
-                  : `Daha fazla (${remainingCount})`}
+                {t("message.moreCount", { count: remainingCount })}
               </Button>
             </div>
           )}

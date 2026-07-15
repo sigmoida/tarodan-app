@@ -137,91 +137,49 @@ export const getTradeStatusMeta = (
   });
   return {
     pending: {
-      description:
-        locale === "en"
-          ? "Offer is being evaluated by the recipient"
-          : "Teklif alıcı tarafından değerlendiriliyor",
+      description: t("trade.statusMeta.pending"),
     },
     accepted: {
-      description:
-        locale === "en"
-          ? "Trade accepted, awaiting shipment"
-          : "Takas kabul edildi, gönderim bekleniyor",
+      description: t("trade.statusMeta.accepted"),
     },
     rejected: {
       description: t("offer.offerRejected"),
     },
     awaiting_payment: {
-      description:
-        locale === "en"
-          ? "Cash payment required to proceed"
-          : "Devam etmek için nakit ödeme gerekli",
+      description: t("trade.statusMeta.awaitingPayment"),
     },
     shipping_to_warehouse: {
-      description:
-        locale === "en"
-          ? "Both parties must ship their items to the Tarodan warehouse"
-          : "Her iki taraf ürünlerini Tarodan deposuna göndermelidir",
+      description: t("trade.statusMeta.shippingToWarehouse"),
     },
     at_warehouse: {
-      description:
-        locale === "en"
-          ? "Your items are at the Tarodan warehouse and being reviewed"
-          : "Ürünleriniz Tarodan deposunda, inceleme başlatıldı",
+      description: t("trade.statusMeta.atWarehouse"),
     },
     admin_reviewing: {
-      description:
-        locale === "en"
-          ? "An admin is physically reviewing the items"
-          : "Admin ürünleri fiziksel olarak inceliyor",
+      description: t("trade.statusMeta.adminReviewing"),
     },
     shipping_to_recipients: {
-      description:
-        locale === "en"
-          ? "Admin approved — items are being shipped to the recipients"
-          : "Admin onayladı — ürünler alıcılara gönderiliyor",
+      description: t("trade.statusMeta.shippingToRecipients"),
     },
     returning: {
-      description:
-        locale === "en"
-          ? "Trade was rejected — items are being returned to their owners"
-          : "Takas reddedildi — ürünler sahiplerine iade ediliyor",
+      description: t("trade.statusMeta.returning"),
     },
     initiator_shipped: {
-      description:
-        locale === "en"
-          ? "Initiator shipped their items"
-          : "Başlatıcı ürünlerini gönderdi",
+      description: t("trade.statusMeta.initiatorShipped"),
     },
     receiver_shipped: {
-      description:
-        locale === "en"
-          ? "Receiver shipped their items"
-          : "Alıcı ürünlerini gönderdi",
+      description: t("trade.statusMeta.receiverShipped"),
     },
     both_shipped: {
-      description:
-        locale === "en"
-          ? "Both parties shipped their items"
-          : "Her iki taraf da ürünlerini gönderdi",
+      description: t("trade.statusMeta.bothShipped"),
     },
     initiator_received: {
-      description:
-        locale === "en"
-          ? "Initiator received the items"
-          : "Başlatıcı ürünleri teslim aldı",
+      description: t("trade.statusMeta.initiatorReceived"),
     },
     receiver_received: {
-      description:
-        locale === "en"
-          ? "Receiver received the items"
-          : "Alıcı ürünleri teslim aldı",
+      description: t("trade.statusMeta.receiverReceived"),
     },
     completed: {
-      description:
-        locale === "en"
-          ? "Trade successfully completed"
-          : "Takas başarıyla tamamlandı",
+      description: t("trade.statusMeta.completed"),
     },
     cancelled: {
       description: t("trade.tradeCancelled"),

@@ -1,78 +1,96 @@
 /** @format */
 
-import type { BadgeVariant } from '@tarodan/ui';
+import type { BadgeVariant } from "@tarodan/ui";
+import type { MessageKey } from "@tarodan/i18n";
 
 /**
  * Single source of truth for refund-request labels shared by the list and the
- * detail page (previously each kept its own copy). Bilingual because the
- * marketplace switches locale; the shared `@tarodan/shared` config is TR-only.
+ * detail page (previously each kept its own copy). Labels are catalog keys
+ * (resolved via `t()` at the call site) so the marketplace can switch locale.
  */
 
-export interface Bilingual {
-	tr: string;
-	en: string;
+export interface RefundStatusMeta {
+  labelKey: MessageKey;
+  variant: BadgeVariant;
 }
 
-export interface RefundStatusMeta extends Bilingual {
-	variant: BadgeVariant;
-}
-
-/** RefundRequestStatus → Badge variant + bilingual label. */
+/** RefundRequestStatus → Badge variant + catalog label key. */
 export const refundStatusMeta: Record<string, RefundStatusMeta> = {
-	pending_review: { tr: 'İnceleniyor', en: 'Under Review', variant: 'warning' },
-	approved: { tr: 'Onaylandı', en: 'Approved', variant: 'info' },
-	wait_for_delivery: { tr: 'Teslim Bekleniyor', en: 'Awaiting Delivery', variant: 'info' },
-	return_shipment_open: { tr: 'İade Kargosu Hazır', en: 'Return Label Ready', variant: 'info' },
-	return_in_transit: { tr: 'İade Yolda', en: 'Return In Transit', variant: 'info' },
-	return_delivered: { tr: 'Satıcıya Ulaştı', en: 'Reached Seller', variant: 'info' },
-	refunded: { tr: 'İade Tamamlandı', en: 'Refunded', variant: 'success' },
-	rejected: { tr: 'Reddedildi', en: 'Rejected', variant: 'danger' },
-	disputed: { tr: 'İtiraz / İnceleme', en: 'Under Dispute', variant: 'warning' },
-	cancelled: { tr: 'İptal Edildi', en: 'Cancelled', variant: 'secondary' },
+  pending_review: {
+    labelKey: "refund.statusPendingReview",
+    variant: "warning",
+  },
+  approved: { labelKey: "refund.statusApproved", variant: "info" },
+  wait_for_delivery: {
+    labelKey: "refund.statusWaitForDelivery",
+    variant: "info",
+  },
+  return_shipment_open: {
+    labelKey: "refund.statusReturnShipmentOpen",
+    variant: "info",
+  },
+  return_in_transit: {
+    labelKey: "refund.statusReturnInTransit",
+    variant: "info",
+  },
+  return_delivered: {
+    labelKey: "refund.statusReturnDelivered",
+    variant: "info",
+  },
+  refunded: { labelKey: "refund.statusRefunded", variant: "success" },
+  rejected: { labelKey: "common.rejected", variant: "danger" },
+  disputed: { labelKey: "refund.statusDisputed", variant: "warning" },
+  cancelled: { labelKey: "order.statusCancelled", variant: "secondary" },
 };
 
-export function statusMetaOf(status: string): RefundStatusMeta {
-	return refundStatusMeta[status] ?? { tr: status, en: status, variant: 'secondary' };
+/** Meta for a status, or `null` labelKey (caller falls back to the raw status). */
+export function statusMetaOf(status: string): {
+  labelKey: MessageKey | null;
+  variant: BadgeVariant;
+} {
+  return refundStatusMeta[status] ?? { labelKey: null, variant: "secondary" };
 }
 
-/** RefundReason → bilingual label. */
-export const refundReasonLabel: Record<string, Bilingual> = {
-	changed_mind: { tr: 'Vazgeçtim / Fikrim değişti', en: 'Changed my mind' },
-	damaged: { tr: 'Hasarlı geldi', en: 'Damaged' },
-	wrong_item: { tr: 'Yanlış ürün geldi', en: 'Wrong item' },
-	not_as_described: { tr: 'Açıklamayla uyuşmuyor', en: 'Not as described' },
-	missing_parts: { tr: 'Eksik parça', en: 'Missing parts' },
-	counterfeit: { tr: 'Sahte ürün', en: 'Counterfeit' },
-	lost_in_transit: { tr: 'Kargoda kayboldu', en: 'Lost in transit' },
-	other: { tr: 'Diğer', en: 'Other' },
+/** RefundReason → catalog label key. */
+export const refundReasonLabelKey: Record<string, MessageKey> = {
+  changed_mind: "order.refundReasonChangedMind",
+  damaged: "order.refundReasonDamaged",
+  wrong_item: "order.refundReasonWrongItem",
+  not_as_described: "order.refundReasonNotAsDescribed",
+  missing_parts: "order.refundReasonMissingParts",
+  counterfeit: "order.refundReasonCounterfeit",
+  lost_in_transit: "order.refundReasonLostInTransit",
+  other: "order.refundReasonOther",
 };
 
-export function reasonLabelOf(reason: string): Bilingual {
-	return refundReasonLabel[reason] ?? { tr: reason, en: reason };
+/** Reason label key, or `null` (caller falls back to the raw reason). */
+export function reasonLabelKeyOf(reason: string): MessageKey | null {
+  return refundReasonLabelKey[reason] ?? null;
 }
 
 /**
- * Lifecycle phases for the status stepper — aligned with admin's automatic flow
- * (no human "review/approval" step; a request goes straight to the return phase).
+ * Lifecycle phases for the status stepper (catalog keys) — aligned with admin's
+ * automatic flow (no human "review/approval" step; a request goes straight to
+ * the return phase).
  */
-export const REFUND_LIFECYCLE: Bilingual[] = [
-	{ tr: 'Talep alındı', en: 'Request received' },
-	{ tr: 'İade kargosu', en: 'Return shipment' },
-	{ tr: 'Ürün yolda', en: 'In transit' },
-	{ tr: 'Ürün satıcıda', en: 'At seller' },
-	{ tr: 'Para iade edildi', en: 'Refunded' },
+export const REFUND_LIFECYCLE: MessageKey[] = [
+  "refund.requestReceived",
+  "trade.returnShipment",
+  "refund.lifecycleInTransit",
+  "refund.lifecycleAtSeller",
+  "refund.lifecycleRefunded",
 ];
 
 /** RefundRequestStatus → active phase index (into REFUND_LIFECYCLE). */
 export const refundStatusPhase: Record<string, number> = {
-	pending_review: 0,
-	approved: 1,
-	wait_for_delivery: 1,
-	return_shipment_open: 1,
-	return_in_transit: 2,
-	return_delivered: 3,
-	refunded: 4,
+  pending_review: 0,
+  approved: 1,
+  wait_for_delivery: 1,
+  return_shipment_open: 1,
+  return_in_transit: 2,
+  return_delivered: 3,
+  refunded: 4,
 };
 
 /** Off-flow (terminal) states — shown as a red end-cap in the stepper. */
-export const refundTerminalStatuses = new Set(['rejected', 'cancelled']);
+export const refundTerminalStatuses = new Set(["rejected", "cancelled"]);

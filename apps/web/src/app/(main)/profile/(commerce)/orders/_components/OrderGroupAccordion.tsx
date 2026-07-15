@@ -11,7 +11,7 @@ import {
   ThumbnailStack,
 } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { formatDate } from "@/lib/format";
 import {
   formatTL,
@@ -40,7 +40,6 @@ export default function OrderGroupAccordion({
   actions,
 }: OrderGroupAccordionProps) {
   const t = useTranslations();
-  const locale = useLocale();
   const total = group.orders.reduce((sum, o) => sum + orderAmount(o), 0);
   const date = group.orders[0]?.createdAt;
 
@@ -91,14 +90,10 @@ export default function OrderGroupAccordion({
               />
               <div className="min-w-0 flex-1 text-left">
                 <p className="font-medium text-heading">
-                  {locale === "en"
-                    ? `Cart of ${group.orders.length} items`
-                    : `${group.orders.length} ürünlük sepet`}
+                  {t("order.cartOfItems", { count: group.orders.length })}
                 </p>
                 <p className="text-sm font-normal text-muted">
-                  {locale === "en"
-                    ? "Each item ships separately"
-                    : "Her ürün ayrı kargolanır"}
+                  {t("order.eachItemShipsSeparately")}
                 </p>
               </div>
             </div>

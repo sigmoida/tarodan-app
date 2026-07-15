@@ -3,7 +3,7 @@
 "use client";
 
 import { api } from "@/lib/api";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
 import type { Notification } from "../_lib/notifications";
@@ -26,7 +26,6 @@ const NOTIFICATION_INVALIDATES = [
  */
 export function useNotifications(enabled: boolean) {
   const t = useTranslations();
-  const locale = useLocale();
 
   const query = useWebList<Notification[]>({
     resource: RESOURCE,
@@ -49,10 +48,7 @@ export function useNotifications(enabled: boolean) {
     () => api.post("/notifications/mark-all-read"),
     {
       invalidates: NOTIFICATION_INVALIDATES,
-      successMessage:
-        locale === "en"
-          ? "All marked as read"
-          : "Tümü okundu olarak işaretlendi",
+      successMessage: t("notification.allRead"),
       errorMessage: t("common.operationFailed"),
     },
   );

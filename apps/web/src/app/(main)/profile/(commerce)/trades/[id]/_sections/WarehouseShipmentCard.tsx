@@ -8,7 +8,6 @@ import type { Trade, TradeShipment } from "../_lib/types";
 interface WarehouseShipmentCardProps {
   trade: Trade;
   userId?: string;
-  locale: string;
   myToWarehouseShipment?: TradeShipment;
   otherToWarehouseShipment?: TradeShipment;
 }
@@ -16,7 +15,6 @@ interface WarehouseShipmentCardProps {
 export default function WarehouseShipmentCard({
   trade,
   userId,
-  locale,
   myToWarehouseShipment,
   otherToWarehouseShipment,
 }: WarehouseShipmentCardProps) {
@@ -30,18 +28,9 @@ export default function WarehouseShipmentCard({
   }
 
   return (
-    <SectionCard
-      title={
-        locale === "en"
-          ? "Shipping to Tarodan Warehouse"
-          : "Tarodan Deposuna Gönderim"
-      }
-      className="mb-6"
-    >
+    <SectionCard title={t("trade.warehouseShipping.title")} className="mb-6">
       <p className="text-sm text-subtle mb-5">
-        {locale === "en"
-          ? "The system has issued a Sürat Kargo tracking number for both parties. Take your item to the nearest Sürat branch with the number below."
-          : "Sistem her iki tarafa Sürat Kargo takip numarası tahsis etti. Aşağıdaki numara ile en yakın Sürat şubesine giderek ürününüzü teslim edin."}
+        {t("trade.warehouseShipping.subtitle")}
       </p>
       {/* Tek kart: yalnız kullanıcının kendi gönderisi. Karşı tarafın
          numarası gösterilmez; sadece "kargoya verdi mi" durumu altta
@@ -54,9 +43,7 @@ export default function WarehouseShipmentCard({
           {myToWarehouseShipment?.trackingNumber ?? "—"}
         </p>
         <p className="text-xs text-muted mt-2">
-          {locale === "en"
-            ? "Take this number to the nearest Sürat Kargo branch and hand in your item."
-            : "Bu numarayla Sürat Kargo şubesine gidip ürününüzü teslim edin."}
+          {t("trade.warehouseShipping.handIn")}
         </p>
         <div className="mt-3">
           <ShipmentStatusChip status={myToWarehouseShipment?.status} />
@@ -73,10 +60,7 @@ export default function WarehouseShipmentCard({
           if (s === "delivered") {
             return (
               <span className="inline-flex items-center gap-2 text-success-700">
-                ✓
-                {locale === "en"
-                  ? "The other party's shipment has reached the warehouse."
-                  : "Karşı tarafın gönderisi de depoya ulaştı."}
+                {t("trade.warehouseShipping.counterpartyDelivered")}
               </span>
             );
           }
@@ -87,47 +71,33 @@ export default function WarehouseShipmentCard({
             s === "out_for_delivery"
           ) {
             return (
-              <span>
-                {locale === "en"
-                  ? "The other party's shipment is on the way."
-                  : "Karşı tarafın gönderisi yolda."}
-              </span>
+              <span>{t("trade.warehouseShipping.counterpartyInTransit")}</span>
             );
           }
           if (s === "cancelled") {
             return (
               <span className="text-warning-700">
-                {locale === "en"
-                  ? "The other party's shipment was cancelled. Admin will follow up."
-                  : "Karşı tarafın gönderisi iptal edildi; yetkili ekibimiz devreye girecek."}
+                {t("trade.warehouseShipping.counterpartyCancelled")}
               </span>
             );
           }
           if (s === "failed") {
             return (
               <span className="text-warning-700">
-                {locale === "en"
-                  ? "The other party's shipment failed. Admin will follow up."
-                  : "Karşı tarafın gönderisinde bir aksaklık oluştu; yetkili ekibimiz inceliyor."}
+                {t("trade.warehouseShipping.counterpartyFailed")}
               </span>
             );
           }
           if (s === "returned" || s === "return_in_progress") {
             return (
               <span className="text-warning-700">
-                {locale === "en"
-                  ? "The other party's shipment was returned."
-                  : "Karşı tarafın gönderisi iade edildi."}
+                {t("trade.warehouseShipping.counterpartyReturned")}
               </span>
             );
           }
           // pending | label_created | undefined → henüz kargoya verilmedi
           return (
-            <span>
-              {locale === "en"
-                ? "Waiting for the other party to hand in their shipment."
-                : "Karşı tarafın kargoya teslim etmesi bekleniyor."}
-            </span>
+            <span>{t("trade.warehouseShipping.counterpartyWaiting")}</span>
           );
         })()}
       </div>

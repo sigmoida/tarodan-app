@@ -16,7 +16,6 @@ import type { TradeDetailVM } from "../_hooks/useTradeDetail";
 export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
   const {
     t,
-    locale,
     isLoadingCounterData,
     counterTargetProducts,
     selectedCounterTargetProducts,
@@ -51,11 +50,7 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
             <ArrowsRightLeftIcon className="w-8 h-8 text-primary-500" />
             {t("trade.counterOffer")}
           </h1>
-          <p className="text-muted mt-2">
-            {locale === "en"
-              ? "Modify the trade offer"
-              : "Takas teklifini değiştirin"}
-          </p>
+          <p className="text-muted mt-2">{t("trade.counterOfferModify")}</p>
         </div>
 
         {isLoadingCounterData ? (
@@ -74,16 +69,12 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
               {/* SOL - İstenilen Ürünler */}
               <div className="bg-surface-elevated rounded-xl p-6 shadow-sm border border-border flex-1">
                 <h2 className="text-lg font-semibold text-heading mb-4">
-                  {locale === "en"
-                    ? "Products You Want"
-                    : "İstediğiniz Ürünler"}
+                  {t("trade.productsYouWant")}
                 </h2>
                 {counterTargetProducts.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-muted">
-                      {locale === "en"
-                        ? "No products available from this seller"
-                        : "Bu satıcıdan kullanılabilir ürün yok"}
+                      {t("trade.noProductsFromSeller")}
                     </p>
                   </div>
                 ) : (
@@ -153,24 +144,18 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
               {/* SAĞ - Benim Ürünlerim */}
               <div className="bg-surface-elevated rounded-xl p-6 shadow-sm border border-border flex-1">
                 <h2 className="text-lg font-semibold text-heading mb-4">
-                  {locale === "en"
-                    ? "Products You Offer"
-                    : "Teklif Edeceğiniz Ürünler"}
+                  {t("trade.productsYouOffer")}
                 </h2>
                 {counterProducts.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-muted mb-4">
-                      {locale === "en"
-                        ? "No products available"
-                        : "Kullanılabilir ürün yok"}
+                      {t("trade.noProductsAvailable")}
                     </p>
                     <Link
                       href="/profile/listings"
                       className="text-primary-500 hover:text-primary-600 font-medium"
                     >
-                      {locale === "en"
-                        ? "Go to My Listings →"
-                        : "İlanlarıma Git →"}
+                      {t("trade.goToMyListings")}
                     </Link>
                   </div>
                 ) : (
@@ -237,9 +222,7 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                 {t("trade.cashDifference")} ({t("common.optional")})
               </h2>
               <p className="text-muted text-sm mb-4">
-                {locale === "en"
-                  ? "You can add cash to balance the trade value."
-                  : "Takas değerini dengelemek için nakit fark ekleyebilirsiniz."}
+                {t("trade.cashBalanceHint")}
               </p>
               <div className="space-y-4">
                 <div className="relative max-w-xs">
@@ -259,9 +242,7 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                 {parseFloat(counterCashAmount) > 0 && (
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-body">
-                      {locale === "en"
-                        ? "Who will pay the cash difference?"
-                        : "Nakit farkı kim ödeyecek?"}
+                      {t("trade.whoPaysCash")}
                     </p>
                     <div className="flex gap-4">
                       <Radio
@@ -280,11 +261,7 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                         onChange={(e) =>
                           setCounterCashPayer(e.target.value as "me" | "them")
                         }
-                        label={
-                          locale === "en"
-                            ? "They will pay"
-                            : "Karşı taraf ödeyecek"
-                        }
+                        label={t("trade.theyWillPay")}
                       />
                     </div>
                   </div>
@@ -342,9 +319,7 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                 ) : (
                   <>
                     <ArrowsRightLeftIcon className="w-5 h-5" />
-                    {locale === "en"
-                      ? "Send Counter Offer"
-                      : "Karşı Teklif Gönder"}
+                    {t("trade.sendCounterOffer")}
                   </>
                 )}
               </Button>

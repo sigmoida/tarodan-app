@@ -4,7 +4,7 @@
 
 import { api, mediaApi, userApi } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
 
@@ -65,7 +65,6 @@ export function useUpdateProfile() {
 /** Upload a new avatar → save the S3 key → return a display URL. */
 export function useUploadAvatar() {
   const t = useTranslations();
-  const locale = useLocale();
   const refreshUser = useAuthStore((s) => s.refreshUser);
   return useWebMutation(
     async (file: File): Promise<string> => {
@@ -77,10 +76,7 @@ export function useUploadAvatar() {
     },
     {
       invalidates: [RESOURCE],
-      successMessage:
-        locale === "en"
-          ? "Profile photo updated"
-          : "Profil fotoğrafı güncellendi",
+      successMessage: t("profile.photoUpdated"),
       errorMessage: t("profile.photoUploadFailed"),
       onSuccess: () => {
         void refreshUser();

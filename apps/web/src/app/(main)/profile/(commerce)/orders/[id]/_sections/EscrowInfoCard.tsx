@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import {
   computePayoutDate,
   isMembershipOrder,
@@ -15,7 +15,6 @@ import {
  */
 export default function EscrowInfoCard({ order }: { order: OrderDetail }) {
   const t = useTranslations();
-  const locale = useLocale();
 
   if (
     !order.isBuyer ||
@@ -26,6 +25,11 @@ export default function EscrowInfoCard({ order }: { order: OrderDetail }) {
   }
 
   const payoutDate = computePayoutDate(order);
+  const payoutDateStr = payoutDate?.toLocaleDateString(t("common.dateLocale"), {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 
   return (
     <div className="bg-info-50 border border-info-200 rounded-xl shadow-sm p-6">
@@ -33,25 +37,13 @@ export default function EscrowInfoCard({ order }: { order: OrderDetail }) {
         {t("order.statusDelivered")}
       </h2>
       <p className="text-sm text-info-800">
-        {payoutDate
-          ? locale === "en"
-            ? `Payment to the seller is released 14 days after delivery (on ${payoutDate.toLocaleDateString(
-                "en-US",
-                { year: "numeric", month: "long", day: "numeric" },
-              )}). You have until then to request a refund.`
-            : `Satıcıya ödeme teslimden 14 gün sonra serbest bırakılır (${payoutDate.toLocaleDateString(
-                "tr-TR",
-                { year: "numeric", month: "long", day: "numeric" },
-              )}). O tarihe kadar iade talep edebilirsiniz.`
-          : locale === "en"
-            ? "Payment to the seller is released 14 days after delivery. You can request a refund during this window."
-            : "Satıcıya ödeme teslimden 14 gün sonra serbest bırakılır. Bu süre içinde iade talep edebilirsiniz."}
+        {payoutDateStr
+          ? t("order.payoutReleaseWithDate", { date: payoutDateStr })
+          : t("order.payoutRelease")}
       </p>
       {order.activeRefundRequest && (
         <p className="text-sm text-info-800 mt-2 font-medium">
-          {locale === "en"
-            ? "Payment is on hold until the open refund request is resolved."
-            : "Açık iade talebiniz sonuçlanana kadar ödeme bekletiliyor."}
+          {t("order.paymentOnHoldRefund")}
         </p>
       )}
     </div>

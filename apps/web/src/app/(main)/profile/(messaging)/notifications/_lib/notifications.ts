@@ -1,7 +1,7 @@
 /** @format */
 
 import { createTranslator } from "next-intl";
-import { getMessages, resolveLocale } from "@tarodan/i18n";
+import { getMessages, resolveLocale, type MessageKey } from "@tarodan/i18n";
 
 const DATE_LOCALES = { en: "en-US", tr: "tr-TR" } as const;
 
@@ -44,14 +44,14 @@ export const NOTIFICATION_CATEGORIES: Record<string, FilterType> = {
   new_message: "messages",
 };
 
-export const FILTER_LABELS: Record<FilterType, { tr: string; en: string }> = {
-  all: { tr: "Tümü", en: "All" },
-  unread: { tr: "Okunmamış", en: "Unread" },
-  orders: { tr: "Siparişler", en: "Orders" },
-  offers: { tr: "Teklifler", en: "Offers" },
-  trades: { tr: "Takaslar", en: "Trades" },
-  messages: { tr: "Mesajlar", en: "Messages" },
-  other: { tr: "Diğer", en: "Other" },
+export const FILTER_LABELS: Record<FilterType, MessageKey> = {
+  all: "common.all",
+  unread: "notification.filterUnread",
+  orders: "notification.filterOrders",
+  offers: "nav.offers",
+  trades: "nav.trades",
+  messages: "nav.messages",
+  other: "product.other",
 };
 
 export const getNotificationCategory = (type: string): FilterType =>
@@ -63,15 +63,14 @@ export function getTimeAgo(dateString: string, locale: string): string {
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
-  const en = locale === "en";
   const t = createTranslator({
     locale,
     messages: getMessages(resolveLocale(locale)),
   });
 
   if (diffMins < 1) return t("time.justNow");
-  if (diffMins < 60) return en ? `${diffMins}m ago` : `${diffMins} dk önce`;
-  if (diffHours < 24) return en ? `${diffHours}h ago` : `${diffHours} sa önce`;
-  if (diffDays < 7) return en ? `${diffDays}d ago` : `${diffDays} gün önce`;
+  if (diffMins < 60) return t("time.ago.minutes", { count: diffMins });
+  if (diffHours < 24) return t("time.ago.hours", { count: diffHours });
+  if (diffDays < 7) return t("time.ago.days", { count: diffDays });
   return date.toLocaleDateString(DATE_LOCALES[resolveLocale(locale)]);
 }

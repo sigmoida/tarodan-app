@@ -8,7 +8,6 @@ import type { Trade, TradeShipment } from "../_lib/types";
 interface RecipientsShipmentCardProps {
   trade: Trade;
   userId?: string;
-  locale: string;
   myFromWarehouseShipment?: TradeShipment;
   otherFromWarehouseShipment?: TradeShipment;
   onConfirmReceipt: () => void;
@@ -18,7 +17,6 @@ interface RecipientsShipmentCardProps {
 export default function RecipientsShipmentCard({
   trade,
   userId,
-  locale,
   myFromWarehouseShipment,
   otherFromWarehouseShipment,
   onConfirmReceipt,
@@ -65,20 +63,14 @@ export default function RecipientsShipmentCard({
         </div>
       ) : (
         <div className="p-4 bg-surface-elevated rounded-lg border border-info-200 mb-4">
-          <p className="text-sm text-muted">
-            {locale === "en"
-              ? "Tracking info will be available shortly."
-              : "Takip bilgileri kısa süre içinde görünecek."}
-          </p>
+          <p className="text-sm text-muted">{t("trade.trackingSoon")}</p>
         </div>
       )}
 
       {otherFromWarehouseShipment && (
         <div className="p-3 bg-surface-elevated/70 rounded-lg border border-info-100 mb-4 text-sm text-muted">
           <p className="font-medium text-body mb-0.5">
-            {locale === "en"
-              ? "Other party's shipment"
-              : "Karşı tarafın kargosu"}
+            {t("trade.otherPartyShipment")}
           </p>
           <p>
             {otherFromWarehouseShipment.carrier === "surat"
@@ -117,9 +109,7 @@ export default function RecipientsShipmentCard({
       </Button>
       {myFromWarehouseShipment?.status !== "delivered" && (
         <p className="text-xs text-muted mt-2 text-center">
-          {locale === "en"
-            ? "Waiting for the carrier to mark the shipment as delivered."
-            : "Kargonun teslim edildiği bilgisi bekleniyor."}
+          {t("trade.confirmReceipt.waitingDelivered")}
         </p>
       )}
     </div>

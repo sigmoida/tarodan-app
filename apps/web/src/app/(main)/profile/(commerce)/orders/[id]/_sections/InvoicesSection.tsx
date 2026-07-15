@@ -6,7 +6,7 @@ import { useRef } from "react";
 import toast from "react-hot-toast";
 import { Button } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import {
   useDownloadElogoInvoice,
   useDownloadSellerInvoice,
@@ -18,7 +18,6 @@ import type { OrderDetail } from "../_lib/types";
 
 export default function InvoicesSection({ order }: { order: OrderDetail }) {
   const t = useTranslations();
-  const locale = useLocale();
   const orderId = order.id;
 
   const elogoQuery = useElogoInvoice(orderId, order);
@@ -92,9 +91,7 @@ export default function InvoicesSection({ order }: { order: OrderDetail }) {
             </svg>
             <div className="flex-1">
               <p className="text-sm text-success-800 mb-1">
-                {locale === "en"
-                  ? "Your invoice has been sent to your email address."
-                  : "Faturanız e-posta adresinize gönderildi."}
+                {t("order.invoiceSentToEmail")}
               </p>
               {elogoInvoice.invoiceNumber && (
                 <p className="text-xs text-success-700 mb-2">
@@ -108,12 +105,8 @@ export default function InvoicesSection({ order }: { order: OrderDetail }) {
                 disabled={downloadElogo.isPending}
               >
                 {downloadElogo.isPending
-                  ? locale === "en"
-                    ? "Opening..."
-                    : "Açılıyor..."
-                  : locale === "en"
-                    ? "View / Download Invoice"
-                    : "Faturayı Görüntüle / İndir"}
+                  ? t("common.opening")
+                  : t("order.viewDownloadInvoice")}
               </Button>
             </div>
           </div>
@@ -172,12 +165,8 @@ export default function InvoicesSection({ order }: { order: OrderDetail }) {
                       disabled={downloadSeller.isPending}
                     >
                       {downloadSeller.isPending
-                        ? locale === "en"
-                          ? "Opening..."
-                          : "Açılıyor..."
-                        : locale === "en"
-                          ? "View / Download"
-                          : "Görüntüle / İndir"}
+                        ? t("common.opening")
+                        : t("order.viewDownload")}
                     </Button>
                     {sellerInvoice.canUpload && (
                       <Button
@@ -187,12 +176,8 @@ export default function InvoicesSection({ order }: { order: OrderDetail }) {
                         disabled={uploadSeller.isPending}
                       >
                         {uploadSeller.isPending
-                          ? locale === "en"
-                            ? "Uploading..."
-                            : "Yükleniyor..."
-                          : locale === "en"
-                            ? "Replace"
-                            : "Değiştir"}
+                          ? t("common.uploading")
+                          : t("common.replace")}
                       </Button>
                     )}
                   </div>
@@ -201,9 +186,7 @@ export default function InvoicesSection({ order }: { order: OrderDetail }) {
             ) : (
               <div className="p-3 bg-surface rounded-lg border border-dashed border-default">
                 <p className="text-sm text-muted mb-3">
-                  {locale === "en"
-                    ? "You can upload the product invoice (PDF) for this order. The buyer will be notified by email."
-                    : "Bu sipariş için ürün faturanızı (PDF) yükleyebilirsiniz. Alıcıya e-posta ile bildirilir."}
+                  {t("order.uploadInvoiceNotice")}
                 </p>
                 <Button
                   variant="primary"
@@ -212,12 +195,8 @@ export default function InvoicesSection({ order }: { order: OrderDetail }) {
                   disabled={uploadSeller.isPending}
                 >
                   {uploadSeller.isPending
-                    ? locale === "en"
-                      ? "Uploading..."
-                      : "Yükleniyor..."
-                    : locale === "en"
-                      ? "Upload Invoice (PDF)"
-                      : "Fatura Yükle (PDF)"}
+                    ? t("common.uploading")
+                    : t("order.uploadInvoicePdf")}
                 </Button>
               </div>
             )}

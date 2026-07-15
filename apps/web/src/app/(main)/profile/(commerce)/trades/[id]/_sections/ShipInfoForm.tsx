@@ -6,7 +6,6 @@ import { Button, Select, Spinner } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 
 interface ShipInfoFormProps {
-  locale: string;
   addresses: any[];
   addressesLoading: boolean;
   shipAddressId: string;
@@ -16,7 +15,6 @@ interface ShipInfoFormProps {
 }
 
 export default function ShipInfoForm({
-  locale,
   addresses,
   addressesLoading,
   shipAddressId,
@@ -30,11 +28,7 @@ export default function ShipInfoForm({
       <h2 className="text-lg font-semibold text-heading mb-4">
         {t("trade.enterShipInfo")}
       </h2>
-      <p className="text-muted text-sm mb-4">
-        {locale === "en"
-          ? "Select the address you will ship from and the carrier."
-          : "Gönderim yapacağınız adresi ve kargo firmasını seçin."}
-      </p>
+      <p className="text-muted text-sm mb-4">{t("trade.shipInfoDesc")}</p>
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-body mb-2">
@@ -47,12 +41,8 @@ export default function ShipInfoForm({
           >
             <option value="">
               {addressesLoading
-                ? locale === "en"
-                  ? "Loading..."
-                  : "Yükleniyor..."
-                : locale === "en"
-                  ? "Select address"
-                  : "Adres seçin"}
+                ? t("common.loading")
+                : t("checkout.selectAddress")}
             </option>
             {addresses.map((addr: any) => (
               <option key={addr.id} value={addr.id}>
@@ -63,13 +53,13 @@ export default function ShipInfoForm({
           </Select>
           {addresses.length === 0 && !addressesLoading && (
             <p className="text-sm text-warning-600 mt-2">
-              {locale === "en"
-                ? "No saved addresses. Add one in "
-                : "Kayıtlı adres yok. "}
-              <Link href="/profile" className="underline font-medium">
-                {t("trade.profileAddressesLink")}
-              </Link>
-              {t("trade.addressLinkSuffix")}
+              {t.rich("trade.noSavedAddresses", {
+                link: (chunks) => (
+                  <Link href="/profile" className="underline font-medium">
+                    {chunks}
+                  </Link>
+                ),
+              })}
             </p>
           )}
         </div>
@@ -91,9 +81,7 @@ export default function ShipInfoForm({
           ) : (
             <>
               <TruckIcon className="w-5 h-5" />
-              {locale === "en"
-                ? "Submit Shipping Info"
-                : "Kargo Bilgisini Gönder"}
+              {t("trade.submitShipInfo")}
             </>
           )}
         </Button>

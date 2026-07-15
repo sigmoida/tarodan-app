@@ -15,35 +15,21 @@ import {
  * `@tarodan/ui` Stepper (same component the checkout wizard uses), mirroring the
  * admin refund detail. Terminal states render a red ✕ end-cap.
  */
-export default function RefundStatusStepper({
-  status,
-  locale,
-}: {
-  status: string;
-  locale: string;
-}) {
+export default function RefundStatusStepper({ status }: { status: string }) {
   const t = useTranslations();
   let steps: StepperStep[];
   let current: number;
 
   if (refundTerminalStatuses.has(status)) {
     const endLabel =
-      status === "rejected"
-        ? locale === "en"
-          ? "Rejected"
-          : "Reddedildi"
-        : locale === "en"
-          ? "Cancelled"
-          : "İptal edildi";
+      status === "rejected" ? t("common.rejected") : t("order.statusCancelled");
     steps = [
       { label: t("refund.requestReceived") },
       { label: endLabel, error: true },
     ];
     current = 1;
   } else {
-    steps = REFUND_LIFECYCLE.map((p) => ({
-      label: locale === "en" ? p.en : p.tr,
-    }));
+    steps = REFUND_LIFECYCLE.map((labelKey) => ({ label: t(labelKey) }));
     current = refundStatusPhase[status] ?? 0;
   }
 

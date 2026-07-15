@@ -6,7 +6,7 @@ import { TruckIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
 import { StarIcon } from "@heroicons/react/24/solid";
 import { Button } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import {
   REVIEWABLE_STATUSES,
   getOrderProductId,
@@ -51,7 +51,6 @@ export default function OrderActions({
   onReview,
 }: OrderActionsProps) {
   const t = useTranslations();
-  const locale = useLocale();
 
   const shipped = hasShipped(order);
   const cancelled = isCancelledOrder(order);
@@ -130,11 +129,7 @@ export default function OrderActions({
           onClick={() => onInvoice(order.id)}
           disabled={downloading}
         >
-          {downloading
-            ? locale === "en"
-              ? "Downloading..."
-              : "İndiriliyor..."
-            : t("order.downloadInvoice")}
+          {downloading ? t("payment.downloading") : t("order.downloadInvoice")}
         </Button>
       )}
 
@@ -161,13 +156,7 @@ export default function OrderActions({
               onClick={() => onCancel(order)}
               disabled={cancelling}
             >
-              {cancelling
-                ? locale === "en"
-                  ? "Cancelling..."
-                  : "İptal ediliyor..."
-                : locale === "en"
-                  ? "Cancel"
-                  : "İptal Et"}
+              {cancelling ? t("common.cancelling") : t("order.cancelShort")}
             </Button>
           )}
           {show.requestRefund && (

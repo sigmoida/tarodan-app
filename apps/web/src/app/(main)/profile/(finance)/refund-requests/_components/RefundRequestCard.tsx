@@ -5,7 +5,7 @@
 import Link from "next/link";
 import OptimizedImage from "@/components/OptimizedImage";
 import { Badge } from "@tarodan/ui";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { formatTL } from "@/lib/format";
 import { statusMetaOf } from "../_lib/refund-status";
 import type { RefundRequest } from "../_lib/types";
@@ -16,7 +16,6 @@ export default function RefundRequestCard({
   request: RefundRequest;
 }) {
   const t = useTranslations();
-  const locale = useLocale();
   const meta = statusMetaOf(request.status);
   const image = request.order?.product?.images?.[0];
 
@@ -52,7 +51,7 @@ export default function RefundRequestCard({
           </p>
         </div>
         <Badge variant={meta.variant} size="sm" className="flex-shrink-0">
-          {locale === "en" ? meta.en : meta.tr}
+          {meta.labelKey ? t(meta.labelKey) : request.status}
         </Badge>
       </div>
     </Link>

@@ -10,6 +10,7 @@ import { formatTL } from "@/lib/format";
 import { useAuthStore } from "@/stores/authStore";
 import { useRequireAuth } from "../../../_hooks/useRequireAuth";
 import { useLocale, useTranslations } from "next-intl";
+import { resolveLocale } from "@tarodan/i18n";
 import { statusMetaOf } from "../_lib/refund-status";
 import { useRefundDetail, useCancelRefund } from "../_hooks/useRefundRequests";
 import RefundStatusStepper from "./_components/RefundStatusStepper";
@@ -18,6 +19,8 @@ import ReturnShipmentCard from "./_sections/ReturnShipmentCard";
 import RelatedOrderCard from "./_sections/RelatedOrderCard";
 import ReasonCard from "./_sections/ReasonCard";
 import WhatsNextCard from "./_sections/WhatsNextCard";
+
+const DATE_LOCALES = { en: "en-US", tr: "tr-TR" } as const;
 
 export default function RefundRequestDetailPage() {
   const params = useParams();
@@ -57,14 +60,14 @@ export default function RefundRequestDetailPage() {
       <PageHeader
         backHref="/profile/refund-requests"
         title={<span className="font-mono">{refund.refundNumber}</span>}
-        description={
-          locale === "en"
-            ? `Refund Request · ${new Date(refund.createdAt).toLocaleDateString("en-US")}`
-            : `İade Talebi · ${new Date(refund.createdAt).toLocaleDateString("tr-TR")}`
-        }
+        description={t("refund.requestedOnLabel", {
+          date: new Date(refund.createdAt).toLocaleDateString(
+            DATE_LOCALES[resolveLocale(locale)],
+          ),
+        })}
         actions={
           <Badge variant={meta.variant}>
-            {locale === "en" ? meta.en : meta.tr}
+            {meta.labelKey ? t(meta.labelKey) : refund.status}
           </Badge>
         }
       />
@@ -78,19 +81,17 @@ export default function RefundRequestDetailPage() {
         </div>
       </div>
 
-      {!isInstantRefund && (
-        <RefundStatusStepper status={refund.status} locale={locale} />
-      )}
+      {!isInstantRefund && <RefundStatusStepper status={refund.status} />}
 
       <StatusCallout refund={refund} locale={locale} />
 
       {showReturnShipment && (
-        <ReturnShipmentCard refund={refund} isBuyer={isBuyer} locale={locale} />
+        <ReturnShipmentCard refund={refund} isBuyer={isBuyer} />
       )}
 
       <RelatedOrderCard refund={refund} />
 
-      <ReasonCard refund={refund} locale={locale} />
+      <ReasonCard refund={refund} />
 
       {refund.sellerResponse && (
         <div className="rounded-lg border border-warning-200 bg-warning-50 p-5">
@@ -103,7 +104,7 @@ export default function RefundRequestDetailPage() {
         </div>
       )}
 
-      {!isTerminal && <WhatsNextCard status={refund.status} locale={locale} />}
+      {!isTerminal && <WhatsNextCard status={refund.status} />}
 
       {canCancel && (
         <div className="rounded-lg border border-border bg-surface-elevated p-5">

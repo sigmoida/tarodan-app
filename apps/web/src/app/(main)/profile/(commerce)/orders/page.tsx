@@ -9,7 +9,7 @@ import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useAuthStore } from "@/stores/authStore";
 import { useRequireAuth } from "../../_hooks/useRequireAuth";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import {
   useOrders,
   useOrderCounts,
@@ -32,7 +32,6 @@ import CancelOrderModal from "./_modals/CancelOrderModal";
 export default function OrdersPage() {
   const searchParams = useSearchParams();
   const t = useTranslations();
-  const locale = useLocale();
   const { ready } = useRequireAuth();
   const user = useAuthStore((s) => s.user);
 
@@ -97,11 +96,7 @@ export default function OrdersPage() {
     <PageShell className="pb-16">
       <PageHeader
         title={t("order.myOrders")}
-        description={
-          locale === "en"
-            ? "Track and manage your purchases and sales."
-            : "Alım ve satışlarını takip et ve yönet."
-        }
+        description={t("order.trackManageDescription")}
       />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

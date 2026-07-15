@@ -26,9 +26,7 @@ export default function OrderBanners({ order }: { order: OrderDetail }) {
       {order.canReactivate && (
         <div className="mb-6 p-4 bg-warning-50 border border-warning-200 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <p className="text-warning-800 text-sm">
-            {locale === "en"
-              ? "This order expired before payment. You can reactivate it to complete payment."
-              : "Bu sipariş ödeme yapılmadan süre aşımına uğradı. Ödemeyi tamamlamak için siparişi yeniden aktive edebilirsiniz."}
+            {t("order.expiredReactivate")}
           </p>
           <Button
             type="button"
@@ -87,15 +85,11 @@ export default function OrderBanners({ order }: { order: OrderDetail }) {
               {order.payment?.status === "refunded" ||
               (order.status as string) === "refunded" ? (
                 <p className="text-sm text-danger-700">
-                  {locale === "en"
-                    ? "The payment has been refunded."
-                    : "Ödemeniz iade edilmiştir."}
+                  {t("order.paymentRefunded")}
                 </p>
               ) : order.payment?.status === "completed" ? (
                 <p className="text-sm text-danger-700">
-                  {locale === "en"
-                    ? "If a payment was made, the refund will be processed to your original payment method."
-                    : "Ödeme yapıldıysa, iadeniz ödemeyi yaptığınız yönteme aktarılacaktır."}
+                  {t("order.refundToOriginalMethod")}
                 </p>
               ) : null}
             </div>

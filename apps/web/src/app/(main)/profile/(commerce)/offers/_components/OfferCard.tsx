@@ -61,6 +61,7 @@ export default function OfferCard({
   onBuyerCounter,
 }: OfferCardProps) {
   const locale = useLocale();
+  const t = useTranslations();
 
   const listingPrice = getProductEffectivePrice(offer.product);
   const discount = calculateDiscount(offer.amount, listingPrice);
@@ -69,9 +70,7 @@ export default function OfferCard({
   const otherUser = activeTab === "received" ? offer.buyer : offer.seller;
   const paid = isOfferOrderPaid(offer);
   const statusLabel = paid
-    ? locale === "en"
-      ? "Paid"
-      : "Ödendi"
+    ? t("order.statusPaid")
     : offerStatusLabel(
         offer.status,
         locale,
