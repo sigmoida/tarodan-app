@@ -33,9 +33,7 @@ export function LoginForm() {
   return (
     <AuthCard
       title={t("auth.welcomeBack")}
-      description={
-        locale === "tr" ? "Hesabınıza giriş yapın" : "Sign in to your account"
-      }
+      description={t("auth.signInToAccount")}
       footer={
         <>
           {t("auth.noAccount")}{" "}
@@ -53,9 +51,7 @@ export function LoginForm() {
           <div className="mb-3 flex gap-3">
             <ExclamationTriangleIcon className="h-6 w-6 flex-shrink-0 text-warning-600" />
             <p className="text-sm font-medium text-warning-900">
-              {locale === "tr"
-                ? "E-postanız henüz doğrulanmadı. Gelen kutunuzu veya spam klasörünüzü kontrol edin."
-                : "Your email is not verified yet. Please check your inbox or spam folder for the verification link."}
+              {t("auth.emailNotVerifiedBanner")}
             </p>
           </div>
           <div className="space-y-2">
@@ -67,20 +63,14 @@ export function LoginForm() {
               className="w-full"
             >
               {isResending
-                ? locale === "tr"
-                  ? "Gönderiliyor..."
-                  : "Sending..."
-                : locale === "tr"
-                  ? "Doğrulama E-postasını Tekrar Gönder"
-                  : "Resend verification email"}
+                ? t("common.sending")
+                : t("auth.resendVerificationEmail")}
             </Button>
             <Link
               href="/verify-email"
               className="block w-full py-2 text-center text-sm text-warning-800 underline hover:text-warning-900"
             >
-              {locale === "tr"
-                ? "Doğrulama sayfasına git"
-                : "Go to verification page"}
+              {t("auth.goToVerificationPage")}
             </Link>
           </div>
         </div>
@@ -91,9 +81,7 @@ export function LoginForm() {
           name="email"
           type="email"
           label={t("auth.email")}
-          placeholder={
-            locale === "tr" ? "ornek@email.com" : "example@email.com"
-          }
+          placeholder={t("auth.emailPlaceholder")}
           autoComplete="email"
           autoFocus
         />

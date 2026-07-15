@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
-import { useLocale, useTranslations } from "next-intl";
-import { api } from '@/lib/api';
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import toast from "react-hot-toast";
+import { useTranslations } from "next-intl";
+import { api } from "@/lib/api";
 
 interface RegisterBusinessInput {
   companyName: string;
@@ -26,16 +26,15 @@ interface RegisterBusinessInput {
  */
 export function useRegisterBusiness() {
   const t = useTranslations();
-  const locale = useLocale();
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
-  const [registeredEmail, setRegisteredEmail] = useState('');
+  const [registeredEmail, setRegisteredEmail] = useState("");
 
   const registerMutation = useMutation({
     mutationFn: (input: RegisterBusinessInput) => {
       const formattedPhone = input.phone
-        ? '+90' + input.phone.replace(/\s/g, '')
+        ? "+90" + input.phone.replace(/\s/g, "")
         : undefined;
-      return api.post('/auth/register/business', {
+      return api.post("/auth/register/business", {
         companyName: input.companyName,
         email: input.email,
         password: input.password,
@@ -50,22 +49,25 @@ export function useRegisterBusiness() {
     onSuccess: (_res, input) => {
       setRegisteredEmail(input.email);
       setRegistrationSuccess(true);
-      toast.success(
-        locale === 'en'
-          ? 'Registration successful! Please verify your email.'
-          : 'Kayıt başarılı! Lütfen e-postanızı doğrulayın.',
-      );
+      toast.success(t("auth.registerSuccessVerify"));
     },
     onError: (error: any) =>
       toast.error(
-        error.response?.data?.message ||
-          (locale === 'en' ? 'Registration failed' : 'Kayıt başarısız'),
+        error.response?.data?.message || t("auth.registrationFailed"),
       ),
   });
 
   const submit = (input: RegisterBusinessInput) => {
-    const { companyName, email, phone, taxId, city, password, confirmPassword, agreeTerms } =
-      input;
+    const {
+      companyName,
+      email,
+      phone,
+      taxId,
+      city,
+      password,
+      confirmPassword,
+      agreeTerms,
+    } = input;
 
     if (
       !companyName.trim() ||
@@ -75,43 +77,27 @@ export function useRegisterBusiness() {
       !city.trim() ||
       !password.trim()
     ) {
-      toast.error(
-        locale === 'en'
-          ? 'Please fill in all required fields'
-          : 'Lütfen tüm zorunlu alanları doldurun',
-      );
+      toast.error(t("auth.fillRequiredFields"));
       return;
     }
 
     if (password !== confirmPassword) {
-      toast.error(t('validation.passwordMatch'));
+      toast.error(t("validation.passwordMatch"));
       return;
     }
 
     if (password.length < 8) {
-      toast.error(
-        locale === 'en'
-          ? 'Password must be at least 8 characters'
-          : 'Şifre en az 8 karakter olmalıdır',
-      );
+      toast.error(t("validation.passwordMin8"));
       return;
     }
 
     if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
-      toast.error(
-        locale === 'en'
-          ? 'Password must contain at least one uppercase, one lowercase, and one number'
-          : 'Şifre en az bir büyük harf, bir küçük harf ve bir rakam içermelidir',
-      );
+      toast.error(t("auth.passwordComplexity"));
       return;
     }
 
     if (!agreeTerms) {
-      toast.error(
-        locale === 'en'
-          ? 'You must accept the terms of service'
-          : 'Kullanım şartlarını kabul etmelisiniz',
-      );
+      toast.error(t("auth.mustAcceptTerms"));
       return;
     }
 
@@ -120,17 +106,9 @@ export function useRegisterBusiness() {
 
   const resendMutation = useMutation({
     mutationFn: () =>
-      api.post('/auth/resend-verification', { email: registeredEmail }),
-    onSuccess: () =>
-      toast.success(
-        locale === 'en'
-          ? 'Verification email resent!'
-          : 'Doğrulama e-postası tekrar gönderildi!',
-      ),
-    onError: () =>
-      toast.error(
-        locale === 'en' ? 'Could not resend email' : 'E-posta gönderilemedi',
-      ),
+      api.post("/auth/resend-verification", { email: registeredEmail }),
+    onSuccess: () => toast.success(t("auth.verificationEmailResent")),
+    onError: () => toast.error(t("auth.couldNotResendEmail")),
   });
   const resendVerification = () => resendMutation.mutate();
 

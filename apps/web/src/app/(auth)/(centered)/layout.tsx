@@ -80,15 +80,16 @@ export default function AuthHeroLayout({
   children: React.ReactNode;
 }) {
   const locale = useLocale();
+  const t = useTranslations();
   const pathname = usePathname();
   const hero = heroFor(pathname ?? "/login");
   const en = locale === "en";
   const heroLeft = hero.side === "left";
 
   const stats = [
-    { v: "10K+", l: en ? "Listings" : "İlan" },
-    { v: "5K+", l: en ? "Members" : "Üye" },
-    { v: "2K+", l: en ? "Trades" : "Takas" },
+    { v: "10K+", l: t("nav.listings") },
+    { v: "5K+", l: t("auth.heroStatMembers") },
+    { v: "2K+", l: t("auth.heroStatTrades") },
   ];
 
   return (
@@ -117,8 +118,7 @@ export default function AuthHeroLayout({
 
         <footer className="p-6 text-center">
           <p className="text-sm text-subtle">
-            © {new Date().getFullYear()} Tarodan.{" "}
-            {en ? "All rights reserved." : "Tüm hakları saklıdır."}
+            © {new Date().getFullYear()} Tarodan. {t("footer.copyright")}
           </p>
         </footer>
       </div>

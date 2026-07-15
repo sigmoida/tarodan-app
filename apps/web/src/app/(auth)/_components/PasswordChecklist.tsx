@@ -1,6 +1,7 @@
-'use client';
+"use client";
 
-import { CheckIcon } from '@heroicons/react/24/solid';
+import { CheckIcon } from "@heroicons/react/24/solid";
+import { useTranslations } from "next-intl";
 
 /** The password rules the marketplace enforces, computed from a raw value. */
 export function passwordChecks(password: string) {
@@ -19,12 +20,20 @@ export function isPasswordValid(password: string): boolean {
 }
 
 /** A single requirement row: green + check when met, grey dot otherwise. */
-export function PasswordRequirement({ met, text }: { met: boolean; text: string }) {
+export function PasswordRequirement({
+  met,
+  text,
+}: {
+  met: boolean;
+  text: string;
+}) {
   return (
-    <div className={`flex items-center gap-2 text-xs ${met ? 'text-success-600' : 'text-subtle'}`}>
+    <div
+      className={`flex items-center gap-2 text-xs ${met ? "text-success-600" : "text-subtle"}`}
+    >
       <div
         className={`w-4 h-4 rounded-full flex items-center justify-center ${
-          met ? 'bg-success-100' : 'bg-surface-alt'
+          met ? "bg-success-100" : "bg-surface-alt"
         }`}
       >
         {met ? (
@@ -39,25 +48,28 @@ export function PasswordRequirement({ met, text }: { met: boolean; text: string 
 }
 
 /** Live 2-col requirements panel, shared by reset-password and register. */
-export function PasswordChecklist({
-  password,
-  locale,
-}: {
-  password: string;
-  locale: string;
-}) {
+export function PasswordChecklist({ password }: { password: string }) {
+  const t = useTranslations();
   const c = passwordChecks(password);
-  const tr = locale === 'tr';
   return (
     <div className="bg-surface rounded-xl p-4 space-y-2">
       <p className="text-xs font-medium text-muted mb-2">
-        {tr ? 'Şifre gereksinimleri:' : 'Password requirements:'}
+        {t("auth.pwReqTitle")}
       </p>
       <div className="grid grid-cols-2 gap-2">
-        <PasswordRequirement met={c.hasMinLength} text={tr ? 'En az 8 karakter' : 'At least 8 characters'} />
-        <PasswordRequirement met={c.hasUppercase} text={tr ? 'Büyük harf (A-Z)' : 'Uppercase (A-Z)'} />
-        <PasswordRequirement met={c.hasLowercase} text={tr ? 'Küçük harf (a-z)' : 'Lowercase (a-z)'} />
-        <PasswordRequirement met={c.hasNumber} text={tr ? 'Rakam (0-9)' : 'Number (0-9)'} />
+        <PasswordRequirement
+          met={c.hasMinLength}
+          text={t("auth.pwReqMinLength")}
+        />
+        <PasswordRequirement
+          met={c.hasUppercase}
+          text={t("auth.pwReqUppercase")}
+        />
+        <PasswordRequirement
+          met={c.hasLowercase}
+          text={t("auth.pwReqLowercase")}
+        />
+        <PasswordRequirement met={c.hasNumber} text={t("auth.pwReqNumber")} />
       </div>
     </div>
   );
