@@ -1,15 +1,18 @@
 import Image from "next/image";
 import { ChevronRightIcon, TruckIcon } from "@heroicons/react/24/outline";
 import { Badge, Button } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
 import { col, TruncatedText } from "@/components/table";
 import { brandRowMenu, type BrandRowActions } from "./rowActions";
 import type { Brand } from "./types";
 
-export function brandColumns(actions: BrandRowActions) {
+type T = ReturnType<typeof useTranslations<never>>;
+
+export function brandColumns(t: T, actions: BrandRowActions) {
   const { onToggleExpand, expandedId } = actions;
   return [
     col.custom<Brand>(
-      "Marka",
+      t("admin.catalog.common.brand"),
       (b) => (
         <div className="flex min-w-0 items-center gap-3">
           {b.logo ? (
@@ -37,9 +40,9 @@ export function brandColumns(actions: BrandRowActions) {
       ),
       { grow: 3, minWidth: 200 },
     ),
-    col.badge<Brand>("Durum", (b) => <Badge active={b.isActive} />),
+    col.badge<Brand>(t("common.status"), (b) => <Badge active={b.isActive} />),
     col.custom<Brand>(
-      "Modeller",
+      t("admin.catalog.common.models"),
       (b) => {
         const open = expandedId === b.id;
         return (
@@ -53,7 +56,7 @@ export function brandColumns(actions: BrandRowActions) {
               className={`h-4 w-4 transition-transform ${open ? "rotate-90" : ""}`}
             />
             <TruckIcon className="h-4 w-4" />
-            Modeller
+            {t("admin.catalog.common.models")}
           </Button>
         );
       },

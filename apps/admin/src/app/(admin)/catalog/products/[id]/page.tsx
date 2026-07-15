@@ -1,13 +1,16 @@
-'use client';
+"use client";
 
-import { useParams } from 'next/navigation';
-import { adminApi } from '@/lib/api';
-import { DetailPage } from '@/components/detail/DetailPage';
-import { ProductDetailBody } from './_components/ProductDetailBody';
-import { productStatusConfig, type ProductDetail } from './_lib/types';
+import { useParams } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { adminApi } from "@/lib/api";
+import { DetailPage } from "@/components/detail/DetailPage";
+import { ProductDetailBody } from "./_components/ProductDetailBody";
+import { productStatusConfig, type ProductDetail } from "./_lib/types";
 
 export default function ProductDetailPage() {
+  const t = useTranslations();
   const { id } = useParams<{ id: string }>();
+  const statusConfig = productStatusConfig(t);
 
   return (
     <DetailPage<ProductDetail>
@@ -15,13 +18,17 @@ export default function ProductDetailPage() {
       id={id}
       fetcher={(pid) => adminApi.getProduct(pid).then((r) => r.data)}
       backHref="/catalog/products"
-      emptyTitle="Ürün bulunamadı"
+      emptyTitle={t("admin.catalog.products.empty")}
       title={(p) => p.title}
-      subtitle={(p) => `Kategori: ${p.category.name}`}
+      subtitle={(p) =>
+        t("admin.catalog.products.categoryLabel", { name: p.category.name })
+      }
       badge={(p) => {
-        const s = productStatusConfig[p.status] ?? productStatusConfig.pending;
+        const s = statusConfig[p.status] ?? statusConfig.pending;
         return (
-          <span className={`rounded-full px-3 py-1 text-sm font-medium ${s.color} ${s.bg}`}>
+          <span
+            className={`rounded-full px-3 py-1 text-sm font-medium ${s.color} ${s.bg}`}
+          >
             {s.label}
           </span>
         );

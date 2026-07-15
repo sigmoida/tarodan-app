@@ -1,11 +1,12 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { Select } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { ResourceList, useFilter } from "@/components/list";
-import { productStatusOptions } from "../_lib/types";
+import { getProductStatusOptions } from "../_lib/types";
 
 interface Brand {
   id: string;
@@ -19,6 +20,7 @@ interface CarModel {
 
 /** Product list filters: status (static) + brand/model (dynamic, dependent). */
 export function ProductFilters() {
+  const t = useTranslations();
   const [brandId, setBrandId] = useFilter("brandId");
   const [carModelId, setCarModelId] = useFilter("carModelId");
 
@@ -39,7 +41,7 @@ export function ProductFilters() {
     <>
       <ResourceList.FilterSelect
         name="status"
-        options={productStatusOptions}
+        options={getProductStatusOptions(t)}
         className="sm:w-48"
       />
       <Select
@@ -51,7 +53,7 @@ export function ProductFilters() {
         }}
         className="w-full sm:w-44"
       >
-        <option value="">Tüm Markalar</option>
+        <option value="">{t("admin.catalog.brands.allBrands")}</option>
         {brands.map((b) => (
           <option key={b.id} value={b.id}>
             {b.name}
@@ -65,7 +67,7 @@ export function ProductFilters() {
         className="w-full sm:w-44"
         disabled={!brandId && modelsForBrand.length === 0}
       >
-        <option value="">Tüm Modeller</option>
+        <option value="">{t("admin.catalog.common.allModels")}</option>
         {modelsForBrand.map((m) => (
           <option key={m.id} value={m.id}>
             {m.name}

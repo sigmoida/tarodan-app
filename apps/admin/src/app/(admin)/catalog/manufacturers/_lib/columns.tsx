@@ -1,14 +1,17 @@
 import Image from "next/image";
 import { GlobeAltIcon } from "@heroicons/react/24/outline";
 import { Badge } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
 import { col, TruncatedText, Empty } from "@/components/table";
 import { manufacturerRowMenu, type ManufacturerRowActions } from "./rowActions";
 import type { Manufacturer } from "./types";
 
-export function manufacturerColumns(actions: ManufacturerRowActions) {
+type T = ReturnType<typeof useTranslations<never>>;
+
+export function manufacturerColumns(t: T, actions: ManufacturerRowActions) {
   return [
     col.custom<Manufacturer>(
-      "Üretici",
+      t("admin.catalog.common.manufacturer"),
       (m) => (
         <div className="flex min-w-0 items-center gap-3">
           {m.logo ? (
@@ -36,8 +39,8 @@ export function manufacturerColumns(actions: ManufacturerRowActions) {
       ),
       { grow: 3, minWidth: 200 },
     ),
-    col.text<Manufacturer>("Ülke", (m) => m.country),
-    col.custom<Manufacturer>("Website", (m) =>
+    col.text<Manufacturer>(t("admin.catalog.common.country"), (m) => m.country),
+    col.custom<Manufacturer>(t("admin.catalog.common.website"), (m) =>
       m.website ? (
         <a
           href={m.website}
@@ -47,13 +50,15 @@ export function manufacturerColumns(actions: ManufacturerRowActions) {
           className="inline-flex items-center gap-1 whitespace-nowrap text-sm text-info-600 hover:underline"
         >
           <GlobeAltIcon className="h-4 w-4" />
-          Ziyaret Et
+          {t("admin.catalog.manufacturers.visit")}
         </a>
       ) : (
         <Empty />
       ),
     ),
-    col.badge<Manufacturer>("Durum", (m) => <Badge active={m.isActive} />),
+    col.badge<Manufacturer>(t("common.status"), (m) => (
+      <Badge active={m.isActive} />
+    )),
     col.rowMenu<Manufacturer>(manufacturerRowMenu(actions)),
   ];
 }

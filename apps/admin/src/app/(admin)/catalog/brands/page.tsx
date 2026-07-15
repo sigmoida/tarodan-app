@@ -3,6 +3,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@tarodan/ui";
 import { PlusIcon } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
@@ -17,20 +18,20 @@ import { brandColumns } from "./_lib/columns";
 import { BrandModelsPanel } from "./_components/BrandModelsPanel";
 import { BrandFormModal } from "./_modals/BrandFormModal";
 
-const STATUS_OPTIONS = [
-  { value: "all", label: "Tüm Markalar" },
-  { value: "active", label: "Aktif" },
-  { value: "inactive", label: "Pasif" },
-];
-
 export default function BrandsPage() {
+  const t = useTranslations();
+  const STATUS_OPTIONS = [
+    { value: "all", label: t("admin.catalog.brands.allBrands") },
+    { value: "active", label: t("common.active") },
+    { value: "inactive", label: t("common.inactive") },
+  ];
   const confirm = useConfirm();
   const [modal, setModal] = useState<{ brand?: Brand } | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const del = useAdminMutation((id: string) => adminApi.deleteBrand(id), {
     invalidates: ["brands"],
-    successMessage: "Marka silindi",
+    successMessage: t("admin.catalog.brands.deleted"),
   });
   const toggle = useAdminMutation(
     (b: Brand) => adminApi.updateBrand(b.id, { isActive: !b.isActive }),
@@ -41,20 +42,19 @@ export default function BrandsPage() {
     async (b: Brand) => {
       if (
         await confirm({
-          title: "Markayı Sil",
-          description:
-            "Bu markayı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+          title: t("admin.catalog.brands.deleteTitle"),
+          description: t("admin.catalog.brands.deleteDescription"),
           destructive: true,
         })
       )
         del.mutate(b.id);
     },
-    [confirm, del],
+    [confirm, del, t],
   );
 
   const columns = useMemo(
     () =>
-      brandColumns({
+      brandColumns(t, {
         onEdit: (b) => setModal({ brand: b }),
         onDelete,
         onToggle: (b) => toggle.mutate(b),
@@ -63,21 +63,21 @@ export default function BrandsPage() {
         expandedId,
         busyId: toggle.isPending ? (toggle.variables?.id ?? null) : null,
       }),
-    [onDelete, toggle, expandedId],
+    [t, onDelete, toggle, expandedId],
   );
 
   return (
     <AdminPage>
       <PageHeader
-        title="Marka Yönetimi"
-        description="Uygulamada gösterilecek markaları buradan yönetebilirsiniz"
+        title={t("admin.catalog.brands.title")}
+        description={t("admin.catalog.brands.subtitle")}
       >
         <Button
           variant="primary"
           leftIcon={<PlusIcon className="h-5 w-5" />}
           onClick={() => setModal({})}
         >
-          Yeni Marka Ekle
+          {t("admin.catalog.brands.new")}
         </Button>
       </PageHeader>
 
@@ -99,7 +99,7 @@ export default function BrandsPage() {
         getRowId={(b) => b.id}
         syncUrl
         initialFilters={{ status: "all" }}
-        errorMessage="Markalar yüklenemedi"
+        errorMessage={t("admin.catalog.brands.loadError")}
       >
         <ResourceList.Toolbar>
           <ResourceList.Search />
@@ -111,11 +111,11 @@ export default function BrandsPage() {
         </ResourceList.Toolbar>
         <ResourceList.Table
           columns={columns}
-          emptyText="Henüz marka eklenmemiş"
+          emptyText={t("admin.catalog.brands.empty")}
           expandedId={expandedId}
           renderExpanded={(b) => <BrandModelsPanel brand={b} />}
         />
-        <ResourceList.Total unit="marka" />
+        <ResourceList.Total unit={t("admin.catalog.brands.unit")} />
         <ResourceList.Pagination />
       </ResourceList>
 
