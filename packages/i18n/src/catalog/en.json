@@ -92,7 +92,8 @@
     "show": "Show",
     "home": "Home",
     "listings": "Listings",
-    "category": "Category"
+    "category": "Category",
+    "language": "Language"
   },
   "nav": {
     "home": "Home",
