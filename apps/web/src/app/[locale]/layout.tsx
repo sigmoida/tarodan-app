@@ -1,0 +1,69 @@
+/** @format */
+
+import { Noto_Sans } from "next/font/google";
+import { notFound } from "next/navigation";
+import { NextIntlClientProvider } from "next-intl";
+import { getMessages, setRequestLocale } from "next-intl/server";
+import { Toaster } from "react-hot-toast";
+import { GoogleOAuthProvider } from "@react-oauth/google";
+import { isLocale } from "@tarodan/i18n";
+import { routing } from "@/i18n/routing";
+import CookieConsentBanner from "@/components/CookieConsentBanner";
+import "../globals.css";
+
+const notoSans = Noto_Sans({
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "500", "600", "700"],
+});
+
+/**
+ * Pre-render both locale shells at build time so `/` (tr) and `/en` are static
+ * (SSG) rather than rendered per request — the SEO win this issue restores.
+ */
+export function generateStaticParams() {
+  return routing.locales.map((locale) => ({ locale }));
+}
+
+/**
+ * The real document shell for every localized route. It owns `<html lang>` (set
+ * from the URL segment, so the first byte is in the right language — no flash),
+ * the font, and the truly cross-cutting providers: i18n (server-resolved locale
+ * + shared catalog), Google OAuth, the global toast, and the cookie banner.
+ * Visual chrome and route gating stay in the route-group layouts ((main) owns
+ * the storefront, (auth) the auth frame). Renders {children} bare otherwise.
+ *
+ * `setRequestLocale` opts the subtree into static rendering by telling next-intl
+ * the locale up-front (instead of it being read lazily from headers, which would
+ * force dynamic rendering). An unknown `[locale]` 404s.
+ */
+export default async function LocaleLayout({
+  children,
+  params: { locale },
+}: {
+  children: React.ReactNode;
+  params: { locale: string };
+}) {
+  if (!isLocale(locale)) notFound();
+  setRequestLocale(locale);
+
+  const messages = await getMessages();
+
+  return (
+    <html lang={locale}>
+      <body className={notoSans.className}>
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <GoogleOAuthProvider
+            clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
+          >
+            {children}
+            <CookieConsentBanner />
+            <Toaster
+              position="bottom-right"
+              toastOptions={{ style: { maxWidth: "360px" } }}
+            />
+          </GoogleOAuthProvider>
+        </NextIntlClientProvider>
+      </body>
+    </html>
+  );
+}
