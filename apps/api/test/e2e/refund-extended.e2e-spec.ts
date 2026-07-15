@@ -78,66 +78,16 @@ describe('Refund: HTTP layer + RefundService extended (E2E)', () => {
   // POST /api/payments/refund — HTTP layer authorization & validation
   // ============================================================================
 
-  describe('POST /api/payments/refund', () => {
-    it('only the buyer can call (seller → 403, stranger → 403)', async () => {
+  describe('POST /api/payments/refund kaldırıldı (#61)', () => {
+    // Buyer-facing doğrudan iade ucu güvenlik nedeniyle kaldırıldı: order.status kapısı
+    // yoktu → alıcı teslim sonrası tam iade alıp malı tutabiliyordu. Route artık yok →
+    // her çağrı 404 (JwtAuthGuard route'a bağlı olduğundan auth'suz istek de 401 değil 404).
+    // Alıcı iadeleri POST /orders/:id/refund-requests state machine'inden geçer
+    // (refund-flow.e2e-spec + 12-ref.e2e-spec kapsıyor).
+    it('route removed → 404 for buyer, seller, stranger and unauthenticated; payment untouched', async () => {
       const buyer = await createUser(ctx.module);
       const seller = await createUser(ctx.module, { isSeller: true });
       const stranger = await createUser(ctx.module);
-      const product = await createProduct({
-        sellerId: seller.id,
-        categoryId: baseline.categoryId,
-        price: 100,
-        quantity: 1,
-      });
-      const addr = await createAddress({ userId: buyer.id });
-      await createAddress({ userId: seller.id });
-
-      const { orderId } = await buyAndPay(ctx, buyer, product.id, addr.id);
-
-      await request(ctx.app.getHttpServer())
-        .post('/api/payments/refund')
-        .set(authHeader(seller))
-        .send({ orderId })
-        .expect(403);
-
-      await request(ctx.app.getHttpServer())
-        .post('/api/payments/refund')
-        .set(authHeader(stranger))
-        .send({ orderId })
-        .expect(403);
-    });
-
-    it('rejects unauthenticated (401)', async () => {
-      await request(ctx.app.getHttpServer())
-        .post('/api/payments/refund')
-        .send({ orderId: '00000000-0000-0000-0000-000000000000' })
-        .expect(401);
-    });
-
-    it('returns 404 for non-existent (but well-formed) order id', async () => {
-      const buyer = await createUser(ctx.module);
-
-      // Use a v4-style UUID that isn't in the DB
-      await request(ctx.app.getHttpServer())
-        .post('/api/payments/refund')
-        .set(authHeader(buyer))
-        .send({ orderId: 'a0000000-0000-4000-8000-000000000000' })
-        .expect(404);
-    });
-
-    it('rejects malformed UUID with 400', async () => {
-      const buyer = await createUser(ctx.module);
-
-      await request(ctx.app.getHttpServer())
-        .post('/api/payments/refund')
-        .set(authHeader(buyer))
-        .send({ orderId: 'not-a-uuid' })
-        .expect(400);
-    });
-
-    it('completes refund as buyer and updates payment + order + stock', async () => {
-      const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true });
       const product = await createProduct({
         sellerId: seller.id,
         categoryId: baseline.categoryId,
@@ -149,26 +99,23 @@ describe('Refund: HTTP layer + RefundService extended (E2E)', () => {
 
       const { orderId } = await buyAndPay(ctx, buyer, product.id, addr.id);
 
-      const res = await request(ctx.app.getHttpServer())
+      for (const who of [buyer, seller, stranger]) {
+        await request(ctx.app.getHttpServer())
+          .post('/api/payments/refund')
+          .set(authHeader(who))
+          .send({ orderId })
+          .expect(404);
+      }
+      await request(ctx.app.getHttpServer())
         .post('/api/payments/refund')
-        .set(authHeader(buyer))
         .send({ orderId })
-        .expect(201);
+        .expect(404);
 
-      expect(res.body.success).toBe(true);
-      expect(res.body.refundAmount).toBeGreaterThan(0);
-
+      // Self-refund gerçekleşmedi: ödeme hâlâ completed, PayTR iadesi yok.
       const prisma = getPrisma();
       const payment = await prisma.payment.findFirst({ where: { orderId } });
-      const order = await prisma.order.findUnique({ where: { id: orderId } });
-      const refreshedProduct = await prisma.product.findUnique({
-        where: { id: product.id },
-      });
-
-      expect(payment!.status).toBe(PaymentStatus.refunded);
-      expect(order!.status).toBe(OrderStatus.cancelled);
-      expect(refreshedProduct!.quantity).toBe(1); // restored
-      expect(ctx.paytr.refundCalls.length).toBe(1);
+      expect(payment!.status).toBe(PaymentStatus.completed);
+      expect(ctx.paytr.refundCalls.length).toBe(0);
     });
   });
 

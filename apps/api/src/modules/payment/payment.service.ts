@@ -163,13 +163,6 @@ export class PaymentService {
     return this.paymentReconciliation.processRefundedOrders();
   }
 
-  // Taşındı: payment-query.service.ts — imza aynen korunuyor (facade delege).
-  async findOrderParties(
-    orderId: string,
-  ): Promise<{ buyerId: string; sellerId: string } | null> {
-    return this.paymentQuery.findOrderParties(orderId);
-  }
-
   // Taşındı: payment-reconciliation.service.ts — facade delege (imza aynı).
   async syncSavedCardsFromUtoken(
     userId: string,

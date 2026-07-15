@@ -508,17 +508,4 @@ export class PaymentQueryService {
       },
     };
   }
-
-  /**
-   * Wave 4 (kapsülleme): Sipariş taraflarını döndürür. Controller'ın PaymentService'in
-   * private `prisma`'sına bracket-notation ile erişmesini (`paymentService['prisma']`) önler.
-   */
-  async findOrderParties(
-    orderId: string,
-  ): Promise<{ buyerId: string; sellerId: string } | null> {
-    return this.prisma.order.findUnique({
-      where: { id: orderId },
-      select: { buyerId: true, sellerId: true },
-    });
-  }
 }

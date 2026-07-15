@@ -42,8 +42,6 @@ export const paymentsApi = {
     api.post<{ completed: boolean; status: string }>(
       `/payments/${paymentId}/verify`,
     ),
-  refund: (orderId: string, refundAmount?: number) =>
-    api.post("/payments/refund", { orderId, refundAmount }),
   retry: (paymentId: string) => api.post(`/payments/${paymentId}/retry`),
   /** Dev/test: PayTR olmadan ödemeyi tamamla */
   bypassComplete: (paymentId: string, _card?: string) =>
