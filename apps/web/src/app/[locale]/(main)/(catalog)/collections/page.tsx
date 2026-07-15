@@ -6,28 +6,35 @@ import {
   fetchPublicCollectionsServer,
   fetchCategoriesServer,
 } from "./_lib/data";
+import { localizedCanonical, localizedPath } from "@/lib/seo";
 import CollectionsClient from "./CollectionsClient";
 
 const TITLE = "Koleksiyonlar | Tarodan";
 const DESCRIPTION =
   "Diecast model araba koleksiyonlarını keşfedin. Kategoriye göre filtreleyin, popüler ve yeni koleksiyonları görüntüleyin, kendi koleksiyonunuzu oluşturun.";
 
-export const metadata: Metadata = {
-  title: TITLE,
-  description: DESCRIPTION,
-  alternates: { canonical: "/collections" },
-  openGraph: {
+export function generateMetadata({
+  params: { locale },
+}: {
+  params: { locale: string };
+}): Metadata {
+  return {
     title: TITLE,
     description: DESCRIPTION,
-    type: "website",
-    url: "/collections",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: TITLE,
-    description: DESCRIPTION,
-  },
-};
+    alternates: localizedCanonical(locale, "/collections"),
+    openGraph: {
+      title: TITLE,
+      description: DESCRIPTION,
+      type: "website",
+      url: localizedPath(locale, "/collections"),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: TITLE,
+      description: DESCRIPTION,
+    },
+  };
+}
 
 type Props = {
   searchParams: Record<string, string | string[] | undefined>;

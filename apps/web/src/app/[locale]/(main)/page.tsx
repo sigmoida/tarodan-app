@@ -4,6 +4,7 @@ import { getServerQueryClient } from "@/lib/query/server";
 import { queryKeys } from "@/lib/query/keys";
 import { hasRealDiscount } from "@/lib/productPrice";
 import { unwrapList } from "@/lib/unwrapList";
+import { localizedCanonical, localizedPath } from "@/lib/seo";
 import HomeClient from "./_home/_components/HomeClient";
 
 const API_BASE =
@@ -15,22 +16,28 @@ const TITLE = "Tarodan - Diecast Model Araba Pazarı";
 const DESCRIPTION =
   "Diecast model araba koleksiyoncuları için güvenli alış, satış ve takas platformu. Öne çıkan ürünler, indirimler, takas vitrini ve popüler ilanları keşfedin.";
 
-export const metadata: Metadata = {
-  title: TITLE,
-  description: DESCRIPTION,
-  alternates: { canonical: "/" },
-  openGraph: {
+export function generateMetadata({
+  params: { locale },
+}: {
+  params: { locale: string };
+}): Metadata {
+  return {
     title: TITLE,
     description: DESCRIPTION,
-    type: "website",
-    url: "/",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: TITLE,
-    description: DESCRIPTION,
-  },
-};
+    alternates: localizedCanonical(locale, "/"),
+    openGraph: {
+      title: TITLE,
+      description: DESCRIPTION,
+      type: "website",
+      url: localizedPath(locale, "/"),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: TITLE,
+      description: DESCRIPTION,
+    },
+  };
+}
 
 /**
  * Server fetch for `/products` (public, no auth). Mirrors the client

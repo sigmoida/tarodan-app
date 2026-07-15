@@ -9,28 +9,35 @@ import {
   buildListApiParams,
 } from "./_lib/params";
 import { fetchCategoryServer, fetchListingsServer } from "./_lib/data";
+import { localizedCanonical, localizedPath } from "@/lib/seo";
 import ListingsClient from "./ListingsClient";
 
 const TITLE = "Ürünler | Tarodan";
 const DESCRIPTION =
   "Diecast model araba, koleksiyon ve model araç ilanlarını keşfedin. Markaya, ölçeğe, fiyata ve duruma göre filtreleyin; takas ve indirimli ürünleri bulun.";
 
-export const metadata: Metadata = {
-  title: TITLE,
-  description: DESCRIPTION,
-  alternates: { canonical: "/listings" },
-  openGraph: {
+export function generateMetadata({
+  params: { locale },
+}: {
+  params: { locale: string };
+}): Metadata {
+  return {
     title: TITLE,
     description: DESCRIPTION,
-    type: "website",
-    url: "/listings",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: TITLE,
-    description: DESCRIPTION,
-  },
-};
+    alternates: localizedCanonical(locale, "/listings"),
+    openGraph: {
+      title: TITLE,
+      description: DESCRIPTION,
+      type: "website",
+      url: localizedPath(locale, "/listings"),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: TITLE,
+      description: DESCRIPTION,
+    },
+  };
+}
 
 type Props = {
   searchParams: Record<string, string | string[] | undefined>;
