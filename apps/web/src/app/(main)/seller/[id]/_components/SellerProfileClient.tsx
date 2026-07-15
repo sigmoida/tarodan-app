@@ -67,11 +67,7 @@ export default function SellerProfileClient() {
         <div className="mx-auto w-full max-w-6xl">
           <EmptyStateCard
             title={t("seller.notFound")}
-            description={
-              locale === "en"
-                ? "The seller you are looking for does not exist or has been removed."
-                : "Aradığınız satıcı bulunamadı veya kaldırılmış olabilir."
-            }
+            description={t("seller.notFoundDesc")}
             action={
               <ButtonLink variant="primary" href="/listings">
                 {t("seller.backToListings")}

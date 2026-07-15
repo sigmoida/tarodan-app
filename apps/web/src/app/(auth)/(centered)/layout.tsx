@@ -4,7 +4,8 @@ import Link from "next/link";
 import { heroImageUrl } from "@/lib/assetCdn";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
+import type { MessageKey } from "@tarodan/i18n";
 
 /**
  * Shared two-panel hero frame for every auth screen. One column = brand logo +
@@ -19,10 +20,8 @@ interface Hero {
   image: string;
   /** Which side the hero panel sits on at `lg+` — the form takes the other. */
   side: "left" | "right";
-  titleTr: string;
-  titleEn: string;
-  subtitleTr: string;
-  subtitleEn: string;
+  titleKey: MessageKey;
+  subtitleKey: MessageKey;
   stats?: boolean;
 }
 
@@ -33,12 +32,8 @@ const HERO_BY_PATH: Array<{ prefix: string; hero: Hero }> = [
     hero: {
       image: heroImageUrl("hero-trading.png"),
       side: "right",
-      titleTr: "İşini Vitrine Taşı",
-      titleEn: "Put Your Business Center Stage",
-      subtitleTr:
-        "Şirket hesabıyla binlerce koleksiyonere ulaş, ilanlarını tek yerden yönet.",
-      subtitleEn:
-        "Reach thousands of collectors and manage every listing from one business account.",
+      titleKey: "auth.heroBusinessTitle",
+      subtitleKey: "auth.heroBusinessSubtitle",
     },
   },
   {
@@ -46,10 +41,8 @@ const HERO_BY_PATH: Array<{ prefix: string; hero: Hero }> = [
     hero: {
       image: heroImageUrl("hero-hot-wheels.png"),
       side: "left",
-      titleTr: "Koleksiyonun Başlasın",
-      titleEn: "Let the Collection Begin",
-      subtitleTr: "Ücretsiz katıl, ilk modelini bugün keşfet.",
-      subtitleEn: "Join free and discover your first model today.",
+      titleKey: "auth.heroRegisterTitle",
+      subtitleKey: "auth.heroRegisterSubtitle",
       stats: true,
     },
   },
@@ -58,12 +51,8 @@ const HERO_BY_PATH: Array<{ prefix: string; hero: Hero }> = [
 const DEFAULT_HERO: Hero = {
   image: heroImageUrl("hero-marketplace.png"),
   side: "right",
-  titleTr: "Koleksiyonun Kalbi Burada",
-  titleEn: "Where Collections Come Alive",
-  subtitleTr:
-    "Binlerce diecast model, tek adres. Aradığını bul, koleksiyonunu büyüt.",
-  subtitleEn:
-    "Thousands of diecast models, one place. Find it, own it, grow it.",
+  titleKey: "auth.heroDefaultTitle",
+  subtitleKey: "auth.heroDefaultSubtitle",
   stats: true,
 };
 
@@ -79,11 +68,9 @@ export default function AuthHeroLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const locale = useLocale();
   const t = useTranslations();
   const pathname = usePathname();
   const hero = heroFor(pathname ?? "/login");
-  const en = locale === "en";
   const heroLeft = hero.side === "left";
 
   const stats = [
@@ -142,10 +129,10 @@ export default function AuthHeroLayout({
         <div className="absolute inset-0 z-10 flex flex-col justify-between p-10 lg:p-14">
           <div className="max-w-lg">
             <h2 className="text-4xl font-extrabold leading-tight tracking-tight text-inverted drop-shadow-lg lg:text-5xl">
-              {en ? hero.titleEn : hero.titleTr}
+              {t(hero.titleKey)}
             </h2>
             <p className="mt-4 max-w-md text-base text-inverted/85 drop-shadow lg:text-lg">
-              {en ? hero.subtitleEn : hero.subtitleTr}
+              {t(hero.subtitleKey)}
             </p>
           </div>
 

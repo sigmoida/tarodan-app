@@ -4,8 +4,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
-import { useLocale } from "next-intl";
-import { resolveLocale } from "@tarodan/i18n";
+import { useTranslations } from "next-intl";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { Button } from "@tarodan/ui";
 import { HERO_SLIDES } from "../lib/heroSlides";
@@ -14,8 +13,8 @@ const AUTOPLAY_MS = 10000;
 const SWIPE_THRESHOLD = 50;
 
 export default function HeroSlider() {
-  const locale = useLocale();
-  const slides = HERO_SLIDES[resolveLocale(locale)];
+  const t = useTranslations();
+  const slides = HERO_SLIDES;
   const count = slides.length;
 
   const [current, setCurrent] = useState(0);
@@ -62,17 +61,17 @@ export default function HeroSlider() {
                 {/* Text */}
                 <div className={slide.imageRight ? "" : "md:order-2"}>
                   <h1 className="text-3xl md:text-4xl lg:text-[3.25rem] font-bold text-heading font-display leading-[1.1] tracking-tight mb-6 whitespace-pre-line">
-                    {slide.title}
+                    {t(slide.titleKey)}
                   </h1>
                   <p className="text-base md:text-lg text-muted mb-6 max-w-lg leading-relaxed">
-                    {slide.subtitle}
+                    {t(slide.subtitleKey)}
                   </p>
                   <div className="flex flex-col sm:flex-row gap-3">
                     <ButtonLink variant="primary" href={slide.cta1.href}>
-                      {slide.cta1.label}
+                      {t(slide.cta1.labelKey)}
                     </ButtonLink>
                     <ButtonLink variant="secondary" href={slide.cta2.href}>
-                      {slide.cta2.label}
+                      {t(slide.cta2.labelKey)}
                     </ButtonLink>
                   </div>
                 </div>
@@ -84,11 +83,7 @@ export default function HeroSlider() {
                 >
                   <Image
                     src={slide.image}
-                    alt={
-                      locale === "tr"
-                        ? "Diecast model araç koleksiyonu"
-                        : "Diecast model car collection"
-                    }
+                    alt={t("home.slider.imageAlt")}
                     fill
                     sizes="(max-width: 768px) 0px, (max-width: 1024px) 400px, 512px"
                     className="object-cover object-center rounded-lg"

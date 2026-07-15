@@ -276,7 +276,13 @@
     "emailVerifiedSuccess": "Email verified successfully!",
     "failedToSend": "Failed to send",
     "passwordChangedSuccess": "Password changed successfully!",
-    "passwordResetFailed": "Password reset failed"
+    "passwordResetFailed": "Password reset failed",
+    "heroBusinessTitle": "Put Your Business Center Stage",
+    "heroBusinessSubtitle": "Reach thousands of collectors and manage every listing from one business account.",
+    "heroRegisterTitle": "Let the Collection Begin",
+    "heroRegisterSubtitle": "Join free and discover your first model today.",
+    "heroDefaultTitle": "Where Collections Come Alive",
+    "heroDefaultSubtitle": "Thousands of diecast models, one place. Find it, own it, grow it."
   },
   "brands": {
     "title": "Brands",
@@ -535,7 +541,10 @@
     "noReviewsWithRating": "No reviews with this rating",
     "verifiedPurchase": "Verified Purchase",
     "leaveEmptyUnlimitedStock": "Leave empty for unlimited stock",
-    "multipleImagesRequired360": "Multiple images required for 360° view"
+    "multipleImagesRequired360": "Multiple images required for 360° view",
+    "conditionPoor": "Poor",
+    "statusDeleted": "Removed",
+    "upToImages": "Up to {count} images"
   },
   "cart": {
     "myCart": "My Cart",
@@ -844,7 +853,9 @@
     "tapToUploadPhotos": "Tap + to upload photos of the issue.",
     "refundReasonCounterfeit": "Counterfeit",
     "refundReasonLostInTransit": "Lost in transit",
-    "refundReasonOther": "Other"
+    "refundReasonOther": "Other",
+    "statusPendingPayment": "Pending Payment",
+    "statusRefundRequested": "Refund Requested"
   },
   "trade": {
     "myTrades": "My Trades",
@@ -1055,7 +1066,16 @@
     "selectAtLeastOneOffer": "Please select at least one product to offer",
     "selectAtLeastOneWant": "Please select at least one product you want",
     "progressReturning": "Trade was rejected at warehouse. Items are being returned to senders.",
-    "loginToViewDetails": "Please login to view trade details"
+    "loginToViewDetails": "Please login to view trade details",
+    "statusInProgress": "In Progress",
+    "statusShipping": "Shipping",
+    "statusAwaitingConfirmation": "Awaiting Confirmation",
+    "statusAwaitingPayment": "Awaiting Payment",
+    "statusShippingToWarehouse": "Shipping to Warehouse",
+    "statusAtWarehouse": "At Warehouse",
+    "statusAdminReviewing": "Under Review",
+    "statusShippingToRecipients": "Shipping to Recipients",
+    "statusReturning": "Returning"
   },
   "offer": {
     "makeOffer": "Make Offer",
@@ -1081,7 +1101,9 @@
     "acceptFailed": "Failed to accept offer",
     "rejectFailed": "Failed to reject offer",
     "cancelFailed": "Failed to cancel offer",
-    "counterFailed": "Failed to send counter"
+    "counterFailed": "Failed to send counter",
+    "statusExpired": "Expired",
+    "statusCounterOffered": "Counter Offered"
   },
   "message": {
     "messages": "Messages",
@@ -1448,7 +1470,21 @@
     "viewCollection": "View Collection",
     "companyOfWeek": "Company of the Week",
     "companyBioFallback": "Premium Diecast vehicle buying and selling",
-    "viewStore": "View Store"
+    "viewStore": "View Store",
+    "slider": {
+      "marketplaceTitle": "Turkey''s Largest\nDiecast Marketplace",
+      "marketplaceSubtitle": "Buy, sell, and trade diecast models. Create your Digital Garage and showcase your collection.",
+      "browseMarketplace": "Browse Marketplace",
+      "hotWheelsTitle": "Premium Hot Wheels\nCollections",
+      "hotWheelsSubtitle": "Fast & Furious, Formula 1 and more. Discover rare models.",
+      "exploreHotWheels": "Explore Hot Wheels",
+      "allBrands": "All Brands",
+      "secureTradingTitle": "Secure Trading\nSystem",
+      "secureTradingSubtitle": "Trade your collections with other collectors safely. Protected system for both parties.",
+      "startTrading": "Start Trading",
+      "howItWorks": "How It Works?",
+      "imageAlt": "Diecast model car collection"
+    }
   },
   "search": {
     "search": "Search",
@@ -1465,7 +1501,9 @@
     "filterResults": "Filter Results",
     "searchPlaceholder": "Search products, brands, categories...",
     "popularSearches": "Popular Searches",
-    "searchAction": "search for"
+    "searchAction": "search for",
+    "browseAllListings": "Browse all listings",
+    "relatedResults": "Related Results"
   },
   "error": {
     "pageNotFound": "Page Not Found",
@@ -1690,7 +1728,12 @@
     "backToMyOrders": "Back to My Orders",
     "paginationSummary": "Total {total} payments, Page {page} / {totalPages}",
     "itemsCount": "{count} items",
-    "viewItemsCount": "View {count} items"
+    "viewItemsCount": "View {count} items",
+    "reasonInsufficientBalance": "Insufficient balance",
+    "reasonCardError": "Card information error",
+    "reason3dSecureFailed": "3D Secure verification failed",
+    "reasonBankRejected": "Transaction rejected by bank",
+    "reasonConnectionProblem": "Internet connection problem"
   },
   "seller": {
     "sellerProfile": "Seller Profile",
@@ -1717,7 +1760,8 @@
     "noCollectionsDesc": "This seller has no public collections.",
     "newMember": "New member",
     "monthsCount": "{count} months",
-    "yearsCount": "{count}+ years"
+    "yearsCount": "{count}+ years",
+    "notFoundDesc": "The seller you are looking for does not exist or has been removed."
   },
   "sellerDashboard": {
     "title": "Seller Dashboard",
