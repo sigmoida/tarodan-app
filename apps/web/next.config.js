@@ -1,5 +1,9 @@
 const { withSentryConfig } = require('@sentry/nextjs');
+const createNextIntlPlugin = require('next-intl/plugin');
 const path = require('path');
+
+// next-intl plugin — points at the request config (locale + messages per request).
+const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 /**
  * Cache headers (browser / CDN) – sadece /public altındaki statik dosyalar.
@@ -244,7 +248,9 @@ const sentryWebpackPluginOptions = {
 // Sentry'yi YALNIZ DSN *ve* auth token birlikte varken devreye al. Token yoksa
 // source-map upload zaten yapılamaz → gereksiz yere prod build'ini riske atma
 // (deploy bu yüzden "error: project not found" ile patlıyordu).
+const configWithIntl = withNextIntl(nextConfig);
+
 module.exports =
   process.env.NEXT_PUBLIC_SENTRY_DSN && process.env.SENTRY_AUTH_TOKEN
-    ? withSentryConfig(nextConfig, sentryWebpackPluginOptions)
-    : nextConfig;
+    ? withSentryConfig(configWithIntl, sentryWebpackPluginOptions)
+    : configWithIntl;

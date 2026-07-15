@@ -2,6 +2,8 @@
 
 import type { Metadata } from "next";
 import { Noto_Sans } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getMessages } from "next-intl/server";
 import { Toaster } from "react-hot-toast";
 import "./globals.css";
 import CookieConsentBanner from "@/components/CookieConsentBanner";
@@ -64,26 +66,34 @@ export const metadata: Metadata = {
  * ((main) owns the storefront; (auth) owns the auth frame). Renders {children}
  * bare — no Navbar/Footer, no marketplace providers.
  */
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // next-intl (cookie-resolved locale + shared catalog). Runs alongside the
+  // legacy LanguageProvider until call sites migrate (#213); the legacy context
+  // still drives visible strings for now.
+  const locale = await getLocale();
+  const messages = await getMessages();
+
   return (
-    <html lang="tr">
+    <html lang={locale}>
       <body className={notoSans.className}>
-        <LanguageProvider>
-          <GoogleOAuthProvider
-            clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
-          >
-            {children}
-            <CookieConsentBanner />
-            <Toaster
-              position="bottom-right"
-              toastOptions={{ style: { maxWidth: "360px" } }}
-            />
-          </GoogleOAuthProvider>
-        </LanguageProvider>
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <LanguageProvider>
+            <GoogleOAuthProvider
+              clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
+            >
+              {children}
+              <CookieConsentBanner />
+              <Toaster
+                position="bottom-right"
+                toastOptions={{ style: { maxWidth: "360px" } }}
+              />
+            </GoogleOAuthProvider>
+          </LanguageProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );
