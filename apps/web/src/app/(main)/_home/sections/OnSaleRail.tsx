@@ -1,43 +1,38 @@
-'use client';
+"use client";
 
-import { ButtonLink, EmptyState, ProductBadge } from '@/components/ui';
-import { useLocale, useTranslations } from "next-intl";
-import { useHome } from '../context/HomeDataContext';
-import HomeSection from './HomeSection';
-import ProductRail from './ProductRail';
+import { ButtonLink, EmptyState, ProductBadge } from "@/components/ui";
+import { useTranslations } from "next-intl";
+import { useHome } from "../context/HomeDataContext";
+import HomeSection from "./HomeSection";
+import ProductRail from "./ProductRail";
 
 export default function OnSaleRail() {
-	const locale = useLocale();
-	const { discounted, isLoadingDiscounted } = useHome();
-	const viewAllLabel = locale === 'en' ? 'View All' : 'Tümünü gör';
+  const t = useTranslations();
+  const { discounted, isLoadingDiscounted } = useHome();
+  const viewAllLabel = t("home.viewAll");
 
-	return (
-		<HomeSection
-			title={locale === 'en' ? 'On Sale' : 'İndirimdekiler'}
-			viewAllHref='/listings?discountOnly=true'
-			viewAllLabel={viewAllLabel}
-			badge={
-				<ProductBadge variant='sale'>
-					{locale === 'en' ? 'Deals' : 'Fırsat'}
-				</ProductBadge>
-			}>
-			<ProductRail
-				items={discounted}
-				isLoading={isLoadingDiscounted}
-				emptyState={
-					<EmptyState
-						title={locale === 'en' ? 'No products on sale' : 'İndirimde ürün yok'}
-						description={
-							locale === 'en' ? 'Check back later!' : 'Daha sonra tekrar bakın!'
-						}
-						action={
-							<ButtonLink variant='secondary' size='sm' href='/listings'>
-								{viewAllLabel}
-							</ButtonLink>
-						}
-					/>
-				}
-			/>
-		</HomeSection>
-	);
+  return (
+    <HomeSection
+      title={t("product.onSale")}
+      viewAllHref="/listings?discountOnly=true"
+      viewAllLabel={viewAllLabel}
+      badge={<ProductBadge variant="sale">{t("home.deals")}</ProductBadge>}
+    >
+      <ProductRail
+        items={discounted}
+        isLoading={isLoadingDiscounted}
+        emptyState={
+          <EmptyState
+            title={t("home.noProductsOnSale")}
+            description={t("home.checkBackLater")}
+            action={
+              <ButtonLink variant="secondary" size="sm" href="/listings">
+                {viewAllLabel}
+              </ButtonLink>
+            }
+          />
+        }
+      />
+    </HomeSection>
+  );
 }

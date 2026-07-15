@@ -8,7 +8,7 @@ import { CheckBadgeIcon, StarIcon } from "@heroicons/react/24/solid";
 import OptimizedImage from "@/components/OptimizedImage";
 import UserAvatar from "@/components/UserAvatar";
 import { ButtonLink, ProductBadge, SectionCard } from "@/components/ui";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useHome } from "../context/HomeDataContext";
 import { getImageUrl } from "../lib/helpers";
 
@@ -33,7 +33,7 @@ function SpotlightSkeleton({ tiles }: { tiles: number }) {
 }
 
 export default function Spotlights() {
-  const locale = useLocale();
+  const t = useTranslations();
   const {
     featuredCollectorToShow,
     companyOfWeek,
@@ -53,11 +53,7 @@ export default function Spotlights() {
         {showCollector && (
           <SectionCard
             className="flex flex-col"
-            title={
-              locale === "en"
-                ? "Collector of the Week"
-                : "Haftanın Koleksiyoneri"
-            }
+            title={t("home.collectorOfWeek")}
           >
             {isLoadingFeaturedCollector || !featuredCollectorToShow ? (
               <SpotlightSkeleton tiles={5} />
@@ -72,7 +68,7 @@ export default function Spotlights() {
                   <div className="min-w-0">
                     <h3 className="text-sm font-bold text-heading flex items-center gap-1.5 mb-0.5">
                       {featuredCollectorToShow.user?.displayName ||
-                        (locale === "en" ? "Collector" : "Koleksiyoner")}
+                        t("home.collector")}
                       {featuredCollectorToShow.user?.isVerified && (
                         <CheckBadgeIcon className="w-4 h-4 text-success-500" />
                       )}
@@ -82,7 +78,7 @@ export default function Spotlights() {
                     </p>
                     <p className="text-xs text-muted mt-1 line-clamp-2">
                       {featuredCollectorToShow?.description ||
-                        `${featuredCollectorToShow.itemCount || 0} ${locale === "en" ? "items" : "araç"}`}
+                        `${featuredCollectorToShow.itemCount || 0} ${t("home.items")}`}
                     </p>
                   </div>
                 </div>
@@ -91,25 +87,19 @@ export default function Spotlights() {
                     <p className="text-sm font-bold text-heading">
                       {formatCount(featuredCollectorToShow.viewCount)}
                     </p>
-                    <p className="text-2xs text-muted">
-                      {locale === "en" ? "Views" : "Görüntü"}
-                    </p>
+                    <p className="text-2xs text-muted">{t("home.statViews")}</p>
                   </div>
                   <div className="bg-surface-alt rounded p-2 text-center">
                     <p className="text-sm font-bold text-heading">
                       {formatCount(featuredCollectorToShow.likeCount)}
                     </p>
-                    <p className="text-2xs text-muted">
-                      {locale === "en" ? "Likes" : "Beğeni"}
-                    </p>
+                    <p className="text-2xs text-muted">{t("home.statLikes")}</p>
                   </div>
                   <div className="bg-surface-alt rounded p-2 text-center">
                     <p className="text-sm font-bold text-heading">
                       {featuredCollectorToShow.itemCount || 0}
                     </p>
-                    <p className="text-2xs text-muted">
-                      {locale === "en" ? "Items" : "Araç"}
-                    </p>
+                    <p className="text-2xs text-muted">{t("home.statItems")}</p>
                   </div>
                 </div>
                 {featuredCollectorToShow.items &&
@@ -144,7 +134,7 @@ export default function Spotlights() {
                   href={`/collections/${featuredCollectorToShow.id}`}
                   className="w-full text-center mt-auto"
                 >
-                  {locale === "en" ? "View Collection" : "Koleksiyonu incele"}
+                  {t("home.viewCollection")}
                 </ButtonLink>
               </>
             )}
@@ -155,7 +145,7 @@ export default function Spotlights() {
         {showCompany && (
           <SectionCard
             className="flex flex-col"
-            title={locale === "en" ? "Company of the Week" : "Haftanın Şirketi"}
+            title={t("home.companyOfWeek")}
             badge={<ProductBadge variant="default">Business</ProductBadge>}
           >
             {isLoadingCompany || !companyOfWeek ? (
@@ -177,10 +167,7 @@ export default function Spotlights() {
                       )}
                     </h3>
                     <p className="text-xs text-muted line-clamp-2">
-                      {companyOfWeek.bio ||
-                        (locale === "en"
-                          ? "Premium Diecast vehicle buying and selling"
-                          : "Premium Diecast araçların alım ve satımı")}
+                      {companyOfWeek.bio || t("home.companyBioFallback")}
                     </p>
                     {companyOfWeek.stats?.averageRating > 0 && (
                       <div className="flex items-center gap-1 mt-1">
@@ -201,32 +188,26 @@ export default function Spotlights() {
                       {companyOfWeek.stats?.totalProducts || 0}
                     </p>
                     <p className="text-2xs text-muted">
-                      {locale === "en" ? "Products" : "Ürün"}
+                      {t("home.statProducts")}
                     </p>
                   </div>
                   <div className="bg-surface-alt rounded p-2 text-center">
                     <p className="text-sm font-bold text-heading">
                       {companyOfWeek.stats?.totalSales || 0}
                     </p>
-                    <p className="text-2xs text-muted">
-                      {locale === "en" ? "Sales" : "Satış"}
-                    </p>
+                    <p className="text-2xs text-muted">{t("common.sales")}</p>
                   </div>
                   <div className="bg-surface-alt rounded p-2 text-center">
                     <p className="text-sm font-bold text-heading">
                       {formatCount(companyOfWeek.stats?.totalViews)}
                     </p>
-                    <p className="text-2xs text-muted">
-                      {locale === "en" ? "Views" : "Görüntü"}
-                    </p>
+                    <p className="text-2xs text-muted">{t("home.statViews")}</p>
                   </div>
                   <div className="bg-surface-alt rounded p-2 text-center">
                     <p className="text-sm font-bold text-heading">
                       {formatCount(companyOfWeek.stats?.totalLikes)}
                     </p>
-                    <p className="text-2xs text-muted">
-                      {locale === "en" ? "Likes" : "Beğeni"}
-                    </p>
+                    <p className="text-2xs text-muted">{t("home.statLikes")}</p>
                   </div>
                 </div>
                 {companyOfWeek.products &&
@@ -262,7 +243,7 @@ export default function Spotlights() {
                   href={`/seller/${companyOfWeek.id}`}
                   className="w-full text-center mt-auto"
                 >
-                  {locale === "en" ? "View Store" : "Mağazayı İncele"}
+                  {t("home.viewStore")}
                 </ButtonLink>
               </>
             )}

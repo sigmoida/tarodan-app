@@ -102,7 +102,10 @@
     "downloadFailed": "İndirme başarısız",
     "uploadFailed": "Yükleme başarısız",
     "new": "Yeni",
-    "evidence": "Kanıt"
+    "evidence": "Kanıt",
+    "sales": "Satış",
+    "signingOut": "Çıkış yapılıyor...",
+    "requestFailed": "İstek başarısız"
   },
   "nav": {
     "home": "Ana Sayfa",
@@ -676,7 +679,8 @@
     "withholdingTax": "Stopaj (tevkifat)",
     "unsupportedStatus": "Desteklenmeyen durum",
     "invoiceNotReady": "Fatura henüz hazır değil",
-    "invoiceNotFound": "Fatura bulunamadı"
+    "invoiceNotFound": "Fatura bulunamadı",
+    "refundReasonNotAsDescribed": "Açıklamayla uyuşmuyor"
   },
   "trade": {
     "myTrades": "Takaslarım",
@@ -824,7 +828,8 @@
     "shippingTime": "Kargo Süresi",
     "timeExpired": "Süre Doldu!",
     "dayShort": "g",
-    "rejectTradeTitle": "Takası Reddet"
+    "rejectTradeTitle": "Takası Reddet",
+    "profileAddressesLink": "Profil → Adresler"
   },
   "offer": {
     "makeOffer": "Teklif Ver",
@@ -914,7 +919,9 @@
     "loginToContinue": "Devam etmek için giriş yapın",
     "acceptTerms": "Lütfen kullanım koşullarını kabul edin",
     "fillCardInfo": "Lütfen tüm kart bilgilerini doldurun",
-    "invalidCardNumber": "Geçersiz kart numarası"
+    "invalidCardNumber": "Geçersiz kart numarası",
+    "scheduledChangeCancelled": "Bekleyen değişiklik iptal edildi",
+    "cancelConfirmDesc": "Üyeliğinizi iptal etmek istediğinizden emin misiniz? Mevcut dönem sonuna kadar özelliklerinizi kullanmaya devam edebilirsiniz."
   },
   "collection": {
     "share": "Paylaş",
@@ -1159,7 +1166,27 @@
     "qualityProductsDesc": "Doğrulanmış satıcılardan kaliteli ürünler",
     "easyReturns": "Kolay İade",
     "easyReturnsDesc": "Memnun kalmazsanız iade garantisi",
-    "banner": "₺500 üzeri siparişlerde ücretsiz kargo!"
+    "banner": "₺500 üzeri siparişlerde ücretsiz kargo!",
+    "viewAll": "Tümünü gör",
+    "popularListings": "Popüler İlanlar",
+    "beTheFirst": "İlk ilanı siz verin!",
+    "deals": "Fırsat",
+    "noProductsOnSale": "İndirimde ürün yok",
+    "checkBackLater": "Daha sonra tekrar bakın!",
+    "featuredRailTitle": "Öne Çıkan Ürünler",
+    "collector": "Koleksiyoner",
+    "items": "araç",
+    "views": "görüntü",
+    "topCollections": "En İyi Koleksiyonlar",
+    "collectorOfWeek": "Haftanın Koleksiyoneri",
+    "statViews": "Görüntü",
+    "statLikes": "Beğeni",
+    "statItems": "Araç",
+    "statProducts": "Ürün",
+    "viewCollection": "Koleksiyonu incele",
+    "companyOfWeek": "Haftanın Şirketi",
+    "companyBioFallback": "Premium Diecast araçların alım ve satımı",
+    "viewStore": "Mağazayı İncele"
   },
   "search": {
     "search": "Ara",
@@ -1214,7 +1241,9 @@
     "enterValidAmount": "Geçerli bir tutar girin",
     "max500Chars": "En fazla 500 karakter",
     "enterOrderNumber": "Sipariş numarası girin",
-    "offerBelowPrice": "Teklif fiyattan düşük olmalı"
+    "offerBelowPrice": "Teklif fiyattan düşük olmalı",
+    "nameRequired": "Ad soyad gerekli",
+    "subjectRequired": "Konu gerekli"
   },
   "time": {
     "justNow": "Az önce",
@@ -1365,7 +1394,31 @@
     "pay": "Ödeme Yap",
     "startFailed": "Ödeme başlatılamadı",
     "statusPending": "Bekliyor",
-    "statusProcessing": "İşleniyor"
+    "statusProcessing": "İşleniyor",
+    "detailsTitle": "Ödeme Detayları",
+    "amountLabel": "Ödeme Tutarı",
+    "transactionIdLabel": "İşlem No",
+    "statusAwaitingConfirmation": "Onay bekleniyor",
+    "downloading": "İndiriliyor...",
+    "downloadInvoice": "Faturayı İndir (PDF)",
+    "preparingInvoice": "Fatura Hazırlanıyor...",
+    "completedTitle": "Ödeme Başarıyla Tamamlandı!",
+    "confirmingTitle": "Ödemeniz Doğrulanıyor",
+    "completedDesc": "Ödemeniz alındı ve siparişiniz hazırlanmaya başlandı.",
+    "confirmingDesc": "Ödeme talebiniz alındı ancak henüz onaylanmadı. Durumu Siparişlerim sayfasından takip edebilirsiniz.",
+    "estimatedDelivery": "Tahmini Teslimat",
+    "deliveryDisclaimer": "*Teslimat süresi satıcı ve kargo firmasına göre değişebilir.",
+    "informationLabel": "Bilgilendirme",
+    "orderEmailSent": "Sipariş onay e-postası gönderildi. Takip için ",
+    "viewMyOrder": "Siparişimi Görüntüle",
+    "trackMyOrder": "Siparişimi takip et",
+    "failedDesc": "Ödeme işleminiz tamamlanamadı. Lütfen tekrar deneyin veya farklı bir ödeme yöntemi seçin.",
+    "failureReasonsTitle": "Ödeme başarısız olmasının olası nedenleri:",
+    "needHelp": "Yardıma mı ihtiyacınız var?",
+    "supportPrompt": "Ödeme sorununuz devam ederse, lütfen ",
+    "supportTeam": "destek ekibimiz",
+    "contactSuffix": " ile iletişime geçin.",
+    "backToMyOrders": "Siparişlerime Dön"
   },
   "seller": {
     "sellerProfile": "Satıcı Profili",
@@ -1384,7 +1437,15 @@
     "follow": "Takip Et",
     "report": "Raporla",
     "noActiveListings": "Bu satıcının henüz aktif ilanı yok.",
-    "viewProfile": "Profili Gör"
+    "viewProfile": "Profili Gör",
+    "trust": "Güven",
+    "noReviewsDesc": "Bu satıcının henüz değerlendirmesi yok.",
+    "totalReviews": "değerlendirme",
+    "noCollections": "Henüz koleksiyon yok",
+    "noCollectionsDesc": "Bu satıcının herkese açık koleksiyonu yok.",
+    "newMember": "Yeni üye",
+    "monthsCount": "{count} ay",
+    "yearsCount": "{count}+ yıl"
   },
   "sellerDashboard": {
     "title": "Satıcı Panosu",
@@ -1695,7 +1756,10 @@
       "unsubscribeSuccess": "Aboneliğiniz iptal edildi. Artık bülten e-postası almayacaksınız.",
       "unsubscribeTokenSuccess": "Bülten aboneliğiniz iptal edildi.",
       "feedbackTitle": "Neden ayrılıyorsunuz? (İsteğe bağlı)",
-      "feedbackPlaceholder": "Geri bildiriminiz..."
+      "feedbackPlaceholder": "Geri bildiriminiz...",
+      "subscribeAgain": "Tekrar abone ol",
+      "unsubscribedToast": "Abonelikten çıkıldı",
+      "subscriptionFailed": "Abonelik başarısız"
     }
   },
   "stockout": {

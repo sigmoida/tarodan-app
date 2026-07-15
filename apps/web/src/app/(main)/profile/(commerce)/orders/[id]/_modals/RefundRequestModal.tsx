@@ -130,7 +130,7 @@ export default function RefundRequestModal({
     },
     {
       value: "not_as_described",
-      label: locale === "en" ? "Not as described" : "Açıklamayla uyuşmuyor",
+      label: t("order.refundReasonNotAsDescribed"),
     },
     {
       value: "missing_parts",

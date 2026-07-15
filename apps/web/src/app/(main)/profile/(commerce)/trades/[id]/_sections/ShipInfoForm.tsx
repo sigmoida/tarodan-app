@@ -67,7 +67,7 @@ export default function ShipInfoForm({
                 ? "No saved addresses. Add one in "
                 : "Kayıtlı adres yok. "}
               <Link href="/profile" className="underline font-medium">
-                {locale === "en" ? "Profile → Addresses" : "Profil → Adresler"}
+                {t("trade.profileAddressesLink")}
               </Link>
               {t("trade.addressLinkSuffix")}
             </p>

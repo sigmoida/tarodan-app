@@ -1,133 +1,145 @@
 /** @format */
 
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { XCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
-import { Badge, Button, Spinner } from '@tarodan/ui';
-import { PageShell } from '@/components/layout/PageShell';
-import { SectionCard, ButtonLink } from '@/components/ui';
-import AuthLoadingScreen from '@/components/AuthLoadingScreen';
-import { usePaymentFail } from '../_hooks/usePaymentFail';
+import Link from "next/link";
+import {
+  XCircleIcon,
+  ExclamationTriangleIcon,
+} from "@heroicons/react/24/outline";
+import { Badge, Button, Spinner } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
+import { PageShell } from "@/components/layout/PageShell";
+import { SectionCard, ButtonLink } from "@/components/ui";
+import AuthLoadingScreen from "@/components/AuthLoadingScreen";
+import { usePaymentFail } from "../_hooks/usePaymentFail";
 
 const REASONS_TR = [
-	'Yetersiz bakiye',
-	'Kart bilgilerinde hata',
-	'3D Secure doğrulaması başarısız',
-	'Banka tarafından işlem reddedildi',
-	'İnternet bağlantı problemi',
+  "Yetersiz bakiye",
+  "Kart bilgilerinde hata",
+  "3D Secure doğrulaması başarısız",
+  "Banka tarafından işlem reddedildi",
+  "İnternet bağlantı problemi",
 ];
 const REASONS_EN = [
-	'Insufficient balance',
-	'Card information error',
-	'3D Secure verification failed',
-	'Transaction rejected by bank',
-	'Internet connection problem',
+  "Insufficient balance",
+  "Card information error",
+  "3D Secure verification failed",
+  "Transaction rejected by bank",
+  "Internet connection problem",
 ];
 
 export default function PaymentFailClient() {
-	const { phase, payment, locale, isGuestCheckout, handleRetry } = usePaymentFail();
+  const t = useTranslations();
+  const { phase, payment, locale, isGuestCheckout, handleRetry } =
+    usePaymentFail();
 
-	if (phase === 'auth-loading') return <AuthLoadingScreen />;
-	if (phase === 'loading') {
-		return (
-			<PageShell className='flex min-h-[60vh] items-center justify-center'>
-				<Spinner size='xl' />
-			</PageShell>
-		);
-	}
+  if (phase === "auth-loading") return <AuthLoadingScreen />;
+  if (phase === "loading") {
+    return (
+      <PageShell className="flex min-h-[60vh] items-center justify-center">
+        <Spinner size="xl" />
+      </PageShell>
+    );
+  }
 
-	const en = locale === 'en';
-	const reasons = en ? REASONS_EN : REASONS_TR;
+  const en = locale === "en";
+  const reasons = en ? REASONS_EN : REASONS_TR;
 
-	return (
-		<PageShell className='flex items-center justify-center p-4'>
-			<div className='w-full max-w-2xl'>
-				<SectionCard className='p-8 text-center'>
-					<div className='mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-danger-100'>
-						<XCircleIcon className='h-12 w-12 text-danger-500' />
-					</div>
+  return (
+    <PageShell className="flex items-center justify-center p-4">
+      <div className="w-full max-w-2xl">
+        <SectionCard className="p-8 text-center">
+          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-danger-100">
+            <XCircleIcon className="h-12 w-12 text-danger-500" />
+          </div>
 
-					<h1 className='mb-2 text-3xl font-bold text-heading'>
-						{en ? 'Payment Failed' : 'Ödeme Başarısız Oldu'}
-					</h1>
-					<p className='mb-6 text-muted'>
-						{en
-							? 'Your payment could not be completed. Please try again or choose a different payment method.'
-							: 'Ödeme işleminiz tamamlanamadı. Lütfen tekrar deneyin veya farklı bir ödeme yöntemi seçin.'}
-					</p>
+          <h1 className="mb-2 text-3xl font-bold text-heading">
+            {t("payment.paymentFailed")}
+          </h1>
+          <p className="mb-6 text-muted">{t("payment.failedDesc")}</p>
 
-					{payment && (
-						<SectionCard title={en ? 'Payment Details' : 'Ödeme Detayları'} className='mb-6 text-left'>
-							<div className='space-y-2 text-sm'>
-								<div className='flex justify-between'>
-									<span className='text-muted'>{en ? 'Payment Amount:' : 'Ödeme Tutarı:'}</span>
-									<span className='font-semibold'>
-										{payment.amount?.toLocaleString('tr-TR', {
-											minimumFractionDigits: 2,
-											maximumFractionDigits: 2,
-										})}{' '}
-										TL
-									</span>
-								</div>
-								<div className='flex justify-between'>
-									<span className='text-muted'>{en ? 'Payment Method:' : 'Ödeme Yöntemi:'}</span>
-									<span className='font-semibold'>PayTR</span>
-								</div>
-								<div className='flex justify-between'>
-									<span className='text-muted'>{en ? 'Status:' : 'Durum:'}</span>
-									<Badge variant='danger'>{en ? 'Failed' : 'Başarısız'}</Badge>
-								</div>
-								{payment.failureReason && (
-									<div className='mt-3 border-t border-border pt-3 text-xs text-muted'>
-										<strong>{en ? 'Error:' : 'Hata:'}</strong> {payment.failureReason}
-									</div>
-								)}
-							</div>
-						</SectionCard>
-					)}
+          {payment && (
+            <SectionCard
+              title={t("payment.detailsTitle")}
+              className="mb-6 text-left"
+            >
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted">
+                    {t("payment.amountLabel")}:
+                  </span>
+                  <span className="font-semibold">
+                    {payment.amount?.toLocaleString("tr-TR", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}{" "}
+                    TL
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted">
+                    {t("checkout.paymentMethod")}:
+                  </span>
+                  <span className="font-semibold">PayTR</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted">{t("common.status")}:</span>
+                  <Badge variant="danger">
+                    {t("trade.shipmentStatus.failed")}
+                  </Badge>
+                </div>
+                {payment.failureReason && (
+                  <div className="mt-3 border-t border-border pt-3 text-xs text-muted">
+                    <strong>{t("common.error")}:</strong>{" "}
+                    {payment.failureReason}
+                  </div>
+                )}
+              </div>
+            </SectionCard>
+          )}
 
-					<div className='mb-6 rounded-lg border border-warning-200 bg-warning-50 p-4 text-left'>
-						<div className='flex items-start gap-3 text-sm text-warning-800'>
-							<ExclamationTriangleIcon className='mt-0.5 h-5 w-5 flex-shrink-0 text-warning-600' />
-							<div>
-								<p className='mb-2 font-semibold'>
-									{en
-										? 'Possible reasons for payment failure:'
-										: 'Ödeme başarısız olmasının olası nedenleri:'}
-								</p>
-								<ul className='list-inside list-disc space-y-1 text-xs'>
-									{reasons.map((r) => (
-										<li key={r}>{r}</li>
-									))}
-								</ul>
-							</div>
-						</div>
-					</div>
+          <div className="mb-6 rounded-lg border border-warning-200 bg-warning-50 p-4 text-left">
+            <div className="flex items-start gap-3 text-sm text-warning-800">
+              <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-warning-600" />
+              <div>
+                <p className="mb-2 font-semibold">
+                  {t("payment.failureReasonsTitle")}
+                </p>
+                <ul className="list-inside list-disc space-y-1 text-xs">
+                  {reasons.map((r) => (
+                    <li key={r}>{r}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
 
-					<div className='mb-6 rounded-lg border border-info-200 bg-info-50 p-4 text-left text-sm text-info-800'>
-						<strong>{en ? 'Need help?' : 'Yardıma mı ihtiyacınız var?'}</strong>{' '}
-						{en ? 'If your payment issue persists, please contact ' : 'Ödeme sorununuz devam ederse, lütfen '}
-						<Link href='/support' className='font-medium underline'>
-							{en ? 'our support team' : 'destek ekibimiz'}
-						</Link>
-						{en ? '.' : ' ile iletişime geçin.'}
-					</div>
+          <div className="mb-6 rounded-lg border border-info-200 bg-info-50 p-4 text-left text-sm text-info-800">
+            <strong>{t("payment.needHelp")}</strong>{" "}
+            {t("payment.supportPrompt")}
+            <Link href="/support" className="font-medium underline">
+              {t("payment.supportTeam")}
+            </Link>
+            {t("payment.contactSuffix")}
+          </div>
 
-					<div className='flex flex-col justify-center gap-3 sm:flex-row'>
-						{isGuestCheckout ? (
-							<ButtonLink href='/listings'>{en ? 'Back to Listings' : 'İlanlara Dön'}</ButtonLink>
-						) : (
-							<>
-								<Button onClick={handleRetry}>{en ? 'Try Again' : 'Tekrar Dene'}</Button>
-								<ButtonLink variant='secondary' href='/profile/orders'>
-									{en ? 'Back to My Orders' : 'Siparişlerime Dön'}
-								</ButtonLink>
-							</>
-						)}
-					</div>
-				</SectionCard>
-			</div>
-		</PageShell>
-	);
+          <div className="flex flex-col justify-center gap-3 sm:flex-row">
+            {isGuestCheckout ? (
+              <ButtonLink href="/listings">
+                {t("seller.backToListings")}
+              </ButtonLink>
+            ) : (
+              <>
+                <Button onClick={handleRetry}>{t("common.tryAgain")}</Button>
+                <ButtonLink variant="secondary" href="/profile/orders">
+                  {t("payment.backToMyOrders")}
+                </ButtonLink>
+              </>
+            )}
+          </div>
+        </SectionCard>
+      </div>
+    </PageShell>
+  );
 }

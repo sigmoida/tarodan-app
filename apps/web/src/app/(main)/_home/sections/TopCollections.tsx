@@ -8,20 +8,15 @@ import { CheckBadgeIcon } from "@heroicons/react/24/solid";
 import OptimizedImage from "@/components/OptimizedImage";
 import UserAvatar from "@/components/UserAvatar";
 import { SkeletonCard } from "@/components/ui";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useHome } from "../context/HomeDataContext";
 import { getImageUrl } from "../lib/helpers";
 import HomeSection from "./HomeSection";
 
 type TopCollection = ReturnType<typeof useHome>["topCollections"][number];
 
-function CollectionCard({
-  collection,
-  locale,
-}: {
-  collection: TopCollection;
-  locale: string;
-}) {
+function CollectionCard({ collection }: { collection: TopCollection }) {
+  const t = useTranslations();
   const items = collection.items?.slice(0, 3) ?? [];
 
   return (
@@ -62,8 +57,7 @@ function CollectionCard({
             size="xs"
           />
           <span className="flex items-center gap-1 text-xs font-medium text-muted truncate">
-            {collection.user?.displayName ||
-              (locale === "en" ? "Collector" : "Koleksiyoner")}
+            {collection.user?.displayName || t("home.collector")}
             {collection.user?.isVerified && (
               <CheckBadgeIcon className="w-3.5 h-3.5 text-success-500 flex-shrink-0" />
             )}
@@ -74,11 +68,10 @@ function CollectionCard({
         </h3>
         <div className="flex items-center gap-3 mt-1 text-xs text-muted">
           <span>
-            {collection.itemCount || 0} {locale === "en" ? "items" : "araç"}
+            {collection.itemCount || 0} {t("home.items")}
           </span>
           <span>
-            {formatCount(collection.viewCount)}{" "}
-            {locale === "en" ? "views" : "görüntü"}
+            {formatCount(collection.viewCount)} {t("home.views")}
           </span>
         </div>
       </div>
@@ -87,16 +80,16 @@ function CollectionCard({
 }
 
 export default function TopCollections() {
-  const locale = useLocale();
+  const t = useTranslations();
   const { topCollections, isLoadingCollections } = useHome();
 
   if (!(topCollections.length > 0 || isLoadingCollections)) return null;
 
   return (
     <HomeSection
-      title={locale === "en" ? "Top Collections" : "En İyi Koleksiyonlar"}
+      title={t("home.topCollections")}
       viewAllHref="/collections"
-      viewAllLabel={locale === "en" ? "View All" : "Tümünü gör"}
+      viewAllLabel={t("home.viewAll")}
     >
       <div className="grid grid-cols-2 gap-4">
         {isLoadingCollections
@@ -104,11 +97,7 @@ export default function TopCollections() {
           : topCollections
               .slice(0, 6)
               .map((collection) => (
-                <CollectionCard
-                  key={collection.id}
-                  collection={collection}
-                  locale={locale}
-                />
+                <CollectionCard key={collection.id} collection={collection} />
               ))}
       </div>
     </HomeSection>

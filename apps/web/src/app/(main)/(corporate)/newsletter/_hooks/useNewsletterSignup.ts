@@ -10,6 +10,7 @@ import { newsletterSchema, type NewsletterValues } from "../_lib/schema";
 
 /** Newsletter signup — RHF+zod form + subscribe mutation (owns toasts). */
 export function useNewsletterSignup() {
+  const t = useTranslations();
   const locale = useLocale();
   const [success, setSuccess] = useState(false);
   const form = useZodForm(newsletterSchema(locale), {
@@ -24,8 +25,7 @@ export function useNewsletterSignup() {
         promotions: values.promotions,
       }),
     {
-      errorMessage:
-        locale === "en" ? "Subscription failed" : "Abonelik başarısız",
+      errorMessage: t("marketing.newsletter.subscriptionFailed"),
       onSuccess: ({ data }) => {
         setSuccess(true);
         toast.success(data.message);

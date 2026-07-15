@@ -179,18 +179,15 @@ export function useSellerProfile() {
   };
 
   const membershipDuration = (() => {
-    if (!seller?.createdAt) return locale === "en" ? "New member" : "Yeni üye";
+    if (!seller?.createdAt) return t("seller.newMember");
     const created = new Date(seller.createdAt);
     const now = new Date();
     const months =
       (now.getFullYear() - created.getFullYear()) * 12 +
       (now.getMonth() - created.getMonth());
-    if (months < 1) return locale === "en" ? "New member" : "Yeni üye";
-    if (months < 12)
-      return locale === "en" ? `${months} months` : `${months} ay`;
-    return locale === "en"
-      ? `${Math.floor(months / 12)}+ years`
-      : `${Math.floor(months / 12)}+ yıl`;
+    if (months < 1) return t("seller.newMember");
+    if (months < 12) return t("seller.monthsCount", { count: months });
+    return t("seller.yearsCount", { count: Math.floor(months / 12) });
   })();
 
   return {
