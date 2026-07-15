@@ -178,9 +178,7 @@ export function useMessaging(enabled: boolean) {
   }, [searchParams, threads]);
 
   const prefilledFor = (productTitle: string) =>
-    locale === "en"
-      ? `Hi, I'd like to ask about the "${productTitle}" listing.\n\n`
-      : `Merhaba, "${productTitle}" ilanı hakkında bilgi almak istiyorum.\n\n`;
+    t("message.prefilledInquiry", { title: productTitle });
 
   const handleCreateThreadForProduct = async () => {
     if (!sellerId || creatingThread) return;
@@ -290,7 +288,7 @@ export function useMessaging(enabled: boolean) {
         if (existingThread) {
           setSelectedThread(existingThread);
           if (productTitle) {
-            const prefilled = `Merhaba, "${productTitle}" ilanı hakkında bilgi almak istiyorum.\n\n`;
+            const prefilled = prefilledFor(productTitle);
             setDraftsByThreadId((prev) => ({
               ...prev,
               [existingThread.id]: { text: prefilled, urls: [] },
@@ -328,11 +326,7 @@ export function useMessaging(enabled: boolean) {
     if (!files?.length || attaching || !selectedThread) return;
     const file = files[0];
     if (!file.type.startsWith("image/")) {
-      toast.error(
-        locale === "en"
-          ? "Please select an image file"
-          : "Lütfen bir resim dosyası seçin",
-      );
+      toast.error(t("message.selectImageFile"));
       return;
     }
     setAttaching(true);
@@ -353,11 +347,7 @@ export function useMessaging(enabled: boolean) {
       const raw = err?.response?.data?.message;
       const msg = Array.isArray(raw) ? raw.join(" • ") : raw;
       toast.error(
-        typeof msg === "string" && msg
-          ? msg
-          : locale === "en"
-            ? "Failed to upload image"
-            : "Resim yüklenemedi",
+        typeof msg === "string" && msg ? msg : t("message.imageUploadFailed"),
       );
     } finally {
       setAttaching(false);
@@ -392,9 +382,10 @@ export function useMessaging(enabled: boolean) {
     // Check message length (content includes attachment markers)
     if (contentToSend.length > maxMessageLength) {
       toast.error(
-        locale === "en"
-          ? `Message cannot exceed ${maxMessageLength} characters. Current: ${newMessage.length}`
-          : `Mesaj ${maxMessageLength} karakteri aşamaz. Mevcut: ${newMessage.length}`,
+        t("message.tooLong", {
+          max: maxMessageLength,
+          current: newMessage.length,
+        }),
       );
       return;
     }
@@ -406,10 +397,9 @@ export function useMessaging(enabled: boolean) {
     if (!filterResult.passed) {
       const proceed = await confirm({
         title: t("message.contentWarning"),
-        description:
-          locale === "en"
-            ? `${filterResult.warning} Do you still want to send it?`
-            : `${filterResult.warning} Yine de göndermek istiyor musunuz?`,
+        description: t("message.stillSend", {
+          warning: filterResult.warning ?? "",
+        }),
         confirmLabel: t("common.send"),
         cancelLabel: t("trade.dispute.cancelCta"),
       });
@@ -426,12 +416,7 @@ export function useMessaging(enabled: boolean) {
 
       // Check if message was filtered by backend
       if (sentMessage.isFiltered || sentMessage.status === "pending") {
-        toast(
-          locale === "en"
-            ? "Your message has been sent for review"
-            : "Mesajınız incelenmek üzere gönderildi",
-          { icon: "⚠️" },
-        );
+        toast(t("message.sentForReview"), { icon: "⚠️" });
       }
 
       setDraftsByThreadId((prev) => {
@@ -451,25 +436,11 @@ export function useMessaging(enabled: boolean) {
       setTimeout(scrollChatToBottom, 80);
     } catch (error: any) {
       if (error.response?.data?.requiresApproval) {
-        toast(
-          locale === "en"
-            ? "Your message has been sent for review"
-            : "Mesajınız incelenmek üzere gönderildi",
-          { icon: "⚠️" },
-        );
+        toast(t("message.sentForReview"), { icon: "⚠️" });
       } else if (error.response?.data?.filtered) {
-        toast.error(
-          locale === "en"
-            ? "Your message has been blocked due to inappropriate content"
-            : "Mesajınız uygunsuz içerik nedeniyle engellenmiştir",
-        );
+        toast.error(t("message.blockedContent"));
       } else {
-        toast.error(
-          error.response?.data?.message ||
-            (locale === "en"
-              ? "Failed to send message"
-              : "Mesaj gönderilemedi"),
-        );
+        toast.error(error.response?.data?.message || t("message.sendFailed"));
       }
     } finally {
       setSending(false);

@@ -2,15 +2,12 @@
 
 "use client";
 
-import {
-  TrashIcon,
-  ShoppingCartIcon,
-} from "@heroicons/react/24/outline";
+import { TrashIcon, ShoppingCartIcon } from "@heroicons/react/24/outline";
 import { Button, IconButton } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
-import { EmptyStateCard } from '@/components/ui';
+import { EmptyStateCard } from "@/components/ui";
 import { ProductCard } from "@/components/ui";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { wishlistItemToProduct, type WishlistItem } from "../_lib/types";
 
 export default function FavoritesGrid({
@@ -25,19 +22,16 @@ export default function FavoritesGrid({
   onAddToCart: (item: WishlistItem) => void;
 }) {
   const t = useTranslations();
-  const locale = useLocale();
 
   if (items.length === 0) {
     return (
       <EmptyStateCard
         title={t("favorites.empty")}
-        description={
-          locale === "en"
-            ? "Add the products you like to your favorites and keep track of them from here."
-            : "Beğendiğin ürünleri favorilerine ekle, buradan kolayca takip et."
-        }
+        description={t("favorites.emptyDesc")}
         action={
-          <ButtonLink href="/listings">{t("favorites.browseProducts")}</ButtonLink>
+          <ButtonLink href="/listings">
+            {t("favorites.browseProducts")}
+          </ButtonLink>
         }
       />
     );

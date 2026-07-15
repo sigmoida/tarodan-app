@@ -6,7 +6,7 @@ import { Spinner } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useAuthStore } from "@/stores/authStore";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useRefundRequests } from "./_hooks/useRefundRequests";
 import RefundRequestCard from "./_components/RefundRequestCard";
 
@@ -14,7 +14,6 @@ export default function MyRefundRequestsPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const t = useTranslations();
-  const locale = useLocale();
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -36,11 +35,7 @@ export default function MyRefundRequestsPage() {
     <PageShell>
       <PageHeader
         title={t("order.myRefundRequests")}
-        description={
-          locale === "en"
-            ? "Track the status of your refund requests."
-            : "İade taleplerinin durumunu takip et."
-        }
+        description={t("refund.listDesc")}
       />
 
       {isLoading ? (
@@ -49,9 +44,7 @@ export default function MyRefundRequestsPage() {
         </div>
       ) : requests.length === 0 ? (
         <div className="rounded-lg border border-border bg-surface-elevated p-8 text-center text-muted">
-          {locale === "en"
-            ? "You have no refund requests yet."
-            : "Henüz iade talebiniz yok."}
+          {t("refund.listEmpty")}
         </div>
       ) : (
         <div className="space-y-3">

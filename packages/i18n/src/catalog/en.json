@@ -567,7 +567,8 @@
     "loadFailed": "Failed to load favorites",
     "shareList": "Share list",
     "linkCopied": "Link copied",
-    "sharedList": "Shared list"
+    "sharedList": "Shared list",
+    "emptyDesc": "Add the products you like to your favorites and keep track of them from here."
   },
   "checkout": {
     "title": "Checkout",
@@ -840,7 +841,10 @@
     "refundQuantityHint": "This order has {quantity} items. Choose how many to return.",
     "describeIssuePlaceholder": "Please describe the issue in detail (min 20 chars)",
     "evidencePhotosMax5": "Evidence photos (max 5)",
-    "tapToUploadPhotos": "Tap + to upload photos of the issue."
+    "tapToUploadPhotos": "Tap + to upload photos of the issue.",
+    "refundReasonCounterfeit": "Counterfeit",
+    "refundReasonLostInTransit": "Lost in transit",
+    "refundReasonOther": "Other"
   },
   "trade": {
     "myTrades": "My Trades",
@@ -1101,7 +1105,16 @@
     "chooseThread": "Choose a thread from the list",
     "contentWarning": "Content warning",
     "removeImage": "Remove image",
-    "attachImage": "Attach image"
+    "attachImage": "Attach image",
+    "moreCount": "More ({count})",
+    "selectImageFile": "Please select an image file",
+    "imageUploadFailed": "Failed to upload image",
+    "sentForReview": "Your message has been sent for review",
+    "sendFailed": "Failed to send message",
+    "prefilledInquiry": "Hi, I''d like to ask about the \"{title}\" listing.\n\n",
+    "tooLong": "Message cannot exceed {max} characters. Current: {current}",
+    "stillSend": "{warning} Do you still want to send it?",
+    "contactInfoWarning": "Personal contact information detected in your message. Communication outside the platform is not recommended for your safety."
   },
   "membership": {
     "title": "Membership Plans",
@@ -1257,7 +1270,13 @@
     "unreadCount": "{count} unread",
     "markAllReadShort": "Mark all read",
     "newBadge": "new",
-    "viewAll": "View all notifications"
+    "viewAll": "View all notifications",
+    "allCaughtUp": "All caught up!",
+    "noUnread": "No unread notifications",
+    "noneYet": "No notifications yet",
+    "emptyDesc": "When you receive notifications, they will appear here.",
+    "filterUnread": "Unread",
+    "filterOrders": "Orders"
   },
   "profile": {
     "profile": "Profile",
@@ -1668,7 +1687,10 @@
     "supportPrompt": "If your payment issue persists, please contact ",
     "supportTeam": "our support team",
     "contactSuffix": ".",
-    "backToMyOrders": "Back to My Orders"
+    "backToMyOrders": "Back to My Orders",
+    "paginationSummary": "Total {total} payments, Page {page} / {totalPages}",
+    "itemsCount": "{count} items",
+    "viewItemsCount": "View {count} items"
   },
   "seller": {
     "sellerProfile": "Seller Profile",
@@ -2122,7 +2144,44 @@
     "statusRefunded": "Refunded",
     "statusDisputed": "Under Dispute",
     "dropOffAtSurat": "Drop the package off at any Sürat branch with this number:",
-    "buyerGivenReturnLabel": "The buyer has been given a return label. Package will be sent to your address."
+    "buyerGivenReturnLabel": "The buyer has been given a return label. Package will be sent to your address.",
+    "listDesc": "Track the status of your refund requests.",
+    "listEmpty": "You have no refund requests yet.",
+    "requestedOnLabel": "Refund Request · {date}",
+    "lifecycleInTransit": "In transit",
+    "lifecycleAtSeller": "At seller",
+    "lifecycleRefunded": "Refunded",
+    "next": {
+      "pendingReview": "The seller has 48 hours to respond. If they don''t, the request will be auto-approved.",
+      "approved": "Your request was approved. Refund is being processed.",
+      "waitForDelivery": "Once your package is marked as delivered, we''ll automatically open a free Sürat return shipment for you.",
+      "returnShipmentOpen": "Drop the package off at any Sürat branch. Once it reaches the seller, your refund will be triggered automatically.",
+      "returnInTransit": "Your package is on its way. Track it via the link above.",
+      "returnDelivered": "The seller has received the package. Your refund is being processed.",
+      "disputed": "An admin will review the case and contact you within 1-3 business days."
+    },
+    "return": {
+      "yourShipment": "Your Return Shipment",
+      "incomingShipment": "Incoming Return Shipment"
+    },
+    "transit": {
+      "returnShipmentOpen": {
+        "buyer": "Take the package to any Sürat branch. The shipment is paid — give them this tracking number:",
+        "seller": "The buyer has been given a return label and will drop off the package. Tracking number:"
+      },
+      "returnInTransit": {
+        "buyer": "Your package is on its way back to the seller. Once delivered, your refund will be processed automatically.",
+        "seller": "The return package is on its way to you. The refund will be processed once it is delivered."
+      },
+      "returnDelivered": {
+        "buyer": "The package has reached the seller. Your refund is being processed and will be on your card shortly.",
+        "seller": "The return package has arrived. The refund will be processed shortly."
+      }
+    },
+    "trackingGenerating": "Your return tracking number is being generated, please check back shortly.",
+    "refundedBody": "Your money has been returned to the original payment method. It may take 1-3 business days to reflect on your statement.",
+    "rejectedBody": "If you disagree, please reach out to support.",
+    "disputedBody": "The seller disputed this request. Our admin team will review the case and reach out within 1-3 business days."
   },
   "report": {
     "reportListing": "Report Listing",

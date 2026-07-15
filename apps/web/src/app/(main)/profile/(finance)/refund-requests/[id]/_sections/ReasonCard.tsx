@@ -5,18 +5,12 @@
 import OptimizedImage from "@/components/OptimizedImage";
 import SectionCard from "@/components/ui/SectionCard";
 import { useTranslations } from "next-intl";
-import { reasonLabelOf } from "../../_lib/refund-status";
+import { reasonLabelKeyOf } from "../../_lib/refund-status";
 import type { RefundRequest } from "../../_lib/types";
 
-export default function ReasonCard({
-  refund,
-  locale,
-}: {
-  refund: RefundRequest;
-  locale: string;
-}) {
+export default function ReasonCard({ refund }: { refund: RefundRequest }) {
   const t = useTranslations();
-  const reason = reasonLabelOf(refund.reason);
+  const reasonKey = reasonLabelKeyOf(refund.reason);
   const photos = Array.isArray(refund.evidencePhotoUrls)
     ? refund.evidencePhotoUrls
     : [];
@@ -24,7 +18,7 @@ export default function ReasonCard({
   return (
     <SectionCard title={t("common.reason")}>
       <p className="text-base font-medium text-heading">
-        {locale === "en" ? reason.en : reason.tr}
+        {reasonKey ? t(reasonKey) : refund.reason}
       </p>
 
       {refund.description && (

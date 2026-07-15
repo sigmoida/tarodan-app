@@ -567,7 +567,8 @@
     "loadFailed": "Favoriler yüklenemedi",
     "shareList": "Listeyi paylaş",
     "linkCopied": "Link kopyalandı",
-    "sharedList": "Paylaşılan liste"
+    "sharedList": "Paylaşılan liste",
+    "emptyDesc": "Beğendiğin ürünleri favorilerine ekle, buradan kolayca takip et."
   },
   "checkout": {
     "title": "Ödeme",
@@ -840,7 +841,10 @@
     "refundQuantityHint": "Bu siparişte {quantity} adet var. Kaç adedini iade edeceğinizi seçin.",
     "describeIssuePlaceholder": "Sorunu detaylı açıklayın (en az 20 karakter)",
     "evidencePhotosMax5": "Kanıt fotoğrafları (maks 5)",
-    "tapToUploadPhotos": "Sorunun fotoğraflarını yüklemek için + simgesine dokunun."
+    "tapToUploadPhotos": "Sorunun fotoğraflarını yüklemek için + simgesine dokunun.",
+    "refundReasonCounterfeit": "Sahte ürün",
+    "refundReasonLostInTransit": "Kargoda kayboldu",
+    "refundReasonOther": "Diğer"
   },
   "trade": {
     "myTrades": "Takaslarım",
@@ -1101,7 +1105,16 @@
     "chooseThread": "Listeden bir sohbet seçin",
     "contentWarning": "İçerik uyarısı",
     "removeImage": "Resmi kaldır",
-    "attachImage": "Resim ekle"
+    "attachImage": "Resim ekle",
+    "moreCount": "Daha fazla ({count})",
+    "selectImageFile": "Lütfen bir resim dosyası seçin",
+    "imageUploadFailed": "Resim yüklenemedi",
+    "sentForReview": "Mesajınız incelenmek üzere gönderildi",
+    "sendFailed": "Mesaj gönderilemedi",
+    "prefilledInquiry": "Merhaba, \"{title}\" ilanı hakkında bilgi almak istiyorum.\n\n",
+    "tooLong": "Mesaj {max} karakteri aşamaz. Mevcut: {current}",
+    "stillSend": "{warning} Yine de göndermek istiyor musunuz?",
+    "contactInfoWarning": "Mesajınızda kişisel iletişim bilgisi tespit edildi. Platform dışı iletişim güvenliğiniz için önerilmez."
   },
   "membership": {
     "title": "Üyelik Planları",
@@ -1257,7 +1270,13 @@
     "unreadCount": "{count} okunmamış",
     "markAllReadShort": "Tümünü oku",
     "newBadge": "yeni",
-    "viewAll": "Tüm bildirimleri gör"
+    "viewAll": "Tüm bildirimleri gör",
+    "allCaughtUp": "Tümü okundu!",
+    "noUnread": "Okunmamış bildirim yok",
+    "noneYet": "Henüz bildirim yok",
+    "emptyDesc": "Bildirimleriniz burada görünecek.",
+    "filterUnread": "Okunmamış",
+    "filterOrders": "Siparişler"
   },
   "profile": {
     "profile": "Profil",
@@ -1668,7 +1687,10 @@
     "supportPrompt": "Ödeme sorununuz devam ederse, lütfen ",
     "supportTeam": "destek ekibimiz",
     "contactSuffix": " ile iletişime geçin.",
-    "backToMyOrders": "Siparişlerime Dön"
+    "backToMyOrders": "Siparişlerime Dön",
+    "paginationSummary": "Toplam {total} ödeme, Sayfa {page} / {totalPages}",
+    "itemsCount": "{count} ürün",
+    "viewItemsCount": "{count} ürünü gör"
   },
   "seller": {
     "sellerProfile": "Satıcı Profili",
@@ -2122,7 +2144,44 @@
     "statusRefunded": "İade Tamamlandı",
     "statusDisputed": "İtirazlı (İnceleniyor)",
     "dropOffAtSurat": "Bu numarayı paketle birlikte herhangi bir Sürat şubesine bırakın:",
-    "buyerGivenReturnLabel": "Alıcıya iade kargo etiketi verildi. Paket adresinize gönderilecek."
+    "buyerGivenReturnLabel": "Alıcıya iade kargo etiketi verildi. Paket adresinize gönderilecek.",
+    "listDesc": "İade taleplerinin durumunu takip et.",
+    "listEmpty": "Henüz iade talebiniz yok.",
+    "requestedOnLabel": "İade Talebi · {date}",
+    "lifecycleInTransit": "Ürün yolda",
+    "lifecycleAtSeller": "Ürün satıcıda",
+    "lifecycleRefunded": "Para iade edildi",
+    "next": {
+      "pendingReview": "Satıcının 48 saat içinde cevap vermesi gerekiyor. Cevap gelmezse talep otomatik olarak onaylanacak.",
+      "approved": "Talebiniz onaylandı, iade şu anda işleniyor.",
+      "waitForDelivery": "Ürünün size teslim edildiği anda otomatik olarak ücretsiz Sürat iade kargosu açılacak ve size takip numarası verilecek.",
+      "returnShipmentOpen": "Paketi en yakın Sürat şubesine bırakın. Satıcıya ulaştığı anda paranız otomatik iade edilecek.",
+      "returnInTransit": "Paketiniz yolda — yukarıdaki Sürat takip linkinden ilerleyişi izleyebilirsiniz.",
+      "returnDelivered": "Paket satıcıya teslim edildi. Para iadesi şu anda işleniyor — birkaç dakika içinde tamamlanır.",
+      "disputed": "Admin ekibimiz dosyayı inceleyip 1-3 iş günü içinde size dönecek."
+    },
+    "return": {
+      "yourShipment": "İade Kargonuz",
+      "incomingShipment": "Alıcının İade Kargosu"
+    },
+    "transit": {
+      "returnShipmentOpen": {
+        "buyer": "Paketi en yakın Sürat şubesine bırakın. Kargo ücreti ödenmiştir — şubedeki personele bu numarayı verin:",
+        "seller": "Alıcıya iade etiketi verildi, paketi kargoya verecek. Takip numarası:"
+      },
+      "returnInTransit": {
+        "buyer": "Paketiniz satıcıya ulaşmak üzere yolda. Teslim edildiği anda paranız otomatik iade edilecek.",
+        "seller": "İade paketi size doğru yolda. Teslim alındığında para iadesi otomatik işlenecek."
+      },
+      "returnDelivered": {
+        "buyer": "Paket satıcıya ulaştı. Para iadeniz şu anda işleniyor, kartınıza kısa süre içinde geçecek.",
+        "seller": "İade paketi size ulaştı. Para iadesi kısa süre içinde işlenecek."
+      }
+    },
+    "trackingGenerating": "İade kargo numaranız oluşturuluyor, kısa süre içinde burada görünecek.",
+    "refundedBody": "Tutar ödediğiniz karta iade edildi. Banka ekstresinde görünmesi 1-3 iş günü sürebilir.",
+    "rejectedBody": "Bu karara itiraz etmek için destek ekibimizle iletişime geçin.",
+    "disputedBody": "Satıcı bu talebe itiraz etti. Admin ekibimiz dosyayı 1-3 iş günü içinde inceleyip size dönecek."
   },
   "report": {
     "reportListing": "İlanı Raporla",

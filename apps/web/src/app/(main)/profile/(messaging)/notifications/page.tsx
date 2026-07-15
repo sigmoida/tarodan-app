@@ -5,7 +5,7 @@
 import { useMemo, useState } from "react";
 import { CheckCircleIcon } from "@heroicons/react/24/outline";
 import { Button, Select, Spinner } from "@tarodan/ui";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useRequireAuth } from "../../_hooks/useRequireAuth";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -21,7 +21,6 @@ import {
 
 export default function NotificationsPage() {
   const t = useTranslations();
-  const locale = useLocale();
   const { ready } = useRequireAuth();
   const [filter, setFilter] = useState<FilterType>("all");
 
@@ -44,9 +43,7 @@ export default function NotificationsPage() {
   const description =
     unreadCount > 0
       ? t("notification.unreadCount", { count: unreadCount })
-      : locale === "en"
-        ? "All caught up!"
-        : "Tümü okundu!";
+      : t("notification.allCaughtUp");
 
   return (
     <PageShell className="pb-16">
@@ -63,7 +60,7 @@ export default function NotificationsPage() {
             >
               {(Object.keys(FILTER_LABELS) as FilterType[]).map((key) => (
                 <option key={key} value={key}>
-                  {FILTER_LABELS[key][locale as "tr" | "en"]}
+                  {t(FILTER_LABELS[key])}
                   {key === "unread" && unreadCount > 0
                     ? ` (${unreadCount})`
                     : ""}
@@ -96,18 +93,10 @@ export default function NotificationsPage() {
         <EmptyStateCard
           title={
             filter === "unread"
-              ? locale === "en"
-                ? "No unread notifications"
-                : "Okunmamış bildirim yok"
-              : locale === "en"
-                ? "No notifications yet"
-                : "Henüz bildirim yok"
+              ? t("notification.noUnread")
+              : t("notification.noneYet")
           }
-          description={
-            locale === "en"
-              ? "When you receive notifications, they will appear here."
-              : "Bildirimleriniz burada görünecek."
-          }
+          description={t("notification.emptyDesc")}
         />
       ) : (
         <div className="space-y-2">

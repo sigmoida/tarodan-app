@@ -105,13 +105,11 @@ export const checkContentFilter = (
   for (const pattern of PROHIBITED_PATTERNS) {
     if (pattern.test(lowerText)) {
       pattern.lastIndex = 0;
-      return {
-        passed: false,
-        warning:
-          locale === "en"
-            ? "Personal contact information detected in your message. Communication outside the platform is not recommended for your safety."
-            : "Mesajınızda kişisel iletişim bilgisi tespit edildi. Platform dışı iletişim güvenliğiniz için önerilmez.",
-      };
+      const t = createTranslator({
+        locale,
+        messages: getMessages(resolveLocale(locale)),
+      });
+      return { passed: false, warning: t("message.contactInfoWarning") };
     }
     pattern.lastIndex = 0;
   }

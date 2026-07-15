@@ -119,9 +119,7 @@ export default function PaymentCard({
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
             {isGroup ? (
               <span className="text-primary-600">
-                {locale === "en"
-                  ? `${groupOrders.length} items`
-                  : `${groupOrders.length} ürün`}
+                {t("payment.itemsCount", { count: groupOrders.length })}
               </span>
             ) : payment.orderId ? (
               <Link
@@ -211,9 +209,7 @@ export default function PaymentCard({
         <Accordion type="single" collapsible className="mt-2">
           <AccordionItem value="items" className="border-none">
             <AccordionTrigger className="py-2 text-sm text-primary-600">
-              {locale === "en"
-                ? `View ${groupOrders.length} items`
-                : `${groupOrders.length} ürünü gör`}
+              {t("payment.viewItemsCount", { count: groupOrders.length })}
             </AccordionTrigger>
             <AccordionContent>
               <div className="space-y-2">

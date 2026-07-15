@@ -9,7 +9,7 @@ import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useAuthStore } from "@/stores/authStore";
 import { queryKeys } from "@/lib/query/keys";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import CreateCollectionModal from "@/components/CreateCollectionModal";
 import { EmptyStateCard } from "@/components/ui";
 import { useMyCollections } from "./_hooks/useMyCollections";
@@ -19,7 +19,6 @@ import PremiumRequiredModal from "./_modals/PremiumRequiredModal";
 
 export default function MyCollectionsPage() {
   const t = useTranslations();
-  const locale = useLocale();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { isAuthenticated, user, limits } = useAuthStore();
@@ -102,11 +101,7 @@ export default function MyCollectionsPage() {
               ? `"${searchQuery}" ${t("common.noResults")}`
               : t("collection.noCollections")
           }
-          description={
-            locale === "en"
-              ? "Start building your collection today"
-              : "Koleksiyonunuzu bugün oluşturmaya başlayın"
-          }
+          description={t("collection.startBuildingToday")}
           action={
             searchQuery ? (
               <Button variant="secondary" onClick={() => setSearchQuery("")}>
