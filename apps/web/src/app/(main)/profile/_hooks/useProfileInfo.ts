@@ -4,7 +4,7 @@
 
 import { api, mediaApi, userApi } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
 
@@ -40,7 +40,7 @@ export function useProfileInfo(enabled: boolean) {
 
 /** Patch the user's personal (+ business) info. */
 export function useUpdateProfile() {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const refreshUser = useAuthStore((s) => s.refreshUser);
   return useWebMutation(
     async (data: Record<string, unknown>) => {
@@ -66,7 +66,7 @@ export function useUpdateProfile() {
 
 /** Upload a new avatar → save the S3 key → return a display URL. */
 export function useUploadAvatar() {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const refreshUser = useAuthStore((s) => s.refreshUser);
   return useWebMutation(
     async (file: File): Promise<string> => {

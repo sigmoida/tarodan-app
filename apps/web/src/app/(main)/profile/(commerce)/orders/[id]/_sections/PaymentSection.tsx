@@ -10,13 +10,13 @@ import {
 import { Badge, Button, Input, Radio, Spinner, Textarea } from '@tarodan/ui';
 import CityDistrictSelector from '@/components/CityDistrictSelector';
 import { formatTL } from '@/lib/format';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { useSavedAddresses, useSetAddressAndPay } from '../_hooks/useOrderDetail';
 import { orderAmountOf, type OrderDetail } from '../_lib/types';
 
 /** Ödeme bekleyen alıcı: adres seç/ekle + güvenli ödeme akışı. */
 export default function PaymentSection({ order }: { order: OrderDetail }) {
-	const { locale } = useTranslation();
+	const locale = useLocale();
 	const isPendingPaymentBuyer = order.isBuyer && order.status === 'pending_payment';
 
 	const addressesQuery = useSavedAddresses(isPendingPaymentBuyer);

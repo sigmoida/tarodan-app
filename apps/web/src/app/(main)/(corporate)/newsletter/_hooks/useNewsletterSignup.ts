@@ -4,13 +4,13 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import { useZodForm } from "@tarodan/ui/form";
 import { api } from "@/lib/api";
-import { useTranslation } from "@/i18n/LanguageContext";
+import { useLocale, useTranslations } from "next-intl";
 import { useWebMutation } from "@/hooks/useWebMutation";
 import { newsletterSchema, type NewsletterValues } from "../_lib/schema";
 
 /** Newsletter signup — RHF+zod form + subscribe mutation (owns toasts). */
 export function useNewsletterSignup() {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const [success, setSuccess] = useState(false);
   const form = useZodForm(newsletterSchema(locale), {
     defaultValues: { email: "", newsletter: true, promotions: true },

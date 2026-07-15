@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 
 export interface CookiePreferences {
 	functional: boolean;
@@ -21,7 +21,7 @@ const DEFAULT_PREFERENCES: CookiePreferences = {
  * plain local state saved to `localStorage` under `cookie_preferences`.
  */
 export function useCookiePreferences() {
-	const { t } = useTranslation();
+	const t = useTranslations();
 	const [preferences, setPreferences] =
 		useState<CookiePreferences>(DEFAULT_PREFERENCES);
 

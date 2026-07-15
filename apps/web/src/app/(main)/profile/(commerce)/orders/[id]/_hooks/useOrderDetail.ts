@@ -13,7 +13,7 @@ import {
   mediaApi,
 } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import { useWebItem, useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
 import type {
@@ -115,7 +115,7 @@ function useInvalidateOrder(_orderId: string) {
 
 /** Satıcı: paid → preparing, ya da alıcı onayı → completed. */
 export function useUpdateOrderStatus(orderId: string) {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const invalidateOrder = useInvalidateOrder(orderId);
   return useMutation({
     mutationFn: async (newStatus: string) => {
@@ -152,7 +152,7 @@ export function useUpdateOrderStatus(orderId: string) {
 
 /** Alıcı: kargo öncesi siparişi iptal et (anında geri ödeme). */
 export function useCancelOrder(orderId: string) {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   return useWebMutation(
     async () => {
       await api.post(`/orders/${orderId}/cancel`, {});
@@ -171,7 +171,7 @@ export function useCancelOrder(orderId: string) {
 
 /** Süre aşımına uğramış teklif siparişini yeniden aktive et. */
 export function useReactivateOrder(orderId: string) {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   return useWebMutation(
     async () => {
       await api.post(`/orders/${orderId}/reactivate`);
@@ -213,7 +213,7 @@ export interface CheckoutInput {
  */
 export function useSetAddressAndPay(orderId: string) {
   const router = useRouter();
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const invalidateOrder = useInvalidateOrder(orderId);
 
   const initiatePayment = async (order: OrderDetail): Promise<void> => {
@@ -359,7 +359,7 @@ export interface ReviewInput {
 
 /** Ürün + satıcı değerlendirmesi (fotoğrafları önce yükler). */
 export function useSubmitReview(orderId: string) {
-  const { t } = useTranslation();
+  const t = useTranslations();
   const invalidateOrder = useInvalidateOrder(orderId);
   return useMutation({
     mutationFn: async (p: ReviewInput) => {
@@ -410,7 +410,7 @@ export function useSubmitReview(orderId: string) {
 
 /** eLogo e-Arşiv PDF'ini yeni sekmede aç (görüntüle/indir). */
 export function useDownloadElogoInvoice() {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   return useMutation({
     mutationFn: async (invoiceId: string | undefined) => {
       if (!invoiceId) {
@@ -449,7 +449,7 @@ export function useDownloadElogoInvoice() {
 /** Kurumsal satıcı: siparişe fatura PDF yükle/değiştir. */
 export function useUploadSellerInvoice(orderId: string) {
   const queryClient = useQueryClient();
-  const { locale } = useTranslation();
+  const locale = useLocale();
   return useMutation({
     mutationFn: async (file: File) => {
       const form = new FormData();
@@ -484,7 +484,7 @@ export function useUploadSellerInvoice(orderId: string) {
 
 /** Kurumsal satıcı faturasını yeni sekmede aç. */
 export function useDownloadSellerInvoice(orderId: string) {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   return useMutation({
     mutationFn: async () => {
       const res = await api.get(`/orders/${orderId}/seller-invoice/download`);

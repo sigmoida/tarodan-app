@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { CheckIcon } from '@heroicons/react/24/outline';
 import { Badge, IconButton } from '@tarodan/ui';
 import { SectionCard } from '@/components/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { getTimeAgo, type Notification } from '../_lib/notifications';
 
 /**
@@ -21,7 +21,7 @@ export default function NotificationCard({
 	notification: Notification;
 	onMarkRead: (id: string) => void;
 }) {
-	const { locale } = useTranslation();
+	const locale = useLocale();
 	const { isRead, data, title, message, createdAt, link } = notification;
 	const href = link || data?.link;
 

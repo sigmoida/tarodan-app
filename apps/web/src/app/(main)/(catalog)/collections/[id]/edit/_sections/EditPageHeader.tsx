@@ -2,14 +2,14 @@
 
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { Button } from '@tarodan/ui';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useLocale, useTranslations } from "next-intl";
 
 interface EditPageHeaderProps {
   onBack: () => void;
 }
 
 export default function EditPageHeader({ onBack }: EditPageHeaderProps) {
-  const { t } = useTranslation();
+  const t = useTranslations();
 
   return (
     <div className="bg-surface-elevated border-b border-border">

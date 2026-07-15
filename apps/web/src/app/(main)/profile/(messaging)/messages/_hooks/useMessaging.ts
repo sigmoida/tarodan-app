@@ -8,7 +8,7 @@ import { messagesApi, listingsApi, api, mediaApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { useAuthStore } from "@/stores/authStore";
 import { useConfirm } from "@/components/ConfirmProvider";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import { useMessagingSocket } from "@/hooks/useMessagingSocket";
 import {
   checkContentFilter,
@@ -30,7 +30,8 @@ const EMPTY_DRAFT: Draft = { text: "", urls: [] };
 export function useMessaging(enabled: boolean) {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
   const confirm = useConfirm();
   const { user } = useAuthStore();
 

@@ -4,7 +4,7 @@
 
 import toast from "react-hot-toast";
 import { addressesApi } from "@/lib/api";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
 import type { AddressValues } from "../_lib/schemas";
@@ -30,7 +30,7 @@ export function useAddresses(enabled: boolean) {
 
 /** Create or update an address (update when `id` is passed). */
 export function useSaveAddress() {
-  const { t } = useTranslation();
+  const t = useTranslations();
   return useWebMutation(
     async ({ id, values }: { id: string | null; values: AddressValues }) => {
       const payload = { ...values, title: values.title?.trim() || "Ev" };
@@ -48,7 +48,7 @@ export function useSaveAddress() {
 }
 
 export function useDeleteAddress() {
-  const { t } = useTranslation();
+  const t = useTranslations();
   return useWebMutation((id: string) => addressesApi.delete(id), {
     invalidates: [RESOURCE],
     successMessage: t("address.deleted"),
@@ -57,7 +57,7 @@ export function useDeleteAddress() {
 }
 
 export function useSetDefaultAddress() {
-  const { t } = useTranslation();
+  const t = useTranslations();
   return useWebMutation((id: string) => addressesApi.setDefault(id), {
     invalidates: [RESOURCE],
     successMessage: t("address.defaultUpdated"),

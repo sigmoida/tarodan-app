@@ -19,7 +19,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { Badge, Button } from "@tarodan/ui";
 import UserAvatar from "@/components/UserAvatar";
-import { useTranslation } from "@/i18n/LanguageContext";
+import { useLocale, useTranslations } from "next-intl";
 import type { HeaderData } from "./_hooks/useHeaderData";
 
 /**
@@ -98,7 +98,7 @@ export default function AccountMenu({
   wishlistCount,
 }: AccountMenuProps) {
   const router = useRouter();
-  const { t } = useTranslation();
+  const t = useTranslations();
   const {
     accountDropdownRef,
     showAccountDropdown,

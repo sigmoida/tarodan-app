@@ -11,7 +11,7 @@ import {
 	ThumbnailStack,
 } from '@tarodan/ui';
 import OptimizedImage from '@/components/OptimizedImage';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { formatDate } from '@/lib/format';
 import {
 	formatTL,
@@ -38,7 +38,7 @@ export default function OrderGroupAccordion({
 	group,
 	actions,
 }: OrderGroupAccordionProps) {
-	const { locale } = useTranslation();
+	const locale = useLocale();
 	const total = group.orders.reduce((sum, o) => sum + orderAmount(o), 0);
 	const date = group.orders[0]?.createdAt;
 

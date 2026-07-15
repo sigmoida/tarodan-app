@@ -2,7 +2,7 @@
 
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { Button } from '@tarodan/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import SidebarFilters from './SidebarFilters';
 import { useListings } from '../_context/ListingsContext';
 
@@ -11,7 +11,7 @@ import { useListings } from '../_context/ListingsContext';
  * filter sections collapse via the shared Accordion, so no sticky positioning.
  */
 export default function ListingsSidebar() {
-  const { t } = useTranslation();
+  const t = useTranslations();
   const {
     filtersForSidebar,
     activeFilterCount,

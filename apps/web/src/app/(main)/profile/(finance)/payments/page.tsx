@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import AuthLoadingScreen from '@/components/AuthLoadingScreen';
 import { useAuthStore } from '@/stores/authStore';
 import { useRequireAuth } from '../../_hooks/useRequireAuth';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { usePayments, usePaymentAction, type PaymentActionType } from './_hooks/usePayments';
 import PaymentFilters from './_components/PaymentFilters';
 import PaymentCard from './_components/PaymentCard';
@@ -16,7 +16,8 @@ import PaymentCard from './_components/PaymentCard';
 export default function PaymentHistoryPage() {
 	const { ready } = useRequireAuth();
 	const user = useAuthStore((s) => s.user);
-	const { t, locale } = useTranslation();
+	const t = useTranslations();
+  const locale = useLocale();
 	const [confirm, setConfirm] = useState<{ type: PaymentActionType; paymentId: string } | null>(
 		null,
 	);

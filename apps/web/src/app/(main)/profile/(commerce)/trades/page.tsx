@@ -12,7 +12,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { Tabs, TabsList, TabsTrigger } from "@tarodan/ui";
 import { useAuthStore } from "@/stores/authStore";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useTrades } from "./_hooks/useTrades";
@@ -20,7 +20,8 @@ import TradeCard from "./_components/TradeCard";
 
 export default function TradesPage() {
   const router = useRouter();
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
   const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
 

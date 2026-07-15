@@ -4,7 +4,7 @@
 
 import Link from 'next/link';
 import { FolderPlusIcon } from '@heroicons/react/24/outline';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { Button } from '@tarodan/ui';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -18,7 +18,7 @@ import CollectionsToolbar from './_components/CollectionsToolbar';
 import CollectionsGrid from './_components/CollectionsGrid';
 
 function CollectionsLayout() {
-	const { t } = useTranslation();
+	const t = useTranslations();
 	const {
 		mounted,
 		isAuthenticated,

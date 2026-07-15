@@ -1,10 +1,11 @@
 'use client';
 
 import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 
 export default function EmptyConversation() {
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
 
   return (
     <div className="flex-1 hidden sm:flex flex-col items-center justify-center text-muted p-8 text-center">

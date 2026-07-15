@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { getCityNames, getDistrictsForCity } from '@/lib/turkeyLocations';
-import { useTranslation } from '@/i18n';import { Button, Input } from '@tarodan/ui';
+import { useLocale, useTranslations } from "next-intl";import { Button, Input } from '@tarodan/ui';
 
 
 interface CityDistrictSelectorProps {
@@ -25,7 +25,7 @@ export default function CityDistrictSelector({
   districtPlaceholder,
   className = '',
 }: CityDistrictSelectorProps) {
-  const { t } = useTranslation();
+  const t = useTranslations();
   const [cityOpen, setCityOpen] = useState(false);
   const [districtOpen, setDistrictOpen] = useState(false);
   const [citySearch, setCitySearch] = useState('');

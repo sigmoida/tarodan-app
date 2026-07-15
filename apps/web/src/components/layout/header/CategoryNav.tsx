@@ -11,7 +11,7 @@ import {
 	NavigationMenuContent,
 	NavigationMenuLink,
 } from '@tarodan/ui';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useLocale, useTranslations } from "next-intl";
 import { CATEGORY_BAR_ITEMS } from './nav/config';
 import { SCALE_FALLBACK } from '@/lib/constants';
 import { useNavCatalog } from './_hooks/useNavCatalog';
@@ -24,7 +24,7 @@ const NAV_TRIGGER_CLASS =
 	'text-body hover:text-heading hover:bg-surface-elevated data-[state=open]:bg-surface-elevated data-[state=open]:text-heading';
 
 export default function CategoryNav() {
-	const { locale } = useTranslation();
+	const locale = useLocale();
 	const { categories, manufacturers, scales } = useNavCatalog();
 
 	const items = CATEGORY_BAR_ITEMS[locale as 'tr' | 'en'];

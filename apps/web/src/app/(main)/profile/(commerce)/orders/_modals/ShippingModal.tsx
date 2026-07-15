@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 import { TruckIcon } from '@heroicons/react/24/outline';
 import { Button, Input, Modal } from '@tarodan/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { useShipOrder } from '../_hooks/useOrders';
 
 interface ShippingModalProps {
@@ -15,7 +15,7 @@ interface ShippingModalProps {
 
 /** Seller adds a tracking number (fixed carrier) → ships the order. */
 export default function ShippingModal({ orderId, onClose }: ShippingModalProps) {
-	const { locale } = useTranslation();
+	const locale = useLocale();
 	const [trackingNumber, setTrackingNumber] = useState('');
 	const shipMutation = useShipOrder();
 

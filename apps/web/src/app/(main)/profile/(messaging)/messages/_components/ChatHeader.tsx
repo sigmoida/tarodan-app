@@ -3,7 +3,7 @@
 import { ChevronLeftIcon } from '@heroicons/react/24/outline';
 import { IconButton } from '@tarodan/ui';
 import UserAvatar from '@/components/UserAvatar';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import type { MessageThread } from '../_lib/messages';
 
 export default function ChatHeader({
@@ -15,7 +15,7 @@ export default function ChatHeader({
   typing: boolean;
   onBack: () => void;
 }) {
-  const { locale } = useTranslation();
+  const locale = useLocale();
 
   return (
     <div className="flex-shrink-0 px-4 py-3 bg-surface-elevated border-b border-border flex items-center gap-3 shadow-sm">

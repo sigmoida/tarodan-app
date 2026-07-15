@@ -3,13 +3,13 @@
 import Link from 'next/link';
 import { Button, Spinner } from '@tarodan/ui';
 import { Form, FormInput, FormError, useZodForm } from '@tarodan/ui/form';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useLocale, useTranslations } from "next-intl";
 import { AuthCard } from './AuthCard';
 import { useVerifyEmail } from '../_hooks/useVerifyEmail';
 import { resendEmailSchema, type ResendEmailValues } from '../_lib/auth';
 
 export function VerifyEmailForm() {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const { status, errorMessage, resend, resendLoading, resendSuccess } = useVerifyEmail(locale);
   const form = useZodForm(resendEmailSchema(locale), { defaultValues: { email: '' } });
 

@@ -10,7 +10,7 @@ import { Button, IconButton } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { EmptyStateCard } from '@/components/ui';
 import { ProductCard } from "@/components/ui";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import { wishlistItemToProduct, type WishlistItem } from "../_lib/types";
 
 export default function FavoritesGrid({
@@ -24,7 +24,8 @@ export default function FavoritesGrid({
   onRemove: (productId: string) => void;
   onAddToCart: (item: WishlistItem) => void;
 }) {
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
 
   if (items.length === 0) {
     return (

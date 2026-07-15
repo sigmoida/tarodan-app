@@ -3,13 +3,13 @@
 import Link from 'next/link';
 import { Button } from '@tarodan/ui';
 import { Form, FormInput, FormError, useZodForm } from '@tarodan/ui/form';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { AuthCard } from './AuthCard';
 import { forgotPasswordSchema, type ForgotPasswordValues } from '../_lib/auth';
 import { useForgotPassword } from '../_hooks/useForgotPassword';
 
 export function ForgotPasswordForm() {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const { submit, sent, reset } = useForgotPassword();
   const form = useZodForm(forgotPasswordSchema(locale), { defaultValues: { email: '' } });
 

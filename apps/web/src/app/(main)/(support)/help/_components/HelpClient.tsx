@@ -7,7 +7,7 @@ import {
 	PhoneIcon,
 	EnvelopeIcon,
 } from '@heroicons/react/24/outline';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { DocPage } from '@/components/layout/DocPage';
 import SectionCard from '@/components/ui/SectionCard';
 import { ButtonLink } from '@/components/ui/ButtonLink';
@@ -19,7 +19,8 @@ import {
 } from '../_lib/data';
 
 export default function HelpClient() {
-	const { t, locale } = useTranslation();
+	const t = useTranslations();
+  const locale = useLocale();
 	const quickLinks = locale === 'en' ? QUICK_LINKS_EN : QUICK_LINKS;
 
 	return (

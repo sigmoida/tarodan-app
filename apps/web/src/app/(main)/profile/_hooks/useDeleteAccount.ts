@@ -7,12 +7,12 @@ import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 
 /** Permanently delete the account, then log out and go home. */
 export function useDeleteAccount() {
 	const router = useRouter();
-	const { locale } = useTranslation();
+	const locale = useLocale();
 	const logout = useAuthStore((s) => s.logout);
 	return useMutation({
 		mutationFn: () => api.delete('/users/me'),

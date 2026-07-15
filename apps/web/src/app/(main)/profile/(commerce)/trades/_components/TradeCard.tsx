@@ -6,7 +6,7 @@ import Link from "next/link";
 import { ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
 import { StatusBadge, tradeStatusConfig } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import { formatTradeStatus } from "@/lib/format";
 import {
   calculateTotalValue,
@@ -78,7 +78,8 @@ export default function TradeCard({
   trade: Trade;
   currentUserId?: string;
 }) {
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
 
   const statusLabels: Record<string, string> = {
     pending: t("trade.statusPending"),

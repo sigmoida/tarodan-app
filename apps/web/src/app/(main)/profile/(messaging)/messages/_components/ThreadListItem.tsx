@@ -2,7 +2,7 @@
 
 import { Badge } from '@tarodan/ui';
 import UserAvatar from '@/components/UserAvatar';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { getThreadPreview, type MessageThread } from '../_lib/messages';
 
 export default function ThreadListItem({
@@ -14,7 +14,7 @@ export default function ThreadListItem({
   isSelected: boolean;
   onSelect: () => void;
 }) {
-  const { locale } = useTranslation();
+  const locale = useLocale();
 
   return (
     // A full-width, multi-line list row — the @tarodan/ui Button (fixed height,

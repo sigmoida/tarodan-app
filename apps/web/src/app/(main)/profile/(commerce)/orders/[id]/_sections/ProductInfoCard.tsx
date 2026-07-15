@@ -7,11 +7,11 @@ import OptimizedImage from '@/components/OptimizedImage';
 import { TagIcon } from '@heroicons/react/24/outline';
 import { SectionCard } from '@/components/ui';
 import { formatTL } from '@/lib/format';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { getProductInfo, orderAmountOf, type OrderDetail } from '../_lib/types';
 
 export default function ProductInfoCard({ order }: { order: OrderDetail }) {
-	const { locale } = useTranslation();
+	const locale = useLocale();
 	const productInfo = getProductInfo(order);
 	const productImage = productInfo?.imageUrl || order.items?.[0]?.product?.imageUrl;
 	const orderAmount = orderAmountOf(order);

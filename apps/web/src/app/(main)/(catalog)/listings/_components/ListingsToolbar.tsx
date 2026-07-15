@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FunnelIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { Button, Chip, Select } from "@tarodan/ui";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import { formatCondition } from "@/lib/format";
 import ProductLayoutSelector from "./ProductLayoutSelector";
 import { useListings } from "../_context/ListingsContext";
@@ -17,7 +17,8 @@ import { useListings } from "../_context/ListingsContext";
  * The title + result count live in the PageHeader itself (see ListingsClient).
  */
 export default function ListingsControls() {
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
   const {
     filters,
     productLayout,
@@ -92,7 +93,8 @@ const CHIP_TINT = {
  * removable `@tarodan/ui` Chip; the whole chip is the remove control.
  */
 export function ActiveFilterChips() {
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
   const {

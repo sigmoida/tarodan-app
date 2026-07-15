@@ -3,7 +3,7 @@
 'use client';
 
 import { SearchInput, Select } from '@tarodan/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import type { SortOption } from '../_lib/types';
 
 interface Props {
@@ -19,7 +19,7 @@ export default function CollectionsToolbar({
 	sortBy,
 	onSortChange,
 }: Props) {
-	const { t } = useTranslation();
+	const t = useTranslations();
 
 	return (
 		<div className='flex flex-col gap-3 sm:flex-row'>

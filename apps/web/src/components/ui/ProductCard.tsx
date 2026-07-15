@@ -12,7 +12,7 @@ import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { ProductBadge } from '@tarodan/ui';
 import OptimizedImage from '@/components/OptimizedImage';
 import OutOfStockOverlay from '@/components/ui/OutOfStockOverlay';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { formatCondition } from '@/lib/format';
 import {
 	getProductEffectivePrice,
@@ -121,7 +121,7 @@ export default function ProductCard({
 	footer,
 	href,
 }: ProductCardProps) {
-	const { locale } = useTranslation();
+	const locale = useLocale();
 
 	const linkHref = href === undefined ? `/listings/${product.id}` : href;
 

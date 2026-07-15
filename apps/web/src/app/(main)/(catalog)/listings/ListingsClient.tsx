@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ListingsProvider, useListings } from './_context/ListingsContext';
@@ -14,7 +14,7 @@ import ListingsGrid from './_components/ListingsGrid';
 import ListingsPagination from './_components/ListingsPagination';
 
 function ListingsLayout() {
-	const { locale } = useTranslation();
+	const locale = useLocale();
 	const { filters, currentSearch, pagination } = useListings();
 
 	const title = currentSearch

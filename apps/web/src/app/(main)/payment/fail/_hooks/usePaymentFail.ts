@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { paymentsApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useLocale, useTranslations } from "next-intl";
 
 const urlHasGuest = () =>
 	typeof window !== 'undefined' && window.location.search.includes('guest=true');
@@ -19,7 +19,7 @@ export function usePaymentFail() {
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const { isAuthenticated, isLoading: authLoading } = useAuthStore();
-	const { locale } = useTranslation();
+	const locale = useLocale();
 
 	const paymentId = searchParams.get('paymentId');
 	const isGuestCheckout = searchParams.get('guest') === 'true';

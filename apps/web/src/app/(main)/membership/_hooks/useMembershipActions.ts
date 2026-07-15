@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 import { membershipApi } from '@/lib/api';
 import { queryKeys } from '@/lib/query/keys';
 import { useConfirm } from '@/components/ConfirmProvider';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import type { MembershipDetails } from '../_lib/types';
 
 /**
@@ -18,7 +18,8 @@ import type { MembershipDetails } from '../_lib/types';
 export function useMembershipActions() {
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
-	const { t, locale } = useTranslation();
+	const t = useTranslations();
+  const locale = useLocale();
 	const meKey = queryKeys.membership.me();
 	const invalidate = () => queryClient.invalidateQueries({ queryKey: meKey });
 

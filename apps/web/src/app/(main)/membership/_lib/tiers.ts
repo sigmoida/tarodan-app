@@ -2,7 +2,7 @@
 
 import type { ListingLimits, Period, Tier, TierData, TierId, TierPrices } from './types';
 
-type TFn = (key: string) => string;
+import type { Translate as TFn } from "@/types/i18n";
 
 /** Fallback active-listing caps when the tier row is missing a value. */
 const LIMIT_FALLBACK: Record<TierId, number> = {

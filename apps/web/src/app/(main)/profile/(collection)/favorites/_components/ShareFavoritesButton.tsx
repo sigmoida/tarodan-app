@@ -5,14 +5,14 @@
 import { ShareIcon } from "@heroicons/react/24/outline";
 import { Button } from "@tarodan/ui";
 import toast from "react-hot-toast";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 
 export default function ShareFavoritesButton({
   productIds,
 }: {
   productIds: string[];
 }) {
-  const { t } = useTranslation();
+  const t = useTranslations();
 
   const share = () => {
     const origin = typeof window !== "undefined" ? window.location.origin : "";

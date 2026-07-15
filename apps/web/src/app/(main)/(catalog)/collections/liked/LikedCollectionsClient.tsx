@@ -17,7 +17,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { api, collectionsApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import toast from "react-hot-toast";
-import { useTranslation } from "@/i18n/LanguageContext";
+import { useLocale, useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 import { Button } from "@tarodan/ui";
 
@@ -54,7 +54,8 @@ export default function LikedCollectionsClient() {
   const queryClient = useQueryClient();
   const [mounted, setMounted] = useState(false);
   const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
 
   useEffect(() => {
     setMounted(true);

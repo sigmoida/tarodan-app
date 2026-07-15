@@ -3,7 +3,7 @@
 import { formatOrderStatus } from '@/lib/format';
 import type { Order } from './types';
 
-type Translate = (key: string) => string;
+import type { Translate } from "@/types/i18n";
 
 /**
  * Liste durum rozeti kaynağı:

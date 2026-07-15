@@ -9,7 +9,7 @@ import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useAuthStore } from "@/stores/authStore";
 import { queryKeys } from "@/lib/query/keys";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import CreateCollectionModal from "@/components/CreateCollectionModal";
 import { EmptyStateCard } from "@/components/ui";
 import { useMyCollections } from "./_hooks/useMyCollections";
@@ -18,7 +18,8 @@ import CollectionsToolbar from "./_components/CollectionsToolbar";
 import PremiumRequiredModal from "./_modals/PremiumRequiredModal";
 
 export default function MyCollectionsPage() {
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { isAuthenticated, user, limits } = useAuthStore();

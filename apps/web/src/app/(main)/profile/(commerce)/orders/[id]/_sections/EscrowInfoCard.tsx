@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { computePayoutDate, isMembershipOrder, type OrderDetail } from '../_lib/types';
 
 /**
@@ -10,7 +10,7 @@ import { computePayoutDate, isMembershipOrder, type OrderDetail } from '../_lib/
  * Satıcıya ödeme: teslim + 14 gün iade penceresi + 1 gün grace ile otomatik.
  */
 export default function EscrowInfoCard({ order }: { order: OrderDetail }) {
-	const { locale } = useTranslation();
+	const locale = useLocale();
 
 	if (
 		!order.isBuyer ||

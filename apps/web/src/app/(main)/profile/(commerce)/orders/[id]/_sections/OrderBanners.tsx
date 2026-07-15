@@ -4,7 +4,7 @@
 
 import { CreditCardIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import { Button, Spinner } from '@tarodan/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { useReactivateOrder } from '../_hooks/useOrderDetail';
 import { getCancelMessage, type OrderDetail } from '../_lib/types';
 
@@ -14,7 +14,7 @@ import { getCancelMessage, type OrderDetail } from '../_lib/types';
  *  - İptal edilmiş sipariş → iptal tarihi/sebebi + iade durumu özeti.
  */
 export default function OrderBanners({ order }: { order: OrderDetail }) {
-	const { locale } = useTranslation();
+	const locale = useLocale();
 	const reactivate = useReactivateOrder(order.id);
 
 	return (

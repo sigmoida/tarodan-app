@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useLocale, useTranslations } from "next-intl";
 import { Button } from '@tarodan/ui';
 import { Form, FormInput, FormSelect, FormCheckbox, FormError, useZodForm } from '@tarodan/ui/form';
 import { businessRegisterSchema, type BusinessRegisterValues } from '../_lib/auth';
@@ -106,7 +106,8 @@ const COMPANY_TYPES = [
 ];
 
 export function RegisterBusinessForm() {
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
   const { registrationSuccess, registeredEmail, submit, resendVerification } = useRegisterBusiness();
 
   const form = useZodForm(businessRegisterSchema(locale), {

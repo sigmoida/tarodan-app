@@ -1,13 +1,13 @@
 'use client';
 
 import { ButtonLink, EmptyState, ProductBadge } from '@/components/ui';
-import { useTranslation } from '@/i18n/LanguageContext';
+import { useLocale, useTranslations } from "next-intl";
 import { useHome } from '../context/HomeDataContext';
 import HomeSection from './HomeSection';
 import ProductRail from './ProductRail';
 
 export default function OnSaleRail() {
-	const { locale } = useTranslation();
+	const locale = useLocale();
 	const { discounted, isLoadingDiscounted } = useHome();
 	const viewAllLabel = locale === 'en' ? 'View All' : 'Tümünü gör';
 

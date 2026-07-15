@@ -13,7 +13,7 @@ import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { EmptyStateCard } from '@/components/ui';
 import { useAuthStore } from '@/stores/authStore';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { getProductEffectivePrice } from '@/lib/productPrice';
 import { formatTL } from '@/lib/format';
 import {
@@ -29,7 +29,8 @@ function NewTradeContent() {
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const listingId = searchParams.get('listing');
-	const { t, locale } = useTranslation();
+	const t = useTranslations();
+  const locale = useLocale();
 	const { user, isAuthenticated, isLoading: authLoading, limits } = useAuthStore();
 
 	const canTrade = limits

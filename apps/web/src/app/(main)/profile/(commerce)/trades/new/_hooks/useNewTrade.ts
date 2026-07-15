@@ -8,7 +8,7 @@ import toast from "react-hot-toast";
 import { api, listingsApi, userApi } from "@/lib/api";
 import { useWebList } from "@/hooks/useWebResource";
 import { useAuthStore } from "@/stores/authStore";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import type { TradeProduct } from "../_lib/types";
 
 /** The listing the user wants (target of the trade). */
@@ -62,7 +62,8 @@ export interface CreateTradePayload {
 /** Send a trade offer → navigate to the trades list. */
 export function useCreateTrade() {
   const router = useRouter();
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
   const refreshUserData = useAuthStore((s) => s.refreshUserData);
 
   return useMutation({

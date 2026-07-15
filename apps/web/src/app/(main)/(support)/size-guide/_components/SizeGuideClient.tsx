@@ -1,11 +1,11 @@
 'use client';
 
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { DocPage } from '@/components/layout/DocPage';
 import SectionCard from '@/components/ui/SectionCard';
 
 export default function SizeGuideClient() {
-	const { t } = useTranslation();
+	const t = useTranslations();
 
 	const scales = [
 		{ scale: t('information.sizeGuide.scale18'), length: '~25–30 cm', note: t('information.sizeGuide.note18') },

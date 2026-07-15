@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { useZodForm } from "@tarodan/ui/form";
 import { api } from "@/lib/api";
-import { useTranslation } from "@/i18n/LanguageContext";
+import { useLocale, useTranslations } from "next-intl";
 import { useWebItem } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
 import { unsubscribeSchema, type UnsubscribeValues } from "../_lib/schema";
@@ -16,7 +16,7 @@ import { unsubscribeSchema, type UnsubscribeValues } from "../_lib/schema";
  * derive from the query + mutation state.
  */
 export function useUnsubscribe() {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const token = useSearchParams().get("token");
 
   const tokenQuery = useWebItem<{ message?: string }>({

@@ -3,7 +3,7 @@
 'use client';
 
 import { Button, Input, Select } from '@tarodan/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import type { PaymentFilterState } from '../_lib/types';
 
 interface Props {
@@ -13,7 +13,8 @@ interface Props {
 }
 
 export default function PaymentFilters({ filters, onChange, onClear }: Props) {
-	const { t, locale } = useTranslation();
+	const t = useTranslations();
+  const locale = useLocale();
 
 	return (
 		<div className='rounded-lg border border-border bg-surface-elevated p-4'>

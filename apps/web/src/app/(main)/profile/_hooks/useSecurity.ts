@@ -5,7 +5,7 @@
 import toast from "react-hot-toast";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
 import type { ChangePasswordValues } from "../_lib/schemas";
@@ -26,7 +26,7 @@ export function use2faStatus(enabled: boolean) {
 
 /** Change the account password. */
 export function useChangePassword() {
-  const { t } = useTranslation();
+  const t = useTranslations();
   return useWebMutation(
     async (values: ChangePasswordValues) => {
       await api.post("/security/password/change", {
@@ -43,7 +43,7 @@ export function useChangePassword() {
 
 /** SMS phone-verification: send a code, then verify it. */
 export function usePhoneVerification() {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const refreshUser = useAuthStore((s) => s.refreshUser);
 
   const sendCode = useWebMutation(

@@ -16,7 +16,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useStepper } from "@tarodan/ui";
 import { useCart } from "@/hooks/useCart";
 import { useAuthStore } from "@/stores/authStore";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
+import type { Locale } from "@tarodan/i18n";
 import {
   billingAddressSchema,
   isValid,
@@ -45,7 +46,8 @@ function useCheckoutValue() {
     appliedCouponCode,
   } = useCart();
   const { user, isAuthenticated, token: authToken } = useAuthStore();
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale() as Locale;
 
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => {

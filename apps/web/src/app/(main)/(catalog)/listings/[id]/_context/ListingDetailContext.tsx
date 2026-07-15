@@ -20,7 +20,7 @@ import {
   ArrowsRightLeftIcon,
   HeartIcon as HeartOutlineIcon,
 } from "@heroicons/react/24/outline";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import { collectionsApi, wishlistApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { useCart } from "@/hooks/useCart";
@@ -35,7 +35,8 @@ function useListingDetailValue() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const id = params.id as string;
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
 
   const {
     addToCart,

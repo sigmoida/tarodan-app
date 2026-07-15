@@ -6,7 +6,7 @@ import { ArrowUturnLeftIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import { Button, Spinner } from '@tarodan/ui';
 import { SectionCard } from '@/components/ui';
 import { useConfirm } from '@/components/ConfirmProvider';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { useCancelOrder } from '../_hooks/useOrderDetail';
 import { hasShipped, isMembershipOrder, isPastRefundWindow, type OrderDetail } from '../_lib/types';
 
@@ -21,7 +21,7 @@ export default function RefundActions({
 	order: OrderDetail;
 	onRequestRefund: () => void;
 }) {
-	const { locale } = useTranslation();
+	const locale = useLocale();
 	const confirm = useConfirm();
 	const cancelOrder = useCancelOrder(order.id);
 

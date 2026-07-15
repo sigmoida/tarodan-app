@@ -10,7 +10,7 @@ import { wishlistApi, listingsApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { useAuthStore } from "@/stores/authStore";
 import { useCart } from "@/hooks/useCart";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import type { WishlistItem } from "../_lib/types";
 
 /**
@@ -23,7 +23,7 @@ export function useFavorites() {
   const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { addToCart } = useCart();
-  const { t } = useTranslation();
+  const t = useTranslations();
 
   const sharedIds = useMemo(() => {
     const ids = searchParams.get("ids");

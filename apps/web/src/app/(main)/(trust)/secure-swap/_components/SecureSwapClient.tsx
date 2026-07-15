@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { ArrowsRightLeftIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { useAuthStore } from '@/stores/authStore';
 import { DocPage } from '@/components/layout/DocPage';
 import SectionCard from '@/components/ui/SectionCard';
 import { STEPS, GUARANTEES, FAQ, type Lang } from '../_lib/data';
 
 export default function SecureSwapClient() {
-	const { locale } = useTranslation();
+	const locale = useLocale();
 	const { isAuthenticated } = useAuthStore();
 	const lang = (locale as Lang) || 'tr';
 

@@ -8,11 +8,12 @@ import { useMutation, type QueryClient } from "@tanstack/react-query";
 import { addressesApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { getFullPhoneNumber } from "@/lib/phone";
-import { useTranslation, type Locale } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
+import type { Locale } from "@tarodan/i18n";
 import { savedAddressSchema } from "../_lib/schema";
 import type { Address } from "../_lib/types";
 
-type Translate = ReturnType<typeof useTranslation>["t"];
+type Translate = ReturnType<typeof useTranslations<never>>;
 
 const EMPTY_ADDRESS: Omit<Address, "id"> = {
   title: "",

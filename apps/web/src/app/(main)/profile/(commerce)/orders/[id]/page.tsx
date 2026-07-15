@@ -12,7 +12,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { queryKeys } from "@/lib/query/keys";
 import RefundRequestModal from "./_modals/RefundRequestModal";
 import { useRequireAuth } from "../../../_hooks/useRequireAuth";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import { useOrderQuery } from "./_hooks/useOrderDetail";
 import { inferRefundPhase, getOrderStatusLabel } from "./_lib/types";
 import OrderBanners from "./_sections/OrderBanners";
@@ -36,7 +36,7 @@ export default function OrderDetailPage() {
   const params = useParams();
   const queryClient = useQueryClient();
   const { ready } = useRequireAuth();
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const orderId = params?.id as string;
 
   const [showReviewModal, setShowReviewModal] = useState(false);

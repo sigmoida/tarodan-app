@@ -5,7 +5,7 @@
 import { StarIcon } from '@heroicons/react/24/solid';
 import { Button } from '@tarodan/ui';
 import { SectionCard } from '@/components/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { canReview, type OrderDetail } from '../_lib/types';
 
 /** Yorum Yap — sadece alınan siparişlerde, teslim/tamamlandıktan sonra. */
@@ -16,7 +16,8 @@ export default function ReviewCta({
 	order: OrderDetail;
 	onReview: () => void;
 }) {
-	const { t, locale } = useTranslation();
+	const t = useTranslations();
+  const locale = useLocale();
 	if (!canReview(order)) return null;
 
 	return (

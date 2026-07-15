@@ -6,14 +6,15 @@ import Link from "next/link";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { Button, Checkbox } from "@tarodan/ui";
 import { Form, FormInput, FormError, useZodForm } from "@tarodan/ui/form";
-import { useTranslation } from "@/i18n/LanguageContext";
+import { useLocale, useTranslations } from "next-intl";
 import { AuthCard } from "./AuthCard";
 import { GoogleSignInButton } from "./GoogleSignInButton";
 import { loginSchema, type LoginValues } from "../_lib/auth";
 import { useLogin } from "../_hooks/useLogin";
 
 export function LoginForm() {
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
   const {
     submit,
     showVerificationBanner,

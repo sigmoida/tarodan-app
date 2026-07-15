@@ -6,14 +6,14 @@ import { Spinner } from '@tarodan/ui';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useAuthStore } from '@/stores/authStore';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { useRefundRequests } from './_hooks/useRefundRequests';
 import RefundRequestCard from './_components/RefundRequestCard';
 
 export default function MyRefundRequestsPage() {
 	const router = useRouter();
 	const { isAuthenticated, isLoading: authLoading } = useAuthStore();
-	const { locale } = useTranslation();
+	const locale = useLocale();
 
 	useEffect(() => {
 		if (!authLoading && !isAuthenticated) {

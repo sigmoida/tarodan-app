@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@tarodan/ui";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
-import { useTranslation } from "@/i18n/LanguageContext";
+import { useLocale, useTranslations } from "next-intl";
 import { Container } from "../Container";
 
 interface TopAd {
@@ -116,7 +116,7 @@ function useTopAds() {
  * next/image).
  */
 export default function TopAdsBar() {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const {
     shouldShowAd,
     topAds,

@@ -1,12 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { DocPage } from '@/components/layout/DocPage';
 import SectionCard from '@/components/ui/SectionCard';
 
 export default function IntellectualPropertyClient() {
-	const { t } = useTranslation();
+	const t = useTranslations();
 
 	return (
 		<DocPage

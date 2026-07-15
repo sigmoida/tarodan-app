@@ -28,7 +28,7 @@ import {
 } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";
 import UserAvatar from "@/components/UserAvatar";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import { getProductEffectivePrice } from "@/lib/productPrice";
 import {
   calculateDiscount,
@@ -60,7 +60,7 @@ export default function OfferCard({
   onSellerCounter,
   onBuyerCounter,
 }: OfferCardProps) {
-  const { locale } = useTranslation();
+  const locale = useLocale();
 
   const listingPrice = getProductEffectivePrice(offer.product);
   const discount = calculateDiscount(offer.amount, listingPrice);

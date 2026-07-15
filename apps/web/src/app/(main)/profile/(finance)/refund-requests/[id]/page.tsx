@@ -9,7 +9,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { formatTL } from '@/lib/format';
 import { useAuthStore } from '@/stores/authStore';
 import { useRequireAuth } from '../../../_hooks/useRequireAuth';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { statusMetaOf } from '../_lib/refund-status';
 import { useRefundDetail, useCancelRefund } from '../_hooks/useRefundRequests';
 import RefundStatusStepper from './_components/RefundStatusStepper';
@@ -23,7 +23,7 @@ export default function RefundRequestDetailPage() {
 	const params = useParams();
 	const { ready } = useRequireAuth();
 	const user = useAuthStore((s) => s.user);
-	const { locale } = useTranslation();
+	const locale = useLocale();
 	const refundId = (params?.id as string) ?? '';
 
 	const { refund } = useRefundDetail(refundId, ready);

@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button, Modal, Spinner, Textarea } from '@tarodan/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { useCancelOrder } from '../_hooks/useOrders';
 import type { Order } from '../_lib/types';
 
@@ -15,7 +15,7 @@ interface CancelOrderModalProps {
 
 /** Pre-shipment buyer cancellation — optional reason (presets + free text). */
 export default function CancelOrderModal({ order, onClose }: CancelOrderModalProps) {
-	const { locale } = useTranslation();
+	const locale = useLocale();
 	const [reason, setReason] = useState('');
 	const cancelMutation = useCancelOrder();
 

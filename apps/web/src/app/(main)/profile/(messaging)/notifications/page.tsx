@@ -5,7 +5,7 @@
 import { useMemo, useState } from 'react';
 import { CheckCircleIcon } from '@heroicons/react/24/outline';
 import { Button, Select, Spinner } from '@tarodan/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { useRequireAuth } from '../../_hooks/useRequireAuth';
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -20,7 +20,8 @@ import {
 } from './_lib/notifications';
 
 export default function NotificationsPage() {
-	const { t, locale } = useTranslation();
+	const t = useTranslations();
+  const locale = useLocale();
 	const { ready } = useRequireAuth();
 	const [filter, setFilter] = useState<FilterType>('all');
 

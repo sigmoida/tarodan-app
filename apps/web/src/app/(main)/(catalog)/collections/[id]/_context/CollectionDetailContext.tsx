@@ -15,7 +15,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { HeartIcon } from "@heroicons/react/24/outline";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import { collectionsApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { useAuthStore } from "@/stores/authStore";
@@ -29,7 +29,8 @@ function useCollectionDetailValue() {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const { requireAuth, authModal } = useAuthGate();
-  const { t, locale } = useTranslation();
+  const t = useTranslations();
+  const locale = useLocale();
   const confirm = useConfirm();
   const collectionIdOrSlug = params.id as string;
   const collectionKey = queryKeys.collection.detail(collectionIdOrSlug);

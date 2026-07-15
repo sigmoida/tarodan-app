@@ -3,7 +3,7 @@
 'use client';
 
 import { Button } from '@tarodan/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import type { MembershipDetails } from '../_lib/types';
 
 const SCHEDULED_TIER_LABEL: Record<string, string> = {
@@ -32,7 +32,7 @@ export default function MembershipStatusBanners({
 	currentTierName,
 	onCancelScheduledChange,
 }: Props) {
-	const { t } = useTranslation();
+	const t = useTranslations();
 	const isPaid = !!currentTier && currentTier !== 'free';
 	const isCancelled = membership.status === 'cancelled';
 

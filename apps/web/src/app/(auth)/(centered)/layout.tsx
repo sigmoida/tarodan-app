@@ -4,7 +4,7 @@ import Link from "next/link";
 import { heroImageUrl } from "@/lib/assetCdn";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 
 /**
  * Shared two-panel hero frame for every auth screen. One column = brand logo +
@@ -79,7 +79,7 @@ export default function AuthHeroLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { locale } = useTranslation();
+  const locale = useLocale();
   const pathname = usePathname();
   const hero = heroFor(pathname ?? "/login");
   const en = locale === "en";

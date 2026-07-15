@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/authStore";
 import { collectionsApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
-import { useTranslation } from "@/i18n/LanguageContext";
+import { useLocale, useTranslations } from "next-intl";
 import type { Collection } from "../_lib/types";
 import { isUUID } from "../_lib/constants";
 
@@ -14,7 +14,7 @@ export function useEditCollection() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
-  const { t } = useTranslation();
+  const t = useTranslations();
   const collectionIdOrSlug = params.id as string;
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);

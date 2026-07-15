@@ -5,11 +5,11 @@
 import { CreditCardIcon } from '@heroicons/react/24/outline';
 import { SectionCard } from '@/components/ui';
 import { formatPriceNumber, formatTL } from '@/lib/format';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { isMembershipOrder, orderAmountOf, type OrderDetail } from '../_lib/types';
 
 export default function OrderSummaryCard({ order }: { order: OrderDetail }) {
-	const { locale } = useTranslation();
+	const locale = useLocale();
 	const orderAmount = orderAmountOf(order);
 	const p = order.pricing;
 

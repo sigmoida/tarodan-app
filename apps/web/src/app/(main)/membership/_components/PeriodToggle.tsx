@@ -3,7 +3,7 @@
 'use client';
 
 import { Badge, Tabs, TabsList, TabsTrigger } from '@tarodan/ui';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import type { Period } from '../_lib/types';
 
 export default function PeriodToggle({
@@ -15,7 +15,7 @@ export default function PeriodToggle({
 	onChange: (p: Period) => void;
 	discountPct: number;
 }) {
-	const { t } = useTranslation();
+	const t = useTranslations();
 
 	return (
 		<div className='flex justify-center'>

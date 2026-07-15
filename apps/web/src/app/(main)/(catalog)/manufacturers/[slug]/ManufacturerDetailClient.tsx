@@ -7,7 +7,7 @@ import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Badge, Spinner } from '@tarodan/ui';
 import { queryKeys } from '@/lib/query/keys';
-import { useTranslation } from '@/i18n';
+import { useLocale, useTranslations } from "next-intl";
 import { PageShell } from '@/components/layout/PageShell';
 import { PageHeader } from '@/components/layout/PageHeader';
 import type { Product } from '@/types/product';
@@ -21,7 +21,7 @@ import ManufacturerProductsGrid from './_components/ManufacturerProductsGrid';
 export default function ManufacturerDetailClient() {
 	const params = useParams();
 	const slug = params?.slug as string;
-	const { t } = useTranslation();
+	const t = useTranslations();
 
 	const brandQuery = useQuery({
 		queryKey: queryKeys.manufacturers.detail(slug),

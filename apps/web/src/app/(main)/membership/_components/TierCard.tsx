@@ -4,7 +4,7 @@
 
 import { CheckIcon, XMarkIcon } from "@heroicons/react/24/solid";
 import { Badge, Button } from "@tarodan/ui";
-import { useTranslation } from "@/i18n";
+import { useLocale, useTranslations } from "next-intl";
 import { formatTL } from "@/lib/format";
 import { displayPrice } from "../_lib/tiers";
 import type { Period, Tier, TierPrices } from "../_lib/types";
@@ -28,7 +28,7 @@ export default function TierCard({
   disabled: boolean;
   onSelect: () => void;
 }) {
-  const { t } = useTranslation();
+  const t = useTranslations();
   const price = displayPrice(tier, period, prices);
   const discount = prices.yearly_discount_percentage ?? 20;
 

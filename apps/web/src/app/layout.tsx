@@ -7,7 +7,6 @@ import { getLocale, getMessages } from "next-intl/server";
 import { Toaster } from "react-hot-toast";
 import "./globals.css";
 import CookieConsentBanner from "@/components/CookieConsentBanner";
-import { LanguageProvider } from "@/i18n/LanguageContext";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { ALLOW_INDEXING } from "@/lib/seo";
 
@@ -81,18 +80,16 @@ export default async function RootLayout({
     <html lang={locale}>
       <body className={notoSans.className}>
         <NextIntlClientProvider locale={locale} messages={messages}>
-          <LanguageProvider>
-            <GoogleOAuthProvider
-              clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
-            >
-              {children}
-              <CookieConsentBanner />
-              <Toaster
-                position="bottom-right"
-                toastOptions={{ style: { maxWidth: "360px" } }}
-              />
-            </GoogleOAuthProvider>
-          </LanguageProvider>
+          <GoogleOAuthProvider
+            clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
+          >
+            {children}
+            <CookieConsentBanner />
+            <Toaster
+              position="bottom-right"
+              toastOptions={{ style: { maxWidth: "360px" } }}
+            />
+          </GoogleOAuthProvider>
         </NextIntlClientProvider>
       </body>
     </html>
