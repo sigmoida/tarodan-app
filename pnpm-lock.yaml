@@ -85,6 +85,9 @@ importers:
       '@tarodan/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@tarodan/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
       '@tarodan/ui':
         specifier: workspace:*
         version: link:../../packages/ui
