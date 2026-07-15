@@ -81,7 +81,8 @@
           "iosUrlScheme": "com.googleusercontent.apps.243308404313-92c5475nff3874maoqes02ajakn81hvh"
         }
       ],
-      "./plugins/withGoogleSigninPods.js"
+      "./plugins/withGoogleSigninPods.js",
+      "@sentry/react-native/expo"
     ],
     "experiments": {
       "typedRoutes": true
