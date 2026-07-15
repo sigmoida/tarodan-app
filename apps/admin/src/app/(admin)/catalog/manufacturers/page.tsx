@@ -3,6 +3,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@tarodan/ui";
 import { PlusIcon } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
@@ -18,6 +19,7 @@ import { ManufacturerFormModal } from "./_modals/ManufacturerFormModal";
 
 export default function ManufacturersPage() {
   const confirm = useConfirm();
+  const t = useTranslations();
   const [modal, setModal] = useState<{ manufacturer?: Manufacturer } | null>(
     null,
   );
@@ -26,7 +28,7 @@ export default function ManufacturersPage() {
     (id: string) => adminApi.deleteManufacturer(id),
     {
       invalidates: ["manufacturers"],
-      successMessage: "Üretici silindi",
+      successMessage: t("admin.catalog.manufacturers.deleted"),
     },
   );
   const toggle = useAdminMutation(
@@ -39,40 +41,39 @@ export default function ManufacturersPage() {
     async (m: Manufacturer) => {
       if (
         await confirm({
-          title: "Üreticiyi Sil",
-          description:
-            "Bu üreticiyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+          title: t("admin.catalog.manufacturers.deleteTitle"),
+          description: t("admin.catalog.manufacturers.deleteDescription"),
           destructive: true,
         })
       )
         del.mutate(m.id);
     },
-    [confirm, del],
+    [confirm, del, t],
   );
 
   const columns = useMemo(
     () =>
-      manufacturerColumns({
+      manufacturerColumns(t, {
         onEdit: (m) => setModal({ manufacturer: m }),
         onDelete,
         onToggle: (m) => toggle.mutate(m),
         busyId: toggle.isPending ? (toggle.variables?.id ?? null) : null,
       }),
-    [onDelete, toggle],
+    [t, onDelete, toggle],
   );
 
   return (
     <AdminPage>
       <PageHeader
-        title="Üretici Yönetimi"
-        description="Diecast model üreticilerini (Hot Wheels, Matchbox vb.) buradan yönetebilirsiniz"
+        title={t("admin.catalog.manufacturers.title")}
+        description={t("admin.catalog.manufacturers.subtitle")}
       >
         <Button
           variant="primary"
           leftIcon={<PlusIcon className="h-5 w-5" />}
           onClick={() => setModal({})}
         >
-          Yeni Üretici Ekle
+          {t("admin.catalog.manufacturers.new")}
         </Button>
       </PageHeader>
 
@@ -87,16 +88,16 @@ export default function ManufacturersPage() {
         )}
         getRowId={(m) => m.id}
         syncUrl
-        errorMessage="Üreticiler yüklenemedi"
+        errorMessage={t("admin.catalog.manufacturers.loadError")}
       >
         <ResourceList.Toolbar>
           <ResourceList.Search />
         </ResourceList.Toolbar>
         <ResourceList.Table
           columns={columns}
-          emptyText="Henüz üretici eklenmemiş"
+          emptyText={t("admin.catalog.manufacturers.empty")}
         />
-        <ResourceList.Total unit="üretici" />
+        <ResourceList.Total unit={t("admin.catalog.manufacturers.unit")} />
         <ResourceList.Pagination />
       </ResourceList>
 

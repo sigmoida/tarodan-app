@@ -1,7 +1,10 @@
-import { AdminFinancialSummary } from '../_components/AdminFinancialSummary';
-import { SectionCard } from '@/components/detail/SectionCard';
-import type { OrderDetail } from '../types';
-import type { OrderStatusView } from '../_lib/status';
+"use client";
+
+import { useTranslations } from "next-intl";
+import { AdminFinancialSummary } from "../_components/AdminFinancialSummary";
+import { SectionCard } from "@/components/detail/SectionCard";
+import type { OrderDetail } from "../types";
+import type { OrderStatusView } from "../_lib/status";
 
 export function OrderInfoSection({
   order,
@@ -10,10 +13,14 @@ export function OrderInfoSection({
   order: OrderDetail;
   status: OrderStatusView;
 }) {
+  const t = useTranslations();
   return (
-    <SectionCard title="Sipariş Bilgileri" bodyClassName="space-y-4">
+    <SectionCard
+      title={t("admin.operations.orders.infoTitle")}
+      bodyClassName="space-y-4"
+    >
       <div>
-        <span className="text-sm text-muted">Durum:</span>
+        <span className="text-sm text-muted">{t("common.status")}:</span>
         <p className="font-medium text-heading">{status.label}</p>
       </div>
       <div className="border-t border-border pt-4">

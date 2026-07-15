@@ -1,25 +1,31 @@
-'use client';
+"use client";
 
-import { Button } from '@tarodan/ui';
-import { useResourceList } from '@/components/list';
+import { useTranslations } from "next-intl";
+import { Button } from "@tarodan/ui";
+import { useResourceList } from "@/components/list";
 
 /** List header description: total count + active deep-link filter notice. */
 export function OrdersSummary() {
+  const t = useTranslations();
   const { total, filters, setFilter, rows } = useResourceList<any>();
 
   const clearDeepLinkFilter = () =>
-    setFilter(filters.productId ? 'productId' : 'userId', '');
+    setFilter(filters.productId ? "productId" : "userId", "");
 
   const firstProductTitle = rows[0]?.product?.title as string | undefined;
   const deepLinkFilterLabel = filters.productId
-    ? `Ürüne göre filtreleniyor${firstProductTitle ? `: ${firstProductTitle}` : ''}`
+    ? firstProductTitle
+      ? t("admin.operations.orders.filteringByProductNamed", {
+          title: firstProductTitle,
+        })
+      : t("admin.operations.orders.filteringByProduct")
     : filters.userId
-      ? 'Kullanıcıya göre filtreleniyor'
+      ? t("admin.operations.common.filteringByUser")
       : null;
 
   return (
     <>
-      Toplam {total} sipariş
+      {t("admin.operations.orders.totalCount", { count: total })}
       {deepLinkFilterLabel && (
         <span className="ml-2">
           — {deepLinkFilterLabel}
@@ -29,7 +35,7 @@ export function OrdersSummary() {
             onClick={clearDeepLinkFilter}
             className="ml-2 text-primary-600 hover:underline"
           >
-            Filtreyi kaldır
+            {t("admin.operations.common.removeFilter")}
           </Button>
         </span>
       )}

@@ -1,13 +1,20 @@
-'use client';
+"use client";
 
-import { FormModal, FormInput, FormTextarea, FormCheckbox, useZodForm } from '@tarodan/ui/form';
-import { adminApi } from '@/lib/api';
-import { useAdminMutation } from '@/hooks/useAdminMutation';
+import {
+  FormModal,
+  FormInput,
+  FormTextarea,
+  FormCheckbox,
+  useZodForm,
+} from "@tarodan/ui/form";
+import { useTranslations } from "next-intl";
+import { adminApi } from "@/lib/api";
+import { useAdminMutation } from "@/hooks/useAdminMutation";
 import {
   attributeGroupSchema,
   type AttributeGroupFormValues,
-} from '../_lib/schema';
-import type { AttributeGroup } from '../_lib/types';
+} from "../_lib/schema";
+import type { AttributeGroup } from "../_lib/types";
 
 export function AttributeGroupFormModal({
   open,
@@ -18,17 +25,24 @@ export function AttributeGroupFormModal({
   onClose: () => void;
   group?: AttributeGroup;
 }) {
+  const t = useTranslations();
   const isEdit = Boolean(group);
-  const form = useZodForm(attributeGroupSchema, {
+  const form = useZodForm(attributeGroupSchema(t), {
     defaultValues: group
       ? {
           name: group.name,
-          description: group.description ?? '',
+          description: group.description ?? "",
           sortOrder: String(group.sortOrder ?? 0),
           isRequired: group.isRequired,
           isActive: group.isActive,
         }
-      : { name: '', description: '', sortOrder: '0', isRequired: false, isActive: true },
+      : {
+          name: "",
+          description: "",
+          sortOrder: "0",
+          isRequired: false,
+          isActive: true,
+        },
   });
 
   const save = useAdminMutation(
@@ -45,8 +59,10 @@ export function AttributeGroupFormModal({
         : adminApi.createAttributeGroup(payload);
     },
     {
-      invalidates: ['attribute-groups'],
-      successMessage: isEdit ? 'Grup güncellendi' : 'Grup oluşturuldu',
+      invalidates: ["attribute-groups"],
+      successMessage: isEdit
+        ? t("admin.catalog.attributes.groupUpdated")
+        : t("admin.catalog.attributes.groupCreated"),
       onSuccess: onClose,
     },
   );
@@ -55,18 +71,33 @@ export function AttributeGroupFormModal({
     <FormModal
       open={open}
       onClose={onClose}
-      title={isEdit ? 'Grubu Düzenle' : 'Yeni Grup'}
+      title={
+        isEdit
+          ? t("admin.catalog.attributes.editGroup")
+          : t("admin.catalog.attributes.newGroup")
+      }
       form={form}
       onSubmit={(v) => save.mutate(v)}
       isSubmitting={save.isPending}
-      submitLabel={isEdit ? 'Güncelle' : 'Oluştur'}
+      submitLabel={isEdit ? t("common.update") : t("common.create")}
     >
-      <FormInput name="name" label="Ad" />
-      <FormTextarea name="description" label="Açıklama" rows={2} />
-      <FormInput name="sortOrder" label="Sıra" type="number" />
+      <FormInput name="name" label={t("admin.catalog.attributes.nameField")} />
+      <FormTextarea
+        name="description"
+        label={t("common.description")}
+        rows={2}
+      />
+      <FormInput
+        name="sortOrder"
+        label={t("admin.catalog.common.sortOrder")}
+        type="number"
+      />
       <div className="flex gap-6 pt-1">
-        <FormCheckbox name="isRequired" label="Zorunlu" />
-        <FormCheckbox name="isActive" label="Aktif" />
+        <FormCheckbox
+          name="isRequired"
+          label={t("admin.catalog.attributes.required")}
+        />
+        <FormCheckbox name="isActive" label={t("common.active")} />
       </div>
     </FormModal>
   );

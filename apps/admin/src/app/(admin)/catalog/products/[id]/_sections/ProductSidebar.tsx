@@ -1,13 +1,16 @@
-import Link from 'next/link';
-import { Button } from '@tarodan/ui';
+"use client";
+
+import Link from "next/link";
+import { Button } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
 import {
   CheckCircleIcon,
   XCircleIcon,
   TrashIcon,
   ArrowUturnLeftIcon,
-} from '@heroicons/react/24/outline';
-import { SectionCard } from '@/components/detail/SectionCard';
-import type { ProductDetail } from '../_lib/types';
+} from "@heroicons/react/24/outline";
+import { SectionCard } from "@/components/detail/SectionCard";
+import type { ProductDetail } from "../_lib/types";
 
 export interface ProductSidebarProps {
   product: ProductDetail;
@@ -28,15 +31,18 @@ export function ProductSidebar({
   busyRestore,
   busyDelete,
 }: ProductSidebarProps) {
-  const canApprove = product.status === 'pending';
-  const canReject = product.status === 'pending';
-  const canRestore = product.status === 'deleted';
+  const t = useTranslations();
+  const canApprove = product.status === "pending";
+  const canReject = product.status === "pending";
+  const canRestore = product.status === "deleted";
   const canDelete =
-    product.status !== 'sold' && product.status !== 'reserved' && product.status !== 'deleted';
+    product.status !== "sold" &&
+    product.status !== "reserved" &&
+    product.status !== "deleted";
 
   return (
     <>
-      <SectionCard title="İşlemler" bodyClassName="space-y-2">
+      <SectionCard title={t("common.actions")} bodyClassName="space-y-2">
         {canApprove && (
           <Button
             variant="success"
@@ -44,7 +50,7 @@ export function ProductSidebar({
             leftIcon={<CheckCircleIcon className="h-5 w-5" />}
             className="w-full justify-center"
           >
-            Onayla
+            {t("admin.catalog.products.approve")}
           </Button>
         )}
         {canReject && (
@@ -54,7 +60,7 @@ export function ProductSidebar({
             leftIcon={<XCircleIcon className="h-5 w-5" />}
             className="w-full justify-center"
           >
-            Reddet
+            {t("admin.catalog.products.reject")}
           </Button>
         )}
         {canRestore && (
@@ -65,7 +71,7 @@ export function ProductSidebar({
             leftIcon={<ArrowUturnLeftIcon className="h-5 w-5" />}
             className="w-full justify-center"
           >
-            Geri Yükle
+            {t("admin.catalog.products.restore")}
           </Button>
         )}
         {canDelete && (
@@ -76,23 +82,26 @@ export function ProductSidebar({
             leftIcon={<TrashIcon className="h-5 w-5" />}
             className="w-full justify-center"
           >
-            Kaldır
+            {t("common.remove")}
           </Button>
         )}
       </SectionCard>
 
-      <SectionCard title="Hızlı Linkler" bodyClassName="space-y-2">
+      <SectionCard
+        title={t("admin.catalog.products.quickLinks")}
+        bodyClassName="space-y-2"
+      >
         <Link
           href={`/accounts/users/${product.seller.id}`}
           className="block rounded-lg px-4 py-2 text-body transition-colors hover:bg-surface"
         >
-          Satıcıyı Görüntüle
+          {t("admin.catalog.products.viewSeller")}
         </Link>
         <Link
           href={`/operations/orders?productId=${product.id}`}
           className="block rounded-lg px-4 py-2 text-body transition-colors hover:bg-surface"
         >
-          Siparişleri Görüntüle
+          {t("admin.catalog.products.viewOrders")}
         </Link>
       </SectionCard>
     </>

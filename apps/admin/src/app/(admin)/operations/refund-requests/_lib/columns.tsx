@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import {
   Badge,
   enumLabel,
@@ -6,6 +7,8 @@ import {
   refundRequestStatusConfig,
 } from "@tarodan/ui";
 import { col, TruncatedText } from "@/components/table";
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 export interface RefundRequestRow {
   id: string;
@@ -24,17 +27,20 @@ export interface RefundRequestRow {
   };
 }
 
-export const refundRequestColumns = [
-  col.link<RefundRequestRow>("İade No", (r) => ({
-    href: `/operations/refund-requests/${r.id}`,
-    label: r.refundNumber,
-  })),
-  col.link<RefundRequestRow>("Sipariş", (r) => ({
+export const refundRequestColumns = (t: T) => [
+  col.link<RefundRequestRow>(
+    t("admin.operations.common.refundNumber"),
+    (r) => ({
+      href: `/operations/refund-requests/${r.id}`,
+      label: r.refundNumber,
+    }),
+  ),
+  col.link<RefundRequestRow>(t("admin.operations.common.order"), (r) => ({
     href: `/operations/orders/${r.order.id}`,
     label: r.order.orderNumber,
   })),
   col.custom<RefundRequestRow>(
-    "Ürün",
+    t("admin.catalog.common.product"),
     (r) => {
       const img = r.order.product.images?.[0]?.url;
       return (
@@ -60,24 +66,27 @@ export const refundRequestColumns = [
     },
     { grow: 3, minWidth: 180 },
   ),
-  col.user<RefundRequestRow>("Alıcı", (r) => ({
+  col.user<RefundRequestRow>(t("admin.operations.common.buyer"), (r) => ({
     name: r.requester?.displayName,
     secondary: r.requester?.email,
   })),
-  col.user<RefundRequestRow>("Satıcı", (r) => ({
+  col.user<RefundRequestRow>(t("admin.operations.common.seller"), (r) => ({
     name: r.order?.seller?.displayName,
     secondary: r.order?.seller?.email,
   })),
-  col.money<RefundRequestRow>("Tutar", (r) => r.amount),
+  col.money<RefundRequestRow>(t("common.amount"), (r) => r.amount),
   col.text<RefundRequestRow>(
-    "Sebep",
+    t("admin.operations.refundRequests.reason"),
     (r) => enumLabel(refundReasonConfig, r.reason, r.reason),
     {
       grow: 2,
     },
   ),
-  col.badge<RefundRequestRow>("Durum", (r) => (
+  col.badge<RefundRequestRow>(t("common.status"), (r) => (
     <Badge status={r.status} config={refundRequestStatusConfig} />
   )),
-  col.date<RefundRequestRow>("Oluşturma", (r) => r.createdAt),
+  col.date<RefundRequestRow>(
+    t("admin.operations.common.createdAt"),
+    (r) => r.createdAt,
+  ),
 ];

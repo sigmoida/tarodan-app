@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import {
   FormModal,
   FormInput,
@@ -32,6 +33,7 @@ export function CarModelFormModal({
   defaultBrandId?: string;
   lockBrand?: boolean;
 }) {
+  const t = useTranslations();
   const isEdit = Boolean(model);
 
   const { data: brands = [] } = useQuery<Brand[]>({
@@ -39,7 +41,7 @@ export function CarModelFormModal({
     queryFn: async () => (await adminApi.getBrands()).data?.data ?? [],
   });
 
-  const form = useZodForm(carModelSchema, {
+  const form = useZodForm(carModelSchema(t), {
     defaultValues: model
       ? {
           brandId: model.brandId,
@@ -71,7 +73,9 @@ export function CarModelFormModal({
     },
     {
       invalidates: ["car-models", "brands"],
-      successMessage: isEdit ? "Model güncellendi" : "Model oluşturuldu",
+      successMessage: isEdit
+        ? t("admin.catalog.carModels.updated")
+        : t("admin.catalog.carModels.created"),
       onSuccess: onClose,
     },
   );
@@ -80,25 +84,33 @@ export function CarModelFormModal({
     <FormModal
       open={open}
       onClose={onClose}
-      title={isEdit ? "Modeli Düzenle" : "Yeni Model Ekle"}
+      title={
+        isEdit
+          ? t("admin.catalog.carModels.editTitle")
+          : t("admin.catalog.carModels.new")
+      }
       form={form}
       onSubmit={(v) => save.mutate(v)}
       isSubmitting={save.isPending}
-      submitLabel={isEdit ? "Güncelle" : "Ekle"}
+      submitLabel={isEdit ? t("common.update") : t("common.add")}
     >
       <FormSelect
         name="brandId"
-        label="Marka"
-        placeholder="Seçiniz"
+        label={t("admin.catalog.common.brand")}
+        placeholder={t("admin.catalog.common.selectPlaceholder")}
         options={brands.map((b) => ({ value: b.id, label: b.name }))}
         disabled={isEdit || lockBrand}
       />
-      <FormInput name="name" label="Model Adı" placeholder="Örn: M4, 911 GT3" />
+      <FormInput
+        name="name"
+        label={t("admin.catalog.carModels.nameLabel")}
+        placeholder={t("admin.catalog.carModels.namePlaceholder")}
+      />
       <div className="flex gap-4">
         <div className="flex-1">
           <FormInput
             name="yearStart"
-            label="Başlangıç Yılı"
+            label={t("admin.catalog.carModels.yearStart")}
             type="number"
             placeholder="2014"
           />
@@ -106,13 +118,13 @@ export function CarModelFormModal({
         <div className="flex-1">
           <FormInput
             name="yearEnd"
-            label="Bitiş Yılı"
+            label={t("admin.catalog.carModels.yearEnd")}
             type="number"
-            placeholder="Boş = devam ediyor"
+            placeholder={t("admin.catalog.carModels.yearEndPlaceholder")}
           />
         </div>
       </div>
-      <FormCheckbox name="isActive" label="Aktif" />
+      <FormCheckbox name="isActive" label={t("common.active")} />
     </FormModal>
   );
 }

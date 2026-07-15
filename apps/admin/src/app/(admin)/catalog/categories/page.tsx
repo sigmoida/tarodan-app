@@ -3,6 +3,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@tarodan/ui";
 import { PlusIcon } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
@@ -17,47 +18,50 @@ import { categoryColumns } from "./_lib/columns";
 import { CategoryFormModal } from "./_modals/CategoryFormModal";
 
 export default function CategoriesPage() {
+  const t = useTranslations();
   const confirm = useConfirm();
   const [modal, setModal] = useState<{ category?: Category } | null>(null);
 
   const del = useAdminMutation((id: string) => adminApi.deleteCategory(id), {
     invalidates: ["categories"],
-    successMessage: "Kategori silindi",
+    successMessage: t("admin.catalog.categories.deleted"),
   });
 
   const onDelete = useCallback(
     async (c: Category) => {
       if (
         await confirm({
-          title: "Kategoriyi Sil",
-          description:
-            "Bu kategoriyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+          title: t("admin.catalog.categories.deleteTitle"),
+          description: t("admin.catalog.categories.deleteDescription"),
           destructive: true,
         })
       )
         del.mutate(c.id);
     },
-    [confirm, del],
+    [confirm, del, t],
   );
 
   const columns = useMemo(
     () =>
-      categoryColumns({ onEdit: (c) => setModal({ category: c }), onDelete }),
-    [onDelete],
+      categoryColumns(t, {
+        onEdit: (c) => setModal({ category: c }),
+        onDelete,
+      }),
+    [t, onDelete],
   );
 
   return (
     <AdminPage>
       <PageHeader
-        title="Kategoriler"
-        description="Kategori listesi ve yönetimi"
+        title={t("admin.catalog.categories.title")}
+        description={t("admin.catalog.categories.subtitle")}
       >
         <Button
           variant="primary"
           leftIcon={<PlusIcon className="h-5 w-5" />}
           onClick={() => setModal({})}
         >
-          Yeni Kategori
+          {t("admin.catalog.categories.new")}
         </Button>
       </PageHeader>
 
@@ -70,13 +74,16 @@ export default function CategoriesPage() {
         )}
         getRowId={(c) => c.id}
         syncUrl
-        errorMessage="Kategoriler yüklenemedi"
+        errorMessage={t("admin.catalog.categories.loadError")}
       >
         <ResourceList.Toolbar>
           <ResourceList.Search />
         </ResourceList.Toolbar>
-        <ResourceList.Table columns={columns} emptyText="Henüz kategori yok" />
-        <ResourceList.Total unit="kategori" />
+        <ResourceList.Table
+          columns={columns}
+          emptyText={t("admin.catalog.categories.empty")}
+        />
+        <ResourceList.Total unit={t("admin.catalog.categories.unit")} />
         <ResourceList.Pagination />
       </ResourceList>
 

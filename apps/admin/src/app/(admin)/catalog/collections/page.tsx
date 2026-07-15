@@ -3,6 +3,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@tarodan/ui";
 import { PlusIcon } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
@@ -18,29 +19,30 @@ import type { Collection } from "./_lib/types";
 import { collectionColumns } from "./_lib/columns";
 import { CollectionFormModal } from "./_modals/CollectionFormModal";
 
-const COLLECTION_TABS = [
-  { key: "list", label: "Koleksiyonlar" },
-  { key: "ai", label: "AI Denetim" },
-];
-
-const PUBLIC_OPTIONS = [
-  { value: "all", label: "Tüm Görünürlük" },
-  { value: "true", label: "Görünür" },
-  { value: "false", label: "Gizli" },
-];
-const FEATURED_OPTIONS = [
-  { value: "all", label: "Tümü" },
-  { value: "true", label: "Öne Çıkan" },
-];
-
 export default function CollectionsPage() {
+  const t = useTranslations();
   const confirm = useConfirm();
   const [tab, setTab] = useTabParam("list");
   const [modal, setModal] = useState<{ collection?: Collection } | null>(null);
 
+  const COLLECTION_TABS = [
+    { key: "list", label: t("admin.catalog.collections.title") },
+    { key: "ai", label: t("admin.catalog.common.aiModeration") },
+  ];
+
+  const PUBLIC_OPTIONS = [
+    { value: "all", label: t("admin.catalog.collections.allVisibility") },
+    { value: "true", label: t("admin.catalog.collections.visible") },
+    { value: "false", label: t("admin.catalog.collections.hidden") },
+  ];
+  const FEATURED_OPTIONS = [
+    { value: "all", label: t("common.all") },
+    { value: "true", label: t("admin.catalog.collections.featured") },
+  ];
+
   const del = useAdminMutation((id: string) => adminApi.deleteCollection(id), {
     invalidates: ["collections"],
-    successMessage: "Koleksiyon silindi",
+    successMessage: t("admin.catalog.collections.deleted"),
   });
   const toggle = useAdminMutation(
     (c: Collection) => adminApi.setCollectionVisibility(c.id, !c.isPublic),
@@ -51,25 +53,24 @@ export default function CollectionsPage() {
     async (c: Collection) => {
       if (
         await confirm({
-          title: "Koleksiyonu Sil",
-          description:
-            "Bu koleksiyonu silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+          title: t("admin.catalog.collections.deleteTitle"),
+          description: t("admin.catalog.collections.deleteDescription"),
           destructive: true,
         })
       )
         del.mutate(c.id);
     },
-    [confirm, del],
+    [confirm, del, t],
   );
 
   const columns = useMemo(
     () =>
-      collectionColumns({
+      collectionColumns(t, {
         onToggleVisibility: (c) => toggle.mutate(c),
         onEdit: (c) => setModal({ collection: c }),
         onDelete,
       }),
-    [onDelete, toggle],
+    [t, onDelete, toggle],
   );
 
   // Chrome (title + New button + tabs) is page-level and persists across tab
@@ -77,15 +78,15 @@ export default function CollectionsPage() {
   return (
     <AdminPage>
       <PageHeader
-        title="Koleksiyonlar"
-        description="Kullanıcı koleksiyonlarını görüntüle, düzenle ve öne çıkar"
+        title={t("admin.catalog.collections.title")}
+        description={t("admin.catalog.collections.subtitle")}
       >
         <Button
           variant="primary"
           leftIcon={<PlusIcon className="h-5 w-5" />}
           onClick={() => setModal({})}
         >
-          Yeni Koleksiyon
+          {t("admin.catalog.collections.new")}
         </Button>
       </PageHeader>
       <AdminTabs tabs={COLLECTION_TABS} value={tab} onChange={setTab} />
@@ -120,7 +121,7 @@ export default function CollectionsPage() {
             sortBy: "",
             sortOrder: "",
           }}
-          errorMessage="Koleksiyonlar yüklenemedi"
+          errorMessage={t("admin.catalog.collections.loadError")}
         >
           <ResourceList.Toolbar>
             <ResourceList.Search />
@@ -137,9 +138,9 @@ export default function CollectionsPage() {
           </ResourceList.Toolbar>
           <ResourceList.Table
             columns={columns}
-            emptyText="Henüz koleksiyon yok"
+            emptyText={t("admin.catalog.collections.empty")}
           />
-          <ResourceList.Total unit="koleksiyon" />
+          <ResourceList.Total unit={t("admin.catalog.collections.unit")} />
           <ResourceList.Pagination />
         </ResourceList>
       )}

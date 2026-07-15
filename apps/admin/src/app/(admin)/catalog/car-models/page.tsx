@@ -3,6 +3,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@tarodan/ui";
 import { PlusIcon } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
@@ -19,12 +20,13 @@ import { CarModelFilters } from "./_components/CarModelFilters";
 import { CarModelFormModal } from "./_modals/CarModelFormModal";
 
 export default function CarModelsPage() {
+  const t = useTranslations();
   const confirm = useConfirm();
   const [modal, setModal] = useState<{ model?: CarModel } | null>(null);
 
   const del = useAdminMutation((id: string) => adminApi.deleteCarModel(id), {
     invalidates: ["car-models", "brands"],
-    successMessage: "Model silindi",
+    successMessage: t("admin.catalog.carModels.deleted"),
   });
   const toggle = useAdminMutation(
     (m: CarModel) => adminApi.updateCarModel(m.id, { isActive: !m.isActive }),
@@ -35,40 +37,39 @@ export default function CarModelsPage() {
     async (m: CarModel) => {
       if (
         await confirm({
-          title: "Modeli Sil",
-          description:
-            "Bu modeli silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+          title: t("admin.catalog.carModels.deleteTitle"),
+          description: t("admin.catalog.carModels.deleteDescription"),
           destructive: true,
         })
       )
         del.mutate(m.id);
     },
-    [confirm, del],
+    [confirm, del, t],
   );
 
   const columns = useMemo(
     () =>
-      carModelColumns({
+      carModelColumns(t, {
         onEdit: (m) => setModal({ model: m }),
         onDelete,
         onToggle: (m) => toggle.mutate(m),
         busyId: toggle.isPending ? (toggle.variables?.id ?? null) : null,
       }),
-    [onDelete, toggle],
+    [t, onDelete, toggle],
   );
 
   return (
     <AdminPage>
       <PageHeader
-        title="Model Yönetimi"
-        description="Marka bazlı araç modellerini (örn. BMW M4, Porsche 911) buradan yönetebilirsiniz"
+        title={t("admin.catalog.carModels.title")}
+        description={t("admin.catalog.carModels.subtitle")}
       >
         <Button
           variant="primary"
           leftIcon={<PlusIcon className="h-5 w-5" />}
           onClick={() => setModal({})}
         >
-          Yeni Model Ekle
+          {t("admin.catalog.carModels.new")}
         </Button>
       </PageHeader>
 
@@ -87,7 +88,7 @@ export default function CarModelsPage() {
         getRowId={(m) => m.id}
         syncUrl
         initialFilters={{ brandId: "" }}
-        errorMessage="Modeller yüklenemedi"
+        errorMessage={t("admin.catalog.carModels.loadError")}
       >
         <ResourceList.Toolbar>
           <ResourceList.Search />
@@ -95,9 +96,9 @@ export default function CarModelsPage() {
         </ResourceList.Toolbar>
         <ResourceList.Table
           columns={columns}
-          emptyText="Bu marka için henüz model eklenmemiş"
+          emptyText={t("admin.catalog.carModels.emptyForBrand")}
         />
-        <ResourceList.Total unit="model" />
+        <ResourceList.Total unit={t("admin.catalog.carModels.unit")} />
         <ResourceList.Pagination />
       </ResourceList>
 

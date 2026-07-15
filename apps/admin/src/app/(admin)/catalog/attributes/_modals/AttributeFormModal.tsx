@@ -1,11 +1,17 @@
-'use client';
+"use client";
 
-import { FormModal, FormInput, FormCheckbox, useZodForm } from '@tarodan/ui/form';
-import { colors } from '@tarodan/ui';
-import { adminApi } from '@/lib/api';
-import { useAdminMutation } from '@/hooks/useAdminMutation';
-import { attributeSchema, type AttributeFormValues } from '../_lib/schema';
-import type { Attribute } from '../_lib/types';
+import {
+  FormModal,
+  FormInput,
+  FormCheckbox,
+  useZodForm,
+} from "@tarodan/ui/form";
+import { colors } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
+import { adminApi } from "@/lib/api";
+import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { attributeSchema, type AttributeFormValues } from "../_lib/schema";
+import type { Attribute } from "../_lib/types";
 
 const DEFAULT_COLOR = colors.primary[500];
 
@@ -22,21 +28,22 @@ export function AttributeFormModal({
   groupId: string;
   showColor?: boolean;
 }) {
+  const t = useTranslations();
   const isEdit = Boolean(attribute);
-  const form = useZodForm(attributeSchema, {
+  const form = useZodForm(attributeSchema(t), {
     defaultValues: attribute
       ? {
           value: attribute.value,
-          displayValue: attribute.displayValue ?? '',
-          color: attribute.color ?? (showColor ? DEFAULT_COLOR : ''),
+          displayValue: attribute.displayValue ?? "",
+          color: attribute.color ?? (showColor ? DEFAULT_COLOR : ""),
           sortOrder: String(attribute.sortOrder ?? 0),
           isActive: attribute.isActive,
         }
       : {
-          value: '',
-          displayValue: '',
-          color: showColor ? DEFAULT_COLOR : '',
-          sortOrder: '0',
+          value: "",
+          displayValue: "",
+          color: showColor ? DEFAULT_COLOR : "",
+          sortOrder: "0",
           isActive: true,
         },
   });
@@ -55,8 +62,10 @@ export function AttributeFormModal({
         : adminApi.createAttribute({ ...payload, groupId });
     },
     {
-      invalidates: ['attributes'],
-      successMessage: isEdit ? 'Değer güncellendi' : 'Değer oluşturuldu',
+      invalidates: ["attributes"],
+      successMessage: isEdit
+        ? t("admin.catalog.attributes.valueUpdated")
+        : t("admin.catalog.attributes.valueCreated"),
       onSuccess: onClose,
     },
   );
@@ -65,25 +74,41 @@ export function AttributeFormModal({
     <FormModal
       open={open}
       onClose={onClose}
-      title={isEdit ? 'Değeri Düzenle' : 'Yeni Değer'}
+      title={
+        isEdit
+          ? t("admin.catalog.attributes.editValue")
+          : t("admin.catalog.attributes.newValue")
+      }
       form={form}
       onSubmit={(v) => save.mutate(v)}
       isSubmitting={save.isPending}
-      submitLabel={isEdit ? 'Güncelle' : 'Oluştur'}
+      submitLabel={isEdit ? t("common.update") : t("common.create")}
     >
-      <FormInput name="value" label="Değer" />
-      <FormInput name="displayValue" label="Görüntülenen Değer" />
+      <FormInput name="value" label={t("admin.catalog.attributes.value")} />
+      <FormInput
+        name="displayValue"
+        label={t("admin.catalog.attributes.displayValue")}
+      />
       <div className="flex gap-4">
         {showColor && (
           <div>
-            <FormInput name="color" label="Renk" type="color" className="h-10 w-14 p-1" />
+            <FormInput
+              name="color"
+              label={t("admin.catalog.attributes.color")}
+              type="color"
+              className="h-10 w-14 p-1"
+            />
           </div>
         )}
         <div className="flex-1">
-          <FormInput name="sortOrder" label="Sıra" type="number" />
+          <FormInput
+            name="sortOrder"
+            label={t("admin.catalog.common.sortOrder")}
+            type="number"
+          />
         </div>
       </div>
-      <FormCheckbox name="isActive" label="Aktif" />
+      <FormCheckbox name="isActive" label={t("common.active")} />
     </FormModal>
   );
 }

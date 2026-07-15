@@ -1,27 +1,37 @@
-import { Badge } from '@tarodan/ui';
-import { col, TruncatedText } from '@/components/table';
-import { carModelRowMenu, type CarModelRowActions } from './rowActions';
-import type { CarModel } from './types';
+import { Badge } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
+import { col, TruncatedText } from "@/components/table";
+import { carModelRowMenu, type CarModelRowActions } from "./rowActions";
+import type { CarModel } from "./types";
 
-export function carModelColumns(actions: CarModelRowActions) {
+type T = ReturnType<typeof useTranslations<never>>;
+
+export function carModelColumns(t: T, actions: CarModelRowActions) {
   return [
     col.custom<CarModel>(
-      'Model',
+      t("admin.catalog.common.model"),
       (m) => (
         <div className="min-w-0">
-          <TruncatedText className="font-medium text-heading">{m.name}</TruncatedText>
+          <TruncatedText className="font-medium text-heading">
+            {m.name}
+          </TruncatedText>
           <TruncatedText className="text-xs text-muted">{m.slug}</TruncatedText>
         </div>
       ),
       { grow: 3, minWidth: 180 },
     ),
-    col.text<CarModel>('Marka', (m) => m.brand?.name),
+    col.text<CarModel>(t("admin.catalog.common.brand"), (m) => m.brand?.name),
     col.text<CarModel>(
-      'Yıl',
-      (m) => (m.yearStart || m.yearEnd ? `${m.yearStart ?? '?'} - ${m.yearEnd ?? '?'}` : undefined),
+      t("admin.catalog.common.year"),
+      (m) =>
+        m.yearStart || m.yearEnd
+          ? `${m.yearStart ?? "?"} - ${m.yearEnd ?? "?"}`
+          : undefined,
       { minWidth: 120 },
     ),
-    col.badge<CarModel>('Durum', (m) => <Badge active={m.isActive} />),
+    col.badge<CarModel>(t("common.status"), (m) => (
+      <Badge active={m.isActive} />
+    )),
     col.rowMenu<CarModel>(carModelRowMenu(actions)),
   ];
 }

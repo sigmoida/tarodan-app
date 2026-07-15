@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Button } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
@@ -13,6 +14,7 @@ import { adminKeys } from "@/lib/query/keys";
  * ResourceList/SuspenseBoundary — the header stays put while the list swaps.
  */
 export function ProductsCountText() {
+  const t = useTranslations();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -57,12 +59,12 @@ export function ProductsCountText() {
 
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
-      Toplam {total ?? 0} ürün
+      {t("admin.catalog.products.totalCount", { count: total ?? 0 })}
       {sellerId && (
         <span className="inline-flex items-center gap-1">
-          — Satıcıya göre filtreleniyor
+          {t("admin.catalog.products.filteredBySeller")}
           <Button variant="ghost" size="sm" onClick={removeSeller}>
-            Filtreyi kaldır
+            {t("admin.catalog.products.removeFilter")}
           </Button>
         </span>
       )}
