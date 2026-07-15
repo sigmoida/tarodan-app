@@ -84,9 +84,7 @@ export default function OrderDetailPage() {
       ? "cancelled"
       : order.status;
   const statusLabel = hasActiveRefund
-    ? locale === "en"
-      ? "Refund in progress"
-      : "İade Sürecinde"
+    ? t("order.refundInProgress")
     : getOrderStatusLabel(displayStatus, locale);
 
   const orderDate = new Date(order.createdAt).toLocaleDateString("tr-TR", {
@@ -99,11 +97,7 @@ export default function OrderDetailPage() {
 
   const handleRefund = () => {
     if (order.status === "pending_payment") {
-      toast(
-        locale === "en"
-          ? "This order is not paid; cancel it instead"
-          : "Bu sipariş henüz ödenmemiş, iptal etmelisiniz",
-      );
+      toast(t("order.notPaidCancelInstead"));
       return;
     }
     setShowRefundModal(true);

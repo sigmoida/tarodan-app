@@ -5,27 +5,16 @@
 import Link from "next/link";
 import { SectionCard } from "@/components/ui";
 import UserAvatar from "@/components/UserAvatar";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import type { OrderDetail } from "../_lib/types";
 
 /** Karşı taraf kartı: alıcı görünümünde satıcı, satıcı görünümünde alıcı. */
 export default function PartyCard({ order }: { order: OrderDetail }) {
   const t = useTranslations();
-  const locale = useLocale();
   const party = order.isBuyer ? order.seller : order.buyer;
 
   return (
-    <SectionCard
-      title={
-        order.isBuyer
-          ? locale === "en"
-            ? "Seller"
-            : "Satıcı"
-          : locale === "en"
-            ? "Buyer"
-            : "Alıcı"
-      }
-    >
+    <SectionCard title={order.isBuyer ? t("product.seller") : t("order.buyer")}>
       <Link
         href={`/seller/${party.id}`}
         className="flex items-center gap-3 hover:bg-surface -mx-2 px-2 py-2 rounded-lg transition-colors"

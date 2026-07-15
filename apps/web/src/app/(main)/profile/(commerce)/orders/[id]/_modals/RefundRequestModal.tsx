@@ -10,7 +10,7 @@ import {
 } from "@/components/ui";
 import { useMutation } from "@tanstack/react-query";
 import { mediaApi, refundsApi, type RefundReason } from "@/lib/api";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import toast from "react-hot-toast";
 
@@ -37,7 +37,6 @@ export default function RefundRequestModal({
   onSuccess,
 }: Props) {
   const t = useTranslations();
-  const locale = useLocale();
   const [reason, setReason] = useState<RefundReason>("changed_mind");
   const [description, setDescription] = useState("");
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
@@ -75,10 +74,7 @@ export default function RefundRequestModal({
     },
     onError: (err: any) =>
       toast.error(
-        err?.response?.data?.message ||
-          (locale === "en"
-            ? "Failed to create refund request"
-            : "İade talebi oluşturulamadı"),
+        err?.response?.data?.message || t("order.refundRequestFailed"),
       ),
   });
 
@@ -144,19 +140,11 @@ export default function RefundRequestModal({
 
   const handleSubmit = async () => {
     if (descriptionRequired && description.trim().length < 20) {
-      toast.error(
-        locale === "en"
-          ? "Description must be at least 20 characters"
-          : "Açıklama en az 20 karakter olmalıdır",
-      );
+      toast.error(t("order.descriptionMin20"));
       return;
     }
     if (evidenceRequired && evidenceFiles.length === 0) {
-      toast.error(
-        locale === "en"
-          ? "Photo evidence is required for this reason"
-          : "Bu sebep için en az bir kanıt fotoğrafı gereklidir",
-      );
+      toast.error(t("order.photoEvidenceRequired"));
       return;
     }
 
@@ -165,16 +153,10 @@ export default function RefundRequestModal({
 
   const phaseDescription =
     phase === "preparing"
-      ? locale === "en"
-        ? "The seller has not shipped yet. Your refund will be processed instantly."
-        : "Satıcı henüz kargoya vermedi. İadeniz anında işlenecek."
+      ? t("order.refundPhasePreparing")
       : phase === "in_cooling_off"
-        ? locale === "en"
-          ? "You're within the 14-day right-of-withdrawal window. Your request will be approved automatically and a return shipping label will be created — drop the package off at any Sürat branch."
-          : "14 günlük cayma hakkı süresindesiniz. Talebiniz otomatik onaylanır; size bir iade kargo numarası verilecek, paketi en yakın Sürat şubesine bırakmanız yeterli."
-        : locale === "en"
-          ? "The cooling-off period has expired. Your request will be reviewed by the seller and admin team."
-          : "14 günlük cayma süresi dolmuş. Talebiniz satıcı ve admin tarafından incelenecek.";
+        ? t("order.refundPhaseCoolingOff")
+        : t("order.refundPhasePastCoolingOff");
 
   return (
     <Modal
@@ -236,9 +218,7 @@ export default function RefundRequestModal({
               ))}
             </Select>
             <p className="text-xs text-muted mt-1">
-              {locale === "en"
-                ? `This order has ${quantity} items. Choose how many to return.`
-                : `Bu siparişte ${quantity} adet var. Kaç adedini iade edeceğinizi seçin.`}
+              {t("order.refundQuantityHint", { quantity })}
             </p>
           </div>
         )}
@@ -256,12 +236,8 @@ export default function RefundRequestModal({
             rows={4}
             placeholder={
               descriptionRequired
-                ? locale === "en"
-                  ? "Please describe the issue in detail (min 20 chars)"
-                  : "Sorunu detaylı açıklayın (en az 20 karakter)"
-                : locale === "en"
-                  ? "Optional"
-                  : "Opsiyonel"
+                ? t("order.describeIssuePlaceholder")
+                : t("common.optional")
             }
           />
         </div>
@@ -269,9 +245,7 @@ export default function RefundRequestModal({
         {showEvidenceUpload && (
           <div>
             <label className="block text-sm font-medium text-body mb-2">
-              {locale === "en"
-                ? "Evidence photos (max 5)"
-                : "Kanıt fotoğrafları (maks 5)"}{" "}
+              {t("order.evidencePhotosMax5")}{" "}
               {evidenceRequired ? (
                 <span className="text-danger-500">*</span>
               ) : (
@@ -314,9 +288,7 @@ export default function RefundRequestModal({
               )}
             </div>
             <p className="text-xs text-muted mt-1">
-              {locale === "en"
-                ? "Tap + to upload photos of the issue."
-                : "Sorunun fotoğraflarını yüklemek için + simgesine dokunun."}
+              {t("order.tapToUploadPhotos")}
             </p>
           </div>
         )}

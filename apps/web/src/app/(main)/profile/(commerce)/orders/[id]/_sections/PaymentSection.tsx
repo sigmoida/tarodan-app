@@ -7,7 +7,7 @@ import { PlusIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
 import { Badge, Button, Input, Radio, Spinner, Textarea } from "@tarodan/ui";
 import CityDistrictSelector from "@/components/CityDistrictSelector";
 import { formatTL } from "@/lib/format";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import {
   useSavedAddresses,
   useSetAddressAndPay,
@@ -17,7 +17,6 @@ import { orderAmountOf, type OrderDetail } from "../_lib/types";
 /** Ödeme bekleyen alıcı: adres seç/ekle + güvenli ödeme akışı. */
 export default function PaymentSection({ order }: { order: OrderDetail }) {
   const t = useTranslations();
-  const locale = useLocale();
   const isPendingPaymentBuyer =
     order.isBuyer && order.status === "pending_payment";
 
@@ -102,9 +101,7 @@ export default function PaymentSection({ order }: { order: OrderDetail }) {
           {t("payment.completeYourPayment")}
         </h2>
         <p className="text-sm text-primary-100 mt-1">
-          {locale === "en"
-            ? "Your offer has been accepted. Complete the payment to finalize the purchase."
-            : "Teklifiniz kabul edildi. Satın alma işlemini tamamlamak için ödeme yapın."}
+          {t("order.offerAcceptedCompletePayment")}
         </p>
       </div>
 
@@ -236,11 +233,7 @@ export default function PaymentSection({ order }: { order: OrderDetail }) {
                   }
                   rows={2}
                   className="py-2.5 resize-none"
-                  placeholder={
-                    locale === "en"
-                      ? "Street, building, floor..."
-                      : "Mahalle, sokak, bina, kat..."
-                  }
+                  placeholder={t("address.addressPlaceholder")}
                 />
               </div>
               <div className="sm:w-1/2">
@@ -274,9 +267,7 @@ export default function PaymentSection({ order }: { order: OrderDetail }) {
           <div className="p-4 bg-surface border border-border rounded-lg flex items-start gap-3">
             <ShieldCheckIcon className="w-5 h-5 text-success-500 mt-0.5 flex-shrink-0" />
             <p className="text-sm text-muted">
-              {locale === "en"
-                ? "You'll enter your card on our secure payment page (3D Secure). Your card details are never stored on our servers — they're processed via PayTR over 256-bit SSL."
-                : "Kart bilgilerinizi güvenli ödeme sayfamızda gireceksiniz (3D Secure). Kart bilgileriniz sunucularımızda saklanmaz; PayTR altyapısıyla 256-bit SSL üzerinden işlenir."}
+              {t("order.securePaymentNotice")}
             </p>
           </div>
         </div>
@@ -301,9 +292,7 @@ export default function PaymentSection({ order }: { order: OrderDetail }) {
           >
             <ShieldCheckIcon className="w-5 h-5" />
             {busy
-              ? locale === "en"
-                ? "Processing..."
-                : "İşleniyor..."
+              ? t("checkout.processing")
               : `${t("payment.pay")} – ${formatTL(orderAmount)}`}
           </Button>
         </div>

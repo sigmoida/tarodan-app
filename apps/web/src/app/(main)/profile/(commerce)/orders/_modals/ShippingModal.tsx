@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { TruckIcon } from "@heroicons/react/24/outline";
 import { Button, Input, Modal } from "@tarodan/ui";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useShipOrder } from "../_hooks/useOrders";
 
 interface ShippingModalProps {
@@ -19,7 +19,6 @@ export default function ShippingModal({
   onClose,
 }: ShippingModalProps) {
   const t = useTranslations();
-  const locale = useLocale();
   const [trackingNumber, setTrackingNumber] = useState("");
   const shipMutation = useShipOrder();
 
@@ -56,11 +55,7 @@ export default function ShippingModal({
             type="text"
             value={trackingNumber}
             onChange={(e) => setTrackingNumber(e.target.value)}
-            placeholder={
-              locale === "en"
-                ? "Enter tracking number"
-                : "Kargo takip numarasını girin"
-            }
+            placeholder={t("order.enterTrackingNumber")}
             className="font-mono"
           />
         </div>
@@ -83,12 +78,8 @@ export default function ShippingModal({
         >
           <TruckIcon className="h-4 w-4" />
           {shipMutation.isPending
-            ? locale === "en"
-              ? "Saving..."
-              : "Kaydediliyor..."
-            : locale === "en"
-              ? "Save & Ship"
-              : "Kaydet ve Gönder"}
+            ? t("collection.saving")
+            : t("order.saveAndShip")}
         </Button>
       </div>
     </Modal>

@@ -8,7 +8,7 @@ import { StarIcon } from "@heroicons/react/24/solid";
 import { StarIcon as StarOutlineIcon } from "@heroicons/react/24/outline";
 import { Button, Input, Modal, Textarea } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useSubmitReview } from "../_hooks/useOrderDetail";
 import { getProductInfo, type OrderDetail } from "../_lib/types";
 
@@ -55,7 +55,6 @@ export default function ReviewModal({
   onClose,
 }: ReviewModalProps) {
   const t = useTranslations();
-  const locale = useLocale();
   const submitReview = useSubmitReview(orderId);
 
   const [score, setScore] = useState(5);
@@ -187,11 +186,7 @@ export default function ReviewModal({
           <Textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder={
-              locale === "en"
-                ? "Share your experience about the product..."
-                : "Ürün hakkında deneyiminizi paylaşın..."
-            }
+            placeholder={t("review.productExperiencePlaceholder")}
             rows={3}
             maxLength={1000}
           />

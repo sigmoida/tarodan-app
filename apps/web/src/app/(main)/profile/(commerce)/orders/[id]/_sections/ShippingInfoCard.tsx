@@ -4,7 +4,7 @@
 
 import { TruckIcon } from "@heroicons/react/24/outline";
 import { SectionCard } from "@/components/ui";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import type { OrderDetail } from "../_lib/types";
 
 const SHIPPED_ORDER_STATUSES = [
@@ -14,27 +14,26 @@ const SHIPPED_ORDER_STATUSES = [
   "completed",
 ];
 
-const statusLabelMap: Record<string, { tr: string; en: string }> = {
-  pending: { tr: "Satıcı Hazırlıyor", en: "Preparing" },
-  label_created: { tr: "Kargo Etiketi Oluşturuldu", en: "Label Created" },
-  picked_up: { tr: "Şubeye Teslim Edildi", en: "Picked Up" },
-  in_transit: { tr: "Yolda", en: "In Transit" },
-  at_delivery_branch: { tr: "Dağıtım Şubesinde", en: "At Delivery Branch" },
-  out_for_delivery: { tr: "Dağıtıma Çıktı", en: "Out For Delivery" },
-  delivered: { tr: "Teslim Edildi", en: "Delivered" },
-  failed: { tr: "Teslim Edilemedi", en: "Failed" },
-  return_in_progress: { tr: "İade Yolda", en: "Return In Progress" },
-  returned: { tr: "İade Tamamlandı", en: "Returned" },
-  cancelled: { tr: "İptal Edildi", en: "Cancelled" },
-};
-
 /**
  * Kargo bilgileri — SADECE gerçek gönderi varken: shipment + dolu trackingNumber +
  * sipariş durumu kargolanmış/teslim. İptal ya da teslim öncesi durumlarda gizli.
  */
 export default function ShippingInfoCard({ order }: { order: OrderDetail }) {
   const t = useTranslations();
-  const locale = useLocale();
+
+  const statusLabelMap: Record<string, string> = {
+    pending: t("order.shipStatusPending"),
+    label_created: t("order.shipStatusLabelCreated"),
+    picked_up: t("order.shipStatusPickedUp"),
+    in_transit: t("order.shipStatusInTransit"),
+    at_delivery_branch: t("order.shipStatusAtDeliveryBranch"),
+    out_for_delivery: t("order.shipStatusOutForDelivery"),
+    delivered: t("order.statusDelivered"),
+    failed: t("order.shipStatusFailed"),
+    return_in_progress: t("order.shipStatusReturnInProgress"),
+    returned: t("order.shipStatusReturned"),
+    cancelled: t("order.statusCancelled"),
+  };
 
   const isIptalOrder = order.cancellationType === "iptal";
   if (
@@ -85,7 +84,7 @@ export default function ShippingInfoCard({ order }: { order: OrderDetail }) {
     return null;
   }
 
-  const statusLbl = statusLabelMap[s] ?? { tr: s, en: s };
+  const statusLbl = statusLabelMap[s] ?? s;
 
   return (
     <SectionCard
@@ -98,17 +97,13 @@ export default function ShippingInfoCard({ order }: { order: OrderDetail }) {
     >
       {isPending && order.isBuyer && (
         <div className="bg-info-50 border border-info-200 rounded-lg p-4 text-sm text-info-800">
-          {locale === "en"
-            ? "The seller is preparing your package. Tracking details will appear here once it's handed over to Sürat."
-            : "Satıcı paketinizi hazırlıyor. Sürat şubesine teslim edildiği anda takip bilgileri burada görünecek."}
+          {t("order.shipmentPreparingBuyer")}
         </div>
       )}
 
       {isCancelled && (
         <div className="bg-danger-50 border border-danger-200 rounded-lg p-4 text-sm text-danger-800">
-          {locale === "en"
-            ? "This shipment has been cancelled."
-            : "Bu kargo iptal edildi."}
+          {t("order.shipmentCancelled")}
         </div>
       )}
 
@@ -135,7 +130,7 @@ export default function ShippingInfoCard({ order }: { order: OrderDetail }) {
             <span
               className={`font-medium ${isDelivered ? "text-success-700" : "text-info-700"}`}
             >
-              {locale === "en" ? statusLbl.en : statusLbl.tr}
+              {statusLbl}
             </span>
           </div>
           {order.isBuyer && order.shipment.trackingNumber && (

@@ -6,13 +6,12 @@ import toast from "react-hot-toast";
 import { TruckIcon } from "@heroicons/react/24/outline";
 import { Button } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useUpdateOrderStatus } from "../_hooks/useOrderDetail";
 import type { OrderDetail } from "../_lib/types";
 
 export default function SellerActions({ order }: { order: OrderDetail }) {
   const t = useTranslations();
-  const locale = useLocale();
   const updateStatus = useUpdateOrderStatus(order.id);
 
   if (!order.isSeller) return null;
@@ -42,11 +41,7 @@ export default function SellerActions({ order }: { order: OrderDetail }) {
           </span>
         }
       >
-        <p className="text-muted mb-4">
-          {locale === "en"
-            ? "Hand this number to the Sürat Kargo branch when delivering your package. The shipment is already registered — the branch will retrieve all details automatically."
-            : "Paketi Sürat Kargo şubesine teslim ederken bu numarayı veriniz. Gönderi zaten sistemde kayıtlıdır — şube tüm bilgileri otomatik olarak alacaktır."}
-        </p>
+        <p className="text-muted mb-4">{t("order.cargoRefInstructions")}</p>
         <div className="flex items-center gap-2 mb-4">
           <code className="flex-1 font-mono text-lg bg-surface-alt px-4 py-3 rounded-lg border border-border-default text-center font-semibold tracking-wider">
             {order.orderNumber}
@@ -63,9 +58,7 @@ export default function SellerActions({ order }: { order: OrderDetail }) {
           </Button>
         </div>
         <p className="text-sm text-muted">
-          {locale === "en"
-            ? "Once the branch receives your package, the Sürat tracking number will appear here automatically (within 30 minutes)."
-            : "Şube paketinizi aldığında Sürat takip numarası burada otomatik olarak görünecektir (30 dakika içinde)."}
+          {t("order.trackingAppearsAfterDropoff")}
         </p>
       </SectionCard>
     );

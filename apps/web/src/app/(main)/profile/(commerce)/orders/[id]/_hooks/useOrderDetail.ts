@@ -13,7 +13,7 @@ import {
   mediaApi,
 } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useWebItem, useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
 import type {
@@ -116,7 +116,6 @@ function useInvalidateOrder(_orderId: string) {
 /** Satıcı: paid → preparing, ya da alıcı onayı → completed. */
 export function useUpdateOrderStatus(orderId: string) {
   const t = useTranslations();
-  const locale = useLocale();
   const invalidateOrder = useInvalidateOrder(orderId);
   return useMutation({
     mutationFn: async (newStatus: string) => {
@@ -138,10 +137,7 @@ export function useUpdateOrderStatus(orderId: string) {
         return;
       }
       toast.error(
-        error?.response?.data?.message ||
-          (locale === "en"
-            ? "Failed to update status"
-            : "Durum güncellenemedi"),
+        error?.response?.data?.message || t("order.statusUpdateFailed"),
       );
     },
   });
@@ -164,23 +160,15 @@ export function useCancelOrder(orderId: string) {
 
 /** Süre aşımına uğramış teklif siparişini yeniden aktive et. */
 export function useReactivateOrder(orderId: string) {
-  const locale = useLocale();
+  const t = useTranslations();
   return useWebMutation(
     async () => {
       await api.post(`/orders/${orderId}/reactivate`);
     },
     {
       invalidates: ["order", "orders"],
-      errorMessage:
-        locale === "en"
-          ? "Could not reactivate order"
-          : "Sipariş aktive edilemedi",
-      onSuccess: () =>
-        toast.success(
-          locale === "en"
-            ? "Order reactivated. You can complete payment now."
-            : "Sipariş yeniden aktive edildi. Ödemenizi tamamlayabilirsiniz.",
-        ),
+      errorMessage: t("order.reactivateFailed"),
+      onSuccess: () => toast.success(t("order.reactivateSuccess")),
     },
   );
 }
@@ -207,7 +195,6 @@ export interface CheckoutInput {
 export function useSetAddressAndPay(orderId: string) {
   const router = useRouter();
   const t = useTranslations();
-  const locale = useLocale();
   const invalidateOrder = useInvalidateOrder(orderId);
 
   const initiatePayment = async (order: OrderDetail): Promise<void> => {
@@ -242,12 +229,7 @@ export function useSetAddressAndPay(orderId: string) {
 
       toast.error(t("payment.startFailed"));
     } catch (err: any) {
-      toast.error(
-        err.response?.data?.message ||
-          (locale === "en"
-            ? "Payment initiation failed"
-            : "Ödeme başlatılamadı"),
-      );
+      toast.error(err.response?.data?.message || t("payment.startFailed"));
     }
   };
 
@@ -278,11 +260,7 @@ export function useSetAddressAndPay(orderId: string) {
           !newAddress.district ||
           !newAddress.address
         ) {
-          toast.error(
-            locale === "en"
-              ? "Please fill all required fields"
-              : "Lütfen tüm zorunlu alanları doldurun",
-          );
+          toast.error(t("auth.fillRequiredFields"));
           return;
         }
         addrPayload = {
@@ -430,7 +408,6 @@ export function useDownloadElogoInvoice() {
 export function useUploadSellerInvoice(orderId: string) {
   const queryClient = useQueryClient();
   const t = useTranslations();
-  const locale = useLocale();
   return useMutation({
     mutationFn: async (file: File) => {
       const form = new FormData();
@@ -442,13 +419,7 @@ export function useUploadSellerInvoice(orderId: string) {
     },
     onSuccess: async (replaced) => {
       toast.success(
-        replaced
-          ? locale === "en"
-            ? "Invoice replaced, buyer notified"
-            : "Fatura değiştirildi, alıcıya mail gönderildi"
-          : locale === "en"
-            ? "Invoice uploaded, buyer notified"
-            : "Fatura yüklendi, alıcıya mail gönderildi",
+        replaced ? t("order.invoiceReplaced") : t("order.invoiceUploaded"),
       );
       await queryClient.invalidateQueries({
         queryKey: queryKeys.orders.sellerInvoice(orderId),

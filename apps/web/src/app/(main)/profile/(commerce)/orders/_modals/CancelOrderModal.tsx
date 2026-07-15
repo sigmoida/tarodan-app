@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from "react";
 import { Button, Modal, Spinner, Textarea } from "@tarodan/ui";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useCancelOrder } from "../_hooks/useOrders";
 import type { Order } from "../_lib/types";
 
@@ -19,7 +19,6 @@ export default function CancelOrderModal({
   onClose,
 }: CancelOrderModalProps) {
   const t = useTranslations();
-  const locale = useLocale();
   const [reason, setReason] = useState("");
   const cancelMutation = useCancelOrder();
 
@@ -27,10 +26,12 @@ export default function CancelOrderModal({
     setReason("");
   }, [order?.id]);
 
-  const presets =
-    locale === "en"
-      ? ["Changed my mind", "Wrong item", "Found cheaper", "Too slow"]
-      : ["Vazgeçtim", "Yanlış ürün", "Daha uygununu buldum", "Teslimat uzun"];
+  const presets = [
+    t("order.cancelReasonChangedMind"),
+    t("order.cancelReasonWrongItem"),
+    t("order.cancelReasonFoundCheaper"),
+    t("order.cancelReasonTooSlow"),
+  ];
 
   const submit = () => {
     if (!order) return;
@@ -42,11 +43,7 @@ export default function CancelOrderModal({
 
   return (
     <Modal isOpen={!!order} onClose={onClose} title={t("order.cancelOrder")}>
-      <p className="mb-4 text-sm text-muted">
-        {locale === "en"
-          ? "Your payment will be refunded. You can optionally add a reason."
-          : "Ödemeniz iade edilecektir. İsterseniz bir neden ekleyebilirsiniz."}
-      </p>
+      <p className="mb-4 text-sm text-muted">{t("order.cancelRefundNotice")}</p>
 
       <div className="mb-3 flex flex-wrap gap-2">
         {presets.map((preset) => (
@@ -66,11 +63,7 @@ export default function CancelOrderModal({
       <Textarea
         value={reason}
         onChange={(e) => setReason(e.target.value.slice(0, 500))}
-        placeholder={
-          locale === "en"
-            ? "Reason (optional, max 500 characters)"
-            : "İptal nedeni (opsiyonel, en fazla 500 karakter)"
-        }
+        placeholder={t("order.cancelReasonPlaceholder")}
         rows={3}
         maxLength={500}
       />

@@ -6,39 +6,29 @@ import Link from "next/link";
 import toast from "react-hot-toast";
 import { ArrowUturnLeftIcon, TruckIcon } from "@heroicons/react/24/outline";
 import { Button } from "@tarodan/ui";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import type { OrderDetail } from "../_lib/types";
-
-const labelMap: Record<string, { tr: string; en: string }> = {
-  pending_review: { tr: "Talep İnceleniyor", en: "Under Review" },
-  approved: { tr: "Onaylandı, İşleniyor", en: "Approved, Processing" },
-  wait_for_delivery: {
-    tr: "Ürün Tesliminden Sonra İade Açılacak",
-    en: "Awaiting Delivery",
-  },
-  return_shipment_open: {
-    tr: "İade Kargonuz Hazır",
-    en: "Return Shipment Ready",
-  },
-  return_in_transit: { tr: "İade Yolda", en: "Return In Transit" },
-  return_delivered: {
-    tr: "Satıcıya Ulaştı, Para İadesi Yapılıyor",
-    en: "Delivered, Refund Processing",
-  },
-  refunded: { tr: "İade Tamamlandı", en: "Refunded" },
-  disputed: { tr: "İtirazlı (İnceleniyor)", en: "Under Dispute" },
-};
 
 export default function RefundRequestBanner({ order }: { order: OrderDetail }) {
   const t = useTranslations();
-  const locale = useLocale();
   const rr = order.activeRefundRequest;
   if (!rr) return null;
+
+  const labelMap: Record<string, string> = {
+    pending_review: t("refund.statusPendingReview"),
+    approved: t("refund.statusApproved"),
+    wait_for_delivery: t("refund.statusWaitForDelivery"),
+    return_shipment_open: t("refund.statusReturnShipmentOpen"),
+    return_in_transit: t("refund.statusReturnInTransit"),
+    return_delivered: t("refund.statusReturnDelivered"),
+    refunded: t("refund.statusRefunded"),
+    disputed: t("refund.statusDisputed"),
+  };
 
   const isRefunded = rr.status === "refunded";
   const isReturnReady =
     rr.status === "return_shipment_open" && !!rr.returnTrackingNumber;
-  const lbl = labelMap[rr.status] ?? { tr: rr.status, en: rr.status };
+  const lbl = labelMap[rr.status] ?? rr.status;
 
   return (
     <div
@@ -70,7 +60,7 @@ export default function RefundRequestBanner({ order }: { order: OrderDetail }) {
               : "bg-info-100 text-info-800 border-info-300"
           }`}
         >
-          {locale === "en" ? lbl.en : lbl.tr}
+          {lbl}
         </span>
       </div>
 
@@ -78,12 +68,8 @@ export default function RefundRequestBanner({ order }: { order: OrderDetail }) {
         <div className="bg-surface-elevated rounded-lg p-4 mb-3">
           <p className="text-sm text-body mb-2">
             {order.isBuyer
-              ? locale === "en"
-                ? "Drop the package off at any Sürat branch with this number:"
-                : "Bu numarayı paketle birlikte herhangi bir Sürat şubesine bırakın:"
-              : locale === "en"
-                ? "The buyer has been given a return label. Package will be sent to your address."
-                : "Alıcıya iade kargo etiketi verildi. Paket adresinize gönderilecek."}
+              ? t("refund.dropOffAtSurat")
+              : t("refund.buyerGivenReturnLabel")}
           </p>
           <div className="flex items-center justify-between gap-3">
             <span className="font-mono text-lg font-bold text-heading break-all">

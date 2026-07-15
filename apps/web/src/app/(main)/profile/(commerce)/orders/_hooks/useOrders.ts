@@ -9,7 +9,7 @@ import toast from "react-hot-toast";
 import { api, ratingsApi, mediaApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { useCart } from "@/hooks/useCart";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
 import type { Order, OrderRole, OrderStatusFilter } from "../_lib/types";
@@ -61,7 +61,7 @@ export function useOrderCounts(enabled: boolean) {
 
 /** Seller adds tracking info → ships the order. */
 export function useShipOrder() {
-  const locale = useLocale();
+  const t = useTranslations();
   return useWebMutation(
     async ({
       orderId,
@@ -77,16 +77,8 @@ export function useShipOrder() {
     },
     {
       invalidates: ["orders"],
-      errorMessage:
-        locale === "en"
-          ? "Could not save shipping info"
-          : "Kargo bilgileri kaydedilemedi",
-      onSuccess: () =>
-        toast.success(
-          locale === "en"
-            ? "Shipping info saved!"
-            : "Kargo bilgileri kaydedildi!",
-        ),
+      errorMessage: t("order.shippingSaveFailed"),
+      onSuccess: () => toast.success(t("order.shippingSaved")),
     },
   );
 }
@@ -132,7 +124,6 @@ export function useReorder() {
 /** eLogo e-Arşiv invoice for an order (opens the PDF), with per-order loading. */
 export function useInvoiceDownload() {
   const t = useTranslations();
-  const locale = useLocale();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const download = async (orderId: string) => {
@@ -141,11 +132,7 @@ export function useInvoiceDownload() {
       const invoiceRes = await api.get(`/elogo/invoices/by-order/${orderId}`);
       const invoice = invoiceRes.data;
       if (!invoice?.id) {
-        toast.error(
-          locale === "en"
-            ? "Invoice not ready yet"
-            : "Fatura henüz hazır değil",
-        );
+        toast.error(t("order.invoiceNotReady"));
         return;
       }
       const res = await api.get(`/elogo/invoices/${invoice.id}/pdf`);
@@ -154,19 +141,11 @@ export function useInvoiceDownload() {
         window.open(url, "_blank", "noopener,noreferrer");
         toast.success(t("order.invoiceOpened"));
       } else {
-        toast.error(
-          locale === "en"
-            ? "Invoice not ready yet"
-            : "Fatura henüz hazır değil",
-        );
+        toast.error(t("order.invoiceNotReady"));
       }
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        toast.error(
-          locale === "en"
-            ? "Invoice not ready yet"
-            : "Fatura henüz hazır değil",
-        );
+        toast.error(t("order.invoiceNotReady"));
       } else {
         toast.error(err?.response?.data?.message || t("common.downloadFailed"));
       }
