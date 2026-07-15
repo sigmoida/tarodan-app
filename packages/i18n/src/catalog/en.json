@@ -100,7 +100,9 @@
     "copiedShort": "Copied",
     "reason": "Reason",
     "downloadFailed": "Download failed",
-    "uploadFailed": "Upload failed"
+    "uploadFailed": "Upload failed",
+    "new": "New",
+    "evidence": "Evidence"
   },
   "nav": {
     "home": "Home",
@@ -861,7 +863,14 @@
     "typing": "typing...",
     "blockedContent": "Your message was blocked due to inappropriate content",
     "selectConversation": "Select a conversation to start messaging",
-    "searchConversations": "Search conversations..."
+    "searchConversations": "Search conversations...",
+    "photoLabel": "📷 Photo",
+    "youPrefix": "You: ",
+    "selectConversationTitle": "Select a conversation",
+    "chooseThread": "Choose a thread from the list",
+    "contentWarning": "Content warning",
+    "removeImage": "Remove image",
+    "attachImage": "Attach image"
   },
   "membership": {
     "title": "Membership Plans",
@@ -994,7 +1003,8 @@
     "characters": "characters",
     "createNewCollection": "Create New Collection",
     "collection": "Collection",
-    "removeProduct": "Remove product"
+    "removeProduct": "Remove product",
+    "collectionsCount": "{count} collections"
   },
   "notification": {
     "notifications": "Notifications",
@@ -1009,7 +1019,9 @@
     "newFollower": "You have a new follower",
     "tradeRequest": "You received a trade request",
     "allRead": "All notifications marked as read",
-    "markRead": "Mark as read"
+    "markRead": "Mark as read",
+    "unreadCount": "{count} unread",
+    "markAllReadShort": "Mark all read"
   },
   "profile": {
     "profile": "Profile",
@@ -1051,7 +1063,15 @@
     "taxNumber": "Tax Number",
     "emailChangeNote": "Contact support to change your email address",
     "businessInfo": "Business Information",
-    "personalInfo": "Personal Information"
+    "personalInfo": "Personal Information",
+    "updateFailed": "Failed to update profile",
+    "photoUploadFailed": "Failed to upload photo",
+    "sendCodeFailed": "Failed",
+    "codeSent": "Code sent",
+    "invalidCode": "Invalid code",
+    "phoneVerified": "Phone verified",
+    "cannotDeleteAccount": "Cannot delete account",
+    "deleteAccountFailed": "Failed to delete account"
   },
   "review": {
     "reviews": "Reviews",
@@ -1343,7 +1363,9 @@
     "retry": "Retry",
     "completeYourPayment": "Complete Your Payment",
     "pay": "Pay",
-    "startFailed": "Could not start payment"
+    "startFailed": "Could not start payment",
+    "statusPending": "Pending",
+    "statusProcessing": "Processing"
   },
   "seller": {
     "sellerProfile": "Seller Profile",
@@ -1766,6 +1788,16 @@
       "confirmBody": "Your refund request will be cancelled. Continue?",
       "successMessage": "Refund request cancelled.",
       "errorMessage": "Cancel failed."
-    }
+    },
+    "label": "Refund",
+    "sellerResponse": "Seller''s Response",
+    "relatedOrder": "Related Order",
+    "viewLink": "View →",
+    "completedSuccess": "Refund completed successfully",
+    "refundedAt": "Refunded at: ",
+    "requestRejected": "Request rejected",
+    "underAdminReview": "Under admin review",
+    "requestReceived": "Request received",
+    "whatsNext": "What''s next?"
   }
 }

@@ -1,235 +1,262 @@
 /** @format */
 
-'use client';
+"use client";
 
-import Link from 'next/link';
-import OptimizedImage from '@/components/OptimizedImage';
-import { CreditCardIcon, CalendarIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import Link from "next/link";
+import OptimizedImage from "@/components/OptimizedImage";
 import {
-	Button,
-	StatusBadge,
-	paymentStatusConfig,
-	Accordion,
-	AccordionItem,
-	AccordionTrigger,
-	AccordionContent,
-	ThumbnailStack,
-} from '@tarodan/ui';
+  CreditCardIcon,
+  CalendarIcon,
+  ChevronRightIcon,
+} from "@heroicons/react/24/outline";
+import {
+  Button,
+  StatusBadge,
+  paymentStatusConfig,
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+  ThumbnailStack,
+} from "@tarodan/ui";
 import { useLocale, useTranslations } from "next-intl";
-import { formatTL } from '@/lib/format';
+import { formatTL } from "@/lib/format";
 import {
-	groupOrdersOf,
-	paymentStatusEnLabels,
-	type Payment,
-	type PaymentActionCb,
-} from '../_lib/types';
+  groupOrdersOf,
+  paymentStatusEnLabels,
+  type Payment,
+  type PaymentActionCb,
+} from "../_lib/types";
 
 function Thumb({ src, alt }: { src?: string | null; alt: string }) {
-	if (src) {
-		return (
-			<div className='relative h-12 w-12 overflow-hidden rounded-lg'>
-				<OptimizedImage src={src} alt={alt} fill sizes='48px' className='object-cover' />
-			</div>
-		);
-	}
-	return (
-		<div className='flex h-12 w-12 items-center justify-center rounded-lg bg-surface-alt'>
-			<CreditCardIcon className='h-6 w-6 text-subtle' />
-		</div>
-	);
+  if (src) {
+    return (
+      <div className="relative h-12 w-12 overflow-hidden rounded-lg">
+        <OptimizedImage
+          src={src}
+          alt={alt}
+          fill
+          sizes="48px"
+          className="object-cover"
+        />
+      </div>
+    );
+  }
+  return (
+    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-surface-alt">
+      <CreditCardIcon className="h-6 w-6 text-subtle" />
+    </div>
+  );
 }
 
 export default function PaymentCard({
-	payment,
-	currentUserId,
-	onAction,
-	pending,
+  payment,
+  currentUserId,
+  onAction,
+  pending,
 }: {
-	payment: Payment;
-	currentUserId?: string;
-	onAction: PaymentActionCb;
-	pending: boolean;
+  payment: Payment;
+  currentUserId?: string;
+  onAction: PaymentActionCb;
+  pending: boolean;
 }) {
-	const t = useTranslations();
+  const t = useTranslations();
   const locale = useLocale();
-	const groupOrders = groupOrdersOf(payment);
-	const isGroup = groupOrders.length > 0;
+  const groupOrders = groupOrdersOf(payment);
+  const isGroup = groupOrders.length > 0;
 
-	const statusLabel =
-		locale === 'en'
-			? paymentStatusEnLabels[payment.status] || payment.status
-			: paymentStatusConfig[payment.status]?.label || payment.status;
+  const statusLabel =
+    locale === "en"
+      ? paymentStatusEnLabels[payment.status] || payment.status
+      : paymentStatusConfig[payment.status]?.label || payment.status;
 
-	const counterparty =
-		payment.buyer && payment.seller
-			? currentUserId === payment.buyer.id
-				? { role: locale === 'en' ? 'Seller' : 'Satıcı', name: payment.seller.displayName }
-				: { role: locale === 'en' ? 'Buyer' : 'Alıcı', name: payment.buyer.displayName }
-			: null;
+  const counterparty =
+    payment.buyer && payment.seller
+      ? currentUserId === payment.buyer.id
+        ? { role: t("product.seller"), name: payment.seller.displayName }
+        : { role: t("order.buyer"), name: payment.buyer.displayName }
+      : null;
 
-	return (
-		<div className='rounded-lg border border-border bg-surface-elevated p-4'>
-			<div className='flex items-start gap-4'>
-				{/* Thumbnail(s) */}
-				{isGroup ? (
-					<ThumbnailStack
-						items={groupOrders}
-						getKey={(o) => o.id}
-						max={3}
-						size='md'
-						renderItem={(o) =>
-							o.image ? (
-								// eslint-disable-next-line @next/next/no-img-element
-								<img src={o.image} alt={o.title} className='h-full w-full object-cover' />
-							) : (
-								<div className='flex h-full w-full items-center justify-center'>
-									<CreditCardIcon className='h-6 w-6 text-subtle' />
-								</div>
-							)
-						}
-					/>
-				) : (
-					<Thumb src={payment.product?.images?.[0]} alt={payment.product?.title ?? ''} />
-				)}
+  return (
+    <div className="rounded-lg border border-border bg-surface-elevated p-4">
+      <div className="flex items-start gap-4">
+        {/* Thumbnail(s) */}
+        {isGroup ? (
+          <ThumbnailStack
+            items={groupOrders}
+            getKey={(o) => o.id}
+            max={3}
+            size="md"
+            renderItem={(o) =>
+              o.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={o.image}
+                  alt={o.title}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center">
+                  <CreditCardIcon className="h-6 w-6 text-subtle" />
+                </div>
+              )
+            }
+          />
+        ) : (
+          <Thumb
+            src={payment.product?.images?.[0]}
+            alt={payment.product?.title ?? ""}
+          />
+        )}
 
-				{/* Title + meta */}
-				<div className='min-w-0 flex-1'>
-					<p className='truncate font-medium text-heading'>
-						{payment.description ||
-							payment.product?.title ||
-							(locale === 'en' ? 'Payment' : 'Ödeme')}
-					</p>
-					<div className='mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted'>
-						{isGroup ? (
-							<span className='text-primary-600'>
-								{locale === 'en'
-									? `${groupOrders.length} items`
-									: `${groupOrders.length} ürün`}
-							</span>
-						) : payment.orderId ? (
-							<Link
-								href={`/profile/orders/${payment.orderId}`}
-								className='font-medium text-primary-600 hover:text-primary-700'>
-								#{payment.orderNumber}
-							</Link>
-						) : payment.orderNumber ? (
-							<span className='font-medium'>#{payment.orderNumber}</span>
-						) : null}
-						{counterparty && (
-							<span>
-								· {counterparty.role}: {counterparty.name}
-							</span>
-						)}
-						<span className='uppercase'>· {payment.provider}</span>
-					</div>
-					<div className='mt-1 flex items-center gap-1 text-xs text-subtle'>
-						<CalendarIcon className='h-3.5 w-3.5' />
-						{new Date(payment.createdAt).toLocaleDateString('tr-TR', {
-							year: 'numeric',
-							month: 'short',
-							day: 'numeric',
-							hour: '2-digit',
-							minute: '2-digit',
-						})}
-					</div>
-				</div>
+        {/* Title + meta */}
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium text-heading">
+            {payment.description ||
+              payment.product?.title ||
+              t("checkout.step2")}
+          </p>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
+            {isGroup ? (
+              <span className="text-primary-600">
+                {locale === "en"
+                  ? `${groupOrders.length} items`
+                  : `${groupOrders.length} ürün`}
+              </span>
+            ) : payment.orderId ? (
+              <Link
+                href={`/profile/orders/${payment.orderId}`}
+                className="font-medium text-primary-600 hover:text-primary-700"
+              >
+                #{payment.orderNumber}
+              </Link>
+            ) : payment.orderNumber ? (
+              <span className="font-medium">#{payment.orderNumber}</span>
+            ) : null}
+            {counterparty && (
+              <span>
+                · {counterparty.role}: {counterparty.name}
+              </span>
+            )}
+            <span className="uppercase">· {payment.provider}</span>
+          </div>
+          <div className="mt-1 flex items-center gap-1 text-xs text-subtle">
+            <CalendarIcon className="h-3.5 w-3.5" />
+            {new Date(payment.createdAt).toLocaleDateString("tr-TR", {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </div>
+        </div>
 
-				{/* Amount + status */}
-				<div className='flex flex-shrink-0 flex-col items-end gap-2'>
-					<span className='font-semibold text-heading'>{formatTL(payment.amount)}</span>
-					<StatusBadge
-						status={payment.status}
-						config={paymentStatusConfig}
-						label={statusLabel}
-						size='sm'
-					/>
-				</div>
-			</div>
+        {/* Amount + status */}
+        <div className="flex flex-shrink-0 flex-col items-end gap-2">
+          <span className="font-semibold text-heading">
+            {formatTL(payment.amount)}
+          </span>
+          <StatusBadge
+            status={payment.status}
+            config={paymentStatusConfig}
+            label={statusLabel}
+            size="sm"
+          />
+        </div>
+      </div>
 
-			{payment.failureReason && (
-				<p className='mt-2 text-xs text-danger-600'>{payment.failureReason}</p>
-			)}
+      {payment.failureReason && (
+        <p className="mt-2 text-xs text-danger-600">{payment.failureReason}</p>
+      )}
 
-			{/* Actions */}
-			{(payment.status === 'pending' || payment.status === 'failed' || payment.orderId) && (
-				<div className='mt-3 flex items-center justify-end gap-2 border-t border-border pt-3'>
-					{payment.orderId && (
-						<Button asChild variant='outline' size='sm'>
-							<Link href={`/profile/orders/${payment.orderId}`}>
-								{t('common.details')}
-								<ChevronRightIcon className='h-4 w-4' />
-							</Link>
-						</Button>
-					)}
-					{payment.status === 'pending' && (
-						<Button
-							variant='danger'
-							size='sm'
-							disabled={pending}
-							onClick={() => onAction('cancel', payment.id)}>
-							{t('common.cancel')}
-						</Button>
-					)}
-					{payment.status === 'failed' && (
-						<Button
-							variant='secondary'
-							size='sm'
-							disabled={pending}
-							onClick={() => onAction('retry', payment.id)}>
-							{t('payment.retry')}
-						</Button>
-					)}
-				</div>
-			)}
+      {/* Actions */}
+      {(payment.status === "pending" ||
+        payment.status === "failed" ||
+        payment.orderId) && (
+        <div className="mt-3 flex items-center justify-end gap-2 border-t border-border pt-3">
+          {payment.orderId && (
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/profile/orders/${payment.orderId}`}>
+                {t("common.details")}
+                <ChevronRightIcon className="h-4 w-4" />
+              </Link>
+            </Button>
+          )}
+          {payment.status === "pending" && (
+            <Button
+              variant="danger"
+              size="sm"
+              disabled={pending}
+              onClick={() => onAction("cancel", payment.id)}
+            >
+              {t("common.cancel")}
+            </Button>
+          )}
+          {payment.status === "failed" && (
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={pending}
+              onClick={() => onAction("retry", payment.id)}
+            >
+              {t("payment.retry")}
+            </Button>
+          )}
+        </div>
+      )}
 
-			{/* Cart (checkout_group) sub-orders */}
-			{isGroup && (
-				<Accordion type='single' collapsible className='mt-2'>
-					<AccordionItem value='items' className='border-none'>
-						<AccordionTrigger className='py-2 text-sm text-primary-600'>
-							{locale === 'en'
-								? `View ${groupOrders.length} items`
-								: `${groupOrders.length} ürünü gör`}
-						</AccordionTrigger>
-						<AccordionContent>
-							<div className='space-y-2'>
-								{groupOrders.map((o) => (
-									<div
-										key={o.id}
-										className='flex items-center gap-3 rounded-lg border border-border bg-surface p-2'>
-										<div className='h-10 w-10 flex-shrink-0'>
-											<Thumb src={o.image} alt={o.title} />
-										</div>
-										<div className='min-w-0 flex-1'>
-											<Link
-												href={`/profile/orders/${o.id}`}
-												className='block truncate text-sm font-medium text-heading hover:text-primary-600'>
-												{o.title}
-											</Link>
-											<p className='truncate text-xs text-muted'>
-												{o.orderNumber ? `#${o.orderNumber}` : ''}
-												{o.sellerName
-													? `${o.orderNumber ? ' · ' : ''}${
-															locale === 'en' ? 'Seller' : 'Satıcı'
-														}: ${o.sellerName}`
-													: ''}
-											</p>
-										</div>
-										<span className='whitespace-nowrap text-sm font-medium text-heading'>
-											{formatTL(o.amount)}
-										</span>
-										<Link
-											href={`/profile/orders/${o.id}`}
-											className='whitespace-nowrap text-sm font-medium text-primary-600 hover:text-primary-700'>
-											{t('common.details')}
-										</Link>
-									</div>
-								))}
-							</div>
-						</AccordionContent>
-					</AccordionItem>
-				</Accordion>
-			)}
-		</div>
-	);
+      {/* Cart (checkout_group) sub-orders */}
+      {isGroup && (
+        <Accordion type="single" collapsible className="mt-2">
+          <AccordionItem value="items" className="border-none">
+            <AccordionTrigger className="py-2 text-sm text-primary-600">
+              {locale === "en"
+                ? `View ${groupOrders.length} items`
+                : `${groupOrders.length} ürünü gör`}
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="space-y-2">
+                {groupOrders.map((o) => (
+                  <div
+                    key={o.id}
+                    className="flex items-center gap-3 rounded-lg border border-border bg-surface p-2"
+                  >
+                    <div className="h-10 w-10 flex-shrink-0">
+                      <Thumb src={o.image} alt={o.title} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        href={`/profile/orders/${o.id}`}
+                        className="block truncate text-sm font-medium text-heading hover:text-primary-600"
+                      >
+                        {o.title}
+                      </Link>
+                      <p className="truncate text-xs text-muted">
+                        {o.orderNumber ? `#${o.orderNumber}` : ""}
+                        {o.sellerName
+                          ? `${o.orderNumber ? " · " : ""}${t(
+                              "product.seller",
+                            )}: ${o.sellerName}`
+                          : ""}
+                      </p>
+                    </div>
+                    <span className="whitespace-nowrap text-sm font-medium text-heading">
+                      {formatTL(o.amount)}
+                    </span>
+                    <Link
+                      href={`/profile/orders/${o.id}`}
+                      className="whitespace-nowrap text-sm font-medium text-primary-600 hover:text-primary-700"
+                    >
+                      {t("common.details")}
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      )}
+    </div>
+  );
 }

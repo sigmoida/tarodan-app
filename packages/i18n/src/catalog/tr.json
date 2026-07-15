@@ -100,7 +100,9 @@
     "copiedShort": "Kopyalandı",
     "reason": "Sebep",
     "downloadFailed": "İndirme başarısız",
-    "uploadFailed": "Yükleme başarısız"
+    "uploadFailed": "Yükleme başarısız",
+    "new": "Yeni",
+    "evidence": "Kanıt"
   },
   "nav": {
     "home": "Ana Sayfa",
@@ -861,7 +863,14 @@
     "typing": "yazıyor...",
     "blockedContent": "Mesajınız uygunsuz içerik nedeniyle engellendi",
     "selectConversation": "Mesajlaşmak için bir konuşma seçin",
-    "searchConversations": "Konuşmalarda ara..."
+    "searchConversations": "Konuşmalarda ara...",
+    "photoLabel": "📷 Fotoğraf",
+    "youPrefix": "Sen: ",
+    "selectConversationTitle": "Bir sohbet seçin",
+    "chooseThread": "Listeden bir sohbet seçin",
+    "contentWarning": "İçerik uyarısı",
+    "removeImage": "Resmi kaldır",
+    "attachImage": "Resim ekle"
   },
   "membership": {
     "title": "Üyelik Planları",
@@ -994,7 +1003,8 @@
     "yesDelete": "Evet, Sil",
     "characters": "karakter",
     "collection": "Koleksiyon",
-    "removeProduct": "Ürünü kaldır"
+    "removeProduct": "Ürünü kaldır",
+    "collectionsCount": "{count} koleksiyon"
   },
   "notification": {
     "notifications": "Bildirimler",
@@ -1009,7 +1019,9 @@
     "newFollower": "Yeni takipçiniz var",
     "tradeRequest": "Takas teklifi aldınız",
     "allRead": "Tüm bildirimler okundu olarak işaretlendi",
-    "markRead": "Okundu işaretle"
+    "markRead": "Okundu işaretle",
+    "unreadCount": "{count} okunmamış",
+    "markAllReadShort": "Tümünü oku"
   },
   "profile": {
     "profile": "Profil",
@@ -1051,7 +1063,15 @@
     "taxNumber": "Vergi Numarası",
     "emailChangeNote": "E-posta adresinizi değiştirmek için destek ile iletişime geçin",
     "businessInfo": "İş Bilgileri",
-    "personalInfo": "Kişisel Bilgiler"
+    "personalInfo": "Kişisel Bilgiler",
+    "updateFailed": "Profil güncellenemedi",
+    "photoUploadFailed": "Fotoğraf yüklenemedi",
+    "sendCodeFailed": "Gönderilemedi",
+    "codeSent": "Kod gönderildi",
+    "invalidCode": "Kod hatalı",
+    "phoneVerified": "Telefon doğrulandı",
+    "cannotDeleteAccount": "Hesap silinemez",
+    "deleteAccountFailed": "Hesap silinemedi"
   },
   "review": {
     "reviews": "Değerlendirmeler",
@@ -1343,7 +1363,9 @@
     "retry": "Tekrar Dene",
     "completeYourPayment": "Ödemenizi Tamamlayın",
     "pay": "Ödeme Yap",
-    "startFailed": "Ödeme başlatılamadı"
+    "startFailed": "Ödeme başlatılamadı",
+    "statusPending": "Bekliyor",
+    "statusProcessing": "İşleniyor"
   },
   "seller": {
     "sellerProfile": "Satıcı Profili",
@@ -1766,6 +1788,16 @@
       "confirmBody": "İade talebiniz iptal edilecek. Devam edilsin mi?",
       "successMessage": "İade talebi iptal edildi.",
       "errorMessage": "İptal başarısız."
-    }
+    },
+    "label": "İade",
+    "sellerResponse": "Satıcı Yanıtı",
+    "relatedOrder": "İlgili Sipariş",
+    "viewLink": "Aç →",
+    "completedSuccess": "İadeniz başarıyla tamamlandı",
+    "refundedAt": "İade tarihi: ",
+    "requestRejected": "Talep reddedildi",
+    "underAdminReview": "Admin İncelemesinde",
+    "requestReceived": "Talep alındı",
+    "whatsNext": "Sonraki Adım"
   }
 }

@@ -40,7 +40,7 @@ export function useProfileInfo(enabled: boolean) {
 
 /** Patch the user's personal (+ business) info. */
 export function useUpdateProfile() {
-  const locale = useLocale();
+  const t = useTranslations();
   const refreshUser = useAuthStore((s) => s.refreshUser);
   return useWebMutation(
     async (data: Record<string, unknown>) => {
@@ -53,10 +53,8 @@ export function useUpdateProfile() {
     },
     {
       invalidates: [RESOURCE, OVERVIEW_RESOURCE],
-      successMessage:
-        locale === "en" ? "Profile updated" : "Profil güncellendi",
-      errorMessage:
-        locale === "en" ? "Failed to update profile" : "Profil güncellenemedi",
+      successMessage: t("profile.profileUpdated"),
+      errorMessage: t("profile.updateFailed"),
       onSuccess: () => {
         void refreshUser();
       },
@@ -66,6 +64,7 @@ export function useUpdateProfile() {
 
 /** Upload a new avatar → save the S3 key → return a display URL. */
 export function useUploadAvatar() {
+  const t = useTranslations();
   const locale = useLocale();
   const refreshUser = useAuthStore((s) => s.refreshUser);
   return useWebMutation(
@@ -82,8 +81,7 @@ export function useUploadAvatar() {
         locale === "en"
           ? "Profile photo updated"
           : "Profil fotoğrafı güncellendi",
-      errorMessage:
-        locale === "en" ? "Failed to upload photo" : "Fotoğraf yüklenemedi",
+      errorMessage: t("profile.photoUploadFailed"),
       onSuccess: () => {
         void refreshUser();
       },

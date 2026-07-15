@@ -1,13 +1,14 @@
 /** @format */
 
-'use client';
+"use client";
 
-import { Stepper, type StepperStep } from '@tarodan/ui';
+import { Stepper, type StepperStep } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
 import {
-	REFUND_LIFECYCLE,
-	refundStatusPhase,
-	refundTerminalStatuses,
-} from '../../_lib/refund-status';
+  REFUND_LIFECYCLE,
+  refundStatusPhase,
+  refundTerminalStatuses,
+} from "../../_lib/refund-status";
 
 /**
  * Horizontal stepper showing which phase the refund is in — built on the shared
@@ -15,37 +16,40 @@ import {
  * admin refund detail. Terminal states render a red ✕ end-cap.
  */
 export default function RefundStatusStepper({
-	status,
-	locale,
+  status,
+  locale,
 }: {
-	status: string;
-	locale: string;
+  status: string;
+  locale: string;
 }) {
-	let steps: StepperStep[];
-	let current: number;
+  const t = useTranslations();
+  let steps: StepperStep[];
+  let current: number;
 
-	if (refundTerminalStatuses.has(status)) {
-		const endLabel =
-			status === 'rejected'
-				? locale === 'en'
-					? 'Rejected'
-					: 'Reddedildi'
-				: locale === 'en'
-					? 'Cancelled'
-					: 'İptal edildi';
-		steps = [
-			{ label: locale === 'en' ? 'Request received' : 'Talep alındı' },
-			{ label: endLabel, error: true },
-		];
-		current = 1;
-	} else {
-		steps = REFUND_LIFECYCLE.map((p) => ({ label: locale === 'en' ? p.en : p.tr }));
-		current = refundStatusPhase[status] ?? 0;
-	}
+  if (refundTerminalStatuses.has(status)) {
+    const endLabel =
+      status === "rejected"
+        ? locale === "en"
+          ? "Rejected"
+          : "Reddedildi"
+        : locale === "en"
+          ? "Cancelled"
+          : "İptal edildi";
+    steps = [
+      { label: t("refund.requestReceived") },
+      { label: endLabel, error: true },
+    ];
+    current = 1;
+  } else {
+    steps = REFUND_LIFECYCLE.map((p) => ({
+      label: locale === "en" ? p.en : p.tr,
+    }));
+    current = refundStatusPhase[status] ?? 0;
+  }
 
-	return (
-		<div className='rounded-lg border border-border bg-surface-elevated p-4 sm:p-6'>
-			<Stepper steps={steps} current={current} />
-		</div>
-	);
+  return (
+    <div className="rounded-lg border border-border bg-surface-elevated p-4 sm:p-6">
+      <Stepper steps={steps} current={current} />
+    </div>
+  );
 }

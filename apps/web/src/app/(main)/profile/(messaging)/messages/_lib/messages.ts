@@ -1,5 +1,8 @@
 /** @format */
 
+import { createTranslator } from "next-intl";
+import { getMessages, resolveLocale } from "@tarodan/i18n";
+
 export interface MessageThread {
   id: string;
   otherUser: {
@@ -72,14 +75,21 @@ export function parseMessageContent(
  */
 export function getThreadPreview(content: string, locale: string): string {
   if (!content) return "";
-  const photoLabel = locale === "en" ? "📷 Photo" : "📷 Fotoğraf";
+  const t = createTranslator({
+    locale,
+    messages: getMessages(resolveLocale(locale)),
+  });
+  const photoLabel = t("message.photoLabel");
   let hadImage = /\[IMG:/i.test(content);
   let text = content.replace(/\[IMG:[^\]]*\]/gi, "").trim();
   const urlLike = /(https?:\/\/|www\.|amazonaws|x-amz-|%2[fF]|\.s3\.)/i;
   if (urlLike.test(text)) {
     hadImage = true;
     text = text
-      .replace(/\S*(?:https?:\/\/|www\.|amazonaws|x-amz-|%2[fF]|\.s3\.)\S*/gi, "")
+      .replace(
+        /\S*(?:https?:\/\/|www\.|amazonaws|x-amz-|%2[fF]|\.s3\.)\S*/gi,
+        "",
+      )
       .trim();
   }
   if (hadImage && urlLike.test(text)) text = "";

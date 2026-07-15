@@ -4,7 +4,7 @@
 
 import toast from "react-hot-toast";
 import { refundsApi } from "@/lib/api";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useWebItem, useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
 import type { RefundRequest } from "../_lib/types";
@@ -41,13 +41,10 @@ export function useRefundDetail(refundId: string, enabled: boolean) {
 
 /** Cancel a refund request — owns toast + invalidation. */
 export function useCancelRefund(refundId: string) {
-  const locale = useLocale();
+  const t = useTranslations();
   return useWebMutation(() => refundsApi.cancel(refundId), {
     invalidates: [DETAIL_RESOURCE, LIST_RESOURCE],
     errorMessage: "Hata",
-    onSuccess: () =>
-      toast.success(
-        locale === "en" ? "Request cancelled" : "Talep iptal edildi",
-      ),
+    onSuccess: () => toast.success(t("refund.cancel.successMessage")),
   });
 }

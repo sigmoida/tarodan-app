@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useRef } from 'react';
-import { XMarkIcon, PhotoIcon } from '@heroicons/react/24/outline';
-import { Button, Input, IconButton } from '@tarodan/ui';
-import { useLocale, useTranslations } from "next-intl";
+import { useRef } from "react";
+import { XMarkIcon, PhotoIcon } from "@heroicons/react/24/outline";
+import { Button, Input, IconButton } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
 
 export default function MessageComposer({
   newMessage,
@@ -29,7 +29,6 @@ export default function MessageComposer({
   onSend: () => void;
 }) {
   const t = useTranslations();
-  const locale = useLocale();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
@@ -44,12 +43,17 @@ export default function MessageComposer({
           {attachedUrls.map((url, i) => (
             <div key={i} className="relative">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="" className="w-14 h-14 object-cover rounded-lg border border-border" />
+              <img
+                src={url}
+                alt=""
+                className="w-14 h-14 object-cover rounded-lg border border-border"
+              />
               <IconButton
                 size="xs"
-                aria-label={locale === 'en' ? 'Remove image' : 'Resmi kaldır'}
+                aria-label={t("message.removeImage")}
                 onClick={() => onRemoveAttachment(i)}
-                className="absolute -top-1 -right-1 rounded-full bg-danger-600 text-inverted hover:bg-danger-700">
+                className="absolute -top-1 -right-1 rounded-full bg-danger-600 text-inverted hover:bg-danger-700"
+              >
                 <XMarkIcon className="w-3.5 h-3.5" />
               </IconButton>
             </div>
@@ -57,35 +61,46 @@ export default function MessageComposer({
         </div>
       )}
       <div className="flex gap-2">
-        <input type="file" ref={fileInputRef} accept="image/*" className="hidden" onChange={onAttachImage} />
+        <input
+          type="file"
+          ref={fileInputRef}
+          accept="image/*"
+          className="hidden"
+          onChange={onAttachImage}
+        />
         <IconButton
           variant="outline"
-          aria-label={locale === 'en' ? 'Attach image' : 'Resim ekle'}
+          aria-label={t("message.attachImage")}
           onClick={() => fileInputRef.current?.click()}
           isLoading={attaching}
           disabled={attaching}
-          className="flex-shrink-0 rounded-xl">
+          className="flex-shrink-0 rounded-xl"
+        >
           <PhotoIcon className="w-5 h-5" />
         </IconButton>
         <Input
           type="text"
           value={newMessage}
           onChange={(e) => onMessageChange(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && onSend()}
-          placeholder={t('message.typeMessage')}
+          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && onSend()}
+          placeholder={t("message.typeMessage")}
           maxLength={maxMessageLength}
-          className={`flex-1 rounded-xl ${contentWarning ? 'border-warning-400 focus:border-warning-400 focus:ring-warning-400' : ''}`} />
+          className={`flex-1 rounded-xl ${contentWarning ? "border-warning-400 focus:border-warning-400 focus:ring-warning-400" : ""}`}
+        />
         <Button
           type="button"
           variant="primary"
           size="md"
           className="flex-shrink-0 rounded-xl shadow-sm"
           onClick={onSend}
-          disabled={(!newMessage.trim() && !attachedUrls.length) || sending}>
-          {sending ? '...' : t('common.send')}
+          disabled={(!newMessage.trim() && !attachedUrls.length) || sending}
+        >
+          {sending ? "..." : t("common.send")}
         </Button>
       </div>
-      <p className="text-xs text-border-strong mt-1.5">{newMessage.length}/{maxMessageLength}</p>
+      <p className="text-xs text-border-strong mt-1.5">
+        {newMessage.length}/{maxMessageLength}
+      </p>
     </div>
   );
 }

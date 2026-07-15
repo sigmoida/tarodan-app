@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { Button, Spinner } from '@tarodan/ui';
+import { Button, Spinner } from "@tarodan/ui";
 import { useLocale, useTranslations } from "next-intl";
-import type { MessageThread } from '../_lib/messages';
-import ThreadListItem from './ThreadListItem';
+import type { MessageThread } from "../_lib/messages";
+import ThreadListItem from "./ThreadListItem";
 
 export default function ThreadList({
   loading,
@@ -28,11 +28,15 @@ export default function ThreadList({
   const locale = useLocale();
 
   return (
-    <div className={`${className} flex-col min-h-0 bg-surface-elevated border-r border-border`}>
+    <div
+      className={`${className} flex-col min-h-0 bg-surface-elevated border-r border-border`}
+    >
       <div className="flex-shrink-0 px-4 py-4 border-b border-border bg-surface-elevated">
-        <h1 className="text-lg font-semibold text-heading">{t('message.messages')}</h1>
+        <h1 className="text-lg font-semibold text-heading">
+          {t("message.messages")}
+        </h1>
         <p className="text-xs text-muted mt-0.5">
-          {locale === 'en' ? 'Select a conversation' : 'Bir sohbet seçin'}
+          {t("message.selectConversationTitle")}
         </p>
       </div>
 
@@ -42,7 +46,7 @@ export default function ThreadList({
         </div>
       ) : threads.length === 0 ? (
         <div className="flex-1 flex items-center justify-center text-muted p-6 text-center text-sm">
-          {t('message.noMessages')}
+          {t("message.noMessages")}
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto flex flex-col">
@@ -56,10 +60,15 @@ export default function ThreadList({
           ))}
           {hasMore && (
             <div className="flex-shrink-0 p-2 border-t border-border-subtle">
-              <Button variant="secondary" type="button"
+              <Button
+                variant="secondary"
+                type="button"
                 onClick={onExpand}
-                className="w-full py-2.5 text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors">
-                {locale === 'en' ? `More (${remainingCount})` : `Daha fazla (${remainingCount})`}
+                className="w-full py-2.5 text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
+              >
+                {locale === "en"
+                  ? `More (${remainingCount})`
+                  : `Daha fazla (${remainingCount})`}
               </Button>
             </div>
           )}
