@@ -174,9 +174,9 @@ function useCollectionDetailValue() {
     if (!collection) return;
     if (
       !(await confirm({
-        title: locale === "en" ? "Remove product" : "Ürünü kaldır",
+        title: t("collection.removeProduct"),
         description: t("collection.removeProductConfirm"),
-        confirmLabel: locale === "en" ? "Remove" : "Kaldır",
+        confirmLabel: t("common.remove"),
         cancelLabel: t("common.cancel"),
         destructive: true,
       }))

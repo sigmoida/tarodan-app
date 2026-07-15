@@ -92,7 +92,10 @@
     "show": "Show",
     "home": "Home",
     "listings": "Listings",
-    "category": "Category"
+    "category": "Category",
+    "learnMore": "Learn more",
+    "removed": "Removed",
+    "dateLocale": "en-US"
   },
   "nav": {
     "home": "Home",
@@ -437,7 +440,32 @@
     "discountedPrice": "Discounted Price",
     "discountAmount": "Discount Amount",
     "adding": "Adding...",
-    "removing": "Removing..."
+    "removing": "Removing...",
+    "productsFound": "products found",
+    "sortHighestRating": "Highest Rating",
+    "sortLowestRating": "Lowest Rating",
+    "searchTypes": "Search types...",
+    "searchModels": "Search models...",
+    "searchScale": "Search scale...",
+    "searchMaterial": "Search material...",
+    "searchManufacturers": "Search manufacturers...",
+    "vehicleType": "Vehicle Type",
+    "material": "Material",
+    "manufacturer": "Manufacturer",
+    "options": "Options",
+    "view360": "360° View",
+    "pause": "Pause",
+    "autoRotate": "Auto Rotate",
+    "stock": "Stock",
+    "detailsSection": "Details",
+    "technicalDetails": "Technical details",
+    "copyLink": "Copy Link",
+    "thisIsYourListing": "This is your listing",
+    "clearFilter": "Clear filter",
+    "failedToCreateListing": "Failed to create listing",
+    "quantityDefaultHint": "Defaults to 1 if left empty",
+    "available": "available",
+    "detailsSuffix": "details"
   },
   "cart": {
     "myCart": "My Cart",
@@ -549,7 +577,8 @@
     "clickAddNewAddress": "Please click \"Add New Address\" button to enter your delivery address",
     "selectShippingAddress": "Please select your delivery address",
     "invalidAddressAddNew": "Selected address is invalid, please add a new address",
-    "enterShippingAddress": "Please enter your delivery address"
+    "enterShippingAddress": "Please enter your delivery address",
+    "payWithPaytr": "Pay with PayTR"
   },
   "order": {
     "myOrders": "My Orders",
@@ -584,7 +613,10 @@
     "trackingNumber": "Tracking Number",
     "shippingCompany": "Shipping Company",
     "retryPayment": "Retry Payment",
-    "paymentRetried": "Payment retried"
+    "paymentRetried": "Payment retried",
+    "order": "Order",
+    "product": "Product",
+    "carrier": "Carrier"
   },
   "trade": {
     "myTrades": "My Trades",
@@ -714,7 +746,9 @@
     "pendingOffers": "Pending Offers",
     "receivedOffers": "Received Offers",
     "sentOffers": "Sent Offers",
-    "myOffers": "Offers"
+    "myOffers": "Offers",
+    "minimumOffer": "Minimum offer",
+    "yourOfferAmount": "Your Offer Amount (TL)"
   },
   "message": {
     "messages": "Messages",
@@ -862,7 +896,9 @@
     "deleting": "Deleting...",
     "yesDelete": "Yes, Delete",
     "characters": "characters",
-    "createNewCollection": "Create New Collection"
+    "createNewCollection": "Create New Collection",
+    "collection": "Collection",
+    "removeProduct": "Remove product"
   },
   "notification": {
     "notifications": "Notifications",
@@ -946,7 +982,8 @@
     "packaging": "Packaging",
     "sellerComment": "Comment About Seller (Optional)",
     "sellerCommentPlaceholder": "Share your experience with this seller...",
-    "submit": "Submit Review"
+    "submit": "Submit Review",
+    "mostHelpful": "Most Helpful"
   },
   "footer": {
     "about": "About Us",
@@ -1055,7 +1092,12 @@
     "passwordNumber": "Number required",
     "confirmPassword": "Confirm your password",
     "birthDateRequired": "Please enter your birth date",
-    "minAge18": "You must be at least 18 years old to register."
+    "minAge18": "You must be at least 18 years old to register.",
+    "enterAmount": "Enter an amount",
+    "enterValidAmount": "Enter a valid amount",
+    "max500Chars": "Max 500 characters",
+    "enterOrderNumber": "Enter order number",
+    "offerBelowPrice": "Offer must be lower than the price"
   },
   "time": {
     "justNow": "Just now",
@@ -1215,7 +1257,8 @@
     "following": "Following",
     "follow": "Follow",
     "report": "Report",
-    "noActiveListings": "This seller has no active listings yet."
+    "noActiveListings": "This seller has no active listings yet.",
+    "viewProfile": "View Profile"
   },
   "sellerDashboard": {
     "title": "Seller Dashboard",

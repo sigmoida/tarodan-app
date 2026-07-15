@@ -3,11 +3,13 @@
 "use client";
 
 import { useFormContext } from "react-hook-form";
+import { useTranslations } from "next-intl";
 import { Button, Select } from "@tarodan/ui";
 import SectionCard from "@/components/ui/SectionCard";
 import { useNewListing } from "../_context/NewListingContext";
 
 export default function ManufacturerAttributesSection() {
+  const t = useTranslations();
   const { locale, manufacturerList, manufacturerAttrGroups } = useNewListing();
   const { watch, setValue } = useFormContext();
   const manufacturerId = watch("manufacturerId");
@@ -29,7 +31,7 @@ export default function ManufacturerAttributesSection() {
 
   return (
     <SectionCard
-      title={`${manufacturerName ?? ""} ${locale === "en" ? "details" : "detayları"}`}
+      title={`${manufacturerName ?? ""} ${t("product.detailsSuffix")}`}
     >
       <p className="text-xs text-muted -mt-2 mb-4">
         {locale === "en"

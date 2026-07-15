@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { useParams, useRouter } from 'next/navigation';
-import { Button, Spinner } from '@tarodan/ui';
-import { Form } from '@tarodan/ui/form';
-import { PageShell } from '@/components/layout/PageShell';
-import { PageHeader } from '@/components/layout/PageHeader';
+import { useParams, useRouter } from "next/navigation";
+import { Button, Spinner } from "@tarodan/ui";
+import { Form } from "@tarodan/ui/form";
+import { PageShell } from "@/components/layout/PageShell";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { useLocale, useTranslations } from "next-intl";
-import { useAuthStore } from '@/stores/authStore';
-import AuthLoadingScreen from '@/components/AuthLoadingScreen';
+import { useAuthStore } from "@/stores/authStore";
+import AuthLoadingScreen from "@/components/AuthLoadingScreen";
 import {
   getConditions,
   getYearOptions,
@@ -21,20 +21,21 @@ import {
   useCarModels,
   useCommissionPreview,
   useListingImageUpload,
-} from '@/components/listings/form';
-import { useEditListingForm } from './_hooks/useEditListingForm';
-import { useProductDiscounts } from './_hooks/useProductDiscounts';
-import { useListingLifecycle } from './_hooks/useListingLifecycle';
-import StatusBanners from './_sections/StatusBanners';
-import DiscountSection from './_sections/DiscountSection';
-import DeleteListingModal from './_modals/DeleteListingModal';
+} from "@/components/listings/form";
+import { useEditListingForm } from "./_hooks/useEditListingForm";
+import { useProductDiscounts } from "./_hooks/useProductDiscounts";
+import { useListingLifecycle } from "./_hooks/useListingLifecycle";
+import StatusBanners from "./_sections/StatusBanners";
+import DiscountSection from "./_sections/DiscountSection";
+import DeleteListingModal from "./_modals/DeleteListingModal";
 
-const TERMINAL_STATUSES = ['sold', 'reserved', 'inactive', 'deleted'];
+const TERMINAL_STATUSES = ["sold", "reserved", "inactive", "deleted"];
 
 export default function EditListingClient() {
   const params = useParams();
   const router = useRouter();
   const locale = useLocale();
+  const t = useTranslations();
   const id = params.id as string;
   const { isAuthenticated, isLoading: authLoading, limits } = useAuthStore();
 
@@ -52,10 +53,10 @@ export default function EditListingClient() {
     isFetching,
   } = useEditListingForm({ id, authLoading, isAuthenticated });
 
-  const status = form.watch('status');
-  const brandId = form.watch('brandId');
-  const price = form.watch('price');
-  const categoryId = form.watch('categoryId');
+  const status = form.watch("status");
+  const brandId = form.watch("brandId");
+  const price = form.watch("price");
+  const categoryId = form.watch("categoryId");
 
   const catalogEnabled = !authLoading && isAuthenticated;
   const { flatCategories } = useListingCategories(catalogEnabled);
@@ -68,14 +69,22 @@ export default function EditListingClient() {
   } = useListingFilters(catalogEnabled);
   const selectedBrandSlug = brands.find((b) => b.id === brandId)?.slug;
   const { models, modelsLoading } = useCarModels(selectedBrandSlug);
-  const { commissionPreview, commissionPreviewLoading } = useCommissionPreview(price, categoryId);
-  const { productDiscounts } = useProductDiscounts({ id, authLoading, isAuthenticated });
-  const { uploadingImages, handleFileUpload, removeImage } = useListingImageUpload({
-    form,
-    maxImages: limits?.maxImagesPerListing || 3,
-    imagePreviewUrls,
-    setImagePreviewUrls,
+  const { commissionPreview, commissionPreviewLoading } = useCommissionPreview(
+    price,
+    categoryId,
+  );
+  const { productDiscounts } = useProductDiscounts({
+    id,
+    authLoading,
+    isAuthenticated,
   });
+  const { uploadingImages, handleFileUpload, removeImage } =
+    useListingImageUpload({
+      form,
+      maxImages: limits?.maxImagesPerListing || 3,
+      imagePreviewUrls,
+      setImagePreviewUrls,
+    });
   const {
     reactivateQuantity,
     setReactivateQuantity,
@@ -105,20 +114,35 @@ export default function EditListingClient() {
 
   const statusActions = isTerminal ? null : (
     <>
-      {status === 'active' ? (
-        <Button type="button" variant="secondary" onClick={handleDeactivate} disabled={isLoading}>
+      {status === "active" ? (
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={handleDeactivate}
+          disabled={isLoading}
+        >
           İlanı Pasife Al
         </Button>
-      ) : status === 'pending' ? (
+      ) : status === "pending" ? (
         <Button type="button" variant="secondary" disabled>
           İnceleme Bekleniyor
         </Button>
       ) : (
-        <Button type="button" variant="success" onClick={handleActivate} disabled={isLoading}>
+        <Button
+          type="button"
+          variant="success"
+          onClick={handleActivate}
+          disabled={isLoading}
+        >
           İncelemeye Gönder
         </Button>
       )}
-      <Button type="button" variant="danger" onClick={() => setShowDeleteModal(true)} disabled={isLoading}>
+      <Button
+        type="button"
+        variant="danger"
+        onClick={() => setShowDeleteModal(true)}
+        disabled={isLoading}
+      >
         İlanı Sil
       </Button>
     </>
@@ -142,7 +166,11 @@ export default function EditListingClient() {
         handleReactivate={handleReactivate}
       />
 
-      <Form form={form} onSubmit={onSubmit} className={`space-y-4 ${isTerminal ? 'hidden' : ''}`}>
+      <Form
+        form={form}
+        onSubmit={onSubmit}
+        className={`space-y-4 ${isTerminal ? "hidden" : ""}`}
+      >
         <TitleDescriptionCard />
         <ProductDetailsCard
           locale={locale}
@@ -157,16 +185,20 @@ export default function EditListingClient() {
           manufacturerList={manufacturerList}
           yearOptions={getYearOptions()}
         />
-        <OptionsCard locale={locale} canTrade={!!limits?.canTrade} showPreorder />
+        <OptionsCard
+          locale={locale}
+          canTrade={!!limits?.canTrade}
+          showPreorder
+        />
         <PricingCard
           locale={locale}
           commissionPreview={commissionPreview}
           commissionPreviewLoading={commissionPreviewLoading}
-          quantityPlaceholder={locale === 'en' ? 'Unlimited' : 'Sınırsız'}
+          quantityPlaceholder={t("membership.unlimited")}
           quantityHelper={
-            locale === 'en'
-              ? 'Leave empty for unlimited stock'
-              : 'Boş bırakırsanız sınırsız stok olur'
+            locale === "en"
+              ? "Leave empty for unlimited stock"
+              : "Boş bırakırsanız sınırsız stok olur"
           }
         />
         <DiscountSection
@@ -195,8 +227,14 @@ export default function EditListingClient() {
           >
             İptal
           </Button>
-          <Button type="submit" variant="primary" size="lg" className="flex-1" disabled={isLoading}>
-            {isLoading ? 'Güncelleniyor...' : 'Değişiklikleri Kaydet'}
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            className="flex-1"
+            disabled={isLoading}
+          >
+            {isLoading ? "Güncelleniyor..." : "Değişiklikleri Kaydet"}
           </Button>
         </div>
       </Form>

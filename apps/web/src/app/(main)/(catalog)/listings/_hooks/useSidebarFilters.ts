@@ -200,11 +200,11 @@ export function useSidebarFilters({
   const [materialSearch, setMaterialSearch] = useState("");
 
   const CONDITIONS = [
-    { value: "new", label: locale === "en" ? "New" : "Yeni" },
-    { value: "like_new", label: locale === "en" ? "Like New" : "Yeni Gibi" },
-    { value: "very_good", label: locale === "en" ? "Very Good" : "Çok İyi" },
-    { value: "good", label: locale === "en" ? "Good" : "İyi" },
-    { value: "fair", label: locale === "en" ? "Fair" : "Orta" },
+    { value: "new", label: t("product.conditionNew") },
+    { value: "like_new", label: t("product.conditionLikeNew") },
+    { value: "very_good", label: t("product.conditionVeryGood") },
+    { value: "good", label: t("product.conditionGood") },
+    { value: "fair", label: t("product.conditionFair") },
   ];
 
   const handleBrandChange = (brandId: string, brandName: string) => {

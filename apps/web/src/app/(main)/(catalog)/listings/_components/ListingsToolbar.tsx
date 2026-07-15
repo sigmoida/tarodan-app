@@ -18,7 +18,6 @@ import { useListings } from "../_context/ListingsContext";
  */
 export default function ListingsControls() {
   const t = useTranslations();
-  const locale = useLocale();
   const {
     filters,
     productLayout,
@@ -55,17 +54,13 @@ export default function ListingsControls() {
         }
         className="w-auto flex-shrink-0"
       >
-        <option value="relevance">
-          {locale === "en" ? "Recommended" : "Önerilen"}
-        </option>
+        <option value="relevance">{t("common.recommended")}</option>
         <option value="created_desc">{t("product.sortNewest")}</option>
         <option value="created_asc">{t("product.sortOldest")}</option>
         <option value="view_count_desc">{t("product.sortPopular")}</option>
         <option value="price_asc">{t("product.sortPriceLow")}</option>
         <option value="price_desc">{t("product.sortPriceHigh")}</option>
-        <option value="rating_desc">
-          {locale === "en" ? "Highest Rating" : "En yüksek puan"}
-        </option>
+        <option value="rating_desc">{t("product.sortHighestRating")}</option>
         <option value="title_asc">A-Z</option>
         <option value="title_desc">Z-A</option>
       </Select>
@@ -121,7 +116,7 @@ export function ActiveFilterChips() {
   if (currentSearch) {
     chips.push({
       key: "search",
-      label: `${locale === "en" ? "Search" : "Arama"}: "${currentSearch}"`,
+      label: `${t("common.search")}: "${currentSearch}"`,
       onRemove: () => {
         setFilters({ ...filters, search: "" });
         setCurrentPage(1);
@@ -216,7 +211,7 @@ export function ActiveFilterChips() {
     {
       key: "discountOnly",
       on: !!filters.discountOnly,
-      label: locale === "en" ? "On Sale" : "İndirimli",
+      label: t("product.onSale"),
       tint: "danger",
       patch: { discountOnly: false },
     },
@@ -234,7 +229,7 @@ export function ActiveFilterChips() {
   return (
     <div className="flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-border">
       <span className="text-xs font-medium text-muted uppercase tracking-wide mr-1">
-        {locale === "en" ? "Filters" : "Filtreler"}:
+        {t("product.filters")}:
       </span>
       {chips.map((chip) => (
         <Chip
@@ -242,7 +237,7 @@ export function ActiveFilterChips() {
           active
           activeClassName={chip.tint ? CHIP_TINT[chip.tint] : undefined}
           onClick={chip.onRemove}
-          aria-label={`${locale === "en" ? "Remove" : "Kaldır"}: ${
+          aria-label={`${t("common.remove")}: ${
             typeof chip.label === "string" ? chip.label : chip.key
           }`}
           className="inline-flex items-center gap-1 font-medium"

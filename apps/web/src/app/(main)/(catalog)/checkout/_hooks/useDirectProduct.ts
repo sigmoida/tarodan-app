@@ -2,6 +2,8 @@
 
 "use client";
 
+import { createTranslator } from "next-intl";
+import { getMessages, resolveLocale } from "@tarodan/i18n";
 import { listingsApi } from "@/lib/api";
 import { useWebList } from "@/hooks/useWebResource";
 import {
@@ -22,6 +24,10 @@ export function useDirectProduct(
   directProductId: string | null,
   locale: string,
 ) {
+  const t = createTranslator({
+    locale,
+    messages: getMessages(resolveLocale(locale)),
+  });
   const query = useWebList<CheckoutItem>({
     resource: "checkout-direct-product",
     params: directProductId,
@@ -53,9 +59,7 @@ export function useDirectProduct(
           PLACEHOLDER,
         seller: {
           id: product.sellerId || product.seller?.id,
-          displayName:
-            product.seller?.displayName ||
-            (locale === "en" ? "Seller" : "Satıcı"),
+          displayName: product.seller?.displayName || t("product.seller"),
         },
       };
     },

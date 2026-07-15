@@ -8,7 +8,6 @@ import { useListingDetail } from "../_context/ListingDetailContext";
 export default function CollectionPickerModal() {
   const {
     t,
-    locale,
     router,
     showCollectionModal,
     setShowCollectionModal,
@@ -47,8 +46,7 @@ export default function CollectionPickerModal() {
                   </p>
                 )}
                 <p className="mt-2 text-xs text-muted">
-                  {collection.itemCount || 0}{" "}
-                  {locale === "en" ? "products" : "ürün"}
+                  {collection.itemCount || 0} {t("collection.products")}
                 </p>
               </Button>
             ))

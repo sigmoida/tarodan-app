@@ -132,7 +132,7 @@ export default function CollectionsGrid() {
               )}
               <div className="flex items-center justify-between mt-2 text-2xs text-subtle">
                 <span className="font-medium">
-                  {collection.itemCount} {locale === "en" ? "items" : "ürün"}
+                  {collection.itemCount} {t("collection.items")}
                 </span>
                 <div className="flex items-center gap-2">
                   {collection.viewCount !== undefined && (
