@@ -95,7 +95,12 @@
     "category": "Category",
     "learnMore": "Learn more",
     "removed": "Removed",
-    "dateLocale": "en-US"
+    "dateLocale": "en-US",
+    "copy": "Copy",
+    "copiedShort": "Copied",
+    "reason": "Reason",
+    "downloadFailed": "Download failed",
+    "uploadFailed": "Upload failed"
   },
   "nav": {
     "home": "Home",
@@ -483,7 +488,9 @@
     "couponApplied": "Coupon Applied",
     "removeCoupon": "Remove Coupon",
     "couponApplyError": "Coupon could not be applied",
-    "couponLoginRequired": "Please login to use a coupon"
+    "couponLoginRequired": "Please login to use a coupon",
+    "addedToCart": "Added to cart",
+    "addToCartFailed": "Could not add to cart"
   },
   "favorites": {
     "myFavorites": "My Favorites",
@@ -616,7 +623,58 @@
     "paymentRetried": "Payment retried",
     "order": "Order",
     "product": "Product",
-    "carrier": "Carrier"
+    "carrier": "Carrier",
+    "filterCancelled": "Cancelled",
+    "filterRefunds": "Refunds",
+    "unitTimes": "x",
+    "productInfoUnavailable": "Product info could not be loaded",
+    "buyer": "Buyer",
+    "netToYou": "Net to you",
+    "viewRefundRequest": "View refund request",
+    "requestRefund": "Request Refund",
+    "requestRefundTitle": "Request Refund",
+    "addShippingInfo": "Add Shipping Info",
+    "invoice": "Invoice",
+    "keepOrder": "Keep Order",
+    "cancelFailed": "Could not cancel order",
+    "invoiceOpened": "Invoice opened",
+    "multiItemOrder": "Multi-item order",
+    "loadFailed": "Failed to load order",
+    "trackOnSurat": "Track on Sürat",
+    "refundRequest": "Refund Request",
+    "trackReturn": "Track Return",
+    "reportIssue": "Report Order Issue",
+    "myRefundRequests": "My Refund Requests",
+    "completePayment": "Complete payment",
+    "orderWasCancelled": "This order was cancelled",
+    "cancelledOn": "Cancelled on ",
+    "sellerActions": "Seller Actions",
+    "markAsPreparing": "Mark as Preparing",
+    "cargoReference": "Cargo Reference",
+    "orderNumberCopied": "Order number copied",
+    "pdfOnly": "PDF only",
+    "maxPdfSize": "Max 10 MB",
+    "invoiceNo": "No: ",
+    "sellerInvoice": "Seller Invoice",
+    "refundWindowClosed": "Refund window closed",
+    "cancelConfirmYes": "Yes, cancel",
+    "cancelConfirmNo": "No",
+    "refundRequestCreated": "Refund request created",
+    "refundReasonChangedMind": "Changed my mind",
+    "refundReasonDamaged": "Damaged",
+    "refundReasonWrongItem": "Wrong item",
+    "refundReasonMissingParts": "Missing parts",
+    "quantityToRefund": "Quantity to refund",
+    "quantityOne": "Quantity: 1",
+    "submitRefund": "Submit",
+    "productAmount": "Product Amount",
+    "vat": "VAT",
+    "platformFee": "Platform fee",
+    "platformDeduction": "Platform deduction",
+    "withholdingTax": "Withholding tax",
+    "unsupportedStatus": "Unsupported status",
+    "invoiceNotReady": "Invoice not ready",
+    "invoiceNotFound": "Invoice not found"
   },
   "trade": {
     "myTrades": "My Trades",
@@ -983,7 +1041,8 @@
     "sellerComment": "Comment About Seller (Optional)",
     "sellerCommentPlaceholder": "Share your experience with this seller...",
     "submit": "Submit Review",
-    "mostHelpful": "Most Helpful"
+    "mostHelpful": "Most Helpful",
+    "photosLabel": "Photos (optional, max 5)"
   },
   "footer": {
     "about": "About Us",
@@ -1156,7 +1215,11 @@
     "saveFailed": "Failed to save address",
     "defaultFailed": "Failed to set default address",
     "cityDistrict": "City / District",
-    "deleteFailed": "Failed to delete address"
+    "deleteFailed": "Failed to delete address",
+    "deliveryAddress": "Delivery Address",
+    "loadingAddresses": "Loading addresses...",
+    "backToSaved": "Back to saved addresses",
+    "fullNamePlaceholder": "John Doe"
   },
   "contact": {
     "title": "Contact Us",
@@ -1239,7 +1302,10 @@
     "provider": "Provider",
     "startDate": "Start Date",
     "endDate": "End Date",
-    "retry": "Retry"
+    "retry": "Retry",
+    "completeYourPayment": "Complete Your Payment",
+    "pay": "Pay",
+    "startFailed": "Could not start payment"
   },
   "seller": {
     "sellerProfile": "Seller Profile",
@@ -1317,7 +1383,8 @@
     "open": "Open",
     "inProgress": "In Progress",
     "resolved": "Resolved",
-    "closed": "Closed"
+    "closed": "Closed",
+    "contactSupport": "Contact Support"
   },
   "faq": {
     "title": "Frequently Asked Questions",

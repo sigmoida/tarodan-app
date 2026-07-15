@@ -115,6 +115,7 @@ function useInvalidateOrder(_orderId: string) {
 
 /** Satıcı: paid → preparing, ya da alıcı onayı → completed. */
 export function useUpdateOrderStatus(orderId: string) {
+  const t = useTranslations();
   const locale = useLocale();
   const invalidateOrder = useInvalidateOrder(orderId);
   return useMutation({
@@ -128,16 +129,12 @@ export function useUpdateOrderStatus(orderId: string) {
       }
     },
     onSuccess: async () => {
-      toast.success(
-        locale === "en" ? "Order status updated" : "Sipariş durumu güncellendi",
-      );
+      toast.success(t("order.statusUpdated"));
       await invalidateOrder();
     },
     onError: (error: any) => {
       if (error?.message === "unsupported") {
-        toast.error(
-          locale === "en" ? "Unsupported status" : "Desteklenmeyen durum",
-        );
+        toast.error(t("order.unsupportedStatus"));
         return;
       }
       toast.error(
@@ -152,19 +149,15 @@ export function useUpdateOrderStatus(orderId: string) {
 
 /** Alıcı: kargo öncesi siparişi iptal et (anında geri ödeme). */
 export function useCancelOrder(orderId: string) {
-  const locale = useLocale();
+  const t = useTranslations();
   return useWebMutation(
     async () => {
       await api.post(`/orders/${orderId}/cancel`, {});
     },
     {
       invalidates: ["order", "orders"],
-      errorMessage:
-        locale === "en" ? "Could not cancel order" : "Sipariş iptal edilemedi",
-      onSuccess: () =>
-        toast.success(
-          locale === "en" ? "Order cancelled" : "Sipariş iptal edildi",
-        ),
+      errorMessage: t("order.cancelFailed"),
+      onSuccess: () => toast.success(t("order.orderCancelled")),
     },
   );
 }
@@ -213,6 +206,7 @@ export interface CheckoutInput {
  */
 export function useSetAddressAndPay(orderId: string) {
   const router = useRouter();
+  const t = useTranslations();
   const locale = useLocale();
   const invalidateOrder = useInvalidateOrder(orderId);
 
@@ -226,18 +220,15 @@ export function useSetAddressAndPay(orderId: string) {
         try {
           const bypassRes = await paymentsApi.bypassComplete(data.paymentId);
           if (bypassRes.data?.success) {
-            toast.success(
-              locale === "en" ? "Payment successful" : "Ödeme başarılı",
-            );
+            toast.success(t("payment.paymentSuccess"));
             router.push(`/payment/success?paymentId=${data.paymentId}`);
           } else {
-            toast.error(locale === "en" ? "Payment failed" : "Ödeme başarısız");
+            toast.error(t("payment.paymentFailed"));
             router.push(`/payment/fail?paymentId=${data.paymentId}`);
           }
         } catch (err: any) {
           toast.error(
-            err.response?.data?.message ||
-              (locale === "en" ? "Payment failed" : "Ödeme başarısız"),
+            err.response?.data?.message || t("payment.paymentFailed"),
           );
         }
         return;
@@ -249,9 +240,7 @@ export function useSetAddressAndPay(orderId: string) {
         return;
       }
 
-      toast.error(
-        locale === "en" ? "Could not start payment" : "Ödeme başlatılamadı",
-      );
+      toast.error(t("payment.startFailed"));
     } catch (err: any) {
       toast.error(
         err.response?.data?.message ||
@@ -334,10 +323,7 @@ export function useSetAddressAndPay(orderId: string) {
         await invalidateOrder();
         await initiatePayment(order);
       } catch (err: any) {
-        toast.error(
-          err.response?.data?.message ||
-            (locale === "en" ? "Failed to set address" : "Adres kaydedilemedi"),
-        );
+        toast.error(err.response?.data?.message || t("address.saveFailed"));
       }
     },
   });
@@ -410,7 +396,7 @@ export function useSubmitReview(orderId: string) {
 
 /** eLogo e-Arşiv PDF'ini yeni sekmede aç (görüntüle/indir). */
 export function useDownloadElogoInvoice() {
-  const locale = useLocale();
+  const t = useTranslations();
   return useMutation({
     mutationFn: async (invoiceId: string | undefined) => {
       if (!invoiceId) {
@@ -423,24 +409,18 @@ export function useDownloadElogoInvoice() {
       window.open(url, "_blank", "noopener,noreferrer");
     },
     onSuccess: () => {
-      toast.success(locale === "en" ? "Invoice opened" : "Fatura açıldı");
+      toast.success(t("order.invoiceOpened"));
     },
     onError: (err: any) => {
       if (err?.message === "not-ready") {
-        toast.error(
-          locale === "en" ? "Invoice not ready" : "Fatura henüz hazır değil",
-        );
+        toast.error(t("order.invoiceNotReady"));
         return;
       }
       const msg = err.response?.data?.message;
       if (err.response?.status === 404) {
-        toast.error(
-          msg || (locale === "en" ? "Invoice not found" : "Fatura bulunamadı"),
-        );
+        toast.error(msg || t("order.invoiceNotFound"));
       } else {
-        toast.error(
-          msg || (locale === "en" ? "Download failed" : "İndirme başarısız"),
-        );
+        toast.error(msg || t("common.downloadFailed"));
       }
     },
   });
@@ -449,6 +429,7 @@ export function useDownloadElogoInvoice() {
 /** Kurumsal satıcı: siparişe fatura PDF yükle/değiştir. */
 export function useUploadSellerInvoice(orderId: string) {
   const queryClient = useQueryClient();
+  const t = useTranslations();
   const locale = useLocale();
   return useMutation({
     mutationFn: async (file: File) => {
@@ -474,17 +455,14 @@ export function useUploadSellerInvoice(orderId: string) {
       });
     },
     onError: (err: any) => {
-      toast.error(
-        err.response?.data?.message ||
-          (locale === "en" ? "Upload failed" : "Yükleme başarısız"),
-      );
+      toast.error(err.response?.data?.message || t("common.uploadFailed"));
     },
   });
 }
 
 /** Kurumsal satıcı faturasını yeni sekmede aç. */
 export function useDownloadSellerInvoice(orderId: string) {
-  const locale = useLocale();
+  const t = useTranslations();
   return useMutation({
     mutationFn: async () => {
       const res = await api.get(`/orders/${orderId}/seller-invoice/download`);
@@ -494,15 +472,10 @@ export function useDownloadSellerInvoice(orderId: string) {
     },
     onError: (err: any) => {
       if (err?.message === "not-found") {
-        toast.error(
-          locale === "en" ? "Invoice not found" : "Fatura bulunamadı",
-        );
+        toast.error(t("order.invoiceNotFound"));
         return;
       }
-      toast.error(
-        err.response?.data?.message ||
-          (locale === "en" ? "Download failed" : "İndirme başarısız"),
-      );
+      toast.error(err.response?.data?.message || t("common.downloadFailed"));
     },
   });
 }

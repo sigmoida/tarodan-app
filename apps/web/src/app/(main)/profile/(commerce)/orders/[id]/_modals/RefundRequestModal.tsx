@@ -1,6 +1,13 @@
 "use client";
 
-import { Button, Input, Modal, Select, Spinner, Textarea } from "@/components/ui";
+import {
+  Button,
+  Input,
+  Modal,
+  Select,
+  Spinner,
+  Textarea,
+} from "@/components/ui";
 import { useMutation } from "@tanstack/react-query";
 import { mediaApi, refundsApi, type RefundReason } from "@/lib/api";
 import { useLocale, useTranslations } from "next-intl";
@@ -29,6 +36,7 @@ export default function RefundRequestModal({
   quantity = 1,
   onSuccess,
 }: Props) {
+  const t = useTranslations();
   const locale = useLocale();
   const [reason, setReason] = useState<RefundReason>("changed_mind");
   const [description, setDescription] = useState("");
@@ -55,13 +63,13 @@ export default function RefundRequestModal({
           evidencePhotoUrls.length > 0 ? evidencePhotoUrls : undefined,
         // Adet bazlı kısmi iade: tüm adet iade ediliyorsa alanı gönderme.
         refundQuantity:
-          quantity > 1 && refundQuantity < quantity ? refundQuantity : undefined,
+          quantity > 1 && refundQuantity < quantity
+            ? refundQuantity
+            : undefined,
       });
     },
     onSuccess: () => {
-      toast.success(
-        locale === "en" ? "Refund request created" : "İade talebi oluşturuldu",
-      );
+      toast.success(t("order.refundRequestCreated"));
       onSuccess();
       onClose();
     },
@@ -110,30 +118,27 @@ export default function RefundRequestModal({
   const reasonOptions: { value: RefundReason; label: string }[] = [
     {
       value: "changed_mind",
-      label: locale === "en" ? "Changed my mind" : "Vazgeçtim / fikrim değişti",
+      label: t("order.refundReasonChangedMind"),
     },
     {
       value: "damaged",
-      label: locale === "en" ? "Damaged" : "Hasarlı geldi",
+      label: t("order.refundReasonDamaged"),
     },
     {
       value: "wrong_item",
-      label: locale === "en" ? "Wrong item" : "Yanlış ürün geldi",
+      label: t("order.refundReasonWrongItem"),
     },
     {
       value: "not_as_described",
-      label:
-        locale === "en"
-          ? "Not as described"
-          : "Açıklamayla uyuşmuyor",
+      label: locale === "en" ? "Not as described" : "Açıklamayla uyuşmuyor",
     },
     {
       value: "missing_parts",
-      label: locale === "en" ? "Missing parts" : "Eksik parça",
+      label: t("order.refundReasonMissingParts"),
     },
     {
       value: "other",
-      label: locale === "en" ? "Other" : "Diğer",
+      label: t("trade.dispute.reasonOther"),
     },
   ];
 
@@ -175,13 +180,13 @@ export default function RefundRequestModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={locale === "en" ? "Request Refund" : "İade Talebi Oluştur"}
+      title={t("order.requestRefundTitle")}
       maxWidth="max-w-lg"
     >
       <div className="space-y-4">
         <div className="bg-surface rounded-lg p-3 text-sm">
           <p className="text-muted">
-            {locale === "en" ? "Order" : "Sipariş"}:{" "}
+            {t("order.order")}:{" "}
             <span className="font-medium text-heading">{orderNumber}</span>
           </p>
         </div>
@@ -192,10 +197,10 @@ export default function RefundRequestModal({
 
         <div>
           <label className="block text-sm font-medium text-body mb-2">
-            {locale === "en" ? "Reason" : "Sebep"}
+            {t("common.reason")}
             {!isDispute && (
               <span className="text-muted font-normal ml-1">
-                ({locale === "en" ? "optional" : "opsiyonel"})
+                ({t("common.optional")})
               </span>
             )}
           </label>
@@ -217,7 +222,7 @@ export default function RefundRequestModal({
         {quantity > 1 && (
           <div>
             <label className="block text-sm font-medium text-body mb-2">
-              {locale === "en" ? "Quantity to refund" : "İade edilecek adet"}
+              {t("order.quantityToRefund")}
             </label>
             <Select
               value={String(refundQuantity)}
@@ -240,7 +245,7 @@ export default function RefundRequestModal({
 
         <div>
           <label className="block text-sm font-medium text-body mb-2">
-            {locale === "en" ? "Description" : "Açıklama"}
+            {t("common.description")}
             {descriptionRequired && (
               <span className="text-danger-500 ml-1">*</span>
             )}
@@ -271,7 +276,7 @@ export default function RefundRequestModal({
                 <span className="text-danger-500">*</span>
               ) : (
                 <span className="text-muted font-normal">
-                  ({locale === "en" ? "optional" : "opsiyonel"})
+                  ({t("common.optional")})
                 </span>
               )}
             </label>
@@ -282,7 +287,11 @@ export default function RefundRequestModal({
                   className="relative w-16 h-16 rounded-lg overflow-hidden border border-border"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={src} alt="" className="w-full h-full object-cover" />
+                  <img
+                    src={src}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
                   <button
                     type="button"
                     onClick={() => removeEvidence(idx)}
@@ -319,7 +328,7 @@ export default function RefundRequestModal({
             onClick={onClose}
             disabled={submitMutation.isPending}
           >
-            {locale === "en" ? "Cancel" : "Vazgeç"}
+            {t("trade.dispute.cancelCta")}
           </Button>
           <Button
             variant="primary"
@@ -328,9 +337,12 @@ export default function RefundRequestModal({
             disabled={submitMutation.isPending}
           >
             {submitMutation.isPending ? (
-              <Spinner size="sm" color="border-surface-elevated border-t-transparent" />
+              <Spinner
+                size="sm"
+                color="border-surface-elevated border-t-transparent"
+              />
             ) : null}
-            {locale === "en" ? "Submit" : "Talep Oluştur"}
+            {t("order.submitRefund")}
           </Button>
         </div>
       </div>

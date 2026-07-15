@@ -36,6 +36,7 @@ export default function OrderDetailPage() {
   const params = useParams();
   const queryClient = useQueryClient();
   const { ready } = useRequireAuth();
+  const t = useTranslations();
   const locale = useLocale();
   const orderId = params?.id as string;
 
@@ -52,12 +53,10 @@ export default function OrderDetailPage() {
 
   useEffect(() => {
     if (orderQuery.isError && orderId) {
-      toast.error(
-        locale === "en" ? "Failed to load order" : "Sipariş yüklenemedi",
-      );
+      toast.error(t("order.loadFailed"));
       router.push("/profile/orders");
     }
-  }, [orderQuery.isError, orderId, locale, router]);
+  }, [orderQuery.isError, orderId, t, router]);
 
   if (!ready || loading) {
     return (
@@ -70,9 +69,7 @@ export default function OrderDetailPage() {
   if (!order) {
     return (
       <div className="min-h-screen bg-surface flex items-center justify-center">
-        <p className="text-muted">
-          {locale === "en" ? "Order not found" : "Sipariş bulunamadı"}
-        </p>
+        <p className="text-muted">{t("order.orderNotFound")}</p>
       </div>
     );
   }
