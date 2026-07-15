@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { Button } from '@tarodan/ui';
+import { logger } from '@/lib/logger';
 import './globals.css';
 
 /**
@@ -16,7 +17,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development') console.error(error);
+    logger.error('Global error boundary caught error', { error, digest: error.digest });
   }, [error]);
 
   return (

@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@tarodan/ui';
+import { logger } from '@/lib/logger';
 
 /**
  * Segment-level error boundary (root). Catches route render/data errors;
@@ -17,7 +18,7 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development') console.error(error);
+    logger.error('Segment error boundary caught error', { error, digest: error.digest });
   }, [error]);
 
   return (
