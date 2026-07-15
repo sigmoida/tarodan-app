@@ -14,25 +14,17 @@ import { SectionCard, ButtonLink } from "@/components/ui";
 import AuthLoadingScreen from "@/components/AuthLoadingScreen";
 import { usePaymentFail } from "../_hooks/usePaymentFail";
 
-const REASONS_TR = [
-  "Yetersiz bakiye",
-  "Kart bilgilerinde hata",
-  "3D Secure doğrulaması başarısız",
-  "Banka tarafından işlem reddedildi",
-  "İnternet bağlantı problemi",
-];
-const REASONS_EN = [
-  "Insufficient balance",
-  "Card information error",
-  "3D Secure verification failed",
-  "Transaction rejected by bank",
-  "Internet connection problem",
-];
+const REASON_KEYS = [
+  "payment.reasonInsufficientBalance",
+  "payment.reasonCardError",
+  "payment.reason3dSecureFailed",
+  "payment.reasonBankRejected",
+  "payment.reasonConnectionProblem",
+] as const;
 
 export default function PaymentFailClient() {
   const t = useTranslations();
-  const { phase, payment, locale, isGuestCheckout, handleRetry } =
-    usePaymentFail();
+  const { phase, payment, isGuestCheckout, handleRetry } = usePaymentFail();
 
   if (phase === "auth-loading") return <AuthLoadingScreen />;
   if (phase === "loading") {
@@ -42,9 +34,6 @@ export default function PaymentFailClient() {
       </PageShell>
     );
   }
-
-  const en = locale === "en";
-  const reasons = en ? REASONS_EN : REASONS_TR;
 
   return (
     <PageShell className="flex items-center justify-center p-4">
@@ -107,8 +96,8 @@ export default function PaymentFailClient() {
                   {t("payment.failureReasonsTitle")}
                 </p>
                 <ul className="list-inside list-disc space-y-1 text-xs">
-                  {reasons.map((r) => (
-                    <li key={r}>{r}</li>
+                  {REASON_KEYS.map((key) => (
+                    <li key={key}>{t(key)}</li>
                   ))}
                 </ul>
               </div>

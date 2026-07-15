@@ -574,11 +574,7 @@ export default function HeaderSearch() {
                   className="flex items-center justify-between px-4 py-2.5 text-sm text-muted hover:bg-primary-50 hover:text-primary-600 border-t border-border-subtle transition-colors"
                   onClick={() => setShowSearchDropdown(false)}
                 >
-                  <span>
-                    {locale === "en"
-                      ? "Browse all listings"
-                      : "Tüm ilanları gör"}
-                  </span>
+                  <span>{t("search.browseAllListings")}</span>
                   <ArrowRightIcon className="w-4 h-4" />
                 </Link>
               </div>
@@ -597,9 +593,7 @@ export default function HeaderSearch() {
                     {/* İlgili Sonuçlar başlığı */}
                     <div className="px-4 pt-3 pb-1">
                       <span className="text-xs font-semibold text-muted uppercase tracking-wide">
-                        {locale === "en"
-                          ? "Related Results"
-                          : "İlgili Sonuçlar"}
+                        {t("search.relatedResults")}
                       </span>
                     </div>
 
@@ -978,9 +972,7 @@ export default function HeaderSearch() {
                       !autoResults?.materials?.length &&
                       !autoResults?.conditions?.length && (
                         <div className="px-4 py-6 text-center text-sm text-muted">
-                          {locale === "en"
-                            ? "No results found"
-                            : "Sonuç bulunamadı"}
+                          {t("search.noResults")}
                         </div>
                       )}
 

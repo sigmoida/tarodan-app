@@ -276,7 +276,13 @@
     "emailVerifiedSuccess": "E-posta adresiniz doğrulandı!",
     "failedToSend": "Gönderilemedi",
     "passwordChangedSuccess": "Şifreniz başarıyla değiştirildi!",
-    "passwordResetFailed": "Şifre sıfırlama başarısız"
+    "passwordResetFailed": "Şifre sıfırlama başarısız",
+    "heroBusinessTitle": "İşini Vitrine Taşı",
+    "heroBusinessSubtitle": "Şirket hesabıyla binlerce koleksiyonere ulaş, ilanlarını tek yerden yönet.",
+    "heroRegisterTitle": "Koleksiyonun Başlasın",
+    "heroRegisterSubtitle": "Ücretsiz katıl, ilk modelini bugün keşfet.",
+    "heroDefaultTitle": "Koleksiyonun Kalbi Burada",
+    "heroDefaultSubtitle": "Binlerce diecast model, tek adres. Aradığını bul, koleksiyonunu büyüt."
   },
   "brands": {
     "title": "Markalar",
@@ -535,7 +541,10 @@
     "noReviewsWithRating": "Bu puana sahip değerlendirme yok",
     "verifiedPurchase": "Doğrulanmış Alıcı",
     "leaveEmptyUnlimitedStock": "Boş bırakırsanız sınırsız stok olur",
-    "multipleImagesRequired360": "360° görüntüleme için birden fazla resim gerekli"
+    "multipleImagesRequired360": "360° görüntüleme için birden fazla resim gerekli",
+    "conditionPoor": "Kötü",
+    "statusDeleted": "Kaldırıldı",
+    "upToImages": "En fazla {count} görsel"
   },
   "cart": {
     "myCart": "Sepetim",
@@ -844,7 +853,9 @@
     "tapToUploadPhotos": "Sorunun fotoğraflarını yüklemek için + simgesine dokunun.",
     "refundReasonCounterfeit": "Sahte ürün",
     "refundReasonLostInTransit": "Kargoda kayboldu",
-    "refundReasonOther": "Diğer"
+    "refundReasonOther": "Diğer",
+    "statusPendingPayment": "Ödeme Bekleniyor",
+    "statusRefundRequested": "İade Talep Edildi"
   },
   "trade": {
     "myTrades": "Takaslarım",
@@ -1055,7 +1066,16 @@
     "selectAtLeastOneOffer": "Lütfen en az bir ürün seçin",
     "selectAtLeastOneWant": "Lütfen en az bir istediğiniz ürünü seçin",
     "progressReturning": "Takas depoda reddedildi. Ürünler göndericilere iade ediliyor.",
-    "loginToViewDetails": "Takas detaylarını görmek için giriş yapmalısınız"
+    "loginToViewDetails": "Takas detaylarını görmek için giriş yapmalısınız",
+    "statusInProgress": "Devam Ediyor",
+    "statusShipping": "Kargo Aşamasında",
+    "statusAwaitingConfirmation": "Onay Bekleniyor",
+    "statusAwaitingPayment": "Ödeme Bekleniyor",
+    "statusShippingToWarehouse": "Depoya Gönderiliyor",
+    "statusAtWarehouse": "Depoda",
+    "statusAdminReviewing": "İnceleniyor",
+    "statusShippingToRecipients": "Alıcılara Gönderiliyor",
+    "statusReturning": "İade Ediliyor"
   },
   "offer": {
     "makeOffer": "Teklif Ver",
@@ -1081,7 +1101,9 @@
     "acceptFailed": "Teklif kabul edilirken hata oluştu",
     "rejectFailed": "Teklif reddedilirken hata oluştu",
     "cancelFailed": "Teklif iptal edilirken hata oluştu",
-    "counterFailed": "Karşı teklif gönderilemedi"
+    "counterFailed": "Karşı teklif gönderilemedi",
+    "statusExpired": "Süresi Doldu",
+    "statusCounterOffered": "Karşı Teklif Yapıldı"
   },
   "message": {
     "messages": "Mesajlar",
@@ -1448,7 +1470,21 @@
     "viewCollection": "Koleksiyonu incele",
     "companyOfWeek": "Haftanın Şirketi",
     "companyBioFallback": "Premium Diecast araçların alım ve satımı",
-    "viewStore": "Mağazayı İncele"
+    "viewStore": "Mağazayı İncele",
+    "slider": {
+      "marketplaceTitle": "Türkiye''nin En Büyük\nDiecast Pazaryeri",
+      "marketplaceSubtitle": "Diecast modelleri satın alın, satın ve takas edin. Dijital Garajınızı oluşturun ve koleksiyonunuzu sergileyin.",
+      "browseMarketplace": "Pazaryerini İncele",
+      "hotWheelsTitle": "Premium Hot Wheels\nKoleksiyonları",
+      "hotWheelsSubtitle": "Fast & Furious, Formula 1 ve daha fazlası. Nadir bulunan modelleri keşfedin.",
+      "exploreHotWheels": "Hot Wheels Keşfet",
+      "allBrands": "Tüm Markalar",
+      "secureTradingTitle": "Güvenli Takas\nSistemi",
+      "secureTradingSubtitle": "Koleksiyonlarınızı diğer koleksiyonerlerle güvenle takas edin. Her iki taraf için korumalı sistem.",
+      "startTrading": "Takasa Başla",
+      "howItWorks": "Nasıl Çalışır?",
+      "imageAlt": "Diecast model araç koleksiyonu"
+    }
   },
   "search": {
     "search": "Ara",
@@ -1465,7 +1501,9 @@
     "filterResults": "Sonuçları Filtrele",
     "searchPlaceholder": "Ürün, marka, kategori ara...",
     "popularSearches": "Popüler Aramalar",
-    "searchAction": "ile ara"
+    "searchAction": "ile ara",
+    "browseAllListings": "Tüm ilanları gör",
+    "relatedResults": "İlgili Sonuçlar"
   },
   "error": {
     "pageNotFound": "Sayfa Bulunamadı",
@@ -1690,7 +1728,12 @@
     "backToMyOrders": "Siparişlerime Dön",
     "paginationSummary": "Toplam {total} ödeme, Sayfa {page} / {totalPages}",
     "itemsCount": "{count} ürün",
-    "viewItemsCount": "{count} ürünü gör"
+    "viewItemsCount": "{count} ürünü gör",
+    "reasonInsufficientBalance": "Yetersiz bakiye",
+    "reasonCardError": "Kart bilgilerinde hata",
+    "reason3dSecureFailed": "3D Secure doğrulaması başarısız",
+    "reasonBankRejected": "Banka tarafından işlem reddedildi",
+    "reasonConnectionProblem": "İnternet bağlantı problemi"
   },
   "seller": {
     "sellerProfile": "Satıcı Profili",
@@ -1717,7 +1760,8 @@
     "noCollectionsDesc": "Bu satıcının herkese açık koleksiyonu yok.",
     "newMember": "Yeni üye",
     "monthsCount": "{count} ay",
-    "yearsCount": "{count}+ yıl"
+    "yearsCount": "{count}+ yıl",
+    "notFoundDesc": "Aradığınız satıcı bulunamadı veya kaldırılmış olabilir."
   },
   "sellerDashboard": {
     "title": "Satıcı Panosu",

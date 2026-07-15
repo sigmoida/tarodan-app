@@ -205,7 +205,6 @@ export default function EditListingClient() {
           productDiscounts={productDiscounts}
         />
         <ImagesCard
-          locale={locale}
           maxImages={limits?.maxImagesPerListing || 3}
           imagePreviewUrls={imagePreviewUrls}
           uploadingImages={uploadingImages}

@@ -10,7 +10,6 @@ import { SectionCard, ImagePreviewGrid } from "@/components/ui";
 import type { ListingImage } from "../useListingImageUpload";
 
 interface ImagesCardProps {
-  locale: string;
   maxImages: number;
   imagePreviewUrls: string[];
   uploadingImages: boolean;
@@ -21,7 +20,6 @@ interface ImagesCardProps {
 /** "Görseller" — upload dropzone + compact preview grid. Reads the `images`
  *  field from form context (and surfaces its validation error). Shared. */
 export default function ImagesCard({
-  locale,
   maxImages,
   imagePreviewUrls,
   uploadingImages,
@@ -32,9 +30,6 @@ export default function ImagesCard({
   const images: ListingImage[] = watch("images") ?? [];
   const imagesError = formState.errors.images?.message as string | undefined;
   const t = useTranslations();
-  // Template-literal ternary (interpolates `maxImages`) — left for the later
-  // ICU-parameter sweep.
-  const en = locale === "en";
 
   const previewUrls = images.map(
     (img, index) =>
@@ -44,7 +39,7 @@ export default function ImagesCard({
   return (
     <SectionCard title={t("product.images")}>
       <p className="text-xs text-muted -mt-2 mb-4">
-        {en ? `Up to ${maxImages} images` : `En fazla ${maxImages} görsel`}
+        {t("product.upToImages", { count: maxImages })}
       </p>
       <div className="space-y-3">
         {images.length < maxImages ? (
