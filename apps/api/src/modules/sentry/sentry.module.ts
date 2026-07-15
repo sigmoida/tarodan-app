@@ -7,6 +7,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import * as Sentry from '@sentry/node';
 import { SentryService } from './sentry.service';
 import { SentryInterceptor } from './sentry.interceptor';
+import { initAppLogger } from '../../common/logging/logger';
 
 @Global()
 @Module({
@@ -17,7 +18,10 @@ import { SentryInterceptor } from './sentry.interceptor';
 export class SentryModule implements OnModuleInit {
   private readonly logger = new Logger(SentryModule.name);
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly sentryService: SentryService,
+  ) {}
 
   onModuleInit() {
     const dsn = this.configService.get<string>('SENTRY_DSN');
@@ -53,5 +57,7 @@ export class SentryModule implements OnModuleInit {
     } else {
       this.logger.warn('Sentry DSN not configured, error tracking disabled');
     }
+
+    initAppLogger(this.sentryService);
   }
 }

@@ -242,6 +242,9 @@ importers:
       '@sentry/tracing':
         specifier: ^7.91.0
         version: 7.120.4
+      '@tarodan/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
       '@tarodan/types':
         specifier: workspace:*
         version: link:../../packages/types
