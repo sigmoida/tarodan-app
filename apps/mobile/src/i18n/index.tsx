@@ -62,8 +62,11 @@ export function useLanguage() {
   );
 
   const t = useCallback(
+    // key: string — çağrı siteleri dinamik anahtar da geçebilir; #216 tip
+    // augmentation'ı (typed MessageKey) doğrudan react-i18next kullanımı için
+    // aktif, ama bu uyum katmanında gevşetiyoruz.
     (key: string, params?: Record<string, string | number>): string =>
-      i18nextT(key, params ?? undefined) as string,
+      (i18nextT as (k: string, o?: object) => string)(key, params ?? undefined),
     [i18nextT],
   );
 

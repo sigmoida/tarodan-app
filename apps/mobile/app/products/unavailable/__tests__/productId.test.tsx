@@ -19,7 +19,7 @@ const pushMock = router.push as jest.Mock;
 
 // i18n: gerçek TR mesajlarını {param} interpolasyonu ile çözen hafif t().
 jest.mock('@/i18n', () => {
-  const tr = require('@/i18n/messages/tr.json');
+  const tr = require('@tarodan/i18n').messages.tr; // #216: katalog tek kaynak
   const get = (path: string) =>
     path.split('.').reduce((o: any, k) => (o == null ? undefined : o[k]), tr);
   return {
