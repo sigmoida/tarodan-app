@@ -3,10 +3,9 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { Link, usePathname } from "@/i18n/navigation";
 import Image from "next/image";
 import dynamic from "next/dynamic";
-import { usePathname } from "next/navigation";
 import {
   PlusIcon,
   ChatBubbleLeftRightIcon,
@@ -16,7 +15,7 @@ import {
 import { Button } from "@tarodan/ui";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import { withChunkErrorLogging } from "@/lib/withChunkErrorLogging";
-import { useTranslation } from "@/i18n/LanguageContext";
+import { useLocale, useTranslations } from "next-intl";
 import { Container } from "./Container";
 import HeaderSearch from "./header/HeaderSearch";
 import AccountMenu from "./header/AccountMenu";
@@ -41,7 +40,7 @@ const AuthRequiredModal = dynamic(
  * header block stays pinned with `sticky top-0`.
  */
 export default function Header() {
-  const { t } = useTranslation();
+  const t = useTranslations();
   const pathname = usePathname();
   const headerData = useHeaderData();
   const {

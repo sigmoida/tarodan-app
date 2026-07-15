@@ -3,8 +3,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 import {
   UserCircleIcon,
   ChatBubbleLeftRightIcon,
@@ -19,7 +18,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { Badge, Button } from "@tarodan/ui";
 import UserAvatar from "@/components/UserAvatar";
-import { useTranslation } from "@/i18n/LanguageContext";
+import { useLocale, useTranslations } from "next-intl";
 import type { HeaderData } from "./_hooks/useHeaderData";
 
 /**
@@ -98,7 +97,7 @@ export default function AccountMenu({
   wishlistCount,
 }: AccountMenuProps) {
   const router = useRouter();
-  const { t } = useTranslation();
+  const t = useTranslations();
   const {
     accountDropdownRef,
     showAccountDropdown,

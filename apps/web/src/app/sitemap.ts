@@ -1,6 +1,24 @@
 import { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/seo";
 
+/**
+ * hreflang alternates for one path, in the sitemap's Google-preferred form.
+ * With `localePrefix: 'as-needed'` (#214) the default `tr` URL is prefix-free
+ * and English lives under `/en`. `x-default` points at the tr URL. Emitting
+ * these as `<xhtml:link rel="alternate">` per entry tells crawlers the two
+ * language variants are the same page (complements the `Link` hreflang headers
+ * the next-intl middleware already sets on every response).
+ */
+function localeAlternates(path: string) {
+  return {
+    languages: {
+      tr: `${SITE_URL}${path}`,
+      en: `${SITE_URL}/en${path}`,
+      "x-default": `${SITE_URL}${path}`,
+    },
+  };
+}
+
 // Server-side API origin (same resolution the listings route uses).
 const API_BASE =
   process.env.API_INTERNAL_URL ||
@@ -66,6 +84,7 @@ async function fetchListingUrls(): Promise<MetadataRoute.Sitemap> {
         lastModified: p.updatedAt ? new Date(p.updatedAt) : undefined,
         changeFrequency: "daily" as const,
         priority: 0.7,
+        alternates: localeAlternates(`/listings/${p.id}`),
       }));
   } catch {
     return [];
@@ -77,6 +96,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     url: `${SITE_URL}${p}`,
     changeFrequency: p === "" || p === "/listings" ? "daily" : "weekly",
     priority: p === "" ? 1 : 0.6,
+    alternates: localeAlternates(p),
   }));
   const listingEntries = await fetchListingUrls();
   return [...staticEntries, ...listingEntries];

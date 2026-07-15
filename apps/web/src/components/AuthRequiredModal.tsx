@@ -1,9 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { UserIcon, UserPlusIcon } from "@heroicons/react/24/outline";
 import { Button, Modal } from "@tarodan/ui";
-import { useTranslation } from "@/i18n/LanguageContext";
+import { useLocale, useTranslations } from "next-intl";
 
 interface AuthRequiredModalProps {
   isOpen: boolean;
@@ -23,7 +23,7 @@ export default function AuthRequiredModal({
   redirectPath,
 }: AuthRequiredModalProps) {
   const router = useRouter();
-  const { t } = useTranslation();
+  const t = useTranslations();
 
   const go = (base: string) => {
     onClose();
