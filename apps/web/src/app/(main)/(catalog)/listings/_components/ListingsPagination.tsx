@@ -1,12 +1,11 @@
 "use client";
 
 import { Button } from "@tarodan/ui";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useListings } from "../_context/ListingsContext";
 
 export default function ListingsPagination() {
   const t = useTranslations();
-  const locale = useLocale();
   const { pagination, setCurrentPage } = useListings();
 
   if (pagination.totalPages <= 1) return null;
@@ -14,9 +13,11 @@ export default function ListingsPagination() {
   return (
     <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 bg-surface-elevated rounded border border-border px-4 py-4">
       <div className="text-sm text-muted">
-        {locale === "en"
-          ? `Showing ${(pagination.page - 1) * pagination.limit + 1}-${Math.min(pagination.page * pagination.limit, pagination.total)} of ${pagination.total} products`
-          : `${(pagination.page - 1) * pagination.limit + 1}-${Math.min(pagination.page * pagination.limit, pagination.total)} / ${pagination.total} ürün gösteriliyor`}
+        {t("product.showingRange", {
+          from: (pagination.page - 1) * pagination.limit + 1,
+          to: Math.min(pagination.page * pagination.limit, pagination.total),
+          total: pagination.total,
+        })}
       </div>
       <div className="flex items-center gap-2">
         <Button

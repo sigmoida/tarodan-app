@@ -106,7 +106,8 @@
     "sales": "Satış",
     "signingOut": "Çıkış yapılıyor...",
     "requestFailed": "İstek başarısız",
-    "unknown": "Bilinmiyor"
+    "unknown": "Bilinmiyor",
+    "creating": "Oluşturuluyor..."
   },
   "nav": {
     "home": "Ana Sayfa",
@@ -517,7 +518,20 @@
     "maxImagesReached": "Maksimum görsel sayısına ulaştınız",
     "uploadingImages": "Resimler yükleniyor...",
     "setMinPieces": "Set için en az 2 parça girin",
-    "addPhoto": "En az bir fotoğraf ekleyin"
+    "addPhoto": "En az bir fotoğraf ekleyin",
+    "searchResultsFor": "\"{query}\" araması",
+    "searchAttribute": "{name} ara...",
+    "tradeOnlyHint": "Sadece takas yapılabilir ürünleri göster",
+    "showingRange": "{total} üründen {from}-{to} arası gösteriliyor",
+    "tryAdjustingFilters": "Filtrelerinizi değiştirmeyi deneyin",
+    "loginRequiredToCreate": "İlan oluşturmak için giriş yapmalısınız",
+    "manufacturerAttrsHint": "Bu üreticiye özgü opsiyonel alanlar. Alıcılar bunlara göre filtreleyebilir.",
+    "selectAttribute": "{name} seçin",
+    "rotateToSeeAngles": "Tüm açılardan görüntüleyin",
+    "noReviewsWithRating": "Bu puana sahip değerlendirme yok",
+    "verifiedPurchase": "Doğrulanmış Alıcı",
+    "leaveEmptyUnlimitedStock": "Boş bırakırsanız sınırsız stok olur",
+    "multipleImagesRequired360": "360° görüntüleme için birden fazla resim gerekli"
   },
   "cart": {
     "myCart": "Sepetim",
@@ -632,7 +646,28 @@
     "selectShippingAddress": "Lütfen teslimat adresinizi seçin",
     "invalidAddressAddNew": "Seçilen adres geçersiz, lütfen yeni bir adres ekleyin",
     "enterShippingAddress": "Lütfen teslimat adresini girin",
-    "payWithPaytr": "PayTR ile Öde"
+    "payWithPaytr": "PayTR ile Öde",
+    "discountLabel": "İndirim",
+    "platformServiceFeeWithRate": "Platform Hizmet Bedeli (%3)",
+    "securePaymentCreditCard": "Kredi kartı ile güvenli ödeme",
+    "paytrRedirectNotice": "“Devam Et” butonuna bastığınızda, kart bilgilerinizi güvenli PayTR ödeme sayfasında gireceksiniz.",
+    "addressTitlePlaceholder": "Adres Başlığı (örn: Ev, İş)",
+    "guestShoppingNotice": "Üye olmadan alışveriş yapıyorsunuz. Siparişinizi takip etmek için e-posta adresinizi girin.",
+    "pleaseFillIn": "Lütfen şu alanları doldurun: {fields}",
+    "selectOrEnterShippingAddress": "Lütfen bir teslimat adresi seçin veya girin",
+    "orderCreatedPaymentFailed": "Sipariş oluşturuldu ancak ödeme başlatılamadı. Lütfen Siparişlerim sayfasından ödemeyi tamamlayın.",
+    "paymentInitFailedRetry": "Ödeme başlatılamadı. Lütfen tekrar deneyin.",
+    "completePaymentFromOrders": "Lütfen ödemeyi Siparişlerim sayfasından tamamlayın.",
+    "emailAlreadyRegistered": "Bu e-posta adresi zaten kayıtlı. Lütfen giriş yapıp alışverişe devam edin.",
+    "addressAddedUnverified": "Adres eklenmiş olabilir ancak doğrulanamadı. Lütfen sayfayı yenileyin.",
+    "fillAllRequiredWithTitle": "Adres başlığı dahil tüm zorunlu alanları doldurun (örn: Ev, İş)",
+    "selectOrEnterCompleteShippingAddress": "Lütfen teslimat adresini seçin veya eksiksiz doldurun",
+    "completeBillingAddress": "Lütfen fatura adresini doldurun",
+    "fillNameEmailPhone": "Lütfen ad, e-posta ve telefon girin",
+    "completeDeliveryAddress": "Lütfen teslimat adresini eksiksiz doldurun",
+    "shippingCalculatedAtCheckout": "Ödeme adımında hesaplanır",
+    "loginFasterCheckout": "Hızlı ödeme için giriş yapın",
+    "cartSavedAfterLogin": "Sepetiniz giriş yaptıktan sonra korunacak."
   },
   "order": {
     "myOrders": "Siparişlerim",
@@ -722,7 +757,16 @@
     "unsupportedStatus": "Desteklenmeyen durum",
     "invoiceNotReady": "Fatura henüz hazır değil",
     "invoiceNotFound": "Fatura bulunamadı",
-    "refundReasonNotAsDescribed": "Açıklamayla uyuşmuyor"
+    "refundReasonNotAsDescribed": "Açıklamayla uyuşmuyor",
+    "trackDescription": "Sipariş numaran ve e-postanla sipariş durumunu ve kargo bilgisini gör.",
+    "loadingDetails": "Sipariş bilgileriniz yükleniyor...",
+    "trackInstructions": "Sipariş numaranız ve siparişte kullandığınız e-posta adresi ile sipariş durumunu ve kargo bilgisini görebilirsiniz.",
+    "orderNumberHint": "Sipariş numarasını, satın alma sonrası gönderdiğimiz onay e-postasında bulabilirsiniz.",
+    "shipmentPreparing": "Satıcı paketi hazırlıyor. Kargo şubesine teslim edildiği anda takip bilgileri burada görünecek.",
+    "shipmentCancelled": "Bu kargo iptal edildi.",
+    "trackShipment": "Kargoyu takip et",
+    "trackAnother": "Başka sipariş sorgula",
+    "notFoundCheckDetails": "Sipariş bulunamadı. Bilgileri kontrol edin."
   },
   "trade": {
     "myTrades": "Takaslarım",
@@ -1053,7 +1097,8 @@
     "characters": "karakter",
     "collection": "Koleksiyon",
     "removeProduct": "Ürünü kaldır",
-    "collectionsCount": "{count} koleksiyon"
+    "collectionsCount": "{count} koleksiyon",
+    "startBuildingToday": "Koleksiyonunuzu bugün oluşturmaya başlayın"
   },
   "notification": {
     "notifications": "Bildirimler",

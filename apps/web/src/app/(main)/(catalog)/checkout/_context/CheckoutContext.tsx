@@ -191,7 +191,7 @@ function useCheckoutValue() {
     guestOtpInputRef,
     requestGuestCheckoutOtp,
     confirmGuestOtpModal,
-  } = useGuestOtp({ checkoutItems, t, locale, router, goToStep });
+  } = useGuestOtp({ checkoutItems, t, router, goToStep });
 
   // Payment orchestration slice (idempotency key + handleCheckout)
   const { handleCheckout } = useCheckoutSubmit({
@@ -206,7 +206,6 @@ function useCheckoutValue() {
     guestPhone,
     guestName,
     guestEmailVerificationCode,
-    locale,
     newAddressPhoneCountryCode,
     guestPhoneCountryCode,
     billingSameAsShipping,
@@ -277,19 +276,11 @@ function useCheckoutValue() {
   const handleAddressStepContinue = async () => {
     if (isAuthenticated) {
       if (!authAddressOk) {
-        toast.error(
-          locale === "en"
-            ? "Please select or enter a complete shipping address"
-            : "Lütfen teslimat adresini seçin veya eksiksiz doldurun",
-        );
+        toast.error(t("checkout.selectOrEnterCompleteShippingAddress"));
         return;
       }
       if (!billingOk) {
-        toast.error(
-          locale === "en"
-            ? "Please complete the billing address"
-            : "Lütfen fatura adresini doldurun",
-        );
+        toast.error(t("checkout.completeBillingAddress"));
         return;
       }
       goToStep(1);
@@ -297,27 +288,15 @@ function useCheckoutValue() {
     }
 
     if (!billingOk) {
-      toast.error(
-        locale === "en"
-          ? "Please complete the billing address"
-          : "Lütfen fatura adresini doldurun",
-      );
+      toast.error(t("checkout.completeBillingAddress"));
       return;
     }
     if (!guestContactOk) {
-      toast.error(
-        locale === "en"
-          ? "Please fill in your name, email and phone"
-          : "Lütfen ad, e-posta ve telefon girin",
-      );
+      toast.error(t("checkout.fillNameEmailPhone"));
       return;
     }
     if (!guestAddressOk) {
-      toast.error(
-        locale === "en"
-          ? "Please complete the delivery address"
-          : "Lütfen teslimat adresini eksiksiz doldurun",
-      );
+      toast.error(t("checkout.completeDeliveryAddress"));
       return;
     }
 

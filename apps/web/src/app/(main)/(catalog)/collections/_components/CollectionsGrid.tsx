@@ -10,14 +10,13 @@ import {
   HeartIcon,
 } from "@heroicons/react/24/outline";
 import OptimizedImage from "@/components/OptimizedImage";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { Button } from "@tarodan/ui";
 import { useCollections } from "../_context/CollectionsContext";
 import CollectionVisibilityBadge from "./CollectionVisibilityBadge";
 
 export default function CollectionsGrid() {
   const t = useTranslations();
-  const locale = useLocale();
   const {
     loading,
     displayedCollections,
@@ -58,9 +57,7 @@ export default function CollectionsGrid() {
             : t("collection.noCollections")}
         </p>
         <p className="text-subtle text-sm mb-4">
-          {locale === "en"
-            ? "Start building your collection today"
-            : "Koleksiyonunuzu bugün oluşturmaya başlayın"}
+          {t("collection.startBuildingToday")}
         </p>
         {searchQuery && (
           <Button

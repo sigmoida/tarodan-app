@@ -45,13 +45,8 @@ export function useTrackOrder(locale: string) {
     onError: (err: any) => {
       setError(
         err.response?.status === 404
-          ? locale === "en"
-            ? "Order not found. Check your details."
-            : "Sipariş bulunamadı. Bilgileri kontrol edin."
-          : err.response?.data?.message ||
-              (locale === "en"
-                ? "Could not load order"
-                : "Sipariş yüklenemedi"),
+          ? t("order.notFoundCheckDetails")
+          : err.response?.data?.message || t("order.loadFailed"),
       );
     },
   });

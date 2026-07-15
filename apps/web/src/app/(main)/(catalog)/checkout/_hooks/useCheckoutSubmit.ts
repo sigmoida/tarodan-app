@@ -6,8 +6,7 @@ import { useRef, type Dispatch, type SetStateAction } from "react";
 import toast from "react-hot-toast";
 import { ordersApi, paymentsApi } from "@/lib/api";
 import { getFullPhoneNumber, normalizePhoneForPayload } from "@/lib/phone";
-import { useLocale, useTranslations } from "next-intl";
-import type { Locale } from "@tarodan/i18n";
+import { useTranslations } from "next-intl";
 import type { Address, CheckoutItem } from "../_lib/types";
 
 type Translate = ReturnType<typeof useTranslations<never>>;
@@ -31,7 +30,6 @@ export function useCheckoutSubmit({
   guestPhone,
   guestName,
   guestEmailVerificationCode,
-  locale,
   newAddressPhoneCountryCode,
   guestPhoneCountryCode,
   billingSameAsShipping,
@@ -57,7 +55,6 @@ export function useCheckoutSubmit({
   guestPhone: string;
   guestName: string;
   guestEmailVerificationCode: string;
-  locale: Locale;
   newAddressPhoneCountryCode: string;
   guestPhoneCountryCode: string;
   billingSameAsShipping: boolean;
@@ -229,9 +226,7 @@ export function useCheckoutSubmit({
 
           if (missingFields.length > 0) {
             toast.error(
-              locale === "en"
-                ? `Please fill in: ${missingFields.join(", ")}`
-                : `Lütfen şu alanları doldurun: ${missingFields.join(", ")}`,
+              t("checkout.pleaseFillIn", { fields: missingFields.join(", ") }),
             );
           } else {
             toast.error(t("checkout.enterShippingAddress"));
@@ -346,11 +341,7 @@ export function useCheckoutSubmit({
                   zipCode: addr.zipCode?.trim() || undefined,
                 };
               } else {
-                toast.error(
-                  locale === "en"
-                    ? "Please select or enter a shipping address"
-                    : "Lütfen bir teslimat adresi seçin veya girin",
-                );
+                toast.error(t("checkout.selectOrEnterShippingAddress"));
                 setIsLoading(false);
                 return;
               }
@@ -478,11 +469,7 @@ export function useCheckoutSubmit({
           null;
 
         if (!checkoutGroupId || !orderId) {
-          toast.error(
-            locale === "en"
-              ? "Order was created but could not start payment. Please go to My Orders to complete payment."
-              : "Sipariş oluşturuldu ancak ödeme başlatılamadı. Lütfen Siparişlerim sayfasından ödemeyi tamamlayın.",
-          );
+          toast.error(t("checkout.orderCreatedPaymentFailed"));
           setIsLoading(false);
           router.push("/profile/orders");
           return;
@@ -517,11 +504,7 @@ export function useCheckoutSubmit({
               window.location.href = paymentData.paymentUrl;
               return;
             } else {
-              throw new Error(
-                locale === "en"
-                  ? "Failed to initiate payment"
-                  : "Ödeme başlatılamadı",
-              );
+              throw new Error(t("payment.startFailed"));
             }
           } catch (paymentError: any) {
             const msg = paymentError.response?.data?.message ?? "";
@@ -546,23 +529,14 @@ export function useCheckoutSubmit({
               router.push(`/products/unavailable/${stockoutProductId}`);
               return;
             }
-            toast.error(
-              msg ||
-                (locale === "en"
-                  ? "Failed to initiate payment. Please try again."
-                  : "Ödeme başlatılamadı. Lütfen tekrar deneyin."),
-            );
+            toast.error(msg || t("checkout.paymentInitFailedRetry"));
             return;
           }
         }
       }
 
       // Beklenmeyen durum: sipariş oluştu ama ödeme adımına düşülemedi.
-      toast.error(
-        locale === "en"
-          ? "Please complete payment from My Orders."
-          : "Lütfen ödemeyi Siparişlerim sayfasından tamamlayın.",
-      );
+      toast.error(t("checkout.completePaymentFromOrders"));
       router.push("/profile/orders");
     } catch (error: any) {
       toast.error(error.response?.data?.message || t("checkout.orderFailed"));

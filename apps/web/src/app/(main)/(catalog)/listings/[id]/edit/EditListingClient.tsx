@@ -195,11 +195,7 @@ export default function EditListingClient() {
           commissionPreview={commissionPreview}
           commissionPreviewLoading={commissionPreviewLoading}
           quantityPlaceholder={t("membership.unlimited")}
-          quantityHelper={
-            locale === "en"
-              ? "Leave empty for unlimited stock"
-              : "Boş bırakırsanız sınırsız stok olur"
-          }
+          quantityHelper={t("product.leaveEmptyUnlimitedStock")}
         />
         <DiscountSection
           saleData={saleData}

@@ -90,11 +90,7 @@ export default function OfferModal() {
         <FormTextarea
           name="message"
           label={t("offer.offerMessage")}
-          placeholder={
-            locale === "en"
-              ? "Message you want to send to seller..."
-              : "Satıcıya iletmek istediğiniz mesaj..."
-          }
+          placeholder={t("product.offerMessagePlaceholder")}
           rows={4}
           maxLength={500}
         />

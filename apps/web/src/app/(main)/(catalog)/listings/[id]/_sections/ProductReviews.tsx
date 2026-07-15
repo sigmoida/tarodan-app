@@ -15,7 +15,6 @@ import { useListingDetail } from "../_context/ListingDetailContext";
 export default function ProductReviews() {
   const {
     t,
-    locale,
     reviews,
     reviewStats,
     reviewsLoading,
@@ -134,9 +133,7 @@ export default function ProductReviews() {
           <ChatBubbleLeftRightIcon className="w-12 h-12 mx-auto mb-4 text-subtle" />
           <p className="text-lg font-medium text-heading mb-2">
             {reviewFilterScore
-              ? locale === "en"
-                ? "No reviews with this rating"
-                : "Bu puana sahip değerlendirme yok"
+              ? t("product.noReviewsWithRating")
               : t("product.noReviews")}
           </p>
           {!reviewFilterScore && (
@@ -161,9 +158,7 @@ export default function ProductReviews() {
                     <span className="font-medium text-heading">
                       {review.isAnonymous ||
                       (!review.userName && !review.user?.displayName)
-                        ? locale === "en"
-                          ? "Anonymous"
-                          : "Anonim"
+                        ? t("collection.anonymous")
                         : review.userName || review.user?.displayName}
                     </span>
                     <div className="flex">
@@ -184,9 +179,7 @@ export default function ProductReviews() {
                         size="sm"
                         icon={<CheckBadgeIcon className="h-3.5 w-3.5" />}
                       >
-                        {locale === "en"
-                          ? "Verified Purchase"
-                          : "Doğrulanmış Alıcı"}
+                        {t("product.verifiedPurchase")}
                       </Badge>
                     )}
                     <span className="text-sm text-muted">

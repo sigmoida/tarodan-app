@@ -55,11 +55,7 @@ export default function TrackOrderClient() {
       <PageHeader
         onBack={handleBack}
         title={t("order.trackOrder")}
-        description={
-          locale === "en"
-            ? "Enter your order number and email to view its status and tracking."
-            : "Sipariş numaran ve e-postanla sipariş durumunu ve kargo bilgisini gör."
-        }
+        description={t("order.trackDescription")}
       />
 
       {!order ? (
@@ -69,19 +65,11 @@ export default function TrackOrderClient() {
           searchParams.get("email") ? (
             <div className="py-12 flex flex-col items-center justify-center gap-4">
               <Spinner size="lg" />
-              <p className="text-muted">
-                {locale === "en"
-                  ? "Loading order details..."
-                  : "Sipariş bilgileriniz yükleniyor..."}
-              </p>
+              <p className="text-muted">{t("order.loadingDetails")}</p>
             </div>
           ) : (
             <>
-              <p className="text-muted mb-4">
-                {locale === "en"
-                  ? "Enter your order number and the email address you used when placing the order to view status and tracking."
-                  : "Sipariş numaranız ve siparişte kullandığınız e-posta adresi ile sipariş durumunu ve kargo bilgisini görebilirsiniz."}
-              </p>
+              <p className="text-muted mb-4">{t("order.trackInstructions")}</p>
               <Form
                 form={form}
                 onSubmit={(v) => lookup(v, { toastOnError: true })}
@@ -120,9 +108,7 @@ export default function TrackOrderClient() {
                 </Button>
               </Form>
               <p className="text-sm text-muted mt-4">
-                {locale === "en"
-                  ? "You can find the order number in the confirmation email we sent after your purchase."
-                  : "Sipariş numarasını, satın alma sonrası gönderdiğimiz onay e-postasında bulabilirsiniz."}
+                {t("order.orderNumberHint")}
               </p>
             </>
           )}
@@ -234,16 +220,12 @@ export default function TrackOrderClient() {
                   </h3>
                   {isPending && (
                     <p className="text-sm bg-info-50 border border-info-200 rounded p-3 text-info-800">
-                      {locale === "en"
-                        ? "The seller is preparing the package. Tracking details will appear once it's handed over to the cargo branch."
-                        : "Satıcı paketi hazırlıyor. Kargo şubesine teslim edildiği anda takip bilgileri burada görünecek."}
+                      {t("order.shipmentPreparing")}
                     </p>
                   )}
                   {isCancelled && (
                     <p className="text-sm bg-danger-50 border border-danger-200 rounded p-3 text-danger-800">
-                      {locale === "en"
-                        ? "This shipment has been cancelled."
-                        : "Bu kargo iptal edildi."}
+                      {t("order.shipmentCancelled")}
                     </p>
                   )}
                   {showTracking && (
@@ -275,10 +257,7 @@ export default function TrackOrderClient() {
                           rel="noopener noreferrer"
                           className="text-primary-500 hover:underline"
                         >
-                          {locale === "en"
-                            ? "Track shipment"
-                            : "Kargoyu takip et"}{" "}
-                          →
+                          {t("order.trackShipment")} →
                         </a>
                       )}
                     </div>
@@ -321,9 +300,7 @@ export default function TrackOrderClient() {
               }}
               className="flex-1"
             >
-              {locale === "en"
-                ? "Track another order"
-                : "Başka sipariş sorgula"}
+              {t("order.trackAnother")}
             </Button>
             <ButtonLink href="/listings" className="flex-1 text-center">
               {t("cart.continueShopping")}

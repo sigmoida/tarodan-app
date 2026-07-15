@@ -12,7 +12,7 @@ import { SectionCard } from "@/components/ui";
 import { useCheckout } from "../_context/CheckoutContext";
 
 export default function PaymentStep() {
-  const { t, locale, shippingLoading, nextStep } = useCheckout();
+  const { t, shippingLoading, nextStep } = useCheckout();
 
   return (
     <SectionCard title={t("checkout.paymentMethod")} className="p-6">
@@ -44,9 +44,7 @@ export default function PaymentStep() {
           <div className="flex-1">
             <p className="font-semibold">{t("checkout.payWithPaytr")}</p>
             <p className="text-muted text-sm">
-              {locale === "en"
-                ? "Secure payment with credit card"
-                : "Kredi kartı ile güvenli ödeme"}
+              {t("checkout.securePaymentCreditCard")}
             </p>
           </div>
           <div className="text-2xl">🏦</div>
@@ -55,11 +53,7 @@ export default function PaymentStep() {
 
       {/* PayTR güvenli ödeme bilgilendirmesi */}
       <div className="mt-6 p-4 bg-surface rounded border border-border">
-        <p className="text-sm text-body">
-          {locale === "en"
-            ? "Click 'Continue' to proceed. Your card details will be entered securely on the PayTR payment page."
-            : "“Devam Et” butonuna bastığınızda, kart bilgilerinizi güvenli PayTR ödeme sayfasında gireceksiniz."}
-        </p>
+        <p className="text-sm text-body">{t("checkout.paytrRedirectNotice")}</p>
         <div className="mt-3 flex items-center gap-2 text-xs text-muted">
           <ShieldCheckIcon className="w-4 h-4 text-success-500" />
           256-bit SSL ile şifrelenmiş güvenli ödeme

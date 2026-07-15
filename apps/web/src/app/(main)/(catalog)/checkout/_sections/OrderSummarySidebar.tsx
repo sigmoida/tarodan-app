@@ -16,7 +16,6 @@ const fmtTL = (n: number) =>
 export default function OrderSummarySidebar() {
   const {
     t,
-    locale,
     checkoutItems,
     quote,
     quoteLoading,
@@ -98,9 +97,7 @@ export default function OrderSummarySidebar() {
               <TagIcon className="w-3.5 h-3.5 shrink-0" />
               {appliedCouponCode
                 ? `Kupon (${appliedCouponCode})`
-                : locale === "en"
-                  ? "Discount"
-                  : "İndirim"}
+                : t("checkout.discountLabel")}
             </span>
             <span className="font-medium">-{fmtTL(couponDiscount)} TL</span>
           </div>
@@ -109,9 +106,7 @@ export default function OrderSummarySidebar() {
         {(quote?.pricing?.buyerFeeAmount ?? 0) > 0 && (
           <div className="flex justify-between items-center">
             <span className="text-muted flex items-center gap-1">
-              {locale === "en"
-                ? "Platform Service Fee (3%)"
-                : "Platform Hizmet Bedeli (%3)"}
+              {t("checkout.platformServiceFeeWithRate")}
               <a
                 href="/platform-service-fee"
                 target="_blank"

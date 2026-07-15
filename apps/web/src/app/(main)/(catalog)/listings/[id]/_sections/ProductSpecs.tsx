@@ -55,9 +55,7 @@ export default function ProductSpecs() {
     (listing.quantity !== undefined && listing.quantity !== null);
   const stockValue =
     available === null || available === undefined
-      ? locale === "en"
-        ? "Unlimited"
-        : "Sınırsız"
+      ? t("membership.unlimited")
       : available > 0
         ? `${available} ${t("product.available")}`
         : t("product.stockFinished");
