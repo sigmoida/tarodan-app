@@ -1,5 +1,6 @@
 /** @format */
 
+import type { Metadata } from "next";
 import { Noto_Sans } from "next/font/google";
 import { notFound } from "next/navigation";
 import { NextIntlClientProvider } from "next-intl";
@@ -22,6 +23,27 @@ const notoSans = Noto_Sans({
  */
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
+}
+
+/**
+ * Per-locale Open Graph language, merged over the global metadata in the root
+ * layout. `og:locale` must reflect the page's actual language (tr_TR vs en_US)
+ * with the other locale listed as an alternate, so social/link previews render
+ * in the right language. hreflang itself is emitted via the sitemap alternates
+ * + the next-intl middleware's `Link` headers (#214c).
+ */
+export function generateMetadata({
+  params: { locale },
+}: {
+  params: { locale: string };
+}): Metadata {
+  const isEn = locale === "en";
+  return {
+    openGraph: {
+      locale: isEn ? "en_US" : "tr_TR",
+      alternateLocale: isEn ? ["tr_TR"] : ["en_US"],
+    },
+  };
 }
 
 /**
