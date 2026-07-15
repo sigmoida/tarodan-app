@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 
 /**
  * Global 404. Rendered at the root level for all unmatched URLs (and

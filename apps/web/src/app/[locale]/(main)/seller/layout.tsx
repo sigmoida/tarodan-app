@@ -2,7 +2,8 @@
 
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { redirect } from "next/navigation";
+import { redirect } from "@/i18n/navigation";
+import { getLocale } from "next-intl/server";
 import { getSession } from "@/lib/server/session";
 
 /**
@@ -21,6 +22,7 @@ export default async function SellerLayout({
   children: ReactNode;
 }) {
   const session = await getSession();
-  if (!session) redirect("/login?redirect=/seller");
+  if (!session)
+    redirect({ href: "/login?redirect=/seller", locale: await getLocale() });
   return <>{children}</>;
 }

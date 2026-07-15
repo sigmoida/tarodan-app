@@ -1,6 +1,6 @@
 /** @format */
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { TrophyIcon, EyeIcon, HeartIcon } from "@heroicons/react/24/outline";
 import { Badge, type BadgeVariant } from "@tarodan/ui";
 import SectionCard from "@/components/ui/SectionCard";

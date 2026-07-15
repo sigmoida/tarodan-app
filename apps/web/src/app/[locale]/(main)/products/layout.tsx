@@ -2,7 +2,8 @@
 
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { redirect } from "next/navigation";
+import { redirect } from "@/i18n/navigation";
+import { getLocale } from "next-intl/server";
 import { getSession } from "@/lib/server/session";
 
 /**
@@ -20,6 +21,7 @@ export default async function ProductsLayout({
   children: ReactNode;
 }) {
   const session = await getSession();
-  if (!session) redirect("/login?redirect=/products");
+  if (!session)
+    redirect({ href: "/login?redirect=/products", locale: await getLocale() });
   return <>{children}</>;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { Button, Checkbox } from "@tarodan/ui";
 import { DocPage } from "@/components/layout/DocPage";

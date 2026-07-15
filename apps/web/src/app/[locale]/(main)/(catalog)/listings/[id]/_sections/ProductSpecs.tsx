@@ -3,7 +3,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { SectionCard } from "@/components/ui";
 import { formatCondition } from "@/lib/format";
 import { useListingDetail } from "../_context/ListingDetailContext";

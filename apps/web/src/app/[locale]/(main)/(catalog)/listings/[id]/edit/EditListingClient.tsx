@@ -1,6 +1,7 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
+import { useParams } from "next/navigation";
 import { Button, Spinner } from "@tarodan/ui";
 import { Form } from "@tarodan/ui/form";
 import { PageShell } from "@/components/layout/PageShell";

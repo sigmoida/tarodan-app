@@ -10,7 +10,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
+import { useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useStepper } from "@tarodan/ui";

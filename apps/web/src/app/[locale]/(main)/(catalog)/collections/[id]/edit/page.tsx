@@ -1,7 +1,8 @@
 /** @format */
 
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
+import { redirect } from "@/i18n/navigation";
+import { getLocale } from "next-intl/server";
 import { getSession } from "@/lib/server/session";
 import EditCollectionClient from "./EditCollectionClient";
 
@@ -20,6 +21,10 @@ export default async function EditCollectionPage({
   params: { id: string };
 }) {
   const session = await getSession();
-  if (!session) redirect(`/login?redirect=/collections/${params.id}/edit`);
+  if (!session)
+    redirect({
+      href: `/login?redirect=/collections/${params.id}/edit`,
+      locale: await getLocale(),
+    });
   return <EditCollectionClient />;
 }

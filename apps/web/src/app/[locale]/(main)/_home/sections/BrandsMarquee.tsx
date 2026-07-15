@@ -2,7 +2,7 @@
 
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import OptimizedImage from "@/components/OptimizedImage";
 import { useHome } from "../context/HomeDataContext";
 

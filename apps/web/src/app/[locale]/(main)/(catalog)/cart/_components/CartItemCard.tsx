@@ -3,7 +3,7 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { TrashIcon } from "@heroicons/react/24/outline";
 import { IconButton } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";

@@ -11,7 +11,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
+import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { HeartIcon } from "@heroicons/react/24/outline";

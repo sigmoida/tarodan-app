@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { useAuthStore } from "@/stores/authStore";
 import { useTranslations } from "next-intl";
 import { TransitionLoader } from "@/components/TransitionLoader";

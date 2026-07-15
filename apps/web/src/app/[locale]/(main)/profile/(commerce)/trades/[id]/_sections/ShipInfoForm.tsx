@@ -1,6 +1,6 @@
 /** @format */
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { TruckIcon } from "@heroicons/react/24/outline";
 import { Button, Select, Spinner } from "@tarodan/ui";
 import { useTranslations } from "next-intl";

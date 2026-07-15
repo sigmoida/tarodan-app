@@ -1,6 +1,6 @@
 /** @format */
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
 import OptimizedImage from "@/components/OptimizedImage";
 import { formatTL } from "@/lib/format";

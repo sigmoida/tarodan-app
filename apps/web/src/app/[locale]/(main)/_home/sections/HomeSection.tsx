@@ -3,7 +3,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { ChevronRightIcon } from "@heroicons/react/24/outline";
 import { Button } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";

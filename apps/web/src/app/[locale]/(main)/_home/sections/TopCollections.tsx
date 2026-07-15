@@ -2,7 +2,7 @@
 
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { formatCount } from "@/lib/format";
 import { CheckBadgeIcon } from "@heroicons/react/24/solid";
 import OptimizedImage from "@/components/OptimizedImage";

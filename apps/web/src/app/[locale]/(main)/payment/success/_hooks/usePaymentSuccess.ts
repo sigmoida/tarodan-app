@@ -3,7 +3,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
+import { useSearchParams } from "next/navigation";
 import { paymentsApi, api } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import { useLocale, useTranslations } from "next-intl";

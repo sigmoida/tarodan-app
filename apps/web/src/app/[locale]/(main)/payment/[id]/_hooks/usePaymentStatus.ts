@@ -3,7 +3,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { paymentsApi } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";

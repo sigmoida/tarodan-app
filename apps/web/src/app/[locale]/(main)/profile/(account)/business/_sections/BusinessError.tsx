@@ -1,6 +1,6 @@
 /** @format */
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { Button } from "@tarodan/ui";
 import { EmptyStateCard } from "@/components/ui";
 

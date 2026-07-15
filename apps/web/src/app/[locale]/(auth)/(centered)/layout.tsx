@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
+import { Link, usePathname } from "@/i18n/navigation";
 import { heroImageUrl } from "@/lib/assetCdn";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import type { MessageKey } from "@tarodan/i18n";
 

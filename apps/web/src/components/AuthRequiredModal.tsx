@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { UserIcon, UserPlusIcon } from "@heroicons/react/24/outline";
 import { Button, Modal } from "@tarodan/ui";
 import { useLocale, useTranslations } from "next-intl";

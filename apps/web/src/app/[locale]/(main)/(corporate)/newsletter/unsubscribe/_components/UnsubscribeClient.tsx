@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { CheckCircleIcon, EnvelopeIcon } from "@heroicons/react/24/outline";
 import { Button } from "@tarodan/ui";
 import { Form, FormInput, FormTextarea } from "@tarodan/ui/form";
