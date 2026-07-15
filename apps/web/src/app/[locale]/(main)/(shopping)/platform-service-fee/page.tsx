@@ -4,13 +4,20 @@ import type { Metadata } from "next";
 import { Link } from "@/i18n/navigation";
 import { DocPage } from "@/components/layout/DocPage";
 import SectionCard from "@/components/ui/SectionCard";
+import { localizedCanonical } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Platform Hizmet Bedeli · Tarodan",
-  description:
-    "TARODAN Platform Hizmet Bedeli nedir, nasıl hesaplanır, nereye gider ve iade durumunda ne olur? Şeffaf ücretlendirme hakkında bilmeniz gerekenler.",
-  alternates: { canonical: "/platform-service-fee" },
-};
+export function generateMetadata({
+  params: { locale },
+}: {
+  params: { locale: string };
+}): Metadata {
+  return {
+    title: "Platform Hizmet Bedeli · Tarodan",
+    description:
+      "TARODAN Platform Hizmet Bedeli nedir, nasıl hesaplanır, nereye gider ve iade durumunda ne olur? Şeffaf ücretlendirme hakkında bilmeniz gerekenler.",
+    alternates: localizedCanonical(locale, "/platform-service-fee"),
+  };
+}
 
 export default function PlatformHizmetBedeliPage() {
   return (

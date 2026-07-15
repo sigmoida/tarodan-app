@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
 import { getServerQueryClient } from "@/lib/query/server";
 import { queryKeys } from "@/lib/query/keys";
+import { localizedCanonical, localizedPath } from "@/lib/seo";
 import MembershipClient from "./MembershipClient";
 
 const API_BASE =
@@ -11,19 +12,25 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
   "http://localhost:3001";
 
-export const metadata: Metadata = {
-  title: "Üyelik Planları · Tarodan",
-  description:
-    "Tarodan üyelik planları: ilan limitleri, takas, koleksiyonlar, reklamsız deneyim ve öne çıkan ilanlar. Size uygun planı seçin.",
-  alternates: { canonical: "/membership" },
-  openGraph: {
+export function generateMetadata({
+  params: { locale },
+}: {
+  params: { locale: string };
+}): Metadata {
+  return {
     title: "Üyelik Planları · Tarodan",
-    description: "Size uygun Tarodan üyelik planını seçin.",
-    type: "website",
-    url: "/membership",
-  },
-  robots: { index: true, follow: true },
-};
+    description:
+      "Tarodan üyelik planları: ilan limitleri, takas, koleksiyonlar, reklamsız deneyim ve öne çıkan ilanlar. Size uygun planı seçin.",
+    alternates: localizedCanonical(locale, "/membership"),
+    openGraph: {
+      title: "Üyelik Planları · Tarodan",
+      description: "Size uygun Tarodan üyelik planını seçin.",
+      type: "website",
+      url: localizedPath(locale, "/membership"),
+    },
+    robots: { index: true, follow: true },
+  };
+}
 
 /**
  * Public membership page. Server-fetches the tier prices/limits (public,
