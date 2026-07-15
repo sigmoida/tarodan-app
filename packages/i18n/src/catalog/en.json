@@ -106,7 +106,8 @@
     "sales": "Sales",
     "signingOut": "Signing out...",
     "requestFailed": "Request failed",
-    "unknown": "Unknown"
+    "unknown": "Unknown",
+    "creating": "Creating..."
   },
   "nav": {
     "home": "Home",
@@ -517,7 +518,20 @@
     "maxImagesReached": "Maximum number of images reached",
     "uploadingImages": "Uploading images...",
     "setMinPieces": "A set needs at least 2 pieces",
-    "addPhoto": "Please add at least one photo"
+    "addPhoto": "Please add at least one photo",
+    "searchResultsFor": "Results for \"{query}\"",
+    "searchAttribute": "Search {name}...",
+    "tradeOnlyHint": "Only show items available for trade",
+    "showingRange": "Showing {from}-{to} of {total} products",
+    "tryAdjustingFilters": "Try adjusting your filters",
+    "loginRequiredToCreate": "Please login to create a listing",
+    "manufacturerAttrsHint": "Optional fields specific to this manufacturer. Buyers can filter by these.",
+    "selectAttribute": "Select {name}",
+    "rotateToSeeAngles": "Rotate to see from all angles",
+    "noReviewsWithRating": "No reviews with this rating",
+    "verifiedPurchase": "Verified Purchase",
+    "leaveEmptyUnlimitedStock": "Leave empty for unlimited stock",
+    "multipleImagesRequired360": "Multiple images required for 360° view"
   },
   "cart": {
     "myCart": "My Cart",
@@ -632,7 +646,28 @@
     "selectShippingAddress": "Please select your delivery address",
     "invalidAddressAddNew": "Selected address is invalid, please add a new address",
     "enterShippingAddress": "Please enter your delivery address",
-    "payWithPaytr": "Pay with PayTR"
+    "payWithPaytr": "Pay with PayTR",
+    "discountLabel": "Discount",
+    "platformServiceFeeWithRate": "Platform Service Fee (3%)",
+    "securePaymentCreditCard": "Secure payment with credit card",
+    "paytrRedirectNotice": "Click ''Continue'' to proceed. Your card details will be entered securely on the PayTR payment page.",
+    "addressTitlePlaceholder": "Address Title (e.g. Home, Work)",
+    "guestShoppingNotice": "You are shopping without logging in. Enter your email to track your order.",
+    "pleaseFillIn": "Please fill in: {fields}",
+    "selectOrEnterShippingAddress": "Please select or enter a shipping address",
+    "orderCreatedPaymentFailed": "Order was created but could not start payment. Please go to My Orders to complete payment.",
+    "paymentInitFailedRetry": "Failed to initiate payment. Please try again.",
+    "completePaymentFromOrders": "Please complete payment from My Orders.",
+    "emailAlreadyRegistered": "This email is already registered. Please log in to continue.",
+    "addressAddedUnverified": "Address may have been added, but could not verify. Please refresh the page.",
+    "fillAllRequiredWithTitle": "Please fill all required fields including address title (e.g. Home, Work)",
+    "selectOrEnterCompleteShippingAddress": "Please select or enter a complete shipping address",
+    "completeBillingAddress": "Please complete the billing address",
+    "fillNameEmailPhone": "Please fill in your name, email and phone",
+    "completeDeliveryAddress": "Please complete the delivery address",
+    "shippingCalculatedAtCheckout": "Calculated at checkout",
+    "loginFasterCheckout": "Login for faster checkout",
+    "cartSavedAfterLogin": "Your cart will be saved after login."
   },
   "order": {
     "myOrders": "My Orders",
@@ -722,7 +757,16 @@
     "unsupportedStatus": "Unsupported status",
     "invoiceNotReady": "Invoice not ready",
     "invoiceNotFound": "Invoice not found",
-    "refundReasonNotAsDescribed": "Not as described"
+    "refundReasonNotAsDescribed": "Not as described",
+    "trackDescription": "Enter your order number and email to view its status and tracking.",
+    "loadingDetails": "Loading order details...",
+    "trackInstructions": "Enter your order number and the email address you used when placing the order to view status and tracking.",
+    "orderNumberHint": "You can find the order number in the confirmation email we sent after your purchase.",
+    "shipmentPreparing": "The seller is preparing the package. Tracking details will appear once it''s handed over to the cargo branch.",
+    "shipmentCancelled": "This shipment has been cancelled.",
+    "trackShipment": "Track shipment",
+    "trackAnother": "Track another order",
+    "notFoundCheckDetails": "Order not found. Check your details."
   },
   "trade": {
     "myTrades": "My Trades",
@@ -1053,7 +1097,8 @@
     "createNewCollection": "Create New Collection",
     "collection": "Collection",
     "removeProduct": "Remove product",
-    "collectionsCount": "{count} collections"
+    "collectionsCount": "{count} collections",
+    "startBuildingToday": "Start building your collection today"
   },
   "notification": {
     "notifications": "Notifications",

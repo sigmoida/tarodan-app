@@ -3,10 +3,12 @@
 "use client";
 
 import { Button } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
 import { useNewListing } from "../_context/NewListingContext";
 
 export default function SubmitBar() {
-  const { locale, router, form } = useNewListing();
+  const t = useTranslations();
+  const { router, form } = useNewListing();
   const isSubmitting = form.formState.isSubmitting;
   return (
     <div className="flex gap-3">
@@ -24,13 +26,7 @@ export default function SubmitBar() {
         className="flex-1"
         disabled={isSubmitting}
       >
-        {isSubmitting
-          ? locale === "en"
-            ? "Creating..."
-            : "Oluşturuluyor..."
-          : locale === "en"
-            ? "Create Listing"
-            : "İlanı Oluştur"}
+        {isSubmitting ? t("common.creating") : t("product.createListing")}
       </Button>
     </div>
   );

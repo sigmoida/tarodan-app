@@ -10,7 +10,7 @@ import { useNewListing } from "../_context/NewListingContext";
 
 export default function ManufacturerAttributesSection() {
   const t = useTranslations();
-  const { locale, manufacturerList, manufacturerAttrGroups } = useNewListing();
+  const { manufacturerList, manufacturerAttrGroups } = useNewListing();
   const { watch, setValue } = useFormContext();
   const manufacturerId = watch("manufacturerId");
   const customAttributes: Record<string, string[]> =
@@ -34,9 +34,7 @@ export default function ManufacturerAttributesSection() {
       title={`${manufacturerName ?? ""} ${t("product.detailsSuffix")}`}
     >
       <p className="text-xs text-muted -mt-2 mb-4">
-        {locale === "en"
-          ? "Optional fields specific to this manufacturer. Buyers can filter by these."
-          : "Bu üreticiye özgü opsiyonel alanlar. Alıcılar bunlara göre filtreleyebilir."}
+        {t("product.manufacturerAttrsHint")}
       </p>
       <div className="space-y-4">
         {manufacturerAttrGroups.map((group) => {
@@ -58,11 +56,9 @@ export default function ManufacturerAttributesSection() {
                   onChange={(e) =>
                     setGroup(group.slug, e.target.value ? [e.target.value] : [])
                   }
-                  placeholder={
-                    locale === "en"
-                      ? `Select ${group.name.toLowerCase()}`
-                      : `${group.name} seçin`
-                  }
+                  placeholder={t("product.selectAttribute", {
+                    name: group.name,
+                  })}
                   options={group.attributes.map((a) => ({
                     value: a.slug,
                     label: a.label,

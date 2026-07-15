@@ -106,11 +106,7 @@ function useNewListingValue() {
   useEffect(() => {
     if (authLoading) return;
     if (!isAuthenticated) {
-      toast.error(
-        locale === "en"
-          ? "Please login to create a listing"
-          : "İlan oluşturmak için giriş yapmalısınız",
-      );
+      toast.error(t("product.loginRequiredToCreate"));
       router.push("/login?redirect=/listings/new");
       return;
     }
@@ -182,11 +178,7 @@ function useNewListingValue() {
       };
 
       await listingsApi.create(payload as any);
-      toast.success(
-        locale === "en"
-          ? "Your listing has been created! Pending approval."
-          : "İlanınız oluşturuldu! Onay bekliyor.",
-      );
+      toast.success(t("product.listingCreated"));
       await refreshUser();
       await refetchLimits();
       router.push("/profile/listings?status=pending");

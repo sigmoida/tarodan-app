@@ -34,7 +34,6 @@ export default function SidebarFilters({
 }: SidebarFiltersProps) {
   const {
     t,
-    locale,
     openSections,
     setOpenSections,
     brandSearch,
@@ -338,11 +337,9 @@ export default function SidebarFilters({
                 {showSearch && (
                   <Input
                     type="text"
-                    placeholder={
-                      locale === "en"
-                        ? `Search ${group.name}...`
-                        : `${group.name} ara...`
-                    }
+                    placeholder={t("product.searchAttribute", {
+                      name: group.name,
+                    })}
                     value={searchTerm}
                     onChange={(e) =>
                       setCustomAttrSearch((s) => ({
@@ -493,9 +490,7 @@ export default function SidebarFilters({
                   {t("product.tradeAvailable")}
                 </span>
                 <p className="text-xs text-muted">
-                  {locale === "en"
-                    ? "Only show items available for trade"
-                    : "Sadece takas yapılabilir ürünleri göster"}
+                  {t("product.tradeOnlyHint")}
                 </p>
               </div>
             </label>

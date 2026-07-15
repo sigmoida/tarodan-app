@@ -19,7 +19,6 @@ export default function Product360Modal() {
   const {
     listing,
     t,
-    locale,
     images,
     show360Modal,
     is360Playing,
@@ -53,9 +52,7 @@ export default function Product360Modal() {
                 {t("product.view360")}
               </h3>
               <p className="text-inverted/60 text-sm">
-                {locale === "en"
-                  ? "Rotate to see from all angles"
-                  : "Tüm açılardan görüntüleyin"}
+                {t("product.rotateToSeeAngles")}
               </p>
             </div>
           </div>

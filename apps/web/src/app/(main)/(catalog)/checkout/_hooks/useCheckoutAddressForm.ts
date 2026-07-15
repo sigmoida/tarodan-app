@@ -137,11 +137,7 @@ export function useCheckoutAddressForm({
         toast.success(t("address.addressAdded"));
       } else {
         await invalidateAddresses();
-        toast.error(
-          locale === "en"
-            ? "Address may have been added, but could not verify. Please refresh the page."
-            : "Adres eklenmiş olabilir ancak doğrulanamadı. Lütfen sayfayı yenileyin.",
-        );
+        toast.error(t("checkout.addressAddedUnverified"));
       }
     },
     onError: async (error: any) => {
@@ -159,11 +155,7 @@ export function useCheckoutAddressForm({
   const handleAddAddress = async () => {
     const parsed = savedAddressSchema(locale).safeParse(newAddress);
     if (!parsed.success) {
-      toast.error(
-        locale === "en"
-          ? "Please fill all required fields including address title (e.g. Home, Work)"
-          : "Adres başlığı dahil tüm zorunlu alanları doldurun (örn: Ev, İş)",
-      );
+      toast.error(t("checkout.fillAllRequiredWithTitle"));
       return;
     }
 
