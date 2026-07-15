@@ -352,15 +352,23 @@ export class PaymentRefundService {
           }
         }
 
-        // Ledger: pending/earned → refunded (Faz 3B.6). Adet bazlı KISMİ iadede
-        // komisyonu tamamen "refunded" işaretleme — platform, alıcıda kalan adetlerin
-        // komisyonunu korur (kısmi komisyon mahsubu Faz 6 ileri iş; cash zaten hold
-        // subdivision ile doğru). Yalnız TAM iadede ledger refunded olur.
+        // #88: Ledger'ı iade oranınca PRO-RATE et (kısmi iadede de). Original alanlar
+        // korunur; refunded* kümülatif artar → net komisyon = original - refunded
+        // (elogo net faturalar). Kümülatif tam iadeye ulaşınca status=refunded olur ve
+        // e-Arşiv reverse tetiklenir (eski davranış: yalnız tam iadede reverse — korunur).
         const ledgerFullThreshold = isGroupPayment
           ? Number(refundTargetOrder!.totalAmount)
           : Number(payment.amount);
+        const ledgerPortion =
+          ledgerFullThreshold > 0
+            ? Math.min(amountToRefund / ledgerFullThreshold, 1)
+            : 1;
+        await this.commissionLedger.applyRefund(orderId, ledgerPortion, tx);
+        // e-Arşiv reverse tetiği ESKİ davranışla AYNI: tam iade tutarında tetiklenir —
+        // ledger'a BAĞLAMA. handleOrderRefund siparişin kesilmiş TÜM faturalarını geri
+        // alır (platform_sale gibi ledger'sız ama faturalı siparişlerde de gerekir);
+        // ledger.fullyRefunded'a bağlarsak ledger'sız tam iadede reverse atlanırdı.
         if (amountToRefund >= ledgerFullThreshold) {
-          await this.commissionLedger.markRefunded(orderId, tx);
           einvoiceReverse = true;
         }
 

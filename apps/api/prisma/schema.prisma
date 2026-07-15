@@ -1147,6 +1147,12 @@ model CommissionLedger {
   buyerFee             Decimal                @map("buyer_fee") @db.Decimal(10, 2)
   totalPlatformRevenue Decimal                @map("total_platform_revenue") @db.Decimal(10, 2)
 
+  // Kısmi (adet) iadede pro-rate edilen komisyon KÜMÜLATİF olarak burada birikir
+  // (#88). Net = sellerCommission - refundedSellerCommission; original alanlar
+  // DEĞİŞMEZ (tekrarlı kısmi iadeler compound olmasın). Tam iadede refunded = original.
+  refundedSellerCommission Decimal            @default(0) @map("refunded_seller_commission") @db.Decimal(10, 2)
+  refundedBuyerFee         Decimal            @default(0) @map("refunded_buyer_fee") @db.Decimal(10, 2)
+
   status               CommissionLedgerStatus @default(pending)
   earnedAt             DateTime?              @map("earned_at")
   refundedAt           DateTime?              @map("refunded_at")
