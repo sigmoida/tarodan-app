@@ -40,11 +40,19 @@ export default function TradesPage() {
     { value: "pending", label: t("trade.statusPending"), Icon: ClockIcon },
     {
       value: "shipped",
-      label: locale === "en" ? "In Transit" : "Kargoda",
+      label: t("trade.filterInTransit"),
       Icon: TruckIcon,
     },
-    { value: "completed", label: t("trade.statusCompleted"), Icon: CheckCircleIcon },
-    { value: "cancelled", label: t("trade.statusCancelled"), Icon: XCircleIcon },
+    {
+      value: "completed",
+      label: t("trade.statusCompleted"),
+      Icon: CheckCircleIcon,
+    },
+    {
+      value: "cancelled",
+      label: t("trade.statusCancelled"),
+      Icon: XCircleIcon,
+    },
     { value: "rejected", label: t("trade.statusRejected"), Icon: XCircleIcon },
   ];
 

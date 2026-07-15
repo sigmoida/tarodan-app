@@ -33,7 +33,7 @@ export function useTradeDetail() {
     myReturnShipment,
   } = useTradeShipments(trade, user);
 
-  const countdown = useTradeCountdown(trade, locale);
+  const countdown = useTradeCountdown(trade);
 
   const {
     isInitiator,

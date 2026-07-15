@@ -1,6 +1,7 @@
 /** @format */
 
 import { Button } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
 import TradeAddressPicker from "../../_components/TradeAddressPicker";
 
 interface TradeActionBarProps {
@@ -32,7 +33,14 @@ export default function TradeActionBar({
   onReject,
   onCancel,
 }: TradeActionBarProps) {
-  if (!(canAccept || canReject || canCounter || canCancel || showCancelDisabled))
+  const t = useTranslations();
+  if (!(
+    canAccept ||
+    canReject ||
+    canCounter ||
+    canCancel ||
+    showCancelDisabled
+  ))
     return null;
 
   return (
@@ -41,7 +49,7 @@ export default function TradeActionBar({
       {canAccept && (
         <div className="mb-5">
           <TradeAddressPicker
-            label={locale === "en" ? "Delivery Address" : "Teslimat Adresi"}
+            label={t("address.deliveryAddress")}
             onChange={onAddressChange}
           />
         </div>
@@ -72,7 +80,7 @@ export default function TradeActionBar({
             onClick={onCounter}
             disabled={isActionLoading}
           >
-            {locale === "en" ? "Counter Offer" : "Karşı Teklif"}
+            {t("trade.counterOffer")}
           </Button>
         )}
         {canReject && (
@@ -83,7 +91,7 @@ export default function TradeActionBar({
             onClick={onReject}
             disabled={isActionLoading}
           >
-            {locale === "en" ? "Reject" : "Reddet"}
+            {t("trade.rejectTrade")}
           </Button>
         )}
         {canCancel && !canAccept && !canReject && (
@@ -94,7 +102,7 @@ export default function TradeActionBar({
             onClick={onCancel}
             disabled={isActionLoading}
           >
-            {locale === "en" ? "Cancel Trade" : "İptal Et"}
+            {t("trade.cancelTradeAction")}
           </Button>
         )}
         {showCancelDisabled && !canAccept && !canReject && (
@@ -110,7 +118,7 @@ export default function TradeActionBar({
                   : "Ürünlerden biri Tarodan deposuna ulaştı; iptal edilemez. Sorun varsa itiraz açın."
               }
             >
-              {locale === "en" ? "Cancel Locked" : "İptal Edilemez"}
+              {t("trade.cancelLocked")}
             </Button>
             <span className="text-xs text-muted mt-1">
               {locale === "en"

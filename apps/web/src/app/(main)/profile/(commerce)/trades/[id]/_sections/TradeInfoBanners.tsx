@@ -77,9 +77,7 @@ export default function TradeInfoBanners({
               </h2>
               {trade.cancelReason && (
                 <p className="text-sm text-warning-800 mb-2">
-                  <span className="font-medium">
-                    {locale === "en" ? "Reason: " : "Sebep: "}
-                  </span>
+                  <span className="font-medium">{t("common.reason")}: </span>
                   {trade.cancelReason}
                 </p>
               )}

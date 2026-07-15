@@ -5,6 +5,7 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import toast from "react-hot-toast";
+import { useTranslations } from "next-intl";
 import { tradesApi, listingsApi, userApi } from "@/lib/api";
 import type { Trade, TradeItem } from "../_lib/types";
 
@@ -26,6 +27,7 @@ export function useCounterOfferEditor({
   locale,
   invalidateTrade,
 }: UseCounterOfferEditorArgs) {
+  const t = useTranslations();
   const [isCounterMode, setIsCounterMode] = useState(false);
   const [counterProducts, setCounterProducts] = useState<any[]>([]);
   const [counterTargetProducts, setCounterTargetProducts] = useState<any[]>([]);
@@ -50,9 +52,7 @@ export function useCounterOfferEditor({
       return tradesApi.counter(trade.id, data);
     },
     onSuccess: async () => {
-      toast.success(
-        locale === "en" ? "Counter offer sent!" : "Karşı teklif gönderildi!",
-      );
+      toast.success(t("trade.counterOfferSent"));
       setIsCounterMode(false);
       await invalidateTrade();
     },
@@ -214,9 +214,7 @@ export function useCounterOfferEditor({
     } catch (error: any) {
       if (process.env.NODE_ENV === "development")
         console.error("Failed to load counter-offer data:", error);
-      toast.error(
-        locale === "en" ? "Failed to load products" : "Ürünler yüklenemedi",
-      );
+      toast.error(t("collection.productsLoadFailed"));
       setIsCounterMode(false);
     } finally {
       setIsLoadingCounterData(false);

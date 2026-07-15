@@ -6,6 +6,7 @@ import {
   ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
 import { Badge, Button } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
 import { formatTL } from "@/lib/format";
 import type { Trade } from "../_lib/types";
 
@@ -24,6 +25,7 @@ export default function CashDifferenceCard({
   onPay,
   cashPaymentLoading,
 }: CashDifferenceCardProps) {
+  const t = useTranslations();
   if (!(trade.cashAmount && trade.cashAmount > 0)) return null;
 
   const isPayer = !!userId && trade.cashPayerId === userId;
@@ -32,9 +34,7 @@ export default function CashDifferenceCard({
     <div className="card p-6 mb-6 bg-success-50 border-success-200">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <p className="text-sm text-muted">
-            {locale === "en" ? "Cash Difference" : "Nakit Fark"}
-          </p>
+          <p className="text-sm text-muted">{t("trade.cashDifference")}</p>
           <p className="text-2xl font-bold text-success-700">
             {formatTL(Math.abs(trade.cashAmount))}
           </p>
@@ -50,8 +50,8 @@ export default function CashDifferenceCard({
         <div className="text-right">
           <p className="text-sm text-muted">
             {trade.cashPayerId === trade.initiatorId
-              ? `${trade.initiatorName} ${locale === "en" ? "will pay" : "ödeyecek"}`
-              : `${trade.receiverName} ${locale === "en" ? "will pay" : "ödeyecek"}`}
+              ? t("trade.willPayBy", { name: trade.initiatorName })
+              : t("trade.willPayBy", { name: trade.receiverName })}
           </p>
           {trade.cashPayment?.status === "completed" && (
             <Badge
@@ -60,7 +60,7 @@ export default function CashDifferenceCard({
               className="mt-1 rounded-full"
               icon={<CheckCircleIcon className="w-3.5 h-3.5" />}
             >
-              {locale === "en" ? "Paid" : "Ödendi"}
+              {t("order.statusPaid")}
             </Badge>
           )}
         </div>
@@ -114,7 +114,7 @@ export default function CashDifferenceCard({
                 ? locale === "en"
                   ? "Processing..."
                   : "İşleniyor..."
-                : `${locale === "en" ? "Pay" : "Ödeme Yap"} – ${formatTL(trade.cashPayment?.totalAmount ?? trade.cashAmount)}`}
+                : `${t("payment.pay")} – ${formatTL(trade.cashPayment?.totalAmount ?? trade.cashAmount)}`}
             </Button>
           </div>
         )}

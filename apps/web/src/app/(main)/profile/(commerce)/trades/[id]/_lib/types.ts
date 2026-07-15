@@ -1,6 +1,8 @@
 /** @format */
 
 import { tradeStatusConfig } from "@tarodan/ui";
+import { createTranslator } from "next-intl";
+import { getMessages, resolveLocale } from "@tarodan/i18n";
 import type { TradeItem } from "../../_lib/types";
 
 // Reuse the shared TradeItem shape from the list route.
@@ -128,102 +130,107 @@ export const getTradeStatusLabel = (s: string, locale: string): string =>
 
 export const getTradeStatusMeta = (
   locale: string,
-): Record<string, { description: string }> => ({
-  pending: {
-    description:
-      locale === "en"
-        ? "Offer is being evaluated by the recipient"
-        : "Teklif alıcı tarafından değerlendiriliyor",
-  },
-  accepted: {
-    description:
-      locale === "en"
-        ? "Trade accepted, awaiting shipment"
-        : "Takas kabul edildi, gönderim bekleniyor",
-  },
-  rejected: {
-    description: locale === "en" ? "Offer rejected" : "Teklif reddedildi",
-  },
-  awaiting_payment: {
-    description:
-      locale === "en"
-        ? "Cash payment required to proceed"
-        : "Devam etmek için nakit ödeme gerekli",
-  },
-  shipping_to_warehouse: {
-    description:
-      locale === "en"
-        ? "Both parties must ship their items to the Tarodan warehouse"
-        : "Her iki taraf ürünlerini Tarodan deposuna göndermelidir",
-  },
-  at_warehouse: {
-    description:
-      locale === "en"
-        ? "Your items are at the Tarodan warehouse and being reviewed"
-        : "Ürünleriniz Tarodan deposunda, inceleme başlatıldı",
-  },
-  admin_reviewing: {
-    description:
-      locale === "en"
-        ? "An admin is physically reviewing the items"
-        : "Admin ürünleri fiziksel olarak inceliyor",
-  },
-  shipping_to_recipients: {
-    description:
-      locale === "en"
-        ? "Admin approved — items are being shipped to the recipients"
-        : "Admin onayladı — ürünler alıcılara gönderiliyor",
-  },
-  returning: {
-    description:
-      locale === "en"
-        ? "Trade was rejected — items are being returned to their owners"
-        : "Takas reddedildi — ürünler sahiplerine iade ediliyor",
-  },
-  initiator_shipped: {
-    description:
-      locale === "en"
-        ? "Initiator shipped their items"
-        : "Başlatıcı ürünlerini gönderdi",
-  },
-  receiver_shipped: {
-    description:
-      locale === "en"
-        ? "Receiver shipped their items"
-        : "Alıcı ürünlerini gönderdi",
-  },
-  both_shipped: {
-    description:
-      locale === "en"
-        ? "Both parties shipped their items"
-        : "Her iki taraf da ürünlerini gönderdi",
-  },
-  initiator_received: {
-    description:
-      locale === "en"
-        ? "Initiator received the items"
-        : "Başlatıcı ürünleri teslim aldı",
-  },
-  receiver_received: {
-    description:
-      locale === "en"
-        ? "Receiver received the items"
-        : "Alıcı ürünleri teslim aldı",
-  },
-  completed: {
-    description:
-      locale === "en"
-        ? "Trade successfully completed"
-        : "Takas başarıyla tamamlandı",
-  },
-  cancelled: {
-    description: locale === "en" ? "Trade cancelled" : "Takas iptal edildi",
-  },
-  disputed: {
-    description:
-      locale === "en" ? "Dispute opened for trade" : "Takas için itiraz açıldı",
-  },
-});
+): Record<string, { description: string }> => {
+  const t = createTranslator({
+    locale,
+    messages: getMessages(resolveLocale(locale)),
+  });
+  return {
+    pending: {
+      description:
+        locale === "en"
+          ? "Offer is being evaluated by the recipient"
+          : "Teklif alıcı tarafından değerlendiriliyor",
+    },
+    accepted: {
+      description:
+        locale === "en"
+          ? "Trade accepted, awaiting shipment"
+          : "Takas kabul edildi, gönderim bekleniyor",
+    },
+    rejected: {
+      description: t("offer.offerRejected"),
+    },
+    awaiting_payment: {
+      description:
+        locale === "en"
+          ? "Cash payment required to proceed"
+          : "Devam etmek için nakit ödeme gerekli",
+    },
+    shipping_to_warehouse: {
+      description:
+        locale === "en"
+          ? "Both parties must ship their items to the Tarodan warehouse"
+          : "Her iki taraf ürünlerini Tarodan deposuna göndermelidir",
+    },
+    at_warehouse: {
+      description:
+        locale === "en"
+          ? "Your items are at the Tarodan warehouse and being reviewed"
+          : "Ürünleriniz Tarodan deposunda, inceleme başlatıldı",
+    },
+    admin_reviewing: {
+      description:
+        locale === "en"
+          ? "An admin is physically reviewing the items"
+          : "Admin ürünleri fiziksel olarak inceliyor",
+    },
+    shipping_to_recipients: {
+      description:
+        locale === "en"
+          ? "Admin approved — items are being shipped to the recipients"
+          : "Admin onayladı — ürünler alıcılara gönderiliyor",
+    },
+    returning: {
+      description:
+        locale === "en"
+          ? "Trade was rejected — items are being returned to their owners"
+          : "Takas reddedildi — ürünler sahiplerine iade ediliyor",
+    },
+    initiator_shipped: {
+      description:
+        locale === "en"
+          ? "Initiator shipped their items"
+          : "Başlatıcı ürünlerini gönderdi",
+    },
+    receiver_shipped: {
+      description:
+        locale === "en"
+          ? "Receiver shipped their items"
+          : "Alıcı ürünlerini gönderdi",
+    },
+    both_shipped: {
+      description:
+        locale === "en"
+          ? "Both parties shipped their items"
+          : "Her iki taraf da ürünlerini gönderdi",
+    },
+    initiator_received: {
+      description:
+        locale === "en"
+          ? "Initiator received the items"
+          : "Başlatıcı ürünleri teslim aldı",
+    },
+    receiver_received: {
+      description:
+        locale === "en"
+          ? "Receiver received the items"
+          : "Alıcı ürünleri teslim aldı",
+    },
+    completed: {
+      description:
+        locale === "en"
+          ? "Trade successfully completed"
+          : "Takas başarıyla tamamlandı",
+    },
+    cancelled: {
+      description: t("trade.tradeCancelled"),
+    },
+    disputed: {
+      description: t("trade.disputeOpened"),
+    },
+  };
+};
 
 export const SHIPMENT_STATUS_CHIP: Record<
   string,

@@ -1,10 +1,7 @@
 /** @format */
 
 import Link from "next/link";
-import {
-  ArrowsRightLeftIcon,
-  CheckIcon,
-} from "@heroicons/react/24/outline";
+import { ArrowsRightLeftIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { Button, Input, Radio, Spinner, Textarea } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";
 import { getProductEffectivePrice } from "@/lib/productPrice";
@@ -48,11 +45,11 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
             onClick={handleExitCounterMode}
             className="text-primary-500 hover:text-primary-600 mb-4 inline-block"
           >
-            ← {locale === "en" ? "Back to Trade" : "Takasa Dön"}
+            ← {t("trade.backToTrade")}
           </Button>
           <h1 className="text-3xl font-bold text-heading flex items-center gap-3">
             <ArrowsRightLeftIcon className="w-8 h-8 text-primary-500" />
-            {locale === "en" ? "Counter Offer" : "Karşı Teklif"}
+            {t("trade.counterOffer")}
           </h1>
           <p className="text-muted mt-2">
             {locale === "en"
@@ -68,9 +65,7 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
               color="border-primary-500 border-t-transparent"
               className="mx-auto mb-4"
             />
-            <p className="text-muted">
-              {locale === "en" ? "Loading products..." : "Ürünler yükleniyor..."}
-            </p>
+            <p className="text-muted">{t("trade.loadingProducts")}</p>
           </div>
         ) : (
           <>
@@ -94,15 +89,14 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                 ) : (
                   <div className="grid grid-cols-2 gap-4 max-h-[400px] overflow-y-auto">
                     {counterTargetProducts.map((product) => {
-                      const isSelected =
-                        selectedCounterTargetProducts.includes(product.id);
+                      const isSelected = selectedCounterTargetProducts.includes(
+                        product.id,
+                      );
                       return (
                         <button
                           type="button"
                           key={product.id}
-                          onClick={() =>
-                            toggleCounterTargetProduct(product.id)
-                          }
+                          onClick={() => toggleCounterTargetProduct(product.id)}
                           className={`relative block w-full rounded-xl border-2 p-4 transition-all ${
                             isSelected
                               ? "border-primary-500 ring-2 ring-primary-200"
@@ -132,13 +126,12 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                                 {product.title}
                               </h3>
                               <p className="text-base font-bold text-primary-500">
-                                {getProductEffectivePrice(product).toLocaleString(
-                                  "tr-TR",
-                                  {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  },
-                                )}{" "}
+                                {getProductEffectivePrice(
+                                  product,
+                                ).toLocaleString("tr-TR", {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}{" "}
                                 TL
                               </p>
                             </div>
@@ -220,13 +213,12 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                                 {product.title}
                               </h3>
                               <p className="text-base font-bold text-primary-500">
-                                {getProductEffectivePrice(product).toLocaleString(
-                                  "tr-TR",
-                                  {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  },
-                                )}{" "}
+                                {getProductEffectivePrice(
+                                  product,
+                                ).toLocaleString("tr-TR", {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}{" "}
                                 TL
                               </p>
                             </div>
@@ -279,9 +271,7 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                         onChange={(e) =>
                           setCounterCashPayer(e.target.value as "me" | "them")
                         }
-                        label={
-                          locale === "en" ? "I will pay" : "Ben ödeyeceğim"
-                        }
+                        label={t("trade.iWillPay")}
                       />
                       <Radio
                         name="counterCashPayer"
@@ -310,9 +300,7 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
               <Textarea
                 value={counterMessage}
                 onChange={(e) => setCounterMessage(e.target.value)}
-                placeholder={
-                  locale === "en" ? "Leave a message..." : "Mesaj bırakın..."
-                }
+                placeholder={t("trade.counterMessagePlaceholder")}
                 rows={4}
                 maxLength={500}
                 className="px-4 py-3 rounded-xl resize-none"
@@ -349,7 +337,7 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                       size="sm"
                       color="border-surface-elevated border-t-transparent"
                     />
-                    {locale === "en" ? "Sending..." : "Gönderiliyor..."}
+                    {t("common.sending")}
                   </>
                 ) : (
                   <>
