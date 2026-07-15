@@ -1,10 +1,11 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useAuthStore } from '@/stores/authStore';
-import { useCartStore } from '@/stores/cartStore';
-import { messagesApi, api, wishlistApi } from '@/lib/api';
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useAuthStore } from "@/stores/authStore";
+import { useCart } from "@/hooks/useCart";
+import { messagesApi, api, wishlistApi } from "@/lib/api";
+import { queryKeys } from "@/lib/query/keys";
 
 /**
  * The shared header data hook: auth (from the auth store, gated behind hydration
@@ -17,7 +18,7 @@ import { messagesApi, api, wishlistApi } from '@/lib/api';
  * NavbarContext + useNavbarCounts split (no context layer).
  */
 export function useHeaderData() {
-  const { isAuthenticated, user, logout, checkAuth } = useAuthStore();
+  const { isAuthenticated, user, checkAuth } = useAuthStore();
 
   useEffect(() => {
     checkAuth();
@@ -33,22 +34,23 @@ export function useHeaderData() {
 
   const showAuthUI = mounted && isAuthenticated;
 
-  const { itemCount: cartCount, fetchCart } = useCartStore();
+  const { itemCount: cartCount, refetch: fetchCart } = useCart();
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [pendingOffersCount, setPendingOffersCount] = useState(0);
   const [pendingTradesCount, setPendingTradesCount] = useState(0);
 
   const wishlistQuery = useQuery({
-    queryKey: ['wishlist'],
+    queryKey: queryKeys.wishlist.all(),
     queryFn: async () => {
       const res = await wishlistApi.get();
       const data = res.data;
-      const items = data?.items ?? data?.data ?? (Array.isArray(data) ? data : []);
+      const items =
+        data?.items ?? data?.data ?? (Array.isArray(data) ? data : []);
       return Array.isArray(items) ? items : [];
     },
     enabled: showAuthUI,
-    meta: { page: 'navbar-wishlist-count' },
+    meta: { page: "navbar-wishlist-count" },
   });
   const wishlistCount = wishlistQuery.data?.length ?? 0;
 
@@ -61,22 +63,28 @@ export function useHeaderData() {
       }, 0);
       setUnreadMessageCount(totalUnread);
     } catch (error) {
-      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch unread message count:', error);
+      if (process.env.NODE_ENV === "development")
+        console.error("Failed to fetch unread message count:", error);
     }
   };
 
   const fetchPendingCounts = async () => {
     try {
       const [offersRes, tradesRes, notificationsRes] = await Promise.all([
-        api.get('/offers/pending-count').catch(() => null),
-        api.get('/trades/pending-count').catch(() => null),
-        api.get('/notifications/unread-count').catch(() => null),
+        api.get("/offers/pending-count").catch(() => null),
+        api.get("/trades/pending-count").catch(() => null),
+        api.get("/notifications/unread-count").catch(() => null),
       ]);
       setPendingOffersCount(offersRes?.data?.received || 0);
       setPendingTradesCount(tradesRes?.data?.received || 0);
-      setUnreadNotificationsCount(notificationsRes?.data?.count ?? notificationsRes?.data?.unreadCount ?? 0);
+      setUnreadNotificationsCount(
+        notificationsRes?.data?.count ??
+          notificationsRes?.data?.unreadCount ??
+          0,
+      );
     } catch (error) {
-      if (process.env.NODE_ENV === 'development') console.error('Failed to fetch pending counts:', error);
+      if (process.env.NODE_ENV === "development")
+        console.error("Failed to fetch pending counts:", error);
     }
   };
 
@@ -103,7 +111,6 @@ export function useHeaderData() {
   return {
     isAuthenticated,
     user,
-    logout,
     showAuthUI,
     unreadMessageCount,
     unreadNotificationsCount,

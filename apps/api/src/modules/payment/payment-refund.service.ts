@@ -164,25 +164,82 @@ export class PaymentRefundService {
             bypass: true,
           };
         } else {
-          const paytrOid =
-            payment.providerConversationId?.trim() ||
-            orderId.replace(/-/g, '');
-          try {
-            refundResult = await this.paytrService.createRefund(paytrOid, amountToRefund);
-          } catch (err) {
-            const msg = (err as Error).message || '';
-            if (/odeme henuz siteye bildirilmemis|henuz siteye bildirilmemi/i.test(msg)) {
+          // O-B3: Çift-iade koruması (order yolu — trade-cash B3 ile aynı desen). PayTR
+          // idempotency anahtarı taşımaz: PayTR iadesi YAPILIP tx persist edilemezse
+          // reconciliation cron order'ı (payment.status hâlâ completed) tekrar seçip
+          // processRefund'ı çağırır → PayTR TEKRAR tetiklenir → çift iade. Marker'ı
+          // PayTR'den ÖNCE kalıcı yaz; marker zaten varsa PayTR'yi ATLA, doğrudan tx
+          // persist-recovery'ye geç. Grup ödemesinde tek payment birden çok siparişi
+          // kapsadığından marker SİPARİŞ BAŞINA tutulur (refundedOrders map'i gibi) —
+          // kardeş siparişin markerı bu siparişin PayTR çağrısını engellemesin.
+          const existingMeta =
+            (payment.metadata as Record<string, any>) || {};
+          const inProgressOrders =
+            (existingMeta.refundInProgressOrders as Record<string, string>) || {};
+
+          if (inProgressOrders[orderId]) {
+            this.logger.warn(
+              `processRefund: refundInProgressOrders[${orderId}] zaten set — PayTR ` +
+                `çağrısı atlanıyor, yalnız persist-recovery denenecek (payment=${payment.id}).`,
+            );
+            refundResult = {
+              status: 'success',
+              err_msg: null,
+              return_amount: amountToRefund,
+              recovered: true,
+            };
+          } else {
+            // Marker'ı PayTR'den ÖNCE kalıcı yaz. Yazım başarısızsa para hareketi
+            // olmadan abort et — çağıran güvenle tekrar deneyebilir.
+            try {
+              await this.prisma.payment.update({
+                where: { id: payment.id },
+                data: {
+                  metadata: {
+                    ...existingMeta,
+                    refundInProgressOrders: {
+                      ...inProgressOrders,
+                      [orderId]: new Date().toISOString(),
+                    },
+                  },
+                },
+              });
+            } catch (markerErr: any) {
+              this.logger.error(
+                `processRefund: refundInProgress marker yazılamadı, PayTR çağrısı ` +
+                  `yapılmadan abort (payment=${payment.id}, order=${orderId}): ${markerErr?.message}`,
+              );
               throw new BadRequestException(
-                'Ödeme yeni tamamlandı, PayTR henüz işlemi tam senkronize etmedi. Lütfen 1-2 dakika sonra tekrar deneyin.',
+                'İade başlatılamadı (geçici hata). Lütfen tekrar deneyin.',
               );
             }
-            throw err;
-          }
 
-          if (refundResult.status !== 'success') {
-            throw new BadRequestException(
-              refundResult.err_msg || 'PayTR iade işlemi başarısız',
-            );
+            const paytrOid =
+              payment.providerConversationId?.trim() ||
+              orderId.replace(/-/g, '');
+            try {
+              refundResult = await this.paytrService.createRefund(paytrOid, amountToRefund);
+            } catch (err) {
+              // PayTR KESİN başarısız (throw) → marker'ı geri al ki kullanıcı/cron tekrar
+              // denediğinde PayTR yeniden çağrılsın (yoksa iade edilmeden refunded işaretlenir;
+              // "1-2 dakika sonra tekrar deneyin" akışı bozulur).
+              await this.clearRefundInProgress(payment.id, orderId).catch(() => {});
+              const msg = (err as Error).message || '';
+              if (/odeme henuz siteye bildirilmemis|henuz siteye bildirilmemi/i.test(msg)) {
+                throw new BadRequestException(
+                  'Ödeme yeni tamamlandı, PayTR henüz işlemi tam senkronize etmedi. Lütfen 1-2 dakika sonra tekrar deneyin.',
+                );
+              }
+              throw err;
+            }
+
+            if (refundResult.status !== 'success') {
+              // Kesin ret → marker geri al (retry PayTR'yi tekrar çağırabilsin).
+              await this.clearRefundInProgress(payment.id, orderId).catch(() => {});
+              throw new BadRequestException(
+                refundResult.err_msg || 'PayTR iade işlemi başarısız',
+              );
+            }
           }
         }
       } else {
@@ -466,6 +523,32 @@ export class PaymentRefundService {
   }
 
   /**
+   * O-B3 marker geri-alma: PayTR KESİN başarısız olduğunda ilgili siparişin
+   * refundInProgressOrders marker'ını siler ki retry PayTR'yi yeniden çağırabilsin.
+   * Fresh metadata okur → yalnız bu siparişin key'ini kaldırır (kardeş siparişlerin
+   * marker'larını korur). Best-effort: hatası iade akışını bozmaz (çağıran .catch'ler).
+   */
+  private async clearRefundInProgress(
+    paymentId: string,
+    orderId: string,
+  ): Promise<void> {
+    const p = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      select: { metadata: true },
+    });
+    const meta = (p?.metadata as Record<string, any>) || {};
+    const inProgressOrders = {
+      ...((meta.refundInProgressOrders as Record<string, string>) || {}),
+    };
+    if (!(orderId in inProgressOrders)) return;
+    delete inProgressOrders[orderId];
+    await this.prisma.payment.update({
+      where: { id: paymentId },
+      data: { metadata: { ...meta, refundInProgressOrders: inProgressOrders } },
+    });
+  }
+
+  /**
    * Takas nakit ödemesi PayTR ile tamamlanmışken iptal: PayTR iade API + payment / trade_cash_payment güncelleme.
    * Tamamlanmış PayTR trade ödemesi yoksa no-op (refunded: false).
    */
@@ -725,6 +808,85 @@ export class PaymentRefundService {
     );
   }
 
+  /**
+   * Tek kanonik TESLİM handler'ı. Bir sipariş teslim edildiğinde çağrılır — hangi
+   * yoldan gelirse gelsin (generic webhook, worker, Sürat poll cron, admin). İki işi
+   * ATOMIK bir mantıkta birleştirir:
+   *   1) Order.status/deliveredAt/confirmationDeadline'ı FEATURE_48H'e göre ayarlar,
+   *   2) escrow release'ini planlar (scheduleHoldReleaseOnDelivery) — satıcıya ödemenin
+   *      TEK tetikleyicisi budur; atlanırsa PaymentHold.releaseAt null kalır ve satıcı
+   *      hiç ödenmez.
+   *
+   * Idempotent + güvenli: yalnız HENÜZ teslim edilmemiş (deliveredAt null) ve terminal
+   * olmayan (completed/cancelled/refund_requested/refunded değil) bir siparişte ilerler.
+   * Böylece re-poll/replay deliveredAt'i TAŞIMAZ → releaseAt kaymaz; iptal/iade edilmiş
+   * sipariş yanlışlıkla "delivered"a çekilmez. Eski poll'un status=delivered ama
+   * deliveredAt=null bıraktığı takılı siparişler bir sonraki teslim çağrısında iyileşir.
+   *
+   * Bildirim ÇAĞIRANDA kalır (metod acted + use48h + confirmationDeadline + buyerId döner)
+   * ki teslim I/O'su alıcı bildirim çağrısını beklemesin ve mevcut çağıran davranışı korunsun.
+   */
+  async handleOrderDelivered(
+    orderId: string,
+    deliveredAt: Date,
+    tx?: Prisma.TransactionClient,
+  ): Promise<{
+    acted: boolean;
+    use48h: boolean;
+    confirmationDeadline: Date | null;
+    buyerId: string | null;
+  }> {
+    const db = tx ?? this.prisma;
+    const use48h =
+      this.configService.get<string>('FEATURE_48H_CONFIRMATION_WINDOW') === 'true';
+    const confirmationDeadline = use48h
+      ? new Date(deliveredAt.getTime() + 48 * 60 * 60 * 1000)
+      : null;
+    const targetStatus = use48h
+      ? OrderStatus.awaiting_buyer_confirmation
+      : OrderStatus.delivered;
+
+    const updated = await db.order.updateMany({
+      where: {
+        id: orderId,
+        deliveredAt: null,
+        status: {
+          notIn: [
+            OrderStatus.completed,
+            OrderStatus.cancelled,
+            OrderStatus.refund_requested,
+            OrderStatus.refunded,
+          ],
+        },
+      },
+      data: {
+        status: targetStatus,
+        deliveredAt,
+        confirmationDeadline,
+        version: { increment: 1 },
+      },
+    });
+
+    if (updated.count === 0) {
+      // Zaten teslim işlenmiş / teslim-uygun değil → no-op (replay-safe).
+      return { acted: false, use48h, confirmationDeadline: null, buyerId: null };
+    }
+
+    // Escrow saatini teslimden başlat — para akışının TEK tetikleyicisi.
+    await this.scheduleHoldReleaseOnDelivery(orderId, deliveredAt, tx);
+
+    const order = await db.order.findUnique({
+      where: { id: orderId },
+      select: { buyerId: true },
+    });
+    return {
+      acted: true,
+      use48h,
+      confirmationDeadline,
+      buyerId: order?.buyerId ?? null,
+    };
+  }
+
   async releaseHoldsDue(): Promise<{ count: number; tradeCashReleased: number }> {
     const now = new Date();
 
@@ -741,10 +903,12 @@ export class PaymentRefundService {
     });
 
     // Y1: Escrow yalnızca ürün en az sevk edildiyse VE açık bir iade/itiraz yoksa
-    // serbest bırakılmalı. releaseAt ödeme anında +7gün sabitlendiği için, teslim
-    // edilmemiş ya da iadesi açık bir siparişte süre dolsa bile parayı satıcıya
-    // BIRAKMAYIZ (held bırakmak, yanlış ödemekten güvenlidir). preparing'de takılan
-    // siparişler zaten handleExpiredPreparingOrders tarafından iptal+iade edilir.
+    // serbest bırakılmalı. releaseAt ödeme anında NULL'dır; yalnız teslimde
+    // handleOrderDelivered/scheduleHoldReleaseOnDelivery ile teslim+return+grace olarak
+    // set edilir. Bu yüzden aşağıdaki durum guard'ı ek bir güvenlik katmanıdır: teslim
+    // edilmemiş ya da iadesi açık bir siparişte (releaseAt bir şekilde geçmişte olsa bile)
+    // parayı satıcıya BIRAKMAYIZ (held bırakmak, yanlış ödemekten güvenlidir). preparing'de
+    // takılan siparişler zaten handleExpiredPreparingOrders tarafından iptal+iade edilir.
     const RELEASABLE_ORDER_STATUSES: OrderStatus[] = [
       OrderStatus.shipped,
       OrderStatus.delivered,

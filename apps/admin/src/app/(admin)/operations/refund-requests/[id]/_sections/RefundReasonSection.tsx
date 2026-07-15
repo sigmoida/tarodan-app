@@ -1,13 +1,22 @@
-import Link from 'next/link';
-import { StatusBadge, refundReasonConfig, orderStatusConfig } from '@tarodan/ui';
-import { SectionCard } from '@/components/detail/SectionCard';
-import type { RefundRequestDetail } from '../types';
-import { fmtTry } from '../_lib/format';
-import { Field } from '../_components/Field';
+"use client";
+
+import Link from "next/link";
+import { useTranslations } from "next-intl";
+import {
+  StatusBadge,
+  refundReasonConfig,
+  orderStatusConfig,
+} from "@tarodan/ui";
+import { SectionCard } from "@/components/detail/SectionCard";
+import type { RefundRequestDetail } from "../types";
+import { fmtTry } from "../_lib/format";
+import { Field } from "../_components/Field";
 
 export function RefundReasonSection({ rr }: { rr: RefundRequestDetail }) {
+  const t = useTranslations();
   const orderQty = rr.order.quantity != null ? Number(rr.order.quantity) : 1;
-  const refundQty = rr.refundQuantity != null ? Number(rr.refundQuantity) : orderQty;
+  const refundQty =
+    rr.refundQuantity != null ? Number(rr.refundQuantity) : orderQty;
   const isPartialQty = orderQty > 1 && refundQty < orderQty;
   const unitPrice =
     rr.order.unitPrice != null
@@ -17,7 +26,10 @@ export function RefundReasonSection({ rr }: { rr: RefundRequestDetail }) {
         : null;
 
   return (
-    <SectionCard title="Neden iade isteniyor?" bodyClassName="space-y-4">
+    <SectionCard
+      title={t("admin.operations.refundRequests.reasonSectionTitle")}
+      bodyClassName="space-y-4"
+    >
       <div className="flex items-center gap-3">
         <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-alt">
           {rr.order.product.images?.[0]?.url ? (
@@ -32,7 +44,9 @@ export function RefundReasonSection({ rr }: { rr: RefundRequestDetail }) {
           )}
         </div>
         <div className="min-w-0">
-          <div className="truncate font-medium text-body">{rr.order.product.title}</div>
+          <div className="truncate font-medium text-body">
+            {rr.order.product.title}
+          </div>
           <Link
             href={`/operations/orders/${rr.order.id}`}
             className="font-mono text-sm text-primary-600 hover:underline"
@@ -43,63 +57,97 @@ export function RefundReasonSection({ rr }: { rr: RefundRequestDetail }) {
       </div>
 
       <div className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm md:grid-cols-2">
-        <Field label="İade sebebi">
+        <Field label={t("admin.operations.refundRequests.refundReason")}>
           <StatusBadge status={rr.reason} config={refundReasonConfig} />
         </Field>
-        <Field label="Sipariş durumu">
+        <Field label={t("admin.operations.refundRequests.orderStatus")}>
           <StatusBadge status={rr.order.status} config={orderStatusConfig} />
         </Field>
-        <Field label="Sipariş tutarı">{fmtTry(rr.order.totalAmount)}</Field>
-        <Field label="İade tutarı">
+        <Field label={t("admin.operations.refundRequests.orderAmount")}>
+          {fmtTry(rr.order.totalAmount)}
+        </Field>
+        <Field label={t("admin.operations.refundRequests.refundAmount")}>
           <span className="font-semibold">{fmtTry(rr.amount)}</span>
         </Field>
-        <Field label="İade adedi">
-          <span className={isPartialQty ? 'font-semibold text-warning-700' : ''}>
-            {refundQty} / {orderQty} adet{isPartialQty && ' (kısmi iade)'}
+        <Field label={t("admin.operations.refundRequests.refundQuantity")}>
+          <span
+            className={isPartialQty ? "font-semibold text-warning-700" : ""}
+          >
+            {t("admin.operations.refundRequests.quantityOfTotal", {
+              refund: refundQty,
+              total: orderQty,
+            })}
+            {isPartialQty &&
+              t("admin.operations.refundRequests.partialRefundSuffix")}
           </span>
         </Field>
-        {unitPrice != null && <Field label="Birim fiyat">{fmtTry(unitPrice)}</Field>}
+        {unitPrice != null && (
+          <Field label={t("admin.operations.refundRequests.unitPrice")}>
+            {fmtTry(unitPrice)}
+          </Field>
+        )}
       </div>
 
       {isPartialQty && unitPrice != null && (
         <div className="space-y-1 rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm">
-          <div className="font-medium text-warning-800">Kısmi iade kırılımı</div>
+          <div className="font-medium text-warning-800">
+            {t("admin.operations.refundRequests.partialBreakdownTitle")}
+          </div>
           <div className="flex justify-between text-warning-900">
             <span>
-              İade edilen ürün bedeli ({refundQty} × {fmtTry(unitPrice)})
+              {t("admin.operations.refundRequests.partialRefundedLine", {
+                qty: refundQty,
+                price: fmtTry(unitPrice),
+              })}
             </span>
-            <span className="font-semibold">{fmtTry(unitPrice * refundQty)}</span>
+            <span className="font-semibold">
+              {fmtTry(unitPrice * refundQty)}
+            </span>
           </div>
           <div className="flex justify-between text-muted">
             <span>
-              Satıcıda kalan ({orderQty - refundQty} × {fmtTry(unitPrice)})
+              {t("admin.operations.refundRequests.partialRemainingLine", {
+                qty: orderQty - refundQty,
+                price: fmtTry(unitPrice),
+              })}
             </span>
             <span>{fmtTry(unitPrice * (orderQty - refundQty))}</span>
           </div>
           <p className="pt-1 text-xs text-warning-700">
-            {orderQty} adetlik siparişin {refundQty} adedi iade ediliyor; kalan{' '}
-            {orderQty - refundQty} adet siparişte kalır.
+            {t("admin.operations.refundRequests.partialExplain", {
+              total: orderQty,
+              refund: refundQty,
+              remaining: orderQty - refundQty,
+            })}
           </p>
         </div>
       )}
 
       {rr.description && (
         <div className="text-sm">
-          <span className="font-medium text-body">Alıcının açıklaması:</span>
-          <p className="mt-1 whitespace-pre-wrap text-muted">{rr.description}</p>
+          <span className="font-medium text-body">
+            {t("admin.operations.refundRequests.buyerDescription")}
+          </span>
+          <p className="mt-1 whitespace-pre-wrap text-muted">
+            {rr.description}
+          </p>
         </div>
       )}
 
       {rr.evidencePhotoUrls && rr.evidencePhotoUrls.length > 0 && (
         <div>
-          <span className="mb-2 block font-medium text-body">Kanıt fotoğrafları:</span>
+          <span className="mb-2 block font-medium text-body">
+            {t("admin.operations.refundRequests.evidencePhotos")}
+          </span>
           <div className="grid grid-cols-3 gap-2 md:grid-cols-6">
             {rr.evidencePhotoUrls.map((url, i) => (
               <a key={i} href={url} target="_blank" rel="noopener noreferrer">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={url}
-                  alt={`Kanıt ${i + 1}`}
+                  alt={t("admin.operations.refundRequests.evidenceAlt", {
+                    index: i + 1,
+                  })}
                   className="h-24 w-full rounded border border-border object-cover transition-opacity hover:opacity-90"
                 />
               </a>

@@ -1,9 +1,10 @@
-'use client';
+"use client";
 
-import { IconButton } from '@tarodan/ui';
-import { Bars3Icon } from '@heroicons/react/24/outline';
-import { Breadcrumbs } from './Breadcrumbs';
-import { AdminProfileMenu } from './AdminProfileMenu';
+import { IconButton } from "@tarodan/ui";
+import { Bars3Icon } from "@heroicons/react/24/outline";
+import { Breadcrumbs } from "./Breadcrumbs";
+import { AdminProfileMenu } from "./AdminProfileMenu";
+import { LocaleSwitcher } from "./LocaleSwitcher";
 
 /** Fixed top bar: mobile menu trigger + breadcrumb trail + account menu. */
 export function Topbar({ onOpenSidebar }: { onOpenSidebar: () => void }) {
@@ -22,7 +23,10 @@ export function Topbar({ onOpenSidebar }: { onOpenSidebar: () => void }) {
         </div>
       </div>
 
-      <AdminProfileMenu />
+      <div className="flex items-center gap-3">
+        <LocaleSwitcher />
+        <AdminProfileMenu />
+      </div>
     </header>
   );
 }

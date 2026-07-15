@@ -1,11 +1,11 @@
 {
   "meta": {
-    "total": 2293,
+    "total": 2294,
     "source": "Tarodan-Test-Konsolu.html (window.__DATA__)",
     "generated": "30.06.2026",
     "gapCount": 33,
     "byPri": {
-      "P0": 699,
+      "P0": 700,
       "P1": 984,
       "P2": 610
     }
@@ -33,7 +33,7 @@
       "code": "04",
       "prefix": "PRD",
       "title": "04 — Ürün/İlan & Katalog",
-      "count": 114
+      "count": 115
     },
     {
       "code": "05",
@@ -81,7 +81,7 @@
       "code": "12",
       "prefix": "REF",
       "title": "12 — İade & İptal",
-      "count": 78
+      "count": 79
     },
     {
       "code": "13",
@@ -105,7 +105,7 @@
       "code": "16",
       "prefix": "TAX",
       "title": "16 — Vergi (KDV) & Fatura",
-      "count": 95
+      "count": 96
     },
     {
       "code": "17",
@@ -5425,6 +5425,19 @@
       "pri": "P2",
       "steps": "GET /api/products/' OR 1=1--; GET /api/products?categoryId=' OR '1'='1.",
       "exp": "Bozuk UUID path → 400 (ParseUUIDPipe); query categoryId @IsUUID('4') → 400; Prisma parametreli sorgu (injection yok) (product.controller.ts:277, dto/product-query.dto.ts:29).",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "PRD-265",
+      "code": "04",
+      "prefix": "PRD",
+      "domTitle": "04 — Ürün/İlan & Katalog",
+      "title": "N+1 batch: ürün listesinde satıcı istatistikleri ürün başına değil toplu çekilir (#67)",
+      "tur": "Performans",
+      "pri": "P0",
+      "steps": "1. Aynı satıcıdan N(=4) aktif ürün seed et. 2. userMembership.findUnique/findMany spy'la. 3. GET /api/products?limit=20.",
+      "exp": "N ürün döner; yanıt şekli/değeri DEĞİŞMEZ; per-ürün userMembership.findUnique HİÇ çağrılmaz (batch findMany 1 kez). Eskiden ürün başına 4 per-seller + 1 discount sorgu vardı → 20'lik sayfa 80+ sorgu. — product-common.service.ts formatProductResponseMany; discount.service.ts getEffectiveDisplayPriceMany",
       "gap": false,
       "gapRefs": []
     },
@@ -12222,7 +12235,7 @@
       "title": "Alıcı iade talep eder → sipariş iptal, hold cancelled, stok geri, PayTR refund",
       "tur": "Happy path",
       "pri": "P0",
-      "steps": "1. processRefund(orderId) (servis düzeyi; uç: POST /api/payments/refund {orderId} Bearer deniz).",
+      "steps": "1. processRefund(orderId) servis düzeyinde çağır (paylaşılan executor; buyer-facing uç #61 ile kaldırıldı).",
       "exp": "order.status=cancelled; hold.status=cancelled; PayTR refund çağrısı ≥1; ürün stoğu geri.",
       "gap": false,
       "gapRefs": []
@@ -12232,11 +12245,11 @@
       "code": "10",
       "prefix": "PAY",
       "domTitle": "10 — Ödeme & Escrow (PayTR Direct)",
-      "title": "Yalnız alıcı iade talep edebilir (satıcı 403)",
-      "tur": "Yetki (Authz)",
+      "title": "`POST /payments/refund` KALDIRILDI (#61) → satıcı çağrısı da 404",
+      "tur": "Güvenlik / Yetki",
       "pri": "P0",
-      "steps": "1. POST /api/payments/refund { orderId } (Bearer ahmet — satıcı).",
-      "exp": "HTTP 403 \"Sadece alıcı iade talebi oluşturabilir\".",
+      "steps": "1. Satıcı token'ı ile POST /api/payments/refund { orderId } (uç kaldırıldı).",
+      "exp": "HTTP 404 (route yok; authz'a bile ulaşmadan). Buyer-facing iade ucu #61 ile kaldırıldı. — payment.controller.ts",
       "gap": false,
       "gapRefs": []
     },
@@ -12245,11 +12258,11 @@
       "code": "10",
       "prefix": "PAY",
       "domTitle": "10 — Ödeme & Escrow (PayTR Direct)",
-      "title": "İade: tamamlanmış ödeme yoksa 404",
-      "tur": "Negatif/Doğrulama",
+      "title": "REGRESYON (#61): alıcı geçerli ödenmiş siparişi bu uçtan self-refund edemez",
+      "tur": "Güvenlik / Negatif",
       "pri": "P1",
-      "steps": "1. POST /api/payments/refund { orderId }.",
-      "exp": "HTTP 404 (sipariş yoksa) / \"Tamamlanmış ödeme bulunamadı\".",
+      "steps": "1. Alıcı, ödenmiş siparişi için POST /api/payments/refund { orderId } (uç kaldırıldı).",
+      "exp": "HTTP 404; ödeme dokunulmaz (completed kalır). Alıcı iadeleri artık POST /orders/:id/refund-requests. — payment.controller.ts (#61)",
       "gap": false,
       "gapRefs": []
     },
@@ -12258,11 +12271,11 @@
       "code": "10",
       "prefix": "PAY",
       "domTitle": "10 — Ödeme & Escrow (PayTR Direct)",
-      "title": "İade tutarı üst sınırı aşamaz (O12, 400)",
-      "tur": "Sınır değer / Para",
+      "title": "`POST /payments/refund` KALDIRILDI (#61) → client refundAmount ile de 404",
+      "tur": "Güvenlik / Sınır değer",
       "pri": "P1",
-      "steps": "1. POST /api/payments/refund { orderId, refundAmount: 250 }.",
-      "exp": "HTTP 400 \"İade tutarı (...) izin verilen üst sınırı (...) aşıyor\".",
+      "steps": "1. Alıcı POST /api/payments/refund { orderId, refundAmount: 100000 } (uç kaldırıldı).",
+      "exp": "HTTP 404 (route yok). Client-supplied refundAmount'a güvenen buyer-facing uç kaldırıldı. — payment.controller.ts (#61)",
       "gap": false,
       "gapRefs": []
     },
@@ -14325,11 +14338,11 @@
       "code": "12",
       "prefix": "REF",
       "domTitle": "12 — İade & İptal",
-      "title": "`POST /payments/refund` (legacy) yalnızca alıcı + auth + UUID kuralları",
-      "tur": "Yetki (Authz) / Negatif/Doğrulama",
+      "title": "`POST /payments/refund` KALDIRILDI (#61) → her çağrı 404; iade RefundController'dan",
+      "tur": "Güvenlik / Yetki",
       "pri": "P1",
-      "steps": "1. Satıcı ile POST /api/payments/refund body { \"orderId\": \" \" }. 2. Yabancı ile aynı. 3. Auth'suz aynı. 4. { \"orderId\": \"a0000000-0000-4000-8000-000000000000\" } (alıcı). 5. { \"orderId\": \"not-a-uuid\" } (alıcı). 6. Alıcı ile geçerli { \"orderId\": \" \" }.",
-      "exp": "(1)(2) 403, (3) 401, (4) 404, (5) 400, (6) 201 (success=true, refundAmount>0, payment refunded, order cancelled, stok geri yüklenir). — refund-extended e2e \"POST /api/payments/refund\"",
+      "steps": "1. Alıcı/satıcı/yabancı ile POST /api/payments/refund { orderId } → hepsi 404. 2. Auth'suz da 404. 3. Aynı alıcı POST /api/orders/:id/refund-requests { reason: changed_mind }.",
+      "exp": "(1)(2) route kaldırıldığından tüm çağrılar 404 (auth'suz bile 401 değil 404). (3) 201 anlık iade: payment refunded, order cancelled, PayTR 1 çağrı. — payment.controller.ts (uç kaldırıldı, #61); refund.service.ts createInstantRefund",
       "gap": false,
       "gapRefs": []
     },
@@ -14715,11 +14728,11 @@
       "code": "12",
       "prefix": "REF",
       "domTitle": "12 — İade & İptal",
-      "title": "İade tutarı üst sınır aşımı (O12) reddi",
+      "title": "Alıcı iade tutarını kontrol edemez (client refundAmount yok sayılır)",
       "tur": "Para/Vergi / Güvenlik",
       "pri": "P0",
-      "steps": "1. POST /api/payments/refund body { \"orderId\": \" \", \"refundAmount\": } (alıcı).",
-      "exp": "HTTP 400, \"İade tutarı (...) izin verilen üst sınırı (...) aşıyor\". — payment.service.ts:3019-3029",
+      "steps": "1. Alıcı POST /api/orders/:id/refund-requests body { reason: changed_mind, refundAmount: 999999 } (enjekte alan).",
+      "exp": "HTTP 201; enjekte refundAmount whitelist ValidationPipe ile strip → iade sunucunun hesapladığı sipariş toplamıyla işlenir (999999 değil). — main.ts ValidationPipe(whitelist); refund.service.ts createInstantRefund/computeRefundAmount",
       "gap": false,
       "gapRefs": []
     },
@@ -14770,8 +14783,8 @@
       "title": "Payout completed/processing iken iade reddi (çift-ödeme koruması)",
       "tur": "Eşzamanlılık / Para/Vergi / Güvenlik",
       "pri": "P0",
-      "steps": "1. processRefund(orderId) tetikle (veya POST /payments/refund).",
-      "exp": "400, \"Transfer zaten başlatılmış, iade yapılamaz\"; bekleyen (pending/retry_pending) payout'lar atomik failed (order_refunded) olur. — payment.service.ts:3043-3060",
+      "steps": "1. Ödenmiş sipariş + completed payout ekle; alıcı POST /api/orders/:id/refund-requests.",
+      "exp": "HTTP 400, \"Transfer zaten başlatılmış, iade yapılamaz\"; oluşturulan RefundRequest geri alınır, PayTR çağrısı olmaz. — payment-refund.service.ts processRefund guard; refund.service.ts createInstantRefund rollback",
       "gap": false,
       "gapRefs": []
     },
@@ -14952,8 +14965,8 @@
       "title": "Anlık iade + eşzamanlı payout cron yarışı",
       "tur": "Eşzamanlılık / Para/Vergi",
       "pri": "P1",
-      "steps": "1. processRefund(orderId) ve payout cron'unu yakın zamanlı tetikle.",
-      "exp": "Satır başına tek kazanan; pending payout failed (order_refunded) ya da iade 400 (in-flight). — payment.service.ts:3038-3060",
+      "steps": "1. Ödenmiş sipariş + pending payout ekle; alıcı POST /api/orders/:id/refund-requests.",
+      "exp": "HTTP 201; pending payout atomik failed (order_refunded) olur (iade satıcıya çift-ödeme yapmaz). — payment-refund.service.ts processRefund",
       "gap": false,
       "gapRefs": []
     },
@@ -15066,11 +15079,11 @@
       "code": "12",
       "prefix": "REF",
       "domTitle": "12 — İade & İptal",
-      "title": "Satıcı, alıcı adına `POST /payments/refund` ile para iadesi tetikleyemez",
+      "title": "Satıcı, alıcı adına iade tetikleyemez (RefundController buyerId kontrolü)",
       "tur": "Güvenlik / Yetki",
       "pri": "P0",
-      "steps": "1. Satıcı token'ı ile POST /api/payments/refund body { \"orderId\": \" \" }.",
-      "exp": "HTTP 403, \"Sadece alıcı iade talebi oluşturabilir\". — payment.controller.ts:430-433",
+      "steps": "1. Satıcı token'ı ile POST /api/orders/:id/refund-requests body { reason: changed_mind }.",
+      "exp": "HTTP 403, \"Sadece alıcı iade talebi oluşturabilir\". (Doğrudan uç #61 ile kaldırıldı; satıcı için tek yol RefundController.) — refund.service.ts createRefundRequest",
       "gap": false,
       "gapRefs": []
     },
@@ -15079,11 +15092,24 @@
       "code": "12",
       "prefix": "REF",
       "domTitle": "12 — İade & İptal",
-      "title": "`POST /payments/refund` rate limit (5 istek/dk)",
-      "tur": "Güvenlik / Sınır deger",
+      "title": "`POST /payments/refund` KALDIRILDI (#61) → rate-limit senaryosu konusuz (skip)",
+      "tur": "Güvenlik / Sınır değer",
       "pri": "P2",
-      "steps": "1. 1 dakika içinde aynı endpoint'e 6 istek gönder.",
-      "exp": "6. istek HTTP 429 Too Many Requests. — payment.controller.ts:402",
+      "steps": "1. — (uç kaldırıldı).",
+      "exp": "Buyer-facing iade ucu #61 ile kaldırıldı → rate-limit testi konusuz. scenario.skip. — payment.controller.ts",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "REF-145",
+      "code": "12",
+      "prefix": "REF",
+      "domTitle": "12 — İade & İptal",
+      "title": "REGRESYON (#61): alıcı teslim edilmiş siparişi self-refund edip malı tutamaz",
+      "tur": "Güvenlik / Para/Vergi",
+      "pri": "P0",
+      "steps": "1. Ödenmiş+teslim edilmiş sipariş. 2. Alıcı POST /api/payments/refund { orderId } → 404 (route kaldırıldı). 3. Alıcı POST /api/orders/:id/refund-requests { reason: changed_mind }.",
+      "exp": "(2) HTTP 404, PayTR iadesi yok. (3) HTTP 201 ama status return_shipment_open (iade kargosu; mal geri gelmeli), ANINDA para iadesi YOK: PayTR çağrısı 0, ödeme completed, hold iptal edilmez. — payment.controller.ts (uç kaldırıldı, #61); refund.service.ts createCoolingOffRefund",
       "gap": false,
       "gapRefs": []
     },
@@ -19660,6 +19686,19 @@
       "pri": "P1",
       "steps": "1. Ödeme tamamla; MailHog'da alıcı e-postasının adresini kontrol et.",
       "exp": "Alıcı e-postası shippingAddress.guestEmail'e; takip linki /track-order?orderNumber=...&email=... (login gerektirmez). — invoice.service.ts:356-376.",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "TAX-096",
+      "code": "16",
+      "prefix": "TAX",
+      "domTitle": "16 — Vergi (KDV) & Fatura",
+      "title": "IDOR: başkasının siparişinin faturası POST /invoices/generate ile üretilemez (#63)",
+      "tur": "Güvenlik / Yetki",
+      "pri": "P0",
+      "steps": "1. İlgisiz kullanıcı POST /api/invoices/generate/:orderId (başka birinin siparişi). 2. Sahip alıcı aynı çağrı. 3. Sahip satıcı aynı çağrı.",
+      "exp": "(1) HTTP 403, fatura satırı OLUŞMAZ (PII/PDF sızmaz). (2)(3) HTTP 201 (sahip taraflar üretebilir). — invoice.controller.ts generateInvoice → invoice.service.ts generateForOrderAsUser sahiplik guard'ı (#63)",
       "gap": false,
       "gapRefs": []
     },

@@ -1,103 +1,114 @@
 /** @format */
 
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Button } from '@tarodan/ui';
-import { PlusIcon } from '@heroicons/react/24/outline';
-import { adminApi } from '@/lib/api';
-import { AdminPage } from '@/components/page/AdminPage';
-import { PageHeader } from '@/components/AdminList';
-import { ResourceList } from '@/components/list';
-import { clientListFetcher } from '@/lib/query/client-list';
-import { useConfirm } from '@/provider/ConfirmProvider';
-import { useAdminMutation } from '@/hooks/useAdminMutation';
-import type { Manufacturer } from './_lib/types';
-import { manufacturerColumns } from './_lib/columns';
-import { ManufacturerFormModal } from './_modals/ManufacturerFormModal';
+import { useCallback, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
+import { Button } from "@tarodan/ui";
+import { PlusIcon } from "@heroicons/react/24/outline";
+import { adminApi } from "@/lib/api";
+import { AdminPage } from "@/components/page/AdminPage";
+import { PageHeader } from "@/components/AdminList";
+import { ResourceList } from "@/components/list";
+import { clientListFetcher } from "@/lib/query/client-list";
+import { useConfirm } from "@/provider/ConfirmProvider";
+import { useAdminMutation } from "@/hooks/useAdminMutation";
+import type { Manufacturer } from "./_lib/types";
+import { manufacturerColumns } from "./_lib/columns";
+import { ManufacturerFormModal } from "./_modals/ManufacturerFormModal";
 
 export default function ManufacturersPage() {
-	const confirm = useConfirm();
-	const [modal, setModal] = useState<{ manufacturer?: Manufacturer } | null>(
-		null,
-	);
+  const confirm = useConfirm();
+  const t = useTranslations();
+  const [modal, setModal] = useState<{ manufacturer?: Manufacturer } | null>(
+    null,
+  );
 
-	const del = useAdminMutation(
-		(id: string) => adminApi.deleteManufacturer(id),
-		{
-			invalidates: ['manufacturers'],
-			successMessage: 'Üretici silindi',
-		},
-	);
-	const toggle = useAdminMutation(
-		(m: Manufacturer) =>
-			adminApi.updateManufacturer(m.id, { isActive: !m.isActive }),
-		{ invalidates: ['manufacturers'] },
-	);
+  const del = useAdminMutation(
+    (id: string) => adminApi.deleteManufacturer(id),
+    {
+      invalidates: ["manufacturers"],
+      successMessage: t("admin.catalog.manufacturers.deleted"),
+    },
+  );
+  const toggle = useAdminMutation(
+    (m: Manufacturer) =>
+      adminApi.updateManufacturer(m.id, { isActive: !m.isActive }),
+    { invalidates: ["manufacturers"] },
+  );
 
-	const onDelete = async (m: Manufacturer) => {
-		if (
-			await confirm({
-				title: 'Üreticiyi Sil',
-				description:
-					'Bu üreticiyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.',
-				destructive: true,
-			})
-		)
-			del.mutate(m.id);
-	};
+  const onDelete = useCallback(
+    async (m: Manufacturer) => {
+      if (
+        await confirm({
+          title: t("admin.catalog.manufacturers.deleteTitle"),
+          description: t("admin.catalog.manufacturers.deleteDescription"),
+          destructive: true,
+        })
+      )
+        del.mutate(m.id);
+    },
+    [confirm, del, t],
+  );
 
-	const columns = manufacturerColumns({
-		onEdit: (m) => setModal({ manufacturer: m }),
-		onDelete,
-		onToggle: (m) => toggle.mutate(m),
-		busyId: toggle.isPending ? (toggle.variables?.id ?? null) : null,
-	});
+  const columns = useMemo(
+    () =>
+      manufacturerColumns(t, {
+        onEdit: (m) => setModal({ manufacturer: m }),
+        onDelete,
+        onToggle: (m) => toggle.mutate(m),
+        busyId: toggle.isPending ? (toggle.variables?.id ?? null) : null,
+      }),
+    [t, onDelete, toggle],
+  );
 
-	return (
-		<AdminPage>
-			<PageHeader
-				title='Üretici Yönetimi'
-				description='Diecast model üreticilerini (Hot Wheels, Matchbox vb.) buradan yönetebilirsiniz'>
-				<Button
-					variant='primary'
-					leftIcon={<PlusIcon className='h-5 w-5' />}
-					onClick={() => setModal({})}>
-					Yeni Üretici Ekle
-				</Button>
-			</PageHeader>
+  return (
+    <AdminPage>
+      <PageHeader
+        title={t("admin.catalog.manufacturers.title")}
+        description={t("admin.catalog.manufacturers.subtitle")}
+      >
+        <Button
+          variant="primary"
+          leftIcon={<PlusIcon className="h-5 w-5" />}
+          onClick={() => setModal({})}
+        >
+          {t("admin.catalog.manufacturers.new")}
+        </Button>
+      </PageHeader>
 
-			<ResourceList<Manufacturer>
-				resource='manufacturers'
-				fetcher={clientListFetcher<Manufacturer>(
-					() => adminApi.getManufacturers(),
-					(raw) => raw.data ?? [],
-					{
-						searchFields: ['name', 'slug', 'country', 'website', 'description'],
-					},
-				)}
-				getRowId={(m) => m.id}
-				syncUrl
-				errorMessage='Üreticiler yüklenemedi'>
-				<ResourceList.Toolbar>
-					<ResourceList.Search />
-				</ResourceList.Toolbar>
-				<ResourceList.Table
-					columns={columns}
-					emptyText='Henüz üretici eklenmemiş'
-				/>
-				<ResourceList.Total unit='üretici' />
-				<ResourceList.Pagination />
-			</ResourceList>
+      <ResourceList<Manufacturer>
+        resource="manufacturers"
+        fetcher={clientListFetcher<Manufacturer>(
+          () => adminApi.getManufacturers(),
+          (raw) => raw.data ?? [],
+          {
+            searchFields: ["name", "slug", "country", "website", "description"],
+          },
+        )}
+        getRowId={(m) => m.id}
+        syncUrl
+        errorMessage={t("admin.catalog.manufacturers.loadError")}
+      >
+        <ResourceList.Toolbar>
+          <ResourceList.Search />
+        </ResourceList.Toolbar>
+        <ResourceList.Table
+          columns={columns}
+          emptyText={t("admin.catalog.manufacturers.empty")}
+        />
+        <ResourceList.Total unit={t("admin.catalog.manufacturers.unit")} />
+        <ResourceList.Pagination />
+      </ResourceList>
 
-			{modal && (
-				<ManufacturerFormModal
-					key={modal.manufacturer?.id ?? 'new'}
-					open
-					onClose={() => setModal(null)}
-					manufacturer={modal.manufacturer}
-				/>
-			)}
-		</AdminPage>
-	);
+      {modal && (
+        <ManufacturerFormModal
+          key={modal.manufacturer?.id ?? "new"}
+          open
+          onClose={() => setModal(null)}
+          manufacturer={modal.manufacturer}
+        />
+      )}
+    </AdminPage>
+  );
 }

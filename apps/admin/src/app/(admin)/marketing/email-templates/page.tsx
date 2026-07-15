@@ -1,34 +1,35 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Input } from '@tarodan/ui';
-import { adminApi } from '@/lib/api';
-import { AdminPage } from '@/components/page/AdminPage';
-import { PageHeader } from '@/components/AdminList';
-import { SectionCard } from '@/components/detail/SectionCard';
-import { DataTable } from '@/components/DataTable';
-import { templateColumns } from './_lib/columns';
-import { type TemplateListItem } from './_lib/types';
-import { EmailTemplateEditorModal } from './_modals/EmailTemplateEditorModal';
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Input } from "@tarodan/ui";
+import { adminApi } from "@/lib/api";
+import { adminKeys } from "@/lib/query/keys";
+import { AdminPage } from "@/components/page/AdminPage";
+import { PageHeader } from "@/components/AdminList";
+import { SectionCard } from "@/components/detail/SectionCard";
+import { DataTable } from "@/components/DataTable";
+import { templateColumns } from "./_lib/columns";
+import { type TemplateListItem } from "./_lib/types";
+import { EmailTemplateEditorModal } from "./_modals/EmailTemplateEditorModal";
 
 export default function EmailTemplatesPage() {
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const [editKey, setEditKey] = useState<string | null>(null);
 
   const { data: list = [], isLoading } = useQuery({
-    queryKey: ['email-templates'],
+    queryKey: adminKeys.all("email-templates"),
     queryFn: async () => {
       const res = await adminApi.getEmailTemplates();
       return (res.data?.data || []) as TemplateListItem[];
     },
   });
 
-  const q = search.trim().toLocaleLowerCase('tr');
+  const q = search.trim().toLocaleLowerCase("tr");
   const visible = q
     ? list.filter((t) =>
-        [t.key, t.name, t.group, t.subject ?? ''].some((f) =>
-          f.toLocaleLowerCase('tr').includes(q),
+        [t.key, t.name, t.group, t.subject ?? ""].some((f) =>
+          f.toLocaleLowerCase("tr").includes(q),
         ),
       )
     : list;
@@ -42,10 +43,10 @@ export default function EmailTemplatesPage() {
         title="E-posta Şablonları"
         description={
           <>
-            Sistem e-postalarını özelleştirin. Değişkenler için{' '}
+            Sistem e-postalarını özelleştirin. Değişkenler için{" "}
             <code className="rounded bg-surface-alt px-1 font-mono text-xs">
-              {'{{değişkenAdı}}'}
-            </code>{' '}
+              {"{{değişkenAdı}}"}
+            </code>{" "}
             kullanın.
           </>
         }
@@ -65,7 +66,7 @@ export default function EmailTemplatesPage() {
       ) : visible.length === 0 ? (
         <SectionCard>
           <p className="text-center text-muted">
-            {q ? 'Aramayla eşleşen şablon yok' : 'Şablon bulunamadı'}
+            {q ? "Aramayla eşleşen şablon yok" : "Şablon bulunamadı"}
           </p>
         </SectionCard>
       ) : (
@@ -83,7 +84,10 @@ export default function EmailTemplatesPage() {
       )}
 
       {editKey && (
-        <EmailTemplateEditorModal templateKey={editKey} onClose={() => setEditKey(null)} />
+        <EmailTemplateEditorModal
+          templateKey={editKey}
+          onClose={() => setEditKey(null)}
+        />
       )}
     </AdminPage>
   );

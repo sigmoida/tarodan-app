@@ -41,6 +41,7 @@ import { truncateAll, getPrisma, seedBaseline, disconnectPrisma } from '../../te
 import { createUser, createAdminUser, authHeader } from '../../factories/user.factory';
 import { scenario } from '../../test-utils/scenario';
 import { ProductSchedulerService } from '../../../src/modules/product/product-scheduler.service';
+import { PrismaService } from '../../../src/prisma';
 
 describe('04 — Ürün/İlan & Katalog (PRD)', () => {
   let ctx: E2ETestApp;
@@ -238,7 +239,10 @@ describe('04 — Ürün/İlan & Katalog (PRD)', () => {
 
       const prisma = getPrisma();
       const row = await prisma.product.findUnique({ where: { id: res.body.id } });
-      expect(row?.releaseDate?.toISOString().slice(0, 10)).toBe('2023-01-01');
+      // TZ-güvenli (#58): releaseDate = new Date(year, 0, 1) YEREL saatte kurulur;
+      // uygulama da getFullYear() ile YEREL okur (formatProductResponse) → yıl tutarlı.
+      // toISOString().slice(0,10) UTC'ye çevirip UTC+ TZ'de "2022-12-31"e kayıyordu.
+      expect(row?.releaseDate?.getFullYear()).toBe(2023);
       expect(row?.bundleSize).toBe(5);
       expect(row?.isSet).toBe(true);
       expect(row?.quantity).toBe(10);
@@ -1315,7 +1319,13 @@ describe('04 — Ürün/İlan & Katalog (PRD)', () => {
 
       const seller = await mkSeller();
       await mkProduct({ sellerId: seller.id, status: ProductStatus.active });
-      const full = await request(server()).get('/api/products?page=1&limit=20').expect(200);
+      // "Dolu" kontrolünü FARKLI bir cache anahtarıyla yap (#58): düz browse
+      // (?page&limit) sonucu yukarıda BOŞ olarak 120s TTL ile cache'lendi
+      // (findAll isListAllOrPopular cache). Aynı sorgu seed sonrası bayat boş
+      // dönerdi. sellerId filtresi ayrı anahtar → taze sorgu → yeni ürün görünür.
+      const full = await request(server())
+        .get(`/api/products?page=1&limit=20&sellerId=${seller.id}`)
+        .expect(200);
       expect(full.body.data.length).toBeGreaterThanOrEqual(1);
       expect(full.body.meta.total).toBeGreaterThanOrEqual(1);
     });
@@ -1747,6 +1757,42 @@ describe('04 — Ürün/İlan & Katalog (PRD)', () => {
       // SQL/UUID enjeksiyon: bozuk UUID path → 400; query categoryId @IsUUID → 400.
       await request(server()).get("/api/products/' OR 1=1--").expect(400);
       await request(server()).get("/api/products?categoryId=' OR '1'='1").expect(400);
+    });
+  });
+
+  describe('N+1 batch (perf) — #67', () => {
+    scenario('PRD-265', async () => {
+      // [P0] N+1 REGRESYON (#67): Aynı satıcının çok ürünü listelenirken satıcı
+      // istatistikleri ürün BAŞINA sorgulanmaz; sayfa başına TOPLU çekilir. Eski kod her
+      // ürün için userMembership.findUnique çağırıyordu (N kez). Artık tek toplu
+      // userMembership.findMany → findUnique HİÇ çağrılmaz. Yanıt şekli/değeri değişmez
+      // (04-prd/06-src/17-dsc senaryoları bunu ayrıca doğrular). Plain GET (arama yok) →
+      // PostgreSQL yolu → formatProductResponseMany.
+      const seller = await mkSeller();
+      const N = 4;
+      for (let i = 0; i < N; i++) {
+        await mkProduct({ sellerId: seller.id, price: 100 + i });
+      }
+
+      const appPrisma = ctx.module.get(PrismaService);
+      const findUniqueSpy = jest.spyOn(appPrisma.userMembership, 'findUnique');
+      const findManySpy = jest.spyOn(appPrisma.userMembership, 'findMany');
+      try {
+        const res = await request(server())
+          .get('/api/products?limit=20')
+          .expect(200);
+        const mine = res.body.data.filter(
+          (p: any) => p.sellerId === seller.id,
+        );
+        expect(mine.length).toBeGreaterThanOrEqual(N);
+        // Batch: per-ürün userMembership.findUnique ARTIK ÇAĞRILMAZ (N+1 giderildi).
+        expect(findUniqueSpy).not.toHaveBeenCalled();
+        // Satıcı premium durumu tek toplu findMany'den gelir.
+        expect(findManySpy).toHaveBeenCalled();
+      } finally {
+        findUniqueSpy.mockRestore();
+        findManySpy.mockRestore();
+      }
     });
   });
 });

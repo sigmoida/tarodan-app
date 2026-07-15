@@ -93,6 +93,7 @@ import { PagesModule } from "./modules/pages";
 
 import { EventEmitterModule } from "@nestjs/event-emitter";
 import { ErrorLogInterceptor } from "./common/interceptors/error-log.interceptor";
+import { StripSensitiveFieldsInterceptor } from "./common/interceptors/strip-sensitive-fields.interceptor";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 
 @Module({
@@ -251,6 +252,12 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
     {
       provide: APP_INTERCEPTOR,
       useClass: ErrorLogInterceptor,
+    },
+    // Defense-in-depth: strip sensitive fields (e.g. passwordHash) from every
+    // response body so a raw Prisma entity can never leak secrets (#71).
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: StripSensitiveFieldsInterceptor,
     },
     // Global exception filter — maps Prisma errors to clean 4xx and sanitizes
     // any unhandled 5xx so no internal detail leaks to clients (#70).

@@ -12,8 +12,22 @@ inputs:
     description: 'Coolify API token (deploy-capable)'
     required: true
   uuids:
-    description: 'Comma-separated app UUIDs to deploy'
-    required: true
+    description: 'Comma-separated app UUIDs to deploy (used when apps/all-uuids are not given)'
+    required: false
+    default: ''
+  all-uuids:
+    description: >-
+      Full comma-separated UUID list in api,web,admin order (usually the
+      COOLIFY_*_UUIDS secret). Combined with `apps`, the action selects the
+      subset to deploy — so the secret flows as an action INPUT and never as a
+      job/step OUTPUT (GitHub redacts secret-valued outputs, which silently
+      empties them and skips the deploy).
+    required: false
+    default: ''
+  apps:
+    description: 'Comma-separated app names (api/web/admin) to deploy; mapped against all-uuids.'
+    required: false
+    default: ''
   timeout-seconds:
     description: 'Max seconds to wait per deployment before giving up'
     required: false
@@ -32,15 +46,63 @@ runs:
         COOLIFY_URL: ${{ inputs.coolify-url }}
         COOLIFY_TOKEN: ${{ inputs.coolify-token }}
         UUIDS: ${{ inputs.uuids }}
+        ALL_UUIDS: ${{ inputs.all-uuids }}
+        APPS: ${{ inputs.apps }}
         TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
         POLL_INTERVAL: ${{ inputs.poll-interval }}
       run: |
         set -euo pipefail
 
+        # Resolve the effective UUIDs. Preferred path: map app NAMES (apps) to a
+        # subset of ALL_UUIDS here, inside the action, because ALL_UUIDS is a
+        # secret — a secret routed through a job/step OUTPUT is redacted by
+        # GitHub and comes back empty (which was silently skipping deploys).
+        # As an action INPUT it is safe.
+        if [ -n "${APPS:-}" ] && [ -n "${ALL_UUIDS:-}" ]; then
+          # api,web,admin order is load-bearing.
+          IFS=',' read -r API_UUID WEB_UUID ADMIN_UUID _rest <<< "$ALL_UUIDS"
+          sel=""
+          _old_ifs="$IFS"; IFS=','
+          for a in $APPS; do
+            a="$(printf '%s' "$a" | tr -d '[:space:]')"
+            case "$a" in
+              api)   u="$API_UUID" ;;
+              web)   u="$WEB_UUID" ;;
+              admin) u="$ADMIN_UUID" ;;
+              '')    u="" ;;
+              *)     u=""; echo "::warning::unknown app name '$a' — skipped" ;;
+            esac
+            [ -n "$u" ] && sel="$sel,$u"
+          done
+          IFS="$_old_ifs"
+          UUIDS="${sel#,}"
+        fi
+        if [ -z "${UUIDS:-}" ]; then
+          echo "::error::No UUIDs to deploy — pass 'uuids', or 'apps' + 'all-uuids'."
+          exit 1
+        fi
+
         echo "Triggering Coolify deploy for: $UUIDS"
-        resp="$(curl -fsSL --retry 3 --retry-delay 10 \
+        # Capture the HTTP status AND body separately (no -f) so a non-2xx from
+        # Coolify surfaces the actual message instead of a bare "curl: (22) 403".
+        # A 401 = bad/expired token; 403 = token authenticated but lacks the
+        # deploy scope or belongs to a different team than the app UUIDs; an HTML
+        # body usually means a WAF/Cloudflare in front of Coolify blocked us.
+        body_file="$(mktemp)"
+        http_code="$(curl -sS --retry 3 --retry-delay 10 \
           -H "Authorization: Bearer $COOLIFY_TOKEN" \
+          -o "$body_file" -w '%{http_code}' \
           "$COOLIFY_URL/api/v1/deploy?uuid=$UUIDS&force=false")"
+        echo "Coolify deploy trigger -> HTTP $http_code"
+        if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+          echo "::error::Coolify deploy trigger returned HTTP $http_code"
+          echo "----- response body -----"
+          cat "$body_file" || true
+          echo
+          echo "-------------------------"
+          exit 1
+        fi
+        resp="$(cat "$body_file")"
         echo "$resp" | jq .
 
         # Collect the deployment UUID(s) Coolify queued (one per app).

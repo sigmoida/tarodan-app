@@ -1,37 +1,38 @@
 /** @format */
 
-import { redirect } from 'next/navigation';
-import { Logo } from '@tarodan/ui/logo';
-import { getSession } from '@/lib/server/session';
+import { Logo } from "@tarodan/ui/logo";
 
 /**
- * Layout for unauthenticated pages (login, forgot-password). Server Component:
- * if a valid session already exists, bounce to the app before rendering.
- * A primary header with the brand on the left + a centered card frame below.
+ * Layout for unauthenticated pages (login, forgot-password). Pure passthrough —
+ * a primary header with the brand on the left + a centered card frame below.
+ *
+ * The "already logged in → /dashboard" bounce used to live here as an
+ * `await getSession()` redirect. That made this an async layout that suspended
+ * on a network call, and after login the Server Action revalidates /login and
+ * re-runs it — flashing a blank frame before landing on /dashboard (same issue
+ * web had). The bounce now happens at the edge in `middleware.ts`
+ * (guestOnlyPaths), before render and only on real navigations.
  */
-export default async function AuthLayout({
-	children,
+export default function AuthLayout({
+  children,
 }: {
-	children: React.ReactNode;
+  children: React.ReactNode;
 }) {
-	const session = await getSession();
-	if (session) redirect('/dashboard');
+  return (
+    <div className="flex min-h-screen flex-col">
+      <header className="flex h-16 items-center bg-primary-500 px-6 shadow-sm">
+        <Logo style={{ maxHeight: "40px", width: "auto" }} />
+      </header>
 
-	return (
-		<div className='flex min-h-screen flex-col'>
-			<header className='flex h-16 items-center bg-primary-500 px-6 shadow-sm'>
-				<Logo style={{ maxHeight: '40px', width: 'auto' }} />
-			</header>
+      <main className="flex flex-1 items-center justify-center bg-gradient-to-br from-surface via-surface-elevated to-surface-alt px-4 py-10">
+        <div className="w-full max-w-md">
+          {children}
 
-			<main className='flex flex-1 items-center justify-center bg-gradient-to-br from-surface via-surface-elevated to-surface-alt px-4 py-10'>
-				<div className='w-full max-w-md'>
-					{children}
-
-					<p className='mt-6 text-center text-sm text-muted'>
-						© 2026 Tarodan Marketplace. Tüm hakları saklıdır.
-					</p>
-				</div>
-			</main>
-		</div>
-	);
+          <p className="mt-6 text-center text-sm text-muted">
+            © 2026 Tarodan Marketplace. Tüm hakları saklıdır.
+          </p>
+        </div>
+      </main>
+    </div>
+  );
 }

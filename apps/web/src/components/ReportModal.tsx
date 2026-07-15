@@ -1,21 +1,22 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { XMarkIcon, FlagIcon } from '@heroicons/react/24/outline';
-import toast from 'react-hot-toast';
-import { api } from '@/lib/api';
-import { Button, Radio, Textarea } from '@tarodan/ui';
+import { useMemo } from "react";
+import { z } from "zod";
+import toast from "react-hot-toast";
+import { useTranslations } from "next-intl";
+import { Button, Modal, Radio } from "@tarodan/ui";
+import { Form, FormTextarea, useZodForm } from "@tarodan/ui/form";
+import { api } from "@/lib/api";
 
-export type ReportEntityType = 'product' | 'user' | 'collection' | 'message';
+export type ReportEntityType = "product" | "user" | "collection" | "message";
 
-export type ReportReason = 
-  | 'spam'
-  | 'inappropriate_content'
-  | 'harassment'
-  | 'fake_product'
-  | 'scam'
-  | 'other';
+export type ReportReason =
+  | "spam"
+  | "inappropriate_content"
+  | "harassment"
+  | "fake_product"
+  | "scam"
+  | "other";
 
 interface ReportModalProps {
   isOpen: boolean;
@@ -26,204 +27,176 @@ interface ReportModalProps {
   locale?: string;
 }
 
-const REPORT_REASONS: { value: ReportReason; labelTr: string; labelEn: string }[] = [
-  { value: 'spam', labelTr: 'Spam / İstenmeyen İçerik', labelEn: 'Spam' },
-  { value: 'inappropriate_content', labelTr: 'Uygunsuz İçerik', labelEn: 'Inappropriate' },
-  { value: 'harassment', labelTr: 'Taciz / Kötüye Kullanım', labelEn: 'Harassment' },
-  { value: 'fake_product', labelTr: 'Sahte / Yanıltıcı Ürün', labelEn: 'Fake Product' },
-  { value: 'scam', labelTr: 'Dolandırıcılık', labelEn: 'Scam' },
-  { value: 'other', labelTr: 'Diğer', labelEn: 'Other' },
+const REPORT_REASONS: {
+  value: ReportReason;
+  labelKey: string;
+}[] = [
+  { value: "spam", labelKey: "report.reasonSpam" },
+  { value: "inappropriate_content", labelKey: "report.reasonInappropriate" },
+  { value: "harassment", labelKey: "report.reasonHarassment" },
+  { value: "fake_product", labelKey: "report.reasonFakeProduct" },
+  { value: "scam", labelKey: "report.reasonScam" },
+  { value: "other", labelKey: "report.reasonOther" },
 ];
 
-export default function ReportModal({ 
-  isOpen, 
-  onClose, 
-  entityType, 
-  entityId, 
+const REASON_VALUES = REPORT_REASONS.map((r) => r.value) as [
+  ReportReason,
+  ...ReportReason[],
+];
+
+export default function ReportModal({
+  isOpen,
+  onClose,
+  entityType,
+  entityId,
   entityName,
-  locale = 'tr' 
 }: ReportModalProps) {
-  const [selectedReason, setSelectedReason] = useState<ReportReason | ''>('');
-  const [description, setDescription] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const t = useTranslations();
 
-  const getTitle = () => {
+  const schema = useMemo(
+    () =>
+      z.object({
+        reason: z.enum(REASON_VALUES, {
+          errorMap: () => ({
+            message: t("report.selectReason"),
+          }),
+        }),
+        description: z.string().trim().max(500).optional().or(z.literal("")),
+      }),
+    [t],
+  );
+  type ReportValues = z.infer<typeof schema>;
+
+  const form = useZodForm(schema, { defaultValues: { description: "" } });
+  const reason = form.watch("reason");
+  const description = form.watch("description") ?? "";
+
+  const title = (() => {
     switch (entityType) {
-      case 'product':
-        return locale === 'en' ? 'Report Listing' : 'İlanı Raporla';
-      case 'user':
-        return locale === 'en' ? 'Report User' : 'Kullanıcıyı Raporla';
-      case 'collection':
-        return locale === 'en' ? 'Report Collection' : 'Koleksiyonu Raporla';
-      case 'message':
-        return locale === 'en' ? 'Report Message' : 'Mesajı Raporla';
+      case "product":
+        return t("report.reportListing");
+      case "user":
+        return t("report.reportUser");
+      case "collection":
+        return t("report.reportCollection");
+      case "message":
+        return t("report.reportMessage");
       default:
-        return locale === 'en' ? 'Report' : 'Raporla';
+        return t("report.report");
     }
-  };
+  })();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!selectedReason) {
-      toast.error(locale === 'en' ? 'Please select a reason' : 'Lütfen bir neden seçin');
-      return;
+  const onSubmit = async (v: ReportValues) => {
+    const payload: {
+      type: string;
+      targetId: string;
+      reason: string;
+      description?: string;
+    } = { type: entityType, targetId: entityId, reason: v.reason };
+    // Backend only accepts a description of at least 10 characters.
+    if (v.description && v.description.trim().length >= 10) {
+      payload.description = v.description.trim();
     }
 
-    setIsSubmitting(true);
     try {
-      // Build payload with correct field names for backend
-      const payload: { type: string; targetId: string; reason: string; description?: string } = {
-        type: entityType,       // Backend expects 'type' not 'entityType'
-        targetId: entityId,     // Backend expects 'targetId' not 'entityId'
-        reason: selectedReason,
-      };
-      
-      // Only include description if it's at least 10 characters (backend validation)
-      if (description.trim().length >= 10) {
-        payload.description = description.trim();
-      }
-
-      await api.post('/user-reports', payload);
-      
-      toast.success(
-        locale === 'en' 
-          ? 'Report submitted. Our team will review it.' 
-          : 'Rapor gönderildi. Ekibimiz inceleyecektir.'
-      );
+      await api.post("/user-reports", payload);
+      toast.success(t("report.submitSuccess"));
+      form.reset({ description: "" });
       onClose();
-      setSelectedReason('');
-      setDescription('');
     } catch (error: any) {
-      if (process.env.NODE_ENV === 'development') console.error('Report submission failed:', error);
+      if (process.env.NODE_ENV === "development")
+        console.error("Report submission failed:", error);
       const errorMsg = error.response?.data?.message;
-      // Handle array of validation errors
       const displayMsg = Array.isArray(errorMsg) ? errorMsg[0] : errorMsg;
-      toast.error(
-        displayMsg || 
-        (locale === 'en' ? 'Failed to submit report' : 'Rapor gönderilemedi')
-      );
-    } finally {
-      setIsSubmitting(false);
+      toast.error(displayMsg || t("report.submitFailed"));
     }
   };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="absolute inset-0 bg-heading/50"
-          />
-          
-          {/* Modal - Compact size with max-height and scroll */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative bg-surface-elevated rounded-xl shadow-xl w-full max-w-sm max-h-[90vh] overflow-hidden flex flex-col"
-          >
-            {/* Header - Compact */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <FlagIcon className="w-5 h-5 text-danger-600" />
-                <h2 className="text-lg font-semibold text-heading">{getTitle()}</h2>
-              </div>
-              <Button variant="secondary" onClick={onClose}
-                className="p-1.5 rounded-full hover:bg-surface-alt transition-colors">
-                <XMarkIcon className="w-5 h-5 text-muted" />
-              </Button>
-            </div>
+    <Modal isOpen={isOpen} onClose={onClose} title={title} maxWidth="max-w-sm">
+      <Form form={form} onSubmit={onSubmit} className="space-y-4">
+        {entityName && (
+          <div className="rounded-lg bg-surface p-2">
+            <p className="text-xs text-muted">{t("report.reporting")}</p>
+            <p className="truncate text-sm font-medium text-heading">
+              {entityName}
+            </p>
+          </div>
+        )}
 
-            {/* Content - Scrollable */}
-            <form onSubmit={handleSubmit} className="p-4 space-y-4 overflow-y-auto flex-1">
-              {entityName && (
-                <div className="p-2 bg-surface rounded-lg">
-                  <p className="text-xs text-muted">{locale === 'en' ? 'Reporting:' : 'Raporlanan:'}</p>
-                  <p className="text-sm font-medium text-heading truncate">{entityName}</p>
-                </div>
-              )}
-
-              {/* Reason Selection - Compact */}
-              <div>
-                <label className="block text-sm font-medium text-body mb-2">
-                  {locale === 'en' ? 'Reason' : 'Neden'} <span className="text-danger-500">*</span>
-                </label>
-                <div className="space-y-1.5">
-                  {REPORT_REASONS.map((reason) => (
-                    <label
-                      key={reason.value}
-                      className={`flex items-center p-2.5 rounded-lg border cursor-pointer transition-all text-sm ${
-                        selectedReason === reason.value
-                          ? 'border-danger-500 bg-danger-50'
-                          : 'border-border hover:border-border'
-                      }`}
-                    >
-                      <Radio name="reportReason"
-                        value={reason.value}
-                        checked={selectedReason === reason.value}
-                        onChange={(e) => setSelectedReason(e.target.value as ReportReason)}
-                        className="w-3.5 h-3.5 text-danger-600 focus:ring-danger-500" />
-                      <span className="ml-2 text-body">
-                        {locale === 'en' ? reason.labelEn : reason.labelTr}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Description - Compact */}
-              <div>
-                <label className="block text-sm font-medium text-body mb-1.5">
-                  {locale === 'en' ? 'Details (optional, min 10 chars)' : 'Detaylar (isteğe bağlı, min 10 karakter)'}
-                </label>
-                <Textarea value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder={locale === 'en' ? 'More details...' : 'Daha fazla detay...'}
-                  rows={2}
-                  maxLength={500}
-                  className="focus:ring-danger-500 focus:border-danger-500 resize-none" />
-                <p className="text-xs text-subtle mt-0.5 text-right">{description.length}/500</p>
-              </div>
-
-              {/* Actions - Compact */}
-              <div className="flex gap-2 pt-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  className="flex-1"
-                  onClick={onClose}
-                >
-                  {locale === 'en' ? 'Cancel' : 'İptal'}
-                </Button>
-                <Button
-                  type="submit"
-                  variant="danger"
-                  size="sm"
-                  className="flex-1"
-                  disabled={isSubmitting || !selectedReason}
-                >
-                  {isSubmitting ? '...' : (locale === 'en' ? 'Report' : 'Raporu Gönder')}
-                </Button>
-              </div>
-
-              {/* Info - Compact */}
-              <p className="text-xs text-subtle text-center">
-                {locale === 'en' 
-                  ? 'Reports are reviewed within 24-48 hours.'
-                  : 'Raporlar 24-48 saat içinde incelenir.'
-                }
-              </p>
-            </form>
-          </motion.div>
+        <div>
+          <label className="mb-2 block text-sm font-medium text-body">
+            {t("common.reason")} <span className="text-danger-500">*</span>
+          </label>
+          <div className="space-y-1.5">
+            {REPORT_REASONS.map((r) => (
+              <label
+                key={r.value}
+                className={`flex cursor-pointer items-center rounded-lg border p-2.5 text-sm transition-all ${
+                  reason === r.value
+                    ? "border-danger-500 bg-danger-50"
+                    : "border-border"
+                }`}
+              >
+                <Radio
+                  name="reportReason"
+                  value={r.value}
+                  checked={reason === r.value}
+                  onChange={() =>
+                    form.setValue("reason", r.value, { shouldValidate: true })
+                  }
+                />
+                <span className="ml-2 text-body">
+                  {t(r.labelKey as Parameters<typeof t>[0])}
+                </span>
+              </label>
+            ))}
+          </div>
+          {form.formState.errors.reason && (
+            <p className="mt-1 text-xs text-danger-600">
+              {form.formState.errors.reason.message}
+            </p>
+          )}
         </div>
-      )}
-    </AnimatePresence>
+
+        <div>
+          <FormTextarea
+            name="description"
+            label={t("report.detailsLabel")}
+            placeholder={t("report.detailsPlaceholder")}
+            rows={2}
+            maxLength={500}
+          />
+          <p className="mt-0.5 text-right text-xs text-subtle">
+            {description.length}/500
+          </p>
+        </div>
+
+        <div className="flex gap-2 pt-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="flex-1"
+            onClick={onClose}
+          >
+            {t("common.cancel")}
+          </Button>
+          <Button
+            type="submit"
+            variant="danger"
+            size="sm"
+            className="flex-1"
+            isLoading={form.formState.isSubmitting}
+          >
+            {t("report.submit")}
+          </Button>
+        </div>
+
+        <p className="text-center text-xs text-subtle">
+          {t("report.reviewNotice")}
+        </p>
+      </Form>
+    </Modal>
   );
 }

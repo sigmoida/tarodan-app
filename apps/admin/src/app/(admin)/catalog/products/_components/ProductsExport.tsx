@@ -1,31 +1,33 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { Button } from '@tarodan/ui';
-import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
-import { adminApi } from '@/lib/api';
-import { downloadBlob } from '@/lib/download';
+import { useState } from "react";
+import { useTranslations } from "next-intl";
+import { useSearchParams } from "next/navigation";
+import { Button } from "@tarodan/ui";
+import { ArrowDownTrayIcon } from "@heroicons/react/24/outline";
+import { adminApi } from "@/lib/api";
+import { downloadBlob } from "@/lib/download";
 
 /** CSV export of the current product filters (reads status/sellerId from the URL). */
 export function ProductsExport() {
+  const t = useTranslations();
   const searchParams = useSearchParams();
   const [busy, setBusy] = useState(false);
 
-  const status = searchParams.get('status') ?? 'all';
-  const sellerId = searchParams.get('sellerId') ?? '';
+  const status = searchParams.get("status") ?? "all";
+  const sellerId = searchParams.get("sellerId") ?? "";
 
   const onExport = async () => {
     setBusy(true);
     try {
       const res = await adminApi.exportProducts({
-        status: status === 'all' ? undefined : status,
+        status: status === "all" ? undefined : status,
         sellerId: sellerId || undefined,
       });
       downloadBlob(
-        `products_${new Date().toISOString().split('T')[0]}.csv`,
+        `products_${new Date().toISOString().split("T")[0]}.csv`,
         res.data,
-        'text/csv',
+        "text/csv",
       );
     } finally {
       setBusy(false);
@@ -34,10 +36,11 @@ export function ProductsExport() {
 
   return (
     <Button
-      leftIcon={<ArrowDownTrayIcon className='h-5 w-5' />}
+      leftIcon={<ArrowDownTrayIcon className="h-5 w-5" />}
       isLoading={busy}
-      onClick={onExport}>
-      CSV İndir
+      onClick={onExport}
+    >
+      {t("admin.catalog.products.exportCsv")}
     </Button>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { ResourceList } from "@/components/list";
 import { statusOptions } from "./_shared";
@@ -7,14 +8,17 @@ import { SuratTestConsole } from "./_components/SuratTestConsole";
 import { SuratShipmentsTable } from "./_components/SuratShipmentsTable";
 
 export function SuratTrackingTab() {
+  const t = useTranslations();
   return (
     <div className="space-y-4">
       <SuratTestConsole />
 
       <p className="text-sm text-muted">
-        Sürat Kargo gönderilerinin canlı durumu. Durumlar arka planda her 30 dakikada bir otomatik
-        senkronlanır; anlık güncel durum için satırdaki{" "}
-        <span className="font-medium text-body">Takibi Yenile</span> düğmesini kullanın.
+        {t("admin.operations.shipping.surat.liveInfoPrefix")}
+        <span className="font-medium text-body">
+          {t("admin.operations.shipping.surat.refreshTracking")}
+        </span>
+        {t("admin.operations.shipping.surat.liveInfoSuffix")}
       </p>
 
       <ResourceList
@@ -22,14 +26,18 @@ export function SuratTrackingTab() {
         fetcher={(p) => adminApi.getShipments({ ...p, carrierId: "surat" })}
         getRowId={(r: any) => r.id}
         initialFilters={{ status: "all" }}
-        errorMessage="Sürat kargoları yüklenemedi"
+        errorMessage={t("admin.operations.shipping.surat.loadError")}
       >
         <ResourceList.Toolbar>
           <ResourceList.Search />
-          <ResourceList.FilterSelect name="status" options={statusOptions} className="sm:w-56" />
+          <ResourceList.FilterSelect
+            name="status"
+            options={statusOptions(t)}
+            className="sm:w-56"
+          />
         </ResourceList.Toolbar>
         <SuratShipmentsTable />
-        <ResourceList.Total unit="Sürat gönderisi" />
+        <ResourceList.Total unit={t("admin.operations.shipping.surat.unit")} />
         <ResourceList.Pagination />
       </ResourceList>
     </div>

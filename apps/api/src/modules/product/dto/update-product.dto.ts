@@ -15,6 +15,21 @@ export class UpdateProductDto extends PartialType(CreateProductDto) {
   @IsEnum(ProductStatus, { message: 'Geçerli bir durum seçiniz' })
   status?: ProductStatus;
 
+  // Güncellemede stok 0'a çekilebilir (create'te @Min(1) → yeni ilan 0 olamaz).
+  // Stok 0 → ilan otomatik pasif (resolveUpdatedStatus) ve "yeniden satışa açma"
+  // guard'ı service'te 0'ı ele alır. create-dto'nun @Min(1)'i PartialType ile miras
+  // kalıp bu meşru yolları ("stok 0 → pasif", nazik reopen mesajı) 400 "Stok miktarı
+  // en az 1" ile engelliyordu (#58). quantity'yi @Min(0) ile ez; null = sınırsız.
+  @ApiPropertyOptional({
+    example: 0,
+    description: 'Stock quantity (0 allowed on update → auto-inactive; null for unlimited)',
+  })
+  @IsOptional()
+  @IsNumber({}, { message: 'Stok miktarı sayı olmalıdır' })
+  @Type(() => Number)
+  @Min(0, { message: 'Stok miktarı negatif olamaz' })
+  quantity?: number | null;
+
   @ApiPropertyOptional({ example: 299.99, description: 'Original price before sale (strike-through)' })
   @IsOptional()
   @IsNumber()

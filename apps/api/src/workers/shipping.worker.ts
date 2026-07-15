@@ -33,10 +33,6 @@ export class ShippingWorker {
     private readonly notificationService: NotificationService,
   ) {}
 
-  private is48hWindowEnabled(): boolean {
-    return this.configService.get<string>('FEATURE_48H_CONFIRMATION_WINDOW') === 'true';
-  }
-
   @Process('create-shipment')
   async handleCreateShipment(job: Job<ShippingJobData>) {
     this.logger.log(`Processing create shipment job ${job.id} for order ${job.data.orderId}`);
@@ -144,58 +140,27 @@ export class ShippingWorker {
         },
       });
 
-      // If delivered, branch on FEATURE_48H_CONFIRMATION_WINDOW
+      // If delivered: tek kanonik handler order geçişini + escrow schedule'ı + 48h
+      // dallanmasını yapar. Bildirim (48h modunda) burada, teslim I/O'sunu bloklamadan.
       if (newStatus === ShipmentStatus.delivered) {
-        if (this.is48hWindowEnabled()) {
-          // Faz 3A: 48h alıcı kontrol penceresi başlat (hold release ETMEZ)
-          const deliveredAt = new Date();
-          const confirmationDeadline = new Date(deliveredAt.getTime() + 48 * 60 * 60 * 1000);
-          await this.prisma.order.update({
-            where: { id: shipment.orderId },
-            data: {
-              status: OrderStatus.awaiting_buyer_confirmation,
-              deliveredAt,
-              confirmationDeadline,
-            },
-          });
-          // Escrow saatini teslimden başlat: hold release = teslim + return + grace.
-          try {
-            await this.paymentService.scheduleHoldReleaseOnDelivery(shipment.orderId, deliveredAt);
-          } catch (e: any) {
-            this.logger.warn(`scheduleHoldRelease failed (track-update) for ${shipment.orderId}: ${e?.message}`);
-          }
+        const res = await this.paymentService.handleOrderDelivered(
+          shipment.orderId,
+          new Date(),
+        );
+        if (res.acted && res.use48h && res.confirmationDeadline && res.buyerId) {
           this.logger.log(
-            `Order ${shipment.orderId} entered 48h window (track-update); deadline=${confirmationDeadline.toISOString()}`,
+            `Order ${shipment.orderId} entered 48h window (track-update); deadline=${res.confirmationDeadline.toISOString()}`,
           );
           try {
-            const o = await this.prisma.order.findUnique({
-              where: { id: shipment.orderId },
-              select: { buyerId: true },
-            });
-            if (o) {
-              await this.notificationService.notifyOrderDeliveredConfirm(
-                o.buyerId,
-                shipment.orderId,
-                confirmationDeadline,
-              );
-            }
+            await this.notificationService.notifyOrderDeliveredConfirm(
+              res.buyerId,
+              shipment.orderId,
+              res.confirmationDeadline,
+            );
           } catch (e: any) {
             this.logger.warn(
               `notify delivered-confirm failed (track-update) for ${shipment.orderId}: ${e?.message}`,
             );
-          }
-        } else {
-          // Yeni escrow: teslimde ANINDA release YOK. deliveredAt set edilir ve
-          // hold release = teslim + return + grace olarak zamanlanır.
-          const deliveredAt = new Date();
-          await this.prisma.order.update({
-            where: { id: shipment.orderId },
-            data: { status: OrderStatus.delivered, deliveredAt },
-          });
-          try {
-            await this.paymentService.scheduleHoldReleaseOnDelivery(shipment.orderId, deliveredAt);
-          } catch (e: any) {
-            this.logger.warn(`scheduleHoldRelease failed (track-update legacy) for order ${shipment.orderId}: ${e?.message}`);
           }
         }
       }
@@ -271,59 +236,27 @@ export class ShippingWorker {
         },
       });
 
-      // Handle delivery: branch on FEATURE_48H_CONFIRMATION_WINDOW
+      // Handle delivery: tek kanonik handler order geçişini + escrow schedule'ı + 48h
+      // dallanmasını yapar. Bildirim (48h modunda) burada, teslim I/O'sunu bloklamadan.
       if (status === ShipmentStatus.delivered) {
-        if (this.is48hWindowEnabled()) {
-          // Faz 3A: 48h alıcı kontrol penceresi başlat (hold release ETMEZ)
-          const deliveredAt = new Date();
-          const confirmationDeadline = new Date(deliveredAt.getTime() + 48 * 60 * 60 * 1000);
-          await this.prisma.order.update({
-            where: { id: shipment.orderId },
-            data: {
-              status: OrderStatus.awaiting_buyer_confirmation,
-              deliveredAt,
-              confirmationDeadline,
-            },
-          });
-          // Escrow saatini teslimden başlat: hold release = teslim + return + grace.
-          try {
-            await this.paymentService.scheduleHoldReleaseOnDelivery(shipment.orderId, deliveredAt);
-          } catch (e: any) {
-            this.logger.warn(`scheduleHoldRelease failed (webhook) for ${shipment.orderId}: ${e?.message}`);
-          }
+        const res = await this.paymentService.handleOrderDelivered(
+          shipment.orderId,
+          new Date(),
+        );
+        if (res.acted && res.use48h && res.confirmationDeadline && res.buyerId) {
           this.logger.log(
-            `Order ${shipment.orderId} entered 48h window (webhook); deadline=${confirmationDeadline.toISOString()}`,
+            `Order ${shipment.orderId} entered 48h window (webhook); deadline=${res.confirmationDeadline.toISOString()}`,
           );
           try {
-            const o = await this.prisma.order.findUnique({
-              where: { id: shipment.orderId },
-              select: { buyerId: true },
-            });
-            if (o) {
-              await this.notificationService.notifyOrderDeliveredConfirm(
-                o.buyerId,
-                shipment.orderId,
-                confirmationDeadline,
-              );
-            }
+            await this.notificationService.notifyOrderDeliveredConfirm(
+              res.buyerId,
+              shipment.orderId,
+              res.confirmationDeadline,
+            );
           } catch (e: any) {
             this.logger.warn(
               `notify delivered-confirm failed (webhook) for ${shipment.orderId}: ${e?.message}`,
             );
-          }
-        } else {
-          // Yeni escrow: teslimde ANINDA release YOK. deliveredAt set edilir ve
-          // hold release = teslim + return + grace olarak zamanlanır; satıcıya
-          // ödeme yalnızca o tarihten sonra + açık iade yokken cron ile yapılır.
-          const deliveredAt = new Date();
-          await this.prisma.order.update({
-            where: { id: shipment.orderId },
-            data: { status: OrderStatus.delivered, deliveredAt },
-          });
-          try {
-            await this.paymentService.scheduleHoldReleaseOnDelivery(shipment.orderId, deliveredAt);
-          } catch (e: any) {
-            this.logger.warn(`scheduleHoldRelease failed (legacy) for order ${shipment.orderId}: ${e?.message}`);
           }
         }
       }

@@ -130,6 +130,23 @@ export class PaymentService {
     );
   }
 
+  /**
+   * Tek kanonik teslim handler'ı — order durumunu (48h'e göre) ayarlar VE escrow
+   * release'ini planlar. Tüm teslim yolları (webhook/worker/Sürat poll/admin) bunu çağırır.
+   */
+  async handleOrderDelivered(
+    orderId: string,
+    deliveredAt: Date,
+    tx?: Prisma.TransactionClient,
+  ): Promise<{
+    acted: boolean;
+    use48h: boolean;
+    confirmationDeadline: Date | null;
+    buyerId: string | null;
+  }> {
+    return this.paymentRefund.handleOrderDelivered(orderId, deliveredAt, tx);
+  }
+
   async releaseHoldsDue(): Promise<{
     count: number;
     tradeCashReleased: number;
@@ -144,13 +161,6 @@ export class PaymentService {
   // Taşındı: payment-reconciliation.service.ts — facade delege (imza aynı).
   async processRefundedOrders(): Promise<{ refunded: number; failed: number }> {
     return this.paymentReconciliation.processRefundedOrders();
-  }
-
-  // Taşındı: payment-query.service.ts — imza aynen korunuyor (facade delege).
-  async findOrderParties(
-    orderId: string,
-  ): Promise<{ buyerId: string; sellerId: string } | null> {
-    return this.paymentQuery.findOrderParties(orderId);
   }
 
   // Taşındı: payment-reconciliation.service.ts — facade delege (imza aynı).

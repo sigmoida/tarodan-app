@@ -1,8 +1,34 @@
 const { withSentryConfig } = require('@sentry/nextjs');
+const createNextIntlPlugin = require('next-intl/plugin');
 const path = require('path');
+
+// next-intl plugin — points at the request config (locale + messages per request).
+const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
+
+/**
+ * App-level security headers for the admin dashboard. Stricter than web: it's a
+ * private, non-indexable app that should never be framed. No CSP here (tracked
+ * separately — needs nonces + report-only rollout).
+ */
+const SECURITY_HEADERS = [
+  { key: 'X-Frame-Options', value: 'DENY' },
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  {
+    key: 'Strict-Transport-Security',
+    value: 'max-age=63072000; includeSubDomains; preload',
+  },
+  {
+    key: 'Permissions-Policy',
+    value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()',
+  },
+];
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  async headers() {
+    return [{ source: '/(.*)', headers: SECURITY_HEADERS }];
+  },
   // standalone yalnızca prod build için; dev-server bu monorepo'da standalone ile takılıyor.
   output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
   // Dev'de StrictMode effect'leri 2× çalıştırıp her yükleme/hata toast'ını ikiye
@@ -16,6 +42,9 @@ const nextConfig = {
   transpilePackages: ['@tarodan/ui', '@tarodan/design-tokens', '@tarodan/shared'],
   experimental: {
     outputFileTracingRoot: path.join(__dirname, '../../'),
+    // Tree-shake the 112 barrel imports from @heroicons/react to per-icon
+    // modules so unused icons don't ship (#102).
+    optimizePackageImports: ['@heroicons/react'],
     // Next 14.2 strictly requires a Suspense boundary around useSearchParams()
     // during prerender. Admin pages are user-specific and exported via
     // output: 'standalone' (server-rendered), so this strict bailout adds no
@@ -59,7 +88,7 @@ const nextConfig = {
     contentDispositionType: 'attachment',
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
-  // Data calls go to the same-origin BFF proxy at app/api/[...path]/route.ts
+  // Data calls go to the same-origin gateway proxy at app/gateway/[...path]/route.ts
   // (which injects the Bearer token server-side) — no next.config rewrite.
 };
 
@@ -81,7 +110,9 @@ const sentryWebpackPluginOptions = {
 
 // Sentry'yi YALNIZ DSN *ve* auth token birlikte varken devreye al. Token yoksa
 // source-map upload zaten yapılamaz → gereksiz yere prod build'ini riske atma.
+const configWithIntl = withNextIntl(nextConfig);
+
 module.exports =
   process.env.NEXT_PUBLIC_SENTRY_DSN && process.env.SENTRY_AUTH_TOKEN
-    ? withSentryConfig(nextConfig, sentryWebpackPluginOptions)
-    : nextConfig;
+    ? withSentryConfig(configWithIntl, sentryWebpackPluginOptions)
+    : configWithIntl;

@@ -1,8 +1,8 @@
-import { Button, type ButtonProps } from '@tarodan/ui';
-import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { Button, type ButtonProps } from "@tarodan/ui";
+import { Link } from "@/i18n/navigation";
+import type { ReactNode } from "react";
 
-interface ButtonLinkProps extends Omit<ButtonProps, 'asChild'> {
+interface ButtonLinkProps extends Omit<ButtonProps, "asChild"> {
   href: string;
   children: ReactNode;
 }
