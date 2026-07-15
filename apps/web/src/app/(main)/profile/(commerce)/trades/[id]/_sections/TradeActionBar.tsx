@@ -5,7 +5,6 @@ import { useTranslations } from "next-intl";
 import TradeAddressPicker from "../../_components/TradeAddressPicker";
 
 interface TradeActionBarProps {
-  locale: string;
   isActionLoading: boolean;
   canAccept: boolean;
   canReject: boolean;
@@ -20,7 +19,6 @@ interface TradeActionBarProps {
 }
 
 export default function TradeActionBar({
-  locale,
   isActionLoading,
   canAccept,
   canReject,
@@ -64,12 +62,8 @@ export default function TradeActionBar({
             disabled={isActionLoading}
           >
             {isActionLoading
-              ? locale === "en"
-                ? "Processing..."
-                : "İşleniyor..."
-              : locale === "en"
-                ? "Accept"
-                : "Kabul Et"}
+              ? t("checkout.processing")
+              : t("trade.acceptTrade")}
           </Button>
         )}
         {canCounter && (
@@ -112,18 +106,12 @@ export default function TradeActionBar({
               size="lg"
               className="opacity-70 cursor-not-allowed"
               disabled
-              title={
-                locale === "en"
-                  ? "An item already reached the warehouse — cancel is no longer available. Open a dispute if needed."
-                  : "Ürünlerden biri Tarodan deposuna ulaştı; iptal edilemez. Sorun varsa itiraz açın."
-              }
+              title={t("trade.cancelLockedTooltip")}
             >
               {t("trade.cancelLocked")}
             </Button>
             <span className="text-xs text-muted mt-1">
-              {locale === "en"
-                ? "An item reached the warehouse."
-                : "Ürünlerden biri depoya ulaştı."}
+              {t("trade.itemReachedWarehouse")}
             </span>
           </div>
         )}

@@ -10,7 +10,6 @@ interface RejectTradeModalProps {
   onReasonChange: (v: string) => void;
   onReject: () => void;
   isActionLoading: boolean;
-  locale: string;
   cancelLabel: string;
 }
 
@@ -21,7 +20,6 @@ export default function RejectTradeModal({
   onReasonChange,
   onReject,
   isActionLoading,
-  locale,
   cancelLabel,
 }: RejectTradeModalProps) {
   const t = useTranslations();
@@ -35,11 +33,7 @@ export default function RejectTradeModal({
       <Textarea
         value={reason}
         onChange={(e) => onReasonChange(e.target.value)}
-        placeholder={
-          locale === "en"
-            ? "Rejection reason (optional)"
-            : "Red nedeni (opsiyonel)"
-        }
+        placeholder={t("trade.rejectReasonPlaceholder")}
         rows={4}
         className="mb-4"
       />
@@ -59,13 +53,7 @@ export default function RejectTradeModal({
           onClick={onReject}
           disabled={isActionLoading}
         >
-          {isActionLoading
-            ? locale === "en"
-              ? "Rejecting..."
-              : "Reddediliyor..."
-            : locale === "en"
-              ? "Reject"
-              : "Reddet"}
+          {isActionLoading ? t("trade.rejecting") : t("trade.rejectTrade")}
         </Button>
       </div>
     </Modal>

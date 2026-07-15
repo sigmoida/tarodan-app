@@ -16,11 +16,9 @@ import type { Trade } from "../_lib/types";
  */
 export default function TradeInfoBanners({
   trade,
-  locale,
   t,
 }: {
   trade: Trade;
-  locale: string;
   t: Translate;
 }) {
   return (
@@ -48,14 +46,10 @@ export default function TradeInfoBanners({
             </div>
             <div className="flex-1">
               <h2 className="text-xl font-bold text-info-900 mb-1">
-                {locale === "en"
-                  ? "Your items are at the Tarodan warehouse"
-                  : "Ürünleriniz Tarodan Deposunda"}
+                {t("trade.warehouseBannerTitle")}
               </h2>
               <p className="text-sm text-info-800">
-                {locale === "en"
-                  ? "Our team is reviewing the items. You will be notified once the review is complete."
-                  : "Ekibimiz ürünleri inceliyor. İnceleme tamamlandığında bilgilendirileceksiniz."}
+                {t("trade.warehouseBannerDesc")}
               </p>
             </div>
           </div>
@@ -71,9 +65,7 @@ export default function TradeInfoBanners({
             </div>
             <div className="flex-1">
               <h2 className="text-xl font-bold text-warning-900 mb-1">
-                {locale === "en"
-                  ? "Trade rejected by admin"
-                  : "Takas reddedildi"}
+                {t("trade.returningBannerTitle")}
               </h2>
               {trade.cancelReason && (
                 <p className="text-sm text-warning-800 mb-2">
@@ -82,15 +74,11 @@ export default function TradeInfoBanners({
                 </p>
               )}
               <p className="text-sm text-warning-800">
-                {locale === "en"
-                  ? "Your items are being returned to you."
-                  : "Ürünleriniz size iade ediliyor."}
+                {t("trade.returningBannerDesc")}
               </p>
               {(trade.cashRefundedAt || trade.cashPayment?.refundedAt) && (
                 <p className="text-sm text-success-700 mt-2 font-medium">
-                  {locale === "en"
-                    ? "Cash has been refunded"
-                    : "Nakit iade edildi"}
+                  {t("trade.cashRefunded")}
                 </p>
               )}
             </div>

@@ -14,7 +14,6 @@ import type { Trade } from "../_lib/types";
 
 interface UseTradeActionsArgs {
   trade: Trade | null;
-  locale: string;
   invalidateTrade: () => Promise<unknown>;
   needToShip: unknown;
 }
@@ -28,7 +27,6 @@ interface UseTradeActionsArgs {
  */
 export function useTradeActions({
   trade,
-  locale,
   invalidateTrade,
   needToShip,
 }: UseTradeActionsArgs) {
@@ -83,11 +81,7 @@ export function useTradeActions({
             return;
           }
         } catch {
-          toast.error(
-            locale === "en"
-              ? "Bypass payment failed"
-              : "Test ödemesi tamamlanamadı",
-          );
+          toast.error(t("trade.bypassPaymentFailed"));
         }
         return;
       }
@@ -101,12 +95,7 @@ export function useTradeActions({
       toast.error(t("payment.startFailed"));
     },
     onError: (err: any) => {
-      toast.error(
-        err.response?.data?.message ||
-          (locale === "en"
-            ? "Payment initiation failed"
-            : "Ödeme başlatılamadı"),
-      );
+      toast.error(err.response?.data?.message || t("payment.startFailed"));
     },
   });
 
@@ -121,11 +110,7 @@ export function useTradeActions({
       return tradesApi.ship(trade.id, { fromAddressId, carrier: "surat" });
     },
     onSuccess: async () => {
-      toast.success(
-        locale === "en"
-          ? "Shipping info submitted"
-          : "Kargo bilgisi gönderildi",
-      );
+      toast.success(t("trade.shipInfoSubmitted"));
       setShipAddressId("");
       await invalidateTrade();
     },
@@ -133,10 +118,7 @@ export function useTradeActions({
       if (process.env.NODE_ENV === "development")
         console.error("Failed to submit shipping:", error);
       toast.error(
-        error.response?.data?.message ||
-          (locale === "en"
-            ? "Failed to submit shipping"
-            : "Kargo bilgisi gönderilemedi"),
+        error.response?.data?.message || t("trade.shipInfoSubmitFailed"),
       );
     },
   });
@@ -155,21 +137,14 @@ export function useTradeActions({
       return tradesApi.confirmReceipt(trade.id);
     },
     onSuccess: async () => {
-      toast.success(
-        locale === "en"
-          ? "Receipt confirmed"
-          : "Teslim alındı olarak işaretlendi",
-      );
+      toast.success(t("trade.receiptConfirmed"));
       await invalidateTrade();
     },
     onError: (error: any) => {
       if (process.env.NODE_ENV === "development")
         console.error("Failed to confirm receipt:", error);
       toast.error(
-        error.response?.data?.message ||
-          (locale === "en"
-            ? "Failed to confirm receipt"
-            : "Teslim alındı işaretlenemedi"),
+        error.response?.data?.message || t("trade.confirmReceiptFailed"),
       );
     },
   });
@@ -191,25 +166,18 @@ export function useTradeActions({
     onError: (error: any) => {
       if (process.env.NODE_ENV === "development")
         console.error("Failed to accept trade:", error);
-      toast.error(
-        error.response?.data?.message ||
-          (locale === "en"
-            ? "Failed to accept trade"
-            : "Takas kabul edilemedi"),
-        { id: "trade-action-error" },
-      );
+      toast.error(error.response?.data?.message || t("trade.acceptFailed"), {
+        id: "trade-action-error",
+      });
     },
   });
 
   const handleAccept = () => {
     if (!trade) return;
     if (!tradeAddressId) {
-      toast.error(
-        locale === "en"
-          ? "Please select or add a delivery address"
-          : "Lütfen bir teslimat adresi seçin veya ekleyin",
-        { id: "trade-address-required" },
-      );
+      toast.error(t("trade.selectDeliveryAddress"), {
+        id: "trade-address-required",
+      });
       return;
     }
     acceptMutation.mutate(tradeAddressId);
@@ -241,12 +209,7 @@ export function useTradeActions({
   const cancelMutation = useMutation({
     mutationFn: () => {
       if (!trade) throw new Error("no trade");
-      return tradesApi.cancel(
-        trade.id,
-        locale === "en"
-          ? "Cancelled by user"
-          : "Kullanıcı tarafından iptal edildi",
-      );
+      return tradesApi.cancel(trade.id, t("trade.cancelledByUser"));
     },
     onSuccess: async () => {
       toast.success(t("trade.tradeCancelled"));
@@ -255,12 +218,7 @@ export function useTradeActions({
     onError: (error: any) => {
       if (process.env.NODE_ENV === "development")
         console.error("Failed to cancel trade:", error);
-      toast.error(
-        error.response?.data?.message ||
-          (locale === "en"
-            ? "Failed to cancel trade"
-            : "Takas iptal edilemedi"),
-      );
+      toast.error(error.response?.data?.message || t("trade.cancelFailed"));
     },
   });
 
@@ -270,10 +228,7 @@ export function useTradeActions({
     if (
       !(await confirm({
         title: t("trade.cancelConfirmTitle"),
-        description:
-          locale === "en"
-            ? "Are you sure you want to cancel this trade?"
-            : "Bu takası iptal etmek istediğinizden emin misiniz?",
+        description: t("trade.cancelConfirmDesc"),
         confirmLabel: t("order.cancelConfirmYes"),
         cancelLabel: t("order.cancelConfirmNo"),
         destructive: true,

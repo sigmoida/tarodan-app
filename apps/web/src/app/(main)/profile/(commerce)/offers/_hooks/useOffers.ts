@@ -5,7 +5,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { api } from "@/lib/api";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
 import type { Offer, OfferTab } from "../_lib/types";
@@ -37,7 +37,7 @@ type OfferActionType = "accept" | "reject" | "cancel";
 /** Accept / reject / cancel — one mutation; `pendingId` marks the in-flight offer. */
 export function useOfferAction() {
   const queryClient = useQueryClient();
-  const locale = useLocale();
+  const t = useTranslations();
   const mutation = useMutation({
     mutationFn: ({
       offerId,
@@ -50,16 +50,10 @@ export function useOfferAction() {
     onError: (err: any, { action }) => {
       const fallback =
         action === "accept"
-          ? locale === "en"
-            ? "Failed to accept offer"
-            : "Teklif kabul edilirken hata oluştu"
+          ? t("offer.acceptFailed")
           : action === "reject"
-            ? locale === "en"
-              ? "Failed to reject offer"
-              : "Teklif reddedilirken hata oluştu"
-            : locale === "en"
-              ? "Failed to cancel offer"
-              : "Teklif iptal edilirken hata oluştu";
+            ? t("offer.rejectFailed")
+            : t("offer.cancelFailed");
       toast.error(err?.response?.data?.message || fallback);
     },
   });
@@ -75,7 +69,7 @@ type CounterMode = "buyer" | "seller";
 
 /** Buyer (lower) / seller counter offer. */
 export function useCounterOffer() {
-  const locale = useLocale();
+  const t = useTranslations();
   return useWebMutation(
     ({
       offerId,
@@ -92,10 +86,7 @@ export function useCounterOffer() {
       ),
     {
       invalidates: [RESOURCE],
-      errorMessage:
-        locale === "en"
-          ? "Failed to send counter"
-          : "Karşı teklif gönderilemedi",
+      errorMessage: t("offer.counterFailed"),
     },
   );
 }

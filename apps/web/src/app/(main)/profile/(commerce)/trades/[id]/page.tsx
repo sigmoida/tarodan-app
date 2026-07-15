@@ -117,9 +117,7 @@ export default function TradeDetailPage() {
             Takas No: {trade.tradeNumber}
             {trade.version && trade.version > 1 && (
               <Badge variant="primary" size="sm">
-                {locale === "en"
-                  ? `Counter-offer #${trade.version - 1}`
-                  : `Karşı Teklif #${trade.version - 1}`}
+                {t("trade.counterOfferNumber", { number: trade.version - 1 })}
               </Badge>
             )}
           </span>
@@ -144,13 +142,13 @@ export default function TradeDetailPage() {
           )}
       </div>
 
-      <TradeProgressTimeline trade={trade} locale={locale} />
+      <TradeProgressTimeline trade={trade} />
 
       <CompletedTradeSummary trade={trade} locale={locale} t={t} />
 
       <TradeCountdown countdown={countdown} />
 
-      <TradeInfoBanners trade={trade} locale={locale} t={t} />
+      <TradeInfoBanners trade={trade} t={t} />
 
       <TradeItemsComparison
         theirItems={theirItems}
@@ -162,14 +160,12 @@ export default function TradeDetailPage() {
       <CashDifferenceCard
         trade={trade}
         userId={user?.id}
-        locale={locale}
         onPay={handleCashPayment}
         cashPaymentLoading={cashPaymentLoading}
       />
 
       {needToShip && (
         <ShipInfoForm
-          locale={locale}
           addresses={addresses}
           addressesLoading={addressesLoading}
           shipAddressId={shipAddressId}
@@ -182,7 +178,6 @@ export default function TradeDetailPage() {
       <WarehouseShipmentCard
         trade={trade}
         userId={user?.id}
-        locale={locale}
         myToWarehouseShipment={myToWarehouseShipment}
         otherToWarehouseShipment={otherToWarehouseShipment}
       />
@@ -190,7 +185,6 @@ export default function TradeDetailPage() {
       <RecipientsShipmentCard
         trade={trade}
         userId={user?.id}
-        locale={locale}
         myFromWarehouseShipment={myFromWarehouseShipment}
         otherFromWarehouseShipment={otherFromWarehouseShipment}
         onConfirmReceipt={handleConfirmReceipt}
@@ -202,7 +196,6 @@ export default function TradeDetailPage() {
       <TradeMessages trade={trade} />
 
       <TradeActionBar
-        locale={locale}
         isActionLoading={isActionLoading}
         canAccept={!!canAccept}
         canReject={!!canReject}
@@ -226,7 +219,6 @@ export default function TradeDetailPage() {
         onReasonChange={setRejectReason}
         onReject={handleReject}
         isActionLoading={isActionLoading}
-        locale={locale}
         cancelLabel={t("common.cancel")}
       />
     </PageShell>

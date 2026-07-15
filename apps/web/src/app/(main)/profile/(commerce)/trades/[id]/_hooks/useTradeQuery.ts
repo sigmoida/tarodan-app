@@ -9,7 +9,7 @@ import toast from "react-hot-toast";
 import { useAuthStore } from "@/stores/authStore";
 import { tradesApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import type { Trade } from "../_lib/types";
 
 /**
@@ -22,21 +22,16 @@ export function useTradeQuery() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
-  const locale = useLocale();
   const t = useTranslations();
   const tradeId = params.id as string;
 
   useEffect(() => {
     if (authLoading) return;
     if (!isAuthenticated) {
-      toast.error(
-        locale === "en"
-          ? "Please login to view trade details"
-          : "Takas detaylarını görmek için giriş yapmalısınız",
-      );
+      toast.error(t("trade.loginToViewDetails"));
       router.push(`/login?redirect=/profile/trades/${tradeId}`);
     }
-  }, [isAuthenticated, authLoading, locale, router, tradeId]);
+  }, [isAuthenticated, authLoading, t, router, tradeId]);
 
   const tradeQuery = useQuery({
     queryKey: queryKeys.trades.detail(tradeId),

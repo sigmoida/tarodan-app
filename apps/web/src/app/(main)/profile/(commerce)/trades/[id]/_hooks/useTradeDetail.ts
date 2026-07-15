@@ -68,7 +68,7 @@ export function useTradeDetail() {
     handleAccept,
     handleReject,
     handleCancel,
-  } = useTradeActions({ trade, locale, invalidateTrade, needToShip });
+  } = useTradeActions({ trade, invalidateTrade, needToShip });
 
   const {
     isCounterMode,
@@ -89,7 +89,7 @@ export function useTradeDetail() {
     toggleCounterProduct,
     toggleCounterTargetProduct,
     handleCounterSubmit,
-  } = useCounterOfferEditor({ trade, locale, invalidateTrade });
+  } = useCounterOfferEditor({ trade, invalidateTrade });
 
   return {
     trade,

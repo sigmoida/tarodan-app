@@ -84,18 +84,11 @@ export function formatTimeAgo(
   const hours = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
   if (minutes < 1) return t("time.justNow");
-  if (minutes < 60)
-    return locale === "en" ? `${minutes} min ago` : `${minutes} dk önce`;
-  if (hours < 24)
-    return locale === "en" ? `${hours} hr ago` : `${hours} saat önce`;
-  if (days < 30)
-    return locale === "en"
-      ? `${days} day${days === 1 ? "" : "s"} ago`
-      : `${days} gün önce`;
+  if (minutes < 60) return t("time.ago.minutes", { count: minutes });
+  if (hours < 24) return t("time.ago.hours", { count: hours });
+  if (days < 30) return t("time.ago.days", { count: days });
   const months = Math.floor(days / 30);
-  return locale === "en"
-    ? `${months} month${months === 1 ? "" : "s"} ago`
-    : `${months} ay önce`;
+  return t("time.ago.months", { count: months });
 }
 
 const OFFER_STATUS_EN: Record<string, string> = {

@@ -8,7 +8,7 @@ import toast from "react-hot-toast";
 import { api, listingsApi, userApi } from "@/lib/api";
 import { useWebList } from "@/hooks/useWebResource";
 import { useAuthStore } from "@/stores/authStore";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import type { TradeProduct } from "../_lib/types";
 
 /** The listing the user wants (target of the trade). */
@@ -63,7 +63,6 @@ export interface CreateTradePayload {
 export function useCreateTrade() {
   const router = useRouter();
   const t = useTranslations();
-  const locale = useLocale();
   const refreshUserData = useAuthStore((s) => s.refreshUserData);
 
   return useMutation({
@@ -76,9 +75,7 @@ export function useCreateTrade() {
       const msg =
         error?.response?.data?.message ||
         error?.message ||
-        (locale === "en"
-          ? "Failed to send trade offer"
-          : "Takas teklifi gönderilemedi");
+        t("trade.sendFailed");
       if (
         msg.includes("Takas özelliği") ||
         msg.includes("üyeliğinizde mevcut değil") ||
