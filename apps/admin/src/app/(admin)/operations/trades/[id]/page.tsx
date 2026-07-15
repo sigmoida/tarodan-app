@@ -1,30 +1,32 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useParams } from 'next/navigation';
-import { Button, StatusBadge, tradeStatusConfig } from '@tarodan/ui';
-import { adminApi } from '@/lib/api';
-import { useConfirm } from '@/provider/ConfirmProvider';
-import { useAdminMutation } from '@/hooks/useAdminMutation';
-import { DetailPage } from '@/components/detail/DetailPage';
-import { Timeline } from '@/components/detail/Timeline';
-import type { TradeDetail } from './types';
-import { groupShipmentsByLeg, mapTradePayload } from './_lib/trade';
-import { CompensationPanel } from './_sections/CompensationPanel';
-import { RefundFailurePanel } from './_sections/RefundFailurePanel';
-import { StuckPanel } from './_sections/StuckPanel';
-import { ReviewPanel } from './_sections/ReviewPanel';
-import { TradeInfoCards } from './_sections/TradeInfoCards';
-import { TradePartyCard } from './_components/TradePartyCard';
-import { ShipmentLegCard } from './_components/ShipmentLegCard';
-import { ApproveTradeModal } from './_modals/ApproveTradeModal';
-import { RejectTradeModal } from './_modals/RejectTradeModal';
-import { ResolveDisputeModal } from './_modals/ResolveDisputeModal';
-import { MarkReturnLostModal } from './_modals/MarkReturnLostModal';
-import { ForceCancelModal } from './_modals/ForceCancelModal';
+import { useState } from "react";
+import { useParams } from "next/navigation";
+import { Button, StatusBadge, tradeStatusConfig } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
+import { adminApi } from "@/lib/api";
+import { useConfirm } from "@/provider/ConfirmProvider";
+import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { DetailPage } from "@/components/detail/DetailPage";
+import { Timeline } from "@/components/detail/Timeline";
+import type { TradeDetail } from "./types";
+import { groupShipmentsByLeg, mapTradePayload } from "./_lib/trade";
+import { CompensationPanel } from "./_sections/CompensationPanel";
+import { RefundFailurePanel } from "./_sections/RefundFailurePanel";
+import { StuckPanel } from "./_sections/StuckPanel";
+import { ReviewPanel } from "./_sections/ReviewPanel";
+import { TradeInfoCards } from "./_sections/TradeInfoCards";
+import { TradePartyCard } from "./_components/TradePartyCard";
+import { ShipmentLegCard } from "./_components/ShipmentLegCard";
+import { ApproveTradeModal } from "./_modals/ApproveTradeModal";
+import { RejectTradeModal } from "./_modals/RejectTradeModal";
+import { ResolveDisputeModal } from "./_modals/ResolveDisputeModal";
+import { MarkReturnLostModal } from "./_modals/MarkReturnLostModal";
+import { ForceCancelModal } from "./_modals/ForceCancelModal";
 
 export default function TradeDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const t = useTranslations();
   const confirm = useConfirm();
 
   // Modal open states
@@ -32,30 +34,48 @@ export default function TradeDetailPage() {
   const [showReject, setShowReject] = useState(false);
   const [showResolve, setShowResolve] = useState(false);
   const [showForceCancel, setShowForceCancel] = useState(false);
-  const [markLostShipmentId, setMarkLostShipmentId] = useState<string | null>(null);
+  const [markLostShipmentId, setMarkLostShipmentId] = useState<string | null>(
+    null,
+  );
 
   // Shipment actions (direct mutations, triggered from ShipmentLegCard).
   const warehouse = useAdminMutation(
     (shipmentId: string) => adminApi.markWarehouseReceived(id, shipmentId),
-    { invalidates: ['trades'], successMessage: 'Gönderi depoya ulaştı olarak işaretlendi' },
+    {
+      invalidates: ["trades"],
+      successMessage: t("admin.operations.trades.warehouseReceivedMsg"),
+    },
   );
   const returnDelivered = useAdminMutation(
     (shipmentId: string) => adminApi.markReturnDelivered(id, shipmentId),
-    { invalidates: ['trades'], successMessage: 'İade gönderisi teslim edildi olarak işaretlendi' },
+    {
+      invalidates: ["trades"],
+      successMessage: t("admin.operations.trades.returnDeliveredMsg"),
+    },
   );
   const processingShipmentId: string | null = warehouse.isPending
-    ? warehouse.variables ?? null
+    ? (warehouse.variables ?? null)
     : returnDelivered.isPending
-      ? returnDelivered.variables ?? null
+      ? (returnDelivered.variables ?? null)
       : null;
 
   const handleMarkWarehouse = async (shipmentId: string) => {
-    if (!(await confirm({ description: 'Bu gönderinin depoya ulaştığını onaylıyor musunuz?', destructive: true })))
+    if (
+      !(await confirm({
+        description: t("admin.operations.trades.confirmWarehouse"),
+        destructive: true,
+      }))
+    )
       return;
     warehouse.mutate(shipmentId);
   };
   const handleMarkReturnDelivered = async (shipmentId: string) => {
-    if (!(await confirm({ description: 'Bu iade gönderisinin teslim edildiğini onaylıyor musunuz?', destructive: true })))
+    if (
+      !(await confirm({
+        description: t("admin.operations.trades.confirmReturnDelivered"),
+        destructive: true,
+      }))
+    )
       return;
     returnDelivered.mutate(shipmentId);
   };
@@ -64,38 +84,52 @@ export default function TradeDetailPage() {
     <DetailPage<TradeDetail>
       resource="trades"
       id={id}
-      fetcher={(tid) => adminApi.getTrade(tid).then((r) => mapTradePayload(r.data?.data ?? r.data))}
+      fetcher={(tid) =>
+        adminApi
+          .getTrade(tid)
+          .then((r) => mapTradePayload(r.data?.data ?? r.data))
+      }
       backHref="/operations/trades"
-      emptyTitle="Takas bulunamadı"
+      emptyTitle={t("admin.operations.trades.notFound")}
       title={(trade) => (
         <>
-          Takas Detayı
+          {t("admin.operations.trades.detailTitle")}
           {trade.tradeNumber && (
-            <span className="ml-3 font-mono text-base text-muted">{trade.tradeNumber}</span>
+            <span className="ml-3 font-mono text-base text-muted">
+              {trade.tradeNumber}
+            </span>
           )}
         </>
       )}
-      subtitle={(trade) => `Oluşturulma: ${new Date(trade.createdAt).toLocaleString('tr-TR')}`}
-      badge={(trade) => <StatusBadge status={trade.status} config={tradeStatusConfig} />}
+      subtitle={(trade) =>
+        t("admin.operations.trades.createdAtLabel", {
+          date: new Date(trade.createdAt).toLocaleString("tr-TR"),
+        })
+      }
+      badge={(trade) => (
+        <StatusBadge status={trade.status} config={tradeStatusConfig} />
+      )}
       actions={(trade) =>
-        trade.status === 'disputed' ? (
+        trade.status === "disputed" ? (
           <Button variant="primary" onClick={() => setShowResolve(true)}>
-            Çözümle
+            {t("admin.operations.trades.resolve")}
           </Button>
         ) : undefined
       }
     >
       {(trade) => {
         const legs = groupShipmentsByLeg(trade.shipments || []);
-        const toWarehouse = legs['to_warehouse'] || [];
-        const fromWarehouse = legs['from_warehouse'] || [];
-        const returns = legs['return'] || [];
-        const canMarkWarehouse = trade.status === 'shipping_to_warehouse';
-        const canApproveReject = trade.status === 'at_warehouse' || trade.status === 'admin_reviewing';
-        const isShippingToRecipients = trade.status === 'shipping_to_recipients';
-        const isReturning = trade.status === 'returning';
+        const toWarehouse = legs["to_warehouse"] || [];
+        const fromWarehouse = legs["from_warehouse"] || [];
+        const returns = legs["return"] || [];
+        const canMarkWarehouse = trade.status === "shipping_to_warehouse";
+        const canApproveReject =
+          trade.status === "at_warehouse" || trade.status === "admin_reviewing";
+        const isShippingToRecipients =
+          trade.status === "shipping_to_recipients";
+        const isReturning = trade.status === "returning";
         const canForceCancelStuck =
-          trade.status === 'shipping_to_warehouse' &&
+          trade.status === "shipping_to_warehouse" &&
           !!trade.firstWarehouseArrivalAt &&
           toWarehouse.some((s) => !s.deliveredAt);
 
@@ -103,7 +137,11 @@ export default function TradeDetailPage() {
           <>
             <CompensationPanel trade={trade} />
             <RefundFailurePanel trade={trade} />
-            <StuckPanel trade={trade} show={canForceCancelStuck} onResolve={() => setShowForceCancel(true)} />
+            <StuckPanel
+              trade={trade}
+              show={canForceCancelStuck}
+              onResolve={() => setShowForceCancel(true)}
+            />
             <ReviewPanel
               show={canApproveReject}
               onApprove={() => setShowApprove(true)}
@@ -112,23 +150,28 @@ export default function TradeDetailPage() {
 
             {trade.cashAmount && trade.cashAmount > 0 && (
               <div className="flex items-center justify-between rounded-xl bg-surface-elevated p-4 shadow-sm">
-                <span className="font-medium text-heading">Nakit Fark</span>
+                <span className="font-medium text-heading">
+                  {t("admin.operations.trades.cashDifference")}
+                </span>
                 <span className="text-lg font-semibold text-primary-600">
-                  +₺{Number(trade.cashAmount).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                  +₺
+                  {Number(trade.cashAmount).toLocaleString("tr-TR", {
+                    minimumFractionDigits: 2,
+                  })}
                 </span>
               </div>
             )}
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <TradePartyCard
-                title="Teklif Veren"
-                itemsTitle="Teklif Edilen Ürünler:"
+                title={t("admin.operations.trades.offerer")}
+                itemsTitle={t("admin.operations.trades.offeredItems")}
                 user={trade.initiator}
                 items={trade.initiatorItems}
               />
               <TradePartyCard
-                title="Teklif Alan"
-                itemsTitle="Karşılık Verilen Ürünler:"
+                title={t("admin.operations.trades.offerReceiver")}
+                itemsTitle={t("admin.operations.trades.counterItems")}
                 user={trade.receiver}
                 items={trade.receiverItems}
               />
@@ -138,36 +181,50 @@ export default function TradeDetailPage() {
               <div className="space-y-6">
                 {toWarehouse.length > 0 && (
                   <ShipmentLegCard
-                    title="Depoya Giden Gönderiler"
+                    title={t("admin.operations.trades.legToWarehouse")}
                     shipments={toWarehouse}
-                    actionLabel={canMarkWarehouse ? 'Depoya Ulaştı' : null}
+                    actionLabel={
+                      canMarkWarehouse
+                        ? t("admin.operations.trades.markWarehouseArrived")
+                        : null
+                    }
                     onAction={canMarkWarehouse ? handleMarkWarehouse : null}
                     processingShipmentId={processingShipmentId}
                   />
                 )}
                 {fromWarehouse.length > 0 && (
                   <ShipmentLegCard
-                    title="Depodan Alıcılara Gönderiler"
+                    title={t("admin.operations.trades.legFromWarehouse")}
                     shipments={fromWarehouse}
                     actionLabel={null}
                     onAction={null}
                     processingShipmentId={processingShipmentId}
                     infoMessage={
                       isShippingToRecipients
-                        ? 'Bilgi: Alıcılar teslim aldıklarında kendi tarafından onaylayacak.'
+                        ? t("admin.operations.trades.recipientsWillConfirm")
                         : undefined
                     }
                   />
                 )}
                 {returns.length > 0 && (
                   <ShipmentLegCard
-                    title="İade Gönderileri"
+                    title={t("admin.operations.trades.legReturns")}
                     shipments={returns}
-                    actionLabel={isReturning ? 'Teslim Edildi' : null}
+                    actionLabel={
+                      isReturning
+                        ? t("admin.operations.common.delivered")
+                        : null
+                    }
                     onAction={isReturning ? handleMarkReturnDelivered : null}
                     processingShipmentId={processingShipmentId}
-                    secondaryActionLabel={isReturning ? 'Kayıp İşaretle' : undefined}
-                    onSecondaryAction={isReturning ? setMarkLostShipmentId : undefined}
+                    secondaryActionLabel={
+                      isReturning
+                        ? t("admin.operations.trades.markLost")
+                        : undefined
+                    }
+                    onSecondaryAction={
+                      isReturning ? setMarkLostShipmentId : undefined
+                    }
                   />
                 )}
               </div>
@@ -177,20 +234,59 @@ export default function TradeDetailPage() {
 
             <Timeline
               items={[
-                { label: 'Oluşturulma', at: trade.createdAt },
-                { label: 'Kabul Edildi', at: trade.acceptedAt },
-                { label: 'Depoya Ulaştı', at: trade.warehouseReceivedAt },
-                { label: 'Onaylandı', at: trade.approvedAt },
-                { label: 'Reddedildi', at: trade.rejectedAt },
-                { label: 'Tamamlandı', at: trade.completedAt },
-                { label: 'İptal', at: trade.cancelledAt },
+                {
+                  label: t("admin.operations.common.createdAt"),
+                  at: trade.createdAt,
+                },
+                {
+                  label: t("admin.operations.trades.timeline.accepted"),
+                  at: trade.acceptedAt,
+                },
+                {
+                  label: t(
+                    "admin.operations.trades.timeline.warehouseReceived",
+                  ),
+                  at: trade.warehouseReceivedAt,
+                },
+                {
+                  label: t("admin.operations.trades.timeline.approved"),
+                  at: trade.approvedAt,
+                },
+                {
+                  label: t("admin.operations.trades.timeline.rejected"),
+                  at: trade.rejectedAt,
+                },
+                {
+                  label: t("admin.operations.trades.timeline.completed"),
+                  at: trade.completedAt,
+                },
+                {
+                  label: t("admin.operations.trades.timeline.cancelled"),
+                  at: trade.cancelledAt,
+                },
               ]}
             />
 
-            <ApproveTradeModal open={showApprove} onClose={() => setShowApprove(false)} tradeId={id} />
-            <RejectTradeModal open={showReject} onClose={() => setShowReject(false)} tradeId={id} />
-            <ResolveDisputeModal open={showResolve} onClose={() => setShowResolve(false)} tradeId={id} />
-            <ForceCancelModal open={showForceCancel} onClose={() => setShowForceCancel(false)} tradeId={id} />
+            <ApproveTradeModal
+              open={showApprove}
+              onClose={() => setShowApprove(false)}
+              tradeId={id}
+            />
+            <RejectTradeModal
+              open={showReject}
+              onClose={() => setShowReject(false)}
+              tradeId={id}
+            />
+            <ResolveDisputeModal
+              open={showResolve}
+              onClose={() => setShowResolve(false)}
+              tradeId={id}
+            />
+            <ForceCancelModal
+              open={showForceCancel}
+              onClose={() => setShowForceCancel(false)}
+              tradeId={id}
+            />
             <MarkReturnLostModal
               shipmentId={markLostShipmentId}
               onClose={() => setMarkLostShipmentId(null)}

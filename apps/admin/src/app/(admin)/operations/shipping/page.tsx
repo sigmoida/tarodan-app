@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
 import { AdminTabs } from "@/components/AdminTabs";
@@ -18,18 +19,35 @@ import { SuratTrackingTab } from "./SuratTrackingTab";
 
 type TabKey = "siparisler" | "takas" | "iade" | "surat";
 
-const TABS = [
-  { key: "siparisler", label: "Siparişler", icon: TruckIcon },
-  { key: "takas", label: "Takas", icon: ArrowsRightLeftIcon },
-  { key: "iade", label: "İade", icon: ArrowUturnLeftIcon },
-  { key: "surat", label: "Sürat Takip", icon: MapPinIcon },
+const TAB_DEFS = [
+  {
+    key: "siparisler",
+    labelKey: "admin.operations.shipping.tabs.orders",
+    icon: TruckIcon,
+  },
+  {
+    key: "takas",
+    labelKey: "admin.operations.shipping.tabs.trades",
+    icon: ArrowsRightLeftIcon,
+  },
+  {
+    key: "iade",
+    labelKey: "admin.operations.shipping.tabs.returns",
+    icon: ArrowUturnLeftIcon,
+  },
+  {
+    key: "surat",
+    labelKey: "admin.operations.shipping.tabs.surat",
+    icon: MapPinIcon,
+  },
 ] as const;
 
-const VALID_TABS = TABS.map((t) => t.key) as readonly string[];
+const VALID_TABS = TAB_DEFS.map((t) => t.key) as readonly string[];
 
 export default function ShippingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const t = useTranslations();
 
   const urlTab = searchParams.get("tab");
   const activeTab: TabKey = VALID_TABS.includes(urlTab ?? "")
@@ -46,12 +64,16 @@ export default function ShippingPage() {
   return (
     <AdminPage>
       <PageHeader
-        title="Kargo İşlemleri"
-        description="Tüm kargo işlemleri — sipariş, takas ve iade gönderilerini tek yerden takip edin"
+        title={t("admin.operations.shipping.title")}
+        description={t("admin.operations.shipping.description")}
       />
 
       <AdminTabs
-        tabs={TABS.map((t) => ({ key: t.key, label: t.label, icon: t.icon }))}
+        tabs={TAB_DEFS.map((def) => ({
+          key: def.key,
+          label: t(def.labelKey),
+          icon: def.icon,
+        }))}
         value={activeTab}
         onChange={handleTabChange}
       />

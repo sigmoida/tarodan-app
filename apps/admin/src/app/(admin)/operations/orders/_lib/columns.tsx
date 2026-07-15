@@ -1,20 +1,38 @@
-import Link from 'next/link';
-import { Button, Badge, orderStatusConfig } from '@tarodan/ui';
-import { ShoppingBagIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
-import { cancelReasonLabel, orderOriginLabel } from '@/lib/utils';
-import { col, CellText, CellUser, type RowActionItem } from '@/components/table';
-import { type Order } from './orders';
+import Link from "next/link";
+import { Button, Badge, orderStatusConfig } from "@tarodan/ui";
+import {
+  ShoppingBagIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+} from "@heroicons/react/24/outline";
+import { useTranslations } from "next-intl";
+import { cancelReasonLabel, orderOriginLabel } from "@/lib/utils";
+import {
+  col,
+  CellText,
+  CellUser,
+  type RowActionItem,
+} from "@/components/table";
+import { type Order } from "./orders";
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 export interface OrderColumnProps {
+  t: T;
   expandedGroups: Set<string>;
   toggleGroup: (gid: string) => void;
   rowMenu: (o: Order) => RowActionItem[];
 }
 
-export function orderColumns({ expandedGroups, toggleGroup, rowMenu }: OrderColumnProps) {
+export function orderColumns({
+  t,
+  expandedGroups,
+  toggleGroup,
+  rowMenu,
+}: OrderColumnProps) {
   return [
     col.custom<Order>(
-      'Sipariş No',
+      t("admin.operations.orders.orderNumber"),
       (o) => {
         if (o.isGroupSummary && o.checkoutGroupId) {
           const gid = o.checkoutGroupId;
@@ -28,11 +46,17 @@ export function orderColumns({ expandedGroups, toggleGroup, rowMenu }: OrderColu
                 toggleGroup(gid);
               }}
               aria-expanded={isOpen}
-              title={isOpen ? 'Sepeti kapat' : 'Sepeti aç'}
+              title={
+                isOpen
+                  ? t("admin.operations.orders.collapseCart")
+                  : t("admin.operations.orders.expandCart")
+              }
               className="-mx-1 h-auto w-fit gap-1 rounded px-1 py-0.5 text-[11px] font-medium uppercase tracking-wide text-primary-600 hover:bg-primary-100 hover:text-primary-700"
             >
               <ShoppingBagIcon className="h-3.5 w-3.5" />
-              {o.groupItemCount} ürünlük sepet
+              {t("admin.operations.orders.cartItems", {
+                count: o.groupItemCount,
+              })}
               {isOpen ? (
                 <ChevronUpIcon className="h-3.5 w-3.5" />
               ) : (
@@ -53,42 +77,55 @@ export function orderColumns({ expandedGroups, toggleGroup, rowMenu }: OrderColu
       { grow: 2, minWidth: 150 },
     ),
     col.custom<Order>(
-      'Durum',
+      t("common.status"),
       (o) =>
         o.isGroupSummary ? (
           <span
             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-              o.groupStatus === 'done'
-                ? 'bg-success-100 text-success-700'
-                : 'bg-info-100 text-info-700'
+              o.groupStatus === "done"
+                ? "bg-success-100 text-success-700"
+                : "bg-info-100 text-info-700"
             }`}
           >
-            {o.groupStatus === 'done' ? 'Bitti' : 'Devam ediyor'}
+            {o.groupStatus === "done"
+              ? t("admin.operations.orders.groupDone")
+              : t("admin.operations.orders.groupOngoing")}
           </span>
         ) : (
           <div className="flex flex-col items-start gap-1">
             {o.activeRefundRequest ? (
-              <Badge status="refund_requested" config={orderStatusConfig} label="İade Sürecinde" />
-            ) : o.cancellationType === 'iptal' ? (
-              <Badge status="cancelled" config={orderStatusConfig} label="İptal Edildi" />
+              <Badge
+                status="refund_requested"
+                config={orderStatusConfig}
+                label={t("admin.operations.orders.status.refundInProgress")}
+              />
+            ) : o.cancellationType === "iptal" ? (
+              <Badge
+                status="cancelled"
+                config={orderStatusConfig}
+                label={t("admin.operations.orders.status.cancelledConfirmed")}
+              />
             ) : (
               <Badge status={o.status} config={orderStatusConfig} />
             )}
-            {(o.status === 'cancelled' || o.cancellationType === 'iptal') &&
+            {(o.status === "cancelled" || o.cancellationType === "iptal") &&
               cancelReasonLabel(o.cancelReason) && (
                 <span className="truncate text-xs text-muted">
-                  {cancelReasonLabel(o.cancelReason)} · {orderOriginLabel(o.offerId)} iptali
+                  {cancelReasonLabel(o.cancelReason)} ·{" "}
+                  {t("admin.operations.orders.originCancellation", {
+                    origin: orderOriginLabel(o.offerId),
+                  })}
                 </span>
               )}
           </div>
         ),
       { grow: 2, minWidth: 170 },
     ),
-    col.user<Order>('Alıcı', (o) => ({
+    col.user<Order>(t("admin.operations.orders.buyer"), (o) => ({
       name: o.buyer.displayName,
       href: `/accounts/users/${o.buyer.id}`,
     })),
-    col.custom<Order>('Satıcı', (o) => {
+    col.custom<Order>(t("admin.operations.orders.seller"), (o) => {
       if (o.isGroupSummary) {
         const sellers = o.groupSellers ?? [];
         const first = sellers[0];
@@ -97,15 +134,22 @@ export function orderColumns({ expandedGroups, toggleGroup, rowMenu }: OrderColu
           <span className="flex items-center gap-1 text-sm text-body">
             <CellText value={first?.displayName} />
             {extra > 0 && (
-              <span className="rounded bg-surface-alt px-1 text-xs text-muted">+{extra}</span>
+              <span className="rounded bg-surface-alt px-1 text-xs text-muted">
+                +{extra}
+              </span>
             )}
           </span>
         );
       }
-      return <CellUser name={o.seller.displayName} href={`/accounts/users/${o.seller.id}`} />;
+      return (
+        <CellUser
+          name={o.seller.displayName}
+          href={`/accounts/users/${o.seller.id}`}
+        />
+      );
     }),
     col.custom<Order>(
-      'Ürün',
+      t("admin.catalog.common.product"),
       (o) => {
         if (o.isGroupSummary) {
           const thumbs = o.groupThumbs ?? [];
@@ -135,19 +179,28 @@ export function orderColumns({ expandedGroups, toggleGroup, rowMenu }: OrderColu
             </div>
           );
         }
-        return <CellText value={o.product?.title || `${o.itemCount} adet`} />;
+        return (
+          <CellText
+            value={
+              o.product?.title ||
+              t("admin.operations.orders.itemCountUnit", { count: o.itemCount })
+            }
+          />
+        );
       },
       { grow: 2 },
     ),
-    col.money<Order>('Tutar', (o) => (o.isGroupSummary ? o.groupTotalAmount ?? 0 : o.totalAmount), {
-      tone: 'primary',
-    }),
     col.money<Order>(
-      'Komisyon',
-      (o) => (o.isGroupSummary ? o.groupCommission ?? 0 : o.commission),
-      { tone: 'positive' },
+      t("common.amount"),
+      (o) => (o.isGroupSummary ? (o.groupTotalAmount ?? 0) : o.totalAmount),
+      { tone: "primary" },
     ),
-    col.date<Order>('Tarih', (o) => o.createdAt),
+    col.money<Order>(
+      t("admin.operations.orders.commission"),
+      (o) => (o.isGroupSummary ? (o.groupCommission ?? 0) : o.commission),
+      { tone: "positive" },
+    ),
+    col.date<Order>(t("common.date"), (o) => o.createdAt),
     col.rowMenu<Order>(rowMenu),
   ];
 }

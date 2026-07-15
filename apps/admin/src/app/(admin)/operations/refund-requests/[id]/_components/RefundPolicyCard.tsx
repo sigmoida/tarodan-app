@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   Card,
   CardHeader,
@@ -56,6 +57,7 @@ export function RefundPolicyCard({
   onSavePayer,
   disabled,
 }: RefundPolicyCardProps) {
+  const t = useTranslations();
   const [refundProductAmount, setRefundProductAmount] = useState(
     initial.refundProductAmount,
   );
@@ -109,7 +111,11 @@ export function RefundPolicyCard({
         refundSellerCommission,
       });
     } catch (e: any) {
-      setError(e?.response?.data?.message || e?.message || "Hata oluştu");
+      setError(
+        e?.response?.data?.message ||
+          e?.message ||
+          t("admin.operations.common.errorOccurred"),
+      );
     } finally {
       setSavingPolicy(false);
     }
@@ -122,7 +128,11 @@ export function RefundPolicyCard({
     try {
       await onSavePayer(returnShippingPayer);
     } catch (e: any) {
-      setError(e?.response?.data?.message || e?.message || "Hata oluştu");
+      setError(
+        e?.response?.data?.message ||
+          e?.message ||
+          t("admin.operations.common.errorOccurred"),
+      );
     } finally {
       setSavingPayer(false);
     }
@@ -131,31 +141,44 @@ export function RefundPolicyCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>İade Politikası</CardTitle>
+        <CardTitle>
+          {t("admin.operations.refundRequests.policyTitle")}
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* 4 booleans */}
         <div className="space-y-2">
           <PolicyRow
-            label={`Ürün bedeli iade (${fmt(Number(order.subtotal ?? 0))})`}
+            label={t("admin.operations.refundRequests.policy.productAmount", {
+              amount: fmt(Number(order.subtotal ?? 0)),
+            })}
             checked={refundProductAmount}
             onChange={setRefundProductAmount}
             disabled={disabled || savingPolicy}
           />
           <PolicyRow
-            label={`Kargo bedeli iade (${fmt(Number(order.shippingCost))})`}
+            label={t("admin.operations.refundRequests.policy.shippingFee", {
+              amount: fmt(Number(order.shippingCost)),
+            })}
             checked={refundShippingFee}
             onChange={setRefundShippingFee}
             disabled={disabled || savingPolicy}
           />
           <PolicyRow
-            label={`Platform hizmet bedeli (%3) iade (${fmt(Number(order.buyerFeeAmount))})`}
+            label={t("admin.operations.refundRequests.policy.buyerFee", {
+              amount: fmt(Number(order.buyerFeeAmount)),
+            })}
             checked={refundBuyerFee}
             onChange={setRefundBuyerFee}
             disabled={disabled || savingPolicy}
           />
           <PolicyRow
-            label={`Satıcı komisyonu iade (${fmt(Number(order.commissionAmount))})`}
+            label={t(
+              "admin.operations.refundRequests.policy.sellerCommission",
+              {
+                amount: fmt(Number(order.commissionAmount)),
+              },
+            )}
             checked={refundSellerCommission}
             onChange={setRefundSellerCommission}
             disabled={disabled || savingPolicy}
@@ -163,7 +186,9 @@ export function RefundPolicyCard({
         </div>
 
         <div className="rounded-md bg-info-50 p-3 text-sm">
-          <div className="text-muted">Alıcıya iade edilecek tutar</div>
+          <div className="text-muted">
+            {t("admin.operations.refundRequests.policy.refundAmountLabel")}
+          </div>
           <div className="text-2xl font-bold text-info-700">
             {fmt(refundAmount)}
           </div>
@@ -174,36 +199,44 @@ export function RefundPolicyCard({
             onClick={handleSavePolicy}
             disabled={!dirtyPolicy || savingPolicy || disabled}
           >
-            {savingPolicy ? "Kaydediliyor..." : "Politikayı Kaydet"}
+            {savingPolicy
+              ? t("admin.operations.common.saving")
+              : t("admin.operations.refundRequests.policy.saveButton")}
           </Button>
         </div>
 
         {/* Shipping payer */}
         <div className="space-y-2 border-t pt-4">
-          <Label>İade kargosunu kim öder?</Label>
+          <Label>{t("admin.operations.refundRequests.payerQuestion")}</Label>
           <div className="flex flex-col gap-2">
             <PayerRadio
               value="buyer"
               current={returnShippingPayer}
               onChange={setReturnShippingPayerState}
-              label="Alıcı"
-              helper="Vazgeçme / keyfi iade durumunda"
+              label={t("admin.operations.common.buyer")}
+              helper={t(
+                "admin.operations.refundRequests.payerRadio.buyerHelper",
+              )}
               disabled={disabled || savingPayer}
             />
             <PayerRadio
               value="seller"
               current={returnShippingPayer}
               onChange={setReturnShippingPayerState}
-              label="Satıcı"
-              helper="Haklı iade (hatalı, eksik ya da yanlış ürün)"
+              label={t("admin.operations.common.seller")}
+              helper={t(
+                "admin.operations.refundRequests.payerRadio.sellerHelper",
+              )}
               disabled={disabled || savingPayer}
             />
             <PayerRadio
               value="platform"
               current={returnShippingPayer}
               onChange={setReturnShippingPayerState}
-              label="Platform"
-              helper="Kargo kaybı veya istisnai durum"
+              label={t("admin.operations.refundRequests.payerRadio.platform")}
+              helper={t(
+                "admin.operations.refundRequests.payerRadio.platformHelper",
+              )}
               disabled={disabled || savingPayer}
             />
           </div>
@@ -214,7 +247,9 @@ export function RefundPolicyCard({
                 !dirtyPayer || !returnShippingPayer || savingPayer || disabled
               }
             >
-              {savingPayer ? "Kaydediliyor..." : "Tarafı Kaydet"}
+              {savingPayer
+                ? t("admin.operations.common.saving")
+                : t("admin.operations.refundRequests.payerSaveButton")}
             </Button>
           </div>
         </div>

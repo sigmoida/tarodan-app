@@ -1,9 +1,10 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { Modal, ModalFooter, Textarea } from '@tarodan/ui';
-import { adminApi } from '@/lib/api';
-import { useAdminMutation } from '@/hooks/useAdminMutation';
+import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
+import { Modal, ModalFooter, Textarea } from "@tarodan/ui";
+import { adminApi } from "@/lib/api";
+import { useAdminMutation } from "@/hooks/useAdminMutation";
 
 export function ApproveTradeModal({
   open,
@@ -14,42 +15,48 @@ export function ApproveTradeModal({
   onClose: () => void;
   tradeId: string;
 }) {
-  const [notes, setNotes] = useState('');
+  const t = useTranslations();
+  const [notes, setNotes] = useState("");
   useEffect(() => {
-    if (open) setNotes('');
+    if (open) setNotes("");
   }, [open]);
 
   const approve = useAdminMutation(
     () => adminApi.approveTrade(tradeId, notes.trim() || undefined),
     {
-      invalidates: ['trades'],
-      successMessage: 'Takas onaylandı, ürünler alıcılara gönderiliyor',
-      errorMessage: 'Onaylama başarısız',
+      invalidates: ["trades"],
+      successMessage: t("admin.operations.trades.approvedMsg"),
+      errorMessage: t("admin.operations.trades.approveFailed"),
       onSuccess: onClose,
     },
   );
 
   return (
-    <Modal isOpen={open} onClose={() => !approve.isPending && onClose()} title="Takası Onayla">
+    <Modal
+      isOpen={open}
+      onClose={() => !approve.isPending && onClose()}
+      title={t("admin.operations.trades.approveTitle")}
+    >
       <div className="space-y-4">
         <p className="text-sm text-body">
-          Takas onaylandığında, her iki ürün de depodan alıcılara gönderilecek ve nakit fark
-          alıcıya aktarılacaktır.
+          {t("admin.operations.trades.approveBody")}
         </p>
         <div>
-          <label className="mb-2 block text-sm font-medium text-body">Not (Opsiyonel)</label>
+          <label className="mb-2 block text-sm font-medium text-body">
+            {t("admin.operations.common.noteOptional")}
+          </label>
           <Textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={3}
-            placeholder="Onay notu..."
+            placeholder={t("admin.operations.trades.approveNotePlaceholder")}
             disabled={approve.isPending}
           />
         </div>
         <ModalFooter
           onCancel={onClose}
           onConfirm={() => approve.mutate()}
-          confirmLabel="Onayla"
+          confirmLabel={t("common.confirm")}
           confirmVariant="success"
           isLoading={approve.isPending}
         />

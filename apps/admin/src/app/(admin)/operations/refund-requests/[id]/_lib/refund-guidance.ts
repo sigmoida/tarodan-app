@@ -1,22 +1,27 @@
 /**
- * Plain-Turkish guidance/label maps for the Refund Request detail page.
- * Pure data — no UI. Used by page.tsx + RefundStatusStepper + RefundNextActionPanel.
+ * Guidance/label maps for the Refund Request detail page.
+ * Pure data + i18n resolvers — no UI. Used by page.tsx + RefundStatusStepper + RefundNextActionPanel.
  */
+import { useTranslations } from "next-intl";
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 /**
  * Lifecycle phases (stepper order). The refund flow is now fully automatic —
  * there is no human "review/approval" step; a request is auto-approved as soon
  * as it is created and goes straight to the return shipment phase. (The "review" step was removed.)
  */
-export const REFUND_LIFECYCLE = [
-  "Talep alındı",
-  "İade kargosu",
-  "Ürün yolda",
-  "Ürün satıcıda",
-  "Para iade edildi",
-] as const;
+export function refundLifecycle(t: T): string[] {
+  return [
+    t("admin.operations.refundRequests.lifecycle.received"),
+    t("admin.operations.refundRequests.lifecycle.returnShipment"),
+    t("admin.operations.refundRequests.lifecycle.productInTransit"),
+    t("admin.operations.refundRequests.lifecycle.productAtSeller"),
+    t("admin.operations.refundRequests.lifecycle.refunded"),
+  ];
+}
 
-/** RefundRequestStatus → active phase index (into REFUND_LIFECYCLE). */
+/** RefundRequestStatus → active phase index (into the refund lifecycle). */
 export const refundStatusPhase: Record<string, number> = {
   approved: 1,
   wait_for_delivery: 1,
@@ -30,11 +35,7 @@ export const refundStatusPhase: Record<string, number> = {
 export const refundTerminalStatuses = new Set(["rejected", "cancelled"]);
 
 export type GuidanceVariant =
-  | "default"
-  | "info"
-  | "success"
-  | "warning"
-  | "danger";
+  "default" | "info" | "success" | "warning" | "danger";
 
 export interface RefundGuidance {
   variant: GuidanceVariant;
@@ -45,122 +46,167 @@ export interface RefundGuidance {
 }
 
 /** The "what should you do now?" text for each state. */
-export const statusGuidance: Record<string, RefundGuidance> = {
-  approved: {
-    variant: "info",
-    title: "Talep onaylandı",
-    description:
-      "İade onaylandı; iade kargosu otomatik açılıyor. Süreç kendiliğinden ilerler, işlem gerekmez.",
-    actionNeeded: false,
-  },
-  wait_for_delivery: {
-    variant: "info",
-    title: "Ürün teslimi bekleniyor",
-    description:
-      "İade onaylandı ancak ürün henüz alıcıya ulaşmadı. Ürün teslim edilince iade kargosu otomatik açılır. İşlem gerekmez.",
-    actionNeeded: false,
-  },
-  return_shipment_open: {
-    variant: "info",
-    title: "İade kargosu hazır",
-    description:
-      "İade kargo etiketi oluşturuldu. Alıcı ürünü kargoya verdiğinde süreç otomatik ilerler. İşlem gerekmez.",
-    actionNeeded: false,
-  },
-  return_in_transit: {
-    variant: "info",
-    title: "Ürün satıcıya dönüyor",
-    description:
-      "İade kargosu yolda. Ürün satıcıya ulaştığında para iadesi otomatik başlatılır. İşlem gerekmez.",
-    actionNeeded: false,
-  },
-  return_delivered: {
-    variant: "warning",
-    title: "Para iadesi bekleniyor",
-    description:
-      "İade edilen ürün satıcıya ulaştı ama para iadesi otomatik tamamlanmadı. Aşağıdaki butonla manuel olarak tetikleyebilirsiniz.",
-    actionNeeded: true,
-  },
-  refunded: {
-    variant: "success",
-    title: "Süreç tamamlandı",
-    description:
-      "Para iadesi başarıyla yapıldı ve bu talep kapandı. İşlem gerekmez.",
-    actionNeeded: false,
-  },
-  rejected: {
-    variant: "danger",
-    title: "Talep reddedildi",
-    description:
-      "Bu iade talebi reddedildi ve kapatıldı. Para iadesi yapılmadı.",
-    actionNeeded: false,
-  },
-  cancelled: {
-    variant: "default",
-    title: "Talep iptal edildi",
-    description: "İade talebi iptal edildi. Herhangi bir işlem gerekmez.",
-    actionNeeded: false,
-  },
-};
+export function guidanceForStatus(t: T, status: string): RefundGuidance {
+  const map: Record<string, RefundGuidance> = {
+    approved: {
+      variant: "info",
+      title: t("admin.operations.refundRequests.guidance.approved.title"),
+      description: t(
+        "admin.operations.refundRequests.guidance.approved.description",
+      ),
+      actionNeeded: false,
+    },
+    wait_for_delivery: {
+      variant: "info",
+      title: t(
+        "admin.operations.refundRequests.guidance.waitForDelivery.title",
+      ),
+      description: t(
+        "admin.operations.refundRequests.guidance.waitForDelivery.description",
+      ),
+      actionNeeded: false,
+    },
+    return_shipment_open: {
+      variant: "info",
+      title: t(
+        "admin.operations.refundRequests.guidance.returnShipmentOpen.title",
+      ),
+      description: t(
+        "admin.operations.refundRequests.guidance.returnShipmentOpen.description",
+      ),
+      actionNeeded: false,
+    },
+    return_in_transit: {
+      variant: "info",
+      title: t(
+        "admin.operations.refundRequests.guidance.returnInTransit.title",
+      ),
+      description: t(
+        "admin.operations.refundRequests.guidance.returnInTransit.description",
+      ),
+      actionNeeded: false,
+    },
+    return_delivered: {
+      variant: "warning",
+      title: t(
+        "admin.operations.refundRequests.guidance.returnDelivered.title",
+      ),
+      description: t(
+        "admin.operations.refundRequests.guidance.returnDelivered.description",
+      ),
+      actionNeeded: true,
+    },
+    refunded: {
+      variant: "success",
+      title: t("admin.operations.refundRequests.guidance.refunded.title"),
+      description: t(
+        "admin.operations.refundRequests.guidance.refunded.description",
+      ),
+      actionNeeded: false,
+    },
+    rejected: {
+      variant: "danger",
+      title: t("admin.operations.refundRequests.guidance.rejected.title"),
+      description: t(
+        "admin.operations.refundRequests.guidance.rejected.description",
+      ),
+      actionNeeded: false,
+    },
+    cancelled: {
+      variant: "default",
+      title: t("admin.operations.refundRequests.guidance.cancelled.title"),
+      description: t(
+        "admin.operations.refundRequests.guidance.cancelled.description",
+      ),
+      actionNeeded: false,
+    },
+  };
 
-export const defaultGuidance: RefundGuidance = {
-  variant: "default",
-  title: "Durum",
-  description:
-    "Bu talebin güncel durumu için ayrıntıları aşağıda inceleyebilirsiniz.",
-  actionNeeded: false,
-};
-
-export function guidanceForStatus(status: string): RefundGuidance {
-  return statusGuidance[status] ?? defaultGuidance;
+  return (
+    map[status] ?? {
+      variant: "default",
+      title: t("common.status"),
+      description: t(
+        "admin.operations.refundRequests.guidance.default.description",
+      ),
+      actionNeeded: false,
+    }
+  );
 }
 
-/** Who pays for the return shipping — plain Turkish label + description. */
-export const payerLabels: Record<string, { label: string; helper: string }> = {
-  buyer: {
-    label: "Alıcı öder",
-    helper: "Vazgeçme / keyfi iade durumunda iade kargo bedeli alıcıya aittir.",
-  },
-  seller: {
-    label: "Satıcı öder",
-    helper:
-      "Haklı iade (hatalı, eksik ya da yanlış ürün) — iade kargo bedeli satıcıya aittir.",
-  },
-  platform: {
-    label: "Platform öder",
-    helper:
-      "Kargo kaybı veya istisnai durum — iade kargo bedelini platform üstlenir.",
-  },
-};
+/** Who pays for the return shipping — label + description. */
+export function payerLabel(
+  t: T,
+  payer: string,
+): { label: string; helper: string } | undefined {
+  const map: Record<string, { label: string; helper: string }> = {
+    buyer: {
+      label: t("admin.operations.refundRequests.payer.buyer.label"),
+      helper: t("admin.operations.refundRequests.payer.buyer.helper"),
+    },
+    seller: {
+      label: t("admin.operations.refundRequests.payer.seller.label"),
+      helper: t("admin.operations.refundRequests.payer.seller.helper"),
+    },
+    platform: {
+      label: t("admin.operations.refundRequests.payer.platform.label"),
+      helper: t("admin.operations.refundRequests.payer.platform.helper"),
+    },
+  };
+  return map[payer];
+}
 
 /** Audit history action code → readable label + actor. */
-const refundActionLabels: Record<string, { label: string; actor: string }> = {
-  cancelled_by_buyer: { label: "Alıcı talebi iptal etti", actor: "Alıcı" },
-  accepted_by_seller: { label: "Satıcı talebi kabul etti", actor: "Satıcı" },
-  rejected_by_seller: { label: "Satıcı talebi reddetti", actor: "Satıcı" },
-  dispute_resolved_approve: {
-    label: "İtiraz onaylandı (iade açıldı)",
-    actor: "Admin",
-  },
-  dispute_resolved_reject: {
-    label: "İtiraz reddedildi (talep kapatıldı)",
-    actor: "Admin",
-  },
-  return_opened: { label: "İade kargosu açıldı", actor: "Sistem" },
-  refund_completed: { label: "Para iadesi tamamlandı", actor: "Sistem" },
-  policy_overridden: { label: "İade politikası güncellendi", actor: "Admin" },
-  return_shipping_payer_changed: {
-    label: "İade kargo tarafı değiştirildi",
-    actor: "Admin",
-  },
-};
+export function refundActionLabel(
+  t: T,
+  action: string,
+): { label: string; actor: string } {
+  const buyer = t("admin.operations.refundRequests.actor.buyer");
+  const seller = t("admin.operations.refundRequests.actor.seller");
+  const admin = t("admin.operations.refundRequests.actor.admin");
+  const system = t("admin.operations.refundRequests.actor.system");
 
-export function refundActionLabel(action: string): {
-  label: string;
-  actor: string;
-} {
+  const map: Record<string, { label: string; actor: string }> = {
+    cancelled_by_buyer: {
+      label: t("admin.operations.refundRequests.actionLabel.cancelledByBuyer"),
+      actor: buyer,
+    },
+    accepted_by_seller: {
+      label: t("admin.operations.refundRequests.actionLabel.acceptedBySeller"),
+      actor: seller,
+    },
+    rejected_by_seller: {
+      label: t("admin.operations.refundRequests.actionLabel.rejectedBySeller"),
+      actor: seller,
+    },
+    dispute_resolved_approve: {
+      label: t("admin.operations.refundRequests.actionLabel.disputeApproved"),
+      actor: admin,
+    },
+    dispute_resolved_reject: {
+      label: t("admin.operations.refundRequests.actionLabel.disputeRejected"),
+      actor: admin,
+    },
+    return_opened: {
+      label: t("admin.operations.refundRequests.actionLabel.returnOpened"),
+      actor: system,
+    },
+    refund_completed: {
+      label: t("admin.operations.refundRequests.actionLabel.refundCompleted"),
+      actor: system,
+    },
+    policy_overridden: {
+      label: t("admin.operations.refundRequests.actionLabel.policyOverridden"),
+      actor: admin,
+    },
+    return_shipping_payer_changed: {
+      label: t("admin.operations.refundRequests.actionLabel.payerChanged"),
+      actor: admin,
+    },
+  };
+
   return (
-    refundActionLabels[action] ?? {
+    map[action] ?? {
       label: action.replace(/_/g, " "),
       actor: "—",
     }
