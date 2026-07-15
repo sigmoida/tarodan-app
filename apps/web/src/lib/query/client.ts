@@ -1,5 +1,5 @@
 import { QueryCache, QueryClient } from '@tanstack/react-query';
-import * as Sentry from '@sentry/nextjs';
+import { logger } from '@/lib/logger';
 
 /**
  * Shared QueryClient config — used by BOTH the browser client (lib/queryClient)
@@ -14,10 +14,7 @@ export function onQueryError(error: unknown, query: { queryKey?: unknown; meta?:
     // eslint-disable-next-line no-console
     console.error('React Query error:', query?.queryKey, error);
   }
-  Sentry.captureException(error, {
-    tags: { layer: 'ReactQuery', type: 'query' },
-    extra: { queryKey: query?.queryKey, meta: query?.meta },
-  });
+  logger.captureException(error, { source: 'react-query', queryKey: query?.queryKey, meta: query?.meta });
 }
 
 export function makeQueryClient() {
@@ -45,10 +42,7 @@ export function makeQueryClient() {
       },
       mutations: {
         onError: (error: unknown, _variables: unknown, context: unknown) => {
-          Sentry.captureException(error, {
-            tags: { layer: 'ReactQuery', type: 'mutation' },
-            extra: { context },
-          });
+          logger.captureException(error, { source: 'react-query', type: 'mutation', context });
         },
       },
     },
