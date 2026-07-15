@@ -10,7 +10,7 @@ import { Button, Spinner } from "@tarodan/ui";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { useAuthStore } from "@/stores/authStore";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 
 interface Notification {
   id: string;
@@ -27,7 +27,7 @@ interface Notification {
 export default function NotificationBell() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const locale = useLocale();
+  const t = useTranslations();
   const { isAuthenticated } = useAuthStore();
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -124,10 +124,10 @@ export default function NotificationBell() {
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return locale === "en" ? "now" : "şimdi";
-    if (diffMins < 60) return `${diffMins}${locale === "en" ? "m" : "dk"}`;
-    if (diffHours < 24) return `${diffHours}${locale === "en" ? "h" : "sa"}`;
-    return `${diffDays}${locale === "en" ? "d" : "g"}`;
+    if (diffMins < 1) return t("time.now");
+    if (diffMins < 60) return `${diffMins}${t("time.minuteShort")}`;
+    if (diffHours < 24) return `${diffHours}${t("time.hourShort")}`;
+    return `${diffDays}${t("time.dayShort")}`;
   };
 
   if (!isAuthenticated) {
@@ -141,7 +141,7 @@ export default function NotificationBell() {
         size="icon"
         onClick={handleBellClick}
         aria-expanded={showDropdown}
-        aria-label={locale === "en" ? "Notifications" : "Bildirimler"}
+        aria-label={t("notification.notifications")}
         className="relative h-9 w-9 rounded-md"
       >
         {unreadCount > 0 ? (
@@ -163,11 +163,11 @@ export default function NotificationBell() {
           <div className="px-4 py-3 border-b border-border-subtle">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-heading">
-                {locale === "en" ? "Notifications" : "Bildirimler"}
+                {t("notification.notifications")}
               </h3>
               {unreadCount > 0 && (
                 <span className="px-2 py-0.5 text-xs font-medium bg-primary-500 text-inverted rounded-full">
-                  {unreadCount} {locale === "en" ? "new" : "yeni"}
+                  {unreadCount} {t("notification.newBadge")}
                 </span>
               )}
             </div>
@@ -186,9 +186,7 @@ export default function NotificationBell() {
               <div className="text-center py-8 px-4">
                 <BellIcon className="w-10 h-10 text-border-strong mx-auto mb-2" />
                 <p className="text-sm text-muted">
-                  {locale === "en"
-                    ? "No notifications yet"
-                    : "Henüz bildirim yok"}
+                  {t("notification.noNotifications")}
                 </p>
               </div>
             ) : (
@@ -256,7 +254,7 @@ export default function NotificationBell() {
                         dismissNotification(notification.id);
                       }}
                       className="absolute top-2 right-2 h-6 w-6 rounded-md text-subtle opacity-0 group-hover:opacity-100 transition-opacity"
-                      aria-label={locale === "en" ? "Dismiss" : "Kapat"}
+                      aria-label={t("common.close")}
                     >
                       <XMarkIcon className="w-3.5 h-3.5" />
                     </Button>
@@ -273,9 +271,7 @@ export default function NotificationBell() {
               onClick={() => setShowDropdown(false)}
               className="block text-center text-sm font-medium text-primary-500 hover:text-primary-600"
             >
-              {locale === "en"
-                ? "View all notifications"
-                : "Tüm bildirimleri gör"}
+              {t("notification.viewAll")}
             </Link>
           </div>
         </div>

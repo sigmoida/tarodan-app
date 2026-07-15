@@ -1,3 +1,10 @@
+import { createTranslator } from "next-intl";
+import { getMessages, resolveLocale } from "@tarodan/i18n";
+
+/** A root translator for `locale`, backed by the shared message catalog. */
+const translator = (locale: string) =>
+  createTranslator({ locale, messages: getMessages(resolveLocale(locale)) });
+
 // Cached Intl instances — built once and reused across every row (constructing an
 // Intl formatter is the costly part; formatting with it is cheap). Replaces the
 // per-render `new Date().toLocaleDateString()` / `toLocaleString()` churn in lists.
@@ -101,7 +108,7 @@ export function formatCondition(
   condition: string | null | undefined,
   locale: string = "tr",
 ): string {
-  if (!condition) return locale === "en" ? "Unknown" : "Bilinmiyor";
+  if (!condition) return translator(locale)("common.unknown");
 
   // Filtre ve ürün kartında aynı etiketler kullanılsın (Yeni, Yeni Gibi, İyi, Orta)
   const conditionMap: Record<string, { tr: string; en: string }> = {
@@ -132,7 +139,7 @@ export function formatOrderStatus(
   status: string | null | undefined,
   locale: string = "tr",
 ): string {
-  if (!status) return locale === "en" ? "Unknown" : "Bilinmiyor";
+  if (!status) return translator(locale)("common.unknown");
 
   const statusMap: Record<string, { tr: string; en: string }> = {
     pending_payment: { tr: "Ödeme Bekleniyor", en: "Pending Payment" },
@@ -167,7 +174,7 @@ export function formatProductStatus(
   status: string | null | undefined,
   locale: string = "tr",
 ): string {
-  if (!status) return locale === "en" ? "Unknown" : "Bilinmiyor";
+  if (!status) return translator(locale)("common.unknown");
 
   const statusMap: Record<string, { tr: string; en: string }> = {
     pending: { tr: "Onay Bekliyor", en: "Pending" },
@@ -198,7 +205,7 @@ export function formatShipmentStatus(
   status: string | null | undefined,
   locale: string = "tr",
 ): string {
-  if (!status) return locale === "en" ? "Unknown" : "Bilinmiyor";
+  if (!status) return translator(locale)("common.unknown");
 
   const statusMap: Record<string, { tr: string; en: string }> = {
     pending: { tr: "Beklemede", en: "Pending" },
@@ -230,7 +237,7 @@ export function formatTradeStatus(
   status: string | null | undefined,
   locale: string = "tr",
 ): string {
-  if (!status) return locale === "en" ? "Unknown" : "Bilinmiyor";
+  if (!status) return translator(locale)("common.unknown");
 
   const statusMap: Record<string, { tr: string; en: string }> = {
     pending: { tr: "Beklemede", en: "Pending" },
@@ -290,7 +297,7 @@ export function formatOfferStatus(
   status: string | null | undefined,
   locale: string = "tr",
 ): string {
-  if (!status) return locale === "en" ? "Unknown" : "Bilinmiyor";
+  if (!status) return translator(locale)("common.unknown");
 
   const statusMap: Record<string, { tr: string; en: string }> = {
     pending: { tr: "Beklemede", en: "Pending" },
