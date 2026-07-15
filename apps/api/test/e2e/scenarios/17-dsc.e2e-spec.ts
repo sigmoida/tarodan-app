@@ -99,6 +99,24 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   const uuid = () => crypto.randomUUID();
   const ABSENT_UUID = "00000000-0000-0000-0000-000000000000";
 
+  /**
+   * Moderatör izin matrisine (admin_role_permissions) izin ver (#58): admin uçları
+   * @Roles(...,moderator) olsa da RolesGuard ikinci katmanda izin matrisini uygular;
+   * moderator varsayılanında 'discounts'/'ads' yoktur → 403. Ayar beforeEach'te
+   * truncate edilir; sadece ilgili teste etki eder. (16-tax ile aynı desen.)
+   */
+  async function grantModeratorPermissions(perms: string[]): Promise<void> {
+    await getPrisma().platformSetting.upsert({
+      where: { settingKey: "admin_role_permissions" },
+      update: { settingValue: JSON.stringify({ moderator: perms }), settingType: "json" },
+      create: {
+        settingKey: "admin_role_permissions",
+        settingValue: JSON.stringify({ moderator: perms }),
+        settingType: "json",
+      },
+    });
+  }
+
   /** Geçerli discount create gövdesi (startDate/endDate zorunlu). */
   const validDiscount = (over: Record<string, unknown> = {}) => {
     const now = Date.now();
@@ -524,6 +542,8 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
 
   scenario("DSC-017", async () => {
     // Moderator admin endpoint'inden indirim oluşturabilir → 201.
+    // İzin matrisi gating (#58): moderator'e 'discounts' iznini ver.
+    await grantModeratorPermissions(["discounts"]);
     const mod = await createAdminUser(ctx.module, {
       email: "mod-dsc17@test.com",
       role: AdminRole.moderator,
@@ -1576,6 +1596,8 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
 
   scenario("DSC-066", async () => {
     // Moderator reklam yönetebilir (list/create/patch/delete hepsi 2xx).
+    // İzin matrisi gating (#58): moderator'e 'ads' iznini ver.
+    await grantModeratorPermissions(["ads"]);
     const mod = await createAdminUser(ctx.module, {
       email: "mod-dsc66@test.com",
       role: AdminRole.moderator,
@@ -2412,15 +2434,29 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   // DSC-100: Misafir kupon — backend reddi API'den doğrulanabilir (mobile UI tutarsızlığı ayrı).
   // Backend davranışı: misafir checkout'ta couponCode → 400. (UI görünürlüğü API dışı; backend ucu test edilir.)
   scenario("DSC-100", async () => {
+    await clearMailbox();
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await makeProduct({ sellerId: seller.id, quantity: 5 });
+    // GERÇEK OTP (#58): fake "123456" artık kupon kontrolünden ÖNCE (controller OTP
+    // doğrulaması) "Doğrulama kodu geçersiz" ile reddediliyordu → kupon-reddine hiç
+    // ulaşılmıyordu. send-verification-code → MailHog kodu ile ilerleyip, misafir
+    // checkout'un couponCode reddini (order-checkout-group.service.ts:110-113) doğrula.
+    const guestEmail = `g100-${Date.now()}@external.test`;
+    await request(server())
+      .post("/api/orders/guest/send-verification-code")
+      .send({ email: guestEmail })
+      .expect(200);
+    const mail = await getLastEmailTo(guestEmail);
+    const code = extractCode(mail.body, 6);
+    expect(code).toBeTruthy();
+
     const res = await request(server())
       .post("/api/orders/checkout/guest")
       .send({
         items: [{ productId: product.id }],
         idempotencyKey: uuid(),
-        email: `g100-${Date.now()}@external.test`,
-        emailVerificationCode: "123456",
+        email: guestEmail,
+        emailVerificationCode: code,
         phone: "+905551234567",
         guestName: "Misafir",
         shippingAddress: {

@@ -1,0 +1,31 @@
+{
+  "name": "@tarodan/i18n",
+  "private": true,
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "codegen": "node scripts/gen-keys.mjs",
+    "build": "node scripts/gen-keys.mjs && tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "lint": "eslint \"src/**/*.ts\"",
+    "typecheck": "node scripts/check-catalog.mjs && tsc --noEmit",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "intl-messageformat": "^10.5.14"
+  },
+  "devDependencies": {
+    "@tarodan/eslint-config": "workspace:*",
+    "@tarodan/tsconfig": "workspace:*",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.2"
+  }
+}

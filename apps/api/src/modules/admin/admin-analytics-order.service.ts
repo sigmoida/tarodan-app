@@ -14,6 +14,7 @@ import { SearchService } from '../search/search.service';
 import { CacheService } from '../cache/cache.service';
 import { AdminAnalyticsCommonService } from './admin-analytics-common.service';
 import { OrderService } from '../order/order.service';
+import { PaymentService } from '../payment/payment.service';
 
 /**
  * Admin sipariş işlemleri (+ unbanUser kullanıcı moderasyonu) — AdminAnalyticsService'ten
@@ -34,6 +35,8 @@ export class AdminAnalyticsOrderService {
     private readonly common: AdminAnalyticsCommonService,
     @Optional()
     private readonly orderService?: OrderService,
+    @Optional()
+    private readonly paymentService?: PaymentService,
   ) {}
 
   /**
@@ -251,6 +254,17 @@ export class AdminAnalyticsOrderService {
     ) {
       extra.deliveredAt = now;
     }
+    // awaiting_buyer_confirmation'a ELLE geçişte confirmationDeadline de set edilmeli;
+    // yoksa auto-complete cron'u (confirmationDeadline < now filtreli) siparişi ASLA
+    // almaz → sonsuz stall. Yalnız yeni teslimde (deliveredAt taze set) uygula.
+    if (
+      newStatus === OrderStatus.awaiting_buyer_confirmation &&
+      extra.deliveredAt
+    ) {
+      extra.confirmationDeadline = new Date(
+        extra.deliveredAt.getTime() + 48 * 60 * 60 * 1000,
+      );
+    }
     if (newStatus === OrderStatus.completed && !(order as any).completedAt) {
       extra.completedAt = now;
     }
@@ -263,6 +277,23 @@ export class AdminAnalyticsOrderService {
         ...extra,
       },
     });
+
+    // Escrow release'i teslimde planla — para akışının TEK tetikleyicisi. Admin ELLE
+    // teslim/tamamlandıya çektiğinde de releaseAt set edilmeli; aksi halde PaymentHold
+    // releaseAt null kalıp satıcı hiç ödenmez (poll'daki #83 ile aynı boşluk). Yalnız
+    // yeni teslimde (deliveredAt taze) ve best-effort — status update'i bloklamaz.
+    if (extra.deliveredAt) {
+      try {
+        await this.paymentService?.scheduleHoldReleaseOnDelivery(
+          orderId,
+          extra.deliveredAt,
+        );
+      } catch (e: any) {
+        this.logger.warn(
+          `admin durum→escrow schedule hatası ${orderId}: ${e?.message}`,
+        );
+      }
+    }
 
     await this.audit.createAuditLog(adminId, 'order_status_update', 'Order', orderId, order, {
       ...updated,

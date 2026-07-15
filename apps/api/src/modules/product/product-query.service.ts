@@ -1,14 +1,19 @@
-import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { CacheService } from '../cache/cache.service';
-import { SearchService } from '../search/search.service';
-import { DiscountService } from '../discount/discount.service';
-import { ProductQueryDto } from './dto';
-import { ProductStatus, Prisma } from '@prisma/client';
-import { buildProductWhere } from './helpers/build-product-where';
-import { fulltextProductSearch } from './helpers/fulltext-search';
-import { ACTIVE_TRADE_STATUSES } from '../trade/trade.constants';
-import { ProductCommonService } from './product-common.service';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ForbiddenException,
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { CacheService } from "../cache/cache.service";
+import { SearchService } from "../search/search.service";
+import { DiscountService } from "../discount/discount.service";
+import { ProductQueryDto } from "./dto";
+import { ProductStatus, Prisma } from "@prisma/client";
+import { buildProductWhere } from "./helpers/build-product-where";
+import { fulltextProductSearch } from "./helpers/fulltext-search";
+import { ACTIVE_TRADE_STATUSES } from "../trade/trade.constants";
+import { ProductCommonService } from "./product-common.service";
 
 /**
  * ProductQueryService — ürün okuma/listeleme (findAll ES/PG akışı, popüler, tekil
@@ -26,7 +31,7 @@ export class ProductQueryService {
     private readonly searchService: SearchService,
     private readonly discountService: DiscountService,
     private readonly common: ProductCommonService,
-  ) { }
+  ) {}
 
   /**
    * Get paginated products with filters
@@ -61,15 +66,29 @@ export class ProductQueryService {
     } = query;
 
     const cacheKey = `products:list:${JSON.stringify({
-      search, categoryId, sellerId,
+      search,
+      categoryId,
+      sellerId,
       // Ham status: undefined (kapsayıcı: aktif + tükenen + satıldı) ile 'active'
       // (yalnızca stok-içi) farklı sonuç verir → ayrı cache anahtarları olmalı.
       status: status ?? null,
-      condition, brand, brandId, manufacturerId,
-      scale, material: materialSlug,
-      tradeOnly, discountOnly, preOrder, limited,
+      condition,
+      brand,
+      brandId,
+      manufacturerId,
+      scale,
+      material: materialSlug,
+      tradeOnly,
+      discountOnly,
+      preOrder,
+      limited,
       set: query.set,
-      minPrice, maxPrice, sortBy, page, limit, carModelId,
+      minPrice,
+      maxPrice,
+      sortBy,
+      page,
+      limit,
+      carModelId,
       attributeSlugs: query.attributeSlugs,
       attrGroups: query.attrGroups,
     })}`;
@@ -77,7 +96,17 @@ export class ProductQueryService {
     const hasSearch = !!(search && String(search).trim());
     const isListAllOrPopular = !hasSearch && !discountOnly;
     if (isListAllOrPopular) {
-      return this.findAllViaPostgres(query);
+      // The plain browse / popular grid is the hottest surface and was the ONLY
+      // list path bypassing the cache — so every request re-ran the per-product
+      // fan-out in formatProductResponse (seller aggregates, campaign price, …).
+      // Cache it with a SHORT ttl: absorbs bursts without each recomputing, while
+      // new/changed listings still appear within the window. Keyed identically to
+      // the search path (page/filters included), so pages don't cross-contaminate.
+      return this.cache.getOrSet(
+        cacheKey,
+        () => this.findAllViaPostgres(query),
+        { ttl: 120 },
+      );
     }
 
     const runListQuery = async () => {
@@ -86,7 +115,7 @@ export class ProductQueryService {
           const esResult = await this.findAllViaElasticsearch(query);
           if (esResult) return esResult;
         } catch (err) {
-          this.logger.warn('ES findAll failed, falling back to PostgreSQL');
+          this.logger.warn("ES findAll failed, falling back to PostgreSQL");
         }
       }
       return this.findAllViaPostgres(query);
@@ -115,7 +144,7 @@ export class ProductQueryService {
   async findPopular(limit: number, page: number) {
     const where: Prisma.ProductWhereInput = {
       status: ProductStatus.active,
-      NOT: { id: { startsWith: 'membership-' } },
+      NOT: { id: { startsWith: "membership-" } },
       AND: [{ OR: this.inStockOrConditions() }],
     };
     const total = await this.prisma.product.count({ where });
@@ -123,27 +152,35 @@ export class ProductQueryService {
       where,
       // Sponsorlu (rankTier=2) → Premium (1) → Standart (0); kademe içinde kalite + popülerlik
       orderBy: [
-        { relevanceScore: { sort: 'desc', nulls: 'last' } },
-        { viewCount: 'desc' },
-        { likeCount: 'desc' },
-        { createdAt: 'desc' },
-        { id: 'asc' },
+        { relevanceScore: { sort: "desc", nulls: "last" } },
+        { viewCount: "desc" },
+        { likeCount: "desc" },
+        { createdAt: "desc" },
+        { id: "asc" },
       ],
       skip: (page - 1) * limit,
       take: limit,
       include: {
-        images: { orderBy: { sortOrder: 'asc' }, take: 1 },
-        seller: { select: { id: true, displayName: true, isVerified: true, sellerType: true, avatarUrl: true } },
+        images: { orderBy: { sortOrder: "asc" }, take: 1 },
+        seller: {
+          select: {
+            id: true,
+            displayName: true,
+            isVerified: true,
+            sellerType: true,
+            avatarUrl: true,
+          },
+        },
         category: { select: { id: true, name: true, slug: true } },
         brand: { select: { id: true, name: true, slug: true, logo: true } },
         manufacturer: { select: { id: true, name: true, slug: true } },
         carModel: { include: { brand: { select: { slug: true } } } },
-        productAttributes: { include: { attribute: { include: { group: true } } } },
+        productAttributes: {
+          include: { attribute: { include: { group: true } } },
+        },
       },
     });
-    const formattedProducts = await Promise.all(
-      products.map((p) => this.common.formatProductResponse(p)),
-    );
+    const formattedProducts = await this.common.formatProductResponseMany(products);
     return {
       data: formattedProducts,
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
@@ -155,10 +192,27 @@ export class ProductQueryService {
    */
   private async findAllViaElasticsearch(query: ProductQueryDto) {
     const {
-      search, categoryId, sellerId, status, condition, brand, scale,
-      material: materialSlug, tradeOnly, discountOnly, preOrder,
-      limited, set: setFilter, minPrice, maxPrice, sortBy,
-      page = 1, limit = 20, brandId, manufacturerId, carModelId,
+      search,
+      categoryId,
+      sellerId,
+      status,
+      condition,
+      brand,
+      scale,
+      material: materialSlug,
+      tradeOnly,
+      discountOnly,
+      preOrder,
+      limited,
+      set: setFilter,
+      minPrice,
+      maxPrice,
+      sortBy,
+      page = 1,
+      limit = 20,
+      brandId,
+      manufacturerId,
+      carModelId,
     } = query;
 
     const esOptions = {
@@ -184,7 +238,7 @@ export class ProductQueryService {
       maxPrice,
       page,
       pageSize: limit,
-      sortBy: sortBy || 'relevance',
+      sortBy: sortBy || "relevance",
     };
 
     const esResult = await this.searchService.searchProductIds(esOptions);
@@ -197,15 +251,23 @@ export class ProductQueryService {
     const products = await this.prisma.product.findMany({
       where: { id: { in: esResult.ids } },
       include: {
-        images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+        images: { orderBy: { sortOrder: "asc" }, take: 1 },
         seller: {
-          select: { id: true, displayName: true, avatarUrl: true, isVerified: true, sellerType: true },
+          select: {
+            id: true,
+            displayName: true,
+            avatarUrl: true,
+            isVerified: true,
+            sellerType: true,
+          },
         },
         category: { select: { id: true, name: true, slug: true } },
         brand: { select: { id: true, name: true, slug: true, logo: true } },
         manufacturer: { select: { id: true, name: true, slug: true } },
         carModel: { include: { brand: { select: { slug: true } } } },
-        productAttributes: { include: { attribute: { include: { group: true } } } },
+        productAttributes: {
+          include: { attribute: { include: { group: true } } },
+        },
       },
     });
 
@@ -214,12 +276,18 @@ export class ProductQueryService {
 
     // Preserve ES ordering
     const idOrder = new Map(esResult.ids.map((id, i) => [id, i]));
-    products.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
+    products.sort(
+      (a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0),
+    );
 
     // Stok bitenler sayfa sonunda: ES'teki inStock bayrağı rezervasyon
     // değişiminde yeniden indekslenmez; canlı DB verisiyle (quantity − reserved)
     // UI "STOKTA YOK" tanımına göre sayfa içinde stoktakileri öne al.
-    const isInStock = (p: { status: ProductStatus; quantity: number | null; reservedQuantity: number | null }) =>
+    const isInStock = (p: {
+      status: ProductStatus;
+      quantity: number | null;
+      reservedQuantity: number | null;
+    }) =>
       p.status === ProductStatus.active &&
       (p.quantity == null || p.quantity - (p.reservedQuantity ?? 0) > 0);
     const pageOrdered = [
@@ -227,9 +295,7 @@ export class ProductQueryService {
       ...products.filter((p) => !isInStock(p)),
     ];
 
-    const formattedProducts = await Promise.all(
-      pageOrdered.map((p) => this.common.formatProductResponse(p)),
-    );
+    const formattedProducts = await this.common.formatProductResponseMany(pageOrdered);
 
     // Tutarlılık: Postgres path ile aynı şekilde, discountOnly=true iken sadece
     // gerçekten indirimli ürünleri döndür.
@@ -292,10 +358,15 @@ export class ProductQueryService {
       const criteria = await this.discountService.getActiveDiscountCriteria();
       if (!criteria.hasGlobal) {
         const campaignConditions: any[] = [];
-        if (criteria.sellerIds.length > 0) campaignConditions.push({ sellerId: { in: criteria.sellerIds } });
-        if (criteria.categoryIds.length > 0) campaignConditions.push({ categoryId: { in: criteria.categoryIds } });
-        if (criteria.productIds.length > 0) campaignConditions.push({ id: { in: criteria.productIds } });
-        const combinedCondition = { OR: [manualDiscountCondition, ...campaignConditions] };
+        if (criteria.sellerIds.length > 0)
+          campaignConditions.push({ sellerId: { in: criteria.sellerIds } });
+        if (criteria.categoryIds.length > 0)
+          campaignConditions.push({ categoryId: { in: criteria.categoryIds } });
+        if (criteria.productIds.length > 0)
+          campaignConditions.push({ id: { in: criteria.productIds } });
+        const combinedCondition = {
+          OR: [manualDiscountCondition, ...campaignConditions],
+        };
         (where.AND as any[]).push(combinedCondition);
       }
     }
@@ -303,20 +374,36 @@ export class ProductQueryService {
     // DB-level sorting (replaces old in-memory scoring)
     let orderBy: Prisma.ProductOrderByWithRelationInput[];
     switch (sortBy) {
-      case 'price_asc': orderBy = [{ price: 'asc' }]; break;
-      case 'price_desc': orderBy = [{ price: 'desc' }]; break;
-      case 'created_asc': orderBy = [{ createdAt: 'asc' }]; break;
-      case 'created_desc': orderBy = [{ createdAt: 'desc' }]; break;
-      case 'title_asc': orderBy = [{ title: 'asc' }]; break;
-      case 'title_desc': orderBy = [{ title: 'desc' }]; break;
-      case 'view_count_asc': orderBy = [{ viewCount: 'asc' }]; break;
-      case 'view_count_desc': orderBy = [{ viewCount: 'desc' }]; break;
-      case 'rating_desc':
+      case "price_asc":
+        orderBy = [{ price: "asc" }];
+        break;
+      case "price_desc":
+        orderBy = [{ price: "desc" }];
+        break;
+      case "created_asc":
+        orderBy = [{ createdAt: "asc" }];
+        break;
+      case "created_desc":
+        orderBy = [{ createdAt: "desc" }];
+        break;
+      case "title_asc":
+        orderBy = [{ title: "asc" }];
+        break;
+      case "title_desc":
+        orderBy = [{ title: "desc" }];
+        break;
+      case "view_count_asc":
+        orderBy = [{ viewCount: "asc" }];
+        break;
+      case "view_count_desc":
+        orderBy = [{ viewCount: "desc" }];
+        break;
+      case "rating_desc":
         orderBy = [
-          { averageRating: { sort: 'desc', nulls: 'last' } },
-          { ratingCount: 'desc' },
-          { viewCount: 'desc' },
-          { createdAt: 'desc' },
+          { averageRating: { sort: "desc", nulls: "last" } },
+          { ratingCount: "desc" },
+          { viewCount: "desc" },
+          { createdAt: "desc" },
         ];
         break;
       default:
@@ -326,11 +413,11 @@ export class ProductQueryService {
         // Harmanlanmış relevance skoru: boost/premium bonusu + kalite + etkileşim tek skorda.
         // Öne çıkanlar normalde önde; çok popüler ürün de geri kalmaz (viral geçebilir).
         orderBy = [
-          { relevanceScore: { sort: 'desc', nulls: 'last' } },
-          { viewCount: 'desc' }, // relevance eşitse: çok görüntülenen önde (canlı)
-          { likeCount: 'desc' },
-          { createdAt: 'desc' },
-          { id: 'asc' },
+          { relevanceScore: { sort: "desc", nulls: "last" } },
+          { viewCount: "desc" }, // relevance eşitse: çok görüntülenen önde (canlı)
+          { likeCount: "desc" },
+          { createdAt: "desc" },
+          { id: "asc" },
         ];
     }
 
@@ -348,19 +435,36 @@ export class ProductQueryService {
         { quantity: { gt: this.prisma.product.fields.reservedQuantity } },
       ],
     };
-    const whereInStock: Prisma.ProductWhereInput = { AND: [where, inStockCondition] };
-    const whereOutOfStock: Prisma.ProductWhereInput = { AND: [where, { NOT: inStockCondition }] };
+    const whereInStock: Prisma.ProductWhereInput = {
+      AND: [where, inStockCondition],
+    };
+    const whereOutOfStock: Prisma.ProductWhereInput = {
+      AND: [where, { NOT: inStockCondition }],
+    };
     // Stok bitenler kovasında satılan, tükenenden önce gelsin (enum: sold < inactive)
-    const outOfStockOrderBy: Prisma.ProductOrderByWithRelationInput[] = [{ status: 'asc' }, ...orderBy];
+    const outOfStockOrderBy: Prisma.ProductOrderByWithRelationInput[] = [
+      { status: "asc" },
+      ...orderBy,
+    ];
 
     const productInclude = {
-      images: { orderBy: { sortOrder: 'asc' as const }, take: 1 },
-      seller: { select: { id: true, displayName: true, isVerified: true, sellerType: true, avatarUrl: true } },
+      images: { orderBy: { sortOrder: "asc" as const }, take: 1 },
+      seller: {
+        select: {
+          id: true,
+          displayName: true,
+          isVerified: true,
+          sellerType: true,
+          avatarUrl: true,
+        },
+      },
       category: { select: { id: true, name: true, slug: true } },
       brand: { select: { id: true, name: true, slug: true, logo: true } },
       manufacturer: { select: { id: true, name: true, slug: true } },
       carModel: { include: { brand: { select: { slug: true } } } },
-      productAttributes: { include: { attribute: { include: { group: true } } } },
+      productAttributes: {
+        include: { attribute: { include: { group: true } } },
+      },
     } satisfies Prisma.ProductInclude;
 
     const [totalInStock, totalOutOfStock] = await Promise.all([
@@ -371,30 +475,30 @@ export class ProductQueryService {
 
     const skip = (page - 1) * limit;
     const inStockTake = Math.max(0, Math.min(limit, totalInStock - skip));
-    const inStockRows = inStockTake > 0
-      ? await this.prisma.product.findMany({
-          where: whereInStock,
-          orderBy,
-          skip,
-          take: inStockTake,
-          include: productInclude,
-        })
-      : [];
+    const inStockRows =
+      inStockTake > 0
+        ? await this.prisma.product.findMany({
+            where: whereInStock,
+            orderBy,
+            skip,
+            take: inStockTake,
+            include: productInclude,
+          })
+        : [];
     const outOfStockTake = limit - inStockRows.length;
-    const outOfStockRows = outOfStockTake > 0
-      ? await this.prisma.product.findMany({
-          where: whereOutOfStock,
-          orderBy: outOfStockOrderBy,
-          skip: Math.max(0, skip - totalInStock),
-          take: outOfStockTake,
-          include: productInclude,
-        })
-      : [];
+    const outOfStockRows =
+      outOfStockTake > 0
+        ? await this.prisma.product.findMany({
+            where: whereOutOfStock,
+            orderBy: outOfStockOrderBy,
+            skip: Math.max(0, skip - totalInStock),
+            take: outOfStockTake,
+            include: productInclude,
+          })
+        : [];
     const products = [...inStockRows, ...outOfStockRows];
 
-    const formattedProducts = await Promise.all(
-      products.map((p) => this.common.formatProductResponse(p)),
-    );
+    const formattedProducts = await this.common.formatProductResponseMany(products);
 
     // discountOnly: WHERE kolayca "kampanya kapsamındaki" ürünleri geçirse de,
     // formatProductResponse kampanya fiyatını uygulayamayabilir (değer 0, tarih
@@ -432,7 +536,7 @@ export class ProductQueryService {
         const product = await this.prisma.product.findUnique({
           where: { id },
           include: {
-            images: { orderBy: { sortOrder: 'asc' } },
+            images: { orderBy: { sortOrder: "asc" } },
             seller: {
               select: {
                 id: true,
@@ -482,7 +586,7 @@ export class ProductQueryService {
         });
 
         if (!product) {
-          throw new NotFoundException('Ürün bulunamadı');
+          throw new NotFoundException("Ürün bulunamadı");
         }
 
         // Allow active, sold, and out-of-stock (inactive + quantity=0) products to be viewable
@@ -494,7 +598,7 @@ export class ProductQueryService {
           product.status === ProductStatus.sold ||
           (product.status === ProductStatus.inactive && isOutOfStock);
         if (!canView) {
-          throw new NotFoundException('Ürün bulunamadı');
+          throw new NotFoundException("Ürün bulunamadı");
         }
 
         return await this.common.formatProductResponse(product);
@@ -511,7 +615,7 @@ export class ProductQueryService {
     const product = await this.prisma.product.findUnique({
       where: { id },
       include: {
-        images: { orderBy: { sortOrder: 'asc' } },
+        images: { orderBy: { sortOrder: "asc" } },
         seller: {
           select: {
             id: true,
@@ -561,11 +665,11 @@ export class ProductQueryService {
     });
 
     if (!product) {
-      throw new NotFoundException('Ürün bulunamadı');
+      throw new NotFoundException("Ürün bulunamadı");
     }
 
     if (product.sellerId !== userId) {
-      throw new ForbiddenException('Bu ürünü görüntüleme yetkiniz yok');
+      throw new ForbiddenException("Bu ürünü görüntüleme yetkiniz yok");
     }
 
     return await this.common.formatProductResponse(product);
@@ -592,10 +696,10 @@ export class ProductQueryService {
         // ürün (available=0) "alternatif ürünler"de gösterilmez.
         OR: this.inStockOrConditions(),
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: Math.min(limit, 24),
       include: {
-        images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+        images: { orderBy: { sortOrder: "asc" }, take: 1 },
         seller: {
           select: {
             id: true,
@@ -615,7 +719,7 @@ export class ProductQueryService {
       },
     });
 
-    return Promise.all(products.map((p) => this.common.formatProductResponse(p)));
+    return this.common.formatProductResponseMany(products);
   }
 
   /**
@@ -625,7 +729,7 @@ export class ProductQueryService {
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
       include: {
-        images: { orderBy: { sortOrder: 'asc' } },
+        images: { orderBy: { sortOrder: "asc" } },
         seller: {
           select: {
             id: true,
@@ -646,12 +750,12 @@ export class ProductQueryService {
     });
 
     if (!product) {
-      throw new NotFoundException('Ürün bulunamadı');
+      throw new NotFoundException("Ürün bulunamadı");
     }
 
     // Only the owner can see their own non-active products
     if (product.sellerId !== sellerId) {
-      throw new ForbiddenException('Bu ürünü görüntüleme yetkiniz yok');
+      throw new ForbiddenException("Bu ürünü görüntüleme yetkiniz yok");
     }
 
     return await this.common.formatProductResponse(product);
@@ -665,33 +769,32 @@ export class ProductQueryService {
 
     const where: Prisma.ProductWhereInput = {
       sellerId,
-      ...(status && status.trim() !== ''
+      ...(status && status.trim() !== ""
         ? { status: status as ProductStatus }
         : {
-          // "Tümü": deleted hariç hepsi (sold, inactive, reserved, active,
-          // pending, rejected görünür). Kaldırılan ürünler ayrı 'deleted' filtresinde.
-          status: { notIn: [ProductStatus.deleted] }
-        }
-      ),
+            // "Tümü": deleted hariç hepsi (sold, inactive, reserved, active,
+            // pending, rejected görünür). Kaldırılan ürünler ayrı 'deleted' filtresinde.
+            status: { notIn: [ProductStatus.deleted] },
+          }),
       // Takas teklifine eklenebilir ürünler: aktif + aktif takasta değil + müsait stoğu var
       // (createTrade'in initiator validasyonuyla birebir — trade.service.ts)
       ...(tradeEligible
         ? {
-          status: ProductStatus.active,
-          NOT: {
-            tradeItemsOffered: {
-              some: {
-                side: 'initiator',
-                trade: { status: { in: ACTIVE_TRADE_STATUSES } },
+            status: ProductStatus.active,
+            NOT: {
+              tradeItemsOffered: {
+                some: {
+                  side: "initiator",
+                  trade: { status: { in: ACTIVE_TRADE_STATUSES } },
+                },
               },
             },
-          },
-          OR: [
-            { quantity: null },
-            { reservedQuantity: null, quantity: { gt: 0 } },
-            { quantity: { gt: this.prisma.product.fields.reservedQuantity } },
-          ],
-        }
+            OR: [
+              { quantity: null },
+              { reservedQuantity: null, quantity: { gt: 0 } },
+              { quantity: { gt: this.prisma.product.fields.reservedQuantity } },
+            ],
+          }
         : {}),
     };
 
@@ -703,11 +806,11 @@ export class ProductQueryService {
       // ilanların durumuna göre değil tarihe göre sıralanması istenir; satılan/
       // pasif/reddedilen ilanlar aşağıdaki adımda en alta taşınır (yine en yeni
       // önce). Öne çıkarma (boost) bu sorguya dahil değildir, dokunulmaz.
-      orderBy: [{ createdAt: 'desc' }],
+      orderBy: [{ createdAt: "desc" }],
       skip: (page - 1) * limit,
       take: limit,
       include: {
-        images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+        images: { orderBy: { sortOrder: "asc" }, take: 1 },
         category: {
           select: {
             id: true,
@@ -717,7 +820,7 @@ export class ProductQueryService {
         },
         _count: {
           select: {
-            offers: { where: { status: 'pending' } },
+            offers: { where: { status: "pending" } },
           },
         },
       },
@@ -736,12 +839,11 @@ export class ProductQueryService {
       TERMINAL_STATUSES.includes(p.status);
     products.sort((a, b) => Number(isTerminal(a)) - Number(isTerminal(b)));
 
-    const formattedProducts = await Promise.all(
-      products.map(async (p) => ({
-        ...(await this.common.formatProductResponse(p)),
-        pendingOffersCount: p._count.offers,
-      }))
-    );
+    const formattedBase = await this.common.formatProductResponseMany(products);
+    const formattedProducts = formattedBase.map((f, i) => ({
+      ...f,
+      pendingOffersCount: products[i]._count.offers,
+    }));
 
     return {
       data: formattedProducts,

@@ -67,16 +67,21 @@ export class InvoiceController {
   }
 
   /**
-   * Generate invoice for order (admin or system use)
+   * Generate invoice for order — yalnız siparişin tarafı (alıcı/satıcı).
+   * Güvenlik (#63): eskiden userId almadan generateForOrder çağırıyordu → IDOR
+   * (herhangi bir oturumlu kullanıcı başka siparişin fatura PII/PDF'ini üretip
+   * okuyabiliyordu). Artık sahiplik guard'lı generateForOrderAsUser'dan geçer.
    */
   @Post('generate/:orderId')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Generate invoice for order' })
+  @ApiOperation({ summary: 'Generate invoice for order (only the order buyer or seller)' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Not a party to this order' })
   async generateInvoice(
     @Param('orderId', ParseUUIDPipe) orderId: string,
+    @CurrentUser('id') userId: string,
   ) {
-    return this.invoiceService.generateForOrder(orderId);
+    return this.invoiceService.generateForOrderAsUser(orderId, userId);
   }
 
   /**

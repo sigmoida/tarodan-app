@@ -50,6 +50,16 @@ const ALLOWED_IMAGE_TYPES = [
   "image/webp",
   "image/gif",
 ];
+// Private document buckets (invoices, ticket attachments): PDFs and images are
+// legitimate; executables, scripts, HTML and SVG are not. Validated by real
+// magic bytes so a spoofed Content-Type cannot smuggle active content in (#71).
+const ALLOWED_DOCUMENT_TYPES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+];
+const DOCUMENT_BUCKETS = ["documents", "tickets"];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 /**
@@ -204,6 +214,17 @@ export class StorageService implements OnModuleInit {
       const sniffed = await fileTypeFromBuffer(buffer);
       if (!sniffed || !ALLOWED_IMAGE_TYPES.includes(sniffed.mime)) {
         throw new BadRequestException("Dosya içeriği geçerli bir resim değil.");
+      }
+    } else if (DOCUMENT_BUCKETS.includes(options.bucket)) {
+      // documents/tickets previously skipped content validation entirely (#71).
+      // The uploaded Content-Type is spoofable, so verify the real bytes: only
+      // PDFs and images may land in these private buckets — never HTML, SVG,
+      // scripts or executables. Server-generated invoice PDFs (real %PDF) pass.
+      const sniffed = await fileTypeFromBuffer(buffer);
+      if (!sniffed || !ALLOWED_DOCUMENT_TYPES.includes(sniffed.mime)) {
+        throw new BadRequestException(
+          "Dosya içeriği geçerli bir belge (PDF veya resim) değil.",
+        );
       }
     }
 

@@ -1,13 +1,14 @@
-'use client';
+"use client";
 
-import { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { DataTable } from '@/components/DataTable';
-import { useResourceList } from '@/components/list';
-import { StatusUpdateModal } from '../[id]/_modals/StatusUpdateModal';
-import { orderColumns } from '../_lib/columns';
-import { orderRowMenu } from '../_lib/rowActions';
-import { type Order, mapOrders, useOrderGroups } from '../_lib/orders';
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { DataTable } from "@/components/DataTable";
+import { useResourceList } from "@/components/list";
+import { StatusUpdateModal } from "../[id]/_modals/StatusUpdateModal";
+import { orderColumns } from "../_lib/columns";
+import { orderRowMenu } from "../_lib/rowActions";
+import { type Order, mapOrders, useOrderGroups } from "../_lib/orders";
 
 /**
  * The orders table — the page's unique logic (checkout-group accordion) lives
@@ -15,6 +16,7 @@ import { type Order, mapOrders, useOrderGroups } from '../_lib/orders';
  * the shared StatusUpdateModal (same as the detail page).
  */
 export function OrdersTable() {
+  const t = useTranslations();
   const router = useRouter();
   const { rows, isLoading, search, filters } = useResourceList<any>();
 
@@ -29,22 +31,23 @@ export function OrdersTable() {
       return next;
     });
 
-  const orders = useMemo(() => mapOrders(rows), [rows]);
+  const orders = useMemo(() => mapOrders(rows, t), [rows, t]);
   const { displayRows, rowClassById } = useOrderGroups(orders, expandedGroups);
 
   const columns = orderColumns({
+    t,
     expandedGroups,
     toggleGroup,
-    rowMenu: orderRowMenu({
+    rowMenu: orderRowMenu(t, {
       onView: (o) => router.push(`/operations/orders/${o.id}`),
       onEditStatus: (o) => setStatusOrder(o),
     }),
   });
 
   const emptyText =
-    search || filters.status !== 'all' || filters.userId
-      ? 'Filtreye uygun sipariş bulunamadı'
-      : 'Henüz sipariş yok';
+    search || filters.status !== "all" || filters.userId
+      ? t("admin.operations.orders.emptyFiltered")
+      : t("admin.operations.orders.empty");
 
   return (
     <>

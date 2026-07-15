@@ -1,6 +1,9 @@
-import { useMemo } from 'react';
-import { orderStatusConfig } from '@tarodan/ui';
-import { statusFilterOptions } from '@/lib/utils';
+import { useMemo } from "react";
+import { orderStatusConfig } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
+import { statusFilterOptions } from "@/lib/utils";
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 export interface Order {
   id: string;
@@ -15,7 +18,11 @@ export interface Order {
   itemCount: number;
   cancelReason?: string;
   cancellationType?: string | null;
-  activeRefundRequest?: { id: string; status: string; refundNumber?: string } | null;
+  activeRefundRequest?: {
+    id: string;
+    status: string;
+    refundNumber?: string;
+  } | null;
   offerId?: string | null;
   checkoutGroupId?: string | null;
   groupNumber?: string | null;
@@ -26,22 +33,28 @@ export interface Order {
   groupTotalAmount?: number;
   groupCommission?: number;
   groupSellers?: { id: string; displayName: string }[];
-  groupStatus?: 'ongoing' | 'done';
+  groupStatus?: "ongoing" | "done";
   groupThumbs?: string[];
 }
 
 /** Filter options derived from orderStatusConfig → exactly consistent with badges. */
 export const statusOptions = statusFilterOptions(orderStatusConfig);
 
-export function mapOrders(raw: any[]): Order[] {
+export function mapOrders(raw: any[], t: T): Order[] {
   return raw.map((o: any) => ({
     id: o.id,
     orderNumber: o.orderNumber || `ORD-${o.id.slice(0, 8)}`,
     status: o.status,
     totalAmount: Number(o.totalAmount || o.total || 0),
     commission: Number(o.commissionAmount || 0),
-    buyer: o.buyer || { id: '', displayName: 'Alıcı' },
-    seller: o.seller || { id: '', displayName: 'Satıcı' },
+    buyer: o.buyer || {
+      id: "",
+      displayName: t("admin.operations.orders.buyer"),
+    },
+    seller: o.seller || {
+      id: "",
+      displayName: t("admin.operations.orders.seller"),
+    },
     product: o.product || undefined,
     createdAt: o.createdAt,
     itemCount: o.items?.length || 1,
@@ -65,8 +78,8 @@ export function useOrderGroups(orders: Order[], expandedGroups: Set<string>) {
   return useMemo(() => {
     const rows: Order[] = [];
     const classMap = new Map<string, string>();
-    const BAND = 'bg-primary-50/30 border-l-2 border-l-primary-300';
-    const TERMINAL = ['completed', 'cancelled', 'refunded'];
+    const BAND = "bg-primary-50/30 border-l-2 border-l-primary-300";
+    const TERMINAL = ["completed", "cancelled", "refunded"];
     let i = 0;
     while (i < orders.length) {
       const o = orders[i];
@@ -78,20 +91,30 @@ export function useOrderGroups(orders: Order[], expandedGroups: Set<string>) {
           members.push(orders[j]);
           j++;
         }
-        const sellersMap = new Map<string, { id: string; displayName: string }>();
-        for (const m of members) if (m.seller?.id) sellersMap.set(m.seller.id, m.seller);
+        const sellersMap = new Map<
+          string,
+          { id: string; displayName: string }
+        >();
+        for (const m of members)
+          if (m.seller?.id) sellersMap.set(m.seller.id, m.seller);
         const thumbs: string[] = [];
         for (const m of members)
-          if (thumbs.length < 4 && m.productImageUrl) thumbs.push(m.productImageUrl);
+          if (thumbs.length < 4 && m.productImageUrl)
+            thumbs.push(m.productImageUrl);
         const summary: Order = {
           ...o,
           id: `grp:${gid}`,
           isGroupSummary: true,
           checkoutGroupId: gid,
-          groupTotalAmount: members.reduce((s, m) => s + (m.totalAmount || 0), 0),
+          groupTotalAmount: members.reduce(
+            (s, m) => s + (m.totalAmount || 0),
+            0,
+          ),
           groupCommission: members.reduce((s, m) => s + (m.commission || 0), 0),
           groupSellers: Array.from(sellersMap.values()),
-          groupStatus: members.every((m) => TERMINAL.includes(m.status)) ? 'done' : 'ongoing',
+          groupStatus: members.every((m) => TERMINAL.includes(m.status))
+            ? "done"
+            : "ongoing",
           groupThumbs: thumbs,
         };
         rows.push(summary);

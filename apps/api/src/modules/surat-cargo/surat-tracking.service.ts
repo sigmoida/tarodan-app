@@ -279,8 +279,13 @@ export class SuratTrackingService {
       return false;
     }
 
-    // Use the tracking ID we stored, or fall back to order ID
-    const webSiparisKodu = shipment.providerTrackingId || shipment.orderId;
+    // Sürat sorgusu OzelKargoTakipNo ile yapılır = shipment.trackingNumber
+    // (oto-oluşturmada order.orderNumber olarak yazılır). providerTrackingId Sürat'ın
+    // KargoTakipNo'sudur (WebSiparisKodu DEĞİL), orderId ise iç UUID — ikisi de yanlış
+    // referans olup "Gonderiler boş" döndürür. Return/trade poll'larıyla tutarlı: her
+    // zaman trackingNumber ile sorgula. (trackingNumber yoksa hiç Sürat'a düşmemiş
+    // manuel kayıt; orderId fallback'i yalnız boş sonuç verir, zarar vermez.) (#84)
+    const webSiparisKodu = shipment.trackingNumber || shipment.orderId;
     const data = await this.fetchTrackingInfo(webSiparisKodu);
 
     if (!data || data.Gonderiler.length === 0) {
@@ -395,12 +400,48 @@ export class SuratTrackingService {
     // Sync movement events (Hareketler)
     await this.syncShipmentEvents(shipment.id, gonderi);
 
-    // Update order status based on shipment status
-    if (isDelivered && shipment.order?.status !== OrderStatus.delivered) {
-      await this.prisma.order.update({
-        where: { id: shipment.orderId },
-        data: { status: OrderStatus.delivered },
-      });
+    // Teslim: order geçişini + escrow release'ini + 48h dallanmasını TEK kanonik
+    // handler yapar (webhook/worker ile aynı yol). Eskiden burada yalnız
+    // order.status=delivered set ediliyor, scheduleHoldReleaseOnDelivery ATLANIYOR ve
+    // deliveredAt yazılmıyordu → PaymentHold.releaseAt null kalıp satıcı hiç ödenmiyordu
+    // (kanonik oto-oluşturulan siparişler). Handler idempotent; re-poll deliveredAt'i
+    // taşımaz. PaymentService/NotificationService circular import'u önlemek için lazy. (#83)
+    if (isDelivered) {
+      const deliveredAt =
+        updateData.deliveredAt instanceof Date ? updateData.deliveredAt : new Date();
+      try {
+        const { PaymentService } = await import('../payment/payment.service');
+        const paymentService = this.moduleRef.get(PaymentService, { strict: false });
+        if (paymentService) {
+          const res = await paymentService.handleOrderDelivered(
+            shipment.orderId,
+            deliveredAt,
+          );
+          if (res.acted && res.use48h && res.confirmationDeadline && res.buyerId) {
+            try {
+              const { NotificationService } = await import(
+                '../notification/notification.service'
+              );
+              const notificationService = this.moduleRef.get(NotificationService, {
+                strict: false,
+              });
+              await notificationService?.notifyOrderDeliveredConfirm(
+                res.buyerId,
+                shipment.orderId,
+                res.confirmationDeadline,
+              );
+            } catch (e: any) {
+              this.logger.warn(
+                `notify delivered-confirm failed (poll) for ${shipment.orderId}: ${e?.message}`,
+              );
+            }
+          }
+        }
+      } catch (error: any) {
+        this.logger.error(
+          `handleOrderDelivered failed (poll) for order ${shipment.orderId}: ${error.message}. Manual intervention may be needed.`,
+        );
+      }
     }
 
     if (isReturnCompleted && shipment.order) {

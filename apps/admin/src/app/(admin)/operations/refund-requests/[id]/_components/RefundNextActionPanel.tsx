@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Alert, Button } from "@tarodan/ui";
 import {
   InformationCircleIcon,
@@ -8,7 +9,10 @@ import {
   XCircleIcon,
   BanknotesIcon,
 } from "@heroicons/react/24/outline";
-import { guidanceForStatus, type GuidanceVariant } from "../_lib/refund-guidance";
+import {
+  guidanceForStatus,
+  type GuidanceVariant,
+} from "../_lib/refund-guidance";
 
 const VARIANT_ICON: Record<GuidanceVariant, React.ReactNode> = {
   info: <InformationCircleIcon className="h-6 w-6" />,
@@ -43,7 +47,8 @@ export function RefundNextActionPanel({
   finalizing,
   onFinalize,
 }: RefundNextActionPanelProps) {
-  const guidance = guidanceForStatus(status);
+  const t = useTranslations();
+  const guidance = guidanceForStatus(t, status);
 
   return (
     <div className="space-y-4">
@@ -57,7 +62,9 @@ export function RefundNextActionPanel({
 
           {status === "refunded" && (
             <p className="font-semibold">
-              Alıcıya iade edilen tutar: {fmtTry(amount)}
+              {t("admin.operations.refundRequests.refundedAmountLabel", {
+                amount: fmtTry(amount),
+              })}
             </p>
           )}
 
@@ -69,7 +76,7 @@ export function RefundNextActionPanel({
               disabled={finalizing}
             >
               <BanknotesIcon className="mr-1.5 h-5 w-5" />
-              Para İadesini Tamamla
+              {t("admin.operations.refundRequests.forceFinalizeButton")}
             </Button>
           )}
         </div>
@@ -78,12 +85,10 @@ export function RefundNextActionPanel({
       {reason === "counterfeit" && (
         <Alert
           variant="danger"
-          title="Sahte / taklit ürün şikayeti"
+          title={t("admin.operations.refundRequests.counterfeitTitle")}
           icon={<ExclamationTriangleIcon className="h-6 w-6" />}
         >
-          Bu talep sahte ürün gerekçesiyle açıldı. İade onaylandıktan sonra
-          satıcı için yaptırım değerlendirin (uyarı, geçici askı veya fesih) ve
-          satıcının diğer ürünleri için risk incelemesi yapın.
+          {t("admin.operations.refundRequests.counterfeitBody")}
         </Alert>
       )}
     </div>

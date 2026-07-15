@@ -1,9 +1,10 @@
-'use client';
+"use client";
 
-import { useQuery } from '@tanstack/react-query';
-import { useSearchParams } from 'next/navigation';
-import { adminApi } from '@/lib/api';
-import { userFilterParams } from '../_lib/types';
+import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
+import { adminApi } from "@/lib/api";
+import { adminKeys } from "@/lib/query/keys";
+import { userFilterParams } from "../_lib/types";
 
 /**
  * Page-level header subtitle — live total respecting the active URL filters, so
@@ -11,11 +12,11 @@ import { userFilterParams } from '../_lib/types';
  */
 export function UsersSummary() {
   const searchParams = useSearchParams();
-  const search = searchParams.get('q') ?? '';
-  const filter = searchParams.get('filter') ?? 'all';
+  const search = searchParams.get("q") ?? "";
+  const filter = searchParams.get("filter") ?? "all";
 
   const { data: total } = useQuery({
-    queryKey: ['users-count', { search, filter }],
+    queryKey: adminKeys.count("users", { search, filter }),
     queryFn: async () => {
       const res = await adminApi.getUsers({
         page: 1,

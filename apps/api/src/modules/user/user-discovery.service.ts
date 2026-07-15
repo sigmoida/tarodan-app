@@ -1,8 +1,8 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { StorageService } from '../storage/storage.service';
-import { CacheService } from '../cache/cache.service';
-import { UserCommonService } from './user-common.service';
+import { Injectable, Logger, Optional } from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { StorageService } from "../storage/storage.service";
+import { CacheService } from "../cache/cache.service";
+import { UserCommonService } from "./user-common.service";
 
 /**
  * Anasayfa öne çıkarma bölümlerinin (haftanın koleksiyoneri / haftanın şirketi /
@@ -33,7 +33,9 @@ const FEATURED_SCORING = {
 
 /** Skorlama penceresinin başlangıç tarihini döndürür (şimdi - windowDays). */
 function featuredWindowStart(): Date {
-  return new Date(Date.now() - FEATURED_SCORING.windowDays * 24 * 60 * 60 * 1000);
+  return new Date(
+    Date.now() - FEATURED_SCORING.windowDays * 24 * 60 * 60 * 1000,
+  );
 }
 
 /**
@@ -60,16 +62,25 @@ export class UserDiscoveryService {
    * Featured (anasayfa öne çıkarma) yanıtlarını cache-aside ile sarar.
    * Redis yoksa veya hata verirse otomatik olarak factory'ye düşer (graceful).
    */
-  private async cacheFeatured<T>(key: string, factory: () => Promise<T>): Promise<T> {
+  private async cacheFeatured<T>(
+    key: string,
+    factory: () => Promise<T>,
+  ): Promise<T> {
     if (!this.cache) return factory();
-    return this.cache.getOrSet(key, factory, { ttl: FEATURED_SCORING.cacheTtlSeconds });
+    return this.cache.getOrSet(key, factory, {
+      ttl: FEATURED_SCORING.cacheTtlSeconds,
+    });
   }
 
   /**
    * Featured snapshot satırını (haftanın kazananı) upsert eder. Cron ve okuma
    * anındaki fallback kullanır; hata durumunda sessizce geçer (best-effort).
    */
-  private async upsertFeaturedSnapshot(type: string, entityId: string, score: number) {
+  private async upsertFeaturedSnapshot(
+    type: string,
+    entityId: string,
+    score: number,
+  ) {
     try {
       await this.prisma.featuredSnapshot.upsert({
         where: { type },
@@ -77,7 +88,9 @@ export class UserDiscoveryService {
         update: { entityId, score, computedAt: new Date() },
       });
     } catch (e: any) {
-      this.logger.warn(`Featured snapshot upsert failed (${type}): ${e.message}`);
+      this.logger.warn(
+        `Featured snapshot upsert failed (${type}): ${e.message}`,
+      );
     }
   }
 
@@ -110,48 +123,59 @@ export class UserDiscoveryService {
           select: { items: true, likes: true },
         },
       },
-      orderBy: [
-        { viewCount: 'desc' },
-        { likeCount: 'desc' },
-      ],
+      orderBy: [{ viewCount: "desc" }, { likeCount: "desc" }],
       take: limit,
     });
 
-    return Promise.all(collections.map(async (collection) => {
-      // Always show the collection owner's own active products so products always match the user
-      const ownProducts = await this.prisma.product.findMany({
-        where: { sellerId: collection.user.id, status: 'active' },
-        take: 5,
-        include: { images: { take: 1, orderBy: { sortOrder: 'asc' } } },
-        orderBy: [{ likeCount: 'desc' }, { viewCount: 'desc' }, { createdAt: 'desc' }],
-      });
+    return Promise.all(
+      collections.map(async (collection) => {
+        // Always show the collection owner's own active products so products always match the user
+        const ownProducts = await this.prisma.product.findMany({
+          where: { sellerId: collection.user.id, status: "active" },
+          take: 5,
+          include: { images: { take: 1, orderBy: { sortOrder: "asc" } } },
+          orderBy: [
+            { likeCount: "desc" },
+            { viewCount: "desc" },
+            { createdAt: "desc" },
+          ],
+        });
 
-      const items = await Promise.all(ownProducts.map(async p => ({
-        id: p.id,
-        productId: p.id,
-        productTitle: p.title,
-        productPrice: Number(p.price),
-        productImage: this.common.resolveProductImageUrl(p.images[0]?.cardKey),
-      })));
+        const items = await Promise.all(
+          ownProducts.map(async (p) => ({
+            id: p.id,
+            productId: p.id,
+            productTitle: p.title,
+            productPrice: Number(p.price),
+            productImage: this.common.resolveProductImageUrl(
+              p.images[0]?.cardKey,
+            ),
+          })),
+        );
 
-      return {
-        id: collection.id,
-        name: collection.name,
-        description: collection.description,
-        coverImageUrl: collection.coverImageKey ? this.storageService.getPublicAssetUrl(collection.coverImageKey) : undefined,
-        viewCount: collection.viewCount,
-        likeCount: collection.likeCount,
-        itemCount: collection._count.items,
-        user: {
-          id: collection.user.id,
-          displayName: collection.user.displayName,
-          avatarUrl: await this.common.resolveAvatarUrl(collection.user.avatarUrl),
-          bio: collection.user.bio,
-          isVerified: collection.user.isVerified,
-        },
-        items,
-      };
-    }));
+        return {
+          id: collection.id,
+          name: collection.name,
+          description: collection.description,
+          coverImageUrl: collection.coverImageKey
+            ? this.storageService.getPublicAssetUrl(collection.coverImageKey)
+            : undefined,
+          viewCount: collection.viewCount,
+          likeCount: collection.likeCount,
+          itemCount: collection._count.items,
+          user: {
+            id: collection.user.id,
+            displayName: collection.user.displayName,
+            avatarUrl: await this.common.resolveAvatarUrl(
+              collection.user.avatarUrl,
+            ),
+            bio: collection.user.bio,
+            isVerified: collection.user.isVerified,
+          },
+          items,
+        };
+      }),
+    );
   }
 
   /**
@@ -161,19 +185,30 @@ export class UserDiscoveryService {
    * kazanan artık uygun değilse anında hesaplayıp snapshot'ı tazeler.
    */
   async getFeaturedCollector() {
-    return this.cacheFeatured('featured:collector', async () => {
+    return this.cacheFeatured("featured:collector", async () => {
       const snap = await this.prisma.featuredSnapshot.findUnique({
-        where: { type: 'collector' },
+        where: { type: "collector" },
       });
       if (snap) {
-        const hydrated = await this.hydrateCollectorById(snap.entityId, snap.score);
+        const hydrated = await this.hydrateCollectorById(
+          snap.entityId,
+          snap.score,
+        );
         if (hydrated) return hydrated;
       }
       // Snapshot yok ya da hedef koleksiyon artık uygun değil → taze hesapla + sakla
       const selected = await this.selectFeaturedCollector();
       if (!selected) return null;
-      await this.upsertFeaturedSnapshot('collector', selected.id, selected.score);
-      return this.hydrateCollectorById(selected.id, selected.score, selected.salesCount);
+      await this.upsertFeaturedSnapshot(
+        "collector",
+        selected.id,
+        selected.score,
+      );
+      return this.hydrateCollectorById(
+        selected.id,
+        selected.score,
+        selected.salesCount,
+      );
     });
   }
 
@@ -182,7 +217,11 @@ export class UserDiscoveryService {
    * id + skor döner; ağır kısım budur, cron tarafından çağrılır).
    * Admin'in `isFeatured` işaretlediği koleksiyonlar önceliklidir.
    */
-  async selectFeaturedCollector(): Promise<{ id: string; score: number; salesCount: number } | null> {
+  async selectFeaturedCollector(): Promise<{
+    id: string;
+    score: number;
+    salesCount: number;
+  } | null> {
     const collectionWhere = {
       isPublic: true,
       items: { some: {} }, // Has at least one item
@@ -190,15 +229,35 @@ export class UserDiscoveryService {
     const candidateInclude = {
       items: { select: { product: { select: { status: true } } } },
     };
+    // Bound the candidate set: previously this loaded EVERY public collection
+    // (and all their items) into memory to pick one — unbounded with catalog
+    // growth. The final score is view/like/sale/recentLike-weighted, so the
+    // winner is virtually always among the most-liked/viewed collections; take
+    // the top N by that cheap DB-orderable proxy and score only those. It's a
+    // "collector of the week" pick, so this approximation is safe.
+    const CANDIDATE_LIMIT = 200;
+    const candidateOrder = [
+      { likeCount: "desc" as const },
+      { viewCount: "desc" as const },
+    ];
 
     // Prefer admin-featured collections first; fall back to score-based selection
-    const collections = await this.prisma.collection.findMany({
-      where: { ...collectionWhere, isFeatured: true },
-      include: candidateInclude,
-    }).then(async (featured) => {
-      if (featured.length > 0) return featured;
-      return this.prisma.collection.findMany({ where: collectionWhere, include: candidateInclude });
-    });
+    const collections = await this.prisma.collection
+      .findMany({
+        where: { ...collectionWhere, isFeatured: true },
+        include: candidateInclude,
+        orderBy: candidateOrder,
+        take: CANDIDATE_LIMIT,
+      })
+      .then(async (featured) => {
+        if (featured.length > 0) return featured;
+        return this.prisma.collection.findMany({
+          where: collectionWhere,
+          include: candidateInclude,
+          orderBy: candidateOrder,
+          take: CANDIDATE_LIMIT,
+        });
+      });
 
     if (collections.length === 0) {
       return null;
@@ -212,7 +271,7 @@ export class UserDiscoveryService {
 
     // Son penceredeki koleksiyon beğenilerini tek sorguda topla (N+1 yerine groupBy)
     const recentLikeGroups = await this.prisma.collectionLike.groupBy({
-      by: ['collectionId'],
+      by: ["collectionId"],
       where: {
         collectionId: { in: collections.map((c) => c.id) },
         createdAt: { gte: windowStart },
@@ -225,7 +284,7 @@ export class UserDiscoveryService {
 
     const scored = collections.map((collection) => {
       const salesCount = collection.items.filter(
-        (item) => item.product && item.product.status === 'sold'
+        (item) => item.product && item.product.status === "sold",
       ).length;
       const recentLikes = recentLikesByCollection.get(collection.id) ?? 0;
       const score =
@@ -254,7 +313,13 @@ export class UserDiscoveryService {
       where: { id: collectionId },
       include: {
         user: {
-          select: { id: true, displayName: true, avatarUrl: true, bio: true, isVerified: true },
+          select: {
+            id: true,
+            displayName: true,
+            avatarUrl: true,
+            bio: true,
+            isVerified: true,
+          },
         },
         items: { select: { product: { select: { status: true } } } },
         _count: { select: { items: true, likes: true } },
@@ -267,14 +332,20 @@ export class UserDiscoveryService {
 
     const resolvedSalesCount =
       salesCount ??
-      collection.items.filter((item) => item.product && item.product.status === 'sold').length;
+      collection.items.filter(
+        (item) => item.product && item.product.status === "sold",
+      ).length;
 
     // Always show the collector's own active product listings (ensures products match the user)
     const ownProducts = await this.prisma.product.findMany({
-      where: { sellerId: collection.user.id, status: 'active' },
+      where: { sellerId: collection.user.id, status: "active" },
       take: 5,
-      include: { images: { take: 1, orderBy: { sortOrder: 'asc' } } },
-      orderBy: [{ likeCount: 'desc' }, { viewCount: 'desc' }, { createdAt: 'desc' }],
+      include: { images: { take: 1, orderBy: { sortOrder: "asc" } } },
+      orderBy: [
+        { likeCount: "desc" },
+        { viewCount: "desc" },
+        { createdAt: "desc" },
+      ],
     });
 
     const items = ownProducts.map((p) => ({
@@ -289,7 +360,9 @@ export class UserDiscoveryService {
       id: collection.id,
       name: collection.name,
       description: collection.description,
-      coverImageUrl: collection.coverImageKey ? this.storageService.getPublicAssetUrl(collection.coverImageKey) : undefined,
+      coverImageUrl: collection.coverImageKey
+        ? this.storageService.getPublicAssetUrl(collection.coverImageKey)
+        : undefined,
       viewCount: collection.viewCount,
       likeCount: collection.likeCount,
       itemCount: collection._count.items,
@@ -298,7 +371,9 @@ export class UserDiscoveryService {
       user: {
         id: collection.user.id,
         displayName: collection.user.displayName,
-        avatarUrl: await this.common.resolveAvatarUrl(collection.user.avatarUrl),
+        avatarUrl: await this.common.resolveAvatarUrl(
+          collection.user.avatarUrl,
+        ),
         bio: collection.user.bio,
         isVerified: collection.user.isVerified,
       },
@@ -312,9 +387,9 @@ export class UserDiscoveryService {
    * yoksa ya da kazanan artık uygun değilse anında hesaplayıp snapshot'ı tazeler.
    */
   async getFeaturedBusiness() {
-    return this.cacheFeatured('featured:business', async () => {
+    return this.cacheFeatured("featured:business", async () => {
       const snap = await this.prisma.featuredSnapshot.findUnique({
-        where: { type: 'business' },
+        where: { type: "business" },
       });
       if (snap) {
         const hydrated = await this.hydrateBusinessById(snap.entityId);
@@ -322,7 +397,11 @@ export class UserDiscoveryService {
       }
       const selected = await this.selectFeaturedBusiness();
       if (!selected) return null;
-      await this.upsertFeaturedSnapshot('business', selected.id, selected.score);
+      await this.upsertFeaturedSnapshot(
+        "business",
+        selected.id,
+        selected.score,
+      );
       return this.hydrateBusinessById(selected.id);
     });
   }
@@ -332,21 +411,24 @@ export class UserDiscoveryService {
    * id + skor döner). Business tier önceliklidir; yoksa en çok ürünü olan
    * satıcılara düşer. Ağır skorlama burasıdır, cron tarafından çağrılır.
    */
-  async selectFeaturedBusiness(): Promise<{ id: string; score: number } | null> {
+  async selectFeaturedBusiness(): Promise<{
+    id: string;
+    score: number;
+  } | null> {
     const sevenDaysAgo = featuredWindowStart();
 
     // Find business users (membership.tier.type = 'business' AND companyName not null)
     const businessMemberships = await this.prisma.userMembership.findMany({
       where: {
-        tier: { type: 'business' },
-        status: 'active',
+        tier: { type: "business" },
+        status: "active",
       },
       include: {
         user: {
           include: {
             _count: {
               select: {
-                products: { where: { status: 'active' } },
+                products: { where: { status: "active" } },
               },
             },
           },
@@ -357,22 +439,19 @@ export class UserDiscoveryService {
     let businessUsers = businessMemberships
       .map((m) => m.user)
       .filter(
-        (user) =>
-          user.companyName &&
-          user.isSeller &&
-          user._count.products > 0
+        (user) => user.companyName && user.isSeller && user._count.products > 0,
       );
 
     if (businessUsers.length === 0) {
       const topSellers = await this.prisma.user.findMany({
         where: {
           isSeller: true,
-          products: { some: { status: 'active' } },
+          products: { some: { status: "active" } },
         },
         include: {
-          _count: { select: { products: { where: { status: 'active' } } } },
+          _count: { select: { products: { where: { status: "active" } } } },
         },
-        orderBy: { products: { _count: 'desc' } },
+        orderBy: { products: { _count: "desc" } },
         take: 10,
       });
       businessUsers = topSellers.filter((u) => u._count.products > 0);
@@ -385,24 +464,33 @@ export class UserDiscoveryService {
     const { weights } = FEATURED_SCORING;
     const businessScores = await Promise.all(
       businessUsers.map(async (user) => {
-        const [productStats, salesCount, recentLikes, recentViews] = await Promise.all([
-          this.prisma.product.aggregate({
-            where: { sellerId: user.id, status: 'active' },
-            _sum: { viewCount: true, likeCount: true },
-          }),
-          this.prisma.order.count({
-            where: { sellerId: user.id, status: 'completed', createdAt: { gte: sevenDaysAgo } },
-          }),
-          this.prisma.productLike.count({
-            where: {
-              product: { sellerId: user.id, status: 'active' },
-              createdAt: { gte: sevenDaysAgo },
-            },
-          }),
-          this.prisma.product.count({
-            where: { sellerId: user.id, status: 'active', updatedAt: { gte: sevenDaysAgo } },
-          }),
-        ]);
+        const [productStats, salesCount, recentLikes, recentViews] =
+          await Promise.all([
+            this.prisma.product.aggregate({
+              where: { sellerId: user.id, status: "active" },
+              _sum: { viewCount: true, likeCount: true },
+            }),
+            this.prisma.order.count({
+              where: {
+                sellerId: user.id,
+                status: "completed",
+                createdAt: { gte: sevenDaysAgo },
+              },
+            }),
+            this.prisma.productLike.count({
+              where: {
+                product: { sellerId: user.id, status: "active" },
+                createdAt: { gte: sevenDaysAgo },
+              },
+            }),
+            this.prisma.product.count({
+              where: {
+                sellerId: user.id,
+                status: "active",
+                updatedAt: { gte: sevenDaysAgo },
+              },
+            }),
+          ]);
 
         const totalViews = productStats._sum.viewCount || 0;
         const totalLikes = productStats._sum.likeCount || 0;
@@ -414,7 +502,7 @@ export class UserDiscoveryService {
           recentViews * weights.recentUpdate;
 
         return { id: user.id, score };
-      })
+      }),
     );
 
     businessScores.sort((a, b) => b.score - a.score);
@@ -433,7 +521,7 @@ export class UserDiscoveryService {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
-        _count: { select: { products: { where: { status: 'active' } } } },
+        _count: { select: { products: { where: { status: "active" } } } },
       },
     });
 
@@ -444,11 +532,15 @@ export class UserDiscoveryService {
     // Stats: tüm zamanlar view/like toplamı + son penceredeki tamamlanmış satış
     const [productStats, salesCount] = await Promise.all([
       this.prisma.product.aggregate({
-        where: { sellerId: userId, status: 'active' },
+        where: { sellerId: userId, status: "active" },
         _sum: { viewCount: true, likeCount: true },
       }),
       this.prisma.order.count({
-        where: { sellerId: userId, status: 'completed', createdAt: { gte: sevenDaysAgo } },
+        where: {
+          sellerId: userId,
+          status: "completed",
+          createdAt: { gte: sevenDaysAgo },
+        },
       }),
     ]);
     const totalViews = productStats._sum.viewCount || 0;
@@ -476,9 +568,9 @@ export class UserDiscoveryService {
     });
 
     // Calculate collection scores and get top 4
-    const collectionsWithScores = allCollections.map(collection => {
+    const collectionsWithScores = allCollections.map((collection) => {
       const salesCount = collection.items.filter(
-        item => item.product && item.product.status === 'sold'
+        (item) => item.product && item.product.status === "sold",
       ).length;
       const { weights } = FEATURED_SCORING;
       const score =
@@ -489,35 +581,45 @@ export class UserDiscoveryService {
     });
 
     collectionsWithScores.sort((a, b) => b.score - a.score);
-    const topCollections = collectionsWithScores.slice(0, 4).map(item => item.collection);
+    const topCollections = collectionsWithScores
+      .slice(0, 4)
+      .map((item) => item.collection);
 
     // Format collections with preview items (only active products)
-    const formattedCollections = await Promise.all(topCollections.map(async collection => {
-      const activeItems = await Promise.all(collection.items
-        .filter(item => item.product && item.product.status === 'active')
-        .slice(0, 3)
-        .map(async item => ({
-          id: item.id,
-          productTitle: item.product!.title,
-          productPrice: Number(item.product!.price),
-          productImage: this.common.resolveProductImageUrl(item.product!.images[0]?.cardKey),
-        })));
+    const formattedCollections = await Promise.all(
+      topCollections.map(async (collection) => {
+        const activeItems = await Promise.all(
+          collection.items
+            .filter((item) => item.product && item.product.status === "active")
+            .slice(0, 3)
+            .map(async (item) => ({
+              id: item.id,
+              productTitle: item.product!.title,
+              productPrice: Number(item.product!.price),
+              productImage: this.common.resolveProductImageUrl(
+                item.product!.images[0]?.cardKey,
+              ),
+            })),
+        );
 
-      return {
-        id: collection.id,
-        name: collection.name,
-        viewCount: collection.viewCount,
-        likeCount: collection.likeCount,
-        coverImageUrl: collection.coverImageKey ? this.storageService.getPublicAssetUrl(collection.coverImageKey) : undefined,
-        _count: collection._count,
-        items: activeItems,
-      };
-    }));
+        return {
+          id: collection.id,
+          name: collection.name,
+          viewCount: collection.viewCount,
+          likeCount: collection.likeCount,
+          coverImageUrl: collection.coverImageKey
+            ? this.storageService.getPublicAssetUrl(collection.coverImageKey)
+            : undefined,
+          _count: collection._count,
+          items: activeItems,
+        };
+      }),
+    );
 
     // Get business's featured products (top performing products)
     // Priority: featured products, then by engagement score (views + likes)
     const allProducts = await this.prisma.product.findMany({
-      where: { sellerId: userId, status: 'active' },
+      where: { sellerId: userId, status: "active" },
       include: {
         images: { take: 1 },
         _count: {
@@ -527,15 +629,15 @@ export class UserDiscoveryService {
     });
 
     // Calculate product scores and sort
-    const productsWithScores = allProducts.map(product => ({
+    const productsWithScores = allProducts.map((product) => ({
       product,
       score: (product.viewCount || 0) * 1 + (product.likeCount || 0) * 5,
     }));
 
     productsWithScores.sort((a, b) => b.score - a.score);
-    
+
     // Get top 6 products
-    const products = productsWithScores.slice(0, 6).map(item => item.product);
+    const products = productsWithScores.slice(0, 6).map((item) => item.product);
 
     // Get ratings
     const ratings = await this.prisma.rating.aggregate({
@@ -559,7 +661,7 @@ export class UserDiscoveryService {
         averageRating: ratings._avg?.score || 0,
         totalRatings: ratings._count,
       },
-      collections: formattedCollections.map(c => ({
+      collections: formattedCollections.map((c) => ({
         id: c.id,
         name: c.name,
         viewCount: c.viewCount,
@@ -568,14 +670,16 @@ export class UserDiscoveryService {
         itemCount: c._count?.items || 0,
         previewItems: c.items || [],
       })),
-      products: await Promise.all(products.map(async (p) => ({
-        id: p.id,
-        title: p.title,
-        price: Number(p.price),
-        viewCount: p.viewCount,
-        likeCount: p.likeCount,
-        image: this.common.resolveProductImageUrl(p.images[0]?.cardKey),
-      }))),
+      products: await Promise.all(
+        products.map(async (p) => ({
+          id: p.id,
+          title: p.title,
+          price: Number(p.price),
+          viewCount: p.viewCount,
+          likeCount: p.likeCount,
+          image: this.common.resolveProductImageUrl(p.images[0]?.cardKey),
+        })),
+      ),
     };
   }
 
@@ -589,24 +693,36 @@ export class UserDiscoveryService {
     try {
       const collector = await this.selectFeaturedCollector();
       if (collector) {
-        await this.upsertFeaturedSnapshot('collector', collector.id, collector.score);
+        await this.upsertFeaturedSnapshot(
+          "collector",
+          collector.id,
+          collector.score,
+        );
       }
     } catch (e: any) {
-      this.logger.warn(`refreshFeaturedSnapshots(collector) failed: ${e.message}`);
+      this.logger.warn(
+        `refreshFeaturedSnapshots(collector) failed: ${e.message}`,
+      );
     }
 
     try {
       const business = await this.selectFeaturedBusiness();
       if (business) {
-        await this.upsertFeaturedSnapshot('business', business.id, business.score);
+        await this.upsertFeaturedSnapshot(
+          "business",
+          business.id,
+          business.score,
+        );
       }
     } catch (e: any) {
-      this.logger.warn(`refreshFeaturedSnapshots(business) failed: ${e.message}`);
+      this.logger.warn(
+        `refreshFeaturedSnapshots(business) failed: ${e.message}`,
+      );
     }
 
     if (this.cache) {
-      await this.cache.del('featured:collector').catch(() => {});
-      await this.cache.del('featured:business').catch(() => {});
+      await this.cache.del("featured:collector").catch(() => {});
+      await this.cache.del("featured:business").catch(() => {});
     }
   }
 
@@ -618,13 +734,13 @@ export class UserDiscoveryService {
     const sellers = await this.prisma.user.findMany({
       where: {
         isSeller: true,
-        products: { some: { status: 'active' } },
+        products: { some: { status: "active" } },
       },
       take: limit * 2, // Get more to filter
       include: {
         _count: {
           select: {
-            products: { where: { status: 'active' } },
+            products: { where: { status: "active" } },
           },
         },
       },
@@ -635,18 +751,23 @@ export class UserDiscoveryService {
       sellers.map(async (seller) => {
         const [salesCount, ratings] = await Promise.all([
           this.prisma.order.count({
-            where: { sellerId: seller.id, status: 'completed' },
+            where: { sellerId: seller.id, status: "completed" },
           }),
           this.prisma.rating.aggregate({
-            where: { receiverId: seller.id, status: 'approved' },
+            where: { receiverId: seller.id, status: "approved" },
             _avg: { score: true },
             _count: true,
           }),
         ]);
 
-        const score = salesCount * 10 + (ratings._avg?.score || 0) * 20 + seller._count.products * 2;
+        const score =
+          salesCount * 10 +
+          (ratings._avg?.score || 0) * 20 +
+          seller._count.products * 2;
 
-        const resolvedAvatar = await this.common.resolveAvatarUrl(seller.avatarUrl);
+        const resolvedAvatar = await this.common.resolveAvatarUrl(
+          seller.avatarUrl,
+        );
 
         return {
           id: seller.id,
@@ -660,7 +781,7 @@ export class UserDiscoveryService {
           totalSales: salesCount,
           score,
         };
-      })
+      }),
     );
 
     // Sort by score and return top sellers
@@ -673,7 +794,7 @@ export class UserDiscoveryService {
    * satıcıları döndürür — profili herkese açık olmayanları sızdırmaz.
    */
   async searchSellers(query: string, limit: number = 8) {
-    const q = (query || '').trim();
+    const q = (query || "").trim();
     if (q.length < 2) {
       return [];
     }
@@ -683,17 +804,17 @@ export class UserDiscoveryService {
         isSeller: true,
         isBanned: false,
         deletedAt: null,
-        products: { some: { status: 'active' } },
-        displayName: { contains: q, mode: 'insensitive' },
+        products: { some: { status: "active" } },
+        displayName: { contains: q, mode: "insensitive" },
       },
       take: Math.min(20, Math.max(1, Number(limit) || 8)),
-      orderBy: { products: { _count: 'desc' } },
+      orderBy: { products: { _count: "desc" } },
       select: {
         id: true,
         displayName: true,
         avatarUrl: true,
         isVerified: true,
-        _count: { select: { products: { where: { status: 'active' } } } },
+        _count: { select: { products: { where: { status: "active" } } } },
       },
     });
 

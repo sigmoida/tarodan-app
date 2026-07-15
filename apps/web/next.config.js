@@ -1,5 +1,9 @@
 const { withSentryConfig } = require('@sentry/nextjs');
+const createNextIntlPlugin = require('next-intl/plugin');
 const path = require('path');
+
+// next-intl plugin — points at the request config (locale + messages per request).
+const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 /**
  * Cache headers (browser / CDN) – sadece /public altındaki statik dosyalar.
@@ -12,8 +16,14 @@ function getCacheHeaders() {
   const oneDay = 'public, max-age=86400, stale-while-revalidate=3600';
   const oneWeek = 'public, max-age=604800, stale-while-revalidate=86400';
   const noindex = 'noindex, nofollow, noarchive, nosnippet, noimageindex';
+  // Pre-launch guard (#93): the site-wide X-Robots-Tag noindex is part of the
+  // same single switch as robots.ts + metadata.robots. Set
+  // NEXT_PUBLIC_ALLOW_INDEXING=true to drop it (and open indexing) everywhere.
+  const allowIndexing = process.env.NEXT_PUBLIC_ALLOW_INDEXING === 'true';
   return [
-    { source: '/:path*', headers: [{ key: 'X-Robots-Tag', value: noindex }] },
+    ...(allowIndexing
+      ? []
+      : [{ source: '/:path*', headers: [{ key: 'X-Robots-Tag', value: noindex }] }]),
     { source: '/favicon.ico', headers: [{ key: 'Cache-Control', value: oneDay }] },
     { source: '/tarodanfavicon.png', headers: [{ key: 'Cache-Control', value: oneWeek }] },
     { source: '/logo.svg', headers: [{ key: 'Cache-Control', value: oneWeek }] },
@@ -22,6 +32,26 @@ function getCacheHeaders() {
     { source: '/photos/:path*', headers: [{ key: 'Cache-Control', value: oneWeek }] },
   ];
 }
+
+/**
+ * App-level security headers, applied to every route so they travel with the app
+ * regardless of the reverse proxy. NOTE: no Content-Security-Policy here on
+ * purpose — a real CSP for this app (Google OAuth, Sentry, S3 images, inline
+ * styles) needs nonces + a report-only rollout and is tracked separately.
+ */
+const SECURITY_HEADERS = [
+  { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  {
+    key: 'Strict-Transport-Security',
+    value: 'max-age=63072000; includeSubDomains; preload',
+  },
+  {
+    key: 'Permissions-Policy',
+    value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()',
+  },
+];
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -58,7 +88,7 @@ const nextConfig = {
     missingSuspenseWithCSRBailout: false,
   },
   async headers() {
-    return getCacheHeaders();
+    return [{ source: '/(.*)', headers: SECURITY_HEADERS }, ...getCacheHeaders()];
   },
   images: {
     remotePatterns: [
@@ -143,21 +173,41 @@ const nextConfig = {
   },
   async redirects() {
     return [
+      // Retired client-only "brands" showcase (#94): the live catalog surface is
+      // /manufacturers (RSC + generateMetadata). Redirect the old brand routes —
+      // and the /models chain that used to point at /brands — to it.
+      {
+        source: '/brands',
+        destination: '/manufacturers',
+        permanent: true,
+      },
+      {
+        source: '/brands/:slug',
+        destination: '/manufacturers/:slug',
+        permanent: true,
+      },
+      // Retired client-only category page (#94) → the live /listings grid, which
+      // resolves a category slug via its `category` param (params.ts).
+      {
+        source: '/category/:slug',
+        destination: '/listings?category=:slug',
+        permanent: true,
+      },
       {
         source: '/models',
-        destination: '/brands',
+        destination: '/manufacturers',
         permanent: true,
       },
       // Model detay sayfaları (/models/:slug) emekliye ayrıldı; öksüz kalmasın diye
-      // tüm alt yolları da /brands'e yönlendir.
+      // tüm alt yolları da /manufacturers'a yönlendir.
       {
         source: '/models/:path*',
-        destination: '/brands',
+        destination: '/manufacturers',
         permanent: true,
       },
       {
         source: '/modeller',
-        destination: '/brands',
+        destination: '/manufacturers',
         permanent: true,
       },
       // /guvenli-takas → /secure-swap (route slug İngilizce'ye çevrildi).
@@ -198,7 +248,9 @@ const sentryWebpackPluginOptions = {
 // Sentry'yi YALNIZ DSN *ve* auth token birlikte varken devreye al. Token yoksa
 // source-map upload zaten yapılamaz → gereksiz yere prod build'ini riske atma
 // (deploy bu yüzden "error: project not found" ile patlıyordu).
+const configWithIntl = withNextIntl(nextConfig);
+
 module.exports =
   process.env.NEXT_PUBLIC_SENTRY_DSN && process.env.SENTRY_AUTH_TOKEN
-    ? withSentryConfig(nextConfig, sentryWebpackPluginOptions)
-    : nextConfig;
+    ? withSentryConfig(configWithIntl, sentryWebpackPluginOptions)
+    : configWithIntl;

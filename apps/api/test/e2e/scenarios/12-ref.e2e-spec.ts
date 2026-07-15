@@ -995,63 +995,58 @@ describe('12 — İade & İptal (REF)', () => {
     });
   });
 
-  // ══════════════════════════ POST /payments/refund (legacy) ══════════════════════════
+  // ══════════════════════════ POST /payments/refund KALDIRILDI (güvenlik #61) ══════════════════════════
+  // Buyer-facing doğrudan iade ucu, order.status kapısı OLMADAN processRefund çağırıyordu →
+  // alıcı teslim SONRASI tam iade alıp malı da tutabiliyordu (RefundService state-machine
+  // bypass'ı: cooling-off / iade penceresi / iade-kargosu-geri-teslim kontrolleri atlanıyordu).
+  // Uç tamamen kaldırıldı; alıcı iadeleri YALNIZCA RefundController (POST /orders/:id/
+  // refund-requests) state machine'inden geçer. processRefund paylaşılan executor olarak KALIR
+  // (admin/cron/sürat/RefundService çağırır); yalnız buyer-facing doğrudan uç gitti.
 
-  describe('POST /api/payments/refund (legacy iade)', () => {
+  describe('POST /api/payments/refund kaldırıldı → RefundController', () => {
     scenario('REF-024', async () => {
-      // Yetki + auth + UUID kuralları + geçerli iade.
-      const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true });
+      // Uç kaldırıldı → route yok → herkes için 404. JwtAuthGuard route'a bağlı olduğundan
+      // artık çalışmaz: auth'suz istek bile 401 değil 404 alır. Meşru kargo-öncesi iade ise
+      // RefundController (refund-requests) üzerinden çalışmaya devam eder (REF-001 ile aynı yol).
+      const { buyer, seller, orderId } = await paidOrder({ price: 200 });
       const stranger = await createUser(ctx.module);
-      const product = await createProduct({ sellerId: seller.id, categoryId: baseline.categoryId, price: 200, quantity: 1 });
-      const addr = await createAddress({ userId: buyer.id });
-      await createAddress({ userId: seller.id });
-      const { orderId } = await buyAndPay(ctx, buyer, product.id, addr.id);
       const prisma = getPrisma();
 
-      // (1) satıcı → 403, (2) yabancı → 403
-      await request(server()).post('/api/payments/refund').set(authHeader(seller)).send({ orderId }).expect(403);
-      await request(server()).post('/api/payments/refund').set(authHeader(stranger)).send({ orderId }).expect(403);
-      // (3) auth'suz → 401
-      await request(server()).post('/api/payments/refund').send({ orderId }).expect(401);
-      // (4) olmayan UUID → 404
-      await request(server())
-        .post('/api/payments/refund')
-        .set(authHeader(buyer))
-        .send({ orderId: 'a0000000-0000-4000-8000-000000000000' })
-        .expect(404);
-      // (5) bozuk UUID → 400
-      await request(server()).post('/api/payments/refund').set(authHeader(buyer)).send({ orderId: 'not-a-uuid' }).expect(400);
-      // (6) alıcı geçerli → 201, success + payment refunded + order cancelled + stok geri
-      const res = await request(server()).post('/api/payments/refund').set(authHeader(buyer)).send({ orderId }).expect(201);
-      expect(res.body.success).toBe(true);
-      expect(res.body.refundAmount).toBeGreaterThan(0);
+      for (const who of [buyer, seller, stranger]) {
+        await request(server()).post('/api/payments/refund').set(authHeader(who)).send({ orderId }).expect(404);
+      }
+      await request(server()).post('/api/payments/refund').send({ orderId }).expect(404); // auth'suz da 404
+
+      // Uç 404 olsa da alıcı meşru yoldan kargo-öncesi iadeyi yapabilir → anlık iade.
+      const rr = await createRefund(orderId, buyer, { reason: 'changed_mind' }).expect(201);
+      expect(rr.body.status).toBe(RefundRequestStatus.refunded);
       const payment = await prisma.payment.findFirst({ where: { orderId } });
       expect(payment!.status).toBe(PaymentStatus.refunded);
       const order = await prisma.order.findUnique({ where: { id: orderId } });
       expect(order!.status).toBe(OrderStatus.cancelled);
-      const refreshedProduct = await prisma.product.findUnique({ where: { id: product.id } });
-      expect(refreshedProduct!.quantity).toBe(1);
       expect(ctx.paytr.refundCalls).toHaveLength(1);
     });
 
     scenario('REF-085', async () => {
-      // İade tutarı üst sınırı (O12) aşımı reddi → 400.
+      // "Client-supplied refundAmount'a güvenme": buyer DTO'sunda (CreateRefundRequestDto)
+      // tutar alanı YOK. Enjekte edilen refundAmount whitelist ValidationPipe ile strip edilir
+      // → iade SUNUCU'nun hesapladığı tam tutarla (sipariş toplamı) işlenir, alıcı şişiremez.
       const { buyer, orderId } = await paidOrder({ price: 200 });
       const prisma = getPrisma();
-      const payment = await prisma.payment.findFirst({ where: { orderId } });
-      const tooMuch = Number(payment!.amount) + 500;
+      const order = await prisma.order.findUnique({ where: { id: orderId } });
 
-      const res = await request(server())
-        .post('/api/payments/refund')
-        .set(authHeader(buyer))
-        .send({ orderId, refundAmount: tooMuch })
-        .expect(400);
-      expect(res.body.message).toMatch(/üst sınırı.*aşıyor/i);
+      const rr = await createRefund(orderId, buyer, { reason: 'changed_mind', refundAmount: 999999 }).expect(201);
+      expect(rr.body.status).toBe(RefundRequestStatus.refunded);
+      // Enjekte edilen 999999 DEĞİL, sunucunun hesapladığı sipariş toplamı iade edildi.
+      expect(Number(rr.body.amount)).toBeCloseTo(Number(order!.totalAmount), 2);
+      expect(ctx.paytr.refundCalls).toHaveLength(1);
+      expect(ctx.paytr.refundCalls[0].refundAmount).toBeCloseTo(Number(order!.totalAmount), 2);
     });
 
     scenario('REF-093', async () => {
-      // Payout completed iken iade reddi (çift-ödeme koruması) → 400.
+      // Payout completed iken iade reddi (çift-ödeme koruması). Guard artık RefundController
+      // yolundan tetiklenir: createInstantRefund → processRefund guard'ı fırlatır →
+      // createInstantRefund RefundRequest'i geri alıp 400 döndürür.
       const { buyer, seller, orderId } = await paidOrder({ price: 200 });
       const prisma = getPrisma();
       const hold = await prisma.paymentHold.findFirst({ where: { orderId } });
@@ -1072,16 +1067,17 @@ describe('12 — İade & İptal (REF)', () => {
         },
       });
 
-      const res = await request(server())
-        .post('/api/payments/refund')
-        .set(authHeader(buyer))
-        .send({ orderId })
-        .expect(400);
-      expect(res.body.message).toMatch(/Transfer zaten başlatılmış, iade yapılamaz/i);
+      const res = await createRefund(orderId, buyer, { reason: 'changed_mind' }).expect(400);
+      expect(JSON.stringify(res.body)).toMatch(/Transfer zaten başlatılmış, iade yapılamaz/i);
+      // Guard fırladı → oluşturulan RefundRequest geri alındı (aktif talep kalmadı), PayTR yok.
+      const rrs = await prisma.refundRequest.findMany({ where: { orderId } });
+      expect(rrs).toHaveLength(0);
+      expect(ctx.paytr.refundCalls).toHaveLength(0);
     });
 
     scenario('REF-122', async () => {
-      // Anlık iade + payout yarışı: iade ÖNCE pending/retry_pending payout'ları failed(order_refunded) yapar.
+      // Anlık iade + payout yarışı: iade ÖNCE pending/retry_pending payout'ları
+      // failed(order_refunded) yapar. Guard yine RefundController yolundan (createInstantRefund).
       const { buyer, seller, orderId } = await paidOrder({ price: 200 });
       const prisma = getPrisma();
       const hold = await prisma.paymentHold.findFirst({ where: { orderId } });
@@ -1100,7 +1096,7 @@ describe('12 — İade & İptal (REF)', () => {
         },
       });
 
-      await request(server()).post('/api/payments/refund').set(authHeader(buyer)).send({ orderId }).expect(201);
+      await createRefund(orderId, buyer, { reason: 'changed_mind' }).expect(201);
 
       const afterPayout = await prisma.payoutTransfer.findUnique({ where: { id: payout.id } });
       expect(afterPayout!.status).toBe('failed');
@@ -1108,20 +1104,44 @@ describe('12 — İade & İptal (REF)', () => {
     });
 
     scenario('REF-143', async () => {
-      // Satıcı alıcı adına POST /payments/refund tetikleyemez → 403.
+      // Satıcı alıcı adına iade tetikleyemez → 403. Doğrudan uç kaldırıldığından satıcı için
+      // tek yol RefundController; o da buyerId kontrolüyle reddeder (aynı mesaj).
       const { seller, orderId } = await paidOrder({ price: 100 });
       const res = await request(server())
-        .post('/api/payments/refund')
+        .post(`/api/orders/${orderId}/refund-requests`)
         .set(authHeader(seller))
-        .send({ orderId })
+        .send({ reason: 'changed_mind' })
         .expect(403);
-      expect(res.body.message).toMatch(/Sadece alıcı iade talebi oluşturabilir/i);
+      expect(JSON.stringify(res.body)).toMatch(/Sadece alıcı iade talebi oluşturabilir/i);
     });
 
-    // REF-144: POST /payments/refund rate limit (5/dk) → 429. E2E'de ThrottlerModule
-    // `skipIf: NODE_ENV==='test'` ile TAMAMEN devre dışı (app.module.ts:116) → 429 hiç
-    // üretilmez. Rate-limit fonksiyonel testlerde kapsanmaz; env değişmeden test edilemez.
-    scenario.skip('REF-144', 'ThrottlerModule test modunda skipIf ile devre dışı (app.module.ts:116) → 429 üretilmiyor.');
+    // REF-144: POST /payments/refund rate-limit testi ARTIK KONUSUZ — uç #61 ile kaldırıldı.
+    scenario.skip('REF-144', 'POST /payments/refund ucu #61 ile kaldırıldı → rate-limit senaryosu konusuz.');
+
+    scenario('REF-145', async () => {
+      // [P0] REGRESYON (#61): Alıcı TESLİM EDİLMİŞ siparişi self-refund edip malı TUTAMAZ.
+      // (a) Kaldırılan doğrudan uç → 404, PayTR iadesi yok. (b) Meşru yol (refund-requests)
+      // teslim sonrası ANINDA para iadesi YAPMAZ; iade kargosu açar (mal geri gelmeli).
+      // Ne PayTR iadesi ne hold iptali olur; ödeme completed kalır.
+      const { buyer, orderId } = await paidOrder({ price: 200 });
+      const prisma = getPrisma();
+      await markDelivered(orderId);
+
+      // (a) Kaldırılan uç → 404 (sömürü yolu yok), PayTR iadesi tetiklenmez.
+      await request(server()).post('/api/payments/refund').set(authHeader(buyer)).send({ orderId }).expect(404);
+      expect(ctx.paytr.refundCalls).toHaveLength(0);
+
+      // (b) Meşru yol: teslim sonrası → return_shipment_open (mal geri istenir), iade DEĞİL.
+      const rr = await createRefund(orderId, buyer, { reason: 'changed_mind' }).expect(201);
+      expect(rr.body.status).toBe(RefundRequestStatus.return_shipment_open);
+
+      // Hiç para iadesi olmadı: PayTR çağrısı yok, ödeme hâlâ completed, hold iptal edilmedi.
+      expect(ctx.paytr.refundCalls).toHaveLength(0);
+      const payment = await prisma.payment.findFirst({ where: { orderId } });
+      expect(payment!.status).toBe(PaymentStatus.completed);
+      const hold = await prisma.paymentHold.findFirst({ where: { orderId } });
+      expect(hold!.status).not.toBe(PaymentHoldStatus.cancelled);
+    });
   });
 
   // ══════════════════════════ Cron idempotency / PayTR retry ══════════════════════════

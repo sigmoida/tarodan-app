@@ -1,14 +1,14 @@
-import axios from 'axios';
+import axios from "axios";
 
 /**
- * Client API instance. Every call goes to the same-origin BFF proxy
- * (`/api/*` → src/app/api/[...path]/route.ts), which attaches the Bearer
+ * Client API instance. Every call goes to the same-origin gateway proxy
+ * (`/gateway/*` → src/app/gateway/[...path]/route.ts), which attaches the Bearer
  * token server-side and refreshes it on 401. The browser never holds or sees
  * the API tokens — auth lives in src/lib/server/session.ts.
  */
 export const api = axios.create({
-  baseURL: '/api',
-  headers: { 'Content-Type': 'application/json' },
+  baseURL: "/gateway",
+  headers: { "Content-Type": "application/json" },
 });
 
 // On 401, retry the request up to TWICE before giving up. A transient 401 happens
@@ -19,7 +19,9 @@ export const api = axios.create({
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const config = error.config as (typeof error.config & { _retryCount?: number }) | undefined;
+    const config = error.config as
+      | (typeof error.config & { _retryCount?: number })
+      | undefined;
     const isAuthError = error.response?.status === 401;
 
     if (isAuthError && config) {
@@ -30,13 +32,17 @@ api.interceptors.response.use(
         }
         return api(config);
       }
-      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-        window.location.href = '/login?expired=session';
+      if (
+        typeof window !== "undefined" &&
+        window.location.pathname !== "/login"
+      ) {
+        window.location.href = "/login?expired=session";
       }
     }
 
     if (!error.response) {
-      error.message = 'Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.';
+      error.message =
+        "Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.";
     }
     return Promise.reject(error);
   },

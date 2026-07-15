@@ -1,10 +1,21 @@
-'use client';
+"use client";
 
-import { FormModal, FormInput, FormTextarea, FormCheckbox, FormImageUpload, useZodForm } from '@tarodan/ui/form';
-import { adminApi } from '@/lib/api';
-import { useAdminMutation } from '@/hooks/useAdminMutation';
-import { manufacturerSchema, type ManufacturerFormValues } from '../_lib/schema';
-import type { Manufacturer } from '../_lib/types';
+import {
+  FormModal,
+  FormInput,
+  FormTextarea,
+  FormCheckbox,
+  FormImageUpload,
+  useZodForm,
+} from "@tarodan/ui/form";
+import { useTranslations } from "next-intl";
+import { adminApi } from "@/lib/api";
+import { useAdminMutation } from "@/hooks/useAdminMutation";
+import {
+  manufacturerSchema,
+  type ManufacturerFormValues,
+} from "../_lib/schema";
+import type { Manufacturer } from "../_lib/types";
 
 export function ManufacturerFormModal({
   open,
@@ -15,25 +26,29 @@ export function ManufacturerFormModal({
   onClose: () => void;
   manufacturer?: Manufacturer;
 }) {
+  const t = useTranslations();
   const isEdit = Boolean(manufacturer);
-  const form = useZodForm(manufacturerSchema, {
+  const form = useZodForm(manufacturerSchema(t), {
     defaultValues: manufacturer
       ? {
           name: manufacturer.name,
-          logo: manufacturer.logo ?? '',
-          website: manufacturer.website ?? '',
-          country: manufacturer.country ?? '',
-          foundedYear: manufacturer.foundedYear != null ? String(manufacturer.foundedYear) : '',
-          description: manufacturer.description ?? '',
+          logo: manufacturer.logo ?? "",
+          website: manufacturer.website ?? "",
+          country: manufacturer.country ?? "",
+          foundedYear:
+            manufacturer.foundedYear != null
+              ? String(manufacturer.foundedYear)
+              : "",
+          description: manufacturer.description ?? "",
           isActive: manufacturer.isActive,
         }
       : {
-          name: '',
-          logo: '',
-          website: '',
-          country: '',
-          foundedYear: '',
-          description: '',
+          name: "",
+          logo: "",
+          website: "",
+          country: "",
+          foundedYear: "",
+          description: "",
           isActive: true,
         },
   });
@@ -54,8 +69,10 @@ export function ManufacturerFormModal({
         : adminApi.createManufacturer(payload);
     },
     {
-      invalidates: ['manufacturers'],
-      successMessage: isEdit ? 'Üretici güncellendi' : 'Üretici oluşturuldu',
+      invalidates: ["manufacturers"],
+      successMessage: isEdit
+        ? t("admin.catalog.manufacturers.updated")
+        : t("admin.catalog.manufacturers.created"),
       onSuccess: onClose,
     },
   );
@@ -64,29 +81,58 @@ export function ManufacturerFormModal({
     <FormModal
       open={open}
       onClose={onClose}
-      title={isEdit ? 'Üreticiyi Düzenle' : 'Yeni Üretici Ekle'}
+      title={
+        isEdit
+          ? t("admin.catalog.manufacturers.editTitle")
+          : t("admin.catalog.manufacturers.new")
+      }
       form={form}
       onSubmit={(v) => save.mutate(v)}
       isSubmitting={save.isPending}
-      submitLabel={isEdit ? 'Güncelle' : 'Ekle'}
+      submitLabel={isEdit ? t("common.update") : t("common.add")}
     >
-      <FormInput name="name" label="Üretici Adı" placeholder="Örn: Hot Wheels" />
+      <FormInput
+        name="name"
+        label={t("admin.catalog.manufacturers.nameLabel")}
+        placeholder={t("admin.catalog.manufacturers.namePlaceholder")}
+      />
       <FormImageUpload
         name="logo"
-        label="Logo"
+        label={t("admin.catalog.common.logo")}
         upload={(file) => adminApi.uploadMedia(file).then((r) => r.data.url)}
       />
-      <FormInput name="website" label="Website" type="url" placeholder="https://www.hotwheels.com" />
+      <FormInput
+        name="website"
+        label={t("admin.catalog.common.website")}
+        type="url"
+        placeholder="https://www.hotwheels.com"
+      />
       <div className="flex gap-4">
         <div className="flex-1">
-          <FormInput name="country" label="Ülke" placeholder="Örn: ABD" />
+          <FormInput
+            name="country"
+            label={t("admin.catalog.common.country")}
+            placeholder={t("admin.catalog.manufacturers.countryPlaceholder")}
+          />
         </div>
         <div className="flex-1">
-          <FormInput name="foundedYear" label="Kuruluş Yılı" type="number" placeholder="Örn: 1968" />
+          <FormInput
+            name="foundedYear"
+            label={t("admin.catalog.common.foundedYear")}
+            type="number"
+            placeholder={t(
+              "admin.catalog.manufacturers.foundedYearPlaceholder",
+            )}
+          />
         </div>
       </div>
-      <FormTextarea name="description" label="Açıklama" rows={2} placeholder="Üretici hakkında kısa açıklama" />
-      <FormCheckbox name="isActive" label="Aktif" />
+      <FormTextarea
+        name="description"
+        label={t("common.description")}
+        rows={2}
+        placeholder={t("admin.catalog.manufacturers.descriptionPlaceholder")}
+      />
+      <FormCheckbox name="isActive" label={t("common.active")} />
     </FormModal>
   );
 }

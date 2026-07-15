@@ -1,14 +1,14 @@
 /** @format */
 
-import type { ReactNode } from 'react';
-import Link from 'next/link';
-import { ChevronRightIcon } from '@heroicons/react/24/outline';
-import { PageShell } from './PageShell';
-import { PageHeader } from './PageHeader';
+import type { ReactNode } from "react";
+import { Link } from "@/i18n/navigation";
+import { ChevronRightIcon } from "@heroicons/react/24/outline";
+import { PageShell } from "./PageShell";
+import { PageHeader } from "./PageHeader";
 
 export interface DocBreadcrumbItem {
-	label: ReactNode;
-	href?: string;
+  label: ReactNode;
+  href?: string;
 }
 
 /**
@@ -22,32 +22,28 @@ export interface DocBreadcrumbItem {
  * (Input's `useState`, …) into the server graph. Works in Client pages too.
  */
 export function DocPage({
-	title,
-	description,
-	trail,
-	actions,
-	children,
+  title,
+  description,
+  trail,
+  actions,
+  children,
 }: {
-	title: string;
-	description?: ReactNode;
-	/** Breadcrumb items after "Ana Sayfa" (defaults to just the current title). */
-	trail?: DocBreadcrumbItem[];
-	actions?: ReactNode;
-	children: ReactNode;
+  title: string;
+  description?: ReactNode;
+  /** Breadcrumb items after "Ana Sayfa" (defaults to just the current title). */
+  trail?: DocBreadcrumbItem[];
+  actions?: ReactNode;
+  children: ReactNode;
 }) {
-	const items: DocBreadcrumbItem[] = [
-		{ label: 'Ana Sayfa', href: '/' },
-		...(trail ?? [{ label: title }]),
-	];
+  const items: DocBreadcrumbItem[] = [
+    { label: "Ana Sayfa", href: "/" },
+    ...(trail ?? [{ label: title }]),
+  ];
 
-	return (
-		<PageShell>
-			<PageHeader
-				title={title}
-				description={description}
-				actions={actions}
-			/>
-			{children}
-		</PageShell>
-	);
+  return (
+    <PageShell>
+      <PageHeader title={title} description={description} actions={actions} />
+      {children}
+    </PageShell>
+  );
 }

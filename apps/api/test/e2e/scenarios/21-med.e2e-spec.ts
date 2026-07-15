@@ -620,10 +620,10 @@ describe("21 — Medya & Dosya Yükleme (MED)", () => {
     });
 
     scenario("MED-047", async () => {
-      // 11MB jpeg ürün görseli → 400. sharp KURULU → `!sharp` dalı atlanır; tip geçer, sonra
-      // BOYUT kontrolü (service:301) 11MB > 10MB → 400 "Dosya boyutu çok büyük". Boyut/tip
-      // kontrolleri sharp(...).toBuffer() ÇAĞRISINDAN önce (service:298,301 vs 313) → tampon
-      // sharp'a hiç girmez. Yalnız status (400) assert edilir.
+      // 11MB jpeg ürün görseli → 413. multer'ın fileSize cap'i (#71, UPLOAD_MULTER_OPTIONS)
+      // gövde tamamen buffer'lanmadan stream'i keser (memory-DoS koruması), bu yüzden istek
+      // app-seviye boyut kontrolüne (service:301, 400 "Dosya boyutu çok büyük") HİÇ ulaşmadan
+      // 413 Payload Too Large döner. Genel upload'daki 10MB+1 senaryosuyla tutarlıdır.
       const user = await createUser(ctx.module, { email: "prod-big@test.com" });
       await request(server())
         .post("/api/media/upload/product")
@@ -632,7 +632,7 @@ describe("21 — Medya & Dosya Yükleme (MED)", () => {
           filename: "big.jpg",
           contentType: "image/jpeg",
         })
-        .expect(400);
+        .expect(413);
     });
 
     // MED-102 — "Sharp yokken ürün varyantı → 400 'Image processing (sharp) is not available'"
