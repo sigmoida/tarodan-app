@@ -70,14 +70,28 @@ export function paginateClient<T>(
  *     { searchFields: ['name', 'slug', 'description'] },
  *   )}
  */
+/**
+ * #101: full-load kaynakların, detail→list dönüşünde (refetchOnMount) tüm tabloyu
+ * yeniden indirmesini kesen staleTime (5dk). useAdminResource clientListFetcher'ı
+ * `isClientList` marker'ından tanıyıp bunu otomatik uygular.
+ */
+export const CLIENT_LIST_STALE_MS = 5 * 60 * 1000;
+
+/** clientListFetcher ile üretilen fetcher — useAdminResource otomatik staleTime için tanır. */
+export type ClientListFetcher = ((params: Record<string, any>) => Promise<AxiosResponse<any>>) & {
+  isClientList?: boolean;
+};
+
 export function clientListFetcher<T>(
   load: () => Promise<AxiosResponse<any>>,
   extract: (raw: any) => T[],
   opts?: PaginateClientOptions<T>,
 ) {
-  return async (params: Record<string, any>): Promise<AxiosResponse<Paginated<T>>> => {
+  const fetcher: ClientListFetcher = async (params: Record<string, any>): Promise<AxiosResponse<Paginated<T>>> => {
     const res = await load();
     const page = paginateClient<T>(extract(res.data), params, opts);
     return { ...res, data: page };
   };
+  fetcher.isClientList = true;
+  return fetcher;
 }

@@ -249,9 +249,22 @@ export class AdminCatalogController {
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get all car models' })
   @ApiQuery({ name: 'brandId', required: false })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'search', required: false })
   @ApiResponse({ status: HttpStatus.OK, description: 'List of car models' })
-  async getCarModels(@Query('brandId') brandId?: string) {
-    return this.adminService.getCarModels(brandId);
+  async getCarModels(
+    @Query('brandId') brandId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.adminService.getCarModels({
+      brandId,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      search,
+    });
   }
 
   @Post('car-models')

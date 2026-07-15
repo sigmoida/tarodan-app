@@ -553,14 +553,35 @@ export class AdminCatalogService {
 
   // ==================== CAR MODEL MANAGEMENT ====================
 
-  async getCarModels(brandId?: string) {
-    const where = brandId ? { brandId } : {};
-    const models = await this.prisma.carModel.findMany({
-      where,
-      orderBy: [{ brand: { name: 'asc' } }, { name: 'asc' }],
-      include: { brand: { select: { id: true, name: true, slug: true } } },
-    });
-    return { data: models };
+  // #101: opsiyonel server-pagination. page/limit VERİLİRSE (admin liste sayfası)
+  // sayfalar; VERİLMEZSE (product/car-model filtre dropdown'ları, BrandModelsPanel)
+  // tüm listeyi döndürür — mevcut tüketiciler kırılmaz.
+  async getCarModels(params?: { brandId?: string; page?: number; limit?: number; search?: string }) {
+    const { brandId, page, limit, search } = params ?? {};
+    const where: Record<string, unknown> = {};
+    if (brandId) where.brandId = brandId;
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { slug: { contains: search, mode: 'insensitive' } },
+        { brand: { name: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
+    const orderBy = [{ brand: { name: 'asc' as const } }, { name: 'asc' as const }];
+    const include = { brand: { select: { id: true, name: true, slug: true } } };
+
+    if (page === undefined && limit === undefined) {
+      const models = await this.prisma.carModel.findMany({ where, orderBy, include });
+      return { data: models };
+    }
+
+    const p = page ?? 1;
+    const l = limit ?? 20;
+    const [total, models] = await Promise.all([
+      this.prisma.carModel.count({ where }),
+      this.prisma.carModel.findMany({ where, orderBy, include, skip: (p - 1) * l, take: l }),
+    ]);
+    return { data: models, meta: { total, page: p, limit: l, totalPages: Math.ceil(total / l) } };
   }
 
   async createCarModel(

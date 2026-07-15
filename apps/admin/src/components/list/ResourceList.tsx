@@ -17,6 +17,8 @@ export interface ResourceListProps<T> {
   initialFilters?: Record<string, string>;
   errorMessage?: string;
   debounceMs?: number;
+  /** #101: full-load (client-list) kaynakları için staleTime (ms) — mount'ta tekrar indirmeyi keser. */
+  staleTime?: number;
   selectable?: boolean;
   children: ReactNode;
 }
@@ -51,12 +53,14 @@ function ResourceListInner<T>({
   initialFilters,
   errorMessage,
   debounceMs,
+  staleTime,
   selectable = false,
   children,
 }: ResourceListProps<T>) {
   const data = useAdminResource<T>({
     queryKey: resource,
     fetcher,
+    staleTime,
     limit,
     syncUrl,
     initialFilters,
