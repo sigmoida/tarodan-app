@@ -8,3 +8,4 @@ export * from './i18n.controller';
 export * from './locale.util';
 export * from './locale.decorator';
 export * from './locale.interceptor';
+export * from './localized-message';

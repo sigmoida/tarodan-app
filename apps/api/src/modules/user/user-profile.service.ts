@@ -200,6 +200,7 @@ export class UserProfileService {
       isCorporateSeller?: boolean;
       avatarUrl?: string;
       showTrustScore?: boolean;
+      preferredLanguage?: string;
     },
   ) {
     // Profil serbest metinlerini AI moderasyonundan geçir (uygunsuz → engelle)
@@ -256,6 +257,7 @@ export class UserProfileService {
     if (data.phone !== undefined) updateData.phone = data.phone;
     if (data.bio !== undefined) updateData.bio = data.bio;
     if (data.showTrustScore !== undefined) updateData.showTrustScore = data.showTrustScore;
+    if (data.preferredLanguage !== undefined) updateData.preferredLanguage = data.preferredLanguage;
     if (data.birthDate !== undefined) {
       updateData.birthDate = data.birthDate ? new Date(data.birthDate) : null;
     }

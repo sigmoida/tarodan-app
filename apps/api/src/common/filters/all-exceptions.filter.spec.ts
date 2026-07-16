@@ -1,26 +1,30 @@
 import {
   BadRequestException,
   ForbiddenException,
+  NotFoundException,
   ArgumentsHost,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { AllExceptionsFilter } from "./all-exceptions.filter";
+import { I18nService } from "../../modules/i18n/i18n.service";
+import { i18nMessage } from "../../modules/i18n/localized-message";
 
 /**
- * Deterministic proof for issue #70: the filter preserves intentional
- * HttpExceptions, maps known Prisma errors to clean 4xx, and sanitizes any
- * unexpected error so no internal detail reaches the client.
+ * Deterministic proof for issue #70 (+ #224 localization): the filter
+ * preserves intentional HttpExceptions, renders catalog-key exceptions in the
+ * request's locale, maps known Prisma errors to clean localized 4xx, and
+ * sanitizes any unexpected error so no internal detail reaches the client.
  */
 describe("AllExceptionsFilter", () => {
-  const filter = new AllExceptionsFilter();
+  const filter = new AllExceptionsFilter(new I18nService());
 
-  function run(exception: unknown) {
+  function run(exception: unknown, headers: Record<string, string> = {}) {
     const json = jest.fn();
     const status = jest.fn(() => ({ json }));
     const host = {
       switchToHttp: () => ({
         getResponse: () => ({ status }),
-        getRequest: () => ({ method: "GET", url: "/x" }),
+        getRequest: () => ({ method: "GET", url: "/x", headers }),
       }),
     } as unknown as ArgumentsHost;
 
@@ -48,7 +52,25 @@ describe("AllExceptionsFilter", () => {
     expect(body.message).toEqual(["field is required"]);
   });
 
-  it("maps Prisma P2002 (unique) to 409", () => {
+  it("renders a catalog-key exception in the default locale (tr)", () => {
+    const { status, body } = run(
+      new NotFoundException(i18nMessage("server.common.recordNotFound")),
+    );
+    expect(status).toBe(404);
+    expect(body.message).toBe("Kayıt bulunamadı");
+    expect(body.i18nKey).toBe("server.common.recordNotFound");
+    expect(body.error).toBe("Not Found");
+  });
+
+  it("renders a catalog-key exception in the request's locale (en)", () => {
+    const { body } = run(
+      new NotFoundException(i18nMessage("server.common.recordNotFound")),
+      { "accept-language": "en-US,en;q=0.9" },
+    );
+    expect(body.message).toBe("Record not found");
+  });
+
+  it("maps Prisma P2002 (unique) to a localized 409", () => {
     const err = new Prisma.PrismaClientKnownRequestError(
       "Unique failed on email",
       {
@@ -92,5 +114,12 @@ describe("AllExceptionsFilter", () => {
     expect(body.message).toBe("Sunucu hatası");
     expect(JSON.stringify(body)).not.toContain("ECONNREFUSED");
     expect(JSON.stringify(body)).not.toContain("5432");
+  });
+
+  it("localizes the sanitized 500 for an English request", () => {
+    const { body } = run(new Error("boom"), {
+      "accept-language": "en",
+    });
+    expect(body.message).toBe("Server error");
   });
 });

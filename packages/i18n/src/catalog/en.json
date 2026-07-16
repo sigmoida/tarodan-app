@@ -2958,5 +2958,311 @@
         }
       }
     }
+  },
+  "server": {
+    "common": {
+      "recordExists": "This record already exists",
+      "recordNotFound": "Record not found",
+      "relatedRecordsConflict": "The operation could not be completed because of related records",
+      "internalError": "Server error"
+    },
+    "notification": {
+      "orderCreated": {
+        "title": "Your Order Has Been Created",
+        "message": "Your order was created successfully. Awaiting payment."
+      },
+      "orderPaid": {
+        "title": "Payment Received",
+        "message": "Payment for your order has been received. The seller is preparing your order."
+      },
+      "orderShipped": {
+        "title": "Your Order Has Been Shipped",
+        "message": "Your order has been shipped. Your tracking number: {trackingNumber}"
+      },
+      "orderDelivered": {
+        "title": "Your Order Has Been Delivered",
+        "message": "Your order has been delivered; you have an unconditional right of return for 14 days from the delivery date."
+      },
+      "orderCompleted": {
+        "title": "Order Completed",
+        "message": "Your order has been completed successfully. Thank you!"
+      },
+      "orderCancelled": {
+        "title": "Order Cancelled",
+        "message": "Your order has been cancelled. The amount you paid will be refunded."
+      },
+      "orderCancelledSeller": {
+        "title": "Sale Cancelled",
+        "message": "Your order {orderNumber} has been cancelled."
+      },
+      "orderCancelledOutOfStock": {
+        "title": "Your order was cancelled: out of stock",
+        "message": "{productTitle} was purchased by another buyer. You can browse similar products."
+      },
+      "orderRefunded": {
+        "title": "Refund Completed",
+        "message": "Your payment has been refunded. {amount} TL will be transferred to your account."
+      },
+      "orderPreparingDeadlineWarning": {
+        "title": "Shipping Deadline Approaching",
+        "message": "You must ship the order for \"{productTitle}\" by {deadline}. Otherwise the order will be cancelled automatically."
+      },
+      "orderReservationReleased": {
+        "title": "Your stock reservation was released",
+        "message": "The stock reservation for {productTitle} was released because payment was not completed within 30 minutes. If the product is still in stock, you can pay again within 24 hours."
+      },
+      "orderDeliveredConfirm": {
+        "title": "Your order has been delivered",
+        "message": "Your order has been delivered; you have an unconditional right of return for 14 days from the delivery date. When the period ends, the order completes automatically."
+      },
+      "orderAutoCompleted": {
+        "title": "Order completed automatically",
+        "message": "The 48-hour review period has ended; the order is complete."
+      },
+      "orderManuallyConfirmed": {
+        "title": "The buyer confirmed the order",
+        "message": "The buyer confirmed the order. Your payout will be transferred to your account 14 days after delivery (once the return period ends)."
+      },
+      "orderForceCompletedByAdmin": {
+        "title": "Order completed by an administrator",
+        "message": "An administrator completed your order manually."
+      },
+      "sellerDidNotShipRefunded": {
+        "title": "Order cancelled",
+        "message": "The order was cancelled because the seller did not ship within the required time, and a full refund has been initiated."
+      },
+      "offerReceived": {
+        "title": "You Received a New Offer",
+        "message": "You received an offer of {amount} TL for your product {productTitle}."
+      },
+      "offerAccepted": {
+        "title": "Your Offer Was Accepted! 🎉",
+        "message": "Your offer for {productTitle} was accepted. Pay now!"
+      },
+      "offerRejected": {
+        "title": "Your Offer Was Rejected",
+        "message": "Your offer for {productTitle} was rejected by the seller."
+      },
+      "offerCounter": {
+        "title": "You Received a Counter-Offer",
+        "message": "The seller made a counter-offer of {amount} TL for {productTitle}."
+      },
+      "offerCounterDeclined": {
+        "title": "Counter-Offer Declined",
+        "message": "The buyer did not accept your counter-offer for {productTitle}."
+      },
+      "offerExpired": {
+        "title": "Your Offer Has Expired",
+        "message": "Your offer for {productTitle} has expired."
+      },
+      "offerCancelledOutOfStock": {
+        "title": "Your offer was cancelled: product out of stock",
+        "message": "Your offer for {productTitle} was cancelled because the product was sold."
+      },
+      "productApproved": {
+        "title": "Your Listing Is Live! 🎉",
+        "message": "Your listing {productTitle} has been approved and published."
+      },
+      "productRejected": {
+        "title": "Your Listing Was Rejected",
+        "message": "Your listing {productTitle} was not approved. Reason: {reason}"
+      },
+      "productSold": {
+        "title": "Your Product Sold! 🎉",
+        "message": "Your product {productTitle} sold for {amount} TL."
+      },
+      "paymentReceived": {
+        "title": "Payment Received",
+        "message": "You received a payment of {amount} TL from the sale of {productTitle}."
+      },
+      "paymentReleased": {
+        "title": "Your Payout Has Been Transferred",
+        "message": "{amount} TL has been transferred to your account."
+      },
+      "tradeReceived": {
+        "title": "New Trade Offer",
+        "message": "You received a trade offer for your products."
+      },
+      "tradeAccepted": {
+        "title": "Trade Accepted! 🎉",
+        "message": "Your trade offer was accepted. Please ship your package."
+      },
+      "tradeRejected": {
+        "title": "Trade Rejected",
+        "message": "Your trade offer was rejected."
+      },
+      "tradeCounter": {
+        "title": "You Received a Counter Trade Offer",
+        "message": "{counterOffererName} made a counter-offer to your trade offer."
+      },
+      "tradeShipped": {
+        "title": "Trade Shipped",
+        "message": "Your trade package has been shipped. Tracking number: {trackingNumber}"
+      },
+      "tradeCompleted": {
+        "title": "Trade Completed! 🎉",
+        "message": "The trade was completed successfully!"
+      },
+      "newMessage": {
+        "title": "New Message",
+        "message": "{senderName}: {messagePreview}"
+      },
+      "priceDrop": {
+        "title": "Price Drop! 🔥",
+        "message": "The price of {productTitle} dropped from {oldPrice} TL to {newPrice} TL!"
+      },
+      "wishlistItemSold": {
+        "title": "You Missed It! 😢",
+        "message": "{productTitle}, which you added to your favorites, has been sold."
+      },
+      "backInStock": {
+        "title": "Back in Stock!",
+        "message": "{productTitle} is on sale again."
+      },
+      "newFollower": {
+        "title": "New Follower",
+        "message": "{followerName} started following you."
+      },
+      "sellerNewListing": {
+        "title": "New Listing",
+        "message": "{sellerName} added a new listing: {productTitle}"
+      },
+      "collectionLiked": {
+        "title": "Your Collection Was Liked",
+        "message": "{userName} liked your collection."
+      },
+      "productLiked": {
+        "title": "Your Product Was Liked ❤️",
+        "message": "{userName} added your product {productTitle} to their favorites."
+      },
+      "wishlistSold": {
+        "title": "Your Favorite Product Sold 😢",
+        "message": "{productTitle}, which you added to your favorites, has been sold."
+      },
+      "reviewReceived": {
+        "title": "New Review",
+        "message": "{reviewerName} gave you {score} stars."
+      },
+      "membershipExpiring": {
+        "title": "Your Membership Is Ending",
+        "message": "Your {tierName} membership will end in {daysLeft} days."
+      },
+      "membershipExpired": {
+        "title": "Your Membership Has Ended",
+        "message": "Your {tierName} membership has ended. Renew now and keep your benefits!"
+      },
+      "membershipUpgraded": {
+        "title": "Your Membership Was Upgraded! 🎉",
+        "message": "Welcome to {tierName} membership! Your new benefits are active."
+      },
+      "listingExpiring": {
+        "title": "Your Listing Is Ending",
+        "message": "Your listing {productTitle} will end in {daysLeft} days."
+      },
+      "listingExpired": {
+        "title": "Your Listing Has Ended",
+        "message": "Your listing {productTitle} has ended. Republish it."
+      },
+      "listingViewsMilestone": {
+        "title": "Congratulations! 🎉",
+        "message": "Your listing {productTitle} reached {viewCount} views!"
+      },
+      "promotion": {
+        "title": "🎁 Special Campaign",
+        "message": "{promotionTitle}"
+      },
+      "specialOffer": {
+        "title": "💎 Special Offer",
+        "message": "{offerDescription}"
+      },
+      "welcome": {
+        "title": "Welcome to Tarodan! 🎉",
+        "message": "Welcome to the diecast model car collectors' platform."
+      },
+      "passwordReset": {
+        "title": "Password Reset",
+        "message": "Click the link to reset your password."
+      },
+      "emailVerification": {
+        "title": "Email Verification",
+        "message": "Click the link to verify your email."
+      },
+      "systemAnnouncement": {
+        "title": "📢 Announcement",
+        "message": "{announcement}"
+      },
+      "boostExpired": {
+        "title": "🚀 Boost period ended",
+        "message": "The boost for your listing \"{productTitle}\" has ended. Auto-renew was on — boost it again with one click."
+      },
+      "tradeAutoCancelled": {
+        "title": "Trade Cancelled Automatically",
+        "message": "{cancelReason}"
+      },
+      "tradeStuckAtWarehouse": {
+        "title": "Stuck Trade — Admin Action Required",
+        "message": "Trade {tradeNumber} reached the warehouse but timed out; a manual force-cancel-stuck is required."
+      },
+      "offerAutoRejected": {
+        "title": "Your Offer Was Closed",
+        "message": "{cancelReason}"
+      },
+      "reservationExpired": {
+        "title": "Order Timed Out",
+        "message": "Your order was cancelled automatically because the payment period expired."
+      },
+      "refundCancelled": {
+        "title": "Refund Request Cancelled",
+        "message": "The buyer cancelled refund request {refundNumber}."
+      },
+      "refundApproved": {
+        "title": "Your Refund Request Was Approved",
+        "message": "Your refund request {refundNumber} has been approved."
+      },
+      "refundReturnOpened": {
+        "title": "Return Shipment Ready",
+        "message": "You can drop the product off at the nearest Sürat branch using number {trackingNumber}."
+      },
+      "refundCompleted": {
+        "title": "Your Refund Is Complete",
+        "message": "Your refund {refundNumber} has been credited to your account."
+      },
+      "refundRequestReceived": {
+        "title": "Your Refund Request Was Received",
+        "message": "Your refund request {refundNumber} was received and is awaiting the seller's response."
+      },
+      "refundReturnShippedSeller": {
+        "title": "Return Shipment On Its Way",
+        "message": "The buyer shipped the product for refund {refundNumber}; it is on its way to you."
+      },
+      "refundReturnInTransit": {
+        "title": "Your Return Is In Transit",
+        "message": "Your return for refund {refundNumber} is on its way to the seller."
+      },
+      "refundReturnDeliveredBuyer": {
+        "title": "Your Return Reached the Seller",
+        "message": "Your return for refund {refundNumber} was delivered to the seller; your refund will be issued shortly."
+      },
+      "refundReturnDeliveredSeller": {
+        "title": "The Returned Product Reached You",
+        "message": "The returned product for refund {refundNumber} has been delivered to you."
+      },
+      "refundCompletedSeller": {
+        "title": "Refund Completed",
+        "message": "The refund for order {refundNumber} is complete; the amount was returned to the buyer."
+      },
+      "refundAutoAcceptedSeller": {
+        "title": "Refund Request Auto-Approved",
+        "message": "Refund request {refundNumber} was approved automatically because it was not answered within 48 hours."
+      },
+      "sellerApplicationApproved": {
+        "title": "Your Business Application Was Approved! 🎉",
+        "message": "Your business account application has been approved. You can now list products as a seller."
+      },
+      "sellerApplicationRejected": {
+        "title": "Your Business Application Was Rejected",
+        "message": "Your business account application was rejected.{reason}"
+      }
+    }
   }
 }

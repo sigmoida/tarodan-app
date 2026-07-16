@@ -83,6 +83,7 @@ export class UserService {
       isCorporateSeller?: boolean;
       avatarUrl?: string;
       showTrustScore?: boolean;
+      preferredLanguage?: string;
     },
   ) {
     return this.profile.updateProfile(userId, data);

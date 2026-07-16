@@ -51,6 +51,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       isSeller: user.isSeller,
       isAdmin: !!user.adminUser?.isActive,
       role: user.adminUser?.role,
+      preferredLanguage: user.preferredLanguage,
     };
   }
 }
