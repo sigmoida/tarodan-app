@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ArrowsRightLeftIcon } from '@heroicons/react/24/outline';
 import { StatusBadge } from '@tarodan/ui';
+import { useTranslations } from 'next-intl';
 import { SectionCard } from '@/components/detail/SectionCard';
 import {
 	type RecentTrade,
@@ -10,11 +11,13 @@ import {
 	formatRelativeDate,
 } from '../_lib/types';
 
-function tradeSummary(trade: RecentTrade) {
+type T = ReturnType<typeof useTranslations<never>>;
+
+function tradeSummary(trade: RecentTrade, t: T) {
 	const initiatorName =
-		trade.initiator?.displayName || trade.initiator?.email || 'Kullanıcı';
+		trade.initiator?.displayName || trade.initiator?.email || t('common.user');
 	const receiverName =
-		trade.receiver?.displayName || trade.receiver?.email || 'Kullanıcı';
+		trade.receiver?.displayName || trade.receiver?.email || t('common.user');
 	const initiatorItems = (trade.items || []).filter(
 		(i) => i.side === 'initiator',
 	);
@@ -35,20 +38,21 @@ function tradeSummary(trade: RecentTrade) {
 }
 
 export function RecentTrades({ trades }: { trades: RecentTrade[] }) {
+	const t = useTranslations();
 	return (
 		<SectionCard
-			title='Son Takaslar'
+			title={t('admin.dashboard.recentTrades.title')}
 			actions={
 				<Link
 					href='/operations/trades'
 					className='text-sm text-primary-600 hover:underline'>
-					Tümünü Gör →
+					{t('common.seeAll')} →
 				</Link>
 			}>
 			<div className='space-y-3'>
 				{trades.length > 0 ? (
 					trades.map((trade) => {
-						const s = tradeSummary(trade);
+						const s = tradeSummary(trade, t);
 						return (
 							<div
 								key={trade.id}
@@ -71,10 +75,10 @@ export function RecentTrades({ trades }: { trades: RecentTrade[] }) {
 								<div className='ml-3 flex items-center gap-3'>
 									<StatusBadge
 										status={trade.status}
-										config={dashboardTradeStatusConfig}
+										config={dashboardTradeStatusConfig(t)}
 									/>
 									<span className='whitespace-nowrap text-xs text-muted'>
-										{formatRelativeDate(trade.createdAt)}
+										{formatRelativeDate(trade.createdAt, t)}
 									</span>
 								</div>
 							</div>
@@ -82,7 +86,7 @@ export function RecentTrades({ trades }: { trades: RecentTrade[] }) {
 					})
 				) : (
 					<div className='py-8 text-center text-muted'>
-						Henüz takas bulunmuyor
+						{t('admin.dashboard.recentTrades.empty')}
 					</div>
 				)}
 			</div>

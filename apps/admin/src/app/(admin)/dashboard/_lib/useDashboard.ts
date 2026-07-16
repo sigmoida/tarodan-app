@@ -1,12 +1,15 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { useTranslations } from 'next-intl';
 import { adminApi } from '@/lib/api';
 import {
   type DashboardData,
   type DashboardStats,
   type PendingActions,
 } from './types';
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 const EMPTY_STATS: DashboardStats = {
   totalUsers: 0,
@@ -32,7 +35,7 @@ function last30Days(dayMap: Map<string, number>) {
   });
 }
 
-async function fetchDashboard(): Promise<DashboardData> {
+async function fetchDashboard(t: T): Promise<DashboardData> {
   const [dashboardRes, ordersRes, pendingRes, salesRes, tradesRes] = await Promise.all([
     adminApi.getDashboard(),
     adminApi.getRecentOrders(5),
@@ -84,7 +87,7 @@ async function fetchDashboard(): Promise<DashboardData> {
     data.categoryDistribution,
   )
     ? data.categoryDistribution.map((c: { name: string; count: number }) => ({
-        name: c.name || 'Kategorisiz',
+        name: c.name || t('admin.dashboard.charts.uncategorized'),
         count: typeof c.count === 'number' ? c.count : 0,
       }))
     : [];
@@ -123,9 +126,10 @@ async function fetchDashboard(): Promise<DashboardData> {
 
 /** Loads all dashboard data (stats, recent orders/trades, pending, analytics). */
 export function useDashboard() {
+  const t = useTranslations();
   const query = useQuery({
     queryKey: ['dashboard'],
-    queryFn: fetchDashboard,
+    queryFn: () => fetchDashboard(t),
   });
   return {
     data: query.data,

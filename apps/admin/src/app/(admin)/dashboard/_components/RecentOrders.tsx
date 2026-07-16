@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { StatusBadge } from '@tarodan/ui';
+import { useTranslations } from 'next-intl';
 import { SectionCard } from '@/components/detail/SectionCard';
 import {
   type RecentOrder,
@@ -8,13 +9,14 @@ import {
 } from '../_lib/types';
 
 export function RecentOrders({ orders }: { orders: RecentOrder[] }) {
+  const t = useTranslations();
   return (
     <SectionCard
-      title="Son Siparişler"
+      title={t('admin.dashboard.recentOrders.title')}
       className="lg:col-span-2"
       actions={
         <Link href="/operations/orders" className="text-sm text-primary-600 hover:underline">
-          Tümünü Gör →
+          {t('common.seeAll')} →
         </Link>
       }
     >
@@ -44,15 +46,17 @@ export function RecentOrders({ orders }: { orders: RecentOrder[] }) {
                 <span className="whitespace-nowrap text-sm font-semibold text-heading">
                   ₺{order.amount.toLocaleString('tr-TR')}
                 </span>
-                <StatusBadge status={order.status} config={dashboardOrderStatusConfig} />
+                <StatusBadge status={order.status} config={dashboardOrderStatusConfig(t)} />
                 <span className="whitespace-nowrap text-xs text-muted">
-                  {formatRelativeDate(order.createdAt)}
+                  {formatRelativeDate(order.createdAt, t)}
                 </span>
               </div>
             </div>
           ))
         ) : (
-          <div className="py-8 text-center text-muted">Henüz sipariş bulunmuyor</div>
+          <div className="py-8 text-center text-muted">
+            {t('admin.dashboard.recentOrders.empty')}
+          </div>
         )}
       </div>
     </SectionCard>

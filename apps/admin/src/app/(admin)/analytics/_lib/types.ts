@@ -4,6 +4,9 @@ import {
   ShoppingBagIcon,
   ArrowsRightLeftIcon,
 } from '@heroicons/react/24/outline';
+import { useTranslations } from 'next-intl';
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 export type DateRange = '7d' | '30d' | '90d' | '1y';
 
@@ -14,31 +17,31 @@ export interface AnalyticsData {
   tradeReport: any;
 }
 
-export const DATE_RANGE_OPTIONS = [
-  { value: '7d', label: '7 Gün' },
-  { value: '30d', label: '30 Gün' },
-  { value: '90d', label: '90 Gün' },
-  { value: '1y', label: '1 Yıl' },
+export const getDateRangeOptions = (t: T) => [
+  { value: '7d', label: t('admin.analytics.dateRange.7d') },
+  { value: '30d', label: t('admin.analytics.dateRange.30d') },
+  { value: '90d', label: t('admin.analytics.dateRange.90d') },
+  { value: '1y', label: t('admin.analytics.dateRange.1y') },
 ];
 
-export const ANALYTICS_TABS = [
-  { key: 'sales', label: 'Satış Analitiği', icon: CurrencyDollarIcon },
-  { key: 'users', label: 'Kullanıcı Analitiği', icon: UsersIcon },
-  { key: 'products', label: 'Ürün Analitiği', icon: ShoppingBagIcon },
-  { key: 'trades', label: 'Takas Analitiği', icon: ArrowsRightLeftIcon },
+export const getAnalyticsTabs = (t: T) => [
+  { key: 'sales', label: t('admin.analytics.tabs.sales'), icon: CurrencyDollarIcon },
+  { key: 'users', label: t('admin.analytics.tabs.users'), icon: UsersIcon },
+  { key: 'products', label: t('admin.analytics.tabs.products'), icon: ShoppingBagIcon },
+  { key: 'trades', label: t('admin.analytics.tabs.trades'), icon: ArrowsRightLeftIcon },
 ];
 
-export const ORDER_STATUS_LABELS: Record<string, string> = {
-  pending_payment: 'Ödeme Bekliyor',
-  paid: 'Ödendi',
-  preparing: 'Hazırlanıyor',
-  shipped: 'Kargoda',
-  delivered: 'Teslim Edildi',
-  completed: 'Tamamlandı',
-  cancelled: 'İptal',
-  refund_requested: 'İade Talebi',
-  refunded: 'İade Edildi',
-};
+export const getOrderStatusLabels = (t: T): Record<string, string> => ({
+  pending_payment: t('admin.analytics.orderStatus.pendingPayment'),
+  paid: t('admin.analytics.orderStatus.paid'),
+  preparing: t('admin.analytics.orderStatus.preparing'),
+  shipped: t('admin.analytics.orderStatus.shipped'),
+  delivered: t('admin.analytics.orderStatus.delivered'),
+  completed: t('admin.analytics.orderStatus.completed'),
+  cancelled: t('admin.analytics.orderStatus.cancelled'),
+  refund_requested: t('admin.analytics.orderStatus.refundRequested'),
+  refunded: t('admin.analytics.orderStatus.refunded'),
+});
 
 export function getDateRangeParams(dateRange: DateRange) {
   const endDate = new Date();

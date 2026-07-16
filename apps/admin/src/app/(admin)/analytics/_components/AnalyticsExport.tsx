@@ -2,6 +2,7 @@
 
 import { Button } from '@tarodan/ui';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import { useTranslations } from 'next-intl';
 import { adminApi } from '@/lib/api';
 import { downloadBlob } from '@/lib/download';
 import { type DateRange, getDateRangeParams } from '../_lib/types';
@@ -14,6 +15,7 @@ export function AnalyticsExport({
   dateRange: DateRange;
   activeTab: string;
 }) {
+  const t = useTranslations();
   const range = getDateRangeParams(dateRange);
   const base = `rapor-${activeTab}-${range.startDate}-${range.endDate}`;
 
@@ -35,14 +37,14 @@ export function AnalyticsExport({
         leftIcon={<ArrowDownTrayIcon className="h-5 w-5" />}
         onClick={onCsv}
       >
-        CSV İndir
+        {t('admin.analytics.export.csv')}
       </Button>
       <Button
         variant="primary"
         leftIcon={<ArrowDownTrayIcon className="h-5 w-5" />}
         onClick={onJson}
       >
-        JSON İndir
+        {t('admin.analytics.export.json')}
       </Button>
     </>
   );

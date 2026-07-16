@@ -1,8 +1,11 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { useTranslations } from 'next-intl';
 import { adminApi } from '@/lib/api';
 import { type AnalyticsData, type DateRange, getDateRangeParams } from './types';
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 // ─── Mock fallbacks (shown when an endpoint returns nothing) ─────────────────
 
@@ -28,25 +31,25 @@ function generateMockGrowthData() {
   }));
 }
 
-function generateMockCategoryData() {
+function generateMockCategoryData(t: T) {
   return [
     { name: 'Hot Wheels', count: 2345, percentage: 35 },
     { name: 'Matchbox', count: 1567, percentage: 23 },
     { name: 'Tomica', count: 987, percentage: 15 },
     { name: 'Majorette', count: 765, percentage: 11 },
     { name: 'Maisto', count: 543, percentage: 8 },
-    { name: 'Diğer', count: 536, percentage: 8 },
+    { name: t('admin.analytics.categoryOther'), count: 536, percentage: 8 },
   ];
 }
 
-function normalizeProductReport(raw: any) {
+function normalizeProductReport(raw: any, t: T) {
   return {
     totalProducts: raw.total ?? raw.totalProducts ?? 0,
     activeProducts: raw.active ?? raw.activeProducts ?? 0,
     pendingProducts: raw.pending ?? raw.pendingProducts ?? 0,
     averagePrice: raw.averagePrice ?? 0,
     categoryDistribution:
-      raw.categoryDistribution ?? raw.categories ?? generateMockCategoryData(),
+      raw.categoryDistribution ?? raw.categories ?? generateMockCategoryData(t),
   };
 }
 
@@ -62,7 +65,7 @@ function normalizeTradeReport(raw: any) {
 
 // ─── Fetch + normalize all four reports ──────────────────────────────────────
 
-async function fetchAnalytics(dateRange: DateRange): Promise<AnalyticsData> {
+async function fetchAnalytics(dateRange: DateRange, t: T): Promise<AnalyticsData> {
   const params = { ...getDateRangeParams(dateRange), groupBy: 'day' as const };
 
   const [salesRes, revenueRes, userRes, productRes, tradeRes] = await Promise.all([
@@ -110,13 +113,13 @@ async function fetchAnalytics(dateRange: DateRange): Promise<AnalyticsData> {
       userGrowth: userGrowth.length > 0 ? userGrowth : generateMockGrowthData(),
     },
     productReport: productRes?.data
-      ? normalizeProductReport(productRes.data)
+      ? normalizeProductReport(productRes.data, t)
       : {
           totalProducts: 0,
           activeProducts: 0,
           pendingProducts: 0,
           averagePrice: 0,
-          categoryDistribution: generateMockCategoryData(),
+          categoryDistribution: generateMockCategoryData(t),
         },
     tradeReport: tradeRes?.data
       ? normalizeTradeReport(tradeRes.data)
@@ -132,9 +135,10 @@ async function fetchAnalytics(dateRange: DateRange): Promise<AnalyticsData> {
 
 /** Loads + normalizes all analytics reports for the selected range (TanStack Query). */
 export function useAnalytics(dateRange: DateRange) {
+  const t = useTranslations();
   const query = useQuery({
     queryKey: ['analytics', dateRange],
-    queryFn: () => fetchAnalytics(dateRange),
+    queryFn: () => fetchAnalytics(dateRange, t),
   });
   return { data: query.data, loading: query.isLoading };
 }

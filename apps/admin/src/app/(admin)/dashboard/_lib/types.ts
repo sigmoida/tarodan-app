@@ -1,5 +1,8 @@
 import { orderStatusConfig, tradeStatusConfig } from '@tarodan/ui';
 import type { StatusConfig } from '@tarodan/ui';
+import { useTranslations } from 'next-intl';
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 export interface DashboardStats {
   totalUsers: number;
@@ -58,21 +61,26 @@ export interface DashboardData {
 }
 
 /** Order config + refund_requested (not in the shared config). */
-export const dashboardOrderStatusConfig: Record<string, StatusConfig> = {
-  ...orderStatusConfig,
-  refund_requested: { label: 'İade Talebi', variant: 'warning' },
-};
+export function dashboardOrderStatusConfig(t: T): Record<string, StatusConfig> {
+  return {
+    ...orderStatusConfig,
+    refund_requested: { label: t('admin.dashboard.status.refundRequested'), variant: 'warning' },
+  };
+}
 
 /** Trade config + in_progress (not in the shared config). */
-export const dashboardTradeStatusConfig: Record<string, StatusConfig> = {
-  ...tradeStatusConfig,
-  in_progress: { label: 'Devam Ediyor', variant: 'info' },
-};
+export function dashboardTradeStatusConfig(t: T): Record<string, StatusConfig> {
+  return {
+    ...tradeStatusConfig,
+    in_progress: { label: t('admin.dashboard.status.inProgress'), variant: 'info' },
+  };
+}
 
-export function formatRelativeDate(dateString: string) {
+export function formatRelativeDate(dateString: string, t: T) {
   const date = new Date(dateString);
   const diffMins = Math.floor((new Date().getTime() - date.getTime()) / 60000);
-  if (diffMins < 60) return `${diffMins} dk önce`;
-  if (diffMins < 1440) return `${Math.floor(diffMins / 60)} saat önce`;
+  if (diffMins < 60) return t('admin.dashboard.relativeTime.minutesAgo', { count: diffMins });
+  if (diffMins < 1440)
+    return t('admin.dashboard.relativeTime.hoursAgo', { count: Math.floor(diffMins / 60) });
   return date.toLocaleDateString('tr-TR');
 }

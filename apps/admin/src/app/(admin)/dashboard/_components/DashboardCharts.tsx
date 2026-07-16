@@ -1,6 +1,7 @@
 'use client';
 
 import { Line, Bar } from 'react-chartjs-2';
+import { useTranslations } from 'next-intl';
 import { SectionCard } from '@/components/detail/SectionCard';
 import { chartPalette, generate30DayLabels } from '../_lib/charts';
 
@@ -11,13 +12,14 @@ export function DashboardCharts({
   salesByDay: number[];
   ordersByDay: number[];
 }) {
+  const t = useTranslations();
   const labels = generate30DayLabels();
 
   const salesChartData = {
     labels,
     datasets: [
       {
-        label: 'Satışlar (₺)',
+        label: t('admin.dashboard.charts.salesLabel'),
         data:
           salesByDay.length === 30
             ? salesByDay
@@ -36,7 +38,7 @@ export function DashboardCharts({
     labels,
     datasets: [
       {
-        label: 'Siparişler',
+        label: t('admin.dashboard.charts.ordersLabel'),
         data:
           ordersByDay.length === 30
             ? ordersByDay
@@ -60,10 +62,10 @@ export function DashboardCharts({
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <SectionCard title="Son 30 Gün Satış Performansı">
+      <SectionCard title={t('admin.dashboard.charts.sales30dTitle')}>
         <Line data={salesChartData} options={commonOptions} />
       </SectionCard>
-      <SectionCard title="Günlük Sipariş Sayısı">
+      <SectionCard title={t('admin.dashboard.charts.dailyOrdersTitle')}>
         <Bar
           data={ordersChartData}
           options={{

@@ -2957,6 +2957,158 @@
           "footerNote": "Note: The barcode (OrtakBarkodOlustur) endpoint exists but its request schema is pending from Sürat; it''ll be added when it arrives. Also, in the test environment shipments don''t reach the physical \"acceptance\" stage, so tracking/cancel usually returns \"awaiting acceptance / Record Not Found\" (it progresses in production)."
         }
       }
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "description": "Welcome! Here's today's overview.",
+      "stats": {
+        "totalOrders": "Total Sales",
+        "commissionRevenue": "Commission Revenue",
+        "activeProducts": "Active Products",
+        "totalUsers": "Total Users"
+      },
+      "quickActions": {
+        "products": "Products",
+        "orders": "Orders",
+        "users": "Users",
+        "messages": "Messages"
+      },
+      "pendingActions": {
+        "productsPending": "{count} products awaiting approval",
+        "refundRequests": "{count} refund requests",
+        "messagesPending": "{count} messages awaiting approval",
+        "identityVerification": "{count} identity verification requests",
+        "review": "Review"
+      },
+      "charts": {
+        "salesLabel": "Sales (₺)",
+        "ordersLabel": "Orders",
+        "sales30dTitle": "Last 30 Days Sales Performance",
+        "dailyOrdersTitle": "Daily Order Count",
+        "categoryTitle": "Category Distribution",
+        "noData": "No Data",
+        "uncategorized": "Uncategorized"
+      },
+      "recentOrders": {
+        "title": "Recent Orders",
+        "empty": "No orders yet"
+      },
+      "recentTrades": {
+        "title": "Recent Trades",
+        "empty": "No trades yet"
+      },
+      "status": {
+        "refundRequested": "Refund Requested",
+        "inProgress": "In Progress"
+      },
+      "relativeTime": {
+        "minutesAgo": "{count} min ago",
+        "hoursAgo": "{count} hr ago"
+      }
+    },
+    "analytics": {
+      "title": "Analytics",
+      "description": "Detailed sales, user, and product analytics",
+      "dateRange": {
+        "7d": "7 Days",
+        "30d": "30 Days",
+        "90d": "90 Days",
+        "1y": "1 Year"
+      },
+      "tabs": {
+        "sales": "Sales Analytics",
+        "users": "User Analytics",
+        "products": "Product Analytics",
+        "trades": "Trade Analytics"
+      },
+      "orderStatus": {
+        "pendingPayment": "Awaiting Payment",
+        "paid": "Paid",
+        "preparing": "Preparing",
+        "shipped": "Shipped",
+        "delivered": "Delivered",
+        "completed": "Completed",
+        "cancelled": "Cancelled",
+        "refundRequested": "Refund Requested",
+        "refunded": "Refunded"
+      },
+      "categoryOther": "Other",
+      "export": {
+        "csv": "Download CSV",
+        "json": "Download JSON"
+      },
+      "sales": {
+        "salesLabel": "Sales (₺)",
+        "ordersLabel": "Orders",
+        "totalOrders": "Total Orders",
+        "totalRevenue": "Total Revenue",
+        "commissionRevenue": "Commission Revenue",
+        "avgOrderValue": "Avg. Order Value",
+        "revenueChartTitle": "Revenue Chart",
+        "orderCountTitle": "Order Count",
+        "statusDistributionTitle": "Order Status Distribution"
+      },
+      "users": {
+        "newUsers": "New Users",
+        "totalUsers": "Total Users",
+        "activeUsers": "Active Users",
+        "sellers": "Sellers",
+        "growthTitle": "User Growth"
+      },
+      "trades": {
+        "totalTrades": "Total Trades",
+        "completed": "Completed",
+        "pending": "Pending",
+        "avgValue": "Avg. Value",
+        "statsTitle": "Trade Statistics",
+        "disputed": "Disputed",
+        "successRate": "Success Rate"
+      },
+      "products": {
+        "totalProducts": "Total Products",
+        "activeProducts": "Active Products",
+        "pendingApproval": "Pending Approval",
+        "avgPrice": "Avg. Price",
+        "categoryDistributionTitle": "Category Distribution",
+        "byCategoryTitle": "Products by Category"
+      }
+    },
+    "reports": {
+      "title": "Report Requests",
+      "description": "Complaints submitted by users for products, users, collections, and messages",
+      "loadError": "Failed to load complaints",
+      "empty": "No complaints yet",
+      "allTypes": "All Types",
+      "allStatuses": "All Statuses",
+      "status": {
+        "pending": "Pending",
+        "underReview": "Under Review",
+        "resolved": "Resolved",
+        "dismissed": "Dismissed"
+      },
+      "type": {
+        "product": "Product",
+        "collection": "Collection",
+        "message": "Message"
+      },
+      "reason": {
+        "spam": "Spam",
+        "inappropriateContent": "Inappropriate Content",
+        "fakeProduct": "Fake/Misleading Product",
+        "scam": "Scam",
+        "harassment": "Harassment",
+        "hateSpeech": "Hate Speech",
+        "counterfeit": "Counterfeit Product",
+        "wrongCategory": "Wrong Category",
+        "misleadingInfo": "Misleading Information",
+        "other": "Other"
+      },
+      "columns": {
+        "type": "Type",
+        "reason": "Reason",
+        "reporter": "Reporter",
+        "targetId": "Target ID"
+      }
     }
   }
 }

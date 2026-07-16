@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useTranslations } from "next-intl";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageLoading } from "@/components/PageLoading";
 import { PageHeader } from "@/components/AdminList";
@@ -22,13 +23,14 @@ import { RecentOrders } from "./_components/RecentOrders";
 import { RecentTrades } from "./_components/RecentTrades";
 
 export default function DashboardPage() {
+  const t = useTranslations();
   const { data, loading, stats } = useDashboard();
 
   return (
     <AdminPage>
       <PageHeader
-        title="Dashboard"
-        description="Hoş geldiniz! İşte bugünkü genel bakış."
+        title={t("admin.dashboard.title")}
+        description={t("admin.dashboard.description")}
       />
 
       {loading || !data ? (
