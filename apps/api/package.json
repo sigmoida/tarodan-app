@@ -143,6 +143,7 @@
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
+      "packages/i18n/src/catalog/.+\\.json$": "<rootDir>/../test/jest-json-default-transform.js",
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "moduleNameMapper": {
