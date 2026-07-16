@@ -56,11 +56,18 @@ zaten setli; üstüne yazmıyoruz.
 `gh secret set` ya da Settings → Secrets and variables → Actions:
 
 - `EXPO_TOKEN` — `https://expo.dev/accounts/<org>/settings/access-tokens` üzerinden
-  oluşturulan kişisel access token.
+  oluşturulan access token. **Tüm** EAS workflow'ları (build/submit/update) buna
+  bağlı — set edilene kadar hepsi guard'lı no-op.
 - (opsiyonel) `EAS_BUILD_PROFILE_OVERRIDE` — manuel workflow_dispatch için.
 
-Apple credential'ları **EAS sunucusunda** tutuluyor (`eas credentials` komutu),
-GitHub'a Apple ID/şifresi koymuyoruz.
+Hem **Apple** (App Store Connect API key) hem **Google Play** (service account
+JSON) submit credential'ları **EAS sunucusunda** tutulur (`eas credentials`),
+GitHub'a veya repo'ya koymuyoruz. Bu yüzden `eas.json` `submit.production.android`
+sadece `track` taşır — `serviceAccountKeyPath` YOK (eski `./google-services.json`
+değeri yanlıştı: o dosya Firebase config'i, Play service account'ı değil).
+
+Tam release akışı (staging OTA/preview + production tag) ve secrets tablosu:
+[`docs/RELEASE.md`](./docs/RELEASE.md).
 
 ## 5) İlk manuel build (workflow'dan önce sanity check)
 
@@ -96,7 +103,11 @@ ASC → TestFlight → External Testing → "Add Group" → "Enable Public Link"
 - [ ] `app.json` `ITSAppUsesNonExemptEncryption: false` set
 - [ ] `app.json` `extra.eas.projectId` gerçek UUID
 - [ ] `eas.json` `submit.production.ios` placeholder'ları gerçek
-- [ ] `EXPO_PUBLIC_API_URL` EAS secret'ı set
+- [ ] `EXPO_TOKEN` GitHub repo secret'ı set (workflow'ları aktive eder)
+- [ ] App Store Connect API key EAS'e yüklü (`eas credentials`, iOS submit)
+- [ ] Google Play service account JSON EAS'e yüklü (`eas credentials`, Android submit)
+- [ ] `EXPO_PUBLIC_API_URL` EAS secret'ı set (preview→staging, production→prod)
 - [ ] Production API public URL'de erişilebilir (curl ile)
 - [ ] App icon 1024×1024 alpha kanalsız (icon.png)
 - [ ] Privacy Policy URL ASC'de doldurulu (zorunlu, app.tarodan.com/privacy gibi)
+- [ ] Release akışı okundu: [`docs/RELEASE.md`](./docs/RELEASE.md)
