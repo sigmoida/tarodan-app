@@ -24,17 +24,20 @@ export class I18nController {
   }
 
   @Get('translations')
-  @ApiOperation({ summary: 'Get all translations for a language' })
+  @ApiOperation({ summary: 'Get the shared catalog (or a namespace slice) for a language' })
   @ApiQuery({ name: 'lang', required: false, enum: ['tr', 'en'] })
-  @ApiResponse({ status: 200, description: 'All translations for the specified language' })
+  @ApiQuery({ name: 'ns', required: false, description: 'Namespace slice, e.g. "auth" or "server"' })
+  @ApiResponse({ status: 200, description: 'Catalog (or namespace) for the specified language' })
   getTranslations(
     @Query('lang') lang?: SupportedLanguage,
+    @Query('ns') ns?: string,
     @Headers('accept-language') acceptLanguage?: string,
   ) {
     const language = lang || this.i18nService.parseAcceptLanguage(acceptLanguage);
     return {
       language,
-      translations: this.i18nService.getAllTranslations(language),
+      namespace: ns ?? null,
+      translations: this.i18nService.getAllTranslations(language, ns),
     };
   }
 
