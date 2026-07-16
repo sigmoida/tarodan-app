@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException, ForbiddenException, BadRequestException, ConflictException } from '@nestjs/common';
+import { i18nMessage } from '../i18n';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { SearchService } from '../search/search.service';
@@ -43,12 +44,12 @@ export class ProductUpdateService {
     });
 
     if (!product) {
-      throw new NotFoundException('Ürün bulunamadı');
+      throw new NotFoundException(i18nMessage('server.product.notFound'));
     }
 
     // Verify ownership
     if (product.sellerId !== sellerId) {
-      throw new ForbiddenException('Bu ürünü düzenleme yetkiniz yok');
+      throw new ForbiddenException(i18nMessage('server.product.editForbidden'));
     }
 
     // Check if user is banned
@@ -58,18 +59,18 @@ export class ProductUpdateService {
     });
 
     if (seller?.isBanned) {
-      throw new ForbiddenException('Hesabınız banlanmış. Ürün düzenleyemezsiniz.');
+      throw new ForbiddenException(i18nMessage('server.product.bannedCannotEdit'));
     }
 
     // Reserved products cannot be updated at all
     if (product.status === ProductStatus.reserved) {
-      throw new BadRequestException('Rezerve edilmiş ürünler güncellenemez');
+      throw new BadRequestException(i18nMessage('server.product.reservedCannotUpdate'));
     }
 
     // Silinen (yönetici tarafından kaldırılan) ürün düzenlenemez/yeniden açılamaz.
     // "Pasife alma"dan AYRI bir durumdur; satıcı bunu geri getiremez.
     if (product.status === ProductStatus.deleted) {
-      throw new BadRequestException('Bu ürün kaldırılmış ve yeniden açılamaz. Yeniden satmak için yeni ilan oluşturun.');
+      throw new BadRequestException(i18nMessage('server.product.removedCannotReopen'));
     }
 
     // Sold or inactive (stok biten / pasife alınmış): satıcı yeniden satışa
@@ -80,7 +81,7 @@ export class ProductUpdateService {
         const newQuantity =
           dto.quantity != null ? Number(dto.quantity) : product.quantity;
         if (newQuantity != null && newQuantity <= 0) {
-          throw new BadRequestException('Yeniden satışa açmak için stok miktarı belirleyin');
+          throw new BadRequestException(i18nMessage('server.product.setQuantityToReopen'));
         }
         await this.prisma.product.update({
           where: { id },
@@ -101,7 +102,7 @@ export class ProductUpdateService {
       }
       // status=active dışı bir istek (ör. sadece düzenleme) sold/inactive ilanda
       // anlamsız; mevcut akışı korumak için yeniden satışa açma yönlendirmesi ver.
-      throw new BadRequestException('Yeniden satışa açmak için stok miktarı belirleyin');
+      throw new BadRequestException(i18nMessage('server.product.setQuantityToReopen'));
     }
 
     // Verify category if being updated
@@ -111,7 +112,7 @@ export class ProductUpdateService {
       });
 
       if (!category || !category.isActive) {
-        throw new BadRequestException('Geçersiz kategori');
+        throw new BadRequestException(i18nMessage('server.product.invalidCategory'));
       }
     }
 
@@ -129,7 +130,7 @@ export class ProductUpdateService {
       });
 
       if (!seller?.membership?.tier?.canTrade) {
-        throw new BadRequestException('Takas özelliği için Premium üyelik gereklidir. Üyeliğinizi yükseltin.');
+        throw new BadRequestException(i18nMessage('server.product.tradeRequiresPremium'));
       }
       canEnableTrade = true;
     }
@@ -389,7 +390,7 @@ export class ProductUpdateService {
       return await this.common.formatProductResponse(toReturn ?? updated);
     } catch (error) {
       if (error.code === 'P2025') {
-        throw new ConflictException('Ürün başka bir işlem tarafından güncellendi. Lütfen yenileyin.');
+        throw new ConflictException(i18nMessage('server.product.updateConflict'));
       }
       throw error;
     }
@@ -637,23 +638,23 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
    * Delete product (soft delete by setting inactive)
    * DELETE /products/:id
    */
-  async remove(id: string, sellerId: string) {
+  async remove(id: string, sellerId: string): Promise<void> {
     const product = await this.prisma.product.findUnique({
       where: { id },
     });
 
     if (!product) {
-      throw new NotFoundException('Ürün bulunamadı');
+      throw new NotFoundException(i18nMessage('server.product.notFound'));
     }
 
     // Verify ownership
     if (product.sellerId !== sellerId) {
-      throw new ForbiddenException('Bu ürünü silme yetkiniz yok');
+      throw new ForbiddenException(i18nMessage('server.product.deleteForbidden'));
     }
 
     // Cannot delete sold or reserved products
     if (product.status === ProductStatus.sold || product.status === ProductStatus.reserved) {
-      throw new BadRequestException('Satılmış veya rezerve edilmiş ürünler silinemez');
+      throw new BadRequestException(i18nMessage('server.product.soldOrReservedCannotDelete'));
     }
 
     // Soft delete: set status to deleted (pasiften AYRI state — silinen ürün
@@ -676,7 +677,5 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
     this.searchService
       .syncProduct(id)
       .catch((err) => this.logger.warn(`ES sync failed for ${id}: ${err?.message}`));
-
-    return { message: 'Ürün silindi' };
   }
 }

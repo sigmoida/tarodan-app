@@ -6,6 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
+import { i18nMessage } from '../i18n';
 import { CacheService } from '../cache/cache.service';
 import { UpdateOrderStatusDto, CancelOrderDto } from './dto';
 import { OrderStatus, OfferStatus } from '@prisma/client';
@@ -51,10 +52,10 @@ export class OrderLifecycleService {
       where: { id: orderId },
       include: { product: { include: { images: { take: 1 } } }, buyer: true, seller: true, shipment: true, payment: true },
     });
-    if (!order) throw new NotFoundException('Sipariş bulunamadı');
-    if (order.buyerId !== userId) throw new ForbiddenException('Bu siparişe adres ekleme yetkiniz yok');
+    if (!order) throw new NotFoundException(i18nMessage('server.order.notFound'));
+    if (order.buyerId !== userId) throw new ForbiddenException(i18nMessage('server.order.setAddressForbidden'));
     if (order.status !== OrderStatus.pending_payment) {
-      throw new BadRequestException('Sadece ödeme bekleyen siparişlere adres eklenebilir');
+      throw new BadRequestException(i18nMessage('server.order.addressOnlyPendingPayment'));
     }
     const shippingAddress = {
       fullName: dto.fullName.trim(),
@@ -86,7 +87,7 @@ export class OrderLifecycleService {
     });
 
     if (!order) {
-      throw new NotFoundException('Sipariş bulunamadı');
+      throw new NotFoundException(i18nMessage('server.order.notFound'));
     }
 
     // Validate state transitions
@@ -127,19 +128,22 @@ export class OrderLifecycleService {
 
     if (!transition) {
       throw new BadRequestException(
-        `Sipariş durumu ${order.status}'den ${dto.status}'e değiştirilemez`,
+        i18nMessage('server.order.statusTransitionNotAllowed', {
+          from: order.status,
+          to: dto.status,
+        }),
       );
     }
 
     // Check permission
     if (transition.allowedBy === 'buyer' && order.buyerId !== userId) {
-      throw new ForbiddenException('Bu durum değişikliğini yapmaya yetkiniz yok');
+      throw new ForbiddenException(i18nMessage('server.order.statusChangeForbidden'));
     }
     if (transition.allowedBy === 'seller' && order.sellerId !== userId) {
-      throw new ForbiddenException('Bu durum değişikliğini yapmaya yetkiniz yok');
+      throw new ForbiddenException(i18nMessage('server.order.statusChangeForbidden'));
     }
     if (transition.allowedBy === 'system') {
-      throw new BadRequestException('Bu durum değişikliği sistem tarafından yapılır');
+      throw new BadRequestException(i18nMessage('server.order.statusChangeSystemOnly'));
     }
 
     const updatedOrder = await this.prisma.order.update({
@@ -291,14 +295,14 @@ export class OrderLifecycleService {
     });
 
     if (!order) {
-      throw new NotFoundException('Sipariş bulunamadı');
+      throw new NotFoundException(i18nMessage('server.order.notFound'));
     }
     if (order.buyerId !== userId) {
-      throw new ForbiddenException('Bu siparişi onaylama yetkiniz yok');
+      throw new ForbiddenException(i18nMessage('server.order.confirmForbidden'));
     }
     if (order.status !== OrderStatus.awaiting_buyer_confirmation) {
       throw new BadRequestException(
-        `Sipariş bu aşamada onaylanamaz (mevcut durum: ${order.status})`,
+        i18nMessage('server.order.notConfirmableStatus', { status: order.status }),
       );
     }
 
@@ -321,7 +325,7 @@ export class OrderLifecycleService {
     });
     if (openRefund) {
       throw new BadRequestException(
-        'Açık bir iade talebi var; önce sonuçlanması gerek',
+        i18nMessage('server.order.openRefundExists'),
       );
     }
 
@@ -357,10 +361,10 @@ export class OrderLifecycleService {
       where: { id: orderId },
       select: { id: true, status: true, confirmationDeadline: true },
     });
-    if (!order) throw new NotFoundException('Sipariş bulunamadı');
+    if (!order) throw new NotFoundException(i18nMessage('server.order.notFound'));
     if (order.status !== OrderStatus.awaiting_buyer_confirmation) {
       throw new BadRequestException(
-        'Sadece 48h penceresindeki siparişlerde uzatılabilir',
+        i18nMessage('server.order.extendOnlyWithinWindow'),
       );
     }
 
@@ -393,13 +397,13 @@ export class OrderLifecycleService {
       });
 
       if (!order) {
-        throw new NotFoundException('Sipariş bulunamadı');
+        throw new NotFoundException(i18nMessage('server.order.notFound'));
       }
       productIdToInvalidate = order.productId;
 
       // Only buyer can cancel
       if (order.buyerId !== userId) {
-        throw new ForbiddenException('Bu siparişi iptal etme yetkiniz yok');
+        throw new ForbiddenException(i18nMessage('server.order.cancelForbidden'));
       }
 
       // Can only cancel before shipping
@@ -411,7 +415,7 @@ export class OrderLifecycleService {
 
       if (!cancellableStatuses.includes(order.status)) {
         throw new BadRequestException(
-          'Sipariş kargoya verildikten sonra iptal edilemez',
+          i18nMessage('server.order.cannotCancelShipped'),
         );
       }
 
@@ -538,23 +542,23 @@ export class OrderLifecycleService {
       include: { product: true, offer: true },
     });
     if (!order) {
-      throw new NotFoundException('Sipariş bulunamadı');
+      throw new NotFoundException(i18nMessage('server.order.notFound'));
     }
     if (order.buyerId !== userId) {
-      throw new ForbiddenException('Bu siparişi yeniden aktive etme yetkiniz yok');
+      throw new ForbiddenException(i18nMessage('server.order.reactivateForbidden'));
     }
     if (order.status !== OrderStatus.cancelled) {
-      throw new BadRequestException('Sadece iptal edilmiş siparişler yeniden aktive edilebilir');
+      throw new BadRequestException(i18nMessage('server.order.reactivateOnlyCancelled'));
     }
     if (!order.offerId || !order.offer) {
-      throw new BadRequestException('Bu sipariş tekliften oluşmadığı için yeniden aktive edilemez');
+      throw new BadRequestException(i18nMessage('server.order.reactivateNotFromOffer'));
     }
     if (order.offer.status !== OfferStatus.accepted) {
-      throw new BadRequestException('İlgili teklif artık kabul edilmiş değil');
+      throw new BadRequestException(i18nMessage('server.order.reactivateOfferNotAccepted'));
     }
     const available = getAvailableQuantity(order.product);
     if (available !== null && available < 1) {
-      throw new BadRequestException('Ürün için yeterli müsait adet yok');
+      throw new BadRequestException(i18nMessage('server.order.reactivateInsufficientStock'));
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -578,15 +582,15 @@ export class OrderLifecycleService {
     });
 
     if (!order) {
-      throw new NotFoundException('Sipariş bulunamadı');
+      throw new NotFoundException(i18nMessage('server.order.notFound'));
     }
 
     if (order.sellerId !== sellerId) {
-      throw new ForbiddenException('Bu siparişi güncelleme yetkiniz yok');
+      throw new ForbiddenException(i18nMessage('server.order.updateForbidden'));
     }
 
     if (order.status !== OrderStatus.paid) {
-      throw new BadRequestException('Sadece ödenmiş siparişler hazırlanabilir');
+      throw new BadRequestException(i18nMessage('server.order.prepareOnlyPaid'));
     }
 
     const updatedOrder = await this.prisma.order.update({
@@ -626,15 +630,15 @@ export class OrderLifecycleService {
     });
 
     if (!order) {
-      throw new NotFoundException('Sipariş bulunamadı');
+      throw new NotFoundException(i18nMessage('server.order.notFound'));
     }
 
     if (order.buyerId !== buyerId) {
-      throw new ForbiddenException('Bu siparişi onaylama yetkiniz yok');
+      throw new ForbiddenException(i18nMessage('server.order.confirmForbidden'));
     }
 
     if (order.status !== OrderStatus.delivered) {
-      throw new BadRequestException('Sadece teslim edilmiş siparişler onaylanabilir');
+      throw new BadRequestException(i18nMessage('server.order.confirmOnlyDelivered'));
     }
 
     const updatedOrder = await this.prisma.order.update({

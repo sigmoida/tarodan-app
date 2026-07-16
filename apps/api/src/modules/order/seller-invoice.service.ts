@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { OrderStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma';
+import { i18nMessage } from '../i18n';
 import { StorageService } from '../storage/storage.service';
 import { SmtpProvider } from '../notification/providers/smtp.provider';
 import {
@@ -63,9 +64,9 @@ export class SellerInvoiceService {
     sellerId: string,
     file: Express.Multer.File | undefined,
   ): Promise<{ success: boolean; replaced: boolean; fileName: string }> {
-    if (!file) throw new BadRequestException('Fatura PDF dosyası gerekli');
-    if (file.mimetype !== 'application/pdf') throw new BadRequestException('Yalnız PDF yüklenebilir');
-    if (file.size > 10 * 1024 * 1024) throw new BadRequestException('PDF en fazla 10 MB olabilir');
+    if (!file) throw new BadRequestException(i18nMessage('server.order.invoicePdfRequired'));
+    if (file.mimetype !== 'application/pdf') throw new BadRequestException(i18nMessage('server.order.invoiceOnlyPdfAllowed'));
+    if (file.size > 10 * 1024 * 1024) throw new BadRequestException(i18nMessage('server.order.invoicePdfTooLarge'));
 
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -80,13 +81,13 @@ export class SellerInvoiceService {
         seller: { select: { displayName: true, companyName: true } },
       },
     });
-    if (!order) throw new NotFoundException('Sipariş bulunamadı');
-    if (order.sellerId !== sellerId) throw new ForbiddenException('Bu siparişin satıcısı değilsiniz');
+    if (!order) throw new NotFoundException(i18nMessage('server.order.notFound'));
+    if (order.sellerId !== sellerId) throw new ForbiddenException(i18nMessage('server.order.notOrderSeller'));
     if (!(await this.isCorporateSeller(sellerId))) {
-      throw new ForbiddenException('Yalnız iş üyeliği olan kurumsal (şirket) satıcılar fatura yükleyebilir');
+      throw new ForbiddenException(i18nMessage('server.order.invoiceOnlyCorporateSeller'));
     }
     if (!SellerInvoiceService.POST_PAYMENT.includes(order.status)) {
-      throw new BadRequestException('Fatura yalnız ödeme alındıktan sonra yüklenebilir');
+      throw new BadRequestException(i18nMessage('server.order.invoiceOnlyAfterPayment'));
     }
 
     const up = await this.storage.uploadFile(
@@ -179,9 +180,9 @@ export class SellerInvoiceService {
       where: { id: orderId },
       select: { sellerId: true, buyerId: true, status: true },
     });
-    if (!order) throw new NotFoundException('Sipariş bulunamadı');
+    if (!order) throw new NotFoundException(i18nMessage('server.order.notFound'));
     if (order.sellerId !== userId && order.buyerId !== userId) {
-      throw new ForbiddenException('Bu siparişe erişim yetkiniz yok');
+      throw new ForbiddenException(i18nMessage('server.order.orderAccessForbidden'));
     }
     const inv = await this.prisma.sellerUploadedInvoice.findUnique({
       where: { orderId },
@@ -201,15 +202,15 @@ export class SellerInvoiceService {
       where: { id: orderId },
       select: { sellerId: true, buyerId: true },
     });
-    if (!order) throw new NotFoundException('Sipariş bulunamadı');
+    if (!order) throw new NotFoundException(i18nMessage('server.order.notFound'));
     if (order.sellerId !== userId && order.buyerId !== userId) {
-      throw new ForbiddenException('Bu faturaya erişim yetkiniz yok');
+      throw new ForbiddenException(i18nMessage('server.order.invoiceAccessForbidden'));
     }
     const inv = await this.prisma.sellerUploadedInvoice.findUnique({
       where: { orderId },
       select: { pdfKey: true, fileName: true },
     });
-    if (!inv) throw new NotFoundException('Bu siparişe yüklenmiş fatura yok');
+    if (!inv) throw new NotFoundException(i18nMessage('server.order.invoiceNotUploaded'));
     const url = await this.storage.getPresignedDownloadUrl('documents', inv.pdfKey, 3600);
     return { url, fileName: inv.fileName };
   }

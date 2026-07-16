@@ -7,6 +7,8 @@ import {
 import { PrismaService } from '../../prisma';
 import { PaymentStatus } from '@prisma/client';
 import { StorageService } from '../storage/storage.service';
+import { i18nMessage, I18nService } from '../i18n';
+import { type Locale, defaultLocale } from '@tarodan/i18n';
 
 /**
  * Ödeme sorguları (durum sorgu, detay, satıcı hold listesi, kullanıcı ödeme
@@ -18,6 +20,7 @@ export class PaymentQueryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
+    private readonly i18n: I18nService,
   ) {}
 
   /**
@@ -74,7 +77,7 @@ export class PaymentQueryService {
     });
 
     if (!payment) {
-      throw new NotFoundException('Ödeme bulunamadı');
+      throw new NotFoundException(i18nMessage('server.payment.paymentNotFound'));
     }
 
     // iframe kaldırıldı: bekleyen ödeme yeniden /payment/[id] kart formundan tamamlanır
@@ -84,7 +87,7 @@ export class PaymentQueryService {
     // Trade cash payment (no order)
     if (!payment.order && payment.tradeCashPayment) {
       if (userId && payment.tradeCashPayment.payerId !== userId && payment.tradeCashPayment.recipientId !== userId) {
-        throw new ForbiddenException('Bu ödeme durumunu görüntüleme yetkiniz yok');
+        throw new ForbiddenException(i18nMessage('server.payment.viewStatusForbidden'));
       }
       return {
         id: payment.id,
@@ -105,13 +108,13 @@ export class PaymentQueryService {
       const group = payment.checkoutGroup;
       if (userId) {
         if (group.buyerId !== userId) {
-          throw new ForbiddenException('Bu ödeme durumunu görüntüleme yetkiniz yok');
+          throw new ForbiddenException(i18nMessage('server.payment.viewStatusForbidden'));
         }
       } else if (!group.isGuest) {
         const canPollWithoutAuth =
           payment.status === PaymentStatus.pending || payment.status === PaymentStatus.processing;
         if (!canPollWithoutAuth) {
-          throw new ForbiddenException('Bu ödeme için giriş yapmanız gerekiyor');
+          throw new ForbiddenException(i18nMessage('server.payment.loginRequiredForPayment'));
         }
       }
 
@@ -157,7 +160,7 @@ export class PaymentQueryService {
     }
 
     if (!payment.order) {
-      throw new NotFoundException('Ödeme ile ilişkili sipariş veya takas bulunamadı');
+      throw new NotFoundException(i18nMessage('server.payment.orderOrTradeNotFoundForPayment'));
     }
 
     // Check if this is a guest order
@@ -167,7 +170,7 @@ export class PaymentQueryService {
     // Validate access
     if (userId) {
       if (payment.order.buyerId !== userId && payment.order.sellerId !== userId) {
-        throw new ForbiddenException('Bu ödeme durumunu görüntüleme yetkiniz yok');
+        throw new ForbiddenException(i18nMessage('server.payment.viewStatusForbidden'));
       }
     } else {
       if (!isGuestOrder) {
@@ -176,7 +179,7 @@ export class PaymentQueryService {
         const canPollWithoutAuth =
           payment.status === PaymentStatus.pending || payment.status === PaymentStatus.processing;
         if (!canPollWithoutAuth) {
-          throw new ForbiddenException('Bu ödeme için giriş yapmanız gerekiyor');
+          throw new ForbiddenException(i18nMessage('server.payment.loginRequiredForPayment'));
         }
       }
     }
@@ -248,19 +251,19 @@ export class PaymentQueryService {
     });
 
     if (!payment) {
-      throw new NotFoundException('Ödeme bulunamadı');
+      throw new NotFoundException(i18nMessage('server.payment.paymentNotFound'));
     }
 
     // Grup veya takas ödemelerinde tekil sipariş yoktur; durum sorgusu için unified endpoint kullanılmalı
     if (!payment.order) {
       throw new BadRequestException(
-        'Bu ödeme bir sipariş grubuna veya takasa ait. Lütfen ödeme durumunu sipariş grubuyla sorgulayın.',
+        i18nMessage('server.payment.paymentBelongsToGroupOrTrade'),
       );
     }
 
     // Only buyer or seller can view
     if (payment.order.buyerId !== userId && payment.order.sellerId !== userId) {
-      throw new ForbiddenException('Bu ödemeyi görüntüleme yetkiniz yok');
+      throw new ForbiddenException(i18nMessage('server.payment.viewPaymentForbidden'));
     }
 
     const totalAmount = Number(payment.order.totalAmount ?? 0);
@@ -341,6 +344,7 @@ export class PaymentQueryService {
       page?: number;
       limit?: number;
     },
+    locale: Locale = defaultLocale,
   ) {
     const page = options?.page || 1;
     const limit = options?.limit || 20;
@@ -445,19 +449,26 @@ export class PaymentQueryService {
         const firstGroupOrder = group?.orders?.[0];
 
         let type: 'order' | 'checkout_group' | 'trade_cash' = 'order';
-        let description = p.order?.product?.title ?? 'Sipariş ödemesi';
+        let description =
+          p.order?.product?.title ??
+          this.i18n.translate('server.payment.orderPaymentDescription', locale);
         if (group) {
           type = 'checkout_group';
           const count = group.orders?.length ?? 0;
           description =
             count > 1
-              ? `Sepet ödemesi (${count} ürün)`
-              : firstGroupOrder?.product?.title ?? 'Sepet ödemesi';
+              ? this.i18n.translate('server.payment.cartPaymentDescriptionCount', locale, {
+                  count,
+                })
+              : (firstGroupOrder?.product?.title ??
+                this.i18n.translate('server.payment.cartPaymentDescription', locale));
         } else if (tradeCash) {
           type = 'trade_cash';
           description = tradeCash.trade?.tradeNumber
-            ? `Takas nakit farkı (#${tradeCash.trade.tradeNumber})`
-            : 'Takas nakit farkı';
+            ? this.i18n.translate('server.payment.tradeCashDifferenceWithNumber', locale, {
+                tradeNumber: tradeCash.trade.tradeNumber,
+              })
+            : this.i18n.translate('server.payment.tradeCashDifference', locale);
         }
 
         return {
@@ -486,7 +497,9 @@ export class PaymentQueryService {
             ? (group.orders ?? []).map((o: any) => ({
                 id: o.id,
                 orderNumber: o.orderNumber ?? null,
-                title: o.product?.title ?? 'Ürün',
+                title:
+                  o.product?.title ??
+                  this.i18n.translate('server.payment.productFallbackTitle', locale),
                 image: toImageUrls(o.product)?.images?.[0] ?? null,
                 amount: Number(o.totalAmount ?? 0),
                 sellerName: o.seller?.displayName ?? null,

@@ -97,6 +97,8 @@ describe('AuthService.loginWithGoogle', () => {
     google.verifyIdToken.mockResolvedValue({ sub: 'g1', email: 'a@b.com', name: 'Ali' });
     prisma.oAuthAccount.findUnique.mockResolvedValue({ id: 'oa1', userId: 'u1' });
     prisma.user.findUnique.mockResolvedValue({ ...baseUser, deletedAt: new Date() });
-    await expect(service.loginWithGoogle('tok')).rejects.toThrow('Hesap silinmiş');
+    await expect(service.loginWithGoogle('tok')).rejects.toMatchObject({
+      response: { i18nKey: 'server.auth.accountDeleted' },
+    });
   });
 });

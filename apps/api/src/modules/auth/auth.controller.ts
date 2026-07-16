@@ -17,8 +17,10 @@ import {
   ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
+import { type Locale } from '@tarodan/i18n';
 import { AuthService } from './auth.service';
 import { PhoneVerificationService } from './phone-verification.service';
+import { I18nService, ReqLocale } from '../i18n';
 import {
   RegisterDto,
   BusinessRegisterDto,
@@ -44,6 +46,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly phoneVerificationService: PhoneVerificationService,
+    private readonly i18n: I18nService,
   ) {}
 
   /**
@@ -61,8 +64,15 @@ export class AuthController {
   })
   @ApiResponse({ status: 400, description: 'Geçersiz veri' })
   @ApiResponse({ status: 409, description: 'Email zaten kayıtlı' })
-  async register(@Body() dto: RegisterDto): Promise<AuthResponseDto> {
-    return this.authService.register(dto);
+  async register(
+    @Body() dto: RegisterDto,
+    @ReqLocale() locale: Locale,
+  ): Promise<AuthResponseDto> {
+    const result = await this.authService.register(dto);
+    return {
+      ...result,
+      message: this.i18n.translate('server.auth.registerSuccess', locale),
+    };
   }
 
   /**
@@ -79,8 +89,15 @@ export class AuthController {
   })
   @ApiResponse({ status: 400, description: 'Geçersiz veri' })
   @ApiResponse({ status: 409, description: 'Email, telefon veya vergi kimlik numarası zaten kayıtlı' })
-  async registerBusiness(@Body() dto: BusinessRegisterDto): Promise<AuthResponseDto> {
-    return this.authService.registerBusiness(dto);
+  async registerBusiness(
+    @Body() dto: BusinessRegisterDto,
+    @ReqLocale() locale: Locale,
+  ): Promise<AuthResponseDto> {
+    const result = await this.authService.registerBusiness(dto);
+    return {
+      ...result,
+      message: this.i18n.translate('server.auth.businessRegisterSuccess', locale),
+    };
   }
 
   /**
@@ -196,13 +213,15 @@ export class AuthController {
   async logout(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
+    @ReqLocale() locale: Locale,
     @Body() body?: { refreshToken?: string },
   ) {
     clearAuthCookies(res, { admin: false });
     // Web httpOnly cookie'den, mobil body'den gönderir → ikisini de dene ve iptal et.
     const refreshToken =
       readCookie(req, [COOKIE_NAMES.user.refresh]) || body?.refreshToken;
-    return this.authService.logout(refreshToken);
+    await this.authService.logout(refreshToken);
+    return { message: this.i18n.translate('server.auth.loggedOut', locale) };
   }
 
   /**
@@ -233,8 +252,9 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Şifre sıfırlama isteği' })
   @ApiResponse({ status: 200, description: 'Şifre sıfırlama linki gönderildi' })
-  async forgotPassword(@Body() dto: ForgotPasswordDto) {
-    return this.authService.requestPasswordReset(dto.email);
+  async forgotPassword(@Body() dto: ForgotPasswordDto, @ReqLocale() locale: Locale) {
+    await this.authService.requestPasswordReset(dto.email);
+    return { message: this.i18n.translate('server.auth.passwordResetLinkSent', locale) };
   }
 
   /**
@@ -248,8 +268,9 @@ export class AuthController {
   @ApiOperation({ summary: 'Şifre sıfırla' })
   @ApiResponse({ status: 200, description: 'Şifre başarıyla sıfırlandı' })
   @ApiResponse({ status: 400, description: 'Geçersiz token' })
-  async resetPassword(@Body() dto: ResetPasswordDto) {
-    return this.authService.resetPassword(dto.token, dto.newPassword);
+  async resetPassword(@Body() dto: ResetPasswordDto, @ReqLocale() locale: Locale) {
+    await this.authService.resetPassword(dto.token, dto.newPassword);
+    return { message: this.i18n.translate('server.auth.passwordResetSuccess', locale) };
   }
 
   /**
@@ -262,8 +283,16 @@ export class AuthController {
   @ApiOperation({ summary: 'E-posta doğrulama' })
   @ApiResponse({ status: 200, description: 'E-posta başarıyla doğrulandı' })
   @ApiResponse({ status: 400, description: 'Geçersiz veya süresi dolmuş token' })
-  async verifyEmail(@Body() body: { token: string }) {
-    return this.authService.verifyEmail(body.token);
+  async verifyEmail(@Body() body: { token: string }, @ReqLocale() locale: Locale) {
+    const result = await this.authService.verifyEmail(body.token);
+    return {
+      message: this.i18n.translate(
+        result.alreadyVerified
+          ? 'server.auth.emailVerificationAlreadyDone'
+          : 'server.auth.emailVerificationSuccess',
+        locale,
+      ),
+    };
   }
 
   /**
@@ -278,8 +307,10 @@ export class AuthController {
   async sendPhoneCode(
     @CurrentUser() user: RequestUser,
     @Body() dto: SendPhoneCodeDto,
+    @ReqLocale() locale: Locale,
   ): Promise<{ message: string }> {
-    return this.phoneVerificationService.sendCode(user.id, dto.phone);
+    await this.phoneVerificationService.sendCode(user.id, dto.phone);
+    return { message: this.i18n.translate('server.auth.phoneVerificationCodeSent', locale) };
   }
 
   /**
@@ -294,8 +325,13 @@ export class AuthController {
   async verifyPhone(
     @CurrentUser() user: RequestUser,
     @Body() dto: VerifyPhoneDto,
+    @ReqLocale() locale: Locale,
   ): Promise<{ message: string; isPhoneVerified: boolean }> {
-    return this.phoneVerificationService.verify(user.id, dto.code);
+    const result = await this.phoneVerificationService.verify(user.id, dto.code);
+    return {
+      message: this.i18n.translate('server.auth.phoneVerificationSuccess', locale),
+      isPhoneVerified: result.isPhoneVerified,
+    };
   }
 
   /**
@@ -310,13 +346,14 @@ export class AuthController {
   @ApiOperation({ summary: 'Doğrulama e-postasını tekrar gönder' })
   @ApiResponse({ status: 200, description: 'Doğrulama e-postası gönderildi' })
   @ApiResponse({ status: 400, description: 'E-posta zaten doğrulanmış' })
-  async resendVerification(@Body() body: { email: string }) {
+  async resendVerification(@Body() body: { email: string }, @ReqLocale() locale: Locale) {
     // Find user by email
     const user = await this.authService.findUserByEmail(body.email);
     if (!user) {
       // Don't reveal if user exists for security
-      return { message: 'Eğer bu email kayıtlıysa, doğrulama linki gönderildi' };
+      return { message: this.i18n.translate('server.auth.resendVerificationGeneric', locale) };
     }
-    return this.authService.resendEmailVerification(user.id);
+    await this.authService.resendEmailVerification(user.id);
+    return { message: this.i18n.translate('server.auth.verificationEmailResent', locale) };
   }
 }

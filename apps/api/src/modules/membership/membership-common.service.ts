@@ -13,6 +13,7 @@ import {
 } from './dto';
 import { PaymentService } from '../payment/payment.service';
 import { PaymentProvider } from '../payment/dto';
+import { i18nMessage } from '../i18n';
 
 /**
  * MembershipCommonService — üyelik alt-servislerinin paylaştığı çekirdek okuma/
@@ -45,7 +46,7 @@ export class MembershipCommonService {
       });
 
       if (!freeTier) {
-        throw new NotFoundException('Ücretsiz üyelik tipi bulunamadı');
+        throw new NotFoundException(i18nMessage('server.membership.freeTierNotFound'));
       }
 
       const now = new Date();

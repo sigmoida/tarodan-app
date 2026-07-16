@@ -16,6 +16,7 @@ import { NotificationType } from '../notification/dto/notification.dto';
 import { CommissionLedgerService } from '../commission/commission-ledger.service';
 import { ElogoInvoicingService } from '../elogo';
 import { PaymentCommonService } from './payment-common.service';
+import { i18nMessage } from '../i18n';
 
 /**
  * İade / escrow serbest bırakma metodları — PaymentService'ten birebir taşındı
@@ -85,12 +86,12 @@ export class PaymentRefundService {
     }
 
     if (!payment) {
-      throw new NotFoundException('Tamamlanmış ödeme bulunamadı');
+      throw new NotFoundException(i18nMessage('server.payment.completedPaymentNotFound'));
     }
 
     const isGroupPayment = !payment.orderId && !!payment.checkoutGroupId;
     if (isGroupPayment && !refundTargetOrder) {
-      throw new NotFoundException('Sipariş bulunamadı');
+      throw new NotFoundException(i18nMessage('server.payment.orderNotFound'));
     }
 
     // Grup ödemesinde varsayılan iade tutarı SİPARİŞİN tutarıdır (grubun değil)
@@ -108,7 +109,10 @@ export class PaymentRefundService {
       : Number(payment.amount);
     if (amountToRefund > refundCap + 0.01) {
       throw new BadRequestException(
-        `İade tutarı (${amountToRefund} TL) izin verilen üst sınırı (${refundCap} TL) aşıyor`,
+        i18nMessage('server.payment.refundAmountExceedsLimit', {
+          amountToRefund,
+          refundCap,
+        }),
       );
     }
 
@@ -116,7 +120,7 @@ export class PaymentRefundService {
     const previouslyRefundedOrders: Record<string, number> =
       ((payment.metadata as any)?.refundedOrders as Record<string, number>) || {};
     if (isGroupPayment && previouslyRefundedOrders[orderId]) {
-      throw new BadRequestException('Bu sipariş için iade zaten yapılmış');
+      throw new BadRequestException(i18nMessage('server.payment.orderAlreadyRefunded'));
     }
 
     // Çift-ödeme koruması (K1). Bunu PayTR/Sürat'a dokunmadan ÖNCE yap.
@@ -140,7 +144,7 @@ export class PaymentRefundService {
       },
     });
     if (inFlightPayout) {
-      throw new BadRequestException('Transfer zaten başlatılmış, iade yapılamaz');
+      throw new BadRequestException(i18nMessage('server.payment.transferAlreadyStarted'));
     }
 
     try {
@@ -210,7 +214,7 @@ export class PaymentRefundService {
                   `yapılmadan abort (payment=${payment.id}, order=${orderId}): ${markerErr?.message}`,
               );
               throw new BadRequestException(
-                'İade başlatılamadı (geçici hata). Lütfen tekrar deneyin.',
+                i18nMessage('server.payment.refundInitiationFailed'),
               );
             }
 
@@ -227,7 +231,7 @@ export class PaymentRefundService {
               const msg = (err as Error).message || '';
               if (/odeme henuz siteye bildirilmemis|henuz siteye bildirilmemi/i.test(msg)) {
                 throw new BadRequestException(
-                  'Ödeme yeni tamamlandı, PayTR henüz işlemi tam senkronize etmedi. Lütfen 1-2 dakika sonra tekrar deneyin.',
+                  i18nMessage('server.payment.paymentNotYetSynced'),
                 );
               }
               throw err;
@@ -237,13 +241,15 @@ export class PaymentRefundService {
               // Kesin ret → marker geri al (retry PayTR'yi tekrar çağırabilsin).
               await this.clearRefundInProgress(payment.id, orderId).catch(() => {});
               throw new BadRequestException(
-                refundResult.err_msg || 'PayTR iade işlemi başarısız',
+                refundResult.err_msg || i18nMessage('server.payment.paytrRefundFailed'),
               );
             }
           }
         }
       } else {
-        throw new BadRequestException(`Bilinmeyen ödeme sağlayıcı: ${payment.provider}`);
+        throw new BadRequestException(
+          i18nMessage('server.payment.unknownProvider', { provider: payment.provider }),
+        );
       }
 
       // Update payment status after successful refund
@@ -313,7 +319,7 @@ export class PaymentRefundService {
             where: { paymentHoldId: activeHold.id, status: { in: ['completed', 'processing'] } },
           });
           if (activePayout) {
-            throw new BadRequestException('Transfer zaten başlatılmış, iade yapılamaz');
+            throw new BadRequestException(i18nMessage('server.payment.transferAlreadyStarted'));
           }
           // Adet bazlı kısmi iade: hold'un yalnız iade edilen satıcı-payı kadarı
           // tüketilir (refundedAmount += amount*adet/siparişAdedi). Tam iadede hold
@@ -660,21 +666,21 @@ export class PaymentRefundService {
             `PayTR çağrısı yapılmadan abort (tradeId=${tradeId}): ${markerErr?.message}`,
         );
         throw new BadRequestException(
-          'İade başlatılamadı (geçici hata). Lütfen tekrar deneyin.',
+          i18nMessage('server.payment.refundInitiationFailed'),
         );
       }
       try {
         const refundResult = await this.paytrService.createRefund(oid, amount);
         if (refundResult.status !== 'success') {
           throw new BadRequestException(
-            refundResult.err_msg || 'PayTR iade işlemi başarısız',
+            refundResult.err_msg || i18nMessage('server.payment.paytrRefundFailed'),
           );
         }
       } catch (e: any) {
         const msg = (e as Error).message || '';
         if (/odeme henuz siteye bildirilmemis|henuz siteye bildirilmemi/i.test(msg)) {
           throw new BadRequestException(
-            'Ödeme yeni tamamlandı, PayTR henüz işlemi tam senkronize etmedi. Lütfen 1-2 dakika sonra tekrar deneyin.',
+            i18nMessage('server.payment.paymentNotYetSynced'),
           );
         }
         this.logger.error(
@@ -755,7 +761,7 @@ export class PaymentRefundService {
 
     if (!hold) {
       throw new NotFoundException(
-        'Serbest bırakılabilir ödeme bulunamadı (açık iade nedeniyle dondurulmuş olabilir)',
+        i18nMessage('server.payment.holdNotReleasable'),
       );
     }
 
@@ -775,7 +781,7 @@ export class PaymentRefundService {
 
     if (released.count === 0) {
       throw new NotFoundException(
-        'Serbest bırakılabilir ödeme bulunamadı (açık iade nedeniyle dondurulmuş olabilir)',
+        i18nMessage('server.payment.holdNotReleasable'),
       );
     }
 

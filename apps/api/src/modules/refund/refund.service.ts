@@ -30,6 +30,7 @@ import { CreateRefundRequestDto } from './dto/create-refund-request.dto';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto/notification.dto';
 import { StorageService } from '../storage/storage.service';
+import { i18nMessage } from '../i18n';
 
 const COOLING_OFF_DAYS = 14;
 
@@ -179,30 +180,30 @@ export class RefundService {
       },
     });
     if (!order) {
-      throw new NotFoundException('Sipariş bulunamadı');
+      throw new NotFoundException(i18nMessage('server.refund.orderNotFound'));
     }
     // Üyelik/dijital siparişler (sanal ürün + platform satıcısı) genel iade akışına girmez;
     // üyeliğin kendi iptal akışı vardır.
     if (order.orderNumber?.startsWith('MEM-')) {
       throw new BadRequestException(
-        'Üyelik siparişleri için iade talebi oluşturulamaz; üyeliğinizi üyelik ayarlarından iptal edebilirsiniz.',
+        i18nMessage('server.refund.membershipOrderNotEligible'),
       );
     }
     if (order.buyerId !== requesterId) {
-      throw new ForbiddenException('Sadece alıcı iade talebi oluşturabilir');
+      throw new ForbiddenException(i18nMessage('server.refund.onlyBuyerCanRequest'));
     }
 
     if (order.status === OrderStatus.pending_payment) {
       throw new BadRequestException(
-        'Bu sipariş henüz ödenmemiş, iade yerine siparişi iptal etmelisiniz',
+        i18nMessage('server.refund.orderNotPaidYet'),
       );
     }
     if (order.status === OrderStatus.cancelled || order.status === OrderStatus.refunded) {
-      throw new BadRequestException('Bu sipariş zaten iptal/iade edilmiş');
+      throw new BadRequestException(i18nMessage('server.refund.orderAlreadyCancelledOrRefunded'));
     }
     const payment = order.payment ?? (order as any).checkoutGroup?.payment ?? null;
     if (!payment || payment.status !== PaymentStatus.completed) {
-      throw new BadRequestException('Tamamlanmış ödeme bulunamadı');
+      throw new BadRequestException(i18nMessage('server.refund.completedPaymentNotFound'));
     }
 
     const activeStatuses: RefundRequestStatus[] = [
@@ -216,7 +217,7 @@ export class RefundService {
     ];
     const hasActive = order.refundRequests.some((r) => activeStatuses.includes(r.status));
     if (hasActive) {
-      throw new BadRequestException('Bu sipariş için zaten aktif bir iade talebi var');
+      throw new BadRequestException(i18nMessage('server.refund.alreadyActive'));
     }
 
     // Adet bazlı kısmi iade: istenen adet (verilmezse tümü), sipariş adediyle sınırlı.
@@ -240,11 +241,11 @@ export class RefundService {
       // talebi oluşturamaz. (Escrow de gün 15'te payout ettiği için bu kural
       // sayesinde payout anında asla açık/açılabilir iade kalmaz.)
       throw new BadRequestException(
-        '14 günlük iade süresi dolmuştur; bu sipariş için artık iade talebi oluşturulamaz.',
+        i18nMessage('server.refund.coolingOffExpired'),
       );
     }
 
-    throw new BadRequestException('Bu sipariş durumunda iade talebi oluşturulamaz');
+    throw new BadRequestException(i18nMessage('server.refund.orderStatusNotEligible'));
   }
 
   async cancelRefundRequest(refundRequestId: string, requesterId: string) {
@@ -252,16 +253,16 @@ export class RefundService {
       where: { id: refundRequestId },
       include: { order: { select: { id: true, sellerId: true } } },
     });
-    if (!rr) throw new NotFoundException('İade talebi bulunamadı');
+    if (!rr) throw new NotFoundException(i18nMessage('server.refund.notFound'));
     if (rr.requesterId !== requesterId) {
-      throw new ForbiddenException('Bu talebi iptal edemezsiniz');
+      throw new ForbiddenException(i18nMessage('server.refund.cannotCancel'));
     }
     if (
       rr.status !== RefundRequestStatus.pending_review &&
       rr.status !== RefundRequestStatus.wait_for_delivery
     ) {
       throw new BadRequestException(
-        'Bu talep artık iptal edilemez (iade kargosu açılmış veya karara bağlanmış)',
+        i18nMessage('server.refund.cannotCancelAnymore'),
       );
     }
     const updated = await this.prisma.refundRequest.update({
@@ -302,10 +303,10 @@ export class RefundService {
         requester: { select: { id: true, displayName: true } },
       },
     });
-    if (!rr) throw new NotFoundException('İade talebi bulunamadı');
+    if (!rr) throw new NotFoundException(i18nMessage('server.refund.notFound'));
 
     if (!isAdmin && rr.requesterId !== userId && rr.order.sellerId !== userId) {
-      throw new ForbiddenException('Bu talebi görüntüleme yetkiniz yok');
+      throw new ForbiddenException(i18nMessage('server.refund.viewForbidden'));
     }
     return this.withResolvedImages(rr);
   }
@@ -360,7 +361,7 @@ export class RefundService {
         },
       },
     });
-    if (!rr) throw new NotFoundException('İade talebi bulunamadı');
+    if (!rr) throw new NotFoundException(i18nMessage('server.refund.notFound'));
     if (rr.returnTrackingNumber) {
       this.logger.log(`Return shipment already exists for ${rr.refundNumber}`);
       return rr;
@@ -380,7 +381,7 @@ export class RefundService {
     // Yalnız alıcı adresi gerçekten bulunamazsa iade kargosu açılamaz.
     if (!buyerAddr) {
       throw new BadRequestException(
-        'Alıcının teslimat/kayıtlı adresi bulunamadı, iade kargosu oluşturulamaz. Alıcı bir adres eklemeli.',
+        i18nMessage('server.refund.buyerAddressNotFound'),
       );
     }
 
@@ -474,7 +475,7 @@ export class RefundService {
       where: { id: refundRequestId },
       include: { order: true },
     });
-    if (!rr) throw new NotFoundException('İade talebi bulunamadı');
+    if (!rr) throw new NotFoundException(i18nMessage('server.refund.notFound'));
     if (rr.status === RefundRequestStatus.refunded) return rr;
 
     const refundResult = await this.paymentService.processRefund(
@@ -885,7 +886,7 @@ export class RefundService {
       include: { order: true },
     });
     if (!before) {
-      throw new NotFoundException('İade talebi bulunamadı');
+      throw new NotFoundException(i18nMessage('server.refund.notFound'));
     }
 
     // Yeni policy değerleri (mevcut + payload merge)
@@ -995,7 +996,7 @@ export class RefundService {
       select: { id: true, returnShippingPayer: true },
     });
     if (!before) {
-      throw new NotFoundException('İade talebi bulunamadı');
+      throw new NotFoundException(i18nMessage('server.refund.notFound'));
     }
 
     const updated = await this.prisma.refundRequest.update({

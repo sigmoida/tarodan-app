@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, Logger, Optional } 
 import { PrismaService } from '../../prisma';
 import { StorageService } from '../storage/storage.service';
 import { UserCommonService } from './user-common.service';
+import { i18nMessage } from '../i18n';
 
 /**
  * UserAnalyticsService — ağır analitik: getUserAnalytics (dönemsel satış/
@@ -368,19 +369,19 @@ export class UserAnalyticsService {
     });
 
     if (!user) {
-      throw new NotFoundException('Kullanıcı bulunamadı');
+      throw new NotFoundException(i18nMessage('server.user.notFound'));
     }
 
     // Check if user has business tier
     const hasBusinessTier = user.membership?.tier?.type === 'business';
     const hasCompanyName = !!user.companyName;
-    
+
     if (!hasBusinessTier) {
-      throw new BadRequestException('Bu özellik sadece işletme üyeliğine sahip hesaplar için geçerlidir. Üyeliğinizi yükseltin.');
+      throw new BadRequestException(i18nMessage('server.user.businessFeatureOnly'));
     }
-    
+
     if (!hasCompanyName) {
-      throw new BadRequestException('İşletme panelini kullanmak için şirket adı bilgisi gereklidir. Lütfen profil ayarlarınızdan şirket adınızı ekleyin.');
+      throw new BadRequestException(i18nMessage('server.user.companyNameRequired'));
     }
 
     // Get date ranges

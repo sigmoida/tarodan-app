@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { OrderStatus, ProductStatus } from '@prisma/client';
+import { i18nMessage } from '../i18n';
 
 /**
  * UserStatsService — özet istatistikler: isBusinessAccount,
@@ -203,7 +204,7 @@ export class UserStatsService {
     ]);
 
     if (!user) {
-      throw new NotFoundException('Kullanıcı bulunamadı');
+      throw new NotFoundException(i18nMessage('server.user.notFound'));
     }
 
     return {

@@ -70,6 +70,34 @@ describe("AllExceptionsFilter", () => {
     expect(body.message).toBe("Record not found");
   });
 
+  it("preserves extra structured fields on a catalog-key payload", () => {
+    const { status, body } = run(
+      new ForbiddenException({
+        ...i18nMessage("server.common.recordNotFound"),
+        errorCode: "USER_BANNED",
+        bannedReason: "spam",
+      }),
+    );
+    expect(status).toBe(403);
+    expect(body.message).toBe("Kayıt bulunamadı");
+    expect(body.errorCode).toBe("USER_BANNED");
+    expect(body.bannedReason).toBe("spam");
+  });
+
+  it("renders localized payloads nested in extra fields (errors[])", () => {
+    const { body } = run(
+      new BadRequestException({
+        ...i18nMessage("server.common.recordNotFound"),
+        errors: [i18nMessage("server.common.recordExists")],
+        details: { activeProducts: 2 },
+      }),
+      { "accept-language": "en" },
+    );
+    expect(body.message).toBe("Record not found");
+    expect(body.errors).toEqual(["This record already exists"]);
+    expect(body.details).toEqual({ activeProducts: 2 });
+  });
+
   it("maps Prisma P2002 (unique) to a localized 409", () => {
     const err = new Prisma.PrismaClientKnownRequestError(
       "Unique failed on email",

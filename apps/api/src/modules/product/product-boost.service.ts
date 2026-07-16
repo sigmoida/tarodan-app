@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { PrismaService } from '../../prisma';
+import { i18nMessage } from '../i18n';
 import { ProductStatus, OrderStatus } from '@prisma/client';
 import { isPremiumEntitled } from '../membership/membership.util';
 import { PaymentService } from '../payment/payment.service';
@@ -84,11 +85,11 @@ export class ProductBoostService {
     req?: Request,
   ) {
     if (!BOOST_DURATIONS.includes(durationDays as any)) {
-      throw new BadRequestException('Geçerli bir boost süresi seçiniz (3, 7 veya 30 gün)');
+      throw new BadRequestException(i18nMessage('server.product.invalidBoostDuration'));
     }
 
     if (!(await this.isBoostEnabled())) {
-      throw new BadRequestException('Öne çıkarma şu anda kullanılamıyor');
+      throw new BadRequestException(i18nMessage('server.product.boostUnavailable'));
     }
 
     // Ürün + sahiplik + durum doğrula
@@ -97,18 +98,18 @@ export class ProductBoostService {
       select: { id: true, sellerId: true, status: true, title: true, categoryId: true },
     });
     if (!product) {
-      throw new NotFoundException('Ürün bulunamadı');
+      throw new NotFoundException(i18nMessage('server.product.notFound'));
     }
     if (product.sellerId !== userId) {
-      throw new ForbiddenException('Sadece kendi ilanınızı öne çıkarabilirsiniz');
+      throw new ForbiddenException(i18nMessage('server.product.boostOwnOnly'));
     }
     if (product.status !== ProductStatus.active) {
-      throw new BadRequestException('Sadece aktif (yayında) ilanlar öne çıkarılabilir');
+      throw new BadRequestException(i18nMessage('server.product.boostActiveOnly'));
     }
 
     const price = await this.getPriceForDuration(durationDays);
     if (price <= 0) {
-      throw new BadRequestException('Bu süre için geçerli bir fiyat tanımlı değil');
+      throw new BadRequestException(i18nMessage('server.product.boostPriceUndefined'));
     }
 
     // Platform satıcısı + varsayılan kategori (sanal ürün için)
@@ -116,13 +117,13 @@ export class ProductBoostService {
       where: { email: 'platform@tarodan.com', sellerType: 'platform' },
     });
     if (!platformSeller) {
-      throw new NotFoundException('Platform seller bulunamadı');
+      throw new NotFoundException(i18nMessage('server.product.platformSellerNotFound'));
     }
     const defaultCategory = await this.prisma.category.findFirst({
       where: { isActive: true },
     });
     if (!defaultCategory) {
-      throw new NotFoundException('Kategori bulunamadı');
+      throw new NotFoundException(i18nMessage('server.product.categoryNotFound'));
     }
 
     // Otomatik yenileme yalnızca premium (ücretli, aktif) üyelere

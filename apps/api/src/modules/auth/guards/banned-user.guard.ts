@@ -3,6 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../../../prisma';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { IS_ADMIN_ROUTE_KEY } from '../decorators/admin-route.decorator';
+import { i18nMessage } from '../../i18n';
 
 /**
  * Guard to prevent banned users from accessing API endpoints
@@ -79,10 +80,10 @@ export class BannedUserGuard implements CanActivate {
 
       // Block all other requests. errorCode lets clients distinguish a ban
       // from other 403s and route the user to the dedicated banned screen.
+      // AllExceptionsFilter renders the catalog key in the request locale and
+      // preserves the extra structured fields (#224).
       throw new ForbiddenException({
-        statusCode: 403,
-        error: 'Forbidden',
-        message: 'Hesabınız banlanmış. Destek ekibiyle iletişime geçin.',
+        ...i18nMessage('server.auth.accountBanned'),
         errorCode: 'USER_BANNED',
         bannedReason: dbUser.bannedReason ?? null,
       });

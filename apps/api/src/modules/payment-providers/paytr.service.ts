@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as crypto from "crypto";
+import { i18nMessage } from "../i18n";
 
 // =============================================================================
 // PAYTR API TYPES
@@ -399,18 +400,20 @@ export class PayTRService {
       const rawText = await response.text();
       const data = this.parsePaytrJson<PayTRRefundResponse>(rawText);
       if (!data) {
-        throw new BadRequestException("PayTR iade yanıtı geçersiz/boş");
+        throw new BadRequestException(i18nMessage("server.payment.refundResponseInvalid"));
       }
 
       if (data.status !== "success") {
-        throw new BadRequestException(data.err_msg || "PayTR iade başarısız");
+        throw new BadRequestException(
+          data.err_msg || i18nMessage("server.payment.refundFailed"),
+        );
       }
 
       return data;
     } catch (error: any) {
       this.logger.error("PayTR refund error:", error);
       if (error instanceof HttpException) throw error;
-      throw new BadRequestException("PayTR iade hatası");
+      throw new BadRequestException(i18nMessage("server.payment.refundError"));
     }
   }
 
@@ -469,11 +472,15 @@ export class PayTRService {
       const rawText = await response.text();
       const data = this.parsePaytrJson(rawText);
       if (!data) {
-        throw new BadRequestException("PayTR taksit yanıtı geçersiz/boş");
+        throw new BadRequestException(
+          i18nMessage("server.payment.installmentResponseInvalid"),
+        );
       }
 
       if (data.status !== "success") {
-        throw new BadRequestException("Taksit bilgileri alınamadı");
+        throw new BadRequestException(
+          i18nMessage("server.payment.installmentInfoUnavailable"),
+        );
       }
 
       // Parse installment options
@@ -494,7 +501,9 @@ export class PayTRService {
     } catch (error: any) {
       this.logger.error("PayTR installment check error:", error);
       if (error instanceof HttpException) throw error;
-      throw new BadRequestException("Taksit bilgisi alınamadı");
+      throw new BadRequestException(
+        i18nMessage("server.payment.installmentInfoFetchFailed"),
+      );
     }
   }
 
@@ -535,7 +544,7 @@ export class PayTRService {
   ): Promise<{ status: "success"; threeDSHtml?: string }> {
     if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
       throw new BadRequestException(
-        "PayTR yapılandırılmamış (merchant bilgileri eksik)",
+        i18nMessage("server.payment.notConfigured"),
       );
     }
 
@@ -649,16 +658,14 @@ export class PayTRService {
       rawText = await response.text();
     } catch (error: any) {
       this.logger.error(`PayTR direct API connection error: ${error?.message}`);
-      throw new BadRequestException(
-        "PayTR bağlantı hatası, lütfen tekrar deneyin.",
-      );
+      throw new BadRequestException(i18nMessage("server.payment.connectionError"));
     }
 
     const trimmed = (rawText || "").trim();
     if (!trimmed) {
       this.logger.error(`PayTR direct API boş yanıt. HTTP ${httpStatus}`);
       throw new BadRequestException(
-        `PayTR yanıt vermedi (HTTP ${httpStatus}).`,
+        i18nMessage("server.payment.noResponse", { httpStatus }),
       );
     }
 
@@ -679,16 +686,15 @@ export class PayTRService {
         // non_3d=1: çekim anında yapıldı; sonuç ayrıca Bildirim URL'ine düşer.
         return { status: "success" };
       }
-      let reason: string =
-        data?.err_msg || data?.reason || "PayTR ödemeyi reddetti";
-      if (/paytr_token/i.test(reason)) {
+      let reason: string | ReturnType<typeof i18nMessage> =
+        data?.err_msg || data?.reason || i18nMessage("server.payment.paymentRejected");
+      if (typeof reason === "string" && /paytr_token/i.test(reason)) {
         // Bu hata pratikte mağazada Direkt API yetkisinin tanımlı olmamasında da
         // dönüyor — istemci bu mesajla iframe akışına düşer.
-        reason =
-          "PayTR kart ödemesi bu mağaza için doğrulanamadı (Direkt API yetkisi gerekli olabilir).";
+        reason = i18nMessage("server.payment.directApiNotAuthorized");
       }
       this.logger.warn(
-        `PayTR direct API failed oid=${merchantOid}: ${data?.reason || reason}`,
+        `PayTR direct API failed oid=${merchantOid}: ${data?.reason || (typeof reason === "string" ? reason : "")}`,
       );
       throw new BadRequestException(reason);
     }
@@ -706,7 +712,7 @@ export class PayTRService {
       `PayTR direct API beklenmeyen yanıt oid=${merchantOid} HTTP ${httpStatus}: ${trimmed.slice(0, 300)}`,
     );
     throw new BadRequestException(
-      "PayTR beklenmeyen yanıt döndü; kart bilgilerinizi kontrol edin.",
+      i18nMessage("server.payment.unexpectedResponse"),
     );
   }
 
@@ -739,7 +745,7 @@ export class PayTRService {
   }> {
     if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
       throw new BadRequestException(
-        "PayTR yapılandırılmamış (merchant bilgileri eksik)",
+        i18nMessage("server.payment.notConfigured"),
       );
     }
     const paymentAmount = params.amount.toFixed(2); // ONDALIK TL (recurring kuruş kabul etmez)
@@ -861,7 +867,7 @@ export class PayTRService {
   > {
     if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
       throw new BadRequestException(
-        "PayTR yapılandırılmamış (merchant bilgileri eksik)",
+        i18nMessage("server.payment.notConfigured"),
       );
     }
     const paytrToken = crypto
@@ -921,7 +927,7 @@ export class PayTRService {
   ): Promise<{ status: string; reason?: string }> {
     if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
       throw new BadRequestException(
-        "PayTR yapılandırılmamış (merchant bilgileri eksik)",
+        i18nMessage("server.payment.notConfigured"),
       );
     }
     const paytrToken = crypto

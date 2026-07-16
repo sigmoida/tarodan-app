@@ -21,6 +21,7 @@ import { MembershipPaymentInitResponseDto } from "./dto/membership-payment.dto";
 import { isPremiumEntitled } from "./membership.util";
 import { MembershipCommonService } from "./membership-common.service";
 import { MembershipSubscriptionService } from "./membership-subscription.service";
+import { i18nMessage } from "../i18n";
 
 /**
  * MembershipService (facade) — her public imza aynen korunur. Tier/sorgu/limit/
@@ -65,7 +66,7 @@ export class MembershipService {
     });
 
     if (!tier) {
-      throw new NotFoundException(`Üyelik tipi bulunamadı: ${type}`);
+      throw new NotFoundException(i18nMessage('server.membership.tierNotFound', { type }));
     }
 
     return this.common.mapTierToDto(tier);
@@ -84,13 +85,13 @@ export class MembershipService {
   async getUserLimits(userId: string): Promise<MembershipLimitsDto> {
     try {
       if (!userId) {
-        throw new BadRequestException("Kullanıcı kimliği bulunamadı");
+        throw new BadRequestException(i18nMessage('server.membership.userIdNotFound'));
       }
 
       const membership = await this.getUserMembership(userId);
 
       if (!membership || !membership.tier) {
-        throw new NotFoundException("Üyelik bilgisi bulunamadı");
+        throw new NotFoundException(i18nMessage('server.membership.infoNotFound'));
       }
 
       // getUserUsageStats already handles platform setting override for all tiers
@@ -180,7 +181,7 @@ export class MembershipService {
         throw error;
       }
       // Wrap unknown errors — do not leak internal detail to the client.
-      throw new BadRequestException("Üyelik limitleri alınamadı");
+      throw new BadRequestException(i18nMessage('server.membership.limitsFetchFailed'));
     }
   }
 
@@ -242,7 +243,9 @@ export class MembershipService {
     });
 
     if (existingTier) {
-      throw new BadRequestException(`Üyelik tipi zaten mevcut: ${dto.type}`);
+      throw new BadRequestException(
+        i18nMessage('server.membership.tierAlreadyExists', { type: dto.type }),
+      );
     }
 
     const tier = await this.prisma.membershipTier.create({
@@ -279,7 +282,9 @@ export class MembershipService {
     });
 
     if (!tier) {
-      throw new NotFoundException(`Üyelik tipi bulunamadı: ${tierType}`);
+      throw new NotFoundException(
+        i18nMessage('server.membership.tierNotFound', { type: tierType }),
+      );
     }
 
     const updatedTier = await this.prisma.membershipTier.update({
@@ -340,6 +345,14 @@ export class MembershipService {
   // ==========================================================================
   // VALIDATE LISTING CREATION
   // ==========================================================================
+  // #224: bu üç canCreate*() metodunun `reason` alanı i18nMessage()'a taşınmadı —
+  // (a) trade/product/collection modüllerinde doğrudan `throw new
+  // BadRequestException(result.reason)` ile veya `||` fallback'iyle string olarak
+  // tüketiliyor (örn. trade-lifecycle.service.ts, collection-crud.service.ts —
+  // kapsam dışı), (b) /membership/check/* endpoint'leri `reason`'ı olduğu gibi
+  // JSON response'ta client'a dönüyor (AllExceptionsFilter'ın locale-render'ı yalnız
+  // exception'larda çalışır, düz 200 body'de değil). Tipi payload'a çevirmek bu
+  // modüllerde de değişiklik ister — kapsam dışı, invasive, rapora bkz.
   async canCreateListing(
     userId: string,
   ): Promise<{ allowed: boolean; reason?: string }> {

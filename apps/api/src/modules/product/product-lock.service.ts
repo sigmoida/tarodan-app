@@ -7,6 +7,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma';
+import { i18nMessage } from '../i18n';
 import { getAvailableQuantity, safeDecrementReserved } from './helpers/product-availability.helper';
 import { NotificationService } from '../notification/notification.service';
 
@@ -110,19 +111,21 @@ export class ProductLockService {
     const product = await this.lockProductForUpdate(tx, productId);
 
     if (!product) {
-      throw new BadRequestException(`Ürün bulunamadı: ${productId}`);
+      throw new BadRequestException(
+        i18nMessage('server.product.notFoundWithId', { productId }),
+      );
     }
 
     if (product.status !== ProductStatus.active && product.status !== ProductStatus.reserved) {
       throw new BadRequestException(
-        `Ürün satışta değil (status=${product.status})`,
+        i18nMessage('server.product.notForSaleStatus', { status: product.status }),
       );
     }
 
     const available = getAvailableQuantity(product);
     if (available !== null && available < requiredQty) {
       throw new BadRequestException(
-        `Bu ürün stokta bulunmamaktadır (müsait=${available}, istenen=${requiredQty})`,
+        i18nMessage('server.product.insufficientStock', { available, requested: requiredQty }),
       );
     }
 

@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
+import { i18nMessage } from '../i18n';
 import { CheckoutQuoteDto } from './dto';
 import { ProductStatus, CommissionRuleType, CommissionAppliesTo } from '@prisma/client';
 import {
@@ -132,7 +133,7 @@ export class OrderPricingService {
     };
   }> {
     if (!dto.items?.length) {
-      throw new BadRequestException('En az bir ürün gereklidir');
+      throw new BadRequestException(i18nMessage('server.order.atLeastOneProductRequired'));
     }
 
     const now = new Date();
@@ -170,10 +171,12 @@ export class OrderPricingService {
       });
 
       if (!product) {
-        throw new NotFoundException(`Ürün bulunamadı: ${productId}`);
+        throw new NotFoundException(i18nMessage('server.order.productNotFoundById', { productId }));
       }
       if (product.status !== ProductStatus.active) {
-        throw new BadRequestException(`Ürün satışta değil: ${product.title || productId}`);
+        throw new BadRequestException(
+          i18nMessage('server.order.productNotActiveByTitle', { title: product.title || productId }),
+        );
       }
 
       const productPrice = Number(product.price);

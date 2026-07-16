@@ -6,6 +6,7 @@ import { Request } from 'express';
 import { JwtPayload, RequestUser } from '../interfaces';
 import { PrismaService } from '../../../prisma';
 import { COOKIE_NAMES, readCookie } from '../utils/auth-cookies';
+import { i18nMessage } from '../../i18n';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
@@ -27,7 +28,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   async validate(payload: JwtPayload): Promise<RequestUser> {
     // Verify it's an access token
     if (payload.type !== 'access') {
-      throw new UnauthorizedException('Geçersiz token tipi');
+      throw new UnauthorizedException(i18nMessage('server.auth.invalidTokenType'));
     }
 
     // Check if user still exists and is active
@@ -37,12 +38,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Kullanıcı bulunamadı');
+      throw new UnauthorizedException(i18nMessage('server.auth.userNotFound'));
     }
 
     // Silinmiş (anonimleştirilmiş) hesap: satır FK'lar için korunur ama erişim reddedilir.
     if (user.deletedAt) {
-      throw new UnauthorizedException('Hesap silinmiş');
+      throw new UnauthorizedException(i18nMessage('server.auth.accountDeleted'));
     }
 
     return {

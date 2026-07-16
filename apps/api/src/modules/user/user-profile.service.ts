@@ -4,6 +4,7 @@ import { User, Prisma, ProductStatus, TradeStatus, OrderStatus } from '@prisma/c
 import { ModerationAiClient } from '../moderation/moderation-ai.client';
 import { computeTrustScore } from './helpers/trust-score';
 import { isPremiumEntitled } from '../membership/membership.util';
+import { i18nMessage } from '../i18n';
 import {
   DEFAULT_NOTIFICATION_SETTINGS,
   NotificationSettings,
@@ -85,7 +86,7 @@ export class UserProfileService {
     });
 
     if (!user) {
-      throw new NotFoundException('Kullanıcı bulunamadı');
+      throw new NotFoundException(i18nMessage('server.user.notFound'));
     }
 
     // Count only active listings (exclude inactive and deleted)
@@ -230,7 +231,7 @@ export class UserProfileService {
     });
 
     if (!user) {
-      throw new NotFoundException('Kullanıcı bulunamadı');
+      throw new NotFoundException(i18nMessage('server.user.notFound'));
     }
 
     const isBusinessTier = user.membership?.tier?.type === 'business';
@@ -246,7 +247,7 @@ export class UserProfileService {
       });
 
       if (existingPhone) {
-        throw new BadRequestException('Bu telefon numarası zaten kullanılıyor');
+        throw new BadRequestException(i18nMessage('server.user.phoneAlreadyInUse'));
       }
     }
 
@@ -287,7 +288,7 @@ export class UserProfileService {
 
     // Check if there's any data to update
     if (Object.keys(updateData).length === 0) {
-      throw new BadRequestException('Güncellenecek alan bulunamadı');
+      throw new BadRequestException(i18nMessage('server.user.noFieldsToUpdate'));
     }
 
     // Update user
@@ -311,7 +312,7 @@ export class UserProfileService {
     });
 
     if (!user) {
-      throw new NotFoundException('Kullanıcı bulunamadı');
+      throw new NotFoundException(i18nMessage('server.user.notFound'));
     }
 
     const stored = (user.notificationSettings as Partial<NotificationSettings> | null) ?? {};
@@ -357,7 +358,7 @@ export class UserProfileService {
     });
 
     if (!user) {
-      throw new NotFoundException('Kullanıcı bulunamadı');
+      throw new NotFoundException(i18nMessage('server.user.notFound'));
     }
 
     // Check 1: Active products (active, pending, reserved)
@@ -413,30 +414,38 @@ export class UserProfileService {
       select: { id: true, orderNumber: true, status: true },
     });
 
-    // Build error messages
-    const errors: string[] = [];
+    // Build blocking reasons as catalog payloads; AllExceptionsFilter renders
+    // both the top-level message and each errors[] entry in the request locale
+    // while preserving the {errors, details} contract the client relies on (#224).
+    const errors: ReturnType<typeof i18nMessage>[] = [];
 
     if (activeProducts.length > 0) {
       errors.push(
-        `${activeProducts.length} aktif ilanınız bulunmaktadır. Lütfen önce tüm ilanlarınızı kaldırın.`,
+        i18nMessage('server.user.deleteBlockedActiveListings', {
+          count: activeProducts.length,
+        }),
       );
     }
 
     if (activeTrades.length > 0) {
       errors.push(
-        `${activeTrades.length} aktif takas teklifiniz bulunmaktadır. Lütfen takas işlemlerinizi tamamlayın veya iptal edin.`,
+        i18nMessage('server.user.deleteBlockedActiveTrades', {
+          count: activeTrades.length,
+        }),
       );
     }
 
     if (pendingOrders.length > 0) {
       errors.push(
-        `${pendingOrders.length} bekleyen satın alım/satış işleminiz bulunmaktadır. Lütfen siparişlerinizi tamamlayın veya iptal edin.`,
+        i18nMessage('server.user.deleteBlockedPendingOrders', {
+          count: pendingOrders.length,
+        }),
       );
     }
 
     if (errors.length > 0) {
       throw new BadRequestException({
-        message: 'Hesabınızı silmek için aşağıdaki işlemleri tamamlamanız gerekmektedir:',
+        ...i18nMessage('server.user.deleteAccountBlocked'),
         errors,
         details: {
           activeProducts: activeProducts.length,
@@ -493,10 +502,11 @@ export class UserProfileService {
       });
 
       this.logger.log(`User account anonymized (soft-deleted): ${userId}`);
-      return { message: 'Hesabınız başarıyla silindi' };
+      // #224: mesaj artık UserController.deleteAccount() tarafından locale'e göre
+      // kuruluyor (server.user.accountDeleted) — servis burada sabit metin döndürmüyor.
     } catch (error: any) {
       this.logger.error(`Delete account (anonymize) failed for ${userId}: ${error?.message}`);
-      throw new BadRequestException('Hesap silinirken bir hata oluştu. Lütfen destek ile iletişime geçin.');
+      throw new BadRequestException(i18nMessage('server.user.deleteAccountFailed'));
     }
   }
 
@@ -547,7 +557,7 @@ export class UserProfileService {
     });
 
     if (!user) {
-      throw new NotFoundException('Kullanıcı bulunamadı');
+      throw new NotFoundException(i18nMessage('server.user.notFound'));
     }
 
     // İlan/koleksiyon sayımı viewer'a göre değişir (sahip → tümü, başkası → görünür olanlar).

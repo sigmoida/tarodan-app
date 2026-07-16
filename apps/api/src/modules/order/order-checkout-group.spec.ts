@@ -361,6 +361,8 @@ describe('OrderService checkout group (batch checkout)', () => {
         isGuest: true,
         guest: { email: 'g@test.com' },
       }),
-    ).rejects.toThrow('Kupon kodu misafir alışverişte desteklenmiyor');
+    ).rejects.toMatchObject({
+      response: { i18nKey: 'server.order.couponNotSupportedForGuest' },
+    });
   });
 });

@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../../prisma';
 import { TradeStatus, Prisma } from '@prisma/client';
 import { TradeCommonService } from './trade-common.service';
+import { i18nMessage } from '../i18n';
 import {
   TradeQueryDto,
   TradeResponseDto,
@@ -55,12 +56,12 @@ export class TradeQueryService {
     });
 
     if (!trade) {
-      throw new NotFoundException('Takas bulunamadı');
+      throw new NotFoundException(i18nMessage('server.trade.notFound'));
     }
 
     // Only participants can view trade details
     if (trade.initiatorId !== userId && trade.receiverId !== userId) {
-      throw new ForbiddenException('Bu takası görüntüleme yetkiniz yok');
+      throw new ForbiddenException(i18nMessage('server.trade.notAuthorizedToView'));
     }
 
     return await this.tradeCommon.mapToResponseDto(trade, userId);

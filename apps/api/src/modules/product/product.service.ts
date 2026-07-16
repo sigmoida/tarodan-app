@@ -66,7 +66,7 @@ export class ProductService implements OnModuleInit {
     return this.updateService.update(id, sellerId, dto);
   }
 
-  async remove(id: string, sellerId: string) {
+  async remove(id: string, sellerId: string): Promise<void> {
     return this.updateService.remove(id, sellerId);
   }
 

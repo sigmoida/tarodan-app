@@ -20,6 +20,7 @@ import { OrderService } from '../order/order.service';
 import { ProductLockService } from '../product/product-lock.service';
 import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
 import { generateUniqueReference } from '../../common/helpers/generate-reference';
+import { i18nMessage } from '../i18n';
 
 @Injectable()
 export class OfferService {
@@ -86,22 +87,22 @@ export class OfferService {
       });
 
       if (!product) {
-        throw new NotFoundException('Ürün bulunamadı');
+        throw new NotFoundException(i18nMessage('server.offer.productNotFound'));
       }
 
       if (product.status !== ProductStatus.active) {
-        throw new BadRequestException('Bu ürün şu anda satışta değil');
+        throw new BadRequestException(i18nMessage('server.offer.productNotActive'));
       }
 
       // Adet bazlı: en az 1 müsait adet olmalı
       const available = getAvailableQuantity(product);
       if (available !== null && available < 1) {
-        throw new BadRequestException('Ürün stokta yok veya yeterli müsait adet yok');
+        throw new BadRequestException(i18nMessage('server.offer.productOutOfStock'));
       }
 
       // Cannot offer on own product
       if (product.sellerId === buyerId) {
-        throw new BadRequestException('Kendi ürününüze teklif veremezsiniz');
+        throw new BadRequestException(i18nMessage('server.offer.cannotOfferOwnProduct'));
       }
 
       // Check minimum offer percentage
@@ -109,9 +110,12 @@ export class OfferService {
       const minOffer = productPrice * (this.minOfferPercentage / 100);
       if (dto.amount < minOffer) {
         throw new BadRequestException(
-          `Teklif tutarı çok düşük. Ürün fiyatı: ${productPrice.toFixed(2)} TL. ` +
-          `Minimum teklif: ${minOffer.toFixed(2)} TL (fiyatın %${this.minOfferPercentage}'i). ` +
-          `Teklifiniz: ${dto.amount.toFixed(2)} TL`,
+          i18nMessage('server.offer.belowMinimumOffer', {
+            productPrice: productPrice.toFixed(2),
+            minOffer: minOffer.toFixed(2),
+            minOfferPercentage: this.minOfferPercentage,
+            offerAmount: dto.amount.toFixed(2),
+          }),
         );
       }
 
@@ -126,7 +130,7 @@ export class OfferService {
 
       if (existingOffer) {
         throw new BadRequestException(
-          'Bu ürüne zaten bekleyen bir teklifiniz var. Önce mevcut teklifi iptal edin.',
+          i18nMessage('server.offer.alreadyPendingOffer'),
         );
       }
 
@@ -215,7 +219,7 @@ export class OfferService {
       `;
 
       if (!lockedOffers || lockedOffers.length === 0) {
-        throw new NotFoundException('Teklif bulunamadı');
+        throw new NotFoundException(i18nMessage('server.offer.offerNotFound'));
       }
 
       const offerData = await tx.offer.findUnique({
@@ -223,23 +227,25 @@ export class OfferService {
       });
 
       if (!offerData) {
-        throw new NotFoundException('Teklif bulunamadı');
+        throw new NotFoundException(i18nMessage('server.offer.offerNotFound'));
       }
 
       const mustBuyerAccept = Boolean(offerData.buyerMustAccept);
       if (mustBuyerAccept) {
         if (offerData.buyerId !== userId) {
           throw new ForbiddenException(
-            'Bu karşı teklifi yalnızca alıcı kabul edebilir',
+            i18nMessage('server.offer.onlyBuyerCanAcceptCounter'),
           );
         }
       } else if (offerData.sellerId !== userId) {
-        throw new ForbiddenException('Bu teklifi kabul etme yetkiniz yok');
+        throw new ForbiddenException(i18nMessage('server.offer.notAuthorizedToAccept'));
       }
 
       // Check offer status
       if (offerData.status !== OfferStatus.pending) {
-        throw new BadRequestException(`Bu teklif zaten ${offerData.status} durumunda`);
+        throw new BadRequestException(
+          i18nMessage('server.offer.alreadyInStatus', { status: offerData.status }),
+        );
       }
 
       // Check expiration
@@ -249,23 +255,23 @@ export class OfferService {
           where: { id: offerId },
           data: { status: OfferStatus.expired },
         });
-        throw new BadRequestException('Bu teklifin süresi dolmuş');
+        throw new BadRequestException(i18nMessage('server.offer.offerExpired'));
       }
 
       // Lock product row and check availability (prevents race with direct buy / trade accept)
       const productData = await this.productLockService.lockProductForUpdate(tx, offerData.productId);
 
       if (!productData) {
-        throw new NotFoundException('Ürün bulunamadı');
+        throw new NotFoundException(i18nMessage('server.offer.productNotFound'));
       }
 
       if (productData.status !== ProductStatus.active) {
-        throw new BadRequestException('Ürün artık satışta değil');
+        throw new BadRequestException(i18nMessage('server.offer.productNoLongerActive'));
       }
 
       const available = getAvailableQuantity(productData);
       if (available !== null && available < 1) {
-        throw new BadRequestException('Ürün için yeterli müsait adet yok');
+        throw new BadRequestException(i18nMessage('server.offer.insufficientStock'));
       }
 
       // Accept this offer with version check
@@ -384,22 +390,24 @@ export class OfferService {
     });
 
     if (!offer) {
-      throw new NotFoundException('Teklif bulunamadı');
+      throw new NotFoundException(i18nMessage('server.offer.offerNotFound'));
     }
 
     const mustBuyerAccept = Boolean(offer.buyerMustAccept);
     if (mustBuyerAccept) {
       if (offer.buyerId !== userId) {
         throw new ForbiddenException(
-          'Bu karşı teklifi yalnızca alıcı reddedebilir',
+          i18nMessage('server.offer.onlyBuyerCanRejectCounter'),
         );
       }
     } else if (offer.sellerId !== userId) {
-      throw new ForbiddenException('Bu teklifi reddetme yetkiniz yok');
+      throw new ForbiddenException(i18nMessage('server.offer.notAuthorizedToReject'));
     }
 
     if (offer.status !== OfferStatus.pending) {
-      throw new BadRequestException(`Bu teklif zaten ${offer.status} durumunda`);
+      throw new BadRequestException(
+        i18nMessage('server.offer.alreadyInStatus', { status: offer.status }),
+      );
     }
 
     const rejectedOffer = await this.prisma.offer.update({
@@ -464,21 +472,23 @@ export class OfferService {
       });
 
       if (!offer) {
-        throw new NotFoundException('Teklif bulunamadı');
+        throw new NotFoundException(i18nMessage('server.offer.offerNotFound'));
       }
 
       // Only seller can counter
       if (offer.sellerId !== sellerId) {
-        throw new ForbiddenException('Bu teklife karşı teklif verme yetkiniz yok');
+        throw new ForbiddenException(i18nMessage('server.offer.notAuthorizedToCounter'));
       }
 
       if (offer.status !== OfferStatus.pending) {
-        throw new BadRequestException(`Bu teklif zaten ${offer.status} durumunda`);
+        throw new BadRequestException(
+          i18nMessage('server.offer.alreadyInStatus', { status: offer.status }),
+        );
       }
 
       if (offer.buyerMustAccept) {
         throw new BadRequestException(
-          'Alıcının mevcut karşı teklife yanıt vermesi bekleniyor; şu an yeni karşı teklif verilemez',
+          i18nMessage('server.offer.awaitingBuyerResponse'),
         );
       }
 
@@ -488,19 +498,19 @@ export class OfferService {
           where: { id: offerId },
           data: { status: OfferStatus.expired },
         });
-        throw new BadRequestException('Bu teklifin süresi dolmuş');
+        throw new BadRequestException(i18nMessage('server.offer.offerExpired'));
       }
 
       // Counter amount should be between offer and product price
       if (dto.amount <= Number(offer.amount)) {
         throw new BadRequestException(
-          'Karşı teklif, mevcut tekliften yüksek olmalıdır',
+          i18nMessage('server.offer.counterMustExceedOffer'),
         );
       }
 
       if (dto.amount > Number(offer.product.price)) {
         throw new BadRequestException(
-          'Karşı teklif, ürün fiyatından yüksek olamaz',
+          i18nMessage('server.offer.counterCannotExceedPrice'),
         );
       }
 
@@ -573,21 +583,23 @@ export class OfferService {
       });
 
       if (!offer) {
-        throw new NotFoundException('Teklif bulunamadı');
+        throw new NotFoundException(i18nMessage('server.offer.offerNotFound'));
       }
 
       if (!offer.buyerMustAccept) {
         throw new BadRequestException(
-          'Alıcı karşı teklifi yalnızca satıcının son karşı teklifine yanıt olarak verilebilir',
+          i18nMessage('server.offer.buyerCounterOnlyAfterSellerCounter'),
         );
       }
 
       if (offer.buyerId !== buyerId) {
-        throw new ForbiddenException('Bu teklife alıcı karşı teklifi verme yetkiniz yok');
+        throw new ForbiddenException(i18nMessage('server.offer.notAuthorizedToBuyerCounter'));
       }
 
       if (offer.status !== OfferStatus.pending) {
-        throw new BadRequestException(`Bu teklif zaten ${offer.status} durumunda`);
+        throw new BadRequestException(
+          i18nMessage('server.offer.alreadyInStatus', { status: offer.status }),
+        );
       }
 
       if (new Date() > offer.expiresAt) {
@@ -595,7 +607,7 @@ export class OfferService {
           where: { id: offerId },
           data: { status: OfferStatus.expired },
         });
-        throw new BadRequestException('Bu teklifin süresi dolmuş');
+        throw new BadRequestException(i18nMessage('server.offer.offerExpired'));
       }
 
       const productPrice = Number(offer.product.price);
@@ -604,14 +616,17 @@ export class OfferService {
 
       if (dto.amount >= sellerCounterAmount) {
         throw new BadRequestException(
-          'Alıcı karşı teklifi, satıcının karşı teklifinden düşük olmalıdır',
+          i18nMessage('server.offer.buyerCounterMustBeLower'),
         );
       }
 
       if (dto.amount < minOffer) {
         throw new BadRequestException(
-          `Teklif tutarı çok düşük. Ürün fiyatı: ${productPrice.toFixed(2)} TL. ` +
-            `Minimum: ${minOffer.toFixed(2)} TL (fiyatın %${this.minOfferPercentage}'i).`,
+          i18nMessage('server.offer.belowMinimumBuyerCounter', {
+            productPrice: productPrice.toFixed(2),
+            minOffer: minOffer.toFixed(2),
+            minOfferPercentage: this.minOfferPercentage,
+          }),
         );
       }
 
@@ -677,16 +692,18 @@ export class OfferService {
     });
 
     if (!offer) {
-      throw new NotFoundException('Teklif bulunamadı');
+      throw new NotFoundException(i18nMessage('server.offer.offerNotFound'));
     }
 
     // Only buyer can cancel their own offer
     if (offer.buyerId !== buyerId) {
-      throw new ForbiddenException('Bu teklifi iptal etme yetkiniz yok');
+      throw new ForbiddenException(i18nMessage('server.offer.notAuthorizedToCancel'));
     }
 
     if (offer.status !== OfferStatus.pending) {
-      throw new BadRequestException(`Bu teklif zaten ${offer.status} durumunda`);
+      throw new BadRequestException(
+        i18nMessage('server.offer.alreadyInStatus', { status: offer.status }),
+      );
     }
 
     const cancelledOffer = await this.prisma.offer.update({
@@ -828,12 +845,12 @@ export class OfferService {
     });
 
     if (!offer) {
-      throw new NotFoundException('Teklif bulunamadı');
+      throw new NotFoundException(i18nMessage('server.offer.offerNotFound'));
     }
 
     // Only buyer or seller can view the offer
     if (offer.buyerId !== userId && offer.sellerId !== userId) {
-      throw new ForbiddenException('Bu teklifi görüntüleme yetkiniz yok');
+      throw new ForbiddenException(i18nMessage('server.offer.notAuthorizedToView'));
     }
 
     return await this.formatOfferResponse(offer);
@@ -849,11 +866,11 @@ export class OfferService {
     });
 
     if (!product) {
-      throw new NotFoundException('Ürün bulunamadı');
+      throw new NotFoundException(i18nMessage('server.offer.productNotFound'));
     }
 
     if (product.sellerId !== sellerId) {
-      throw new ForbiddenException('Bu ürünün tekliflerini görüntüleme yetkiniz yok');
+      throw new ForbiddenException(i18nMessage('server.offer.notAuthorizedToViewProductOffers'));
     }
 
     const { status, page = 1, limit = 20 } = query;

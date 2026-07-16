@@ -63,8 +63,7 @@ describe('PhoneVerificationService', () => {
   it('kod gönderir ve token oluşturur', async () => {
     const { prisma, netgsm, tokenStore } = makeDeps();
     const svc = new PhoneVerificationService(prisma, netgsm);
-    const res = await svc.sendCode('u1', '+905551234567');
-    expect(res.message).toBeTruthy();
+    await expect(svc.sendCode('u1', '+905551234567')).resolves.toBeUndefined();
     expect(tokenStore.length).toBe(1);
     expect(netgsm.sendOtp).toHaveBeenCalled();
   });
@@ -90,8 +89,9 @@ describe('PhoneVerificationService', () => {
     const { prisma, netgsm, users } = makeDeps();
     users.u2 = { id: 'u2', phone: '+905551234567', isPhoneVerified: false };
     const svc = new PhoneVerificationService(prisma, netgsm);
-    // Conflict fırlatmamalı; başarıyla devam etmeli
-    await expect(svc.sendCode('u1', '+905551234567')).resolves.toBeTruthy();
+    // Conflict fırlatmamalı; başarıyla devam etmeli (sendCode artık void döner,
+    // başarı mesajını controller katalogdan kurar — #224)
+    await expect(svc.sendCode('u1', '+905551234567')).resolves.toBeUndefined();
   });
 
   it('geçersiz numara BadRequestException fırlatır (M5)', async () => {
@@ -160,6 +160,8 @@ describe('PhoneVerificationService', () => {
     for (let i = 0; i < PhoneVerificationService.MAX_ATTEMPTS; i++) {
       await expect(svc.verify('u1', '000000')).rejects.toThrow(BadRequestException);
     }
-    await expect(svc.verify('u1', '000000')).rejects.toThrow('Çok fazla yanlış deneme');
+    await expect(svc.verify('u1', '000000')).rejects.toMatchObject({
+      response: { i18nKey: 'server.auth.tooManyWrongAttempts' },
+    });
   });
 });

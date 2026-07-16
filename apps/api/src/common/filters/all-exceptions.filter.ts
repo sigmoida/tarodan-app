@@ -46,13 +46,23 @@ export class AllExceptionsFilter implements ExceptionFilter {
       const status = exception.getStatus();
       const res = exception.getResponse();
 
-      // 1a) Catalog-key payload (#224) — render in the request's locale.
+      // 1a) Catalog-key payload (#224) — render in the request's locale. Extra
+      // payload fields (e.g. errorCode, bannedReason) are preserved so guards
+      // can keep their structured contracts alongside the localized message.
       if (isLocalizedMessage(res)) {
+        const { i18nKey, i18nParams, ...extras } = res as Record<string, unknown> & {
+          i18nKey: MessageKey;
+          i18nParams?: MessageValues;
+        };
+        for (const [k, v] of Object.entries(extras)) {
+          extras[k] = this.renderNested(v, locale);
+        }
         response.status(status).json({
           statusCode: status,
-          message: this.i18n.translate(res.i18nKey, locale, res.i18nParams),
+          message: this.i18n.translate(i18nKey, locale, i18nParams),
           error: STATUS_CODES[status] ?? "Error",
-          i18nKey: res.i18nKey,
+          i18nKey,
+          ...extras,
         });
         return;
       }
@@ -88,6 +98,21 @@ export class AllExceptionsFilter implements ExceptionFilter {
       error: STATUS_CODES[status] ?? "Error",
       i18nKey: key,
     });
+  }
+
+  /**
+   * Render localized-message payloads nested one level inside extra payload
+   * fields (values or arrays of them), e.g. a `errors: [i18nMessage(...)]`
+   * list of blocking reasons. Anything else passes through untouched.
+   */
+  private renderNested(value: unknown, locale: Locale): unknown {
+    if (Array.isArray(value)) {
+      return value.map((v) => this.renderNested(v, locale));
+    }
+    if (isLocalizedMessage(value)) {
+      return this.i18n.translate(value.i18nKey, locale, value.i18nParams);
+    }
+    return value;
   }
 
   /** The locale attached by LocaleInterceptor, or resolved on the spot. */

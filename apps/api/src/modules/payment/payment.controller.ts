@@ -26,11 +26,13 @@ import {
   ApiParam,
 } from "@nestjs/swagger";
 import { JwtService } from "@nestjs/jwt";
+import { type Locale } from "@tarodan/i18n";
 import { PaymentService } from "./payment.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { Public } from "../auth/decorators/public.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { COOKIE_NAMES, readCookie } from "../auth/utils/auth-cookies";
+import { I18nService, ReqLocale, i18nMessage } from "../i18n";
 import {
   InitiatePaymentDto,
   PayTRCallbackDto,
@@ -51,6 +53,7 @@ export class PaymentController {
     private readonly paymentService: PaymentService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly i18n: I18nService,
   ) {}
 
   /**
@@ -149,7 +152,8 @@ export class PaymentController {
   ) {
     // Trade-cash zorunlu auth: cookie (web) veya Bearer (mobil).
     const userId = this.extractUserId(req);
-    if (!userId) throw new UnauthorizedException("Oturum açmanız gerekiyor");
+    if (!userId)
+      throw new UnauthorizedException(i18nMessage("server.payment.loginRequired"));
     return this.paymentService.initiateTradeCashPayment(
       body.tradeId,
       userId,
@@ -224,6 +228,7 @@ export class PaymentController {
   })
   async getMyPayments(
     @CurrentUser("id") userId: string,
+    @ReqLocale() locale: Locale,
     @Query("status") status?: string,
     @Query("provider") provider?: string,
     @Query("startDate") startDate?: string,
@@ -231,14 +236,18 @@ export class PaymentController {
     @Query("page") page?: string,
     @Query("limit") limit?: string,
   ) {
-    return this.paymentService.getUserPayments(userId, {
-      status: status as any,
-      provider,
-      startDate: startDate ? new Date(startDate) : undefined,
-      endDate: endDate ? new Date(endDate) : undefined,
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
-    });
+    return this.paymentService.getUserPayments(
+      userId,
+      {
+        status: status as any,
+        provider,
+        startDate: startDate ? new Date(startDate) : undefined,
+        endDate: endDate ? new Date(endDate) : undefined,
+        page: page ? parseInt(page, 10) : undefined,
+        limit: limit ? parseInt(limit, 10) : undefined,
+      },
+      locale,
+    );
   }
 
   // ============================================================
@@ -409,8 +418,13 @@ export class PaymentController {
   async cancelPayment(
     @Param("id") paymentId: string,
     @CurrentUser("id") userId: string,
+    @ReqLocale() locale: Locale,
   ): Promise<CancelPaymentResponseDto> {
-    return this.paymentService.cancelPayment(paymentId, userId);
+    const result = await this.paymentService.cancelPayment(paymentId, userId);
+    return {
+      ...result,
+      message: this.i18n.translate("server.payment.cancelledSuccessfully", locale),
+    };
   }
 
   // POST /payments/refund KALDIRILDI (güvenlik, issue #61: buyer self-refund).

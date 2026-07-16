@@ -16,6 +16,7 @@ import {
   SuratGonderiSekli,
   SuratGonderiPayload,
 } from '../surat-cargo/surat-cargo.types';
+import { i18nMessage } from '../i18n';
 
 /**
  * Takas Sürat Kargo orkestrasyonu — TradeService'ten birebir taşındı
@@ -111,7 +112,7 @@ export class TradeShipmentService {
       });
       if (!addr) {
         throw new BadRequestException(
-          'Seçilen teslimat adresi bulunamadı veya size ait değil.',
+          i18nMessage('server.trade.selectedAddressNotFound'),
         );
       }
       return addr.id;
@@ -124,7 +125,7 @@ export class TradeShipmentService {
     if (!fallback) {
       if (required) {
         throw new BadRequestException(
-          'Takas için bir teslimat adresi ekleyin. Profil → Adreslerim üzerinden adres ekleyebilirsiniz.',
+          i18nMessage('server.trade.noShippingAddress'),
         );
       }
       return null;

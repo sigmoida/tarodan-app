@@ -17,17 +17,22 @@ import {
   ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
+import { type Locale } from '@tarodan/i18n';
 import { AuthService } from './auth.service';
 import { LoginDto, AdminAuthResponseDto, RefreshTokenDto, TokensDto } from './dto';
 import { AdminAuthGuard, JwtRefreshGuard } from './guards';
 import { CurrentUser, Public, AdminRoute } from './decorators';
 import { RequestUser } from './interfaces';
 import { setAuthCookies, clearAuthCookies, readCookie, COOKIE_NAMES } from './utils/auth-cookies';
+import { I18nService, ReqLocale } from '../i18n';
 
 @ApiTags('admin')
 @Controller('auth/admin')
 export class AdminAuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly i18n: I18nService,
+  ) {}
 
   /**
    * POST /auth/admin/login
@@ -125,11 +130,13 @@ export class AdminAuthController {
   async adminLogout(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
+    @ReqLocale() locale: Locale,
     @Body() body?: { refreshToken?: string },
   ) {
     clearAuthCookies(res, { admin: true });
     const refreshToken =
       readCookie(req, [COOKIE_NAMES.admin.refresh]) || body?.refreshToken;
-    return this.authService.logout(refreshToken);
+    await this.authService.logout(refreshToken);
+    return { message: this.i18n.translate('server.auth.loggedOut', locale) };
   }
 }
