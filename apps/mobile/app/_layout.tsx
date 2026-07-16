@@ -14,6 +14,7 @@ import { LanguageProvider } from '@/i18n';
 import { initSentry } from '@/services/sentry';
 import AnimatedSplash from '@/components/AnimatedSplash';
 import BusinessMembershipGuard from '@/components/BusinessMembershipGuard';
+import ForceUpdateGate from '@/components/ForceUpdateGate';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const { colors } = theme;
@@ -131,6 +132,8 @@ export default function RootLayout() {
           <BusinessMembershipGuard />
           {/* Native Alert.alert yerine temalı dialog — appAlert() bu host'u kullanır. */}
           <AlertDialogHost />
+          {/* Min desteklenen sürümün altındaki build'leri tam ekran bloklar (#233). */}
+          <ForceUpdateGate />
           {!splashDone && (
             <AnimatedSplash appReady={appReady} onFinish={() => setSplashDone(true)} />
           )}
