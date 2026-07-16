@@ -109,11 +109,11 @@ export function orderColumns({
               <Badge status={o.status} config={orderStatusConfig} />
             )}
             {(o.status === "cancelled" || o.cancellationType === "iptal") &&
-              cancelReasonLabel(o.cancelReason) && (
+              cancelReasonLabel(o.cancelReason, t) && (
                 <span className="truncate text-xs text-muted">
-                  {cancelReasonLabel(o.cancelReason)} ·{" "}
+                  {cancelReasonLabel(o.cancelReason, t)} ·{" "}
                   {t("admin.operations.orders.originCancellation", {
-                    origin: orderOriginLabel(o.offerId),
+                    origin: orderOriginLabel(o.offerId, t),
                   })}
                 </span>
               )}

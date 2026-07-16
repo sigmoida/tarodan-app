@@ -1,6 +1,7 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import {
   forgotPasswordSchema,
   loginSchema,
@@ -20,9 +21,10 @@ export type LoginResult =
  * client uses; the engine's `reason` codes are mapped to admin copy here.
  */
 export async function loginAction(input: LoginValues): Promise<LoginResult> {
-  const parsed = loginSchema.safeParse(input);
+  const t = await getTranslations();
+  const parsed = loginSchema(t).safeParse(input);
   if (!parsed.success) {
-    return { status: 'error', message: 'Geçersiz giriş bilgileri' };
+    return { status: 'error', message: t('admin.auth.login.invalidInput') };
   }
 
   // admin's tsconfig runs with strictNullChecks off, which makes zod infer every
@@ -36,12 +38,12 @@ export async function loginAction(input: LoginValues): Promise<LoginResult> {
   if (result.status === 'error') {
     const message =
       result.reason === 'connection'
-        ? 'Sunucuya bağlanılamadı.'
+        ? t('admin.auth.login.connectionError')
         : result.reason === 'invalid'
           ? parsed.data.twoFactorCode
-            ? 'Doğrulama kodu hatalı'
-            : 'E-posta veya şifre hatalı girildi'
-          : result.serverMessage || 'Giriş başarısız';
+            ? t('admin.auth.login.invalidCode')
+            : t('admin.auth.login.invalidCredentials')
+          : result.serverMessage || t('admin.auth.login.genericFailure');
     return { status: 'error', message };
   }
   return result;
@@ -52,7 +54,8 @@ export async function loginAction(input: LoginValues): Promise<LoginResult> {
  * leak whether an email is registered.
  */
 export async function forgotPasswordAction(email: string): Promise<{ ok: true }> {
-  const parsed = forgotPasswordSchema.safeParse({ email });
+  const t = await getTranslations();
+  const parsed = forgotPasswordSchema(t).safeParse({ email });
   if (parsed.success) {
     await authLogic.forgotPassword(parsed.data.email);
   }

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { loginAction } from '@/lib/server/auth-actions';
 import type { LoginValues } from '@/lib/schemas/auth';
@@ -14,6 +15,7 @@ import type { LoginValues } from '@/lib/schemas/auth';
  */
 export function useLogin() {
   const router = useRouter();
+  const t = useTranslations();
   const [requires2FA, setRequires2FA] = useState(false);
 
   /** Returns a form-level error message, or null on success / next step. */
@@ -21,7 +23,7 @@ export function useLogin() {
     const result = await loginAction(values);
     if (result.status === '2fa') {
       setRequires2FA(true);
-      toast.success('İki faktörlü doğrulama kodu gerekli');
+      toast.success(t('admin.auth.login.twoFactorRequired'));
       return null;
     }
     if (result.status === 'error') {

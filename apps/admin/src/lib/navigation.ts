@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   HomeIcon,
   UsersIcon,
@@ -33,7 +34,17 @@ import {
  * The single source for the admin left menu. The nav data lives here
  * (data ≠ component); shell components consume it. The route→permission mapping
  * is also derived from here (`routePermission`) — no separate list is kept.
+ *
+ * Display text (group/item name, description, keywords) is translated: the static
+ * arrays became `getTopLevelNav(t)` / `getNavGroups(t)` builders driven by the
+ * shared i18n catalog (`admin.nav.*`). Structural fields (href, icon, permission,
+ * roles) stay static literals inside the builders. `routePermission` never needs
+ * text, so it builds its lookup once at module load with a no-op translator —
+ * href/permission stay single-sourced from the same builders without ever
+ * requiring a real `t`.
  */
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 export type NavItem = {
   name: string;
@@ -65,108 +76,359 @@ export type NavGroup = {
   href?: string;
 };
 
-export const topLevelNav: NavItem[] = [
-  { name: 'Dashboard', href: '/dashboard', icon: HomeIcon, description: 'Genel bakış, özet metrikler ve son aktiviteler', keywords: ['ana sayfa', 'home'], permission: 'dashboard' },
-  { name: 'Analizler', href: '/analytics', icon: ChartBarIcon, description: 'Satış, kullanıcı ve platform analiz raporları', keywords: ['istatistik', 'rapor'], permission: 'analytics' },
-];
+/** Translated top-level nav items (rendered above the collapsible groups). */
+export function getTopLevelNav(t: T): NavItem[] {
+  return [
+    {
+      name: t('admin.nav.items.dashboard.name'),
+      href: '/dashboard',
+      icon: HomeIcon,
+      description: t('admin.nav.items.dashboard.description'),
+      keywords: t('admin.nav.items.dashboard.keywords')
+        .split(',')
+        .map((k) => k.trim()),
+      permission: 'dashboard',
+    },
+    {
+      name: t('admin.nav.items.analytics.name'),
+      href: '/analytics',
+      icon: ChartBarIcon,
+      description: t('admin.nav.items.analytics.description'),
+      keywords: t('admin.nav.items.analytics.keywords')
+        .split(',')
+        .map((k) => k.trim()),
+      permission: 'analytics',
+    },
+  ];
+}
 
-export const navGroups: NavGroup[] = [
-  {
-    id: 'operations',
-    name: 'Operasyon',
-    icon: ClipboardDocumentIcon,
-    href: '/operations',
-    items: [
-      { name: 'Siparişler', href: '/operations/orders', icon: ClipboardDocumentListIcon, description: 'Tüm siparişleri görüntüleyin ve yönetin', keywords: ['order'], permission: 'orders' },
-      { name: 'Takaslar', href: '/operations/trades', icon: ArrowsRightLeftIcon, description: 'Ürün takas taleplerini takip edin ve yönetin', keywords: ['takas', 'trade', 'barter', 'değişim'], permission: 'trades' },
-      { name: 'Kargo', href: '/operations/shipping', icon: TruckIcon, description: 'Gönderi, kargo etiketi ve takip işlemleri', keywords: ['kargo', 'shipping', 'gönderi', 'etiket', 'takip'], permission: 'shipping' },
-      { name: 'İade Takibi', href: '/operations/refund-requests', icon: BanknotesIcon, description: 'Açık iade taleplerini inceleyin ve sonuçlandırın', keywords: ['iade', 'refund', 'talep', 'takip'], permission: 'refund_requests' },
-      { name: 'İade Geçmişi', href: '/operations/refunds', icon: BanknotesIcon, description: 'Tamamlanmış iade işlemlerinin geçmişi', keywords: ['iade', 'refund', 'geçmiş'], permission: 'refund_history' },
-    ],
-  },
-  {
-    id: 'catalog',
-    name: 'Katalog',
-    icon: Squares2X2Icon,
-    href: '/catalog',
-    items: [
-      { name: 'Ürünler', href: '/catalog/products', icon: ShoppingBagIcon, description: 'Ürün kataloğunu görüntüleyin, onaylayın ve yönetin', permission: 'products' },
-      { name: 'Kategoriler', href: '/catalog/categories', icon: CubeIcon, description: 'Ürün kategorilerini oluşturun ve düzenleyin', permission: 'categories' },
-      { name: 'Markalar', href: '/catalog/brands', icon: SwatchIcon, description: 'Marka listesini yönetin', permission: 'brands' },
-      { name: 'Modeller', href: '/catalog/car-models', icon: TruckIcon, description: 'Araç modellerini yönetin', permission: 'car_models' },
-      { name: 'Üreticiler', href: '/catalog/manufacturers', icon: BuildingOffice2Icon, description: 'Üretici firmaları yönetin', permission: 'manufacturers' },
-      { name: 'Ürün Özellikleri', href: '/catalog/attributes', icon: ClipboardDocumentListIcon, description: 'Ürün özellik gruplarını ve değerlerini yönetin', keywords: ['attribute', 'özellik'], permission: 'attributes' },
-      { name: 'Koleksiyonlar', href: '/catalog/collections', icon: ClipboardDocumentCheckIcon, description: 'Ürün koleksiyonlarını oluşturun ve düzenleyin', permission: 'collections' },
-    ],
-  },
-  {
-    id: 'users',
-    name: 'Hesaplar',
-    icon: UsersIcon,
-    href: '/accounts',
-    items: [
-      { name: 'Kullanıcılar', href: '/accounts/users', icon: UsersIcon, description: 'Kullanıcı hesaplarını görüntüleyin ve yönetin', keywords: ['user', 'üye'], permission: 'users' },
-      { name: 'Satıcı Başvuruları', href: '/accounts/seller-applications', icon: ClipboardDocumentCheckIcon, description: 'Satıcı olma başvurularını inceleyin ve onaylayın', permission: 'seller_applications' },
-      { name: 'Satıcı Performansı', href: '/accounts/seller-performance', icon: ChartBarIcon, description: 'Satıcı performans metriklerini izleyin', permission: 'seller_performance' },
-      { name: 'Yorumlar', href: '/accounts/reviews', icon: StarIcon, description: 'Kullanıcı yorumlarını denetleyin ve yönetin', permission: 'reviews' },
-      { name: 'Rapor Talepleri', href: '/accounts/reports', icon: FlagIcon, description: 'Kullanıcı şikayet ve rapor taleplerini yönetin', keywords: ['rapor', 'şikayet', 'report', 'complaint', 'abuse'], permission: 'reports' },
-      { name: 'Rol Yönetimi', href: '/accounts/roles', icon: UserCircleIcon, description: 'Personel rollerini ve yetkilerini yönetin', permission: 'staff' },
-    ],
-  },
-  {
-    id: 'messaging',
-    name: 'Mesajlaşma',
-    icon: ChatBubbleLeftRightIcon,
-    href: '/messaging',
-    items: [
-      { name: 'Mesajlar', href: '/messaging/messages', icon: ChatBubbleLeftRightIcon, description: 'Kullanıcı mesajlaşmalarını görüntüleyin', permission: 'messages' },
-      { name: 'Destek Talepleri', href: '/messaging/support', icon: ChatBubbleLeftRightIcon, description: 'Destek taleplerini yanıtlayın ve yönetin', keywords: ['destek', 'support', 'ticket'], permission: 'support' },
-    ],
-  },
-  {
-    id: 'marketing',
-    name: 'Pazarlama & İçerik',
-    icon: MegaphoneIcon,
-    href: '/marketing',
-    items: [
-      { name: 'Reklamlar', href: '/marketing/ads', icon: MegaphoneIcon, description: 'Reklam ve banner kampanyalarını yönetin', keywords: ['reklam', 'ad', 'banner'], permission: 'ads' },
-      { name: 'İndirimler', href: '/marketing/discounts', icon: TicketIcon, description: 'İndirim kuponları ve kampanyaları yönetin', keywords: ['indirim', 'kupon', 'discount', 'coupon', 'kampanya'], permission: 'discounts' },
-      { name: 'Bildirimler', href: '/marketing/notifications', icon: BellAlertIcon, description: 'Kullanıcı bildirimlerini oluşturun ve gönderin', permission: 'notifications' },
-      { name: 'E-posta Şablonları', href: '/marketing/email-templates', icon: ChatBubbleLeftRightIcon, description: 'E-posta şablonlarını düzenleyin', permission: 'email_templates' },
-      { name: 'Sayfalar', href: '/marketing/pages', icon: DocumentTextIcon, description: 'İçerik sayfalarını oluşturun ve düzenleyin', permission: 'pages' },
-    ],
-  },
-  {
-    id: 'finance',
-    name: 'Finans',
-    icon: CurrencyDollarIcon,
-    href: '/finance',
-    items: [
-      { name: 'Ödemeler', href: '/finance/payments', icon: CreditCardIcon, description: 'Ödeme işlemlerini görüntüleyin ve yönetin', keywords: ['ödeme', 'payment', 'hold'], permission: 'payments' },
-      { name: 'Komisyon', href: '/finance/commission', icon: CurrencyDollarIcon, description: 'Komisyon oranlarını ve ayarlarını yönetin', permission: 'commission' },
-      { name: 'Satıcı Ödemeleri', href: '/finance/payouts', icon: BanknotesIcon, description: 'Satıcı ödeme ve hakediş işlemleri', permission: 'payouts' },
-      { name: 'Faturalar', href: '/finance/invoices', icon: DocumentTextIcon, description: 'Fatura ve e-fatura işlemlerini yönetin', keywords: ['fatura', 'invoice', 'e-arşiv', 'e-fatura', 'elogo', 'iade faturası'], permission: 'invoices' },
-      { name: 'Vergi Ayarları', href: '/finance/tax', icon: CalculatorIcon, description: 'Vergi oranlarını ve ayarlarını yapılandırın', permission: 'tax' },
-    ],
-  },
-  {
-    id: 'system',
-    name: 'Sistem',
-    icon: Cog6ToothIcon,
-    href: '/system',
-    items: [
-      { name: 'AI Denetim', href: '/system/ai-moderation', icon: ClipboardDocumentCheckIcon, description: 'Yapay zeka içerik denetim sonuçlarını inceleyin', keywords: ['ai', 'moderasyon', 'nsfw'], permission: 'ai_moderation' },
-      { name: 'Üyelik Katmanları', href: '/system/membership-tiers', icon: StarIcon, description: 'Üyelik paketlerini ve avantajlarını yönetin', keywords: ['üyelik', 'membership', 'tier'], permission: 'membership_tiers' },
-      { name: 'Sistem Ayarları', href: '/system/settings', icon: Cog6ToothIcon, description: 'Genel platform ayarlarını yapılandırın', permission: 'settings' },
-      { name: 'Loglar', href: '/system/logs', icon: ClipboardDocumentIcon, description: 'Sistem, güvenlik ve denetim kayıtlarını görüntüleyin', keywords: ['log', 'hata', 'error', 'güvenlik', 'e-posta', 'audit', 'denetim', 'iz', 'değişiklik', 'security'], permission: 'logs' },
-      { name: 'Test Araçları', href: '/system/test-tools', icon: BeakerIcon, description: 'Geliştirici test ve simülasyon araçları', keywords: ['test', 'zaman', 'cron', 'süre', 'boost', 'üyelik', 'iade', 'time'], permission: 'test_tools', roles: ['super_admin'] },
-    ],
-  },
-];
+/** Translated collapsible nav groups (sidebar sections). */
+export function getNavGroups(t: T): NavGroup[] {
+  return [
+    {
+      id: 'operations',
+      name: t('admin.nav.groups.operations'),
+      icon: ClipboardDocumentIcon,
+      href: '/operations',
+      items: [
+        {
+          name: t('admin.nav.items.orders.name'),
+          href: '/operations/orders',
+          icon: ClipboardDocumentListIcon,
+          description: t('admin.nav.items.orders.description'),
+          keywords: t('admin.nav.items.orders.keywords').split(',').map((k) => k.trim()),
+          permission: 'orders',
+        },
+        {
+          name: t('admin.nav.items.trades.name'),
+          href: '/operations/trades',
+          icon: ArrowsRightLeftIcon,
+          description: t('admin.nav.items.trades.description'),
+          keywords: t('admin.nav.items.trades.keywords').split(',').map((k) => k.trim()),
+          permission: 'trades',
+        },
+        {
+          name: t('admin.nav.items.shipping.name'),
+          href: '/operations/shipping',
+          icon: TruckIcon,
+          description: t('admin.nav.items.shipping.description'),
+          keywords: t('admin.nav.items.shipping.keywords').split(',').map((k) => k.trim()),
+          permission: 'shipping',
+        },
+        {
+          name: t('admin.nav.items.refundRequests.name'),
+          href: '/operations/refund-requests',
+          icon: BanknotesIcon,
+          description: t('admin.nav.items.refundRequests.description'),
+          keywords: t('admin.nav.items.refundRequests.keywords').split(',').map((k) => k.trim()),
+          permission: 'refund_requests',
+        },
+        {
+          name: t('admin.nav.items.refundHistory.name'),
+          href: '/operations/refunds',
+          icon: BanknotesIcon,
+          description: t('admin.nav.items.refundHistory.description'),
+          keywords: t('admin.nav.items.refundHistory.keywords').split(',').map((k) => k.trim()),
+          permission: 'refund_history',
+        },
+      ],
+    },
+    {
+      id: 'catalog',
+      name: t('admin.nav.groups.catalog'),
+      icon: Squares2X2Icon,
+      href: '/catalog',
+      items: [
+        {
+          name: t('admin.nav.items.products.name'),
+          href: '/catalog/products',
+          icon: ShoppingBagIcon,
+          description: t('admin.nav.items.products.description'),
+          permission: 'products',
+        },
+        {
+          name: t('admin.nav.items.categories.name'),
+          href: '/catalog/categories',
+          icon: CubeIcon,
+          description: t('admin.nav.items.categories.description'),
+          permission: 'categories',
+        },
+        {
+          name: t('admin.nav.items.brands.name'),
+          href: '/catalog/brands',
+          icon: SwatchIcon,
+          description: t('admin.nav.items.brands.description'),
+          permission: 'brands',
+        },
+        {
+          name: t('admin.nav.items.carModels.name'),
+          href: '/catalog/car-models',
+          icon: TruckIcon,
+          description: t('admin.nav.items.carModels.description'),
+          permission: 'car_models',
+        },
+        {
+          name: t('admin.nav.items.manufacturers.name'),
+          href: '/catalog/manufacturers',
+          icon: BuildingOffice2Icon,
+          description: t('admin.nav.items.manufacturers.description'),
+          permission: 'manufacturers',
+        },
+        {
+          name: t('admin.nav.items.attributes.name'),
+          href: '/catalog/attributes',
+          icon: ClipboardDocumentListIcon,
+          description: t('admin.nav.items.attributes.description'),
+          keywords: t('admin.nav.items.attributes.keywords').split(',').map((k) => k.trim()),
+          permission: 'attributes',
+        },
+        {
+          name: t('admin.nav.items.collections.name'),
+          href: '/catalog/collections',
+          icon: ClipboardDocumentCheckIcon,
+          description: t('admin.nav.items.collections.description'),
+          permission: 'collections',
+        },
+      ],
+    },
+    {
+      id: 'users',
+      name: t('admin.nav.groups.users'),
+      icon: UsersIcon,
+      href: '/accounts',
+      items: [
+        {
+          name: t('admin.nav.items.users.name'),
+          href: '/accounts/users',
+          icon: UsersIcon,
+          description: t('admin.nav.items.users.description'),
+          keywords: t('admin.nav.items.users.keywords').split(',').map((k) => k.trim()),
+          permission: 'users',
+        },
+        {
+          name: t('admin.nav.items.sellerApplications.name'),
+          href: '/accounts/seller-applications',
+          icon: ClipboardDocumentCheckIcon,
+          description: t('admin.nav.items.sellerApplications.description'),
+          permission: 'seller_applications',
+        },
+        {
+          name: t('admin.nav.items.sellerPerformance.name'),
+          href: '/accounts/seller-performance',
+          icon: ChartBarIcon,
+          description: t('admin.nav.items.sellerPerformance.description'),
+          permission: 'seller_performance',
+        },
+        {
+          name: t('admin.nav.items.reviews.name'),
+          href: '/accounts/reviews',
+          icon: StarIcon,
+          description: t('admin.nav.items.reviews.description'),
+          permission: 'reviews',
+        },
+        {
+          name: t('admin.nav.items.reports.name'),
+          href: '/accounts/reports',
+          icon: FlagIcon,
+          description: t('admin.nav.items.reports.description'),
+          keywords: t('admin.nav.items.reports.keywords').split(',').map((k) => k.trim()),
+          permission: 'reports',
+        },
+        {
+          name: t('admin.nav.items.staff.name'),
+          href: '/accounts/roles',
+          icon: UserCircleIcon,
+          description: t('admin.nav.items.staff.description'),
+          permission: 'staff',
+        },
+      ],
+    },
+    {
+      id: 'messaging',
+      name: t('admin.nav.groups.messaging'),
+      icon: ChatBubbleLeftRightIcon,
+      href: '/messaging',
+      items: [
+        {
+          name: t('admin.nav.items.messages.name'),
+          href: '/messaging/messages',
+          icon: ChatBubbleLeftRightIcon,
+          description: t('admin.nav.items.messages.description'),
+          permission: 'messages',
+        },
+        {
+          name: t('admin.nav.items.support.name'),
+          href: '/messaging/support',
+          icon: ChatBubbleLeftRightIcon,
+          description: t('admin.nav.items.support.description'),
+          keywords: t('admin.nav.items.support.keywords').split(',').map((k) => k.trim()),
+          permission: 'support',
+        },
+      ],
+    },
+    {
+      id: 'marketing',
+      name: t('admin.nav.groups.marketing'),
+      icon: MegaphoneIcon,
+      href: '/marketing',
+      items: [
+        {
+          name: t('admin.nav.items.ads.name'),
+          href: '/marketing/ads',
+          icon: MegaphoneIcon,
+          description: t('admin.nav.items.ads.description'),
+          keywords: t('admin.nav.items.ads.keywords').split(',').map((k) => k.trim()),
+          permission: 'ads',
+        },
+        {
+          name: t('admin.nav.items.discounts.name'),
+          href: '/marketing/discounts',
+          icon: TicketIcon,
+          description: t('admin.nav.items.discounts.description'),
+          keywords: t('admin.nav.items.discounts.keywords').split(',').map((k) => k.trim()),
+          permission: 'discounts',
+        },
+        {
+          name: t('admin.nav.items.notifications.name'),
+          href: '/marketing/notifications',
+          icon: BellAlertIcon,
+          description: t('admin.nav.items.notifications.description'),
+          permission: 'notifications',
+        },
+        {
+          name: t('admin.nav.items.emailTemplates.name'),
+          href: '/marketing/email-templates',
+          icon: ChatBubbleLeftRightIcon,
+          description: t('admin.nav.items.emailTemplates.description'),
+          permission: 'email_templates',
+        },
+        {
+          name: t('admin.nav.items.pages.name'),
+          href: '/marketing/pages',
+          icon: DocumentTextIcon,
+          description: t('admin.nav.items.pages.description'),
+          permission: 'pages',
+        },
+      ],
+    },
+    {
+      id: 'finance',
+      name: t('admin.nav.groups.finance'),
+      icon: CurrencyDollarIcon,
+      href: '/finance',
+      items: [
+        {
+          name: t('admin.nav.items.payments.name'),
+          href: '/finance/payments',
+          icon: CreditCardIcon,
+          description: t('admin.nav.items.payments.description'),
+          keywords: t('admin.nav.items.payments.keywords').split(',').map((k) => k.trim()),
+          permission: 'payments',
+        },
+        {
+          name: t('admin.nav.items.commission.name'),
+          href: '/finance/commission',
+          icon: CurrencyDollarIcon,
+          description: t('admin.nav.items.commission.description'),
+          permission: 'commission',
+        },
+        {
+          name: t('admin.nav.items.payouts.name'),
+          href: '/finance/payouts',
+          icon: BanknotesIcon,
+          description: t('admin.nav.items.payouts.description'),
+          permission: 'payouts',
+        },
+        {
+          name: t('admin.nav.items.invoices.name'),
+          href: '/finance/invoices',
+          icon: DocumentTextIcon,
+          description: t('admin.nav.items.invoices.description'),
+          keywords: t('admin.nav.items.invoices.keywords').split(',').map((k) => k.trim()),
+          permission: 'invoices',
+        },
+        {
+          name: t('admin.nav.items.tax.name'),
+          href: '/finance/tax',
+          icon: CalculatorIcon,
+          description: t('admin.nav.items.tax.description'),
+          permission: 'tax',
+        },
+      ],
+    },
+    {
+      id: 'system',
+      name: t('admin.nav.groups.system'),
+      icon: Cog6ToothIcon,
+      href: '/system',
+      items: [
+        {
+          name: t('admin.nav.items.aiModeration.name'),
+          href: '/system/ai-moderation',
+          icon: ClipboardDocumentCheckIcon,
+          description: t('admin.nav.items.aiModeration.description'),
+          keywords: t('admin.nav.items.aiModeration.keywords').split(',').map((k) => k.trim()),
+          permission: 'ai_moderation',
+        },
+        {
+          name: t('admin.nav.items.membershipTiers.name'),
+          href: '/system/membership-tiers',
+          icon: StarIcon,
+          description: t('admin.nav.items.membershipTiers.description'),
+          keywords: t('admin.nav.items.membershipTiers.keywords').split(',').map((k) => k.trim()),
+          permission: 'membership_tiers',
+        },
+        {
+          name: t('admin.nav.items.settings.name'),
+          href: '/system/settings',
+          icon: Cog6ToothIcon,
+          description: t('admin.nav.items.settings.description'),
+          permission: 'settings',
+        },
+        {
+          name: t('admin.nav.items.logs.name'),
+          href: '/system/logs',
+          icon: ClipboardDocumentIcon,
+          description: t('admin.nav.items.logs.description'),
+          keywords: t('admin.nav.items.logs.keywords').split(',').map((k) => k.trim()),
+          permission: 'logs',
+        },
+        {
+          name: t('admin.nav.items.testTools.name'),
+          href: '/system/test-tools',
+          icon: BeakerIcon,
+          description: t('admin.nav.items.testTools.description'),
+          keywords: t('admin.nav.items.testTools.keywords').split(',').map((k) => k.trim()),
+          permission: 'test_tools',
+          roles: ['super_admin'],
+        },
+      ],
+    },
+  ];
+}
 
 /** Suffix appended to every page title, e.g. "Kullanıcılar - Tarodan Admin". */
 export const APP_NAME = 'Tarodan Admin';
-const DEFAULT_DESCRIPTION = 'Tarodan Marketplace yönetim paneli';
 
 /**
  * Document title + meta description for a path, derived from the nav config
@@ -175,7 +437,11 @@ const DEFAULT_DESCRIPTION = 'Tarodan Marketplace yönetim paneli';
  * there's no separate title list to drift. Unmatched paths (section redirects,
  * unknown routes) fall back to the app name + default description.
  */
-export function pageMetadataFor(pathname: string): { title: string; description: string } {
+export function pageMetadataFor(pathname: string, t: T): { title: string; description: string } {
+  const defaultDescription = t('admin.nav.defaultDescription');
+  const topLevelNav = getTopLevelNav(t);
+  const navGroups = getNavGroups(t);
+
   let bestItem: NavItem | undefined;
   let bestLen = -1;
   const consider = (item: NavItem) => {
@@ -187,13 +453,13 @@ export function pageMetadataFor(pathname: string): { title: string; description:
   topLevelNav.forEach(consider);
   navGroups.forEach((group) => group.items.forEach(consider));
 
-  if (!bestItem) return { title: APP_NAME, description: DEFAULT_DESCRIPTION };
+  if (!bestItem) return { title: APP_NAME, description: defaultDescription };
 
   const isLeaf = pathname === bestItem.href;
-  const label = isLeaf ? bestItem.name : `${bestItem.name} — Detay`;
+  const label = isLeaf ? bestItem.name : `${bestItem.name} — ${t('admin.nav.detailSuffix')}`;
   return {
     title: `${label} - ${APP_NAME}`,
-    description: bestItem.description ?? DEFAULT_DESCRIPTION,
+    description: bestItem.description ?? defaultDescription,
   };
 }
 
@@ -214,9 +480,20 @@ const EXTRA_ROUTE_PERMISSIONS: Record<string, string> = {
 };
 
 /**
+ * A translator stand-in used ONLY to compute the route→permission map below.
+ * `routePermission` never reads item text (name/description/keywords) — just
+ * href/permission — so it doesn't need a real `t`. Building it from the same
+ * `getTopLevelNav`/`getNavGroups` functions (instead of a separate structural
+ * list) keeps href/permission single-sourced with the translated nav; nothing
+ * can drift between the two.
+ */
+const identityT = ((key: string) => key) as unknown as T;
+
+/**
  * Route→permission map. Derived from the nav items' `permission` field + the
  * exceptions above. Dashboard is deliberately EXCLUDED: it's always accessible
- * (it's also the guard's redirect target — avoid a loop).
+ * (it's also the guard's redirect target — avoid a loop). Computed once at
+ * module load (structural data only, no translation needed).
  */
 const ROUTE_PERMISSIONS: Record<string, string> = (() => {
   const map: Record<string, string> = {};
@@ -225,8 +502,8 @@ const ROUTE_PERMISSIONS: Record<string, string> = (() => {
       if (item.permission && item.href !== '/dashboard') map[item.href] = item.permission;
     }
   };
-  add(topLevelNav);
-  navGroups.forEach((g) => add(g.items));
+  add(getTopLevelNav(identityT));
+  getNavGroups(identityT).forEach((g) => add(g.items));
   return { ...map, ...EXTRA_ROUTE_PERMISSIONS };
 })();
 
@@ -252,9 +529,9 @@ export interface Crumb {
   href?: string;
 }
 
-/** Turn a URL segment into a readable leaf label; ids collapse to "Detay". */
-function humanizeSegment(segment: string): string {
-  if (/^\d+$/.test(segment) || /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(segment)) return 'Detay';
+/** Turn a URL segment into a readable leaf label; ids collapse to the "Detail" word. */
+function humanizeSegment(segment: string, t: T): string {
+  if (/^\d+$/.test(segment) || /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(segment)) return t('admin.nav.detailSuffix');
   return segment
     .split('-')
     .filter(Boolean)
@@ -267,7 +544,10 @@ function humanizeSegment(segment: string): string {
  * `[group?, page, leaf?]`. Every crumb except the current page is a link
  * (the group points at its first page). Empty when the path matches no nav item.
  */
-export function breadcrumbsFor(pathname: string): Crumb[] {
+export function breadcrumbsFor(pathname: string, t: T): Crumb[] {
+  const topLevelNav = getTopLevelNav(t);
+  const navGroups = getNavGroups(t);
+
   let bestItem: NavItem | undefined;
   let bestGroup: NavGroup | undefined;
   let bestLen = -1;
@@ -294,7 +574,7 @@ export function breadcrumbsFor(pathname: string): Crumb[] {
   if (!isLeaf) {
     const tail = pathname.slice(item.href.length).split('/').filter(Boolean);
     const last = tail[tail.length - 1];
-    if (last) crumbs.push({ label: humanizeSegment(last) });
+    if (last) crumbs.push({ label: humanizeSegment(last, t) });
   }
 
   return crumbs;

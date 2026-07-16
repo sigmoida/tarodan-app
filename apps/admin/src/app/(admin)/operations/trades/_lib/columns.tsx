@@ -24,9 +24,9 @@ export function tradeColumns(t: T, rowMenu: (t: Trade) => RowActionItem[]) {
         ) : (
           <div className="flex flex-col items-start gap-1">
             <Badge status={r.status} config={tradeStatusConfig} />
-            {r.status === "cancelled" && cancelReasonLabel(r.cancelReason) && (
+            {r.status === "cancelled" && cancelReasonLabel(r.cancelReason, t) && (
               <span className="truncate text-xs text-muted">
-                {cancelReasonLabel(r.cancelReason)}
+                {cancelReasonLabel(r.cancelReason, t)}
               </span>
             )}
           </div>

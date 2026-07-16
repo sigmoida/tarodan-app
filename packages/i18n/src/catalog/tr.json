@@ -3608,6 +3608,299 @@
         "permissionCountSuffix": "{count} izne sahip.",
         "viewMatrixLink": "İzin matrisini gör →"
       }
+    },
+    "nav": {
+      "defaultDescription": "Tarodan Marketplace yönetim paneli",
+      "detailSuffix": "Detay",
+      "groups": {
+        "operations": "Operasyon",
+        "catalog": "Katalog",
+        "users": "Hesaplar",
+        "messaging": "Mesajlaşma",
+        "marketing": "Pazarlama & İçerik",
+        "finance": "Finans",
+        "system": "Sistem"
+      },
+      "items": {
+        "dashboard": {
+          "name": "Dashboard",
+          "description": "Genel bakış, özet metrikler ve son aktiviteler",
+          "keywords": "ana sayfa,home"
+        },
+        "analytics": {
+          "name": "Analizler",
+          "description": "Satış, kullanıcı ve platform analiz raporları",
+          "keywords": "istatistik,rapor"
+        },
+        "orders": {
+          "name": "Siparişler",
+          "description": "Tüm siparişleri görüntüleyin ve yönetin",
+          "keywords": "order"
+        },
+        "trades": {
+          "name": "Takaslar",
+          "description": "Ürün takas taleplerini takip edin ve yönetin",
+          "keywords": "takas,trade,barter,değişim"
+        },
+        "shipping": {
+          "name": "Kargo",
+          "description": "Gönderi, kargo etiketi ve takip işlemleri",
+          "keywords": "kargo,shipping,gönderi,etiket,takip"
+        },
+        "refundRequests": {
+          "name": "İade Takibi",
+          "description": "Açık iade taleplerini inceleyin ve sonuçlandırın",
+          "keywords": "iade,refund,talep,takip"
+        },
+        "refundHistory": {
+          "name": "İade Geçmişi",
+          "description": "Tamamlanmış iade işlemlerinin geçmişi",
+          "keywords": "iade,refund,geçmiş"
+        },
+        "products": {
+          "name": "Ürünler",
+          "description": "Ürün kataloğunu görüntüleyin, onaylayın ve yönetin"
+        },
+        "categories": {
+          "name": "Kategoriler",
+          "description": "Ürün kategorilerini oluşturun ve düzenleyin"
+        },
+        "brands": {
+          "name": "Markalar",
+          "description": "Marka listesini yönetin"
+        },
+        "carModels": {
+          "name": "Modeller",
+          "description": "Araç modellerini yönetin"
+        },
+        "manufacturers": {
+          "name": "Üreticiler",
+          "description": "Üretici firmaları yönetin"
+        },
+        "attributes": {
+          "name": "Ürün Özellikleri",
+          "description": "Ürün özellik gruplarını ve değerlerini yönetin",
+          "keywords": "attribute,özellik"
+        },
+        "collections": {
+          "name": "Koleksiyonlar",
+          "description": "Ürün koleksiyonlarını oluşturun ve düzenleyin"
+        },
+        "users": {
+          "name": "Kullanıcılar",
+          "description": "Kullanıcı hesaplarını görüntüleyin ve yönetin",
+          "keywords": "user,üye"
+        },
+        "sellerApplications": {
+          "name": "Satıcı Başvuruları",
+          "description": "Satıcı olma başvurularını inceleyin ve onaylayın"
+        },
+        "sellerPerformance": {
+          "name": "Satıcı Performansı",
+          "description": "Satıcı performans metriklerini izleyin"
+        },
+        "reviews": {
+          "name": "Yorumlar",
+          "description": "Kullanıcı yorumlarını denetleyin ve yönetin"
+        },
+        "reports": {
+          "name": "Rapor Talepleri",
+          "description": "Kullanıcı şikayet ve rapor taleplerini yönetin",
+          "keywords": "rapor,şikayet,report,complaint,abuse"
+        },
+        "staff": {
+          "name": "Rol Yönetimi",
+          "description": "Personel rollerini ve yetkilerini yönetin"
+        },
+        "messages": {
+          "name": "Mesajlar",
+          "description": "Kullanıcı mesajlaşmalarını görüntüleyin"
+        },
+        "support": {
+          "name": "Destek Talepleri",
+          "description": "Destek taleplerini yanıtlayın ve yönetin",
+          "keywords": "destek,support,ticket"
+        },
+        "ads": {
+          "name": "Reklamlar",
+          "description": "Reklam ve banner kampanyalarını yönetin",
+          "keywords": "reklam,ad,banner"
+        },
+        "discounts": {
+          "name": "İndirimler",
+          "description": "İndirim kuponları ve kampanyaları yönetin",
+          "keywords": "indirim,kupon,discount,coupon,kampanya"
+        },
+        "notifications": {
+          "name": "Bildirimler",
+          "description": "Kullanıcı bildirimlerini oluşturun ve gönderin"
+        },
+        "emailTemplates": {
+          "name": "E-posta Şablonları",
+          "description": "E-posta şablonlarını düzenleyin"
+        },
+        "pages": {
+          "name": "Sayfalar",
+          "description": "İçerik sayfalarını oluşturun ve düzenleyin"
+        },
+        "payments": {
+          "name": "Ödemeler",
+          "description": "Ödeme işlemlerini görüntüleyin ve yönetin",
+          "keywords": "ödeme,payment,hold"
+        },
+        "commission": {
+          "name": "Komisyon",
+          "description": "Komisyon oranlarını ve ayarlarını yönetin"
+        },
+        "payouts": {
+          "name": "Satıcı Ödemeleri",
+          "description": "Satıcı ödeme ve hakediş işlemleri"
+        },
+        "invoices": {
+          "name": "Faturalar",
+          "description": "Fatura ve e-fatura işlemlerini yönetin",
+          "keywords": "fatura,invoice,e-arşiv,e-fatura,elogo,iade faturası"
+        },
+        "tax": {
+          "name": "Vergi Ayarları",
+          "description": "Vergi oranlarını ve ayarlarını yapılandırın"
+        },
+        "aiModeration": {
+          "name": "AI Denetim",
+          "description": "Yapay zeka içerik denetim sonuçlarını inceleyin",
+          "keywords": "ai,moderasyon,nsfw"
+        },
+        "membershipTiers": {
+          "name": "Üyelik Katmanları",
+          "description": "Üyelik paketlerini ve avantajlarını yönetin",
+          "keywords": "üyelik,membership,tier"
+        },
+        "settings": {
+          "name": "Sistem Ayarları",
+          "description": "Genel platform ayarlarını yapılandırın"
+        },
+        "logs": {
+          "name": "Loglar",
+          "description": "Sistem, güvenlik ve denetim kayıtlarını görüntüleyin",
+          "keywords": "log,hata,error,güvenlik,e-posta,audit,denetim,iz,değişiklik,security"
+        },
+        "testTools": {
+          "name": "Test Araçları",
+          "description": "Geliştirici test ve simülasyon araçları",
+          "keywords": "test,zaman,cron,süre,boost,üyelik,iade,time"
+        }
+      }
+    },
+    "shared": {
+      "errors": {
+        "title": "Bir şeyler ters gitti",
+        "description": "Beklenmeyen bir hata oluştu. Tekrar deneyebilir ya da panele dönebilirsiniz.",
+        "errorCode": "Hata kodu: {code}",
+        "retry": "Tekrar dene",
+        "backToPanel": "Panele dön"
+      },
+      "notFound": {
+        "title": "Sayfa bulunamadı",
+        "description": "Aradığınız sayfa taşınmış, silinmiş ya da hiç var olmamış olabilir."
+      },
+      "prompt": {
+        "defaultTitle": "Bir değer girin",
+        "cancel": "Vazgeç",
+        "requiredMessage": "Bu alan zorunludur"
+      },
+      "navSearch": {
+        "placeholder": "Menüde ara…",
+        "ariaLabel": "Sol menüde başlık ara"
+      },
+      "profileMenu": {
+        "ariaLabel": "Hesap menüsü",
+        "defaultName": "Yönetici"
+      },
+      "topbar": {
+        "openMenu": "Menüyü aç"
+      },
+      "sidebarNav": {
+        "noResults": "Eşleşen menü öğesi yok"
+      },
+      "sidebar": {
+        "closeMenu": "Menüyü kapat"
+      },
+      "dateRange": {
+        "startDate": "Başlangıç tarihi",
+        "endDate": "Bitiş tarihi"
+      },
+      "table": {
+        "noRecords": "Kayıt bulunamadı",
+        "selectAll": "Tümünü seç",
+        "selectRow": "Satırı seç"
+      },
+      "timeline": {
+        "title": "Zaman Çizelgesi"
+      },
+      "suspense": {
+        "errorTitle": "Bir hata oluştu",
+        "errorDescription": "Veriler yüklenemedi. Lütfen tekrar deneyin.",
+        "retry": "Tekrar dene"
+      },
+      "metricCard": {
+        "vsYesterday": "vs dün"
+      },
+      "filterToolbar": {
+        "placeholder": "Ara..."
+      },
+      "bulkActionBar": {
+        "selectedCount": "{count} seçili",
+        "clearSelection": "Seçimi temizle"
+      },
+      "pagination": {
+        "pageInfo": "Sayfa {page} / {totalPages}",
+        "next": "Sonraki"
+      },
+      "cancelReason": {
+        "stockout": "Stok bitti",
+        "paymentExpired": "Ödeme süresi doldu",
+        "buyerCancelled": "Alıcı iptal etti",
+        "sellerMissedShipping": "Satıcı kargolamadı",
+        "deadlineExpired": "Süre doldu"
+      },
+      "orderOrigin": {
+        "offer": "Teklif",
+        "directSale": "Doğrudan Satış"
+      }
+    },
+    "auth": {
+      "common": {
+        "password": "Şifre"
+      },
+      "login": {
+        "verificationCode": "Doğrulama Kodu",
+        "forgotPasswordLink": "Şifremi unuttum?",
+        "twoFactorRequired": "İki faktörlü doğrulama kodu gerekli",
+        "pageTitleWord": "Giriş",
+        "pageDescription": "Tarodan yönetim paneline giriş yapın",
+        "invalidInput": "Geçersiz giriş bilgileri",
+        "connectionError": "Sunucuya bağlanılamadı.",
+        "invalidCode": "Doğrulama kodu hatalı",
+        "invalidCredentials": "E-posta veya şifre hatalı girildi",
+        "genericFailure": "Giriş başarısız"
+      },
+      "forgotPassword": {
+        "title": "Şifremi Unuttum",
+        "instructions": "Hesabının e-posta adresini gir; sana şifre sıfırlama bağlantısı gönderelim.",
+        "submit": "Sıfırlama bağlantısı gönder",
+        "backToLogin": "← Girişe dön",
+        "sentMessage": "Eğer <strong>{email}</strong> sistemde kayıtlıysa, şifre sıfırlama bağlantısı e-posta adresine gönderildi. Gelen kutunu (ve spam klasörünü) kontrol et.",
+        "pageDescription": "Hesap şifrenizi sıfırlayın"
+      },
+      "layout": {
+        "copyright": "© 2026 Tarodan Marketplace. Tüm hakları saklıdır."
+      },
+      "validation": {
+        "emailRequired": "E-posta gerekli",
+        "emailInvalid": "Geçerli bir e-posta girin",
+        "passwordMin": "Şifre en az 6 karakter olmalı",
+        "codeInvalid": "6 haneli kod girin"
+      }
     }
   }
 }

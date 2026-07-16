@@ -2,6 +2,7 @@
 
 import { Fragment, type ReactNode } from "react";
 import dynamic from "next/dynamic";
+import { useTranslations } from "next-intl";
 import {
   useReactTable,
   getCoreRowModel,
@@ -70,7 +71,7 @@ export function DataTable<T>({
   columns,
   data,
   loading,
-  emptyText = "Kayıt bulunamadı",
+  emptyText,
   emptyAction,
   onRowClick,
   rowClassName,
@@ -82,6 +83,8 @@ export function DataTable<T>({
   renderExpanded,
   expandedId,
 }: DataTableProps<T>) {
+  const t = useTranslations();
+  const resolvedEmptyText = emptyText ?? t("admin.shared.table.noRecords");
   const table = useReactTable({
     data,
     columns,
@@ -144,7 +147,7 @@ export function DataTable<T>({
                     <Checkbox
                       checked={!!allSelected}
                       onChange={() => onToggleAll?.(rowIds)}
-                      aria-label="Tümünü seç"
+                      aria-label={t("admin.shared.table.selectAll")}
                     />
                   </TableHead>
                 )}
@@ -184,7 +187,7 @@ export function DataTable<T>({
                   className="p-8 text-center text-muted"
                 >
                   <div className="flex flex-col items-center gap-3">
-                    <span>{emptyText}</span>
+                    <span>{resolvedEmptyText}</span>
                     {emptyAction}
                   </div>
                 </TableCell>
@@ -226,7 +229,7 @@ export function DataTable<T>({
                           <Checkbox
                             checked={selectedIds.includes(id)}
                             onChange={() => onToggleRow?.(id)}
-                            aria-label="Satırı seç"
+                            aria-label={t("admin.shared.table.selectRow")}
                           />
                         </TableCell>
                       )}

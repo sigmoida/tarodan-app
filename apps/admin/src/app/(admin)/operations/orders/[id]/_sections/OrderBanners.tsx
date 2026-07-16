@@ -39,18 +39,18 @@ export function OrderBanners({
       )}
 
       {status.isCancelledOrder &&
-        (cancelReasonLabel(order.cancelReason) || order.offerId) && (
+        (cancelReasonLabel(order.cancelReason, t) || order.offerId) && (
           <div className="rounded-lg border border-danger-200 bg-danger-50 px-4 py-3">
             <p className="text-sm font-medium text-danger-700">
               {t("admin.operations.orders.banners.cancelReason", {
                 reason:
-                  cancelReasonLabel(order.cancelReason) ??
+                  cancelReasonLabel(order.cancelReason, t) ??
                   t("admin.operations.common.notSpecified"),
               })}
             </p>
             <p className="mt-0.5 text-xs text-danger-600">
               {t("admin.operations.orders.banners.origin", {
-                origin: orderOriginLabel(order.offerId),
+                origin: orderOriginLabel(order.offerId, t),
               })}
               {order.cancelReason ? ` · "${order.cancelReason}"` : ""}
             </p>

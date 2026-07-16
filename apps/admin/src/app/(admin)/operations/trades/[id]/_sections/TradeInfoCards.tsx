@@ -14,7 +14,7 @@ export function TradeInfoCards({ trade }: { trade: TradeDetail }) {
     trade.rejectionReason || trade.cancellationReason || trade.cancelReason;
   const shortReason = trade.rejectionReason
     ? null
-    : cancelReasonLabel(trade.cancellationReason || trade.cancelReason);
+    : cancelReasonLabel(trade.cancellationReason || trade.cancelReason, t);
 
   return (
     <>

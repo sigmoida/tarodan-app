@@ -1,5 +1,6 @@
 /** @format */
 
+import { getTranslations } from "next-intl/server";
 import { Logo } from "@tarodan/ui/logo";
 
 /**
@@ -12,12 +13,16 @@ import { Logo } from "@tarodan/ui/logo";
  * re-runs it — flashing a blank frame before landing on /dashboard (same issue
  * web had). The bounce now happens at the edge in `middleware.ts`
  * (guestOnlyPaths), before render and only on real navigations.
+ *
+ * Async (like the root layout) so the footer copyright line can come from the
+ * request-resolved locale via `getTranslations`.
  */
-export default function AuthLayout({
+export default async function AuthLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const t = await getTranslations();
   return (
     <div className="flex min-h-screen flex-col">
       <header className="flex h-16 items-center bg-primary-500 px-6 shadow-sm">
@@ -29,7 +34,7 @@ export default function AuthLayout({
           {children}
 
           <p className="mt-6 text-center text-sm text-muted">
-            © 2026 Tarodan Marketplace. Tüm hakları saklıdır.
+            {t("admin.auth.layout.copyright")}
           </p>
         </div>
       </main>

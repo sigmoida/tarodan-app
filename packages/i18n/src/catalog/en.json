@@ -3608,6 +3608,299 @@
         "permissionCountSuffix": "has {count} permissions.",
         "viewMatrixLink": "View permission matrix →"
       }
+    },
+    "nav": {
+      "defaultDescription": "Tarodan Marketplace admin panel",
+      "detailSuffix": "Detail",
+      "groups": {
+        "operations": "Operations",
+        "catalog": "Catalog",
+        "users": "Accounts",
+        "messaging": "Messaging",
+        "marketing": "Marketing & Content",
+        "finance": "Finance",
+        "system": "System"
+      },
+      "items": {
+        "dashboard": {
+          "name": "Dashboard",
+          "description": "Overview, summary metrics, and recent activity",
+          "keywords": "home,homepage"
+        },
+        "analytics": {
+          "name": "Analytics",
+          "description": "Sales, user, and platform analytics reports",
+          "keywords": "statistics,report"
+        },
+        "orders": {
+          "name": "Orders",
+          "description": "View and manage all orders",
+          "keywords": "order"
+        },
+        "trades": {
+          "name": "Trades",
+          "description": "Track and manage product trade requests",
+          "keywords": "trade,barter,exchange,swap"
+        },
+        "shipping": {
+          "name": "Shipping",
+          "description": "Shipment, shipping label, and tracking operations",
+          "keywords": "shipping,cargo,shipment,label,tracking"
+        },
+        "refundRequests": {
+          "name": "Refund Tracking",
+          "description": "Review and resolve open refund requests",
+          "keywords": "refund,return,request,tracking"
+        },
+        "refundHistory": {
+          "name": "Refund History",
+          "description": "History of completed refund transactions",
+          "keywords": "refund,return,history"
+        },
+        "products": {
+          "name": "Products",
+          "description": "View, approve, and manage the product catalog"
+        },
+        "categories": {
+          "name": "Categories",
+          "description": "Create and edit product categories"
+        },
+        "brands": {
+          "name": "Brands",
+          "description": "Manage the brand list"
+        },
+        "carModels": {
+          "name": "Models",
+          "description": "Manage vehicle models"
+        },
+        "manufacturers": {
+          "name": "Manufacturers",
+          "description": "Manage manufacturer companies"
+        },
+        "attributes": {
+          "name": "Product Attributes",
+          "description": "Manage product attribute groups and values",
+          "keywords": "attribute,property"
+        },
+        "collections": {
+          "name": "Collections",
+          "description": "Create and edit product collections"
+        },
+        "users": {
+          "name": "Users",
+          "description": "View and manage user accounts",
+          "keywords": "user,member"
+        },
+        "sellerApplications": {
+          "name": "Seller Applications",
+          "description": "Review and approve seller applications"
+        },
+        "sellerPerformance": {
+          "name": "Seller Performance",
+          "description": "Track seller performance metrics"
+        },
+        "reviews": {
+          "name": "Reviews",
+          "description": "Moderate and manage user reviews"
+        },
+        "reports": {
+          "name": "Report Requests",
+          "description": "Manage user complaint and report requests",
+          "keywords": "report,complaint,abuse"
+        },
+        "staff": {
+          "name": "Role Management",
+          "description": "Manage staff roles and permissions"
+        },
+        "messages": {
+          "name": "Messages",
+          "description": "View user conversations"
+        },
+        "support": {
+          "name": "Support Tickets",
+          "description": "Respond to and manage support tickets",
+          "keywords": "support,ticket,help"
+        },
+        "ads": {
+          "name": "Ads",
+          "description": "Manage ad and banner campaigns",
+          "keywords": "ad,banner,advertisement"
+        },
+        "discounts": {
+          "name": "Discounts",
+          "description": "Manage discount coupons and campaigns",
+          "keywords": "discount,coupon,campaign,promo"
+        },
+        "notifications": {
+          "name": "Notifications",
+          "description": "Create and send user notifications"
+        },
+        "emailTemplates": {
+          "name": "Email Templates",
+          "description": "Edit email templates"
+        },
+        "pages": {
+          "name": "Pages",
+          "description": "Create and edit content pages"
+        },
+        "payments": {
+          "name": "Payments",
+          "description": "View and manage payment transactions",
+          "keywords": "payment,hold"
+        },
+        "commission": {
+          "name": "Commission",
+          "description": "Manage commission rates and settings"
+        },
+        "payouts": {
+          "name": "Seller Payouts",
+          "description": "Seller payout and earnings operations"
+        },
+        "invoices": {
+          "name": "Invoices",
+          "description": "Manage invoice and e-invoice operations",
+          "keywords": "invoice,e-archive,e-invoice,elogo,refund invoice"
+        },
+        "tax": {
+          "name": "Tax Settings",
+          "description": "Configure tax rates and settings"
+        },
+        "aiModeration": {
+          "name": "AI Moderation",
+          "description": "Review AI content moderation results",
+          "keywords": "ai,moderation,nsfw"
+        },
+        "membershipTiers": {
+          "name": "Membership Tiers",
+          "description": "Manage membership plans and benefits",
+          "keywords": "membership,tier,plan"
+        },
+        "settings": {
+          "name": "System Settings",
+          "description": "Configure general platform settings"
+        },
+        "logs": {
+          "name": "Logs",
+          "description": "View system, security, and audit logs",
+          "keywords": "log,error,security,email,audit,trail,change"
+        },
+        "testTools": {
+          "name": "Test Tools",
+          "description": "Developer test and simulation tools",
+          "keywords": "test,time,cron,duration,boost,membership,refund"
+        }
+      }
+    },
+    "shared": {
+      "errors": {
+        "title": "Something went wrong",
+        "description": "An unexpected error occurred. You can try again or return to the panel.",
+        "errorCode": "Error code: {code}",
+        "retry": "Try again",
+        "backToPanel": "Back to panel"
+      },
+      "notFound": {
+        "title": "Page not found",
+        "description": "The page you're looking for may have been moved, deleted, or never existed."
+      },
+      "prompt": {
+        "defaultTitle": "Enter a value",
+        "cancel": "Cancel",
+        "requiredMessage": "This field is required"
+      },
+      "navSearch": {
+        "placeholder": "Search menu…",
+        "ariaLabel": "Search sidebar headings"
+      },
+      "profileMenu": {
+        "ariaLabel": "Account menu",
+        "defaultName": "Admin"
+      },
+      "topbar": {
+        "openMenu": "Open menu"
+      },
+      "sidebarNav": {
+        "noResults": "No matching menu item"
+      },
+      "sidebar": {
+        "closeMenu": "Close menu"
+      },
+      "dateRange": {
+        "startDate": "Start date",
+        "endDate": "End date"
+      },
+      "table": {
+        "noRecords": "No records found",
+        "selectAll": "Select all",
+        "selectRow": "Select row"
+      },
+      "timeline": {
+        "title": "Timeline"
+      },
+      "suspense": {
+        "errorTitle": "An error occurred",
+        "errorDescription": "Failed to load data. Please try again.",
+        "retry": "Try again"
+      },
+      "metricCard": {
+        "vsYesterday": "vs yesterday"
+      },
+      "filterToolbar": {
+        "placeholder": "Search..."
+      },
+      "bulkActionBar": {
+        "selectedCount": "{count} selected",
+        "clearSelection": "Clear selection"
+      },
+      "pagination": {
+        "pageInfo": "Page {page} of {totalPages}",
+        "next": "Next"
+      },
+      "cancelReason": {
+        "stockout": "Out of stock",
+        "paymentExpired": "Payment window expired",
+        "buyerCancelled": "Cancelled by buyer",
+        "sellerMissedShipping": "Seller missed shipping",
+        "deadlineExpired": "Deadline expired"
+      },
+      "orderOrigin": {
+        "offer": "Offer",
+        "directSale": "Direct Sale"
+      }
+    },
+    "auth": {
+      "common": {
+        "password": "Password"
+      },
+      "login": {
+        "verificationCode": "Verification Code",
+        "forgotPasswordLink": "Forgot your password?",
+        "twoFactorRequired": "Two-factor authentication code required",
+        "pageTitleWord": "Login",
+        "pageDescription": "Sign in to the Tarodan admin panel",
+        "invalidInput": "Invalid sign-in information",
+        "connectionError": "Could not connect to the server.",
+        "invalidCode": "Verification code is incorrect",
+        "invalidCredentials": "Incorrect email or password",
+        "genericFailure": "Sign-in failed"
+      },
+      "forgotPassword": {
+        "title": "Forgot Password",
+        "instructions": "Enter your account's email address and we'll send you a password reset link.",
+        "submit": "Send reset link",
+        "backToLogin": "← Back to login",
+        "sentMessage": "If <strong>{email}</strong> is registered with us, a password reset link has been sent to that address. Check your inbox (and spam folder).",
+        "pageDescription": "Reset your account password"
+      },
+      "layout": {
+        "copyright": "© 2026 Tarodan Marketplace. All rights reserved."
+      },
+      "validation": {
+        "emailRequired": "Email is required",
+        "emailInvalid": "Enter a valid email",
+        "passwordMin": "Password must be at least 6 characters",
+        "codeInvalid": "Enter a 6-digit code"
+      }
     }
   }
 }

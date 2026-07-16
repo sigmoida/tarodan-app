@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { ChevronRightIcon } from '@heroicons/react/24/outline';
 import { breadcrumbsFor } from '@/lib/navigation';
 
@@ -13,7 +14,8 @@ import { breadcrumbsFor } from '@/lib/navigation';
  */
 export function Breadcrumbs() {
   const pathname = usePathname();
-  const crumbs = breadcrumbsFor(pathname);
+  const t = useTranslations();
+  const crumbs = breadcrumbsFor(pathname, t);
   if (crumbs.length === 0) return null;
 
   return (

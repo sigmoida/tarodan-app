@@ -25,7 +25,14 @@ export interface UseAdminResourceOptions<T> {
   syncUrl?: boolean;
   /** Initial filter values (excluding search). E.g. { status: "all", userId: "" } */
   initialFilters?: Record<string, string>;
-  /** Toast message on error. Default: "Veriler yüklenemedi" */
+  /**
+   * Toast message on error. NOTE (#222): dead prop — never read after being
+   * destructured below; error display is fully owned by SuspenseBoundary's
+   * ErrorBoundary+Alert. Left as a hardcoded default rather than wired to `t`
+   * since translating unused code doesn't fix any real i18n gap. Flagged for
+   * cleanup (either remove the prop or actually wire it to the mutation's
+   * error toast).
+   */
   errorMessage?: string;
   /**
    * Search debounce duration (ms). Default: 300.

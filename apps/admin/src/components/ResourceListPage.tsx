@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { PageHeader, FilterToolbar, BulkActionBar } from "@/components/AdminList";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
 import { Pagination } from "@/components/Pagination";
@@ -163,7 +164,7 @@ export function ResourceListPage<T>({
   columns,
   data,
   loading,
-  emptyText = "Kayıt bulunamadı",
+  emptyText,
   getRowId,
   rowClassName,
   onRowClick,
@@ -181,6 +182,7 @@ export function ResourceListPage<T>({
   totalPages,
   onPageChange,
 }: ResourceListPageProps<T>) {
+  const t = useTranslations();
   // Toolbar: FilterToolbar if there's search, a plain div if only filters, null if neither
   const hasSearch = !!search;
   const hasFilters = !!filters;
@@ -190,7 +192,7 @@ export function ResourceListPage<T>({
       search={searchValue}
       onSearchChange={onSearchChange ?? (() => {})}
       onSearchSubmit={onSearchSubmit}
-      searchPlaceholder={search.placeholder ?? "Ara..."}
+      searchPlaceholder={search.placeholder}
     >
       {filters}
     </FilterToolbar>

@@ -1,5 +1,8 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { useTranslations } from "next-intl";
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -40,23 +43,25 @@ export function truncate(str: string, length: number): string {
 }
 
 /**
- * Map a raw order/trade cancelReason (set by the API) to a short Turkish
- * label for the admin UI. Falls back to the raw reason when unmapped.
- * Reason strings are emitted by product-lock.service / payment / order / refund
- * flows on the backend.
+ * Map a raw order/trade cancelReason (set by the API) to a short translated
+ * label for the admin UI. Falls back to the raw reason when unmapped. The
+ * MATCH patterns below (STOCKOUT / startsWith / exact-equals) are backend data
+ * — the literal Turkish strings emitted by product-lock.service / payment /
+ * order / refund flows — and stay as-is regardless of locale; only the
+ * returned LABEL is translated via `t`.
  */
-export function cancelReasonLabel(reason?: string | null): string | null {
+export function cancelReasonLabel(reason: string | null | undefined, t: T): string | null {
   if (!reason) return null;
   const STOCKOUT = [
     'Stok tükendi',
     'Stok tükendiği için otomatik iptal edildi',
     'Stok takas icin ayrildi',
   ];
-  if (STOCKOUT.includes(reason)) return 'Stok bitti';
-  if (reason.startsWith('Ödeme süresi')) return 'Ödeme süresi doldu';
-  if (reason === 'Alıcı tarafından iptal edildi') return 'Alıcı iptal etti';
-  if (reason.startsWith('Satıcı belirlenen süre')) return 'Satıcı kargolamadı';
-  if (reason.startsWith('Süre dolumu')) return 'Süre doldu';
+  if (STOCKOUT.includes(reason)) return t('admin.shared.cancelReason.stockout');
+  if (reason.startsWith('Ödeme süresi')) return t('admin.shared.cancelReason.paymentExpired');
+  if (reason === 'Alıcı tarafından iptal edildi') return t('admin.shared.cancelReason.buyerCancelled');
+  if (reason.startsWith('Satıcı belirlenen süre')) return t('admin.shared.cancelReason.sellerMissedShipping');
+  if (reason.startsWith('Süre dolumu')) return t('admin.shared.cancelReason.deadlineExpired');
   return reason;
 }
 
@@ -64,8 +69,8 @@ export function cancelReasonLabel(reason?: string | null): string | null {
  * Human label for an order's origin: offer-based orders carry an offerId,
  * everything else is a direct purchase.
  */
-export function orderOriginLabel(offerId?: string | null): 'Teklif' | 'Doğrudan Satış' {
-  return offerId ? 'Teklif' : 'Doğrudan Satış';
+export function orderOriginLabel(offerId: string | null | undefined, t: T): string {
+  return offerId ? t('admin.shared.orderOrigin.offer') : t('admin.shared.orderOrigin.directSale');
 }
 
 /**
@@ -77,6 +82,13 @@ export function orderOriginLabel(offerId?: string | null): 'Teklif' | 'Doğrudan
  * - If `keys` is given, ONLY those statuses (in that order) are listed — the badge
  *   config stays complete, but this hides unnecessary/intermediate statuses from the
  *   filter (e.g. per-side intermediate statuses in trades).
+ *
+ * NOTE (#222): the `allLabel` default below is still hardcoded Turkish ('Tümü').
+ * Translating it would mean requiring `t` here, which forces every caller —
+ * including several out-of-scope operations/catalog pages — to pass one even
+ * when they already override `allLabel` themselves. Left as-is; only
+ * `cancelReasonLabel`/`orderOriginLabel` (this file's explicit #222 scope)
+ * were converted. Flagged for a follow-up.
  */
 export function statusFilterOptions(
   config: Record<string, { label: string }>,
