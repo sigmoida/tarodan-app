@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Button, enumLabel, membershipTierConfig } from '@tarodan/ui';
 import { PencilIcon } from '@heroicons/react/24/outline';
 import { SectionCard } from '@/components/detail/SectionCard';
@@ -26,13 +27,14 @@ export function TierCard({
   yearlyDiscount: number;
   onEdit: () => void;
 }) {
+  const t = useTranslations();
   const isFree = tier.type === 'free';
 
   return (
     <SectionCard
       title={tier.name}
       actions={
-        <Button variant="ghost" size="sm" onClick={onEdit} title="Düzenle">
+        <Button variant="ghost" size="sm" onClick={onEdit} title={t('common.edit')}>
           <PencilIcon className="h-5 w-5" />
         </Button>
       }
@@ -45,31 +47,45 @@ export function TierCard({
       <div className="space-y-2 text-sm">
         {!isFree && (
           <>
-            <Row label="Aylık:" value={fmtTry(tier.monthlyPrice)} />
-            <Row label="Yıllık:" value={fmtTry(computedYearly(tier.monthlyPrice, yearlyDiscount))} />
+            <Row label={t('admin.tiers.card.monthly')} value={fmtTry(tier.monthlyPrice)} />
+            <Row
+              label={t('admin.tiers.card.yearly')}
+              value={fmtTry(computedYearly(tier.monthlyPrice, yearlyDiscount))}
+            />
           </>
         )}
-        <Row label="Ücretsiz İlan:" value={tier.maxFreeListings} />
+        <Row label={t('admin.tiers.card.freeListings')} value={tier.maxFreeListings} />
         <Row
-          label="Toplam İlan:"
-          value={tier.maxTotalListings === -1 ? 'Sınırsız' : tier.maxTotalListings}
+          label={t('admin.tiers.card.totalListings')}
+          value={tier.maxTotalListings === -1 ? t('admin.tiers.card.unlimited') : tier.maxTotalListings}
         />
-        <Row label="Görsel/İlan:" value={tier.maxImagesPerListing} />
+        <Row label={t('admin.tiers.card.imagesPerListing')} value={tier.maxImagesPerListing} />
         <div className="border-t border-border pt-2">
-          <Row label="Kullanıcı Sayısı:" value={<span className="font-medium">{tier.userCount}</span>} />
+          <Row
+            label={t('admin.tiers.card.userCount')}
+            value={<span className="font-medium">{tier.userCount}</span>}
+          />
         </div>
       </div>
 
       <div className="flex flex-wrap gap-2 border-t border-border pt-4">
         {tier.canCreateCollections && (
-          <span className={`${featurePill} bg-success-50 text-success-700`}>Koleksiyon</span>
+          <span className={`${featurePill} bg-success-50 text-success-700`}>
+            {t('admin.tiers.card.collectionsPill')}
+          </span>
         )}
-        {tier.canTrade && <span className={`${featurePill} bg-info-50 text-info-700`}>Takas</span>}
+        {tier.canTrade && (
+          <span className={`${featurePill} bg-info-50 text-info-700`}>
+            {t('admin.tiers.card.tradePill')}
+          </span>
+        )}
         {tier.isAdFree && (
-          <span className={`${featurePill} bg-primary-50 text-primary-700`}>Reklamsız</span>
+          <span className={`${featurePill} bg-primary-50 text-primary-700`}>
+            {t('admin.tiers.field.isAdFree')}
+          </span>
         )}
         {!tier.isActive && (
-          <span className={`${featurePill} bg-surface-alt text-muted`}>Pasif</span>
+          <span className={`${featurePill} bg-surface-alt text-muted`}>{t('common.inactive')}</span>
         )}
       </div>
     </SectionCard>

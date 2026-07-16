@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Button } from "@tarodan/ui";
 import { Form, FormInput, useZodForm } from "@tarodan/ui/form";
 import { adminApi } from "@/lib/api";
@@ -13,7 +14,8 @@ import { yearlyDiscountSchema } from "../_lib/schema";
  * the backend recompute every tier's yearly price, so both queries invalidate.
  */
 export function YearlyDiscountForm({ value }: { value: number }) {
-  const form = useZodForm(yearlyDiscountSchema, {
+  const t = useTranslations();
+  const form = useZodForm(yearlyDiscountSchema(t), {
     values: { discount: String(value) },
   });
 
@@ -22,12 +24,12 @@ export function YearlyDiscountForm({ value }: { value: number }) {
       adminApi.updateSetting("yearly_discount_percentage", String(pct)),
     {
       invalidates: ["membership-yearly-discount", "membership-tiers"],
-      successMessage: "Yıllık indirim oranı güncellendi",
+      successMessage: t("admin.tiers.yearlyDiscount.saved"),
     },
   );
 
   return (
-    <SectionCard title="Yıllık İndirim Oranı" bodyClassName="space-y-3">
+    <SectionCard title={t("admin.tiers.yearlyDiscount.title")} bodyClassName="space-y-3">
       <Form
         form={form}
         onSubmit={(v) => save.mutate(Number(v.discount))}
@@ -39,17 +41,14 @@ export function YearlyDiscountForm({ value }: { value: number }) {
           step="0.1"
           min="0"
           max="100"
-          label="İndirim Yüzdesi (%)"
+          label={t("admin.tiers.yearlyDiscount.label")}
           className="w-48"
         />
         <Button type="submit" isLoading={save.isPending}>
-          Kaydet
+          {t("common.save")}
         </Button>
       </Form>
-      <p className="text-xs text-muted">
-        Yıllık fiyat = Aylık Fiyat × 12 × (1 − İndirim%) · Değiştirildiğinde tüm
-        katmanların yıllık fiyatı otomatik güncellenir.
-      </p>
+      <p className="text-xs text-muted">{t("admin.tiers.yearlyDiscount.helper")}</p>
     </SectionCard>
   );
 }

@@ -3109,6 +3109,505 @@
         "reporter": "Reporter",
         "targetId": "Target ID"
       }
+    },
+    "settings": {
+      "page": {
+        "title": "System Settings",
+        "description": "Manage system configuration"
+      },
+      "error": {
+        "title": "Failed to load settings",
+        "description": "Your session may have expired. Try again; if it persists, log out and log back in."
+      },
+      "saveButton": "Save Settings",
+      "saved": "Settings saved",
+      "tabs": {
+        "listing": "Listing",
+        "trade": "Trade",
+        "message": "Message"
+      },
+      "tabTitle": {
+        "listing": "Listing Settings",
+        "trade": "Trade Settings",
+        "message": "Message Settings"
+      },
+      "fields": {
+        "freeListingLimit": {
+          "label": "Free Listing Limit",
+          "helper": "Listing limit for free members"
+        },
+        "basicListingLimit": {
+          "label": "Basic Listing Limit",
+          "helper": "Listing limit for basic members (-1 = unlimited)"
+        },
+        "premiumListingLimit": {
+          "label": "Premium Listing Limit",
+          "helper": "Listing limit for premium members (-1 = unlimited)"
+        },
+        "businessListingLimit": {
+          "label": "Business Listing Limit",
+          "helper": "Listing limit for business members (-1 = unlimited)"
+        },
+        "minProductPrice": {
+          "label": "Minimum Product Price (₺)",
+          "helper": "Minimum price for new listings (existing listings unaffected)"
+        },
+        "maxProductPrice": {
+          "label": "Maximum Product Price (₺)",
+          "helper": "Maximum price for new listings (existing listings unaffected)"
+        },
+        "tradeResponseHours": {
+          "label": "Response Time (Hours)",
+          "helper": "Time to respond to a trade offer"
+        },
+        "tradePaymentHours": {
+          "label": "Payment Time (Hours)",
+          "helper": "Time to pay after acceptance (for cash trades)"
+        },
+        "tradeShippingDays": {
+          "label": "Shipping Time (Days)",
+          "helper": "Time to ship after acceptance"
+        },
+        "tradeConfirmationDays": {
+          "label": "Confirmation Time (Days)",
+          "helper": "Time to confirm after delivery"
+        },
+        "maxMessageLength": {
+          "label": "Maximum Message Length",
+          "helper": "Maximum character length of a message"
+        }
+      },
+      "validation": {
+        "required": "Required",
+        "invalidValueMin": "Enter a valid value (at least {min})",
+        "invalidValue": "Enter a valid value"
+      }
+    },
+    "tiers": {
+      "page": {
+        "title": "Membership Tiers",
+        "description": "Manage membership tiers and their prices",
+        "empty": "No membership tiers yet"
+      },
+      "yearlyDiscount": {
+        "title": "Yearly Discount Rate",
+        "label": "Discount Percentage (%)",
+        "helper": "Yearly price = Monthly Price × 12 × (1 − Discount%) · Changing this automatically updates the yearly price for every tier.",
+        "saved": "Yearly discount rate updated"
+      },
+      "validation": {
+        "required": "Required",
+        "discountRange": "Enter a value between 0 and 100",
+        "nameRequired": "Name is required"
+      },
+      "modal": {
+        "editTitle": "Edit Membership Tier — {name}",
+        "saved": "Membership tier updated"
+      },
+      "field": {
+        "name": "Name",
+        "sortOrder": "Sort Order",
+        "monthlyPrice": "Monthly Price (₺)",
+        "yearlyPrice": "Yearly Price (₺)",
+        "automatic": "(Automatic)",
+        "yearlyFormula": "{monthly} × 12 × (1 − {discount}%) = {yearly}",
+        "maxFreeListings": "Free Listings",
+        "maxTotalListings": "Total Listings",
+        "maxTotalListingsHelper": "-1 = unlimited",
+        "maxImagesPerListing": "Images/Listing",
+        "featuredListingSlots": "Featured Listing Slots",
+        "commissionDiscount": "Commission Discount (%)",
+        "canCreateCollections": "Can Create Collections",
+        "canTrade": "Can Trade",
+        "isAdFree": "Ad-Free"
+      },
+      "card": {
+        "monthly": "Monthly:",
+        "yearly": "Yearly:",
+        "freeListings": "Free Listings:",
+        "totalListings": "Total Listings:",
+        "unlimited": "Unlimited",
+        "imagesPerListing": "Images/Listing:",
+        "userCount": "User Count:",
+        "collectionsPill": "Collections",
+        "tradePill": "Trade"
+      }
+    },
+    "aiModeration": {
+      "page": {
+        "title": "AI Moderation",
+        "description": "Shared AI moderation for all entities (product · user · collection · image · text) — thresholds, image testing, and a unified event log",
+        "disabledWarning": "AI moderation service is disabled (AI_MODERATION_ENABLED=false). Threshold settings and image testing are unavailable; past log entries are still listed.",
+        "logTitle": "Moderation Log",
+        "logDescription": "Content blocked / flagged by AI across all entities"
+      },
+      "thresholds": {
+        "saved": "Thresholds saved",
+        "title": "AI Thresholds",
+        "relevanceLabel": "Acceptance threshold (relevance %)",
+        "relevanceHelper": "If a product image's relevance score is above this percentage, it's auto-accepted; below it, it goes to admin review.",
+        "nsfwLabel": "Inappropriateness threshold (NSFW %)",
+        "nsfwHelper": "If an image's NSFW score exceeds this percentage, it's blocked (covers avatar, collection, product, and all other image uploads).",
+        "saveButton": "Save Thresholds",
+        "percentValue": "{value}%"
+      },
+      "imageTest": {
+        "testFailed": "Test failed (the image may not have downloaded)",
+        "title": "Test an Image (see the score without uploading)",
+        "urlPlaceholder": "Image URL (https://...) or data:image/...;base64,...",
+        "testButton": "Test",
+        "orLabel": "or",
+        "chooseFile": "choose a file from your computer",
+        "scores": "Relevance: {relevance}% · Inappropriateness: {nsfw}%",
+        "labels": "Labels:"
+      },
+      "badge": {
+        "flagged": "Suspected inappropriate",
+        "review": "Low relevance",
+        "passed": "Clean · auto-approved"
+      }
+    },
+    "users": {
+      "title": "Users",
+      "loadError": "Failed to load users",
+      "empty": "No users found",
+      "totalCount": "{count} users total",
+      "filterAll": "All Users",
+      "filterSellers": "Sellers",
+      "filterBuyers": "Buyers",
+      "filterBanned": "Banned",
+      "banned": "User banned",
+      "unbanned": "User ban lifted",
+      "banTitle": "Ban User",
+      "banReasonLabel": "Ban reason (optional)",
+      "banDefaultReason": "Banned by admin",
+      "banAction": "Ban",
+      "unbanAction": "Lift Ban",
+      "columnUser": "User",
+      "seller": "Seller",
+      "verified": "Verified",
+      "notVerified": "Not Verified",
+      "bannedBadge": "Banned",
+      "membership": "Membership",
+      "membershipFree": "Free",
+      "membershipBasic": "Basic",
+      "billingMonthly": "Monthly",
+      "billingYearly": "Yearly",
+      "registeredAt": "Registered On",
+      "lastLogin": "Last Login",
+      "neverLoggedIn": "Never logged in",
+      "status": {
+        "pending": "Pending",
+        "bothShipped": "Shipped"
+      },
+      "detail": {
+        "banned": "User banned",
+        "unbanned": "User ban lifted",
+        "banTitle": "Ban User",
+        "banReasonLabel": "Ban Reason",
+        "banReasonPlaceholder": "Describe the reason for the ban...",
+        "banConfirm": "Ban",
+        "banReasonRequired": "Ban reason is required",
+        "unbanTitle": "Lift Ban",
+        "unbanConfirmDesc": "Are you sure you want to lift this user's ban?",
+        "bannedBadge": "Banned",
+        "infoTitle": "User Information",
+        "ratingsCount": "({count} ratings)",
+        "emailLabel": "Email",
+        "bioLabel": "Bio",
+        "sellerInfoTitle": "Seller Information",
+        "sellerTypeLabel": "Seller Type",
+        "individual": "Individual",
+        "corporate": "Corporate",
+        "companyNameLabel": "Company Name",
+        "taxIdLabel": "Tax ID",
+        "bankAccountTitle": "Bank Account (IBAN)",
+        "accountHolderLabel": "Account Holder",
+        "ibanLabel": "IBAN",
+        "tcKimlikNoLabel": "National ID No",
+        "verifiedAtLabel": "Verified On",
+        "noBankAccount": "No bank account added",
+        "banDateLabel": "Ban Date:",
+        "quickActionsTitle": "Quick Actions",
+        "allOrders": "All Orders ({count})",
+        "allProducts": "All Products ({count})",
+        "allTrades": "All Trades ({count})",
+        "verificationStatusTitle": "Verification Status",
+        "identityLabel": "Identity",
+        "addressesTitle": "Addresses ({count})",
+        "totalOrders": "Total Orders",
+        "ordersSub": "{buyer} as buyer / {seller} as seller",
+        "trades": "Trades",
+        "tradesSub": "{initiated} initiated / {received} received",
+        "messagesSub": "{sent} sent / {received} received",
+        "receivedRatings": "Received Ratings",
+        "givenRatings": "Given Ratings",
+        "membershipInfoTitle": "Membership Information",
+        "membershipTierLabel": "Membership Tier",
+        "startDateLabel": "Start Date",
+        "endDateLabel": "End Date",
+        "noMembership": "No membership record (free).",
+        "membershipCancelledNotice": "Cancelled — active until the end of the period",
+        "cancelMembership": "Cancel Membership",
+        "cancelMembershipConfirm": "Are you sure you want to cancel this user's membership? It stays active until the end of the period, then drops to the free plan.",
+        "cancelConfirmLabel": "Cancel",
+        "membershipCancelled": "Membership cancelled",
+        "membershipUpdated": "Membership updated",
+        "changeMembershipLabel": "Change Membership (admin — no payment)",
+        "tierPlaceholder": "Select a tier…",
+        "ratingsTab": "Ratings",
+        "viewAllOrders": "View all orders →",
+        "noOrders": "No orders yet",
+        "viewAllProducts": "View all products →",
+        "noProducts": "No products yet",
+        "initiator": "Initiator",
+        "viewAllTrades": "View all trades →",
+        "noTrades": "No trades yet",
+        "counterpartyLabel": "Counterparty:",
+        "tradeOfferSummary": "{a} items ↔ {b} items",
+        "receivedRatingsTitle": "Received Ratings",
+        "noReceivedRatings": "No ratings yet",
+        "givenRatingsTitle": "Given Ratings",
+        "noGivenRatings": "Hasn't given any ratings yet",
+        "raterLabel": "Rated by",
+        "rateeLabel": "Rated",
+        "anonymous": "Anonymous"
+      }
+    },
+    "roles": {
+      "title": "Roles & Permissions",
+      "description": "View and edit what each role is allowed to do",
+      "emailInvalid": "Enter a valid email address",
+      "revokeAccess": "Revoke Access",
+      "matrixLoadError": "Failed to load the permission matrix",
+      "matrixSaved": "Permission matrix saved",
+      "discardChangesConfirm": "You have unsaved changes. Are you sure you want to discard them?",
+      "resetConfirm": "Are you sure you want to reset all role permissions to their defaults? This cannot be undone.",
+      "allLabel": "All",
+      "allLockedLabel": "All (locked)",
+      "permissionCountLabel": "{count} permissions",
+      "columns": {
+        "role": "Role",
+        "permissionCount": "Permission Count",
+        "lastLogin": "Last Login"
+      },
+      "settingsUpdateError": "Failed to change the setting",
+      "allowAdminAssignOn": "Admins can now assign roles",
+      "allowAdminAssignOff": "Role assignment is restricted to Super Admin again",
+      "revokeSuccess": "Admin access revoked",
+      "revokeError": "Revoke failed",
+      "revokeConfirm": "Are you sure you want to revoke {email}'s admin access?",
+      "staffCreatedNotice": "a new account was created. Temporary password:",
+      "staffCreatedNoticeSuffix": "— share it with the user (it will not be shown again).",
+      "staffHeading": "Admin Users",
+      "allowAdminAssignLabel": "Let admins assign roles too",
+      "assignStaffButton": "Assign Admin",
+      "emptyFiltered": "No users in this role.",
+      "empty": "No admin users yet.",
+      "lockedCannotChange": "Locked — cannot be changed",
+      "matrix": {
+        "title": "Permission Matrix",
+        "columnHeader": "Permission / Description",
+        "removeGroup": "Remove group",
+        "selectGroup": "Select group",
+        "descriptionLabel": "Description",
+        "superAdminAlwaysHasPermission": "Super Admin always has this permission",
+        "editHint": "Switch to edit mode to toggle each role's permissions by clicking.",
+        "viewOnlyHint": "Only Super Admin can edit the permission matrix.",
+        "resetToDefaults": "Reset to Defaults",
+        "unsavedWarning": "You have unsaved changes.",
+        "loading": "Loading…"
+      },
+      "legend": {
+        "superAdmin": "Super Admin — always full access",
+        "hasPermission": "Permission granted",
+        "noPermission": "No permission",
+        "hint": "Click the icon to the left of a permission's name to see its description"
+      },
+      "tabs": {
+        "matrix": "Permission Matrix",
+        "userAssignments": "User Assignments"
+      },
+      "meta": {
+        "superAdmin": {
+          "label": "Super Admin",
+          "description": "Full platform access. System settings, finance, and all administration."
+        },
+        "admin": {
+          "label": "Admin",
+          "description": "Operational management. Everything except system settings and tax."
+        },
+        "moderator": {
+          "label": "Moderator",
+          "description": "Content moderation. Products, reviews, messages, and trade monitoring only."
+        }
+      },
+      "groups": {
+        "dashboard": "Dashboard & Analytics",
+        "operations": "Operations",
+        "catalog": "Catalog",
+        "accounts": "Accounts",
+        "messaging": "Messaging",
+        "marketing": "Marketing & Content",
+        "finance": "Finance",
+        "system": "System"
+      },
+      "permissions": {
+        "dashboard": {
+          "label": "Dashboard",
+          "description": "Main panel: daily order, revenue, and active user counters."
+        },
+        "analytics": {
+          "label": "Analytics",
+          "description": "Sales charts, revenue analysis, user growth, and report pages."
+        },
+        "orders": {
+          "label": "Orders",
+          "description": "Order list, detail view, and status changes."
+        },
+        "trades": {
+          "label": "Trades",
+          "description": "Trade list, detail, approve/reject, shipping, and warehouse operations."
+        },
+        "shipping": {
+          "label": "Shipping",
+          "description": "Shipping label creation, tracking, and warehouse drop-off operations."
+        },
+        "refundRequests": {
+          "label": "Refund Requests",
+          "description": "Refund request list, detail view, approve, and reject."
+        },
+        "refundHistory": {
+          "label": "Refund History",
+          "description": "Completed refund records and history list."
+        },
+        "products": {
+          "label": "Products",
+          "description": "Product list, detail, approve, reject, and edit."
+        },
+        "categories": {
+          "label": "Categories",
+          "description": "Create, edit, and delete the category tree."
+        },
+        "brands": {
+          "label": "Brands",
+          "description": "Brand list, add, and edit."
+        },
+        "carModels": {
+          "label": "Car Models",
+          "description": "Manage the car model and year list."
+        },
+        "manufacturers": {
+          "label": "Manufacturers",
+          "description": "Add and edit manufacturers/suppliers."
+        },
+        "attributes": {
+          "label": "Product Attributes",
+          "description": "Manage attribute groups and values."
+        },
+        "collections": {
+          "label": "Collections",
+          "description": "Create and edit product collections."
+        },
+        "users": {
+          "label": "Users",
+          "description": "User list, profile, ban/unban, and identity verification."
+        },
+        "sellerApplications": {
+          "label": "Seller Applications",
+          "description": "Approve or reject seller applications."
+        },
+        "sellerPerformance": {
+          "label": "Seller Performance",
+          "description": "Seller performance reports and statistics."
+        },
+        "reviews": {
+          "label": "Reviews",
+          "description": "View, approve, and reject user reviews."
+        },
+        "staff": {
+          "label": "Role Management",
+          "description": "Create admin accounts, assign roles, and edit the permission matrix."
+        },
+        "messages": {
+          "label": "Messages",
+          "description": "View and moderate conversations between users."
+        },
+        "support": {
+          "label": "Support Requests",
+          "description": "View and respond to user support requests."
+        },
+        "discounts": {
+          "label": "Discounts",
+          "description": "Create, edit, and delete discount coupons."
+        },
+        "ads": {
+          "label": "Ads",
+          "description": "Manage banner and ad campaigns."
+        },
+        "notifications": {
+          "label": "Notifications",
+          "description": "Create and send push notifications."
+        },
+        "emailTemplates": {
+          "label": "Email Templates",
+          "description": "Create and edit email templates."
+        },
+        "pages": {
+          "label": "Pages",
+          "description": "Manage static content pages."
+        },
+        "payments": {
+          "label": "Payments",
+          "description": "Payment list, hold/release history, and statistics."
+        },
+        "commission": {
+          "label": "Commission",
+          "description": "Create, edit, and delete commission rules."
+        },
+        "payouts": {
+          "label": "Seller Payouts",
+          "description": "Pending payout transfers and payout history."
+        },
+        "tax": {
+          "label": "Tax Settings",
+          "description": "Manage VAT zones, tax rates, and rules."
+        },
+        "aiModeration": {
+          "label": "AI Moderation",
+          "description": "AI moderation events, scores, and threshold settings."
+        },
+        "membershipTiers": {
+          "label": "Membership Tiers",
+          "description": "Create membership tiers and set pricing."
+        },
+        "settings": {
+          "label": "System Settings",
+          "description": "Configure general platform settings."
+        },
+        "logs": {
+          "label": "Logs",
+          "description": "System error logs, security events, email logs, and audit trail."
+        }
+      },
+      "form": {
+        "editTitle": "Update Role",
+        "createTitle": "Assign Role to User",
+        "roleUpdated": "User role updated",
+        "roleAssigned": "Role assigned to user",
+        "assign": "Assign",
+        "emailLabel": "User Email",
+        "emailPlaceholder": "example@email.com",
+        "emailLockedHelp": "The email address cannot be changed.",
+        "emailAutoCreateHelp": "If the email isn't registered, an account is created automatically.",
+        "displayNameLabel": "Display Name",
+        "displayNamePlaceholder": "Derived from the email if left blank",
+        "passwordLabel": "Initial Password",
+        "passwordPlaceholder": "Generated automatically if left blank",
+        "roleLabel": "Role to Assign",
+        "permissionCountSuffix": "has {count} permissions.",
+        "viewMatrixLink": "View permission matrix →"
+      }
     }
   }
 }

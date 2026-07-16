@@ -3,6 +3,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import {
 	Button,
 	Select,
@@ -16,8 +17,8 @@ import { useConfirm } from '@/provider/ConfirmProvider';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
 import {
 	type UserDetail,
-	MEMBERSHIP_TIER_OPTIONS,
-	BILLING_PERIOD_OPTIONS,
+	getMembershipTierOptions,
+	getBillingPeriodOptions,
 } from '../types';
 
 export function MembershipSection({
@@ -27,55 +28,57 @@ export function MembershipSection({
 	userId: string;
 	membership: UserDetail['membership'];
 }) {
+	const t = useTranslations();
 	const confirm = useConfirm();
 	const [tier, setTier] = useState('');
 	const [period, setPeriod] = useState<'monthly' | 'yearly'>('monthly');
 
 	const cancel = useAdminMutation(() => adminApi.cancelUserMembership(userId), {
 		invalidates: ['users'],
-		successMessage: 'Üyelik iptal edildi',
+		successMessage: t('admin.users.detail.membershipCancelled'),
 	});
 	const change = useAdminMutation(
 		() => adminApi.changeUserMembership(userId, tier, period),
 		{
 			invalidates: ['users'],
-			successMessage: 'Üyelik güncellendi',
+			successMessage: t('admin.users.detail.membershipUpdated'),
 			onSuccess: () => setTier(''),
 		},
 	);
 
 	const onCancel = async () => {
 		const ok = await confirm({
-			title: 'Üyeliği İptal Et',
-			description:
-				'Kullanıcının üyeliğini iptal etmek istediğinizden emin misiniz? Dönem sonuna kadar aktif kalır, sonra ücretsiz plana düşer.',
-			confirmLabel: 'İptal Et',
+			title: t('admin.users.detail.cancelMembership'),
+			description: t('admin.users.detail.cancelMembershipConfirm'),
+			confirmLabel: t('admin.users.detail.cancelConfirmLabel'),
 			destructive: true,
 		});
 		if (ok) cancel.mutate();
 	};
 
 	return (
-		<SectionCard title='Üyelik Bilgileri'>
+		<SectionCard title={t('admin.users.detail.membershipInfoTitle')}>
 			{membership ? (
 				<DataList>
-					<Field label='Üyelik Seviyesi'>{membership.tier.name}</Field>
-					<Field label='Durum'>
+					<Field label={t('admin.users.detail.membershipTierLabel')}>
+						{membership.tier.name}
+					</Field>
+					<Field label={t('common.status')}>
 						{enumLabel(subscriptionStatusConfig, membership.status)}
 					</Field>
 					{membership.startDate && (
-						<Field label='Başlangıç'>
+						<Field label={t('admin.users.detail.startDateLabel')}>
 							{new Date(membership.startDate).toLocaleDateString('tr-TR')}
 						</Field>
 					)}
 					{membership.endDate && (
-						<Field label='Bitiş'>
+						<Field label={t('admin.users.detail.endDateLabel')}>
 							{new Date(membership.endDate).toLocaleDateString('tr-TR')}
 						</Field>
 					)}
 				</DataList>
 			) : (
-				<p className='text-sm text-muted'>Üyelik kaydı yok (ücretsiz).</p>
+				<p className='text-sm text-muted'>{t('admin.users.detail.noMembership')}</p>
 			)}
 
 			<div className='mt-6 space-y-4 border-t border-border pt-6'>
@@ -83,7 +86,7 @@ export function MembershipSection({
 					membership.tier.type !== 'free' &&
 					(membership.status === 'cancelled' ? (
 						<span className='inline-block rounded bg-warning-500/10 px-2 py-1 text-xs text-warning-600'>
-							İptal edildi — dönem sonuna kadar aktif
+							{t('admin.users.detail.membershipCancelledNotice')}
 						</span>
 					) : (
 						<Button
@@ -91,20 +94,20 @@ export function MembershipSection({
 							onClick={onCancel}
 							isLoading={cancel.isPending}
 							className='border border-danger-300 text-danger-600 hover:bg-danger-50'>
-							Üyeliği İptal Et
+							{t('admin.users.detail.cancelMembership')}
 						</Button>
 					))}
 
 				<div>
 					<p className='mb-2 text-sm text-muted'>
-						Üyelik Değiştir (admin — ödeme yok)
+						{t('admin.users.detail.changeMembershipLabel')}
 					</p>
 					<div className='flex flex-wrap items-center gap-3'>
 						<Select
 							value={tier}
 							onChange={(e) => setTier(e.target.value)}
-							placeholder='Kademe seçin…'
-							options={MEMBERSHIP_TIER_OPTIONS}
+							placeholder={t('admin.users.detail.tierPlaceholder')}
+							options={getMembershipTierOptions(t)}
 							className='sm:w-44'
 						/>
 						<Select
@@ -112,7 +115,7 @@ export function MembershipSection({
 							onChange={(e) =>
 								setPeriod(e.target.value as 'monthly' | 'yearly')
 							}
-							options={BILLING_PERIOD_OPTIONS}
+							options={getBillingPeriodOptions(t)}
 							className='sm:w-36'
 						/>
 						<Button
@@ -120,7 +123,7 @@ export function MembershipSection({
 							onClick={() => change.mutate()}
 							disabled={!tier}
 							isLoading={change.isPending}>
-							Uygula
+							{t('common.apply')}
 						</Button>
 					</div>
 				</div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useSession } from "@/context/SessionContext";
@@ -20,6 +21,7 @@ export type GroupCheckedState = "all" | "none" | "partial";
  * `super_admin` role itself is always locked (full access).
  */
 export function usePermissionMatrix() {
+  const t = useTranslations();
   const confirm = useConfirm();
   const { user } = useSession();
   const isSuperAdmin = user?.role === "super_admin";
@@ -86,7 +88,7 @@ export function usePermissionMatrix() {
     (perms: Record<string, string[]>) => adminApi.setRolePermissions(perms),
     {
       invalidates: ["role-permissions"],
-      successMessage: "İzin matrisi kaydedildi",
+      successMessage: t("admin.roles.matrixSaved"),
       onSuccess: () => {
         setMatrixDirty(false);
         setEditMode(false);
@@ -103,8 +105,7 @@ export function usePermissionMatrix() {
   const cancelEdit = async () => {
     if (matrixDirty) {
       const ok = await confirm({
-        description:
-          "Kaydedilmemiş değişiklikler var. Değişikliklerden vazgeçmek istediğinizden emin misiniz?",
+        description: t("admin.roles.discardChangesConfirm"),
         destructive: false,
       });
       if (!ok) return;
@@ -116,8 +117,7 @@ export function usePermissionMatrix() {
 
   const resetToDefaults = async () => {
     const ok = await confirm({
-      description:
-        "Tüm rol izinlerini varsayılan değerlere sıfırlamak istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+      description: t("admin.roles.resetConfirm"),
       destructive: true,
     });
     if (!ok) return;

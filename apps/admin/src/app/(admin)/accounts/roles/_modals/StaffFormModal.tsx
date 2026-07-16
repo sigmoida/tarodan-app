@@ -1,15 +1,14 @@
 'use client';
 
 import toast from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
 import { Button } from '@tarodan/ui';
 import { FormModal, FormInput, FormSelect, useZodForm } from '@tarodan/ui/form';
 import { adminApi } from '@/lib/api';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
-import { ROLES, ROLE_META, type RoleId } from '../_lib/constants';
+import { ROLES, getRoleMeta, type RoleId } from '../_lib/constants';
 import { staffSchema, type StaffFormValues } from '../_lib/schema';
 import type { StaffItem } from '../_lib/types';
-
-const roleOptions = ROLES.map((r) => ({ value: r, label: ROLE_META[r].label }));
 
 /**
  * Staff assignment / role update modal. Owns its own form (zod) + mutation;
@@ -31,8 +30,12 @@ export function StaffFormModal({
   onCreated: (info: { email: string; password: string }) => void;
   onShowMatrix: () => void;
 }) {
+  const t = useTranslations();
+  const roleMeta = getRoleMeta(t);
+  const roleOptions = ROLES.map((r) => ({ value: r, label: roleMeta[r].label }));
+
   const isEdit = Boolean(editing);
-  const form = useZodForm(staffSchema, {
+  const form = useZodForm(staffSchema(t), {
     defaultValues: {
       email: editing?.email ?? '',
       role: (editing?.role as RoleId) ?? 'moderator',
@@ -58,9 +61,9 @@ export function StaffFormModal({
       onSuccess: (res, v) => {
         onClose();
         if (editing) {
-          toast.success('Kullanıcı rolü güncellendi');
+          toast.success(t('admin.roles.form.roleUpdated'));
         } else {
-          toast.success('Kullanıcıya rol atandı');
+          toast.success(t('admin.roles.form.roleAssigned'));
           const tempPassword = (res as { data?: { tempPassword?: string } })?.data?.tempPassword;
           if (tempPassword) onCreated({ email: v.email, password: tempPassword });
         }
@@ -72,22 +75,22 @@ export function StaffFormModal({
     <FormModal
       open={open}
       onClose={onClose}
-      title={isEdit ? 'Rolü Güncelle' : 'Kullanıcıya Rol Ata'}
+      title={isEdit ? t('admin.roles.form.editTitle') : t('admin.roles.form.createTitle')}
       form={form}
       onSubmit={(v) => save.mutate(v)}
       isSubmitting={save.isPending}
-      submitLabel={isEdit ? 'Güncelle' : 'Ata'}
+      submitLabel={isEdit ? t('common.update') : t('admin.roles.form.assign')}
     >
       <FormInput
         name="email"
-        label="Kullanıcı E-posta"
+        label={t('admin.roles.form.emailLabel')}
         type="email"
-        placeholder="ornek@email.com"
+        placeholder={t('admin.roles.form.emailPlaceholder')}
         disabled={isEdit}
         helperText={
           isEdit
-            ? 'E-posta adresi değiştirilemez.'
-            : 'E-posta kayıtlı değilse hesap otomatik oluşturulur.'
+            ? t('admin.roles.form.emailLockedHelp')
+            : t('admin.roles.form.emailAutoCreateHelp')
         }
       />
 
@@ -95,26 +98,28 @@ export function StaffFormModal({
         <>
           <FormInput
             name="displayName"
-            label="Görünen Ad"
-            placeholder="Boş bırakılırsa e-postadan türetilir"
+            label={t('admin.roles.form.displayNameLabel')}
+            placeholder={t('admin.roles.form.displayNamePlaceholder')}
           />
           <FormInput
             name="password"
-            label="Başlangıç Şifresi"
-            placeholder="Boş bırakılırsa otomatik üretilir"
+            label={t('admin.roles.form.passwordLabel')}
+            placeholder={t('admin.roles.form.passwordPlaceholder')}
           />
         </>
       )}
 
-      <FormSelect name="role" label="Atanacak Rol" options={roleOptions} />
+      <FormSelect name="role" label={t('admin.roles.form.roleLabel')} options={roleOptions} />
 
       {selectedRole && (
-        <div className={`rounded-lg border px-3 py-2 text-xs ${ROLE_META[selectedRole]?.color}`}>
-          <p className="font-medium">{ROLE_META[selectedRole]?.label}</p>
-          <p className="mt-0.5 opacity-80">{ROLE_META[selectedRole]?.description}</p>
+        <div className={`rounded-lg border px-3 py-2 text-xs ${roleMeta[selectedRole]?.color}`}>
+          <p className="font-medium">{roleMeta[selectedRole]?.label}</p>
+          <p className="mt-0.5 opacity-80">{roleMeta[selectedRole]?.description}</p>
           {selectedRole !== 'super_admin' && (
             <p className="mt-1 opacity-70">
-              {(permissions[selectedRole] ?? []).length} izne sahip.{' '}
+              {t('admin.roles.form.permissionCountSuffix', {
+                count: (permissions[selectedRole] ?? []).length,
+              })}{' '}
               <Button
                 type="button"
                 variant="ghost"
@@ -124,7 +129,7 @@ export function StaffFormModal({
                 }}
                 className="h-auto p-0 text-xs underline"
               >
-                İzin matrisini gör →
+                {t('admin.roles.form.viewMatrixLink')}
               </Button>
             </p>
           )}

@@ -1,3 +1,7 @@
+import { useTranslations } from 'next-intl';
+
+type T = ReturnType<typeof useTranslations<never>>;
+
 export interface User {
   id: string;
   email: string;
@@ -32,16 +36,16 @@ export function mapUsers(raw: any[]): User[] {
 }
 
 /** list ↔ AI Denetim tabs. */
-export const USER_TABS = [
-  { key: 'list', label: 'Kullanıcılar' },
-  { key: 'ai', label: 'AI Denetim' },
+export const getUserTabs = (t: T) => [
+  { key: 'list', label: t('admin.users.title') },
+  { key: 'ai', label: t('admin.catalog.common.aiModeration') },
 ];
 
-export const userFilterOptions = [
-  { value: 'all', label: 'Tüm Kullanıcılar' },
-  { value: 'sellers', label: 'Satıcılar' },
-  { value: 'buyers', label: 'Alıcılar' },
-  { value: 'banned', label: 'Engelliler' },
+export const getUserFilterOptions = (t: T) => [
+  { value: 'all', label: t('admin.users.filterAll') },
+  { value: 'sellers', label: t('admin.users.filterSellers') },
+  { value: 'buyers', label: t('admin.users.filterBuyers') },
+  { value: 'banned', label: t('admin.users.filterBanned') },
 ];
 
 /** Map the "filter" chip to getUsers query flags. */

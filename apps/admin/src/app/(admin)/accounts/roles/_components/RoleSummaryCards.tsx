@@ -1,7 +1,8 @@
 "use client";
 
 import { LockClosedIcon } from "@heroicons/react/24/outline";
-import { ROLES, ROLE_META } from "../_lib/constants";
+import { useTranslations } from "next-intl";
+import { ROLES, getRoleMeta } from "../_lib/constants";
 
 /**
  * The three role description cards above the matrix. `permissions` supplies the
@@ -12,14 +13,18 @@ export function RoleSummaryCards({
 }: {
   permissions: Record<string, string[]>;
 }) {
+  const t = useTranslations();
+  const roleMeta = getRoleMeta(t);
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
       {ROLES.map((role) => {
-        const meta = ROLE_META[role];
+        const meta = roleMeta[role];
         const count =
           role === "super_admin"
-            ? "Tümü"
-            : `${(permissions[role] ?? []).length} izin`;
+            ? t("admin.roles.allLabel")
+            : t("admin.roles.permissionCountLabel", {
+                count: (permissions[role] ?? []).length,
+              });
         return (
           <div
             key={role}
@@ -35,7 +40,7 @@ export function RoleSummaryCards({
             {role === "super_admin" && (
               <div className="mt-2 flex items-center gap-1 text-xs opacity-60">
                 <LockClosedIcon className="h-3 w-3" />
-                Kilitli — değiştirilemez
+                {t("admin.roles.lockedCannotChange")}
               </div>
             )}
           </div>

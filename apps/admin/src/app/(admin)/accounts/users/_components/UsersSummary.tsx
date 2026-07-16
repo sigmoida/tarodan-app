@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { userFilterParams } from "../_lib/types";
@@ -11,6 +12,7 @@ import { userFilterParams } from "../_lib/types";
  * it lives in the stable page-level PageHeader (outside the list boundary).
  */
 export function UsersSummary() {
+  const t = useTranslations();
   const searchParams = useSearchParams();
   const search = searchParams.get("q") ?? "";
   const filter = searchParams.get("filter") ?? "all";
@@ -30,5 +32,5 @@ export function UsersSummary() {
     staleTime: 30_000,
   });
 
-  return <>Toplam {total ?? 0} kullanıcı</>;
+  return <>{t('admin.users.totalCount', { count: total ?? 0 })}</>;
 }

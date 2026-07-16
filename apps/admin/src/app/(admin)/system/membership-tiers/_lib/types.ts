@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import { useTranslations } from 'next-intl';
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 export interface MembershipTier {
   id: string;
@@ -32,23 +35,24 @@ export const computedYearly = (monthly: number, discountPct: number) =>
   Math.round(monthly * 12 * (1 - discountPct / 100) * 100) / 100;
 
 /** Form schema — validation-only; numbers are shaped in the mutationFn. */
-export const tierSchema = z.object({
-  name: z.string().min(1, 'Ad gerekli'),
-  description: z.string().optional().default(''),
-  monthlyPrice: z.string().optional().default('0'),
-  maxFreeListings: z.string().optional().default('0'),
-  maxTotalListings: z.string().optional().default('0'),
-  maxImagesPerListing: z.string().optional().default('0'),
-  featuredListingSlots: z.string().optional().default('0'),
-  commissionDiscount: z.string().optional().default('0'),
-  sortOrder: z.string().optional().default('0'),
-  canCreateCollections: z.boolean().default(false),
-  canTrade: z.boolean().default(false),
-  isAdFree: z.boolean().default(false),
-  isActive: z.boolean().default(true),
-});
+export const tierSchema = (t: T) =>
+  z.object({
+    name: z.string().min(1, t('admin.tiers.validation.nameRequired')),
+    description: z.string().optional().default(''),
+    monthlyPrice: z.string().optional().default('0'),
+    maxFreeListings: z.string().optional().default('0'),
+    maxTotalListings: z.string().optional().default('0'),
+    maxImagesPerListing: z.string().optional().default('0'),
+    featuredListingSlots: z.string().optional().default('0'),
+    commissionDiscount: z.string().optional().default('0'),
+    sortOrder: z.string().optional().default('0'),
+    canCreateCollections: z.boolean().default(false),
+    canTrade: z.boolean().default(false),
+    isAdFree: z.boolean().default(false),
+    isActive: z.boolean().default(true),
+  });
 
-export type TierFormValues = z.infer<typeof tierSchema>;
+export type TierFormValues = z.infer<ReturnType<typeof tierSchema>>;
 
 export function tierToForm(t: MembershipTier): TierFormValues {
   return {
