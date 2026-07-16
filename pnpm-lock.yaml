@@ -140,6 +140,9 @@ importers:
       '@tarodan/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config
+      '@tarodan/eslint-plugin':
+        specifier: workspace:*
+        version: link:../../packages/eslint-plugin
       '@tarodan/tsconfig':
         specifier: workspace:*
         version: link:../../packages/tsconfig
@@ -722,6 +725,9 @@ importers:
       '@tarodan/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config
+      '@tarodan/eslint-plugin':
+        specifier: workspace:*
+        version: link:../../packages/eslint-plugin
       '@tarodan/tsconfig':
         specifier: workspace:*
         version: link:../../packages/tsconfig
@@ -813,6 +819,8 @@ importers:
       eslint-config-next:
         specifier: 14.2.35
         version: 14.2.35(eslint@8.57.1)(typescript@5.9.3)
+
+  packages/eslint-plugin: {}
 
   packages/i18n:
     dependencies:

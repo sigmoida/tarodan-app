@@ -7,6 +7,7 @@ import { Select } from "@tarodan/ui";
 
 // Endonyms + flags — a language's own name isn't translated, so these stay local
 // (mirrors the storefront switcher).
+// eslint-disable-next-line @tarodan/no-hardcoded-turkish -- endonyms: each language names itself
 const LOCALE_NAMES: Record<Locale, string> = { tr: "Türkçe", en: "English" };
 const LOCALE_FLAGS: Record<Locale, string> = { tr: "🇹🇷", en: "🇬🇧" };
 

@@ -18,6 +18,7 @@ import { fmtTry } from "@/lib/format";
 import { productRowMenu, type ProductRowActions } from "./rowActions";
 import { aiCheckConfig, aiCheckKey, type Product } from "./types";
 
+// eslint-disable-next-line @tarodan/no-hardcoded-turkish -- URL query payload, not display copy
 const PLACEHOLDER = "https://placehold.co/100x100/f3f4f6/666?text=Ürün";
 
 type T = ReturnType<typeof useTranslations<never>>;

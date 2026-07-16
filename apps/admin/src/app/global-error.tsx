@@ -1,3 +1,4 @@
+/* eslint-disable @tarodan/no-hardcoded-turkish -- root error boundary renders outside the intl provider; copy stays hardcoded by design (#222) */
 'use client';
 
 import { useEffect } from 'react';
@@ -26,7 +27,7 @@ export default function GlobalError({
           <p className="text-7xl font-bold text-danger-500">500</p>
           <h1 className="text-2xl font-semibold text-heading">Bir şeyler ters gitti</h1>
           <p className="max-w-md text-muted">
-            Uygulama beklenmeyen bir hatayla karşılaştı. Yeniden denemeyi deneyin.
+              Uygulama beklenmeyen bir hatayla karşılaştı. Yeniden denemeyi deneyin.
           </p>
           {error.digest && <p className="text-xs text-subtle">Hata kodu: {error.digest}</p>}
           <Button className="mt-2" onClick={reset}>

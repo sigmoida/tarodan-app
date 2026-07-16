@@ -42,6 +42,7 @@ api.interceptors.response.use(
 
     if (!error.response) {
       error.message =
+        // eslint-disable-next-line @tarodan/no-hardcoded-turkish -- module-scope axios interceptor, no intl context; follow-up in #208
         "Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.";
     }
     return Promise.reject(error);

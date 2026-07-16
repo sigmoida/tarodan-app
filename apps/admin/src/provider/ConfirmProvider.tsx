@@ -65,6 +65,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 export function useConfirm(): ConfirmFn {
   const ctx = useContext(ConfirmContext);
   if (!ctx) {
+  // eslint-disable-next-line @tarodan/no-hardcoded-turkish -- developer-facing hook-misuse error
     throw new Error("useConfirm, ConfirmProvider içinde kullanılmalı");
   }
   return ctx;
