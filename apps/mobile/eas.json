@@ -58,7 +58,6 @@
         "appleTeamId": "P2628CQK26"
       },
       "android": {
-        "serviceAccountKeyPath": "./google-services.json",
         "track": "internal"
       }
     }
