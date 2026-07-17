@@ -5,17 +5,17 @@ import {
   ConflictException,
   Optional,
   Logger,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { StorageService } from '../storage/storage.service';
-import { CacheService } from '../cache/cache.service';
-import { AdminAuditService } from './admin-audit.service';
-import { generateSlug } from './admin-slug.util';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { StorageService } from "../storage/storage.service";
+import { CacheService } from "../cache/cache.service";
+import { AdminAuditService } from "./admin-audit.service";
+import { generateSlug } from "./admin-slug.util";
 import {
   fulltextAttributeGroupSearch,
   fulltextAttributeSearch,
-} from '../../common/helpers/fulltext-search';
-import { Prisma, Brand } from '@prisma/client';
+} from "../../common/helpers/fulltext-search";
+import { Prisma, Brand } from "@prisma/client";
 
 /**
  * Katalog taksonomisi admin operasyonları (kategori, marka, üretici, araç
@@ -37,19 +37,30 @@ export class AdminCatalogService {
 
   // AdminService'teki leaf yardımcı ile birebir aynı (bilinçli kopya; facade'da
   // başka bölümler de kullandığı için oradan kaldırılamadı).
-  private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
+  private resolveProductImageUrl(
+    imageKeyOrUrl: string | null | undefined,
+  ): string | null {
     if (!imageKeyOrUrl) return null;
     // Strip expired presigned S3 query params to get the clean public URL
-    if ((imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://')) && imageKeyOrUrl.includes('X-Amz-Signature')) {
+    if (
+      (imageKeyOrUrl.startsWith("http://") ||
+        imageKeyOrUrl.startsWith("https://")) &&
+      imageKeyOrUrl.includes("X-Amz-Signature")
+    ) {
       try {
         const parsed = new URL(imageKeyOrUrl);
-        parsed.search = '';
+        parsed.search = "";
         return parsed.toString();
       } catch {
         // fall through
       }
     }
-    if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
+    if (
+      imageKeyOrUrl.startsWith("http://") ||
+      imageKeyOrUrl.startsWith("https://") ||
+      imageKeyOrUrl.startsWith("/")
+    )
+      return imageKeyOrUrl;
     // Try to resolve any non-URL string as an S3 key (covers dev/, prod/, and other prefixes)
     if (this.storageService) {
       return this.storageService.getPublicAssetUrl(imageKeyOrUrl) ?? null;
@@ -66,12 +77,12 @@ export class AdminCatalogService {
     const categories = await this.prisma.category.findMany({
       include: {
         parent: true,
-        children: { orderBy: { name: 'asc' } },
+        children: { orderBy: { name: "asc" } },
         _count: {
           select: { products: true, collections: true },
         },
       },
-      orderBy: { name: 'asc' },
+      orderBy: { name: "asc" },
     });
 
     return {
@@ -99,13 +110,16 @@ export class AdminCatalogService {
   /**
    * Create category
    */
-  async createCategory(adminId: string, dto: {
-    name: string;
-    description?: string;
-    parentId?: string;
-    sortOrder?: number;
-    isActive?: boolean;
-  }) {
+  async createCategory(
+    adminId: string,
+    dto: {
+      name: string;
+      description?: string;
+      parentId?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
+  ) {
     // Check if parent exists
     if (dto.parentId) {
       const parent = await this.prisma.category.findUnique({
@@ -113,7 +127,7 @@ export class AdminCatalogService {
       });
 
       if (!parent) {
-        throw new NotFoundException('Üst kategori bulunamadı');
+        throw new NotFoundException("Üst kategori bulunamadı");
       }
     }
 
@@ -145,7 +159,14 @@ export class AdminCatalogService {
     });
 
     // Create audit log
-    await this.audit.createAuditLog(adminId, 'category_create', 'Category', category.id, null, category);
+    await this.audit.createAuditLog(
+      adminId,
+      "category_create",
+      "Category",
+      category.id,
+      null,
+      category,
+    );
 
     return category;
   }
@@ -153,28 +174,36 @@ export class AdminCatalogService {
   /**
    * Update category
    */
-  async updateCategory(adminId: string, categoryId: string, dto: {
-    name?: string;
-    description?: string;
-    parentId?: string;
-    sortOrder?: number;
-    isActive?: boolean;
-  }) {
+  async updateCategory(
+    adminId: string,
+    categoryId: string,
+    dto: {
+      name?: string;
+      description?: string;
+      parentId?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
+  ) {
     const category = await this.prisma.category.findUnique({
       where: { id: categoryId },
       include: { children: true },
     });
 
     if (!category) {
-      throw new NotFoundException('Kategori bulunamadı');
+      throw new NotFoundException("Kategori bulunamadı");
     }
 
     // Check circular reference if parentId is being changed
     if (dto.parentId && dto.parentId !== category.parentId) {
       // Check if new parent is a child of this category
-      const isChild = category.children.some((child) => child.id === dto.parentId);
+      const isChild = category.children.some(
+        (child) => child.id === dto.parentId,
+      );
       if (isChild) {
-        throw new BadRequestException('Kategori kendi alt kategorisini üst kategori olarak seçemez');
+        throw new BadRequestException(
+          "Kategori kendi alt kategorisini üst kategori olarak seçemez",
+        );
       }
 
       // Check if new parent exists
@@ -183,7 +212,7 @@ export class AdminCatalogService {
       });
 
       if (!newParent) {
-        throw new NotFoundException('Üst kategori bulunamadı');
+        throw new NotFoundException("Üst kategori bulunamadı");
       }
     }
 
@@ -215,15 +244,23 @@ export class AdminCatalogService {
       data: {
         name: dto.name,
         slug,
-        description: dto.description !== undefined ? (dto.description || null) : undefined,
-        parentId: dto.parentId !== undefined ? (dto.parentId || null) : undefined, // Empty string becomes null
+        description:
+          dto.description !== undefined ? dto.description || null : undefined,
+        parentId: dto.parentId !== undefined ? dto.parentId || null : undefined, // Empty string becomes null
         sortOrder: dto.sortOrder,
         isActive: dto.isActive,
       },
     });
 
     // Create audit log
-    await this.audit.createAuditLog(adminId, 'category_update', 'Category', categoryId, oldCategory, updatedCategory);
+    await this.audit.createAuditLog(
+      adminId,
+      "category_update",
+      "Category",
+      categoryId,
+      oldCategory,
+      updatedCategory,
+    );
 
     return updatedCategory;
   }
@@ -243,17 +280,21 @@ export class AdminCatalogService {
     });
 
     if (!category) {
-      throw new NotFoundException('Kategori bulunamadı');
+      throw new NotFoundException("Kategori bulunamadı");
     }
 
     // Check if category has products
     if (category._count.products > 0) {
-      throw new BadRequestException('Bu kategoride ürünler bulunmaktadır. Önce ürünleri başka kategoriye taşıyın.');
+      throw new BadRequestException(
+        "Bu kategoride ürünler bulunmaktadır. Önce ürünleri başka kategoriye taşıyın.",
+      );
     }
 
     // Check if category has children
     if (category.children.length > 0) {
-      throw new BadRequestException('Bu kategorinin alt kategorileri bulunmaktadır. Önce alt kategorileri silin.');
+      throw new BadRequestException(
+        "Bu kategorinin alt kategorileri bulunmaktadır. Önce alt kategorileri silin.",
+      );
     }
 
     await this.prisma.category.delete({
@@ -261,7 +302,14 @@ export class AdminCatalogService {
     });
 
     // Create audit log
-    await this.audit.createAuditLog(adminId, 'category_delete', 'Category', categoryId, category, null);
+    await this.audit.createAuditLog(
+      adminId,
+      "category_delete",
+      "Category",
+      categoryId,
+      category,
+      null,
+    );
 
     return { success: true, categoryId };
   }
@@ -273,7 +321,7 @@ export class AdminCatalogService {
    */
   async getBrands() {
     const brands = await this.prisma.brand.findMany({
-      orderBy: { name: 'asc' },
+      orderBy: { name: "asc" },
     });
 
     return {
@@ -313,23 +361,20 @@ export class AdminCatalogService {
     // Generate slug from name
     const slug = dto.name
       .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
       .trim();
 
     // Check if brand with same name or slug exists
     const existing = await this.prisma.brand.findFirst({
       where: {
-        OR: [
-          { name: { equals: dto.name, mode: 'insensitive' } },
-          { slug },
-        ],
+        OR: [{ name: { equals: dto.name, mode: "insensitive" } }, { slug }],
       },
     });
 
     if (existing) {
-      throw new BadRequestException('Bu isimde bir marka zaten mevcut');
+      throw new BadRequestException("Bu isimde bir marka zaten mevcut");
     }
 
     const brand = await this.prisma.brand.create({
@@ -347,9 +392,18 @@ export class AdminCatalogService {
     });
 
     // Create audit log
-    await this.audit.createAuditLog(adminId, 'brand_create', 'Brand', brand.id, null, brand);
+    await this.audit.createAuditLog(
+      adminId,
+      "brand_create",
+      "Brand",
+      brand.id,
+      null,
+      brand,
+    );
 
-    this.logger.log(`Brand created: ${brand.name} (${brand.id}) by admin ${adminId}`);
+    this.logger.log(
+      `Brand created: ${brand.name} (${brand.id}) by admin ${adminId}`,
+    );
 
     return brand;
   }
@@ -376,7 +430,7 @@ export class AdminCatalogService {
     });
 
     if (!existing) {
-      throw new NotFoundException('Marka bulunamadı');
+      throw new NotFoundException("Marka bulunamadı");
     }
 
     // If name is being changed, check for duplicates and update slug
@@ -384,23 +438,20 @@ export class AdminCatalogService {
     if (dto.name && dto.name !== existing.name) {
       slug = dto.name
         .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, '')
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
+        .replace(/[^a-z0-9\s-]/g, "")
+        .replace(/\s+/g, "-")
+        .replace(/-+/g, "-")
         .trim();
 
       const duplicate = await this.prisma.brand.findFirst({
         where: {
-          OR: [
-            { name: { equals: dto.name, mode: 'insensitive' } },
-            { slug },
-          ],
+          OR: [{ name: { equals: dto.name, mode: "insensitive" } }, { slug }],
           NOT: { id: brandId },
         },
       });
 
       if (duplicate) {
-        throw new BadRequestException('Bu isimde bir marka zaten mevcut');
+        throw new BadRequestException("Bu isimde bir marka zaten mevcut");
       }
     }
 
@@ -420,9 +471,18 @@ export class AdminCatalogService {
     });
 
     // Create audit log
-    await this.audit.createAuditLog(adminId, 'brand_update', 'Brand', brandId, existing, updated);
+    await this.audit.createAuditLog(
+      adminId,
+      "brand_update",
+      "Brand",
+      brandId,
+      existing,
+      updated,
+    );
 
-    this.logger.log(`Brand updated: ${updated.name} (${updated.id}) by admin ${adminId}`);
+    this.logger.log(
+      `Brand updated: ${updated.name} (${updated.id}) by admin ${adminId}`,
+    );
 
     return updated;
   }
@@ -439,10 +499,12 @@ export class AdminCatalogService {
     });
 
     if (!existing) {
-      throw new NotFoundException('Marka bulunamadı');
+      throw new NotFoundException("Marka bulunamadı");
     }
 
-    const { products: productCount, carModels: carModelCount } = (existing as any)._count;
+    const { products: productCount, carModels: carModelCount } = (
+      existing as any
+    )._count;
     if (productCount > 0 || carModelCount > 0) {
       throw new ConflictException(
         `Bu marka silinemez: ${productCount} ürün ve ${carModelCount} araç modeli ile ilişkili.`,
@@ -454,9 +516,18 @@ export class AdminCatalogService {
     });
 
     // Create audit log
-    await this.audit.createAuditLog(adminId, 'brand_delete', 'Brand', brandId, existing, null);
+    await this.audit.createAuditLog(
+      adminId,
+      "brand_delete",
+      "Brand",
+      brandId,
+      existing,
+      null,
+    );
 
-    this.logger.log(`Brand deleted: ${existing.name} (${existing.id}) by admin ${adminId}`);
+    this.logger.log(
+      `Brand deleted: ${existing.name} (${existing.id}) by admin ${adminId}`,
+    );
 
     return { success: true };
   }
@@ -465,10 +536,10 @@ export class AdminCatalogService {
 
   async getManufacturers() {
     const manufacturers = await this.prisma.manufacturer.findMany({
-      orderBy: { name: 'asc' },
+      orderBy: { name: "asc" },
     });
     return {
-      data: manufacturers.map(m => ({
+      data: manufacturers.map((m) => ({
         ...m,
         logo: this.resolveProductImageUrl(m.logo),
       })),
@@ -477,19 +548,31 @@ export class AdminCatalogService {
 
   async createManufacturer(
     adminId: string,
-    dto: { name: string; logo?: string; description?: string; website?: string; country?: string; foundedYear?: number; sortOrder?: number; isActive?: boolean },
+    dto: {
+      name: string;
+      logo?: string;
+      description?: string;
+      website?: string;
+      country?: string;
+      foundedYear?: number;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
   ) {
     const slug = dto.name
       .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
       .trim();
 
     const existing = await this.prisma.manufacturer.findFirst({
-      where: { OR: [{ name: { equals: dto.name, mode: 'insensitive' } }, { slug }] },
+      where: {
+        OR: [{ name: { equals: dto.name, mode: "insensitive" } }, { slug }],
+      },
     });
-    if (existing) throw new BadRequestException('Bu isimde bir üretici zaten mevcut');
+    if (existing)
+      throw new BadRequestException("Bu isimde bir üretici zaten mevcut");
 
     const manufacturer = await this.prisma.manufacturer.create({
       data: {
@@ -504,25 +587,52 @@ export class AdminCatalogService {
         isActive: dto.isActive ?? true,
       },
     });
-    await this.audit.createAuditLog(adminId, 'manufacturer_create', 'Manufacturer', manufacturer.id, null, manufacturer);
+    await this.audit.createAuditLog(
+      adminId,
+      "manufacturer_create",
+      "Manufacturer",
+      manufacturer.id,
+      null,
+      manufacturer,
+    );
     return manufacturer;
   }
 
   async updateManufacturer(
     adminId: string,
     id: string,
-    dto: { name?: string; logo?: string; description?: string; website?: string; country?: string; foundedYear?: number | null; sortOrder?: number; isActive?: boolean },
+    dto: {
+      name?: string;
+      logo?: string;
+      description?: string;
+      website?: string;
+      country?: string;
+      foundedYear?: number | null;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
   ) {
-    const existing = await this.prisma.manufacturer.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException('Üretici bulunamadı');
+    const existing = await this.prisma.manufacturer.findUnique({
+      where: { id },
+    });
+    if (!existing) throw new NotFoundException("Üretici bulunamadı");
 
     let slug = existing.slug;
     if (dto.name && dto.name !== existing.name) {
-      slug = dto.name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').trim();
+      slug = dto.name
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, "")
+        .replace(/\s+/g, "-")
+        .replace(/-+/g, "-")
+        .trim();
       const duplicate = await this.prisma.manufacturer.findFirst({
-        where: { OR: [{ name: { equals: dto.name, mode: 'insensitive' } }, { slug }], NOT: { id } },
+        where: {
+          OR: [{ name: { equals: dto.name, mode: "insensitive" } }, { slug }],
+          NOT: { id },
+        },
       });
-      if (duplicate) throw new BadRequestException('Bu isimde bir üretici zaten mevcut');
+      if (duplicate)
+        throw new BadRequestException("Bu isimde bir üretici zaten mevcut");
     }
 
     const updated = await this.prisma.manufacturer.update({
@@ -539,50 +649,129 @@ export class AdminCatalogService {
         isActive: dto.isActive,
       },
     });
-    await this.audit.createAuditLog(adminId, 'manufacturer_update', 'Manufacturer', id, existing, updated);
+    await this.audit.createAuditLog(
+      adminId,
+      "manufacturer_update",
+      "Manufacturer",
+      id,
+      existing,
+      updated,
+    );
     return updated;
   }
 
   async deleteManufacturer(adminId: string, id: string) {
-    const existing = await this.prisma.manufacturer.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException('Üretici bulunamadı');
+    const existing = await this.prisma.manufacturer.findUnique({
+      where: { id },
+    });
+    if (!existing) throw new NotFoundException("Üretici bulunamadı");
     await this.prisma.manufacturer.delete({ where: { id } });
-    await this.audit.createAuditLog(adminId, 'manufacturer_delete', 'Manufacturer', id, existing, null);
+    await this.audit.createAuditLog(
+      adminId,
+      "manufacturer_delete",
+      "Manufacturer",
+      id,
+      existing,
+      null,
+    );
     return { success: true };
   }
 
   // ==================== CAR MODEL MANAGEMENT ====================
 
-  async getCarModels(brandId?: string) {
-    const where = brandId ? { brandId } : {};
-    const models = await this.prisma.carModel.findMany({
-      where,
-      orderBy: [{ brand: { name: 'asc' } }, { name: 'asc' }],
-      include: { brand: { select: { id: true, name: true, slug: true } } },
-    });
-    return { data: models };
+  // #101: opsiyonel server-pagination. page/limit VERİLİRSE (admin liste sayfası)
+  // sayfalar; VERİLMEZSE (product/car-model filtre dropdown'ları, BrandModelsPanel)
+  // tüm listeyi döndürür — mevcut tüketiciler kırılmaz.
+  async getCarModels(params?: {
+    brandId?: string;
+    page?: number;
+    limit?: number;
+    search?: string;
+  }) {
+    const { brandId, page, limit, search } = params ?? {};
+    const where: Record<string, unknown> = {};
+    if (brandId) where.brandId = brandId;
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { slug: { contains: search, mode: "insensitive" } },
+        { brand: { name: { contains: search, mode: "insensitive" } } },
+      ];
+    }
+    const orderBy = [
+      { brand: { name: "asc" as const } },
+      { name: "asc" as const },
+    ];
+    const include = { brand: { select: { id: true, name: true, slug: true } } };
+
+    if (page === undefined && limit === undefined) {
+      const models = await this.prisma.carModel.findMany({
+        where,
+        orderBy,
+        include,
+      });
+      return { data: models };
+    }
+
+    const p = page ?? 1;
+    const l = limit ?? 20;
+    const [total, models] = await Promise.all([
+      this.prisma.carModel.count({ where }),
+      this.prisma.carModel.findMany({
+        where,
+        orderBy,
+        include,
+        skip: (p - 1) * l,
+        take: l,
+      }),
+    ]);
+    return {
+      data: models,
+      meta: { total, page: p, limit: l, totalPages: Math.ceil(total / l) },
+    };
   }
 
   async createCarModel(
     adminId: string,
-    dto: { brandId: string; name: string; slug?: string; yearStart?: number; yearEnd?: number; sortOrder?: number; isActive?: boolean },
+    dto: {
+      brandId: string;
+      name: string;
+      slug?: string;
+      yearStart?: number;
+      yearEnd?: number;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
   ) {
-    const brand = await this.prisma.brand.findUnique({ where: { id: dto.brandId } });
-    if (!brand) throw new NotFoundException('Marka bulunamadı');
+    const brand = await this.prisma.brand.findUnique({
+      where: { id: dto.brandId },
+    });
+    if (!brand) throw new NotFoundException("Marka bulunamadı");
 
     const slug =
       dto.slug ||
       `${brand.slug}-${dto.name}`
         .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, '')
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
+        .replace(/[^a-z0-9\s-]/g, "")
+        .replace(/\s+/g, "-")
+        .replace(/-+/g, "-")
         .trim();
 
     const existing = await this.prisma.carModel.findFirst({
-      where: { OR: [{ slug }, { brandId: dto.brandId, name: { equals: dto.name, mode: 'insensitive' } }] },
+      where: {
+        OR: [
+          { slug },
+          {
+            brandId: dto.brandId,
+            name: { equals: dto.name, mode: "insensitive" },
+          },
+        ],
+      },
     });
-    if (existing) throw new BadRequestException('Bu isimde veya slug ile bir model zaten mevcut');
+    if (existing)
+      throw new BadRequestException(
+        "Bu isimde veya slug ile bir model zaten mevcut",
+      );
 
     const model = await this.prisma.carModel.create({
       data: {
@@ -595,33 +784,53 @@ export class AdminCatalogService {
         isActive: dto.isActive ?? true,
       },
     });
-    await this.audit.createAuditLog(adminId, 'car_model_create', 'CarModel', model.id, null, model);
-    await this.cache.delPattern('car-models:*');
+    await this.audit.createAuditLog(
+      adminId,
+      "car_model_create",
+      "CarModel",
+      model.id,
+      null,
+      model,
+    );
+    await this.cache.delPattern("car-models:*");
     return model;
   }
 
   async updateCarModel(
     adminId: string,
     id: string,
-    dto: { name?: string; slug?: string; yearStart?: number; yearEnd?: number; sortOrder?: number; isActive?: boolean },
+    dto: {
+      name?: string;
+      slug?: string;
+      yearStart?: number;
+      yearEnd?: number;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
   ) {
-    const existing = await this.prisma.carModel.findUnique({ where: { id }, include: { brand: true } });
-    if (!existing) throw new NotFoundException('Model bulunamadı');
+    const existing = await this.prisma.carModel.findUnique({
+      where: { id },
+      include: { brand: true },
+    });
+    if (!existing) throw new NotFoundException("Model bulunamadı");
 
     let slug = existing.slug;
     if (dto.slug) slug = dto.slug;
     else if (dto.name && dto.name !== existing.name) {
       slug = `${existing.brand.slug}-${dto.name}`
         .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, '')
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
+        .replace(/[^a-z0-9\s-]/g, "")
+        .replace(/\s+/g, "-")
+        .replace(/-+/g, "-")
         .trim();
     }
 
     if (slug !== existing.slug) {
-      const duplicate = await this.prisma.carModel.findFirst({ where: { slug, NOT: { id } } });
-      if (duplicate) throw new BadRequestException('Bu slug ile bir model zaten mevcut');
+      const duplicate = await this.prisma.carModel.findFirst({
+        where: { slug, NOT: { id } },
+      });
+      if (duplicate)
+        throw new BadRequestException("Bu slug ile bir model zaten mevcut");
     }
 
     const updated = await this.prisma.carModel.update({
@@ -635,17 +844,31 @@ export class AdminCatalogService {
         isActive: dto.isActive,
       },
     });
-    await this.audit.createAuditLog(adminId, 'car_model_update', 'CarModel', id, existing, updated);
-    await this.cache.delPattern('car-models:*');
+    await this.audit.createAuditLog(
+      adminId,
+      "car_model_update",
+      "CarModel",
+      id,
+      existing,
+      updated,
+    );
+    await this.cache.delPattern("car-models:*");
     return updated;
   }
 
   async deleteCarModel(adminId: string, id: string) {
     const existing = await this.prisma.carModel.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException('Model bulunamadı');
+    if (!existing) throw new NotFoundException("Model bulunamadı");
     await this.prisma.carModel.delete({ where: { id } });
-    await this.audit.createAuditLog(adminId, 'car_model_delete', 'CarModel', id, existing, null);
-    await this.cache.delPattern('car-models:*');
+    await this.audit.createAuditLog(
+      adminId,
+      "car_model_delete",
+      "CarModel",
+      id,
+      existing,
+      null,
+    );
+    await this.cache.delPattern("car-models:*");
     return { success: true };
   }
 
@@ -678,18 +901,18 @@ export class AdminCatalogService {
         where,
         include: {
           attributes: {
-            orderBy: { sortOrder: 'asc' },
+            orderBy: { sortOrder: "asc" },
           },
           _count: { select: { attributes: true } },
         },
-        orderBy: { sortOrder: 'asc' },
+        orderBy: { sortOrder: "asc" },
         skip: (page - 1) * limit,
         take: limit,
       }),
     ]);
 
     return {
-      data: groups.map(g => ({
+      data: groups.map((g) => ({
         ...g,
         attributeCount: g._count.attributes,
       })),
@@ -708,7 +931,7 @@ export class AdminCatalogService {
       where: { id: groupId },
       include: {
         attributes: {
-          orderBy: { sortOrder: 'asc' },
+          orderBy: { sortOrder: "asc" },
           include: {
             _count: { select: { productAttributes: true } },
           },
@@ -717,13 +940,13 @@ export class AdminCatalogService {
     });
 
     if (!group) {
-      throw new NotFoundException('Özellik grubu bulunamadı');
+      throw new NotFoundException("Özellik grubu bulunamadı");
     }
 
     return {
       ...group,
       attributeCount: group.attributes.length,
-      attributes: group.attributes.map(a => ({
+      attributes: group.attributes.map((a) => ({
         ...a,
         usageCount: a._count.productAttributes,
       })),
@@ -733,13 +956,16 @@ export class AdminCatalogService {
   /**
    * Create attribute group
    */
-  async createAttributeGroup(adminId: string, dto: {
-    name: string;
-    description?: string;
-    isRequired?: boolean;
-    isActive?: boolean;
-    sortOrder?: number;
-  }) {
+  async createAttributeGroup(
+    adminId: string,
+    dto: {
+      name: string;
+      description?: string;
+      isRequired?: boolean;
+      isActive?: boolean;
+      sortOrder?: number;
+    },
+  ) {
     const slug = generateSlug(dto.name);
 
     const existing = await this.prisma.attributeGroup.findFirst({
@@ -747,7 +973,7 @@ export class AdminCatalogService {
     });
 
     if (existing) {
-      throw new BadRequestException('Bu isimde bir özellik grubu zaten mevcut');
+      throw new BadRequestException("Bu isimde bir özellik grubu zaten mevcut");
     }
 
     const group = await this.prisma.attributeGroup.create({
@@ -761,7 +987,14 @@ export class AdminCatalogService {
       },
     });
 
-    await this.audit.createAuditLog(adminId, 'attribute_group_create', 'AttributeGroup', group.id, null, group);
+    await this.audit.createAuditLog(
+      adminId,
+      "attribute_group_create",
+      "AttributeGroup",
+      group.id,
+      null,
+      group,
+    );
 
     return { ...group, attributeCount: 0 };
   }
@@ -769,19 +1002,23 @@ export class AdminCatalogService {
   /**
    * Update attribute group
    */
-  async updateAttributeGroup(adminId: string, groupId: string, dto: {
-    name?: string;
-    description?: string;
-    isRequired?: boolean;
-    isActive?: boolean;
-    sortOrder?: number;
-  }) {
+  async updateAttributeGroup(
+    adminId: string,
+    groupId: string,
+    dto: {
+      name?: string;
+      description?: string;
+      isRequired?: boolean;
+      isActive?: boolean;
+      sortOrder?: number;
+    },
+  ) {
     const existing = await this.prisma.attributeGroup.findUnique({
       where: { id: groupId },
     });
 
     if (!existing) {
-      throw new NotFoundException('Özellik grubu bulunamadı');
+      throw new NotFoundException("Özellik grubu bulunamadı");
     }
 
     const updateData: Prisma.AttributeGroupUpdateInput = {};
@@ -800,7 +1037,14 @@ export class AdminCatalogService {
       include: { _count: { select: { attributes: true } } },
     });
 
-    await this.audit.createAuditLog(adminId, 'attribute_group_update', 'AttributeGroup', groupId, existing, updated);
+    await this.audit.createAuditLog(
+      adminId,
+      "attribute_group_update",
+      "AttributeGroup",
+      groupId,
+      existing,
+      updated,
+    );
 
     return { ...updated, attributeCount: updated._count.attributes };
   }
@@ -815,18 +1059,27 @@ export class AdminCatalogService {
     });
 
     if (!existing) {
-      throw new NotFoundException('Özellik grubu bulunamadı');
+      throw new NotFoundException("Özellik grubu bulunamadı");
     }
 
     if (existing._count.attributes > 0) {
-      throw new BadRequestException(`Bu grupta ${existing._count.attributes} özellik değeri var. Önce değerleri silin.`);
+      throw new BadRequestException(
+        `Bu grupta ${existing._count.attributes} özellik değeri var. Önce değerleri silin.`,
+      );
     }
 
     await this.prisma.attributeGroup.delete({
       where: { id: groupId },
     });
 
-    await this.audit.createAuditLog(adminId, 'attribute_group_delete', 'AttributeGroup', groupId, existing, null);
+    await this.audit.createAuditLog(
+      adminId,
+      "attribute_group_delete",
+      "AttributeGroup",
+      groupId,
+      existing,
+      null,
+    );
 
     return { success: true };
   }
@@ -864,14 +1117,14 @@ export class AdminCatalogService {
           group: { select: { id: true, name: true } },
           _count: { select: { productAttributes: true } },
         },
-        orderBy: [{ groupId: 'asc' }, { sortOrder: 'asc' }],
+        orderBy: [{ groupId: "asc" }, { sortOrder: "asc" }],
         skip: (page - 1) * limit,
         take: limit,
       }),
     ]);
 
     return {
-      data: attributes.map(a => ({
+      data: attributes.map((a) => ({
         ...a,
         usageCount: a._count.productAttributes,
       })),
@@ -885,27 +1138,31 @@ export class AdminCatalogService {
   /**
    * Create attribute value
    */
-  async createAttribute(adminId: string, dto: {
-    groupId: string;
-    value: string;
-    displayValue?: string;
-    color?: string;
-    sortOrder?: number;
-    isActive?: boolean;
-  }) {
+  async createAttribute(
+    adminId: string,
+    dto: {
+      groupId: string;
+      value: string;
+      displayValue?: string;
+      color?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
+  ) {
     // Verify group exists
     const group = await this.prisma.attributeGroup.findUnique({
       where: { id: dto.groupId },
     });
 
     if (!group) {
-      throw new NotFoundException('Özellik grubu bulunamadı');
+      throw new NotFoundException("Özellik grubu bulunamadı");
     }
 
     // Scale group: use same slug normalization as product.service linkProductAttributes
     const slug =
-      group.slug === 'scale'
-        ? dto.value.replace(/\s/g, '').replace(/[:\/]/g, '').toLowerCase() || generateSlug(dto.value)
+      group.slug === "scale"
+        ? dto.value.replace(/\s/g, "").replace(/[:\/]/g, "").toLowerCase() ||
+          generateSlug(dto.value)
         : generateSlug(dto.value);
 
     // Check for duplicate
@@ -914,7 +1171,7 @@ export class AdminCatalogService {
     });
 
     if (existing) {
-      throw new BadRequestException('Bu değer bu grupta zaten mevcut');
+      throw new BadRequestException("Bu değer bu grupta zaten mevcut");
     }
 
     const attribute = await this.prisma.attribute.create({
@@ -932,7 +1189,14 @@ export class AdminCatalogService {
       },
     });
 
-    await this.audit.createAuditLog(adminId, 'attribute_create', 'Attribute', attribute.id, null, attribute);
+    await this.audit.createAuditLog(
+      adminId,
+      "attribute_create",
+      "Attribute",
+      attribute.id,
+      null,
+      attribute,
+    );
 
     return { ...attribute, usageCount: 0 };
   }
@@ -940,31 +1204,39 @@ export class AdminCatalogService {
   /**
    * Update attribute value
    */
-  async updateAttribute(adminId: string, attributeId: string, dto: {
-    value?: string;
-    displayValue?: string;
-    color?: string;
-    sortOrder?: number;
-    isActive?: boolean;
-  }) {
+  async updateAttribute(
+    adminId: string,
+    attributeId: string,
+    dto: {
+      value?: string;
+      displayValue?: string;
+      color?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
+  ) {
     const existing = await this.prisma.attribute.findUnique({
       where: { id: attributeId },
     });
 
     if (!existing) {
-      throw new NotFoundException('Özellik değeri bulunamadı');
+      throw new NotFoundException("Özellik değeri bulunamadı");
     }
 
     const updateData: Prisma.AttributeUpdateInput = {};
     if (dto.value !== undefined) {
       updateData.value = dto.value;
-      const group = await this.prisma.attributeGroup.findUnique({ where: { id: existing.groupId } });
+      const group = await this.prisma.attributeGroup.findUnique({
+        where: { id: existing.groupId },
+      });
       updateData.slug =
-        group?.slug === 'scale'
-          ? dto.value.replace(/\s/g, '').replace(/[:\/]/g, '').toLowerCase() || generateSlug(dto.value)
+        group?.slug === "scale"
+          ? dto.value.replace(/\s/g, "").replace(/[:\/]/g, "").toLowerCase() ||
+            generateSlug(dto.value)
           : generateSlug(dto.value);
     }
-    if (dto.displayValue !== undefined) updateData.displayValue = dto.displayValue?.trim() || null;
+    if (dto.displayValue !== undefined)
+      updateData.displayValue = dto.displayValue?.trim() || null;
     if (dto.color !== undefined) updateData.color = dto.color;
     if (dto.sortOrder !== undefined) updateData.sortOrder = dto.sortOrder;
     if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
@@ -978,7 +1250,14 @@ export class AdminCatalogService {
       },
     });
 
-    await this.audit.createAuditLog(adminId, 'attribute_update', 'Attribute', attributeId, existing, updated);
+    await this.audit.createAuditLog(
+      adminId,
+      "attribute_update",
+      "Attribute",
+      attributeId,
+      existing,
+      updated,
+    );
 
     return { ...updated, usageCount: updated._count.productAttributes };
   }
@@ -993,20 +1272,28 @@ export class AdminCatalogService {
     });
 
     if (!existing) {
-      throw new NotFoundException('Özellik değeri bulunamadı');
+      throw new NotFoundException("Özellik değeri bulunamadı");
     }
 
     if (existing._count.productAttributes > 0) {
-      throw new BadRequestException(`Bu özellik ${existing._count.productAttributes} üründe kullanılıyor. Önce ürünlerden kaldırın.`);
+      throw new BadRequestException(
+        `Bu özellik ${existing._count.productAttributes} üründe kullanılıyor. Önce ürünlerden kaldırın.`,
+      );
     }
 
     await this.prisma.attribute.delete({
       where: { id: attributeId },
     });
 
-    await this.audit.createAuditLog(adminId, 'attribute_delete', 'Attribute', attributeId, existing, null);
+    await this.audit.createAuditLog(
+      adminId,
+      "attribute_delete",
+      "Attribute",
+      attributeId,
+      existing,
+      null,
+    );
 
     return { success: true };
   }
-
 }

@@ -4,19 +4,20 @@ import {
   ForbiddenException,
   BadRequestException,
   Logger,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { CacheService } from '../cache/cache.service';
-import { UpdateOrderStatusDto, CancelOrderDto } from './dto';
-import { OrderStatus, OfferStatus } from '@prisma/client';
-import { getProductStatusFromQuantity } from '../product/helpers/product-status.helper';
-import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
-import { ProductLockService } from '../product/product-lock.service';
-import { NotificationService } from '../notification/notification.service';
-import { CommissionLedgerService } from '../commission/commission-ledger.service';
-import { ElogoInvoicingService } from '../elogo';
-import { OrderCommonService } from './order-common.service';
-import { OrderQueryService } from './order-query.service';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { i18nMessage } from "../i18n";
+import { CacheService } from "../cache/cache.service";
+import { UpdateOrderStatusDto, CancelOrderDto } from "./dto";
+import { OrderStatus, OfferStatus } from "@prisma/client";
+import { getProductStatusFromQuantity } from "../product/helpers/product-status.helper";
+import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
+import { ProductLockService } from "../product/product-lock.service";
+import { NotificationService } from "../notification/notification.service";
+import { CommissionLedgerService } from "../commission/commission-ledger.service";
+import { ElogoInvoicingService } from "../elogo";
+import { OrderCommonService } from "./order-common.service";
+import { OrderQueryService } from "./order-query.service";
 
 /**
  * Sipariş yaşam döngüsü (adres güncelleme, durum geçişleri, tamamlama/onay,
@@ -45,16 +46,35 @@ export class OrderLifecycleService {
   async setShippingAddress(
     orderId: string,
     userId: string,
-    dto: { fullName: string; phone: string; city: string; district: string; address: string; zipCode?: string },
+    dto: {
+      fullName: string;
+      phone: string;
+      city: string;
+      district: string;
+      address: string;
+      zipCode?: string;
+    },
   ) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { product: { include: { images: { take: 1 } } }, buyer: true, seller: true, shipment: true, payment: true },
+      include: {
+        product: { include: { images: { take: 1 } } },
+        buyer: true,
+        seller: true,
+        shipment: true,
+        payment: true,
+      },
     });
-    if (!order) throw new NotFoundException('Sipariş bulunamadı');
-    if (order.buyerId !== userId) throw new ForbiddenException('Bu siparişe adres ekleme yetkiniz yok');
+    if (!order)
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
+    if (order.buyerId !== userId)
+      throw new ForbiddenException(
+        i18nMessage("server.order.setAddressForbidden"),
+      );
     if (order.status !== OrderStatus.pending_payment) {
-      throw new BadRequestException('Sadece ödeme bekleyen siparişlere adres eklenebilir');
+      throw new BadRequestException(
+        i18nMessage("server.order.addressOnlyPendingPayment"),
+      );
     }
     const shippingAddress = {
       fullName: dto.fullName.trim(),
@@ -68,7 +88,10 @@ export class OrderLifecycleService {
       where: { id: orderId },
       data: { shippingAddress: shippingAddress as any },
     });
-    return this.orderCommon.formatOrderResponse({ ...order, shippingAddress }, userId);
+    return this.orderCommon.formatOrderResponse(
+      { ...order, shippingAddress },
+      userId,
+    );
   }
 
   /**
@@ -80,66 +103,90 @@ export class OrderLifecycleService {
    * - shipped → delivered (handled by shipping module)
    * - delivered → completed (buyer confirms)
    */
-  async updateStatus(orderId: string, userId: string, dto: UpdateOrderStatusDto) {
+  async updateStatus(
+    orderId: string,
+    userId: string,
+    dto: UpdateOrderStatusDto,
+  ) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
     });
 
     if (!order) {
-      throw new NotFoundException('Sipariş bulunamadı');
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
     }
 
     // Validate state transitions
-    const allowedTransitions: Record<OrderStatus, { nextStatuses: OrderStatus[]; allowedBy: 'buyer' | 'seller' | 'system' }[]> = {
+    const allowedTransitions: Record<
+      OrderStatus,
+      {
+        nextStatuses: OrderStatus[];
+        allowedBy: "buyer" | "seller" | "system";
+      }[]
+    > = {
       [OrderStatus.pending_payment]: [
-        { nextStatuses: [OrderStatus.paid], allowedBy: 'system' },
-        { nextStatuses: [OrderStatus.preparing], allowedBy: 'system' }, // Payment success → preparing (first state after purchase)
-        { nextStatuses: [OrderStatus.cancelled], allowedBy: 'buyer' },
+        { nextStatuses: [OrderStatus.paid], allowedBy: "system" },
+        { nextStatuses: [OrderStatus.preparing], allowedBy: "system" }, // Payment success → preparing (first state after purchase)
+        { nextStatuses: [OrderStatus.cancelled], allowedBy: "buyer" },
       ],
       [OrderStatus.paid]: [
-        { nextStatuses: [OrderStatus.preparing], allowedBy: 'seller' },
-        { nextStatuses: [OrderStatus.cancelled, OrderStatus.refunded], allowedBy: 'system' },
+        { nextStatuses: [OrderStatus.preparing], allowedBy: "seller" },
+        {
+          nextStatuses: [OrderStatus.cancelled, OrderStatus.refunded],
+          allowedBy: "system",
+        },
       ],
       [OrderStatus.preparing]: [
-        { nextStatuses: [OrderStatus.shipped], allowedBy: 'system' }, // Triggered by shipping
+        { nextStatuses: [OrderStatus.shipped], allowedBy: "system" }, // Triggered by shipping
       ],
       [OrderStatus.shipped]: [
-        { nextStatuses: [OrderStatus.delivered], allowedBy: 'system' }, // Triggered by shipping update
+        { nextStatuses: [OrderStatus.delivered], allowedBy: "system" }, // Triggered by shipping update
       ],
       [OrderStatus.delivered]: [
-        { nextStatuses: [OrderStatus.completed], allowedBy: 'buyer' },
+        { nextStatuses: [OrderStatus.completed], allowedBy: "buyer" },
       ],
       [OrderStatus.awaiting_buyer_confirmation]: [
-        { nextStatuses: [OrderStatus.completed], allowedBy: 'buyer' },   // manual_ok (confirmReceipt)
-        { nextStatuses: [OrderStatus.completed], allowedBy: 'system' },  // auto_timeout (cron)
-        { nextStatuses: [OrderStatus.refund_requested], allowedBy: 'buyer' },
+        { nextStatuses: [OrderStatus.completed], allowedBy: "buyer" }, // manual_ok (confirmReceipt)
+        { nextStatuses: [OrderStatus.completed], allowedBy: "system" }, // auto_timeout (cron)
+        { nextStatuses: [OrderStatus.refund_requested], allowedBy: "buyer" },
       ],
       [OrderStatus.completed]: [],
       [OrderStatus.cancelled]: [],
       [OrderStatus.refund_requested]: [
-        { nextStatuses: [OrderStatus.refunded], allowedBy: 'system' },
+        { nextStatuses: [OrderStatus.refunded], allowedBy: "system" },
       ],
       [OrderStatus.refunded]: [],
     };
 
     const currentTransitions = allowedTransitions[order.status] || [];
-    const transition = currentTransitions.find((t) => t.nextStatuses.includes(dto.status));
+    const transition = currentTransitions.find((t) =>
+      t.nextStatuses.includes(dto.status),
+    );
 
     if (!transition) {
       throw new BadRequestException(
-        `Sipariş durumu ${order.status}'den ${dto.status}'e değiştirilemez`,
+        i18nMessage("server.order.statusTransitionNotAllowed", {
+          from: order.status,
+          to: dto.status,
+        }),
       );
     }
 
     // Check permission
-    if (transition.allowedBy === 'buyer' && order.buyerId !== userId) {
-      throw new ForbiddenException('Bu durum değişikliğini yapmaya yetkiniz yok');
+    if (transition.allowedBy === "buyer" && order.buyerId !== userId) {
+      throw new ForbiddenException(
+        i18nMessage("server.order.statusChangeForbidden"),
+      );
     }
-    if (transition.allowedBy === 'seller' && order.sellerId !== userId) {
-      throw new ForbiddenException('Bu durum değişikliğini yapmaya yetkiniz yok');
+    if (transition.allowedBy === "seller" && order.sellerId !== userId) {
+      throw new ForbiddenException(
+        i18nMessage("server.order.statusChangeForbidden"),
+      );
     }
-    if (transition.allowedBy === 'system') {
-      throw new BadRequestException('Bu durum değişikliği sistem tarafından yapılır');
+    if (transition.allowedBy === "system") {
+      throw new BadRequestException(
+        i18nMessage("server.order.statusChangeSystemOnly"),
+      );
     }
 
     const updatedOrder = await this.prisma.order.update({
@@ -154,14 +201,24 @@ export class OrderLifecycleService {
       include: {
         product: {
           include: {
-            images: { take: 1, orderBy: { sortOrder: 'asc' } },
+            images: { take: 1, orderBy: { sortOrder: "asc" } },
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+          select: {
+            id: true,
+            displayName: true,
+            isVerified: true,
+            avatarUrl: true,
+          },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+          select: {
+            id: true,
+            displayName: true,
+            isVerified: true,
+            avatarUrl: true,
+          },
         },
         shipment: true,
       },
@@ -176,7 +233,7 @@ export class OrderLifecycleService {
    */
   async completeOrder(
     orderId: string,
-    type: 'manual_ok' | 'auto_timeout' | 'admin_force',
+    type: "manual_ok" | "auto_timeout" | "admin_force",
   ): Promise<{ completed: boolean }> {
     const result = await this.prisma.$transaction(async (tx) => {
       const now = new Date();
@@ -224,13 +281,13 @@ export class OrderLifecycleService {
           select: { buyerId: true, sellerId: true },
         });
         if (order) {
-          if (type === 'manual_ok') {
+          if (type === "manual_ok") {
             await this.notificationService
               .notifyOrderManuallyConfirmed(order.sellerId, orderId)
               .catch((e) =>
                 this.logger.warn(`notify manual_ok failed: ${e.message}`),
               );
-          } else if (type === 'auto_timeout') {
+          } else if (type === "auto_timeout") {
             await Promise.allSettled([
               this.notificationService.notifyOrderAutoCompleted(
                 order.buyerId,
@@ -241,7 +298,7 @@ export class OrderLifecycleService {
                 orderId,
               ),
             ]);
-          } else if (type === 'admin_force') {
+          } else if (type === "admin_force") {
             await Promise.allSettled([
               this.notificationService.notifyOrderForceCompletedByAdmin(
                 order.buyerId,
@@ -265,14 +322,26 @@ export class OrderLifecycleService {
       // Fire-and-forget: sipariş tamamlamayı BLOKLAMAZ; servis idempotent + retry cron'lu.
       void this.elogoInvoicing
         .issueCommissionInvoice(orderId)
-        .catch((e) => this.logger.warn(`eLogo komisyon faturası tetik hatası ${orderId}: ${e?.message}`));
+        .catch((e) =>
+          this.logger.warn(
+            `eLogo komisyon faturası tetik hatası ${orderId}: ${e?.message}`,
+          ),
+        );
       void this.elogoInvoicing
         .issueServiceFeeInvoice(orderId)
-        .catch((e) => this.logger.warn(`eLogo hizmet bedeli faturası tetik hatası ${orderId}: ${e?.message}`));
+        .catch((e) =>
+          this.logger.warn(
+            `eLogo hizmet bedeli faturası tetik hatası ${orderId}: ${e?.message}`,
+          ),
+        );
       // Platform kendi ürününü sattıysa → alıcıya ürün e-Arşivi (Tarodan=satıcı).
       void this.elogoInvoicing
         .issuePlatformSaleInvoice(orderId)
-        .catch((e) => this.logger.warn(`eLogo platform satış faturası tetik hatası ${orderId}: ${e?.message}`));
+        .catch((e) =>
+          this.logger.warn(
+            `eLogo platform satış faturası tetik hatası ${orderId}: ${e?.message}`,
+          ),
+        );
     }
 
     return result;
@@ -291,14 +360,18 @@ export class OrderLifecycleService {
     });
 
     if (!order) {
-      throw new NotFoundException('Sipariş bulunamadı');
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
     }
     if (order.buyerId !== userId) {
-      throw new ForbiddenException('Bu siparişi onaylama yetkiniz yok');
+      throw new ForbiddenException(
+        i18nMessage("server.order.confirmForbidden"),
+      );
     }
     if (order.status !== OrderStatus.awaiting_buyer_confirmation) {
       throw new BadRequestException(
-        `Sipariş bu aşamada onaylanamaz (mevcut durum: ${order.status})`,
+        i18nMessage("server.order.notConfirmableStatus", {
+          status: order.status,
+        }),
       );
     }
 
@@ -307,13 +380,13 @@ export class OrderLifecycleService {
         orderId,
         status: {
           in: [
-            'pending_review',
-            'approved',
-            'wait_for_delivery',
-            'return_shipment_open',
-            'return_in_transit',
-            'return_delivered',
-            'disputed',
+            "pending_review",
+            "approved",
+            "wait_for_delivery",
+            "return_shipment_open",
+            "return_in_transit",
+            "return_delivered",
+            "disputed",
           ] as any,
         },
       },
@@ -321,11 +394,11 @@ export class OrderLifecycleService {
     });
     if (openRefund) {
       throw new BadRequestException(
-        'Açık bir iade talebi var; önce sonuçlanması gerek',
+        i18nMessage("server.order.openRefundExists"),
       );
     }
 
-    return this.completeOrder(orderId, 'manual_ok');
+    return this.completeOrder(orderId, "manual_ok");
   }
 
   /**
@@ -338,9 +411,9 @@ export class OrderLifecycleService {
     reason?: string,
   ): Promise<{ completed: boolean }> {
     this.logger.log(
-      `Admin ${adminId} force-completing order ${orderId}. reason="${reason ?? ''}"`,
+      `Admin ${adminId} force-completing order ${orderId}. reason="${reason ?? ""}"`,
     );
-    return this.completeOrder(orderId, 'admin_force');
+    return this.completeOrder(orderId, "admin_force");
   }
 
   /**
@@ -357,10 +430,11 @@ export class OrderLifecycleService {
       where: { id: orderId },
       select: { id: true, status: true, confirmationDeadline: true },
     });
-    if (!order) throw new NotFoundException('Sipariş bulunamadı');
+    if (!order)
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
     if (order.status !== OrderStatus.awaiting_buyer_confirmation) {
       throw new BadRequestException(
-        'Sadece 48h penceresindeki siparişlerde uzatılabilir',
+        i18nMessage("server.order.extendOnlyWithinWindow"),
       );
     }
 
@@ -372,7 +446,7 @@ export class OrderLifecycleService {
     });
 
     this.logger.log(
-      `Admin ${adminId} extended confirmationDeadline of ${orderId} by ${hours}h → ${newDeadline.toISOString()} reason="${reason ?? ''}"`,
+      `Admin ${adminId} extended confirmationDeadline of ${orderId} by ${hours}h → ${newDeadline.toISOString()} reason="${reason ?? ""}"`,
     );
     return { newDeadline };
   }
@@ -393,13 +467,15 @@ export class OrderLifecycleService {
       });
 
       if (!order) {
-        throw new NotFoundException('Sipariş bulunamadı');
+        throw new NotFoundException(i18nMessage("server.order.notFound"));
       }
       productIdToInvalidate = order.productId;
 
       // Only buyer can cancel
       if (order.buyerId !== userId) {
-        throw new ForbiddenException('Bu siparişi iptal etme yetkiniz yok');
+        throw new ForbiddenException(
+          i18nMessage("server.order.cancelForbidden"),
+        );
       }
 
       // Can only cancel before shipping
@@ -411,20 +487,21 @@ export class OrderLifecycleService {
 
       if (!cancellableStatuses.includes(order.status)) {
         throw new BadRequestException(
-          'Sipariş kargoya verildikten sonra iptal edilemez',
+          i18nMessage("server.order.cannotCancelShipped"),
         );
       }
 
       // Determine new status based on payment
-      const newStatus = order.status === OrderStatus.pending_payment
-        ? OrderStatus.cancelled
-        : OrderStatus.refunded; // Will trigger refund in payment module
+      const newStatus =
+        order.status === OrderStatus.pending_payment
+          ? OrderStatus.cancelled
+          : OrderStatus.refunded; // Will trigger refund in payment module
 
       // Update order. cancellationType='iptal': kargo öncesi iptal — status para
       // akışı için (paid/preparing'de 'refunded' tetikler) ama bu alan raporlama/
       // admin için "İADE değil İPTAL" der. reason opsiyonel; boşsa genel default.
       const cancelReasonText =
-        dto?.reason?.trim() || 'Alıcı tarafından iptal edildi';
+        dto?.reason?.trim() || "Alıcı tarafından iptal edildi";
       const cancelledOrder = await tx.order.update({
         where: {
           id: orderId,
@@ -432,21 +509,31 @@ export class OrderLifecycleService {
         },
         data: {
           status: newStatus,
-          cancellationType: 'iptal',
+          cancellationType: "iptal",
           cancelReason: cancelReasonText,
           version: { increment: 1 },
         },
         include: {
           product: {
             include: {
-              images: { take: 1, orderBy: { sortOrder: 'asc' } },
+              images: { take: 1, orderBy: { sortOrder: "asc" } },
             },
           },
           buyer: {
-            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+            select: {
+              id: true,
+              displayName: true,
+              isVerified: true,
+              avatarUrl: true,
+            },
           },
           seller: {
-            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+            select: {
+              id: true,
+              displayName: true,
+              isVerified: true,
+              avatarUrl: true,
+            },
           },
         },
       });
@@ -515,7 +602,7 @@ export class OrderLifecycleService {
       // pending_payment'da ledger henüz yaratılmamıştır (PaymentService.processSuccessfulPayment'da
       // upsert ediliyor); markWaived noop döner. Spec Bölüm 7.4 (buyer-initiated)
       // ile uyumlu — komisyon alınmaz çünkü iş tamamlanmadı.
-      await this.commissionLedger.markWaived(orderId, 'buyer_cancelled', tx);
+      await this.commissionLedger.markWaived(orderId, "buyer_cancelled", tx);
 
       // Note: Refund will be handled by PaymentModule when status is 'refunded'
 
@@ -538,23 +625,33 @@ export class OrderLifecycleService {
       include: { product: true, offer: true },
     });
     if (!order) {
-      throw new NotFoundException('Sipariş bulunamadı');
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
     }
     if (order.buyerId !== userId) {
-      throw new ForbiddenException('Bu siparişi yeniden aktive etme yetkiniz yok');
+      throw new ForbiddenException(
+        i18nMessage("server.order.reactivateForbidden"),
+      );
     }
     if (order.status !== OrderStatus.cancelled) {
-      throw new BadRequestException('Sadece iptal edilmiş siparişler yeniden aktive edilebilir');
+      throw new BadRequestException(
+        i18nMessage("server.order.reactivateOnlyCancelled"),
+      );
     }
     if (!order.offerId || !order.offer) {
-      throw new BadRequestException('Bu sipariş tekliften oluşmadığı için yeniden aktive edilemez');
+      throw new BadRequestException(
+        i18nMessage("server.order.reactivateNotFromOffer"),
+      );
     }
     if (order.offer.status !== OfferStatus.accepted) {
-      throw new BadRequestException('İlgili teklif artık kabul edilmiş değil');
+      throw new BadRequestException(
+        i18nMessage("server.order.reactivateOfferNotAccepted"),
+      );
     }
     const available = getAvailableQuantity(order.product);
     if (available !== null && available < 1) {
-      throw new BadRequestException('Ürün için yeterli müsait adet yok');
+      throw new BadRequestException(
+        i18nMessage("server.order.reactivateInsufficientStock"),
+      );
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -562,7 +659,10 @@ export class OrderLifecycleService {
       await this.productLockService.checkAndReserve(tx, order.productId, 1);
       await tx.order.update({
         where: { id: orderId },
-        data: { status: OrderStatus.pending_payment, version: { increment: 1 } },
+        data: {
+          status: OrderStatus.pending_payment,
+          version: { increment: 1 },
+        },
       });
     });
 
@@ -578,15 +678,17 @@ export class OrderLifecycleService {
     });
 
     if (!order) {
-      throw new NotFoundException('Sipariş bulunamadı');
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
     }
 
     if (order.sellerId !== sellerId) {
-      throw new ForbiddenException('Bu siparişi güncelleme yetkiniz yok');
+      throw new ForbiddenException(i18nMessage("server.order.updateForbidden"));
     }
 
     if (order.status !== OrderStatus.paid) {
-      throw new BadRequestException('Sadece ödenmiş siparişler hazırlanabilir');
+      throw new BadRequestException(
+        i18nMessage("server.order.prepareOnlyPaid"),
+      );
     }
 
     const updatedOrder = await this.prisma.order.update({
@@ -601,14 +703,24 @@ export class OrderLifecycleService {
       include: {
         product: {
           include: {
-            images: { take: 1, orderBy: { sortOrder: 'asc' } },
+            images: { take: 1, orderBy: { sortOrder: "asc" } },
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+          select: {
+            id: true,
+            displayName: true,
+            isVerified: true,
+            avatarUrl: true,
+          },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+          select: {
+            id: true,
+            displayName: true,
+            isVerified: true,
+            avatarUrl: true,
+          },
         },
         shipment: true,
       },
@@ -626,15 +738,19 @@ export class OrderLifecycleService {
     });
 
     if (!order) {
-      throw new NotFoundException('Sipariş bulunamadı');
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
     }
 
     if (order.buyerId !== buyerId) {
-      throw new ForbiddenException('Bu siparişi onaylama yetkiniz yok');
+      throw new ForbiddenException(
+        i18nMessage("server.order.confirmForbidden"),
+      );
     }
 
     if (order.status !== OrderStatus.delivered) {
-      throw new BadRequestException('Sadece teslim edilmiş siparişler onaylanabilir');
+      throw new BadRequestException(
+        i18nMessage("server.order.confirmOnlyDelivered"),
+      );
     }
 
     const updatedOrder = await this.prisma.order.update({
@@ -649,14 +765,24 @@ export class OrderLifecycleService {
       include: {
         product: {
           include: {
-            images: { take: 1, orderBy: { sortOrder: 'asc' } },
+            images: { take: 1, orderBy: { sortOrder: "asc" } },
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+          select: {
+            id: true,
+            displayName: true,
+            isVerified: true,
+            avatarUrl: true,
+          },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+          select: {
+            id: true,
+            displayName: true,
+            isVerified: true,
+            avatarUrl: true,
+          },
         },
         shipment: true,
       },
@@ -677,7 +803,7 @@ export class OrderLifecycleService {
 
         // Invalidate cache
         await this.cache.del(`products:detail:${order.productId}`);
-        await this.cache.delPattern('products:list:*');
+        await this.cache.delPattern("products:list:*");
       }
     }
 
@@ -691,20 +817,38 @@ export class OrderLifecycleService {
     // bu yüzden ledger + e-Arşiv tetiğini burada da çalıştırmak ZORUNLU (yoksa fatura/mail çıkmaz).
     await this.commissionLedger
       .markEarned(orderId, this.prisma)
-      .catch((e: any) => this.logger.warn(`confirmDelivery markEarned hatası ${orderId}: ${e?.message}`));
+      .catch((e: any) =>
+        this.logger.warn(
+          `confirmDelivery markEarned hatası ${orderId}: ${e?.message}`,
+        ),
+      );
 
     // Tarodan gelir e-Arşivleri (komisyon → satıcı, hizmet bedeli → alıcı, platform satışı → alıcı).
     // Fire-and-forget: tamamlamayı BLOKLAMAZ; servis idempotent + retry cron'lu.
-    this.logger.log(`confirmDelivery: ${orderId} tamamlandı → e-Arşiv tetikleniyor (komisyon+hizmet+platform)`);
+    this.logger.log(
+      `confirmDelivery: ${orderId} tamamlandı → e-Arşiv tetikleniyor (komisyon+hizmet+platform)`,
+    );
     void this.elogoInvoicing
       .issueCommissionInvoice(orderId)
-      .catch((e) => this.logger.warn(`eLogo komisyon faturası tetik hatası ${orderId}: ${e?.message}`));
+      .catch((e) =>
+        this.logger.warn(
+          `eLogo komisyon faturası tetik hatası ${orderId}: ${e?.message}`,
+        ),
+      );
     void this.elogoInvoicing
       .issueServiceFeeInvoice(orderId)
-      .catch((e) => this.logger.warn(`eLogo hizmet bedeli faturası tetik hatası ${orderId}: ${e?.message}`));
+      .catch((e) =>
+        this.logger.warn(
+          `eLogo hizmet bedeli faturası tetik hatası ${orderId}: ${e?.message}`,
+        ),
+      );
     void this.elogoInvoicing
       .issuePlatformSaleInvoice(orderId)
-      .catch((e) => this.logger.warn(`eLogo platform satış faturası tetik hatası ${orderId}: ${e?.message}`));
+      .catch((e) =>
+        this.logger.warn(
+          `eLogo platform satış faturası tetik hatası ${orderId}: ${e?.message}`,
+        ),
+      );
 
     return await this.orderCommon.formatOrderResponse(updatedOrder, buyerId);
   }
@@ -718,23 +862,39 @@ export class OrderLifecycleService {
   async emitDeliveryRevenueInvoices(orderId: string): Promise<void> {
     await this.commissionLedger
       .markEarned(orderId, this.prisma)
-      .catch((e: any) => this.logger.warn(`teslim markEarned hatası ${orderId}: ${e?.message}`));
+      .catch((e: any) =>
+        this.logger.warn(`teslim markEarned hatası ${orderId}: ${e?.message}`),
+      );
     void this.elogoInvoicing
       .issueCommissionInvoice(orderId)
-      .catch((e) => this.logger.warn(`eLogo komisyon (teslim) tetik hatası ${orderId}: ${e?.message}`));
+      .catch((e) =>
+        this.logger.warn(
+          `eLogo komisyon (teslim) tetik hatası ${orderId}: ${e?.message}`,
+        ),
+      );
     void this.elogoInvoicing
       .issueServiceFeeInvoice(orderId)
-      .catch((e) => this.logger.warn(`eLogo hizmet bedeli (teslim) tetik hatası ${orderId}: ${e?.message}`));
+      .catch((e) =>
+        this.logger.warn(
+          `eLogo hizmet bedeli (teslim) tetik hatası ${orderId}: ${e?.message}`,
+        ),
+      );
     void this.elogoInvoicing
       .issuePlatformSaleInvoice(orderId)
-      .catch((e) => this.logger.warn(`eLogo platform satış (teslim) tetik hatası ${orderId}: ${e?.message}`));
+      .catch((e) =>
+        this.logger.warn(
+          `eLogo platform satış (teslim) tetik hatası ${orderId}: ${e?.message}`,
+        ),
+      );
   }
 
   /**
    * İade penceresi kapanan (teslim + RETURN_WINDOW_DAYS) `delivered` siparişi 'tamamlandı'ya geçirir.
    * Fatura zaten teslimde kesildi; bu yalnız yaşam döngüsü kapanışı (status). Açık iade varsa cron atlar.
    */
-  async autoCompleteDeliveredOrder(orderId: string): Promise<{ completed: boolean }> {
+  async autoCompleteDeliveredOrder(
+    orderId: string,
+  ): Promise<{ completed: boolean }> {
     const updated = await this.prisma.order.updateMany({
       where: { id: orderId, status: OrderStatus.delivered },
       data: { status: OrderStatus.completed, completedAt: new Date() },
@@ -742,7 +902,9 @@ export class OrderLifecycleService {
     if (updated.count === 0) return { completed: false };
     // Emniyet: teslimde kesilmemişse burada da tetikle (idempotent).
     await this.emitDeliveryRevenueInvoices(orderId);
-    this.logger.log(`Order ${orderId} auto-completed (iade penceresi kapandı: teslim + returnWindow)`);
+    this.logger.log(
+      `Order ${orderId} auto-completed (iade penceresi kapandı: teslim + returnWindow)`,
+    );
     return { completed: true };
   }
 }

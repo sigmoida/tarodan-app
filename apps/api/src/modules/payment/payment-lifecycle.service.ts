@@ -13,6 +13,7 @@ import { EventService } from "../events";
 import { Request } from "express";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
+import { i18nMessage } from "../i18n";
 
 @Injectable()
 export class PaymentLifecycleService {
@@ -46,25 +47,29 @@ export class PaymentLifecycleService {
     });
 
     if (!payment) {
-      throw new NotFoundException("Ödeme bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.payment.paymentNotFound"),
+      );
     }
 
     // Grup ödemesi retry'ı initiate üzerinden yapılır (payment satırı yeniden kullanılır)
     if (!payment.order) {
       throw new BadRequestException(
-        "Bu ödeme bir sipariş grubuna ait. Lütfen ödemeyi sipariş grubuyla yeniden başlatın.",
+        i18nMessage("server.payment.paymentBelongsToGroupRestart"),
       );
     }
 
     // Verify user owns the order
     if (payment.order.buyerId !== userId && payment.order.sellerId !== userId) {
-      throw new ForbiddenException("Bu ödemeyi tekrar deneme yetkiniz yok");
+      throw new ForbiddenException(
+        i18nMessage("server.payment.retryForbidden"),
+      );
     }
 
     // Only allow retrying failed payments
     if (payment.status !== PaymentStatus.failed) {
       throw new BadRequestException(
-        "Sadece başarısız ödemeler tekrar denenebilir",
+        i18nMessage("server.payment.onlyFailedPaymentsRetryable"),
       );
     }
 
@@ -78,7 +83,7 @@ export class PaymentLifecycleService {
       });
       if (!product || product.status !== ProductStatus.active) {
         throw new BadRequestException(
-          "Ürün artık satışta değil veya başka alıcıya satıldı. Lütfen ilanlar sayfasından tekrar sipariş oluşturun.",
+          i18nMessage("server.payment.productNoLongerAvailable"),
         );
       }
       await this.prisma.$transaction([
@@ -102,7 +107,7 @@ export class PaymentLifecycleService {
       });
     } else if (order.status !== OrderStatus.pending_payment) {
       throw new BadRequestException(
-        "Sipariş durumu ödeme tekrarına uygun değil",
+        i18nMessage("server.payment.orderStatusNotRetryable"),
       );
     }
 
@@ -182,7 +187,9 @@ export class PaymentLifecycleService {
     });
 
     if (!payment) {
-      throw new NotFoundException("Ödeme bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.payment.paymentNotFound"),
+      );
     }
 
     // Grup ödemesi: erişim grup üzerinden doğrulanır, tüm siparişler bırakılır
@@ -192,11 +199,13 @@ export class PaymentLifecycleService {
         select: { buyerId: true },
       });
       if (!group || group.buyerId !== userId) {
-        throw new ForbiddenException("Bu ödemeyi iptal etme yetkiniz yok");
+        throw new ForbiddenException(
+          i18nMessage("server.payment.cancelPaymentForbidden"),
+        );
       }
       if (payment.status !== PaymentStatus.pending) {
         throw new BadRequestException(
-          "Sadece bekleyen ödemeler iptal edilebilir",
+          i18nMessage("server.payment.onlyPendingPaymentsCancelable"),
         );
       }
       await this.paymentFulfillment.processFailedPayment(
@@ -207,19 +216,20 @@ export class PaymentLifecycleService {
       return {
         success: true,
         paymentId: payment.id,
-        message: "Ödeme başarıyla iptal edildi",
       };
     }
 
     // Verify user owns the order
     if (payment.order.buyerId !== userId && payment.order.sellerId !== userId) {
-      throw new ForbiddenException("Bu ödemeyi iptal etme yetkiniz yok");
+      throw new ForbiddenException(
+        i18nMessage("server.payment.cancelPaymentForbidden"),
+      );
     }
 
     // Only allow canceling pending payments
     if (payment.status !== PaymentStatus.pending) {
       throw new BadRequestException(
-        "Sadece bekleyen ödemeler iptal edilebilir",
+        i18nMessage("server.payment.onlyPendingPaymentsCancelable"),
       );
     }
 
@@ -278,7 +288,6 @@ export class PaymentLifecycleService {
     return {
       success: true,
       paymentId: payment.id,
-      message: "Ödeme başarıyla iptal edildi",
     };
   }
 

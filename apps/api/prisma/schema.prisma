@@ -33,6 +33,7 @@ model User {
   bannedReason            String?                  @map("banned_reason")
   isBanned                Boolean                  @default(false) @map("is_banned")
   acceptsMarketingEmails  Boolean                  @default(false) @map("accepts_marketing_emails")
+  preferredLanguage       String?                  @map("preferred_language")
   notificationSettings    Json?                    @map("notification_settings")
   lastActivityAt          DateTime?                @map("last_activity_at")
   lastLoginAt             DateTime?                @map("last_login_at")

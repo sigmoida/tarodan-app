@@ -6,6 +6,7 @@ import { Request } from "express";
 import { JwtPayload, RequestUser } from "../interfaces";
 import { PrismaService } from "../../../prisma";
 import { COOKIE_NAMES, readCookie } from "../utils/auth-cookies";
+import { i18nMessage } from "../../i18n";
 
 @Injectable()
 export class AdminJwtStrategy extends PassportStrategy(Strategy, "admin-jwt") {
@@ -27,7 +28,9 @@ export class AdminJwtStrategy extends PassportStrategy(Strategy, "admin-jwt") {
   async validate(payload: JwtPayload): Promise<RequestUser> {
     // Verify it's an access token and is admin
     if (payload.type !== "access" || !payload.isAdmin) {
-      throw new UnauthorizedException("Geçersiz admin token");
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.invalidAdminToken"),
+      );
     }
 
     // Check if admin user exists and is active – select only User columns that exist in DB
@@ -50,7 +53,7 @@ export class AdminJwtStrategy extends PassportStrategy(Strategy, "admin-jwt") {
 
     if (!adminUser || !adminUser.user) {
       throw new UnauthorizedException(
-        "Admin kullanıcı bulunamadı veya deaktif",
+        i18nMessage("server.auth.adminUserNotFoundOrInactive"),
       );
     }
 

@@ -21,6 +21,7 @@ import { NotificationService } from "../notification/notification.service";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
 import { StorageService } from "../storage/storage.service";
+import { I18nService } from "../i18n";
 import { PaymentStatus } from "@prisma/client";
 
 /**
@@ -64,6 +65,7 @@ describe("PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
         PaymentCallbackService,
         PaymentFulfillmentService,
         PaymentLifecycleService,
+        I18nService,
         {
           provide: ElogoInvoicingService,
           useValue: {
@@ -193,6 +195,8 @@ describe("PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
 
     await expect(
       service.refundTradeCashPaymentIfCompleted(TRADE_ID),
-    ).rejects.toThrow(/1-2 dakika/);
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.payment.paymentNotYetSynced" },
+    });
   });
 });

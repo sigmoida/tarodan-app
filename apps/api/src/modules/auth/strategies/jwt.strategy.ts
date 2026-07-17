@@ -1,14 +1,15 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { PassportStrategy } from '@nestjs/passport';
-import { ExtractJwt, Strategy } from 'passport-jwt';
-import { Request } from 'express';
-import { JwtPayload, RequestUser } from '../interfaces';
-import { PrismaService } from '../../../prisma';
-import { COOKIE_NAMES, readCookie } from '../utils/auth-cookies';
+import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { PassportStrategy } from "@nestjs/passport";
+import { ExtractJwt, Strategy } from "passport-jwt";
+import { Request } from "express";
+import { JwtPayload, RequestUser } from "../interfaces";
+import { PrismaService } from "../../../prisma";
+import { COOKIE_NAMES, readCookie } from "../utils/auth-cookies";
+import { i18nMessage } from "../../i18n";
 
 @Injectable()
-export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
+export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
@@ -20,14 +21,16 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         ExtractJwt.fromAuthHeaderAsBearerToken(),
       ]),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('JWT_SECRET'),
+      secretOrKey: configService.get<string>("JWT_SECRET"),
     });
   }
 
   async validate(payload: JwtPayload): Promise<RequestUser> {
     // Verify it's an access token
-    if (payload.type !== 'access') {
-      throw new UnauthorizedException('Geçersiz token tipi');
+    if (payload.type !== "access") {
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.invalidTokenType"),
+      );
     }
 
     // Check if user still exists and is active
@@ -37,12 +40,14 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Kullanıcı bulunamadı');
+      throw new UnauthorizedException(i18nMessage("server.auth.userNotFound"));
     }
 
     // Silinmiş (anonimleştirilmiş) hesap: satır FK'lar için korunur ama erişim reddedilir.
     if (user.deletedAt) {
-      throw new UnauthorizedException('Hesap silinmiş');
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.accountDeleted"),
+      );
     }
 
     return {
@@ -51,6 +56,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       isSeller: user.isSeller,
       isAdmin: !!user.adminUser?.isActive,
       role: user.adminUser?.role,
+      preferredLanguage: user.preferredLanguage,
     };
   }
 }
