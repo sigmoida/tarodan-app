@@ -21,7 +21,9 @@
     "paths": {
       "@/*": ["src/*"],
       "@tarodan/types": ["../../packages/types/src"],
-      "@tarodan/types/*": ["../../packages/types/src/*"]
+      "@tarodan/types/*": ["../../packages/types/src/*"],
+      "@tarodan/logger": ["../../packages/logger/src"],
+      "@tarodan/logger/*": ["../../packages/logger/src/*"]
     }
   },
   "include": ["src/**/*", "prisma/**/*"],

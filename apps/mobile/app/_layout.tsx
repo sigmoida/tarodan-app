@@ -18,9 +18,9 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const { colors } = theme;
 
-// Initialize Sentry as early as possible. Currently a stub (no-op until
-// `@sentry/react-native` is installed and SENTRY_PACKAGE_LOADED is flipped
-// to true in services/sentry.ts). Calling here ensures the wiring exists.
+// Initialize Sentry as early as possible. No-ops in Expo Go or when
+// EXPO_PUBLIC_SENTRY_DSN is unset (see services/sentry.ts guard); real
+// reporting requires a dev/production build with a DSN configured.
 initSentry();
 
 // Conditionally import notifications - only in development builds, not Expo Go

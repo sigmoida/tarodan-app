@@ -1,31 +1,11 @@
 /**
- * Sentry sarmalayıcısı (mobil).
- *
- * Tasarım kararı: `@sentry/react-native` native module — Expo Go'da
- * yüklenemez. Bu modül "stub" olarak yazıldı: paket eklenmediği sürece
- * tüm Sentry çağrıları no-op'tur, geliştirici ortamı bozulmaz.
- *
- * Üretim paketleme zamanında yapılacak değişiklik:
- *   1. `npx expo install @sentry/react-native`
- *   2. `app.json`'a plugin: ["@sentry/react-native/expo"]
- *   3. Aşağıdaki SENTRY_PACKAGE_LOADED bayrağını true yap ve içindeki
- *      `// import * as Sentry from '@sentry/react-native'` satırını
- *      uncomment et.
- *   4. EXPO_PUBLIC_SENTRY_DSN env'i ekle.
- *
- * Hiçbir çağıran kod (App.tsx, error boundary, manuel captureException
- * çağrıları) o gün değiştirilmez — bu modül arkadan çalışır.
+ * Sentry sarmalayıcısı (mobil) — gerçek @sentry/react-native.
+ * Expo Go'da native module yüklenemez; runtime guard ile no-op kalır.
+ * DSN yoksa da no-op.
  */
-
 import Constants from 'expo-constants';
+import * as Sentry from '@sentry/react-native';
 
-// ─── Aktivasyon bayrağı ──────────────────────────────────────────────
-// Paketleme zamanında: SENTRY_PACKAGE_LOADED = true + alttaki import açılır.
-const SENTRY_PACKAGE_LOADED = false;
-
-// import * as Sentry from '@sentry/react-native';   // ← paketleme zamanında uncomment
-
-// ─── Tipler (gerçek paketin sağladıklarına yakın) ────────────────────
 export type SeverityLevel = 'fatal' | 'error' | 'warning' | 'info' | 'debug';
 
 export interface SentryUser {
@@ -41,74 +21,82 @@ interface CaptureOptions {
   user?: SentryUser;
 }
 
-// ─── Çalışma zamanı durumu ───────────────────────────────────────────
 const isExpoGo = Constants.executionEnvironment === 'storeClient';
 const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
-const enabled = SENTRY_PACKAGE_LOADED && !isExpoGo && Boolean(dsn);
+const enabled = !isExpoGo && Boolean(dsn);
 
 let initialized = false;
 
 /**
- * Uygulama açılışında bir kere çağrılır (App.tsx içinden).
- * Expo Go'da, DSN yoksa veya paket yüklü değilse no-op.
+ * Uygulama açılışında bir kere çağrılır (App.tsx / _layout.tsx içinden).
+ * Expo Go'da veya DSN yoksa no-op.
  */
 export function initSentry(): void {
   if (!enabled || initialized) return;
   initialized = true;
-  // Paketleme zamanında uncomment:
-  // Sentry.init({
-  //   dsn,
-  //   environment: process.env.EXPO_PUBLIC_ENVIRONMENT ?? 'development',
-  //   tracesSampleRate: 0.1,
-  //   enableNative: true,
-  // });
-  console.log('[sentry] initialized (stub)');
+  Sentry.init({
+    dsn,
+    environment: process.env.EXPO_PUBLIC_ENVIRONMENT ?? 'development',
+    tracesSampleRate: 0.1,
+    enableNative: true,
+  });
 }
 
 /**
  * Yakalanmış bir exception'ı Sentry'ye gönderir.
  * Hiçbir şart sağlanmazsa konsola yazar, hata fırlatmaz.
  */
-export function captureException(
-  error: unknown,
-  options: CaptureOptions = {},
-): void {
+export function captureException(error: unknown, options: CaptureOptions = {}): void {
   if (!enabled) {
-    if (__DEV__) console.warn('[sentry stub] captureException:', error, options);
+    if (__DEV__) console.warn('[sentry] captureException (disabled):', error, options);
     return;
   }
-  // Paketleme zamanında uncomment:
-  // Sentry.withScope((scope) => {
-  //   if (options.level) scope.setLevel(options.level);
-  //   if (options.tags) Object.entries(options.tags).forEach(([k, v]) => scope.setTag(k, v));
-  //   if (options.extra) Object.entries(options.extra).forEach(([k, v]) => scope.setExtra(k, v));
-  //   if (options.user) scope.setUser(options.user);
-  //   Sentry.captureException(error);
-  // });
+  Sentry.withScope((scope) => {
+    if (options.level) scope.setLevel(options.level);
+    if (options.tags) Object.entries(options.tags).forEach(([k, v]) => scope.setTag(k, v));
+    if (options.extra) Object.entries(options.extra).forEach(([k, v]) => scope.setExtra(k, v));
+    if (options.user) scope.setUser(options.user);
+    Sentry.captureException(error);
+  });
 }
 
 export function captureMessage(message: string, level: SeverityLevel = 'info'): void {
   if (!enabled) {
-    if (__DEV__) console.log('[sentry stub] captureMessage:', message, level);
+    if (__DEV__) console.log('[sentry] captureMessage (disabled):', message, level);
     return;
   }
-  // Sentry.captureMessage(message, level);
+  Sentry.captureMessage(message, level);
 }
 
 export function setUser(user: SentryUser | null): void {
   if (!enabled) return;
-  // Sentry.setUser(user);
+  Sentry.setUser(user);
+}
+
+/**
+ * Gerçek bir Sentry breadcrumb ekler (Sentry.addBreadcrumb) — captureMessage'ın
+ * aksine tam bir event GÖNDERMEZ, sadece bir sonraki hataya iliştirilecek iz
+ * bırakır. debug/info/warn log seviyeleri buraya akmalı, captureMessage'a değil.
+ */
+export function addBreadcrumb(breadcrumb: {
+  category?: string;
+  message: string;
+  level?: SeverityLevel;
+  data?: Record<string, unknown>;
+}): void {
+  if (!enabled) return;
+  Sentry.addBreadcrumb(breadcrumb);
 }
 
 /**
  * Performans iz kaydı: bir async işlemi sar, ne kadar sürdüğü Sentry'ye
- * raporlanır. Şu an stub — paketleme zamanında transaction wrap eder.
+ * raporlanır. Guard kapalıyken sadece fn'i çalıştırır.
  */
 export async function withTransaction<T>(
-  _name: string,
-  _op: string,
+  name: string,
+  op: string,
   fn: () => Promise<T>,
 ): Promise<T> {
-  // Paketleme zamanında: Sentry.startTransaction({ name, op }) ile sar.
-  return fn();
+  if (!enabled) return fn();
+  return Sentry.startSpan({ name, op }, () => fn());
 }

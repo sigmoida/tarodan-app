@@ -2,8 +2,8 @@
 
 import Image, { ImageProps } from 'next/image';
 import { useState, useCallback, useEffect } from 'react';
-import * as Sentry from '@sentry/nextjs';
 import { colors as dsColors } from '@tarodan/ui';
+import { logger } from '@/lib/logger';
 
 // Default placeholder for broken images (data URL avoids external SSL / ERR_CERT_AUTHORITY_INVALID)
 const DEFAULT_PLACEHOLDER =
@@ -123,21 +123,10 @@ export default function OptimizedImage({
     }
 
     // Production & Development: Log to Sentry
-    Sentry.captureMessage('Image load failed', {
-      level: 'warning',
-      tags: {
-        component: 'OptimizedImage',
-        errorType: 'image_load_failure',
-      },
-      extra: errorDetails,
-    });
-
-    // Track metrics for monitoring
-    Sentry.addBreadcrumb({
-      category: 'image',
-      message: `Image failed: ${typeof src === 'string' ? src : 'StaticImport'}`,
-      level: 'warning',
-      data: errorDetails,
+    logger.warn('Image load failed', {
+      component: 'OptimizedImage',
+      errorType: 'image_load_failure',
+      ...errorDetails,
     });
 
     // Switch to fallback
@@ -227,13 +216,8 @@ export function logImagePerformance(
   }
 
   // Track in Sentry for performance monitoring
-  Sentry.addBreadcrumb({
-    category: 'performance',
-    message: `Image loaded: ${imageSrc}`,
-    level: 'info',
-    data: {
-      loadTimeMs: loadTime,
-      ...context,
-    },
+  logger.info(`Image loaded: ${imageSrc}`, {
+    loadTimeMs: loadTime,
+    ...context,
   });
 }
