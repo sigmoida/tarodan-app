@@ -19,6 +19,7 @@
     "@tarodan/auth": "workspace:*",
     "@tarodan/design-tokens": "workspace:*",
     "@tarodan/i18n": "workspace:*",
+    "@tarodan/logger": "workspace:*",
     "@tarodan/ui": "workspace:*",
     "axios": "^1.18.1",
     "chart.js": "^4.4.1",

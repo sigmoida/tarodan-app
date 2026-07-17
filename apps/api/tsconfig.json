@@ -24,7 +24,9 @@
       "@tarodan/i18n": ["../../packages/i18n/src"],
       "@tarodan/i18n/*": ["../../packages/i18n/src/*"],
       "@tarodan/types": ["../../packages/types/src"],
-      "@tarodan/types/*": ["../../packages/types/src/*"]
+      "@tarodan/types/*": ["../../packages/types/src/*"],
+      "@tarodan/logger": ["../../packages/logger/src"],
+      "@tarodan/logger/*": ["../../packages/logger/src/*"]
     }
   },
   "include": ["src/**/*", "prisma/**/*"],
