@@ -4,14 +4,14 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
 import {
   TicketCategory,
   TicketPriority,
   TicketStatus,
   Prisma,
-} from '@prisma/client';
+} from "@prisma/client";
 import {
   CreateTicketDto,
   AddTicketMessageDto,
@@ -22,9 +22,9 @@ import {
   TicketStatsDto,
   GuestContactDto,
   GuestContactResponseDto,
-} from './dto';
-import { CacheService } from '../cache/cache.service';
-import { NotificationService } from '../notification/notification.service';
+} from "./dto";
+import { CacheService } from "../cache/cache.service";
+import { NotificationService } from "../notification/notification.service";
 
 @Injectable()
 export class SupportService {
@@ -71,18 +71,18 @@ export class SupportService {
 
     try {
       // Generate a reference number for the guest contact
-      const referenceNumber = this.generateTicketNumber().replace('TKT', 'GC');
-      
+      const referenceNumber = this.generateTicketNumber().replace("TKT", "GC");
+
       // Store guest contact in Redis with 30 day TTL
       const guestContactData = {
         referenceNumber,
         name: dto.name,
         email: dto.email,
-        subject: dto.subject || 'İletişim Formu',
+        subject: dto.subject || "İletişim Formu",
         message: dto.message,
         clientIp,
         createdAt: new Date().toISOString(),
-        status: 'pending',
+        status: "pending",
       };
 
       // Store in Redis for admin review
@@ -92,8 +92,9 @@ export class SupportService {
       });
 
       // Add to guest contacts list
-      const listKey = 'guest_contacts:list';
-      const existingList = await this.cacheService.get<string[]>(listKey) || [];
+      const listKey = "guest_contacts:list";
+      const existingList =
+        (await this.cacheService.get<string[]>(listKey)) || [];
       existingList.unshift(referenceNumber);
       // Keep only last 1000 entries
       const trimmedList = existingList.slice(0, 1000);
@@ -124,13 +125,13 @@ export class SupportService {
       return {
         success: true,
         message:
-          'Mesajınız başarıyla alındı. En kısa sürede size dönüş yapacağız.',
+          "Mesajınız başarıyla alındı. En kısa sürede size dönüş yapacağız.",
         ticketNumber: referenceNumber,
       };
     } catch (error) {
-      this.logger.error('Guest contact form error:', error);
+      this.logger.error("Guest contact form error:", error);
       throw new BadRequestException(
-        'Mesajınız gönderilemedi. Lütfen daha sonra tekrar deneyin.',
+        "Mesajınız gönderilemedi. Lütfen daha sonra tekrar deneyin.",
       );
     }
   }
@@ -138,20 +139,67 @@ export class SupportService {
   // ==========================================================================
   // ADMIN: GET GUEST CONTACTS
   // ==========================================================================
-  async getGuestContacts(): Promise<any[]> {
-    const listKey = 'guest_contacts:list';
-    const referenceNumbers = await this.cacheService.get<string[]>(listKey) || [];
-    
-    const contacts = [];
-    for (const refNum of referenceNumbers.slice(0, 100)) {
-      const contactKey = `guest_contact:submission:${refNum}`;
-      const contact = await this.cacheService.get(contactKey);
-      if (contact) {
-        contacts.push(contact);
-      }
+  /**
+   * #101 faz-2: server pagination for the cache-backed guest-contacts list.
+   *
+   * The store is Redis (a `guest_contacts:list` array of reference numbers, one
+   * `guest_contact:submission:<ref>` object each), not Prisma — so there is no DB
+   * query to paginate/search. Two paths:
+   * - **No search:** slice the reference list by page/limit and hydrate ONLY the
+   *   current page's objects. This is the real win — it replaces the old
+   *   fetch-first-100-then-slice-client-side with true server pagination.
+   * - **Search:** the searchable fields (name/email/subject) live inside the
+   *   objects, not the reference key, so we hydrate the list and filter in-memory,
+   *   then paginate. Bounded by the guest-contact volume (contact-form submissions).
+   */
+  async getGuestContacts(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }): Promise<{
+    data: any[];
+    meta: { total: number; page: number; limit: number; totalPages: number };
+  }> {
+    const { page = 1, limit = 20, search } = params ?? {};
+    const listKey = "guest_contacts:list";
+    const referenceNumbers =
+      (await this.cacheService.get<string[]>(listKey)) || [];
+
+    const hydrate = (refs: string[]) =>
+      Promise.all(
+        refs.map((refNum) =>
+          this.cacheService.get<any>(`guest_contact:submission:${refNum}`),
+        ),
+      ).then((list) => list.filter(Boolean) as any[]);
+
+    const meta = (total: number) => ({
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    });
+
+    if (search) {
+      const q = search.toLowerCase();
+      const all = await hydrate(referenceNumbers);
+      const filtered = all.filter((c) =>
+        [c?.referenceNumber, c?.name, c?.email, c?.subject].some((f) =>
+          String(f ?? "")
+            .toLowerCase()
+            .includes(q),
+        ),
+      );
+      const start = (page - 1) * limit;
+      return {
+        data: filtered.slice(start, start + limit),
+        meta: meta(filtered.length),
+      };
     }
-    
-    return contacts;
+
+    const start = (page - 1) * limit;
+    const pageRefs = referenceNumbers.slice(start, start + limit);
+    const data = await hydrate(pageRefs);
+    return { data, meta: meta(referenceNumbers.length) };
   }
 
   // ==========================================================================
@@ -205,7 +253,7 @@ export class SupportService {
           include: {
             sender: { select: { id: true, displayName: true } },
           },
-          orderBy: { createdAt: 'asc' },
+          orderBy: { createdAt: "asc" },
           // Hide internal messages from non-admins
           where: isAdmin ? {} : { isInternal: false },
         },
@@ -214,12 +262,12 @@ export class SupportService {
     });
 
     if (!ticket) {
-      throw new NotFoundException('Destek talebi bulunamadı');
+      throw new NotFoundException("Destek talebi bulunamadı");
     }
 
     // Only creator or admin can view
     if (!isAdmin && ticket.creatorId !== userId) {
-      throw new ForbiddenException('Bu talebi görüntüleme yetkiniz yok');
+      throw new ForbiddenException("Bu talebi görüntüleme yetkiniz yok");
     }
 
     return this.mapTicketToDto(ticket);
@@ -237,7 +285,7 @@ export class SupportService {
     // Ensure valid pagination values
     const safePage = Math.max(1, Number(page) || 1);
     const safePageSize = Math.min(100, Math.max(1, Number(pageSize) || 20));
-    
+
     const where: Prisma.SupportTicketWhereInput = {
       creatorId: userId,
       ...(status && { status }),
@@ -251,7 +299,7 @@ export class SupportService {
           assignee: { select: { id: true, displayName: true } },
           _count: { select: { messages: true } },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip: (safePage - 1) * safePageSize,
         take: safePageSize,
       }),
@@ -280,17 +328,17 @@ export class SupportService {
     });
 
     if (!ticket) {
-      throw new NotFoundException('Destek talebi bulunamadı');
+      throw new NotFoundException("Destek talebi bulunamadı");
     }
 
     // Only creator or admin can add messages
     if (!isAdmin && ticket.creatorId !== userId) {
-      throw new ForbiddenException('Bu talebe mesaj ekleme yetkiniz yok');
+      throw new ForbiddenException("Bu talebe mesaj ekleme yetkiniz yok");
     }
 
     // Closed tickets cannot receive messages
     if (ticket.status === TicketStatus.closed) {
-      throw new BadRequestException('Kapatılmış taleplere mesaj eklenemez');
+      throw new BadRequestException("Kapatılmış taleplere mesaj eklenemez");
     }
 
     // Create message
@@ -309,7 +357,10 @@ export class SupportService {
       ? TicketStatus.waiting_customer
       : TicketStatus.in_progress;
 
-    if (ticket.status !== TicketStatus.resolved && (ticket.status as string) !== 'closed') {
+    if (
+      ticket.status !== TicketStatus.resolved &&
+      (ticket.status as string) !== "closed"
+    ) {
       await this.prisma.supportTicket.update({
         where: { id: ticketId },
         data: { status: newStatus },
@@ -333,7 +384,7 @@ export class SupportService {
     // Ensure valid pagination values
     const safePage = Math.max(1, Number(page) || 1);
     const safePageSize = Math.min(100, Math.max(1, Number(pageSize) || 20));
-    
+
     const where: Prisma.SupportTicketWhereInput = {
       ...(status && { status }),
       ...(priority && { priority }),
@@ -349,10 +400,7 @@ export class SupportService {
           assignee: { select: { id: true, displayName: true } },
           _count: { select: { messages: true } },
         },
-        orderBy: [
-          { createdAt: 'desc' },
-          { priority: 'desc' },
-        ],
+        orderBy: [{ createdAt: "desc" }, { priority: "desc" }],
         skip: (safePage - 1) * safePageSize,
         take: safePageSize,
       }),
@@ -380,7 +428,7 @@ export class SupportService {
     });
 
     if (!ticket) {
-      throw new NotFoundException('Destek talebi bulunamadı');
+      throw new NotFoundException("Destek talebi bulunamadı");
     }
 
     const updateData: Prisma.SupportTicketUpdateInput = {
@@ -428,7 +476,7 @@ export class SupportService {
     });
 
     if (!ticket) {
-      throw new NotFoundException('Destek talebi bulunamadı');
+      throw new NotFoundException("Destek talebi bulunamadı");
     }
 
     await this.prisma.supportTicket.update({
@@ -451,7 +499,7 @@ export class SupportService {
     });
 
     if (!ticket) {
-      throw new NotFoundException('Destek talebi bulunamadı');
+      throw new NotFoundException("Destek talebi bulunamadı");
     }
 
     await this.prisma.supportTicket.update({
@@ -477,10 +525,18 @@ export class SupportService {
     ] = await Promise.all([
       this.prisma.supportTicket.count(),
       this.prisma.supportTicket.count({ where: { status: TicketStatus.open } }),
-      this.prisma.supportTicket.count({ where: { status: TicketStatus.in_progress } }),
-      this.prisma.supportTicket.count({ where: { status: TicketStatus.waiting_customer } }),
-      this.prisma.supportTicket.count({ where: { status: TicketStatus.resolved } }),
-      this.prisma.supportTicket.count({ where: { status: TicketStatus.closed } }),
+      this.prisma.supportTicket.count({
+        where: { status: TicketStatus.in_progress },
+      }),
+      this.prisma.supportTicket.count({
+        where: { status: TicketStatus.waiting_customer },
+      }),
+      this.prisma.supportTicket.count({
+        where: { status: TicketStatus.resolved },
+      }),
+      this.prisma.supportTicket.count({
+        where: { status: TicketStatus.closed },
+      }),
       this.prisma.supportTicket.findMany({
         where: { resolvedAt: { not: null } },
         select: { createdAt: true, resolvedAt: true },
@@ -518,7 +574,7 @@ export class SupportService {
       id: ticket.id,
       ticketNumber: ticket.ticketNumber,
       creatorId: ticket.creatorId,
-      creatorName: ticket.creator?.displayName || '',
+      creatorName: ticket.creator?.displayName || "",
       assigneeId: ticket.assigneeId || undefined,
       assigneeName: ticket.assignee?.displayName || undefined,
       category: ticket.category,
@@ -530,7 +586,7 @@ export class SupportService {
       messages: ticket.messages?.map((m: any) => ({
         id: m.id,
         senderId: m.senderId,
-        senderName: m.sender?.displayName || '',
+        senderName: m.sender?.displayName || "",
         content: m.content,
         isInternal: m.isInternal,
         attachments: m.attachments,
