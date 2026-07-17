@@ -7,19 +7,22 @@ import {
   ChartBarIcon,
   ArrowTrendingUpIcon,
 } from '@heroicons/react/24/outline';
+import { useTranslations } from 'next-intl';
 import { MetricCard } from '@/components/MetricCard';
 import { SectionCard } from '@/components/detail/SectionCard';
 import { chartPalette, chartOptions } from '../_lib/charts';
-import { ORDER_STATUS_LABELS } from '../_lib/types';
+import { getOrderStatusLabels } from '../_lib/types';
 
 export function SalesTab({ report }: { report: any }) {
+  const t = useTranslations();
+  const orderStatusLabels = getOrderStatusLabels(t);
   const labels = report.dailyData?.map((d: any) => d.date.slice(5)) || [];
 
   const salesChartData = {
     labels,
     datasets: [
       {
-        label: 'Satışlar (₺)',
+        label: t('admin.analytics.sales.salesLabel'),
         data: report.dailyData?.map((d: any) => d.revenue) || [],
         borderColor: chartPalette.primary,
         backgroundColor: chartPalette.primaryLight,
@@ -33,7 +36,7 @@ export function SalesTab({ report }: { report: any }) {
     labels,
     datasets: [
       {
-        label: 'Siparişler',
+        label: t('admin.analytics.sales.ordersLabel'),
         data: report.dailyData?.map((d: any) => d.orders) || [],
         backgroundColor: chartPalette.info,
         borderRadius: 4,
@@ -47,49 +50,49 @@ export function SalesTab({ report }: { report: any }) {
         <MetricCard
           icon={ShoppingBagIcon}
           tone="info"
-          label="Toplam Sipariş"
+          label={t('admin.analytics.sales.totalOrders')}
           value={report.totalOrders?.toLocaleString() ?? 0}
         />
         <MetricCard
           icon={CurrencyDollarIcon}
           tone="success"
-          label="Toplam Gelir"
+          label={t('admin.analytics.sales.totalRevenue')}
           value={`₺${report.totalRevenue?.toLocaleString() ?? 0}`}
         />
         <MetricCard
           icon={ChartBarIcon}
           tone="primary"
-          label="Komisyon Geliri"
+          label={t('admin.analytics.sales.commissionRevenue')}
           value={`₺${report.totalCommission?.toLocaleString() ?? 0}`}
         />
         <MetricCard
           icon={ArrowTrendingUpIcon}
           tone="primary"
-          label="Ort. Sipariş Tutarı"
+          label={t('admin.analytics.sales.avgOrderValue')}
           value={`₺${report.averageOrderValue?.toFixed(2) ?? 0}`}
         />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <SectionCard title="Gelir Grafiği">
+        <SectionCard title={t('admin.analytics.sales.revenueChartTitle')}>
           <div className="h-80">
             <Line data={salesChartData} options={chartOptions} />
           </div>
         </SectionCard>
-        <SectionCard title="Sipariş Sayısı">
+        <SectionCard title={t('admin.analytics.sales.orderCountTitle')}>
           <div className="h-80">
             <Bar data={ordersChartData} options={chartOptions} />
           </div>
         </SectionCard>
       </div>
 
-      <SectionCard title="Sipariş Durumu Dağılımı">
+      <SectionCard title={t('admin.analytics.sales.statusDistributionTitle')}>
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           {Object.entries(report.ordersByStatus || {}).map(([status, count]) => (
             <div key={status} className="rounded-lg bg-surface-alt p-4 text-center">
               <p className="text-2xl font-bold text-heading">{String(count)}</p>
               <p className="text-sm text-muted">
-                {ORDER_STATUS_LABELS[status] ?? status}
+                {orderStatusLabels[status] ?? status}
               </p>
             </div>
           ))}

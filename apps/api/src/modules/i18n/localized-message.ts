@@ -13,7 +13,7 @@
 // and additionally exposes `i18nKey` for clients that want to re-render.
 // =============================================================================
 
-import { type MessageKey, type MessageValues } from '@tarodan/i18n';
+import { type MessageKey, type MessageValues } from "@tarodan/i18n";
 
 export interface LocalizedMessagePayload {
   i18nKey: MessageKey;
@@ -25,14 +25,18 @@ export function i18nMessage(
   key: MessageKey,
   params?: MessageValues,
 ): LocalizedMessagePayload {
-  return params === undefined ? { i18nKey: key } : { i18nKey: key, i18nParams: params };
+  return params === undefined
+    ? { i18nKey: key }
+    : { i18nKey: key, i18nParams: params };
 }
 
 /** Narrow an arbitrary exception response payload to a localized-message payload. */
-export function isLocalizedMessage(value: unknown): value is LocalizedMessagePayload {
+export function isLocalizedMessage(
+  value: unknown,
+): value is LocalizedMessagePayload {
   return (
-    typeof value === 'object' &&
+    typeof value === "object" &&
     value !== null &&
-    typeof (value as LocalizedMessagePayload).i18nKey === 'string'
+    typeof (value as LocalizedMessagePayload).i18nKey === "string"
   );
 }

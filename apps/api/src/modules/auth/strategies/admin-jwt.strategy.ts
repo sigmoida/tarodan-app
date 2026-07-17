@@ -28,7 +28,9 @@ export class AdminJwtStrategy extends PassportStrategy(Strategy, "admin-jwt") {
   async validate(payload: JwtPayload): Promise<RequestUser> {
     // Verify it's an access token and is admin
     if (payload.type !== "access" || !payload.isAdmin) {
-      throw new UnauthorizedException(i18nMessage("server.auth.invalidAdminToken"));
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.invalidAdminToken"),
+      );
     }
 
     // Check if admin user exists and is active – select only User columns that exist in DB

@@ -4,7 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-} from '@nestjs/common';
+} from "@nestjs/common";
 import {
   OrderStatus,
   PaymentHoldStatus,
@@ -13,24 +13,27 @@ import {
   RefundReason,
   RefundRequestStatus,
   ShipmentStatus,
-} from '@prisma/client';
-import { PrismaService } from '../../prisma';
-import { generateUniqueReference } from '../../common/helpers/generate-reference';
-import { PaymentService } from '../payment/payment.service';
-import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
-import { normalizeSuratPhone, normalizeSuratLocation } from '../surat-cargo/surat-address.util';
+} from "@prisma/client";
+import { PrismaService } from "../../prisma";
+import { generateUniqueReference } from "../../common/helpers/generate-reference";
+import { PaymentService } from "../payment/payment.service";
+import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
+import {
+  normalizeSuratPhone,
+  normalizeSuratLocation,
+} from "../surat-cargo/surat-address.util";
 import {
   SuratGonderiSekli,
   SuratKargoTuru,
   SuratOdemeTipi,
   SuratTasimaSekli,
   SuratTeslimSekli,
-} from '../surat-cargo/surat-cargo.types';
-import { CreateRefundRequestDto } from './dto/create-refund-request.dto';
-import { NotificationService } from '../notification/notification.service';
-import { NotificationType } from '../notification/dto/notification.dto';
-import { StorageService } from '../storage/storage.service';
-import { i18nMessage } from '../i18n';
+} from "../surat-cargo/surat-cargo.types";
+import { CreateRefundRequestDto } from "./dto/create-refund-request.dto";
+import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto/notification.dto";
+import { StorageService } from "../storage/storage.service";
+import { i18nMessage } from "../i18n";
 
 const COOLING_OFF_DAYS = 14;
 
@@ -62,7 +65,7 @@ export class RefundService {
     if (!Array.isArray(images)) return [];
     return images
       .map((img: any) =>
-        img?.cardKey ? this.storageService.getPublicAssetUrl(img.cardKey) : '',
+        img?.cardKey ? this.storageService.getPublicAssetUrl(img.cardKey) : "",
       )
       .filter(Boolean);
   }
@@ -109,7 +112,11 @@ export class RefundService {
     data?: Record<string, any>,
   ): Promise<void> {
     try {
-      await this.notificationService.createInAppNotification(userId, type, data);
+      await this.notificationService.createInAppNotification(
+        userId,
+        type,
+        data,
+      );
     } catch (err: any) {
       this.logger.error(
         `Notification ${type} → ${userId} failed: ${err?.message}`,
@@ -124,7 +131,7 @@ export class RefundService {
    */
   private async sendRefundEmail(
     refundRequestId: string,
-    recipient: 'buyer' | 'seller',
+    recipient: "buyer" | "seller",
     templateKey: string,
     extra?: Record<string, any>,
   ): Promise<void> {
@@ -147,17 +154,22 @@ export class RefundService {
         },
       });
       if (!rr) return;
-      const recipientId = recipient === 'buyer' ? rr.requesterId : rr.order?.sellerId;
+      const recipientId =
+        recipient === "buyer" ? rr.requesterId : rr.order?.sellerId;
       if (!recipientId) return;
-      await this.notificationService.sendTemplateEmailToUser(recipientId, templateKey, {
-        buyerName: rr.order?.buyer?.displayName ?? '',
-        sellerName: rr.order?.seller?.displayName ?? '',
-        orderNumber: rr.order?.orderNumber,
-        orderId: rr.orderId,
-        productTitle: rr.order?.product?.title ?? '',
-        refundAmount: Number(rr.amount),
-        ...extra,
-      });
+      await this.notificationService.sendTemplateEmailToUser(
+        recipientId,
+        templateKey,
+        {
+          buyerName: rr.order?.buyer?.displayName ?? "",
+          sellerName: rr.order?.seller?.displayName ?? "",
+          orderNumber: rr.order?.orderNumber,
+          orderId: rr.orderId,
+          productTitle: rr.order?.product?.title ?? "",
+          refundAmount: Number(rr.amount),
+          ...extra,
+        },
+      );
     } catch (err: any) {
       this.logger.error(
         `Refund email ${templateKey} failed for ${refundRequestId}: ${err?.message}`,
@@ -165,7 +177,11 @@ export class RefundService {
     }
   }
 
-  async createRefundRequest(orderId: string, requesterId: string, dto: CreateRefundRequestDto) {
+  async createRefundRequest(
+    orderId: string,
+    requesterId: string,
+    dto: CreateRefundRequestDto,
+  ) {
     // KOŞULSUZ 14 GÜN İADE (Mesafeli Satış cayma hakkı): teslimden sonraki 14 gün
     // içinde sebep belirtmeden (changed_mind dahil) ve kanıt fotoğrafı olmadan iade
     // edilebilir. changed_mind reddi KALDIRILDI; sebep/foto zorunluluğu yalnızca
@@ -180,30 +196,40 @@ export class RefundService {
       },
     });
     if (!order) {
-      throw new NotFoundException(i18nMessage('server.refund.orderNotFound'));
+      throw new NotFoundException(i18nMessage("server.refund.orderNotFound"));
     }
     // Üyelik/dijital siparişler (sanal ürün + platform satıcısı) genel iade akışına girmez;
     // üyeliğin kendi iptal akışı vardır.
-    if (order.orderNumber?.startsWith('MEM-')) {
+    if (order.orderNumber?.startsWith("MEM-")) {
       throw new BadRequestException(
-        i18nMessage('server.refund.membershipOrderNotEligible'),
+        i18nMessage("server.refund.membershipOrderNotEligible"),
       );
     }
     if (order.buyerId !== requesterId) {
-      throw new ForbiddenException(i18nMessage('server.refund.onlyBuyerCanRequest'));
+      throw new ForbiddenException(
+        i18nMessage("server.refund.onlyBuyerCanRequest"),
+      );
     }
 
     if (order.status === OrderStatus.pending_payment) {
       throw new BadRequestException(
-        i18nMessage('server.refund.orderNotPaidYet'),
+        i18nMessage("server.refund.orderNotPaidYet"),
       );
     }
-    if (order.status === OrderStatus.cancelled || order.status === OrderStatus.refunded) {
-      throw new BadRequestException(i18nMessage('server.refund.orderAlreadyCancelledOrRefunded'));
+    if (
+      order.status === OrderStatus.cancelled ||
+      order.status === OrderStatus.refunded
+    ) {
+      throw new BadRequestException(
+        i18nMessage("server.refund.orderAlreadyCancelledOrRefunded"),
+      );
     }
-    const payment = order.payment ?? (order as any).checkoutGroup?.payment ?? null;
+    const payment =
+      order.payment ?? (order as any).checkoutGroup?.payment ?? null;
     if (!payment || payment.status !== PaymentStatus.completed) {
-      throw new BadRequestException(i18nMessage('server.refund.completedPaymentNotFound'));
+      throw new BadRequestException(
+        i18nMessage("server.refund.completedPaymentNotFound"),
+      );
     }
 
     const activeStatuses: RefundRequestStatus[] = [
@@ -215,37 +241,44 @@ export class RefundService {
       RefundRequestStatus.return_delivered,
       RefundRequestStatus.disputed,
     ];
-    const hasActive = order.refundRequests.some((r) => activeStatuses.includes(r.status));
+    const hasActive = order.refundRequests.some((r) =>
+      activeStatuses.includes(r.status),
+    );
     if (hasActive) {
-      throw new BadRequestException(i18nMessage('server.refund.alreadyActive'));
+      throw new BadRequestException(i18nMessage("server.refund.alreadyActive"));
     }
 
     // Adet bazlı kısmi iade: istenen adet (verilmezse tümü), sipariş adediyle sınırlı.
     const orderQty = (order as any).quantity ?? 1;
-    const reqQty = Math.min(Math.max(dto.refundQuantity ?? orderQty, 1), orderQty);
+    const reqQty = Math.min(
+      Math.max(dto.refundQuantity ?? orderQty, 1),
+      orderQty,
+    );
 
     const phase = this.classifyOrderPhase(order);
 
-    if (phase === 'preparing' || phase === 'paid') {
+    if (phase === "preparing" || phase === "paid") {
       return this.createInstantRefund(order, requesterId, dto, reqQty);
     }
 
-    if (phase === 'in_cooling_off') {
+    if (phase === "in_cooling_off") {
       // KOŞULSUZ: 14 gün içinde kanıt fotoğrafı ZORUNLU DEĞİL (cayma hakkı).
       // İsteyen yine de foto/açıklama ekleyebilir; otomatik onaylanır.
       return this.createCoolingOffRefund(order, requesterId, dto, reqQty);
     }
 
-    if (phase === 'past_cooling_off') {
+    if (phase === "past_cooling_off") {
       // 14 GÜNDEN SONRA İADE YOK: cayma penceresi kapandıktan sonra alıcı iade
       // talebi oluşturamaz. (Escrow de gün 15'te payout ettiği için bu kural
       // sayesinde payout anında asla açık/açılabilir iade kalmaz.)
       throw new BadRequestException(
-        i18nMessage('server.refund.coolingOffExpired'),
+        i18nMessage("server.refund.coolingOffExpired"),
       );
     }
 
-    throw new BadRequestException(i18nMessage('server.refund.orderStatusNotEligible'));
+    throw new BadRequestException(
+      i18nMessage("server.refund.orderStatusNotEligible"),
+    );
   }
 
   async cancelRefundRequest(refundRequestId: string, requesterId: string) {
@@ -253,16 +286,16 @@ export class RefundService {
       where: { id: refundRequestId },
       include: { order: { select: { id: true, sellerId: true } } },
     });
-    if (!rr) throw new NotFoundException(i18nMessage('server.refund.notFound'));
+    if (!rr) throw new NotFoundException(i18nMessage("server.refund.notFound"));
     if (rr.requesterId !== requesterId) {
-      throw new ForbiddenException(i18nMessage('server.refund.cannotCancel'));
+      throw new ForbiddenException(i18nMessage("server.refund.cannotCancel"));
     }
     if (
       rr.status !== RefundRequestStatus.pending_review &&
       rr.status !== RefundRequestStatus.wait_for_delivery
     ) {
       throw new BadRequestException(
-        i18nMessage('server.refund.cannotCancelAnymore'),
+        i18nMessage("server.refund.cannotCancelAnymore"),
       );
     }
     const updated = await this.prisma.refundRequest.update({
@@ -276,14 +309,18 @@ export class RefundService {
     // İade iptal edildi → hold kilidini kaldır, normal escrow akışına dönsün.
     await this.unfreezeHoldForRefund(rr.order.id);
     await this.appendHistory(refundRequestId, {
-      action: 'cancelled_by_buyer',
+      action: "cancelled_by_buyer",
       by: requesterId,
       details: { previousStatus: rr.status },
     });
-    await this.safeNotify(rr.order.sellerId, NotificationType.REFUND_CANCELLED, {
-      refundNumber: rr.refundNumber,
-      orderId: rr.order.id,
-    });
+    await this.safeNotify(
+      rr.order.sellerId,
+      NotificationType.REFUND_CANCELLED,
+      {
+        refundNumber: rr.refundNumber,
+        orderId: rr.order.id,
+      },
+    );
     return updated;
   }
 
@@ -294,7 +331,9 @@ export class RefundService {
         order: {
           include: {
             buyer: { select: { id: true, displayName: true, avatarUrl: true } },
-            seller: { select: { id: true, displayName: true, avatarUrl: true } },
+            seller: {
+              select: { id: true, displayName: true, avatarUrl: true },
+            },
             product: { select: { id: true, title: true, images: true } },
             shipment: true,
             payment: { select: { amount: true, currency: true, paidAt: true } },
@@ -303,10 +342,10 @@ export class RefundService {
         requester: { select: { id: true, displayName: true } },
       },
     });
-    if (!rr) throw new NotFoundException(i18nMessage('server.refund.notFound'));
+    if (!rr) throw new NotFoundException(i18nMessage("server.refund.notFound"));
 
     if (!isAdmin && rr.requesterId !== userId && rr.order.sellerId !== userId) {
-      throw new ForbiddenException(i18nMessage('server.refund.viewForbidden'));
+      throw new ForbiddenException(i18nMessage("server.refund.viewForbidden"));
     }
     return this.withResolvedImages(rr);
   }
@@ -314,7 +353,7 @@ export class RefundService {
   async listForBuyer(userId: string) {
     const rows = await this.prisma.refundRequest.findMany({
       where: { requesterId: userId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       include: {
         order: {
           select: {
@@ -332,7 +371,7 @@ export class RefundService {
   async listForSeller(userId: string) {
     const rows = await this.prisma.refundRequest.findMany({
       where: { order: { sellerId: userId } },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       include: {
         order: {
           select: {
@@ -355,13 +394,21 @@ export class RefundService {
         order: {
           include: {
             // Default adres yoksa default-olmayan adresi de kullan (default önce).
-            buyer: { include: { addresses: { orderBy: { isDefault: 'desc' }, take: 1 } } },
-            seller: { include: { addresses: { orderBy: { isDefault: 'desc' }, take: 1 } } },
+            buyer: {
+              include: {
+                addresses: { orderBy: { isDefault: "desc" }, take: 1 },
+              },
+            },
+            seller: {
+              include: {
+                addresses: { orderBy: { isDefault: "desc" }, take: 1 },
+              },
+            },
           },
         },
       },
     });
-    if (!rr) throw new NotFoundException(i18nMessage('server.refund.notFound'));
+    if (!rr) throw new NotFoundException(i18nMessage("server.refund.notFound"));
     if (rr.returnTrackingNumber) {
       this.logger.log(`Return shipment already exists for ${rr.refundNumber}`);
       return rr;
@@ -381,32 +428,38 @@ export class RefundService {
     // Yalnız alıcı adresi gerçekten bulunamazsa iade kargosu açılamaz.
     if (!buyerAddr) {
       throw new BadRequestException(
-        i18nMessage('server.refund.buyerAddressNotFound'),
+        i18nMessage("server.refund.buyerAddressNotFound"),
       );
     }
 
     if (!this.suratCargoService.isIntegrationEnabled()) {
-      this.logger.warn(`Surat integration disabled, marking ${rr.refundNumber} as return_shipment_open without provider call`);
+      this.logger.warn(
+        `Surat integration disabled, marking ${rr.refundNumber} as return_shipment_open without provider call`,
+      );
       const updated = await this.prisma.refundRequest.update({
         where: { id: rr.id },
         data: {
           status: RefundRequestStatus.return_shipment_open,
-          returnProvider: 'manual',
+          returnProvider: "manual",
           returnTrackingNumber: rr.refundNumber,
           returnCreatedAt: new Date(),
         },
       });
       await this.appendHistory(rr.id, {
-        action: 'return_opened',
-        by: 'system',
-        details: { provider: 'manual', trackingNumber: rr.refundNumber },
+        action: "return_opened",
+        by: "system",
+        details: { provider: "manual", trackingNumber: rr.refundNumber },
       });
-      await this.safeNotify(rr.requesterId, NotificationType.REFUND_RETURN_OPENED, {
-        refundNumber: rr.refundNumber,
-        orderId: rr.orderId,
-        trackingNumber: rr.refundNumber,
-      });
-      await this.sendRefundEmail(rr.id, 'buyer', 'refund-return-label-buyer', {
+      await this.safeNotify(
+        rr.requesterId,
+        NotificationType.REFUND_RETURN_OPENED,
+        {
+          refundNumber: rr.refundNumber,
+          orderId: rr.orderId,
+          trackingNumber: rr.refundNumber,
+        },
+      );
+      await this.sendRefundEmail(rr.id, "buyer", "refund-return-label-buyer", {
         returnTrackingNumber: rr.refundNumber,
       });
       return updated;
@@ -439,7 +492,8 @@ export class RefundService {
 
     if (!result.ok) {
       const r = result as any;
-      const errMsg = r.kind === 'business' ? r.suratMessage : `technical: ${r.code}`;
+      const errMsg =
+        r.kind === "business" ? r.suratMessage : `technical: ${r.code}`;
       throw new BadRequestException(`Sürat iade kargosu açılamadı: ${errMsg}`);
     }
 
@@ -447,25 +501,29 @@ export class RefundService {
       where: { id: rr.id },
       data: {
         status: RefundRequestStatus.return_shipment_open,
-        returnProvider: 'surat',
+        returnProvider: "surat",
         returnTrackingNumber: rr.refundNumber,
         returnStatus: ShipmentStatus.label_created,
         returnCreatedAt: new Date(),
       },
     });
     await this.appendHistory(rr.id, {
-      action: 'return_opened',
-      by: 'system',
-      details: { provider: 'surat', trackingNumber: rr.refundNumber },
+      action: "return_opened",
+      by: "system",
+      details: { provider: "surat", trackingNumber: rr.refundNumber },
     });
-    await this.safeNotify(rr.requesterId, NotificationType.REFUND_RETURN_OPENED, {
-      refundNumber: rr.refundNumber,
-      orderId: rr.orderId,
-      trackingNumber: rr.refundNumber,
-    });
-    await this.sendRefundEmail(rr.id, 'buyer', 'refund-return-label-buyer', {
+    await this.safeNotify(
+      rr.requesterId,
+      NotificationType.REFUND_RETURN_OPENED,
+      {
+        refundNumber: rr.refundNumber,
+        orderId: rr.orderId,
+        trackingNumber: rr.refundNumber,
+      },
+    );
+    await this.sendRefundEmail(rr.id, "buyer", "refund-return-label-buyer", {
       returnTrackingNumber: rr.refundNumber,
-      cargoCompany: 'Sürat Kargo',
+      cargoCompany: "Sürat Kargo",
     });
     return updated;
   }
@@ -475,7 +533,7 @@ export class RefundService {
       where: { id: refundRequestId },
       include: { order: true },
     });
-    if (!rr) throw new NotFoundException(i18nMessage('server.refund.notFound'));
+    if (!rr) throw new NotFoundException(i18nMessage("server.refund.notFound"));
     if (rr.status === RefundRequestStatus.refunded) return rr;
 
     const refundResult = await this.paymentService.processRefund(
@@ -496,13 +554,15 @@ export class RefundService {
 
     // Hold (adet bazlı) tüketimi processRefund içinde tek otoriteden yapıldı.
     // Kargo sonrası gerçek İADE → raporlama ayrımı.
-    await this.prisma.order.update({
-      where: { id: rr.orderId },
-      data: { cancellationType: 'iade' },
-    }).catch(() => undefined);
+    await this.prisma.order
+      .update({
+        where: { id: rr.orderId },
+        data: { cancellationType: "iade" },
+      })
+      .catch(() => undefined);
     await this.appendHistory(rr.id, {
-      action: 'refund_completed',
-      by: 'system',
+      action: "refund_completed",
+      by: "system",
       details: { providerRefundId: refundResult.providerRefundId },
     });
     await this.safeNotify(rr.requesterId, NotificationType.REFUND_COMPLETED, {
@@ -510,13 +570,17 @@ export class RefundService {
       orderId: rr.orderId,
     });
     // "Para iadeniz tamamlandı" maili eksikti (sadece zile düşüyordu) — eklendi.
-    await this.sendRefundEmail(rr.id, 'buyer', 'refund-completed');
+    await this.sendRefundEmail(rr.id, "buyer", "refund-completed");
     // Satıcı tarafı: iade tamamlandı bildirimi + mail.
-    await this.safeNotify(rr.order.sellerId, NotificationType.REFUND_COMPLETED_SELLER, {
-      refundNumber: rr.refundNumber,
-      orderId: rr.orderId,
-    });
-    await this.sendRefundEmail(rr.id, 'seller', 'refund-completed-seller');
+    await this.safeNotify(
+      rr.order.sellerId,
+      NotificationType.REFUND_COMPLETED_SELLER,
+      {
+        refundNumber: rr.refundNumber,
+        orderId: rr.orderId,
+      },
+    );
+    await this.sendRefundEmail(rr.id, "seller", "refund-completed-seller");
     return updated;
   }
 
@@ -584,23 +648,48 @@ export class RefundService {
 
     // Kargo takip adımları önceden tamamen sessizdi. Her iki taraf da bilgilendirilsin.
     // Bell + push (her ping'de mail spam'i olmasın diye mail göndermiyoruz).
-    const notifData = { refundNumber: updated.refundNumber, orderId: updated.orderId };
+    const notifData = {
+      refundNumber: updated.refundNumber,
+      orderId: updated.orderId,
+    };
     if (
       update.status === ShipmentStatus.in_transit ||
       update.status === ShipmentStatus.picked_up
     ) {
-      await this.safeNotify(updated.requesterId, NotificationType.REFUND_RETURN_IN_TRANSIT, notifData);
-      await this.safeNotify(updated.order.sellerId, NotificationType.REFUND_RETURN_SHIPPED_SELLER, notifData);
+      await this.safeNotify(
+        updated.requesterId,
+        NotificationType.REFUND_RETURN_IN_TRANSIT,
+        notifData,
+      );
+      await this.safeNotify(
+        updated.order.sellerId,
+        NotificationType.REFUND_RETURN_SHIPPED_SELLER,
+        notifData,
+      );
       // Satıcıya bir kez markalı mail: ürün kendisine geliyor.
-      await this.sendRefundEmail(updated.id, 'seller', 'refund-return-incoming-seller', {
-        returnTrackingNumber: updated.returnTrackingNumber ?? updated.refundNumber,
-      });
+      await this.sendRefundEmail(
+        updated.id,
+        "seller",
+        "refund-return-incoming-seller",
+        {
+          returnTrackingNumber:
+            updated.returnTrackingNumber ?? updated.refundNumber,
+        },
+      );
     } else if (
       update.status === ShipmentStatus.delivered ||
       update.status === ShipmentStatus.returned
     ) {
-      await this.safeNotify(updated.requesterId, NotificationType.REFUND_RETURN_DELIVERED_BUYER, notifData);
-      await this.safeNotify(updated.order.sellerId, NotificationType.REFUND_RETURN_DELIVERED_SELLER, notifData);
+      await this.safeNotify(
+        updated.requesterId,
+        NotificationType.REFUND_RETURN_DELIVERED_BUYER,
+        notifData,
+      );
+      await this.safeNotify(
+        updated.order.sellerId,
+        NotificationType.REFUND_RETURN_DELIVERED_SELLER,
+        notifData,
+      );
     }
 
     return updated;
@@ -617,9 +706,11 @@ export class RefundService {
    */
   private async generateRefundNumber(): Promise<string> {
     return generateUniqueReference(
-      'RFD',
+      "RFD",
       async (code) =>
-        (await this.prisma.refundRequest.count({ where: { refundNumber: code } })) > 0,
+        (await this.prisma.refundRequest.count({
+          where: { refundNumber: code },
+        })) > 0,
     );
   }
 
@@ -627,8 +718,11 @@ export class RefundService {
     status: OrderStatus;
     deliveredAt?: Date | null;
     shipment: { status: ShipmentStatus; deliveredAt: Date | null } | null;
-  }): 'paid' | 'preparing' | 'in_cooling_off' | 'past_cooling_off' | 'unknown' {
-    if (order.status === OrderStatus.paid || order.status === OrderStatus.preparing) {
+  }): "paid" | "preparing" | "in_cooling_off" | "past_cooling_off" | "unknown" {
+    if (
+      order.status === OrderStatus.paid ||
+      order.status === OrderStatus.preparing
+    ) {
       // Sürat hasn't actually picked up if shipment is still pending, or if a
       // previous attempt was cancelled / failed. In those cases we can still
       // do an instant refund (no in-flight cargo to chase).
@@ -637,10 +731,10 @@ export class RefundService {
         order.shipment.status === ShipmentStatus.pending ||
         order.shipment.status === ShipmentStatus.cancelled ||
         order.shipment.status === ShipmentStatus.failed;
-      return stillNotShipped ? 'preparing' : 'in_cooling_off';
+      return stillNotShipped ? "preparing" : "in_cooling_off";
     }
     if (order.status === OrderStatus.shipped) {
-      return 'in_cooling_off';
+      return "in_cooling_off";
     }
     if (
       order.status === OrderStatus.delivered ||
@@ -650,12 +744,15 @@ export class RefundService {
       // Teslim tarihi order.deliveredAt'e yazılır (shipping.worker). Track
       // güncellemesinde shipment.deliveredAt set edilmediği için order alanı
       // birincil kaynaktır; shipment yalnızca yedek.
-      const deliveredAt = order.deliveredAt ?? order.shipment?.deliveredAt ?? null;
-      if (!deliveredAt) return 'in_cooling_off';
+      const deliveredAt =
+        order.deliveredAt ?? order.shipment?.deliveredAt ?? null;
+      if (!deliveredAt) return "in_cooling_off";
       const ageDays = (Date.now() - deliveredAt.getTime()) / (1000 * 3600 * 24);
-      return ageDays <= COOLING_OFF_DAYS ? 'in_cooling_off' : 'past_cooling_off';
+      return ageDays <= COOLING_OFF_DAYS
+        ? "in_cooling_off"
+        : "past_cooling_off";
     }
-    return 'unknown';
+    return "unknown";
   }
 
   /**
@@ -680,7 +777,10 @@ export class RefundService {
    * dueHolds filtresinde hem atomik updateMany guard'ında kontrol eder). Bu,
    * "14. günün son saniyesinde iade + payout çoktan gitti" yarışını kapatır.
    */
-  private async freezeHoldForRefund(orderId: string, refundRequestId: string): Promise<void> {
+  private async freezeHoldForRefund(
+    orderId: string,
+    refundRequestId: string,
+  ): Promise<void> {
     await this.prisma.paymentHold.updateMany({
       where: { orderId, status: PaymentHoldStatus.held },
       data: { frozenByRefundId: refundRequestId },
@@ -690,13 +790,22 @@ export class RefundService {
   /** İade reddedilir/iptal edilirse hold kilidini kaldır → normal escrow akışına döner. */
   private async unfreezeHoldForRefund(orderId: string): Promise<void> {
     await this.prisma.paymentHold.updateMany({
-      where: { orderId, status: PaymentHoldStatus.held, NOT: { frozenByRefundId: null } },
+      where: {
+        orderId,
+        status: PaymentHoldStatus.held,
+        NOT: { frozenByRefundId: null },
+      },
       data: { frozenByRefundId: null },
     });
   }
 
   private async createInstantRefund(
-    order: { id: string; totalAmount: Prisma.Decimal; orderNumber: string; quantity?: number },
+    order: {
+      id: string;
+      totalAmount: Prisma.Decimal;
+      orderNumber: string;
+      quantity?: number;
+    },
     requesterId: string,
     dto: CreateRefundRequestDto,
     refundQuantity = 1,
@@ -736,10 +845,12 @@ export class RefundService {
 
     // Hold tüketimi processRefund içinde yapıldı (tek otorite).
     // Kargo öncesi → İPTAL olarak işaretle (raporlama ayrımı).
-    await this.prisma.order.update({
-      where: { id: order.id },
-      data: { cancellationType: 'iptal' },
-    }).catch(() => undefined);
+    await this.prisma.order
+      .update({
+        where: { id: order.id },
+        data: { cancellationType: "iptal" },
+      })
+      .catch(() => undefined);
 
     const updated = await this.prisma.refundRequest.update({
       where: { id: created.id },
@@ -756,19 +867,23 @@ export class RefundService {
       refundNumber,
       orderId: order.id,
     });
-    await this.sendRefundEmail(created.id, 'buyer', 'refund-completed');
+    await this.sendRefundEmail(created.id, "buyer", "refund-completed");
     // Satıcı tarafı: iade tamamlandı bildirimi + mail.
     const sellerRow = await this.prisma.order.findUnique({
       where: { id: order.id },
       select: { sellerId: true },
     });
     if (sellerRow?.sellerId) {
-      await this.safeNotify(sellerRow.sellerId, NotificationType.REFUND_COMPLETED_SELLER, {
-        refundNumber,
-        orderId: order.id,
-      });
+      await this.safeNotify(
+        sellerRow.sellerId,
+        NotificationType.REFUND_COMPLETED_SELLER,
+        {
+          refundNumber,
+          orderId: order.id,
+        },
+      );
     }
-    await this.sendRefundEmail(created.id, 'seller', 'refund-completed-seller');
+    await this.sendRefundEmail(created.id, "seller", "refund-completed-seller");
 
     return updated;
   }
@@ -806,7 +921,7 @@ export class RefundService {
         amount,
         refundQuantity,
         status: RefundRequestStatus.wait_for_delivery,
-        decidedBy: 'system',
+        decidedBy: "system",
         decidedAt: new Date(),
       },
     });
@@ -820,7 +935,7 @@ export class RefundService {
       refundNumber,
       orderId: order.id,
     });
-    await this.sendRefundEmail(created.id, 'buyer', 'refund-approved-buyer');
+    await this.sendRefundEmail(created.id, "buyer", "refund-approved-buyer");
 
     // Ürün alıcıya ulaşmışsa (delivered/awaiting_buyer_confirmation/completed)
     // iade kargosunu hemen aç; aksi hâlde cron teslimatta açar.
@@ -830,16 +945,19 @@ export class RefundService {
       order.status === OrderStatus.completed
     ) {
       await this.openReturnShipment(created.id);
-      return this.prisma.refundRequest.findUnique({ where: { id: created.id } });
+      return this.prisma.refundRequest.findUnique({
+        where: { id: created.id },
+      });
     }
 
     return created;
   }
 
   private fallbackAddressFromOrderJson(json: Prisma.JsonValue | null) {
-    if (!json || typeof json !== 'object' || Array.isArray(json)) return null;
+    if (!json || typeof json !== "object" || Array.isArray(json)) return null;
     const j = json as Record<string, any>;
-    if (!j.fullName || !j.address || !j.city || !j.district || !j.phone) return null;
+    if (!j.fullName || !j.address || !j.city || !j.district || !j.phone)
+      return null;
     return {
       fullName: String(j.fullName),
       address: String(j.address),
@@ -856,13 +974,13 @@ export class RefundService {
    */
   private warehouseReturnAddress() {
     return {
-      fullName: process.env.TARODAN_WAREHOUSE_NAME?.trim() || 'Tarodan Depo',
+      fullName: process.env.TARODAN_WAREHOUSE_NAME?.trim() || "Tarodan Depo",
       address:
         process.env.TARODAN_WAREHOUSE_ADDRESS?.trim() ||
-        'Tarodan Merkez Depo Adresi',
-      city: process.env.TARODAN_WAREHOUSE_CITY?.trim() || 'Istanbul',
-      district: process.env.TARODAN_WAREHOUSE_DISTRICT?.trim() || 'Maltepe',
-      phone: process.env.TARODAN_WAREHOUSE_PHONE?.trim() || '05000000000',
+        "Tarodan Merkez Depo Adresi",
+      city: process.env.TARODAN_WAREHOUSE_CITY?.trim() || "Istanbul",
+      district: process.env.TARODAN_WAREHOUSE_DISTRICT?.trim() || "Maltepe",
+      phone: process.env.TARODAN_WAREHOUSE_PHONE?.trim() || "05000000000",
     };
   }
 
@@ -886,15 +1004,14 @@ export class RefundService {
       include: { order: true },
     });
     if (!before) {
-      throw new NotFoundException(i18nMessage('server.refund.notFound'));
+      throw new NotFoundException(i18nMessage("server.refund.notFound"));
     }
 
     // Yeni policy değerleri (mevcut + payload merge)
     const policy = {
       refundProductAmount:
         payload.refundProductAmount ?? before.refundProductAmount,
-      refundShippingFee:
-        payload.refundShippingFee ?? before.refundShippingFee,
+      refundShippingFee: payload.refundShippingFee ?? before.refundShippingFee,
       refundBuyerFee: payload.refundBuyerFee ?? before.refundBuyerFee,
       refundSellerCommission:
         payload.refundSellerCommission ?? before.refundSellerCommission,
@@ -915,7 +1032,7 @@ export class RefundService {
     });
 
     await this.appendHistory(refundRequestId, {
-      action: 'policy_overridden',
+      action: "policy_overridden",
       by: adminId,
       details: {
         before: {
@@ -972,7 +1089,9 @@ export class RefundService {
 
     let amount = new D(0);
     if (policy.refundProductAmount) {
-      amount = amount.add(productAmount.isNegative() ? new D(0) : productAmount);
+      amount = amount.add(
+        productAmount.isNegative() ? new D(0) : productAmount,
+      );
     }
     if (policy.refundShippingFee) {
       amount = amount.add(shippingCost);
@@ -989,14 +1108,14 @@ export class RefundService {
   async setReturnShippingPayer(
     refundRequestId: string,
     adminId: string,
-    payer: 'buyer' | 'seller' | 'platform',
+    payer: "buyer" | "seller" | "platform",
   ) {
     const before = await this.prisma.refundRequest.findUnique({
       where: { id: refundRequestId },
       select: { id: true, returnShippingPayer: true },
     });
     if (!before) {
-      throw new NotFoundException(i18nMessage('server.refund.notFound'));
+      throw new NotFoundException(i18nMessage("server.refund.notFound"));
     }
 
     const updated = await this.prisma.refundRequest.update({
@@ -1005,7 +1124,7 @@ export class RefundService {
     });
 
     await this.appendHistory(refundRequestId, {
-      action: 'return_shipping_payer_changed',
+      action: "return_shipping_payer_changed",
       by: adminId,
       details: { before: before.returnShippingPayer, after: payer },
     });

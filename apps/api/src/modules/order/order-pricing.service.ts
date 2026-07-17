@@ -1,14 +1,23 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { i18nMessage } from '../i18n';
-import { CheckoutQuoteDto } from './dto';
-import { ProductStatus, CommissionRuleType, CommissionAppliesTo } from '@prisma/client';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { i18nMessage } from "../i18n";
+import { CheckoutQuoteDto } from "./dto";
+import {
+  ProductStatus,
+  CommissionRuleType,
+  CommissionAppliesTo,
+} from "@prisma/client";
 import {
   findMatchingCommissionRule,
   clampCommissionAmount,
   mapSellerTypeForCommission,
-} from './order-commission.helper';
-import { TaxService } from '../tax/tax.service';
+} from "./order-commission.helper";
+import { TaxService } from "../tax/tax.service";
 
 /**
  * Commission calculation result interface
@@ -43,24 +52,42 @@ export class OrderPricingService {
   // Shipping cost defaults (overridden by PlatformSetting)
   private readonly DEFAULT_SHIPPING_COST = 29.99;
   private readonly DEFAULT_FREE_THRESHOLD = 500;
-  private shippingSettingsCache: { baseCost: number; freeThreshold: number; cachedAt: number } | null = null;
+  private shippingSettingsCache: {
+    baseCost: number;
+    freeThreshold: number;
+    cachedAt: number;
+  } | null = null;
 
   /**
    * Load shipping cost settings from PlatformSetting (cached for 5 minutes).
    */
-  private async getShippingSettings(): Promise<{ baseCost: number; freeThreshold: number }> {
+  private async getShippingSettings(): Promise<{
+    baseCost: number;
+    freeThreshold: number;
+  }> {
     const now = Date.now();
-    if (this.shippingSettingsCache && now - this.shippingSettingsCache.cachedAt < 5 * 60 * 1000) {
+    if (
+      this.shippingSettingsCache &&
+      now - this.shippingSettingsCache.cachedAt < 5 * 60 * 1000
+    ) {
       return this.shippingSettingsCache;
     }
 
     const [baseSetting, thresholdSetting] = await Promise.all([
-      this.prisma.platformSetting.findUnique({ where: { settingKey: 'shipping_base_cost' } }),
-      this.prisma.platformSetting.findUnique({ where: { settingKey: 'free_shipping_threshold' } }),
+      this.prisma.platformSetting.findUnique({
+        where: { settingKey: "shipping_base_cost" },
+      }),
+      this.prisma.platformSetting.findUnique({
+        where: { settingKey: "free_shipping_threshold" },
+      }),
     ]);
 
-    const baseCost = baseSetting ? parseFloat(baseSetting.settingValue) : this.DEFAULT_SHIPPING_COST;
-    const freeThreshold = thresholdSetting ? parseFloat(thresholdSetting.settingValue) : this.DEFAULT_FREE_THRESHOLD;
+    const baseCost = baseSetting
+      ? parseFloat(baseSetting.settingValue)
+      : this.DEFAULT_SHIPPING_COST;
+    const freeThreshold = thresholdSetting
+      ? parseFloat(thresholdSetting.settingValue)
+      : this.DEFAULT_FREE_THRESHOLD;
 
     this.shippingSettingsCache = { baseCost, freeThreshold, cachedAt: now };
     return { baseCost, freeThreshold };
@@ -133,7 +160,9 @@ export class OrderPricingService {
     };
   }> {
     if (!dto.items?.length) {
-      throw new BadRequestException(i18nMessage('server.order.atLeastOneProductRequired'));
+      throw new BadRequestException(
+        i18nMessage("server.order.atLeastOneProductRequired"),
+      );
     }
 
     const now = new Date();
@@ -171,11 +200,15 @@ export class OrderPricingService {
       });
 
       if (!product) {
-        throw new NotFoundException(i18nMessage('server.order.productNotFoundById', { productId }));
+        throw new NotFoundException(
+          i18nMessage("server.order.productNotFoundById", { productId }),
+        );
       }
       if (product.status !== ProductStatus.active) {
         throw new BadRequestException(
-          i18nMessage('server.order.productNotActiveByTitle', { title: product.title || productId }),
+          i18nMessage("server.order.productNotActiveByTitle", {
+            title: product.title || productId,
+          }),
         );
       }
 
@@ -184,9 +217,8 @@ export class OrderPricingService {
         product.oldPrice != null &&
         (!product.saleStartDate || now >= new Date(product.saleStartDate)) &&
         (!product.saleEndDate || now <= new Date(product.saleEndDate));
-      const unitPrice = isSaleActive && product.oldPrice != null
-        ? productPrice
-        : productPrice;
+      const unitPrice =
+        isSaleActive && product.oldPrice != null ? productPrice : productPrice;
       const lineSubtotal = unitPrice * quantity;
 
       const commissionResult = await this.calculateCommission(
@@ -201,11 +233,18 @@ export class OrderPricingService {
 
       // KDV: sadece kurumsal satıcılar (businessStatus=approved ve taxId dolu)
       const isCorporate =
-        product.seller?.businessStatus === 'approved' && !!product.seller?.taxId;
+        product.seller?.businessStatus === "approved" &&
+        !!product.seller?.taxId;
       let lineTax = 0;
       if (isCorporate) {
-        const resolved = await this.taxService.resolveTaxRate('TR', null, product.categoryId);
-        lineTax = resolved ? this.taxService.calculateTaxAmount(lineSubtotal, resolved) : 0;
+        const resolved = await this.taxService.resolveTaxRate(
+          "TR",
+          null,
+          product.categoryId,
+        );
+        lineTax = resolved
+          ? this.taxService.calculateTaxAmount(lineSubtotal, resolved)
+          : 0;
       }
 
       itemsSubtotal += lineSubtotal;
@@ -228,7 +267,8 @@ export class OrderPricingService {
 
     const shippingAmount = await this.calculateShippingCost(itemsSubtotal);
     const commissionAmount = totalBuyerFee + totalSellerFee;
-    const totalAmount = itemsSubtotal + shippingAmount + totalBuyerFee + totalTax;
+    const totalAmount =
+      itemsSubtotal + shippingAmount + totalBuyerFee + totalTax;
     const sellerNetAmount = Math.max(0, itemsSubtotal - totalSellerFee);
 
     const pricing = {
@@ -263,9 +303,9 @@ export class OrderPricingService {
   /** E-ticaret stopaj oranı (%) — PlatformSetting 'withholding_tax_rate', varsayılan %1 (9284 sayılı CK). */
   private async getWithholdingTaxRate(): Promise<number> {
     const row = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: 'withholding_tax_rate' },
+      where: { settingKey: "withholding_tax_rate" },
     });
-    const rate = Number(row?.settingValue ?? '1');
+    const rate = Number(row?.settingValue ?? "1");
     return Number.isFinite(rate) && rate >= 0 ? rate : 1;
   }
 
@@ -289,11 +329,14 @@ export class OrderPricingService {
     ]);
     // Kurumsal satıcıda stopaj da kesileceğinden önizleme neti gerçek payout ile eşleşsin.
     let withholdingTaxAmount = 0;
-    if (seller?.businessStatus === 'approved' && seller?.taxId) {
+    if (seller?.businessStatus === "approved" && seller?.taxId) {
       const rate = await this.getWithholdingTaxRate();
       withholdingTaxAmount = rate > 0 ? Math.round(amount * rate) / 100 : 0;
     }
-    const sellerNetAmount = Math.max(0, amount - result.sellerFeeAmount - withholdingTaxAmount);
+    const sellerNetAmount = Math.max(
+      0,
+      amount - result.sellerFeeAmount - withholdingTaxAmount,
+    );
     return {
       sellerFeeAmount: result.sellerFeeAmount,
       buyerFeeAmount: result.buyerFeeAmount,
@@ -309,15 +352,24 @@ export class OrderPricingService {
   async getCommissionPreviewBatch(
     sellerId: string,
     items: Array<{ amount: number; categoryId?: string | null }>,
-  ): Promise<{ results: Array<{ sellerFeeAmount: number; sellerNetAmount: number }> }> {
+  ): Promise<{
+    results: Array<{ sellerFeeAmount: number; sellerNetAmount: number }>;
+  }> {
     const results = await Promise.all(
       items.map(async (item) => {
         const amount = Number(item.amount);
         if (Number.isNaN(amount) || amount < 0) {
           return { sellerFeeAmount: 0, sellerNetAmount: amount };
         }
-        const preview = await this.getCommissionPreview(amount, sellerId, item.categoryId ?? null);
-        return { sellerFeeAmount: preview.sellerFeeAmount, sellerNetAmount: preview.sellerNetAmount };
+        const preview = await this.getCommissionPreview(
+          amount,
+          sellerId,
+          item.categoryId ?? null,
+        );
+        return {
+          sellerFeeAmount: preview.sellerFeeAmount,
+          sellerNetAmount: preview.sellerNetAmount,
+        };
       }),
     );
     return { results };
@@ -326,13 +378,13 @@ export class OrderPricingService {
   /**
    * Calculate commission based on rules with priority matching
    * Requirement: Admin Commission Calculation (3.3)
-   * 
+   *
    * Matching hierarchy (by priority descending):
    * 1. Exact match: categoryId + sellerType
    * 2. Category match: categoryId only
    * 3. Seller type match: sellerType only
    * 4. Default rule: ruleType = 'default'
-   * 
+   *
    * Applies min/max limits after calculation
    */
   async calculateCommission(
@@ -397,7 +449,7 @@ export class OrderPricingService {
 
     if (!sellerMatch && !buyerMatch) {
       this.logger.warn(
-        'No matching commission rule found; applying 0 commission fallback',
+        "No matching commission rule found; applying 0 commission fallback",
       );
       return {
         buyerFeeAmount: 0,
@@ -435,7 +487,7 @@ export class OrderPricingService {
     const totalCommission = sellerFee + buyerFee;
 
     this.logger.log(
-      `Commission: amount=${amount} sellerFee=${sellerFee} (rule=${sellerMatch?.id ?? 'none'}) buyerFee=${buyerFee} (rule=${buyerMatch?.id ?? 'none'})`,
+      `Commission: amount=${amount} sellerFee=${sellerFee} (rule=${sellerMatch?.id ?? "none"}) buyerFee=${buyerFee} (rule=${buyerMatch?.id ?? "none"})`,
     );
 
     // ruleId/ruleName legacy alanları: seller match öncelikli, yoksa buyer

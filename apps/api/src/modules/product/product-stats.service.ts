@@ -87,7 +87,9 @@ export class ProductStatsService {
   async getSellerListingStats(sellerId: string) {
     try {
       if (!sellerId) {
-        throw new BadRequestException(i18nMessage("server.product.sellerIdNotFound"));
+        throw new BadRequestException(
+          i18nMessage("server.product.sellerIdNotFound"),
+        );
       }
 
       // Get all listing counts by status (exclude inactive, draft, deleted)
@@ -203,7 +205,9 @@ export class ProductStatsService {
       ) {
         throw error;
       }
-      throw new BadRequestException(i18nMessage("server.product.listingStatsFailed"));
+      throw new BadRequestException(
+        i18nMessage("server.product.listingStatsFailed"),
+      );
     }
   }
 }

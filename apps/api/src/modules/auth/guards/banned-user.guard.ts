@@ -1,9 +1,14 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { PrismaService } from '../../../prisma';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
-import { IS_ADMIN_ROUTE_KEY } from '../decorators/admin-route.decorator';
-import { i18nMessage } from '../../i18n';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { PrismaService } from "../../../prisma";
+import { IS_PUBLIC_KEY } from "../decorators/public.decorator";
+import { IS_ADMIN_ROUTE_KEY } from "../decorators/admin-route.decorator";
+import { i18nMessage } from "../../i18n";
 
 /**
  * Guard to prevent banned users from accessing API endpoints
@@ -36,10 +41,10 @@ export class BannedUserGuard implements CanActivate {
 
     // Admin route'lar AdminJwtAuthGuard ile ayrı yönetilir; ban kontrolü kullanıcı
     // oturumuna göredir, admin oturumuna karışma.
-    const isAdminRoute = this.reflector.getAllAndOverride<boolean>(IS_ADMIN_ROUTE_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const isAdminRoute = this.reflector.getAllAndOverride<boolean>(
+      IS_ADMIN_ROUTE_KEY,
+      [context.getHandler(), context.getClass()],
+    );
     if (isAdminRoute) {
       return true;
     }
@@ -68,13 +73,16 @@ export class BannedUserGuard implements CanActivate {
       const method = request.method;
 
       // Allow POST /auth/logout
-      if (path.includes('/auth/logout') && method === 'POST') {
+      if (path.includes("/auth/logout") && method === "POST") {
         return true;
       }
 
       // Allow the whole support ticket flow (create, list own, view, reply)
       // so banned users can reach the support team. SupportController prefix: /support
-      if (path.includes('/support/tickets') || path.includes('/support/contact')) {
+      if (
+        path.includes("/support/tickets") ||
+        path.includes("/support/contact")
+      ) {
         return true;
       }
 
@@ -83,8 +91,8 @@ export class BannedUserGuard implements CanActivate {
       // AllExceptionsFilter renders the catalog key in the request locale and
       // preserves the extra structured fields (#224).
       throw new ForbiddenException({
-        ...i18nMessage('server.auth.accountBanned'),
-        errorCode: 'USER_BANNED',
+        ...i18nMessage("server.auth.accountBanned"),
+        errorCode: "USER_BANNED",
         bannedReason: dbUser.bannedReason ?? null,
       });
     }

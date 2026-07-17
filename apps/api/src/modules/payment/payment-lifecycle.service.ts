@@ -47,7 +47,9 @@ export class PaymentLifecycleService {
     });
 
     if (!payment) {
-      throw new NotFoundException(i18nMessage("server.payment.paymentNotFound"));
+      throw new NotFoundException(
+        i18nMessage("server.payment.paymentNotFound"),
+      );
     }
 
     // Grup ödemesi retry'ı initiate üzerinden yapılır (payment satırı yeniden kullanılır)
@@ -59,7 +61,9 @@ export class PaymentLifecycleService {
 
     // Verify user owns the order
     if (payment.order.buyerId !== userId && payment.order.sellerId !== userId) {
-      throw new ForbiddenException(i18nMessage("server.payment.retryForbidden"));
+      throw new ForbiddenException(
+        i18nMessage("server.payment.retryForbidden"),
+      );
     }
 
     // Only allow retrying failed payments
@@ -183,7 +187,9 @@ export class PaymentLifecycleService {
     });
 
     if (!payment) {
-      throw new NotFoundException(i18nMessage("server.payment.paymentNotFound"));
+      throw new NotFoundException(
+        i18nMessage("server.payment.paymentNotFound"),
+      );
     }
 
     // Grup ödemesi: erişim grup üzerinden doğrulanır, tüm siparişler bırakılır
@@ -193,7 +199,9 @@ export class PaymentLifecycleService {
         select: { buyerId: true },
       });
       if (!group || group.buyerId !== userId) {
-        throw new ForbiddenException(i18nMessage("server.payment.cancelPaymentForbidden"));
+        throw new ForbiddenException(
+          i18nMessage("server.payment.cancelPaymentForbidden"),
+        );
       }
       if (payment.status !== PaymentStatus.pending) {
         throw new BadRequestException(
@@ -213,7 +221,9 @@ export class PaymentLifecycleService {
 
     // Verify user owns the order
     if (payment.order.buyerId !== userId && payment.order.sellerId !== userId) {
-      throw new ForbiddenException(i18nMessage("server.payment.cancelPaymentForbidden"));
+      throw new ForbiddenException(
+        i18nMessage("server.payment.cancelPaymentForbidden"),
+      );
     }
 
     // Only allow canceling pending payments

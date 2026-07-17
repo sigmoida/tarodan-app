@@ -6,24 +6,31 @@ import {
   UsersIcon,
   ArrowsRightLeftIcon,
 } from '@heroicons/react/24/outline';
+import { useTranslations } from 'next-intl';
 
-const ACTIONS: {
+type T = ReturnType<typeof useTranslations<never>>;
+
+function getActions(t: T): {
   href: string;
   label: string;
   icon: ComponentType<{ className?: string }>;
   box: string;
   icon_: string;
-}[] = [
-  { href: '/catalog/products', label: 'Ürünler', icon: ShoppingBagIcon, box: 'bg-primary-100', icon_: 'text-primary-600' },
-  { href: '/operations/orders', label: 'Siparişler', icon: ChartBarIcon, box: 'bg-info-500/20', icon_: 'text-info-500' },
-  { href: '/accounts/users', label: 'Kullanıcılar', icon: UsersIcon, box: 'bg-primary-500/20', icon_: 'text-primary-500' },
-  { href: '/messaging/messages', label: 'Mesajlar', icon: ArrowsRightLeftIcon, box: 'bg-success-500/20', icon_: 'text-success-500' },
-];
+}[] {
+  return [
+    { href: '/catalog/products', label: t('admin.dashboard.quickActions.products'), icon: ShoppingBagIcon, box: 'bg-primary-100', icon_: 'text-primary-600' },
+    { href: '/operations/orders', label: t('admin.dashboard.quickActions.orders'), icon: ChartBarIcon, box: 'bg-info-500/20', icon_: 'text-info-500' },
+    { href: '/accounts/users', label: t('admin.dashboard.quickActions.users'), icon: UsersIcon, box: 'bg-primary-500/20', icon_: 'text-primary-500' },
+    { href: '/messaging/messages', label: t('admin.dashboard.quickActions.messages'), icon: ArrowsRightLeftIcon, box: 'bg-success-500/20', icon_: 'text-success-500' },
+  ];
+}
 
 export function QuickActions() {
+  const t = useTranslations();
+  const actions = getActions(t);
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-      {ACTIONS.map((a) => {
+      {actions.map((a) => {
         const Icon = a.icon;
         return (
           <Link

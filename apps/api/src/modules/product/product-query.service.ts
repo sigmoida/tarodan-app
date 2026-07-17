@@ -181,7 +181,8 @@ export class ProductQueryService {
         },
       },
     });
-    const formattedProducts = await this.common.formatProductResponseMany(products);
+    const formattedProducts =
+      await this.common.formatProductResponseMany(products);
     return {
       data: formattedProducts,
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
@@ -296,7 +297,8 @@ export class ProductQueryService {
       ...products.filter((p) => !isInStock(p)),
     ];
 
-    const formattedProducts = await this.common.formatProductResponseMany(pageOrdered);
+    const formattedProducts =
+      await this.common.formatProductResponseMany(pageOrdered);
 
     // Tutarlılık: Postgres path ile aynı şekilde, discountOnly=true iken sadece
     // gerçekten indirimli ürünleri döndür.
@@ -499,7 +501,8 @@ export class ProductQueryService {
         : [];
     const products = [...inStockRows, ...outOfStockRows];
 
-    const formattedProducts = await this.common.formatProductResponseMany(products);
+    const formattedProducts =
+      await this.common.formatProductResponseMany(products);
 
     // discountOnly: WHERE kolayca "kampanya kapsamındaki" ürünleri geçirse de,
     // formatProductResponse kampanya fiyatını uygulayamayabilir (değer 0, tarih

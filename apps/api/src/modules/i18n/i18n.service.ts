@@ -7,7 +7,7 @@
 // MessageFormat, so plurals/select work server-side too.
 // =============================================================================
 
-import { Injectable } from '@nestjs/common';
+import { Injectable } from "@nestjs/common";
 import {
   type Locale,
   type MessageKey,
@@ -19,8 +19,8 @@ import {
   resolveLocale,
   formatMessage,
   getMessages,
-} from '@tarodan/i18n';
-import { parseAcceptLanguage } from './locale.util';
+} from "@tarodan/i18n";
+import { parseAcceptLanguage } from "./locale.util";
 
 /** Back-compat alias — the codebase's locale type is the shared `Locale`. */
 export type SupportedLanguage = Locale;
@@ -58,7 +58,10 @@ export class I18nService {
    * The shared catalog for a locale, or a namespace slice
    * (e.g. `getAllTranslations('en', 'auth')`). Served by /i18n/translations.
    */
-  getAllTranslations(lang: Locale = defaultLocale, namespace?: string): unknown {
+  getAllTranslations(
+    lang: Locale = defaultLocale,
+    namespace?: string,
+  ): unknown {
     const all = getMessages(resolveLocale(lang)) as Record<string, unknown>;
     return namespace ? (this.lookupNode(all, namespace) ?? {}) : all;
   }
@@ -77,12 +80,16 @@ export class I18nService {
 
   private lookup(tree: Messages, key: string): string | undefined {
     const node = this.lookupNode(tree as Record<string, unknown>, key);
-    return typeof node === 'string' ? node : undefined;
+    return typeof node === "string" ? node : undefined;
   }
 
   private lookupNode(tree: Record<string, unknown>, path: string): unknown {
-    return path.split('.').reduce<unknown>((node, part) => {
-      if (node && typeof node === 'object' && part in (node as Record<string, unknown>)) {
+    return path.split(".").reduce<unknown>((node, part) => {
+      if (
+        node &&
+        typeof node === "object" &&
+        part in (node as Record<string, unknown>)
+      ) {
         return (node as Record<string, unknown>)[part];
       }
       return undefined;

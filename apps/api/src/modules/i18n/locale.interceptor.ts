@@ -3,9 +3,9 @@ import {
   ExecutionContext,
   Injectable,
   NestInterceptor,
-} from '@nestjs/common';
-import { Observable } from 'rxjs';
-import { resolveRequestLocale } from './locale.util';
+} from "@nestjs/common";
+import { Observable } from "rxjs";
+import { resolveRequestLocale } from "./locale.util";
 
 /**
  * Attaches the resolved request locale to `request.locale` for every request
@@ -17,7 +17,7 @@ import { resolveRequestLocale } from './locale.util';
 @Injectable()
 export class LocaleInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
-    if (context.getType() === 'http') {
+    if (context.getType() === "http") {
       const req = context.switchToHttp().getRequest();
       if (req) req.locale = resolveRequestLocale(req);
     }

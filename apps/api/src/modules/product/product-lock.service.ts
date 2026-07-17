@@ -1,15 +1,18 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import {
   OfferStatus,
   OrderStatus,
   ProductStatus,
   TradeStatus,
   Prisma,
-} from '@prisma/client';
-import { PrismaService } from '../../prisma';
-import { i18nMessage } from '../i18n';
-import { getAvailableQuantity, safeDecrementReserved } from './helpers/product-availability.helper';
-import { NotificationService } from '../notification/notification.service';
+} from "@prisma/client";
+import { PrismaService } from "../../prisma";
+import { i18nMessage } from "../i18n";
+import {
+  getAvailableQuantity,
+  safeDecrementReserved,
+} from "./helpers/product-availability.helper";
+import { NotificationService } from "../notification/notification.service";
 
 type PrismaTx = Prisma.TransactionClient;
 
@@ -112,20 +115,28 @@ export class ProductLockService {
 
     if (!product) {
       throw new BadRequestException(
-        i18nMessage('server.product.notFoundWithId', { productId }),
+        i18nMessage("server.product.notFoundWithId", { productId }),
       );
     }
 
-    if (product.status !== ProductStatus.active && product.status !== ProductStatus.reserved) {
+    if (
+      product.status !== ProductStatus.active &&
+      product.status !== ProductStatus.reserved
+    ) {
       throw new BadRequestException(
-        i18nMessage('server.product.notForSaleStatus', { status: product.status }),
+        i18nMessage("server.product.notForSaleStatus", {
+          status: product.status,
+        }),
       );
     }
 
     const available = getAvailableQuantity(product);
     if (available !== null && available < requiredQty) {
       throw new BadRequestException(
-        i18nMessage('server.product.insufficientStock', { available, requested: requiredQty }),
+        i18nMessage("server.product.insufficientStock", {
+          available,
+          requested: requiredQty,
+        }),
       );
     }
 
@@ -162,7 +173,13 @@ export class ProductLockService {
       // "İptal Edildi" alongside the genuinely unpaid ones.
       OR: [
         { order: { is: null } },
-        { order: { status: { in: [OrderStatus.pending_payment, OrderStatus.cancelled] } } },
+        {
+          order: {
+            status: {
+              in: [OrderStatus.pending_payment, OrderStatus.cancelled],
+            },
+          },
+        },
       ],
     };
     if (excludeOfferId) {
@@ -187,7 +204,7 @@ export class ProductLockService {
       where: { id: { in: offersToReject.map((o) => o.id) } },
       data: {
         status: OfferStatus.cancelled,
-        cancelReason: 'Stok tükendiği için otomatik iptal edildi',
+        cancelReason: "Stok tükendiği için otomatik iptal edildi",
       },
     });
 
@@ -244,7 +261,7 @@ export class ProductLockService {
       where: { id: { in: tradeIds } },
       data: {
         status: TradeStatus.cancelled,
-        cancelReason: 'Stok tükendiği için otomatik iptal edildi',
+        cancelReason: "Stok tükendiği için otomatik iptal edildi",
         cancelledAt: new Date(),
       },
     });
@@ -274,7 +291,7 @@ export class ProductLockService {
   async invalidatePendingOrdersForProduct(
     tx: PrismaTx,
     productId: string,
-    cancelReason: string = 'Stok takas icin ayrildi',
+    cancelReason: string = "Stok takas icin ayrildi",
   ): Promise<InvalidateOrdersResult> {
     // Fetch each pending_payment order with the signals we need to tell
     // whether it currently holds a stock reservation:
@@ -411,9 +428,16 @@ export class ProductLockService {
         // Dispatch notifications AFTER tx commit so a rollback can't emit phantom messages.
         for (const o of productRejectedOffers) {
           await this.notificationService
-            .notifyOfferCancelledOutOfStock(o.buyerId, o.productId, o.productTitle, null)
+            .notifyOfferCancelledOutOfStock(
+              o.buyerId,
+              o.productId,
+              o.productTitle,
+              null,
+            )
             .catch((err) =>
-              this.logger.warn(`sweep-notify failed for ${o.buyerId}: ${err.message}`),
+              this.logger.warn(
+                `sweep-notify failed for ${o.buyerId}: ${err.message}`,
+              ),
             );
         }
       } catch (e: any) {

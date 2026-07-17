@@ -40,18 +40,7 @@ export interface PayTRPaymentRequest {
   testMode: "0" | "1";
   noInstallment: "0" | "1";
   maxInstallment:
-    | "0"
-    | "2"
-    | "3"
-    | "4"
-    | "5"
-    | "6"
-    | "7"
-    | "8"
-    | "9"
-    | "10"
-    | "11"
-    | "12";
+    "0" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "11" | "12";
   userName: string;
   userAddress: string;
   userPhone: string;
@@ -110,8 +99,7 @@ export type PayTRStatusInquirySuccess = {
 };
 
 export type PayTRStatusInquiryResult =
-  | PayTRStatusInquirySuccess
-  | { ok: false; errNo?: string; errMsg?: string };
+  PayTRStatusInquirySuccess | { ok: false; errNo?: string; errMsg?: string };
 
 /** PAYTR_TEST_MODE: true / 1 / yes → test */
 export function parsePaytrTestMode(raw: string | undefined): boolean {
@@ -400,7 +388,9 @@ export class PayTRService {
       const rawText = await response.text();
       const data = this.parsePaytrJson<PayTRRefundResponse>(rawText);
       if (!data) {
-        throw new BadRequestException(i18nMessage("server.payment.refundResponseInvalid"));
+        throw new BadRequestException(
+          i18nMessage("server.payment.refundResponseInvalid"),
+        );
       }
 
       if (data.status !== "success") {
@@ -658,7 +648,9 @@ export class PayTRService {
       rawText = await response.text();
     } catch (error: any) {
       this.logger.error(`PayTR direct API connection error: ${error?.message}`);
-      throw new BadRequestException(i18nMessage("server.payment.connectionError"));
+      throw new BadRequestException(
+        i18nMessage("server.payment.connectionError"),
+      );
     }
 
     const trimmed = (rawText || "").trim();
@@ -687,7 +679,9 @@ export class PayTRService {
         return { status: "success" };
       }
       let reason: string | ReturnType<typeof i18nMessage> =
-        data?.err_msg || data?.reason || i18nMessage("server.payment.paymentRejected");
+        data?.err_msg ||
+        data?.reason ||
+        i18nMessage("server.payment.paymentRejected");
       if (typeof reason === "string" && /paytr_token/i.test(reason)) {
         // Bu hata pratikte mağazada Direkt API yetkisinin tanımlı olmamasında da
         // dönüyor — istemci bu mesajla iframe akışına düşer.

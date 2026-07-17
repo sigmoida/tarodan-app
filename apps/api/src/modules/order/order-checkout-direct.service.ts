@@ -1,19 +1,30 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
-import { randomUUID } from 'crypto';
-import { PrismaService } from '../../prisma';
-import { i18nMessage } from '../i18n';
-import { CreateOrderDto, DirectBuyDto, CheckoutDto } from './dto';
-import { OrderStatus, OfferStatus, ProductStatus, Prisma } from '@prisma/client';
-import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
-import { EventService } from '../events';
-import { NotificationService } from '../notification/notification.service';
-import { NotificationType } from '../notification/dto';
-import { DiscountService } from '../discount';
-import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
-import { OrderPricingService } from './order-pricing.service';
-import { OrderCommonService } from './order-common.service';
-import { OrderCheckoutCommonService } from './order-checkout-common.service';
-import { OrderCheckoutGroupService } from './order-checkout-group.service';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+  Logger,
+} from "@nestjs/common";
+import { randomUUID } from "crypto";
+import { PrismaService } from "../../prisma";
+import { i18nMessage } from "../i18n";
+import { CreateOrderDto, DirectBuyDto, CheckoutDto } from "./dto";
+import {
+  OrderStatus,
+  OfferStatus,
+  ProductStatus,
+  Prisma,
+} from "@prisma/client";
+import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
+import { EventService } from "../events";
+import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto";
+import { DiscountService } from "../discount";
+import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
+import { OrderPricingService } from "./order-pricing.service";
+import { OrderCommonService } from "./order-common.service";
+import { OrderCheckoutCommonService } from "./order-checkout-common.service";
+import { OrderCheckoutGroupService } from "./order-checkout-group.service";
 
 /**
  * Grup dışı satın alma akışları: Hızlı Al (createDirectOrder), teklif→sipariş (create)
@@ -50,13 +61,15 @@ export class OrderCheckoutDirectService {
   async createDirectOrder(buyerId: string, dto: DirectBuyDto) {
     this.logger.log(`[createDirectOrder] Starting order for buyer: ${buyerId}`);
     this.logger.log(`[createDirectOrder] DTO: ${JSON.stringify(dto)}`);
-    
+
     // Validate DTO has necessary address info
     if (!dto.shippingAddressId && !dto.shippingAddress) {
-      this.logger.error('[createDirectOrder] No shipping address provided');
-      throw new BadRequestException(i18nMessage('server.order.shippingAddressRequiredWithFields'));
+      this.logger.error("[createDirectOrder] No shipping address provided");
+      throw new BadRequestException(
+        i18nMessage("server.order.shippingAddressRequiredWithFields"),
+      );
     }
-    
+
     // Check if user is banned
     const buyer = await this.prisma.user.findUnique({
       where: { id: buyerId },
@@ -64,7 +77,7 @@ export class OrderCheckoutDirectService {
     });
 
     if (buyer?.isBanned) {
-      throw new ForbiddenException(i18nMessage('server.order.accountBanned'));
+      throw new ForbiddenException(i18nMessage("server.order.accountBanned"));
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -75,7 +88,9 @@ export class OrderCheckoutDirectService {
         FOR UPDATE
       `;
       if (!lockedRows?.length) {
-        throw new NotFoundException(i18nMessage('server.order.productNotFound'));
+        throw new NotFoundException(
+          i18nMessage("server.order.productNotFound"),
+        );
       }
 
       const product = await tx.product.findUnique({
@@ -88,7 +103,9 @@ export class OrderCheckoutDirectService {
       });
 
       if (!product) {
-        throw new NotFoundException(i18nMessage('server.order.productNotFound'));
+        throw new NotFoundException(
+          i18nMessage("server.order.productNotFound"),
+        );
       }
 
       // Aynı alıcının bu ürün için bekleyen (ödeme yapılmamış) siparişi varsa onu döndür, yeni sipariş açma
@@ -98,7 +115,7 @@ export class OrderCheckoutDirectService {
           buyerId,
           status: OrderStatus.pending_payment,
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
       });
       if (existingOrder) {
         const numTotal = Number(existingOrder.totalAmount);
@@ -110,28 +127,35 @@ export class OrderCheckoutDirectService {
           totalAmount: numTotal,
           subtotal: numSubtotal,
           discountAmount: numDiscount,
-          appliedCouponCode: (existingOrder.discountCode as string) ?? undefined,
+          appliedCouponCode:
+            (existingOrder.discountCode as string) ?? undefined,
           productId: dto.productId,
-          paymentUrl: '',
-          provider: 'paytr',
+          paymentUrl: "",
+          provider: "paytr",
           existingOrder: true,
         };
       }
 
       // Ürün satışta değilse (sold, inactive vb.) hata ver
       if (product.status !== ProductStatus.active) {
-        throw new BadRequestException(i18nMessage('server.order.productNotActive'));
+        throw new BadRequestException(
+          i18nMessage("server.order.productNotActive"),
+        );
       }
 
       // Adet bazlı stok kontrolü: müsait adet >= 1 olmalı
       const available = getAvailableQuantity(product);
       if (available !== null && available < 1) {
-        throw new BadRequestException(i18nMessage('server.order.productOutOfStock'));
+        throw new BadRequestException(
+          i18nMessage("server.order.productOutOfStock"),
+        );
       }
 
       // Cannot buy own product
       if (product.sellerId === buyerId) {
-        throw new ForbiddenException(i18nMessage('server.order.cannotBuyOwnProduct'));
+        throw new ForbiddenException(
+          i18nMessage("server.order.cannotBuyOwnProduct"),
+        );
       }
 
       // Resolve shipping address - either from saved address or inline address
@@ -145,33 +169,45 @@ export class OrderCheckoutDirectService {
         });
 
         if (!savedAddress || savedAddress.userId !== buyerId) {
-          throw new BadRequestException(i18nMessage('server.order.invalidShippingAddress'));
+          throw new BadRequestException(
+            i18nMessage("server.order.invalidShippingAddress"),
+          );
         }
         shippingAddress = savedAddress;
         shippingAddressId = savedAddress.id;
       } else if (dto.shippingAddress) {
         // Validate required fields
         if (!dto.shippingAddress.fullName?.trim()) {
-          throw new BadRequestException(i18nMessage('server.order.shippingAddressNameRequired'));
+          throw new BadRequestException(
+            i18nMessage("server.order.shippingAddressNameRequired"),
+          );
         }
         if (!dto.shippingAddress.phone?.trim()) {
-          throw new BadRequestException(i18nMessage('server.order.shippingAddressPhoneRequired'));
+          throw new BadRequestException(
+            i18nMessage("server.order.shippingAddressPhoneRequired"),
+          );
         }
         if (!dto.shippingAddress.city?.trim()) {
-          throw new BadRequestException(i18nMessage('server.order.shippingAddressCityRequired'));
+          throw new BadRequestException(
+            i18nMessage("server.order.shippingAddressCityRequired"),
+          );
         }
         if (!dto.shippingAddress.district?.trim()) {
-          throw new BadRequestException(i18nMessage('server.order.shippingAddressDistrictRequired'));
+          throw new BadRequestException(
+            i18nMessage("server.order.shippingAddressDistrictRequired"),
+          );
         }
         if (!dto.shippingAddress.address?.trim()) {
-          throw new BadRequestException(i18nMessage('server.order.shippingAddressLineRequired'));
+          throw new BadRequestException(
+            i18nMessage("server.order.shippingAddressLineRequired"),
+          );
         }
-        
+
         // Use inline address object - create a new address for the user
         const newAddress = await tx.address.create({
           data: {
             userId: buyerId,
-            title: 'Sipariş Adresi',
+            title: "Sipariş Adresi",
             fullName: dto.shippingAddress.fullName.trim(),
             phone: dto.shippingAddress.phone.trim(),
             city: dto.shippingAddress.city.trim(),
@@ -184,29 +220,45 @@ export class OrderCheckoutDirectService {
         shippingAddress = newAddress;
         shippingAddressId = newAddress.id;
       } else {
-        throw new BadRequestException(i18nMessage('server.order.shippingAddressRequired'));
+        throw new BadRequestException(
+          i18nMessage("server.order.shippingAddressRequired"),
+        );
       }
 
       // Resolve billing address: inline object > saved address ID > same as shipping
       let billingAddress = shippingAddress;
-      if (dto.billingAddress && dto.billingAddress.fullName?.trim() && dto.billingAddress.city?.trim() && dto.billingAddress.address?.trim()) {
+      if (
+        dto.billingAddress &&
+        dto.billingAddress.fullName?.trim() &&
+        dto.billingAddress.city?.trim() &&
+        dto.billingAddress.address?.trim()
+      ) {
         // Inline billing address (no need to save in profile)
         billingAddress = {
-          id: '',
-          title: 'Fatura Adresi',
+          id: "",
+          title: "Fatura Adresi",
           fullName: dto.billingAddress.fullName.trim(),
-          phone: (dto.billingAddress.phone || shippingAddress.phone || '').trim(),
+          phone: (
+            dto.billingAddress.phone ||
+            shippingAddress.phone ||
+            ""
+          ).trim(),
           city: dto.billingAddress.city.trim(),
-          district: (dto.billingAddress.district || '').trim(),
+          district: (dto.billingAddress.district || "").trim(),
           address: dto.billingAddress.address.trim(),
           zipCode: dto.billingAddress.zipCode?.trim() || null,
         };
-      } else if (dto.billingAddressId && dto.billingAddressId !== shippingAddressId) {
+      } else if (
+        dto.billingAddressId &&
+        dto.billingAddressId !== shippingAddressId
+      ) {
         const billing = await tx.address.findUnique({
           where: { id: dto.billingAddressId },
         });
         if (!billing || billing.userId !== buyerId) {
-          throw new BadRequestException(i18nMessage('server.order.invalidBillingAddress'));
+          throw new BadRequestException(
+            i18nMessage("server.order.invalidBillingAddress"),
+          );
         }
         billingAddress = billing;
       }
@@ -218,34 +270,37 @@ export class OrderCheckoutDirectService {
         product.oldPrice != null &&
         (!product.saleStartDate || now >= new Date(product.saleStartDate)) &&
         (!product.saleEndDate || now <= new Date(product.saleEndDate));
-      const originalPrice = isSaleActive && product.oldPrice != null
-        ? Number(product.oldPrice)
-        : productPrice;
+      const originalPrice =
+        isSaleActive && product.oldPrice != null
+          ? Number(product.oldPrice)
+          : productPrice;
       const productDiscount = isSaleActive ? originalPrice - productPrice : 0;
-      
+
       // Apply coupon discount if provided
       let couponDiscount = 0;
       let appliedCouponCode: string | null = null;
       let appliedDiscountId: string | null = null;
-      
+
       if (dto.couponCode) {
         const validation = await this.discountService.validateCoupon(
-          { 
-            code: dto.couponCode, 
-            cartItems: [{ productId: dto.productId, quantity: 1 }] 
+          {
+            code: dto.couponCode,
+            cartItems: [{ productId: dto.productId, quantity: 1 }],
           },
           buyerId,
         );
-        
+
         if (validation.isValid && validation.discount) {
           couponDiscount = validation.discount.estimatedDiscount;
           appliedCouponCode = dto.couponCode.toUpperCase();
           appliedDiscountId = validation.discount.id;
         } else if (!validation.isValid) {
-          throw new BadRequestException(validation.error || i18nMessage('server.order.invalidCouponCode'));
+          throw new BadRequestException(
+            validation.error || i18nMessage("server.order.invalidCouponCode"),
+          );
         }
       }
-      
+
       // Calculate total discount and subtotal
       const totalDiscount = productDiscount + couponDiscount;
       const subtotal = originalPrice;
@@ -260,11 +315,21 @@ export class OrderCheckoutDirectService {
       );
 
       // Calculate shipping cost (free shipping for orders >= 500 TL)
-      const shippingCost = await this.orderPricing.calculateShippingCost(discountedPrice);
+      const shippingCost =
+        await this.orderPricing.calculateShippingCost(discountedPrice);
       // KDV + stopaj: kurumsal satıcı ise ürün fiyatı üzerinden
-      const { taxAmount, withholdingTaxAmount } = await this.checkoutCommon.resolveSellerTaxes(product.sellerId, product.categoryId, discountedPrice);
+      const { taxAmount, withholdingTaxAmount } =
+        await this.checkoutCommon.resolveSellerTaxes(
+          product.sellerId,
+          product.categoryId,
+          discountedPrice,
+        );
       // Buyer fee + KDV eklenir (stopaj alıcı tutarını etkilemez; satıcı payout'undan kesilir)
-      const totalAmount = discountedPrice + shippingCost + commissionResult.buyerFeeAmount + taxAmount;
+      const totalAmount =
+        discountedPrice +
+        shippingCost +
+        commissionResult.buyerFeeAmount +
+        taxAmount;
 
       // Generate order number
       const orderNumber = await this.checkoutCommon.generateOrderNumber();
@@ -274,11 +339,11 @@ export class OrderCheckoutDirectService {
         this.checkoutCommon.buildSuratIdempotencyKey([
           buyerId,
           dto.productId,
-          String(shippingAddressId || ''),
+          String(shippingAddressId || ""),
           dto.shippingAddress
             ? `${dto.shippingAddress.city}|${dto.shippingAddress.phone}|${dto.shippingAddress.address}`
-            : '',
-          dto.couponCode || '',
+            : "",
+          dto.couponCode || "",
         ]);
 
       await this.checkoutCommon.assertSuratShipmentSucceeded({
@@ -304,7 +369,7 @@ export class OrderCheckoutDirectService {
       // Build shippingAddress JSON; add billing snapshot when different from shipping
       const shippingAddressJson: Record<string, unknown> = {
         id: shippingAddress.id,
-        title: shippingAddress.title || 'Teslimat Adresi',
+        title: shippingAddress.title || "Teslimat Adresi",
         fullName: shippingAddress.fullName,
         phone: shippingAddress.phone,
         city: shippingAddress.city,
@@ -349,12 +414,15 @@ export class OrderCheckoutDirectService {
           subtotal,
           discountAmount: totalDiscount,
           discountCode: appliedCouponCode,
-          discountBreakdown: totalDiscount > 0 ? {
-            productDiscount,
-            couponDiscount,
-            appliedDiscountId,
-            originalPrice,
-          } : undefined,
+          discountBreakdown:
+            totalDiscount > 0
+              ? {
+                  productDiscount,
+                  couponDiscount,
+                  appliedDiscountId,
+                  originalPrice,
+                }
+              : undefined,
           shippingCost,
           taxAmount,
           withholdingTaxAmount,
@@ -369,7 +437,7 @@ export class OrderCheckoutDirectService {
         include: {
           product: {
             include: {
-              images: { take: 1, orderBy: { sortOrder: 'asc' } },
+              images: { take: 1, orderBy: { sortOrder: "asc" } },
             },
           },
           buyer: {
@@ -405,13 +473,19 @@ export class OrderCheckoutDirectService {
           order.id,
           couponDiscount,
         );
-        this.logger.log(`Discount usage recorded: ${appliedDiscountId} for order ${orderNumber}`);
+        this.logger.log(
+          `Discount usage recorded: ${appliedDiscountId} for order ${orderNumber}`,
+        );
       }
 
       // Emit order.created event (outside transaction but still in the method)
       // This sends notification emails and push notifications
       try {
-        const createdOrder = order as typeof order & { product: { title: string }; buyer: { email: string; displayName: string | null }; seller: { email: string | null; displayName: string | null } };
+        const createdOrder = order as typeof order & {
+          product: { title: string };
+          buyer: { email: string; displayName: string | null };
+          seller: { email: string | null; displayName: string | null };
+        };
         await this.eventService.emitOrderCreated({
           orderId: createdOrder.id,
           orderNumber: createdOrder.orderNumber,
@@ -422,10 +496,12 @@ export class OrderCheckoutDirectService {
           totalAmount,
           buyerEmail: createdOrder.buyer.email,
           buyerName: createdOrder.buyer.displayName || createdOrder.buyer.email,
-          sellerEmail: createdOrder.seller.email || '',
-          sellerName: createdOrder.seller.displayName || 'Satıcı',
+          sellerEmail: createdOrder.seller.email || "",
+          sellerName: createdOrder.seller.displayName || "Satıcı",
         });
-        this.logger.log(`order.created event emitted for order ${createdOrder.orderNumber}`);
+        this.logger.log(
+          `order.created event emitted for order ${createdOrder.orderNumber}`,
+        );
       } catch (error) {
         // Log but don't fail the order creation
         this.logger.error(`Failed to emit order.created event: ${error}`);
@@ -440,8 +516,8 @@ export class OrderCheckoutDirectService {
         discountAmount: totalDiscount,
         appliedCouponCode: appliedCouponCode ?? undefined,
         productId: dto.productId,
-        paymentUrl: '',
-        provider: 'paytr',
+        paymentUrl: "",
+        provider: "paytr",
       };
     });
 
@@ -462,7 +538,7 @@ export class OrderCheckoutDirectService {
       select: { isBanned: true },
     });
     if (buyer?.isBanned) {
-      throw new ForbiddenException(i18nMessage('server.order.accountBanned'));
+      throw new ForbiddenException(i18nMessage("server.order.accountBanned"));
     }
 
     return this.group.createCheckoutGroup({ buyerId, dto, isGuest: false });
@@ -485,10 +561,10 @@ export class OrderCheckoutDirectService {
     });
 
     if (buyer?.isBanned) {
-      throw new ForbiddenException(i18nMessage('server.order.accountBanned'));
+      throw new ForbiddenException(i18nMessage("server.order.accountBanned"));
     }
     let productIdForCache: string | null = null;
-    
+
     const result = await this.prisma.$transaction(async (tx) => {
       // Get and validate offer
       const offer = await tx.offer.findUnique({
@@ -496,24 +572,28 @@ export class OrderCheckoutDirectService {
         include: {
           product: {
             include: {
-              images: { take: 1, orderBy: { sortOrder: 'asc' } },
+              images: { take: 1, orderBy: { sortOrder: "asc" } },
             },
           },
         },
       });
 
       if (!offer) {
-        throw new NotFoundException(i18nMessage('server.order.offerNotFound'));
+        throw new NotFoundException(i18nMessage("server.order.offerNotFound"));
       }
 
       // Only buyer can create order
       if (offer.buyerId !== buyerId) {
-        throw new ForbiddenException(i18nMessage('server.order.offerOrderForbidden'));
+        throw new ForbiddenException(
+          i18nMessage("server.order.offerOrderForbidden"),
+        );
       }
 
       // Offer must be accepted
       if (offer.status !== OfferStatus.accepted) {
-        throw new BadRequestException(i18nMessage('server.order.offerNotAccepted'));
+        throw new BadRequestException(
+          i18nMessage("server.order.offerNotAccepted"),
+        );
       }
 
       // Check if order already exists for this offer
@@ -522,7 +602,9 @@ export class OrderCheckoutDirectService {
       });
 
       if (existingOrder) {
-        throw new BadRequestException(i18nMessage('server.order.offerAlreadyHasOrder'));
+        throw new BadRequestException(
+          i18nMessage("server.order.offerAlreadyHasOrder"),
+        );
       }
 
       // Validate shipping address belongs to buyer
@@ -531,7 +613,9 @@ export class OrderCheckoutDirectService {
       });
 
       if (!shippingAddress || shippingAddress.userId !== buyerId) {
-        throw new BadRequestException(i18nMessage('server.order.invalidShippingAddress'));
+        throw new BadRequestException(
+          i18nMessage("server.order.invalidShippingAddress"),
+        );
       }
 
       // Validate billing address if provided
@@ -542,7 +626,9 @@ export class OrderCheckoutDirectService {
         });
 
         if (!billingAddress || billingAddress.userId !== buyerId) {
-          throw new BadRequestException(i18nMessage('server.order.invalidBillingAddress'));
+          throw new BadRequestException(
+            i18nMessage("server.order.invalidBillingAddress"),
+          );
         }
       }
 
@@ -558,7 +644,11 @@ export class OrderCheckoutDirectService {
 
       const suratIdempotencyKeyOffer =
         dto.idempotencyKey?.trim() ||
-        this.checkoutCommon.buildSuratIdempotencyKey([buyerId, dto.offerId, dto.shippingAddressId]);
+        this.checkoutCommon.buildSuratIdempotencyKey([
+          buyerId,
+          dto.offerId,
+          dto.shippingAddressId,
+        ]);
 
       await this.checkoutCommon.assertSuratShipmentSucceeded({
         correlationId: randomUUID(),
@@ -574,23 +664,31 @@ export class OrderCheckoutDirectService {
       });
 
       // KDV + stopaj: kurumsal satıcı ise ürün fiyatı üzerinden
-      const { taxAmount: offerTaxAmount, withholdingTaxAmount: offerWithholdingAmount } =
-        await this.checkoutCommon.resolveSellerTaxes(offer.sellerId, offer.product.categoryId, Number(offer.amount));
+      const {
+        taxAmount: offerTaxAmount,
+        withholdingTaxAmount: offerWithholdingAmount,
+      } = await this.checkoutCommon.resolveSellerTaxes(
+        offer.sellerId,
+        offer.product.categoryId,
+        Number(offer.amount),
+      );
       // Buyer fee + KDV eklenir (stopaj satıcı payout'undan kesilir)
-      const totalAmount = Number(offer.amount) + commissionResult.buyerFeeAmount + offerTaxAmount;
+      const totalAmount =
+        Number(offer.amount) + commissionResult.buyerFeeAmount + offerTaxAmount;
 
-      const offerShippingJson: Record<string, unknown> | undefined = shippingAddress
-        ? {
-            id: shippingAddress.id,
-            title: shippingAddress.title,
-            fullName: shippingAddress.fullName,
-            phone: shippingAddress.phone,
-            city: shippingAddress.city,
-            district: shippingAddress.district,
-            address: shippingAddress.address,
-            zipCode: shippingAddress.zipCode,
-          }
-        : undefined;
+      const offerShippingJson: Record<string, unknown> | undefined =
+        shippingAddress
+          ? {
+              id: shippingAddress.id,
+              title: shippingAddress.title,
+              fullName: shippingAddress.fullName,
+              phone: shippingAddress.phone,
+              city: shippingAddress.city,
+              district: shippingAddress.district,
+              address: shippingAddress.address,
+              zipCode: shippingAddress.zipCode,
+            }
+          : undefined;
       if (offerShippingJson && this.suratCargoService.isIntegrationEnabled()) {
         offerShippingJson.suratIdempotencyKey = suratIdempotencyKeyOffer;
       }
@@ -623,19 +721,30 @@ export class OrderCheckoutDirectService {
           status: OrderStatus.pending_payment,
           paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
           shippingAddressId: dto.shippingAddressId,
-          shippingAddress: offerShippingJson as Prisma.InputJsonValue | undefined,
+          shippingAddress: offerShippingJson as
+            Prisma.InputJsonValue | undefined,
         },
         include: {
           product: {
             include: {
-              images: { take: 1, orderBy: { sortOrder: 'asc' } },
+              images: { take: 1, orderBy: { sortOrder: "asc" } },
             },
           },
           buyer: {
-            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+            select: {
+              id: true,
+              displayName: true,
+              isVerified: true,
+              avatarUrl: true,
+            },
           },
           seller: {
-            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+            select: {
+              id: true,
+              displayName: true,
+              isVerified: true,
+              avatarUrl: true,
+            },
           },
         },
       });
@@ -660,27 +769,33 @@ export class OrderCheckoutDirectService {
     // Invalidate product cache after successful transaction
     if (productIdForCache) {
       await this.orderCommon.invalidateProductCaches(productIdForCache);
-      
+
       // Send notifications about product sold
-      await this.sendProductSoldNotifications(productIdForCache, result.seller?.id);
+      await this.sendProductSoldNotifications(
+        productIdForCache,
+        result.seller?.id,
+      );
     }
-    
+
     return result;
   }
 
   /**
    * Send notifications when product is sold
    */
-  private async sendProductSoldNotifications(productId: string, sellerId?: string): Promise<void> {
+  private async sendProductSoldNotifications(
+    productId: string,
+    sellerId?: string,
+  ): Promise<void> {
     try {
       // Get product details
       const product = await this.prisma.product.findUnique({
         where: { id: productId },
         select: { id: true, title: true, sellerId: true },
       });
-      
+
       if (!product) return;
-      
+
       const actualSellerId = sellerId || product.sellerId;
 
       // NOTE: We intentionally do NOT notify the seller here. This runs at order creation
@@ -693,7 +808,7 @@ export class OrderCheckoutDirectService {
         where: { productId },
         include: { wishlist: { select: { userId: true } } },
       });
-      
+
       for (const entry of wishlistEntries) {
         const userId = entry.wishlist.userId;
         if (userId !== actualSellerId) {
@@ -708,7 +823,7 @@ export class OrderCheckoutDirectService {
         }
       }
     } catch (error) {
-      this.logger.error('Failed to send product sold notifications:', error);
+      this.logger.error("Failed to send product sold notifications:", error);
     }
   }
 }

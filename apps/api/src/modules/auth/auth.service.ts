@@ -76,7 +76,9 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new ConflictException(i18nMessage("server.auth.emailAlreadyRegistered"));
+      throw new ConflictException(
+        i18nMessage("server.auth.emailAlreadyRegistered"),
+      );
     }
 
     // Check if phone already exists (if provided)
@@ -86,7 +88,9 @@ export class AuthService {
       });
 
       if (existingPhone) {
-        throw new ConflictException(i18nMessage("server.auth.phoneAlreadyRegistered"));
+        throw new ConflictException(
+          i18nMessage("server.auth.phoneAlreadyRegistered"),
+        );
       }
     }
 
@@ -108,7 +112,9 @@ export class AuthService {
         throw new BadRequestException(i18nMessage("server.auth.minAge18"));
       }
     } else {
-      throw new BadRequestException(i18nMessage("server.auth.birthDateRequired"));
+      throw new BadRequestException(
+        i18nMessage("server.auth.birthDateRequired"),
+      );
     }
 
     // Hash password
@@ -357,11 +363,15 @@ export class AuthService {
         // kuruluyor (server.auth.emailVerificationAlreadyDone).
         return { alreadyVerified: true };
       }
-      throw new BadRequestException(i18nMessage("server.auth.emailVerificationLinkUsed"));
+      throw new BadRequestException(
+        i18nMessage("server.auth.emailVerificationLinkUsed"),
+      );
     }
 
     if (verificationToken.expiresAt < new Date()) {
-      throw new BadRequestException(i18nMessage("server.auth.emailVerificationLinkExpired"));
+      throw new BadRequestException(
+        i18nMessage("server.auth.emailVerificationLinkExpired"),
+      );
     }
 
     // Mark email as verified
@@ -392,7 +402,9 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new ConflictException(i18nMessage("server.auth.emailAlreadyRegistered"));
+      throw new ConflictException(
+        i18nMessage("server.auth.emailAlreadyRegistered"),
+      );
     }
 
     // Check if phone already exists
@@ -401,7 +413,9 @@ export class AuthService {
     });
 
     if (existingPhone) {
-      throw new ConflictException(i18nMessage("server.auth.phoneAlreadyRegistered"));
+      throw new ConflictException(
+        i18nMessage("server.auth.phoneAlreadyRegistered"),
+      );
     }
 
     // Check if company name already exists (must be unique for business accounts)
@@ -412,7 +426,9 @@ export class AuthService {
     });
 
     if (existingCompanyName) {
-      throw new ConflictException(i18nMessage("server.auth.companyNameAlreadyRegistered"));
+      throw new ConflictException(
+        i18nMessage("server.auth.companyNameAlreadyRegistered"),
+      );
     }
 
     // Check if tax ID already exists
@@ -422,7 +438,9 @@ export class AuthService {
       });
 
       if (existingTaxId) {
-        throw new ConflictException(i18nMessage("server.auth.taxIdAlreadyRegistered"));
+        throw new ConflictException(
+          i18nMessage("server.auth.taxIdAlreadyRegistered"),
+        );
       }
     }
 
@@ -487,7 +505,9 @@ export class AuthService {
     }
 
     if (user.isEmailVerified) {
-      throw new BadRequestException(i18nMessage("server.auth.emailAlreadyVerified"));
+      throw new BadRequestException(
+        i18nMessage("server.auth.emailAlreadyVerified"),
+      );
     }
 
     await this.sendEmailVerification(userId, user.email);
@@ -517,7 +537,9 @@ export class AuthService {
           email: dto.email,
           reason: "user_not_found",
         });
-        throw new UnauthorizedException(i18nMessage("server.auth.invalidCredentials"));
+        throw new UnauthorizedException(
+          i18nMessage("server.auth.invalidCredentials"),
+        );
       }
 
       // Silinmiş (anonimleştirilmiş) hesap: kaynakta reddet, token üretme.
@@ -527,7 +549,9 @@ export class AuthService {
           userId: user.id,
           reason: "deleted_account",
         });
-        throw new UnauthorizedException(i18nMessage("server.auth.invalidCredentials"));
+        throw new UnauthorizedException(
+          i18nMessage("server.auth.invalidCredentials"),
+        );
       }
 
       // Guard: OAuth-only accounts have no passwordHash — avoid bcrypt throwing on null
@@ -537,7 +561,9 @@ export class AuthService {
           userId: user.id,
           reason: "oauth_only_account",
         });
-        throw new UnauthorizedException(i18nMessage("server.auth.invalidCredentials"));
+        throw new UnauthorizedException(
+          i18nMessage("server.auth.invalidCredentials"),
+        );
       }
 
       // Verify password
@@ -553,7 +579,9 @@ export class AuthService {
           userId: user.id,
           reason: "invalid_password",
         });
-        throw new UnauthorizedException(i18nMessage("server.auth.invalidCredentials"));
+        throw new UnauthorizedException(
+          i18nMessage("server.auth.invalidCredentials"),
+        );
       }
 
       // Check if email is verified - require email verification before login
@@ -663,12 +691,16 @@ export class AuthService {
 
     if (!user || !user.adminUser) {
       this.logger.warn("Admin login failed: user not found or no admin user");
-      throw new UnauthorizedException(i18nMessage("server.auth.invalidCredentials"));
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.invalidCredentials"),
+      );
     }
 
     if (!user.adminUser.isActive) {
       this.logger.warn("Admin login failed: admin account inactive");
-      throw new UnauthorizedException(i18nMessage("server.auth.adminAccountDeactivated"));
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.adminAccountDeactivated"),
+      );
     }
 
     const isPasswordValid = await bcrypt.compare(
@@ -677,7 +709,9 @@ export class AuthService {
     );
     if (!isPasswordValid) {
       this.logger.warn("Admin login failed: invalid password");
-      throw new UnauthorizedException(i18nMessage("server.auth.invalidCredentials"));
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.invalidCredentials"),
+      );
     }
 
     // Generate admin tokens (using separate secret)
@@ -745,7 +779,9 @@ export class AuthService {
     // Admin refresh: hesabın hâlâ aktif admin olduğunu doğrula, admin token üret.
     if (opts?.isAdmin) {
       if (!user.adminUser?.isActive) {
-        throw new UnauthorizedException(i18nMessage("server.auth.adminAccountNotFoundOrInactive"));
+        throw new UnauthorizedException(
+          i18nMessage("server.auth.adminAccountNotFoundOrInactive"),
+        );
       }
       return this.generateAdminTokens(user.id, user.email, user.adminUser.role);
     }
@@ -974,7 +1010,9 @@ export class AuthService {
     refreshToken: string,
   ): Promise<void> {
     if (!refreshToken) {
-      throw new UnauthorizedException(i18nMessage("server.auth.invalidRefreshToken"));
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.invalidRefreshToken"),
+      );
     }
     const tokenHash = this.hashToken(refreshToken);
     const existing = await this.prisma.refreshToken.findUnique({
@@ -983,13 +1021,19 @@ export class AuthService {
 
     if (existing) {
       if (existing.revokedAt) {
-        throw new UnauthorizedException(i18nMessage("server.auth.refreshTokenRevoked"));
+        throw new UnauthorizedException(
+          i18nMessage("server.auth.refreshTokenRevoked"),
+        );
       }
       if (existing.expiresAt < new Date()) {
-        throw new UnauthorizedException(i18nMessage("server.auth.refreshTokenExpired"));
+        throw new UnauthorizedException(
+          i18nMessage("server.auth.refreshTokenExpired"),
+        );
       }
       if (existing.userId !== userId) {
-        throw new UnauthorizedException(i18nMessage("server.auth.invalidRefreshToken"));
+        throw new UnauthorizedException(
+          i18nMessage("server.auth.invalidRefreshToken"),
+        );
       }
       // Geçerli → rotasyon: eskiyi iptal et (tekrar kullanılırsa yukarıda reddedilir).
       await this.prisma.refreshToken.update({
@@ -1099,15 +1143,21 @@ export class AuthService {
     });
 
     if (!resetToken) {
-      throw new BadRequestException(i18nMessage("server.auth.resetTokenInvalidOrExpired"));
+      throw new BadRequestException(
+        i18nMessage("server.auth.resetTokenInvalidOrExpired"),
+      );
     }
 
     if (resetToken.usedAt) {
-      throw new BadRequestException(i18nMessage("server.auth.resetTokenAlreadyUsed"));
+      throw new BadRequestException(
+        i18nMessage("server.auth.resetTokenAlreadyUsed"),
+      );
     }
 
     if (resetToken.expiresAt < new Date()) {
-      throw new BadRequestException(i18nMessage("server.auth.resetTokenExpired"));
+      throw new BadRequestException(
+        i18nMessage("server.auth.resetTokenExpired"),
+      );
     }
 
     // Hash new password
@@ -1145,10 +1195,14 @@ export class AuthService {
     // Silinmiş/banlı satıra token verme: aksi halde login "başarılı" olur ama
     // ilk korumalı istekte guard reddeder → kafa karıştırıcı "askıya alındı" ekranı.
     if (user.deletedAt) {
-      throw new UnauthorizedException(i18nMessage("server.auth.accountDeleted"));
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.accountDeleted"),
+      );
     }
     if (user.isBanned) {
-      throw new UnauthorizedException(i18nMessage("server.auth.accountSuspended"));
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.accountSuspended"),
+      );
     }
 
     const tokens = await this.generateTokens(

@@ -257,7 +257,9 @@ export class ProductController {
   })
   async getMyListingStats(@CurrentUser("id") sellerId: string) {
     if (!sellerId) {
-      throw new BadRequestException(i18nMessage("server.product.userIdNotFound"));
+      throw new BadRequestException(
+        i18nMessage("server.product.userIdNotFound"),
+      );
     }
     try {
       return await this.productService.getSellerListingStats(sellerId);
@@ -273,7 +275,9 @@ export class ProductController {
         "getMyListingStats failed",
         error instanceof Error ? error.stack : String(error),
       );
-      throw new BadRequestException(i18nMessage("server.product.listingStatsFailed"));
+      throw new BadRequestException(
+        i18nMessage("server.product.listingStatsFailed"),
+      );
     }
   }
 
@@ -342,7 +346,9 @@ export class ProductController {
       new ParseUUIDPipe({
         errorHttpStatusCode: 400,
         exceptionFactory: () =>
-          new BadRequestException(i18nMessage("server.product.invalidIdFormat")),
+          new BadRequestException(
+            i18nMessage("server.product.invalidIdFormat"),
+          ),
       }),
     )
     id: string,
@@ -398,7 +404,9 @@ export class ProductController {
       new ParseUUIDPipe({
         errorHttpStatusCode: 400,
         exceptionFactory: () =>
-          new BadRequestException(i18nMessage("server.product.invalidIdFormat")),
+          new BadRequestException(
+            i18nMessage("server.product.invalidIdFormat"),
+          ),
       }),
     )
     id: string,
@@ -432,7 +440,9 @@ export class ProductController {
       new ParseUUIDPipe({
         errorHttpStatusCode: 400,
         exceptionFactory: () =>
-          new BadRequestException(i18nMessage("server.product.invalidIdFormat")),
+          new BadRequestException(
+            i18nMessage("server.product.invalidIdFormat"),
+          ),
       }),
     )
     id: string,
@@ -469,7 +479,9 @@ export class ProductController {
       new ParseUUIDPipe({
         errorHttpStatusCode: 400,
         exceptionFactory: () =>
-          new BadRequestException(i18nMessage("server.product.invalidIdFormat")),
+          new BadRequestException(
+            i18nMessage("server.product.invalidIdFormat"),
+          ),
       }),
     )
     id: string,
@@ -512,7 +524,9 @@ export class ProductController {
       new ParseUUIDPipe({
         errorHttpStatusCode: 400,
         exceptionFactory: () =>
-          new BadRequestException(i18nMessage("server.product.invalidIdFormat")),
+          new BadRequestException(
+            i18nMessage("server.product.invalidIdFormat"),
+          ),
       }),
     )
     id: string,
@@ -549,7 +563,9 @@ export class ProductController {
       new ParseUUIDPipe({
         errorHttpStatusCode: 400,
         exceptionFactory: () =>
-          new BadRequestException(i18nMessage("server.product.invalidIdFormat")),
+          new BadRequestException(
+            i18nMessage("server.product.invalidIdFormat"),
+          ),
       }),
     )
     id: string,
@@ -583,7 +599,9 @@ export class ProductController {
       new ParseUUIDPipe({
         errorHttpStatusCode: 400,
         exceptionFactory: () =>
-          new BadRequestException(i18nMessage("server.product.invalidIdFormat")),
+          new BadRequestException(
+            i18nMessage("server.product.invalidIdFormat"),
+          ),
       }),
     )
     id: string,
@@ -638,7 +656,9 @@ export class ProductController {
       new ParseUUIDPipe({
         errorHttpStatusCode: 400,
         exceptionFactory: () =>
-          new BadRequestException(i18nMessage("server.product.invalidIdFormat")),
+          new BadRequestException(
+            i18nMessage("server.product.invalidIdFormat"),
+          ),
       }),
     )
     id: string,
@@ -672,7 +692,9 @@ export class ProductController {
       new ParseUUIDPipe({
         errorHttpStatusCode: 400,
         exceptionFactory: () =>
-          new BadRequestException(i18nMessage("server.product.invalidIdFormat")),
+          new BadRequestException(
+            i18nMessage("server.product.invalidIdFormat"),
+          ),
       }),
     )
     id: string,

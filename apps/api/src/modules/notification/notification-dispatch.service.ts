@@ -7,30 +7,38 @@
  * sub-services (commerce/account) and the NotificationService facade delegate
  * to this single engine.
  */
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../prisma';
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { PrismaService } from "../../prisma";
 import {
   SendNotificationDto,
   NotificationType,
   NotificationChannel,
   RegisterPushTokenDto,
-} from './dto';
-import { SendGridProvider } from './providers/sendgrid.provider';
-import { ExpoPushProvider } from './providers/expo-push.provider';
-import { SmsProvider } from './providers/sms.provider';
-import { SmtpProvider } from './providers/smtp.provider';
-import { RealtimeService } from '../websocket/realtime.service';
-import { renderEmailTemplate, getEmailTemplateSubject } from '../../common/helpers/email-template-renderer';
+} from "./dto";
+import { SendGridProvider } from "./providers/sendgrid.provider";
+import { ExpoPushProvider } from "./providers/expo-push.provider";
+import { SmsProvider } from "./providers/sms.provider";
+import { SmtpProvider } from "./providers/smtp.provider";
+import { RealtimeService } from "../websocket/realtime.service";
+import {
+  renderEmailTemplate,
+  getEmailTemplateSubject,
+} from "../../common/helpers/email-template-renderer";
 import {
   resolveSettings,
   shouldDeliver,
   DeliveryChannel,
-} from './notification-preferences';
-import { NotificationSettings } from '../user/dto/notification-settings.dto';
-import { NOTIFICATION_TEMPLATES } from './notification-templates';
-import { type Locale, type MessageValues, defaultLocale, isLocale } from '@tarodan/i18n';
-import { I18nService } from '../i18n/i18n.service';
+} from "./notification-preferences";
+import { NotificationSettings } from "../user/dto/notification-settings.dto";
+import { NOTIFICATION_TEMPLATES } from "./notification-templates";
+import {
+  type Locale,
+  type MessageValues,
+  defaultLocale,
+  isLocale,
+} from "@tarodan/i18n";
+import { I18nService } from "../i18n/i18n.service";
 
 @Injectable()
 export class NotificationDispatchService {
@@ -62,7 +70,9 @@ export class NotificationDispatchService {
     });
     return {
       settings: resolveSettings(user?.notificationSettings),
-      locale: isLocale(user?.preferredLanguage) ? user.preferredLanguage : defaultLocale,
+      locale: isLocale(user?.preferredLanguage)
+        ? user.preferredLanguage
+        : defaultLocale,
     };
   }
 
@@ -81,8 +91,10 @@ export class NotificationDispatchService {
 
   substituteTemplateVariables(text: string, data: Record<string, any>): string {
     return text.replace(/\{\{([\w.]+)\}\}/g, (_, key) => {
-      const val = key.includes('.')
-        ? key.split('.').reduce((o: any, k: string) => (o != null ? o[k] : undefined), data)
+      const val = key.includes(".")
+        ? key
+            .split(".")
+            .reduce((o: any, k: string) => (o != null ? o[k] : undefined), data)
         : data[key];
       return val != null ? String(val) : `{{${key}}}`;
     });
@@ -96,7 +108,7 @@ export class NotificationDispatchService {
     const template = NOTIFICATION_TEMPLATES[dto.type];
     if (!template) {
       this.logger.warn(`Unknown notification type: ${dto.type}`);
-      return { success: false, error: 'Unknown notification type' };
+      return { success: false, error: "Unknown notification type" };
     }
 
     // Get user
@@ -107,7 +119,7 @@ export class NotificationDispatchService {
 
     if (!user) {
       this.logger.warn(`User not found: ${dto.userId}`);
-      return { success: false, error: 'User not found' };
+      return { success: false, error: "User not found" };
     }
 
     // Kullanıcı bildirim tercihleri (Bulgu #9) + dil tercihi (#224).
@@ -117,13 +129,22 @@ export class NotificationDispatchService {
     const { title, message } = this.renderTemplate(template, locale, dto.data);
 
     // Determine channels (default to email + in_app)
-    const channels = dto.channels || [NotificationChannel.EMAIL, NotificationChannel.IN_APP];
+    const channels = dto.channels || [
+      NotificationChannel.EMAIL,
+      NotificationChannel.IN_APP,
+    ];
 
     const results: Record<string, boolean> = {};
 
     // Send to each channel using REAL providers
     for (const channel of channels) {
-      if (!shouldDeliver(settings, dto.type, channel as unknown as DeliveryChannel)) {
+      if (
+        !shouldDeliver(
+          settings,
+          dto.type,
+          channel as unknown as DeliveryChannel,
+        )
+      ) {
         this.logger.log(
           `Notification suppressed by user preference: user=${dto.userId} type=${dto.type} channel=${channel}`,
         );
@@ -132,21 +153,38 @@ export class NotificationDispatchService {
       }
       switch (channel) {
         case NotificationChannel.EMAIL:
-          results.email = await this.sendEmailReal(user.email, title, message, dto.data);
-          await this.logNotification(dto.userId, 'email', dto.type, title, message, results.email);
+          results.email = await this.sendEmailReal(
+            user.email,
+            title,
+            message,
+            dto.data,
+          );
+          await this.logNotification(
+            dto.userId,
+            "email",
+            dto.type,
+            title,
+            message,
+            results.email,
+          );
           break;
 
         case NotificationChannel.PUSH:
           // `type`'ı push payload'ına ekle: mobil deep-link routing (push.ts
           // routeFromNotification) önce type'a bakıyor; yoksa tüm push'lar genel
           // bildirim sekmesine düşüyordu. dto.data zaten ilgili id'leri içeriyor.
-          results.push = await this.sendPushReal(
+          results.push = await this.sendPushReal(dto.userId, title, message, {
+            ...dto.data,
+            type: dto.type,
+          });
+          await this.logNotification(
             dto.userId,
+            "push",
+            dto.type,
             title,
             message,
-            { ...dto.data, type: dto.type },
+            results.push,
           );
-          await this.logNotification(dto.userId, 'push', dto.type, title, message, results.push);
           break;
 
         case NotificationChannel.IN_APP:
@@ -156,13 +194,26 @@ export class NotificationDispatchService {
           // getInAppNotifications() would surface the notification twice in the
           // bell. logNotification is only a delivery tracker for the external
           // channels (email/push/sms).
-          results.in_app = !!(await this.saveInAppNotification(dto.userId, dto.type, title, message, dto.data));
+          results.in_app = !!(await this.saveInAppNotification(
+            dto.userId,
+            dto.type,
+            title,
+            message,
+            dto.data,
+          ));
           break;
 
         case NotificationChannel.SMS:
           if (user.phone) {
             results.sms = await this.sendSmsReal(user.phone, message);
-            await this.logNotification(dto.userId, 'sms', dto.type, title, message, results.sms);
+            await this.logNotification(
+              dto.userId,
+              "sms",
+              dto.type,
+              title,
+              message,
+              results.sms,
+            );
           }
           break;
       }
@@ -215,7 +266,12 @@ export class NotificationDispatchService {
     data?: Record<string, any>,
   ): Promise<boolean> {
     try {
-      const results = await this.expoPushProvider.sendToUser(userId, title, body, data);
+      const results = await this.expoPushProvider.sendToUser(
+        userId,
+        title,
+        body,
+        data,
+      );
       return results.some((r) => r.success);
     } catch (error) {
       this.logger.error(`Failed to send push to user ${userId}:`, error);
@@ -249,11 +305,13 @@ export class NotificationDispatchService {
     message: string,
     data?: Record<string, any>,
   ): Promise<string | null> {
-    this.logger.log(`[saveInAppNotification] Saving for userId=${userId}, type=${type}`);
+    this.logger.log(
+      `[saveInAppNotification] Saving for userId=${userId}, type=${type}`,
+    );
     try {
       const template = NOTIFICATION_TEMPLATES[type];
       let link = template?.link;
-      
+
       // Interpolate link with data
       if (link && data) {
         link = this.interpolate(link, data);
@@ -267,12 +325,12 @@ export class NotificationDispatchService {
         const existing = await this.prisma.notificationLog.findFirst({
           where: {
             userId,
-            channel: 'in_app',
+            channel: "in_app",
             type,
-            status: 'sent',
-            data: { path: ['threadId'], equals: data.threadId },
+            status: "sent",
+            data: { path: ["threadId"], equals: data.threadId },
           },
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
         });
 
         if (existing) {
@@ -310,7 +368,7 @@ export class NotificationDispatchService {
       const notification = await this.prisma.notificationLog.create({
         data: {
           userId,
-          channel: 'in_app',
+          channel: "in_app",
           type,
           title,
           body: message,
@@ -319,15 +377,20 @@ export class NotificationDispatchService {
             icon: template?.icon,
             link,
           },
-          status: 'sent',
+          status: "sent",
           sentAt: new Date(),
         },
       });
 
-      this.logger.log(`[saveInAppNotification] Successfully saved notification id=${notification.id}`);
+      this.logger.log(
+        `[saveInAppNotification] Successfully saved notification id=${notification.id}`,
+      );
       return notification.id;
     } catch (error) {
-      this.logger.error(`[saveInAppNotification] Failed to save for ${userId}:`, error);
+      this.logger.error(
+        `[saveInAppNotification] Failed to save for ${userId}:`,
+        error,
+      );
       return null;
     }
   }
@@ -341,18 +404,22 @@ export class NotificationDispatchService {
     type: NotificationType,
     data?: Record<string, any>,
   ): Promise<boolean> {
-    this.logger.log(`[createInAppNotification] Called with userId=${userId}, type=${type}, data=${JSON.stringify(data)}`);
-    
+    this.logger.log(
+      `[createInAppNotification] Called with userId=${userId}, type=${type}, data=${JSON.stringify(data)}`,
+    );
+
     const template = NOTIFICATION_TEMPLATES[type];
     if (!template) {
-      this.logger.warn(`[createInAppNotification] Unknown notification type: ${type}`);
+      this.logger.warn(
+        `[createInAppNotification] Unknown notification type: ${type}`,
+      );
       return false;
     }
 
     // Bildirim tercihleri (Bulgu #9). Kategori kapalıysa zil + push birlikte
     // atlanır; kategori açık ama push master kapalıysa yalnız push atlanır.
     const { settings, locale } = await this.loadRecipientPrefs(userId);
-    if (!shouldDeliver(settings, type, 'in_app')) {
+    if (!shouldDeliver(settings, type, "in_app")) {
       this.logger.log(
         `[createInAppNotification] suppressed by user preference: user=${userId} type=${type}`,
       );
@@ -362,9 +429,17 @@ export class NotificationDispatchService {
     // Şablonu alıcının dilinde render et (#224).
     const { title, message } = this.renderTemplate(template, locale, data);
 
-    this.logger.log(`[createInAppNotification] Saving notification: title="${title}", message="${message}"`);
+    this.logger.log(
+      `[createInAppNotification] Saving notification: title="${title}", message="${message}"`,
+    );
 
-    const notificationId = await this.saveInAppNotification(userId, type, title, message, data);
+    const notificationId = await this.saveInAppNotification(
+      userId,
+      type,
+      title,
+      message,
+      data,
+    );
     this.logger.log(`[createInAppNotification] Result: ${notificationId}`);
 
     if (notificationId) {
@@ -378,7 +453,9 @@ export class NotificationDispatchService {
           createdAt: new Date().toISOString(),
         });
       } catch (e) {
-        this.logger.warn(`[createInAppNotification] realtime emit failed: ${e}`);
+        this.logger.warn(
+          `[createInAppNotification] realtime emit failed: ${e}`,
+        );
       }
     }
 
@@ -389,7 +466,7 @@ export class NotificationDispatchService {
     // type'ı data'ya ekliyoruz → mobil deep-link routing doğru ekrana gider.
     // Best-effort: push hatası in-app bildirimi etkilemez.
     // Push master anahtarı kapalıysa zil kalır ama cihaza push gönderilmez.
-    if (shouldDeliver(settings, type, 'push')) {
+    if (shouldDeliver(settings, type, "push")) {
       try {
         await this.sendPushReal(userId, title, message, { ...data, type });
       } catch (e) {
@@ -418,7 +495,7 @@ export class NotificationDispatchService {
     // in_app notifications are persisted by saveInAppNotification (the
     // canonical store the bell reads). Guard against any caller logging an
     // in_app delivery row here, which would duplicate the notification.
-    if (channel === 'in_app') return;
+    if (channel === "in_app") return;
     try {
       await this.prisma.notificationLog.create({
         data: {
@@ -427,9 +504,9 @@ export class NotificationDispatchService {
           type,
           title,
           body,
-          status: success ? 'sent' : 'failed',
+          status: success ? "sent" : "failed",
           sentAt: success ? new Date() : null,
-          errorMessage: success ? null : 'Delivery failed',
+          errorMessage: success ? null : "Delivery failed",
         },
       });
     } catch (error) {
@@ -452,13 +529,14 @@ export class NotificationDispatchService {
       await this.expoPushProvider.registerToken(
         userId,
         dto.token,
-        dto.platform as 'ios' | 'android',
+        dto.platform as "ios" | "android",
         dto.deviceId,
       );
 
       return { success: true, userId, platform: dto.platform };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       return { success: false, error: errorMessage };
     }
   }
@@ -477,21 +555,25 @@ export class NotificationDispatchService {
   /**
    * Get user's in-app notifications
    */
-  async getInAppNotifications(userId: string, page: number = 1, limit: number = 20) {
+  async getInAppNotifications(
+    userId: string,
+    page: number = 1,
+    limit: number = 20,
+  ) {
     const skip = (page - 1) * limit;
 
     const [notifications, total, unreadCount] = await Promise.all([
       this.prisma.notificationLog.findMany({
-        where: { userId, channel: 'in_app' },
-        orderBy: { createdAt: 'desc' },
+        where: { userId, channel: "in_app" },
+        orderBy: { createdAt: "desc" },
         skip,
         take: limit,
       }),
       this.prisma.notificationLog.count({
-        where: { userId, channel: 'in_app' },
+        where: { userId, channel: "in_app" },
       }),
       this.prisma.notificationLog.count({
-        where: { userId, channel: 'in_app', status: 'sent' },
+        where: { userId, channel: "in_app", status: "sent" },
       }),
     ]);
 
@@ -505,7 +587,7 @@ export class NotificationDispatchService {
         message: n.body,
         icon: data.icon || this.getDefaultIcon(n.type),
         link: data.link,
-        isRead: n.status === 'read',
+        isRead: n.status === "read",
         createdAt: n.createdAt,
         data: data,
       };
@@ -528,7 +610,7 @@ export class NotificationDispatchService {
    */
   private getDefaultIcon(type: string): string {
     const template = NOTIFICATION_TEMPLATES[type as NotificationType];
-    return template?.icon || '🔔';
+    return template?.icon || "🔔";
   }
 
   /**
@@ -538,7 +620,7 @@ export class NotificationDispatchService {
     try {
       await this.prisma.notificationLog.updateMany({
         where: { id: notificationId, userId },
-        data: { status: 'read' },
+        data: { status: "read" },
       });
       return true;
     } catch (error) {
@@ -551,8 +633,8 @@ export class NotificationDispatchService {
    */
   async markAllAsRead(userId: string): Promise<void> {
     await this.prisma.notificationLog.updateMany({
-      where: { userId, channel: 'in_app', status: 'sent' },
-      data: { status: 'read' },
+      where: { userId, channel: "in_app", status: "sent" },
+      data: { status: "read" },
     });
   }
 
@@ -561,23 +643,42 @@ export class NotificationDispatchService {
    */
   async getUnreadCount(userId: string): Promise<number> {
     return this.prisma.notificationLog.count({
-      where: { userId, channel: 'in_app', status: 'sent' },
+      where: { userId, channel: "in_app", status: "sent" },
     });
   }
 
-  async sendTemplateEmailToUser(userId: string, templateKey: string, templateData: Record<string, any>): Promise<void> {
+  async sendTemplateEmailToUser(
+    userId: string,
+    templateKey: string,
+    templateData: Record<string, any>,
+  ): Promise<void> {
     try {
-      const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true },
+      });
       if (!user) return;
-      await this.sendTemplateEmailToAddress(user.email, templateKey, templateData);
+      await this.sendTemplateEmailToAddress(
+        user.email,
+        templateKey,
+        templateData,
+      );
     } catch (err) {
-      this.logger.error(`Failed to send ${templateKey} email to user ${userId}:`, err);
+      this.logger.error(
+        `Failed to send ${templateKey} email to user ${userId}:`,
+        err,
+      );
     }
   }
 
-  async sendTemplateEmailToAddress(email: string, templateKey: string, templateData: Record<string, any>): Promise<void> {
+  async sendTemplateEmailToAddress(
+    email: string,
+    templateKey: string,
+    templateData: Record<string, any>,
+  ): Promise<void> {
     try {
-      const frontendUrl = this.configService.get('FRONTEND_URL') || 'https://tarodan.com';
+      const frontendUrl =
+        this.configService.get("FRONTEND_URL") || "https://tarodan.com";
       // Placeholder takma adları: göndericiler farklı anahtar adları geçebiliyor
       // (ör. welcome 'name'/'verifyUrl' geçer ama DB şablonu {{displayName}}/{{frontendUrl}}
       // bekler). Eşdeğer anahtarları doldur ki ham {{...}} kalmasın. Mevcut değerler
@@ -586,14 +687,21 @@ export class NotificationDispatchService {
         frontendUrl,
         ...templateData,
       };
-      if (enriched.displayName == null && enriched.name != null) enriched.displayName = enriched.name;
-      if (enriched.name == null && enriched.displayName != null) enriched.name = enriched.displayName;
+      if (enriched.displayName == null && enriched.name != null)
+        enriched.displayName = enriched.name;
+      if (enriched.name == null && enriched.displayName != null)
+        enriched.name = enriched.displayName;
       templateData = enriched;
-      const dbTemplate = await this.prisma.emailTemplate.findUnique({ where: { key: templateKey } });
+      const dbTemplate = await this.prisma.emailTemplate.findUnique({
+        where: { key: templateKey },
+      });
       let html: string;
       let subject: string;
       if (dbTemplate?.bodyHtml) {
-        html = this.substituteTemplateVariables(dbTemplate.bodyHtml, templateData);
+        html = this.substituteTemplateVariables(
+          dbTemplate.bodyHtml,
+          templateData,
+        );
         subject = dbTemplate.subject
           ? this.substituteTemplateVariables(dbTemplate.subject, templateData)
           : getEmailTemplateSubject(templateKey, templateData);
@@ -607,7 +715,10 @@ export class NotificationDispatchService {
         await this.smtpProvider.sendEmail({ to: email, subject, html });
       }
     } catch (err) {
-      this.logger.error(`Failed to send ${templateKey} email to ${email}:`, err);
+      this.logger.error(
+        `Failed to send ${templateKey} email to ${email}:`,
+        err,
+      );
     }
   }
 

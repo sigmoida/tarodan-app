@@ -2957,6 +2957,158 @@
           "footerNote": "Not: Barkod (OrtakBarkodOlustur) endpoint''i mevcut ama istek şeması Sürat''tan bekleniyor; geldiğinde eklenecek. Ayrıca test ortamında gönderiler fiziksel \"kabul\" aşamasına gelmediği için takip/iptal genelde \"kabul bekleniyor / Kayıt Bulunamadı\" döner (üretimde ilerler)."
         }
       }
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "description": "Hoş geldiniz! İşte bugünkü genel bakış.",
+      "stats": {
+        "totalOrders": "Toplam Satış",
+        "commissionRevenue": "Komisyon Geliri",
+        "activeProducts": "Aktif Ürünler",
+        "totalUsers": "Toplam Kullanıcı"
+      },
+      "quickActions": {
+        "products": "Ürünler",
+        "orders": "Siparişler",
+        "users": "Kullanıcılar",
+        "messages": "Mesajlar"
+      },
+      "pendingActions": {
+        "productsPending": "{count} ürün onay bekliyor",
+        "refundRequests": "{count} iade talebi",
+        "messagesPending": "{count} mesaj onay bekliyor",
+        "identityVerification": "{count} kimlik doğrulama talebi",
+        "review": "İncele"
+      },
+      "charts": {
+        "salesLabel": "Satışlar (₺)",
+        "ordersLabel": "Siparişler",
+        "sales30dTitle": "Son 30 Gün Satış Performansı",
+        "dailyOrdersTitle": "Günlük Sipariş Sayısı",
+        "categoryTitle": "Kategori Dağılımı",
+        "noData": "Veri Yok",
+        "uncategorized": "Kategorisiz"
+      },
+      "recentOrders": {
+        "title": "Son Siparişler",
+        "empty": "Henüz sipariş bulunmuyor"
+      },
+      "recentTrades": {
+        "title": "Son Takaslar",
+        "empty": "Henüz takas bulunmuyor"
+      },
+      "status": {
+        "refundRequested": "İade Talebi",
+        "inProgress": "Devam Ediyor"
+      },
+      "relativeTime": {
+        "minutesAgo": "{count} dk önce",
+        "hoursAgo": "{count} saat önce"
+      }
+    },
+    "analytics": {
+      "title": "Analizler",
+      "description": "Detaylı satış, kullanıcı ve ürün analizleri",
+      "dateRange": {
+        "7d": "7 Gün",
+        "30d": "30 Gün",
+        "90d": "90 Gün",
+        "1y": "1 Yıl"
+      },
+      "tabs": {
+        "sales": "Satış Analitiği",
+        "users": "Kullanıcı Analitiği",
+        "products": "Ürün Analitiği",
+        "trades": "Takas Analitiği"
+      },
+      "orderStatus": {
+        "pendingPayment": "Ödeme Bekliyor",
+        "paid": "Ödendi",
+        "preparing": "Hazırlanıyor",
+        "shipped": "Kargoda",
+        "delivered": "Teslim Edildi",
+        "completed": "Tamamlandı",
+        "cancelled": "İptal",
+        "refundRequested": "İade Talebi",
+        "refunded": "İade Edildi"
+      },
+      "categoryOther": "Diğer",
+      "export": {
+        "csv": "CSV İndir",
+        "json": "JSON İndir"
+      },
+      "sales": {
+        "salesLabel": "Satışlar (₺)",
+        "ordersLabel": "Siparişler",
+        "totalOrders": "Toplam Sipariş",
+        "totalRevenue": "Toplam Gelir",
+        "commissionRevenue": "Komisyon Geliri",
+        "avgOrderValue": "Ort. Sipariş Tutarı",
+        "revenueChartTitle": "Gelir Grafiği",
+        "orderCountTitle": "Sipariş Sayısı",
+        "statusDistributionTitle": "Sipariş Durumu Dağılımı"
+      },
+      "users": {
+        "newUsers": "Yeni Kullanıcılar",
+        "totalUsers": "Toplam Kullanıcı",
+        "activeUsers": "Aktif Kullanıcılar",
+        "sellers": "Satıcılar",
+        "growthTitle": "Kullanıcı Büyümesi"
+      },
+      "trades": {
+        "totalTrades": "Toplam Takas",
+        "completed": "Tamamlanan",
+        "pending": "Bekleyen",
+        "avgValue": "Ort. Değer",
+        "statsTitle": "Takas İstatistikleri",
+        "disputed": "Anlaşmazlık",
+        "successRate": "Başarı Oranı"
+      },
+      "products": {
+        "totalProducts": "Toplam Ürün",
+        "activeProducts": "Aktif Ürünler",
+        "pendingApproval": "Onay Bekleyen",
+        "avgPrice": "Ort. Fiyat",
+        "categoryDistributionTitle": "Kategori Dağılımı",
+        "byCategoryTitle": "Kategorilere Göre Ürünler"
+      }
+    },
+    "reports": {
+      "title": "Rapor Talepleri",
+      "description": "Kullanıcıların ürün, kullanıcı, koleksiyon ve mesajlar için gönderdiği şikayetler",
+      "loadError": "Şikayetler yüklenirken hata oluştu",
+      "empty": "Henüz şikayet yok",
+      "allTypes": "Tüm Türler",
+      "allStatuses": "Tüm Durumlar",
+      "status": {
+        "pending": "Bekliyor",
+        "underReview": "İncelemede",
+        "resolved": "Çözüldü",
+        "dismissed": "Reddedildi"
+      },
+      "type": {
+        "product": "Ürün",
+        "collection": "Koleksiyon",
+        "message": "Mesaj"
+      },
+      "reason": {
+        "spam": "Spam",
+        "inappropriateContent": "Uygunsuz İçerik",
+        "fakeProduct": "Sahte/Yanıltıcı Ürün",
+        "scam": "Dolandırıcılık",
+        "harassment": "Taciz",
+        "hateSpeech": "Nefret Söylemi",
+        "counterfeit": "Taklit Ürün",
+        "wrongCategory": "Yanlış Kategori",
+        "misleadingInfo": "Yanıltıcı Bilgi",
+        "other": "Diğer"
+      },
+      "columns": {
+        "type": "Tür",
+        "reason": "Neden",
+        "reporter": "Raporlayan",
+        "targetId": "Hedef ID"
+      }
     }
   },
   "server": {

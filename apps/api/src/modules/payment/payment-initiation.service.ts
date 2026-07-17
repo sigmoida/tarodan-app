@@ -99,7 +99,9 @@ export class PaymentInitiationService {
     if (userId) {
       // Authenticated user - must be the buyer
       if (order.buyerId !== userId) {
-        throw new ForbiddenException(i18nMessage("server.payment.cannotPayForOrder"));
+        throw new ForbiddenException(
+          i18nMessage("server.payment.cannotPayForOrder"),
+        );
       }
     } else {
       // Guest user - order must be a guest order
@@ -111,7 +113,9 @@ export class PaymentInitiationService {
     }
 
     if (order.status !== OrderStatus.pending_payment) {
-      throw new BadRequestException(i18nMessage("server.payment.orderNotAwaitingPayment"));
+      throw new BadRequestException(
+        i18nMessage("server.payment.orderNotAwaitingPayment"),
+      );
     }
 
     // 24h kill-switch: defense in depth in case the cron hasn't run yet.
@@ -147,7 +151,9 @@ export class PaymentInitiationService {
     });
 
     if (!group || group.orders.length === 0) {
-      throw new NotFoundException(i18nMessage("server.payment.orderGroupNotFound"));
+      throw new NotFoundException(
+        i18nMessage("server.payment.orderGroupNotFound"),
+      );
     }
 
     // Erişim kontrolü
@@ -158,7 +164,9 @@ export class PaymentInitiationService {
         );
       }
     } else if (!group.isGuest) {
-      throw new ForbiddenException(i18nMessage("server.payment.loginRequiredForOrder"));
+      throw new ForbiddenException(
+        i18nMessage("server.payment.loginRequiredForOrder"),
+      );
     }
 
     const now = Date.now();
@@ -219,7 +227,9 @@ export class PaymentInitiationService {
     let payment;
     if (existingPayment) {
       if (existingPayment.status === PaymentStatus.completed) {
-        throw new BadRequestException(i18nMessage("server.payment.orderGroupAlreadyPaid"));
+        throw new BadRequestException(
+          i18nMessage("server.payment.orderGroupAlreadyPaid"),
+        );
       }
       payment = await this.prisma.payment.update({
         where: { id: existingPayment.id },
@@ -433,9 +443,13 @@ export class PaymentInitiationService {
         },
       });
       if (!saved)
-        throw new NotFoundException(i18nMessage("server.payment.savedCardNotFound"));
+        throw new NotFoundException(
+          i18nMessage("server.payment.savedCardNotFound"),
+        );
       if (saved.requireCvv && !dto.cvv) {
-        throw new BadRequestException(i18nMessage("server.payment.cvvRequiredForCard"));
+        throw new BadRequestException(
+          i18nMessage("server.payment.cvvRequiredForCard"),
+        );
       }
       const r = await this.paytrService.chargeRecurring({
         utoken: saved.utoken,
@@ -463,7 +477,9 @@ export class PaymentInitiationService {
     // Flow A — YENİ KART (CIT): 3D ile (non3d=false). storeCard yalnız giriş yapmış kullanıcı +
     // Non3D yetkisi (PAYTR_RECURRING_ENABLED) açıkken; aksi halde saklanan kart kullanılamaz.
     if (!dto.card)
-      throw new BadRequestException(i18nMessage("server.payment.cardInfoRequired"));
+      throw new BadRequestException(
+        i18nMessage("server.payment.cardInfoRequired"),
+      );
     const storeCard = !!dto.saveCard && !!userId && recurringEnabled;
     const result = await this.paytrService.createDirectPayment(
       merchantOid,
@@ -553,20 +569,27 @@ export class PaymentInitiationService {
         where: { id: dto.orderId },
         include: { buyer: true, seller: true, product: true },
       });
-      if (!order) throw new NotFoundException(i18nMessage("server.payment.orderNotFound"));
+      if (!order)
+        throw new NotFoundException(
+          i18nMessage("server.payment.orderNotFound"),
+        );
       // Sahiplik: üye → alıcı olmalı; misafir → sipariş misafir siparişi olmalı (iframe ile aynı kural).
       const isGuestOrder =
         (order.shippingAddress as any)?.isGuestOrder === true;
       if (userId) {
         if (order.buyerId !== userId)
-          throw new ForbiddenException(i18nMessage("server.payment.cannotPayForOrder"));
+          throw new ForbiddenException(
+            i18nMessage("server.payment.cannotPayForOrder"),
+          );
       } else if (!isGuestOrder) {
         throw new ForbiddenException(
           i18nMessage("server.payment.loginRequiredForOrder"),
         );
       }
       if (order.status !== OrderStatus.pending_payment) {
-        throw new BadRequestException(i18nMessage("server.payment.orderNotAwaitingPayment"));
+        throw new BadRequestException(
+          i18nMessage("server.payment.orderNotAwaitingPayment"),
+        );
       }
       if (
         order.paymentExpiresAt &&
@@ -601,7 +624,9 @@ export class PaymentInitiationService {
         where: { orderId: order.id },
       });
       if (existingOrderPayment?.status === PaymentStatus.completed) {
-        throw new BadRequestException(i18nMessage("server.payment.orderAlreadyPaid"));
+        throw new BadRequestException(
+          i18nMessage("server.payment.orderAlreadyPaid"),
+        );
       }
       if (existingOrderPayment) {
         payment = existingOrderPayment;
@@ -658,7 +683,9 @@ export class PaymentInitiationService {
         },
       });
       if (!group || group.orders.length === 0)
-        throw new NotFoundException(i18nMessage("server.payment.orderGroupNotFound"));
+        throw new NotFoundException(
+          i18nMessage("server.payment.orderGroupNotFound"),
+        );
       // Sahiplik: üye → grup alıcısı olmalı; misafir → grup misafir grubu olmalı (iframe ile aynı kural).
       if (userId) {
         if (group.buyerId !== userId)
@@ -704,7 +731,9 @@ export class PaymentInitiationService {
         where: { checkoutGroupId: group.id },
       });
       if (existing?.status === PaymentStatus.completed)
-        throw new BadRequestException(i18nMessage("server.payment.orderGroupAlreadyPaid"));
+        throw new BadRequestException(
+          i18nMessage("server.payment.orderGroupAlreadyPaid"),
+        );
       payment =
         existing ||
         (await this.prisma.payment.create({
@@ -744,7 +773,10 @@ export class PaymentInitiationService {
           },
         },
       });
-      if (!trade) throw new NotFoundException(i18nMessage("server.payment.tradeNotFound"));
+      if (!trade)
+        throw new NotFoundException(
+          i18nMessage("server.payment.tradeNotFound"),
+        );
       const payableStatuses: TradeStatus[] = [
         TradeStatus.accepted,
         TradeStatus.awaiting_payment,
@@ -755,7 +787,9 @@ export class PaymentInitiationService {
         );
       }
       if (!trade.cashAmount || Number(trade.cashAmount) <= 0) {
-        throw new BadRequestException(i18nMessage("server.payment.tradeNoCashDifference"));
+        throw new BadRequestException(
+          i18nMessage("server.payment.tradeNoCashDifference"),
+        );
       }
       if (trade.cashPayerId !== userId) {
         throw new ForbiddenException(
@@ -764,9 +798,13 @@ export class PaymentInitiationService {
       }
       const cashPayment = trade.cashPayment;
       if (!cashPayment)
-        throw new BadRequestException(i18nMessage("server.payment.cashPaymentRecordNotFound"));
+        throw new BadRequestException(
+          i18nMessage("server.payment.cashPaymentRecordNotFound"),
+        );
       if (cashPayment.status === PaymentStatus.completed)
-        throw new BadRequestException(i18nMessage("server.payment.tradeCashPaymentAlreadyCompleted"));
+        throw new BadRequestException(
+          i18nMessage("server.payment.tradeCashPaymentAlreadyCompleted"),
+        );
       amount = Number(cashPayment.totalAmount);
       const payer =
         trade.cashPayerId === trade.initiatorId
@@ -893,7 +931,8 @@ export class PaymentInitiationService {
       },
     });
 
-    if (!trade) throw new NotFoundException(i18nMessage("server.payment.tradeNotFound"));
+    if (!trade)
+      throw new NotFoundException(i18nMessage("server.payment.tradeNotFound"));
     // Safe-trade akışı: cash trade kabul edildiğinde status 'awaiting_payment' olur.
     // Legacy akış için 'accepted' da destekleniyor.
     const payableStatuses: TradeStatus[] = [
@@ -906,7 +945,9 @@ export class PaymentInitiationService {
       );
     }
     if (!trade.cashAmount || Number(trade.cashAmount) <= 0) {
-      throw new BadRequestException(i18nMessage("server.payment.tradeNoCashDifference"));
+      throw new BadRequestException(
+        i18nMessage("server.payment.tradeNoCashDifference"),
+      );
     }
     if (trade.cashPayerId !== userId) {
       throw new ForbiddenException(
@@ -916,10 +957,14 @@ export class PaymentInitiationService {
 
     const cashPayment = trade.cashPayment;
     if (!cashPayment) {
-      throw new BadRequestException(i18nMessage("server.payment.cashPaymentRecordNotFound"));
+      throw new BadRequestException(
+        i18nMessage("server.payment.cashPaymentRecordNotFound"),
+      );
     }
     if (cashPayment.status === PaymentStatus.completed) {
-      throw new BadRequestException(i18nMessage("server.payment.tradeCashPaymentAlreadyCompleted"));
+      throw new BadRequestException(
+        i18nMessage("server.payment.tradeCashPaymentAlreadyCompleted"),
+      );
     }
 
     const bypassEnabled = this.configService.get("PAYMENT_BYPASS") === "true";
@@ -935,7 +980,9 @@ export class PaymentInitiationService {
     // PAYMENT_BYPASS: dev/test — PayTR token üretmeden; istemci bypass-complete çağırır.
     if (existingPayment) {
       if (existingPayment.status === PaymentStatus.completed) {
-        throw new BadRequestException(i18nMessage("server.payment.tradeCashPaymentAlreadyCompleted"));
+        throw new BadRequestException(
+          i18nMessage("server.payment.tradeCashPaymentAlreadyCompleted"),
+        );
       }
       if (bypassEnabled) {
         await this.prisma.payment.update({
@@ -1150,7 +1197,9 @@ export class PaymentInitiationService {
     let payment;
     if (existingOrderPayment) {
       if (existingOrderPayment.status === PaymentStatus.completed) {
-        throw new BadRequestException(i18nMessage("server.payment.orderAlreadyPaid"));
+        throw new BadRequestException(
+          i18nMessage("server.payment.orderAlreadyPaid"),
+        );
       }
       payment = await this.prisma.payment.update({
         where: { id: existingOrderPayment.id },

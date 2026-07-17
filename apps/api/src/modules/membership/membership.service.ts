@@ -66,7 +66,9 @@ export class MembershipService {
     });
 
     if (!tier) {
-      throw new NotFoundException(i18nMessage('server.membership.tierNotFound', { type }));
+      throw new NotFoundException(
+        i18nMessage("server.membership.tierNotFound", { type }),
+      );
     }
 
     return this.common.mapTierToDto(tier);
@@ -85,13 +87,17 @@ export class MembershipService {
   async getUserLimits(userId: string): Promise<MembershipLimitsDto> {
     try {
       if (!userId) {
-        throw new BadRequestException(i18nMessage('server.membership.userIdNotFound'));
+        throw new BadRequestException(
+          i18nMessage("server.membership.userIdNotFound"),
+        );
       }
 
       const membership = await this.getUserMembership(userId);
 
       if (!membership || !membership.tier) {
-        throw new NotFoundException(i18nMessage('server.membership.infoNotFound'));
+        throw new NotFoundException(
+          i18nMessage("server.membership.infoNotFound"),
+        );
       }
 
       // getUserUsageStats already handles platform setting override for all tiers
@@ -181,7 +187,9 @@ export class MembershipService {
         throw error;
       }
       // Wrap unknown errors — do not leak internal detail to the client.
-      throw new BadRequestException(i18nMessage('server.membership.limitsFetchFailed'));
+      throw new BadRequestException(
+        i18nMessage("server.membership.limitsFetchFailed"),
+      );
     }
   }
 
@@ -244,7 +252,7 @@ export class MembershipService {
 
     if (existingTier) {
       throw new BadRequestException(
-        i18nMessage('server.membership.tierAlreadyExists', { type: dto.type }),
+        i18nMessage("server.membership.tierAlreadyExists", { type: dto.type }),
       );
     }
 
@@ -283,7 +291,7 @@ export class MembershipService {
 
     if (!tier) {
       throw new NotFoundException(
-        i18nMessage('server.membership.tierNotFound', { type: tierType }),
+        i18nMessage("server.membership.tierNotFound", { type: tierType }),
       );
     }
 

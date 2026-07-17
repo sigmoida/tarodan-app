@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { OrderStatus, ProductStatus } from '@prisma/client';
-import { i18nMessage } from '../i18n';
+import { Injectable, NotFoundException, Logger } from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { OrderStatus, ProductStatus } from "@prisma/client";
+import { i18nMessage } from "../i18n";
 
 /**
  * UserStatsService — özet istatistikler: isBusinessAccount,
@@ -12,9 +12,7 @@ import { i18nMessage } from '../i18n';
 export class UserStatsService {
   private readonly logger = new Logger(UserStatsService.name);
 
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Check if user is a business account
@@ -32,7 +30,7 @@ export class UserStatsService {
 
     if (!user) return false;
 
-    return user.membership?.tier?.type === 'business' && !!user.companyName;
+    return user.membership?.tier?.type === "business" && !!user.companyName;
   }
 
   /**
@@ -50,19 +48,20 @@ export class UserStatsService {
       OrderStatus.completed,
     ];
 
-    const [revenue, soldOrdersCount, activeProductsCount, followersCount] = await Promise.all([
-      this.prisma.order.aggregate({
-        where: { sellerId: userId, status: { in: REVENUE_STATUSES } },
-        _sum: { totalAmount: true },
-      }),
-      this.prisma.order.count({
-        where: { sellerId: userId, status: { in: REVENUE_STATUSES } },
-      }),
-      this.prisma.product.count({
-        where: { sellerId: userId, status: ProductStatus.active },
-      }),
-      this.prisma.userFollow.count({ where: { followingId: userId } }),
-    ]);
+    const [revenue, soldOrdersCount, activeProductsCount, followersCount] =
+      await Promise.all([
+        this.prisma.order.aggregate({
+          where: { sellerId: userId, status: { in: REVENUE_STATUSES } },
+          _sum: { totalAmount: true },
+        }),
+        this.prisma.order.count({
+          where: { sellerId: userId, status: { in: REVENUE_STATUSES } },
+        }),
+        this.prisma.product.count({
+          where: { sellerId: userId, status: ProductStatus.active },
+        }),
+        this.prisma.userFollow.count({ where: { followingId: userId } }),
+      ]);
 
     return {
       totalRevenue: Number(revenue._sum.totalAmount || 0),
@@ -84,12 +83,12 @@ export class UserStatsService {
    */
   async getMyStats(userId: string) {
     const PAID_STATUSES = [
-      'paid',
-      'preparing',
-      'shipped',
-      'delivered',
-      'awaiting_buyer_confirmation',
-      'completed',
+      "paid",
+      "preparing",
+      "shipped",
+      "delivered",
+      "awaiting_buyer_confirmation",
+      "completed",
     ] as const;
 
     // "Satıldı" ürün durumundan (sold) DEĞİL, ödemesi alınmış SATIŞ SİPARİŞİNDEN
@@ -123,13 +122,13 @@ export class UserStatsService {
         },
       }),
       this.prisma.product.count({
-        where: { sellerId: userId, status: { notIn: ['deleted'] } },
+        where: { sellerId: userId, status: { notIn: ["deleted"] } },
       }),
       // Gerçekten satılabilir aktif ilan = active VE ödenmiş satış siparişi YOK
       this.prisma.product.count({
         where: {
           sellerId: userId,
-          status: 'active',
+          status: "active",
           orders: { none: { status: { in: [...PAID_STATUSES] } } },
         },
       }),
@@ -137,7 +136,7 @@ export class UserStatsService {
       this.prisma.product.count({
         where: {
           sellerId: userId,
-          status: { notIn: ['deleted'] },
+          status: { notIn: ["deleted"] },
           orders: { some: { status: { in: [...PAID_STATUSES] } } },
         },
       }),
@@ -157,14 +156,14 @@ export class UserStatsService {
           buyerId: userId,
           NOT: {
             OR: [
-              { productId: { startsWith: 'membership-' } },
-              { productId: { startsWith: 'boost-' } },
+              { productId: { startsWith: "membership-" } },
+              { productId: { startsWith: "boost-" } },
             ],
           },
         },
       }),
       this.prisma.order.count({
-        where: { buyerId: userId, status: { in: ['delivered', 'completed'] } },
+        where: { buyerId: userId, status: { in: ["delivered", "completed"] } },
       }),
       // Harcama yapılan (ödemesi alınmış) alıcı siparişi sayısı
       this.prisma.order.count({
@@ -188,12 +187,12 @@ export class UserStatsService {
       this.prisma.trade.count({
         where: {
           OR: [{ initiatorId: userId }, { receiverId: userId }],
-          status: 'completed',
+          status: "completed",
         },
       }),
       this.prisma.collection.count({ where: { userId } }),
       this.prisma.rating.aggregate({
-        where: { receiverId: userId, status: 'approved' },
+        where: { receiverId: userId, status: "approved" },
         _avg: { score: true },
         _count: true,
       }),
@@ -204,7 +203,7 @@ export class UserStatsService {
     ]);
 
     if (!user) {
-      throw new NotFoundException(i18nMessage('server.user.notFound'));
+      throw new NotFoundException(i18nMessage("server.user.notFound"));
     }
 
     return {
@@ -227,7 +226,7 @@ export class UserStatsService {
       totalRevenue: Number(revenueAgg._sum.totalAmount || 0),
       totalSpent: Number(spentAgg._sum.totalAmount || 0),
       memberSince: user.createdAt,
-      membershipTier: user.membership?.tier?.type || 'free',
+      membershipTier: user.membership?.tier?.type || "free",
     };
   }
 }

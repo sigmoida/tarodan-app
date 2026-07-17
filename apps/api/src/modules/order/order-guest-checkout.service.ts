@@ -122,7 +122,9 @@ export class OrderGuestCheckoutService {
         ttlSec,
       );
     if (!sendResult.success) {
-      throw new BadRequestException(i18nMessage("server.order.guestOtpSendFailed"));
+      throw new BadRequestException(
+        i18nMessage("server.order.guestOtpSendFailed"),
+      );
     }
 
     const otpKey = this.guestCheckoutOtpKey(normEmail);
@@ -152,7 +154,9 @@ export class OrderGuestCheckoutService {
     await this.consumeGuestCheckoutOtp(normEmail, dto.emailVerificationCode);
 
     if (!dto.shippingAddress) {
-      throw new BadRequestException(i18nMessage("server.order.shippingAddressRequired"));
+      throw new BadRequestException(
+        i18nMessage("server.order.shippingAddressRequired"),
+      );
     }
 
     const guestUser = await this.getOrCreateSystemGuestUser();
@@ -188,7 +192,9 @@ export class OrderGuestCheckoutService {
         FOR UPDATE
       `;
       if (!lockedRows?.length) {
-        throw new NotFoundException(i18nMessage("server.order.productNotFound"));
+        throw new NotFoundException(
+          i18nMessage("server.order.productNotFound"),
+        );
       }
 
       const product = await tx.product.findUnique({
@@ -200,17 +206,23 @@ export class OrderGuestCheckoutService {
       });
 
       if (!product) {
-        throw new NotFoundException(i18nMessage("server.order.productNotFound"));
+        throw new NotFoundException(
+          i18nMessage("server.order.productNotFound"),
+        );
       }
 
       if (product.status !== ProductStatus.active) {
-        throw new BadRequestException(i18nMessage("server.order.productNotOnSale"));
+        throw new BadRequestException(
+          i18nMessage("server.order.productNotOnSale"),
+        );
       }
 
       // Adet bazlı stok: müsait adet >= 1
       const available = getAvailableQuantity(product);
       if (available !== null && available < 1) {
-        throw new BadRequestException(i18nMessage("server.order.productOutOfStock"));
+        throw new BadRequestException(
+          i18nMessage("server.order.productOutOfStock"),
+        );
       }
 
       // Price is ALWAYS derived server-side — NEVER from the client. A guest was
@@ -226,11 +238,15 @@ export class OrderGuestCheckoutService {
         });
 
         if (!offer || offer.productId !== dto.productId) {
-          throw new BadRequestException(i18nMessage("server.order.invalidOffer"));
+          throw new BadRequestException(
+            i18nMessage("server.order.invalidOffer"),
+          );
         }
 
         if (offer.status !== OfferStatus.accepted) {
-          throw new BadRequestException(i18nMessage("server.order.offerNotAcceptedYet"));
+          throw new BadRequestException(
+            i18nMessage("server.order.offerNotAcceptedYet"),
+          );
         }
 
         finalPrice = Number(offer.amount);
@@ -269,10 +285,14 @@ export class OrderGuestCheckoutService {
         );
       }
       if (!dto.shippingAddress?.city?.trim()) {
-        throw new BadRequestException(i18nMessage("server.order.shippingAddressCityRequired"));
+        throw new BadRequestException(
+          i18nMessage("server.order.shippingAddressCityRequired"),
+        );
       }
       if (!dto.shippingAddress?.district?.trim()) {
-        throw new BadRequestException(i18nMessage("server.order.shippingAddressDistrictRequired"));
+        throw new BadRequestException(
+          i18nMessage("server.order.shippingAddressDistrictRequired"),
+        );
       }
       if (!dto.shippingAddress?.address?.trim()) {
         throw new BadRequestException(
@@ -562,7 +582,9 @@ export class OrderGuestCheckoutService {
       } else if (ttlLeft > 0) {
         await this.cache.set(otpKey, record, { ttl: ttlLeft });
       }
-      throw new BadRequestException(i18nMessage("server.order.guestOtpIncorrect"));
+      throw new BadRequestException(
+        i18nMessage("server.order.guestOtpIncorrect"),
+      );
     }
 
     record.c -= 1;

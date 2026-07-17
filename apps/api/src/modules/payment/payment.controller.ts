@@ -153,7 +153,9 @@ export class PaymentController {
     // Trade-cash zorunlu auth: cookie (web) veya Bearer (mobil).
     const userId = this.extractUserId(req);
     if (!userId)
-      throw new UnauthorizedException(i18nMessage("server.payment.loginRequired"));
+      throw new UnauthorizedException(
+        i18nMessage("server.payment.loginRequired"),
+      );
     return this.paymentService.initiateTradeCashPayment(
       body.tradeId,
       userId,
@@ -423,7 +425,10 @@ export class PaymentController {
     const result = await this.paymentService.cancelPayment(paymentId, userId);
     return {
       ...result,
-      message: this.i18n.translate("server.payment.cancelledSuccessfully", locale),
+      message: this.i18n.translate(
+        "server.payment.cancelledSuccessfully",
+        locale,
+      ),
     };
   }
 

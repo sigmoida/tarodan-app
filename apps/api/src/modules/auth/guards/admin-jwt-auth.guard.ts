@@ -1,11 +1,15 @@
-import { Injectable, ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
-import { Reflector } from '@nestjs/core';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
-import { i18nMessage } from '../../i18n';
+import {
+  Injectable,
+  ExecutionContext,
+  UnauthorizedException,
+} from "@nestjs/common";
+import { AuthGuard } from "@nestjs/passport";
+import { Reflector } from "@nestjs/core";
+import { IS_PUBLIC_KEY } from "../decorators/public.decorator";
+import { i18nMessage } from "../../i18n";
 
 @Injectable()
-export class AdminJwtAuthGuard extends AuthGuard('admin-jwt') {
+export class AdminJwtAuthGuard extends AuthGuard("admin-jwt") {
   constructor(private reflector: Reflector) {
     super();
   }
@@ -26,12 +30,17 @@ export class AdminJwtAuthGuard extends AuthGuard('admin-jwt') {
 
   handleRequest<TUser = any>(err: any, user: any, info: any): TUser {
     if (err || !user) {
-      throw err || new UnauthorizedException(i18nMessage('server.auth.adminAuthRequired'));
+      throw (
+        err ||
+        new UnauthorizedException(i18nMessage("server.auth.adminAuthRequired"))
+      );
     }
 
     // Check if user has admin privileges (isAdmin is set by AdminJwtStrategy)
     if (!user.isAdmin) {
-      throw new UnauthorizedException(i18nMessage('server.auth.adminPrivilegeRequired'));
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.adminPrivilegeRequired"),
+      );
     }
 
     return user;

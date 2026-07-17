@@ -196,7 +196,7 @@ describe("PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
     await expect(
       service.refundTradeCashPaymentIfCompleted(TRADE_ID),
     ).rejects.toMatchObject({
-      response: { i18nKey: 'server.payment.paymentNotYetSynced' },
+      response: { i18nKey: "server.payment.paymentNotYetSynced" },
     });
   });
 });

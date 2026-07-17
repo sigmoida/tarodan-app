@@ -9,7 +9,11 @@ import {
 import { Prisma } from "@prisma/client";
 import { Request, Response } from "express";
 import { STATUS_CODES } from "http";
-import { type Locale, type MessageKey, type MessageValues } from "@tarodan/i18n";
+import {
+  type Locale,
+  type MessageKey,
+  type MessageValues,
+} from "@tarodan/i18n";
 import { I18nService } from "../../modules/i18n/i18n.service";
 import { isLocalizedMessage } from "../../modules/i18n/localized-message";
 import { resolveRequestLocale } from "../../modules/i18n/locale.util";
@@ -50,7 +54,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
       // payload fields (e.g. errorCode, bannedReason) are preserved so guards
       // can keep their structured contracts alongside the localized message.
       if (isLocalizedMessage(res)) {
-        const { i18nKey, i18nParams, ...extras } = res as Record<string, unknown> & {
+        const { i18nKey, i18nParams, ...extras } = res as Record<
+          string,
+          unknown
+        > & {
           i18nKey: MessageKey;
           i18nParams?: MessageValues;
         };
@@ -130,9 +137,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (exception instanceof Prisma.PrismaClientKnownRequestError) {
       switch (exception.code) {
         case "P2002": // unique constraint violation
-          return { status: HttpStatus.CONFLICT, key: "server.common.recordExists" };
+          return {
+            status: HttpStatus.CONFLICT,
+            key: "server.common.recordExists",
+          };
         case "P2025": // record required but not found
-          return { status: HttpStatus.NOT_FOUND, key: "server.common.recordNotFound" };
+          return {
+            status: HttpStatus.NOT_FOUND,
+            key: "server.common.recordNotFound",
+          };
         case "P2003": // foreign key constraint violation
           return {
             status: HttpStatus.CONFLICT,

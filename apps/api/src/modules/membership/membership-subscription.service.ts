@@ -4,8 +4,8 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
 import {
   MembershipTierType,
   SubscriptionStatus,
@@ -14,17 +14,17 @@ import {
   PaymentStatus,
   SavedCardStatus,
   TradeStatus,
-} from '@prisma/client';
-import { SubscribeDto, UserMembershipResponseDto } from './dto';
-import { PaymentService } from '../payment/payment.service';
-import { PaymentProvider } from '../payment/dto';
-import { Request } from 'express';
-import { MembershipPaymentInitResponseDto } from './dto/membership-payment.dto';
-import { PayTRService } from '../payment-providers/paytr.service';
-import { ConfigService } from '@nestjs/config';
-import { MembershipCommonService } from './membership-common.service';
-import { isPremiumEntitled } from './membership.util';
-import { i18nMessage } from '../i18n';
+} from "@prisma/client";
+import { SubscribeDto, UserMembershipResponseDto } from "./dto";
+import { PaymentService } from "../payment/payment.service";
+import { PaymentProvider } from "../payment/dto";
+import { Request } from "express";
+import { MembershipPaymentInitResponseDto } from "./dto/membership-payment.dto";
+import { PayTRService } from "../payment-providers/paytr.service";
+import { ConfigService } from "@nestjs/config";
+import { MembershipCommonService } from "./membership-common.service";
+import { isPremiumEntitled } from "./membership.util";
+import { i18nMessage } from "../i18n";
 
 /**
  * MembershipSubscriptionService — abonelik yaşam döngüsü + PayTR/ödeme tarafı:
@@ -47,19 +47,24 @@ export class MembershipSubscriptionService {
   // ==========================================================================
   // SUBSCRIBE TO TIER
   // ==========================================================================
-  async subscribe(userId: string, dto: SubscribeDto): Promise<UserMembershipResponseDto> {
+  async subscribe(
+    userId: string,
+    dto: SubscribeDto,
+  ): Promise<UserMembershipResponseDto> {
     const tier = await this.prisma.membershipTier.findUnique({
       where: { type: dto.tierType },
     });
 
     if (!tier) {
       throw new NotFoundException(
-        i18nMessage('server.membership.tierNotFound', { type: dto.tierType }),
+        i18nMessage("server.membership.tierNotFound", { type: dto.tierType }),
       );
     }
 
     if (!tier.isActive) {
-      throw new BadRequestException(i18nMessage('server.membership.tierNotActive'));
+      throw new BadRequestException(
+        i18nMessage("server.membership.tierNotActive"),
+      );
     }
 
     // Business tier can only be subscribed by corporate accounts (users with companyName and taxId)
@@ -70,7 +75,9 @@ export class MembershipSubscriptionService {
       });
 
       if (!user || !user.companyName || !user.taxId) {
-        throw new ForbiddenException(i18nMessage('server.membership.businessTierRequiresCompany'));
+        throw new ForbiddenException(
+          i18nMessage("server.membership.businessTierRequiresCompany"),
+        );
       }
     }
 
@@ -82,13 +89,14 @@ export class MembershipSubscriptionService {
     // Calculate period
     const now = new Date();
     const periodEnd = new Date(now);
-    if (dto.billingPeriod === 'monthly') {
+    if (dto.billingPeriod === "monthly") {
       periodEnd.setMonth(periodEnd.getMonth() + 1);
     } else {
       periodEnd.setFullYear(periodEnd.getFullYear() + 1);
     }
 
-    const price = dto.billingPeriod === 'monthly' ? tier.monthlyPrice : tier.yearlyPrice;
+    const price =
+      dto.billingPeriod === "monthly" ? tier.monthlyPrice : tier.yearlyPrice;
 
     // === GEÇİŞ YÖNÜ KARARI (upgrade anında / downgrade ertelemeli) ===
     // Kullanıcı şu an GEÇERLİ ve ücretli bir tier'a sahipse, yön hem tier seviyesine
@@ -105,38 +113,44 @@ export class MembershipSubscriptionService {
     if (existingMembership && isPremiumEntitled(existingMembership)) {
       const curPeriodDays = Math.round(
         (existingMembership.currentPeriodEnd.getTime() -
-          existingMembership.currentPeriodStart.getTime()) / 86_400_000,
+          existingMembership.currentPeriodStart.getTime()) /
+          86_400_000,
       );
       const currentIsYearly = curPeriodDays > 180;
-      const targetIsYearly = dto.billingPeriod === 'yearly';
+      const targetIsYearly = dto.billingPeriod === "yearly";
 
-      let direction: 'upgrade' | 'downgrade' | 'same';
+      let direction: "upgrade" | "downgrade" | "same";
       if (tier.sortOrder > existingMembership.tier.sortOrder) {
-        direction = 'upgrade';
+        direction = "upgrade";
       } else if (tier.sortOrder < existingMembership.tier.sortOrder) {
-        direction = 'downgrade';
+        direction = "downgrade";
       } else if (targetIsYearly && !currentIsYearly) {
-        direction = 'upgrade'; // aynı tier, aylık→yıllık
+        direction = "upgrade"; // aynı tier, aylık→yıllık
       } else if (!targetIsYearly && currentIsYearly) {
-        direction = 'downgrade'; // aynı tier, yıllık→aylık
+        direction = "downgrade"; // aynı tier, yıllık→aylık
       } else {
-        direction = 'same'; // aynı tier + aynı periyot
+        direction = "same"; // aynı tier + aynı periyot
       }
 
-      if (direction === 'same') {
+      if (direction === "same") {
         // Bekleyen bir değişiklik (downgrade/period) varsa kullanıcı eski planına
         // dönmek istiyor demektir → planı iptal et (revert). Yoksa gerçekten aynı plan.
-        if (existingMembership.scheduledTierType || existingMembership.scheduledBillingPeriod) {
+        if (
+          existingMembership.scheduledTierType ||
+          existingMembership.scheduledBillingPeriod
+        ) {
           await this.prisma.userMembership.update({
             where: { userId },
             data: { scheduledTierType: null, scheduledBillingPeriod: null },
           });
           return this.common.getUserMembership(userId);
         }
-        throw new BadRequestException(i18nMessage('server.membership.alreadyOnThisPlan'));
+        throw new BadRequestException(
+          i18nMessage("server.membership.alreadyOnThisPlan"),
+        );
       }
 
-      if (direction === 'downgrade') {
+      if (direction === "downgrade") {
         await this.prisma.userMembership.update({
           where: { userId },
           data: {
@@ -233,11 +247,13 @@ export class MembershipSubscriptionService {
       } as any;
     } catch (error) {
       // If payment initiation fails, rollback membership
-      await this.prisma.userMembership.delete({
-        where: { userId },
-      }).catch(() => {
-        // Ignore if already deleted or doesn't exist
-      });
+      await this.prisma.userMembership
+        .delete({
+          where: { userId },
+        })
+        .catch(() => {
+          // Ignore if already deleted or doesn't exist
+        });
       throw error;
     }
   }
@@ -256,37 +272,45 @@ export class MembershipSubscriptionService {
     });
 
     if (!membership) {
-      throw new NotFoundException(i18nMessage('server.membership.notFound'));
+      throw new NotFoundException(i18nMessage("server.membership.notFound"));
     }
 
     if (membership.tier.type === MembershipTierType.free) {
-      throw new BadRequestException(i18nMessage('server.membership.freeTierNoPaymentNeeded'));
+      throw new BadRequestException(
+        i18nMessage("server.membership.freeTierNoPaymentNeeded"),
+      );
     }
 
     // Determine billing period from membership period (monthly or yearly)
     const periodDays = Math.round(
-      (membership.currentPeriodEnd.getTime() - membership.currentPeriodStart.getTime()) / (1000 * 60 * 60 * 24)
+      (membership.currentPeriodEnd.getTime() -
+        membership.currentPeriodStart.getTime()) /
+        (1000 * 60 * 60 * 24),
     );
     const isYearly = periodDays > 180; // More than 6 months = yearly
-    
-    const price = isYearly 
-      ? membership.tier.yearlyPrice.toNumber() 
+
+    const price = isYearly
+      ? membership.tier.yearlyPrice.toNumber()
       : membership.tier.monthlyPrice.toNumber();
 
     if (price === 0) {
-      throw new BadRequestException(i18nMessage('server.membership.tierNoPaymentNeeded'));
+      throw new BadRequestException(
+        i18nMessage("server.membership.tierNoPaymentNeeded"),
+      );
     }
 
     // Find platform seller for membership orders
     const platformSeller = await this.prisma.user.findFirst({
       where: {
-        email: 'platform@tarodan.com',
-        sellerType: 'platform',
+        email: "platform@tarodan.com",
+        sellerType: "platform",
       },
     });
 
     if (!platformSeller) {
-      throw new NotFoundException(i18nMessage('server.membership.platformSellerNotFound'));
+      throw new NotFoundException(
+        i18nMessage("server.membership.platformSellerNotFound"),
+      );
     }
 
     // Find or create a virtual product for membership
@@ -296,7 +320,9 @@ export class MembershipSubscriptionService {
     });
 
     if (!defaultCategory) {
-      throw new NotFoundException(i18nMessage('server.membership.categoryNotFound'));
+      throw new NotFoundException(
+        i18nMessage("server.membership.categoryNotFound"),
+      );
     }
 
     // Create or find virtual product for membership
@@ -312,12 +338,12 @@ export class MembershipSubscriptionService {
           sellerId: platformSeller.id,
           categoryId: defaultCategory.id,
           // tier.name zaten "… Üyelik" içerir ("Premium Üyelik Üyelik" olmasın)
-          title: membership.tier.name.includes('Üyelik')
+          title: membership.tier.name.includes("Üyelik")
             ? membership.tier.name
             : `${membership.tier.name} Üyelik`,
           description: `Üyelik ödemesi için sanal ürün`,
           price: price,
-          condition: 'new',
+          condition: "new",
           status: ProductStatus.active,
         },
       });
@@ -333,7 +359,7 @@ export class MembershipSubscriptionService {
         productId: product.id,
         status: OrderStatus.pending_payment,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
 
     if (order) {
@@ -358,7 +384,7 @@ export class MembershipSubscriptionService {
           status: OrderStatus.pending_payment,
           paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
           shippingAddress: {
-            type: 'membership',
+            type: "membership",
           } as any,
         },
       });
@@ -395,15 +421,19 @@ export class MembershipSubscriptionService {
     });
 
     if (!membership) {
-      throw new NotFoundException(i18nMessage('server.membership.notFound'));
+      throw new NotFoundException(i18nMessage("server.membership.notFound"));
     }
 
     if (membership.tier.type === MembershipTierType.free) {
-      throw new BadRequestException(i18nMessage('server.membership.freeTierCannotCancel'));
+      throw new BadRequestException(
+        i18nMessage("server.membership.freeTierCannotCancel"),
+      );
     }
 
     if (membership.status === SubscriptionStatus.cancelled) {
-      throw new BadRequestException(i18nMessage('server.membership.alreadyCancelled'));
+      throw new BadRequestException(
+        i18nMessage("server.membership.alreadyCancelled"),
+      );
     }
 
     await this.prisma.userMembership.update({
@@ -429,15 +459,19 @@ export class MembershipSubscriptionService {
    * eder; mevcut plan olduğu gibi sürer ve dönem sonunda aynı tier+periyotla yenilenir.
    * Aktif bir değişiklik planı yoksa hata verir.
    */
-  async cancelScheduledChange(userId: string): Promise<UserMembershipResponseDto> {
+  async cancelScheduledChange(
+    userId: string,
+  ): Promise<UserMembershipResponseDto> {
     const membership = await this.prisma.userMembership.findUnique({
       where: { userId },
     });
     if (!membership) {
-      throw new NotFoundException(i18nMessage('server.membership.notFound'));
+      throw new NotFoundException(i18nMessage("server.membership.notFound"));
     }
     if (!membership.scheduledTierType && !membership.scheduledBillingPeriod) {
-      throw new BadRequestException(i18nMessage('server.membership.noPendingChange'));
+      throw new BadRequestException(
+        i18nMessage("server.membership.noPendingChange"),
+      );
     }
     await this.prisma.userMembership.update({
       where: { userId },
@@ -459,7 +493,7 @@ export class MembershipSubscriptionService {
     });
 
     if (!membership) {
-      throw new NotFoundException(i18nMessage('server.membership.notFound'));
+      throw new NotFoundException(i18nMessage("server.membership.notFound"));
     }
 
     // Otomatik yenileme yalnızca HATIRLATMA-tabanlıdır: dönem bitişinde bildirim
@@ -485,20 +519,30 @@ export class MembershipSubscriptionService {
    * (dönem sonunda checkExpiredMemberships free'ye düşürür); try_again=true (geçici) → kart
    * açık kalır, sonraki turda tekrar denenir. Üyelik virtual order'dır → escrow/hold yok.
    */
-  async runAutoRenewals(): Promise<{ renewed: number; failed: number; attempted: number }> {
-    if (this.configService.get('PAYTR_RECURRING_ENABLED') !== 'true') {
+  async runAutoRenewals(): Promise<{
+    renewed: number;
+    failed: number;
+    attempted: number;
+  }> {
+    if (this.configService.get("PAYTR_RECURRING_ENABLED") !== "true") {
       return { renewed: 0, failed: 0, attempted: 0 };
     }
     const now = new Date();
     const due = await this.prisma.userMembership.findMany({
       where: {
         autoRenew: true,
-        status: { in: [SubscriptionStatus.active, SubscriptionStatus.past_due] },
+        status: {
+          in: [SubscriptionStatus.active, SubscriptionStatus.past_due],
+        },
         currentPeriodEnd: { lte: now },
         tier: { type: { not: MembershipTierType.free } },
         user: {
           savedCards: {
-            some: { provider: 'paytr', status: SavedCardStatus.active, requireCvv: false },
+            some: {
+              provider: "paytr",
+              status: SavedCardStatus.active,
+              requireCvv: false,
+            },
           },
         },
       },
@@ -507,8 +551,12 @@ export class MembershipSubscriptionService {
         user: {
           include: {
             savedCards: {
-              where: { provider: 'paytr', status: SavedCardStatus.active, requireCvv: false },
-              orderBy: { isDefault: 'desc' },
+              where: {
+                provider: "paytr",
+                status: SavedCardStatus.active,
+                requireCvv: false,
+              },
+              orderBy: { isDefault: "desc" },
               take: 1,
             },
           },
@@ -541,18 +589,23 @@ export class MembershipSubscriptionService {
         }
 
         const curPeriodDays = Math.round(
-          (m.currentPeriodEnd.getTime() - m.currentPeriodStart.getTime()) / 86_400_000,
+          (m.currentPeriodEnd.getTime() - m.currentPeriodStart.getTime()) /
+            86_400_000,
         );
         // Bekleyen period değişimi varsa onu uygula; yoksa mevcut periyodu sürdür.
         const isYearly = m.scheduledBillingPeriod
-          ? m.scheduledBillingPeriod === 'yearly'
+          ? m.scheduledBillingPeriod === "yearly"
           : curPeriodDays > 180;
 
         // Plan (tier veya period) gerçekten değişiyor mu? Başarıda planı temizlemek için.
-        const hasScheduledChange = !!(m.scheduledTierType || m.scheduledBillingPeriod);
+        const hasScheduledChange = !!(
+          m.scheduledTierType || m.scheduledBillingPeriod
+        );
         const tierChanging = effectiveTier.id !== m.tierId;
 
-        const price = Number(isYearly ? effectiveTier.yearlyPrice : effectiveTier.monthlyPrice);
+        const price = Number(
+          isYearly ? effectiveTier.yearlyPrice : effectiveTier.monthlyPrice,
+        );
         if (!(price > 0)) continue;
 
         const newStart = now;
@@ -560,21 +613,27 @@ export class MembershipSubscriptionService {
         if (isYearly) newEnd.setFullYear(newEnd.getFullYear() + 1);
         else newEnd.setMonth(newEnd.getMonth() + 1);
 
-        const merchantOid = `REN${m.id.replace(/-/g, '').slice(0, 18)}T${Date.now().toString().slice(-6)}`;
-        const nameParts = (m.user.displayName || 'Üye').split(' ');
+        const merchantOid = `REN${m.id.replace(/-/g, "").slice(0, 18)}T${Date.now().toString().slice(-6)}`;
+        const nameParts = (m.user.displayName || "Üye").split(" ");
         const buyer = {
           id: m.userId,
-          name: nameParts[0] || 'Üye',
-          surname: nameParts.slice(1).join(' ') || '-',
+          name: nameParts[0] || "Üye",
+          surname: nameParts.slice(1).join(" ") || "-",
           email: m.user.email,
-          phone: m.user.phone || '+905000000000',
-          ip: card.mandateIp || '0.0.0.0',
-          address: 'Türkiye',
-          city: 'İstanbul',
-          country: 'Türkiye',
+          phone: m.user.phone || "+905000000000",
+          ip: card.mandateIp || "0.0.0.0",
+          address: "Türkiye",
+          city: "İstanbul",
+          country: "Türkiye",
         };
         const basket = [
-          { id: effectiveTier.id, name: `${effectiveTier.name} Üyelik (yenileme)`, category: 'Üyelik', price, quantity: 1 },
+          {
+            id: effectiveTier.id,
+            name: `${effectiveTier.name} Üyelik (yenileme)`,
+            category: "Üyelik",
+            price,
+            quantity: 1,
+          },
         ];
 
         const result = await this.paytr.chargeRecurring({
@@ -586,7 +645,7 @@ export class MembershipSubscriptionService {
           basketItems: basket,
         });
 
-        if (result.status === 'success') {
+        if (result.status === "success") {
           await this.prisma.$transaction(async (tx) => {
             await tx.userMembership.update({
               where: { id: m.id },
@@ -597,14 +656,16 @@ export class MembershipSubscriptionService {
                 // Bekleyen değişiklik (tier ve/veya period) uygulandı: tier'ı geçir
                 // (değiştiyse) ve planı temizle. Değişiklik yoksa olduğu gibi kalır.
                 ...(tierChanging ? { tierId: effectiveTier.id } : {}),
-                ...(hasScheduledChange ? { scheduledTierType: null, scheduledBillingPeriod: null } : {}),
+                ...(hasScheduledChange
+                  ? { scheduledTierType: null, scheduledBillingPeriod: null }
+                  : {}),
               },
             });
             await tx.membershipPayment.create({
               data: {
                 membershipId: m.id,
                 amount: price,
-                provider: 'paytr',
+                provider: "paytr",
                 providerPaymentId: merchantOid,
                 status: PaymentStatus.completed,
                 periodStart: newStart,
@@ -613,28 +674,32 @@ export class MembershipSubscriptionService {
             });
           });
           renewed++;
-          this.logger.log(`Oto-yenileme OK: membership=${m.id} oid=${merchantOid} tutar=${price}`);
-        } else if (result.status === 'wait_callback') {
+          this.logger.log(
+            `Oto-yenileme OK: membership=${m.id} oid=${merchantOid} tutar=${price}`,
+          );
+        } else if (result.status === "wait_callback") {
           // Sonuç Bildirim URL'ine düşecek; takip için pending kayıt (tam callback tamamlaması Faz 4b).
           await this.prisma.membershipPayment.create({
             data: {
               membershipId: m.id,
               amount: price,
-              provider: 'paytr',
+              provider: "paytr",
               providerPaymentId: merchantOid,
               status: PaymentStatus.pending,
               periodStart: newStart,
               periodEnd: newEnd,
             },
           });
-          this.logger.warn(`Oto-yenileme wait_callback: membership=${m.id} oid=${merchantOid}`);
+          this.logger.warn(
+            `Oto-yenileme wait_callback: membership=${m.id} oid=${merchantOid}`,
+          );
         } else {
           failed++;
           await this.prisma.membershipPayment.create({
             data: {
               membershipId: m.id,
               amount: price,
-              provider: 'paytr',
+              provider: "paytr",
               providerPaymentId: merchantOid,
               status: PaymentStatus.failed,
               periodStart: newStart,
@@ -657,7 +722,9 @@ export class MembershipSubscriptionService {
         }
       } catch (e: any) {
         failed++;
-        this.logger.error(`Oto-yenileme hata membership=${m.id}: ${e?.message}`);
+        this.logger.error(
+          `Oto-yenileme hata membership=${m.id}: ${e?.message}`,
+        );
       }
     }
     return { renewed, failed, attempted: due.length };
@@ -687,8 +754,8 @@ export class MembershipSubscriptionService {
     }>
   > {
     const cards = await this.prisma.savedCard.findMany({
-      where: { userId, provider: 'paytr', status: SavedCardStatus.active },
-      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+      where: { userId, provider: "paytr", status: SavedCardStatus.active },
+      orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
     });
     return cards.map((c) => ({
       id: c.id,
@@ -709,12 +776,17 @@ export class MembershipSubscriptionService {
    * silme onayı alınamasa bile yerelde revoke edilir (kart "kullanılmaz" işaretlenir;
    * bu sayede runAutoRenewals bu kartı bir daha seçmez). Kart sahibi değilse 404.
    */
-  async deleteSavedCard(userId: string, cardId: string): Promise<{ deleted: boolean }> {
+  async deleteSavedCard(
+    userId: string,
+    cardId: string,
+  ): Promise<{ deleted: boolean }> {
     const card = await this.prisma.savedCard.findFirst({
       where: { id: cardId, userId },
     });
     if (!card) {
-      throw new NotFoundException(i18nMessage('server.membership.savedCardNotFound'));
+      throw new NotFoundException(
+        i18nMessage("server.membership.savedCardNotFound"),
+      );
     }
     if (card.status === SavedCardStatus.revoked) {
       return { deleted: true }; // idempotent
@@ -722,14 +794,16 @@ export class MembershipSubscriptionService {
     let providerDeleted = false;
     try {
       const res = await this.paytr.capiDeleteCard(card.utoken, card.ctoken);
-      providerDeleted = res.status === 'success';
+      providerDeleted = res.status === "success";
       if (!providerDeleted) {
         this.logger.warn(
           `PayTR kart silme onayı alınamadı (card=${cardId}): ${res.reason || res.status}; yerelde revoke ediliyor`,
         );
       }
     } catch (e: any) {
-      this.logger.error(`PayTR kart silme hatası (card=${cardId}): ${e?.message}`);
+      this.logger.error(
+        `PayTR kart silme hatası (card=${cardId}): ${e?.message}`,
+      );
     }
     await this.prisma.savedCard.update({
       where: { id: card.id },
@@ -749,7 +823,9 @@ export class MembershipSubscriptionService {
     // active'leri düşürürse cancelled üyelik premium'da takılı kalıyordu (bug).
     const expiredMemberships = await this.prisma.userMembership.findMany({
       where: {
-        status: { in: [SubscriptionStatus.active, SubscriptionStatus.cancelled] },
+        status: {
+          in: [SubscriptionStatus.active, SubscriptionStatus.cancelled],
+        },
         currentPeriodEnd: { lt: now },
         tier: { type: { not: MembershipTierType.free } },
       },
@@ -798,33 +874,34 @@ export class MembershipSubscriptionService {
         // KRİTİK: İptal SADECE hedef tier'da takas hakkı yoksa yapılır. Hedef
         // tier takas yapabiliyorsa (örn. premium→temel; temelde de takas var)
         // pending teklifler korunur — kullanıcı hâlâ takas edebildiği için.
-        if (!freeTier.canTrade) try {
-          const cancelledPending = await this.prisma.trade.updateMany({
-            where: {
-              initiatorId: membership.userId,
-              status: TradeStatus.pending,
-            },
-            data: {
-              status: TradeStatus.cancelled,
-              cancelReason:
-                'Üyelik süresi sona erdiği için bekleyen takas teklifiniz otomatik iptal edildi.',
-              cancelledAt: now,
-              version: { increment: 1 },
-            },
-          });
-          if (cancelledPending.count > 0) {
-            this.logger.log(
-              `Auto-cancelled ${cancelledPending.count} pending trade offer(s) for downgraded user`,
+        if (!freeTier.canTrade)
+          try {
+            const cancelledPending = await this.prisma.trade.updateMany({
+              where: {
+                initiatorId: membership.userId,
+                status: TradeStatus.pending,
+              },
+              data: {
+                status: TradeStatus.cancelled,
+                cancelReason:
+                  "Üyelik süresi sona erdiği için bekleyen takas teklifiniz otomatik iptal edildi.",
+                cancelledAt: now,
+                version: { increment: 1 },
+              },
+            });
+            if (cancelledPending.count > 0) {
+              this.logger.log(
+                `Auto-cancelled ${cancelledPending.count} pending trade offer(s) for downgraded user`,
+              );
+            }
+          } catch (tradeErr: any) {
+            // Takas iptali downgrade'i bloklamasın; üyelik düşürme başarılı sayılır.
+            this.logger.warn(
+              `Failed to auto-cancel pending trades after downgrade: ${tradeErr?.message}`,
             );
           }
-        } catch (tradeErr: any) {
-          // Takas iptali downgrade'i bloklamasın; üyelik düşürme başarılı sayılır.
-          this.logger.warn(
-            `Failed to auto-cancel pending trades after downgrade: ${tradeErr?.message}`,
-          );
-        }
       } catch (error) {
-        this.logger.warn('Failed to downgrade membership');
+        this.logger.warn("Failed to downgrade membership");
       }
     }
 

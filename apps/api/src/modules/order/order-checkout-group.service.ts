@@ -79,7 +79,9 @@ export class OrderCheckoutGroupService {
     });
     if (!existing) return null;
     if (buyerId && existing.buyerId !== buyerId) {
-      throw new ForbiddenException(i18nMessage("server.order.notYourTransaction"));
+      throw new ForbiddenException(
+        i18nMessage("server.order.notYourTransaction"),
+      );
     }
     return {
       ...this.formatCheckoutGroupCreateResponse(existing),
@@ -129,7 +131,9 @@ export class OrderCheckoutGroupService {
           FOR UPDATE
         `;
           if ((lockedRows?.length ?? 0) !== productIds.length) {
-            throw new NotFoundException(i18nMessage("server.order.cartProductNotFound"));
+            throw new NotFoundException(
+              i18nMessage("server.order.cartProductNotFound"),
+            );
           }
 
           // Aynı alıcının aynı ürün için eski bekleyen siparişi varsa iptal et ve
@@ -207,7 +211,9 @@ export class OrderCheckoutGroupService {
               });
             }
             if (!isGuest && product.sellerId === buyerId) {
-              throw new ForbiddenException(i18nMessage("server.order.cannotBuyOwnProduct"));
+              throw new ForbiddenException(
+                i18nMessage("server.order.cannotBuyOwnProduct"),
+              );
             }
           }
 
@@ -220,7 +226,9 @@ export class OrderCheckoutGroupService {
               where: { id: dto.shippingAddressId },
             });
             if (!savedAddress || savedAddress.userId !== buyerId) {
-              throw new BadRequestException(i18nMessage("server.order.invalidShippingAddress"));
+              throw new BadRequestException(
+                i18nMessage("server.order.invalidShippingAddress"),
+              );
             }
             shippingAddress = savedAddress;
             shippingAddressId = savedAddress.id;
@@ -280,7 +288,9 @@ export class OrderCheckoutGroupService {
               shippingAddressId = newAddress.id;
             }
           } else {
-            throw new BadRequestException(i18nMessage("server.order.shippingAddressRequired"));
+            throw new BadRequestException(
+              i18nMessage("server.order.shippingAddressRequired"),
+            );
           }
 
           // Fatura adresi: inline > kayıtlı ID > teslimatla aynı
@@ -314,7 +324,9 @@ export class OrderCheckoutGroupService {
               where: { id: dto.billingAddressId },
             });
             if (!billing || billing.userId !== buyerId) {
-              throw new BadRequestException(i18nMessage("server.order.invalidBillingAddress"));
+              throw new BadRequestException(
+                i18nMessage("server.order.invalidBillingAddress"),
+              );
             }
             billingAddress = billing;
           }
@@ -363,7 +375,8 @@ export class OrderCheckoutGroupService {
             );
             if (!validation.isValid) {
               throw new BadRequestException(
-                validation.error || i18nMessage("server.order.invalidCouponCode"),
+                validation.error ||
+                  i18nMessage("server.order.invalidCouponCode"),
               );
             }
             if (validation.discount) {

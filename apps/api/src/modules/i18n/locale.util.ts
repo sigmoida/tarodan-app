@@ -2,7 +2,7 @@
 // @ReqLocale() decorator, and the exception filter (#224) all resolve the same
 // way without a circular dependency on I18nService.
 
-import { type Locale, defaultLocale, isLocale } from '@tarodan/i18n';
+import { type Locale, defaultLocale, isLocale } from "@tarodan/i18n";
 
 /** A user shape carrying an optional language preference (added later). */
 interface LocaleAwareUser {
@@ -22,10 +22,10 @@ interface LocaleAwareRequest {
 export function parseAcceptLanguage(acceptLanguage?: string): Locale {
   if (!acceptLanguage) return defaultLocale;
   const ranked = acceptLanguage
-    .split(',')
+    .split(",")
     .map((part) => {
-      const [tag, q] = part.trim().split(';q=');
-      const primary = tag.trim().toLowerCase().split('-')[0];
+      const [tag, q] = part.trim().split(";q=");
+      const primary = tag.trim().toLowerCase().split("-")[0];
       const quality = q !== undefined ? parseFloat(q) : 1;
       return { tag: primary, q: Number.isNaN(quality) ? 0 : quality };
     })
@@ -44,6 +44,6 @@ export function resolveRequestLocale(req: LocaleAwareRequest): Locale {
   const pref = req?.user?.preferredLanguage;
   if (isLocale(pref)) return pref;
 
-  const header = req?.headers?.['accept-language'];
+  const header = req?.headers?.["accept-language"];
   return parseAcceptLanguage(Array.isArray(header) ? header[0] : header);
 }

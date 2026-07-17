@@ -6,21 +6,26 @@ import {
   ConflictException,
   Optional,
   Logger,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { CacheService } from '../cache/cache.service';
-import { StorageService } from '../storage/storage.service';
-import { CreateOfferDto, CounterOfferDto, OfferQueryDto } from './dto';
-import { OfferStatus, ProductStatus, OrderStatus, Prisma } from '@prisma/client';
-import { ConfigService } from '@nestjs/config';
-import { EventService } from '../events';
-import { NotificationService } from '../notification/notification.service';
-import { NotificationType } from '../notification/dto';
-import { OrderService } from '../order/order.service';
-import { ProductLockService } from '../product/product-lock.service';
-import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
-import { generateUniqueReference } from '../../common/helpers/generate-reference';
-import { i18nMessage } from '../i18n';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { CacheService } from "../cache/cache.service";
+import { StorageService } from "../storage/storage.service";
+import { CreateOfferDto, CounterOfferDto, OfferQueryDto } from "./dto";
+import {
+  OfferStatus,
+  ProductStatus,
+  OrderStatus,
+  Prisma,
+} from "@prisma/client";
+import { ConfigService } from "@nestjs/config";
+import { EventService } from "../events";
+import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto";
+import { OrderService } from "../order/order.service";
+import { ProductLockService } from "../product/product-lock.service";
+import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
+import { generateUniqueReference } from "../../common/helpers/generate-reference";
+import { i18nMessage } from "../i18n";
 
 @Injectable()
 export class OfferService {
@@ -40,11 +45,11 @@ export class OfferService {
     private readonly storageService: StorageService,
   ) {
     this.offerExpiryHours = parseInt(
-      this.configService.get('OFFER_EXPIRY_HOURS') || '24',
+      this.configService.get("OFFER_EXPIRY_HOURS") || "24",
       10,
     );
     this.minOfferPercentage = parseInt(
-      this.configService.get('MIN_OFFER_PERCENTAGE') || '50',
+      this.configService.get("MIN_OFFER_PERCENTAGE") || "50",
       10,
     );
   }
@@ -55,7 +60,7 @@ export class OfferService {
    */
   private async generateOrderNumber(): Promise<string> {
     return generateUniqueReference(
-      'ORD',
+      "ORD",
       async (code) =>
         (await this.prisma.order.count({ where: { orderNumber: code } })) > 0,
     );
@@ -87,22 +92,30 @@ export class OfferService {
       });
 
       if (!product) {
-        throw new NotFoundException(i18nMessage('server.offer.productNotFound'));
+        throw new NotFoundException(
+          i18nMessage("server.offer.productNotFound"),
+        );
       }
 
       if (product.status !== ProductStatus.active) {
-        throw new BadRequestException(i18nMessage('server.offer.productNotActive'));
+        throw new BadRequestException(
+          i18nMessage("server.offer.productNotActive"),
+        );
       }
 
       // Adet bazlı: en az 1 müsait adet olmalı
       const available = getAvailableQuantity(product);
       if (available !== null && available < 1) {
-        throw new BadRequestException(i18nMessage('server.offer.productOutOfStock'));
+        throw new BadRequestException(
+          i18nMessage("server.offer.productOutOfStock"),
+        );
       }
 
       // Cannot offer on own product
       if (product.sellerId === buyerId) {
-        throw new BadRequestException(i18nMessage('server.offer.cannotOfferOwnProduct'));
+        throw new BadRequestException(
+          i18nMessage("server.offer.cannotOfferOwnProduct"),
+        );
       }
 
       // Check minimum offer percentage
@@ -110,7 +123,7 @@ export class OfferService {
       const minOffer = productPrice * (this.minOfferPercentage / 100);
       if (dto.amount < minOffer) {
         throw new BadRequestException(
-          i18nMessage('server.offer.belowMinimumOffer', {
+          i18nMessage("server.offer.belowMinimumOffer", {
             productPrice: productPrice.toFixed(2),
             minOffer: minOffer.toFixed(2),
             minOfferPercentage: this.minOfferPercentage,
@@ -130,7 +143,7 @@ export class OfferService {
 
       if (existingOffer) {
         throw new BadRequestException(
-          i18nMessage('server.offer.alreadyPendingOffer'),
+          i18nMessage("server.offer.alreadyPendingOffer"),
         );
       }
 
@@ -152,14 +165,26 @@ export class OfferService {
         include: {
           product: {
             include: {
-              images: { take: 1, orderBy: { sortOrder: 'asc' } },
+              images: { take: 1, orderBy: { sortOrder: "asc" } },
             },
           },
           buyer: {
-            select: { id: true, displayName: true, isVerified: true, email: true, avatarUrl: true },
+            select: {
+              id: true,
+              displayName: true,
+              isVerified: true,
+              email: true,
+              avatarUrl: true,
+            },
           },
           seller: {
-            select: { id: true, displayName: true, isVerified: true, email: true, avatarUrl: true },
+            select: {
+              id: true,
+              displayName: true,
+              isVerified: true,
+              email: true,
+              avatarUrl: true,
+            },
           },
         },
       });
@@ -168,8 +193,8 @@ export class OfferService {
         offer,
         productTitle: product.title,
         productPrice,
-        sellerEmail: product.seller?.email || '',
-        sellerName: product.seller?.displayName || '',
+        sellerEmail: product.seller?.email || "",
+        sellerName: product.seller?.displayName || "",
       };
     });
 
@@ -182,13 +207,15 @@ export class OfferService {
         productPrice: result.productPrice,
         offerAmount: Number(result.offer.amount),
         buyerId: result.offer.buyerId,
-        buyerName: result.offer.buyer.displayName || 'Alıcı',
+        buyerName: result.offer.buyer.displayName || "Alıcı",
         sellerId: result.offer.sellerId,
         sellerEmail: result.sellerEmail,
-        sellerName: result.sellerName || 'Satıcı',
+        sellerName: result.sellerName || "Satıcı",
         expiresAt: result.offer.expiresAt,
       });
-      this.logger.log(`offer.created event emitted for offer ${result.offer.id}`);
+      this.logger.log(
+        `offer.created event emitted for offer ${result.offer.id}`,
+      );
     } catch (error) {
       // Log but don't fail - offer was already created
       this.logger.error(`Failed to emit offer.created event: ${error}`);
@@ -219,7 +246,7 @@ export class OfferService {
       `;
 
       if (!lockedOffers || lockedOffers.length === 0) {
-        throw new NotFoundException(i18nMessage('server.offer.offerNotFound'));
+        throw new NotFoundException(i18nMessage("server.offer.offerNotFound"));
       }
 
       const offerData = await tx.offer.findUnique({
@@ -227,24 +254,28 @@ export class OfferService {
       });
 
       if (!offerData) {
-        throw new NotFoundException(i18nMessage('server.offer.offerNotFound'));
+        throw new NotFoundException(i18nMessage("server.offer.offerNotFound"));
       }
 
       const mustBuyerAccept = Boolean(offerData.buyerMustAccept);
       if (mustBuyerAccept) {
         if (offerData.buyerId !== userId) {
           throw new ForbiddenException(
-            i18nMessage('server.offer.onlyBuyerCanAcceptCounter'),
+            i18nMessage("server.offer.onlyBuyerCanAcceptCounter"),
           );
         }
       } else if (offerData.sellerId !== userId) {
-        throw new ForbiddenException(i18nMessage('server.offer.notAuthorizedToAccept'));
+        throw new ForbiddenException(
+          i18nMessage("server.offer.notAuthorizedToAccept"),
+        );
       }
 
       // Check offer status
       if (offerData.status !== OfferStatus.pending) {
         throw new BadRequestException(
-          i18nMessage('server.offer.alreadyInStatus', { status: offerData.status }),
+          i18nMessage("server.offer.alreadyInStatus", {
+            status: offerData.status,
+          }),
         );
       }
 
@@ -255,23 +286,32 @@ export class OfferService {
           where: { id: offerId },
           data: { status: OfferStatus.expired },
         });
-        throw new BadRequestException(i18nMessage('server.offer.offerExpired'));
+        throw new BadRequestException(i18nMessage("server.offer.offerExpired"));
       }
 
       // Lock product row and check availability (prevents race with direct buy / trade accept)
-      const productData = await this.productLockService.lockProductForUpdate(tx, offerData.productId);
+      const productData = await this.productLockService.lockProductForUpdate(
+        tx,
+        offerData.productId,
+      );
 
       if (!productData) {
-        throw new NotFoundException(i18nMessage('server.offer.productNotFound'));
+        throw new NotFoundException(
+          i18nMessage("server.offer.productNotFound"),
+        );
       }
 
       if (productData.status !== ProductStatus.active) {
-        throw new BadRequestException(i18nMessage('server.offer.productNoLongerActive'));
+        throw new BadRequestException(
+          i18nMessage("server.offer.productNoLongerActive"),
+        );
       }
 
       const available = getAvailableQuantity(productData);
       if (available !== null && available < 1) {
-        throw new BadRequestException(i18nMessage('server.offer.insufficientStock'));
+        throw new BadRequestException(
+          i18nMessage("server.offer.insufficientStock"),
+        );
       }
 
       // Accept this offer with version check
@@ -287,14 +327,26 @@ export class OfferService {
         include: {
           product: {
             include: {
-              images: { take: 1, orderBy: { sortOrder: 'asc' } },
+              images: { take: 1, orderBy: { sortOrder: "asc" } },
             },
           },
           buyer: {
-            select: { id: true, displayName: true, isVerified: true, email: true, avatarUrl: true },
+            select: {
+              id: true,
+              displayName: true,
+              isVerified: true,
+              email: true,
+              avatarUrl: true,
+            },
           },
           seller: {
-            select: { id: true, displayName: true, isVerified: true, email: true, avatarUrl: true },
+            select: {
+              id: true,
+              displayName: true,
+              isVerified: true,
+              email: true,
+              avatarUrl: true,
+            },
           },
         },
       });
@@ -309,7 +361,8 @@ export class OfferService {
         productData.categoryId,
       );
 
-      const totalAmount = Number(offerData.amount) + commissionResult.buyerFeeAmount;
+      const totalAmount =
+        Number(offerData.amount) + commissionResult.buyerFeeAmount;
 
       // Generate order number
       const orderNumber = await this.generateOrderNumber();
@@ -331,7 +384,9 @@ export class OfferService {
         },
       });
 
-      this.logger.log(`Order ${orderNumber} created for accepted offer ${offerId} (total=${totalAmount}, commission=${commissionResult.commissionAmount})`);
+      this.logger.log(
+        `Order ${orderNumber} created for accepted offer ${offerId} (total=${totalAmount}, commission=${commissionResult.commissionAmount})`,
+      );
 
       // Re-fetch offer with order relation so response includes orderId
       const offerWithOrder = await tx.offer.findUnique({
@@ -339,14 +394,26 @@ export class OfferService {
         include: {
           product: {
             include: {
-              images: { take: 1, orderBy: { sortOrder: 'asc' } },
+              images: { take: 1, orderBy: { sortOrder: "asc" } },
             },
           },
           buyer: {
-            select: { id: true, displayName: true, isVerified: true, email: true, avatarUrl: true },
+            select: {
+              id: true,
+              displayName: true,
+              isVerified: true,
+              email: true,
+              avatarUrl: true,
+            },
           },
           seller: {
-            select: { id: true, displayName: true, isVerified: true, email: true, avatarUrl: true },
+            select: {
+              id: true,
+              displayName: true,
+              isVerified: true,
+              email: true,
+              avatarUrl: true,
+            },
           },
           order: { select: { id: true, status: true } },
         },
@@ -368,12 +435,14 @@ export class OfferService {
         productTitle: result.offer.product.title,
         offerAmount: Number(result.offer.amount),
         buyerId: result.offer.buyerId,
-        buyerEmail: (result.offer.buyer as any).email || '',
-        buyerName: result.offer.buyer.displayName || 'Alıcı',
+        buyerEmail: (result.offer.buyer as any).email || "",
+        buyerName: result.offer.buyer.displayName || "Alıcı",
         sellerId: result.offer.sellerId,
-        sellerName: result.offer.seller.displayName || 'Satıcı',
+        sellerName: result.offer.seller.displayName || "Satıcı",
       });
-      this.logger.log(`offer.accepted event emitted for offer ${result.offer.id}`);
+      this.logger.log(
+        `offer.accepted event emitted for offer ${result.offer.id}`,
+      );
     } catch (error) {
       this.logger.error(`Failed to emit offer.accepted event: ${error}`);
     }
@@ -390,23 +459,25 @@ export class OfferService {
     });
 
     if (!offer) {
-      throw new NotFoundException(i18nMessage('server.offer.offerNotFound'));
+      throw new NotFoundException(i18nMessage("server.offer.offerNotFound"));
     }
 
     const mustBuyerAccept = Boolean(offer.buyerMustAccept);
     if (mustBuyerAccept) {
       if (offer.buyerId !== userId) {
         throw new ForbiddenException(
-          i18nMessage('server.offer.onlyBuyerCanRejectCounter'),
+          i18nMessage("server.offer.onlyBuyerCanRejectCounter"),
         );
       }
     } else if (offer.sellerId !== userId) {
-      throw new ForbiddenException(i18nMessage('server.offer.notAuthorizedToReject'));
+      throw new ForbiddenException(
+        i18nMessage("server.offer.notAuthorizedToReject"),
+      );
     }
 
     if (offer.status !== OfferStatus.pending) {
       throw new BadRequestException(
-        i18nMessage('server.offer.alreadyInStatus', { status: offer.status }),
+        i18nMessage("server.offer.alreadyInStatus", { status: offer.status }),
       );
     }
 
@@ -419,14 +490,24 @@ export class OfferService {
       include: {
         product: {
           include: {
-            images: { take: 1, orderBy: { sortOrder: 'asc' } },
+            images: { take: 1, orderBy: { sortOrder: "asc" } },
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+          select: {
+            id: true,
+            displayName: true,
+            isVerified: true,
+            avatarUrl: true,
+          },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+          select: {
+            id: true,
+            displayName: true,
+            isVerified: true,
+            avatarUrl: true,
+          },
         },
       },
     });
@@ -472,23 +553,25 @@ export class OfferService {
       });
 
       if (!offer) {
-        throw new NotFoundException(i18nMessage('server.offer.offerNotFound'));
+        throw new NotFoundException(i18nMessage("server.offer.offerNotFound"));
       }
 
       // Only seller can counter
       if (offer.sellerId !== sellerId) {
-        throw new ForbiddenException(i18nMessage('server.offer.notAuthorizedToCounter'));
+        throw new ForbiddenException(
+          i18nMessage("server.offer.notAuthorizedToCounter"),
+        );
       }
 
       if (offer.status !== OfferStatus.pending) {
         throw new BadRequestException(
-          i18nMessage('server.offer.alreadyInStatus', { status: offer.status }),
+          i18nMessage("server.offer.alreadyInStatus", { status: offer.status }),
         );
       }
 
       if (offer.buyerMustAccept) {
         throw new BadRequestException(
-          i18nMessage('server.offer.awaitingBuyerResponse'),
+          i18nMessage("server.offer.awaitingBuyerResponse"),
         );
       }
 
@@ -498,19 +581,19 @@ export class OfferService {
           where: { id: offerId },
           data: { status: OfferStatus.expired },
         });
-        throw new BadRequestException(i18nMessage('server.offer.offerExpired'));
+        throw new BadRequestException(i18nMessage("server.offer.offerExpired"));
       }
 
       // Counter amount should be between offer and product price
       if (dto.amount <= Number(offer.amount)) {
         throw new BadRequestException(
-          i18nMessage('server.offer.counterMustExceedOffer'),
+          i18nMessage("server.offer.counterMustExceedOffer"),
         );
       }
 
       if (dto.amount > Number(offer.product.price)) {
         throw new BadRequestException(
-          i18nMessage('server.offer.counterCannotExceedPrice'),
+          i18nMessage("server.offer.counterCannotExceedPrice"),
         );
       }
 
@@ -538,14 +621,24 @@ export class OfferService {
         include: {
           product: {
             include: {
-              images: { take: 1, orderBy: { sortOrder: 'asc' } },
+              images: { take: 1, orderBy: { sortOrder: "asc" } },
             },
           },
           buyer: {
-            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+            select: {
+              id: true,
+              displayName: true,
+              isVerified: true,
+              avatarUrl: true,
+            },
           },
           seller: {
-            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+            select: {
+              id: true,
+              displayName: true,
+              isVerified: true,
+              avatarUrl: true,
+            },
           },
         },
       });
@@ -583,22 +676,24 @@ export class OfferService {
       });
 
       if (!offer) {
-        throw new NotFoundException(i18nMessage('server.offer.offerNotFound'));
+        throw new NotFoundException(i18nMessage("server.offer.offerNotFound"));
       }
 
       if (!offer.buyerMustAccept) {
         throw new BadRequestException(
-          i18nMessage('server.offer.buyerCounterOnlyAfterSellerCounter'),
+          i18nMessage("server.offer.buyerCounterOnlyAfterSellerCounter"),
         );
       }
 
       if (offer.buyerId !== buyerId) {
-        throw new ForbiddenException(i18nMessage('server.offer.notAuthorizedToBuyerCounter'));
+        throw new ForbiddenException(
+          i18nMessage("server.offer.notAuthorizedToBuyerCounter"),
+        );
       }
 
       if (offer.status !== OfferStatus.pending) {
         throw new BadRequestException(
-          i18nMessage('server.offer.alreadyInStatus', { status: offer.status }),
+          i18nMessage("server.offer.alreadyInStatus", { status: offer.status }),
         );
       }
 
@@ -607,7 +702,7 @@ export class OfferService {
           where: { id: offerId },
           data: { status: OfferStatus.expired },
         });
-        throw new BadRequestException(i18nMessage('server.offer.offerExpired'));
+        throw new BadRequestException(i18nMessage("server.offer.offerExpired"));
       }
 
       const productPrice = Number(offer.product.price);
@@ -616,13 +711,13 @@ export class OfferService {
 
       if (dto.amount >= sellerCounterAmount) {
         throw new BadRequestException(
-          i18nMessage('server.offer.buyerCounterMustBeLower'),
+          i18nMessage("server.offer.buyerCounterMustBeLower"),
         );
       }
 
       if (dto.amount < minOffer) {
         throw new BadRequestException(
-          i18nMessage('server.offer.belowMinimumBuyerCounter', {
+          i18nMessage("server.offer.belowMinimumBuyerCounter", {
             productPrice: productPrice.toFixed(2),
             minOffer: minOffer.toFixed(2),
             minOfferPercentage: this.minOfferPercentage,
@@ -652,14 +747,24 @@ export class OfferService {
         include: {
           product: {
             include: {
-              images: { take: 1, orderBy: { sortOrder: 'asc' } },
+              images: { take: 1, orderBy: { sortOrder: "asc" } },
             },
           },
           buyer: {
-            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+            select: {
+              id: true,
+              displayName: true,
+              isVerified: true,
+              avatarUrl: true,
+            },
           },
           seller: {
-            select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+            select: {
+              id: true,
+              displayName: true,
+              isVerified: true,
+              avatarUrl: true,
+            },
           },
         },
       });
@@ -692,17 +797,19 @@ export class OfferService {
     });
 
     if (!offer) {
-      throw new NotFoundException(i18nMessage('server.offer.offerNotFound'));
+      throw new NotFoundException(i18nMessage("server.offer.offerNotFound"));
     }
 
     // Only buyer can cancel their own offer
     if (offer.buyerId !== buyerId) {
-      throw new ForbiddenException(i18nMessage('server.offer.notAuthorizedToCancel'));
+      throw new ForbiddenException(
+        i18nMessage("server.offer.notAuthorizedToCancel"),
+      );
     }
 
     if (offer.status !== OfferStatus.pending) {
       throw new BadRequestException(
-        i18nMessage('server.offer.alreadyInStatus', { status: offer.status }),
+        i18nMessage("server.offer.alreadyInStatus", { status: offer.status }),
       );
     }
 
@@ -710,20 +817,30 @@ export class OfferService {
       where: { id: offerId },
       data: {
         status: OfferStatus.cancelled,
-        cancelReason: 'Alıcı tarafından iptal edildi',
+        cancelReason: "Alıcı tarafından iptal edildi",
         version: { increment: 1 },
       },
       include: {
         product: {
           include: {
-            images: { take: 1, orderBy: { sortOrder: 'asc' } },
+            images: { take: 1, orderBy: { sortOrder: "asc" } },
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+          select: {
+            id: true,
+            displayName: true,
+            isVerified: true,
+            avatarUrl: true,
+          },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+          select: {
+            id: true,
+            displayName: true,
+            isVerified: true,
+            avatarUrl: true,
+          },
         },
       },
     });
@@ -766,9 +883,9 @@ export class OfferService {
     const where: Prisma.OfferWhereInput = {};
 
     // Filter by type (sent or received)
-    if (type === 'sent') {
+    if (type === "sent") {
       where.buyerId = userId;
-    } else if (type === 'received') {
+    } else if (type === "received") {
       where.sellerId = userId;
     } else {
       // Default: both sent and received
@@ -787,20 +904,30 @@ export class OfferService {
 
     const offers = await this.prisma.offer.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       skip: (page - 1) * limit,
       take: limit,
       include: {
         product: {
           include: {
-            images: { take: 1, orderBy: { sortOrder: 'asc' } },
+            images: { take: 1, orderBy: { sortOrder: "asc" } },
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+          select: {
+            id: true,
+            displayName: true,
+            isVerified: true,
+            avatarUrl: true,
+          },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+          select: {
+            id: true,
+            displayName: true,
+            isVerified: true,
+            avatarUrl: true,
+          },
         },
         order: {
           select: { id: true, status: true },
@@ -828,15 +955,25 @@ export class OfferService {
       include: {
         product: {
           include: {
-            images: { take: 1, orderBy: { sortOrder: 'asc' } },
+            images: { take: 1, orderBy: { sortOrder: "asc" } },
             category: { select: { id: true } },
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+          select: {
+            id: true,
+            displayName: true,
+            isVerified: true,
+            avatarUrl: true,
+          },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+          select: {
+            id: true,
+            displayName: true,
+            isVerified: true,
+            avatarUrl: true,
+          },
         },
         order: {
           select: { id: true, status: true },
@@ -845,12 +982,14 @@ export class OfferService {
     });
 
     if (!offer) {
-      throw new NotFoundException(i18nMessage('server.offer.offerNotFound'));
+      throw new NotFoundException(i18nMessage("server.offer.offerNotFound"));
     }
 
     // Only buyer or seller can view the offer
     if (offer.buyerId !== userId && offer.sellerId !== userId) {
-      throw new ForbiddenException(i18nMessage('server.offer.notAuthorizedToView'));
+      throw new ForbiddenException(
+        i18nMessage("server.offer.notAuthorizedToView"),
+      );
     }
 
     return await this.formatOfferResponse(offer);
@@ -859,18 +998,24 @@ export class OfferService {
   /**
    * Get offers for a product (seller only)
    */
-  async findProductOffers(productId: string, sellerId: string, query: OfferQueryDto) {
+  async findProductOffers(
+    productId: string,
+    sellerId: string,
+    query: OfferQueryDto,
+  ) {
     // Verify ownership
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
     });
 
     if (!product) {
-      throw new NotFoundException(i18nMessage('server.offer.productNotFound'));
+      throw new NotFoundException(i18nMessage("server.offer.productNotFound"));
     }
 
     if (product.sellerId !== sellerId) {
-      throw new ForbiddenException(i18nMessage('server.offer.notAuthorizedToViewProductOffers'));
+      throw new ForbiddenException(
+        i18nMessage("server.offer.notAuthorizedToViewProductOffers"),
+      );
     }
 
     const { status, page = 1, limit = 20 } = query;
@@ -887,21 +1032,31 @@ export class OfferService {
 
     const offers = await this.prisma.offer.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       skip: (page - 1) * limit,
       take: limit,
       include: {
         product: {
           include: {
-            images: { take: 1, orderBy: { sortOrder: 'asc' } },
+            images: { take: 1, orderBy: { sortOrder: "asc" } },
             category: { select: { id: true } },
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+          select: {
+            id: true,
+            displayName: true,
+            isVerified: true,
+            avatarUrl: true,
+          },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+          select: {
+            id: true,
+            displayName: true,
+            isVerified: true,
+            avatarUrl: true,
+          },
         },
         order: {
           select: { id: true, status: true },
@@ -923,10 +1078,17 @@ export class OfferService {
   /**
    * Resolve product image URL (S3 key -> presigned URL)
    */
-  private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
+  private resolveProductImageUrl(
+    imageKeyOrUrl: string | null | undefined,
+  ): string | null {
     if (!imageKeyOrUrl) return null;
-    if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
-    if (imageKeyOrUrl.includes('dev/') || imageKeyOrUrl.includes('prod/')) {
+    if (
+      imageKeyOrUrl.startsWith("http://") ||
+      imageKeyOrUrl.startsWith("https://") ||
+      imageKeyOrUrl.startsWith("/")
+    )
+      return imageKeyOrUrl;
+    if (imageKeyOrUrl.includes("dev/") || imageKeyOrUrl.includes("prod/")) {
       return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
     }
     return null;
@@ -946,10 +1108,11 @@ export class OfferService {
       const hours = Math.floor(diff / (1000 * 60 * 60));
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-      timeRemaining = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      timeRemaining = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
     }
 
-    const firstImage = (offer.product.images && offer.product.images[0]) || null;
+    const firstImage =
+      (offer.product.images && offer.product.images[0]) || null;
     const imageUrl = this.resolveProductImageUrl(firstImage?.cardKey);
 
     const images =
@@ -958,9 +1121,13 @@ export class OfferService {
             {
               cardKey: firstImage.cardKey,
               detailKey: firstImage.detailKey,
-              cardUrl: this.storageService?.getPublicAssetUrl(firstImage.cardKey) ?? null,
+              cardUrl:
+                this.storageService?.getPublicAssetUrl(firstImage.cardKey) ??
+                null,
               detailUrl: firstImage.detailKey
-                ? this.storageService?.getPublicAssetUrl(firstImage.detailKey) ?? null
+                ? (this.storageService?.getPublicAssetUrl(
+                    firstImage.detailKey,
+                  ) ?? null)
                 : undefined,
               sortOrder: firstImage.sortOrder,
             },
@@ -985,28 +1152,40 @@ export class OfferService {
         imageUrl: imageUrl || undefined,
         images,
         status: offer.product.status,
-        categoryId: offer.product.categoryId ?? offer.product.category?.id ?? undefined,
+        categoryId:
+          offer.product.categoryId ?? offer.product.category?.id ?? undefined,
       },
-      buyer: offer.buyer ? {
-        ...offer.buyer,
-        avatarUrl: await this.resolveOfferAvatarUrl(offer.buyer.avatarUrl),
-      } : offer.buyer,
-      seller: offer.seller ? {
-        ...offer.seller,
-        avatarUrl: await this.resolveOfferAvatarUrl(offer.seller.avatarUrl),
-      } : offer.seller,
+      buyer: offer.buyer
+        ? {
+            ...offer.buyer,
+            avatarUrl: await this.resolveOfferAvatarUrl(offer.buyer.avatarUrl),
+          }
+        : offer.buyer,
+      seller: offer.seller
+        ? {
+            ...offer.seller,
+            avatarUrl: await this.resolveOfferAvatarUrl(offer.seller.avatarUrl),
+          }
+        : offer.seller,
       cancelReason: offer.cancelReason ?? null,
       createdAt: offer.createdAt,
       updatedAt: offer.updatedAt,
     };
   }
 
-  private async resolveOfferAvatarUrl(avatarUrl: string | null | undefined): Promise<string | null> {
+  private async resolveOfferAvatarUrl(
+    avatarUrl: string | null | undefined,
+  ): Promise<string | null> {
     if (!avatarUrl) return null;
-    if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) return avatarUrl;
+    if (avatarUrl.startsWith("http://") || avatarUrl.startsWith("https://"))
+      return avatarUrl;
     if (this.storageService) {
       try {
-        return await this.storageService.getPresignedDownloadUrl('avatars', avatarUrl, 86400);
+        return await this.storageService.getPresignedDownloadUrl(
+          "avatars",
+          avatarUrl,
+          86400,
+        );
       } catch {
         return null;
       }

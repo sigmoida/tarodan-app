@@ -1,8 +1,8 @@
 // apps/api/src/modules/auth/google-auth.service.ts
-import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { OAuth2Client } from 'google-auth-library';
-import { i18nMessage } from '../i18n';
+import { Injectable, UnauthorizedException, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { OAuth2Client } from "google-auth-library";
+import { i18nMessage } from "../i18n";
 
 export interface GoogleProfile {
   sub: string;
@@ -20,9 +20,9 @@ export class GoogleAuthService {
 
   private audience(): string[] {
     return [
-      this.configService.get<string>('GOOGLE_CLIENT_ID_WEB'),
-      this.configService.get<string>('GOOGLE_CLIENT_ID_IOS'),
-      this.configService.get<string>('GOOGLE_CLIENT_ID_ANDROID'),
+      this.configService.get<string>("GOOGLE_CLIENT_ID_WEB"),
+      this.configService.get<string>("GOOGLE_CLIENT_ID_IOS"),
+      this.configService.get<string>("GOOGLE_CLIENT_ID_ANDROID"),
     ].filter((x): x is string => !!x);
   }
 
@@ -35,14 +35,22 @@ export class GoogleAuthService {
       });
       payload = ticket.getPayload();
     } catch (e) {
-      this.logger.warn(`Google token verify failed: ${e instanceof Error ? e.message : e}`);
-      throw new UnauthorizedException(i18nMessage('server.auth.googleSessionVerifyFailed'));
+      this.logger.warn(
+        `Google token verify failed: ${e instanceof Error ? e.message : e}`,
+      );
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.googleSessionVerifyFailed"),
+      );
     }
     if (!payload?.sub || !payload?.email) {
-      throw new UnauthorizedException(i18nMessage('server.auth.googleSessionInvalid'));
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.googleSessionInvalid"),
+      );
     }
     if (payload.email_verified !== true) {
-      throw new UnauthorizedException(i18nMessage('server.auth.googleEmailNotVerified'));
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.googleEmailNotVerified"),
+      );
     }
     return {
       sub: payload.sub,

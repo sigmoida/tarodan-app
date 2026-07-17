@@ -45,7 +45,9 @@ export class JwtRefreshStrategy extends PassportStrategy(
   async validate(req: Request, payload: JwtPayload) {
     // Verify it's a refresh token
     if (payload.type !== "refresh") {
-      throw new UnauthorizedException(i18nMessage("server.auth.invalidTokenType"));
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.invalidTokenType"),
+      );
     }
 
     // Check if user still exists

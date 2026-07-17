@@ -1,6 +1,6 @@
-import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { type Locale } from '@tarodan/i18n';
-import { resolveRequestLocale } from './locale.util';
+import { createParamDecorator, ExecutionContext } from "@nestjs/common";
+import { type Locale } from "@tarodan/i18n";
+import { resolveRequestLocale } from "./locale.util";
 
 /**
  * Injects the resolved request locale into a controller handler (#223):

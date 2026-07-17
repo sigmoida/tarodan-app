@@ -1,20 +1,26 @@
-import { Injectable, Logger, ForbiddenException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
-import { i18nMessage } from '../i18n';
-import { PrismaService } from '../../prisma';
-import { CacheService } from '../cache/cache.service';
-import { MembershipService } from '../membership/membership.service';
-import { isPremiumEntitled } from '../membership/membership.util';
-import { StorageService } from '../storage/storage.service';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
-import { QUEUE_NAMES } from '../../workers/constants';
-import { ModerationAiClient } from '../moderation/moderation-ai.client';
-import { CreateProductDto } from './dto';
-import { ProductStatus } from '@prisma/client';
-import { computeRelevanceScore } from './helpers/relevance-score';
-import { ProductCommonService } from './product-common.service';
-import { ProductRankingService } from './product-ranking.service';
-import { ProductStatsService } from './product-stats.service';
+import {
+  Injectable,
+  Logger,
+  ForbiddenException,
+  BadRequestException,
+  InternalServerErrorException,
+} from "@nestjs/common";
+import { i18nMessage } from "../i18n";
+import { PrismaService } from "../../prisma";
+import { CacheService } from "../cache/cache.service";
+import { MembershipService } from "../membership/membership.service";
+import { isPremiumEntitled } from "../membership/membership.util";
+import { StorageService } from "../storage/storage.service";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
+import { QUEUE_NAMES } from "../../workers/constants";
+import { ModerationAiClient } from "../moderation/moderation-ai.client";
+import { CreateProductDto } from "./dto";
+import { ProductStatus } from "@prisma/client";
+import { computeRelevanceScore } from "./helpers/relevance-score";
+import { ProductCommonService } from "./product-common.service";
+import { ProductRankingService } from "./product-ranking.service";
+import { ProductStatsService } from "./product-stats.service";
 
 /**
  * ProductCreateService — ilan oluşturma. Üyelik ilan/görsel limiti, AI görsel+metin
@@ -38,12 +44,12 @@ export class ProductCreateService {
     private readonly common: ProductCommonService,
     private readonly ranking: ProductRankingService,
     private readonly stats: ProductStatsService,
-  ) { }
+  ) {}
 
   /**
    * Create a new product
    * POST /products
-   * 
+   *
    * Membership Listing Limits:
    * - Free: 5 free listings, 10 total
    * - Basic: 15 free listings, 50 total
@@ -57,12 +63,14 @@ export class ProductCreateService {
     });
 
     if (!seller) {
-      throw new ForbiddenException(i18nMessage('server.product.userNotFound'));
+      throw new ForbiddenException(i18nMessage("server.product.userNotFound"));
     }
 
     // Check if user is banned
     if (seller.isBanned) {
-      throw new ForbiddenException(i18nMessage('server.product.bannedCannotCreate'));
+      throw new ForbiddenException(
+        i18nMessage("server.product.bannedCannotCreate"),
+      );
     }
 
     // ========================================================================
@@ -72,9 +80,14 @@ export class ProductCreateService {
     if (!canCreate.allowed) {
       // Get detailed limits for error message
       const limits = await this.membershipService.getUserLimits(sellerId);
-      const maxListings = limits.remainingTotalListings + await this.stats.getActiveListingCount(sellerId);
+      const maxListings =
+        limits.remainingTotalListings +
+        (await this.stats.getActiveListingCount(sellerId));
       throw new ForbiddenException(
-        i18nMessage('server.product.listingLimitReached', { tierName: limits.tierName, maxListings }),
+        i18nMessage("server.product.listingLimitReached", {
+          tierName: limits.tierName,
+          maxListings,
+        }),
       );
     }
 
@@ -82,7 +95,7 @@ export class ProductCreateService {
     const limits = await this.membershipService.getUserLimits(sellerId);
     if (dto.images && dto.images.length > limits.maxImages) {
       throw new BadRequestException(
-        i18nMessage('server.product.imageLimitExceeded', {
+        i18nMessage("server.product.imageLimitExceeded", {
           tierName: limits.tierName,
           maxImages: limits.maxImages,
           sentCount: dto.images.length,
@@ -94,12 +107,14 @@ export class ProductCreateService {
     // Düşük ilgililik admin incelemesine kalabilir; burada sadece uygunsuzu durdururuz.
     if (dto.images?.length && this.moderationAi.isEnabled) {
       for (const img of dto.images) {
-        const url = this.storageService.getPublicAssetUrl(img.detailKey || img.cardKey);
+        const url = this.storageService.getPublicAssetUrl(
+          img.detailKey || img.cardKey,
+        );
         if (!url) continue;
         const verdict = await this.moderationAi.moderateImage(url);
-        if (verdict?.decision === 'flag') {
+        if (verdict?.decision === "flag") {
           throw new BadRequestException(
-            i18nMessage('server.product.imageNotAppropriate'),
+            i18nMessage("server.product.imageNotAppropriate"),
           );
         }
       }
@@ -107,17 +122,17 @@ export class ProductCreateService {
 
     // Başlık + açıklama küfür/uygunsuz dil kontrolü (senkron) — uygunsuzsa engelle + event yaz.
     await this.moderationAi.assertTextClean(dto.title, {
-      entityType: 'product',
+      entityType: "product",
       userId: sellerId,
-      field: 'title',
-      label: 'ürün başlığı',
+      field: "title",
+      label: "ürün başlığı",
     });
     if (dto.description) {
       await this.moderationAi.assertTextClean(dto.description, {
-        entityType: 'product',
+        entityType: "product",
         userId: sellerId,
-        field: 'description',
-        label: 'ürün açıklaması',
+        field: "description",
+        label: "ürün açıklaması",
       });
     }
 
@@ -127,7 +142,7 @@ export class ProductCreateService {
         where: { id: sellerId },
         data: {
           isSeller: true,
-          sellerType: 'individual', // Default to individual seller
+          sellerType: "individual", // Default to individual seller
         },
       });
     }
@@ -138,17 +153,19 @@ export class ProductCreateService {
     });
 
     if (!category || !category.isActive) {
-      throw new BadRequestException(i18nMessage('server.product.invalidCategory'));
+      throw new BadRequestException(
+        i18nMessage("server.product.invalidCategory"),
+      );
     }
 
     // ========================================================================
     // PRICE VALIDATION FROM PLATFORM SETTINGS (Not retroactive - only new listings)
     // ========================================================================
     const minPriceSetting = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: 'min_product_price' },
+      where: { settingKey: "min_product_price" },
     });
     const maxPriceSetting = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: 'max_product_price' },
+      where: { settingKey: "max_product_price" },
     });
 
     const minPrice = minPriceSetting?.settingValue
@@ -160,20 +177,21 @@ export class ProductCreateService {
 
     if (minPrice != null && !isNaN(minPrice) && dto.price < minPrice) {
       throw new BadRequestException(
-        i18nMessage('server.product.priceBelowMinimum', { minPrice }),
+        i18nMessage("server.product.priceBelowMinimum", { minPrice }),
       );
     }
 
     if (maxPrice != null && !isNaN(maxPrice) && dto.price > maxPrice) {
       throw new BadRequestException(
-        i18nMessage('server.product.priceAboveMaximum', { maxPrice }),
+        i18nMessage("server.product.priceAboveMaximum", { maxPrice }),
       );
     }
 
     // Create product with images
-    const releaseDate = dto.year != null && dto.year >= 1900 && dto.year <= 2100
-      ? new Date(dto.year, 0, 1)
-      : undefined;
+    const releaseDate =
+      dto.year != null && dto.year >= 1900 && dto.year <= 2100
+        ? new Date(dto.year, 0, 1)
+        : undefined;
 
     // Normalize optional UUIDs: empty string causes Prisma FK error → use undefined
     const brandId = dto.brandId?.trim() || undefined;
@@ -185,7 +203,11 @@ export class ProductCreateService {
     // yeni ilana "ilk 24 saat" görünürlük sağlar (skor 0 değil, createdAt ile kademe üstünde).
     const sellerMembership = await this.prisma.userMembership.findUnique({
       where: { userId: sellerId },
-      select: { status: true, currentPeriodEnd: true, tier: { select: { type: true } } },
+      select: {
+        status: true,
+        currentPeriodEnd: true,
+        tier: { select: { type: true } },
+      },
     });
     const isPremiumSeller = isPremiumEntitled(sellerMembership);
     const FRESH_POPULARITY_BASELINE = 10;
@@ -219,16 +241,16 @@ export class ProductCreateService {
           releaseDate,
           images: dto.images?.length
             ? {
-              create: dto.images.map((img, index) => ({
-                cardKey: img.cardKey,
-                detailKey: img.detailKey,
-                sortOrder: index,
-              })),
-            }
+                create: dto.images.map((img, index) => ({
+                  cardKey: img.cardKey,
+                  detailKey: img.detailKey,
+                  sortOrder: index,
+                })),
+              }
             : undefined,
         },
         include: {
-          images: { orderBy: { sortOrder: 'asc' } },
+          images: { orderBy: { sortOrder: "asc" } },
           seller: {
             select: {
               id: true,
@@ -263,9 +285,11 @@ export class ProductCreateService {
       // NSFW/şüpheli -> pending kalır (admin kuyruğu). Servis kapalıysa pending.
       if (product.images?.length) {
         this.moderationQueue
-          .add('product-image', {
+          .add("product-image", {
             productId: product.id,
-            imageKeys: product.images.map((img) => img.detailKey || img.cardKey),
+            imageKeys: product.images.map(
+              (img) => img.detailKey || img.cardKey,
+            ),
           })
           .catch((err) =>
             this.logger.warn(`Moderation job eklenemedi: ${err.message}`),
@@ -273,33 +297,47 @@ export class ProductCreateService {
       }
 
       // Invalidate product list cache
-      await this.cache.delPattern('products:list:*');
+      await this.cache.delPattern("products:list:*");
 
       const productWithAttrs = await this.prisma.product.findUnique({
         where: { id: product.id },
         include: {
-          images: { orderBy: { sortOrder: 'asc' } },
-          seller: { select: { id: true, displayName: true, isVerified: true, sellerType: true, avatarUrl: true } },
+          images: { orderBy: { sortOrder: "asc" } },
+          seller: {
+            select: {
+              id: true,
+              displayName: true,
+              isVerified: true,
+              sellerType: true,
+              avatarUrl: true,
+            },
+          },
           category: { select: { id: true, name: true, slug: true } },
           brand: { select: { id: true, name: true, slug: true } },
           carModel: { select: { id: true, name: true, slug: true } },
-          productAttributes: { include: { attribute: { include: { group: true } } } },
+          productAttributes: {
+            include: { attribute: { include: { group: true } } },
+          },
         },
       });
 
       if (!productWithAttrs) {
-        throw new BadRequestException(i18nMessage('server.product.createdButLoadFailed'));
+        throw new BadRequestException(
+          i18nMessage("server.product.createdButLoadFailed"),
+        );
       }
       return await this.common.formatProductResponse(productWithAttrs);
     } catch (err: any) {
       const code = err?.code;
-      if (code === 'P2003') {
+      if (code === "P2003") {
         throw new BadRequestException(
-          i18nMessage('server.product.invalidBrandModelManufacturer'),
+          i18nMessage("server.product.invalidBrandModelManufacturer"),
         );
       }
-      if (code === 'P2002') {
-        throw new BadRequestException(i18nMessage('server.product.duplicateProduct'));
+      if (code === "P2002") {
+        throw new BadRequestException(
+          i18nMessage("server.product.duplicateProduct"),
+        );
       }
       // Zaten HTTP exception ise (400, 403 vb.) aynen fırlat
       if (err?.status && err?.status >= 400 && err?.status < 500) {
@@ -307,11 +345,18 @@ export class ProductCreateService {
       }
       // Diğer hataları logla ve 500 döndür (development'ta ham hata mesajı debug için
       // korunur — kullanıcıya görünen katalog mesajı DEĞİLDİR, i18n dışı bırakıldı)
-      this.logger.error('Product create failed', err?.stack || err?.message || err);
-      if (process.env.NODE_ENV === 'development' && err?.message) {
-        throw new InternalServerErrorException(`İlan oluşturulamadı: ${err.message}`);
+      this.logger.error(
+        "Product create failed",
+        err?.stack || err?.message || err,
+      );
+      if (process.env.NODE_ENV === "development" && err?.message) {
+        throw new InternalServerErrorException(
+          `İlan oluşturulamadı: ${err.message}`,
+        );
       }
-      throw new InternalServerErrorException(i18nMessage('server.product.createFailedGeneric'));
+      throw new InternalServerErrorException(
+        i18nMessage("server.product.createFailedGeneric"),
+      );
     }
   }
 }

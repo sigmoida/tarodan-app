@@ -2,6 +2,7 @@
 
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { adminApi } from '@/lib/api';
 import { AdminPage } from '@/components/page/AdminPage';
 import { PageHeader } from '@/components/AdminList';
@@ -14,11 +15,12 @@ import {
 import { reportColumns } from './_lib/columns';
 
 export default function ReportsPage() {
+	const t = useTranslations();
 	return (
 		<AdminPage>
 			<PageHeader
-				title='Rapor Talepleri'
-				description='Kullanıcıların ürün, kullanıcı, koleksiyon ve mesajlar için gönderdiği şikayetler'
+				title={t('admin.reports.title')}
+				description={t('admin.reports.description')}
 			/>
 			<ResourceList<Report>
 				resource='reports'
@@ -29,23 +31,23 @@ export default function ReportsPage() {
 				getRowId={(r) => r.id}
 				syncUrl
 				initialFilters={{ status: 'all', type: 'all' }}
-				errorMessage='Şikayetler yüklenirken hata oluştu'>
+				errorMessage={t('admin.reports.loadError')}>
 				<ResourceList.Toolbar>
 					<ResourceList.Search />
 					<ResourceList.FilterSelect
 						name='type'
-						options={reportTypeOptions}
+						options={reportTypeOptions(t)}
 						className='sm:w-44'
 					/>
 					<ResourceList.FilterSelect
 						name='status'
-						options={reportStatusOptions}
+						options={reportStatusOptions(t)}
 						className='sm:w-44'
 					/>
 				</ResourceList.Toolbar>
 				<ResourceList.Table
-					columns={reportColumns}
-					emptyText='Henüz şikayet yok'
+					columns={reportColumns({ t })}
+					emptyText={t('admin.reports.empty')}
 				/>
 				<ResourceList.Pagination />
 			</ResourceList>

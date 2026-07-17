@@ -3,12 +3,12 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { PaymentStatus } from '@prisma/client';
-import { StorageService } from '../storage/storage.service';
-import { i18nMessage, I18nService } from '../i18n';
-import { type Locale, defaultLocale } from '@tarodan/i18n';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { PaymentStatus } from "@prisma/client";
+import { StorageService } from "../storage/storage.service";
+import { i18nMessage, I18nService } from "../i18n";
+import { type Locale, defaultLocale } from "@tarodan/i18n";
 
 /**
  * Ödeme sorguları (durum sorgu, detay, satıcı hold listesi, kullanıcı ödeme
@@ -77,7 +77,9 @@ export class PaymentQueryService {
     });
 
     if (!payment) {
-      throw new NotFoundException(i18nMessage('server.payment.paymentNotFound'));
+      throw new NotFoundException(
+        i18nMessage("server.payment.paymentNotFound"),
+      );
     }
 
     // iframe kaldırıldı: bekleyen ödeme yeniden /payment/[id] kart formundan tamamlanır
@@ -86,8 +88,14 @@ export class PaymentQueryService {
 
     // Trade cash payment (no order)
     if (!payment.order && payment.tradeCashPayment) {
-      if (userId && payment.tradeCashPayment.payerId !== userId && payment.tradeCashPayment.recipientId !== userId) {
-        throw new ForbiddenException(i18nMessage('server.payment.viewStatusForbidden'));
+      if (
+        userId &&
+        payment.tradeCashPayment.payerId !== userId &&
+        payment.tradeCashPayment.recipientId !== userId
+      ) {
+        throw new ForbiddenException(
+          i18nMessage("server.payment.viewStatusForbidden"),
+        );
       }
       return {
         id: payment.id,
@@ -108,18 +116,24 @@ export class PaymentQueryService {
       const group = payment.checkoutGroup;
       if (userId) {
         if (group.buyerId !== userId) {
-          throw new ForbiddenException(i18nMessage('server.payment.viewStatusForbidden'));
+          throw new ForbiddenException(
+            i18nMessage("server.payment.viewStatusForbidden"),
+          );
         }
       } else if (!group.isGuest) {
         const canPollWithoutAuth =
-          payment.status === PaymentStatus.pending || payment.status === PaymentStatus.processing;
+          payment.status === PaymentStatus.pending ||
+          payment.status === PaymentStatus.processing;
         if (!canPollWithoutAuth) {
-          throw new ForbiddenException(i18nMessage('server.payment.loginRequiredForPayment'));
+          throw new ForbiddenException(
+            i18nMessage("server.payment.loginRequiredForPayment"),
+          );
         }
       }
 
       const groupTotal = Number(group.totalAmount ?? 0);
-      const sum = (fn: (o: any) => number) => group.orders.reduce((acc: number, o: any) => acc + fn(o), 0);
+      const sum = (fn: (o: any) => number) =>
+        group.orders.reduce((acc: number, o: any) => acc + fn(o), 0);
       const shippingAmount = sum((o) => Number(o.shippingCost ?? 0));
       const buyerFeeAmount = sum((o) => Number(o.buyerFeeAmount ?? 0));
       const sellerFeeAmount = sum((o) => Number(o.sellerFeeAmount ?? 0));
@@ -135,7 +149,8 @@ export class PaymentQueryService {
         amount: Number(payment.amount),
         currency: payment.currency,
         provider: payment.provider,
-        providerTransactionId: payment.providerPaymentId || payment.providerConversationId,
+        providerTransactionId:
+          payment.providerPaymentId || payment.providerConversationId,
         pricing: {
           subtotal,
           shippingAmount,
@@ -160,7 +175,9 @@ export class PaymentQueryService {
     }
 
     if (!payment.order) {
-      throw new NotFoundException(i18nMessage('server.payment.orderOrTradeNotFoundForPayment'));
+      throw new NotFoundException(
+        i18nMessage("server.payment.orderOrTradeNotFoundForPayment"),
+      );
     }
 
     // Check if this is a guest order
@@ -169,17 +186,25 @@ export class PaymentQueryService {
 
     // Validate access
     if (userId) {
-      if (payment.order.buyerId !== userId && payment.order.sellerId !== userId) {
-        throw new ForbiddenException(i18nMessage('server.payment.viewStatusForbidden'));
+      if (
+        payment.order.buyerId !== userId &&
+        payment.order.sellerId !== userId
+      ) {
+        throw new ForbiddenException(
+          i18nMessage("server.payment.viewStatusForbidden"),
+        );
       }
     } else {
       if (!isGuestOrder) {
         // Oturum yok veya JWT decode edilemedi (ör. token checkout sırasında temizlendi): yine de
         // bekleyen/işlenen ödemede durum okunabilsin; ödeme kimliği UUID ile korunur.
         const canPollWithoutAuth =
-          payment.status === PaymentStatus.pending || payment.status === PaymentStatus.processing;
+          payment.status === PaymentStatus.pending ||
+          payment.status === PaymentStatus.processing;
         if (!canPollWithoutAuth) {
-          throw new ForbiddenException(i18nMessage('server.payment.loginRequiredForPayment'));
+          throw new ForbiddenException(
+            i18nMessage("server.payment.loginRequiredForPayment"),
+          );
         }
       }
     }
@@ -202,7 +227,8 @@ export class PaymentQueryService {
       sellerNetAmount,
     };
 
-    const isMembershipOrder = payment.order.productId?.startsWith?.('membership-') ?? false;
+    const isMembershipOrder =
+      payment.order.productId?.startsWith?.("membership-") ?? false;
 
     return {
       id: payment.id,
@@ -211,7 +237,8 @@ export class PaymentQueryService {
       amount: Number(payment.amount),
       currency: payment.currency,
       provider: payment.provider,
-      providerTransactionId: payment.providerPaymentId || payment.providerConversationId,
+      providerTransactionId:
+        payment.providerPaymentId || payment.providerConversationId,
       pricing,
       createdAt: payment.createdAt,
       updatedAt: payment.updatedAt,
@@ -251,19 +278,23 @@ export class PaymentQueryService {
     });
 
     if (!payment) {
-      throw new NotFoundException(i18nMessage('server.payment.paymentNotFound'));
+      throw new NotFoundException(
+        i18nMessage("server.payment.paymentNotFound"),
+      );
     }
 
     // Grup veya takas ödemelerinde tekil sipariş yoktur; durum sorgusu için unified endpoint kullanılmalı
     if (!payment.order) {
       throw new BadRequestException(
-        i18nMessage('server.payment.paymentBelongsToGroupOrTrade'),
+        i18nMessage("server.payment.paymentBelongsToGroupOrTrade"),
       );
     }
 
     // Only buyer or seller can view
     if (payment.order.buyerId !== userId && payment.order.sellerId !== userId) {
-      throw new ForbiddenException(i18nMessage('server.payment.viewPaymentForbidden'));
+      throw new ForbiddenException(
+        i18nMessage("server.payment.viewPaymentForbidden"),
+      );
     }
 
     const totalAmount = Number(payment.order.totalAmount ?? 0);
@@ -291,7 +322,8 @@ export class PaymentQueryService {
       currency: payment.currency,
       provider: payment.provider,
       status: payment.status,
-      providerTransactionId: payment.providerPaymentId || payment.providerConversationId,
+      providerTransactionId:
+        payment.providerPaymentId || payment.providerConversationId,
       pricing,
       createdAt: payment.createdAt,
       updatedAt: payment.updatedAt,
@@ -304,7 +336,7 @@ export class PaymentQueryService {
   async getSellerHolds(sellerId: string) {
     const holds = await this.prisma.paymentHold.findMany({
       where: { sellerId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       include: {
         payment: {
           include: {
@@ -384,7 +416,7 @@ export class PaymentQueryService {
     const [payments, total] = await Promise.all([
       this.prisma.payment.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip,
         take: limit,
         include: {
@@ -394,7 +426,11 @@ export class PaymentQueryService {
                 select: {
                   id: true,
                   title: true,
-                  images: { take: 1, orderBy: { sortOrder: 'asc' as const }, select: { cardKey: true } },
+                  images: {
+                    take: 1,
+                    orderBy: { sortOrder: "asc" as const },
+                    select: { cardKey: true },
+                  },
                 },
               },
               buyer: { select: { id: true, displayName: true } },
@@ -410,7 +446,11 @@ export class PaymentQueryService {
                     select: {
                       id: true,
                       title: true,
-                      images: { take: 1, orderBy: { sortOrder: 'asc' as const }, select: { cardKey: true } },
+                      images: {
+                        take: 1,
+                        orderBy: { sortOrder: "asc" as const },
+                        select: { cardKey: true },
+                      },
                     },
                   },
                   seller: { select: { id: true, displayName: true } },
@@ -435,7 +475,12 @@ export class PaymentQueryService {
         .map((img: any) => {
           const key = img?.cardKey;
           if (!key) return null;
-          if (key.startsWith('http://') || key.startsWith('https://') || key.startsWith('/')) return key;
+          if (
+            key.startsWith("http://") ||
+            key.startsWith("https://") ||
+            key.startsWith("/")
+          )
+            return key;
           return this.storageService.getPublicAssetUrl(key) || null;
         })
         .filter(Boolean);
@@ -448,27 +493,38 @@ export class PaymentQueryService {
         const tradeCash = (p as any).tradeCashPayment;
         const firstGroupOrder = group?.orders?.[0];
 
-        let type: 'order' | 'checkout_group' | 'trade_cash' = 'order';
+        let type: "order" | "checkout_group" | "trade_cash" = "order";
         let description =
           p.order?.product?.title ??
-          this.i18n.translate('server.payment.orderPaymentDescription', locale);
+          this.i18n.translate("server.payment.orderPaymentDescription", locale);
         if (group) {
-          type = 'checkout_group';
+          type = "checkout_group";
           const count = group.orders?.length ?? 0;
           description =
             count > 1
-              ? this.i18n.translate('server.payment.cartPaymentDescriptionCount', locale, {
-                  count,
-                })
+              ? this.i18n.translate(
+                  "server.payment.cartPaymentDescriptionCount",
+                  locale,
+                  {
+                    count,
+                  },
+                )
               : (firstGroupOrder?.product?.title ??
-                this.i18n.translate('server.payment.cartPaymentDescription', locale));
+                this.i18n.translate(
+                  "server.payment.cartPaymentDescription",
+                  locale,
+                ));
         } else if (tradeCash) {
-          type = 'trade_cash';
+          type = "trade_cash";
           description = tradeCash.trade?.tradeNumber
-            ? this.i18n.translate('server.payment.tradeCashDifferenceWithNumber', locale, {
-                tradeNumber: tradeCash.trade.tradeNumber,
-              })
-            : this.i18n.translate('server.payment.tradeCashDifference', locale);
+            ? this.i18n.translate(
+                "server.payment.tradeCashDifferenceWithNumber",
+                locale,
+                {
+                  tradeNumber: tradeCash.trade.tradeNumber,
+                },
+              )
+            : this.i18n.translate("server.payment.tradeCashDifference", locale);
         }
 
         return {
@@ -477,16 +533,22 @@ export class PaymentQueryService {
           description,
           orderId: p.orderId ?? firstGroupOrder?.id ?? null,
           orderNumber:
-            p.order?.orderNumber ?? group?.groupNumber ?? tradeCash?.trade?.tradeNumber ?? null,
+            p.order?.orderNumber ??
+            group?.groupNumber ??
+            tradeCash?.trade?.tradeNumber ??
+            null,
           amount: Number(p.amount),
           currency: p.currency,
           provider: p.provider,
           status: p.status,
           failureReason: p.failureReason,
-          providerTransactionId: p.providerPaymentId || p.providerConversationId,
+          providerTransactionId:
+            p.providerPaymentId || p.providerConversationId,
           product: toImageUrls(p.order?.product ?? firstGroupOrder?.product),
           products: group
-            ? (group.orders ?? []).map((o: any) => toImageUrls(o.product)).filter(Boolean)
+            ? (group.orders ?? [])
+                .map((o: any) => toImageUrls(o.product))
+                .filter(Boolean)
             : p.order?.product
               ? [toImageUrls(p.order.product)]
               : [],
@@ -499,7 +561,10 @@ export class PaymentQueryService {
                 orderNumber: o.orderNumber ?? null,
                 title:
                   o.product?.title ??
-                  this.i18n.translate('server.payment.productFallbackTitle', locale),
+                  this.i18n.translate(
+                    "server.payment.productFallbackTitle",
+                    locale,
+                  ),
                 image: toImageUrls(o.product)?.images?.[0] ?? null,
                 amount: Number(o.totalAmount ?? 0),
                 sellerName: o.seller?.displayName ?? null,

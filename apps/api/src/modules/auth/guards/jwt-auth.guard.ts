@@ -1,12 +1,16 @@
-import { Injectable, ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
-import { Reflector } from '@nestjs/core';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
-import { IS_ADMIN_ROUTE_KEY } from '../decorators/admin-route.decorator';
-import { i18nMessage } from '../../i18n';
+import {
+  Injectable,
+  ExecutionContext,
+  UnauthorizedException,
+} from "@nestjs/common";
+import { AuthGuard } from "@nestjs/passport";
+import { Reflector } from "@nestjs/core";
+import { IS_PUBLIC_KEY } from "../decorators/public.decorator";
+import { IS_ADMIN_ROUTE_KEY } from "../decorators/admin-route.decorator";
+import { i18nMessage } from "../../i18n";
 
 @Injectable()
-export class JwtAuthGuard extends AuthGuard('jwt') {
+export class JwtAuthGuard extends AuthGuard("jwt") {
   constructor(private reflector: Reflector) {
     super();
   }
@@ -19,10 +23,10 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     ]);
 
     // Check if route is marked as admin route (will be handled by AdminJwtAuthGuard)
-    const isAdminRoute = this.reflector.getAllAndOverride<boolean>(IS_ADMIN_ROUTE_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const isAdminRoute = this.reflector.getAllAndOverride<boolean>(
+      IS_ADMIN_ROUTE_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
     if (isAdminRoute) {
       return true; // Skip global guard, let AdminJwtAuthGuard handle it
@@ -39,7 +43,12 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     return super.canActivate(context);
   }
 
-  handleRequest<TUser = any>(err: any, user: any, info: any, context?: ExecutionContext): TUser {
+  handleRequest<TUser = any>(
+    err: any,
+    user: any,
+    info: any,
+    context?: ExecutionContext,
+  ): TUser {
     // Try to get isPublicRoute from the request if context is available
     let isPublic = false;
     if (context) {
@@ -64,7 +73,10 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
     // For protected routes, require authentication
     if (err || !user) {
-      throw err || new UnauthorizedException(i18nMessage('server.auth.loginRequired'));
+      throw (
+        err ||
+        new UnauthorizedException(i18nMessage("server.auth.loginRequired"))
+      );
     }
     return user;
   }

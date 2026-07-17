@@ -2,6 +2,7 @@
 
 import { Doughnut } from 'react-chartjs-2';
 import { Chart as ChartJS } from 'chart.js';
+import { useTranslations } from 'next-intl';
 import { SectionCard } from '@/components/detail/SectionCard';
 import { chartPalette, categoryColors } from '../_lib/charts';
 
@@ -10,11 +11,12 @@ export function CategoryChart({
 }: {
   categories: { name: string; count: number }[];
 }) {
+  const t = useTranslations();
   const sorted = [...(categories || [])].sort((a, b) => b.count - a.count);
   const hasData = sorted.length > 0;
 
   const data = {
-    labels: hasData ? sorted.map((c) => c.name) : ['Veri Yok'],
+    labels: hasData ? sorted.map((c) => c.name) : [t('admin.dashboard.charts.noData')],
     datasets: [
       {
         data: hasData ? sorted.map((c) => c.count) : [1],
@@ -27,7 +29,7 @@ export function CategoryChart({
   };
 
   return (
-    <SectionCard title="Kategori Dağılımı" className="overflow-visible">
+    <SectionCard title={t('admin.dashboard.charts.categoryTitle')} className="overflow-visible">
       <div className="min-h-[380px] pb-6">
         <Doughnut
           data={data}
