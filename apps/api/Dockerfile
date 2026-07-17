@@ -60,14 +60,19 @@ RUN addgroup --system --gid 1001 nodejs && \
 # Copy built files with correct ownership (avoids slow chown -R over node_modules)
 COPY --from=builder --chown=nestjs:nodejs /app/apps/api/dist ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/apps/api/dist-seed ./dist-seed
-# Copy root node_modules. Hoisting makes third-party deps real files here, but
-# workspace deps are still SYMLINKS: node_modules/@tarodan/* -> /app/packages/*.
+# Copy root node_modules (hoisted third-party deps are real files here).
 COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
-# ...so the symlink targets must exist in the runner too, or `require()` throws
-# MODULE_NOT_FOUND. The compiled dist requires @tarodan/i18n and @tarodan/logger
-# at runtime (@tarodan/types is type-only — tsc erases it, which is why a missing
-# packages/ never surfaced before those two landed).
-COPY --from=builder --chown=nestjs:nodejs /app/packages ./packages
+# pnpm links workspace deps into apps/api/node_modules/@tarodan/* (symlinks into
+# /app/packages) — NOT into the root node_modules copied above. Nothing under
+# /app resolves them, so `require("@tarodan/i18n")` from /app/dist threw
+# MODULE_NOT_FOUND. Drop the built packages in as REAL dirs where node looks
+# from /app/dist. Their own deps (e.g. i18n -> intl-messageformat) are hoisted
+# into the root node_modules above, so they resolve upward from here.
+# (@tarodan/types is type-only today — tsc emits no require() for it — but it is
+# copied too so a future runtime import doesn't reintroduce this failure.)
+COPY --from=builder --chown=nestjs:nodejs /app/packages/i18n ./node_modules/@tarodan/i18n
+COPY --from=builder --chown=nestjs:nodejs /app/packages/logger ./node_modules/@tarodan/logger
+COPY --from=builder --chown=nestjs:nodejs /app/packages/types ./node_modules/@tarodan/types
 COPY --from=builder --chown=nestjs:nodejs /app/apps/api/package.json ./package.json
 COPY --from=builder --chown=nestjs:nodejs /app/apps/api/prisma ./prisma
 
