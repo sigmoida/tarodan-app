@@ -1121,8 +1121,8 @@ export class AdminService {
   // ==================== CAR MODEL MANAGEMENT ====================
   // Taşındı: admin-catalog.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getCarModels(brandId?: string) {
-    return this.catalogService.getCarModels(brandId);
+  async getCarModels(params?: { brandId?: string; page?: number; limit?: number; search?: string }) {
+    return this.catalogService.getCarModels(params);
   }
 
   async createCarModel(

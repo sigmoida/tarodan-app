@@ -54,7 +54,8 @@ export const catalogApi = {
   },
 
   // Car Models
-  getCarModels: (brandId?: string) => api.get('/admin/car-models', { params: brandId ? { brandId } : {} }),
+  getCarModels: (params?: { brandId?: string; page?: number; limit?: number; search?: string }) =>
+    api.get('/admin/car-models', { params: params ?? {} }),
   createCarModel: (data: any) => api.post('/admin/car-models', data),
   updateCarModel: (id: string, data: any) => api.patch(`/admin/car-models/${id}`, data),
   deleteCarModel: (id: string) => api.delete(`/admin/car-models/${id}`),

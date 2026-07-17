@@ -5,6 +5,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import type { AxiosResponse } from "axios";
 import { adminKeys } from "@/lib/query/keys";
+import { CLIENT_LIST_STALE_MS, type ClientListFetcher } from "@/lib/query/client-list";
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -34,6 +35,12 @@ export interface UseAdminResourceOptions<T> {
    * Enter (onSearchSubmit) still works, skipping the debounce for an instant flush.
    */
   debounceMs?: number;
+  /**
+   * react-query staleTime (ms). #101: full-load (client-list) kaynakları için ver
+   * (örn 5dk) → detail→list dönüşünde `refetchOnMount:'always'`'in tüm tabloyu tekrar
+   * indirmesini keser. Default 0 → server-paginated kaynaklar her dönüşte taze kalır.
+   */
+  staleTime?: number;
 }
 
 export interface UseAdminResourceResult<T> {
@@ -147,6 +154,7 @@ export function useAdminResource<T>({
   initialFilters = {},
   errorMessage = "Veriler yüklenemedi",
   debounceMs = 300,
+  staleTime = 0,
 }: UseAdminResourceOptions<T>): UseAdminResourceResult<T> {
   const router = useRouter();
   const pathname = usePathname();
@@ -330,6 +338,10 @@ export function useAdminResource<T>({
   // The initial load suspends (the SuspenseBoundary above shows a spinner; the
   // error is caught there). Later changes happen inside a transition, so they
   // don't suspend again — old data stays while isFetching/isPending dims the table.
+  // #101: explicit staleTime yoksa, clientListFetcher (isClientList marker) otomatik
+  // CLIENT_LIST_STALE_MS alır — 7 client-list sayfası değişmeden faydalanır.
+  const effectiveStaleTime =
+    staleTime || ((fetcher as ClientListFetcher).isClientList ? CLIENT_LIST_STALE_MS : 0);
   const queryResult = useSuspenseQuery({
     // [resource, 'list', {...}] — shares the resource prefix with detail keys so
     // a mutation's invalidateQueries({ queryKey: [resource] }) refreshes lists too.
@@ -338,7 +350,10 @@ export function useAdminResource<T>({
       const response = await fetcher(buildParams());
       return response.data;
     },
-    refetchOnMount: 'always', // fresh data on every return to the page (detail→list navigation)
+    staleTime: effectiveStaleTime,
+    // #101: staleTime>0 (client-list) → mount'ta bayat değilse tekrar indirme;
+    // =0 (server-paginated) → 'always', her dönüşte taze (mevcut davranış).
+    refetchOnMount: effectiveStaleTime > 0 ? true : 'always',
   });
 
   // ── Tab URL sync ────────────────────────────────────────────────────────────
