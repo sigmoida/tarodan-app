@@ -1,15 +1,27 @@
-import { Injectable, Logger, NotFoundException, ForbiddenException, BadRequestException, ConflictException } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { CacheService } from '../cache/cache.service';
-import { SearchService } from '../search/search.service';
-import { NotificationService } from '../notification/notification.service';
-import { NotificationType } from '../notification/dto';
-import { SmtpProvider } from '../notification/providers/smtp.provider';
-import { UpdateProductDto } from './dto';
-import { ProductStatus, Prisma } from '@prisma/client';
-import { renderEmailTemplate, getEmailTemplateSubject, substituteEmailVariables } from '../../common/helpers/email-template-renderer';
-import { ProductCommonService } from './product-common.service';
-import { ProductRankingService } from './product-ranking.service';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+  ConflictException,
+} from "@nestjs/common";
+import { i18nMessage } from "../i18n";
+import { PrismaService } from "../../prisma";
+import { CacheService } from "../cache/cache.service";
+import { SearchService } from "../search/search.service";
+import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto";
+import { SmtpProvider } from "../notification/providers/smtp.provider";
+import { UpdateProductDto } from "./dto";
+import { ProductStatus, Prisma } from "@prisma/client";
+import {
+  renderEmailTemplate,
+  getEmailTemplateSubject,
+  substituteEmailVariables,
+} from "../../common/helpers/email-template-renderer";
+import { ProductCommonService } from "./product-common.service";
+import { ProductRankingService } from "./product-ranking.service";
 
 /**
  * ProductUpdateService — ilan güncelleme + silme (soft delete). Optimistic lock,
@@ -30,7 +42,7 @@ export class ProductUpdateService {
     private readonly smtpProvider: SmtpProvider,
     private readonly common: ProductCommonService,
     private readonly ranking: ProductRankingService,
-  ) { }
+  ) {}
 
   /**
    * Update product
@@ -43,12 +55,12 @@ export class ProductUpdateService {
     });
 
     if (!product) {
-      throw new NotFoundException('Ürün bulunamadı');
+      throw new NotFoundException(i18nMessage("server.product.notFound"));
     }
 
     // Verify ownership
     if (product.sellerId !== sellerId) {
-      throw new ForbiddenException('Bu ürünü düzenleme yetkiniz yok');
+      throw new ForbiddenException(i18nMessage("server.product.editForbidden"));
     }
 
     // Check if user is banned
@@ -58,29 +70,40 @@ export class ProductUpdateService {
     });
 
     if (seller?.isBanned) {
-      throw new ForbiddenException('Hesabınız banlanmış. Ürün düzenleyemezsiniz.');
+      throw new ForbiddenException(
+        i18nMessage("server.product.bannedCannotEdit"),
+      );
     }
 
     // Reserved products cannot be updated at all
     if (product.status === ProductStatus.reserved) {
-      throw new BadRequestException('Rezerve edilmiş ürünler güncellenemez');
+      throw new BadRequestException(
+        i18nMessage("server.product.reservedCannotUpdate"),
+      );
     }
 
     // Silinen (yönetici tarafından kaldırılan) ürün düzenlenemez/yeniden açılamaz.
     // "Pasife alma"dan AYRI bir durumdur; satıcı bunu geri getiremez.
     if (product.status === ProductStatus.deleted) {
-      throw new BadRequestException('Bu ürün kaldırılmış ve yeniden açılamaz. Yeniden satmak için yeni ilan oluşturun.');
+      throw new BadRequestException(
+        i18nMessage("server.product.removedCannotReopen"),
+      );
     }
 
     // Sold or inactive (stok biten / pasife alınmış): satıcı yeniden satışa
     // açmak isteyebilir ama DOĞRUDAN aktifleştiremez — istek admin onayına
     // (pending) gider. Onaylanınca yayına girer. Stok girilmesi/var olması şart.
-    if (product.status === ProductStatus.sold || product.status === ProductStatus.inactive) {
+    if (
+      product.status === ProductStatus.sold ||
+      product.status === ProductStatus.inactive
+    ) {
       if (dto.status === ProductStatus.active) {
         const newQuantity =
           dto.quantity != null ? Number(dto.quantity) : product.quantity;
         if (newQuantity != null && newQuantity <= 0) {
-          throw new BadRequestException('Yeniden satışa açmak için stok miktarı belirleyin');
+          throw new BadRequestException(
+            i18nMessage("server.product.setQuantityToReopen"),
+          );
         }
         await this.prisma.product.update({
           where: { id },
@@ -90,18 +113,25 @@ export class ProductUpdateService {
           },
         });
         await this.cache.del(`products:detail:${id}`);
-        await this.cache.delPattern('products:list:*');
+        await this.cache.delPattern("products:list:*");
         // NOT: back-in-stock bildirimi burada GÖNDERİLMEZ — ilan henüz yayında
         // değil (pending). Bildirim, admin onayıyla active'e geçtiğinde gider.
         const updated = await this.prisma.product.findUnique({
           where: { id },
-          include: { images: true, category: true, brand: true, carModel: true },
+          include: {
+            images: true,
+            category: true,
+            brand: true,
+            carModel: true,
+          },
         });
         return updated;
       }
       // status=active dışı bir istek (ör. sadece düzenleme) sold/inactive ilanda
       // anlamsız; mevcut akışı korumak için yeniden satışa açma yönlendirmesi ver.
-      throw new BadRequestException('Yeniden satışa açmak için stok miktarı belirleyin');
+      throw new BadRequestException(
+        i18nMessage("server.product.setQuantityToReopen"),
+      );
     }
 
     // Verify category if being updated
@@ -111,7 +141,9 @@ export class ProductUpdateService {
       });
 
       if (!category || !category.isActive) {
-        throw new BadRequestException('Geçersiz kategori');
+        throw new BadRequestException(
+          i18nMessage("server.product.invalidCategory"),
+        );
       }
     }
 
@@ -129,18 +161,24 @@ export class ProductUpdateService {
       });
 
       if (!seller?.membership?.tier?.canTrade) {
-        throw new BadRequestException('Takas özelliği için Premium üyelik gereklidir. Üyeliğinizi yükseltin.');
+        throw new BadRequestException(
+          i18nMessage("server.product.tradeRequiresPremium"),
+        );
       }
       canEnableTrade = true;
     }
 
     // A + oldPrice: price (A) = her zaman güncel satış fiyatı; indirim uygulanınca price = indirimli, oldPrice = önceki; indirim bitince price = oldPrice
     const currentPrice = Number(product.price);
-    const currentOldPrice = product.oldPrice != null ? Number(product.oldPrice) : null;
+    const currentOldPrice =
+      product.oldPrice != null ? Number(product.oldPrice) : null;
     // class-transformer @Type(() => Number) converts null → 0, so treat 0 as "no sale" too
     const rawSalePrice = dto.salePrice;
     const isSettingSale = rawSalePrice != null && Number(rawSalePrice) > 0;
-    const isClearingSale = rawSalePrice === null || rawSalePrice === undefined || Number(rawSalePrice) === 0;
+    const isClearingSale =
+      rawSalePrice === null ||
+      rawSalePrice === undefined ||
+      Number(rawSalePrice) === 0;
 
     let priceUpdate: number | undefined;
     let oldPriceUpdate: number | null | undefined;
@@ -151,15 +189,25 @@ export class ProductUpdateService {
 
     if (isSettingSale) {
       const salePriceNum = Number(dto.salePrice);
-      const originalNum = dto.originalPrice != null ? Number(dto.originalPrice) : currentPrice;
+      const originalNum =
+        dto.originalPrice != null ? Number(dto.originalPrice) : currentPrice;
       priceUpdate = salePriceNum;
       oldPriceUpdate = originalNum;
-      saleStartDateUpdate = dto.saleStartDate != null && dto.saleStartDate !== '' ? new Date(dto.saleStartDate as string) : undefined;
-      saleEndDateUpdate = dto.saleEndDate != null && dto.saleEndDate !== '' ? new Date(dto.saleEndDate as string) : undefined;
+      saleStartDateUpdate =
+        dto.saleStartDate != null && dto.saleStartDate !== ""
+          ? new Date(dto.saleStartDate as string)
+          : undefined;
+      saleEndDateUpdate =
+        dto.saleEndDate != null && dto.saleEndDate !== ""
+          ? new Date(dto.saleEndDate as string)
+          : undefined;
       legacyOriginalPrice = originalNum;
       legacySalePrice = salePriceNum;
     } else if (isClearingSale) {
-      priceUpdate = dto.price !== undefined ? Number(dto.price) : (currentOldPrice ?? currentPrice);
+      priceUpdate =
+        dto.price !== undefined
+          ? Number(dto.price)
+          : (currentOldPrice ?? currentPrice);
       oldPriceUpdate = null;
       saleStartDateUpdate = null;
       saleEndDateUpdate = null;
@@ -173,20 +221,28 @@ export class ProductUpdateService {
       legacySalePrice = null;
       saleStartDateUpdate = null;
       saleEndDateUpdate = null;
-      if (dto.saleStartDate !== undefined) saleStartDateUpdate = dto.saleStartDate == null ? null : new Date(dto.saleStartDate);
-      if (dto.saleEndDate !== undefined) saleEndDateUpdate = dto.saleEndDate == null ? null : new Date(dto.saleEndDate);
+      if (dto.saleStartDate !== undefined)
+        saleStartDateUpdate =
+          dto.saleStartDate == null ? null : new Date(dto.saleStartDate);
+      if (dto.saleEndDate !== undefined)
+        saleEndDateUpdate =
+          dto.saleEndDate == null ? null : new Date(dto.saleEndDate);
     }
 
     const releaseDateUpdate =
       dto.year !== undefined && dto.year !== null
-        ? (dto.year >= 1900 && dto.year <= 2100 ? new Date(dto.year, 0, 1) : null)
+        ? dto.year >= 1900 && dto.year <= 2100
+          ? new Date(dto.year, 0, 1)
+          : null
         : undefined;
 
     // When client sends dto.price and we're not setting a sale, always apply it so price updates are never dropped
     const effectivePrice =
       dto.price !== undefined && !isSettingSale
         ? Number(dto.price)
-        : (priceUpdate !== undefined ? priceUpdate : dto.price);
+        : priceUpdate !== undefined
+          ? priceUpdate
+          : dto.price;
 
     const updateData: Prisma.ProductUpdateInput = {
       title: dto.title,
@@ -195,7 +251,8 @@ export class ProductUpdateService {
       condition: dto.condition,
       // Reddedilen ürün düzenlenince otomatik yeniden incelemeye girsin (re-submit → pending).
       status: this.resolveUpdatedStatus(product, dto),
-      isTradeEnabled: dto.isTradeEnabled !== undefined ? dto.isTradeEnabled : undefined,
+      isTradeEnabled:
+        dto.isTradeEnabled !== undefined ? dto.isTradeEnabled : undefined,
       isPreorder: dto.isPreorder !== undefined ? dto.isPreorder : undefined,
       isSet: dto.isSet !== undefined ? dto.isSet : undefined,
       bundleSize:
@@ -204,19 +261,55 @@ export class ProductUpdateService {
           : dto.bundleSize !== undefined
             ? dto.bundleSize
             : undefined,
-      quantity: dto.quantity !== undefined ? (dto.quantity === null ? null : Number(dto.quantity)) : undefined,
-      category: dto.categoryId ? { connect: { id: dto.categoryId } } : undefined,
-      brand: dto.brandId ? { connect: { id: dto.brandId } } : (dto.brandId === null ? { disconnect: true } : undefined),
-      carModel: dto.carModelId ? { connect: { id: dto.carModelId } } : (dto.carModelId === null ? { disconnect: true } : undefined),
-      manufacturer: dto.manufacturerId !== undefined
-        ? (dto.manufacturerId ? { connect: { id: dto.manufacturerId } } : { disconnect: true })
+      quantity:
+        dto.quantity !== undefined
+          ? dto.quantity === null
+            ? null
+            : Number(dto.quantity)
+          : undefined,
+      category: dto.categoryId
+        ? { connect: { id: dto.categoryId } }
         : undefined,
+      brand: dto.brandId
+        ? { connect: { id: dto.brandId } }
+        : dto.brandId === null
+          ? { disconnect: true }
+          : undefined,
+      carModel: dto.carModelId
+        ? { connect: { id: dto.carModelId } }
+        : dto.carModelId === null
+          ? { disconnect: true }
+          : undefined,
+      manufacturer:
+        dto.manufacturerId !== undefined
+          ? dto.manufacturerId
+            ? { connect: { id: dto.manufacturerId } }
+            : { disconnect: true }
+          : undefined,
       version: { increment: 1 },
-      ...(releaseDateUpdate !== undefined ? { releaseDate: releaseDateUpdate } : {}),
+      ...(releaseDateUpdate !== undefined
+        ? { releaseDate: releaseDateUpdate }
+        : {}),
       ...(oldPriceUpdate !== undefined ? { oldPrice: oldPriceUpdate } : {}),
-      ...(saleStartDateUpdate !== undefined ? { saleStartDate: saleStartDateUpdate } : (dto.saleStartDate !== undefined ? { saleStartDate: dto.saleStartDate == null ? null : new Date(dto.saleStartDate) } : {})),
-      ...(saleEndDateUpdate !== undefined ? { saleEndDate: saleEndDateUpdate } : (dto.saleEndDate !== undefined ? { saleEndDate: dto.saleEndDate == null ? null : new Date(dto.saleEndDate) } : {})),
-      ...(legacyOriginalPrice !== undefined ? { originalPrice: legacyOriginalPrice } : {}),
+      ...(saleStartDateUpdate !== undefined
+        ? { saleStartDate: saleStartDateUpdate }
+        : dto.saleStartDate !== undefined
+          ? {
+              saleStartDate:
+                dto.saleStartDate == null ? null : new Date(dto.saleStartDate),
+            }
+          : {}),
+      ...(saleEndDateUpdate !== undefined
+        ? { saleEndDate: saleEndDateUpdate }
+        : dto.saleEndDate !== undefined
+          ? {
+              saleEndDate:
+                dto.saleEndDate == null ? null : new Date(dto.saleEndDate),
+            }
+          : {}),
+      ...(legacyOriginalPrice !== undefined
+        ? { originalPrice: legacyOriginalPrice }
+        : {}),
       ...(legacySalePrice !== undefined ? { salePrice: legacySalePrice } : {}),
     };
 
@@ -240,7 +333,8 @@ export class ProductUpdateService {
 
     // Check if price changed (for wishlist notifications) – compare previous selling price with new one
     const prevSellingPrice = Number(product.price);
-    const newSellingPrice = effectivePrice !== undefined ? effectivePrice : prevSellingPrice;
+    const newSellingPrice =
+      effectivePrice !== undefined ? effectivePrice : prevSellingPrice;
     const priceChanged = prevSellingPrice !== newSellingPrice;
 
     // Update with optimistic locking
@@ -252,7 +346,7 @@ export class ProductUpdateService {
         },
         data: updateData,
         include: {
-          images: { orderBy: { sortOrder: 'asc' } },
+          images: { orderBy: { sortOrder: "asc" } },
           seller: {
             select: {
               id: true,
@@ -282,11 +376,13 @@ export class ProductUpdateService {
               name: true,
               slug: true,
               brand: {
-                select: { slug: true }
-              }
+                select: { slug: true },
+              },
             },
           },
-          productAttributes: { include: { attribute: { include: { group: true } } } },
+          productAttributes: {
+            include: { attribute: { include: { group: true } } },
+          },
         },
       });
 
@@ -296,10 +392,12 @@ export class ProductUpdateService {
         dto.material !== undefined ||
         dto.attributes !== undefined
       ) {
-        const scaleMaterialAttrIds = await this.prisma.attribute.findMany({
-          where: { group: { slug: { in: ['scale', 'material'] } } },
-          select: { id: true },
-        }).then((a) => a.map((x) => x.id));
+        const scaleMaterialAttrIds = await this.prisma.attribute
+          .findMany({
+            where: { group: { slug: { in: ["scale", "material"] } } },
+            select: { id: true },
+          })
+          .then((a) => a.map((x) => x.id));
         if (scaleMaterialAttrIds.length > 0) {
           await this.prisma.productAttribute.deleteMany({
             where: { productId: id, attributeId: { in: scaleMaterialAttrIds } },
@@ -308,10 +406,12 @@ export class ProductUpdateService {
         // Also clear any prior manufacturer-scoped attribute selections so the user can
         // replace them via the update payload (matches POST create semantics).
         if (dto.attributes !== undefined) {
-          const scopedAttrIds = await this.prisma.attribute.findMany({
-            where: { group: { manufacturerSlug: { not: null } } },
-            select: { id: true },
-          }).then((a) => a.map((x) => x.id));
+          const scopedAttrIds = await this.prisma.attribute
+            .findMany({
+              where: { group: { manufacturerSlug: { not: null } } },
+              select: { id: true },
+            })
+            .then((a) => a.map((x) => x.id));
           if (scopedAttrIds.length > 0) {
             await this.prisma.productAttribute.deleteMany({
               where: { productId: id, attributeId: { in: scopedAttrIds } },
@@ -332,22 +432,32 @@ export class ProductUpdateService {
 
       // Invalidate cache for this product and product lists
       await this.cache.del(`products:detail:${id}`);
-      await this.cache.delPattern('products:list:*');
+      await this.cache.delPattern("products:list:*");
 
       // Arama index'ini güncel durum/stok/skora göre senkronla: listelenebilir
       // ise indexle (scale/material/ranking güncel), değilse (pasife alındı vb.)
       // ES'ten kaldır. Recompute + cache invalidation sonrası çağrılır.
       this.searchService
         .syncProduct(id)
-        .catch((err) => this.logger.warn(`ES sync failed for ${id}: ${err?.message}`));
+        .catch((err) =>
+          this.logger.warn(`ES sync failed for ${id}: ${err?.message}`),
+        );
 
       // If price changed, notify users who have this product in their wishlist
       if (priceChanged && updated.status === ProductStatus.active) {
         try {
-          await this.notifyWishlistUsersOfPriceChange(id, prevSellingPrice, newSellingPrice, updated.title);
+          await this.notifyWishlistUsersOfPriceChange(
+            id,
+            prevSellingPrice,
+            newSellingPrice,
+            updated.title,
+          );
         } catch (error) {
           // Don't fail the update if notification fails
-          this.logger.error(`Failed to notify wishlist users of price change for product ${id}:`, error);
+          this.logger.error(
+            `Failed to notify wishlist users of price change for product ${id}:`,
+            error,
+          );
         }
       }
 
@@ -365,31 +475,49 @@ export class ProductUpdateService {
         this.notificationService
           .broadcastBackInStock(id, updated.title)
           .catch((err) =>
-            this.logger.warn(`broadcastBackInStock failed for ${id}: ${err?.message}`),
+            this.logger.warn(
+              `broadcastBackInStock failed for ${id}: ${err?.message}`,
+            ),
           );
       }
 
       // Refetch product after attribute linking so response includes updated scale/material
       const toReturn =
-        dto.scale !== undefined || dto.attributeIds !== undefined || dto.material !== undefined
+        dto.scale !== undefined ||
+        dto.attributeIds !== undefined ||
+        dto.material !== undefined
           ? await this.prisma.product.findUnique({
               where: { id },
               include: {
-                images: { orderBy: { sortOrder: 'asc' } },
-                seller: { select: { id: true, displayName: true, isVerified: true, sellerType: true, avatarUrl: true } },
+                images: { orderBy: { sortOrder: "asc" } },
+                seller: {
+                  select: {
+                    id: true,
+                    displayName: true,
+                    isVerified: true,
+                    sellerType: true,
+                    avatarUrl: true,
+                  },
+                },
                 category: { select: { id: true, name: true, slug: true } },
-                brand: { select: { id: true, name: true, slug: true, logo: true } },
+                brand: {
+                  select: { id: true, name: true, slug: true, logo: true },
+                },
                 manufacturer: { select: { id: true, name: true, slug: true } },
                 carModel: { include: { brand: { select: { slug: true } } } },
-                productAttributes: { include: { attribute: { include: { group: true } } } },
+                productAttributes: {
+                  include: { attribute: { include: { group: true } } },
+                },
               },
             })
           : updated;
 
       return await this.common.formatProductResponse(toReturn ?? updated);
     } catch (error) {
-      if (error.code === 'P2025') {
-        throw new ConflictException('Ürün başka bir işlem tarafından güncellendi. Lütfen yenileyin.');
+      if (error.code === "P2025") {
+        throw new ConflictException(
+          i18nMessage("server.product.updateConflict"),
+        );
       }
       throw error;
     }
@@ -410,7 +538,9 @@ export class ProductUpdateService {
     const requested = dto.status;
     const newQuantity =
       dto.quantity !== undefined
-        ? (dto.quantity === null ? null : Number(dto.quantity))
+        ? dto.quantity === null
+          ? null
+          : Number(dto.quantity)
         : product.quantity;
 
     // Satıcı kendi ilanını pasife alabilir.
@@ -425,7 +555,10 @@ export class ProductUpdateService {
 
     // Satıcı DOĞRUDAN aktifleştiremez: aktif olmayan bir ilanı aktif etme isteği
     // admin onayına (pending) yönlendirilir. Zaten aktif ilanda statü değişmez.
-    if (requested === ProductStatus.active && product.status !== ProductStatus.active) {
+    if (
+      requested === ProductStatus.active &&
+      product.status !== ProductStatus.active
+    ) {
       return ProductStatus.pending;
     }
 
@@ -497,7 +630,8 @@ export class ProductUpdateService {
         try {
           const acceptsMarketingEmails = user.acceptsMarketingEmails === true;
           if (acceptsMarketingEmails) {
-            const frontendUrl = process.env.FRONTEND_URL || 'https://tarodan.com';
+            const frontendUrl =
+              process.env.FRONTEND_URL || "https://tarodan.com";
             const templateData = {
               userName: user.displayName,
               productTitle,
@@ -508,26 +642,44 @@ export class ProductUpdateService {
               isPriceDrop,
               productUrl: `${frontendUrl}/products/${productId}`,
             };
-            const priceDbTemplate = await this.prisma.emailTemplate.findUnique({ where: { key: 'wishlist-price-change' } });
+            const priceDbTemplate = await this.prisma.emailTemplate.findUnique({
+              where: { key: "wishlist-price-change" },
+            });
             const html = priceDbTemplate?.bodyHtml
               ? substituteEmailVariables(priceDbTemplate.bodyHtml, templateData)
-              : renderEmailTemplate('wishlist-price-change', templateData, frontendUrl);
+              : renderEmailTemplate(
+                  "wishlist-price-change",
+                  templateData,
+                  frontendUrl,
+                );
             const subject = priceDbTemplate?.subject
               ? substituteEmailVariables(priceDbTemplate.subject, templateData)
-              : getEmailTemplateSubject('wishlist-price-change', templateData);
+              : getEmailTemplateSubject("wishlist-price-change", templateData);
 
-            await this.smtpProvider.sendEmail({ to: user.email, subject, html });
+            await this.smtpProvider.sendEmail({
+              to: user.email,
+              subject,
+              html,
+            });
           }
         } catch (emailError: any) {
           // Email failure shouldn't stop in-app notification
-          this.logger.warn(`Failed to send price change email for user ${user.id}:`, emailError);
+          this.logger.warn(
+            `Failed to send price change email for user ${user.id}:`,
+            emailError,
+          );
         }
       } catch (error: any) {
-        this.logger.error(`Failed to send price change notification for user ${user.id}:`, error);
+        this.logger.error(
+          `Failed to send price change notification for user ${user.id}:`,
+          error,
+        );
       }
     }
 
-    this.logger.log(`Sent price change notifications to ${usersToNotify.length} users for product ${productId}`);
+    this.logger.log(
+      `Sent price change notifications to ${usersToNotify.length} users for product ${productId}`,
+    );
   }
 
   /**
@@ -570,29 +722,33 @@ export class ProductUpdateService {
 
     return `
       <div style="${baseStyle}">
-        <h1 style="${headerStyle}">${isPriceDrop ? '🎉 Fiyat Düştü!' : '📈 Fiyat Değişti!'}</h1>
+        <h1 style="${headerStyle}">${isPriceDrop ? "🎉 Fiyat Düştü!" : "📈 Fiyat Değişti!"}</h1>
         <p>Merhaba ${userName},</p>
         <p>İstek listenizdeki bir ürünün fiyatı değişti:</p>
         <div style="${boxStyle}">
           <p style="margin: 8px 0; font-size: 18px; font-weight: 600;"><strong>${productTitle}</strong></p>
           <p style="margin: 8px 0;"><strong>Eski Fiyat:</strong> <span style="text-decoration: line-through; color: #64748b;">${oldPrice.toFixed(2)} TL</span></p>
-          <p style="margin: 8px 0; font-size: 20px; color: ${isPriceDrop ? '#059669' : '#dc2626'}; font-weight: 600;">
+          <p style="margin: 8px 0; font-size: 20px; color: ${isPriceDrop ? "#059669" : "#dc2626"}; font-weight: 600;">
             <strong>Yeni Fiyat:</strong> ${newPrice.toFixed(2)} TL
           </p>
-          <p style="margin: 8px 0; color: ${isPriceDrop ? '#059669' : '#dc2626'};">
-            <strong>${isPriceDrop ? 'İndirim:' : 'Artış:'}</strong> ${Math.abs(priceChange).toFixed(2)} TL (${Math.abs(Number(priceChangePercent))}%)
+          <p style="margin: 8px 0; color: ${isPriceDrop ? "#059669" : "#dc2626"};">
+            <strong>${isPriceDrop ? "İndirim:" : "Artış:"}</strong> ${Math.abs(priceChange).toFixed(2)} TL (${Math.abs(Number(priceChangePercent))}%)
           </p>
         </div>
-        ${isPriceDrop ? `
+        ${
+          isPriceDrop
+            ? `
         <p style="color: #059669; font-weight: 500; margin: 20px 0;">
           🎉 Bu ürünün fiyatı düştü! Hemen almak için aşağıdaki butona tıklayın.
         </p>
-        ` : `
+        `
+            : `
         <p style="color: #dc2626; font-weight: 500; margin: 20px 0;">
           ⚠️ Bu ürünün fiyatı arttı. Hala ilginizi çekiyorsa hemen alabilirsiniz.
         </p>
-        `}
-        <a href="${process.env.FRONTEND_URL || 'https://tarodan.com'}/products/${productId}" style="${buttonStyle}">Ürünü Görüntüle</a>
+        `
+        }
+        <a href="${process.env.FRONTEND_URL || "https://tarodan.com"}/products/${productId}" style="${buttonStyle}">Ürünü Görüntüle</a>
         <p style="margin-top: 24px; color: #64748b; font-size: 14px;">
           Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek Listesinden Çıkar" butonuna tıklayabilirsiniz.
         </p>
@@ -614,7 +770,7 @@ export class ProductUpdateService {
     productId: string,
   ): string {
     return `
-${isPriceDrop ? '🎉 Fiyat Düştü!' : '📈 Fiyat Değişti!'}
+${isPriceDrop ? "🎉 Fiyat Düştü!" : "📈 Fiyat Değişti!"}
 
 Merhaba ${userName},
 
@@ -623,11 +779,11 @@ Merhaba ${userName},
 Ürün: ${productTitle}
 Eski Fiyat: ${oldPrice.toFixed(2)} TL
 Yeni Fiyat: ${newPrice.toFixed(2)} TL
-${isPriceDrop ? 'İndirim' : 'Artış'}: ${Math.abs(priceChange).toFixed(2)} TL (${Math.abs(Number(priceChangePercent))}%)
+${isPriceDrop ? "İndirim" : "Artış"}: ${Math.abs(priceChange).toFixed(2)} TL (${Math.abs(Number(priceChangePercent))}%)
 
-${isPriceDrop ? '🎉 Bu ürünün fiyatı düştü! Hemen almak için linke tıklayın.' : '⚠️ Bu ürünün fiyatı arttı. Hala ilginizi çekiyorsa hemen alabilirsiniz.'}
+${isPriceDrop ? "🎉 Bu ürünün fiyatı düştü! Hemen almak için linke tıklayın." : "⚠️ Bu ürünün fiyatı arttı. Hala ilginizi çekiyorsa hemen alabilirsiniz."}
 
-Ürünü görüntüle: ${process.env.FRONTEND_URL || 'https://tarodan.com'}/products/${productId}
+Ürünü görüntüle: ${process.env.FRONTEND_URL || "https://tarodan.com"}/products/${productId}
 
 Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek Listesinden Çıkar" butonuna tıklayabilirsiniz.
     `.trim();
@@ -637,23 +793,30 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
    * Delete product (soft delete by setting inactive)
    * DELETE /products/:id
    */
-  async remove(id: string, sellerId: string) {
+  async remove(id: string, sellerId: string): Promise<void> {
     const product = await this.prisma.product.findUnique({
       where: { id },
     });
 
     if (!product) {
-      throw new NotFoundException('Ürün bulunamadı');
+      throw new NotFoundException(i18nMessage("server.product.notFound"));
     }
 
     // Verify ownership
     if (product.sellerId !== sellerId) {
-      throw new ForbiddenException('Bu ürünü silme yetkiniz yok');
+      throw new ForbiddenException(
+        i18nMessage("server.product.deleteForbidden"),
+      );
     }
 
     // Cannot delete sold or reserved products
-    if (product.status === ProductStatus.sold || product.status === ProductStatus.reserved) {
-      throw new BadRequestException('Satılmış veya rezerve edilmiş ürünler silinemez');
+    if (
+      product.status === ProductStatus.sold ||
+      product.status === ProductStatus.reserved
+    ) {
+      throw new BadRequestException(
+        i18nMessage("server.product.soldOrReservedCannotDelete"),
+      );
     }
 
     // Soft delete: set status to deleted (pasiften AYRI state — silinen ürün
@@ -666,7 +829,7 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
 
     // Invalidate cache
     await this.cache.del(`products:detail:${id}`);
-    await this.cache.delPattern('products:list:*');
+    await this.cache.delPattern("products:list:*");
     // Invalidate user's membership limits cache to refresh listing counts
     await this.cache.del(`membership:limits:${sellerId}`);
     await this.cache.del(`membership:${sellerId}`);
@@ -675,8 +838,8 @@ Bu ürünü istek listenizden kaldırmak için ürün sayfasına gidip "İstek L
     // ES dokümanı eski (active) haliyle kalıp aramada görünür ama detay 404 olur.
     this.searchService
       .syncProduct(id)
-      .catch((err) => this.logger.warn(`ES sync failed for ${id}: ${err?.message}`));
-
-    return { message: 'Ürün silindi' };
+      .catch((err) =>
+        this.logger.warn(`ES sync failed for ${id}: ${err?.message}`),
+      );
   }
 }

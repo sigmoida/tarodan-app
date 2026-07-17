@@ -16,4 +16,6 @@ export interface RequestUser {
   isSeller: boolean;
   isAdmin?: boolean;
   role?: string;
+  /** Stored locale preference; read by resolveRequestLocale (#224). */
+  preferredLanguage?: string | null;
 }

@@ -3903,5 +3903,690 @@
         "codeInvalid": "Enter a 6-digit code"
       }
     }
+  },
+  "server": {
+    "common": {
+      "recordExists": "This record already exists",
+      "recordNotFound": "Record not found",
+      "relatedRecordsConflict": "The operation could not be completed because of related records",
+      "internalError": "Server error"
+    },
+    "notification": {
+      "orderCreated": {
+        "title": "Your Order Has Been Created",
+        "message": "Your order was created successfully. Awaiting payment."
+      },
+      "orderPaid": {
+        "title": "Payment Received",
+        "message": "Payment for your order has been received. The seller is preparing your order."
+      },
+      "orderShipped": {
+        "title": "Your Order Has Been Shipped",
+        "message": "Your order has been shipped. Your tracking number: {trackingNumber}"
+      },
+      "orderDelivered": {
+        "title": "Your Order Has Been Delivered",
+        "message": "Your order has been delivered; you have an unconditional right of return for 14 days from the delivery date."
+      },
+      "orderCompleted": {
+        "title": "Order Completed",
+        "message": "Your order has been completed successfully. Thank you!"
+      },
+      "orderCancelled": {
+        "title": "Order Cancelled",
+        "message": "Your order has been cancelled. The amount you paid will be refunded."
+      },
+      "orderCancelledSeller": {
+        "title": "Sale Cancelled",
+        "message": "Your order {orderNumber} has been cancelled."
+      },
+      "orderCancelledOutOfStock": {
+        "title": "Your order was cancelled: out of stock",
+        "message": "{productTitle} was purchased by another buyer. You can browse similar products."
+      },
+      "orderRefunded": {
+        "title": "Refund Completed",
+        "message": "Your payment has been refunded. {amount} TL will be transferred to your account."
+      },
+      "orderPreparingDeadlineWarning": {
+        "title": "Shipping Deadline Approaching",
+        "message": "You must ship the order for \"{productTitle}\" by {deadline}. Otherwise the order will be cancelled automatically."
+      },
+      "orderReservationReleased": {
+        "title": "Your stock reservation was released",
+        "message": "The stock reservation for {productTitle} was released because payment was not completed within 30 minutes. If the product is still in stock, you can pay again within 24 hours."
+      },
+      "orderDeliveredConfirm": {
+        "title": "Your order has been delivered",
+        "message": "Your order has been delivered; you have an unconditional right of return for 14 days from the delivery date. When the period ends, the order completes automatically."
+      },
+      "orderAutoCompleted": {
+        "title": "Order completed automatically",
+        "message": "The 48-hour review period has ended; the order is complete."
+      },
+      "orderManuallyConfirmed": {
+        "title": "The buyer confirmed the order",
+        "message": "The buyer confirmed the order. Your payout will be transferred to your account 14 days after delivery (once the return period ends)."
+      },
+      "orderForceCompletedByAdmin": {
+        "title": "Order completed by an administrator",
+        "message": "An administrator completed your order manually."
+      },
+      "sellerDidNotShipRefunded": {
+        "title": "Order cancelled",
+        "message": "The order was cancelled because the seller did not ship within the required time, and a full refund has been initiated."
+      },
+      "offerReceived": {
+        "title": "You Received a New Offer",
+        "message": "You received an offer of {amount} TL for your product {productTitle}."
+      },
+      "offerAccepted": {
+        "title": "Your Offer Was Accepted! 🎉",
+        "message": "Your offer for {productTitle} was accepted. Pay now!"
+      },
+      "offerRejected": {
+        "title": "Your Offer Was Rejected",
+        "message": "Your offer for {productTitle} was rejected by the seller."
+      },
+      "offerCounter": {
+        "title": "You Received a Counter-Offer",
+        "message": "The seller made a counter-offer of {amount} TL for {productTitle}."
+      },
+      "offerCounterDeclined": {
+        "title": "Counter-Offer Declined",
+        "message": "The buyer did not accept your counter-offer for {productTitle}."
+      },
+      "offerExpired": {
+        "title": "Your Offer Has Expired",
+        "message": "Your offer for {productTitle} has expired."
+      },
+      "offerCancelledOutOfStock": {
+        "title": "Your offer was cancelled: product out of stock",
+        "message": "Your offer for {productTitle} was cancelled because the product was sold."
+      },
+      "productApproved": {
+        "title": "Your Listing Is Live! 🎉",
+        "message": "Your listing {productTitle} has been approved and published."
+      },
+      "productRejected": {
+        "title": "Your Listing Was Rejected",
+        "message": "Your listing {productTitle} was not approved. Reason: {reason}"
+      },
+      "productSold": {
+        "title": "Your Product Sold! 🎉",
+        "message": "Your product {productTitle} sold for {amount} TL."
+      },
+      "paymentReceived": {
+        "title": "Payment Received",
+        "message": "You received a payment of {amount} TL from the sale of {productTitle}."
+      },
+      "paymentReleased": {
+        "title": "Your Payout Has Been Transferred",
+        "message": "{amount} TL has been transferred to your account."
+      },
+      "tradeReceived": {
+        "title": "New Trade Offer",
+        "message": "You received a trade offer for your products."
+      },
+      "tradeAccepted": {
+        "title": "Trade Accepted! 🎉",
+        "message": "Your trade offer was accepted. Please ship your package."
+      },
+      "tradeRejected": {
+        "title": "Trade Rejected",
+        "message": "Your trade offer was rejected."
+      },
+      "tradeCounter": {
+        "title": "You Received a Counter Trade Offer",
+        "message": "{counterOffererName} made a counter-offer to your trade offer."
+      },
+      "tradeShipped": {
+        "title": "Trade Shipped",
+        "message": "Your trade package has been shipped. Tracking number: {trackingNumber}"
+      },
+      "tradeCompleted": {
+        "title": "Trade Completed! 🎉",
+        "message": "The trade was completed successfully!"
+      },
+      "newMessage": {
+        "title": "New Message",
+        "message": "{senderName}: {messagePreview}"
+      },
+      "priceDrop": {
+        "title": "Price Drop! 🔥",
+        "message": "The price of {productTitle} dropped from {oldPrice} TL to {newPrice} TL!"
+      },
+      "wishlistItemSold": {
+        "title": "You Missed It! 😢",
+        "message": "{productTitle}, which you added to your favorites, has been sold."
+      },
+      "backInStock": {
+        "title": "Back in Stock!",
+        "message": "{productTitle} is on sale again."
+      },
+      "newFollower": {
+        "title": "New Follower",
+        "message": "{followerName} started following you."
+      },
+      "sellerNewListing": {
+        "title": "New Listing",
+        "message": "{sellerName} added a new listing: {productTitle}"
+      },
+      "collectionLiked": {
+        "title": "Your Collection Was Liked",
+        "message": "{userName} liked your collection."
+      },
+      "productLiked": {
+        "title": "Your Product Was Liked ❤️",
+        "message": "{userName} added your product {productTitle} to their favorites."
+      },
+      "wishlistSold": {
+        "title": "Your Favorite Product Sold 😢",
+        "message": "{productTitle}, which you added to your favorites, has been sold."
+      },
+      "reviewReceived": {
+        "title": "New Review",
+        "message": "{reviewerName} gave you {score} stars."
+      },
+      "membershipExpiring": {
+        "title": "Your Membership Is Ending",
+        "message": "Your {tierName} membership will end in {daysLeft} days."
+      },
+      "membershipExpired": {
+        "title": "Your Membership Has Ended",
+        "message": "Your {tierName} membership has ended. Renew now and keep your benefits!"
+      },
+      "membershipUpgraded": {
+        "title": "Your Membership Was Upgraded! 🎉",
+        "message": "Welcome to {tierName} membership! Your new benefits are active."
+      },
+      "listingExpiring": {
+        "title": "Your Listing Is Ending",
+        "message": "Your listing {productTitle} will end in {daysLeft} days."
+      },
+      "listingExpired": {
+        "title": "Your Listing Has Ended",
+        "message": "Your listing {productTitle} has ended. Republish it."
+      },
+      "listingViewsMilestone": {
+        "title": "Congratulations! 🎉",
+        "message": "Your listing {productTitle} reached {viewCount} views!"
+      },
+      "promotion": {
+        "title": "🎁 Special Campaign",
+        "message": "{promotionTitle}"
+      },
+      "specialOffer": {
+        "title": "💎 Special Offer",
+        "message": "{offerDescription}"
+      },
+      "welcome": {
+        "title": "Welcome to Tarodan! 🎉",
+        "message": "Welcome to the diecast model car collectors' platform."
+      },
+      "passwordReset": {
+        "title": "Password Reset",
+        "message": "Click the link to reset your password."
+      },
+      "emailVerification": {
+        "title": "Email Verification",
+        "message": "Click the link to verify your email."
+      },
+      "systemAnnouncement": {
+        "title": "📢 Announcement",
+        "message": "{announcement}"
+      },
+      "boostExpired": {
+        "title": "🚀 Boost period ended",
+        "message": "The boost for your listing \"{productTitle}\" has ended. Auto-renew was on — boost it again with one click."
+      },
+      "tradeAutoCancelled": {
+        "title": "Trade Cancelled Automatically",
+        "message": "{cancelReason}"
+      },
+      "tradeStuckAtWarehouse": {
+        "title": "Stuck Trade — Admin Action Required",
+        "message": "Trade {tradeNumber} reached the warehouse but timed out; a manual force-cancel-stuck is required."
+      },
+      "offerAutoRejected": {
+        "title": "Your Offer Was Closed",
+        "message": "{cancelReason}"
+      },
+      "reservationExpired": {
+        "title": "Order Timed Out",
+        "message": "Your order was cancelled automatically because the payment period expired."
+      },
+      "refundCancelled": {
+        "title": "Refund Request Cancelled",
+        "message": "The buyer cancelled refund request {refundNumber}."
+      },
+      "refundApproved": {
+        "title": "Your Refund Request Was Approved",
+        "message": "Your refund request {refundNumber} has been approved."
+      },
+      "refundReturnOpened": {
+        "title": "Return Shipment Ready",
+        "message": "You can drop the product off at the nearest Sürat branch using number {trackingNumber}."
+      },
+      "refundCompleted": {
+        "title": "Your Refund Is Complete",
+        "message": "Your refund {refundNumber} has been credited to your account."
+      },
+      "refundRequestReceived": {
+        "title": "Your Refund Request Was Received",
+        "message": "Your refund request {refundNumber} was received and is awaiting the seller's response."
+      },
+      "refundReturnShippedSeller": {
+        "title": "Return Shipment On Its Way",
+        "message": "The buyer shipped the product for refund {refundNumber}; it is on its way to you."
+      },
+      "refundReturnInTransit": {
+        "title": "Your Return Is In Transit",
+        "message": "Your return for refund {refundNumber} is on its way to the seller."
+      },
+      "refundReturnDeliveredBuyer": {
+        "title": "Your Return Reached the Seller",
+        "message": "Your return for refund {refundNumber} was delivered to the seller; your refund will be issued shortly."
+      },
+      "refundReturnDeliveredSeller": {
+        "title": "The Returned Product Reached You",
+        "message": "The returned product for refund {refundNumber} has been delivered to you."
+      },
+      "refundCompletedSeller": {
+        "title": "Refund Completed",
+        "message": "The refund for order {refundNumber} is complete; the amount was returned to the buyer."
+      },
+      "refundAutoAcceptedSeller": {
+        "title": "Refund Request Auto-Approved",
+        "message": "Refund request {refundNumber} was approved automatically because it was not answered within 48 hours."
+      },
+      "sellerApplicationApproved": {
+        "title": "Your Business Application Was Approved! 🎉",
+        "message": "Your business account application has been approved. You can now list products as a seller."
+      },
+      "sellerApplicationRejected": {
+        "title": "Your Business Application Was Rejected",
+        "message": "Your business account application was rejected.{reason}"
+      }
+    },
+    "auth": {
+      "accountBanned": "Your account has been banned. Please contact the support team.",
+      "accountDeleted": "Account has been deleted",
+      "accountSuspended": "Your account has been suspended",
+      "adminAccountDeactivated": "Admin account has been deactivated",
+      "adminAccountNotFoundOrInactive": "Admin account not found or inactive",
+      "adminAuthRequired": "Admin authorization is required",
+      "adminPrivilegeRequired": "Admin privileges are required for this action",
+      "adminUserNotFoundOrInactive": "Admin user not found or inactive",
+      "appleEmailNotVerified": "Your Apple account's email is not verified",
+      "appleSessionInvalid": "Apple session is invalid",
+      "appleSessionVerifyFailed": "Could not verify Apple session",
+      "birthDateRequired": "Birth date is required",
+      "businessRegisterSuccess": "Company account created successfully! Please click the verification link sent to your email.",
+      "companyNameAlreadyRegistered": "This company name is already registered",
+      "emailAlreadyRegistered": "This email address is already registered",
+      "emailAlreadyVerified": "This email address is already verified",
+      "emailNotVerifiedLogin": "Your email address has not been verified yet. Please click the verification link sent to your email. If you didn't receive the verification email, you can resend it.",
+      "emailVerificationAlreadyDone": "Your email address has already been verified.",
+      "emailVerificationLinkExpired": "This verification link has expired",
+      "emailVerificationLinkInvalid": "Invalid or expired verification link",
+      "emailVerificationLinkUsed": "This verification link has already been used",
+      "emailVerificationSuccess": "Your email address has been successfully verified!",
+      "googleEmailNotVerified": "Your Google account's email is not verified",
+      "googleSessionInvalid": "Google session is invalid",
+      "googleSessionVerifyFailed": "Could not verify Google session",
+      "invalidAdminToken": "Invalid admin token",
+      "invalidCredentials": "Invalid email or password",
+      "invalidPhoneNumber": "Invalid phone number",
+      "invalidRefreshToken": "Invalid refresh token",
+      "invalidTokenType": "Invalid token type",
+      "loggedOut": "Logged out",
+      "loginFailed": "An error occurred during login",
+      "loginRequired": "You need to sign in",
+      "minAge18": "You must be at least 18 years old to register",
+      "noActiveVerificationCode": "No active verification code. Please request a new one.",
+      "noPermission": "You don't have permission for this action",
+      "noPermissionDefined": "No permission defined for this admin action; access denied",
+      "passwordResetLinkSent": "If this email is registered, a password reset link has been sent",
+      "passwordResetSuccess": "Password reset successfully",
+      "permissionRequired": "This action requires one of the following permissions: [{perms}]. Role: {role}",
+      "phoneAlreadyRegistered": "This phone number is already registered",
+      "phoneAlreadyRegisteredOtherAccount": "This phone number is already registered to another account",
+      "phoneVerificationCodeSent": "Verification code sent to your phone",
+      "phoneVerificationSuccess": "Your phone number has been verified",
+      "phoneVerificationTooFrequent": "Too many attempts. Please try again shortly.",
+      "refreshTokenExpired": "Refresh token has expired",
+      "refreshTokenRevoked": "Refresh token has been revoked",
+      "registerSuccess": "Registration successful! Please click the verification link sent to your email.",
+      "resendVerificationGeneric": "If this email is registered, a verification link has been sent",
+      "resetTokenAlreadyUsed": "This token has already been used",
+      "resetTokenExpired": "Token has expired",
+      "resetTokenInvalidOrExpired": "Invalid or expired token",
+      "roleRequired": "This action requires the {roles} role",
+      "smsSendFailed": "Failed to send SMS",
+      "taxIdAlreadyRegistered": "This tax ID number is already registered",
+      "tooManyWrongAttempts": "Too many incorrect attempts. Please request a new code.",
+      "userNotFound": "User not found",
+      "verificationCodeExpired": "Code has expired. Please request a new one.",
+      "verificationEmailResent": "Verification email resent",
+      "wrongVerificationCode": "Incorrect code"
+    },
+    "offer": {
+      "alreadyInStatus": "This offer is already in {status} status",
+      "alreadyPendingOffer": "You already have a pending offer on this product. Cancel your existing offer first.",
+      "awaitingBuyerResponse": "Waiting for the buyer to respond to the current counter-offer; a new counter-offer cannot be made right now",
+      "belowMinimumBuyerCounter": "Offer amount is too low. Product price: {productPrice} TL. Minimum: {minOffer} TL ({minOfferPercentage}% of the price).",
+      "belowMinimumOffer": "Offer amount is too low. Product price: {productPrice} TL. Minimum offer: {minOffer} TL ({minOfferPercentage}% of the price). Your offer: {offerAmount} TL",
+      "buyerCounterMustBeLower": "The buyer counter-offer must be lower than the seller's counter-offer",
+      "buyerCounterOnlyAfterSellerCounter": "A buyer counter-offer can only be made in response to the seller's latest counter-offer",
+      "cannotOfferOwnProduct": "You cannot make an offer on your own product",
+      "counterCannotExceedPrice": "The counter-offer cannot exceed the product price",
+      "counterMustExceedOffer": "The counter-offer must be higher than the current offer",
+      "insufficientStock": "There is not enough available quantity for this product",
+      "notAuthorizedToAccept": "You are not authorized to accept this offer",
+      "notAuthorizedToBuyerCounter": "You are not authorized to make a buyer counter-offer on this offer",
+      "notAuthorizedToCancel": "You are not authorized to cancel this offer",
+      "notAuthorizedToCounter": "You are not authorized to make a counter-offer on this offer",
+      "notAuthorizedToReject": "You are not authorized to reject this offer",
+      "notAuthorizedToView": "You are not authorized to view this offer",
+      "notAuthorizedToViewProductOffers": "You are not authorized to view offers for this product",
+      "offerExpired": "This offer has expired",
+      "offerNotFound": "Offer not found",
+      "onlyBuyerCanAcceptCounter": "Only the buyer can accept this counter-offer",
+      "onlyBuyerCanRejectCounter": "Only the buyer can reject this counter-offer",
+      "productNoLongerActive": "The product is no longer for sale",
+      "productNotActive": "This product is not currently for sale",
+      "productNotFound": "Product not found",
+      "productOutOfStock": "The product is out of stock or does not have enough available quantity"
+    },
+    "trade": {
+      "addressNotFound": "Address not found",
+      "alreadyShipped": "You have already shipped",
+      "cannotAcceptInStatus": "A trade in status '{status}' cannot be accepted",
+      "cannotCancelAfterBothShipped": "Cannot be cancelled after both parties have shipped",
+      "cannotCancelAfterShippedToCargo": "The trade cannot be cancelled once the product has been handed to the courier. If there is a problem, open a dispute or contact support.",
+      "cannotCancelAfterWarehouseArrival": "Only an admin can cancel once the products have arrived at the warehouse",
+      "cannotCancelInStatus": "A trade in status '{status}' cannot be cancelled",
+      "cannotConfirmInStatus": "Confirmation cannot be made for a trade in status '{status}'",
+      "cannotCounterInStatus": "A counter-offer cannot be sent for a trade in status '{status}'",
+      "cannotDisputeInStatus": "A dispute cannot be opened for a trade in status '{status}'",
+      "cannotRejectInStatus": "A trade in status '{status}' cannot be rejected",
+      "cannotShipInStatus": "Shipment cannot be made for a trade in status '{status}'",
+      "cannotTradeWithSelf": "You cannot trade with yourself",
+      "confirmationDeadlinePassed": "The confirmation deadline has passed",
+      "counterOfferIdenticalToPrevious": "This is identical to the previous offer. Please make a change.",
+      "disputeAlreadyOpen": "A dispute has already been opened for this trade",
+      "disputeNotFound": "Dispute not found",
+      "insufficientStockForItem": "Not enough available stock for \"{title}\" (available: {available}, requested: {requested})",
+      "invalidConfirmationStatus": "Invalid confirmation status",
+      "invalidShipmentStatus": "Invalid shipment status",
+      "itemAlreadyInActiveTrade": "One of the products you offered is already part of an active trade. Cancel the existing trade first or wait for it to be resolved.",
+      "membershipExpiredForAccept": "Your membership appears to have expired. Renew your Basic or higher membership to accept a trade.",
+      "membershipRequiredForCounter": "A Basic or higher membership is required to send a counter-offer. Please renew your membership.",
+      "noShipmentToConfirm": "No shipment found to confirm",
+      "noShippingAddress": "Add a delivery address for the trade. You can add an address via Profile → My Addresses.",
+      "notAuthorizedForAction": "You are not authorized to perform this trade action",
+      "notAuthorizedToCancel": "You are not authorized to cancel this trade",
+      "notAuthorizedToView": "You are not authorized to view this trade",
+      "notFound": "Trade not found",
+      "onlyReceiverCanAccept": "Only the trade recipient can accept",
+      "onlyReceiverCanCounter": "Only the trade recipient can send a counter-offer",
+      "onlyReceiverCanReject": "Only the trade recipient can reject",
+      "receiverNotFound": "Receiving user not found",
+      "requestedItemsNotEligible": "Some of the requested products are not eligible for trade",
+      "responseDeadlinePassed": "The response deadline has passed",
+      "selectedAddressNotFound": "The selected delivery address was not found or does not belong to you.",
+      "sessionRequired": "Session required",
+      "shipToWarehouseDeprecated": "This endpoint is no longer in use. When a trade is accepted, the system automatically generates Sürat Kargo tracking numbers for both parties; drop off your item at the nearest Sürat branch using your assigned tracking number.",
+      "shipmentAlreadyConfirmed": "This shipment has already been confirmed",
+      "someItemsNotOwnedOrInactive": "Some products do not belong to you or are not active",
+      "tradeNotInDisputeStatus": "The trade is not in dispute status"
+    },
+    "order": {
+      "accountBanned": "Your account is banned. You cannot create new orders.",
+      "addressOnlyPendingPayment": "An address can only be added to orders awaiting payment",
+      "atLeastOneProductRequired": "At least one product is required",
+      "cancelForbidden": "You are not authorized to cancel this order",
+      "cannotBuyOwnProduct": "You cannot buy your own product",
+      "cannotCancelShipped": "The order cannot be cancelled after it has been shipped",
+      "cartProductNotFound": "One of the products in your cart could not be found",
+      "confirmForbidden": "You are not authorized to confirm this order",
+      "confirmOnlyDelivered": "Only delivered orders can be confirmed",
+      "couponNotSupportedForGuest": "Coupon codes are not supported for guest checkout",
+      "extendOnlyWithinWindow": "Can only be extended for orders within the 48h window",
+      "groupNotFound": "Order group not found",
+      "groupViewForbidden": "You are not authorized to view this order group",
+      "guestOtpIncorrect": "Incorrect verification code",
+      "guestOtpInvalidOrExpired": "The verification code is invalid or has expired",
+      "guestOtpSendFailed": "The verification code email could not be sent",
+      "guestOtpTooManyAttempts": "Too many incorrect attempts. Please request a new code.",
+      "guestOtpTooManyRequests": "Too many code requests sent. Please try again later.",
+      "invalidAmount": "Enter a valid amount",
+      "invalidBillingAddress": "Invalid billing address",
+      "invalidCouponCode": "Invalid coupon code",
+      "invalidOffer": "Invalid offer",
+      "invalidShippingAddress": "Invalid shipping address",
+      "invoiceAccessForbidden": "You are not authorized to access this invoice",
+      "invoiceNotUploaded": "No invoice has been uploaded for this order",
+      "invoiceOnlyAfterPayment": "The invoice can only be uploaded after payment has been received",
+      "invoiceOnlyCorporateSeller": "Only corporate (company) sellers with a business membership can upload invoices",
+      "invoiceOnlyPdfAllowed": "Only PDF files can be uploaded",
+      "invoicePdfRequired": "Invoice PDF file is required",
+      "invoicePdfRequiredFormField": "Invoice PDF file is required (form-data field: file)",
+      "invoicePdfTooLarge": "PDF can be at most 10 MB",
+      "notConfirmableStatus": "The order cannot be confirmed at this stage (current status: {status})",
+      "notFound": "Order not found",
+      "notOrderSeller": "You are not the seller of this order",
+      "notYourTransaction": "This transaction does not belong to you",
+      "offerAlreadyHasOrder": "An order already exists for this offer",
+      "offerNotAccepted": "An order can only be created from an accepted offer",
+      "offerNotAcceptedYet": "The offer has not been accepted",
+      "offerNotFound": "Offer not found",
+      "offerOrderForbidden": "You are not authorized to create an order from this offer",
+      "openRefundExists": "There is an open refund request; it must be resolved first",
+      "orderAccessForbidden": "You are not authorized to access this order",
+      "prepareOnlyPaid": "Only paid orders can be marked as preparing",
+      "productNotActive": "This product is not for sale or is being purchased by someone else",
+      "productNotActiveByTitle": "Product is not for sale: {title}",
+      "productNotFound": "Product not found",
+      "productNotFoundById": "Product not found: {productId}",
+      "productNotOnSale": "This product is not for sale",
+      "productOutOfStock": "This product is out of stock",
+      "reactivateForbidden": "You are not authorized to reactivate this order",
+      "reactivateInsufficientStock": "There is not enough available quantity for this product",
+      "reactivateNotFromOffer": "This order cannot be reactivated because it was not created from an offer",
+      "reactivateOfferNotAccepted": "The related offer is no longer accepted",
+      "reactivateOnlyCancelled": "Only cancelled orders can be reactivated",
+      "setAddressForbidden": "You are not authorized to add an address to this order",
+      "shippingAddressCityRequired": "City is required for the shipping address",
+      "shippingAddressDistrictRequired": "District is required for the shipping address",
+      "shippingAddressLineRequired": "Address line is required for the shipping address",
+      "shippingAddressNameRequired": "Full name is required for the shipping address",
+      "shippingAddressPhoneRequired": "Phone number is required for the shipping address",
+      "shippingAddressRequired": "Shipping address is required",
+      "shippingAddressRequiredWithFields": "Shipping address is required (shippingAddressId or shippingAddress)",
+      "statusChangeForbidden": "You are not authorized to make this status change",
+      "statusChangeSystemOnly": "This status change is performed by the system",
+      "statusTransitionNotAllowed": "Order status cannot be changed from {from} to {to}",
+      "updateForbidden": "You are not authorized to update this order",
+      "viewForbidden": "You are not authorized to view this order"
+    },
+    "payment": {
+      "cancelPaymentForbidden": "You do not have permission to cancel this payment",
+      "cancelledSuccessfully": "Payment cancelled successfully",
+      "cannotPayForOrder": "You cannot pay for this order",
+      "cannotPayForOrderGroup": "You cannot pay for this order group",
+      "cardInfoRequired": "Card details are required.",
+      "cardOrSavedCardRequired": "Card details or a saved card selection are required.",
+      "cartPaymentDescription": "Cart payment",
+      "cartPaymentDescriptionCount": "Cart payment ({count} items)",
+      "cashPaymentRecordNotFound": "Cash payment record not found",
+      "completedPaymentNotFound": "No completed payment was found",
+      "connectionError": "PayTR connection error, please try again.",
+      "cvvRequiredForCard": "A CVV is required for this card",
+      "directApiNotAuthorized": "PayTR card payment could not be verified for this store (Direct API authorization may be required).",
+      "groupOrderItemNotAwaitingPayment": "The \"{item}\" order in the group is not awaiting payment. Please recreate the cart.",
+      "groupOrderNotAwaitingPayment": "An order in the group is not awaiting payment. Please recreate the cart.",
+      "holdNotReleasable": "No releasable payment was found (it may be frozen due to an open refund)",
+      "installmentInfoFetchFailed": "Installment information could not be fetched",
+      "installmentInfoUnavailable": "Installment information could not be retrieved",
+      "installmentResponseInvalid": "The PayTR installment response is invalid or empty",
+      "loginRequired": "You need to log in",
+      "loginRequiredForOrder": "You need to log in for this order",
+      "loginRequiredForPayment": "You need to log in for this payment",
+      "loginRequiredForSavedCard": "You need to log in to pay with a saved card",
+      "noResponse": "PayTR did not respond (HTTP {httpStatus}).",
+      "notConfigured": "PayTR is not configured (merchant credentials are missing)",
+      "onlyDesignatedPayerCanInitiate": "Only the designated paying party can start this payment",
+      "onlyFailedPaymentsRetryable": "Only failed payments can be retried",
+      "onlyPendingPaymentsCancelable": "Only pending payments can be cancelled",
+      "orderAlreadyPaid": "This order has already been paid",
+      "orderAlreadyRefunded": "A refund has already been made for this order",
+      "orderGroupAlreadyPaid": "This order group has already been paid",
+      "orderGroupNotFound": "Order group not found",
+      "orderNotAwaitingPayment": "This order is not awaiting payment",
+      "orderNotFound": "Order not found",
+      "orderOrTradeNotFoundForPayment": "No order or trade associated with this payment was found",
+      "orderPaymentDescription": "Order payment",
+      "orderStatusNotRetryable": "The order status is not eligible for a payment retry",
+      "paymentAlreadyReceived": "This payment appears to have already been received. Please refresh the page; you do not need to pay again.",
+      "paymentBelongsToGroupOrTrade": "This payment belongs to an order group or a trade. Please check the payment status using the order group instead.",
+      "paymentBelongsToGroupRestart": "This payment belongs to an order group. Please restart the payment using the order group.",
+      "paymentCurrentlyProcessing": "This payment is currently being processed. Please wait a few seconds and try again.",
+      "paymentNotFound": "Payment not found",
+      "paymentNotYetSynced": "The payment has just completed and PayTR has not fully synced the transaction yet. Please try again in 1-2 minutes.",
+      "paymentRejected": "PayTR rejected the payment",
+      "paymentTargetRequired": "orderId, checkoutGroupId or tradeId is required.",
+      "paymentWindowExpired": "The payment window has expired. Please create a new order.",
+      "paytrRefundFailed": "The PayTR refund transaction failed",
+      "productFallbackTitle": "Product",
+      "productNoLongerAvailable": "The product is no longer for sale or was sold to another buyer. Please create a new order from the listings page.",
+      "refundAmountExceedsLimit": "The refund amount ({amountToRefund} TL) exceeds the allowed limit ({refundCap} TL)",
+      "refundError": "PayTR refund error",
+      "refundFailed": "PayTR refund failed",
+      "refundInitiationFailed": "The refund could not be started (temporary error). Please try again.",
+      "refundResponseInvalid": "The PayTR refund response is invalid or empty",
+      "retryForbidden": "You do not have permission to retry this payment",
+      "savedCardNotFound": "Saved card not found",
+      "savedCardPaymentUnavailable": "Paying with a saved card is currently unavailable. Please enter your card details.",
+      "tradeCashDifference": "Trade cash difference",
+      "tradeCashDifferenceWithNumber": "Trade cash difference (#{tradeNumber})",
+      "tradeCashPaymentAlreadyCompleted": "This trade payment has already been completed",
+      "tradeNoCashDifference": "There is no extra payment for this trade",
+      "tradeNotAcceptedOrInvalidStatus": "The trade has not been accepted yet or is not in an eligible status",
+      "tradeNotFound": "Trade not found",
+      "transferAlreadyStarted": "A transfer has already been started; a refund cannot be made",
+      "unexpectedResponse": "PayTR returned an unexpected response; please check your card details.",
+      "unknownProvider": "Unknown payment provider: {provider}",
+      "viewPaymentForbidden": "You do not have permission to view this payment",
+      "viewStatusForbidden": "You do not have permission to view this payment status"
+    },
+    "product": {
+      "alreadyLiked": "You have already liked this product",
+      "bannedCannotCreate": "Your account is banned. You cannot add new products.",
+      "bannedCannotEdit": "Your account is banned. You cannot edit products.",
+      "boostActiveOnly": "Only active (published) listings can be boosted",
+      "boostOwnOnly": "You can only boost your own listing",
+      "boostPriceUndefined": "No valid price is defined for this duration",
+      "boostUnavailable": "Boosting is currently unavailable",
+      "cannotLikeOwn": "You cannot like your own product",
+      "categoryNotFound": "Category not found",
+      "createFailedGeneric": "An error occurred while creating the listing. Please try again.",
+      "createdButLoadFailed": "The product was created but could not be loaded. Please try again.",
+      "deleteForbidden": "You do not have permission to delete this product",
+      "deleted": "Product deleted",
+      "duplicateProduct": "This product already exists or there is a unique field conflict.",
+      "editForbidden": "You do not have permission to edit this product",
+      "imageLimitExceeded": "With your membership ({tierName}) you can upload up to {maxImages} images per listing. You sent {sentCount} images.",
+      "imageNotAppropriate": "The image you uploaded is not appropriate. Please upload a suitable product image.",
+      "insufficientStock": "This product is out of stock (available={available}, requested={requested})",
+      "invalidBoostDuration": "Please select a valid boost duration (3, 7, or 30 days)",
+      "invalidBrandModelManufacturer": "The selected brand, model, or manufacturer is invalid. Please select again from the list.",
+      "invalidCategory": "Invalid category",
+      "invalidIdFormat": "Invalid product ID format",
+      "invalidIdFormatDetailed": "Invalid product ID format. It must be a UUID (e.g., a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11)",
+      "listingLimitReached": "You've reached your listing limit. With your current membership ({tierName}) you can create up to {maxListings} listings. Upgrade your membership to add more listings.",
+      "listingStatsFailed": "Failed to retrieve listing statistics",
+      "notForSaleStatus": "Product is not for sale (status={status})",
+      "notFound": "Product not found",
+      "notFoundWithId": "Product not found: {productId}",
+      "notLiked": "You have not liked this product",
+      "platformSellerNotFound": "Platform seller not found",
+      "priceAboveMaximum": "Product price can be at most {maxPrice} TL.",
+      "priceBelowMinimum": "Product price must be at least {minPrice} TL.",
+      "removedCannotReopen": "This product has been removed and cannot be reopened. Create a new listing to sell it again.",
+      "reservedCannotUpdate": "Reserved products cannot be updated",
+      "sellerIdNotFound": "Seller ID not found",
+      "setQuantityToReopen": "Set a stock quantity to reopen for sale",
+      "soldOrReservedCannotDelete": "Sold or reserved products cannot be deleted",
+      "statsForbidden": "You do not have permission to view this product's statistics",
+      "tradeRequiresPremium": "Trade feature requires Premium membership. Upgrade your membership.",
+      "updateConflict": "The product was updated by another process. Please refresh.",
+      "userIdNotFound": "User ID not found",
+      "userNotFound": "User not found",
+      "viewForbidden": "You do not have permission to view this product"
+    },
+    "refund": {
+      "alreadyActive": "There is already an active refund request for this order",
+      "buyerAddressNotFound": "The buyer's delivery/registered address was not found, so the return shipment cannot be created. The buyer must add an address.",
+      "cannotCancel": "You cannot cancel this request",
+      "cannotCancelAnymore": "This request can no longer be cancelled (the return shipment has been opened or a decision has already been made)",
+      "completedPaymentNotFound": "No completed payment was found",
+      "coolingOffExpired": "The 14-day refund period has expired; a refund request can no longer be created for this order.",
+      "membershipOrderNotEligible": "A refund request cannot be created for membership orders; you can cancel your membership from your membership settings.",
+      "notFound": "Refund request not found",
+      "onlyBuyerCanRequest": "Only the buyer can create a refund request",
+      "orderAlreadyCancelledOrRefunded": "This order has already been cancelled or refunded",
+      "orderNotFound": "Order not found",
+      "orderNotPaidYet": "This order has not been paid yet; you should cancel the order instead of requesting a refund",
+      "orderStatusNotEligible": "A refund request cannot be created while the order is in this status",
+      "viewForbidden": "You do not have permission to view this request"
+    },
+    "user": {
+      "accountDeleted": "Your account has been successfully deleted",
+      "addressDeleted": "Address deleted",
+      "addressHasOpenOrders": "You have ongoing orders linked to this delivery address. You cannot delete the address until the order is completed or cancelled.",
+      "addressLimitReached": "You can add up to 3 addresses. Delete an existing address to add a new one.",
+      "addressNotFound": "Address not found",
+      "alreadyBlocked": "This user is already blocked",
+      "bankAccountNotFound": "Bank account not found",
+      "businessFeatureOnly": "This feature is only available to accounts with a business membership. Upgrade your membership.",
+      "cannotBlockSelf": "You cannot block yourself",
+      "cannotFollowSelf": "You cannot follow yourself",
+      "cannotUnfollowSelf": "You cannot unfollow yourself",
+      "companyNameRequired": "A company name is required to use the business dashboard. Please add your company name in your profile settings.",
+      "deleteAccountBlocked": "To delete your account, you must first complete the following:",
+      "deleteAccountFailed": "An error occurred while deleting your account. Please contact support.",
+      "deleteBlockedActiveListings": "You have {count} active listings. Please remove all of your listings first.",
+      "deleteBlockedActiveTrades": "You have {count} active trade offers. Please complete or cancel your trades.",
+      "deleteBlockedPendingOrders": "You have {count} pending purchase/sale transactions. Please complete or cancel your orders.",
+      "noFieldsToUpdate": "No fields to update were provided",
+      "notBlocked": "This user is not blocked",
+      "notFound": "User not found",
+      "phoneAlreadyInUse": "This phone number is already in use",
+      "unfollowed": "Unfollowed",
+      "userBlocked": "{displayName} has been blocked",
+      "userUnblocked": "Block removed"
+    },
+    "membership": {
+      "alreadyCancelled": "Membership has already been cancelled",
+      "alreadyOnThisPlan": "You are already on this plan",
+      "businessTierRequiresCompany": "The business membership is only available to company accounts",
+      "categoryNotFound": "Category not found",
+      "freeTierCannotCancel": "The free membership cannot be cancelled",
+      "freeTierNoPaymentNeeded": "No payment is required for the free membership",
+      "freeTierNotFound": "Free membership tier not found",
+      "infoNotFound": "Membership information not found",
+      "limitsFetchFailed": "Failed to retrieve membership limits",
+      "noPendingChange": "There is no pending membership change",
+      "notFound": "Membership not found",
+      "platformSellerNotFound": "Platform seller not found",
+      "savedCardNotFound": "Saved card not found",
+      "tierAlreadyExists": "Membership tier already exists: {type}",
+      "tierNoPaymentNeeded": "No payment is required for this membership tier",
+      "tierNotActive": "This membership tier is not active",
+      "tierNotFound": "Membership tier not found: {type}",
+      "userIdNotFound": "User ID not found"
+    }
   }
 }

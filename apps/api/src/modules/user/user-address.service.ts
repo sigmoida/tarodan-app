@@ -1,6 +1,12 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { OrderStatus } from '@prisma/client';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { OrderStatus } from "@prisma/client";
+import { i18nMessage } from "../i18n";
 
 /** Edge case 1.11: allow address delete only when no open order references it as shipping (terminal orders keep JSON snapshot). */
 const ADDRESS_DELETE_BLOCKED_ORDER_STATUSES: OrderStatus[] = [
@@ -20,9 +26,7 @@ const ADDRESS_DELETE_BLOCKED_ORDER_STATUSES: OrderStatus[] = [
 export class UserAddressService {
   private readonly logger = new Logger(UserAddressService.name);
 
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Add user address
@@ -48,10 +52,14 @@ export class UserAddressService {
 
     // Check address limit (max 3)
     if (existingAddresses >= 3) {
-      throw new BadRequestException('En fazla 3 adres ekleyebilirsiniz. Yeni adres eklemek için mevcut bir adresi silin.');
+      throw new BadRequestException(
+        i18nMessage("server.user.addressLimitReached"),
+      );
     }
 
-    const title = (data.title?.trim() && data.title.trim()) || `Adres ${existingAddresses + 1}`;
+    const title =
+      (data.title?.trim() && data.title.trim()) ||
+      `Adres ${existingAddresses + 1}`;
 
     // If this is the default address, unset other defaults
     if (data.isDefault) {
@@ -97,7 +105,7 @@ export class UserAddressService {
     });
 
     if (!address) {
-      throw new NotFoundException('Adres bulunamadı');
+      throw new NotFoundException(i18nMessage("server.user.addressNotFound"));
     }
 
     // If setting as default, unset other defaults
@@ -124,7 +132,7 @@ export class UserAddressService {
     });
 
     if (!address) {
-      throw new NotFoundException('Adres bulunamadı');
+      throw new NotFoundException(i18nMessage("server.user.addressNotFound"));
     }
 
     const openOrdersUsingAddress = await this.prisma.order.count({
@@ -136,7 +144,7 @@ export class UserAddressService {
     });
     if (openOrdersUsingAddress > 0) {
       throw new BadRequestException(
-        'Bu teslimat adresine bağlı devam eden siparişleriniz var. Sipariş tamamlanana veya iptal edilene kadar adresi silemezsiniz.',
+        i18nMessage("server.user.addressHasOpenOrders"),
       );
     }
 
@@ -158,7 +166,8 @@ export class UserAddressService {
       }
     }
 
-    return { message: 'Adres silindi' };
+    // #224: mesaj artık UserController.deleteAddress() tarafından locale'e göre
+    // kuruluyor (server.user.addressDeleted) — servis burada sabit metin döndürmüyor.
   }
 
   /**
@@ -167,7 +176,7 @@ export class UserAddressService {
   async getAddresses(userId: string) {
     return this.prisma.address.findMany({
       where: { userId },
-      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+      orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
     });
   }
 }

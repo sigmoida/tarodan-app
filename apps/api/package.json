@@ -71,6 +71,8 @@
     "@prisma/client": "^5.7.1",
     "@sentry/node": "^7.91.0",
     "@sentry/tracing": "^7.91.0",
+    "@tarodan/i18n": "workspace:*",
+    "@tarodan/logger": "workspace:*",
     "@tarodan/types": "workspace:*",
     "apollo-server-express": "^3.13.0",
     "apple-signin-auth": "^1.7.3",
@@ -142,10 +144,13 @@
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
+      "packages/i18n/src/catalog/.+\\.json$": "<rootDir>/../test/jest-json-default-transform.js",
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "moduleNameMapper": {
-      "^@tarodan/types$": "<rootDir>/../../../packages/types/src/index.ts"
+      "^@tarodan/i18n$": "<rootDir>/../../../packages/i18n/src/index.ts",
+      "^@tarodan/types$": "<rootDir>/../../../packages/types/src/index.ts",
+      "^@tarodan/logger$": "<rootDir>/../../../packages/logger/src/index.ts"
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"

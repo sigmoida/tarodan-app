@@ -73,6 +73,9 @@ import { MonitoringModule } from "./monitoring/monitoring.module";
 // Health check for monitoring
 import { HealthModule } from "./modules/health";
 
+// Public mobile bootstrap config (min supported app version / force-update gate)
+import { AppConfigModule } from "./modules/app-config";
+
 // Media/File uploads (AWS S3)
 import { MediaModule } from "./modules/media";
 
@@ -207,6 +210,9 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 
     // Health check endpoints
     HealthModule, // /health, /health/detailed, /health/live, /health/ready
+
+    // Public mobile bootstrap config (#232): GET /app-config → minSupportedAppVersion
+    AppConfigModule,
 
     // Media/File uploads
     MediaModule, // Product images, Avatars, Documents

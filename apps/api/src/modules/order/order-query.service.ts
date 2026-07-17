@@ -1,8 +1,13 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { OrderQueryDto, GuestOrderTrackDto } from './dto';
-import { OrderStatus, Prisma } from '@prisma/client';
-import { OrderCommonService } from './order-common.service';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { i18nMessage } from "../i18n";
+import { OrderQueryDto, GuestOrderTrackDto } from "./dto";
+import { OrderStatus, Prisma } from "@prisma/client";
+import { OrderCommonService } from "./order-common.service";
 
 /**
  * Sipariş sorguları (liste, detay, grup görünümleri, misafir takibi, satıcı
@@ -26,21 +31,31 @@ export class OrderQueryService {
       include: {
         product: {
           include: {
-            images: { take: 1, orderBy: { sortOrder: 'asc' } },
+            images: { take: 1, orderBy: { sortOrder: "asc" } },
           },
         },
         buyer: {
-          select: { id: true, displayName: true, email: true, isVerified: true },
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+            isVerified: true,
+          },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+          select: {
+            id: true,
+            displayName: true,
+            isVerified: true,
+            avatarUrl: true,
+          },
         },
         shipment: true,
       },
     });
 
     if (!order) {
-      throw new NotFoundException('Sipariş bulunamadı');
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
     }
 
     // Verify email matches - check guest email in shippingAddress or buyer email
@@ -48,9 +63,9 @@ export class OrderQueryService {
     const guestEmail = shippingData?.guestEmail?.toLowerCase();
     const buyerEmail = order.buyer.email?.toLowerCase();
     const inputEmail = dto.email.toLowerCase();
-    
+
     if (guestEmail !== inputEmail && buyerEmail !== inputEmail) {
-      throw new NotFoundException('Sipariş bulunamadı');
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
     }
 
     return {
@@ -61,17 +76,21 @@ export class OrderQueryService {
       product: {
         id: order.product.id,
         title: order.product.title,
-        image: this.orderCommon.resolveProductImageUrl(order.product.images?.[0]?.cardKey),
+        image: this.orderCommon.resolveProductImageUrl(
+          order.product.images?.[0]?.cardKey,
+        ),
       },
       seller: order.seller,
       shippingAddress: order.shippingAddress,
-      shipment: order.shipment ? {
-        provider: order.shipment.provider,
-        trackingNumber: order.shipment.trackingNumber,
-        trackingUrl: order.shipment.trackingUrl,
-        status: order.shipment.status,
-        estimatedDelivery: order.shipment.estimatedDelivery,
-      } : null,
+      shipment: order.shipment
+        ? {
+            provider: order.shipment.provider,
+            trackingNumber: order.shipment.trackingNumber,
+            trackingUrl: order.shipment.trackingUrl,
+            status: order.shipment.status,
+            estimatedDelivery: order.shipment.estimatedDelivery,
+          }
+        : null,
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
     };
@@ -84,14 +103,24 @@ export class OrderQueryService {
    *   totalEarnings   = teslim edilen + tamamlanan siparişlerin toplam tutarı
    *   pendingEarnings = ödendi + hazırlanıyor + kargoda siparişlerin toplam tutarı
    */
-  async getSellerEarnings(sellerId: string): Promise<{ totalEarnings: number; pendingEarnings: number }> {
+  async getSellerEarnings(
+    sellerId: string,
+  ): Promise<{ totalEarnings: number; pendingEarnings: number }> {
     const [realized, pending] = await Promise.all([
       this.prisma.order.aggregate({
-        where: { sellerId, status: { in: [OrderStatus.delivered, OrderStatus.completed] } },
+        where: {
+          sellerId,
+          status: { in: [OrderStatus.delivered, OrderStatus.completed] },
+        },
         _sum: { totalAmount: true },
       }),
       this.prisma.order.aggregate({
-        where: { sellerId, status: { in: [OrderStatus.paid, OrderStatus.preparing, OrderStatus.shipped] } },
+        where: {
+          sellerId,
+          status: {
+            in: [OrderStatus.paid, OrderStatus.preparing, OrderStatus.shipped],
+          },
+        },
         _sum: { totalAmount: true },
       }),
     ]);
@@ -110,9 +139,9 @@ export class OrderQueryService {
     const where: Prisma.OrderWhereInput = {};
 
     // Filter by role
-    if (role === 'buyer') {
+    if (role === "buyer") {
       where.buyerId = userId;
-    } else if (role === 'seller') {
+    } else if (role === "seller") {
       where.sellerId = userId;
     } else {
       // Default: both
@@ -137,8 +166,8 @@ export class OrderQueryService {
     // (sadece gerçek ürün siparişleri). Boost'lar "Boostlarım"da görünür.
     where.NOT = {
       OR: [
-        { productId: { startsWith: 'membership-' } },
-        { productId: { startsWith: 'boost-' } },
+        { productId: { startsWith: "membership-" } },
+        { productId: { startsWith: "boost-" } },
       ],
     };
 
@@ -146,20 +175,30 @@ export class OrderQueryService {
 
     const orders = await this.prisma.order.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       skip: (page - 1) * limit,
       take: limit,
       include: {
         product: {
           include: {
-            images: { take: 1, orderBy: { sortOrder: 'asc' } },
+            images: { take: 1, orderBy: { sortOrder: "asc" } },
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+          select: {
+            id: true,
+            displayName: true,
+            isVerified: true,
+            avatarUrl: true,
+          },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+          select: {
+            id: true,
+            displayName: true,
+            isVerified: true,
+            avatarUrl: true,
+          },
         },
         shipment: true,
         // Liste yanıtında da aktif iade durumunu gösterebilmek için (detayla tutarlı):
@@ -167,19 +206,21 @@ export class OrderQueryService {
         // include edilmezse activeRefundRequest null kalır ve liste ham order.status
         // (örn. "Teslim Edildi") gösterir. (Sadece okuma; başka davranış değişmez.)
         refundRequests: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
         },
       },
     });
 
-    const formatted = await Promise.all(orders.map((o) => this.orderCommon.formatOrderResponse(o, userId)));
+    const formatted = await Promise.all(
+      orders.map((o) => this.orderCommon.formatOrderResponse(o, userId)),
+    );
 
     // Kullanıcı hem alıcı hem satıcı olabilir (test ortamı).
     // Talep edilen role'e göre perspektif bayraklarını sabitle ki
     // satıcı tabında alıcı UI'ı (iade talebi butonu vb.) çıkmasın.
     const data = formatted.map((o) => {
-      if (role === 'seller') return { ...o, isBuyer: false };
-      if (role === 'buyer') return { ...o, isSeller: false };
+      if (role === "seller") return { ...o, isBuyer: false };
+      if (role === "buyer") return { ...o, isSeller: false };
       return o;
     });
 
@@ -203,19 +244,29 @@ export class OrderQueryService {
       include: {
         product: {
           include: {
-            images: { take: 1, orderBy: { sortOrder: 'asc' } },
+            images: { take: 1, orderBy: { sortOrder: "asc" } },
           },
         },
         buyer: {
-          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+          select: {
+            id: true,
+            displayName: true,
+            isVerified: true,
+            avatarUrl: true,
+          },
         },
         seller: {
-          select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+          select: {
+            id: true,
+            displayName: true,
+            isVerified: true,
+            avatarUrl: true,
+          },
         },
         shipment: {
           include: {
             events: {
-              orderBy: { createdAt: 'desc' },
+              orderBy: { createdAt: "desc" },
               take: 5,
             },
           },
@@ -228,18 +279,18 @@ export class OrderQueryService {
         // yalnız teklif hâlâ accepted iken gösterilmeli)
         offer: { select: { status: true } },
         refundRequests: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
         },
       },
     });
 
     if (!order) {
-      throw new NotFoundException('Sipariş bulunamadı');
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
     }
 
     // Only buyer or seller can view the order
     if (order.buyerId !== userId && order.sellerId !== userId) {
-      throw new ForbiddenException('Bu siparişi görüntüleme yetkiniz yok');
+      throw new ForbiddenException(i18nMessage("server.order.viewForbidden"));
     }
 
     return await this.orderCommon.formatOrderResponse(order, userId);
@@ -250,7 +301,7 @@ export class OrderQueryService {
     const active = orders.filter((o) => o.status !== OrderStatus.cancelled);
     const pool = active.length > 0 ? active : orders;
     const first = pool[0]?.status;
-    return pool.every((o) => o.status === first) ? String(first) : 'mixed';
+    return pool.every((o) => o.status === first) ? String(first) : "mixed";
   }
 
   /**
@@ -268,20 +319,30 @@ export class OrderQueryService {
     const total = await this.prisma.checkoutGroup.count({ where });
     const groups = await this.prisma.checkoutGroup.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       skip: (page - 1) * limit,
       take: limit,
       include: {
         orders: {
           include: {
             product: {
-              include: { images: { take: 1, orderBy: { sortOrder: 'asc' } } },
+              include: { images: { take: 1, orderBy: { sortOrder: "asc" } } },
             },
             buyer: {
-              select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+              select: {
+                id: true,
+                displayName: true,
+                isVerified: true,
+                avatarUrl: true,
+              },
             },
             seller: {
-              select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+              select: {
+                id: true,
+                displayName: true,
+                isVerified: true,
+                avatarUrl: true,
+              },
             },
             shipment: true,
           },
@@ -291,7 +352,9 @@ export class OrderQueryService {
 
     const data = await Promise.all(
       groups.map(async (group) => {
-        const visibleOrders = group.orders.filter((o) => o.status !== OrderStatus.cancelled);
+        const visibleOrders = group.orders.filter(
+          (o) => o.status !== OrderStatus.cancelled,
+        );
         const orders = visibleOrders.length > 0 ? visibleOrders : group.orders;
         return {
           id: group.id,
@@ -299,7 +362,9 @@ export class OrderQueryService {
           totalAmount: Number(group.totalAmount),
           status: this.deriveGroupStatus(group.orders),
           createdAt: group.createdAt,
-          orders: await Promise.all(orders.map((o) => this.orderCommon.formatOrderResponse(o, userId))),
+          orders: await Promise.all(
+            orders.map((o) => this.orderCommon.formatOrderResponse(o, userId)),
+          ),
         };
       }),
     );
@@ -322,36 +387,54 @@ export class OrderQueryService {
         orders: {
           include: {
             product: {
-              include: { images: { take: 1, orderBy: { sortOrder: 'asc' } } },
+              include: { images: { take: 1, orderBy: { sortOrder: "asc" } } },
             },
             buyer: {
-              select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+              select: {
+                id: true,
+                displayName: true,
+                isVerified: true,
+                avatarUrl: true,
+              },
             },
             seller: {
-              select: { id: true, displayName: true, isVerified: true, avatarUrl: true },
+              select: {
+                id: true,
+                displayName: true,
+                isVerified: true,
+                avatarUrl: true,
+              },
             },
             shipment: {
               include: {
-                events: { orderBy: { createdAt: 'desc' }, take: 5 },
+                events: { orderBy: { createdAt: "desc" }, take: 5 },
               },
             },
             payment: true,
             // Grup içi siparişlerde de "Ödeme Yapıldı"/paidAt çözülsün diye group payment.
             checkoutGroup: { include: { payment: true } },
-            refundRequests: { orderBy: { createdAt: 'desc' } },
+            refundRequests: { orderBy: { createdAt: "desc" } },
           },
         },
         payment: {
-          select: { id: true, status: true, amount: true, provider: true, paidAt: true },
+          select: {
+            id: true,
+            status: true,
+            amount: true,
+            provider: true,
+            paidAt: true,
+          },
         },
       },
     });
 
     if (!group) {
-      throw new NotFoundException('Sipariş grubu bulunamadı');
+      throw new NotFoundException(i18nMessage("server.order.groupNotFound"));
     }
     if (group.buyerId !== userId) {
-      throw new ForbiddenException('Bu sipariş grubunu görüntüleme yetkiniz yok');
+      throw new ForbiddenException(
+        i18nMessage("server.order.groupViewForbidden"),
+      );
     }
 
     return {
@@ -370,7 +453,9 @@ export class OrderQueryService {
           }
         : null,
       orders: await Promise.all(
-        group.orders.map((o) => this.orderCommon.formatOrderResponse(o, userId)),
+        group.orders.map((o) =>
+          this.orderCommon.formatOrderResponse(o, userId),
+        ),
       ),
     };
   }

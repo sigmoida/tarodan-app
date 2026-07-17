@@ -8,6 +8,7 @@ import {
 import { createHash, randomInt, randomUUID, timingSafeEqual } from "crypto";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
+import { i18nMessage } from "../i18n";
 import { CacheService } from "../cache/cache.service";
 import {
   GuestCheckoutDto,
@@ -100,7 +101,7 @@ export class OrderGuestCheckoutService {
     const recentSends = prevSends.filter((t) => now - t < windowMs);
     if (recentSends.length >= maxSends) {
       throw new BadRequestException(
-        "Çok fazla kod isteği gönderildi. Lütfen bir süre sonra tekrar deneyin.",
+        i18nMessage("server.order.guestOtpTooManyRequests"),
       );
     }
     recentSends.push(now);
@@ -121,7 +122,9 @@ export class OrderGuestCheckoutService {
         ttlSec,
       );
     if (!sendResult.success) {
-      throw new BadRequestException("Doğrulama kodu e-postası gönderilemedi");
+      throw new BadRequestException(
+        i18nMessage("server.order.guestOtpSendFailed"),
+      );
     }
 
     const otpKey = this.guestCheckoutOtpKey(normEmail);
@@ -151,7 +154,9 @@ export class OrderGuestCheckoutService {
     await this.consumeGuestCheckoutOtp(normEmail, dto.emailVerificationCode);
 
     if (!dto.shippingAddress) {
-      throw new BadRequestException("Teslimat adresi gereklidir");
+      throw new BadRequestException(
+        i18nMessage("server.order.shippingAddressRequired"),
+      );
     }
 
     const guestUser = await this.getOrCreateSystemGuestUser();
@@ -187,7 +192,9 @@ export class OrderGuestCheckoutService {
         FOR UPDATE
       `;
       if (!lockedRows?.length) {
-        throw new NotFoundException("Ürün bulunamadı");
+        throw new NotFoundException(
+          i18nMessage("server.order.productNotFound"),
+        );
       }
 
       const product = await tx.product.findUnique({
@@ -199,17 +206,23 @@ export class OrderGuestCheckoutService {
       });
 
       if (!product) {
-        throw new NotFoundException("Ürün bulunamadı");
+        throw new NotFoundException(
+          i18nMessage("server.order.productNotFound"),
+        );
       }
 
       if (product.status !== ProductStatus.active) {
-        throw new BadRequestException("Bu ürün satışta değil");
+        throw new BadRequestException(
+          i18nMessage("server.order.productNotOnSale"),
+        );
       }
 
       // Adet bazlı stok: müsait adet >= 1
       const available = getAvailableQuantity(product);
       if (available !== null && available < 1) {
-        throw new BadRequestException("Bu ürün stokta bulunmamaktadır");
+        throw new BadRequestException(
+          i18nMessage("server.order.productOutOfStock"),
+        );
       }
 
       // Price is ALWAYS derived server-side — NEVER from the client. A guest was
@@ -225,11 +238,15 @@ export class OrderGuestCheckoutService {
         });
 
         if (!offer || offer.productId !== dto.productId) {
-          throw new BadRequestException("Geçersiz teklif");
+          throw new BadRequestException(
+            i18nMessage("server.order.invalidOffer"),
+          );
         }
 
         if (offer.status !== OfferStatus.accepted) {
-          throw new BadRequestException("Teklif kabul edilmemiş");
+          throw new BadRequestException(
+            i18nMessage("server.order.offerNotAcceptedYet"),
+          );
         }
 
         finalPrice = Number(offer.amount);
@@ -259,23 +276,27 @@ export class OrderGuestCheckoutService {
       // Validate shipping address for guest checkout
       if (!dto.shippingAddress?.fullName?.trim()) {
         throw new BadRequestException(
-          "Teslimat adresi için ad soyad gereklidir",
+          i18nMessage("server.order.shippingAddressNameRequired"),
         );
       }
       if (!dto.shippingAddress?.phone?.trim()) {
         throw new BadRequestException(
-          "Teslimat adresi için telefon numarası gereklidir",
+          i18nMessage("server.order.shippingAddressPhoneRequired"),
         );
       }
       if (!dto.shippingAddress?.city?.trim()) {
-        throw new BadRequestException("Teslimat adresi için şehir gereklidir");
+        throw new BadRequestException(
+          i18nMessage("server.order.shippingAddressCityRequired"),
+        );
       }
       if (!dto.shippingAddress?.district?.trim()) {
-        throw new BadRequestException("Teslimat adresi için ilçe gereklidir");
+        throw new BadRequestException(
+          i18nMessage("server.order.shippingAddressDistrictRequired"),
+        );
       }
       if (!dto.shippingAddress?.address?.trim()) {
         throw new BadRequestException(
-          "Teslimat adresi için açık adres gereklidir",
+          i18nMessage("server.order.shippingAddressLineRequired"),
         );
       }
 
@@ -532,7 +553,7 @@ export class OrderGuestCheckoutService {
 
     if (!record?.h) {
       throw new BadRequestException(
-        "Doğrulama kodu geçersiz veya süresi dolmuş",
+        i18nMessage("server.order.guestOtpInvalidOrExpired"),
       );
     }
 
@@ -540,7 +561,7 @@ export class OrderGuestCheckoutService {
     if (record.a >= maxWrong) {
       await this.cache.del(otpKey);
       throw new BadRequestException(
-        "Çok fazla hatalı deneme. Yeni kod isteyin.",
+        i18nMessage("server.order.guestOtpTooManyAttempts"),
       );
     }
 
@@ -561,7 +582,9 @@ export class OrderGuestCheckoutService {
       } else if (ttlLeft > 0) {
         await this.cache.set(otpKey, record, { ttl: ttlLeft });
       }
-      throw new BadRequestException("Doğrulama kodu hatalı");
+      throw new BadRequestException(
+        i18nMessage("server.order.guestOtpIncorrect"),
+      );
     }
 
     record.c -= 1;

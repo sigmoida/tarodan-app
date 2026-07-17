@@ -4,24 +4,24 @@ import {
   PaymentHoldStatus,
   OrderStatus,
   CommissionLedgerStatus,
-} from '@prisma/client';
-import { PrismaService } from '../../src/prisma';
-import { CommissionLedgerService } from '../../src/modules/commission/commission-ledger.service';
-import { PaymentRefundService } from '../../src/modules/payment/payment-refund.service';
-import { ElogoInvoicingService } from '../../src/modules/elogo/elogo-invoicing.service';
+} from "@prisma/client";
+import { PrismaService } from "../../src/prisma";
+import { CommissionLedgerService } from "../../src/modules/commission/commission-ledger.service";
+import { PaymentRefundService } from "../../src/modules/payment/payment-refund.service";
+import { ElogoInvoicingService } from "../../src/modules/elogo/elogo-invoicing.service";
 import {
   truncateAll,
   getPrisma,
   seedBaseline,
   disconnectPrisma,
-} from '../test-utils/db';
+} from "../test-utils/db";
 
 /**
  * #88 — kısmi (adet) iadede CommissionLedger komisyonu PRO-RATE edilir (eskiden yalnız
  * TAM iade işaretleniyor, kısmi iade komisyonu fazla-raporluyordu). Original alanlar
  * korunur; refunded* kümülatif; net = original - refunded → elogo net faturalar. [P0]
  */
-describe('Partial-refund commission ledger pro-rating (#88) [P0]', () => {
+describe("Partial-refund commission ledger pro-rating (#88) [P0]", () => {
   let prisma: PrismaService;
   let ledger: CommissionLedgerService;
 
@@ -43,13 +43,13 @@ describe('Partial-refund commission ledger pro-rating (#88) [P0]', () => {
   }): Promise<{ orderId: string; sellerId: string }> {
     const uniq = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const buyer = await prisma.user.create({
-      data: { email: `b-${uniq}@t.local`, passwordHash: 'x', displayName: 'B' },
+      data: { email: `b-${uniq}@t.local`, passwordHash: "x", displayName: "B" },
     });
     const seller = await prisma.user.create({
       data: {
         email: `s-${uniq}@t.local`,
-        passwordHash: 'x',
-        displayName: 'S',
+        passwordHash: "x",
+        displayName: "S",
         isSeller: true,
       },
     });
@@ -59,10 +59,10 @@ describe('Partial-refund commission ledger pro-rating (#88) [P0]', () => {
         sellerId: seller.id,
         categoryId: category!.id,
         title: `P-${uniq}`,
-        description: 'x',
+        description: "x",
         price: new Prisma.Decimal(100),
-        condition: 'new' as any,
-        status: 'active' as any,
+        condition: "new" as any,
+        status: "active" as any,
         quantity: 2,
         reservedQuantity: 0,
       },
@@ -90,8 +90,11 @@ describe('Partial-refund commission ledger pro-rating (#88) [P0]', () => {
     return { orderId: order.id, sellerId: seller.id };
   }
 
-  it('applyRefund: kısmi (0.5) pro-rate eder, original korunur, status refunded OLMAZ', async () => {
-    const { orderId } = await makeOrderWithLedger({ sellerCommission: 10, buyerFee: 4 });
+  it("applyRefund: kısmi (0.5) pro-rate eder, original korunur, status refunded OLMAZ", async () => {
+    const { orderId } = await makeOrderWithLedger({
+      sellerCommission: 10,
+      buyerFee: 4,
+    });
 
     const res = await prisma.$transaction((tx) =>
       ledger.applyRefund(orderId, 0.5, tx),
@@ -105,8 +108,11 @@ describe('Partial-refund commission ledger pro-rating (#88) [P0]', () => {
     expect(l!.status).not.toBe(CommissionLedgerStatus.refunded);
   });
 
-  it('applyRefund kümülatif: iki kısmi (0.5 + 0.5) tam iadeye ulaşır, clamp + status refunded', async () => {
-    const { orderId } = await makeOrderWithLedger({ sellerCommission: 10, buyerFee: 4 });
+  it("applyRefund kümülatif: iki kısmi (0.5 + 0.5) tam iadeye ulaşır, clamp + status refunded", async () => {
+    const { orderId } = await makeOrderWithLedger({
+      sellerCommission: 10,
+      buyerFee: 4,
+    });
 
     await prisma.$transaction((tx) => ledger.applyRefund(orderId, 0.5, tx));
     const res2 = await prisma.$transaction((tx) =>
@@ -124,16 +130,21 @@ describe('Partial-refund commission ledger pro-rating (#88) [P0]', () => {
     ).toBeCloseTo(0, 2);
   });
 
-  it('applyRefund idempotent: zaten refunded olan ledger tekrar çağrıda compound ETMEZ', async () => {
-    const { orderId } = await makeOrderWithLedger({ sellerCommission: 10, buyerFee: 4 });
+  it("applyRefund idempotent: zaten refunded olan ledger tekrar çağrıda compound ETMEZ", async () => {
+    const { orderId } = await makeOrderWithLedger({
+      sellerCommission: 10,
+      buyerFee: 4,
+    });
     await prisma.$transaction((tx) => ledger.applyRefund(orderId, 1, tx));
-    const r = await prisma.$transaction((tx) => ledger.applyRefund(orderId, 0.5, tx));
+    const r = await prisma.$transaction((tx) =>
+      ledger.applyRefund(orderId, 0.5, tx),
+    );
     expect(r.updated).toBe(false);
     const l = await prisma.commissionLedger.findUnique({ where: { orderId } });
     expect(Number(l!.refundedSellerCommission)).toBeCloseTo(10, 2); // aşmadı
   });
 
-  it('processRefund kısmi iade: ledger komisyonu pro-rate edilir (entegrasyon)', async () => {
+  it("processRefund kısmi iade: ledger komisyonu pro-rate edilir (entegrasyon)", async () => {
     const { orderId, sellerId } = await makeOrderWithLedger({
       sellerCommission: 10,
       buyerFee: 4,
@@ -141,7 +152,7 @@ describe('Partial-refund commission ledger pro-rating (#88) [P0]', () => {
     const payment = await prisma.payment.create({
       data: {
         orderId,
-        provider: 'paytr',
+        provider: "paytr",
         providerConversationId: `oid-${orderId.slice(0, 8)}`,
         amount: new Prisma.Decimal(100),
         status: PaymentStatus.completed,
@@ -159,15 +170,23 @@ describe('Partial-refund commission ledger pro-rating (#88) [P0]', () => {
       },
     });
 
-    const createRefund = jest.fn().mockResolvedValue({ status: 'success' });
+    const createRefund = jest.fn().mockResolvedValue({ status: "success" });
     const refundSvc = new PaymentRefundService(
       prisma,
       { get: () => undefined } as any, // config (PAYMENT_BYPASS undefined → PayTR yolu)
       { createRefund } as any,
       { emitPaymentRefunded: async () => {} } as any,
-      { createInAppNotification: async () => {}, sendOrderCancelledEmails: async () => {} } as any,
+      {
+        createInAppNotification: async () => {},
+        sendOrderCancelledEmails: async () => {},
+      } as any,
       ledger, // GERÇEK commissionLedger
-      { handleOrderRefund: async () => {}, issueCommissionInvoice: async () => {}, issueServiceFeeInvoice: async () => {}, issuePlatformSaleInvoice: async () => {} } as any,
+      {
+        handleOrderRefund: async () => {},
+        issueCommissionInvoice: async () => {},
+        issueServiceFeeInvoice: async () => {},
+        issuePlatformSaleInvoice: async () => {},
+      } as any,
       { cancelSuratShipmentIfExists: async () => {} } as any,
     );
 
@@ -180,7 +199,7 @@ describe('Partial-refund commission ledger pro-rating (#88) [P0]', () => {
     expect(Number(l!.sellerCommission)).toBe(10); // original korundu
   });
 
-  it('elogo NET komisyon faturalar: kısmi iade sonrası original değil net kesilir', async () => {
+  it("elogo NET komisyon faturalar: kısmi iade sonrası original değil net kesilir", async () => {
     const { orderId, sellerId } = await makeOrderWithLedger({
       sellerCommission: 10,
       buyerFee: 4,
@@ -194,16 +213,14 @@ describe('Partial-refund commission ledger pro-rating (#88) [P0]', () => {
     const elogo = new ElogoInvoicingService(
       prisma,
       {} as any, // elogo client
-      { get: () => '' } as any, // config
+      { get: () => "" } as any, // config
     );
-    const cutSpy = jest
-      .spyOn(elogo as any, 'cut')
-      .mockResolvedValue(undefined);
+    const cutSpy = jest.spyOn(elogo as any, "cut").mockResolvedValue(undefined);
 
     await elogo.issueCommissionInvoice(orderId);
 
     expect(cutSpy).toHaveBeenCalledTimes(1);
     // net = 10 - 3 = 7 (original 10 DEĞİL)
-    expect(cutSpy).toHaveBeenCalledWith('commission', orderId, sellerId, 7);
+    expect(cutSpy).toHaveBeenCalledWith("commission", orderId, sellerId, 7);
   });
 });
