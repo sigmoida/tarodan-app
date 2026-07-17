@@ -873,8 +873,12 @@ export class AdminService {
   // ==================== CATEGORY MANAGEMENT ====================
   // Taşındı: admin-catalog.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getCategories() {
-    return this.catalogService.getCategories();
+  async getCategories(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }) {
+    return this.catalogService.getCategories(params);
   }
 
   async createCategory(
@@ -1224,8 +1228,13 @@ export class AdminService {
   // ==================== BRAND MANAGEMENT ====================
   // Taşındı: admin-catalog.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getBrands() {
-    return this.catalogService.getBrands();
+  async getBrands(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+  }) {
+    return this.catalogService.getBrands(params);
   }
 
   async createBrand(
@@ -1268,8 +1277,12 @@ export class AdminService {
   // ==================== MANUFACTURER MANAGEMENT ====================
   // Taşındı: admin-catalog.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getManufacturers() {
-    return this.catalogService.getManufacturers();
+  async getManufacturers(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }) {
+    return this.catalogService.getManufacturers(params);
   }
 
   async createManufacturer(

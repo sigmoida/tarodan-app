@@ -10,7 +10,6 @@ import { adminApi } from "@/lib/api";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
 import { ResourceList } from "@/components/list";
-import { clientListFetcher } from "@/lib/query/client-list";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import type { Category } from "./_lib/types";
@@ -67,11 +66,7 @@ export default function CategoriesPage() {
 
       <ResourceList<Category>
         resource="categories"
-        fetcher={clientListFetcher(
-          () => adminApi.getCategories(),
-          (raw) => raw.data ?? [],
-          { searchFields: ["name", "slug", "description"] },
-        )}
+        fetcher={(params) => adminApi.getCategories(params)}
         getRowId={(c) => c.id}
         syncUrl
         errorMessage={t("admin.catalog.categories.loadError")}

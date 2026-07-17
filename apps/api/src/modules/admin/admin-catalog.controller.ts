@@ -116,9 +116,20 @@ export class AdminCatalogController {
   @Get("categories")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: "Get all categories with tree structure" })
+  @ApiQuery({ name: "page", required: false })
+  @ApiQuery({ name: "limit", required: false })
+  @ApiQuery({ name: "search", required: false })
   @ApiResponse({ status: HttpStatus.OK, description: "List of categories" })
-  async getCategories() {
-    return this.adminService.getCategories();
+  async getCategories(
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+    @Query("search") search?: string,
+  ) {
+    return this.adminService.getCategories({
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      search,
+    });
   }
 
   @Post("categories")
@@ -177,9 +188,23 @@ export class AdminCatalogController {
   @Get("brands")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: "Get all brands" })
+  @ApiQuery({ name: "page", required: false })
+  @ApiQuery({ name: "limit", required: false })
+  @ApiQuery({ name: "search", required: false })
+  @ApiQuery({ name: "status", required: false })
   @ApiResponse({ status: HttpStatus.OK, description: "List of brands" })
-  async getBrands() {
-    return this.adminService.getBrands();
+  async getBrands(
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+    @Query("search") search?: string,
+    @Query("status") status?: string,
+  ) {
+    return this.adminService.getBrands({
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      search,
+      status,
+    });
   }
 
   @Post("brands")
@@ -240,9 +265,20 @@ export class AdminCatalogController {
   @Get("manufacturers")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: "Get all manufacturers" })
+  @ApiQuery({ name: "page", required: false })
+  @ApiQuery({ name: "limit", required: false })
+  @ApiQuery({ name: "search", required: false })
   @ApiResponse({ status: HttpStatus.OK, description: "List of manufacturers" })
-  async getManufacturers() {
-    return this.adminService.getManufacturers();
+  async getManufacturers(
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+    @Query("search") search?: string,
+  ) {
+    return this.adminService.getManufacturers({
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      search,
+    });
   }
 
   @Post("manufacturers")

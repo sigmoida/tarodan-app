@@ -10,7 +10,6 @@ import { adminApi } from "@/lib/api";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
 import { ResourceList } from "@/components/list";
-import { clientListFetcher } from "@/lib/query/client-list";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import type { Manufacturer } from "./_lib/types";
@@ -79,13 +78,7 @@ export default function ManufacturersPage() {
 
       <ResourceList<Manufacturer>
         resource="manufacturers"
-        fetcher={clientListFetcher<Manufacturer>(
-          () => adminApi.getManufacturers(),
-          (raw) => raw.data ?? [],
-          {
-            searchFields: ["name", "slug", "country", "website", "description"],
-          },
-        )}
+        fetcher={(params) => adminApi.getManufacturers(params)}
         getRowId={(m) => m.id}
         syncUrl
         errorMessage={t("admin.catalog.manufacturers.loadError")}
