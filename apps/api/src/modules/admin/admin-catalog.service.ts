@@ -73,8 +73,30 @@ export class AdminCatalogService {
   /**
    * Get categories with tree structure
    */
-  async getCategories() {
+  async getCategories(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }) {
+    // #101 faz-2: optional server pagination. Omit page AND limit → full list
+    // (old { data } shape) so dropdown consumers (useCategories/*FormModal) keep
+    // working; pass page/limit → paginated { data, meta }.
+    const { page, limit, search } = params ?? {};
+    const paginated = !(page === undefined && limit === undefined);
+    const p = page ?? 1;
+    const l = limit ?? 20;
+
+    const where: Prisma.CategoryWhereInput = {};
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { slug: { contains: search, mode: "insensitive" } },
+        { description: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
     const categories = await this.prisma.category.findMany({
+      where,
       include: {
         parent: true,
         children: { orderBy: { name: "asc" } },
@@ -83,27 +105,34 @@ export class AdminCatalogService {
         },
       },
       orderBy: { name: "asc" },
+      ...(paginated ? { skip: (p - 1) * l, take: l } : {}),
     });
 
-    return {
-      data: categories.map((c) => ({
-        id: c.id,
-        name: c.name,
-        slug: c.slug,
-        description: c.description,
-        parentId: c.parentId,
-        parent: c.parent ? { id: c.parent.id, name: c.parent.name } : null,
-        children: c.children.map((child) => ({
-          id: child.id,
-          name: child.name,
-          slug: child.slug,
-        })),
-        sortOrder: c.sortOrder,
-        isActive: c.isActive,
-        productCount: c._count.products,
-        collectionCount: c._count.collections,
-        createdAt: c.createdAt,
+    const data = categories.map((c) => ({
+      id: c.id,
+      name: c.name,
+      slug: c.slug,
+      description: c.description,
+      parentId: c.parentId,
+      parent: c.parent ? { id: c.parent.id, name: c.parent.name } : null,
+      children: c.children.map((child) => ({
+        id: child.id,
+        name: child.name,
+        slug: child.slug,
       })),
+      sortOrder: c.sortOrder,
+      isActive: c.isActive,
+      productCount: c._count.products,
+      collectionCount: c._count.collections,
+      createdAt: c.createdAt,
+    }));
+
+    if (!paginated) return { data };
+
+    const total = await this.prisma.category.count({ where });
+    return {
+      data,
+      meta: { total, page: p, limit: l, totalPages: Math.ceil(total / l) },
     };
   }
 
@@ -319,26 +348,58 @@ export class AdminCatalogService {
   /**
    * Get all brands
    */
-  async getBrands() {
+  async getBrands(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+  }) {
+    // #101 faz-2: optional server pagination + server-side active/inactive filter
+    // (was client-side). Omit page AND limit → full list ({ data }) so dropdown
+    // consumers (ProductFilters/CarModelFilters/CarModelFormModal) keep working.
+    const { page, limit, search, status } = params ?? {};
+    const paginated = !(page === undefined && limit === undefined);
+    const p = page ?? 1;
+    const l = limit ?? 20;
+
+    const where: Prisma.BrandWhereInput = {};
+    if (status === "active") where.isActive = true;
+    else if (status === "inactive") where.isActive = false;
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { slug: { contains: search, mode: "insensitive" } },
+        { description: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
     const brands = await this.prisma.brand.findMany({
+      where,
       orderBy: { name: "asc" },
+      ...(paginated ? { skip: (p - 1) * l, take: l } : {}),
     });
 
+    const data = brands.map((b: Brand) => ({
+      id: b.id,
+      name: b.name,
+      slug: b.slug,
+      logo: b.logo,
+      description: b.description,
+      website: b.website,
+      country: b.country,
+      foundedYear: b.foundedYear,
+      sortOrder: b.sortOrder,
+      isActive: b.isActive,
+      createdAt: b.createdAt,
+      updatedAt: b.updatedAt,
+    }));
+
+    if (!paginated) return { data };
+
+    const total = await this.prisma.brand.count({ where });
     return {
-      data: brands.map((b: Brand) => ({
-        id: b.id,
-        name: b.name,
-        slug: b.slug,
-        logo: b.logo,
-        description: b.description,
-        website: b.website,
-        country: b.country,
-        foundedYear: b.foundedYear,
-        sortOrder: b.sortOrder,
-        isActive: b.isActive,
-        createdAt: b.createdAt,
-        updatedAt: b.updatedAt,
-      })),
+      data,
+      meta: { total, page: p, limit: l, totalPages: Math.ceil(total / l) },
     };
   }
 
@@ -534,15 +595,46 @@ export class AdminCatalogService {
 
   // ==================== MANUFACTURER MANAGEMENT ====================
 
-  async getManufacturers() {
+  async getManufacturers(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }) {
+    // #101 faz-2: optional server pagination. Omit page AND limit → full list
+    // ({ data }); pass page/limit → paginated { data, meta }.
+    const { page, limit, search } = params ?? {};
+    const paginated = !(page === undefined && limit === undefined);
+    const p = page ?? 1;
+    const l = limit ?? 20;
+
+    const where: Prisma.ManufacturerWhereInput = {};
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { slug: { contains: search, mode: "insensitive" } },
+        { country: { contains: search, mode: "insensitive" } },
+        { website: { contains: search, mode: "insensitive" } },
+        { description: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
     const manufacturers = await this.prisma.manufacturer.findMany({
+      where,
       orderBy: { name: "asc" },
+      ...(paginated ? { skip: (p - 1) * l, take: l } : {}),
     });
+
+    const data = manufacturers.map((m) => ({
+      ...m,
+      logo: this.resolveProductImageUrl(m.logo),
+    }));
+
+    if (!paginated) return { data };
+
+    const total = await this.prisma.manufacturer.count({ where });
     return {
-      data: manufacturers.map((m) => ({
-        ...m,
-        logo: this.resolveProductImageUrl(m.logo),
-      })),
+      data,
+      meta: { total, page: p, limit: l, totalPages: Math.ceil(total / l) },
     };
   }
 

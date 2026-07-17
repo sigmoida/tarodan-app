@@ -37,21 +37,34 @@ export const catalogApi = {
     api.patch(`/admin/user-ratings/${id}/status`, { status }),
 
   // Categories
-  getCategories: () => api.get("/admin/categories"),
+  getCategories: (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }) => api.get("/admin/categories", { params: params ?? {} }),
   createCategory: (data: any) => api.post("/admin/categories", data),
   updateCategory: (id: string, data: any) =>
     api.patch(`/admin/categories/${id}`, data),
   deleteCategory: (id: string) => api.delete(`/admin/categories/${id}`),
 
   // Brands
-  getBrands: () => api.get("/admin/brands"),
+  getBrands: (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+  }) => api.get("/admin/brands", { params: params ?? {} }),
   createBrand: (data: any) => api.post("/admin/brands", data),
   updateBrand: (id: string, data: any) =>
     api.patch(`/admin/brands/${id}`, data),
   deleteBrand: (id: string) => api.delete(`/admin/brands/${id}`),
 
   // Manufacturers
-  getManufacturers: () => api.get("/admin/manufacturers"),
+  getManufacturers: (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }) => api.get("/admin/manufacturers", { params: params ?? {} }),
   createManufacturer: (data: any) => api.post("/admin/manufacturers", data),
   updateManufacturer: (id: string, data: any) =>
     api.patch(`/admin/manufacturers/${id}`, data),

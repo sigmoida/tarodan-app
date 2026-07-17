@@ -10,7 +10,6 @@ import { adminApi } from "@/lib/api";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
 import { ResourceList } from "@/components/list";
-import { clientListFetcher } from "@/lib/query/client-list";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import type { Brand } from "./_lib/types";
@@ -83,19 +82,7 @@ export default function BrandsPage() {
 
       <ResourceList<Brand>
         resource="brands"
-        fetcher={clientListFetcher<Brand>(
-          () => adminApi.getBrands(),
-          (raw) => raw.data ?? [],
-          {
-            searchFields: ["name", "slug", "description"],
-            filter: (b, params) =>
-              params.status === "active"
-                ? b.isActive
-                : params.status === "inactive"
-                  ? !b.isActive
-                  : true,
-          },
-        )}
+        fetcher={(params) => adminApi.getBrands(params)}
         getRowId={(b) => b.id}
         syncUrl
         initialFilters={{ status: "all" }}
