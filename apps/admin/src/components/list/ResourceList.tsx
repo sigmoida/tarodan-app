@@ -1,11 +1,14 @@
-'use client';
+"use client";
 
-import { type ReactNode } from 'react';
-import type { AxiosResponse } from 'axios';
-import { useAdminResource } from '@/hooks/useAdminResource';
-import { SuspenseBoundary } from '@/components/page/SuspenseBoundary';
-import { AdminPage } from '@/components/page/AdminPage';
-import { ResourceListContext, useSelection } from '@/context/ResourceListContext';
+import { type ReactNode } from "react";
+import type { AxiosResponse } from "axios";
+import { useAdminResource } from "@/hooks/useAdminResource";
+import { SuspenseBoundary } from "@/components/page/SuspenseBoundary";
+import { AdminPage } from "@/components/page/AdminPage";
+import {
+  ResourceListContext,
+  useSelection,
+} from "@/context/ResourceListContext";
 
 export interface ResourceListProps<T> {
   /** Resource name — the query key and the invalidation target. */
@@ -36,7 +39,10 @@ export interface ResourceListProps<T> {
  * the whole list (header + toolbar + table + pagination) shows ONE spinner on
  * first load — never a misleading "0 items" header while the table spins.
  */
-export function ResourceListRoot<T>({ children, ...config }: ResourceListProps<T>) {
+export function ResourceListRoot<T>({
+  children,
+  ...config
+}: ResourceListProps<T>) {
   return (
     <SuspenseBoundary>
       <ResourceListInner {...config}>{children}</ResourceListInner>

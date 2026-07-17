@@ -5,7 +5,10 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import type { AxiosResponse } from "axios";
 import { adminKeys } from "@/lib/query/keys";
-import { CLIENT_LIST_STALE_MS, type ClientListFetcher } from "@/lib/query/client-list";
+import {
+  CLIENT_LIST_STALE_MS,
+  type ClientListFetcher,
+} from "@/lib/query/client-list";
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -83,7 +86,11 @@ export interface UseAdminResourceResult<T> {
    */
   setTabUrl: (
     key: string,
-    opts?: { defaultTab?: string; resetFilters?: boolean; resetSearch?: boolean },
+    opts?: {
+      defaultTab?: string;
+      resetFilters?: boolean;
+      resetSearch?: boolean;
+    },
   ) => void;
 }
 
@@ -161,7 +168,9 @@ export function useAdminResource<T>({
   const searchParams = useSearchParams();
   // ref for always accessing the latest searchParams; keeps syncToUrl deps lean.
   const searchParamsRef = useRef(searchParams);
-  useEffect(() => { searchParamsRef.current = searchParams; }, [searchParams]);
+  useEffect(() => {
+    searchParamsRef.current = searchParams;
+  }, [searchParams]);
 
   // ── Read initial values from the URL (syncUrl) ────────────────────────────
   const getInitialPage = () => {
@@ -188,8 +197,10 @@ export function useAdminResource<T>({
   // inputSearch = input value (instant, controlled)
   // committedSearch = committed after debounce/Enter; the query runs against this
   const [inputSearch, setInputSearch] = useState<string>(getInitialSearch);
-  const [committedSearch, setCommittedSearch] = useState<string>(getInitialSearch);
-  const [filters, setFiltersState] = useState<Record<string, string>>(getInitialFilters);
+  const [committedSearch, setCommittedSearch] =
+    useState<string>(getInitialSearch);
+  const [filters, setFiltersState] =
+    useState<Record<string, string>>(getInitialFilters);
 
   // EVERY update that changes the query key (page/committedSearch/filters) runs
   // inside a React transition, so useSuspenseQuery does NOT suspend again after
@@ -341,11 +352,16 @@ export function useAdminResource<T>({
   // #101: explicit staleTime yoksa, clientListFetcher (isClientList marker) otomatik
   // CLIENT_LIST_STALE_MS alır — 7 client-list sayfası değişmeden faydalanır.
   const effectiveStaleTime =
-    staleTime || ((fetcher as ClientListFetcher).isClientList ? CLIENT_LIST_STALE_MS : 0);
+    staleTime ||
+    ((fetcher as ClientListFetcher).isClientList ? CLIENT_LIST_STALE_MS : 0);
   const queryResult = useSuspenseQuery({
     // [resource, 'list', {...}] — shares the resource prefix with detail keys so
     // a mutation's invalidateQueries({ queryKey: [resource] }) refreshes lists too.
-    queryKey: adminKeys.list(queryKey, { page, search: committedSearch, filters }),
+    queryKey: adminKeys.list(queryKey, {
+      page,
+      search: committedSearch,
+      filters,
+    }),
     queryFn: async () => {
       const response = await fetcher(buildParams());
       return response.data;
@@ -353,17 +369,25 @@ export function useAdminResource<T>({
     staleTime: effectiveStaleTime,
     // #101: staleTime>0 (client-list) → mount'ta bayat değilse tekrar indirme;
     // =0 (server-paginated) → 'always', her dönüşte taze (mevcut davranış).
-    refetchOnMount: effectiveStaleTime > 0 ? true : 'always',
+    refetchOnMount: effectiveStaleTime > 0 ? true : "always",
   });
 
   // ── Tab URL sync ────────────────────────────────────────────────────────────
   const setTabUrl = useCallback(
     (
       key: string,
-      opts: { defaultTab?: string; resetFilters?: boolean; resetSearch?: boolean } = {},
+      opts: {
+        defaultTab?: string;
+        resetFilters?: boolean;
+        resetSearch?: boolean;
+      } = {},
     ) => {
       if (!syncUrl) return;
-      const { defaultTab = "", resetFilters = false, resetSearch = false } = opts;
+      const {
+        defaultTab = "",
+        resetFilters = false,
+        resetSearch = false,
+      } = opts;
       // Start from the current URL; params the hook doesn't own are preserved.
       const params = new URLSearchParams(searchParamsRef.current.toString());
       // Tab

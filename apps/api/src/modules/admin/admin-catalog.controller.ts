@@ -15,9 +15,9 @@ import {
   UploadedFile,
   BadRequestException,
   Res,
-} from '@nestjs/common';
+} from "@nestjs/common";
 
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor } from "@nestjs/platform-express";
 import {
   ApiTags,
   ApiOperation,
@@ -25,24 +25,35 @@ import {
   ApiBearerAuth,
   ApiParam,
   ApiQuery,
-} from '@nestjs/swagger';
-import { AdminService } from './admin.service';
-import { AdvertisementService } from '../advertisement/advertisement.service';
-import { MediaService } from '../media/media.service';
-import { CreateAdvertisementDto, UpdateAdvertisementDto, ReorderAdsDto } from '../advertisement/dto';
-import { DiscountService } from '../discount/discount.service';
-import { CreateDiscountDto, UpdateDiscountDto, DiscountQueryDto } from '../discount/dto';
-import { AdminJwtAuthGuard } from '../auth/guards/admin-jwt-auth.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { RequirePermission } from '../auth/decorators/require-permission.decorator';
-import { BypassPermissionMatrix } from '../auth/decorators/bypass-permission-matrix.decorator';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { AdminRoute } from '../auth/decorators/admin-route.decorator';
-import { Public } from '../auth/decorators/public.decorator';
-import { AdminRole } from '@prisma/client';
-import { ForceCompleteOrderDto, ExtendConfirmationDto } from '../order/dto';
-import { OverrideRefundPolicyDto, SetReturnShippingPayerDto } from '../refund/dto';
+} from "@nestjs/swagger";
+import { AdminService } from "./admin.service";
+import { AdvertisementService } from "../advertisement/advertisement.service";
+import { MediaService } from "../media/media.service";
+import {
+  CreateAdvertisementDto,
+  UpdateAdvertisementDto,
+  ReorderAdsDto,
+} from "../advertisement/dto";
+import { DiscountService } from "../discount/discount.service";
+import {
+  CreateDiscountDto,
+  UpdateDiscountDto,
+  DiscountQueryDto,
+} from "../discount/dto";
+import { AdminJwtAuthGuard } from "../auth/guards/admin-jwt-auth.guard";
+import { Roles } from "../auth/decorators/roles.decorator";
+import { RequirePermission } from "../auth/decorators/require-permission.decorator";
+import { BypassPermissionMatrix } from "../auth/decorators/bypass-permission-matrix.decorator";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { AdminRoute } from "../auth/decorators/admin-route.decorator";
+import { Public } from "../auth/decorators/public.decorator";
+import { AdminRole } from "@prisma/client";
+import { ForceCompleteOrderDto, ExtendConfirmationDto } from "../order/dto";
+import {
+  OverrideRefundPolicyDto,
+  SetReturnShippingPayerDto,
+} from "../refund/dto";
 import {
   CreateCommissionRuleDto,
   UpdateCommissionRuleDto,
@@ -90,174 +101,223 @@ import {
   TradeShipmentQueryDto,
   RefundRequestQueryDto,
   AdminChangeMembershipDto,
-} from './dto';
+} from "./dto";
 
-@ApiTags('admin')
-@Controller('admin')
+@ApiTags("admin")
+@Controller("admin")
 @AdminRoute() // Mark as admin route to skip global JwtAuthGuard
 @UseGuards(AdminJwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class AdminCatalogController {
-  constructor(
-    private readonly adminService: AdminService,
-  ) { }
+  constructor(private readonly adminService: AdminService) {}
 
   // ==================== CATEGORY MANAGEMENT ====================
 
-  @Get('categories')
+  @Get("categories")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Get all categories with tree structure' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'List of categories' })
+  @ApiOperation({ summary: "Get all categories with tree structure" })
+  @ApiResponse({ status: HttpStatus.OK, description: "List of categories" })
   async getCategories() {
     return this.adminService.getCategories();
   }
 
-  @Post('categories')
+  @Post("categories")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Create a new category' })
-  @ApiResponse({ status: HttpStatus.CREATED, description: 'Category created' })
+  @ApiOperation({ summary: "Create a new category" })
+  @ApiResponse({ status: HttpStatus.CREATED, description: "Category created" })
   async createCategory(
-    @CurrentUser('id') adminId: string,
-    @Body() body: { name: string; description?: string; parentId?: string; sortOrder?: number; isActive?: boolean },
+    @CurrentUser("id") adminId: string,
+    @Body()
+    body: {
+      name: string;
+      description?: string;
+      parentId?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
   ) {
     return this.adminService.createCategory(adminId, body);
   }
 
-  @Patch('categories/:id')
+  @Patch("categories/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Update category' })
-  @ApiParam({ name: 'id', description: 'Category ID' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Category updated' })
+  @ApiOperation({ summary: "Update category" })
+  @ApiParam({ name: "id", description: "Category ID" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Category updated" })
   async updateCategory(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
-    @Body() body: { name?: string; description?: string; parentId?: string; sortOrder?: number; isActive?: boolean },
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
+    @Body()
+    body: {
+      name?: string;
+      description?: string;
+      parentId?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
   ) {
     return this.adminService.updateCategory(adminId, id, body);
   }
 
-  @Delete('categories/:id')
+  @Delete("categories/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete category' })
-  @ApiParam({ name: 'id', description: 'Category ID' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Category deleted' })
+  @ApiOperation({ summary: "Delete category" })
+  @ApiParam({ name: "id", description: "Category ID" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Category deleted" })
   async deleteCategory(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
   ) {
     return this.adminService.deleteCategory(adminId, id);
   }
 
   // ==================== BRAND MANAGEMENT ====================
 
-  @Get('brands')
+  @Get("brands")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Get all brands' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'List of brands' })
+  @ApiOperation({ summary: "Get all brands" })
+  @ApiResponse({ status: HttpStatus.OK, description: "List of brands" })
   async getBrands() {
     return this.adminService.getBrands();
   }
 
-  @Post('brands')
+  @Post("brands")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Create a new brand' })
-  @ApiResponse({ status: HttpStatus.CREATED, description: 'Brand created' })
+  @ApiOperation({ summary: "Create a new brand" })
+  @ApiResponse({ status: HttpStatus.CREATED, description: "Brand created" })
   async createBrand(
-    @CurrentUser('id') adminId: string,
-    @Body() body: { name: string; logo?: string; description?: string; website?: string; sortOrder?: number; isActive?: boolean },
+    @CurrentUser("id") adminId: string,
+    @Body()
+    body: {
+      name: string;
+      logo?: string;
+      description?: string;
+      website?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
   ) {
     return this.adminService.createBrand(adminId, body);
   }
 
-  @Patch('brands/:id')
+  @Patch("brands/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Update brand' })
-  @ApiParam({ name: 'id', description: 'Brand ID' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Brand updated' })
+  @ApiOperation({ summary: "Update brand" })
+  @ApiParam({ name: "id", description: "Brand ID" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Brand updated" })
   async updateBrand(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
-    @Body() body: { name?: string; logo?: string; description?: string; website?: string; sortOrder?: number; isActive?: boolean },
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
+    @Body()
+    body: {
+      name?: string;
+      logo?: string;
+      description?: string;
+      website?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
   ) {
     return this.adminService.updateBrand(adminId, id, body);
   }
 
-  @Delete('brands/:id')
+  @Delete("brands/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete brand' })
-  @ApiParam({ name: 'id', description: 'Brand ID' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Brand deleted' })
+  @ApiOperation({ summary: "Delete brand" })
+  @ApiParam({ name: "id", description: "Brand ID" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Brand deleted" })
   async deleteBrand(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
   ) {
     return this.adminService.deleteBrand(adminId, id);
   }
 
   // ==================== MANUFACTURER MANAGEMENT ====================
 
-  @Get('manufacturers')
+  @Get("manufacturers")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Get all manufacturers' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'List of manufacturers' })
+  @ApiOperation({ summary: "Get all manufacturers" })
+  @ApiResponse({ status: HttpStatus.OK, description: "List of manufacturers" })
   async getManufacturers() {
     return this.adminService.getManufacturers();
   }
 
-  @Post('manufacturers')
+  @Post("manufacturers")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Create a new manufacturer' })
-  @ApiResponse({ status: HttpStatus.CREATED, description: 'Manufacturer created' })
+  @ApiOperation({ summary: "Create a new manufacturer" })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: "Manufacturer created",
+  })
   async createManufacturer(
-    @CurrentUser('id') adminId: string,
-    @Body() body: { name: string; logo?: string; description?: string; website?: string; country?: string; sortOrder?: number; isActive?: boolean },
+    @CurrentUser("id") adminId: string,
+    @Body()
+    body: {
+      name: string;
+      logo?: string;
+      description?: string;
+      website?: string;
+      country?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
   ) {
     return this.adminService.createManufacturer(adminId, body);
   }
 
-  @Patch('manufacturers/:id')
+  @Patch("manufacturers/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Update manufacturer' })
-  @ApiParam({ name: 'id', description: 'Manufacturer ID' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Manufacturer updated' })
+  @ApiOperation({ summary: "Update manufacturer" })
+  @ApiParam({ name: "id", description: "Manufacturer ID" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Manufacturer updated" })
   async updateManufacturer(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
-    @Body() body: { name?: string; logo?: string; description?: string; website?: string; country?: string; sortOrder?: number; isActive?: boolean },
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
+    @Body()
+    body: {
+      name?: string;
+      logo?: string;
+      description?: string;
+      website?: string;
+      country?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
   ) {
     return this.adminService.updateManufacturer(adminId, id, body);
   }
 
-  @Delete('manufacturers/:id')
+  @Delete("manufacturers/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete manufacturer' })
-  @ApiParam({ name: 'id', description: 'Manufacturer ID' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Manufacturer deleted' })
+  @ApiOperation({ summary: "Delete manufacturer" })
+  @ApiParam({ name: "id", description: "Manufacturer ID" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Manufacturer deleted" })
   async deleteManufacturer(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
   ) {
     return this.adminService.deleteManufacturer(adminId, id);
   }
 
   // ==================== CAR MODEL MANAGEMENT ====================
 
-  @Get('car-models')
+  @Get("car-models")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Get all car models' })
-  @ApiQuery({ name: 'brandId', required: false })
-  @ApiQuery({ name: 'page', required: false })
-  @ApiQuery({ name: 'limit', required: false })
-  @ApiQuery({ name: 'search', required: false })
-  @ApiResponse({ status: HttpStatus.OK, description: 'List of car models' })
+  @ApiOperation({ summary: "Get all car models" })
+  @ApiQuery({ name: "brandId", required: false })
+  @ApiQuery({ name: "page", required: false })
+  @ApiQuery({ name: "limit", required: false })
+  @ApiQuery({ name: "search", required: false })
+  @ApiResponse({ status: HttpStatus.OK, description: "List of car models" })
   async getCarModels(
-    @Query('brandId') brandId?: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('search') search?: string,
+    @Query("brandId") brandId?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+    @Query("search") search?: string,
   ) {
     return this.adminService.getCarModels({
       brandId,
@@ -267,83 +327,111 @@ export class AdminCatalogController {
     });
   }
 
-  @Post('car-models')
+  @Post("car-models")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Create a new car model' })
-  @ApiResponse({ status: HttpStatus.CREATED, description: 'Car model created' })
+  @ApiOperation({ summary: "Create a new car model" })
+  @ApiResponse({ status: HttpStatus.CREATED, description: "Car model created" })
   async createCarModel(
-    @CurrentUser('id') adminId: string,
-    @Body() body: { brandId: string; name: string; slug?: string; yearStart?: number; yearEnd?: number; sortOrder?: number; isActive?: boolean },
+    @CurrentUser("id") adminId: string,
+    @Body()
+    body: {
+      brandId: string;
+      name: string;
+      slug?: string;
+      yearStart?: number;
+      yearEnd?: number;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
   ) {
     return this.adminService.createCarModel(adminId, body);
   }
 
-  @Patch('car-models/:id')
+  @Patch("car-models/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Update car model' })
-  @ApiParam({ name: 'id', description: 'Car Model ID' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Car model updated' })
+  @ApiOperation({ summary: "Update car model" })
+  @ApiParam({ name: "id", description: "Car Model ID" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Car model updated" })
   async updateCarModel(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
-    @Body() body: { name?: string; slug?: string; yearStart?: number; yearEnd?: number; sortOrder?: number; isActive?: boolean },
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
+    @Body()
+    body: {
+      name?: string;
+      slug?: string;
+      yearStart?: number;
+      yearEnd?: number;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
   ) {
     return this.adminService.updateCarModel(adminId, id, body);
   }
 
-  @Delete('car-models/:id')
+  @Delete("car-models/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete car model' })
-  @ApiParam({ name: 'id', description: 'Car Model ID' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Car model deleted' })
+  @ApiOperation({ summary: "Delete car model" })
+  @ApiParam({ name: "id", description: "Car Model ID" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Car model deleted" })
   async deleteCarModel(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
   ) {
     return this.adminService.deleteCarModel(adminId, id);
   }
 
   // ==================== ATTRIBUTE GROUP MANAGEMENT ====================
 
-  @Get('attribute-groups')
+  @Get("attribute-groups")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Get all attribute groups' })
-  @ApiQuery({ name: 'search', required: false })
-  @ApiQuery({ name: 'isActive', required: false })
-  @ApiQuery({ name: 'page', required: false })
-  @ApiQuery({ name: 'limit', required: false })
-  @ApiResponse({ status: HttpStatus.OK, description: 'List of attribute groups' })
+  @ApiOperation({ summary: "Get all attribute groups" })
+  @ApiQuery({ name: "search", required: false })
+  @ApiQuery({ name: "isActive", required: false })
+  @ApiQuery({ name: "page", required: false })
+  @ApiQuery({ name: "limit", required: false })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "List of attribute groups",
+  })
   async getAttributeGroups(
-    @Query('search') search?: string,
-    @Query('isActive') isActive?: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
+    @Query("search") search?: string,
+    @Query("isActive") isActive?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
   ) {
     return this.adminService.getAttributeGroups({
       search,
-      isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
+      isActive:
+        isActive === "true" ? true : isActive === "false" ? false : undefined,
       page: page ? parseInt(page, 10) : undefined,
       limit: limit ? parseInt(limit, 10) : undefined,
     });
   }
 
-  @Get('attribute-groups/:id')
+  @Get("attribute-groups/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Get attribute group with its values' })
-  @ApiParam({ name: 'id', description: 'Attribute Group ID' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Attribute group details' })
-  async getAttributeGroupById(@Param('id') id: string) {
+  @ApiOperation({ summary: "Get attribute group with its values" })
+  @ApiParam({ name: "id", description: "Attribute Group ID" })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Attribute group details",
+  })
+  async getAttributeGroupById(@Param("id") id: string) {
     return this.adminService.getAttributeGroupById(id);
   }
 
-  @Post('attribute-groups')
+  @Post("attribute-groups")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Create a new attribute group' })
-  @ApiResponse({ status: HttpStatus.CREATED, description: 'Attribute group created' })
+  @ApiOperation({ summary: "Create a new attribute group" })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: "Attribute group created",
+  })
   async createAttributeGroup(
-    @CurrentUser('id') adminId: string,
-    @Body() body: {
+    @CurrentUser("id") adminId: string,
+    @Body()
+    body: {
       name: string;
       description?: string;
       isRequired?: boolean;
@@ -354,15 +442,19 @@ export class AdminCatalogController {
     return this.adminService.createAttributeGroup(adminId, body);
   }
 
-  @Patch('attribute-groups/:id')
+  @Patch("attribute-groups/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Update an attribute group' })
-  @ApiParam({ name: 'id', description: 'Attribute Group ID' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Attribute group updated' })
+  @ApiOperation({ summary: "Update an attribute group" })
+  @ApiParam({ name: "id", description: "Attribute Group ID" })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Attribute group updated",
+  })
   async updateAttributeGroup(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
-    @Body() body: {
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
+    @Body()
+    body: {
       name?: string;
       description?: string;
       isRequired?: boolean;
@@ -373,52 +465,54 @@ export class AdminCatalogController {
     return this.adminService.updateAttributeGroup(adminId, id, body);
   }
 
-  @Delete('attribute-groups/:id')
+  @Delete("attribute-groups/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete an attribute group' })
-  @ApiParam({ name: 'id', description: 'Attribute Group ID' })
+  @ApiOperation({ summary: "Delete an attribute group" })
+  @ApiParam({ name: "id", description: "Attribute Group ID" })
   async deleteAttributeGroup(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
   ) {
     return this.adminService.deleteAttributeGroup(adminId, id);
   }
 
   // ==================== ATTRIBUTE VALUE MANAGEMENT ====================
 
-  @Get('attributes')
+  @Get("attributes")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Get all attributes with filters' })
-  @ApiQuery({ name: 'groupId', required: false })
-  @ApiQuery({ name: 'search', required: false })
-  @ApiQuery({ name: 'isActive', required: false })
-  @ApiQuery({ name: 'page', required: false })
-  @ApiQuery({ name: 'limit', required: false })
-  @ApiResponse({ status: HttpStatus.OK, description: 'List of attributes' })
+  @ApiOperation({ summary: "Get all attributes with filters" })
+  @ApiQuery({ name: "groupId", required: false })
+  @ApiQuery({ name: "search", required: false })
+  @ApiQuery({ name: "isActive", required: false })
+  @ApiQuery({ name: "page", required: false })
+  @ApiQuery({ name: "limit", required: false })
+  @ApiResponse({ status: HttpStatus.OK, description: "List of attributes" })
   async getAttributes(
-    @Query('groupId') groupId?: string,
-    @Query('search') search?: string,
-    @Query('isActive') isActive?: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
+    @Query("groupId") groupId?: string,
+    @Query("search") search?: string,
+    @Query("isActive") isActive?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
   ) {
     return this.adminService.getAttributes({
       groupId,
       search,
-      isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
+      isActive:
+        isActive === "true" ? true : isActive === "false" ? false : undefined,
       page: page ? parseInt(page, 10) : undefined,
       limit: limit ? parseInt(limit, 10) : undefined,
     });
   }
 
-  @Post('attributes')
+  @Post("attributes")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Create a new attribute value' })
-  @ApiResponse({ status: HttpStatus.CREATED, description: 'Attribute created' })
+  @ApiOperation({ summary: "Create a new attribute value" })
+  @ApiResponse({ status: HttpStatus.CREATED, description: "Attribute created" })
   async createAttribute(
-    @CurrentUser('id') adminId: string,
-    @Body() body: {
+    @CurrentUser("id") adminId: string,
+    @Body()
+    body: {
       groupId: string;
       value: string;
       displayValue?: string;
@@ -430,15 +524,16 @@ export class AdminCatalogController {
     return this.adminService.createAttribute(adminId, body);
   }
 
-  @Patch('attributes/:id')
+  @Patch("attributes/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Update an attribute value' })
-  @ApiParam({ name: 'id', description: 'Attribute ID' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Attribute updated' })
+  @ApiOperation({ summary: "Update an attribute value" })
+  @ApiParam({ name: "id", description: "Attribute ID" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Attribute updated" })
   async updateAttribute(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
-    @Body() body: {
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
+    @Body()
+    body: {
       value?: string;
       displayValue?: string;
       color?: string;
@@ -449,16 +544,15 @@ export class AdminCatalogController {
     return this.adminService.updateAttribute(adminId, id, body);
   }
 
-  @Delete('attributes/:id')
+  @Delete("attributes/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete an attribute value' })
-  @ApiParam({ name: 'id', description: 'Attribute ID' })
+  @ApiOperation({ summary: "Delete an attribute value" })
+  @ApiParam({ name: "id", description: "Attribute ID" })
   async deleteAttribute(
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
   ) {
     return this.adminService.deleteAttribute(adminId, id);
   }
-
 }

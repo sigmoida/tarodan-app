@@ -1,112 +1,79 @@
 /**
- * Mobile i18n — web'in `apps/web/src/i18n/LanguageContext.tsx` port'u.
+ * Mobile i18n (#215) — i18next + react-i18next + i18next-icu üzerine kurulu.
+ * Katalog tek kaynak `@tarodan/i18n`; init `./config`. Bu dosya mevcut API'yi
+ * (LanguageProvider / useLanguage / useTranslation / t / localeNames / localeFlags)
+ * i18next üzerine KORUYARAK sarmalar — böylece 64 çağrı sitesi değişmez (#216 ayrı iş).
  *
- * Tasarım kararları:
- * - Web ile **aynı** key yapısı (apps/mobile/src/i18n/messages/*.json doğrudan
- *   web'in messages/ klasöründen seed'lendi). Yeni key'ler eklerken her iki
- *   tarafta paralel ekleyin ya da paylaşılan bir paket'e taşıyın (ayrı iş).
- * - Kalıcılık: AsyncStorage (web localStorage'a karşılık).
- * - Cihaz dili tespiti: şu an yok — varsayılan 'tr'. expo-localization paketi
- *   eklenince getDeviceLocale() helper'ı doldurulacak (Expo Go uyumlu, ama
- *   şimdiki commit'te paket bağımlılığı eklemiyoruz).
- * - Fallback: bilinmeyen key → TR sürümünü dene → yoksa key'i göster.
+ * - Kalıcılık: AsyncStorage, anahtar 'locale' (eski davranışla aynı; mevcut kullanıcı
+ *   seçimi bozulmaz).
+ * - Cihaz dili: config.getDeviceLocale() (Hermes Intl) — ilk açılışta i18next lng.
+ * - t imzası eski ile uyumlu: t(key, { count }) → i18next-icu ICU {count}.
  */
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
+import React, { useCallback, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import trMessages from './messages/tr.json';
-import enMessages from './messages/en.json';
+import { I18nextProvider, useTranslation as useI18nextTranslation } from 'react-i18next';
+import { type Locale } from '@tarodan/i18n';
+import i18n from './config';
 
-export type Locale = 'tr' | 'en';
-
-type Messages = typeof trMessages;
-
-interface LanguageContextType {
-  locale: Locale;
-  setLocale: (locale: Locale) => Promise<void>;
-  t: (key: string, params?: Record<string, string | number>) => string;
-  messages: Messages;
-}
-
-const messages: Record<Locale, Messages> = {
-  tr: trMessages,
-  en: enMessages as unknown as Messages,
-};
+export type { Locale };
 
 const LOCALE_STORAGE_KEY = 'locale';
 
-const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
-
-function getNestedValue(obj: unknown, path: string): string | undefined {
-  const keys = path.split('.');
-  let current: unknown = obj;
-  for (const key of keys) {
-    if (current === undefined || current === null || typeof current !== 'object') return undefined;
-    current = (current as Record<string, unknown>)[key];
-  }
-  return typeof current === 'string' ? current : undefined;
-}
-
-function interpolate(text: string, params?: Record<string, string | number>): string {
-  if (!params) return text;
-  return text.replace(/\{(\w+)\}/g, (match, key) => (params[key] !== undefined ? String(params[key]) : match));
-}
-
 interface LanguageProviderProps {
   children: ReactNode;
+  /** Geriye dönük uyum için kabul edilir; i18next lng config.getDeviceLocale()'den gelir. */
   defaultLocale?: Locale;
 }
 
-export function LanguageProvider({ children, defaultLocale = 'tr' }: LanguageProviderProps) {
-  const [locale, setLocaleState] = useState<Locale>(defaultLocale);
-
+export function LanguageProvider({ children }: LanguageProviderProps) {
+  // Kaydedilmiş dil seçimini yükle (cihaz dilinin üzerine yazar).
   useEffect(() => {
     AsyncStorage.getItem(LOCALE_STORAGE_KEY)
       .then((saved) => {
-        if (saved === 'tr' || saved === 'en') setLocaleState(saved);
+        if ((saved === 'tr' || saved === 'en') && saved !== i18n.language) {
+          i18n.changeLanguage(saved);
+        }
       })
       .catch(() => {
-        // First run / corrupted storage — fall back to default.
+        // İlk açılış / bozuk storage — cihaz dili varsayılanı kalır.
       });
   }, []);
 
-  const setLocale = useCallback(async (newLocale: Locale) => {
-    setLocaleState(newLocale);
-    try {
-      await AsyncStorage.setItem(LOCALE_STORAGE_KEY, newLocale);
-    } catch {
-      // Storage may be unavailable in some test environments — keep in-memory state.
-    }
-  }, []);
+  // children cast: merge sonrası @types/react duplicate'i I18nextProvider'ın ReactNode'u
+  // ile çakışıyor (render.tsx/RatingModal.test'teki baseline hatanın aynısı — kütüphane sınırı).
+  return <I18nextProvider i18n={i18n}>{children as never}</I18nextProvider>;
+}
+
+/** Eski API — { locale, setLocale, t }. language.tsx ve tüm ekranlar bunu kullanır. */
+export function useLanguage() {
+  const { t: i18nextT, i18n: instance } = useI18nextTranslation();
+  const locale = (instance.language as Locale) ?? 'tr';
+
+  const setLocale = useCallback(
+    async (newLocale: Locale) => {
+      await instance.changeLanguage(newLocale);
+      try {
+        await AsyncStorage.setItem(LOCALE_STORAGE_KEY, newLocale);
+      } catch {
+        // Bazı test ortamlarında storage yok — bellek içi dil korunur.
+      }
+    },
+    [instance],
+  );
 
   const t = useCallback(
-    (key: string, params?: Record<string, string | number>): string => {
-      const value = getNestedValue(messages[locale], key);
-      if (value !== undefined) return interpolate(value, params);
-      const fallback = getNestedValue(messages.tr, key);
-      if (fallback !== undefined) return interpolate(fallback, params);
-      if (__DEV__) console.warn(`[i18n] missing key: ${key}`);
-      return key;
-    },
-    [locale],
+    // key: string — çağrı siteleri dinamik anahtar da geçebilir; #216 tip
+    // augmentation'ı (typed MessageKey) doğrudan react-i18next kullanımı için
+    // aktif, ama bu uyum katmanında gevşetiyoruz.
+    (key: string, params?: Record<string, string | number>): string =>
+      (i18nextT as (k: string, o?: object) => string)(key, params ?? undefined),
+    [i18nextT],
   );
 
-  // Provider value memoized so every text consumer doesn't re-render on unrelated
-  // provider renders (#75). Identity changes only when locale/t/setLocale change.
-  const value = useMemo(
-    () => ({ locale, setLocale, t, messages: messages[locale] }),
-    [locale, setLocale, t],
-  );
-
-  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
+  return { locale, setLocale, t };
 }
 
-export function useLanguage() {
-  const ctx = useContext(LanguageContext);
-  if (ctx === undefined) throw new Error('useLanguage must be used within LanguageProvider');
-  return ctx;
-}
-
-// Shorthand identical to web — keeps `useTranslation` import sites portable.
+/** Web ile aynı kısayol — useTranslation import sitelerini taşınabilir tutar. */
 export function useTranslation() {
   const { t, locale } = useLanguage();
   return { t, locale };

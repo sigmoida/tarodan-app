@@ -1,4 +1,4 @@
-import type { AxiosResponse } from 'axios';
+import type { AxiosResponse } from "axios";
 
 /**
  * Client-side list adapter.
@@ -25,7 +25,8 @@ export interface Paginated<T> {
   meta: { total: number };
 }
 
-type SearchFields<T> = (keyof T)[] | ((item: T) => Array<string | null | undefined>);
+type SearchFields<T> =
+  (keyof T)[] | ((item: T) => Array<string | null | undefined>);
 
 export interface PaginateClientOptions<T> {
   /** Fields (or a selector) matched case-insensitively against `params.search`. */
@@ -45,14 +46,17 @@ export function paginateClient<T>(
 
   if (opts.filter) rows = rows.filter((r) => opts.filter!(r, params));
 
-  const q = search?.trim().toLocaleLowerCase('tr');
+  const q = search?.trim().toLocaleLowerCase("tr");
   if (q && opts.searchFields) {
     const getFields =
-      typeof opts.searchFields === 'function'
+      typeof opts.searchFields === "function"
         ? opts.searchFields
-        : (item: T) => (opts.searchFields as (keyof T)[]).map((f) => item[f] as any);
+        : (item: T) =>
+            (opts.searchFields as (keyof T)[]).map((f) => item[f] as any);
     rows = rows.filter((item) =>
-      getFields(item).some((v) => (v ? String(v).toLocaleLowerCase('tr').includes(q) : false)),
+      getFields(item).some((v) =>
+        v ? String(v).toLocaleLowerCase("tr").includes(q) : false,
+      ),
     );
   }
 
@@ -78,7 +82,9 @@ export function paginateClient<T>(
 export const CLIENT_LIST_STALE_MS = 5 * 60 * 1000;
 
 /** clientListFetcher ile üretilen fetcher — useAdminResource otomatik staleTime için tanır. */
-export type ClientListFetcher = ((params: Record<string, any>) => Promise<AxiosResponse<any>>) & {
+export type ClientListFetcher = ((
+  params: Record<string, any>,
+) => Promise<AxiosResponse<any>>) & {
   isClientList?: boolean;
 };
 
@@ -87,7 +93,9 @@ export function clientListFetcher<T>(
   extract: (raw: any) => T[],
   opts?: PaginateClientOptions<T>,
 ) {
-  const fetcher: ClientListFetcher = async (params: Record<string, any>): Promise<AxiosResponse<Paginated<T>>> => {
+  const fetcher: ClientListFetcher = async (
+    params: Record<string, any>,
+  ): Promise<AxiosResponse<Paginated<T>>> => {
     const res = await load();
     const page = paginateClient<T>(extract(res.data), params, opts);
     return { ...res, data: page };
