@@ -1,26 +1,40 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ModuleRef } from '@nestjs/core';
-import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../prisma';
-import { ShipmentStatus, OrderStatus, TradeStatus, PaymentStatus } from '@prisma/client';
-import { ElogoInvoicingService } from '../elogo/elogo-invoicing.service';
-import type { SuratTakipResponse, SuratTakipGonderi, SuratGonderiPayload } from './surat-cargo.types';
-import { buildRestGonderi } from './surat-rest.client';
+import { Injectable, Logger } from "@nestjs/common";
+import { ModuleRef } from "@nestjs/core";
+import { ConfigService } from "@nestjs/config";
+import { PrismaService } from "../../prisma";
+import {
+  ShipmentStatus,
+  OrderStatus,
+  TradeStatus,
+  PaymentStatus,
+} from "@prisma/client";
+import { ElogoInvoicingService } from "../elogo/elogo-invoicing.service";
+import type {
+  SuratTakipResponse,
+  SuratTakipGonderi,
+  SuratGonderiPayload,
+} from "./surat-cargo.types";
+import { buildRestGonderi } from "./surat-rest.client";
 import {
   mapSuratStatusToShipmentStatus,
   isSuratDelivered,
   isSuratReturnFlow,
   isSuratReturnCompleted,
-} from './surat-status.mapper';
+} from "./surat-status.mapper";
+import { canTransitionShipmentStatus } from "../shipping/shipment-state-machine";
 
-const SURAT_API_LIVE = 'https://api01.suratkargo.com.tr/api/KargoTakipHareketDetayi';
-const SURAT_API_TEST = 'https://api02.suratkargo.com.tr/api/KargoTakipHareketDetayi';
+const SURAT_API_LIVE =
+  "https://api01.suratkargo.com.tr/api/KargoTakipHareketDetayi";
+const SURAT_API_TEST =
+  "https://api02.suratkargo.com.tr/api/KargoTakipHareketDetayi";
 // OrtakBarkodOlustur = gönderi oluştur + barkod/etiket üret (gerçek KargoTakipNo + ZPL döner).
-const SURAT_BARKOD_LIVE = 'https://api01.suratkargo.com.tr/api/OrtakBarkodOlustur';
-const SURAT_BARKOD_TEST = 'https://api02.suratkargo.com.tr/api/OrtakBarkodOlustur';
+const SURAT_BARKOD_LIVE =
+  "https://api01.suratkargo.com.tr/api/OrtakBarkodOlustur";
+const SURAT_BARKOD_TEST =
+  "https://api02.suratkargo.com.tr/api/OrtakBarkodOlustur";
 // GonderiSil = gönderiyi sil/pasif et. Query auth (CariKodu/Sifre) + WebSiparisKodu.
-const SURAT_SIL_LIVE = 'https://api01.suratkargo.com.tr/api/GonderiSil';
-const SURAT_SIL_TEST = 'https://api02.suratkargo.com.tr/api/GonderiSil';
+const SURAT_SIL_LIVE = "https://api01.suratkargo.com.tr/api/GonderiSil";
+const SURAT_SIL_TEST = "https://api02.suratkargo.com.tr/api/GonderiSil";
 
 @Injectable()
 export class SuratTrackingService {
@@ -36,17 +50,26 @@ export class SuratTrackingService {
    * Query Sürat Kargo tracking API for a shipment by our order reference (OzelKargoTakipNo).
    * Returns the raw Sürat response or null on failure.
    */
-  async fetchTrackingInfo(webSiparisKodu: string): Promise<SuratTakipResponse | null> {
-    const cariKodu = this.configService.get<string>('SURAT_KARGO_CARI_KODU', '');
-    const sifre = this.configService.get<string>('SURAT_KARGO_SIFRE', '');
+  async fetchTrackingInfo(
+    webSiparisKodu: string,
+  ): Promise<SuratTakipResponse | null> {
+    const cariKodu = this.configService.get<string>(
+      "SURAT_KARGO_CARI_KODU",
+      "",
+    );
+    const sifre = this.configService.get<string>("SURAT_KARGO_SIFRE", "");
 
     if (!cariKodu || !sifre) {
-      this.logger.error('SURAT_KARGO_CARI_KODU or SURAT_KARGO_SIFRE not configured');
+      this.logger.error(
+        "SURAT_KARGO_CARI_KODU or SURAT_KARGO_SIFRE not configured",
+      );
       return null;
     }
 
     const isTestMode =
-      this.configService.get<string>('SURAT_KARGO_TEST_MODE', 'true')?.trim() === 'true';
+      this.configService
+        .get<string>("SURAT_KARGO_TEST_MODE", "true")
+        ?.trim() === "true";
     const baseUrl = isTestMode ? SURAT_API_TEST : SURAT_API_LIVE;
 
     const url = `${baseUrl}?CariKodu=${encodeURIComponent(cariKodu)}&Sifre=${encodeURIComponent(sifre)}&WebSiparisKodu=${encodeURIComponent(webSiparisKodu)}`;
@@ -56,8 +79,8 @@ export class SuratTrackingService {
       const timer = setTimeout(() => controller.abort(), 15000);
 
       const response = await fetch(url, {
-        method: 'POST',
-        headers: { Accept: 'application/json' },
+        method: "POST",
+        headers: { Accept: "application/json" },
         signal: controller.signal,
       });
 
@@ -103,13 +126,21 @@ export class SuratTrackingService {
     durum?: string | null;
     error?: string;
   }> {
-    const cariKodu = this.configService.get<string>('SURAT_KARGO_CARI_KODU', '');
-    const sifre = this.configService.get<string>('SURAT_KARGO_SIFRE', '');
+    const cariKodu = this.configService.get<string>(
+      "SURAT_KARGO_CARI_KODU",
+      "",
+    );
+    const sifre = this.configService.get<string>("SURAT_KARGO_SIFRE", "");
     if (!cariKodu || !sifre) {
-      return { ok: false, error: 'SURAT_KARGO_CARI_KODU / SURAT_KARGO_SIFRE tanımlı değil' };
+      return {
+        ok: false,
+        error: "SURAT_KARGO_CARI_KODU / SURAT_KARGO_SIFRE tanımlı değil",
+      };
     }
     const isTestMode =
-      this.configService.get<string>('SURAT_KARGO_TEST_MODE', 'true')?.trim() !== 'false';
+      this.configService
+        .get<string>("SURAT_KARGO_TEST_MODE", "true")
+        ?.trim() !== "false";
     const baseUrl = isTestMode ? SURAT_API_TEST : SURAT_API_LIVE;
     const url = `${baseUrl}?CariKodu=${encodeURIComponent(cariKodu)}&Sifre=${encodeURIComponent(sifre)}&WebSiparisKodu=${encodeURIComponent(webSiparisKodu)}`;
 
@@ -118,9 +149,9 @@ export class SuratTrackingService {
       const timer = setTimeout(() => controller.abort(), 15000);
       // Sürat (IIS) POST'ta Content-Length ister → boş gövde ile 0 gönderiyoruz.
       const response = await fetch(url, {
-        method: 'POST',
-        headers: { Accept: 'application/json' },
-        body: '',
+        method: "POST",
+        headers: { Accept: "application/json" },
+        body: "",
         signal: controller.signal,
       });
       clearTimeout(timer);
@@ -133,7 +164,7 @@ export class SuratTrackingService {
         return {
           ok: false,
           httpStatus: response.status,
-          error: text?.slice(0, 200) || 'JSON olmayan yanıt',
+          error: text?.slice(0, 200) || "JSON olmayan yanıt",
         };
       }
 
@@ -164,13 +195,21 @@ export class SuratTrackingService {
     barcodeSample?: string | null;
     error?: string;
   }> {
-    const cariKodu = this.configService.get<string>('SURAT_KARGO_CARI_KODU', '');
-    const sifre = this.configService.get<string>('SURAT_KARGO_SIFRE', '');
+    const cariKodu = this.configService.get<string>(
+      "SURAT_KARGO_CARI_KODU",
+      "",
+    );
+    const sifre = this.configService.get<string>("SURAT_KARGO_SIFRE", "");
     if (!cariKodu || !sifre) {
-      return { ok: false, error: 'SURAT_KARGO_CARI_KODU / SURAT_KARGO_SIFRE tanımlı değil' };
+      return {
+        ok: false,
+        error: "SURAT_KARGO_CARI_KODU / SURAT_KARGO_SIFRE tanımlı değil",
+      };
     }
     const isTestMode =
-      this.configService.get<string>('SURAT_KARGO_TEST_MODE', 'true')?.trim() !== 'false';
+      this.configService
+        .get<string>("SURAT_KARGO_TEST_MODE", "true")
+        ?.trim() !== "false";
     const url = isTestMode ? SURAT_BARKOD_TEST : SURAT_BARKOD_LIVE;
     const body = JSON.stringify({
       KullaniciAdi: cariKodu,
@@ -182,8 +221,11 @@ export class SuratTrackingService {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 20000);
       const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
         body,
         signal: controller.signal,
       });
@@ -194,11 +236,16 @@ export class SuratTrackingService {
       try {
         data = JSON.parse(text);
       } catch {
-        return { ok: false, error: text?.slice(0, 200) || 'JSON olmayan yanıt' };
+        return {
+          ok: false,
+          error: text?.slice(0, 200) || "JSON olmayan yanıt",
+        };
       }
 
       const isError = data?.isError ?? data?.IsError ?? false;
-      const barcode: unknown[] = Array.isArray(data?.Barcode) ? data.Barcode : [];
+      const barcode: unknown[] = Array.isArray(data?.Barcode)
+        ? data.Barcode
+        : [];
       return {
         ok: isError !== true,
         isError: isError === true,
@@ -223,22 +270,33 @@ export class SuratTrackingService {
     message?: string | null;
     error?: string;
   }> {
-    const cariKodu = this.configService.get<string>('SURAT_KARGO_CARI_KODU', '');
-    const sifre = this.configService.get<string>('SURAT_KARGO_SIFRE', '');
+    const cariKodu = this.configService.get<string>(
+      "SURAT_KARGO_CARI_KODU",
+      "",
+    );
+    const sifre = this.configService.get<string>("SURAT_KARGO_SIFRE", "");
     if (!cariKodu || !sifre) {
-      return { ok: false, error: 'SURAT_KARGO_CARI_KODU / SURAT_KARGO_SIFRE tanımlı değil' };
+      return {
+        ok: false,
+        error: "SURAT_KARGO_CARI_KODU / SURAT_KARGO_SIFRE tanımlı değil",
+      };
     }
     const isTestMode =
-      this.configService.get<string>('SURAT_KARGO_TEST_MODE', 'true')?.trim() !== 'false';
+      this.configService
+        .get<string>("SURAT_KARGO_TEST_MODE", "true")
+        ?.trim() !== "false";
     const baseUrl = isTestMode ? SURAT_SIL_TEST : SURAT_SIL_LIVE;
     const url = `${baseUrl}?CariKodu=${encodeURIComponent(cariKodu)}&Sifre=${encodeURIComponent(sifre)}&WebSiparisKodu=${encodeURIComponent(webSiparisKodu)}`;
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 15000);
       const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: '{}',
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: "{}",
         signal: controller.signal,
       });
       clearTimeout(timer);
@@ -250,7 +308,7 @@ export class SuratTrackingService {
         return {
           ok: false,
           httpStatus: response.status,
-          error: text?.slice(0, 200) || 'JSON olmayan yanıt',
+          error: text?.slice(0, 200) || "JSON olmayan yanıt",
         };
       }
       const isError = data?.IsError ?? data?.isError ?? false;
@@ -275,7 +333,7 @@ export class SuratTrackingService {
       include: { order: true },
     });
 
-    if (!shipment || shipment.provider !== 'surat') {
+    if (!shipment || shipment.provider !== "surat") {
       return false;
     }
 
@@ -306,7 +364,7 @@ export class SuratTrackingService {
     // the API with "not found" responses.
     const activeShipments = await this.prisma.shipment.findMany({
       where: {
-        provider: 'surat',
+        provider: "surat",
         status: {
           notIn: [
             ShipmentStatus.delivered,
@@ -338,7 +396,9 @@ export class SuratTrackingService {
       }
     }
 
-    this.logger.log(`Surat tracking sync: ${synced} synced, ${failed} failed out of ${activeShipments.length}`);
+    this.logger.log(
+      `Surat tracking sync: ${synced} synced, ${failed} failed out of ${activeShipments.length}`,
+    );
     return { synced, failed };
   }
 
@@ -346,9 +406,23 @@ export class SuratTrackingService {
     shipment: any,
     gonderi: SuratTakipGonderi,
   ): Promise<boolean> {
-    const newStatus = mapSuratStatusToShipmentStatus(gonderi.KargonunDurumuSayi);
+    const newStatus = mapSuratStatusToShipmentStatus(
+      gonderi.KargonunDurumuSayi,
+    );
     const isDelivered = isSuratDelivered(gonderi.KargonunDurumuSayi);
-    const isReturnCompleted = isSuratReturnCompleted(gonderi.KargonunDurumuSayi);
+    const isReturnCompleted = isSuratReturnCompleted(
+      gonderi.KargonunDurumuSayi,
+    );
+
+    // #86: a re-poll can return a stale/older code; never regress a terminal
+    // shipment (e.g. delivered → in_transit). Skip the update, keep current state.
+    if (!canTransitionShipmentStatus(shipment.status, newStatus)) {
+      this.logger.warn(
+        `Skipping illegal shipment transition ${shipment.status} → ${newStatus} ` +
+          `for ${shipment.id} (Sürat poll, code=${gonderi.KargonunDurumuSayi})`,
+      );
+      return false;
+    }
 
     // Build update data
     const updateData: Record<string, any> = {
@@ -385,7 +459,7 @@ export class SuratTrackingService {
 
     // Return info
     if (isSuratReturnFlow(gonderi.KargonunDurumuSayi)) {
-      const reason = gonderi.IadeAciklama || gonderi.DevirSebebi || '';
+      const reason = gonderi.IadeAciklama || gonderi.DevirSebebi || "";
       if (reason) {
         updateData.returnReason = reason;
       }
@@ -408,23 +482,34 @@ export class SuratTrackingService {
     // taşımaz. PaymentService/NotificationService circular import'u önlemek için lazy. (#83)
     if (isDelivered) {
       const deliveredAt =
-        updateData.deliveredAt instanceof Date ? updateData.deliveredAt : new Date();
+        updateData.deliveredAt instanceof Date
+          ? updateData.deliveredAt
+          : new Date();
       try {
-        const { PaymentService } = await import('../payment/payment.service');
-        const paymentService = this.moduleRef.get(PaymentService, { strict: false });
+        const { PaymentService } = await import("../payment/payment.service");
+        const paymentService = this.moduleRef.get(PaymentService, {
+          strict: false,
+        });
         if (paymentService) {
           const res = await paymentService.handleOrderDelivered(
             shipment.orderId,
             deliveredAt,
           );
-          if (res.acted && res.use48h && res.confirmationDeadline && res.buyerId) {
+          if (
+            res.acted &&
+            res.use48h &&
+            res.confirmationDeadline &&
+            res.buyerId
+          ) {
             try {
-              const { NotificationService } = await import(
-                '../notification/notification.service'
+              const { NotificationService } =
+                await import("../notification/notification.service");
+              const notificationService = this.moduleRef.get(
+                NotificationService,
+                {
+                  strict: false,
+                },
               );
-              const notificationService = this.moduleRef.get(NotificationService, {
-                strict: false,
-              });
               await notificationService?.notifyOrderDeliveredConfirm(
                 res.buyerId,
                 shipment.orderId,
@@ -453,8 +538,10 @@ export class SuratTrackingService {
       // Auto-trigger refund when Sürat reports return delivery (status 12).
       // PaymentService is resolved lazily via ModuleRef to avoid circular import.
       try {
-        const { PaymentService } = await import('../payment/payment.service');
-        const paymentService = this.moduleRef.get(PaymentService, { strict: false });
+        const { PaymentService } = await import("../payment/payment.service");
+        const paymentService = this.moduleRef.get(PaymentService, {
+          strict: false,
+        });
         if (paymentService) {
           await paymentService.processRefund(shipment.orderId);
           this.logger.log(
@@ -519,7 +606,9 @@ export class SuratTrackingService {
     // Try DD/MM/YYYY format
     const ddmmyyyy = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
     if (ddmmyyyy) {
-      return new Date(`${ddmmyyyy[3]}-${ddmmyyyy[2]}-${ddmmyyyy[1]}T00:00:00.000Z`);
+      return new Date(
+        `${ddmmyyyy[3]}-${ddmmyyyy[2]}-${ddmmyyyy[1]}T00:00:00.000Z`,
+      );
     }
     return new Date(dateStr);
   }
@@ -528,12 +617,15 @@ export class SuratTrackingService {
    * Sync all active refund return shipments (alıcı → satıcı).
    * Refund returns are tracked separately on RefundRequest, not on Shipment.
    */
-  async syncAllActiveRefundReturns(): Promise<{ synced: number; failed: number }> {
+  async syncAllActiveRefundReturns(): Promise<{
+    synced: number;
+    failed: number;
+  }> {
     const activeReturns = await this.prisma.refundRequest.findMany({
       where: {
-        returnProvider: 'surat',
+        returnProvider: "surat",
         status: {
-          in: ['return_shipment_open', 'return_in_transit'],
+          in: ["return_shipment_open", "return_in_transit"],
         },
         returnTrackingNumber: { not: null },
       },
@@ -547,7 +639,9 @@ export class SuratTrackingService {
         if (ok) synced++;
         else failed++;
       } catch (error: any) {
-        this.logger.error(`Failed to sync refund return ${rr.id}: ${error.message}`);
+        this.logger.error(
+          `Failed to sync refund return ${rr.id}: ${error.message}`,
+        );
         failed++;
       }
     }
@@ -558,7 +652,7 @@ export class SuratTrackingService {
     const rr = await this.prisma.refundRequest.findUnique({
       where: { id: refundRequestId },
     });
-    if (!rr || rr.returnProvider !== 'surat' || !rr.returnTrackingNumber) {
+    if (!rr || rr.returnProvider !== "surat" || !rr.returnTrackingNumber) {
       return false;
     }
 
@@ -575,10 +669,12 @@ export class SuratTrackingService {
     const isReturnDelivered =
       isSuratReturnCompleted(suratCode) || isSuratDelivered(suratCode);
 
-    const { RefundService } = await import('../refund/refund.service');
+    const { RefundService } = await import("../refund/refund.service");
     const refundService = this.moduleRef.get(RefundService, { strict: false });
     if (!refundService) {
-      this.logger.warn(`RefundService not resolvable when syncing ${refundRequestId}`);
+      this.logger.warn(
+        `RefundService not resolvable when syncing ${refundRequestId}`,
+      );
       return false;
     }
 
@@ -617,7 +713,7 @@ export class SuratTrackingService {
       where: { id: tradeShipmentId },
     });
 
-    if (!tradeShipment || tradeShipment.carrier !== 'surat') {
+    if (!tradeShipment || tradeShipment.carrier !== "surat") {
       return false;
     }
 
@@ -634,8 +730,19 @@ export class SuratTrackingService {
     }
 
     const gonderi = data.Gonderiler[0];
-    const newStatus = mapSuratStatusToShipmentStatus(gonderi.KargonunDurumuSayi);
+    const newStatus = mapSuratStatusToShipmentStatus(
+      gonderi.KargonunDurumuSayi,
+    );
     const isDelivered = isSuratDelivered(gonderi.KargonunDurumuSayi);
+
+    // #86: same terminal-regression guard for the trade-shipment poll path.
+    if (!canTransitionShipmentStatus(tradeShipment.status, newStatus)) {
+      this.logger.warn(
+        `Skipping illegal trade-shipment transition ${tradeShipment.status} → ${newStatus} ` +
+          `for ${tradeShipment.id} (Sürat poll, code=${gonderi.KargonunDurumuSayi})`,
+      );
+      return false;
+    }
 
     const updateData: Record<string, any> = {
       status: newStatus,
@@ -664,8 +771,8 @@ export class SuratTrackingService {
     // trade is also delivered. If so, transition the parent Trade.
     if (
       isDelivered &&
-      tradeShipment.leg === 'to_warehouse' &&
-      tradeShipment.recipientType === 'warehouse'
+      tradeShipment.leg === "to_warehouse" &&
+      tradeShipment.recipientType === "warehouse"
     ) {
       await this.maybeTransitionTradeToAtWarehouse(tradeShipment.tradeId);
     }
@@ -681,10 +788,13 @@ export class SuratTrackingService {
    * Sync all active TradeShipments shipped via Sürat. Mirrors
    * {@link syncAllActiveShipments} but operates on the TradeShipment table.
    */
-  async syncAllActiveTradeShipments(): Promise<{ synced: number; failed: number }> {
+  async syncAllActiveTradeShipments(): Promise<{
+    synced: number;
+    failed: number;
+  }> {
     const activeTradeShipments = await this.prisma.tradeShipment.findMany({
       where: {
-        carrier: 'surat',
+        carrier: "surat",
         status: {
           in: [
             ShipmentStatus.label_created,
@@ -759,7 +869,9 @@ export class SuratTrackingService {
    * still pre-warehouse, atomically flip Trade.status -> at_warehouse and
    * write a TradeShipmentEvent on each leg recording the auto-transition.
    */
-  private async maybeTransitionTradeToAtWarehouse(tradeId: string): Promise<void> {
+  private async maybeTransitionTradeToAtWarehouse(
+    tradeId: string,
+  ): Promise<void> {
     const transitioned = await this.prisma.$transaction(async (tx) => {
       // Lock the trade row to avoid racing with admin manual transition.
       await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tradeId} FOR UPDATE`;
@@ -772,7 +884,7 @@ export class SuratTrackingService {
       if (trade.status === TradeStatus.at_warehouse) return false;
 
       const toWarehouseShipments = await tx.tradeShipment.findMany({
-        where: { tradeId, leg: 'to_warehouse' },
+        where: { tradeId, leg: "to_warehouse" },
         select: { id: true, status: true, deliveredAt: true },
       });
 
@@ -796,9 +908,9 @@ export class SuratTrackingService {
       await tx.tradeShipmentEvent.createMany({
         data: toWarehouseShipments.map((s) => ({
           tradeShipmentId: s.id,
-          status: 'auto_at_warehouse',
+          status: "auto_at_warehouse",
           description:
-            'Both to_warehouse legs delivered; trade auto-transitioned to at_warehouse',
+            "Both to_warehouse legs delivered; trade auto-transitioned to at_warehouse",
           eventTime: now,
         })),
       });
@@ -819,13 +931,21 @@ export class SuratTrackingService {
         select: { id: true, status: true },
       });
       if (tcp && tcp.status === PaymentStatus.completed) {
-        const elogo = this.moduleRef.get(ElogoInvoicingService, { strict: false });
+        const elogo = this.moduleRef.get(ElogoInvoicingService, {
+          strict: false,
+        });
         await elogo
           .issueTradeCashCommissionInvoice(tcp.id)
-          .catch((e: any) => this.logger.warn(`eLogo takas komisyonu (depo) tetik hatası ${tradeId}: ${e?.message}`));
+          .catch((e: any) =>
+            this.logger.warn(
+              `eLogo takas komisyonu (depo) tetik hatası ${tradeId}: ${e?.message}`,
+            ),
+          );
       }
     } catch (e: any) {
-      this.logger.warn(`at_warehouse takas komisyonu faturası hatası ${tradeId}: ${e?.message}`);
+      this.logger.warn(
+        `at_warehouse takas komisyonu faturası hatası ${tradeId}: ${e?.message}`,
+      );
     }
   }
 }
