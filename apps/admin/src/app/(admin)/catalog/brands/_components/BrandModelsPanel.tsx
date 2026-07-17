@@ -28,7 +28,7 @@ export function BrandModelsPanel({ brand }: { brand: Brand }) {
   const { data: models = [], isLoading } = useQuery<CarModel[]>({
     queryKey: ["car-models", "brand", brand.id],
     queryFn: async () =>
-      (await adminApi.getCarModels(brand.id)).data?.data ?? [],
+      (await adminApi.getCarModels({ brandId: brand.id })).data?.data ?? [],
   });
 
   const del = useAdminMutation((id: string) => adminApi.deleteCarModel(id), {

@@ -213,9 +213,7 @@ export class ElogoInvoicingService {
   }
 
   /** Alıcının varsayılan adresini çek (UBL PostalAddress için). */
-  private async fetchAddress(
-    userId?: string | null,
-  ): Promise<{
+  private async fetchAddress(userId?: string | null): Promise<{
     city: string | null;
     district: string | null;
     address: string | null;
