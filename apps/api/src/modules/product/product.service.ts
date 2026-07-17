@@ -1,13 +1,13 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import { CacheService } from '../cache/cache.service';
-import { CreateProductDto, UpdateProductDto, ProductQueryDto } from './dto';
-import { ProductCreateService } from './product-create.service';
-import { ProductUpdateService } from './product-update.service';
-import { ProductQueryService } from './product-query.service';
-import { ProductFilterService } from './product-filter.service';
-import { ProductRankingService } from './product-ranking.service';
-import { ProductStatsService } from './product-stats.service';
-import { ProductEngagementService } from './product-engagement.service';
+import { Injectable, OnModuleInit, Logger } from "@nestjs/common";
+import { CacheService } from "../cache/cache.service";
+import { CreateProductDto, UpdateProductDto, ProductQueryDto } from "./dto";
+import { ProductCreateService } from "./product-create.service";
+import { ProductUpdateService } from "./product-update.service";
+import { ProductQueryService } from "./product-query.service";
+import { ProductFilterService } from "./product-filter.service";
+import { ProductRankingService } from "./product-ranking.service";
+import { ProductStatsService } from "./product-stats.service";
+import { ProductEngagementService } from "./product-engagement.service";
 
 /**
  * ProductService (facade) — CORE servis; her public imza aynen korunur (controller
@@ -22,9 +22,12 @@ export class ProductService implements OnModuleInit {
   private readonly logger = new Logger(ProductService.name);
 
   onModuleInit() {
-    this.cache.delPattern('products:list:*').then((n) => {
-      if (n > 0) this.logger.log(`Cleared ${n} product list cache key(s)`);
-    }).catch(() => {});
+    this.cache
+      .delPattern("products:list:*")
+      .then((n) => {
+        if (n > 0) this.logger.log(`Cleared ${n} product list cache key(s)`);
+      })
+      .catch(() => {});
   }
 
   constructor(
@@ -36,7 +39,7 @@ export class ProductService implements OnModuleInit {
     private readonly rankingService: ProductRankingService,
     private readonly statsService: ProductStatsService,
     private readonly engagementService: ProductEngagementService,
-  ) { }
+  ) {}
 
   async create(sellerId: string, dto: CreateProductDto) {
     return this.createService.create(sellerId, dto);
@@ -66,7 +69,7 @@ export class ProductService implements OnModuleInit {
     return this.updateService.update(id, sellerId, dto);
   }
 
-  async remove(id: string, sellerId: string) {
+  async remove(id: string, sellerId: string): Promise<void> {
     return this.updateService.remove(id, sellerId);
   }
 
@@ -86,15 +89,24 @@ export class ProductService implements OnModuleInit {
     return this.statsService.getActiveListingCount(sellerId);
   }
 
-  async likeProduct(productId: string, userId: string): Promise<{ liked: boolean; likeCount: number }> {
+  async likeProduct(
+    productId: string,
+    userId: string,
+  ): Promise<{ liked: boolean; likeCount: number }> {
     return this.engagementService.likeProduct(productId, userId);
   }
 
-  async unlikeProduct(productId: string, userId: string): Promise<{ liked: boolean; likeCount: number }> {
+  async unlikeProduct(
+    productId: string,
+    userId: string,
+  ): Promise<{ liked: boolean; likeCount: number }> {
     return this.engagementService.unlikeProduct(productId, userId);
   }
 
-  async isProductLikedByUser(productId: string, userId: string): Promise<boolean> {
+  async isProductLikedByUser(
+    productId: string,
+    userId: string,
+  ): Promise<boolean> {
     return this.engagementService.isProductLikedByUser(productId, userId);
   }
 
@@ -102,9 +114,14 @@ export class ProductService implements OnModuleInit {
     productId: string,
     userId?: string,
     clientIp?: string,
-    userAgent?: string
+    userAgent?: string,
   ): Promise<{ viewCount: number }> {
-    return this.engagementService.incrementViewCount(productId, userId, clientIp, userAgent);
+    return this.engagementService.incrementViewCount(
+      productId,
+      userId,
+      clientIp,
+      userAgent,
+    );
   }
 
   async getProductStats(productId: string, sellerId: string) {

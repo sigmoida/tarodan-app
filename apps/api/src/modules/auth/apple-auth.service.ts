@@ -1,6 +1,7 @@
-import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import appleSignin from 'apple-signin-auth';
+import { Injectable, UnauthorizedException, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import appleSignin from "apple-signin-auth";
+import { i18nMessage } from "../i18n";
 
 export interface AppleProfile {
   sub: string;
@@ -16,10 +17,10 @@ export class AppleAuthService {
 
   private audience(): string[] {
     const list = [
-      this.configService.get<string>('APPLE_CLIENT_ID'),
-      this.configService.get<string>('APPLE_SERVICES_ID'),
+      this.configService.get<string>("APPLE_CLIENT_ID"),
+      this.configService.get<string>("APPLE_SERVICES_ID"),
     ].filter((x): x is string => !!x);
-    return list.length ? list : ['com.tarodan.app'];
+    return list.length ? list : ["com.tarodan.app"];
   }
 
   async verifyIdentityToken(identityToken: string): Promise<AppleProfile> {
@@ -30,17 +31,27 @@ export class AppleAuthService {
         ignoreExpiration: false,
       });
     } catch (e) {
-      this.logger.warn(`Apple token verify failed: ${e instanceof Error ? e.message : e}`);
-      throw new UnauthorizedException('Apple oturumu doğrulanamadı');
+      this.logger.warn(
+        `Apple token verify failed: ${e instanceof Error ? e.message : e}`,
+      );
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.appleSessionVerifyFailed"),
+      );
     }
     if (!payload?.sub || !payload?.email) {
-      throw new UnauthorizedException('Apple oturumu geçersiz');
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.appleSessionInvalid"),
+      );
     }
-    const emailVerified = payload.email_verified === true || payload.email_verified === 'true';
+    const emailVerified =
+      payload.email_verified === true || payload.email_verified === "true";
     if (!emailVerified) {
-      throw new UnauthorizedException('Apple hesabınızın e-postası doğrulanmamış');
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.appleEmailNotVerified"),
+      );
     }
-    const isPrivate = payload.is_private_email === true || payload.is_private_email === 'true';
+    const isPrivate =
+      payload.is_private_email === true || payload.is_private_email === "true";
     return {
       sub: String(payload.sub),
       email: String(payload.email),

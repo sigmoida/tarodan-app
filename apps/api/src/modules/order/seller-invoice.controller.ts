@@ -19,6 +19,7 @@ import {
 } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { i18nMessage } from "../i18n";
 import { SellerInvoiceService } from "./seller-invoice.service";
 
 /**
@@ -46,7 +47,7 @@ export class SellerInvoiceController {
   ) {
     if (!file)
       throw new BadRequestException(
-        "Fatura PDF dosyası gerekli (form-data alanı: file)",
+        i18nMessage("server.order.invoicePdfRequiredFormField"),
       );
     return this.sellerInvoice.uploadForOrder(orderId, userId, file);
   }

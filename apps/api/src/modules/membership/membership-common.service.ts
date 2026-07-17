@@ -1,18 +1,16 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
+import { Injectable, NotFoundException, Logger } from "@nestjs/common";
+import { PrismaService } from "../../prisma";
 import {
   MembershipTierType,
   SubscriptionStatus,
   ProductStatus,
   OrderStatus,
   PaymentStatus,
-} from '@prisma/client';
-import {
-  MembershipTierResponseDto,
-  UserMembershipResponseDto,
-} from './dto';
-import { PaymentService } from '../payment/payment.service';
-import { PaymentProvider } from '../payment/dto';
+} from "@prisma/client";
+import { MembershipTierResponseDto, UserMembershipResponseDto } from "./dto";
+import { PaymentService } from "../payment/payment.service";
+import { PaymentProvider } from "../payment/dto";
+import { i18nMessage } from "../i18n";
 
 /**
  * MembershipCommonService — üyelik alt-servislerinin paylaştığı çekirdek okuma/
@@ -45,11 +43,17 @@ export class MembershipCommonService {
       });
 
       if (!freeTier) {
-        throw new NotFoundException('Ücretsiz üyelik tipi bulunamadı');
+        throw new NotFoundException(
+          i18nMessage("server.membership.freeTierNotFound"),
+        );
       }
 
       const now = new Date();
-      const oneYearLater = new Date(now.getFullYear() + 100, now.getMonth(), now.getDate()); // Free tier never expires
+      const oneYearLater = new Date(
+        now.getFullYear() + 100,
+        now.getMonth(),
+        now.getDate(),
+      ); // Free tier never expires
 
       membership = await this.prisma.userMembership.create({
         data: {
@@ -75,7 +79,9 @@ export class MembershipCommonService {
       // doğrula ve tamamla → reconciliation cron'unu beklemeden anında aktive olur.
       const virtualProductId = `membership-${membership.tierId}`;
       // 1dk tolerans: sipariş, abonelikten (currentPeriodStart) hemen sonra oluşur.
-      const healFloor = new Date(membership.currentPeriodStart.getTime() - 60 * 1000);
+      const healFloor = new Date(
+        membership.currentPeriodStart.getTime() - 60 * 1000,
+      );
 
       // (a) Bu döneme ait BEKLEYEN ödemeyi PayTR'ye sor; ödendiyse tamamla.
       const pendingPaymentRow = await this.prisma.payment.findFirst({
@@ -83,16 +89,24 @@ export class MembershipCommonService {
           status: PaymentStatus.pending,
           provider: PaymentProvider.paytr,
           providerConversationId: { not: null },
-          order: { buyerId: userId, productId: virtualProductId, createdAt: { gte: healFloor } },
+          order: {
+            buyerId: userId,
+            productId: virtualProductId,
+            createdAt: { gte: healFloor },
+          },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         select: { id: true },
       });
       if (pendingPaymentRow) {
         try {
-          await this.paymentService.verifyPaymentFromClient(pendingPaymentRow.id);
+          await this.paymentService.verifyPaymentFromClient(
+            pendingPaymentRow.id,
+          );
         } catch (err) {
-          this.logger.warn(`Membership self-heal verify failed for payment ${pendingPaymentRow.id}: ${(err as Error)?.message}`);
+          this.logger.warn(
+            `Membership self-heal verify failed for payment ${pendingPaymentRow.id}: ${(err as Error)?.message}`,
+          );
         }
       }
 
@@ -101,10 +115,17 @@ export class MembershipCommonService {
         where: {
           buyerId: userId,
           productId: virtualProductId,
-          status: { in: [OrderStatus.completed, OrderStatus.delivered, OrderStatus.paid, OrderStatus.preparing] },
+          status: {
+            in: [
+              OrderStatus.completed,
+              OrderStatus.delivered,
+              OrderStatus.paid,
+              OrderStatus.preparing,
+            ],
+          },
           createdAt: { gte: healFloor },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
       });
 
       // Üyelik (verify aktivasyonu sonrası) güncel durumu yeniden oku.
@@ -122,7 +143,9 @@ export class MembershipCommonService {
           data: { status: SubscriptionStatus.active, cancelledAt: null },
           include: { tier: true },
         });
-        this.logger.log(`Self-healed membership ${membership.id} past_due → active (paid order ${paidOrder.orderNumber})`);
+        this.logger.log(
+          `Self-healed membership ${membership.id} past_due → active (paid order ${paidOrder.orderNumber})`,
+        );
       } else {
         const freeTier = await this.prisma.membershipTier.findUnique({
           where: { type: MembershipTierType.free },
@@ -138,15 +161,19 @@ export class MembershipCommonService {
 
     // Map tier to DTO first
     const tierDto = this.mapTierToDto(effectiveTier);
-    
+
     // Override listing limits based on tier type if platform setting exists
     // This must be done BEFORE getUserUsageStats so it uses the correct limit
     if (effectiveTier.type === MembershipTierType.free) {
-      const freeListingLimitSetting = await this.prisma.platformSetting.findUnique({
-        where: { settingKey: 'free_listing_limit' },
-      });
+      const freeListingLimitSetting =
+        await this.prisma.platformSetting.findUnique({
+          where: { settingKey: "free_listing_limit" },
+        });
       if (freeListingLimitSetting?.settingValue) {
-        const platformLimit = parseInt(freeListingLimitSetting.settingValue, 10);
+        const platformLimit = parseInt(
+          freeListingLimitSetting.settingValue,
+          10,
+        );
         if (!isNaN(platformLimit) && platformLimit > 0) {
           tierDto.maxFreeListings = platformLimit;
           tierDto.maxTotalListings = platformLimit; // For free tier, total = free
@@ -156,11 +183,15 @@ export class MembershipCommonService {
         }
       }
     } else if (effectiveTier.type === MembershipTierType.basic) {
-      const basicListingLimitSetting = await this.prisma.platformSetting.findUnique({
-        where: { settingKey: 'basic_listing_limit' },
-      });
+      const basicListingLimitSetting =
+        await this.prisma.platformSetting.findUnique({
+          where: { settingKey: "basic_listing_limit" },
+        });
       if (basicListingLimitSetting?.settingValue) {
-        const platformLimit = parseInt(basicListingLimitSetting.settingValue, 10);
+        const platformLimit = parseInt(
+          basicListingLimitSetting.settingValue,
+          10,
+        );
         if (!isNaN(platformLimit)) {
           if (platformLimit === -1) {
             tierDto.maxTotalListings = -1;
@@ -172,11 +203,15 @@ export class MembershipCommonService {
         }
       }
     } else if (effectiveTier.type === MembershipTierType.premium) {
-      const premiumListingLimitSetting = await this.prisma.platformSetting.findUnique({
-        where: { settingKey: 'premium_listing_limit' },
-      });
+      const premiumListingLimitSetting =
+        await this.prisma.platformSetting.findUnique({
+          where: { settingKey: "premium_listing_limit" },
+        });
       if (premiumListingLimitSetting?.settingValue) {
-        const platformLimit = parseInt(premiumListingLimitSetting.settingValue, 10);
+        const platformLimit = parseInt(
+          premiumListingLimitSetting.settingValue,
+          10,
+        );
         if (!isNaN(platformLimit)) {
           if (platformLimit === -1) {
             tierDto.maxTotalListings = -1; // Unlimited
@@ -188,11 +223,15 @@ export class MembershipCommonService {
         }
       }
     } else if (effectiveTier.type === MembershipTierType.business) {
-      const businessListingLimitSetting = await this.prisma.platformSetting.findUnique({
-        where: { settingKey: 'business_listing_limit' },
-      });
+      const businessListingLimitSetting =
+        await this.prisma.platformSetting.findUnique({
+          where: { settingKey: "business_listing_limit" },
+        });
       if (businessListingLimitSetting?.settingValue) {
-        const platformLimit = parseInt(businessListingLimitSetting.settingValue, 10);
+        const platformLimit = parseInt(
+          businessListingLimitSetting.settingValue,
+          10,
+        );
         if (!isNaN(platformLimit)) {
           if (platformLimit === -1) {
             tierDto.maxTotalListings = -1; // Unlimited
@@ -220,9 +259,15 @@ export class MembershipCommonService {
       createdAt: membership.createdAt,
       // Ertelemeli downgrade: dönem sonunda geçilecek tier (null = yok). UI
       // "Üyeliğiniz {currentPeriodEnd} tarihinde {scheduledTierType} olacak" gösterebilir.
-      ...(membership.scheduledTierType ? { scheduledTierType: membership.scheduledTierType } : {}),
-      ...(membership.scheduledBillingPeriod ? { scheduledBillingPeriod: membership.scheduledBillingPeriod } : {}),
-      ...(pendingPayment && pendingTierName ? { pendingTierName, pendingTierType, pendingPayment: true } : {}),
+      ...(membership.scheduledTierType
+        ? { scheduledTierType: membership.scheduledTierType }
+        : {}),
+      ...(membership.scheduledBillingPeriod
+        ? { scheduledBillingPeriod: membership.scheduledBillingPeriod }
+        : {}),
+      ...(pendingPayment && pendingTierName
+        ? { pendingTierName, pendingTierType, pendingPayment: true }
+        : {}),
       ...stats,
     };
   }
@@ -235,7 +280,13 @@ export class MembershipCommonService {
     const activeListings = await this.prisma.product.count({
       where: {
         sellerId: userId,
-        status: { in: [ProductStatus.active, ProductStatus.pending, ProductStatus.reserved] },
+        status: {
+          in: [
+            ProductStatus.active,
+            ProductStatus.pending,
+            ProductStatus.reserved,
+          ],
+        },
       },
     });
 
@@ -245,24 +296,32 @@ export class MembershipCommonService {
     // Check platform setting for listing limit override based on tier type
     let maxFreeListings = tier.maxFreeListings;
     let maxTotalListings = tier.maxTotalListings;
-    
+
     if (tier.type === MembershipTierType.free) {
-      const freeListingLimitSetting = await this.prisma.platformSetting.findUnique({
-        where: { settingKey: 'free_listing_limit' },
-      });
+      const freeListingLimitSetting =
+        await this.prisma.platformSetting.findUnique({
+          where: { settingKey: "free_listing_limit" },
+        });
       if (freeListingLimitSetting?.settingValue) {
-        const platformLimit = parseInt(freeListingLimitSetting.settingValue, 10);
+        const platformLimit = parseInt(
+          freeListingLimitSetting.settingValue,
+          10,
+        );
         if (!isNaN(platformLimit) && platformLimit > 0) {
           maxFreeListings = platformLimit;
           maxTotalListings = platformLimit; // For free tier, total = free
         }
       }
     } else if (tier.type === MembershipTierType.premium) {
-      const premiumListingLimitSetting = await this.prisma.platformSetting.findUnique({
-        where: { settingKey: 'premium_listing_limit' },
-      });
+      const premiumListingLimitSetting =
+        await this.prisma.platformSetting.findUnique({
+          where: { settingKey: "premium_listing_limit" },
+        });
       if (premiumListingLimitSetting?.settingValue) {
-        const platformLimit = parseInt(premiumListingLimitSetting.settingValue, 10);
+        const platformLimit = parseInt(
+          premiumListingLimitSetting.settingValue,
+          10,
+        );
         if (!isNaN(platformLimit)) {
           if (platformLimit === -1) {
             maxTotalListings = -1; // Unlimited
@@ -272,11 +331,15 @@ export class MembershipCommonService {
         }
       }
     } else if (tier.type === MembershipTierType.business) {
-      const businessListingLimitSetting = await this.prisma.platformSetting.findUnique({
-        where: { settingKey: 'business_listing_limit' },
-      });
+      const businessListingLimitSetting =
+        await this.prisma.platformSetting.findUnique({
+          where: { settingKey: "business_listing_limit" },
+        });
       if (businessListingLimitSetting?.settingValue) {
-        const platformLimit = parseInt(businessListingLimitSetting.settingValue, 10);
+        const platformLimit = parseInt(
+          businessListingLimitSetting.settingValue,
+          10,
+        );
         if (!isNaN(platformLimit)) {
           if (platformLimit === -1) {
             maxTotalListings = -1; // Unlimited
@@ -297,10 +360,14 @@ export class MembershipCommonService {
       usedTotalListings,
       usedFeaturedSlots,
       remainingFreeListings: Math.max(0, maxFreeListings - usedFreeListings),
-      remainingTotalListings: maxTotalListings === -1 
-        ? -1 // Unlimited
-        : Math.max(0, maxTotalListings - usedTotalListings),
-      remainingFeaturedSlots: Math.max(0, tier.featuredListingSlots - usedFeaturedSlots),
+      remainingTotalListings:
+        maxTotalListings === -1
+          ? -1 // Unlimited
+          : Math.max(0, maxTotalListings - usedTotalListings),
+      remainingFeaturedSlots: Math.max(
+        0,
+        tier.featuredListingSlots - usedFeaturedSlots,
+      ),
     };
   }
 

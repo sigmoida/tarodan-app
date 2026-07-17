@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { InitiatePaymentDto, PayTRCallbackDto, DirectPaymentDto } from "./dto";
 import { Prisma, PaymentStatus } from "@prisma/client";
+import { type Locale } from "@tarodan/i18n";
 import { Request } from "express";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentQueryService } from "./payment-query.service";
@@ -213,8 +214,9 @@ export class PaymentService {
       page?: number;
       limit?: number;
     },
+    locale?: Locale,
   ) {
-    return this.paymentQuery.getUserPayments(userId, options);
+    return this.paymentQuery.getUserPayments(userId, options, locale);
   }
 
   async reconcilePendingPaytrPayments(): Promise<{

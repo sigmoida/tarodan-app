@@ -5,6 +5,7 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
+import { i18nMessage } from "../i18n";
 import { CacheService } from "../cache/cache.service";
 import { SearchService } from "../search/search.service";
 import { DiscountService } from "../discount/discount.service";
@@ -180,7 +181,8 @@ export class ProductQueryService {
         },
       },
     });
-    const formattedProducts = await this.common.formatProductResponseMany(products);
+    const formattedProducts =
+      await this.common.formatProductResponseMany(products);
     return {
       data: formattedProducts,
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
@@ -295,7 +297,8 @@ export class ProductQueryService {
       ...products.filter((p) => !isInStock(p)),
     ];
 
-    const formattedProducts = await this.common.formatProductResponseMany(pageOrdered);
+    const formattedProducts =
+      await this.common.formatProductResponseMany(pageOrdered);
 
     // Tutarlılık: Postgres path ile aynı şekilde, discountOnly=true iken sadece
     // gerçekten indirimli ürünleri döndür.
@@ -498,7 +501,8 @@ export class ProductQueryService {
         : [];
     const products = [...inStockRows, ...outOfStockRows];
 
-    const formattedProducts = await this.common.formatProductResponseMany(products);
+    const formattedProducts =
+      await this.common.formatProductResponseMany(products);
 
     // discountOnly: WHERE kolayca "kampanya kapsamındaki" ürünleri geçirse de,
     // formatProductResponse kampanya fiyatını uygulayamayabilir (değer 0, tarih
@@ -586,7 +590,7 @@ export class ProductQueryService {
         });
 
         if (!product) {
-          throw new NotFoundException("Ürün bulunamadı");
+          throw new NotFoundException(i18nMessage("server.product.notFound"));
         }
 
         // Allow active, sold, and out-of-stock (inactive + quantity=0) products to be viewable
@@ -598,7 +602,7 @@ export class ProductQueryService {
           product.status === ProductStatus.sold ||
           (product.status === ProductStatus.inactive && isOutOfStock);
         if (!canView) {
-          throw new NotFoundException("Ürün bulunamadı");
+          throw new NotFoundException(i18nMessage("server.product.notFound"));
         }
 
         return await this.common.formatProductResponse(product);
@@ -665,11 +669,11 @@ export class ProductQueryService {
     });
 
     if (!product) {
-      throw new NotFoundException("Ürün bulunamadı");
+      throw new NotFoundException(i18nMessage("server.product.notFound"));
     }
 
     if (product.sellerId !== userId) {
-      throw new ForbiddenException("Bu ürünü görüntüleme yetkiniz yok");
+      throw new ForbiddenException(i18nMessage("server.product.viewForbidden"));
     }
 
     return await this.common.formatProductResponse(product);
@@ -750,12 +754,12 @@ export class ProductQueryService {
     });
 
     if (!product) {
-      throw new NotFoundException("Ürün bulunamadı");
+      throw new NotFoundException(i18nMessage("server.product.notFound"));
     }
 
     // Only the owner can see their own non-active products
     if (product.sellerId !== sellerId) {
-      throw new ForbiddenException("Bu ürünü görüntüleme yetkiniz yok");
+      throw new ForbiddenException(i18nMessage("server.product.viewForbidden"));
     }
 
     return await this.common.formatProductResponse(product);
