@@ -3903,5 +3903,690 @@
         "codeInvalid": "6 haneli kod girin"
       }
     }
+  },
+  "server": {
+    "common": {
+      "recordExists": "Kayıt zaten mevcut",
+      "recordNotFound": "Kayıt bulunamadı",
+      "relatedRecordsConflict": "İşlem ilişkili kayıtlar nedeniyle tamamlanamadı",
+      "internalError": "Sunucu hatası"
+    },
+    "notification": {
+      "orderCreated": {
+        "title": "Siparişiniz Oluşturuldu",
+        "message": "Siparişiniz başarıyla oluşturuldu. Ödeme bekleniyor."
+      },
+      "orderPaid": {
+        "title": "Ödeme Alındı",
+        "message": "Siparişiniz için ödeme alındı. Satıcı siparişinizi hazırlıyor."
+      },
+      "orderShipped": {
+        "title": "Siparişiniz Kargoya Verildi",
+        "message": "Siparişiniz kargoya verildi. Takip numaranız: {trackingNumber}"
+      },
+      "orderDelivered": {
+        "title": "Siparişiniz Teslim Edildi",
+        "message": "Siparişiniz teslim edildi; teslim tarihinden itibaren 14 gün içinde koşulsuz iade hakkınız var."
+      },
+      "orderCompleted": {
+        "title": "Sipariş Tamamlandı",
+        "message": "Siparişiniz başarıyla tamamlandı. Teşekkür ederiz!"
+      },
+      "orderCancelled": {
+        "title": "Sipariş İptal Edildi",
+        "message": "Siparişiniz iptal edildi. Ödediğiniz tutar iade edilecek."
+      },
+      "orderCancelledSeller": {
+        "title": "Satış İptal Edildi",
+        "message": "{orderNumber} numaralı siparişiniz iptal edildi."
+      },
+      "orderCancelledOutOfStock": {
+        "title": "Siparişiniz iptal edildi: stok tükendi",
+        "message": "{productTitle} adlı ürün başka bir alıcı tarafından satın alındı. Benzer ürünlere göz atabilirsiniz."
+      },
+      "orderRefunded": {
+        "title": "İade İşlemi Tamamlandı",
+        "message": "Ödemeniz iade edildi. {amount} TL hesabınıza aktarılacak."
+      },
+      "orderPreparingDeadlineWarning": {
+        "title": "Kargo Süresi Dolmak Üzere",
+        "message": "\"{productTitle}\" siparişini {deadline} tarihine kadar kargoya vermeniz gerekmektedir. Aksi halde sipariş otomatik iptal edilecektir."
+      },
+      "orderReservationReleased": {
+        "title": "Stok rezervasyonunuz kaldırıldı",
+        "message": "{productTitle} için 30 dakika içinde ödeme tamamlanmadığı için stok rezervasyonu kaldırıldı. Ürün stoktaysa 24 saat içinde tekrar ödeme yapabilirsiniz."
+      },
+      "orderDeliveredConfirm": {
+        "title": "Siparişin teslim edildi",
+        "message": "Siparişiniz teslim edildi; teslim tarihinden itibaren 14 gün içinde koşulsuz iade hakkınız var. Süre dolunca sipariş otomatik tamamlanır."
+      },
+      "orderAutoCompleted": {
+        "title": "Sipariş otomatik tamamlandı",
+        "message": "48 saatlik kontrol süresi doldu; sipariş tamamlandı."
+      },
+      "orderManuallyConfirmed": {
+        "title": "Alıcı siparişini onayladı",
+        "message": "Alıcı siparişi onayladı. Ödemeniz, teslimden 14 gün sonra (iade süresi dolunca) hesabınıza aktarılır."
+      },
+      "orderForceCompletedByAdmin": {
+        "title": "Sipariş yönetici tarafından tamamlandı",
+        "message": "Bir yönetici siparişini manuel olarak tamamladı."
+      },
+      "sellerDidNotShipRefunded": {
+        "title": "Sipariş iptal edildi",
+        "message": "Satıcı belirlenen süre içinde kargoya vermediği için sipariş iptal edildi ve tam iade işlemi başlatıldı."
+      },
+      "offerReceived": {
+        "title": "Yeni Teklif Aldınız",
+        "message": "{productTitle} ürününüz için {amount} TL teklif aldınız."
+      },
+      "offerAccepted": {
+        "title": "Teklifiniz Kabul Edildi! 🎉",
+        "message": "{productTitle} için teklifiniz kabul edildi. Hemen ödeyin!"
+      },
+      "offerRejected": {
+        "title": "Teklifiniz Reddedildi",
+        "message": "{productTitle} için teklifiniz satıcı tarafından reddedildi."
+      },
+      "offerCounter": {
+        "title": "Karşı Teklif Aldınız",
+        "message": "{productTitle} için satıcı {amount} TL karşı teklif yaptı."
+      },
+      "offerCounterDeclined": {
+        "title": "Karşı Teklif Reddedildi",
+        "message": "{productTitle} için alıcı karşı teklifinizi kabul etmedi."
+      },
+      "offerExpired": {
+        "title": "Teklifin Süresi Doldu",
+        "message": "{productTitle} için teklifinizin süresi doldu."
+      },
+      "offerCancelledOutOfStock": {
+        "title": "Teklifiniz iptal edildi: ürün stokta kalmadı",
+        "message": "{productTitle} adlı ürün için verdiğiniz teklif, ürün satıldığı için iptal edildi."
+      },
+      "productApproved": {
+        "title": "İlanınız Yayında! 🎉",
+        "message": "{productTitle} ilanınız onaylandı ve yayına alındı."
+      },
+      "productRejected": {
+        "title": "İlanınız Reddedildi",
+        "message": "{productTitle} ilanınız onaylanmadı. Neden: {reason}"
+      },
+      "productSold": {
+        "title": "Ürününüz Satıldı! 🎉",
+        "message": "{productTitle} ürününüz {amount} TL'ye satıldı."
+      },
+      "paymentReceived": {
+        "title": "Ödeme Alındı",
+        "message": "{productTitle} satışından {amount} TL ödeme alındı."
+      },
+      "paymentReleased": {
+        "title": "Ödemeniz Aktarıldı",
+        "message": "{amount} TL hesabınıza aktarıldı."
+      },
+      "tradeReceived": {
+        "title": "Yeni Takas Teklifi",
+        "message": "Ürünleriniz için bir takas teklifi aldınız."
+      },
+      "tradeAccepted": {
+        "title": "Takas Kabul Edildi! 🎉",
+        "message": "Takas teklifiniz kabul edildi. Lütfen kargoya verin."
+      },
+      "tradeRejected": {
+        "title": "Takas Reddedildi",
+        "message": "Takas teklifiniz reddedildi."
+      },
+      "tradeCounter": {
+        "title": "Karşı Takas Teklifi Aldınız",
+        "message": "{counterOffererName} takas teklifinize karşı teklif yaptı."
+      },
+      "tradeShipped": {
+        "title": "Takas Kargoya Verildi",
+        "message": "Takas paketiniz kargoya verildi. Takip no: {trackingNumber}"
+      },
+      "tradeCompleted": {
+        "title": "Takas Tamamlandı! 🎉",
+        "message": "Takas işlemi başarıyla tamamlandı!"
+      },
+      "newMessage": {
+        "title": "Yeni Mesaj",
+        "message": "{senderName}: {messagePreview}"
+      },
+      "priceDrop": {
+        "title": "Fiyat Düştü! 🔥",
+        "message": "{productTitle} ürününün fiyatı {oldPrice} TL'den {newPrice} TL'ye düştü!"
+      },
+      "wishlistItemSold": {
+        "title": "Kaçırdınız! 😢",
+        "message": "Favorilerinize eklediğiniz {productTitle} satıldı."
+      },
+      "backInStock": {
+        "title": "Tekrar Satışta!",
+        "message": "{productTitle} tekrar satışa çıktı."
+      },
+      "newFollower": {
+        "title": "Yeni Takipçi",
+        "message": "{followerName} sizi takip etmeye başladı."
+      },
+      "sellerNewListing": {
+        "title": "Yeni İlan",
+        "message": "{sellerName} yeni bir ilan ekledi: {productTitle}"
+      },
+      "collectionLiked": {
+        "title": "Koleksiyonunuz Beğenildi",
+        "message": "{userName} koleksiyonunuzu beğendi."
+      },
+      "productLiked": {
+        "title": "Ürününüz Beğenildi ❤️",
+        "message": "{userName} {productTitle} ürününüzü favorilere ekledi."
+      },
+      "wishlistSold": {
+        "title": "Favori Ürününüz Satıldı 😢",
+        "message": "Favorilerinize eklediğiniz {productTitle} satıldı."
+      },
+      "reviewReceived": {
+        "title": "Yeni Değerlendirme",
+        "message": "{reviewerName} size {score} yıldız verdi."
+      },
+      "membershipExpiring": {
+        "title": "Üyeliğiniz Bitiyor",
+        "message": "{tierName} üyeliğiniz {daysLeft} gün içinde sona erecek."
+      },
+      "membershipExpired": {
+        "title": "Üyeliğiniz Sona Erdi",
+        "message": "{tierName} üyeliğiniz sona erdi. Yenileyin ve avantajlardan yararlanın!"
+      },
+      "membershipUpgraded": {
+        "title": "Üyeliğiniz Yükseltildi! 🎉",
+        "message": "{tierName} üyeliğine hoş geldiniz! Yeni avantajlarınız aktif."
+      },
+      "listingExpiring": {
+        "title": "İlanınız Bitiyor",
+        "message": "{productTitle} ilanınız {daysLeft} gün içinde sona erecek."
+      },
+      "listingExpired": {
+        "title": "İlanınız Sona Erdi",
+        "message": "{productTitle} ilanınız sona erdi. Yeniden yayınlayın."
+      },
+      "listingViewsMilestone": {
+        "title": "Tebrikler! 🎉",
+        "message": "{productTitle} ilanınız {viewCount} görüntülemeye ulaştı!"
+      },
+      "promotion": {
+        "title": "🎁 Özel Kampanya",
+        "message": "{promotionTitle}"
+      },
+      "specialOffer": {
+        "title": "💎 Özel Teklif",
+        "message": "{offerDescription}"
+      },
+      "welcome": {
+        "title": "Tarodan'a Hoş Geldiniz! 🎉",
+        "message": "Diecast model araba koleksiyoncuları platformuna hoş geldiniz."
+      },
+      "passwordReset": {
+        "title": "Şifre Sıfırlama",
+        "message": "Şifrenizi sıfırlamak için linke tıklayın."
+      },
+      "emailVerification": {
+        "title": "E-posta Doğrulama",
+        "message": "E-postanızı doğrulamak için linke tıklayın."
+      },
+      "systemAnnouncement": {
+        "title": "📢 Duyuru",
+        "message": "{announcement}"
+      },
+      "boostExpired": {
+        "title": "🚀 Öne çıkarma süresi doldu",
+        "message": "\"{productTitle}\" ilanının öne çıkarması bitti. Otomatik yenileme açıktı — tek tıkla yeniden öne çıkar."
+      },
+      "tradeAutoCancelled": {
+        "title": "Takas Otomatik İptal Edildi",
+        "message": "{cancelReason}"
+      },
+      "tradeStuckAtWarehouse": {
+        "title": "Sıkışmış Takas — Yönetim Gerekli",
+        "message": "{tradeNumber} takası depoya ulaştı fakat süresi doldu; elle force-cancel-stuck gerekiyor."
+      },
+      "offerAutoRejected": {
+        "title": "Teklifiniz Kapatıldı",
+        "message": "{cancelReason}"
+      },
+      "reservationExpired": {
+        "title": "Sipariş Süresi Doldu",
+        "message": "Siparişinizin ödeme süresi dolduğu için otomatik olarak iptal edildi."
+      },
+      "refundCancelled": {
+        "title": "İade Talebi İptal Edildi",
+        "message": "Alıcı {refundNumber} numaralı iade talebini iptal etti."
+      },
+      "refundApproved": {
+        "title": "İade Talebiniz Onaylandı",
+        "message": "{refundNumber} numaralı iade talebiniz onaylandı."
+      },
+      "refundReturnOpened": {
+        "title": "İade Kargosu Hazır",
+        "message": "{trackingNumber} numarasıyla ürünü en yakın Sürat şubesine teslim edebilirsiniz."
+      },
+      "refundCompleted": {
+        "title": "İadeniz Tamamlandı",
+        "message": "{refundNumber} numaralı iadeniz hesabınıza yansıtıldı."
+      },
+      "refundRequestReceived": {
+        "title": "İade Talebiniz Alındı",
+        "message": "{refundNumber} numaralı iade talebiniz alındı, satıcı yanıtı bekleniyor."
+      },
+      "refundReturnShippedSeller": {
+        "title": "İade Kargosu Yola Çıktı",
+        "message": "Alıcı {refundNumber} numaralı iade için ürünü kargoya verdi; ürün size geliyor."
+      },
+      "refundReturnInTransit": {
+        "title": "İade Kargonuz Yolda",
+        "message": "{refundNumber} numaralı iade ürününüz satıcıya doğru yolda."
+      },
+      "refundReturnDeliveredBuyer": {
+        "title": "İadeniz Satıcıya Ulaştı",
+        "message": "{refundNumber} numaralı iade ürününüz satıcıya teslim edildi; para iadeniz kısa sürede yapılacak."
+      },
+      "refundReturnDeliveredSeller": {
+        "title": "İade Ürünü Size Ulaştı",
+        "message": "{refundNumber} numaralı iade ürünü size teslim edildi."
+      },
+      "refundCompletedSeller": {
+        "title": "İade Tamamlandı",
+        "message": "{refundNumber} numaralı sipariş için iade tamamlandı; tutar alıcıya iade edildi."
+      },
+      "refundAutoAcceptedSeller": {
+        "title": "İade Talebi Otomatik Onaylandı",
+        "message": "{refundNumber} numaralı iade talebine 48 saat içinde yanıt verilmediği için otomatik onaylandı."
+      },
+      "sellerApplicationApproved": {
+        "title": "Kurumsal Başvurunuz Onaylandı! 🎉",
+        "message": "Kurumsal hesap başvurunuz onaylandı. Artık satıcı olarak ürün listeleyebilirsiniz."
+      },
+      "sellerApplicationRejected": {
+        "title": "Kurumsal Başvurunuz Reddedildi",
+        "message": "Kurumsal hesap başvurunuz reddedildi.{reason}"
+      }
+    },
+    "auth": {
+      "accountBanned": "Hesabınız banlanmış. Destek ekibiyle iletişime geçin.",
+      "accountDeleted": "Hesap silinmiş",
+      "accountSuspended": "Hesabınız askıya alınmış",
+      "adminAccountDeactivated": "Admin hesabı deaktif edilmiş",
+      "adminAccountNotFoundOrInactive": "Admin hesabı bulunamadı veya deaktif",
+      "adminAuthRequired": "Admin yetkisi gerekiyor",
+      "adminPrivilegeRequired": "Bu işlem için admin yetkisi gerekiyor",
+      "adminUserNotFoundOrInactive": "Admin kullanıcı bulunamadı veya deaktif",
+      "appleEmailNotVerified": "Apple hesabınızın e-postası doğrulanmamış",
+      "appleSessionInvalid": "Apple oturumu geçersiz",
+      "appleSessionVerifyFailed": "Apple oturumu doğrulanamadı",
+      "birthDateRequired": "Doğum tarihi zorunludur",
+      "businessRegisterSuccess": "Şirket hesabı başarıyla oluşturuldu! Lütfen email adresinize gönderilen doğrulama linkine tıklayın.",
+      "companyNameAlreadyRegistered": "Bu şirket adı zaten kayıtlı",
+      "emailAlreadyRegistered": "Bu email adresi zaten kayıtlı",
+      "emailAlreadyVerified": "Email adresi zaten doğrulanmış",
+      "emailNotVerifiedLogin": "Email adresiniz henüz doğrulanmamış. Lütfen email adresinize gönderilen doğrulama linkine tıklayın. Doğrulama emaili gelmediyse, tekrar gönderebilirsiniz.",
+      "emailVerificationAlreadyDone": "Email adresiniz zaten doğrulanmış.",
+      "emailVerificationLinkExpired": "Doğrulama linkinin süresi dolmuş",
+      "emailVerificationLinkInvalid": "Geçersiz veya süresi dolmuş doğrulama linki",
+      "emailVerificationLinkUsed": "Bu doğrulama linki daha önce kullanılmış",
+      "emailVerificationSuccess": "Email adresiniz başarıyla doğrulandı!",
+      "googleEmailNotVerified": "Google hesabınızın e-postası doğrulanmamış",
+      "googleSessionInvalid": "Google oturumu geçersiz",
+      "googleSessionVerifyFailed": "Google oturumu doğrulanamadı",
+      "invalidAdminToken": "Geçersiz admin token",
+      "invalidCredentials": "Email veya şifre hatalı",
+      "invalidPhoneNumber": "Geçersiz telefon numarası",
+      "invalidRefreshToken": "Geçersiz refresh token",
+      "invalidTokenType": "Geçersiz token tipi",
+      "loggedOut": "Çıkış yapıldı",
+      "loginFailed": "Giriş işlemi sırasında bir hata oluştu",
+      "loginRequired": "Oturum açmanız gerekiyor",
+      "minAge18": "Kayıt olmak için en az 18 yaşında olmanız gerekmektedir",
+      "noActiveVerificationCode": "Aktif doğrulama kodu yok. Yeni kod isteyin.",
+      "noPermission": "Bu işlem için yetkiniz yok",
+      "noPermissionDefined": "Bu admin işlemi için tanımlı bir izin bulunamadı; erişim reddedildi",
+      "passwordResetLinkSent": "Eğer bu email kayıtlıysa, şifre sıfırlama linki gönderildi",
+      "passwordResetSuccess": "Şifre başarıyla sıfırlandı",
+      "permissionRequired": "Bu işlem için [{perms}] izinlerinden biri gerekiyor. Rol: {role}",
+      "phoneAlreadyRegistered": "Bu telefon numarası zaten kayıtlı",
+      "phoneAlreadyRegisteredOtherAccount": "Bu telefon numarası başka bir hesapta kayıtlı",
+      "phoneVerificationCodeSent": "Doğrulama kodu telefonunuza gönderildi",
+      "phoneVerificationSuccess": "Telefon numaranız doğrulandı",
+      "phoneVerificationTooFrequent": "Çok sık deneme. Lütfen biraz sonra tekrar deneyin.",
+      "refreshTokenExpired": "Refresh token süresi dolmuş",
+      "refreshTokenRevoked": "Refresh token iptal edilmiş",
+      "registerSuccess": "Kayıt başarılı! Lütfen email adresinize gönderilen doğrulama linkine tıklayın.",
+      "resendVerificationGeneric": "Eğer bu email kayıtlıysa, doğrulama linki gönderildi",
+      "resetTokenAlreadyUsed": "Bu token daha önce kullanılmış",
+      "resetTokenExpired": "Token süresi dolmuş",
+      "resetTokenInvalidOrExpired": "Geçersiz veya süresi dolmuş token",
+      "roleRequired": "Bu işlem için {roles} rolü gerekiyor",
+      "smsSendFailed": "SMS gönderilemedi",
+      "taxIdAlreadyRegistered": "Bu vergi kimlik numarası zaten kayıtlı",
+      "tooManyWrongAttempts": "Çok fazla yanlış deneme. Yeni kod isteyin.",
+      "userNotFound": "Kullanıcı bulunamadı",
+      "verificationCodeExpired": "Kodun süresi doldu. Yeni kod isteyin.",
+      "verificationEmailResent": "Doğrulama emaili tekrar gönderildi",
+      "wrongVerificationCode": "Kod hatalı"
+    },
+    "offer": {
+      "alreadyInStatus": "Bu teklif zaten {status} durumunda",
+      "alreadyPendingOffer": "Bu ürüne zaten bekleyen bir teklifiniz var. Önce mevcut teklifi iptal edin.",
+      "awaitingBuyerResponse": "Alıcının mevcut karşı teklife yanıt vermesi bekleniyor; şu an yeni karşı teklif verilemez",
+      "belowMinimumBuyerCounter": "Teklif tutarı çok düşük. Ürün fiyatı: {productPrice} TL. Minimum: {minOffer} TL (fiyatın %{minOfferPercentage}'i).",
+      "belowMinimumOffer": "Teklif tutarı çok düşük. Ürün fiyatı: {productPrice} TL. Minimum teklif: {minOffer} TL (fiyatın %{minOfferPercentage}'i). Teklifiniz: {offerAmount} TL",
+      "buyerCounterMustBeLower": "Alıcı karşı teklifi, satıcının karşı teklifinden düşük olmalıdır",
+      "buyerCounterOnlyAfterSellerCounter": "Alıcı karşı teklifi yalnızca satıcının son karşı teklifine yanıt olarak verilebilir",
+      "cannotOfferOwnProduct": "Kendi ürününüze teklif veremezsiniz",
+      "counterCannotExceedPrice": "Karşı teklif, ürün fiyatından yüksek olamaz",
+      "counterMustExceedOffer": "Karşı teklif, mevcut tekliften yüksek olmalıdır",
+      "insufficientStock": "Ürün için yeterli müsait adet yok",
+      "notAuthorizedToAccept": "Bu teklifi kabul etme yetkiniz yok",
+      "notAuthorizedToBuyerCounter": "Bu teklife alıcı karşı teklifi verme yetkiniz yok",
+      "notAuthorizedToCancel": "Bu teklifi iptal etme yetkiniz yok",
+      "notAuthorizedToCounter": "Bu teklife karşı teklif verme yetkiniz yok",
+      "notAuthorizedToReject": "Bu teklifi reddetme yetkiniz yok",
+      "notAuthorizedToView": "Bu teklifi görüntüleme yetkiniz yok",
+      "notAuthorizedToViewProductOffers": "Bu ürünün tekliflerini görüntüleme yetkiniz yok",
+      "offerExpired": "Bu teklifin süresi dolmuş",
+      "offerNotFound": "Teklif bulunamadı",
+      "onlyBuyerCanAcceptCounter": "Bu karşı teklifi yalnızca alıcı kabul edebilir",
+      "onlyBuyerCanRejectCounter": "Bu karşı teklifi yalnızca alıcı reddedebilir",
+      "productNoLongerActive": "Ürün artık satışta değil",
+      "productNotActive": "Bu ürün şu anda satışta değil",
+      "productNotFound": "Ürün bulunamadı",
+      "productOutOfStock": "Ürün stokta yok veya yeterli müsait adet yok"
+    },
+    "trade": {
+      "addressNotFound": "Adres bulunamadı",
+      "alreadyShipped": "Zaten gönderim yaptınız",
+      "cannotAcceptInStatus": "Takas durumu '{status}' kabul edilemez",
+      "cannotCancelAfterBothShipped": "Her iki taraf da gönderdikten sonra iptal edilemez",
+      "cannotCancelAfterShippedToCargo": "Ürün kargoya verildikten sonra takas iptal edilemez. Sorun varsa itiraz açın veya destek ile iletişime geçin.",
+      "cannotCancelAfterWarehouseArrival": "Ürünler depoya ulaştıktan sonra sadece admin iptal edebilir",
+      "cannotCancelInStatus": "Takas durumu '{status}' iptal edilemez",
+      "cannotConfirmInStatus": "Takas durumu '{status}' onay yapılamaz",
+      "cannotCounterInStatus": "Takas durumu '{status}' karşı teklif gönderilemez",
+      "cannotDisputeInStatus": "Takas durumu '{status}' itiraz açılamaz",
+      "cannotRejectInStatus": "Takas durumu '{status}' reddedilemez",
+      "cannotShipInStatus": "Takas durumu '{status}' gönderim yapılamaz",
+      "cannotTradeWithSelf": "Kendinizle takas yapamazsınız",
+      "confirmationDeadlinePassed": "Onay süresi dolmuş",
+      "counterOfferIdenticalToPrevious": "Önceki teklif ile aynı. Lütfen değişiklik yapın.",
+      "disputeAlreadyOpen": "Bu takas için zaten itiraz açılmış",
+      "disputeNotFound": "İtiraz bulunamadı",
+      "insufficientStockForItem": "\"{title}\" için yeterli müsait stok yok (müsait: {available}, talep: {requested})",
+      "invalidConfirmationStatus": "Geçersiz onay durumu",
+      "invalidShipmentStatus": "Geçersiz gönderim durumu",
+      "itemAlreadyInActiveTrade": "Teklif ettiğiniz ürünlerden biri zaten aktif bir takas teklifinde. Önce mevcut takası iptal edin veya sonuçlanmasını bekleyin.",
+      "membershipExpiredForAccept": "Üyeliğinizin süresi dolmuş görünüyor. Trade kabul etmek için Temel veya üstü üyeliğinizi yenileyin.",
+      "membershipRequiredForCounter": "Karşı teklif göndermek için Temel veya üstü üyelik gereklidir. Üyeliğinizi yenileyin.",
+      "noShipmentToConfirm": "Onaylanacak gönderim bulunamadı",
+      "noShippingAddress": "Takas için bir teslimat adresi ekleyin. Profil → Adreslerim üzerinden adres ekleyebilirsiniz.",
+      "notAuthorizedForAction": "Bu takas işlemi için yetkiniz yok",
+      "notAuthorizedToCancel": "Bu takası iptal etme yetkiniz yok",
+      "notAuthorizedToView": "Bu takası görüntüleme yetkiniz yok",
+      "notFound": "Takas bulunamadı",
+      "onlyReceiverCanAccept": "Sadece takas alıcısı kabul edebilir",
+      "onlyReceiverCanCounter": "Sadece takas alıcısı karşı teklif gönderebilir",
+      "onlyReceiverCanReject": "Sadece takas alıcısı reddedebilir",
+      "receiverNotFound": "Alıcı kullanıcı bulunamadı",
+      "requestedItemsNotEligible": "Talep edilen bazı ürünler takasa uygun değil",
+      "responseDeadlinePassed": "Yanıt süresi dolmuş",
+      "selectedAddressNotFound": "Seçilen teslimat adresi bulunamadı veya size ait değil.",
+      "sessionRequired": "Oturum gerekli",
+      "shipToWarehouseDeprecated": "Bu uç nokta artık kullanılmıyor. Takas kabul edildiğinde sistem her iki taraf için Sürat Kargo takip numaralarını otomatik üretir; en yakın Sürat şubesine size atanan takip numarasıyla teslim edin.",
+      "shipmentAlreadyConfirmed": "Bu gönderim zaten onaylandı",
+      "someItemsNotOwnedOrInactive": "Bazı ürünler size ait değil veya aktif değil",
+      "tradeNotInDisputeStatus": "Takas itiraz durumunda değil"
+    },
+    "order": {
+      "accountBanned": "Hesabınız banlanmış. Yeni sipariş oluşturamazsınız.",
+      "addressOnlyPendingPayment": "Sadece ödeme bekleyen siparişlere adres eklenebilir",
+      "atLeastOneProductRequired": "En az bir ürün gereklidir",
+      "cancelForbidden": "Bu siparişi iptal etme yetkiniz yok",
+      "cannotBuyOwnProduct": "Kendi ürününüzü satın alamazsınız",
+      "cannotCancelShipped": "Sipariş kargoya verildikten sonra iptal edilemez",
+      "cartProductNotFound": "Sepetteki ürünlerden biri bulunamadı",
+      "confirmForbidden": "Bu siparişi onaylama yetkiniz yok",
+      "confirmOnlyDelivered": "Sadece teslim edilmiş siparişler onaylanabilir",
+      "couponNotSupportedForGuest": "Kupon kodu misafir alışverişte desteklenmiyor",
+      "extendOnlyWithinWindow": "Sadece 48h penceresindeki siparişlerde uzatılabilir",
+      "groupNotFound": "Sipariş grubu bulunamadı",
+      "groupViewForbidden": "Bu sipariş grubunu görüntüleme yetkiniz yok",
+      "guestOtpIncorrect": "Doğrulama kodu hatalı",
+      "guestOtpInvalidOrExpired": "Doğrulama kodu geçersiz veya süresi dolmuş",
+      "guestOtpSendFailed": "Doğrulama kodu e-postası gönderilemedi",
+      "guestOtpTooManyAttempts": "Çok fazla hatalı deneme. Yeni kod isteyin.",
+      "guestOtpTooManyRequests": "Çok fazla kod isteği gönderildi. Lütfen bir süre sonra tekrar deneyin.",
+      "invalidAmount": "Geçerli bir tutar girin",
+      "invalidBillingAddress": "Geçersiz fatura adresi",
+      "invalidCouponCode": "Kupon kodu geçersiz",
+      "invalidOffer": "Geçersiz teklif",
+      "invalidShippingAddress": "Geçersiz teslimat adresi",
+      "invoiceAccessForbidden": "Bu faturaya erişim yetkiniz yok",
+      "invoiceNotUploaded": "Bu siparişe yüklenmiş fatura yok",
+      "invoiceOnlyAfterPayment": "Fatura yalnız ödeme alındıktan sonra yüklenebilir",
+      "invoiceOnlyCorporateSeller": "Yalnız iş üyeliği olan kurumsal (şirket) satıcılar fatura yükleyebilir",
+      "invoiceOnlyPdfAllowed": "Yalnız PDF yüklenebilir",
+      "invoicePdfRequired": "Fatura PDF dosyası gerekli",
+      "invoicePdfRequiredFormField": "Fatura PDF dosyası gerekli (form-data alanı: file)",
+      "invoicePdfTooLarge": "PDF en fazla 10 MB olabilir",
+      "notConfirmableStatus": "Sipariş bu aşamada onaylanamaz (mevcut durum: {status})",
+      "notFound": "Sipariş bulunamadı",
+      "notOrderSeller": "Bu siparişin satıcısı değilsiniz",
+      "notYourTransaction": "Bu işlem size ait değil",
+      "offerAlreadyHasOrder": "Bu teklif için zaten bir sipariş mevcut",
+      "offerNotAccepted": "Sadece kabul edilmiş tekliflerden sipariş oluşturulabilir",
+      "offerNotAcceptedYet": "Teklif kabul edilmemiş",
+      "offerNotFound": "Teklif bulunamadı",
+      "offerOrderForbidden": "Bu tekliften sipariş oluşturma yetkiniz yok",
+      "openRefundExists": "Açık bir iade talebi var; önce sonuçlanması gerek",
+      "orderAccessForbidden": "Bu siparişe erişim yetkiniz yok",
+      "prepareOnlyPaid": "Sadece ödenmiş siparişler hazırlanabilir",
+      "productNotActive": "Bu ürün satışta değil veya başkası tarafından satın alınıyor",
+      "productNotActiveByTitle": "Ürün satışta değil: {title}",
+      "productNotFound": "Ürün bulunamadı",
+      "productNotFoundById": "Ürün bulunamadı: {productId}",
+      "productNotOnSale": "Bu ürün satışta değil",
+      "productOutOfStock": "Bu ürün stokta bulunmamaktadır",
+      "reactivateForbidden": "Bu siparişi yeniden aktive etme yetkiniz yok",
+      "reactivateInsufficientStock": "Ürün için yeterli müsait adet yok",
+      "reactivateNotFromOffer": "Bu sipariş tekliften oluşmadığı için yeniden aktive edilemez",
+      "reactivateOfferNotAccepted": "İlgili teklif artık kabul edilmiş değil",
+      "reactivateOnlyCancelled": "Sadece iptal edilmiş siparişler yeniden aktive edilebilir",
+      "setAddressForbidden": "Bu siparişe adres ekleme yetkiniz yok",
+      "shippingAddressCityRequired": "Teslimat adresi için şehir gereklidir",
+      "shippingAddressDistrictRequired": "Teslimat adresi için ilçe gereklidir",
+      "shippingAddressLineRequired": "Teslimat adresi için açık adres gereklidir",
+      "shippingAddressNameRequired": "Teslimat adresi için ad soyad gereklidir",
+      "shippingAddressPhoneRequired": "Teslimat adresi için telefon numarası gereklidir",
+      "shippingAddressRequired": "Teslimat adresi gereklidir",
+      "shippingAddressRequiredWithFields": "Teslimat adresi gereklidir (shippingAddressId veya shippingAddress)",
+      "statusChangeForbidden": "Bu durum değişikliğini yapmaya yetkiniz yok",
+      "statusChangeSystemOnly": "Bu durum değişikliği sistem tarafından yapılır",
+      "statusTransitionNotAllowed": "Sipariş durumu {from}'den {to}'e değiştirilemez",
+      "updateForbidden": "Bu siparişi güncelleme yetkiniz yok",
+      "viewForbidden": "Bu siparişi görüntüleme yetkiniz yok"
+    },
+    "payment": {
+      "cancelPaymentForbidden": "Bu ödemeyi iptal etme yetkiniz yok",
+      "cancelledSuccessfully": "Ödeme başarıyla iptal edildi",
+      "cannotPayForOrder": "Bu sipariş için ödeme yapamazsınız",
+      "cannotPayForOrderGroup": "Bu sipariş grubu için ödeme yapamazsınız",
+      "cardInfoRequired": "Kart bilgisi zorunludur.",
+      "cardOrSavedCardRequired": "Kart bilgisi veya kayıtlı kart seçimi zorunludur.",
+      "cartPaymentDescription": "Sepet ödemesi",
+      "cartPaymentDescriptionCount": "Sepet ödemesi ({count} ürün)",
+      "cashPaymentRecordNotFound": "Nakit ödeme kaydı bulunamadı",
+      "completedPaymentNotFound": "Tamamlanmış ödeme bulunamadı",
+      "connectionError": "PayTR bağlantı hatası, lütfen tekrar deneyin.",
+      "cvvRequiredForCard": "Bu kart için CVV gereklidir",
+      "directApiNotAuthorized": "PayTR kart ödemesi bu mağaza için doğrulanamadı (Direkt API yetkisi gerekli olabilir).",
+      "groupOrderItemNotAwaitingPayment": "Gruptaki \"{item}\" siparişi ödeme beklemiyor. Lütfen sepeti yeniden oluşturun.",
+      "groupOrderNotAwaitingPayment": "Gruptaki bir sipariş ödeme beklemiyor. Lütfen sepeti yeniden oluşturun.",
+      "holdNotReleasable": "Serbest bırakılabilir ödeme bulunamadı (açık iade nedeniyle dondurulmuş olabilir)",
+      "installmentInfoFetchFailed": "Taksit bilgisi alınamadı",
+      "installmentInfoUnavailable": "Taksit bilgileri alınamadı",
+      "installmentResponseInvalid": "PayTR taksit yanıtı geçersiz/boş",
+      "loginRequired": "Oturum açmanız gerekiyor",
+      "loginRequiredForOrder": "Bu sipariş için giriş yapmanız gerekiyor",
+      "loginRequiredForPayment": "Bu ödeme için giriş yapmanız gerekiyor",
+      "loginRequiredForSavedCard": "Kayıtlı kartla ödeme için giriş yapmanız gerekiyor",
+      "noResponse": "PayTR yanıt vermedi (HTTP {httpStatus}).",
+      "notConfigured": "PayTR yapılandırılmamış (merchant bilgileri eksik)",
+      "onlyDesignatedPayerCanInitiate": "Bu ödemeyi sadece belirlenmiş ödeyen taraf başlatabilir",
+      "onlyFailedPaymentsRetryable": "Sadece başarısız ödemeler tekrar denenebilir",
+      "onlyPendingPaymentsCancelable": "Sadece bekleyen ödemeler iptal edilebilir",
+      "orderAlreadyPaid": "Bu sipariş zaten ödendi",
+      "orderAlreadyRefunded": "Bu sipariş için iade zaten yapılmış",
+      "orderGroupAlreadyPaid": "Bu sipariş grubu zaten ödendi",
+      "orderGroupNotFound": "Sipariş grubu bulunamadı",
+      "orderNotAwaitingPayment": "Bu sipariş için ödeme beklenmiyor",
+      "orderNotFound": "Sipariş bulunamadı",
+      "orderOrTradeNotFoundForPayment": "Ödeme ile ilişkili sipariş veya takas bulunamadı",
+      "orderPaymentDescription": "Sipariş ödemesi",
+      "orderStatusNotRetryable": "Sipariş durumu ödeme tekrarına uygun değil",
+      "paymentAlreadyReceived": "Bu ödeme zaten alınmış görünüyor. Lütfen sayfayı yenileyin; tekrar ödeme yapmanıza gerek yok.",
+      "paymentBelongsToGroupOrTrade": "Bu ödeme bir sipariş grubuna veya takasa ait. Lütfen ödeme durumunu sipariş grubuyla sorgulayın.",
+      "paymentBelongsToGroupRestart": "Bu ödeme bir sipariş grubuna ait. Lütfen ödemeyi sipariş grubuyla yeniden başlatın.",
+      "paymentCurrentlyProcessing": "Bu ödeme şu anda işleniyor. Lütfen birkaç saniye bekleyip tekrar deneyin.",
+      "paymentNotFound": "Ödeme bulunamadı",
+      "paymentNotYetSynced": "Ödeme yeni tamamlandı, PayTR henüz işlemi tam senkronize etmedi. Lütfen 1-2 dakika sonra tekrar deneyin.",
+      "paymentRejected": "PayTR ödemeyi reddetti",
+      "paymentTargetRequired": "orderId, checkoutGroupId veya tradeId zorunludur.",
+      "paymentWindowExpired": "Ödeme süresi doldu. Lütfen yeni bir sipariş oluşturun.",
+      "paytrRefundFailed": "PayTR iade işlemi başarısız",
+      "productFallbackTitle": "Ürün",
+      "productNoLongerAvailable": "Ürün artık satışta değil veya başka alıcıya satıldı. Lütfen ilanlar sayfasından tekrar sipariş oluşturun.",
+      "refundAmountExceedsLimit": "İade tutarı ({amountToRefund} TL) izin verilen üst sınırı ({refundCap} TL) aşıyor",
+      "refundError": "PayTR iade hatası",
+      "refundFailed": "PayTR iade başarısız",
+      "refundInitiationFailed": "İade başlatılamadı (geçici hata). Lütfen tekrar deneyin.",
+      "refundResponseInvalid": "PayTR iade yanıtı geçersiz/boş",
+      "retryForbidden": "Bu ödemeyi tekrar deneme yetkiniz yok",
+      "savedCardNotFound": "Kayıtlı kart bulunamadı",
+      "savedCardPaymentUnavailable": "Kayıtlı kartla ödeme şu an kullanılamıyor. Lütfen kart bilgilerinizi girin.",
+      "tradeCashDifference": "Takas nakit farkı",
+      "tradeCashDifferenceWithNumber": "Takas nakit farkı (#{tradeNumber})",
+      "tradeCashPaymentAlreadyCompleted": "Bu takas ödemesi zaten tamamlandı",
+      "tradeNoCashDifference": "Bu takasta ekstra ödeme bulunmuyor",
+      "tradeNotAcceptedOrInvalidStatus": "Takas henüz kabul edilmedi veya uygun durumda değil",
+      "tradeNotFound": "Takas bulunamadı",
+      "transferAlreadyStarted": "Transfer zaten başlatılmış, iade yapılamaz",
+      "unexpectedResponse": "PayTR beklenmeyen yanıt döndü; kart bilgilerinizi kontrol edin.",
+      "unknownProvider": "Bilinmeyen ödeme sağlayıcı: {provider}",
+      "viewPaymentForbidden": "Bu ödemeyi görüntüleme yetkiniz yok",
+      "viewStatusForbidden": "Bu ödeme durumunu görüntüleme yetkiniz yok"
+    },
+    "product": {
+      "alreadyLiked": "Bu ürünü zaten beğendiniz",
+      "bannedCannotCreate": "Hesabınız banlanmış. Yeni ürün ekleyemezsiniz.",
+      "bannedCannotEdit": "Hesabınız banlanmış. Ürün düzenleyemezsiniz.",
+      "boostActiveOnly": "Sadece aktif (yayında) ilanlar öne çıkarılabilir",
+      "boostOwnOnly": "Sadece kendi ilanınızı öne çıkarabilirsiniz",
+      "boostPriceUndefined": "Bu süre için geçerli bir fiyat tanımlı değil",
+      "boostUnavailable": "Öne çıkarma şu anda kullanılamıyor",
+      "cannotLikeOwn": "Kendi ürününüzü beğenemezsiniz",
+      "categoryNotFound": "Kategori bulunamadı",
+      "createFailedGeneric": "İlan oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.",
+      "createdButLoadFailed": "Ürün oluşturuldu ancak yüklenemedi. Lütfen tekrar deneyin.",
+      "deleteForbidden": "Bu ürünü silme yetkiniz yok",
+      "deleted": "Ürün silindi",
+      "duplicateProduct": "Bu ürün zaten mevcut veya benzersiz alan çakışması var.",
+      "editForbidden": "Bu ürünü düzenleme yetkiniz yok",
+      "imageLimitExceeded": "Üyeliğiniz ({tierName}) ile ilan başına maksimum {maxImages} görsel yükleyebilirsiniz. {sentCount} görsel gönderdiniz.",
+      "imageNotAppropriate": "Yüklediğiniz resim uygun değildir. Lütfen uygun bir ürün görseli yükleyin.",
+      "insufficientStock": "Bu ürün stokta bulunmamaktadır (müsait={available}, istenen={requested})",
+      "invalidBoostDuration": "Geçerli bir boost süresi seçiniz (3, 7 veya 30 gün)",
+      "invalidBrandModelManufacturer": "Seçilen marka, model veya üretici geçersiz. Lütfen listeden tekrar seçin.",
+      "invalidCategory": "Geçersiz kategori",
+      "invalidIdFormat": "Geçersiz ürün ID formatı",
+      "invalidIdFormatDetailed": "Geçersiz ürün ID formatı. UUID formatında olmalıdır (örn: a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11)",
+      "listingLimitReached": "İlan limitinize ulaştınız. Mevcut üyeliğiniz ({tierName}) ile maksimum {maxListings} ilan oluşturabilirsiniz. Daha fazla ilan eklemek için üyeliğinizi yükseltin.",
+      "listingStatsFailed": "İlan istatistikleri alınamadı",
+      "notForSaleStatus": "Ürün satışta değil (status={status})",
+      "notFound": "Ürün bulunamadı",
+      "notFoundWithId": "Ürün bulunamadı: {productId}",
+      "notLiked": "Bu ürünü beğenmemişsiniz",
+      "platformSellerNotFound": "Platform seller bulunamadı",
+      "priceAboveMaximum": "Ürün fiyatı maksimum {maxPrice} TL olabilir.",
+      "priceBelowMinimum": "Ürün fiyatı minimum {minPrice} TL olmalıdır.",
+      "removedCannotReopen": "Bu ürün kaldırılmış ve yeniden açılamaz. Yeniden satmak için yeni ilan oluşturun.",
+      "reservedCannotUpdate": "Rezerve edilmiş ürünler güncellenemez",
+      "sellerIdNotFound": "Satıcı kimliği bulunamadı",
+      "setQuantityToReopen": "Yeniden satışa açmak için stok miktarı belirleyin",
+      "soldOrReservedCannotDelete": "Satılmış veya rezerve edilmiş ürünler silinemez",
+      "statsForbidden": "Bu ürünün istatistiklerini görme yetkiniz yok",
+      "tradeRequiresPremium": "Takas özelliği için Premium üyelik gereklidir. Üyeliğinizi yükseltin.",
+      "updateConflict": "Ürün başka bir işlem tarafından güncellendi. Lütfen yenileyin.",
+      "userIdNotFound": "Kullanıcı kimliği bulunamadı",
+      "userNotFound": "Kullanıcı bulunamadı",
+      "viewForbidden": "Bu ürünü görüntüleme yetkiniz yok"
+    },
+    "refund": {
+      "alreadyActive": "Bu sipariş için zaten aktif bir iade talebi var",
+      "buyerAddressNotFound": "Alıcının teslimat/kayıtlı adresi bulunamadı, iade kargosu oluşturulamaz. Alıcı bir adres eklemeli.",
+      "cannotCancel": "Bu talebi iptal edemezsiniz",
+      "cannotCancelAnymore": "Bu talep artık iptal edilemez (iade kargosu açılmış veya karara bağlanmış)",
+      "completedPaymentNotFound": "Tamamlanmış ödeme bulunamadı",
+      "coolingOffExpired": "14 günlük iade süresi dolmuştur; bu sipariş için artık iade talebi oluşturulamaz.",
+      "membershipOrderNotEligible": "Üyelik siparişleri için iade talebi oluşturulamaz; üyeliğinizi üyelik ayarlarından iptal edebilirsiniz.",
+      "notFound": "İade talebi bulunamadı",
+      "onlyBuyerCanRequest": "Sadece alıcı iade talebi oluşturabilir",
+      "orderAlreadyCancelledOrRefunded": "Bu sipariş zaten iptal/iade edilmiş",
+      "orderNotFound": "Sipariş bulunamadı",
+      "orderNotPaidYet": "Bu sipariş henüz ödenmemiş, iade yerine siparişi iptal etmelisiniz",
+      "orderStatusNotEligible": "Bu sipariş durumunda iade talebi oluşturulamaz",
+      "viewForbidden": "Bu talebi görüntüleme yetkiniz yok"
+    },
+    "user": {
+      "accountDeleted": "Hesabınız başarıyla silindi",
+      "addressDeleted": "Adres silindi",
+      "addressHasOpenOrders": "Bu teslimat adresine bağlı devam eden siparişleriniz var. Sipariş tamamlanana veya iptal edilene kadar adresi silemezsiniz.",
+      "addressLimitReached": "En fazla 3 adres ekleyebilirsiniz. Yeni adres eklemek için mevcut bir adresi silin.",
+      "addressNotFound": "Adres bulunamadı",
+      "alreadyBlocked": "Bu kullanıcı zaten engellenmiş",
+      "bankAccountNotFound": "Banka hesabı bulunamadı",
+      "businessFeatureOnly": "Bu özellik sadece işletme üyeliğine sahip hesaplar için geçerlidir. Üyeliğinizi yükseltin.",
+      "cannotBlockSelf": "Kendinizi engelleyemezsiniz",
+      "cannotFollowSelf": "Kendinizi takip edemezsiniz",
+      "cannotUnfollowSelf": "Kendinizi takipten çıkaramazsınız",
+      "companyNameRequired": "İşletme panelini kullanmak için şirket adı bilgisi gereklidir. Lütfen profil ayarlarınızdan şirket adınızı ekleyin.",
+      "deleteAccountBlocked": "Hesabınızı silmek için aşağıdaki işlemleri tamamlamanız gerekmektedir:",
+      "deleteAccountFailed": "Hesap silinirken bir hata oluştu. Lütfen destek ile iletişime geçin.",
+      "deleteBlockedActiveListings": "{count} aktif ilanınız bulunmaktadır. Lütfen önce tüm ilanlarınızı kaldırın.",
+      "deleteBlockedActiveTrades": "{count} aktif takas teklifiniz bulunmaktadır. Lütfen takas işlemlerinizi tamamlayın veya iptal edin.",
+      "deleteBlockedPendingOrders": "{count} bekleyen satın alım/satış işleminiz bulunmaktadır. Lütfen siparişlerinizi tamamlayın veya iptal edin.",
+      "noFieldsToUpdate": "Güncellenecek alan bulunamadı",
+      "notBlocked": "Bu kullanıcı engellenmemiş",
+      "notFound": "Kullanıcı bulunamadı",
+      "phoneAlreadyInUse": "Bu telefon numarası zaten kullanılıyor",
+      "unfollowed": "Takip bırakıldı",
+      "userBlocked": "{displayName} engellendi",
+      "userUnblocked": "Engel kaldırıldı"
+    },
+    "membership": {
+      "alreadyCancelled": "Üyelik zaten iptal edilmiş",
+      "alreadyOnThisPlan": "Zaten bu plandasınız",
+      "businessTierRequiresCompany": "Business üyelik sadece şirket hesapları için geçerlidir",
+      "categoryNotFound": "Kategori bulunamadı",
+      "freeTierCannotCancel": "Ücretsiz üyelik iptal edilemez",
+      "freeTierNoPaymentNeeded": "Ücretsiz üyelik için ödeme gerekmez",
+      "freeTierNotFound": "Ücretsiz üyelik tipi bulunamadı",
+      "infoNotFound": "Üyelik bilgisi bulunamadı",
+      "limitsFetchFailed": "Üyelik limitleri alınamadı",
+      "noPendingChange": "Bekleyen bir üyelik değişikliği yok",
+      "notFound": "Üyelik bulunamadı",
+      "platformSellerNotFound": "Platform seller bulunamadı",
+      "savedCardNotFound": "Kayıtlı kart bulunamadı",
+      "tierAlreadyExists": "Üyelik tipi zaten mevcut: {type}",
+      "tierNoPaymentNeeded": "Bu üyelik seviyesi için ödeme gerekmez",
+      "tierNotActive": "Bu üyelik tipi aktif değil",
+      "tierNotFound": "Üyelik tipi bulunamadı: {type}",
+      "userIdNotFound": "Kullanıcı kimliği bulunamadı"
+    }
   }
 }
