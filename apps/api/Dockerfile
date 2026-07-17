@@ -60,8 +60,14 @@ RUN addgroup --system --gid 1001 nodejs && \
 # Copy built files with correct ownership (avoids slow chown -R over node_modules)
 COPY --from=builder --chown=nestjs:nodejs /app/apps/api/dist ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/apps/api/dist-seed ./dist-seed
-# Copy root node_modules (hoisted = real files, not symlinks)
+# Copy root node_modules. Hoisting makes third-party deps real files here, but
+# workspace deps are still SYMLINKS: node_modules/@tarodan/* -> /app/packages/*.
 COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
+# ...so the symlink targets must exist in the runner too, or `require()` throws
+# MODULE_NOT_FOUND. The compiled dist requires @tarodan/i18n and @tarodan/logger
+# at runtime (@tarodan/types is type-only — tsc erases it, which is why a missing
+# packages/ never surfaced before those two landed).
+COPY --from=builder --chown=nestjs:nodejs /app/packages ./packages
 COPY --from=builder --chown=nestjs:nodejs /app/apps/api/package.json ./package.json
 COPY --from=builder --chown=nestjs:nodejs /app/apps/api/prisma ./prisma
 
