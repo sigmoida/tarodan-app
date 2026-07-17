@@ -13,7 +13,7 @@ import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
-import { PayTRService } from "../payment-providers/paytr.service";
+import { PaymentProviderRegistry } from "../payment-providers/payment-provider.registry";
 import { EventService } from "../events";
 import { InvoiceService } from "../invoice/invoice.service";
 import { ElogoInvoicingService } from "../elogo";
@@ -193,7 +193,7 @@ describe("PaymentService group payment (checkout group)", () => {
           },
         },
         { provide: ConfigService, useValue: { get: jest.fn() } },
-        { provide: PayTRService, useValue: {} },
+        { provide: PaymentProviderRegistry, useValue: { resolve: () => ({}) } },
         { provide: EventService, useValue: mockEvents },
         {
           provide: InvoiceService,

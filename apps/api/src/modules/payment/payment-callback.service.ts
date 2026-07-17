@@ -3,7 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { PaymentProvider, PayTRCallbackDto } from "./dto";
 import { PaymentStatus, OrderStatus } from "@prisma/client";
-import { PayTRService } from "../payment-providers/paytr.service";
+import { PaymentProviderRegistry } from "../payment-providers/payment-provider.registry";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 import { PaymentReconciliationService } from "./payment-reconciliation.service";
@@ -16,7 +16,7 @@ export class PaymentCallbackService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
-    private readonly paytrService: PayTRService,
+    private readonly paymentProviders: PaymentProviderRegistry,
     private readonly paymentCommon: PaymentCommonService,
     private readonly paymentFulfillment: PaymentFulfillmentService,
     private readonly paymentReconciliation: PaymentReconciliationService,
@@ -153,11 +153,11 @@ export class PaymentCallbackService {
       return "OK";
     }
 
-    let inquiry = await this.paytrService.queryPaymentStatus(oid);
+    let inquiry = await this.paymentProviders.resolve().queryPaymentStatus(oid);
     if (!inquiry.ok && oid.includes("-")) {
-      inquiry = await this.paytrService.queryPaymentStatus(
-        oid.replace(/-/g, ""),
-      );
+      inquiry = await this.paymentProviders
+        .resolve()
+        .queryPaymentStatus(oid.replace(/-/g, ""));
     }
 
     if (!inquiry.ok) {
@@ -209,7 +209,7 @@ export class PaymentCallbackService {
       return "OK";
     }
 
-    const isValid = this.paytrService.verifyCallback({
+    const isValid = this.paymentProviders.resolve().verifyCallback({
       merchant_oid: dto.merchant_oid,
       status: dto.status as "success" | "failed",
       total_amount: dto.total_amount,

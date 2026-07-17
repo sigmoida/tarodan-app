@@ -8,7 +8,7 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { PaymentStatus, OrderStatus, ProductStatus } from "@prisma/client";
-import { PayTRService } from "../payment-providers/paytr.service";
+import { PaymentProviderRegistry } from "../payment-providers/payment-provider.registry";
 import { EventService } from "../events";
 import { Request } from "express";
 import { PaymentCommonService } from "./payment-common.service";
@@ -22,7 +22,7 @@ export class PaymentLifecycleService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
-    private readonly paytrService: PayTRService,
+    private readonly paymentProviders: PaymentProviderRegistry,
     private readonly eventService: EventService,
     private readonly paymentCommon: PaymentCommonService,
     private readonly paymentFulfillment: PaymentFulfillmentService,
@@ -350,11 +350,11 @@ export class PaymentLifecycleService {
       return { completed: false, status: "no_provider_oid" };
     }
 
-    let inquiry = await this.paytrService.queryPaymentStatus(oid);
+    let inquiry = await this.paymentProviders.resolve().queryPaymentStatus(oid);
     if (!inquiry.ok && oid.includes("-")) {
-      inquiry = await this.paytrService.queryPaymentStatus(
-        oid.replace(/-/g, ""),
-      );
+      inquiry = await this.paymentProviders
+        .resolve()
+        .queryPaymentStatus(oid.replace(/-/g, ""));
     }
 
     if (!inquiry.ok) {
