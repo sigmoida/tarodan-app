@@ -1,4 +1,7 @@
+'use client';
+
 import { type ComponentType, type ReactNode } from 'react';
+import { useTranslations } from 'next-intl';
 import { ArrowTrendingUpIcon, ArrowTrendingDownIcon } from '@heroicons/react/24/outline';
 import { cn } from '@tarodan/ui';
 
@@ -26,7 +29,7 @@ export function MetricCard({
   tone = 'primary',
   title,
   change,
-  changeLabel = 'vs dün',
+  changeLabel,
   footer,
   className,
 }: {
@@ -38,12 +41,14 @@ export function MetricCard({
   title?: string;
   /** Signed percentage delta — renders a colored up/down trend row when set. */
   change?: number;
-  /** Suffix next to the trend value (default "vs dün"). */
+  /** Suffix next to the trend value (default "vs yesterday"). */
   changeLabel?: string;
   /** Extra content rendered under the value/trend (e.g. a secondary stat). */
   footer?: ReactNode;
   className?: string;
 }) {
+  const translate = useTranslations();
+  const resolvedChangeLabel = changeLabel ?? translate('admin.shared.metricCard.vsYesterday');
   const t = TONES[tone];
   const up = (change ?? 0) >= 0;
   const hasBottom = change !== undefined || footer != null;
@@ -77,7 +82,7 @@ export function MetricCard({
               <span className={up ? 'text-success-700' : 'text-danger-600'}>
                 {Math.abs(change)}%
               </span>
-              <span className="whitespace-nowrap text-muted">{changeLabel}</span>
+              <span className="whitespace-nowrap text-muted">{resolvedChangeLabel}</span>
             </>
           )}
           {footer}

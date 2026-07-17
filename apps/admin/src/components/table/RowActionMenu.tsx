@@ -3,6 +3,7 @@
 'use client';
 
 import { Fragment, type ComponentType } from 'react';
+import { useTranslations } from 'next-intl';
 import {
 	IconButton,
 	DropdownMenu,
@@ -31,6 +32,13 @@ export interface RowAction {
 
 /** Lets conditional actions be passed as falsy via `cond && {...}`. */
 export type RowActionItem = RowAction | false | null | undefined;
+
+// activeToggleAction/editDeleteActions below are plain functions (not
+// components/hooks), called from ~10 out-of-scope `_lib/rowActions.tsx` files
+// across catalog/marketing/finance. Localizing their labels would require a
+// `t` param threaded through every one of those callers (and in turn their
+// own callers) — out of scope for #222 (admin's SHARED shell); left hardcoded
+// intentionally. See #222 PR notes.
 
 /** Standard menu action that toggles active/inactive state in one click. */
 export function activeToggleAction(
@@ -73,6 +81,7 @@ export function editDeleteActions<T>(
  * on top, destructive ones below the separator.
  */
 export function RowActionMenu({ items }: { items: RowActionItem[] }) {
+	const t = useTranslations();
 	const actions = items.filter(Boolean) as RowAction[];
 	if (actions.length === 0) return <Empty />;
 
@@ -80,7 +89,7 @@ export function RowActionMenu({ items }: { items: RowActionItem[] }) {
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
 				<IconButton
-					aria-label='İşlemler'
+					aria-label={t('common.actions')}
 					className='text-muted hover:text-heading'>
 					<EllipsisHorizontalIcon className='h-5 w-5' />
 				</IconButton>

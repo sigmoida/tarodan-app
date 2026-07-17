@@ -1,4 +1,7 @@
+'use client';
+
 import { type ComponentType } from 'react';
+import { useTranslations } from 'next-intl';
 import { ClockIcon } from '@heroicons/react/24/outline';
 import { SectionCard } from './SectionCard';
 
@@ -13,18 +16,20 @@ export interface TimelineEntry {
  */
 export function Timeline({
   items,
-  title = 'Zaman Çizelgesi',
+  title,
   icon = ClockIcon,
 }: {
   items: TimelineEntry[];
   title?: string;
   icon?: ComponentType<{ className?: string }>;
 }) {
+  const t = useTranslations();
+  const resolvedTitle = title ?? t('admin.shared.timeline.title');
   const visible = items.filter((i) => i.at);
   if (visible.length === 0) return null;
 
   return (
-    <SectionCard title={title} icon={icon}>
+    <SectionCard title={resolvedTitle} icon={icon}>
       <ol className="space-y-3">
         {visible.map((item, i) => (
           <li key={i}>

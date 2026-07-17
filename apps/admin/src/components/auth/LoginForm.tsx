@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Button } from '@tarodan/ui';
 import { Form, FormError, FormInput, useZodForm } from '@tarodan/ui/form';
 import { loginSchema, type LoginValues } from '@/lib/schemas/auth';
@@ -8,8 +9,9 @@ import { useLogin } from '@/hooks/useLogin';
 import { AuthCard } from './AuthCard';
 
 export function LoginForm() {
+  const t = useTranslations();
   const { login, requires2FA } = useLogin();
-  const form = useZodForm(loginSchema, {
+  const form = useZodForm(loginSchema(t), {
     defaultValues: { email: '', password: '', twoFactorCode: '' },
   });
 
@@ -19,16 +21,21 @@ export function LoginForm() {
   };
 
   return (
-    <AuthCard title="Giriş Yap">
+    <AuthCard title={t('common.login')}>
       <Form form={form} onSubmit={onSubmit} className="space-y-6">
         <FormError />
 
-        <FormInput name="email" label="E-posta" type="email" placeholder="admin@tarodan.com" />
+        <FormInput name="email" label={t('common.email')} type="email" placeholder="admin@tarodan.com" />
 
-        <FormInput name="password" label="Şifre" type="password" placeholder="••••••••" />
+        <FormInput name="password" label={t('admin.auth.common.password')} type="password" placeholder="••••••••" />
 
         {requires2FA && (
-          <FormInput name="twoFactorCode" label="Doğrulama Kodu" placeholder="000000" maxLength={6} />
+          <FormInput
+            name="twoFactorCode"
+            label={t('admin.auth.login.verificationCode')}
+            placeholder="000000"
+            maxLength={6}
+          />
         )}
 
         <Button
@@ -37,7 +44,7 @@ export function LoginForm() {
           isLoading={form.formState.isSubmitting}
           className="w-full"
         >
-          Giriş Yap
+          {t('common.login')}
         </Button>
 
         <p className="text-center">
@@ -45,7 +52,7 @@ export function LoginForm() {
             href="/forgot-password"
             className="text-sm font-medium text-primary-600 hover:text-primary-700"
           >
-            Şifremi unuttum?
+            {t('admin.auth.login.forgotPasswordLink')}
           </Link>
         </p>
       </Form>

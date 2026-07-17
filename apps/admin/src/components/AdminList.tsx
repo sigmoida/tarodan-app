@@ -4,6 +4,7 @@
 
 import { type ComponentType, type ReactNode } from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { MagnifyingGlassIcon, ChevronLeftIcon } from '@heroicons/react/24/outline';
 import { Button, IconButton, iconButtonVariants, Input } from '@tarodan/ui';
 
@@ -18,7 +19,7 @@ export function PageHeader({
 	badge,
 	description,
 	backHref,
-	backLabel = 'Geri',
+	backLabel,
 	children,
 }: {
 	title: ReactNode;
@@ -30,14 +31,16 @@ export function PageHeader({
 	backLabel?: string;
 	children?: ReactNode;
 }) {
+	const t = useTranslations();
+	const resolvedBackLabel = backLabel ?? t('common.back');
 	return (
 		<div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
 			<div className='flex min-w-0 items-start gap-2'>
 				{backHref && (
 					<Link
 						href={backHref}
-						aria-label={backLabel}
-						title={backLabel}
+						aria-label={resolvedBackLabel}
+						title={resolvedBackLabel}
 						// h-8 = text-2xl line box → items-center aligns the chevron to the title's vertical center
 						className='-ml-1 flex h-8 items-center rounded-lg px-1 text-muted transition-colors hover:bg-surface-alt hover:text-heading'>
 						<ChevronLeftIcon className='h-7 w-7' />
@@ -64,7 +67,7 @@ export function FilterToolbar({
 	search,
 	onSearchChange,
 	onSearchSubmit,
-	searchPlaceholder = 'Ara...',
+	searchPlaceholder,
 	children,
 }: {
 	search: string;
@@ -74,6 +77,7 @@ export function FilterToolbar({
 	/** Filter controls on the right (Selects, etc.). */
 	children?: ReactNode;
 }) {
+	const t = useTranslations();
 	return (
 		<div className='flex flex-col gap-3 sm:flex-row'>
 			<div className='relative flex-1'>
@@ -84,7 +88,7 @@ export function FilterToolbar({
 					onKeyDown={(e) => {
 						if (e.key === 'Enter') onSearchSubmit?.();
 					}}
-					placeholder={searchPlaceholder}
+					placeholder={searchPlaceholder ?? t('admin.shared.filterToolbar.placeholder')}
 					className='pl-10'
 				/>
 			</div>
@@ -102,10 +106,13 @@ export function BulkActionBar({
 	children: ReactNode;
 	onClear?: () => void;
 }) {
+	const t = useTranslations();
 	if (count <= 0) return null;
 	return (
 		<div className='flex flex-wrap items-center gap-3 rounded-lg border border-primary-200 bg-primary-50 px-4 py-2'>
-			<span className='text-sm font-medium text-body'>{count} seçili</span>
+			<span className='text-sm font-medium text-body'>
+				{t('admin.shared.bulkActionBar.selectedCount', { count })}
+			</span>
 			<div className='flex flex-wrap items-center gap-2'>{children}</div>
 			{onClear && (
 				<Button
@@ -113,7 +120,7 @@ export function BulkActionBar({
 					size='sm'
 					onClick={onClear}
 					className='ml-auto text-muted hover:text-body'>
-					Seçimi temizle
+					{t('admin.shared.bulkActionBar.clearSelection')}
 				</Button>
 			)}
 		</div>

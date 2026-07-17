@@ -5,17 +5,22 @@ import { Noto_Sans } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import { NextIntlClientProvider } from "next-intl";
-import { getLocale, getMessages } from "next-intl/server";
+import { getLocale, getMessages, getTranslations } from "next-intl/server";
+import { APP_NAME } from "@/lib/navigation";
 
 const notoSans = Noto_Sans({
   subsets: ["latin", "latin-ext"],
   weight: "400",
 });
 
-export const metadata: Metadata = {
-  title: "Tarodan Admin",
-  description: "Tarodan Marketplace yönetim paneli",
-};
+/** Async so the description can come from the request-resolved locale (title stays the brand name, not translated). */
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations();
+  return {
+    title: APP_NAME,
+    description: t("admin.nav.defaultDescription"),
+  };
+}
 
 /**
  * Root layout. Async so it can resolve the request locale (from the NEXT_LOCALE

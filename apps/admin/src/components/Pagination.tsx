@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Button } from "@tarodan/ui";
 
 interface PaginationProps {
@@ -14,10 +15,11 @@ interface PaginationProps {
  * Appearance is identical to the existing pages.
  */
 export function Pagination({ page, totalPages, onPageChange }: PaginationProps) {
+  const t = useTranslations();
   return (
     <div className="flex items-center justify-between">
       <p className="text-sm text-muted">
-        Sayfa {page} / {totalPages}
+        {t("admin.shared.pagination.pageInfo", { page, totalPages })}
       </p>
       <div className="flex gap-2">
         <Button
@@ -25,14 +27,14 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
           onClick={() => onPageChange(Math.max(1, page - 1))}
           disabled={page === 1}
         >
-          Önceki
+          {t("common.previous")}
         </Button>
         <Button
           variant="secondary"
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages}
         >
-          Sonraki
+          {t("admin.shared.pagination.next")}
         </Button>
       </div>
     </div>

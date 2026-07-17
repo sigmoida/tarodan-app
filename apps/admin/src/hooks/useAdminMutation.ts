@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient, type UseMutationOptions } from '@tanstack/react-query';
+import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 
 export interface UseAdminMutationOptions<TData, TVars> {
@@ -33,14 +34,16 @@ function apiErrorMessage(error: unknown): string | undefined {
  */
 export function useAdminMutation<TData, TVars = void>(
   mutationFn: (vars: TVars) => Promise<TData>,
-  {
+  options: UseAdminMutationOptions<TData, TVars> = {},
+) {
+  const t = useTranslations();
+  const {
     invalidates = [],
     successMessage,
-    errorMessage = 'İşlem başarısız',
+    errorMessage = t('common.operationFailed'),
     onSuccess,
     mutation,
-  }: UseAdminMutationOptions<TData, TVars> = {},
-) {
+  } = options;
   const queryClient = useQueryClient();
 
   return useMutation<TData, unknown, TVars>({

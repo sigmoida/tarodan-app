@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Input } from '@tarodan/ui';
 import { useFilter } from '@/context/ResourceListContext';
 
@@ -11,6 +12,7 @@ export function ResourceListDateRange({
   fromName?: string;
   toName?: string;
 }) {
+  const t = useTranslations();
   const [from, setFrom] = useFilter(fromName);
   const [to, setTo] = useFilter(toName);
   return (
@@ -20,14 +22,14 @@ export function ResourceListDateRange({
         value={from}
         onChange={(e) => setFrom(e.target.value)}
         className="flex-1 sm:w-40 sm:flex-none"
-        aria-label="Başlangıç tarihi"
+        aria-label={t('admin.shared.dateRange.startDate')}
       />
       <Input
         type="date"
         value={to}
         onChange={(e) => setTo(e.target.value)}
         className="flex-1 sm:w-40 sm:flex-none"
-        aria-label="Bitiş tarihi"
+        aria-label={t('admin.shared.dateRange.endDate')}
       />
     </div>
   );

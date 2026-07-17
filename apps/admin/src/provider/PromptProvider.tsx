@@ -7,6 +7,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
+import { useTranslations } from "next-intl";
 import { Dialog, ModalFooter, Textarea, Input, Label, FormField } from "@tarodan/ui";
 
 export interface PromptOptions {
@@ -84,16 +85,17 @@ function PromptDialog({
   onCancel: () => void;
   onSubmit: (value: string) => void;
 }) {
+  const t = useTranslations();
   const {
-    title = "Bir değer girin",
+    title = t("admin.shared.prompt.defaultTitle"),
     description,
     label,
     placeholder,
     defaultValue = "",
-    confirmLabel = "Onayla",
-    cancelLabel = "Vazgeç",
+    confirmLabel = t("common.confirm"),
+    cancelLabel = t("admin.shared.prompt.cancel"),
     required = true,
-    requiredMessage = "Bu alan zorunludur",
+    requiredMessage = t("admin.shared.prompt.requiredMessage"),
     multiline = true,
     maxLength,
     destructive,

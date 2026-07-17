@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { navGroups } from '@/lib/navigation';
+import { useTranslations } from 'next-intl';
+import { getNavGroups } from '@/lib/navigation';
 
 const OPEN_GROUPS_STORAGE_KEY = 'admin-nav-open-groups';
 
@@ -10,13 +11,16 @@ const OPEN_GROUPS_STORAGE_KEY = 'admin-nav-open-groups';
  * group auto-opens, and the user's open/closed choice persists in localStorage.
  */
 export function useNavGroups(pathname: string) {
+  const t = useTranslations();
+  const navGroups = useMemo(() => getNavGroups(t), [t]);
+
   // The group containing the active route auto-opens.
   const activeGroupId = useMemo(() => {
     for (const g of navGroups) {
       if (g.items.some((item) => pathname.startsWith(item.href))) return g.id;
     }
     return null;
-  }, [pathname]);
+  }, [pathname, navGroups]);
 
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
   const [hydrated, setHydrated] = useState(false);
