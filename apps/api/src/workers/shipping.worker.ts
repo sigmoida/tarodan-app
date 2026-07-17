@@ -2,26 +2,38 @@
  * Shipping Processing Worker
  * Handles shipment creation, tracking updates, and carrier webhooks
  */
-import { Processor, Process, OnQueueFailed, OnQueueCompleted } from '@nestjs/bull';
-import { Logger } from '@nestjs/common';
-import { Job } from 'bull';
-import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../prisma';
-import { PaymentService } from '../modules/payment/payment.service';
-import { SuratTrackingService } from '../modules/surat-cargo/surat-tracking.service';
-import { NotificationService } from '../modules/notification/notification.service';
-import { ShipmentStatus, OrderStatus } from '@prisma/client';
+import {
+  Processor,
+  Process,
+  OnQueueFailed,
+  OnQueueCompleted,
+} from "@nestjs/bull";
+import { Logger } from "@nestjs/common";
+import { Job } from "bull";
+import { ConfigService } from "@nestjs/config";
+import { PrismaService } from "../prisma";
+import { PaymentService } from "../modules/payment/payment.service";
+import { SuratTrackingService } from "../modules/surat-cargo/surat-tracking.service";
+import { NotificationService } from "../modules/notification/notification.service";
+import { ShipmentStatus, OrderStatus } from "@prisma/client";
+import { canTransitionShipmentStatus } from "../modules/shipping/shipment-state-machine";
 
 export interface ShippingJobData {
-  type: 'create-shipment' | 'track-update' | 'webhook' | 'generate-label' | 'surat-sync' | 'surat-sync-all';
+  type:
+    | "create-shipment"
+    | "track-update"
+    | "webhook"
+    | "generate-label"
+    | "surat-sync"
+    | "surat-sync-all";
   orderId?: string;
   shipmentId?: string;
-  carrier?: 'surat';
+  carrier?: "surat";
   trackingNumber?: string;
   webhookData?: Record<string, any>;
 }
 
-@Processor('shipping')
+@Processor("shipping")
 export class ShippingWorker {
   private readonly logger = new Logger(ShippingWorker.name);
 
@@ -33,11 +45,13 @@ export class ShippingWorker {
     private readonly notificationService: NotificationService,
   ) {}
 
-  @Process('create-shipment')
+  @Process("create-shipment")
   async handleCreateShipment(job: Job<ShippingJobData>) {
-    this.logger.log(`Processing create shipment job ${job.id} for order ${job.data.orderId}`);
+    this.logger.log(
+      `Processing create shipment job ${job.id} for order ${job.data.orderId}`,
+    );
 
-    const { orderId, carrier = 'surat' } = job.data;
+    const { orderId, carrier = "surat" } = job.data;
 
     try {
       const order = await this.prisma.order.findUnique({
@@ -75,12 +89,20 @@ export class ShippingWorker {
       // Alıcıya "kargoya verildi" bildirimi (push + in_app). Önceden notifyOrderShipped
       // hiçbir yerden çağrılmıyordu → kargolanma sessizdi.
       try {
-        await this.notificationService.notifyOrderShipped(order.buyerId, orderId, trackingNumber);
+        await this.notificationService.notifyOrderShipped(
+          order.buyerId,
+          orderId,
+          trackingNumber,
+        );
       } catch (e: any) {
-        this.logger.warn(`notifyOrderShipped failed for ${orderId}: ${e?.message}`);
+        this.logger.warn(
+          `notifyOrderShipped failed for ${orderId}: ${e?.message}`,
+        );
       }
 
-      this.logger.log(`Shipment created: ${shipment.id}, tracking: ${trackingNumber}`);
+      this.logger.log(
+        `Shipment created: ${shipment.id}, tracking: ${trackingNumber}`,
+      );
 
       return {
         success: true,
@@ -89,12 +111,14 @@ export class ShippingWorker {
         carrier,
       };
     } catch (error: any) {
-      this.logger.error(`Failed to create shipment for order ${orderId}: ${error.message}`);
+      this.logger.error(
+        `Failed to create shipment for order ${orderId}: ${error.message}`,
+      );
       throw error;
     }
   }
 
-  @Process('track-update')
+  @Process("track-update")
   async handleTrackUpdate(job: Job<ShippingJobData>) {
     this.logger.log(`Processing tracking update job ${job.id}`);
 
@@ -110,19 +134,28 @@ export class ShippingWorker {
       }
 
       // Sürat Kargo uses its own tracking service (the only active carrier)
-      if (shipment.provider === 'surat') {
-        const success = await this.suratTrackingService.syncShipmentTracking(shipment.id);
-        return { success, shipmentId: shipment.id, provider: 'surat' };
+      if (shipment.provider === "surat") {
+        const success = await this.suratTrackingService.syncShipmentTracking(
+          shipment.id,
+        );
+        return { success, shipmentId: shipment.id, provider: "surat" };
       }
 
       // Legacy/fallback tracking path for any non-Sürat records (mock)
       const trackingInfo = await this.fetchTrackingInfo(
         shipment.provider,
-        shipment.trackingNumber || '',
+        shipment.trackingNumber || "",
       );
 
       // Update shipment status
       const newStatus = this.mapStatusToEnum(trackingInfo.status);
+      // #86: don't regress a terminal shipment from a stale/legacy tracking read.
+      if (!canTransitionShipmentStatus(shipment.status, newStatus)) {
+        this.logger.warn(
+          `Skipping illegal shipment transition ${shipment.status} → ${newStatus} for ${shipment.id} (worker track-update)`,
+        );
+        return { success: true, shipmentId: shipment.id, skipped: true };
+      }
       await this.prisma.shipment.update({
         where: { id: shipment.id },
         data: {
@@ -147,7 +180,12 @@ export class ShippingWorker {
           shipment.orderId,
           new Date(),
         );
-        if (res.acted && res.use48h && res.confirmationDeadline && res.buyerId) {
+        if (
+          res.acted &&
+          res.use48h &&
+          res.confirmationDeadline &&
+          res.buyerId
+        ) {
           this.logger.log(
             `Order ${shipment.orderId} entered 48h window (track-update); deadline=${res.confirmationDeadline.toISOString()}`,
           );
@@ -179,30 +217,33 @@ export class ShippingWorker {
   /**
    * Sync a single Sürat shipment's tracking status.
    */
-  @Process('surat-sync')
+  @Process("surat-sync")
   async handleSuratSync(job: Job<ShippingJobData>) {
-    this.logger.log(`Processing Surat sync job ${job.id} for shipment ${job.data.shipmentId}`);
+    this.logger.log(
+      `Processing Surat sync job ${job.id} for shipment ${job.data.shipmentId}`,
+    );
 
     const { shipmentId } = job.data;
     if (!shipmentId) {
-      throw new Error('shipmentId required for surat-sync');
+      throw new Error("shipmentId required for surat-sync");
     }
 
-    const success = await this.suratTrackingService.syncShipmentTracking(shipmentId);
+    const success =
+      await this.suratTrackingService.syncShipmentTracking(shipmentId);
     return { success, shipmentId };
   }
 
   /**
    * Sync all active Sürat shipments. Intended for periodic cron/scheduled jobs.
    */
-  @Process('surat-sync-all')
+  @Process("surat-sync-all")
   async handleSuratSyncAll(job: Job<ShippingJobData>) {
     this.logger.log(`Processing Surat sync-all job ${job.id}`);
     const result = await this.suratTrackingService.syncAllActiveShipments();
     return result;
   }
 
-  @Process('webhook')
+  @Process("webhook")
   async handleWebhook(job: Job<ShippingJobData>) {
     this.logger.log(`Processing shipping webhook job ${job.id}`);
 
@@ -210,11 +251,14 @@ export class ShippingWorker {
 
     try {
       if (!carrier || !webhookData) {
-        throw new Error('Missing carrier or webhook data');
+        throw new Error("Missing carrier or webhook data");
       }
 
       // Parse webhook based on carrier
-      const trackingNumber = this.parseWebhookTrackingNumber(carrier, webhookData);
+      const trackingNumber = this.parseWebhookTrackingNumber(
+        carrier,
+        webhookData,
+      );
       const statusStr = this.parseWebhookStatus(carrier, webhookData);
       const status = this.mapStatusToEnum(statusStr);
 
@@ -224,7 +268,15 @@ export class ShippingWorker {
 
       if (!shipment) {
         this.logger.warn(`Shipment not found for webhook: ${trackingNumber}`);
-        return { success: false, reason: 'Shipment not found' };
+        return { success: false, reason: "Shipment not found" };
+      }
+
+      // #86: ignore out-of-order webhook events that would regress a terminal shipment.
+      if (!canTransitionShipmentStatus(shipment.status, status)) {
+        this.logger.warn(
+          `Skipping illegal shipment transition ${shipment.status} → ${status} for ${shipment.id} (worker webhook ${carrier})`,
+        );
+        return { success: true, shipmentId: shipment.id, skipped: true };
       }
 
       // Update shipment
@@ -243,7 +295,12 @@ export class ShippingWorker {
           shipment.orderId,
           new Date(),
         );
-        if (res.acted && res.use48h && res.confirmationDeadline && res.buyerId) {
+        if (
+          res.acted &&
+          res.use48h &&
+          res.confirmationDeadline &&
+          res.buyerId
+        ) {
           this.logger.log(
             `Order ${shipment.orderId} entered 48h window (webhook); deadline=${res.confirmationDeadline.toISOString()}`,
           );
@@ -268,11 +325,11 @@ export class ShippingWorker {
     }
   }
 
-  @Process('generate-label')
+  @Process("generate-label")
   async handleGenerateLabel(job: Job<ShippingJobData>) {
     this.logger.log(`Processing label generation job ${job.id}`);
 
-    const { orderId, carrier = 'surat' } = job.data;
+    const { orderId, carrier = "surat" } = job.data;
 
     try {
       const order = await this.prisma.order.findUnique({
@@ -292,7 +349,11 @@ export class ShippingWorker {
       }
 
       // In production: Call carrier API to generate label
-      const labelUrl = await this.generateCarrierLabel(carrier, order, shipment);
+      const labelUrl = await this.generateCarrierLabel(
+        carrier,
+        order,
+        shipment,
+      );
 
       // Update shipment with label URL
       await this.prisma.shipment.update({
@@ -306,7 +367,9 @@ export class ShippingWorker {
         labelUrl,
       };
     } catch (error: any) {
-      this.logger.error(`Failed to generate label for order ${orderId}: ${error.message}`);
+      this.logger.error(
+        `Failed to generate label for order ${orderId}: ${error.message}`,
+      );
       throw error;
     }
   }
@@ -343,37 +406,47 @@ export class ShippingWorker {
     // In production: Call actual carrier API
     this.logger.log(`Fetching tracking info for ${carrier}: ${trackingNumber}`);
     return {
-      status: 'IN_TRANSIT',
-      lastLocation: 'İstanbul Dağıtım Merkezi',
+      status: "IN_TRANSIT",
+      lastLocation: "İstanbul Dağıtım Merkezi",
     };
   }
 
-  private parseWebhookTrackingNumber(carrier: string, data: Record<string, any>): string {
+  private parseWebhookTrackingNumber(
+    carrier: string,
+    data: Record<string, any>,
+  ): string {
     // Parse tracking number based on carrier webhook format
-    return data?.trackingNumber || data?.tracking_number || data?.barcode || '';
+    return data?.trackingNumber || data?.tracking_number || data?.barcode || "";
   }
 
-  private parseWebhookStatus(carrier: string, data: Record<string, any>): string {
+  private parseWebhookStatus(
+    carrier: string,
+    data: Record<string, any>,
+  ): string {
     // Map carrier status to our status
-    return data?.status || 'IN_TRANSIT';
+    return data?.status || "IN_TRANSIT";
   }
 
   private mapStatusToEnum(status: string): ShipmentStatus {
     const statusMap: Record<string, ShipmentStatus> = {
-      'PICKED_UP': ShipmentStatus.picked_up,
-      'IN_TRANSIT': ShipmentStatus.in_transit,
-      'AT_DELIVERY_BRANCH': ShipmentStatus.at_delivery_branch,
-      'OUT_FOR_DELIVERY': ShipmentStatus.out_for_delivery,
-      'DELIVERED': ShipmentStatus.delivered,
-      'RETURN_IN_PROGRESS': ShipmentStatus.return_in_progress,
-      'RETURNED': ShipmentStatus.returned,
-      'FAILED': ShipmentStatus.failed,
-      'CANCELLED': ShipmentStatus.cancelled,
+      PICKED_UP: ShipmentStatus.picked_up,
+      IN_TRANSIT: ShipmentStatus.in_transit,
+      AT_DELIVERY_BRANCH: ShipmentStatus.at_delivery_branch,
+      OUT_FOR_DELIVERY: ShipmentStatus.out_for_delivery,
+      DELIVERED: ShipmentStatus.delivered,
+      RETURN_IN_PROGRESS: ShipmentStatus.return_in_progress,
+      RETURNED: ShipmentStatus.returned,
+      FAILED: ShipmentStatus.failed,
+      CANCELLED: ShipmentStatus.cancelled,
     };
     return statusMap[status] || ShipmentStatus.in_transit;
   }
 
-  private async generateCarrierLabel(carrier: string, order: any, shipment: any): Promise<string> {
+  private async generateCarrierLabel(
+    carrier: string,
+    order: any,
+    shipment: any,
+  ): Promise<string> {
     // In production: Call carrier API to generate shipping label
     this.logger.log(`Generating ${carrier} label for order ${order.id}`);
     return `https://storage.tarodan.com/labels/${shipment.trackingNumber}.pdf`;

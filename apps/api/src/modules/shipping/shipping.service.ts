@@ -4,14 +4,20 @@ import {
   BadRequestException,
   ForbiddenException,
   Logger,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../prisma';
-import { PaymentService } from '../payment/payment.service';
-import { NotificationService } from '../notification/notification.service';
-import { CreateShipmentDto, CalculateShippingDto, UpdateTrackingDto, ShippingProvider } from './dto';
-import { resolveShippingDestinationCity } from './shipping-destination.util';
-import { ShipmentStatus, OrderStatus } from '@prisma/client';
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { PrismaService } from "../../prisma";
+import { PaymentService } from "../payment/payment.service";
+import { NotificationService } from "../notification/notification.service";
+import {
+  CreateShipmentDto,
+  CalculateShippingDto,
+  UpdateTrackingDto,
+  ShippingProvider,
+} from "./dto";
+import { resolveShippingDestinationCity } from "./shipping-destination.util";
+import { canTransitionShipmentStatus } from "./shipment-state-machine";
+import { ShipmentStatus, OrderStatus } from "@prisma/client";
 
 @Injectable()
 export class ShippingService {
@@ -19,12 +25,13 @@ export class ShippingService {
 
   // Provider display names
   private readonly providerNames: Record<ShippingProvider, string> = {
-    [ShippingProvider.surat]: 'Sürat Kargo',
+    [ShippingProvider.surat]: "Sürat Kargo",
   };
 
   // Base tracking URLs
   private readonly trackingUrls: Record<ShippingProvider, string> = {
-    [ShippingProvider.surat]: 'https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=',
+    [ShippingProvider.surat]:
+      "https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=",
   };
 
   constructor(
@@ -44,22 +51,22 @@ export class ShippingService {
       carriers: [
         {
           id: ShippingProvider.surat,
-          name: 'Sürat Kargo',
-          code: 'surat',
-          logo: 'https://www.suratkargo.com.tr/images/logo.png',
+          name: "Sürat Kargo",
+          code: "surat",
+          logo: "https://www.suratkargo.com.tr/images/logo.png",
           trackingUrl: this.trackingUrls[ShippingProvider.surat],
           features: [
-            'Standart Teslimat',
-            'Adrese Teslim',
-            'Şubede Teslim',
-            'SMS Bilgilendirme',
+            "Standart Teslimat",
+            "Adrese Teslim",
+            "Şubede Teslim",
+            "SMS Bilgilendirme",
           ],
           estimatedDelivery: {
-            sameCity: '1-2 iş günü',
-            interCity: '2-4 iş günü',
+            sameCity: "1-2 iş günü",
+            interCity: "2-4 iş günü",
           },
           isActive: true,
-          supportedRegions: ['Türkiye'],
+          supportedRegions: ["Türkiye"],
         },
       ],
       defaultCarrier: ShippingProvider.surat,
@@ -80,7 +87,7 @@ export class ShippingService {
     ]);
 
     if (!fromAddress || !toAddress) {
-      throw new NotFoundException('Adres bulunamadı');
+      throw new NotFoundException("Adres bulunamadı");
     }
 
     // Calculate rates for each provider
@@ -111,14 +118,25 @@ export class ShippingService {
    * Get single shipping rate by city (for checkout)
    * Used when we only have destination city, not address IDs.
    */
-  async getRateByCity(city: string, carrier: string, weightKg: number): Promise<{ rate: number }> {
-    const provider = Object.values(ShippingProvider).includes(carrier as ShippingProvider)
+  async getRateByCity(
+    city: string,
+    carrier: string,
+    weightKg: number,
+  ): Promise<{ rate: number }> {
+    const provider = Object.values(ShippingProvider).includes(
+      carrier as ShippingProvider,
+    )
       ? (carrier as ShippingProvider)
       : ShippingProvider.surat;
     const weight = weightKg > 0 ? weightKg : 0.5;
-    const fromCity = 'İstanbul'; // Default origin for rate calculation
-    const toCity = city?.trim() || 'İstanbul';
-    const result = await this.calculateProviderRate(provider, fromCity, toCity, weight);
+    const fromCity = "İstanbul"; // Default origin for rate calculation
+    const toCity = city?.trim() || "İstanbul";
+    const result = await this.calculateProviderRate(
+      provider,
+      fromCity,
+      toCity,
+      weight,
+    );
     return { rate: result.cost };
   }
 
@@ -130,7 +148,7 @@ export class ShippingService {
   ) {
     // Base rate from PlatformSetting or default
     const baseSetting = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: 'shipping_base_cost' },
+      where: { settingKey: "shipping_base_cost" },
     });
     const baseRate = baseSetting ? parseFloat(baseSetting.settingValue) : 29.99;
 
@@ -145,16 +163,18 @@ export class ShippingService {
     // Weight factor
     const weightFactor = weight > 1 ? 1 + (weight - 1) * 0.15 : 1;
 
-    const cost = Math.round(baseRates[provider] * cityMultiplier * weightFactor * 100) / 100;
+    const cost =
+      Math.round(baseRates[provider] * cityMultiplier * weightFactor * 100) /
+      100;
 
     // Estimated delivery
-    const deliveryDays = isSameCity ? '1-2' : '2-3';
+    const deliveryDays = isSameCity ? "1-2" : "2-3";
 
     return {
       provider,
       providerName: this.providerNames[provider],
       cost,
-      currency: 'TRY',
+      currency: "TRY",
       estimatedDelivery: `${deliveryDays} iş günü`,
     };
   }
@@ -174,16 +194,16 @@ export class ShippingService {
     });
 
     if (!order) {
-      throw new NotFoundException('Sipariş bulunamadı');
+      throw new NotFoundException("Sipariş bulunamadı");
     }
 
     if (order.sellerId !== sellerId) {
-      throw new ForbiddenException('Bu sipariş için kargo oluşturamazsınız');
+      throw new ForbiddenException("Bu sipariş için kargo oluşturamazsınız");
     }
 
     // Order must be in preparing status
     if (order.status !== OrderStatus.preparing) {
-      throw new BadRequestException('Sipariş hazırlanma durumunda değil');
+      throw new BadRequestException("Sipariş hazırlanma durumunda değil");
     }
 
     // Check for existing shipment
@@ -192,13 +212,13 @@ export class ShippingService {
     });
 
     if (existingShipment) {
-      throw new BadRequestException('Bu sipariş için zaten kargo oluşturulmuş');
+      throw new BadRequestException("Bu sipariş için zaten kargo oluşturulmuş");
     }
 
     // Calculate shipping cost
     const sellerAddress = order.seller.addresses[0];
     if (!sellerAddress) {
-      throw new BadRequestException('Satıcı adresi bulunamadı');
+      throw new BadRequestException("Satıcı adresi bulunamadı");
     }
 
     let shippingAddrRow: { city: string | null } | null = null;
@@ -245,18 +265,33 @@ export class ShippingService {
    * Update tracking number (seller uploads tracking)
    * PATCH /shipping/:id/tracking
    */
-  async updateTracking(shipmentId: string, sellerId: string, dto: UpdateTrackingDto) {
+  async updateTracking(
+    shipmentId: string,
+    sellerId: string,
+    dto: UpdateTrackingDto,
+  ) {
     const shipment = await this.prisma.shipment.findUnique({
       where: { id: shipmentId },
       include: { order: true },
     });
 
     if (!shipment) {
-      throw new NotFoundException('Kargo bulunamadı');
+      throw new NotFoundException("Kargo bulunamadı");
     }
 
     if (shipment.order.sellerId !== sellerId) {
-      throw new ForbiddenException('Bu kargoyu güncelleme yetkiniz yok');
+      throw new ForbiddenException("Bu kargoyu güncelleme yetkiniz yok");
+    }
+
+    // #86: guard the manual "mark picked up" against illegal regressions — a
+    // shipment that is already delivered/returned/cancelled must not be flipped
+    // back to picked_up (would desync the order and, post-delivery, escrow).
+    if (
+      !canTransitionShipmentStatus(shipment.status, ShipmentStatus.picked_up)
+    ) {
+      throw new BadRequestException(
+        "Kargo bu durumda güncellenemez (teslim edilmiş, iade veya iptal).",
+      );
     }
 
     const trackingUrl =
@@ -279,9 +314,9 @@ export class ShippingService {
       await tx.shipmentEvent.create({
         data: {
           shipmentId,
-          status: 'picked_up',
-          location: 'Satıcı',
-          description: 'Kargo teslim alındı',
+          status: "picked_up",
+          location: "Satıcı",
+          description: "Kargo teslim alındı",
           occurredAt: new Date(),
         },
       });
@@ -306,7 +341,9 @@ export class ShippingService {
         dto.trackingNumber,
       );
     } catch (e: any) {
-      this.logger.warn(`notifyOrderShipped failed for ${shipment.orderId}: ${e?.message}`);
+      this.logger.warn(
+        `notifyOrderShipped failed for ${shipment.orderId}: ${e?.message}`,
+      );
     }
 
     return result;
@@ -329,8 +366,10 @@ export class ShippingService {
     });
 
     if (!shipment) {
-      this.logger.warn(`Shipment not found for tracking: ${payload.trackingNumber}`);
-      return { status: 'ignored' };
+      this.logger.warn(
+        `Shipment not found for tracking: ${payload.trackingNumber}`,
+      );
+      return { status: "ignored" };
     }
 
     // Map provider status to our status
@@ -343,6 +382,16 @@ export class ShippingService {
     };
 
     const newStatus = statusMap[payload.status] || ShipmentStatus.in_transit;
+
+    // #86: ignore out-of-order / illegal provider events (e.g. a late in_transit
+    // after delivered) instead of blind-writing them and regressing the shipment.
+    if (!canTransitionShipmentStatus(shipment.status, newStatus)) {
+      this.logger.warn(
+        `Ignoring illegal shipment transition ${shipment.status} → ${newStatus} ` +
+          `for ${shipment.id} (provider webhook ${provider})`,
+      );
+      return { status: "ignored" };
+    }
 
     // Y11: Teslimat işlemini tüm yollarla TUTARLI yap. 48h dallanması + escrow schedule
     // artık tek kanonik handler'da (paymentService.handleOrderDelivered) — geldiği yola göre
@@ -359,9 +408,11 @@ export class ShippingService {
         data: {
           shipmentId: shipment.id,
           status: newStatus,
-          location: payload.location || 'Bilinmiyor',
+          location: payload.location || "Bilinmiyor",
           description: payload.description,
-          occurredAt: payload.timestamp ? new Date(payload.timestamp) : new Date(),
+          occurredAt: payload.timestamp
+            ? new Date(payload.timestamp)
+            : new Date(),
         },
       });
 
@@ -377,7 +428,7 @@ export class ShippingService {
         );
       }
 
-      return { status: 'ok' };
+      return { status: "ok" };
     });
 
     return result;
@@ -397,18 +448,21 @@ export class ShippingService {
           },
         },
         events: {
-          orderBy: { occurredAt: 'desc' },
+          orderBy: { occurredAt: "desc" },
         },
       },
     });
 
     if (!shipment) {
-      throw new NotFoundException('Kargo bulunamadı');
+      throw new NotFoundException("Kargo bulunamadı");
     }
 
     // Only buyer or seller can view
-    if (shipment.order.buyerId !== userId && shipment.order.sellerId !== userId) {
-      throw new ForbiddenException('Bu kargoyu görüntüleme yetkiniz yok');
+    if (
+      shipment.order.buyerId !== userId &&
+      shipment.order.sellerId !== userId
+    ) {
+      throw new ForbiddenException("Bu kargoyu görüntüleme yetkiniz yok");
     }
 
     return this.formatShipmentResponse(shipment);
@@ -423,24 +477,26 @@ export class ShippingService {
     });
 
     if (!order) {
-      throw new NotFoundException('Sipariş bulunamadı');
+      throw new NotFoundException("Sipariş bulunamadı");
     }
 
     if (order.buyerId !== userId && order.sellerId !== userId) {
-      throw new ForbiddenException('Bu siparişin kargosunu görüntüleme yetkiniz yok');
+      throw new ForbiddenException(
+        "Bu siparişin kargosunu görüntüleme yetkiniz yok",
+      );
     }
 
     const shipment = await this.prisma.shipment.findFirst({
       where: { orderId },
       include: {
         events: {
-          orderBy: { occurredAt: 'desc' },
+          orderBy: { occurredAt: "desc" },
         },
       },
     });
 
     if (!shipment) {
-      throw new NotFoundException('Bu sipariş için kargo bulunamadı');
+      throw new NotFoundException("Bu sipariş için kargo bulunamadı");
     }
 
     return this.formatShipmentResponse(shipment);
