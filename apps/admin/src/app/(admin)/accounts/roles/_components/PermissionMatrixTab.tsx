@@ -5,6 +5,7 @@ import {
   ArrowUturnLeftIcon,
   InformationCircleIcon,
 } from "@heroicons/react/24/outline";
+import { useTranslations } from "next-intl";
 import { Button } from "@tarodan/ui";
 import { usePermissionMatrix } from "../_lib/usePermissionMatrix";
 import { RoleSummaryCards } from "./RoleSummaryCards";
@@ -18,6 +19,7 @@ import { PermissionMatrixLegend } from "./PermissionMatrixLegend";
  * `useAdminMutation`, after which the page reloads to refresh the sidebar filter.
  */
 export function PermissionMatrixTab() {
+  const t = useTranslations();
   const matrix = usePermissionMatrix();
   const {
     isSuperAdmin,
@@ -37,11 +39,13 @@ export function PermissionMatrixTab() {
       {/* Top control bar */}
       <div className="bg-surface-elevated rounded-lg border border-border p-6 shadow-sm flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <h3 className="text-lg font-semibold text-heading">İzin Matrisi</h3>
+          <h3 className="text-lg font-semibold text-heading">
+            {t("admin.roles.matrix.title")}
+          </h3>
           <p className="mt-0.5 text-sm text-muted">
             {isSuperAdmin
-              ? "Düzenle moduna geçerek her rolün izinlerini tıklayarak değiştirebilirsiniz."
-              : "İzin matrisini yalnızca Süper Admin düzenleyebilir."}
+              ? t("admin.roles.matrix.editHint")
+              : t("admin.roles.matrix.viewOnlyHint")}
           </p>
         </div>
         {isSuperAdmin && (
@@ -54,21 +58,21 @@ export function PermissionMatrixTab() {
                   disabled={matrixSaving}
                   leftIcon={<ArrowUturnLeftIcon className="h-4 w-4" />}
                 >
-                  Varsayılana Sıfırla
+                  {t("admin.roles.matrix.resetToDefaults")}
                 </Button>
                 <Button
                   variant="secondary"
                   onClick={cancelEdit}
                   disabled={matrixSaving}
                 >
-                  İptal
+                  {t("common.cancel")}
                 </Button>
                 <Button
                   onClick={saveMatrix}
                   disabled={!matrixDirty || matrixSaving}
                   isLoading={matrixSaving}
                 >
-                  Kaydet
+                  {t("common.save")}
                 </Button>
               </>
             ) : (
@@ -76,7 +80,7 @@ export function PermissionMatrixTab() {
                 onClick={enterEdit}
                 leftIcon={<PencilIcon className="h-4 w-4" />}
               >
-                Düzenle
+                {t("common.edit")}
               </Button>
             )}
           </div>
@@ -87,13 +91,13 @@ export function PermissionMatrixTab() {
       {editMode && matrixDirty && (
         <div className="flex items-center gap-2 rounded-lg border border-warning-200 bg-warning-50 px-4 py-2.5 text-sm text-warning-800">
           <InformationCircleIcon className="h-4 w-4 shrink-0" />
-          Kaydedilmemiş değişiklikler var.
+          {t("admin.roles.matrix.unsavedWarning")}
         </div>
       )}
 
       {matrixLoading ? (
         <div className="bg-surface-elevated rounded-lg border border-border p-6 shadow-sm flex h-40 items-center justify-center text-sm text-muted">
-          Yükleniyor…
+          {t("admin.roles.matrix.loading")}
         </div>
       ) : (
         <>

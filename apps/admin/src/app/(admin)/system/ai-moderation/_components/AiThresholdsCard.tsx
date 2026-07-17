@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Button, Slider } from "@tarodan/ui";
 import { Form, useZodForm } from "@tarodan/ui/form";
 import { adminApi } from "@/lib/api";
@@ -10,6 +11,7 @@ import { type AiModerationConfig } from "../_lib/types";
 
 /** Relevance auto-accept + NSFW block thresholds (stored 0..1, edited as %). */
 export function AiThresholdsCard({ config }: { config?: AiModerationConfig }) {
+  const t = useTranslations();
   // `values` reseeds the sliders from the server config (and after each save's
   // refetch) — no useEffect mirror. Sliders are controlled, so the values are
   // driven via watch/setValue rather than register.
@@ -32,36 +34,36 @@ export function AiThresholdsCard({ config }: { config?: AiModerationConfig }) {
       }),
     {
       invalidates: ["ai-moderation-config"],
-      successMessage: "Eşikler kaydedildi",
+      successMessage: t("admin.aiModeration.thresholds.saved"),
     },
   );
 
   const disabled = config?.enabled === false;
 
   return (
-    <SectionCard title="AI Eşikleri" bodyClassName="space-y-4">
+    <SectionCard title={t("admin.aiModeration.thresholds.title")} bodyClassName="space-y-4">
       <Form form={form} onSubmit={(v) => save.mutate(v)} className="space-y-4">
         <Slider
           min={0}
           max={100}
           value={rel}
           onChange={(e) => form.setValue("rel", Number(e.target.value))}
-          label="Kabul eşiği (ilgililik %)"
-          valueLabel={`%${rel}`}
-          helperText="Ürün görseli bu yüzdenin üstünde ilgililik alırsa otomatik kabul edilir; altındakiler admin onayına düşer."
+          label={t("admin.aiModeration.thresholds.relevanceLabel")}
+          valueLabel={t("admin.aiModeration.thresholds.percentValue", { value: rel })}
+          helperText={t("admin.aiModeration.thresholds.relevanceHelper")}
         />
         <Slider
           min={0}
           max={100}
           value={nsfw}
           onChange={(e) => form.setValue("nsfw", Number(e.target.value))}
-          label="Uygunsuzluk eşiği (NSFW %)"
-          valueLabel={`%${nsfw}`}
-          helperText="Bir görselin uygunsuzluk skoru bu yüzdeyi aşarsa engellenir (avatar, koleksiyon, ürün ve diğer tüm görsel yüklemeleri kapsar)."
+          label={t("admin.aiModeration.thresholds.nsfwLabel")}
+          valueLabel={t("admin.aiModeration.thresholds.percentValue", { value: nsfw })}
+          helperText={t("admin.aiModeration.thresholds.nsfwHelper")}
         />
         <div className="flex justify-end">
           <Button type="submit" isLoading={save.isPending} disabled={disabled}>
-            Eşikleri Kaydet
+            {t("admin.aiModeration.thresholds.saveButton")}
           </Button>
         </div>
       </Form>

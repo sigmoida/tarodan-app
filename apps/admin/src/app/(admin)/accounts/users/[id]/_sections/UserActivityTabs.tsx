@@ -6,6 +6,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { CubeIcon, StarIcon } from '@heroicons/react/24/outline';
+import { useTranslations } from 'next-intl';
 import { StatusBadge } from '@tarodan/ui';
 import { SectionCard } from '@/components/detail/SectionCard';
 import { AdminTabs } from '@/components/AdminTabs';
@@ -14,7 +15,7 @@ import { getProductEffectivePrice } from '@/lib/product-price';
 import {
 	type UserDetail,
 	type UserRatingItem,
-	userStatusConfig,
+	getUserStatusConfig,
 } from '../types';
 
 function Stars({ score }: { score: number }) {
@@ -40,6 +41,7 @@ function RatingCard({
 	partyLabel: string;
 	party?: string;
 }) {
+	const t = useTranslations();
 	return (
 		<div className='rounded-lg bg-surface-alt p-4'>
 			<div className='mb-2 flex items-center justify-between'>
@@ -50,7 +52,7 @@ function RatingCard({
 			</div>
 			{rating.comment && <p className='text-muted'>{rating.comment}</p>}
 			<p className='mt-2 text-sm text-muted'>
-				{partyLabel}: {party || 'Bilinmiyor'}
+				{partyLabel}: {party || t('common.unknown')}
 			</p>
 		</div>
 	);
@@ -67,6 +69,8 @@ export function UserActivityTabs({
 	userId: string;
 	user: UserDetail;
 }) {
+	const t = useTranslations();
+	const userStatusConfig = getUserStatusConfig(t);
 	const [tab, setTab] = useState<
 		'orders' | 'products' | 'trades' | 'ratings' | 'ai'
 	>('orders');
@@ -74,17 +78,25 @@ export function UserActivityTabs({
 	const tabs = [
 		{
 			key: 'orders',
-			label: 'Siparişler',
+			label: t('admin.operations.orders.title'),
 			badge: user.recentOrders?.length || 0,
 		},
-		{ key: 'products', label: 'Ürünler', badge: user.products?.length || 0 },
-		{ key: 'trades', label: 'Takaslar', badge: user.recentTrades?.length || 0 },
+		{
+			key: 'products',
+			label: t('admin.catalog.products.title'),
+			badge: user.products?.length || 0,
+		},
+		{
+			key: 'trades',
+			label: t('admin.operations.trades.title'),
+			badge: user.recentTrades?.length || 0,
+		},
 		{
 			key: 'ratings',
-			label: 'Değerlendirmeler',
+			label: t('admin.users.detail.ratingsTab'),
 			badge: user.receivedRatings?.length || 0,
 		},
-		{ key: 'ai', label: 'AI Denetim' },
+		{ key: 'ai', label: t('admin.catalog.common.aiModeration') },
 	];
 
 	return (
@@ -110,7 +122,9 @@ export function UserActivityTabs({
 													? 'bg-info-500/20 text-info-700'
 													: 'bg-success-500/20 text-success-700'
 											}`}>
-											{order.role === 'buyer' ? 'Alıcı' : 'Satıcı'}
+											{order.role === 'buyer'
+												? t('admin.operations.common.buyer')
+												: t('admin.operations.common.seller')}
 										</span>
 										<Link
 											href={`/operations/orders/${order.id}`}
@@ -123,8 +137,11 @@ export function UserActivityTabs({
 										/>
 									</div>
 									<p className='mt-1 text-sm text-muted'>
-										{order.role === 'buyer' ? 'Satıcı' : 'Alıcı'}:{' '}
-										{order.otherParty?.displayName || 'Bilinmiyor'}
+										{order.role === 'buyer'
+											? t('admin.operations.common.seller')
+											: t('admin.operations.common.buyer')}
+										:{' '}
+										{order.otherParty?.displayName || t('common.unknown')}
 										{order.product && ` • ${order.product.title}`}
 									</p>
 								</div>
@@ -141,11 +158,11 @@ export function UserActivityTabs({
 						<Link
 							href={`/operations/orders?userId=${user.id}`}
 							className='block py-2 text-center text-primary-600 hover:underline'>
-							Tüm siparişleri görüntüle →
+							{t('admin.users.detail.viewAllOrders')}
 						</Link>
 					</div>
 				) : (
-					<EmptyLine>Henüz sipariş yok</EmptyLine>
+					<EmptyLine>{t('admin.users.detail.noOrders')}</EmptyLine>
 				))}
 
 			{tab === 'products' &&
@@ -192,11 +209,11 @@ export function UserActivityTabs({
 						<Link
 							href={`/catalog/products?sellerId=${user.id}`}
 							className='block py-2 text-center text-primary-600 hover:underline'>
-							Tüm ürünleri görüntüle →
+							{t('admin.users.detail.viewAllProducts')}
 						</Link>
 					</div>
 				) : (
-					<EmptyLine>Henüz ürün yok</EmptyLine>
+					<EmptyLine>{t('admin.users.detail.noProducts')}</EmptyLine>
 				))}
 
 			{tab === 'trades' &&
@@ -214,7 +231,9 @@ export function UserActivityTabs({
 													? 'bg-primary-500/20 text-primary-700'
 													: 'bg-info-500/20 text-info-400'
 											}`}>
-											{trade.role === 'initiator' ? 'Başlatan' : 'Alıcı'}
+											{trade.role === 'initiator'
+												? t('admin.users.detail.initiator')
+												: t('admin.operations.common.buyer')}
 										</span>
 										<Link
 											href={`/operations/trades/${trade.id}`}
@@ -232,14 +251,16 @@ export function UserActivityTabs({
 								</div>
 								<div className='text-sm text-muted'>
 									<p>
-										Karşı taraf:{' '}
+										{t('admin.users.detail.counterpartyLabel')}{' '}
 										{trade.role === 'initiator'
 											? trade.receiver?.displayName
 											: trade.initiator?.displayName}
 									</p>
 									<p className='mt-1'>
-										Teklif: {trade.initiatorItems.length} ürün ↔{' '}
-										{trade.receiverItems.length} ürün
+										{t('admin.users.detail.tradeOfferSummary', {
+											a: trade.initiatorItems.length,
+											b: trade.receiverItems.length,
+										})}
 										{trade.cashAmount != null &&
 											trade.cashAmount > 0 &&
 											` + ₺${trade.cashAmount.toLocaleString('tr-TR')}`}
@@ -250,33 +271,35 @@ export function UserActivityTabs({
 						<Link
 							href={`/operations/trades?userId=${user.id}`}
 							className='block py-2 text-center text-primary-600 hover:underline'>
-							Tüm takasları görüntüle →
+							{t('admin.users.detail.viewAllTrades')}
 						</Link>
 					</div>
 				) : (
-					<EmptyLine>Henüz takas yok</EmptyLine>
+					<EmptyLine>{t('admin.users.detail.noTrades')}</EmptyLine>
 				))}
 
 			{tab === 'ratings' && (
 				<div className='space-y-4'>
-					<h3 className='font-medium text-heading'>Alınan Değerlendirmeler</h3>
+					<h3 className='font-medium text-heading'>
+						{t('admin.users.detail.receivedRatingsTitle')}
+					</h3>
 					{user.receivedRatings && user.receivedRatings.length > 0 ? (
 						<div className='space-y-3'>
 							{user.receivedRatings.map((rating) => (
 								<RatingCard
 									key={rating.id}
 									rating={rating}
-									partyLabel='Değerlendiren'
-									party={rating.giver?.displayName || 'Anonim'}
+									partyLabel={t('admin.users.detail.raterLabel')}
+									party={rating.giver?.displayName || t('admin.users.detail.anonymous')}
 								/>
 							))}
 						</div>
 					) : (
-						<p className='py-4 text-muted'>Henüz değerlendirme yok</p>
+						<p className='py-4 text-muted'>{t('admin.users.detail.noReceivedRatings')}</p>
 					)}
 
 					<h3 className='mt-6 font-medium text-heading'>
-						Verilen Değerlendirmeler
+						{t('admin.users.detail.givenRatingsTitle')}
 					</h3>
 					{user.givenRatings && user.givenRatings.length > 0 ? (
 						<div className='space-y-3'>
@@ -284,13 +307,13 @@ export function UserActivityTabs({
 								<RatingCard
 									key={rating.id}
 									rating={rating}
-									partyLabel='Değerlendirilen'
-									party={rating.receiver?.displayName || 'Bilinmiyor'}
+									partyLabel={t('admin.users.detail.rateeLabel')}
+									party={rating.receiver?.displayName || t('common.unknown')}
 								/>
 							))}
 						</div>
 					) : (
-						<p className='py-4 text-muted'>Henüz değerlendirme vermemiş</p>
+						<p className='py-4 text-muted'>{t('admin.users.detail.noGivenRatings')}</p>
 					)}
 				</div>
 			)}

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import { useTranslations } from 'next-intl';
 import { Button, Input } from '@tarodan/ui';
 import toast from 'react-hot-toast';
 import { adminApi } from '@/lib/api';
@@ -11,6 +12,7 @@ import { type ImageTestResult, decisionState } from '../_lib/types';
 
 /** Score an image URL (or uploaded file) without persisting anything. */
 export function ImageTestCard() {
+  const t = useTranslations();
   const [url, setUrl] = useState('');
   const [result, setResult] = useState<ImageTestResult | null>(null);
 
@@ -21,7 +23,7 @@ export function ImageTestCard() {
         .then((r) => r.data as ImageTestResult),
     onMutate: () => setResult(null),
     onSuccess: (data) => setResult(data),
-    onError: () => toast.error('Test başarısız (görsel indirilemedi olabilir)'),
+    onError: () => toast.error(t('admin.aiModeration.imageTest.testFailed')),
   });
   const testing = testMut.isPending;
 
@@ -45,22 +47,25 @@ export function ImageTestCard() {
   };
 
   return (
-    <SectionCard title="Görsel Test Et (yükleme yapmadan skor gör)" bodyClassName="space-y-3">
+    <SectionCard title={t('admin.aiModeration.imageTest.title')} bodyClassName="space-y-3">
       <div className="flex flex-wrap gap-2">
         <Input
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && runTest()}
-          placeholder="Görsel URL'i (https://...) veya data:image/...;base64,..."
+          placeholder={t('admin.aiModeration.imageTest.urlPlaceholder')}
           className="min-w-0 flex-1"
         />
         <Button onClick={() => runTest()} isLoading={testing} disabled={!url.trim()}>
-          Test Et
+          {t('admin.aiModeration.imageTest.testButton')}
         </Button>
       </div>
 
       <label className="inline-flex cursor-pointer items-center gap-1 text-sm text-muted">
-        veya <span className="text-primary-600 underline">bilgisayardan dosya seç</span>
+        {t('admin.aiModeration.imageTest.orLabel')}{' '}
+        <span className="text-primary-600 underline">
+          {t('admin.aiModeration.imageTest.chooseFile')}
+        </span>
         <input type="file" accept="image/*" className="hidden" onChange={onFile} />
       </label>
 
@@ -76,11 +81,13 @@ export function ImageTestCard() {
             <div className="flex flex-wrap items-center gap-2">
               <AiBadge state={decisionState(result.decision)} />
               <span className="text-sm text-body">
-                İlgililik: %{Math.round((result.relevanceScore ?? 0) * 100)} · Uygunsuzluk: %
-                {((result.nsfwScore ?? 0) * 100).toFixed(2)}
+                {t('admin.aiModeration.imageTest.scores', {
+                  relevance: Math.round((result.relevanceScore ?? 0) * 100),
+                  nsfw: ((result.nsfwScore ?? 0) * 100).toFixed(2),
+                })}
               </span>
               <span className="text-xs text-muted">
-                Etiketler:{' '}
+                {t('admin.aiModeration.imageTest.labels')}{' '}
                 {(result.topLabels || []).slice(0, 3).map((l) => l.label).join(', ')}
               </span>
             </div>

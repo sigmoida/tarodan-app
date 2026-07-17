@@ -6,8 +6,9 @@ import {
   CheckIcon,
   InformationCircleIcon,
 } from "@heroicons/react/24/outline";
+import { useTranslations } from "next-intl";
 import { CheckToggle, DisclosureButton, IconButton } from "@tarodan/ui";
-import { ROLES, ROLE_META, PERMISSION_GROUPS } from "../_lib/constants";
+import { ROLES, getRoleMeta, getPermissionGroups } from "../_lib/constants";
 import type { PermissionMatrix } from "../_lib/usePermissionMatrix";
 
 /**
@@ -19,6 +20,9 @@ import type { PermissionMatrix } from "../_lib/usePermissionMatrix";
  * grid. All state and toggles come from `usePermissionMatrix`.
  */
 export function PermissionMatrixGrid({ matrix }: { matrix: PermissionMatrix }) {
+  const t = useTranslations();
+  const roleMeta = getRoleMeta(t);
+  const permissionGroups = getPermissionGroups(t);
   const {
     editMode,
     isSuperAdmin,
@@ -38,7 +42,7 @@ export function PermissionMatrixGrid({ matrix }: { matrix: PermissionMatrix }) {
         <thead>
           <tr className="border-b border-border">
             <th className="sticky left-0 z-10 w-[40%] min-w-[15rem] bg-surface-alt px-4 py-3 text-left font-medium text-muted">
-              İzin / Açıklama
+              {t("admin.roles.matrix.columnHeader")}
             </th>
             {ROLES.map((role) => (
               <th
@@ -46,12 +50,12 @@ export function PermissionMatrixGrid({ matrix }: { matrix: PermissionMatrix }) {
                 className="min-w-[8rem] bg-surface-alt px-4 py-3 text-center font-medium"
               >
                 <div
-                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${ROLE_META[role].color}`}
+                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${roleMeta[role].color}`}
                 >
                   {role === "super_admin" && (
                     <LockClosedIcon className="h-3 w-3" />
                   )}
-                  {ROLE_META[role].label}
+                  {roleMeta[role].label}
                 </div>
               </th>
             ))}
@@ -59,7 +63,7 @@ export function PermissionMatrixGrid({ matrix }: { matrix: PermissionMatrix }) {
         </thead>
 
         <tbody>
-          {PERMISSION_GROUPS.map((g) => {
+          {permissionGroups.map((g) => {
             const isCollapsed = collapsedGroups.has(g.id);
             return (
               <React.Fragment key={g.id}>
@@ -73,7 +77,7 @@ export function PermissionMatrixGrid({ matrix }: { matrix: PermissionMatrix }) {
                     >
                       {g.group}
                       <span className="font-normal normal-case tracking-normal text-muted">
-                        ({g.permissions.length} izin)
+                        ({t("admin.roles.permissionCountLabel", { count: g.permissions.length })})
                       </span>
                     </DisclosureButton>
                   </td>
@@ -88,7 +92,7 @@ export function PermissionMatrixGrid({ matrix }: { matrix: PermissionMatrix }) {
                       >
                         {locked ? (
                           <span className="text-xs font-medium text-success-600">
-                            Tümü
+                            {t("admin.roles.allLabel")}
                           </span>
                         ) : editMode && isSuperAdmin ? (
                           <CheckToggle
@@ -99,7 +103,9 @@ export function PermissionMatrixGrid({ matrix }: { matrix: PermissionMatrix }) {
                               toggleGroup(g, role, state !== "all")
                             }
                             title={
-                              state === "all" ? "Grubu kaldır" : "Grubu seç"
+                              state === "all"
+                                ? t("admin.roles.matrix.removeGroup")
+                                : t("admin.roles.matrix.selectGroup")
                             }
                             className="mx-auto"
                           />
@@ -134,8 +140,8 @@ export function PermissionMatrixGrid({ matrix }: { matrix: PermissionMatrix }) {
                         <td className="sticky left-0 z-10 bg-inherit px-4 py-2.5">
                           <div className="flex items-start gap-2">
                             <IconButton
-                              aria-label="Açıklama"
-                              title="Açıklama"
+                              aria-label={t("admin.roles.matrix.descriptionLabel")}
+                              title={t("admin.roles.matrix.descriptionLabel")}
                               onClick={() => toggleExpandedPerm(perm.key)}
                               className="mt-0.5 h-auto w-auto shrink-0 p-0 text-muted hover:bg-transparent hover:text-primary-600"
                             >
@@ -181,13 +187,13 @@ export function PermissionMatrixGrid({ matrix }: { matrix: PermissionMatrix }) {
                                   onClick={() =>
                                     togglePermission(role, perm.key)
                                   }
-                                  title={checked ? "Kaldır" : "Ekle"}
+                                  title={checked ? t("common.remove") : t("common.add")}
                                   className="mx-auto"
                                 />
                               ) : locked ? (
                                 <span
                                   className="mx-auto inline-flex h-6 w-6 items-center justify-center rounded-full bg-success-500/15"
-                                  title="Süper Admin her zaman bu izne sahiptir"
+                                  title={t("admin.roles.matrix.superAdminAlwaysHasPermission")}
                                 >
                                   <LockClosedIcon className="h-3.5 w-3.5 text-success-600" />
                                 </span>

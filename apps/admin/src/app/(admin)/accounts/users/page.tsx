@@ -2,6 +2,7 @@
 
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { adminApi } from '@/lib/api';
 import { AdminPage } from '@/components/page/AdminPage';
 import { PageHeader } from '@/components/AdminList';
@@ -12,24 +13,25 @@ import { useTabParam } from '@/hooks/useTabParam';
 import {
 	type User,
 	mapUsers,
-	USER_TABS,
-	userFilterOptions,
+	getUserTabs,
+	getUserFilterOptions,
 	userFilterParams,
 } from './_lib/types';
 import { UsersSummary } from './_components/UsersSummary';
 import { UsersTable } from './_components/UsersTable';
 
 export default function UsersPage() {
+	const t = useTranslations();
 	const [tab, setTab] = useTabParam('list');
 
 	return (
 		<AdminPage>
 			<PageHeader
-				title='Kullanıcılar'
+				title={t('admin.users.title')}
 				description={<UsersSummary />}
 			/>
 			<AdminTabs
-				tabs={USER_TABS}
+				tabs={getUserTabs(t)}
 				value={tab}
 				onChange={setTab}
 			/>
@@ -59,12 +61,12 @@ export default function UsersPage() {
 					getRowId={(u) => u.id}
 					syncUrl
 					initialFilters={{ filter: 'all' }}
-					errorMessage='Kullanıcılar yüklenemedi'>
+					errorMessage={t('admin.users.loadError')}>
 					<ResourceList.Toolbar>
 						<ResourceList.Search />
 						<ResourceList.FilterSelect
 							name='filter'
-							options={userFilterOptions}
+							options={getUserFilterOptions(t)}
 							className='sm:w-48'
 						/>
 					</ResourceList.Toolbar>

@@ -1,4 +1,7 @@
 import type { StatusConfig } from '@tarodan/ui';
+import { useTranslations } from 'next-intl';
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 export interface UserProduct {
   id: string;
@@ -114,32 +117,32 @@ export interface UserDetail {
 }
 
 /** Order/product/trade status → badge, shared across the activity tabs. */
-export const userStatusConfig: Record<string, StatusConfig> = {
-  pending: { label: 'Bekliyor', variant: 'warning' },
-  pending_payment: { label: 'Ödeme Bekliyor', variant: 'warning' },
-  paid: { label: 'Ödendi', variant: 'info' },
-  preparing: { label: 'Hazırlanıyor', variant: 'info' },
-  shipped: { label: 'Kargoda', variant: 'primary' },
-  delivered: { label: 'Teslim Edildi', variant: 'success' },
-  completed: { label: 'Tamamlandı', variant: 'success' },
-  cancelled: { label: 'İptal', variant: 'danger' },
-  rejected: { label: 'Reddedildi', variant: 'danger' },
-  active: { label: 'Aktif', variant: 'success' },
-  inactive: { label: 'Pasif', variant: 'secondary' },
-  sold: { label: 'Satıldı', variant: 'primary' },
-  accepted: { label: 'Kabul Edildi', variant: 'info' },
-  both_shipped: { label: 'Gönderildi', variant: 'primary' },
-  disputed: { label: 'İtirazlı', variant: 'danger' },
-};
+export const getUserStatusConfig = (t: T): Record<string, StatusConfig> => ({
+  pending: { label: t('admin.users.status.pending'), variant: 'warning' },
+  pending_payment: { label: t('admin.operations.orders.status.pendingPayment'), variant: 'warning' },
+  paid: { label: t('admin.operations.orders.status.paid'), variant: 'info' },
+  preparing: { label: t('admin.operations.orders.status.preparing'), variant: 'info' },
+  shipped: { label: t('admin.operations.orders.status.shipped'), variant: 'primary' },
+  delivered: { label: t('admin.operations.orders.status.delivered'), variant: 'success' },
+  completed: { label: t('admin.operations.orders.status.completed'), variant: 'success' },
+  cancelled: { label: t('admin.operations.orders.status.cancelled'), variant: 'danger' },
+  rejected: { label: t('common.rejected'), variant: 'danger' },
+  active: { label: t('common.active'), variant: 'success' },
+  inactive: { label: t('common.inactive'), variant: 'secondary' },
+  sold: { label: t('admin.catalog.products.statusSold'), variant: 'primary' },
+  accepted: { label: t('admin.operations.trades.timeline.accepted'), variant: 'info' },
+  both_shipped: { label: t('admin.users.status.bothShipped'), variant: 'primary' },
+  disputed: { label: t('admin.operations.trades.disputed'), variant: 'danger' },
+});
 
-export const MEMBERSHIP_TIER_OPTIONS = [
-  { value: 'free', label: 'Ücretsiz' },
-  { value: 'basic', label: 'Temel' },
+export const getMembershipTierOptions = (t: T) => [
+  { value: 'free', label: t('admin.users.membershipFree') },
+  { value: 'basic', label: t('admin.users.membershipBasic') },
   { value: 'premium', label: 'Premium' },
   { value: 'business', label: 'Business' },
 ];
 
-export const BILLING_PERIOD_OPTIONS = [
-  { value: 'monthly', label: 'Aylık' },
-  { value: 'yearly', label: 'Yıllık' },
+export const getBillingPeriodOptions = (t: T) => [
+  { value: 'monthly', label: t('admin.users.billingMonthly') },
+  { value: 'yearly', label: t('admin.users.billingYearly') },
 ];

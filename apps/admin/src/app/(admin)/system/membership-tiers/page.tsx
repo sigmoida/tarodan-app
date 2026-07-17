@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageLoading } from "@/components/PageLoading";
@@ -22,6 +23,7 @@ function parseYearlyDiscount(raw: unknown): number {
 }
 
 export default function MembershipTiersPage() {
+  const t = useTranslations();
   const [editing, setEditing] = useState<MembershipTier | null>(null);
 
   const { data: tiers = [], isLoading } = useQuery<MembershipTier[]>({
@@ -41,8 +43,8 @@ export default function MembershipTiersPage() {
   return (
     <AdminPage>
       <PageHeader
-        title="Üyelik Katmanları"
-        description="Üyelik katmanlarını ve fiyatlarını yönetin"
+        title={t("admin.tiers.page.title")}
+        description={t("admin.tiers.page.description")}
       />
 
       <YearlyDiscountForm value={yearlyDiscount} />
@@ -52,7 +54,7 @@ export default function MembershipTiersPage() {
       ) : tiers.length === 0 ? (
         <SectionCard>
           <p className="py-8 text-center text-muted">
-            Henüz üyelik katmanı yok
+            {t("admin.tiers.page.empty")}
           </p>
         </SectionCard>
       ) : (

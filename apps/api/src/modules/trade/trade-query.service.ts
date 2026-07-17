@@ -176,9 +176,7 @@ export class TradeQueryService {
    * Trades sekmesi sayaçları — filtreden ve sayfalamadan bağımsız tek groupBy.
    * all = profil "Takaslar" tile'ı ile birebir (OR initiator/receiver, statü filtresiz).
    */
-  async getTradeStatusCounts(
-    userId: string,
-  ): Promise<{
+  async getTradeStatusCounts(userId: string): Promise<{
     all: number;
     pending: number;
     shipping: number;

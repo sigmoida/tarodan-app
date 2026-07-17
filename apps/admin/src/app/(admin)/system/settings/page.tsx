@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { Button } from "@tarodan/ui";
 import { Form, FormInput, useZodForm } from "@tarodan/ui/form";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
@@ -15,15 +16,16 @@ import { useAdminMutation } from "@/hooks/useAdminMutation";
 import {
   type SettingsTab,
   type SettingsFormValues,
-  SETTINGS_TABS,
-  TAB_TITLE,
-  TAB_FIELDS,
+  settingsTabs,
+  tabTitle,
+  tabFields,
   settingsSchema,
   parseSettings,
   toFormValues,
 } from "./_lib/settings";
 
 export default function SettingsPage() {
+  const t = useTranslations();
   const [tab, setTab] = useTabParam("listing");
   const activeTab = tab as SettingsTab;
 
@@ -38,20 +40,20 @@ export default function SettingsPage() {
   // `values` reactively reseeds the form from the query (and after each save's
   // refetch) — no useEffect state mirror. All fields are seeded, so whole-form
   // validation on submit never trips on a tab the user hasn't touched.
-  const form = useZodForm(settingsSchema, {
+  const form = useZodForm(settingsSchema(t), {
     values: data ? toFormValues(data) : undefined,
   });
 
   const save = useAdminMutation(
     (v: { tab: SettingsTab; values: SettingsFormValues }) =>
       Promise.all(
-        TAB_FIELDS[v.tab].map((f) =>
+        tabFields(t)[v.tab].map((f) =>
           adminApi.updateSetting(f.backendKey, String(Number(v.values[f.key]))),
         ),
       ),
     {
       invalidates: ["platform-settings"],
-      successMessage: "Ayarlar kaydedildi",
+      successMessage: t("admin.settings.saved"),
     },
   );
 
@@ -66,14 +68,13 @@ export default function SettingsPage() {
           <ExclamationTriangleIcon className="h-12 w-12 shrink-0 text-danger-500" />
           <div className="min-w-0">
             <p className="text-lg font-semibold text-heading">
-              Ayarlar yüklenemedi
+              {t("admin.settings.error.title")}
             </p>
             <p className="mt-1 text-sm text-muted">
-              Oturumun sona ermiş olabilir. Tekrar dene; sürerse çıkış yapıp
-              yeniden giriş yap.
+              {t("admin.settings.error.description")}
             </p>
           </div>
-          <Button onClick={() => refetch()}>Tekrar Dene</Button>
+          <Button onClick={() => refetch()}>{t("common.tryAgain")}</Button>
         </div>
       </SectionCard>
     );
@@ -82,20 +83,20 @@ export default function SettingsPage() {
   return (
     <AdminPage>
       <PageHeader
-        title="Sistem Ayarları"
-        description="Sistem yapılandırmasını yönetin"
+        title={t("admin.settings.page.title")}
+        description={t("admin.settings.page.description")}
       />
 
-      <AdminTabs tabs={SETTINGS_TABS} value={tab} onChange={setTab} />
+      <AdminTabs tabs={settingsTabs(t)} value={tab} onChange={setTab} />
 
       <Form
         form={form}
         onSubmit={(values) => save.mutate({ tab: activeTab, values })}
         className="space-y-6"
       >
-        <SectionCard title={TAB_TITLE[activeTab]}>
+        <SectionCard title={tabTitle(t)[activeTab]}>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            {TAB_FIELDS[activeTab].map((f) => (
+            {tabFields(t)[activeTab].map((f) => (
               <FormInput
                 key={f.key}
                 name={f.key}
@@ -111,7 +112,7 @@ export default function SettingsPage() {
 
         <div className="flex justify-end">
           <Button type="submit" isLoading={save.isPending}>
-            Ayarları Kaydet
+            {t("admin.settings.saveButton")}
           </Button>
         </div>
       </Form>

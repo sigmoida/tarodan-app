@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { adminApi } from '@/lib/api';
 import { ResourceList } from '@/components/list';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
@@ -14,16 +15,17 @@ import { type User } from '../_lib/types';
  * the ResourceList context (already mapped to `User` by the page fetcher).
  */
 export function UsersTable() {
+  const t = useTranslations();
   const router = useRouter();
   const prompt = usePrompt();
 
   const ban = useAdminMutation(
     (v: { id: string; reason: string }) => adminApi.banUser(v.id, v.reason),
-    { invalidates: ['users'], successMessage: 'Kullanıcı engellendi' },
+    { invalidates: ['users'], successMessage: t('admin.users.banned') },
   );
   const unban = useAdminMutation((id: string) => adminApi.unbanUser(id), {
     invalidates: ['users'],
-    successMessage: 'Kullanıcı engeli kaldırıldı',
+    successMessage: t('admin.users.unbanned'),
   });
 
   const onBanToggle = async (u: User) => {
@@ -31,21 +33,23 @@ export function UsersTable() {
       unban.mutate(u.id);
       return;
     }
+    const defaultReason = t('admin.users.banDefaultReason');
     const reason = await prompt({
-      title: 'Kullanıcıyı Engelle',
-      label: 'Engelleme sebebi (isteğe bağlı)',
-      defaultValue: 'Admin tarafından engellendi',
-      confirmLabel: 'Engelle',
+      title: t('admin.users.banTitle'),
+      label: t('admin.users.banReasonLabel'),
+      defaultValue: defaultReason,
+      confirmLabel: t('admin.users.banAction'),
       destructive: true,
       required: false,
     });
     if (reason === null) return;
-    ban.mutate({ id: u.id, reason: reason || 'Admin tarafından engellendi' });
+    ban.mutate({ id: u.id, reason: reason || defaultReason });
   };
 
   const columns = userColumns(
-    userRowMenu({ onView: (u) => router.push(`/accounts/users/${u.id}`), onBanToggle }),
+    t,
+    userRowMenu(t, { onView: (u) => router.push(`/accounts/users/${u.id}`), onBanToggle }),
   );
 
-  return <ResourceList.Table columns={columns} emptyText="Kullanıcı bulunamadı" />;
+  return <ResourceList.Table columns={columns} emptyText={t('admin.users.empty')} />;
 }

@@ -3109,6 +3109,505 @@
         "reporter": "Raporlayan",
         "targetId": "Hedef ID"
       }
+    },
+    "settings": {
+      "page": {
+        "title": "Sistem Ayarları",
+        "description": "Sistem yapılandırmasını yönetin"
+      },
+      "error": {
+        "title": "Ayarlar yüklenemedi",
+        "description": "Oturumun sona ermiş olabilir. Tekrar dene; sürerse çıkış yapıp yeniden giriş yap."
+      },
+      "saveButton": "Ayarları Kaydet",
+      "saved": "Ayarlar kaydedildi",
+      "tabs": {
+        "listing": "İlan",
+        "trade": "Takas",
+        "message": "Mesaj"
+      },
+      "tabTitle": {
+        "listing": "İlan Ayarları",
+        "trade": "Takas Ayarları",
+        "message": "Mesaj Ayarları"
+      },
+      "fields": {
+        "freeListingLimit": {
+          "label": "Ücretsiz İlan Limiti",
+          "helper": "Ücretsiz üyelerin ilan limiti"
+        },
+        "basicListingLimit": {
+          "label": "Temel İlan Limiti",
+          "helper": "Temel üyelerin ilan limiti (-1 = sınırsız)"
+        },
+        "premiumListingLimit": {
+          "label": "Premium İlan Limiti",
+          "helper": "Premium üyelerin ilan limiti (-1 = sınırsız)"
+        },
+        "businessListingLimit": {
+          "label": "Business İlan Limiti",
+          "helper": "Business üyelerin ilan limiti (-1 = sınırsız)"
+        },
+        "minProductPrice": {
+          "label": "Minimum Ürün Fiyatı (₺)",
+          "helper": "Yeni ilanlar için minimum fiyat (mevcut ilanlar etkilenmez)"
+        },
+        "maxProductPrice": {
+          "label": "Maksimum Ürün Fiyatı (₺)",
+          "helper": "Yeni ilanlar için maksimum fiyat (mevcut ilanlar etkilenmez)"
+        },
+        "tradeResponseHours": {
+          "label": "Yanıt Süresi (Saat)",
+          "helper": "Takas teklifine yanıt süresi"
+        },
+        "tradePaymentHours": {
+          "label": "Ödeme Süresi (Saat)",
+          "helper": "Kabul sonrası ödeme süresi (nakit takaslar için)"
+        },
+        "tradeShippingDays": {
+          "label": "Kargo Süresi (Gün)",
+          "helper": "Kabul sonrası kargo gönderim süresi"
+        },
+        "tradeConfirmationDays": {
+          "label": "Onay Süresi (Gün)",
+          "helper": "Teslim sonrası onay süresi"
+        },
+        "maxMessageLength": {
+          "label": "Maksimum Mesaj Uzunluğu",
+          "helper": "Bir mesajın maksimum karakter uzunluğu"
+        }
+      },
+      "validation": {
+        "required": "Zorunlu",
+        "invalidValueMin": "Geçerli bir değer girin (en az {min})",
+        "invalidValue": "Geçerli bir değer girin"
+      }
+    },
+    "tiers": {
+      "page": {
+        "title": "Üyelik Katmanları",
+        "description": "Üyelik katmanlarını ve fiyatlarını yönetin",
+        "empty": "Henüz üyelik katmanı yok"
+      },
+      "yearlyDiscount": {
+        "title": "Yıllık İndirim Oranı",
+        "label": "İndirim Yüzdesi (%)",
+        "helper": "Yıllık fiyat = Aylık Fiyat × 12 × (1 − İndirim%) · Değiştirildiğinde tüm katmanların yıllık fiyatı otomatik güncellenir.",
+        "saved": "Yıllık indirim oranı güncellendi"
+      },
+      "validation": {
+        "required": "Zorunlu",
+        "discountRange": "0 ile 100 arasında bir değer girin",
+        "nameRequired": "Ad gerekli"
+      },
+      "modal": {
+        "editTitle": "Üyelik Katmanı Düzenle — {name}",
+        "saved": "Üyelik katmanı güncellendi"
+      },
+      "field": {
+        "name": "Ad",
+        "sortOrder": "Sıralama",
+        "monthlyPrice": "Aylık Fiyat (₺)",
+        "yearlyPrice": "Yıllık Fiyat (₺)",
+        "automatic": "(Otomatik)",
+        "yearlyFormula": "{monthly} × 12 × (1 − {discount}%) = {yearly}",
+        "maxFreeListings": "Ücretsiz İlan",
+        "maxTotalListings": "Toplam İlan",
+        "maxTotalListingsHelper": "-1 = sınırsız",
+        "maxImagesPerListing": "Görsel/İlan",
+        "featuredListingSlots": "Öne Çıkan İlan Slotları",
+        "commissionDiscount": "Komisyon İndirimi (%)",
+        "canCreateCollections": "Koleksiyon Oluşturabilir",
+        "canTrade": "Takas Yapabilir",
+        "isAdFree": "Reklamsız"
+      },
+      "card": {
+        "monthly": "Aylık:",
+        "yearly": "Yıllık:",
+        "freeListings": "Ücretsiz İlan:",
+        "totalListings": "Toplam İlan:",
+        "unlimited": "Sınırsız",
+        "imagesPerListing": "Görsel/İlan:",
+        "userCount": "Kullanıcı Sayısı:",
+        "collectionsPill": "Koleksiyon",
+        "tradePill": "Takas"
+      }
+    },
+    "aiModeration": {
+      "page": {
+        "title": "AI Denetim",
+        "description": "Tüm varlıklar (ürün · kullanıcı · koleksiyon · görsel · metin) için ortak AI moderasyonu — eşikler, görsel testi ve birleşik olay günlüğü",
+        "disabledWarning": "AI moderasyon servisi kapalı (AI_MODERATION_ENABLED=false). Eşik ayarı ve görsel testi devre dışı; geçmiş günlük kayıtları yine listelenir.",
+        "logTitle": "Denetim Günlüğü",
+        "logDescription": "Tüm varlıklarda AI tarafından engellenen / işaretlenen içerikler"
+      },
+      "thresholds": {
+        "saved": "Eşikler kaydedildi",
+        "title": "AI Eşikleri",
+        "relevanceLabel": "Kabul eşiği (ilgililik %)",
+        "relevanceHelper": "Ürün görseli bu yüzdenin üstünde ilgililik alırsa otomatik kabul edilir; altındakiler admin onayına düşer.",
+        "nsfwLabel": "Uygunsuzluk eşiği (NSFW %)",
+        "nsfwHelper": "Bir görselin uygunsuzluk skoru bu yüzdeyi aşarsa engellenir (avatar, koleksiyon, ürün ve diğer tüm görsel yüklemeleri kapsar).",
+        "saveButton": "Eşikleri Kaydet",
+        "percentValue": "%{value}"
+      },
+      "imageTest": {
+        "testFailed": "Test başarısız (görsel indirilemedi olabilir)",
+        "title": "Görsel Test Et (yükleme yapmadan skor gör)",
+        "urlPlaceholder": "Görsel URL'i (https://...) veya data:image/...;base64,...",
+        "testButton": "Test Et",
+        "orLabel": "veya",
+        "chooseFile": "bilgisayardan dosya seç",
+        "scores": "İlgililik: %{relevance} · Uygunsuzluk: %{nsfw}",
+        "labels": "Etiketler:"
+      },
+      "badge": {
+        "flagged": "Uygunsuz şüphesi",
+        "review": "Düşük ilgililik",
+        "passed": "Temiz · oto-onay"
+      }
+    },
+    "users": {
+      "title": "Kullanıcılar",
+      "loadError": "Kullanıcılar yüklenemedi",
+      "empty": "Kullanıcı bulunamadı",
+      "totalCount": "Toplam {count} kullanıcı",
+      "filterAll": "Tüm Kullanıcılar",
+      "filterSellers": "Satıcılar",
+      "filterBuyers": "Alıcılar",
+      "filterBanned": "Engelliler",
+      "banned": "Kullanıcı engellendi",
+      "unbanned": "Kullanıcı engeli kaldırıldı",
+      "banTitle": "Kullanıcıyı Engelle",
+      "banReasonLabel": "Engelleme sebebi (isteğe bağlı)",
+      "banDefaultReason": "Admin tarafından engellendi",
+      "banAction": "Engelle",
+      "unbanAction": "Engeli Kaldır",
+      "columnUser": "Kullanıcı",
+      "seller": "Satıcı",
+      "verified": "Doğrulanmış",
+      "notVerified": "Doğrulanmamış",
+      "bannedBadge": "Engelli",
+      "membership": "Üyelik",
+      "membershipFree": "Ücretsiz",
+      "membershipBasic": "Temel",
+      "billingMonthly": "Aylık",
+      "billingYearly": "Yıllık",
+      "registeredAt": "Kayıt Tarihi",
+      "lastLogin": "Son Giriş",
+      "neverLoggedIn": "Hiç giriş yapmadı",
+      "status": {
+        "pending": "Bekliyor",
+        "bothShipped": "Gönderildi"
+      },
+      "detail": {
+        "banned": "Kullanıcı banlandı",
+        "unbanned": "Kullanıcı banı kaldırıldı",
+        "banTitle": "Kullanıcıyı Banla",
+        "banReasonLabel": "Ban Nedeni",
+        "banReasonPlaceholder": "Ban nedenini açıklayın...",
+        "banConfirm": "Banla",
+        "banReasonRequired": "Ban nedeni gereklidir",
+        "unbanTitle": "Banı Kaldır",
+        "unbanConfirmDesc": "Bu kullanıcının banını kaldırmak istediğinizden emin misiniz?",
+        "bannedBadge": "Banlı",
+        "infoTitle": "Kullanıcı Bilgileri",
+        "ratingsCount": "({count} değerlendirme)",
+        "emailLabel": "Email",
+        "bioLabel": "Biyografi",
+        "sellerInfoTitle": "Satıcı Bilgileri",
+        "sellerTypeLabel": "Satıcı Tipi",
+        "individual": "Bireysel",
+        "corporate": "Kurumsal",
+        "companyNameLabel": "Şirket Adı",
+        "taxIdLabel": "Vergi No",
+        "bankAccountTitle": "Banka Hesabı (IBAN)",
+        "accountHolderLabel": "Hesap Sahibi",
+        "ibanLabel": "IBAN",
+        "tcKimlikNoLabel": "TC Kimlik No",
+        "verifiedAtLabel": "Doğrulama Tarihi",
+        "noBankAccount": "Banka hesabı eklenmemiş",
+        "banDateLabel": "Ban Tarihi:",
+        "quickActionsTitle": "Hızlı İşlemler",
+        "allOrders": "Tüm Siparişler ({count})",
+        "allProducts": "Tüm Ürünler ({count})",
+        "allTrades": "Tüm Takaslar ({count})",
+        "verificationStatusTitle": "Doğrulama Durumu",
+        "identityLabel": "Kimlik",
+        "addressesTitle": "Adresler ({count})",
+        "totalOrders": "Toplam Sipariş",
+        "ordersSub": "{buyer} alıcı / {seller} satıcı",
+        "trades": "Takas",
+        "tradesSub": "{initiated} başlatan / {received} alıcı",
+        "messagesSub": "{sent} gönderilen / {received} alınan",
+        "receivedRatings": "Alınan Değerlendirme",
+        "givenRatings": "Verilen Değerlendirme",
+        "membershipInfoTitle": "Üyelik Bilgileri",
+        "membershipTierLabel": "Üyelik Seviyesi",
+        "startDateLabel": "Başlangıç",
+        "endDateLabel": "Bitiş",
+        "noMembership": "Üyelik kaydı yok (ücretsiz).",
+        "membershipCancelledNotice": "İptal edildi — dönem sonuna kadar aktif",
+        "cancelMembership": "Üyeliği İptal Et",
+        "cancelMembershipConfirm": "Kullanıcının üyeliğini iptal etmek istediğinizden emin misiniz? Dönem sonuna kadar aktif kalır, sonra ücretsiz plana düşer.",
+        "cancelConfirmLabel": "İptal Et",
+        "membershipCancelled": "Üyelik iptal edildi",
+        "membershipUpdated": "Üyelik güncellendi",
+        "changeMembershipLabel": "Üyelik Değiştir (admin — ödeme yok)",
+        "tierPlaceholder": "Kademe seçin…",
+        "ratingsTab": "Değerlendirmeler",
+        "viewAllOrders": "Tüm siparişleri görüntüle →",
+        "noOrders": "Henüz sipariş yok",
+        "viewAllProducts": "Tüm ürünleri görüntüle →",
+        "noProducts": "Henüz ürün yok",
+        "initiator": "Başlatan",
+        "viewAllTrades": "Tüm takasları görüntüle →",
+        "noTrades": "Henüz takas yok",
+        "counterpartyLabel": "Karşı taraf:",
+        "tradeOfferSummary": "{a} ürün ↔ {b} ürün",
+        "receivedRatingsTitle": "Alınan Değerlendirmeler",
+        "noReceivedRatings": "Henüz değerlendirme yok",
+        "givenRatingsTitle": "Verilen Değerlendirmeler",
+        "noGivenRatings": "Henüz değerlendirme vermemiş",
+        "raterLabel": "Değerlendiren",
+        "rateeLabel": "Değerlendirilen",
+        "anonymous": "Anonim"
+      }
+    },
+    "roles": {
+      "title": "Roller ve İzinler",
+      "description": "Her rolün hangi işlemleri yapabileceğini görüntüleyin ve düzenleyin",
+      "emailInvalid": "Geçerli bir e-posta girin",
+      "revokeAccess": "Yetkiyi Kaldır",
+      "matrixLoadError": "İzin matrisi yüklenemedi",
+      "matrixSaved": "İzin matrisi kaydedildi",
+      "discardChangesConfirm": "Kaydedilmemiş değişiklikler var. Değişikliklerden vazgeçmek istediğinizden emin misiniz?",
+      "resetConfirm": "Tüm rol izinlerini varsayılan değerlere sıfırlamak istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+      "allLabel": "Tümü",
+      "allLockedLabel": "Tümü (kilitli)",
+      "permissionCountLabel": "{count} izin",
+      "columns": {
+        "role": "Rol",
+        "permissionCount": "İzin Sayısı",
+        "lastLogin": "Son Giriş"
+      },
+      "settingsUpdateError": "Ayar değiştirilemedi",
+      "allowAdminAssignOn": "Yöneticiler artık rol atayabilir",
+      "allowAdminAssignOff": "Rol atama tekrar yalnızca süper adminde",
+      "revokeSuccess": "Admin yetkisi kaldırıldı",
+      "revokeError": "Kaldırma başarısız",
+      "revokeConfirm": "{email} kullanıcısının admin yetkisini kaldırmak istediğinize emin misiniz?",
+      "staffCreatedNotice": "için yeni hesap oluşturuldu. Geçici şifre:",
+      "staffCreatedNoticeSuffix": "— kullanıcıyla paylaşın (bu şifre bir daha gösterilmez).",
+      "staffHeading": "Yönetici Kullanıcılar",
+      "allowAdminAssignLabel": "Yöneticiler de atayabilsin",
+      "assignStaffButton": "Yönetici Ata",
+      "emptyFiltered": "Bu rolde kullanıcı yok.",
+      "empty": "Henüz admin kullanıcı yok.",
+      "lockedCannotChange": "Kilitli — değiştirilemez",
+      "matrix": {
+        "title": "İzin Matrisi",
+        "columnHeader": "İzin / Açıklama",
+        "removeGroup": "Grubu kaldır",
+        "selectGroup": "Grubu seç",
+        "descriptionLabel": "Açıklama",
+        "superAdminAlwaysHasPermission": "Süper Admin her zaman bu izne sahiptir",
+        "editHint": "Düzenle moduna geçerek her rolün izinlerini tıklayarak değiştirebilirsiniz.",
+        "viewOnlyHint": "İzin matrisini yalnızca Süper Admin düzenleyebilir.",
+        "resetToDefaults": "Varsayılana Sıfırla",
+        "unsavedWarning": "Kaydedilmemiş değişiklikler var.",
+        "loading": "Yükleniyor…"
+      },
+      "legend": {
+        "superAdmin": "Süper Admin — her zaman tam yetkili",
+        "hasPermission": "İzin mevcut",
+        "noPermission": "İzin yok",
+        "hint": "İzin adının solundaki ikona tıklayarak açıklama görebilirsiniz"
+      },
+      "tabs": {
+        "matrix": "İzin Matrisi",
+        "userAssignments": "Kullanıcı Atamaları"
+      },
+      "meta": {
+        "superAdmin": {
+          "label": "Süper Admin",
+          "description": "Platforma tam erişim. Sistem ayarları, finans ve tüm yönetim işlemleri."
+        },
+        "admin": {
+          "label": "Yönetici",
+          "description": "Operasyonel yönetim. Sistem ayarları ve vergi hariç tüm işlemler."
+        },
+        "moderator": {
+          "label": "Moderatör",
+          "description": "İçerik moderasyonu. Yalnızca ürün, yorum, mesaj ve takas takibi."
+        }
+      },
+      "groups": {
+        "dashboard": "Dashboard & Analitik",
+        "operations": "Operasyon",
+        "catalog": "Katalog",
+        "accounts": "Hesaplar",
+        "messaging": "Mesajlaşma",
+        "marketing": "Pazarlama & İçerik",
+        "finance": "Finans",
+        "system": "Sistem"
+      },
+      "permissions": {
+        "dashboard": {
+          "label": "Dashboard",
+          "description": "Ana panel: günlük sipariş, gelir ve aktif kullanıcı sayaçları."
+        },
+        "analytics": {
+          "label": "Analizler",
+          "description": "Satış grafiği, gelir analizi, kullanıcı büyümesi ve rapor sayfaları."
+        },
+        "orders": {
+          "label": "Siparişler",
+          "description": "Sipariş listesi, detay görüntüleme ve durum değiştirme."
+        },
+        "trades": {
+          "label": "Takaslar",
+          "description": "Takas listesi, detay, onaylama, reddetme, kargo ve depo işlemleri."
+        },
+        "shipping": {
+          "label": "Kargo",
+          "description": "Kargo etiketi oluşturma, takip ve depoya gönderim işlemleri."
+        },
+        "refundRequests": {
+          "label": "İade Talepleri",
+          "description": "İade talep listesi, detay görüntüleme, onaylama ve reddetme."
+        },
+        "refundHistory": {
+          "label": "İade Geçmişi",
+          "description": "Tamamlanmış iade kayıtları ve geçmiş liste."
+        },
+        "products": {
+          "label": "Ürünler",
+          "description": "Ürün listesi, detay, onaylama, reddetme ve düzenleme."
+        },
+        "categories": {
+          "label": "Kategoriler",
+          "description": "Kategori ağacı oluşturma, düzenleme ve silme."
+        },
+        "brands": {
+          "label": "Markalar",
+          "description": "Marka listesi, ekleme ve düzenleme."
+        },
+        "carModels": {
+          "label": "Araç Modelleri",
+          "description": "Araç modeli ve yıl listesi yönetimi."
+        },
+        "manufacturers": {
+          "label": "Üreticiler",
+          "description": "Üretici/tedarikçi ekleme ve düzenleme."
+        },
+        "attributes": {
+          "label": "Ürün Özellikleri",
+          "description": "Özellik grubu ve değer yönetimi."
+        },
+        "collections": {
+          "label": "Koleksiyonlar",
+          "description": "Ürün koleksiyonu oluşturma ve düzenleme."
+        },
+        "users": {
+          "label": "Kullanıcılar",
+          "description": "Kullanıcı listesi, profil, ban/ban kaldırma ve kimlik doğrulama."
+        },
+        "sellerApplications": {
+          "label": "Satıcı Başvuruları",
+          "description": "Satıcı başvurularını onaylama veya reddetme."
+        },
+        "sellerPerformance": {
+          "label": "Satıcı Performansı",
+          "description": "Satıcı performans raporları ve istatistikleri."
+        },
+        "reviews": {
+          "label": "Yorumlar",
+          "description": "Kullanıcı yorumlarını görüntüleme, onaylama ve reddetme."
+        },
+        "staff": {
+          "label": "Rol Yönetimi",
+          "description": "Yönetici hesabı oluşturma, rol atama ve izin matrisi düzenleme."
+        },
+        "messages": {
+          "label": "Mesajlar",
+          "description": "Kullanıcılar arası mesaj konuşmalarını görüntüleme ve moderasyon."
+        },
+        "support": {
+          "label": "Destek Talepleri",
+          "description": "Kullanıcı destek taleplerini görüntüleme ve yanıtlama."
+        },
+        "discounts": {
+          "label": "İndirimler",
+          "description": "İndirim kuponu oluşturma, düzenleme ve silme."
+        },
+        "ads": {
+          "label": "Reklamlar",
+          "description": "Banner ve reklam kampanyaları yönetimi."
+        },
+        "notifications": {
+          "label": "Bildirimler",
+          "description": "Push bildirim oluşturma ve gönderme."
+        },
+        "emailTemplates": {
+          "label": "E-posta Şablonları",
+          "description": "E-posta şablonu oluşturma ve düzenleme."
+        },
+        "pages": {
+          "label": "Sayfalar",
+          "description": "Statik içerik sayfaları yönetimi."
+        },
+        "payments": {
+          "label": "Ödemeler",
+          "description": "Ödeme listesi, hold/release geçmişi ve istatistikler."
+        },
+        "commission": {
+          "label": "Komisyon",
+          "description": "Komisyon kuralları oluşturma, düzenleme ve silme."
+        },
+        "payouts": {
+          "label": "Satıcı Ödemeleri",
+          "description": "Bekleyen ödeme transferleri ve payout geçmişi."
+        },
+        "tax": {
+          "label": "Vergi Ayarları",
+          "description": "KDV bölgeleri, vergi oranları ve kural yönetimi."
+        },
+        "aiModeration": {
+          "label": "AI Denetim",
+          "description": "AI moderasyon olayları, skorlar ve eşik ayarları."
+        },
+        "membershipTiers": {
+          "label": "Üyelik Katmanları",
+          "description": "Üyelik katmanı oluşturma ve fiyatlandırma."
+        },
+        "settings": {
+          "label": "Sistem Ayarları",
+          "description": "Platform genel ayarları ve konfigürasyon."
+        },
+        "logs": {
+          "label": "Loglar",
+          "description": "Sistem hata logları, güvenlik olayları, e-posta logları ve denetim izi."
+        }
+      },
+      "form": {
+        "editTitle": "Rolü Güncelle",
+        "createTitle": "Kullanıcıya Rol Ata",
+        "roleUpdated": "Kullanıcı rolü güncellendi",
+        "roleAssigned": "Kullanıcıya rol atandı",
+        "assign": "Ata",
+        "emailLabel": "Kullanıcı E-posta",
+        "emailPlaceholder": "ornek@email.com",
+        "emailLockedHelp": "E-posta adresi değiştirilemez.",
+        "emailAutoCreateHelp": "E-posta kayıtlı değilse hesap otomatik oluşturulur.",
+        "displayNameLabel": "Görünen Ad",
+        "displayNamePlaceholder": "Boş bırakılırsa e-postadan türetilir",
+        "passwordLabel": "Başlangıç Şifresi",
+        "passwordPlaceholder": "Boş bırakılırsa otomatik üretilir",
+        "roleLabel": "Atanacak Rol",
+        "permissionCountSuffix": "{count} izne sahip.",
+        "viewMatrixLink": "İzin matrisini gör →"
+      }
     }
   },
   "server": {

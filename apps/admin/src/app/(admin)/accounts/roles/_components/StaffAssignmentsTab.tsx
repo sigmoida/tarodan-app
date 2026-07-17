@@ -5,6 +5,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { useTranslations } from 'next-intl';
 import { Button, Checkbox, Chip, IconButton } from '@tarodan/ui';
 import toast from 'react-hot-toast';
 import { adminApi } from '@/lib/api';
@@ -12,7 +13,7 @@ import { DataTable } from '@/components/DataTable';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { useSession } from '@/context/SessionContext';
 import { useConfirm } from '@/provider/ConfirmProvider';
-import { ROLES, ROLE_META } from '../_lib/constants';
+import { ROLES, getRoleMeta } from '../_lib/constants';
 import { staffColumns } from '../_lib/columns';
 import { staffRowMenu } from '../_lib/rowActions';
 import { usePermissionsQuery } from '../_lib/usePermissions';
@@ -25,6 +26,8 @@ export function StaffAssignmentsTab({
 }: {
 	onShowMatrix: () => void;
 }) {
+	const t = useTranslations();
+	const roleMeta = getRoleMeta(t);
 	const confirm = useConfirm();
 	const { user } = useSession();
 	const isSuperAdmin = user?.role === 'super_admin';
@@ -77,12 +80,12 @@ export function StaffAssignmentsTab({
 		(next: boolean) => adminApi.setStaffSettings(next),
 		{
 			invalidates: ['staff-settings'],
-			errorMessage: 'Ayar değiştirilemedi',
+			errorMessage: t('admin.roles.settingsUpdateError'),
 			onSuccess: (_d, next) =>
 				toast.success(
 					next
-						? 'Yöneticiler artık rol atayabilir'
-						: 'Rol atama tekrar yalnızca süper adminde',
+						? t('admin.roles.allowAdminAssignOn')
+						: t('admin.roles.allowAdminAssignOff'),
 				),
 		},
 	);
@@ -94,20 +97,21 @@ export function StaffAssignmentsTab({
 
 	const revoke = useAdminMutation((id: string) => adminApi.removeStaff(id), {
 		invalidates: ['staff'],
-		successMessage: 'Admin yetkisi kaldırıldı',
-		errorMessage: 'Kaldırma başarısız',
+		successMessage: t('admin.roles.revokeSuccess'),
+		errorMessage: t('admin.roles.revokeError'),
 	});
 	const onRevoke = async (s: StaffItem) => {
 		const ok = await confirm({
-			description: `${s.email} kullanıcısının admin yetkisini kaldırmak istediğinize emin misiniz?`,
+			description: t('admin.roles.revokeConfirm', { email: s.email }),
 			destructive: true,
 		});
 		if (ok) revoke.mutate(s.id);
 	};
 
 	const columns = staffColumns(
+		t,
 		permissions,
-		staffRowMenu({ onEdit: (s) => setModal({ editing: s }), onRevoke }),
+		staffRowMenu(t, { onEdit: (s) => setModal({ editing: s }), onRevoke }),
 	);
 	const visibleStaff = roleFilter
 		? staff.filter((s) => s.role === roleFilter)
@@ -119,15 +123,15 @@ export function StaffAssignmentsTab({
 			{createdInfo && (
 				<div className='flex items-start justify-between gap-4 rounded-lg border border-warning-200 bg-warning-50 p-4 text-sm text-warning-800'>
 					<div className='min-w-0'>
-						<strong>{createdInfo.email}</strong> için yeni hesap oluşturuldu.
-						Geçici şifre:{' '}
+						<strong>{createdInfo.email}</strong>{' '}
+						{t('admin.roles.staffCreatedNotice')}{' '}
 						<code className='rounded bg-surface-elevated px-2 py-0.5 font-mono'>
 							{createdInfo.password}
 						</code>{' '}
-						— kullanıcıyla paylaşın (bu şifre bir daha gösterilmez).
+						{t('admin.roles.staffCreatedNoticeSuffix')}
 					</div>
 					<IconButton
-						aria-label='Kapat'
+						aria-label={t('common.close')}
 						variant='ghost'
 						onClick={() => setCreatedInfo(null)}
 						className='shrink-0 text-warning-800'>
@@ -139,11 +143,11 @@ export function StaffAssignmentsTab({
 			<div className='bg-surface-elevated rounded-lg border border-border p-6 shadow-sm flex flex-wrap items-center justify-between gap-3'>
 				<div className='flex min-w-0 flex-wrap items-center gap-3'>
 					<h3 className='text-lg font-semibold text-heading'>
-						Yönetici Kullanıcılar
+						{t('admin.roles.staffHeading')}
 					</h3>
 					<div className='flex items-center gap-1.5'>
 						{ROLES.map((r) => {
-							const meta = ROLE_META[r];
+							const meta = roleMeta[r];
 							const active = roleFilter === r;
 							return (
 								<Chip
@@ -162,13 +166,13 @@ export function StaffAssignmentsTab({
 						<Checkbox
 							checked={allowAdminAssign}
 							onChange={toggleAllowAdmin}
-							label='Yöneticiler de atayabilsin'
+							label={t('admin.roles.allowAdminAssignLabel')}
 						/>
 					)}
 					<Button
 						onClick={() => setModal({ editing: null })}
 						leftIcon={<PlusIcon className='h-5 w-5' />}>
-						Yönetici Ata
+						{t('admin.roles.assignStaffButton')}
 					</Button>
 				</div>
 			</div>
@@ -178,7 +182,7 @@ export function StaffAssignmentsTab({
 				data={visibleStaff}
 				loading={staffQuery.isLoading}
 				emptyText={
-					roleFilter ? 'Bu rolde kullanıcı yok.' : 'Henüz admin kullanıcı yok.'
+					roleFilter ? t('admin.roles.emptyFiltered') : t('admin.roles.empty')
 				}
 				getRowId={(s) => s.id}
 			/>
