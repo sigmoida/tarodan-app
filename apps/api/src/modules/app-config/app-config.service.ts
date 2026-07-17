@@ -1,20 +1,20 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { compareVersions, isBelowMinimum } from './app-config.util';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { compareVersions, isBelowMinimum } from "./app-config.util";
 
 /**
  * PlatformSetting keys backing the mobile force-update gate (#232). Operators
  * tune these via the existing generic `PATCH /admin/settings/:key` — no redeploy.
  */
 export const APP_CONFIG_SETTING_KEYS = {
-  minIos: 'min_supported_app_version_ios',
-  minAndroid: 'min_supported_app_version_android',
-  latestIos: 'latest_app_version_ios',
-  latestAndroid: 'latest_app_version_android',
+  minIos: "min_supported_app_version_ios",
+  minAndroid: "min_supported_app_version_android",
+  latestIos: "latest_app_version_ios",
+  latestAndroid: "latest_app_version_android",
 } as const;
 
 /** Fallback when a key has never been set (never blocks a client). */
-const DEFAULT_VERSION = '1.0.0';
+const DEFAULT_VERSION = "1.0.0";
 
 export interface PlatformVersions {
   ios: string;
@@ -35,7 +35,7 @@ export class AppConfigService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getAppConfig(
-    platform?: 'ios' | 'android',
+    platform?: "ios" | "android",
     appVersion?: string,
   ): Promise<AppConfigResponse> {
     const keys = Object.values(APP_CONFIG_SETTING_KEYS);
@@ -52,17 +52,29 @@ export class AppConfigService {
     // latest defaults to the minimum, so `updateAvailable` is false until an
     // operator explicitly advertises a newer non-forced release.
     const latestVersion: PlatformVersions = {
-      ios: map.get(APP_CONFIG_SETTING_KEYS.latestIos) || minSupportedVersion.ios,
-      android: map.get(APP_CONFIG_SETTING_KEYS.latestAndroid) || minSupportedVersion.android,
+      ios:
+        map.get(APP_CONFIG_SETTING_KEYS.latestIos) || minSupportedVersion.ios,
+      android:
+        map.get(APP_CONFIG_SETTING_KEYS.latestAndroid) ||
+        minSupportedVersion.android,
     };
 
     let updateRequired: boolean | null = null;
     let updateAvailable: boolean | null = null;
     if (platform && appVersion) {
-      updateRequired = isBelowMinimum(appVersion, minSupportedVersion[platform]);
-      updateAvailable = compareVersions(appVersion, latestVersion[platform]) < 0;
+      updateRequired = isBelowMinimum(
+        appVersion,
+        minSupportedVersion[platform],
+      );
+      updateAvailable =
+        compareVersions(appVersion, latestVersion[platform]) < 0;
     }
 
-    return { minSupportedVersion, latestVersion, updateRequired, updateAvailable };
+    return {
+      minSupportedVersion,
+      latestVersion,
+      updateRequired,
+      updateAvailable,
+    };
   }
 }

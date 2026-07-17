@@ -56,17 +56,18 @@ Saf TypeScript, sıfır runtime bağımlılık. Dışa açtıkları:
 
 - `type LogLevel = 'debug' | 'info' | 'warn' | 'error'`
 - `interface LogEntry { level: LogLevel; message: string; name: string;
-  timestamp: number; context?: Record<string, unknown>; error?: unknown }`
+timestamp: number; context?: Record<string, unknown>; error?: unknown }`
 - `interface Sink { log(entry: LogEntry): void; captureException?(err: unknown,
-  ctx?: Record<string, unknown>): void; setUser?(user: LogUser | null): void;
-  addBreadcrumb?(bc: Breadcrumb): void; flush?(): Promise<void> }`
+ctx?: Record<string, unknown>): void; setUser?(user: LogUser | null): void;
+addBreadcrumb?(bc: Breadcrumb): void; flush?(): Promise<void> }`
 - `createLogger({ name, sinks, minLevel }): Logger`
 - `Logger`: `debug/info/warn/error(message, context?)`, `captureException(err,
-  context?)`, `setUser(user | null)`, `setContext(key, value)`, `child(name): Logger`
+context?)`, `setUser(user | null)`, `setContext(key, value)`, `child(name): Logger`
 - `ConsoleSink(options?)` — tüm platformlarda çalışır; dev'de okunur (seviye
   etiketli) format, prod'da JSON opsiyonu.
 
 Davranış:
+
 - Her çağrı `minLevel` filtresinden geçer, sonra tüm sink'lerin `log()`'una dağıtılır.
 - `error` seviyesi ve `captureException()` → sink'in `captureException`'ına yönlenir.
 - `debug/info/warn` → sink'in `addBreadcrumb`'ına (varsa) yazılır (Sentry breadcrumb).

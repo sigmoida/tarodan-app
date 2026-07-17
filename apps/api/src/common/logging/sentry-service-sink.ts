@@ -1,11 +1,14 @@
-import type { Breadcrumb, LogEntry, LogUser, Sink } from '@tarodan/logger';
-import type { SentryService } from '../../modules/sentry/sentry.service';
+import type { Breadcrumb, LogEntry, LogUser, Sink } from "@tarodan/logger";
+import type { SentryService } from "../../modules/sentry/sentry.service";
 
-const LEVEL_MAP: Record<string, 'fatal' | 'error' | 'warning' | 'info' | 'debug'> = {
-  debug: 'debug',
-  info: 'info',
-  warn: 'warning',
-  error: 'error',
+const LEVEL_MAP: Record<
+  string,
+  "fatal" | "error" | "warning" | "info" | "debug"
+> = {
+  debug: "debug",
+  info: "info",
+  warn: "warning",
+  error: "error",
 };
 
 /** Adapts SentryService (injectable) to the @tarodan/logger Sink interface. */

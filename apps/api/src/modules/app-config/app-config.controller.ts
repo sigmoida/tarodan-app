@@ -1,11 +1,11 @@
-import { Controller, Get, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { Public } from '../auth/decorators/public.decorator';
-import { AppConfigService, AppConfigResponse } from './app-config.service';
-import { AppConfigQueryDto } from './dto/app-config-query.dto';
+import { Controller, Get, Query } from "@nestjs/common";
+import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
+import { Public } from "../auth/decorators/public.decorator";
+import { AppConfigService, AppConfigResponse } from "./app-config.service";
+import { AppConfigQueryDto } from "./dto/app-config-query.dto";
 
-@ApiTags('App Config')
-@Controller('app-config')
+@ApiTags("App Config")
+@Controller("app-config")
 export class AppConfigController {
   constructor(private readonly appConfigService: AppConfigService) {}
 
@@ -20,12 +20,17 @@ export class AppConfigController {
    */
   @Get()
   @Public()
-  @ApiOperation({ summary: 'Mobil istemci sürüm / force-update konfigürasyonu' })
+  @ApiOperation({
+    summary: "Mobil istemci sürüm / force-update konfigürasyonu",
+  })
   @ApiResponse({
     status: 200,
-    description: 'Min desteklenen sürüm (+ opsiyonel updateRequired/updateAvailable)',
+    description:
+      "Min desteklenen sürüm (+ opsiyonel updateRequired/updateAvailable)",
   })
-  async getAppConfig(@Query() query: AppConfigQueryDto): Promise<AppConfigResponse> {
+  async getAppConfig(
+    @Query() query: AppConfigQueryDto,
+  ): Promise<AppConfigResponse> {
     return this.appConfigService.getAppConfig(query.platform, query.appVersion);
   }
 }

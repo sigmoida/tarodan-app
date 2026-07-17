@@ -1,16 +1,24 @@
-import type { Breadcrumb, LogEntry, LogUser, Sink } from './types';
+import type { Breadcrumb, LogEntry, LogUser, Sink } from "./types";
 
 const LEVEL_MAP: Record<string, string> = {
-  debug: 'debug',
-  info: 'info',
-  warn: 'warning',
-  error: 'error',
+  debug: "debug",
+  info: "info",
+  warn: "warning",
+  error: "error",
 };
 
 /** Minimal surface provided by the platform SDK (Sentry). */
 export interface SentryLike {
-  captureException(err: unknown, opts?: { extra?: Record<string, unknown> }): void;
-  addBreadcrumb(bc: { category?: string; message: string; level?: string; data?: Record<string, unknown> }): void;
+  captureException(
+    err: unknown,
+    opts?: { extra?: Record<string, unknown> },
+  ): void;
+  addBreadcrumb(bc: {
+    category?: string;
+    message: string;
+    level?: string;
+    data?: Record<string, unknown>;
+  }): void;
   setUser(user: LogUser | null): void;
 }
 

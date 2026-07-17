@@ -9,15 +9,18 @@
  * - Cihaz dili: config.getDeviceLocale() (Hermes Intl) — ilk açılışta i18next lng.
  * - t imzası eski ile uyumlu: t(key, { count }) → i18next-icu ICU {count}.
  */
-import React, { useCallback, useEffect, ReactNode } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { I18nextProvider, useTranslation as useI18nextTranslation } from 'react-i18next';
-import { type Locale } from '@tarodan/i18n';
-import i18n from './config';
+import React, { useCallback, useEffect, ReactNode } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  I18nextProvider,
+  useTranslation as useI18nextTranslation,
+} from "react-i18next";
+import { type Locale } from "@tarodan/i18n";
+import i18n from "./config";
 
 export type { Locale };
 
-const LOCALE_STORAGE_KEY = 'locale';
+const LOCALE_STORAGE_KEY = "locale";
 
 interface LanguageProviderProps {
   children: ReactNode;
@@ -30,7 +33,7 @@ export function LanguageProvider({ children }: LanguageProviderProps) {
   useEffect(() => {
     AsyncStorage.getItem(LOCALE_STORAGE_KEY)
       .then((saved) => {
-        if ((saved === 'tr' || saved === 'en') && saved !== i18n.language) {
+        if ((saved === "tr" || saved === "en") && saved !== i18n.language) {
           i18n.changeLanguage(saved);
         }
       })
@@ -47,7 +50,7 @@ export function LanguageProvider({ children }: LanguageProviderProps) {
 /** Eski API — { locale, setLocale, t }. language.tsx ve tüm ekranlar bunu kullanır. */
 export function useLanguage() {
   const { t: i18nextT, i18n: instance } = useI18nextTranslation();
-  const locale = (instance.language as Locale) ?? 'tr';
+  const locale = (instance.language as Locale) ?? "tr";
 
   const setLocale = useCallback(
     async (newLocale: Locale) => {
@@ -80,11 +83,11 @@ export function useTranslation() {
 }
 
 export const localeNames: Record<Locale, string> = {
-  tr: 'Türkçe',
-  en: 'English',
+  tr: "Türkçe",
+  en: "English",
 };
 
 export const localeFlags: Record<Locale, string> = {
-  tr: '🇹🇷',
-  en: '🇬🇧',
+  tr: "🇹🇷",
+  en: "🇬🇧",
 };

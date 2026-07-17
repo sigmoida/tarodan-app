@@ -1,6 +1,6 @@
-import { guestApi } from './client';
+import { guestApi } from "./client";
 
-export type AppPlatform = 'ios' | 'android';
+export type AppPlatform = "ios" | "android";
 
 export interface AppConfigResponse {
   minSupportedVersion: { ios: string; android: string };
@@ -18,7 +18,7 @@ export interface AppConfigResponse {
  */
 export const appConfigApi = {
   getAppConfig: (platform: AppPlatform, appVersion: string) =>
-    guestApi.get<AppConfigResponse>('/app-config', {
+    guestApi.get<AppConfigResponse>("/app-config", {
       params: { platform, appVersion },
     }),
 };

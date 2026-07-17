@@ -25,6 +25,7 @@
 Bağımlılıksız çekirdek: tipler, `createLogger`, `ConsoleSink`. Birim testler vitest ile.
 
 **Files:**
+
 - Create: `packages/logger/package.json`
 - Create: `packages/logger/tsconfig.json`
 - Create: `packages/logger/vitest.config.ts`
@@ -37,6 +38,7 @@ Bağımlılıksız çekirdek: tipler, `createLogger`, `ConsoleSink`. Birim testl
 - Test: `packages/logger/src/sentry-sink.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - `type LogLevel = 'debug' | 'info' | 'warn' | 'error'`
   - `interface LogUser { id: string; email?: string; username?: string }`
@@ -53,6 +55,7 @@ Bağımlılıksız çekirdek: tipler, `createLogger`, `ConsoleSink`. Birim testl
 - [ ] **Step 1: Paket iskeleti**
 
 `packages/logger/package.json`:
+
 ```json
 {
   "name": "@tarodan/logger",
@@ -77,6 +80,7 @@ Bağımlılıksız çekirdek: tipler, `createLogger`, `ConsoleSink`. Birim testl
 ```
 
 `packages/logger/tsconfig.json`:
+
 ```json
 {
   "extends": "@tarodan/tsconfig/base.json",
@@ -86,18 +90,19 @@ Bağımlılıksız çekirdek: tipler, `createLogger`, `ConsoleSink`. Birim testl
 ```
 
 `packages/logger/vitest.config.ts`:
+
 ```ts
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  test: { environment: 'node', include: ['src/**/*.test.ts'] },
+  test: { environment: "node", include: ["src/**/*.test.ts"] },
 });
 ```
 
 - [ ] **Step 2: Tipleri yaz** — `packages/logger/src/types.ts`
 
 ```ts
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+export type LogLevel = "debug" | "info" | "warn" | "error";
 
 export const LEVEL_ORDER: Record<LogLevel, number> = {
   debug: 10,
@@ -151,9 +156,9 @@ export interface Logger {
 - [ ] **Step 3: Failing test yaz** — `packages/logger/src/logger.test.ts`
 
 ```ts
-import { describe, it, expect, vi } from 'vitest';
-import { createLogger } from './logger';
-import type { Sink } from './types';
+import { describe, it, expect, vi } from "vitest";
+import { createLogger } from "./logger";
+import type { Sink } from "./types";
 
 function makeSpySink(): Sink & { log: ReturnType<typeof vi.fn> } {
   return {
@@ -164,79 +169,92 @@ function makeSpySink(): Sink & { log: ReturnType<typeof vi.fn> } {
   } as unknown as Sink & { log: ReturnType<typeof vi.fn> };
 }
 
-describe('createLogger', () => {
-  it('fans out log() to all sinks', () => {
+describe("createLogger", () => {
+  it("fans out log() to all sinks", () => {
     const a = makeSpySink();
     const b = makeSpySink();
-    const log = createLogger({ name: 'test', sinks: [a, b] });
-    log.info('hello', { x: 1 });
+    const log = createLogger({ name: "test", sinks: [a, b] });
+    log.info("hello", { x: 1 });
     expect(a.log).toHaveBeenCalledTimes(1);
     expect(b.log).toHaveBeenCalledTimes(1);
     const entry = a.log.mock.calls[0][0];
-    expect(entry).toMatchObject({ level: 'info', message: 'hello', name: 'test', context: { x: 1 } });
-    expect(typeof entry.timestamp).toBe('number');
+    expect(entry).toMatchObject({
+      level: "info",
+      message: "hello",
+      name: "test",
+      context: { x: 1 },
+    });
+    expect(typeof entry.timestamp).toBe("number");
   });
 
-  it('respects minLevel filtering', () => {
+  it("respects minLevel filtering", () => {
     const s = makeSpySink();
-    const log = createLogger({ name: 't', sinks: [s], minLevel: 'warn' });
-    log.debug('nope');
-    log.info('nope');
-    log.warn('yes');
-    log.error('yes');
+    const log = createLogger({ name: "t", sinks: [s], minLevel: "warn" });
+    log.debug("nope");
+    log.info("nope");
+    log.warn("yes");
+    log.error("yes");
     expect(s.log).toHaveBeenCalledTimes(2);
   });
 
-  it('routes error level to sink.captureException when error is present', () => {
+  it("routes error level to sink.captureException when error is present", () => {
     const s = makeSpySink();
-    const log = createLogger({ name: 't', sinks: [s] });
-    const err = new Error('boom');
-    log.error('failed', { error: err, route: '/x' });
+    const log = createLogger({ name: "t", sinks: [s] });
+    const err = new Error("boom");
+    log.error("failed", { error: err, route: "/x" });
     expect(s.captureException).toHaveBeenCalledTimes(1);
-    expect(s.captureException).toHaveBeenCalledWith(err, { error: err, route: '/x' });
+    expect(s.captureException).toHaveBeenCalledWith(err, {
+      error: err,
+      route: "/x",
+    });
   });
 
-  it('error without an error value does NOT call captureException', () => {
+  it("error without an error value does NOT call captureException", () => {
     const s = makeSpySink();
-    const log = createLogger({ name: 't', sinks: [s] });
-    log.error('plain error message');
+    const log = createLogger({ name: "t", sinks: [s] });
+    log.error("plain error message");
     expect(s.captureException).not.toHaveBeenCalled();
     expect(s.log).toHaveBeenCalledTimes(1);
   });
 
-  it('captureException forwards to sink and also logs error entry', () => {
+  it("captureException forwards to sink and also logs error entry", () => {
     const s = makeSpySink();
-    const log = createLogger({ name: 't', sinks: [s] });
-    const err = new Error('boom');
-    log.captureException(err, { route: '/x' });
+    const log = createLogger({ name: "t", sinks: [s] });
+    const err = new Error("boom");
+    log.captureException(err, { route: "/x" });
     expect(s.captureException).toHaveBeenCalledTimes(1);
-    expect(s.captureException).toHaveBeenCalledWith(err, { route: '/x' });
+    expect(s.captureException).toHaveBeenCalledWith(err, { route: "/x" });
     expect(s.log).toHaveBeenCalledTimes(1);
-    expect(s.log.mock.calls[0][0]).toMatchObject({ level: 'error' });
+    expect(s.log.mock.calls[0][0]).toMatchObject({ level: "error" });
   });
 
-  it('debug/info/warn produce breadcrumbs on the sink', () => {
+  it("debug/info/warn produce breadcrumbs on the sink", () => {
     const s = makeSpySink();
-    const log = createLogger({ name: 't', sinks: [s] });
-    log.info('crumb', { a: 1 });
+    const log = createLogger({ name: "t", sinks: [s] });
+    log.info("crumb", { a: 1 });
     expect(s.addBreadcrumb).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'crumb', level: 'info', category: 't', data: { a: 1 } }),
+      expect.objectContaining({
+        message: "crumb",
+        level: "info",
+        category: "t",
+        data: { a: 1 },
+      }),
     );
   });
 
-  it('setUser and setContext propagate to sinks', () => {
+  it("setUser and setContext propagate to sinks", () => {
     const s = makeSpySink();
-    const log = createLogger({ name: 't', sinks: [s] });
-    log.setUser({ id: 'u1' });
-    expect(s.setUser).toHaveBeenCalledWith({ id: 'u1' });
+    const log = createLogger({ name: "t", sinks: [s] });
+    log.setUser({ id: "u1" });
+    expect(s.setUser).toHaveBeenCalledWith({ id: "u1" });
   });
 
-  it('child inherits sinks and merges name', () => {
+  it("child inherits sinks and merges name", () => {
     const s = makeSpySink();
-    const log = createLogger({ name: 'root', sinks: [s] });
-    const c = log.child('sub');
-    c.info('hi');
-    expect(s.log.mock.calls[0][0].name).toBe('root:sub');
+    const log = createLogger({ name: "root", sinks: [s] });
+    const c = log.child("sub");
+    c.info("hi");
+    expect(s.log.mock.calls[0][0].name).toBe("root:sub");
   });
 });
 ```
@@ -256,7 +274,7 @@ import {
   type Logger,
   type LogUser,
   type Sink,
-} from './types';
+} from "./types";
 
 interface CreateLoggerOptions {
   name: string;
@@ -267,12 +285,17 @@ interface CreateLoggerOptions {
 
 export function createLogger(opts: CreateLoggerOptions): Logger {
   const { name, sinks } = opts;
-  const minLevel = opts.minLevel ?? 'debug';
+  const minLevel = opts.minLevel ?? "debug";
   const context: Record<string, unknown> = { ...(opts.baseContext ?? {}) };
 
-  const enabled = (level: LogLevel) => LEVEL_ORDER[level] >= LEVEL_ORDER[minLevel];
+  const enabled = (level: LogLevel) =>
+    LEVEL_ORDER[level] >= LEVEL_ORDER[minLevel];
 
-  function emit(level: LogLevel, message: string, callCtx?: Record<string, unknown>): void {
+  function emit(
+    level: LogLevel,
+    message: string,
+    callCtx?: Record<string, unknown>,
+  ): void {
     if (!enabled(level)) return;
     const merged = { ...context, ...(callCtx ?? {}) };
     const error = merged.error;
@@ -286,22 +309,22 @@ export function createLogger(opts: CreateLoggerOptions): Logger {
     };
     for (const sink of sinks) {
       sink.log(entry);
-      if (level === 'error' && error !== undefined && sink.captureException) {
+      if (level === "error" && error !== undefined && sink.captureException) {
         sink.captureException(error, merged);
-      } else if (level !== 'error' && sink.addBreadcrumb) {
+      } else if (level !== "error" && sink.addBreadcrumb) {
         sink.addBreadcrumb({ category: name, message, level, data: callCtx });
       }
     }
   }
 
   const logger: Logger = {
-    debug: (m, c) => emit('debug', m, c),
-    info: (m, c) => emit('info', m, c),
-    warn: (m, c) => emit('warn', m, c),
-    error: (m, c) => emit('error', m, c),
+    debug: (m, c) => emit("debug", m, c),
+    info: (m, c) => emit("info", m, c),
+    warn: (m, c) => emit("warn", m, c),
+    error: (m, c) => emit("error", m, c),
     captureException: (err, c) => {
       for (const sink of sinks) sink.captureException?.(err, c);
-      emit('error', errorMessage(err), { ...c, error: err });
+      emit("error", errorMessage(err), { ...c, error: err });
     },
     setUser: (user: LogUser | null) => {
       for (const sink of sinks) sink.setUser?.(user);
@@ -310,7 +333,11 @@ export function createLogger(opts: CreateLoggerOptions): Logger {
       context[key] = value;
     },
     child: (childName: string) =>
-      createLogger({ ...opts, name: `${name}:${childName}`, baseContext: { ...context } }),
+      createLogger({
+        ...opts,
+        name: `${name}:${childName}`,
+        baseContext: { ...context },
+      }),
   };
   return logger;
 }
@@ -331,18 +358,19 @@ function errorMessage(err: unknown): string {
 > ```ts
 > function emit(level, message, callCtx, skipCapture = false) { ... if (!skipCapture && level === 'error' && error !== undefined && sink.captureException) { ... } }
 > ```
+>
 > ve `captureException` içinde: kendisi sink'e gönderdiği için `emit('error', errorMessage(err), { ...c, error: err }, true)` çağır. Test `captureException forwards ... and also logs error entry` bunu doğrular (tam olarak 1 `captureException` çağrısı, 1 `log` çağrısı). Testte gerekiyorsa `toHaveBeenCalledTimes(1)` ekle.
 
 - [ ] **Step 6: `ConsoleSink`** — `packages/logger/src/console-sink.ts`
 
 ```ts
-import type { Breadcrumb, LogEntry, Sink } from './types';
+import type { Breadcrumb, LogEntry, Sink } from "./types";
 
 const LABEL: Record<string, string> = {
-  debug: '🔍 DEBUG',
-  info: 'ℹ️  INFO',
-  warn: '⚠️  WARN',
-  error: '❌ ERROR',
+  debug: "🔍 DEBUG",
+  info: "ℹ️  INFO",
+  warn: "⚠️  WARN",
+  error: "❌ ERROR",
 };
 
 export interface ConsoleSinkOptions {
@@ -354,15 +382,15 @@ export class ConsoleSink implements Sink {
 
   log(entry: LogEntry): void {
     if (this.options.json) {
-       
       console.log(JSON.stringify(entry));
       return;
     }
     const prefix = `${LABEL[entry.level] ?? entry.level} [${entry.name}]`;
     const args: unknown[] = [prefix, entry.message];
-    if (entry.context && Object.keys(entry.context).length) args.push(entry.context);
-    if (entry.level === 'error') console.error(...args);
-    else if (entry.level === 'warn') console.warn(...args);
+    if (entry.context && Object.keys(entry.context).length)
+      args.push(entry.context);
+    if (entry.level === "error") console.error(...args);
+    else if (entry.level === "warn") console.warn(...args);
     else console.log(...args);
   }
 
@@ -373,45 +401,58 @@ export class ConsoleSink implements Sink {
 - [ ] **Step 6b: Generic SentrySink — failing test** — `packages/logger/src/sentry-sink.test.ts`
 
 ```ts
-import { describe, it, expect, vi } from 'vitest';
-import { createSentrySink } from './sentry-sink';
+import { describe, it, expect, vi } from "vitest";
+import { createSentrySink } from "./sentry-sink";
 
 function makeSentryLike() {
-  return { captureException: vi.fn(), addBreadcrumb: vi.fn(), setUser: vi.fn() };
+  return {
+    captureException: vi.fn(),
+    addBreadcrumb: vi.fn(),
+    setUser: vi.fn(),
+  };
 }
 
-describe('createSentrySink', () => {
-  it('captureException forwards err and extra context', () => {
+describe("createSentrySink", () => {
+  it("captureException forwards err and extra context", () => {
     const s = makeSentryLike();
     const sink = createSentrySink(s);
-    const err = new Error('boom');
-    sink.captureException!(err, { route: '/x' });
-    expect(s.captureException).toHaveBeenCalledWith(err, { extra: { route: '/x' } });
+    const err = new Error("boom");
+    sink.captureException!(err, { route: "/x" });
+    expect(s.captureException).toHaveBeenCalledWith(err, {
+      extra: { route: "/x" },
+    });
   });
 
-  it('addBreadcrumb maps level debug->debug, warn->warning', () => {
+  it("addBreadcrumb maps level debug->debug, warn->warning", () => {
     const s = makeSentryLike();
     const sink = createSentrySink(s);
-    sink.addBreadcrumb!({ category: 'auth', message: 'login', level: 'warn', data: { a: 1 } });
+    sink.addBreadcrumb!({
+      category: "auth",
+      message: "login",
+      level: "warn",
+      data: { a: 1 },
+    });
     expect(s.addBreadcrumb).toHaveBeenCalledWith({
-      category: 'auth',
-      message: 'login',
-      level: 'warning',
+      category: "auth",
+      message: "login",
+      level: "warning",
       data: { a: 1 },
     });
   });
 
-  it('setUser passes through (null included)', () => {
+  it("setUser passes through (null included)", () => {
     const s = makeSentryLike();
     const sink = createSentrySink(s);
     sink.setUser!(null);
     expect(s.setUser).toHaveBeenCalledWith(null);
   });
 
-  it('log() is a no-op', () => {
+  it("log() is a no-op", () => {
     const s = makeSentryLike();
     const sink = createSentrySink(s);
-    expect(() => sink.log({ level: 'info', message: 'x', name: 't', timestamp: 0 })).not.toThrow();
+    expect(() =>
+      sink.log({ level: "info", message: "x", name: "t", timestamp: 0 }),
+    ).not.toThrow();
     expect(s.captureException).not.toHaveBeenCalled();
   });
 });
@@ -422,19 +463,27 @@ Run: `pnpm --filter @tarodan/logger test` → FAIL (modül yok).
 - [ ] **Step 6c: Generic SentrySink** — `packages/logger/src/sentry-sink.ts`
 
 ```ts
-import type { Breadcrumb, LogEntry, LogUser, Sink } from './types';
+import type { Breadcrumb, LogEntry, LogUser, Sink } from "./types";
 
 const LEVEL_MAP: Record<string, string> = {
-  debug: 'debug',
-  info: 'info',
-  warn: 'warning',
-  error: 'error',
+  debug: "debug",
+  info: "info",
+  warn: "warning",
+  error: "error",
 };
 
 /** Platform SDK'sının (Sentry) sağladığı asgari yüzey. */
 export interface SentryLike {
-  captureException(err: unknown, opts?: { extra?: Record<string, unknown> }): void;
-  addBreadcrumb(bc: { category?: string; message: string; level?: string; data?: Record<string, unknown> }): void;
+  captureException(
+    err: unknown,
+    opts?: { extra?: Record<string, unknown> },
+  ): void;
+  addBreadcrumb(bc: {
+    category?: string;
+    message: string;
+    level?: string;
+    data?: Record<string, unknown>;
+  }): void;
   setUser(user: LogUser | null): void;
 }
 
@@ -464,12 +513,12 @@ Run: `pnpm --filter @tarodan/logger test` → PASS.
 - [ ] **Step 7: Barrel** — `packages/logger/src/index.ts`
 
 ```ts
-export * from './types';
-export { createLogger } from './logger';
-export { ConsoleSink } from './console-sink';
-export type { ConsoleSinkOptions } from './console-sink';
-export { createSentrySink } from './sentry-sink';
-export type { SentryLike } from './sentry-sink';
+export * from "./types";
+export { createLogger } from "./logger";
+export { ConsoleSink } from "./console-sink";
+export type { ConsoleSinkOptions } from "./console-sink";
+export { createSentrySink } from "./sentry-sink";
+export type { SentryLike } from "./sentry-sink";
 ```
 
 - [ ] **Step 8: Testleri çalıştır — PASS beklenir**
@@ -491,6 +540,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 2: API — SentrySink adaptörü + logger, interceptor'a bağla
 
 **Files:**
+
 - Create: `apps/api/src/common/logging/sentry-service-sink.ts`
 - Create: `apps/api/src/common/logging/logger.ts`
 - Modify: `apps/api/package.json` (dep: `@tarodan/logger`)
@@ -498,6 +548,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Test: `apps/api/src/common/logging/sentry-service-sink.spec.ts`
 
 **Interfaces:**
+
 - Consumes: Task 1 `createLogger`, `ConsoleSink`, `Sink`, `LogEntry`, `LogUser`, `Breadcrumb`; mevcut `SentryService` (`apps/api/src/modules/sentry/sentry.service.ts`): `captureException(Error, ctx?)`, `captureMessage(msg, level)`, `setUser({id,email?,username?})`, `clearUser()`, `addBreadcrumb(bc)`.
 - Produces: `createSentryServiceSink(sentry: SentryService): Sink`; `appLogger: Logger` (singleton, `apps/api/src/common/logging/logger.ts`).
 
@@ -512,9 +563,9 @@ Run: `pnpm install`
 - [ ] **Step 2: Failing test** — `apps/api/src/common/logging/sentry-service-sink.spec.ts`
 
 ```ts
-import { createSentryServiceSink } from './sentry-sink';
+import { createSentryServiceSink } from "./sentry-sink";
 
-describe('createSentryServiceSink', () => {
+describe("createSentryServiceSink", () => {
   const makeSentry = () => ({
     captureException: jest.fn(),
     captureMessage: jest.fn(),
@@ -523,41 +574,47 @@ describe('createSentryServiceSink', () => {
     addBreadcrumb: jest.fn(),
   });
 
-  it('captureException forwards Error to SentryService', () => {
+  it("captureException forwards Error to SentryService", () => {
     const s = makeSentry();
     const sink = createSentryServiceSink(s as any);
-    const err = new Error('boom');
-    sink.captureException!(err, { route: '/x' });
-    expect(s.captureException).toHaveBeenCalledWith(err, { route: '/x' });
+    const err = new Error("boom");
+    sink.captureException!(err, { route: "/x" });
+    expect(s.captureException).toHaveBeenCalledWith(err, { route: "/x" });
   });
 
-  it('wraps non-Error values before forwarding', () => {
+  it("wraps non-Error values before forwarding", () => {
     const s = makeSentry();
     const sink = createSentryServiceSink(s as any);
-    sink.captureException!('stringy', {});
+    sink.captureException!("stringy", {});
     expect(s.captureException).toHaveBeenCalledWith(expect.any(Error), {});
   });
 
-  it('setUser(null) calls clearUser', () => {
+  it("setUser(null) calls clearUser", () => {
     const s = makeSentry();
     const sink = createSentryServiceSink(s as any);
     sink.setUser!(null);
     expect(s.clearUser).toHaveBeenCalled();
   });
 
-  it('addBreadcrumb maps to Sentry breadcrumb shape', () => {
+  it("addBreadcrumb maps to Sentry breadcrumb shape", () => {
     const s = makeSentry();
     const sink = createSentryServiceSink(s as any);
-    sink.addBreadcrumb!({ category: 'auth', message: 'login', level: 'info' });
+    sink.addBreadcrumb!({ category: "auth", message: "login", level: "info" });
     expect(s.addBreadcrumb).toHaveBeenCalledWith(
-      expect.objectContaining({ category: 'auth', message: 'login', level: 'info' }),
+      expect.objectContaining({
+        category: "auth",
+        message: "login",
+        level: "info",
+      }),
     );
   });
 
-  it('log() is a no-op (console handled by ConsoleSink)', () => {
+  it("log() is a no-op (console handled by ConsoleSink)", () => {
     const s = makeSentry();
     const sink = createSentryServiceSink(s as any);
-    expect(() => sink.log({ level: 'info', message: 'x', name: 't', timestamp: 0 })).not.toThrow();
+    expect(() =>
+      sink.log({ level: "info", message: "x", name: "t", timestamp: 0 }),
+    ).not.toThrow();
   });
 });
 ```
@@ -570,14 +627,17 @@ Expected: FAIL — modül yok.
 - [ ] **Step 4: Adaptörü yaz** — `apps/api/src/common/logging/sentry-service-sink.ts`
 
 ```ts
-import type { Breadcrumb, LogEntry, LogUser, Sink } from '@tarodan/logger';
-import type { SentryService } from '../../modules/sentry/sentry.service';
+import type { Breadcrumb, LogEntry, LogUser, Sink } from "@tarodan/logger";
+import type { SentryService } from "../../modules/sentry/sentry.service";
 
-const LEVEL_MAP: Record<string, 'fatal' | 'error' | 'warning' | 'info' | 'debug'> = {
-  debug: 'debug',
-  info: 'info',
-  warn: 'warning',
-  error: 'error',
+const LEVEL_MAP: Record<
+  string,
+  "fatal" | "error" | "warning" | "info" | "debug"
+> = {
+  debug: "debug",
+  info: "info",
+  warn: "warning",
+  error: "error",
 };
 
 /** SentryService'i @tarodan/logger Sink arayüzüne uyarlar. */
@@ -608,18 +668,21 @@ export function createSentryServiceSink(sentry: SentryService): Sink {
 - [ ] **Step 5: Logger singleton** — `apps/api/src/common/logging/logger.ts`
 
 ```ts
-import { ConsoleSink, createLogger, type Logger } from '@tarodan/logger';
-import type { SentryService } from '../../modules/sentry/sentry.service';
-import { createSentryServiceSink } from './sentry-sink';
+import { ConsoleSink, createLogger, type Logger } from "@tarodan/logger";
+import type { SentryService } from "../../modules/sentry/sentry.service";
+import { createSentryServiceSink } from "./sentry-sink";
 
 let instance: Logger | null = null;
 
 /** SentryModule init olduktan sonra bir kez çağrılır (SentryService enjekte edilir). */
 export function initAppLogger(sentry: SentryService): Logger {
   instance = createLogger({
-    name: 'api',
-    sinks: [new ConsoleSink({ json: process.env.NODE_ENV === 'production' }), createSentryServiceSink(sentry)],
-    minLevel: process.env.LOG_LEVEL === 'debug' ? 'debug' : 'info',
+    name: "api",
+    sinks: [
+      new ConsoleSink({ json: process.env.NODE_ENV === "production" }),
+      createSentryServiceSink(sentry),
+    ],
+    minLevel: process.env.LOG_LEVEL === "debug" ? "debug" : "info",
   });
   return instance;
 }
@@ -627,7 +690,11 @@ export function initAppLogger(sentry: SentryService): Logger {
 /** Henüz init edilmemişse yalnız-console fallback döndürür (init sırası bağımsız güvenli). */
 export function getAppLogger(): Logger {
   if (!instance) {
-    instance = createLogger({ name: 'api', sinks: [new ConsoleSink()], minLevel: 'info' });
+    instance = createLogger({
+      name: "api",
+      sinks: [new ConsoleSink()],
+      minLevel: "info",
+    });
   }
   return instance;
 }
@@ -637,19 +704,24 @@ export function getAppLogger(): Logger {
 
 ```ts
 // import ekle:
-import { initAppLogger } from '../../common/logging/logger';
+import { initAppLogger } from "../../common/logging/logger";
 // onModuleInit içinde, this.sentryService erişilebilir olduğunda:
 initAppLogger(this.sentryService);
 ```
+
 (SentryService modülde zaten provider; constructor'a inject edilmemişse `constructor(private readonly sentryService: SentryService) {}` ekle. Değilse mevcut inject edilen referansı kullan.)
 
 - [ ] **Step 7: Interceptor hata yolunu logger'a bağla** — `apps/api/src/modules/sentry/sentry.interceptor.ts` içindeki hata yakalama bloğunda, mevcut Sentry çağrısının yanına:
 
 ```ts
-import { getAppLogger } from '../../common/logging/logger';
+import { getAppLogger } from "../../common/logging/logger";
 // catchError/hata bloğunda:
-getAppLogger().captureException(err, { path: request?.url, method: request?.method });
+getAppLogger().captureException(err, {
+  path: request?.url,
+  method: request?.method,
+});
 ```
+
 (Mevcut davranışı SİLME — ek satır; çift kayıt olmaması için, eğer interceptor zaten `Sentry.captureException` çağırıyorsa onu kaldırıp yerine `getAppLogger().captureException` kullan. Dosyayı okuyup hangi çağrı varsa tek yol bırak.)
 
 - [ ] **Step 8: Testleri çalıştır — PASS**
@@ -672,6 +744,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 3: Web — logger + SentrySink, mevcut çağrıları yönlendir
 
 **Files:**
+
 - Create: `apps/web/src/lib/logger.ts`
 - Modify: `apps/web/package.json` (dep: `@tarodan/logger`)
 - Modify: `apps/web/src/lib/withChunkErrorLogging.ts`
@@ -680,6 +753,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Test: `apps/web/src/lib/logger.test.ts` (varsa web test runner; yoksa Step'te belirtildiği gibi atla)
 
 **Interfaces:**
+
 - Consumes: Task 1 exports; `@sentry/nextjs` (`Sentry.captureException(err, {tags, extra})`, `Sentry.captureMessage`, `Sentry.addBreadcrumb`, `Sentry.setUser`).
 - Produces: `apps/web/src/lib/logger.ts` → `export const logger: Logger`.
 
@@ -688,29 +762,37 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```json
 "@tarodan/logger": "workspace:*",
 ```
+
 Run: `pnpm install`
 
 - [ ] **Step 2: logger** — `apps/web/src/lib/logger.ts` — ortak `createSentrySink`'i kullan (SDK'yı enjekte et):
 
 ```ts
-import * as Sentry from '@sentry/nextjs';
-import { ConsoleSink, createLogger, createSentrySink, type Logger } from '@tarodan/logger';
+import * as Sentry from "@sentry/nextjs";
+import {
+  ConsoleSink,
+  createLogger,
+  createSentrySink,
+  type Logger,
+} from "@tarodan/logger";
 
 export const logger: Logger = createLogger({
-  name: 'web',
+  name: "web",
   sinks: [new ConsoleSink(), createSentrySink(Sentry)],
-  minLevel: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+  minLevel: process.env.NODE_ENV === "production" ? "info" : "debug",
 });
 ```
+
 > `@sentry/nextjs` top-level `captureException(err, {extra})`, `addBreadcrumb(bc)`, `setUser(user)` sağlar — `SentryLike` ile uyumlu. Tip uyuşmazlığı olursa `createSentrySink(Sentry as unknown as SentryLike)` kullan; doğrulama Step 6.
 
 - [ ] **Step 3: `withChunkErrorLogging.ts` yönlendir** — `Sentry.captureException(...)` bloğunu logger'a çevir:
 
 ```ts
-import { logger } from '@/lib/logger';
+import { logger } from "@/lib/logger";
 // importFn().catch içinde, mevcut dev console.group bloğu kalır, Sentry satırı yerine:
-logger.captureException(err, { component: 'LazyLoad', componentName });
+logger.captureException(err, { component: "LazyLoad", componentName });
 ```
+
 (`import * as Sentry from '@sentry/nextjs'` bu dosyadan kaldırılabilir — artık logger üzerinden gidiyor.)
 
 - [ ] **Step 4: `query/client.ts` global error → logger** — mevcut `Sentry.captureException` çağrısını `logger.captureException(error, { source: 'react-query' })` ile değiştir; `@sentry/nextjs` importunu logger importuyla değiştir.
@@ -738,10 +820,12 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 4: Admin — logger + SentrySink
 
 **Files:**
+
 - Create: `apps/admin/src/lib/logger.ts`
 - Modify: `apps/admin/package.json` (dep: `@tarodan/logger`)
 
 **Interfaces:**
+
 - Consumes: Task 1 exports; `@sentry/nextjs`.
 - Produces: `apps/admin/src/lib/logger.ts` → `export const logger: Logger` (name `'admin'`).
 
@@ -750,13 +834,18 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - [ ] **Step 2: logger.ts** — `apps/admin/src/lib/logger.ts` — Task 3 Step 2 ile aynı, tek fark `name: 'admin'`. Ortak `createSentrySink`'i kullanır (mantık tekrarı yok, sadece SDK enjeksiyonu + isim):
 
 ```ts
-import * as Sentry from '@sentry/nextjs';
-import { ConsoleSink, createLogger, createSentrySink, type Logger } from '@tarodan/logger';
+import * as Sentry from "@sentry/nextjs";
+import {
+  ConsoleSink,
+  createLogger,
+  createSentrySink,
+  type Logger,
+} from "@tarodan/logger";
 
 export const logger: Logger = createLogger({
-  name: 'admin',
+  name: "admin",
   sinks: [new ConsoleSink(), createSentrySink(Sentry)],
-  minLevel: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+  minLevel: process.env.NODE_ENV === "production" ? "info" : "debug",
 });
 ```
 
@@ -781,6 +870,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 5: Mobile — gerçek `@sentry/react-native` + logger, stub'ı canlandır
 
 **Files:**
+
 - Modify: `apps/mobile/package.json` (deps: `@sentry/react-native`, `@tarodan/logger`)
 - Modify: `apps/mobile/app.json` (veya `app.config.*`) — expo plugin
 - Rewrite: `apps/mobile/src/services/sentry.ts`
@@ -788,6 +878,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Modify: `apps/mobile/.env.example` (talimatı güncelle)
 
 **Interfaces:**
+
 - Consumes: Task 1 exports; `@sentry/react-native`.
 - Produces: `apps/mobile/src/services/sentry.ts` — mevcut export imzaları KORUNUR: `initSentry(): void`, `captureException(error, options?)`, `captureMessage(msg, level?)`, `setUser(user | null)`, `withTransaction(name, op, fn)`, tipler `SeverityLevel`, `SentryUser`. Ek: `apps/mobile/src/services/logger.ts` → `export const logger: Logger`.
 
@@ -796,6 +887,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```bash
 cd apps/mobile && npx expo install @sentry/react-native
 ```
+
 Ayrıca `apps/mobile/package.json` `dependencies`'e `"@tarodan/logger": "workspace:*"` ekle. Kökten `pnpm install`.
 
 - [ ] **Step 2: Expo plugin** — `apps/mobile/app.json` `expo.plugins` dizisine ekle:
@@ -805,6 +897,7 @@ Ayrıca `apps/mobile/package.json` `dependencies`'e `"@tarodan/logger": "workspa
   "@sentry/react-native/expo"
 ]
 ```
+
 (Mevcut plugins dizisine ekle, ezme.)
 
 - [ ] **Step 3: `sentry.ts`'i gerçek SDK'ya çevir** — `apps/mobile/src/services/sentry.ts` yeniden yaz (imzalar korunur, guard kalır):
@@ -815,10 +908,10 @@ Ayrıca `apps/mobile/package.json` `dependencies`'e `"@tarodan/logger": "workspa
  * Expo Go'da native module yüklenemez; runtime guard ile no-op kalır.
  * DSN yoksa da no-op.
  */
-import Constants from 'expo-constants';
-import * as Sentry from '@sentry/react-native';
+import Constants from "expo-constants";
+import * as Sentry from "@sentry/react-native";
 
-export type SeverityLevel = 'fatal' | 'error' | 'warning' | 'info' | 'debug';
+export type SeverityLevel = "fatal" | "error" | "warning" | "info" | "debug";
 
 export interface SentryUser {
   id?: string;
@@ -833,7 +926,7 @@ interface CaptureOptions {
   user?: SentryUser;
 }
 
-const isExpoGo = Constants.executionEnvironment === 'storeClient';
+const isExpoGo = Constants.executionEnvironment === "storeClient";
 const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
 const enabled = !isExpoGo && Boolean(dsn);
 
@@ -844,29 +937,39 @@ export function initSentry(): void {
   initialized = true;
   Sentry.init({
     dsn,
-    environment: process.env.EXPO_PUBLIC_ENVIRONMENT ?? 'development',
+    environment: process.env.EXPO_PUBLIC_ENVIRONMENT ?? "development",
     tracesSampleRate: 0.1,
     enableNative: true,
   });
 }
 
-export function captureException(error: unknown, options: CaptureOptions = {}): void {
+export function captureException(
+  error: unknown,
+  options: CaptureOptions = {},
+): void {
   if (!enabled) {
-    if (__DEV__) console.warn('[sentry] captureException (disabled):', error, options);
+    if (__DEV__)
+      console.warn("[sentry] captureException (disabled):", error, options);
     return;
   }
   Sentry.withScope((scope) => {
     if (options.level) scope.setLevel(options.level);
-    if (options.tags) Object.entries(options.tags).forEach(([k, v]) => scope.setTag(k, v));
-    if (options.extra) Object.entries(options.extra).forEach(([k, v]) => scope.setExtra(k, v));
+    if (options.tags)
+      Object.entries(options.tags).forEach(([k, v]) => scope.setTag(k, v));
+    if (options.extra)
+      Object.entries(options.extra).forEach(([k, v]) => scope.setExtra(k, v));
     if (options.user) scope.setUser(options.user);
     Sentry.captureException(error);
   });
 }
 
-export function captureMessage(message: string, level: SeverityLevel = 'info'): void {
+export function captureMessage(
+  message: string,
+  level: SeverityLevel = "info",
+): void {
   if (!enabled) {
-    if (__DEV__) console.log('[sentry] captureMessage (disabled):', message, level);
+    if (__DEV__)
+      console.log("[sentry] captureMessage (disabled):", message, level);
     return;
   }
   Sentry.captureMessage(message, level);
@@ -877,11 +980,16 @@ export function setUser(user: SentryUser | null): void {
   Sentry.setUser(user);
 }
 
-export async function withTransaction<T>(name: string, op: string, fn: () => Promise<T>): Promise<T> {
+export async function withTransaction<T>(
+  name: string,
+  op: string,
+  fn: () => Promise<T>,
+): Promise<T> {
   if (!enabled) return fn();
   return Sentry.startSpan({ name, op }, () => fn());
 }
 ```
+
 > Not: `startSpan` v7 `@sentry/react-native` API'sinde mevcut. Kurulan sürümün API'si farklıysa (ör. `startTransaction`), o sürüme uygun eşdeğeri kullan — doğrulama Step 6'da.
 
 - [ ] **Step 4: Ortak logger** — `apps/mobile/src/services/logger.ts`
@@ -895,10 +1003,15 @@ import {
   type LogUser,
   type Logger,
   type Sink,
-} from '@tarodan/logger';
-import { captureException, captureMessage, setUser } from './sentry';
+} from "@tarodan/logger";
+import { captureException, captureMessage, setUser } from "./sentry";
 
-const LEVEL_MAP = { debug: 'debug', info: 'info', warn: 'warning', error: 'error' } as const;
+const LEVEL_MAP = {
+  debug: "debug",
+  info: "info",
+  warn: "warning",
+  error: "error",
+} as const;
 
 function sentryMobileSink(): Sink {
   return {
@@ -907,14 +1020,14 @@ function sentryMobileSink(): Sink {
       captureException(err, { extra: ctx }),
     setUser: (user: LogUser | null) => setUser(user),
     addBreadcrumb: (bc: Breadcrumb) =>
-      captureMessage(bc.message, bc.level ? LEVEL_MAP[bc.level] : 'info'),
+      captureMessage(bc.message, bc.level ? LEVEL_MAP[bc.level] : "info"),
   };
 }
 
 export const logger: Logger = createLogger({
-  name: 'mobile',
+  name: "mobile",
   sinks: [new ConsoleSink(), sentryMobileSink()],
-  minLevel: __DEV__ ? 'debug' : 'info',
+  minLevel: __DEV__ ? "debug" : "info",
 });
 ```
 
@@ -941,6 +1054,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 6: Env örnekleri + Turbo/doküman
 
 **Files:**
+
 - Modify: `infrastructure/env.example.txt` (zaten SENTRY_* var — eksik `LOG_LEVEL` ekle)
 - Modify: `apps/api/env.example.txt`, `apps/web/env.example.txt`, `apps/admin/env.example.txt` (SENTRY_DSN / NEXT_PUBLIC_SENTRY_DSN satırları eksikse ekle)
 - Modify: `turbo.json` (gerekirse `@tarodan/logger` build/test pipeline'a dahil — mevcut `packages/*` globuyla otomatikse dokunma)

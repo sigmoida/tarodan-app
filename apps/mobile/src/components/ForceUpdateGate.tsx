@@ -1,17 +1,17 @@
-import { Linking, StyleSheet, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { theme, Text, Button } from '@tarodan/ui-native';
-import { useForceUpdate } from '@/hooks/useForceUpdate';
+import { Linking, StyleSheet, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { theme, Text, Button } from "@tarodan/ui-native";
+import { useForceUpdate } from "@/hooks/useForceUpdate";
 
 const { colors, spacing, radius } = theme;
 // spacing tokens are numeric (spacing[2]=8, [5]=20, [6]=24) — see design-tokens.
 
 /** Force-update copy — single source (mobile i18n sweep, #216, migrates it). */
 const COPY = {
-  title: 'Güncelleme gerekli',
+  title: "Güncelleme gerekli",
   description:
-    'Uygulamanın bu sürümü artık desteklenmiyor. Devam etmek için lütfen en son sürüme güncelleyin.',
-  button: 'Şimdi güncelle',
+    "Uygulamanın bu sürümü artık desteklenmiyor. Devam etmek için lütfen en son sürüme güncelleyin.",
+  button: "Şimdi güncelle",
 };
 
 /**
@@ -30,12 +30,21 @@ export default function ForceUpdateGate() {
   return (
     <View style={styles.overlay} accessibilityViewIsModal>
       <View style={styles.iconCircle}>
-        <Ionicons name="cloud-download-outline" size={48} color={colors.primary[600]!} />
+        <Ionicons
+          name="cloud-download-outline"
+          size={48}
+          color={colors.primary[600]!}
+        />
       </View>
       <Text variant="h2" align="center" style={styles.title}>
         {COPY.title}
       </Text>
-      <Text variant="body" tone="muted" align="center" style={styles.description}>
+      <Text
+        variant="body"
+        tone="muted"
+        align="center"
+        style={styles.description}
+      >
         {COPY.description}
       </Text>
       <Button
@@ -55,8 +64,8 @@ const styles = StyleSheet.create({
     zIndex: 9999,
     elevation: 9999,
     backgroundColor: colors.surface.DEFAULT,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: spacing[6],
   },
   iconCircle: {
@@ -64,8 +73,8 @@ const styles = StyleSheet.create({
     height: 96,
     borderRadius: radius.full,
     backgroundColor: colors.primary[50]!,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: spacing[5],
   },
   title: {
@@ -77,6 +86,6 @@ const styles = StyleSheet.create({
   },
   button: {
     maxWidth: 320,
-    width: '100%',
+    width: "100%",
   },
 });

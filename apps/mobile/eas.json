@@ -19,6 +19,7 @@
     },
     "preview": {
       "distribution": "internal",
+      "channel": "staging",
       "ios": {
         "simulator": false,
         "autoIncrement": "buildNumber"
@@ -36,6 +37,7 @@
     },
     "production": {
       "distribution": "store",
+      "channel": "production",
       "ios": {
         "autoIncrement": "buildNumber"
       },

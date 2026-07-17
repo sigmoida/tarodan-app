@@ -1,10 +1,10 @@
-import type { LogEntry, Sink } from './types';
+import type { LogEntry, Sink } from "./types";
 
 const LABEL: Record<string, string> = {
-  debug: '🔍 DEBUG',
-  info: 'ℹ️  INFO',
-  warn: '⚠️  WARN',
-  error: '❌ ERROR',
+  debug: "🔍 DEBUG",
+  info: "ℹ️  INFO",
+  warn: "⚠️  WARN",
+  error: "❌ ERROR",
 };
 
 export interface ConsoleSinkOptions {
@@ -21,9 +21,10 @@ export class ConsoleSink implements Sink {
     }
     const prefix = `${LABEL[entry.level] ?? entry.level} [${entry.name}]`;
     const args: unknown[] = [prefix, entry.message];
-    if (entry.context && Object.keys(entry.context).length) args.push(entry.context);
-    if (entry.level === 'error') console.error(...args);
-    else if (entry.level === 'warn') console.warn(...args);
+    if (entry.context && Object.keys(entry.context).length)
+      args.push(entry.context);
+    if (entry.level === "error") console.error(...args);
+    else if (entry.level === "warn") console.warn(...args);
     else console.log(...args);
   }
 

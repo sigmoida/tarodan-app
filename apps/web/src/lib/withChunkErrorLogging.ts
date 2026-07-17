@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { logger } from '@/lib/logger';
+import { logger } from "@/lib/logger";
 
 /**
  * Wraps a dynamic import to log chunk load failures to Sentry and (in dev) console.
@@ -17,16 +17,16 @@ import { logger } from '@/lib/logger';
  */
 export function withChunkErrorLogging<P = Record<string, unknown>>(
   importFn: () => Promise<{ default: React.ComponentType<P> }>,
-  componentName: string
+  componentName: string,
 ) {
   return () =>
     importFn().catch((err: unknown) => {
-      if (process.env.NODE_ENV === 'development') {
-        console.group('🔄 LazyLoad Error');
+      if (process.env.NODE_ENV === "development") {
+        console.group("🔄 LazyLoad Error");
         console.error(`Chunk failed for: ${componentName}`, err);
         console.groupEnd();
       }
-      logger.captureException(err, { component: 'LazyLoad', componentName });
+      logger.captureException(err, { component: "LazyLoad", componentName });
       throw err;
     });
 }

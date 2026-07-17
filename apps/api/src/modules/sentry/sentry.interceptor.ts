@@ -8,11 +8,11 @@ import {
   ExecutionContext,
   CallHandler,
   HttpException,
-} from '@nestjs/common';
-import { Observable, throwError } from 'rxjs';
-import { catchError, tap } from 'rxjs/operators';
-import * as Sentry from '@sentry/node';
-import { getAppLogger } from '../../common/logging/logger';
+} from "@nestjs/common";
+import { Observable, throwError } from "rxjs";
+import { catchError, tap } from "rxjs/operators";
+import * as Sentry from "@sentry/node";
+import { getAppLogger } from "../../common/logging/logger";
 
 @Injectable()
 export class SentryInterceptor implements NestInterceptor {
@@ -22,7 +22,7 @@ export class SentryInterceptor implements NestInterceptor {
 
     // Start transaction for performance monitoring
     const transaction = Sentry.startTransaction({
-      op: 'http.server',
+      op: "http.server",
       name: `${method} ${url}`,
     });
 
@@ -41,7 +41,7 @@ export class SentryInterceptor implements NestInterceptor {
     }
 
     // Add request context
-    Sentry.setContext('request', {
+    Sentry.setContext("request", {
       method,
       url,
       params,
@@ -84,12 +84,18 @@ export class SentryInterceptor implements NestInterceptor {
   private sanitizeBody(body: any): any {
     if (!body) return body;
 
-    const sensitiveFields = ['password', 'token', 'secret', 'apiKey', 'creditCard'];
+    const sensitiveFields = [
+      "password",
+      "token",
+      "secret",
+      "apiKey",
+      "creditCard",
+    ];
     const sanitized = { ...body };
 
     sensitiveFields.forEach((field) => {
       if (field in sanitized) {
-        sanitized[field] = '[REDACTED]';
+        sanitized[field] = "[REDACTED]";
       }
     });
 

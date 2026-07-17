@@ -1,4 +1,4 @@
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+export type LogLevel = "debug" | "info" | "warn" | "error";
 
 export const LEVEL_ORDER: Record<LogLevel, number> = {
   debug: 10,

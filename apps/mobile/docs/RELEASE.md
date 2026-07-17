@@ -3,10 +3,10 @@
 How the mobile app ships, mirroring the backend's staging/production cadence
 (issue #234, part of #227). Two tracks:
 
-| Track | Trigger | Pipeline | Where it lands |
-|-------|---------|----------|----------------|
-| **Staging** | every push to `development` touching mobile | `mobile-staging.yml` | JS→OTA `staging` channel · native→internal preview build |
-| **Production** | `mobile-v*` tag on `master` | `mobile-testflight.yml` | TestFlight (iOS) + Play internal (Android), after manual approval |
+| Track          | Trigger                                     | Pipeline                | Where it lands                                                    |
+| -------------- | ------------------------------------------- | ----------------------- | ----------------------------------------------------------------- |
+| **Staging**    | every push to `development` touching mobile | `mobile-staging.yml`    | JS→OTA `staging` channel · native→internal preview build          |
+| **Production** | `mobile-v*` tag on `master`                 | `mobile-testflight.yml` | TestFlight (iOS) + Play internal (Android), after manual approval |
 
 The golden rule (see [`EAS_UPDATE_OTA.md`](./EAS_UPDATE_OTA.md)):
 
@@ -60,12 +60,12 @@ a profile + submit toggle.
 The workflows are **guarded no-ops until `EXPO_TOKEN` is set** — safe to keep
 committed. To activate:
 
-| Secret / credential | Where | Used by |
-|---------------------|-------|---------|
-| **`EXPO_TOKEN`** (GitHub repo secret) | expo.dev → account → Access Tokens (owner `mki19xcis-organization`) | every EAS workflow (build/submit/update) |
-| **App Store Connect API key** | uploaded to **EAS** via `eas credentials` (stays on EAS servers) | `eas submit` iOS |
-| **Google Play service account JSON** | uploaded to **EAS** via `eas credentials` (stays on EAS servers) | `eas submit` Android |
-| **`EXPO_PUBLIC_API_URL`** (EAS env, per profile) | `eas env:create` — preview→staging-api, production→prod api | build-time bundling |
+| Secret / credential                              | Where                                                               | Used by                                  |
+| ------------------------------------------------ | ------------------------------------------------------------------- | ---------------------------------------- |
+| **`EXPO_TOKEN`** (GitHub repo secret)            | expo.dev → account → Access Tokens (owner `mki19xcis-organization`) | every EAS workflow (build/submit/update) |
+| **App Store Connect API key**                    | uploaded to **EAS** via `eas credentials` (stays on EAS servers)    | `eas submit` iOS                         |
+| **Google Play service account JSON**             | uploaded to **EAS** via `eas credentials` (stays on EAS servers)    | `eas submit` Android                     |
+| **`EXPO_PUBLIC_API_URL`** (EAS env, per profile) | `eas env:create` — preview→staging-api, production→prod api         | build-time bundling                      |
 
 > Apple **and** Google submit credentials live on EAS servers (like the Apple
 > signing certs), so they never touch the repo. That's why `eas.json`

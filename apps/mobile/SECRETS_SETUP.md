@@ -58,12 +58,12 @@ zaten setli; üstüne yazmıyoruz.
 türetir ve ismi "Tarodan (Staging)" yapar. Böylece tester aynı cihazda prod +
 staging'i yan yana tutabilir.
 
-| Alan | Production | Preview / Staging |
-|------|-----------|-------------------|
-| iOS `bundleIdentifier` | `com.tarodan.app` | `com.tarodan.app.staging` |
-| Android `package` | `com.tarodan.app` | `com.tarodan.app.staging` |
-| Uygulama adı | Tarodan | Tarodan (Staging) |
-| `EXPO_PUBLIC_API_URL` | `https://tarodan.shop/api` | `https://staging-api.tarodan.com/api` |
+| Alan                   | Production                 | Preview / Staging                     |
+| ---------------------- | -------------------------- | ------------------------------------- |
+| iOS `bundleIdentifier` | `com.tarodan.app`          | `com.tarodan.app.staging`             |
+| Android `package`      | `com.tarodan.app`          | `com.tarodan.app.staging`             |
+| Uygulama adı           | Tarodan                    | Tarodan (Staging)                     |
+| `EXPO_PUBLIC_API_URL`  | `https://tarodan.shop/api` | `https://staging-api.tarodan.com/api` |
 
 > Doğrula: `EXPO_PUBLIC_ENVIRONMENT=preview npx expo config --type public --json`
 > → `ios.bundleIdentifier` / `android.package` `.staging` ile bitmeli.

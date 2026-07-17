@@ -1,21 +1,24 @@
-import { useEffect, useState } from 'react';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { QueryClientProvider } from '@tanstack/react-query';
-import * as SplashScreen from 'expo-splash-screen';
-import Constants from 'expo-constants';
-import { theme, AlertDialogHost } from '@tarodan/ui-native';
-import { useAuthStore } from '@/stores/authStore';
-import { useMessagingSocket } from '@/hooks/messaging';
+import { useEffect, useState } from "react";
+import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { QueryClientProvider } from "@tanstack/react-query";
+import * as SplashScreen from "expo-splash-screen";
+import Constants from "expo-constants";
+import { theme, AlertDialogHost } from "@tarodan/ui-native";
+import { useAuthStore } from "@/stores/authStore";
+import { useMessagingSocket } from "@/hooks/messaging";
 // Paylaşılan QueryClient — logout'ta resetUserStores aynı örneği temizler.
-import { queryClient } from '@/lib/queryClient';
-import { registerForPushNotifications, setupPushNotificationRouting } from '@/services/push';
-import { LanguageProvider } from '@/i18n';
-import { initSentry } from '@/services/sentry';
-import AnimatedSplash from '@/components/AnimatedSplash';
-import BusinessMembershipGuard from '@/components/BusinessMembershipGuard';
-import ForceUpdateGate from '@/components/ForceUpdateGate';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { queryClient } from "@/lib/queryClient";
+import {
+  registerForPushNotifications,
+  setupPushNotificationRouting,
+} from "@/services/push";
+import { LanguageProvider } from "@/i18n";
+import { initSentry } from "@/services/sentry";
+import AnimatedSplash from "@/components/AnimatedSplash";
+import BusinessMembershipGuard from "@/components/BusinessMembershipGuard";
+import ForceUpdateGate from "@/components/ForceUpdateGate";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const { colors } = theme;
 
@@ -26,13 +29,13 @@ initSentry();
 
 // Conditionally import notifications - only in development builds, not Expo Go
 let Notifications: any = null;
-const isExpoGo = Constants.executionEnvironment === 'storeClient';
+const isExpoGo = Constants.executionEnvironment === "storeClient";
 
 if (!isExpoGo) {
   try {
-    Notifications = require('expo-notifications');
+    Notifications = require("expo-notifications");
   } catch (e) {
-    console.log('⚠️ expo-notifications not available');
+    console.log("⚠️ expo-notifications not available");
   }
 }
 
@@ -50,7 +53,7 @@ if (!isExpoGo && Notifications) {
       }),
     });
   } catch (e) {
-    console.log('⚠️ Notification handler setup failed (normal in Expo Go)');
+    console.log("⚠️ Notification handler setup failed (normal in Expo Go)");
   }
 }
 
@@ -76,7 +79,9 @@ export default function RootLayout() {
           try {
             await registerForPushNotifications();
           } catch (e) {
-            console.log('⚠️ Push notification registration skipped (normal in Expo Go)');
+            console.log(
+              "⚠️ Push notification registration skipped (normal in Expo Go)",
+            );
           }
         }
       } catch (e) {
@@ -119,7 +124,7 @@ export default function RootLayout() {
             screenOptions={{
               headerStyle: { backgroundColor: colors.primary[600]! },
               headerTintColor: colors.white,
-              headerTitleStyle: { fontWeight: 'bold' },
+              headerTitleStyle: { fontWeight: "bold" },
               headerShown: false,
             }}
           >
@@ -135,7 +140,10 @@ export default function RootLayout() {
           {/* Min desteklenen sürümün altındaki build'leri tam ekran bloklar (#233). */}
           <ForceUpdateGate />
           {!splashDone && (
-            <AnimatedSplash appReady={appReady} onFinish={() => setSplashDone(true)} />
+            <AnimatedSplash
+              appReady={appReady}
+              onFinish={() => setSplashDone(true)}
+            />
           )}
         </LanguageProvider>
       </QueryClientProvider>

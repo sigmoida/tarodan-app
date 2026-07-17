@@ -27,11 +27,11 @@ export function isBelowMinimum(current: string, minimum: string): boolean {
 }
 
 function parseVersion(v: string): number[] {
-  const core = String(v ?? '')
+  const core = String(v ?? "")
     .trim()
-    .replace(/^v/i, '')
+    .replace(/^v/i, "")
     .split(/[-+]/)[0]; // drop pre-release / build metadata
-  return core.split('.').map((s) => {
+  return core.split(".").map((s) => {
     const n = parseInt(s, 10);
     return Number.isFinite(n) ? n : 0;
   });

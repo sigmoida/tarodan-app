@@ -21,159 +21,161 @@ type Filters = Record<string, unknown> | undefined;
 
 export const qk = {
   products: {
-    all: ['products'] as const,
-    list: (filters?: Filters) => ['products', 'list', filters] as const,
+    all: ["products"] as const,
+    list: (filters?: Filters) => ["products", "list", filters] as const,
     search: (query?: string, filters?: Filters) =>
-      ['products-search', query, filters] as const,
-    detail: (id: string) => ['product', id] as const,
-    reviews: (id: string) => ['product-reviews', id] as const,
+      ["products-search", query, filters] as const,
+    detail: (id: string) => ["product", id] as const,
+    reviews: (id: string) => ["product-reviews", id] as const,
     /** Liste ekranlarının (home/arama/öne-çıkanlar) prefix root'ları — beğeni/
      * görüntülenme değişince hepsi tazelensin diye tek yerde. */
-    searchAll: ['products-search'] as const,
-    boosted: ['products', 'boosted'] as const,
-    featuredBusiness: ['featured-business'] as const,
-    featuredCollector: ['featured-collector'] as const,
-    myListings: (filters?: Filters | string) => ['my-listings', filters] as const,
-    myListingsStats: ['my-listings-stats'] as const,
-    myFeatured: ['my-featured-listings'] as const,
-    listings: (filters?: Filters) => ['listings', filters] as const,
+    searchAll: ["products-search"] as const,
+    boosted: ["products", "boosted"] as const,
+    featuredBusiness: ["featured-business"] as const,
+    featuredCollector: ["featured-collector"] as const,
+    myListings: (filters?: Filters | string) =>
+      ["my-listings", filters] as const,
+    myListingsStats: ["my-listings-stats"] as const,
+    myFeatured: ["my-featured-listings"] as const,
+    listings: (filters?: Filters) => ["listings", filters] as const,
     /** Prefix roots for invalidation (match every filtered variant). */
-    listingsAll: ['listings'] as const,
-    myListingsAll: ['my-listings'] as const,
+    listingsAll: ["listings"] as const,
+    myListingsAll: ["my-listings"] as const,
   },
 
   catalog: {
-    categories: ['categories'] as const,
-    brands: ['brands'] as const,
-    manufacturers: ['manufacturers'] as const,
-    carModels: (filters?: Filters) => ['car-models', filters] as const,
-    pages: (slug?: string) => ['pages', slug] as const,
+    categories: ["categories"] as const,
+    brands: ["brands"] as const,
+    manufacturers: ["manufacturers"] as const,
+    carModels: (filters?: Filters) => ["car-models", filters] as const,
+    pages: (slug?: string) => ["pages", slug] as const,
   },
 
   collections: {
-    all: ['collections'] as const,
-    list: (filters?: Filters) => ['collections', 'list', filters] as const,
-    detail: (id: string) => ['collection', id] as const,
-    browse: ['collections', 'browse'] as const,
-    mine: ['my-collections'] as const,
-    liked: ['liked-collections'] as const,
-    picker: ['collection-picker'] as const,
-    profile: (userId: string) => ['profile-collections', userId] as const,
+    all: ["collections"] as const,
+    list: (filters?: Filters) => ["collections", "list", filters] as const,
+    detail: (id: string) => ["collection", id] as const,
+    browse: ["collections", "browse"] as const,
+    mine: ["my-collections"] as const,
+    liked: ["liked-collections"] as const,
+    picker: ["collection-picker"] as const,
+    profile: (userId: string) => ["profile-collections", userId] as const,
   },
 
   orders: {
-    all: ['orders'] as const,
-    list: (filters?: Filters) => ['orders', 'list', filters] as const,
-    detail: (id: string) => ['order', id] as const,
-    elogoInvoice: (id: string) => ['elogo-invoice', id] as const,
-    sellerInvoice: (id: string) => ['seller-invoice', id] as const,
-    sellerPending: ['seller-pending-orders'] as const,
+    all: ["orders"] as const,
+    list: (filters?: Filters) => ["orders", "list", filters] as const,
+    detail: (id: string) => ["order", id] as const,
+    elogoInvoice: (id: string) => ["elogo-invoice", id] as const,
+    sellerInvoice: (id: string) => ["seller-invoice", id] as const,
+    sellerPending: ["seller-pending-orders"] as const,
   },
 
   trades: {
-    all: ['trades'] as const,
-    list: (filters?: Filters) => ['trades', 'list', filters] as const,
-    detail: (id: string) => ['trade', id] as const,
-    statusCounts: ['trades-status-counts'] as const,
-    targetListing: (id: string) => ['trade-target-listing', id] as const,
-    myTradeable: ['my-tradeable-products'] as const,
+    all: ["trades"] as const,
+    list: (filters?: Filters) => ["trades", "list", filters] as const,
+    detail: (id: string) => ["trade", id] as const,
+    statusCounts: ["trades-status-counts"] as const,
+    targetListing: (id: string) => ["trade-target-listing", id] as const,
+    myTradeable: ["my-tradeable-products"] as const,
     sellerTradeable: (sellerId: string) =>
-      ['seller-tradeable-products', sellerId] as const,
+      ["seller-tradeable-products", sellerId] as const,
   },
 
   offers: {
-    all: ['offers'] as const,
-    list: (type?: string) => ['offers', 'list', type] as const,
-    detail: (id: string) => ['offer', id] as const,
+    all: ["offers"] as const,
+    list: (type?: string) => ["offers", "list", type] as const,
+    detail: (id: string) => ["offer", id] as const,
     /** Batch komisyon önizlemesi — teklif id kümesine göre anahtarlı. */
     commissionPreview: (ids: string[]) =>
-      ['offers', 'commission-preview', ids] as const,
+      ["offers", "commission-preview", ids] as const,
   },
 
   membership: {
-    all: ['membership'] as const,
-    me: ['membership-me'] as const,
-    discounts: ['my-discounts'] as const,
-    discountProducts: ['my-products-for-discount'] as const,
-    eligibleForFeatured: ['eligible-for-featured'] as const,
+    all: ["membership"] as const,
+    me: ["membership-me"] as const,
+    discounts: ["my-discounts"] as const,
+    discountProducts: ["my-products-for-discount"] as const,
+    eligibleForFeatured: ["eligible-for-featured"] as const,
   },
 
   payments: {
-    mine: ['my-payments'] as const,
-    savedCards: ['saved-cards'] as const,
+    mine: ["my-payments"] as const,
+    savedCards: ["saved-cards"] as const,
   },
 
   user: {
-    detail: (id: string) => ['user', id] as const,
-    stats: (id?: string) => ['user-stats', id] as const,
+    detail: (id: string) => ["user", id] as const,
+    stats: (id?: string) => ["user-stats", id] as const,
     /** Prefix root — invalidate every user-stats variant (with/without id). */
-    statsAll: ['user-stats'] as const,
-    trust: ['me-trust'] as const,
-    bankAccount: ['bank-account'] as const,
-    addresses: ['addresses'] as const,
-    notificationSettings: ['notification-settings'] as const,
-    savedSearches: ['saved-searches'] as const,
+    statsAll: ["user-stats"] as const,
+    trust: ["me-trust"] as const,
+    bankAccount: ["bank-account"] as const,
+    addresses: ["addresses"] as const,
+    notificationSettings: ["notification-settings"] as const,
+    savedSearches: ["saved-searches"] as const,
   },
 
   seller: {
-    detail: (id: string) => ['seller', id] as const,
-    stats: (id: string) => ['seller-stats', id] as const,
-    products: (id: string) => ['seller-products', id] as const,
-    ratings: (id: string) => ['seller-ratings', id] as const,
-    ratingStats: (id: string) => ['seller-rating-stats', id] as const,
-    collections: (id: string) => ['seller-collections', id] as const,
+    detail: (id: string) => ["seller", id] as const,
+    stats: (id: string) => ["seller-stats", id] as const,
+    products: (id: string) => ["seller-products", id] as const,
+    ratings: (id: string) => ["seller-ratings", id] as const,
+    ratingStats: (id: string) => ["seller-rating-stats", id] as const,
+    collections: (id: string) => ["seller-collections", id] as const,
   },
 
   messaging: {
     /** Prefix root — invalidate every messaging query at once. */
-    all: ['messaging'] as const,
-    threads: ['messaging', 'threads'] as const,
-    thread: (id: string) => ['messaging', 'thread', id] as const,
-    messages: (threadId: string) => ['messaging', 'messages', threadId] as const,
-    unreadCount: ['messaging', 'unread-count'] as const,
+    all: ["messaging"] as const,
+    threads: ["messaging", "threads"] as const,
+    thread: (id: string) => ["messaging", "thread", id] as const,
+    messages: (threadId: string) =>
+      ["messaging", "messages", threadId] as const,
+    unreadCount: ["messaging", "unread-count"] as const,
   },
 
   notifications: {
-    unread: ['notifications-unread'] as const,
+    unread: ["notifications-unread"] as const,
   },
 
   favorites: {
-    all: ['favorites'] as const,
+    all: ["favorites"] as const,
   },
 
   follow: {
-    following: ['following'] as const,
+    following: ["following"] as const,
   },
 
   subscription: {
-    current: ['subscription-current'] as const,
-    billing: ['billing-history'] as const,
+    current: ["subscription-current"] as const,
+    billing: ["billing-history"] as const,
   },
 
   addresses: {
-    mine: ['my-addresses'] as const,
+    mine: ["my-addresses"] as const,
   },
 
   checkout: {
-    quote: (sig: string) => ['checkout-quote', sig] as const,
+    quote: (sig: string) => ["checkout-quote", sig] as const,
   },
 
   support: {
-    tickets: ['support-tickets'] as const,
+    tickets: ["support-tickets"] as const,
   },
 
   refunds: {
-    requests: (filters?: Filters) => ['refund-requests', filters] as const,
+    requests: (filters?: Filters) => ["refund-requests", filters] as const,
   },
 
   featured: {
-    business: ['featured-business'] as const,
-    collector: ['featured-collector'] as const,
+    business: ["featured-business"] as const,
+    collector: ["featured-collector"] as const,
   },
 
   appConfig: {
-    all: ['app-config'] as const,
+    all: ["app-config"] as const,
     check: (platform: string, version: string) =>
-      ['app-config', platform, version] as const,
+      ["app-config", platform, version] as const,
   },
 } as const;

@@ -1,6 +1,6 @@
-import { Platform } from 'react-native';
-import Constants from 'expo-constants';
-import type { AppPlatform } from '@/lib/api';
+import { Platform } from "react-native";
+import Constants from "expo-constants";
+import type { AppPlatform } from "@/lib/api";
 
 /**
  * Public store listing URLs for the force-update gate (#233). Always the PROD
@@ -8,14 +8,14 @@ import type { AppPlatform } from '@/lib/api';
  * `ascAppId` (6786614139) matches eas.json `submit.production.ios`.
  */
 export const STORE_URLS: Record<AppPlatform, string> = {
-  ios: 'https://apps.apple.com/app/id6786614139',
-  android: 'https://play.google.com/store/apps/details?id=com.tarodan.app',
+  ios: "https://apps.apple.com/app/id6786614139",
+  android: "https://play.google.com/store/apps/details?id=com.tarodan.app",
 };
 
 /** Current platform, or null on web/unknown (the gate is a no-op there). */
 export function getAppPlatform(): AppPlatform | null {
-  if (Platform.OS === 'ios') return 'ios';
-  if (Platform.OS === 'android') return 'android';
+  if (Platform.OS === "ios") return "ios";
+  if (Platform.OS === "android") return "android";
   return null;
 }
 
@@ -28,4 +28,5 @@ export function getAppVersion(): string | null {
   return Constants.expoConfig?.version ?? null;
 }
 
-export const storeUrlFor = (platform: AppPlatform): string => STORE_URLS[platform];
+export const storeUrlFor = (platform: AppPlatform): string =>
+  STORE_URLS[platform];

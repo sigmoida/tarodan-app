@@ -1,7 +1,11 @@
-import { useQuery } from '@tanstack/react-query';
-import { appConfigApi } from '@/lib/api';
-import { qk } from '@/lib/query';
-import { getAppPlatform, getAppVersion, storeUrlFor } from '@/constants/appUpdate';
+import { useQuery } from "@tanstack/react-query";
+import { appConfigApi } from "@/lib/api";
+import { qk } from "@/lib/query";
+import {
+  getAppPlatform,
+  getAppVersion,
+  storeUrlFor,
+} from "@/constants/appUpdate";
 
 export interface ForceUpdateState {
   /** Client is below the minimum supported version → block. */
@@ -28,8 +32,9 @@ export function useForceUpdate(): ForceUpdateState {
   const enabled = !!platform && !!version;
 
   const { data, isLoading } = useQuery({
-    queryKey: qk.appConfig.check(platform ?? 'none', version ?? 'none'),
-    queryFn: () => appConfigApi.getAppConfig(platform!, version!).then((r) => r.data),
+    queryKey: qk.appConfig.check(platform ?? "none", version ?? "none"),
+    queryFn: () =>
+      appConfigApi.getAppConfig(platform!, version!).then((r) => r.data),
     enabled,
     staleTime: 5 * 60 * 1000,
     retry: 1,

@@ -1,12 +1,12 @@
-import { create } from 'zustand';
-import * as SecureStore from 'expo-secure-store';
-import { authApi, userApi } from '@/lib/api';
-import { logger } from '../services/logger';
+import { create } from "zustand";
+import * as SecureStore from "expo-secure-store";
+import { authApi, userApi } from "@/lib/api";
+import { logger } from "../services/logger";
 
 // Membership tier types
-export type MembershipTier = 'free' | 'basic' | 'premium' | 'business';
-export type VerificationStatus = 'unverified' | 'verified';
-export type SellerType = 'individual' | 'corporate';
+export type MembershipTier = "free" | "basic" | "premium" | "business";
+export type VerificationStatus = "unverified" | "verified";
+export type SellerType = "individual" | "corporate";
 
 // Extended User interface with all member fields
 export interface User {
@@ -17,16 +17,16 @@ export interface User {
   avatar?: string;
   avatarUrl?: string;
   bio?: string;
-  
+
   // Membership
   membershipTier: MembershipTier;
-  
+
   // Verification
   isVerified: boolean;
   isEmailVerified: boolean;
   isPhoneVerified: boolean;
   verificationStatus: VerificationStatus;
-  
+
   // Seller info
   isSeller: boolean;
   sellerType?: SellerType;
@@ -35,22 +35,22 @@ export interface User {
   companyName?: string;
   taxId?: string;
   taxOffice?: string;
-  businessStatus?: 'pending' | 'approved' | 'rejected';
-  
+  businessStatus?: "pending" | "approved" | "rejected";
+
   // Stats for verification criteria
   totalSales: number;
   totalPurchases: number;
   accountAge: number; // days since registration
   profileCompletion: number; // percentage 0-100
   disputeCount: number;
-  
+
   // Listing limits
   listingCount: number;
   maxFreeListings: number;
-  
+
   // Additional
   createdAt: string;
-  
+
   // Rating
   rating?: number;
   totalRatings?: number;
@@ -62,14 +62,15 @@ export interface User {
   facebookUrl?: string;
   youtubeUrl?: string;
   customProfileSlug?: string;
-  
+
   // Privacy Settings
   showEmail?: boolean;
   showPhone?: boolean;
   allowMessages?: boolean;
-  
+
   // Reputation
-  reputationLevel?: 'rising_star' | 'trusted_seller' | 'elite_collector' | 'hall_of_fame';
+  reputationLevel?:
+    "rising_star" | "trusted_seller" | "elite_collector" | "hall_of_fame";
   specialRecognitions?: string[];
 }
 
@@ -98,14 +99,14 @@ interface AuthState {
   user: User | null;
   token: string | null;
   limits: MembershipLimits | null;
-  
+
   // Actions
   login: (token: string, user: User, refreshToken?: string) => Promise<void>;
   logout: () => Promise<void>;
   loadToken: () => Promise<void>;
   updateUser: (user: Partial<User>) => void;
   refreshUserData: () => Promise<void>;
-  
+
   // Helpers
   canCreateListing: () => boolean;
   getRemainingListings: () => number;
@@ -188,90 +189,102 @@ const TIER_LIMITS: Record<MembershipTier, MembershipLimits> = {
 // Helper to extract membership tier from various API formats
 const extractMembershipTier = (apiUser: any): MembershipTier => {
   // Check various possible paths for membership tier
-  const tier = 
+  const tier =
     apiUser.membership?.tier?.type ||
     apiUser.membership?.tier?.name ||
     apiUser.membership?.tier ||
     apiUser.membership?.name ||
     apiUser.membershipTier ||
     apiUser.membership_tier ||
-    'free';
-  
+    "free";
+
   // Normalize the tier name
   const normalizedTier = String(tier).toLowerCase();
-  
-  if (normalizedTier.includes('premium') || normalizedTier === 'premium') return 'premium';
-  if (normalizedTier.includes('business') || normalizedTier === 'business') return 'business';
-  if (normalizedTier.includes('basic') || normalizedTier === 'basic') return 'basic';
-  return 'free';
+
+  if (normalizedTier.includes("premium") || normalizedTier === "premium")
+    return "premium";
+  if (normalizedTier.includes("business") || normalizedTier === "business")
+    return "business";
+  if (normalizedTier.includes("basic") || normalizedTier === "basic")
+    return "basic";
+  return "free";
 };
 
 // Default user values for mapping API response
 const mapApiUserToUser = (apiUser: any): User => {
   const membershipTier = extractMembershipTier(apiUser);
-  
-  return {
-  id: apiUser.id,
-  email: apiUser.email,
-  displayName: apiUser.displayName || apiUser.display_name || '',
-  phone: apiUser.phone,
-  avatar: apiUser.avatar || apiUser.avatarUrl || apiUser.avatar_url,
-  avatarUrl: apiUser.avatarUrl || apiUser.avatar_url,
-  bio: apiUser.bio,
-  
-  // Membership - properly extracted
-  membershipTier,
-  
-  // Verification
-  isVerified: apiUser.isVerified || apiUser.is_verified || false,
-  isEmailVerified: apiUser.isEmailVerified || apiUser.is_email_verified || false,
-  isPhoneVerified: apiUser.isPhoneVerified || apiUser.is_phone_verified || false,
-  verificationStatus: (apiUser.isVerified || apiUser.is_verified) ? 'verified' : 'unverified',
-  
-  // Seller
-  isSeller: apiUser.isSeller || apiUser.is_seller || false,
-  sellerType: apiUser.sellerType || apiUser.seller_type,
 
-  // Business account info (web ile aynı: companyName + taxId varsa kurumsal hesap)
-  companyName: apiUser.companyName ?? apiUser.company_name ?? undefined,
-  taxId: apiUser.taxId ?? apiUser.tax_id ?? undefined,
-  taxOffice: apiUser.taxOffice ?? apiUser.tax_office ?? undefined,
-  businessStatus: apiUser.businessStatus ?? apiUser.business_status ?? undefined,
-  
-  // Stats
-  totalSales: apiUser.totalSales || apiUser.total_sales || 0,
-  totalPurchases: apiUser.totalPurchases || apiUser.total_purchases || 0,
-  accountAge: apiUser.accountAge || calculateAccountAge(apiUser.createdAt || apiUser.created_at),
-  profileCompletion: apiUser.profileCompletion || calculateProfileCompletion(apiUser),
-  disputeCount: apiUser.disputeCount || apiUser.dispute_count || 0,
-  
-  // Listing limits
-  listingCount: apiUser.listingCount || apiUser.listing_count || 0,
-  maxFreeListings: apiUser.maxFreeListings || apiUser.max_free_listings || 10,
-  
-  createdAt: apiUser.createdAt || apiUser.created_at || new Date().toISOString(),
-  
-  // Rating
-  rating: apiUser.rating,
-  totalRatings: apiUser.totalRatings || apiUser.total_ratings,
-  
-  // Premium Profile Fields
-  websiteUrl: apiUser.websiteUrl || apiUser.website_url,
-  twitterHandle: apiUser.twitterHandle || apiUser.twitter_handle,
-  instagramHandle: apiUser.instagramHandle || apiUser.instagram_handle,
-  facebookUrl: apiUser.facebookUrl || apiUser.facebook_url,
-  youtubeUrl: apiUser.youtubeUrl || apiUser.youtube_url,
-  customProfileSlug: apiUser.customProfileSlug || apiUser.custom_profile_slug,
-  
-  // Privacy Settings
-  showEmail: apiUser.showEmail ?? apiUser.show_email ?? false,
-  showPhone: apiUser.showPhone ?? apiUser.show_phone ?? false,
-  allowMessages: apiUser.allowMessages ?? apiUser.allow_messages ?? true,
-  
-  // Reputation
-  reputationLevel: apiUser.reputationLevel || apiUser.reputation_level,
-  specialRecognitions: apiUser.specialRecognitions || apiUser.special_recognitions || [],
-};
+  return {
+    id: apiUser.id,
+    email: apiUser.email,
+    displayName: apiUser.displayName || apiUser.display_name || "",
+    phone: apiUser.phone,
+    avatar: apiUser.avatar || apiUser.avatarUrl || apiUser.avatar_url,
+    avatarUrl: apiUser.avatarUrl || apiUser.avatar_url,
+    bio: apiUser.bio,
+
+    // Membership - properly extracted
+    membershipTier,
+
+    // Verification
+    isVerified: apiUser.isVerified || apiUser.is_verified || false,
+    isEmailVerified:
+      apiUser.isEmailVerified || apiUser.is_email_verified || false,
+    isPhoneVerified:
+      apiUser.isPhoneVerified || apiUser.is_phone_verified || false,
+    verificationStatus:
+      apiUser.isVerified || apiUser.is_verified ? "verified" : "unverified",
+
+    // Seller
+    isSeller: apiUser.isSeller || apiUser.is_seller || false,
+    sellerType: apiUser.sellerType || apiUser.seller_type,
+
+    // Business account info (web ile aynı: companyName + taxId varsa kurumsal hesap)
+    companyName: apiUser.companyName ?? apiUser.company_name ?? undefined,
+    taxId: apiUser.taxId ?? apiUser.tax_id ?? undefined,
+    taxOffice: apiUser.taxOffice ?? apiUser.tax_office ?? undefined,
+    businessStatus:
+      apiUser.businessStatus ?? apiUser.business_status ?? undefined,
+
+    // Stats
+    totalSales: apiUser.totalSales || apiUser.total_sales || 0,
+    totalPurchases: apiUser.totalPurchases || apiUser.total_purchases || 0,
+    accountAge:
+      apiUser.accountAge ||
+      calculateAccountAge(apiUser.createdAt || apiUser.created_at),
+    profileCompletion:
+      apiUser.profileCompletion || calculateProfileCompletion(apiUser),
+    disputeCount: apiUser.disputeCount || apiUser.dispute_count || 0,
+
+    // Listing limits
+    listingCount: apiUser.listingCount || apiUser.listing_count || 0,
+    maxFreeListings: apiUser.maxFreeListings || apiUser.max_free_listings || 10,
+
+    createdAt:
+      apiUser.createdAt || apiUser.created_at || new Date().toISOString(),
+
+    // Rating
+    rating: apiUser.rating,
+    totalRatings: apiUser.totalRatings || apiUser.total_ratings,
+
+    // Premium Profile Fields
+    websiteUrl: apiUser.websiteUrl || apiUser.website_url,
+    twitterHandle: apiUser.twitterHandle || apiUser.twitter_handle,
+    instagramHandle: apiUser.instagramHandle || apiUser.instagram_handle,
+    facebookUrl: apiUser.facebookUrl || apiUser.facebook_url,
+    youtubeUrl: apiUser.youtubeUrl || apiUser.youtube_url,
+    customProfileSlug: apiUser.customProfileSlug || apiUser.custom_profile_slug,
+
+    // Privacy Settings
+    showEmail: apiUser.showEmail ?? apiUser.show_email ?? false,
+    showPhone: apiUser.showPhone ?? apiUser.show_phone ?? false,
+    allowMessages: apiUser.allowMessages ?? apiUser.allow_messages ?? true,
+
+    // Reputation
+    reputationLevel: apiUser.reputationLevel || apiUser.reputation_level,
+    specialRecognitions:
+      apiUser.specialRecognitions || apiUser.special_recognitions || [],
+  };
 };
 
 // Helper to calculate account age in days
@@ -285,22 +298,18 @@ const calculateAccountAge = (createdAt?: string): number => {
 
 // Helper to calculate profile completion percentage
 const calculateProfileCompletion = (user: any): number => {
-  const fields = [
-    'displayName',
-    'email',
-    'phone',
-    'avatarUrl',
-    'bio',
-  ];
-  
+  const fields = ["displayName", "email", "phone", "avatarUrl", "bio"];
+
   let completed = 0;
-  fields.forEach(field => {
-    const value = user[field] || user[field.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)];
-    if (value && value.toString().trim() !== '') {
+  fields.forEach((field) => {
+    const value =
+      user[field] ||
+      user[field.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)];
+    if (value && value.toString().trim() !== "") {
       completed++;
     }
   });
-  
+
   return Math.round((completed / fields.length) * 100);
 };
 
@@ -312,13 +321,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   limits: null,
 
   login: async (token: string, user: User, refreshToken?: string) => {
-    await SecureStore.setItemAsync('accessToken', token);
+    await SecureStore.setItemAsync("accessToken", token);
     if (refreshToken) {
-      await SecureStore.setItemAsync('refreshToken', refreshToken);
+      await SecureStore.setItemAsync("refreshToken", refreshToken);
     }
     const mappedUser = mapApiUserToUser(user);
     const limits = TIER_LIMITS[mappedUser.membershipTier];
-    console.log('🔐 Auth stored - Tier:', mappedUser.membershipTier);
+    console.log("🔐 Auth stored - Tier:", mappedUser.membershipTier);
     set({ isAuthenticated: true, token, user: mappedUser, limits });
     // Tag every subsequent Sentry event with the active user.
     logger.setUser({
@@ -334,7 +343,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // bildirim gitmesin). Token hâlâ geçerliyken, logout çağrısından önce yap.
     // Lazy require: push → api → authStore import zinciriyle döngü oluşmasın.
     try {
-      const { unregisterPushNotifications } = require('../services/push');
+      const { unregisterPushNotifications } = require("../services/push");
       await unregisterPushNotifications();
     } catch {
       /* best-effort — Expo Go'da no-op, hata oturumu engellemesin */
@@ -344,14 +353,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (error) {
       // Best-effort: report logout failures so we don't lose them silently
       // (no-op in dev/Expo Go).
-      logger.captureException(error, { level: 'warning', tags: { flow: 'logout' } });
+      logger.captureException(error, {
+        level: "warning",
+        tags: { flow: "logout" },
+      });
     }
-    await SecureStore.deleteItemAsync('accessToken');
-    await SecureStore.deleteItemAsync('refreshToken');
+    await SecureStore.deleteItemAsync("accessToken");
+    await SecureStore.deleteItemAsync("refreshToken");
     set({ isAuthenticated: false, token: null, user: null, limits: null });
     // Kullanıcıya özel yerel state (sepet/favori/mesaj rozetleri, query cache).
     // Lazy require: messagesStore → authStore import zinciriyle döngü oluşmasın.
-    const { resetUserStores } = require('./resetUserStores');
+    const { resetUserStores } = require("./resetUserStores");
     resetUserStores();
     logger.setUser(null);
   },
@@ -361,13 +373,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Maestro register/guest journey: keychain (SecureStore) clearState'i atlatıp
       // önceki oturumun token'ını taşıyabiliyor. NO_AUTOLOGIN modunda token'ı temizle
       // ki gerçekten çıkışlı (misafir) başlansın. Yalnız test gate'i — prod'da unset.
-      if (process.env.EXPO_PUBLIC_MAESTRO_NO_AUTOLOGIN === '1') {
-        await SecureStore.deleteItemAsync('accessToken');
-        await SecureStore.deleteItemAsync('refreshToken');
-        set({ isAuthenticated: false, token: null, user: null, limits: null, isLoading: false });
+      if (process.env.EXPO_PUBLIC_MAESTRO_NO_AUTOLOGIN === "1") {
+        await SecureStore.deleteItemAsync("accessToken");
+        await SecureStore.deleteItemAsync("refreshToken");
+        set({
+          isAuthenticated: false,
+          token: null,
+          user: null,
+          limits: null,
+          isLoading: false,
+        });
         return;
       }
-      const token = await SecureStore.getItemAsync('accessToken');
+      const token = await SecureStore.getItemAsync("accessToken");
       if (token) {
         // Web ile aynı endpoint: GET /users/me
         const response = await userApi.getProfile();
@@ -381,8 +399,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           isLoading: false,
         });
       } else if (
-        process.env.EXPO_PUBLIC_MAESTRO === '1' &&
-        process.env.EXPO_PUBLIC_MAESTRO_NO_AUTOLOGIN !== '1'
+        process.env.EXPO_PUBLIC_MAESTRO === "1" &&
+        process.env.EXPO_PUBLIC_MAESTRO_NO_AUTOLOGIN !== "1"
       ) {
         // Maestro test bypass: auto-login with seeded credentials so that
         // e2e flows skip the login UI entirely. Code path is gated behind
@@ -390,9 +408,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // compile-time env replacement (env var unset → branch dead-code
         // eliminated).
         try {
-          const email = process.env.EXPO_PUBLIC_MAESTRO_EMAIL || 'zeynep@demo.com';
-          const password = process.env.EXPO_PUBLIC_MAESTRO_PASSWORD || 'Demo123!';
-          console.log('🤖 Maestro auto-login as', email);
+          const email =
+            process.env.EXPO_PUBLIC_MAESTRO_EMAIL || "zeynep@demo.com";
+          const password =
+            process.env.EXPO_PUBLIC_MAESTRO_PASSWORD || "Demo123!";
+          console.log("🤖 Maestro auto-login as", email);
           const response = await authApi.login(email, password);
           const data: any = response.data;
           const accessToken = data.tokens?.accessToken || data.accessToken;
@@ -406,8 +426,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           }
         } catch (autoLoginError) {
           logger.captureException(autoLoginError, {
-            level: 'warning',
-            tags: { flow: 'auth.maestroAutoLogin' },
+            level: "warning",
+            tags: { flow: "auth.maestroAutoLogin" },
           });
           set({
             isAuthenticated: false,
@@ -423,10 +443,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (error) {
       // Token invalid or expired — usually 401 (expected). Report only once,
       // tagged so dashboards can filter expected vs unexpected.
-      logger.captureException(error, { level: 'warning', tags: { flow: 'auth.loadToken' } });
-      await SecureStore.deleteItemAsync('accessToken');
-      await SecureStore.deleteItemAsync('refreshToken');
-      set({ isAuthenticated: false, token: null, user: null, limits: null, isLoading: false });
+      logger.captureException(error, {
+        level: "warning",
+        tags: { flow: "auth.loadToken" },
+      });
+      await SecureStore.deleteItemAsync("accessToken");
+      await SecureStore.deleteItemAsync("refreshToken");
+      set({
+        isAuthenticated: false,
+        token: null,
+        user: null,
+        limits: null,
+        isLoading: false,
+      });
     }
   },
 
@@ -447,8 +476,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const limits = TIER_LIMITS[mappedUser.membershipTier];
       set({ user: mappedUser, limits });
     } catch (error) {
-      console.error('Failed to refresh user data:', error);
-      logger.captureException(error, { level: 'warning', tags: { flow: 'auth.refreshUserData' } });
+      console.error("Failed to refresh user data:", error);
+      logger.captureException(error, {
+        level: "warning",
+        tags: { flow: "auth.refreshUserData" },
+      });
     }
   },
 
@@ -470,24 +502,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isVerifiedMember: () => {
     const { user } = get();
     if (!user) return false;
-    
+
     // Verification criteria for Free members
-    const hasCompletedTransaction = user.totalSales > 0 || user.totalPurchases > 0;
+    const hasCompletedTransaction =
+      user.totalSales > 0 || user.totalPurchases > 0;
     const accountOldEnough = user.accountAge >= 30;
     const noDisputes = user.disputeCount === 0;
     const profileComplete = user.profileCompletion >= 80;
-    
-    return user.isEmailVerified && 
-           user.isPhoneVerified && 
-           hasCompletedTransaction && 
-           accountOldEnough && 
-           noDisputes && 
-           profileComplete;
+
+    return (
+      user.isEmailVerified &&
+      user.isPhoneVerified &&
+      hasCompletedTransaction &&
+      accountOldEnough &&
+      noDisputes &&
+      profileComplete
+    );
   },
 
   getMembershipLimits: () => {
     const { user } = get();
-    const tier = user?.membershipTier || 'free';
+    const tier = user?.membershipTier || "free";
     return TIER_LIMITS[tier];
   },
 }));

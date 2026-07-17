@@ -3,14 +3,14 @@
  * tip-denetlenir (2704 typed MessageKey, generated/keys). keySeparator '.' ile
  * nested nokta-yolu anahtarlar (t('common.login')) tanınır; yanlış anahtar tsc hatası.
  */
-import type { Messages } from '@tarodan/i18n';
+import type { Messages } from "@tarodan/i18n";
 
-declare module 'i18next' {
+declare module "i18next" {
   interface CustomTypeOptions {
-    defaultNS: 'translation';
+    defaultNS: "translation";
     resources: {
       translation: Messages;
     };
-    keySeparator: '.';
+    keySeparator: ".";
   }
 }

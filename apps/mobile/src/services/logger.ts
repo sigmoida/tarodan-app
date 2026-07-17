@@ -6,10 +6,20 @@ import {
   type LogUser,
   type Logger,
   type Sink,
-} from '@tarodan/logger';
-import { addBreadcrumb, captureException, setUser, type SeverityLevel } from './sentry';
+} from "@tarodan/logger";
+import {
+  addBreadcrumb,
+  captureException,
+  setUser,
+  type SeverityLevel,
+} from "./sentry";
 
-const LEVEL_MAP = { debug: 'debug', info: 'info', warn: 'warning', error: 'error' } as const;
+const LEVEL_MAP = {
+  debug: "debug",
+  info: "info",
+  warn: "warning",
+  error: "error",
+} as const;
 
 function sentryMobileSink(): Sink {
   return {
@@ -34,7 +44,7 @@ function sentryMobileSink(): Sink {
 }
 
 export const logger: Logger = createLogger({
-  name: 'mobile',
+  name: "mobile",
   sinks: [new ConsoleSink(), sentryMobileSink()],
-  minLevel: __DEV__ ? 'debug' : 'info',
+  minLevel: __DEV__ ? "debug" : "info",
 });

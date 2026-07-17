@@ -1,8 +1,14 @@
-import React, { Component, ReactNode } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { theme } from '@tarodan/ui-native';
-import { logger } from '../services/logger';
+import React, { Component, ReactNode } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { theme } from "@tarodan/ui-native";
+import { logger } from "../services/logger";
 
 const { colors } = theme;
 
@@ -34,9 +40,9 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: { componentStack?: string }) {
     logger.captureException(error, {
-      level: 'error',
-      tags: { boundary: 'app-root' },
-      componentStack: errorInfo.componentStack ?? 'n/a',
+      level: "error",
+      tags: { boundary: "app-root" },
+      componentStack: errorInfo.componentStack ?? "n/a",
     });
   }
 
@@ -48,18 +54,30 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 }
 
-function FallbackScreen({ error, onRetry }: { error: Error | null; onRetry: () => void }) {
+function FallbackScreen({
+  error,
+  onRetry,
+}: {
+  error: Error | null;
+  onRetry: () => void;
+}) {
   return (
     <View style={styles.container}>
-      <Ionicons name="warning-outline" size={64} color={theme.colors.danger[500]} />
+      <Ionicons
+        name="warning-outline"
+        size={64}
+        color={theme.colors.danger[500]}
+      />
       <Text style={styles.title}>Bir şeyler ters gitti</Text>
-      <Text style={styles.subtitle}>Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.</Text>
+      <Text style={styles.subtitle}>
+        Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.
+      </Text>
       {__DEV__ && error && (
         <ScrollView style={styles.errorBox}>
           <Text style={styles.errorText}>
             {error.message}
-            {'\n\n'}
-            {error.stack ?? ''}
+            {"\n\n"}
+            {error.stack ?? ""}
           </Text>
         </ScrollView>
       )}
@@ -74,21 +92,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: theme.spacing[6],
   },
   title: {
     fontSize: 22,
-    fontWeight: '700',
+    fontWeight: "700",
     color: theme.colors.gray[900],
     marginTop: theme.spacing[4],
-    textAlign: 'center',
+    textAlign: "center",
   },
   subtitle: {
     fontSize: 14,
     color: theme.colors.gray[600],
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: theme.spacing[2],
     lineHeight: 20,
   },
@@ -98,10 +116,10 @@ const styles = StyleSheet.create({
     padding: theme.spacing[3],
     backgroundColor: colors.danger[50],
     borderRadius: theme.radius.xl,
-    width: '100%',
+    width: "100%",
   },
   errorText: {
-    fontFamily: 'Courier',
+    fontFamily: "Courier",
     fontSize: 11,
     color: colors.danger[800],
   },
@@ -114,7 +132,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: colors.white,
-    fontWeight: '600',
+    fontWeight: "600",
     fontSize: 16,
   },
 });
