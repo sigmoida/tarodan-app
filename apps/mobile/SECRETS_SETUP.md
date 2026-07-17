@@ -51,6 +51,43 @@ eas env:create --environment preview --name EXPO_PUBLIC_API_URL --value "https:/
 `eas.json` `production.env` bloğunda `EXPO_PUBLIC_ENVIRONMENT=production`
 zaten setli; üstüne yazmıyoruz.
 
+## 3b) Staging variant — prod ile yan yana kurulum (#229)
+
+`preview` profili artık ayrı bir **staging varyantı** üretir: `app.config.js`,
+`EXPO_PUBLIC_ENVIRONMENT=preview` olduğunda uygulama kimliğini `.staging` ekiyle
+türetir ve ismi "Tarodan (Staging)" yapar. Böylece tester aynı cihazda prod +
+staging'i yan yana tutabilir.
+
+| Alan | Production | Preview / Staging |
+|------|-----------|-------------------|
+| iOS `bundleIdentifier` | `com.tarodan.app` | `com.tarodan.app.staging` |
+| Android `package` | `com.tarodan.app` | `com.tarodan.app.staging` |
+| Uygulama adı | Tarodan | Tarodan (Staging) |
+| `EXPO_PUBLIC_API_URL` | `https://tarodan.shop/api` | `https://staging-api.tarodan.com/api` |
+
+> Doğrula: `EXPO_PUBLIC_ENVIRONMENT=preview npx expo config --type public --json`
+> → `ios.bundleIdentifier` / `android.package` `.staging` ile bitmeli.
+
+**⚠️ Önkoşullar (ilk staging build'den ÖNCE tamamlanmalı — yoksa build kırılır):**
+
+- **Android / Firebase:** `com.tarodan.app.staging` paketi Firebase projesine
+  **yeni Android app** olarak eklenmeli (Firebase Console → Project settings →
+  Add app → Android). Sonra güncel `google-services.json` indirilip
+  `apps/mobile/google-services.json` ile değiştirilir — bu dosya artık iki paketi
+  de (`com.tarodan.app` + `com.tarodan.app.staging`) içerir, tek dosya her iki
+  profili de karşılar. Aksi halde Gradle `google-services` plugin'i "No matching
+  client found for package name 'com.tarodan.app.staging'" ile build'i düşürür.
+- **Android / Google Sign-In:** staging keystore'un SHA-1'i (`eas credentials`
+  → preview profili) GCP → Credentials → Android OAuth client'a eklenmeli
+  (aksi halde staging'de Google ile giriş `DEVELOPER_ERROR` verir).
+- **iOS / Google Sign-In (opsiyonel, iOS Google girişi açılınca):**
+  `com.tarodan.app.staging` bundle id'si için ayrı iOS OAuth client
+  oluşturulmalı; şu an iOS Google girişi açık iş, staging için de birlikte
+  ele alınır.
+
+`EXPO_PUBLIC_API_URL` staging değeri hem `eas.json` `preview.env` bloğunda hem de
+(EAS env kullanıyorsanız) yukarıdaki §3 komutuyla set edilir.
+
 ## 4) GitHub Actions secret'ları
 
 `gh secret set` ya da Settings → Secrets and variables → Actions:
