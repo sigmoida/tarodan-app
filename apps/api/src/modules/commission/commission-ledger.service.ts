@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Prisma, CommissionLedgerStatus } from '@prisma/client';
-import { PrismaService } from '../../prisma';
+import { Injectable, Logger } from "@nestjs/common";
+import { Prisma, CommissionLedgerStatus } from "@prisma/client";
+import { PrismaService } from "../../prisma";
 
 export interface UpsertPendingArgs {
   orderId: string;
@@ -55,7 +55,9 @@ export class CommissionLedgerService {
     const result = await tx.commissionLedger.updateMany({
       where: {
         orderId,
-        status: { in: [CommissionLedgerStatus.pending, CommissionLedgerStatus.earned] },
+        status: {
+          in: [CommissionLedgerStatus.pending, CommissionLedgerStatus.earned],
+        },
       },
       data: {
         status: CommissionLedgerStatus.refunded,

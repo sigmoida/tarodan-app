@@ -22,6 +22,7 @@ import { NotificationService } from "../notification/notification.service";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
 import { StorageService } from "../storage/storage.service";
+import { I18nService } from "../i18n";
 import { OrderStatus, PaymentStatus, ProductStatus } from "@prisma/client";
 
 /**
@@ -166,6 +167,7 @@ describe("PaymentService group payment (checkout group)", () => {
         PaymentCallbackService,
         PaymentFulfillmentService,
         PaymentLifecycleService,
+        I18nService,
         {
           provide: ElogoInvoicingService,
           useValue: {

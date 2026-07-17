@@ -1,11 +1,14 @@
-'use client';
+"use client";
 
-import { type ReactNode } from 'react';
-import type { AxiosResponse } from 'axios';
-import { useAdminResource } from '@/hooks/useAdminResource';
-import { SuspenseBoundary } from '@/components/page/SuspenseBoundary';
-import { AdminPage } from '@/components/page/AdminPage';
-import { ResourceListContext, useSelection } from '@/context/ResourceListContext';
+import { type ReactNode } from "react";
+import type { AxiosResponse } from "axios";
+import { useAdminResource } from "@/hooks/useAdminResource";
+import { SuspenseBoundary } from "@/components/page/SuspenseBoundary";
+import { AdminPage } from "@/components/page/AdminPage";
+import {
+  ResourceListContext,
+  useSelection,
+} from "@/context/ResourceListContext";
 
 export interface ResourceListProps<T> {
   /** Resource name — the query key and the invalidation target. */
@@ -17,6 +20,8 @@ export interface ResourceListProps<T> {
   initialFilters?: Record<string, string>;
   errorMessage?: string;
   debounceMs?: number;
+  /** #101: full-load (client-list) kaynakları için staleTime (ms) — mount'ta tekrar indirmeyi keser. */
+  staleTime?: number;
   selectable?: boolean;
   children: ReactNode;
 }
@@ -34,7 +39,10 @@ export interface ResourceListProps<T> {
  * the whole list (header + toolbar + table + pagination) shows ONE spinner on
  * first load — never a misleading "0 items" header while the table spins.
  */
-export function ResourceListRoot<T>({ children, ...config }: ResourceListProps<T>) {
+export function ResourceListRoot<T>({
+  children,
+  ...config
+}: ResourceListProps<T>) {
   return (
     <SuspenseBoundary>
       <ResourceListInner {...config}>{children}</ResourceListInner>
@@ -51,12 +59,14 @@ function ResourceListInner<T>({
   initialFilters,
   errorMessage,
   debounceMs,
+  staleTime,
   selectable = false,
   children,
 }: ResourceListProps<T>) {
   const data = useAdminResource<T>({
     queryKey: resource,
     fetcher,
+    staleTime,
     limit,
     syncUrl,
     initialFilters,

@@ -10,8 +10,6 @@ import { adminApi } from "@/lib/api";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
 import { ResourceList } from "@/components/list";
-import { paginateClient } from "@/lib/query/client-list";
-import { extractList } from "@/lib/extract";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import type { CarModel } from "./_lib/types";
@@ -75,16 +73,7 @@ export default function CarModelsPage() {
 
       <ResourceList<CarModel>
         resource="car-models"
-        fetcher={async (params) => {
-          const res = await adminApi.getCarModels(params.brandId || undefined);
-          const items = extractList<CarModel>(res);
-          return {
-            ...res,
-            data: paginateClient(items, params, {
-              searchFields: (m) => [m.name, m.slug, m.brand?.name],
-            }),
-          };
-        }}
+        fetcher={(params) => adminApi.getCarModels(params)}
         getRowId={(m) => m.id}
         syncUrl
         initialFilters={{ brandId: "" }}

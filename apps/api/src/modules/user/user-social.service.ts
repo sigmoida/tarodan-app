@@ -1,8 +1,14 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { NotificationService } from '../notification/notification.service';
-import { NotificationType } from '../notification/dto';
-import { UserCommonService } from './user-common.service';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto";
+import { UserCommonService } from "./user-common.service";
+import { i18nMessage } from "../i18n";
 
 // In-memory storage for user blocks until schema is updated
 interface UserBlock {
@@ -53,7 +59,9 @@ export class UserSocialService {
    */
   async followUser(currentUserId: string, targetUserId: string) {
     if (currentUserId === targetUserId) {
-      throw new BadRequestException('Kendinizi takip edemezsiniz');
+      throw new BadRequestException(
+        i18nMessage("server.user.cannotFollowSelf"),
+      );
     }
 
     // Check if target user exists
@@ -62,7 +70,7 @@ export class UserSocialService {
     });
 
     if (!targetUser) {
-      throw new NotFoundException('Kullanıcı bulunamadı');
+      throw new NotFoundException(i18nMessage("server.user.notFound"));
     }
 
     // Check if already following
@@ -76,8 +84,11 @@ export class UserSocialService {
     });
 
     if (existingFollow) {
-      return { 
-        message: 'Zaten takip ediyorsunuz',
+      // #224: bu iki başarı mesajı (satır burada + fonksiyon sonu) durum-bağımlı dal
+      // (zaten takip ediyor vs yeni takip, bildirim yan etkisiyle iç içe) — locale
+      // servise akmıyor, invasive, taşınmadı (rapora bkz).
+      return {
+        message: "Zaten takip ediyorsunuz",
         following: true,
       };
     }
@@ -102,23 +113,23 @@ export class UserSocialService {
         NotificationType.NEW_FOLLOWER,
         {
           followerId: currentUserId,
-          followerName: follower?.displayName || 'Bir kullanıcı',
+          followerName: follower?.displayName || "Bir kullanıcı",
         },
       );
       await this.notificationService.sendTemplateEmailToUser(
         targetUserId,
-        'new-follower',
+        "new-follower",
         {
-          followerName: follower?.displayName || 'Bir kullanıcı',
+          followerName: follower?.displayName || "Bir kullanıcı",
           followerId: currentUserId,
         },
       );
     } catch (error) {
-      this.logger.error('Failed to send follow notification:', error);
+      this.logger.error("Failed to send follow notification:", error);
     }
 
-    return { 
-      message: 'Kullanıcı takip edildi',
+    return {
+      message: "Kullanıcı takip edildi",
       following: true,
     };
   }
@@ -126,9 +137,14 @@ export class UserSocialService {
   /**
    * Unfollow a user
    */
-  async unfollowUser(currentUserId: string, targetUserId: string) {
+  async unfollowUser(
+    currentUserId: string,
+    targetUserId: string,
+  ): Promise<{ following: boolean }> {
     if (currentUserId === targetUserId) {
-      throw new BadRequestException('Kendinizi takipten çıkaramazsınız');
+      throw new BadRequestException(
+        i18nMessage("server.user.cannotUnfollowSelf"),
+      );
     }
 
     // Delete follow relationship
@@ -145,8 +161,9 @@ export class UserSocialService {
       // Not following, ignore
     }
 
-    return { 
-      message: 'Takip bırakıldı',
+    // #224: mesaj artık UserController.unfollowUser() tarafından locale'e göre
+    // kuruluyor (server.user.unfollowed) — servis burada sabit metin döndürmüyor.
+    return {
       following: false,
     };
   }
@@ -167,23 +184,27 @@ export class UserSocialService {
             _count: {
               select: {
                 products: {
-                  where: { status: 'active' },
+                  where: { status: "active" },
                 },
               },
             },
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
 
     const resolved = await Promise.all(
       following.map(async (f: any) => ({
         ...f,
-        following: f.following ? {
-          ...f.following,
-          avatarUrl: await this.common.resolveAvatarUrl(f.following.avatarUrl),
-        } : f.following,
+        following: f.following
+          ? {
+              ...f.following,
+              avatarUrl: await this.common.resolveAvatarUrl(
+                f.following.avatarUrl,
+              ),
+            }
+          : f.following,
       })),
     );
 
@@ -193,10 +214,13 @@ export class UserSocialService {
   /**
    * Block a user
    */
-  async blockUser(blockerId: string, blockedId: string): Promise<{ success: boolean; message: string }> {
+  async blockUser(
+    blockerId: string,
+    blockedId: string,
+  ): Promise<{ success: boolean; blockedDisplayName: string }> {
     // Cannot block yourself
     if (blockerId === blockedId) {
-      throw new BadRequestException('Kendinizi engelleyemezsiniz');
+      throw new BadRequestException(i18nMessage("server.user.cannotBlockSelf"));
     }
 
     // Check if blocked user exists
@@ -206,16 +230,16 @@ export class UserSocialService {
     });
 
     if (!blockedUser) {
-      throw new NotFoundException('Kullanıcı bulunamadı');
+      throw new NotFoundException(i18nMessage("server.user.notFound"));
     }
 
     // Check if already blocked
     const existingBlock = Array.from(this.userBlocks.values()).find(
-      (b) => b.blockerId === blockerId && b.blockedId === blockedId
+      (b) => b.blockerId === blockerId && b.blockedId === blockedId,
     );
 
     if (existingBlock) {
-      throw new BadRequestException('Bu kullanıcı zaten engellenmiş');
+      throw new BadRequestException(i18nMessage("server.user.alreadyBlocked"));
     }
 
     // Create block
@@ -230,20 +254,26 @@ export class UserSocialService {
 
     this.logger.log(`User ${blockerId} blocked user ${blockedId}`);
 
-    return { success: true, message: `${blockedUser.displayName} engellendi` };
+    // #224: mesaj artık UserController.blockUser() tarafından locale'e göre
+    // kuruluyor (server.user.userBlocked, {displayName} parametreli) — servis
+    // burada sabit metin döndürmüyor.
+    return { success: true, blockedDisplayName: blockedUser.displayName };
   }
 
   /**
    * Unblock a user
    */
-  async unblockUser(blockerId: string, blockedId: string): Promise<{ success: boolean; message: string }> {
+  async unblockUser(
+    blockerId: string,
+    blockedId: string,
+  ): Promise<{ success: boolean }> {
     // Find the block
     const block = Array.from(this.userBlocks.values()).find(
-      (b) => b.blockerId === blockerId && b.blockedId === blockedId
+      (b) => b.blockerId === blockerId && b.blockedId === blockedId,
     );
 
     if (!block) {
-      throw new NotFoundException('Bu kullanıcı engellenmemiş');
+      throw new NotFoundException(i18nMessage("server.user.notBlocked"));
     }
 
     // Remove block
@@ -251,7 +281,9 @@ export class UserSocialService {
 
     this.logger.log(`User ${blockerId} unblocked user ${blockedId}`);
 
-    return { success: true, message: 'Engel kaldırıldı' };
+    // #224: mesaj artık UserController.unblockUser() tarafından locale'e göre
+    // kuruluyor (server.user.userUnblocked) — servis burada sabit metin döndürmüyor.
+    return { success: true };
   }
 
   /**
@@ -259,7 +291,7 @@ export class UserSocialService {
    */
   async getBlockedUsers(userId: string): Promise<any[]> {
     const blocks = Array.from(this.userBlocks.values()).filter(
-      (b) => b.blockerId === userId
+      (b) => b.blockerId === userId,
     );
 
     const blockedUserIds = blocks.map((b) => b.blockedId);
@@ -288,7 +320,7 @@ export class UserSocialService {
    */
   isUserBlocked(blockerId: string, blockedId: string): boolean {
     return Array.from(this.userBlocks.values()).some(
-      (b) => b.blockerId === blockerId && b.blockedId === blockedId
+      (b) => b.blockerId === blockerId && b.blockedId === blockedId,
     );
   }
 
@@ -299,14 +331,14 @@ export class UserSocialService {
     return Array.from(this.userBlocks.values()).some(
       (b) =>
         (b.blockerId === userId1 && b.blockedId === userId2) ||
-        (b.blockerId === userId2 && b.blockedId === userId1)
+        (b.blockerId === userId2 && b.blockedId === userId1),
     );
   }
 
   private generateUUID(): string {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
       const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      const v = c === "x" ? r : (r & 0x3) | 0x8;
       return v.toString(16);
     });
   }

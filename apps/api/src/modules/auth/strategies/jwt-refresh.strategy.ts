@@ -6,6 +6,7 @@ import { Request } from "express";
 import { JwtPayload } from "../interfaces";
 import { PrismaService } from "../../../prisma";
 import { COOKIE_NAMES, readCookie } from "../utils/auth-cookies";
+import { i18nMessage } from "../../i18n";
 
 /** İsteğin taşıdığı refresh token'ı çıkarır: önce httpOnly cookie, yoksa body `refreshToken`
  *  (mobil/eski istemciler). Aynı tarayıcıda hem kullanıcı hem admin cookie'si bulunabilir
@@ -44,7 +45,9 @@ export class JwtRefreshStrategy extends PassportStrategy(
   async validate(req: Request, payload: JwtPayload) {
     // Verify it's a refresh token
     if (payload.type !== "refresh") {
-      throw new UnauthorizedException("Geçersiz token tipi");
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.invalidTokenType"),
+      );
     }
 
     // Check if user still exists
@@ -53,7 +56,7 @@ export class JwtRefreshStrategy extends PassportStrategy(
     });
 
     if (!user) {
-      throw new UnauthorizedException("Kullanıcı bulunamadı");
+      throw new UnauthorizedException(i18nMessage("server.auth.userNotFound"));
     }
 
     // Return user info along with the refresh token for rotation.

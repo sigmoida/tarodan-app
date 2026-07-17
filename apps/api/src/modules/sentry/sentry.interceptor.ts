@@ -8,10 +8,11 @@ import {
   ExecutionContext,
   CallHandler,
   HttpException,
-} from '@nestjs/common';
-import { Observable, throwError } from 'rxjs';
-import { catchError, tap } from 'rxjs/operators';
-import * as Sentry from '@sentry/node';
+} from "@nestjs/common";
+import { Observable, throwError } from "rxjs";
+import { catchError, tap } from "rxjs/operators";
+import * as Sentry from "@sentry/node";
+import { getAppLogger } from "../../common/logging/logger";
 
 @Injectable()
 export class SentryInterceptor implements NestInterceptor {
@@ -21,7 +22,7 @@ export class SentryInterceptor implements NestInterceptor {
 
     // Start transaction for performance monitoring
     const transaction = Sentry.startTransaction({
-      op: 'http.server',
+      op: "http.server",
       name: `${method} ${url}`,
     });
 
@@ -40,7 +41,7 @@ export class SentryInterceptor implements NestInterceptor {
     }
 
     // Add request context
-    Sentry.setContext('request', {
+    Sentry.setContext("request", {
       method,
       url,
       params,
@@ -55,28 +56,21 @@ export class SentryInterceptor implements NestInterceptor {
         transaction.finish();
       }),
       catchError((error) => {
-        // Capture exception
-        Sentry.withScope((scope) => {
-          scope.setExtra('request', {
-            method,
-            url,
-            params,
-            query,
-          });
+        // Capture exception via the shared logger (bridges to SentryService, avoids double-capture)
+        const requestContext = { method, url, params, query };
 
-          if (error instanceof HttpException) {
-            const status = error.getStatus();
-            transaction.setHttpStatus(status);
+        if (error instanceof HttpException) {
+          const status = error.getStatus();
+          transaction.setHttpStatus(status);
 
-            // Only capture 5xx errors as exceptions
-            if (status >= 500) {
-              Sentry.captureException(error);
-            }
-          } else {
-            // Capture all non-HTTP exceptions
-            Sentry.captureException(error);
+          // Only capture 5xx errors as exceptions
+          if (status >= 500) {
+            getAppLogger().captureException(error, requestContext);
           }
-        });
+        } else {
+          // Capture all non-HTTP exceptions
+          getAppLogger().captureException(error, requestContext);
+        }
 
         transaction.finish();
         return throwError(() => error);
@@ -90,12 +84,18 @@ export class SentryInterceptor implements NestInterceptor {
   private sanitizeBody(body: any): any {
     if (!body) return body;
 
-    const sensitiveFields = ['password', 'token', 'secret', 'apiKey', 'creditCard'];
+    const sensitiveFields = [
+      "password",
+      "token",
+      "secret",
+      "apiKey",
+      "creditCard",
+    ];
     const sanitized = { ...body };
 
     sensitiveFields.forEach((field) => {
       if (field in sanitized) {
-        sanitized[field] = '[REDACTED]';
+        sanitized[field] = "[REDACTED]";
       }
     });
 
