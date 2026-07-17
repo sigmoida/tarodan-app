@@ -1,52 +1,83 @@
-import { useState } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, Linking } from 'react-native';
-import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { theme, Button, Card, Snackbar, Text, Input, Textarea, ScreenHeader } from '@tarodan/ui-native';
-import { supportApi } from '@/lib/api';
-import { useTranslation } from '@/i18n';
-import { SUPPORT_EMAIL, SUPPORT_PHONE, SUPPORT_WHATSAPP } from '@/constants/legalFacts';
+import { useState } from "react";
+import {
+  View,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  Linking,
+} from "react-native";
+import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import {
+  theme,
+  Button,
+  Card,
+  Snackbar,
+  Text,
+  Input,
+  Textarea,
+  ScreenHeader,
+} from "@tarodan/ui-native";
+import { supportApi } from "@/lib/api";
+import { useTranslation } from "react-i18next";
+import {
+  SUPPORT_EMAIL,
+  SUPPORT_PHONE,
+  SUPPORT_WHATSAPP,
+} from "@/constants/legalFacts";
 
 const { colors } = theme;
 
 export default function ContactScreen() {
   const { t } = useTranslation();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [subject, setSubject] = useState('');
-  const [message, setMessage] = useState('');
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState({ visible: false, message: '' });
+  const [snackbar, setSnackbar] = useState({ visible: false, message: "" });
 
   const handleSubmit = async () => {
     if (!name || !email || !subject || !message) {
-      setSnackbar({ visible: true, message: 'Lütfen tüm alanları doldurun' });
+      setSnackbar({ visible: true, message: "Lütfen tüm alanları doldurun" });
       return;
     }
     // Backend DTO ile parite (GuestContactDto): name @MinLength(2), message @MinLength(10).
     if (name.trim().length < 2) {
-      setSnackbar({ visible: true, message: 'Adınız en az 2 karakter olmalıdır.' });
+      setSnackbar({
+        visible: true,
+        message: "Adınız en az 2 karakter olmalıdır.",
+      });
       return;
     }
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
-      setSnackbar({ visible: true, message: 'Geçerli bir e-posta adresi girin.' });
+      setSnackbar({
+        visible: true,
+        message: "Geçerli bir e-posta adresi girin.",
+      });
       return;
     }
     if (message.trim().length < 10) {
-      setSnackbar({ visible: true, message: 'Mesaj en az 10 karakter olmalıdır.' });
+      setSnackbar({
+        visible: true,
+        message: "Mesaj en az 10 karakter olmalıdır.",
+      });
       return;
     }
 
     setLoading(true);
     try {
       await supportApi.guestContact({ name, email, subject, message });
-      setSnackbar({ visible: true, message: 'Mesajınız gönderildi!' });
-      setName('');
-      setEmail('');
-      setSubject('');
-      setMessage('');
+      setSnackbar({ visible: true, message: "Mesajınız gönderildi!" });
+      setName("");
+      setEmail("");
+      setSubject("");
+      setMessage("");
     } catch {
-      setSnackbar({ visible: true, message: 'Mesaj gönderilemedi, lütfen tekrar deneyin.' });
+      setSnackbar({
+        visible: true,
+        message: "Mesaj gönderilemedi, lütfen tekrar deneyin.",
+      });
     } finally {
       setLoading(false);
     }
@@ -54,34 +85,39 @@ export default function ContactScreen() {
 
   const contactMethods = [
     {
-      icon: 'mail-outline',
-      title: 'E-posta',
+      icon: "mail-outline",
+      title: "E-posta",
       value: SUPPORT_EMAIL,
       action: () => Linking.openURL(`mailto:${SUPPORT_EMAIL}`),
     },
     {
-      icon: 'call-outline',
-      title: 'Telefon',
+      icon: "call-outline",
+      title: "Telefon",
       value: SUPPORT_PHONE,
-      action: () => Linking.openURL('tel:+902121234567'),
+      action: () => Linking.openURL("tel:+902121234567"),
     },
     {
-      icon: 'logo-whatsapp',
-      title: 'WhatsApp',
+      icon: "logo-whatsapp",
+      title: "WhatsApp",
       value: SUPPORT_WHATSAPP,
-      action: () => Linking.openURL('https://wa.me/905321234567'),
+      action: () => Linking.openURL("https://wa.me/905321234567"),
     },
     {
-      icon: 'location-outline',
-      title: 'Adres',
-      value: 'İstanbul, Türkiye',
+      icon: "location-outline",
+      title: "Adres",
+      value: "İstanbul, Türkiye",
       action: () => {},
     },
   ];
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title={t('mobile.pageContact')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
+      <ScreenHeader
+        title={t("mobile.pageContact")}
+        onBack={() =>
+          router.canGoBack() ? router.back() : router.replace("/(tabs)")
+        }
+      />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Contact Methods */}
@@ -94,13 +130,21 @@ export default function ContactScreen() {
               onPress={method.action}
             >
               <View style={styles.contactMethodIcon}>
-                <Ionicons name={method.icon as any} size={24} color={colors.primary[600]!} />
+                <Ionicons
+                  name={method.icon as any}
+                  size={24}
+                  color={colors.primary[600]!}
+                />
               </View>
               <View style={styles.contactMethodContent}>
                 <Text style={styles.contactMethodTitle}>{method.title}</Text>
                 <Text style={styles.contactMethodValue}>{method.value}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.text.subtle} />
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={colors.text.subtle}
+              />
             </TouchableOpacity>
           ))}
         </View>
@@ -163,10 +207,21 @@ export default function ContactScreen() {
         </Card>
 
         {/* FAQ Link */}
-        <TouchableOpacity style={styles.faqLink} onPress={() => router.push('/help')}>
-          <Ionicons name="help-circle-outline" size={24} color={colors.primary[600]!} />
+        <TouchableOpacity
+          style={styles.faqLink}
+          onPress={() => router.push("/help")}
+        >
+          <Ionicons
+            name="help-circle-outline"
+            size={24}
+            color={colors.primary[600]!}
+          />
           <Text style={styles.faqLinkText}>Sık Sorulan Sorular</Text>
-          <Ionicons name="chevron-forward" size={20} color={colors.primary[600]!} />
+          <Ionicons
+            name="chevron-forward"
+            size={20}
+            color={colors.primary[600]!}
+          />
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />
@@ -194,7 +249,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: colors.text.heading,
     marginBottom: theme.spacing[3],
     marginTop: theme.spacing[2],
@@ -205,8 +260,8 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing[6],
   },
   contactMethod: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: theme.spacing[4],
     borderBottomWidth: 1,
     borderBottomColor: colors.border.DEFAULT,
@@ -216,8 +271,8 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     backgroundColor: colors.primary[50]!,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   contactMethodContent: {
     flex: 1,
@@ -225,7 +280,7 @@ const styles = StyleSheet.create({
   },
   contactMethodTitle: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     color: colors.text.heading,
   },
   contactMethodValue: {
@@ -250,8 +305,8 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing[6],
   },
   hoursRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: theme.spacing[3],
   },
   hoursDay: {
@@ -261,16 +316,16 @@ const styles = StyleSheet.create({
   hoursTime: {
     fontSize: 14,
     color: colors.success[600]!,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   hoursClosed: {
     fontSize: 14,
     color: colors.danger[600]!,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   faqLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: colors.surface.DEFAULT,
     padding: theme.spacing[4],
     borderRadius: 12,
@@ -280,6 +335,6 @@ const styles = StyleSheet.create({
     marginLeft: theme.spacing[3],
     fontSize: 15,
     color: colors.primary[600]!,
-    fontWeight: '500',
+    fontWeight: "500",
   },
 });

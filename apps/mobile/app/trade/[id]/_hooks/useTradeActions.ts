@@ -1,13 +1,14 @@
-import { useState } from 'react';
-import { router } from 'expo-router';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { appAlert } from '@tarodan/ui-native';
-import { tradesApi, paymentsApi } from '@/lib/api';
-import { qk } from '@/lib/query';
-import { useTranslation } from '@/i18n';
-import { captureException } from '@/services/sentry';
+import { useState } from "react";
+import { router } from "expo-router";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { appAlert } from "@tarodan/ui-native";
+import { tradesApi, paymentsApi } from "@/lib/api";
+import { qk } from "@/lib/query";
+import { useTranslation } from "react-i18next";
+import { captureException } from "@/services/sentry";
 
-type DisputeReason = 'shipment_lost' | 'shipment_damaged' | 'wrong_item' | 'other';
+type DisputeReason =
+  "shipment_lost" | "shipment_damaged" | "wrong_item" | "other";
 
 /**
  * Takas detay controller'ı: 6 mutation (kabul/reddet/onayla/nakit-öde/iptal/itiraz)
@@ -18,17 +19,18 @@ export function useTradeActions(id: string) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
-  const [snackbar, setSnackbar] = useState({ visible: false, message: '' });
+  const [snackbar, setSnackbar] = useState({ visible: false, message: "" });
   const notify = (message: string) => setSnackbar({ visible: true, message });
   const dismissSnackbar = () => setSnackbar((s) => ({ ...s, visible: false }));
 
   const [tradeAddressId, setTradeAddressId] = useState<string | null>(null);
 
   const [rejectVisible, setRejectVisible] = useState(false);
-  const [rejectReason, setRejectReason] = useState('');
+  const [rejectReason, setRejectReason] = useState("");
   const [disputeVisible, setDisputeVisible] = useState(false);
-  const [disputeReason, setDisputeReason] = useState<DisputeReason>('shipment_lost');
-  const [disputeDescription, setDisputeDescription] = useState('');
+  const [disputeReason, setDisputeReason] =
+    useState<DisputeReason>("shipment_lost");
+  const [disputeDescription, setDisputeDescription] = useState("");
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: qk.trades.detail(id) });
@@ -36,14 +38,19 @@ export function useTradeActions(id: string) {
   };
 
   const acceptMutation = useMutation({
-    mutationFn: () => tradesApi.accept(id, undefined, tradeAddressId ?? undefined),
+    mutationFn: () =>
+      tradesApi.accept(id, undefined, tradeAddressId ?? undefined),
     onSuccess: () => {
       invalidate();
-      notify('Takas kabul edildi!');
+      notify("Takas kabul edildi!");
     },
     onError: (error: any) => {
-      captureException(error, { level: 'error', tags: { flow: 'trade.accept' }, extra: { tradeId: id } });
-      notify(error.response?.data?.message || 'İşlem başarısız');
+      captureException(error, {
+        level: "error",
+        tags: { flow: "trade.accept" },
+        extra: { tradeId: id },
+      });
+      notify(error.response?.data?.message || "İşlem başarısız");
     },
   });
 
@@ -52,19 +59,21 @@ export function useTradeActions(id: string) {
     onSuccess: () => {
       invalidate();
       setRejectVisible(false);
-      setRejectReason('');
-      notify('Takas reddedildi');
+      setRejectReason("");
+      notify("Takas reddedildi");
     },
-    onError: (error: any) => notify(error.response?.data?.message || 'İşlem başarısız'),
+    onError: (error: any) =>
+      notify(error.response?.data?.message || "İşlem başarısız"),
   });
 
   const confirmMutation = useMutation({
     mutationFn: () => tradesApi.confirmReceipt(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.trades.detail(id) });
-      notify('Takas tamamlandı!');
+      notify("Takas tamamlandı!");
     },
-    onError: (error: any) => notify(error.response?.data?.message || 'İşlem başarısız'),
+    onError: (error: any) =>
+      notify(error.response?.data?.message || "İşlem başarısız"),
   });
 
   const cashPayMutation = useMutation({
@@ -73,70 +82,94 @@ export function useTradeActions(id: string) {
       const data = response?.data?.data ?? response?.data ?? {};
       const paymentId = data.paymentId ?? data.id;
       if (!paymentId) {
-        notify('Ödeme başlatılamadı (paymentId eksik).');
+        notify("Ödeme başlatılamadı (paymentId eksik).");
         return;
       }
       const paymentUrl: string | undefined = data.paymentUrl;
       router.push({
-        pathname: '/payment/[id]',
+        pathname: "/payment/[id]",
         params: {
           id: paymentId,
-          provider: 'paytr',
-          tradeCash: '1',
+          provider: "paytr",
+          tradeCash: "1",
           tradeId: String(id),
           ...(paymentUrl ? { paymentUrl } : {}),
         },
       } as any);
     },
     onError: (error: any) => {
-      captureException(error, { level: 'error', tags: { flow: 'trade.cashPay' }, extra: { tradeId: id } });
-      notify(error?.response?.data?.message || 'Ödeme başlatılamadı');
+      captureException(error, {
+        level: "error",
+        tags: { flow: "trade.cashPay" },
+        extra: { tradeId: id },
+      });
+      notify(error?.response?.data?.message || "Ödeme başlatılamadı");
     },
   });
 
   const cancelMutation = useMutation({
-    mutationFn: () => tradesApi.cancel(id, 'Kullanıcı tarafından iptal edildi'),
+    mutationFn: () => tradesApi.cancel(id, "Kullanıcı tarafından iptal edildi"),
     onSuccess: () => {
       invalidate();
-      notify('Takas iptal edildi');
+      notify("Takas iptal edildi");
     },
-    onError: (error: any) => notify(error.response?.data?.message || 'İşlem başarısız'),
+    onError: (error: any) =>
+      notify(error.response?.data?.message || "İşlem başarısız"),
   });
 
   const disputeMutation = useMutation({
     mutationFn: () =>
-      tradesApi.raiseDispute(id, { reason: disputeReason, description: disputeDescription.trim() }),
+      tradesApi.raiseDispute(id, {
+        reason: disputeReason,
+        description: disputeDescription.trim(),
+      }),
     onSuccess: () => {
       invalidate();
       setDisputeVisible(false);
-      setDisputeDescription('');
-      notify(t('trade.dispute.successMessage'));
+      setDisputeDescription("");
+      notify(t("trade.dispute.successMessage"));
     },
-    onError: (error: any) => notify(error.response?.data?.message || t('trade.dispute.errorMessage')),
+    onError: (error: any) =>
+      notify(error.response?.data?.message || t("trade.dispute.errorMessage")),
   });
 
   // --- Handler'lar (aksiyon butonlarından) ---
   const handleAccept = () => {
     if (!tradeAddressId) {
-      appAlert('Teslimat Adresi', 'Lütfen bir teslimat adresi seçin veya ekleyin.');
+      appAlert(
+        "Teslimat Adresi",
+        "Lütfen bir teslimat adresi seçin veya ekleyin.",
+      );
       return;
     }
-    appAlert('Takası Kabul Et', 'Bu takas teklifini kabul etmek istediğinize emin misiniz?', [
-      { text: 'İptal', style: 'cancel' },
-      { text: 'Kabul Et', onPress: () => acceptMutation.mutate() },
-    ]);
+    appAlert(
+      "Takası Kabul Et",
+      "Bu takas teklifini kabul etmek istediğinize emin misiniz?",
+      [
+        { text: "İptal", style: "cancel" },
+        { text: "Kabul Et", onPress: () => acceptMutation.mutate() },
+      ],
+    );
   };
 
   const handleCancel = () => {
-    appAlert('Takası İptal Et', 'Bu takas teklifini iptal etmek istediğinize emin misiniz?', [
-      { text: 'Vazgeç', style: 'cancel' },
-      { text: 'İptal Et', style: 'destructive', onPress: () => cancelMutation.mutate() },
-    ]);
+    appAlert(
+      "Takası İptal Et",
+      "Bu takas teklifini iptal etmek istediğinize emin misiniz?",
+      [
+        { text: "Vazgeç", style: "cancel" },
+        {
+          text: "İptal Et",
+          style: "destructive",
+          onPress: () => cancelMutation.mutate(),
+        },
+      ],
+    );
   };
 
   const submitDispute = () => {
     if (disputeDescription.trim().length < 10) {
-      notify(t('trade.dispute.minLengthError'));
+      notify(t("trade.dispute.minLengthError"));
       return;
     }
     disputeMutation.mutate();

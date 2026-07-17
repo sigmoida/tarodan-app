@@ -13,7 +13,7 @@ import {
   registerForPushNotifications,
   setupPushNotificationRouting,
 } from "@/services/push";
-import { LanguageProvider } from "@/i18n";
+import { LocaleProvider } from "@/i18n/LocaleProvider";
 import { initSentry } from "@/services/sentry";
 import AnimatedSplash from "@/components/AnimatedSplash";
 import BusinessMembershipGuard from "@/components/BusinessMembershipGuard";
@@ -118,7 +118,7 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <LanguageProvider>
+        <LocaleProvider>
           <StatusBar style="auto" />
           <Stack
             screenOptions={{
@@ -145,7 +145,7 @@ export default function RootLayout() {
               onFinish={() => setSplashDone(true)}
             />
           )}
-        </LanguageProvider>
+        </LocaleProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );

@@ -1,14 +1,14 @@
-import { View, ScrollView, TouchableOpacity } from 'react-native';
-import { Button, Snackbar, Text, ScreenHeader } from '@tarodan/ui-native';
-import { router } from 'expo-router';
-import { useTranslation } from '@/i18n';
-import { useEditProfile } from './_hooks/useEditProfile';
-import { styles } from './_lib/styles';
+import { View, ScrollView, TouchableOpacity } from "react-native";
+import { Button, Snackbar, Text, ScreenHeader } from "@tarodan/ui-native";
+import { router } from "expo-router";
+import { useTranslation } from "react-i18next";
+import { useEditProfile } from "./_hooks/useEditProfile";
+import { styles } from "./_lib/styles";
 import {
   AvatarSection,
   PersonalInfoCard,
   BusinessInfoCard,
-} from './_components/EditProfileSections';
+} from "./_components/EditProfileSections";
 
 export default function EditProfileScreen() {
   const { t } = useTranslation();
@@ -21,8 +21,8 @@ export default function EditProfileScreen() {
         <Button
           variant="primary"
           title="Giriş Yap"
-          onPress={() => router.push('/(auth)/login')}
-          style={{ alignSelf: 'center' }}
+          onPress={() => router.push("/(auth)/login")}
+          style={{ alignSelf: "center" }}
         />
       </View>
     );
@@ -31,11 +31,13 @@ export default function EditProfileScreen() {
   return (
     <View style={styles.container}>
       <ScreenHeader
-        title={t('mobile.settingsEditProfile')}
-        onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
+        title={t("mobile.settingsEditProfile")}
+        onBack={() =>
+          router.canGoBack() ? router.back() : router.replace("/(tabs)")
+        }
         right={
           <TouchableOpacity onPress={f.handleSubmit(f.onSubmit)}>
-            <Text style={styles.saveButton}>{t('mobile.save')}</Text>
+            <Text style={styles.saveButton}>{t("mobile.save")}</Text>
           </TouchableOpacity>
         }
       />
@@ -63,7 +65,7 @@ export default function EditProfileScreen() {
         visible={f.snackbar.visible}
         onDismiss={() => f.setSnackbar({ ...f.snackbar, visible: false })}
         duration={3000}
-        variant={f.snackbar.variant ?? 'default'}
+        variant={f.snackbar.variant ?? "default"}
       >
         {f.snackbar.message}
       </Snackbar>

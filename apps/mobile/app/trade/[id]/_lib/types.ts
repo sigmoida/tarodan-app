@@ -1,8 +1,9 @@
 // Takas detay route'unun DTO tipleri.
+import type { TFunction } from "i18next";
 
 export interface TradeShipment {
   id: string;
-  direction: 'to_warehouse' | 'from_warehouse' | 'return' | string;
+  direction: "to_warehouse" | "from_warehouse" | "return" | string;
   senderUserId?: string | null;
   recipientUserId?: string | null;
   trackingNumber?: string | null;
@@ -22,7 +23,7 @@ export interface TradeCashPayment {
 export interface TradeItem {
   id: string;
   productId?: string;
-  side?: 'initiator' | 'receiver';
+  side?: "initiator" | "receiver";
   quantity: number;
   valueAtTrade: number;
   // API'nin döndürdüğü düz alanlar (TradeItemResponseDto):
@@ -75,4 +76,6 @@ export interface Trade {
   firstWarehouseArrivalAt?: string | null;
 }
 
-export type TFn = (key: string, params?: Record<string, string | number>) => string;
+// #216: the strict react-i18next translator (keys typed against @tarodan/i18n).
+// Trade components receive it as a prop and call it with catalog keys.
+export type TFn = TFunction;

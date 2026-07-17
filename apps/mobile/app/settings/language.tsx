@@ -1,17 +1,20 @@
-import React from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React from "react";
+import { View, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
 
-import { Ionicons } from '@expo/vector-icons';
-import { theme, Text } from '@tarodan/ui-native';
-import { ScreenHeader } from '@/components/common';
-import { useLanguage, localeNames, localeFlags, Locale } from '@/i18n';
+import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
+import { type Locale } from "@tarodan/i18n";
+import { theme, Text } from "@tarodan/ui-native";
+import { ScreenHeader } from "@/components/common";
+import { useLocale, localeNames, localeFlags } from "@/i18n/LocaleProvider";
 
 const { colors } = theme;
 
 export default function LanguageSettingsScreen() {
-  const { locale, setLocale, t } = useLanguage();
+  const { t } = useTranslation();
+  const { locale, setLocale } = useLocale();
 
-  const options: Locale[] = ['tr', 'en'];
+  const options: Locale[] = ["tr", "en"];
 
   const handleSelect = (next: Locale) => {
     if (next === locale) return;
@@ -20,18 +23,18 @@ export default function LanguageSettingsScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title={t('language.language') || 'Dil / Language'} />
+      <ScreenHeader title={t("language.language") || "Dil / Language"} />
 
       <ScrollView contentContainerStyle={styles.scrollBody}>
         <View style={styles.infoCard}>
           <Ionicons name="language" size={18} color={colors.primary[600]!} />
           <Text style={styles.infoText}>
-            {t('language.languageInfo') ||
-              'Uygulama dilini değiştirdiğinizde tüm menü ve bildirimler seçtiğiniz dile geçer.'}
+            {t("language.languageInfo") ||
+              "Uygulama dilini değiştirdiğinizde tüm menü ve bildirimler seçtiğiniz dile geçer."}
           </Text>
         </View>
 
-        {options.map(l => (
+        {options.map((l) => (
           <TouchableOpacity
             key={l}
             style={[styles.row, locale === l && styles.rowActive]}
@@ -43,7 +46,11 @@ export default function LanguageSettingsScreen() {
               {localeNames[l]}
             </Text>
             {locale === l ? (
-              <Ionicons name="checkmark-circle" size={22} color={colors.primary[600]!} />
+              <Ionicons
+                name="checkmark-circle"
+                size={22}
+                color={colors.primary[600]!}
+              />
             ) : (
               <View style={styles.emptyCheck} />
             )}
@@ -64,12 +71,12 @@ const styles = StyleSheet.create({
     gap: theme.spacing[3],
   },
   infoCard: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: theme.spacing[2],
-    alignItems: 'flex-start',
+    alignItems: "flex-start",
     backgroundColor: colors.primary[50]!,
     padding: theme.spacing[3],
-    borderRadius: theme.radius['2xl'],
+    borderRadius: theme.radius["2xl"],
   },
   infoText: {
     flex: 1,
@@ -78,12 +85,12 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: theme.spacing[3],
     padding: theme.spacing[3.5],
     backgroundColor: colors.surface.DEFAULT,
-    borderRadius: theme.radius['2xl'],
+    borderRadius: theme.radius["2xl"],
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
   },
@@ -98,10 +105,10 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: colors.text.heading,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   nameActive: {
-    fontWeight: '700',
+    fontWeight: "700",
     color: colors.primary[600]!,
   },
   emptyCheck: {

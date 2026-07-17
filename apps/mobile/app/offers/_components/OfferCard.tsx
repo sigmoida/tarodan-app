@@ -1,17 +1,25 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, ActivityIndicator } from 'react-native';
-import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { theme } from '@tarodan/ui-native';
-import { transformImageUrl } from '@/utils/imageUrl';
-import type { Offer, TabType } from '../_lib/types';
+import React from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Image,
+  ActivityIndicator,
+} from "react-native";
+import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import type { TFunction } from "i18next";
+import { theme } from "@tarodan/ui-native";
+import { transformImageUrl } from "@/utils/imageUrl";
+import type { Offer, TabType } from "../_lib/types";
 import {
   statusConfig,
   getProductImage,
   getTimeRemaining,
   formatTimeAgo,
   formatPrice,
-} from '../_lib/status';
+} from "../_lib/status";
 
 const { colors } = theme;
 
@@ -20,7 +28,7 @@ export interface OfferCardProps {
   tab: TabType;
   estimatedNet?: number;
   isPending: boolean;
-  t: (key: string, params?: Record<string, string | number>) => string;
+  t: TFunction;
   onAccept: (id: string) => void;
   onReject: (id: string) => void;
   onCancel: (id: string) => void;
@@ -41,35 +49,54 @@ function OfferCardBase({
   onOpenBuyerCounter,
 }: OfferCardProps) {
   const status = statusConfig(offer.status);
-  const otherUser = tab === 'received' ? offer.buyer : offer.seller;
-  const timeRemaining = offer.status === 'pending' ? getTimeRemaining(offer.expiresAt) : null;
+  const otherUser = tab === "received" ? offer.buyer : offer.seller;
+  const timeRemaining =
+    offer.status === "pending" ? getTimeRemaining(offer.expiresAt) : null;
 
   return (
     <View style={styles.card}>
       {/* Top row: image + info */}
       <View style={styles.cardRow}>
-        <TouchableOpacity onPress={() => router.push(`/product/${offer.product.id}` as any)}>
-          <Image source={{ uri: getProductImage(offer.product) }} style={styles.productImage} />
+        <TouchableOpacity
+          onPress={() => router.push(`/product/${offer.product.id}` as any)}
+        >
+          <Image
+            source={{ uri: getProductImage(offer.product) }}
+            style={styles.productImage}
+          />
         </TouchableOpacity>
 
         <View style={styles.cardContent}>
-          <TouchableOpacity onPress={() => router.push(`/product/${offer.product.id}` as any)}>
-            <Text style={styles.productTitle} numberOfLines={2}>{offer.product.title}</Text>
+          <TouchableOpacity
+            onPress={() => router.push(`/product/${offer.product.id}` as any)}
+          >
+            <Text style={styles.productTitle} numberOfLines={2}>
+              {offer.product.title}
+            </Text>
           </TouchableOpacity>
 
           <Text style={styles.originalPrice}>
-            İlan Fiyatı: <Text style={styles.strikethrough}>{formatPrice(offer.product.price)}</Text>
+            İlan Fiyatı:{" "}
+            <Text style={styles.strikethrough}>
+              {formatPrice(offer.product.price)}
+            </Text>
           </Text>
 
           <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
             <Ionicons name={status.icon} size={14} color={status.color} />
-            <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+            <Text style={[styles.statusText, { color: status.color }]}>
+              {status.label}
+            </Text>
           </View>
 
-          {tab === 'sent' && offer.status === 'pending' && offer.buyerMustAccept ? (
+          {tab === "sent" &&
+          offer.status === "pending" &&
+          offer.buyerMustAccept ? (
             <View style={styles.counterAlertBadge}>
               <Ionicons name="swap-horizontal" size={14} color={colors.white} />
-              <Text style={styles.counterAlertText}>Satıcıdan karşı teklif · yanıtlayın</Text>
+              <Text style={styles.counterAlertText}>
+                Satıcıdan karşı teklif · yanıtlayın
+              </Text>
             </View>
           ) : null}
         </View>
@@ -91,7 +118,11 @@ function OfferCardBase({
 
         {timeRemaining && (
           <View style={styles.timeBox}>
-            <Ionicons name="time-outline" size={14} color={colors.warning[600]!} />
+            <Ionicons
+              name="time-outline"
+              size={14}
+              color={colors.warning[600]!}
+            />
             <Text style={styles.timeText}>{timeRemaining} kaldı</Text>
           </View>
         )}
@@ -101,14 +132,19 @@ function OfferCardBase({
       {otherUser && (
         <View style={styles.userRow}>
           {otherUser.avatarUrl ? (
-            <Image source={{ uri: transformImageUrl(otherUser.avatarUrl) }} style={styles.avatar} />
+            <Image
+              source={{ uri: transformImageUrl(otherUser.avatarUrl) }}
+              style={styles.avatar}
+            />
           ) : (
             <View style={[styles.avatar, styles.avatarPlaceholder]}>
               <Ionicons name="person" size={16} color={colors.text.subtle} />
             </View>
           )}
           <View>
-            <Text style={styles.userLabel}>{tab === 'received' ? 'Teklif Veren' : 'Satıcı'}</Text>
+            <Text style={styles.userLabel}>
+              {tab === "received" ? "Teklif Veren" : "Satıcı"}
+            </Text>
             <Text style={styles.userName}>{otherUser.displayName}</Text>
           </View>
         </View>
@@ -117,28 +153,41 @@ function OfferCardBase({
       {/* Message */}
       {offer.message ? (
         <View style={styles.messageBox}>
-          <Ionicons name="chatbubble-outline" size={14} color={colors.text.subtle} style={{ marginTop: theme.spacing[0.5] }} />
+          <Ionicons
+            name="chatbubble-outline"
+            size={14}
+            color={colors.text.subtle}
+            style={{ marginTop: theme.spacing[0.5] }}
+          />
           <Text style={styles.messageText}>"{offer.message}"</Text>
         </View>
       ) : null}
 
       {/* Date */}
       <View style={styles.dateRow}>
-        <Ionicons name="calendar-outline" size={14} color={colors.text.subtle} />
+        <Ionicons
+          name="calendar-outline"
+          size={14}
+          color={colors.text.subtle}
+        />
         <Text style={styles.dateText}>{formatTimeAgo(offer.createdAt, t)}</Text>
       </View>
 
       {/* Actions */}
-      {offer.status === 'pending' && (
+      {offer.status === "pending" && (
         <View style={styles.actionsRow}>
-          {tab === 'received' && offer.buyerMustAccept ? (
+          {tab === "received" && offer.buyerMustAccept ? (
             <View style={styles.waitingBanner}>
-              <Ionicons name="time-outline" size={18} color={colors.warning[700]!} />
+              <Ionicons
+                name="time-outline"
+                size={18}
+                color={colors.warning[700]!}
+              />
               <Text style={styles.waitingBannerText}>
                 Alıcının karşı teklifinizi kabul veya reddetmesi bekleniyor.
               </Text>
             </View>
-          ) : tab === 'received' ? (
+          ) : tab === "received" ? (
             <>
               <TouchableOpacity
                 style={[styles.actionBtn, styles.acceptBtn]}
@@ -167,7 +216,11 @@ function OfferCardBase({
                 onPress={() => onOpenCounter(offer)}
                 disabled={isPending}
               >
-                <Ionicons name="swap-horizontal" size={16} color={colors.white} />
+                <Ionicons
+                  name="swap-horizontal"
+                  size={16}
+                  color={colors.white}
+                />
                 <Text style={styles.actionBtnText}>Karşı Teklif</Text>
               </TouchableOpacity>
             </>
@@ -183,7 +236,9 @@ function OfferCardBase({
                 ) : (
                   <>
                     <Ionicons name="checkmark" size={16} color={colors.white} />
-                    <Text style={styles.actionBtnText}>Karşı teklifi kabul et</Text>
+                    <Text style={styles.actionBtnText}>
+                      Karşı teklifi kabul et
+                    </Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -224,30 +279,50 @@ function OfferCardBase({
       )}
 
       {/* Accepted → ödeme bekliyorsa "Ödeme Yap", aksi halde sipariş linki */}
-      {offer.status === 'accepted' && offer.orderId && (
-        offer.orderStatus === 'pending_payment' ? (
+      {offer.status === "accepted" &&
+        offer.orderId &&
+        (offer.orderStatus === "pending_payment" ? (
           <TouchableOpacity
-            style={[styles.actionBtn, styles.payBtn, { alignSelf: 'flex-start', marginTop: theme.spacing[3] }]}
+            style={[
+              styles.actionBtn,
+              styles.payBtn,
+              { alignSelf: "flex-start", marginTop: theme.spacing[3] },
+            ]}
             onPress={() =>
               router.push({
-                pathname: '/payment/[id]',
-                params: { id: offer.orderId!, orderId: offer.orderId!, provider: 'paytr', guest: '0' },
+                pathname: "/payment/[id]",
+                params: {
+                  id: offer.orderId!,
+                  orderId: offer.orderId!,
+                  provider: "paytr",
+                  guest: "0",
+                },
               } as any)
             }
           >
             <Ionicons name="card-outline" size={16} color={colors.white} />
-            <Text style={styles.actionBtnText}>Ödeme Yap · {formatPrice(offer.amount)}</Text>
+            <Text style={styles.actionBtnText}>
+              Ödeme Yap · {formatPrice(offer.amount)}
+            </Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
-            style={[styles.actionBtn, styles.orderBtn, { alignSelf: 'flex-start', marginTop: theme.spacing[3] }]}
-            onPress={() => router.push({ pathname: '/orders/[id]', params: { id: offer.orderId! } } as any)}
+            style={[
+              styles.actionBtn,
+              styles.orderBtn,
+              { alignSelf: "flex-start", marginTop: theme.spacing[3] },
+            ]}
+            onPress={() =>
+              router.push({
+                pathname: "/orders/[id]",
+                params: { id: offer.orderId! },
+              } as any)
+            }
           >
             <Ionicons name="cube-outline" size={16} color={colors.white} />
             <Text style={styles.actionBtnText}>Siparişi Görüntüle</Text>
           </TouchableOpacity>
-        )
-      )}
+        ))}
     </View>
   );
 }
@@ -261,28 +336,42 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
   },
-  cardRow: { flexDirection: 'row', gap: theme.spacing[3] },
-  productImage: { width: 80, height: 80, borderRadius: theme.radius.xl, backgroundColor: colors.gray[100]! },
+  cardRow: { flexDirection: "row", gap: theme.spacing[3] },
+  productImage: {
+    width: 80,
+    height: 80,
+    borderRadius: theme.radius.xl,
+    backgroundColor: colors.gray[100]!,
+  },
   cardContent: { flex: 1, gap: theme.spacing[1] },
-  productTitle: { fontSize: 15, fontWeight: '600', color: colors.text.heading, lineHeight: 20 },
-  originalPrice: { fontSize: 12, color: colors.text.subtle, marginTop: theme.spacing[0.5] },
-  strikethrough: { textDecorationLine: 'line-through' },
+  productTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: colors.text.heading,
+    lineHeight: 20,
+  },
+  originalPrice: {
+    fontSize: 12,
+    color: colors.text.subtle,
+    marginTop: theme.spacing[0.5],
+  },
+  strikethrough: { textDecorationLine: "line-through" },
 
   statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
     gap: theme.spacing[1],
     paddingHorizontal: theme.spacing[2],
     paddingVertical: 3,
     borderRadius: theme.radius.lg,
     marginTop: theme.spacing[1],
   },
-  statusText: { fontSize: 11, fontWeight: '600' },
+  statusText: { fontSize: 11, fontWeight: "600" },
   counterAlertBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
     gap: theme.spacing[1],
     paddingHorizontal: theme.spacing[2],
     paddingVertical: theme.spacing[1],
@@ -290,12 +379,12 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing[1.5],
     backgroundColor: colors.info[600]!,
   },
-  counterAlertText: { fontSize: 11, fontWeight: '700', color: colors.white },
+  counterAlertText: { fontSize: 11, fontWeight: "700", color: colors.white },
 
   amountRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
     gap: theme.spacing[2.5],
     marginTop: theme.spacing[3],
   },
@@ -307,8 +396,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing[3],
     paddingVertical: theme.spacing[2],
   },
-  amountLabel: { fontSize: 10, color: colors.text.subtle, marginBottom: theme.spacing[0.5] },
-  amountValue: { fontSize: 20, fontWeight: '700', color: colors.primary[600]! },
+  amountLabel: {
+    fontSize: 10,
+    color: colors.text.subtle,
+    marginBottom: theme.spacing[0.5],
+  },
+  amountValue: { fontSize: 20, fontWeight: "700", color: colors.primary[600]! },
   netBox: {
     backgroundColor: colors.success[100]!,
     borderWidth: 1,
@@ -319,27 +412,41 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  netLabel: { fontSize: 10, color: colors.text.subtle, marginBottom: theme.spacing[0.5] },
-  netValue: { fontSize: 16, fontWeight: '700', color: colors.success[600]! },
+  netLabel: {
+    fontSize: 10,
+    color: colors.text.subtle,
+    marginBottom: theme.spacing[0.5],
+  },
+  netValue: { fontSize: 16, fontWeight: "700", color: colors.success[600]! },
   timeBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: theme.spacing[1],
     backgroundColor: colors.warning[100]!,
     paddingHorizontal: theme.spacing[2.5],
     paddingVertical: theme.spacing[1.5],
     borderRadius: theme.radius.xl,
   },
-  timeText: { fontSize: 12, fontWeight: '600', color: colors.warning[600]! },
+  timeText: { fontSize: 12, fontWeight: "600", color: colors.warning[600]! },
 
-  userRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing[2], marginTop: theme.spacing[3] },
-  avatar: { width: 32, height: 32, borderRadius: theme.radius['3xl'], backgroundColor: colors.gray[100]! },
-  avatarPlaceholder: { justifyContent: 'center', alignItems: 'center' },
+  userRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[2],
+    marginTop: theme.spacing[3],
+  },
+  avatar: {
+    width: 32,
+    height: 32,
+    borderRadius: theme.radius["3xl"],
+    backgroundColor: colors.gray[100]!,
+  },
+  avatarPlaceholder: { justifyContent: "center", alignItems: "center" },
   userLabel: { fontSize: 10, color: colors.text.subtle },
-  userName: { fontSize: 13, fontWeight: '600', color: colors.text.heading },
+  userName: { fontSize: 13, fontWeight: "600", color: colors.text.heading },
 
   messageBox: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: theme.spacing[1.5],
     backgroundColor: colors.surface.alt,
     borderRadius: theme.radius.xl,
@@ -350,13 +457,13 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     color: colors.text.muted,
-    fontStyle: 'italic',
+    fontStyle: "italic",
     lineHeight: 18,
   },
 
   dateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: theme.spacing[1.5],
     marginTop: theme.spacing[2.5],
     paddingTop: theme.spacing[2.5],
@@ -365,28 +472,38 @@ const styles = StyleSheet.create({
   },
   dateText: { fontSize: 12, color: colors.text.subtle },
 
-  actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing[2], marginTop: theme.spacing[3] },
+  actionsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing[2],
+    marginTop: theme.spacing[3],
+  },
   waitingBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: theme.spacing[2],
     flex: 1,
-    minWidth: '100%',
+    minWidth: "100%",
     backgroundColor: colors.warning[100]!,
     paddingHorizontal: theme.spacing[3],
     paddingVertical: theme.spacing[2.5],
     borderRadius: theme.radius.xl,
   },
-  waitingBannerText: { flex: 1, fontSize: 13, color: colors.warning[800]!, lineHeight: 18 },
+  waitingBannerText: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.warning[800]!,
+    lineHeight: 18,
+  },
   actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 5,
     paddingHorizontal: theme.spacing[3.5],
     paddingVertical: 9,
     borderRadius: theme.radius.xl,
   },
-  actionBtnText: { color: colors.white, fontSize: 13, fontWeight: '600' },
+  actionBtnText: { color: colors.white, fontSize: 13, fontWeight: "600" },
   acceptBtn: { backgroundColor: colors.success[600]! },
   rejectBtn: { backgroundColor: colors.danger[600]! },
   counterBtn: { backgroundColor: colors.info[600]! },

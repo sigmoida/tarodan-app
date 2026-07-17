@@ -1,10 +1,10 @@
-import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { View, Text, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { theme } from '@tarodan/ui-native';
-import { useUnreadCountQuery } from '@/hooks/messaging';
-import { useTranslation } from '@/i18n';
+import { Tabs } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { View, Text, StyleSheet } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { theme } from "@tarodan/ui-native";
+import { useUnreadCountQuery } from "@/hooks/messaging";
+import { useTranslation } from "react-i18next";
 
 const { colors } = theme;
 
@@ -36,7 +36,7 @@ export default function TabLayout() {
         },
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '600',
+          fontWeight: "600",
           marginTop: theme.spacing[0.5],
         },
         headerShown: false,
@@ -45,28 +45,36 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: t('nav.home'),
-          tabBarAccessibilityLabel: t('nav.home'),
+          title: t("nav.home"),
+          tabBarAccessibilityLabel: t("nav.home"),
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
+            <Ionicons
+              name={focused ? "home" : "home-outline"}
+              size={24}
+              color={color}
+            />
           ),
         }}
       />
       <Tabs.Screen
         name="search"
         options={{
-          title: t('common.search'),
-          tabBarAccessibilityLabel: t('common.search'),
+          title: t("common.search"),
+          tabBarAccessibilityLabel: t("common.search"),
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "search" : "search-outline"} size={24} color={color} />
+            <Ionicons
+              name={focused ? "search" : "search-outline"}
+              size={24}
+              color={color}
+            />
           ),
         }}
       />
       <Tabs.Screen
         name="sell"
         options={{
-          title: '',
-          tabBarAccessibilityLabel: t('mobile.tabBarSell'),
+          title: "",
+          tabBarAccessibilityLabel: t("mobile.tabBarSell"),
           tabBarIcon: () => (
             <View style={styles.sellButton}>
               <Ionicons name="add" size={28} color={colors.white} />
@@ -77,15 +85,19 @@ export default function TabLayout() {
       <Tabs.Screen
         name="messages/index"
         options={{
-          title: t('message.messages'),
-          tabBarAccessibilityLabel: t('message.messages'),
+          title: t("message.messages"),
+          tabBarAccessibilityLabel: t("message.messages"),
           tabBarIcon: ({ color, focused }) => (
             <View>
-              <Ionicons name={focused ? "chatbubbles" : "chatbubbles-outline"} size={24} color={color} />
+              <Ionicons
+                name={focused ? "chatbubbles" : "chatbubbles-outline"}
+                size={24}
+                color={color}
+              />
               {unreadCount > 0 && (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>
-                    {unreadCount > 99 ? '99+' : unreadCount}
+                    {unreadCount > 99 ? "99+" : unreadCount}
                   </Text>
                 </View>
               )}
@@ -96,10 +108,14 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: t('nav.profile'),
-          tabBarAccessibilityLabel: t('nav.profile'),
+          title: t("nav.profile"),
+          tabBarAccessibilityLabel: t("nav.profile"),
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "person" : "person-outline"} size={24} color={color} />
+            <Ionicons
+              name={focused ? "person" : "person-outline"}
+              size={24}
+              color={color}
+            />
           ),
         }}
       />
@@ -126,8 +142,8 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     backgroundColor: colors.primary[600]!,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     shadowColor: colors.primary[600]!,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
@@ -135,15 +151,15 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   badge: {
-    position: 'absolute',
+    position: "absolute",
     right: -10,
     top: -5,
     backgroundColor: colors.danger[600]!,
     borderRadius: 12,
     minWidth: 20,
     height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 5,
     borderWidth: 2,
     borderColor: colors.surface.DEFAULT,
@@ -151,6 +167,6 @@ const styles = StyleSheet.create({
   badgeText: {
     color: colors.white,
     fontSize: 10,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
 });

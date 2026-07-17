@@ -1,14 +1,28 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity, Image, RefreshControl } from 'react-native';
-import { FAB, Snackbar, Spinner, Text, theme, ScreenHeader } from '@tarodan/ui-native';
-import { router } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
-import { Ionicons } from '@expo/vector-icons';
-import { api } from '@/lib/api';
-import { qk } from '@/lib/query';
-import { useAuthStore } from '@/stores/authStore';
-import { useTranslation } from '@/i18n';
-import { resolveImageUrl } from '@/utils/imageUrl';
+import {
+  View,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  RefreshControl,
+} from "react-native";
+import {
+  FAB,
+  Snackbar,
+  Spinner,
+  Text,
+  theme,
+  ScreenHeader,
+} from "@tarodan/ui-native";
+import { router } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { api } from "@/lib/api";
+import { qk } from "@/lib/query";
+import { useAuthStore } from "@/stores/authStore";
+import { useTranslation } from "react-i18next";
+import { resolveImageUrl } from "@/utils/imageUrl";
 
 const { colors, radius } = theme;
 
@@ -17,19 +31,27 @@ export default function CollectionsScreen() {
   const { t } = useTranslation();
   const { limits, isAuthenticated } = useAuthStore();
   const [refreshing, setRefreshing] = useState(false);
-  const [snackbar, setSnackbar] = useState({ visible: false, message: '' });
+  const [snackbar, setSnackbar] = useState({ visible: false, message: "" });
 
   const canCreateCollections = limits?.canCreateCollections || false;
 
-  const { data: collectionsData, isLoading, refetch } = useQuery({
+  const {
+    data: collectionsData,
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: qk.collections.mine,
     queryFn: async () => {
       try {
-        const response = await api.get('/collections/me');
+        const response = await api.get("/collections/me");
         // API şekli: { collections, total, page, pageSize }
-        return response.data?.collections ?? response.data?.data ?? (Array.isArray(response.data) ? response.data : []);
+        return (
+          response.data?.collections ??
+          response.data?.data ??
+          (Array.isArray(response.data) ? response.data : [])
+        );
       } catch (error) {
-        console.log('Koleksiyonlar yüklenemedi');
+        console.log("Koleksiyonlar yüklenemedi");
         return [];
       }
     },
@@ -46,22 +68,34 @@ export default function CollectionsScreen() {
 
   const handleCreateCollection = () => {
     if (!canCreateCollections) {
-      setSnackbar({ visible: true, message: 'Koleksiyon oluşturmak için Premium üyelik gerekiyor' });
-      setTimeout(() => router.push('/upgrade'), 1500);
+      setSnackbar({
+        visible: true,
+        message: "Koleksiyon oluşturmak için Premium üyelik gerekiyor",
+      });
+      setTimeout(() => router.push("/upgrade"), 1500);
       return;
     }
-    router.push('/collections/new');
+    router.push("/collections/new");
   };
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title={t('mobile.settingsCollections')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
+      <ScreenHeader
+        title={t("mobile.settingsCollections")}
+        onBack={() =>
+          router.canGoBack() ? router.back() : router.replace("/(tabs)")
+        }
+      />
 
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary[600]!]} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[colors.primary[600]!]}
+          />
         }
       >
         {/* Info Banner */}
@@ -77,7 +111,10 @@ export default function CollectionsScreen() {
 
         {/* Premium Notice if not premium */}
         {!canCreateCollections && (
-          <TouchableOpacity style={styles.premiumNotice} onPress={() => router.push('/upgrade')}>
+          <TouchableOpacity
+            style={styles.premiumNotice}
+            onPress={() => router.push("/upgrade")}
+          >
             <Ionicons name="diamond" size={24} color={colors.warning[500]!} />
             <View style={styles.premiumNoticeText}>
               <Text style={styles.premiumNoticeTitle}>Premium Özellik</Text>
@@ -85,7 +122,11 @@ export default function CollectionsScreen() {
                 Koleksiyon oluşturma özelliği Premium üyelere özeldir.
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.text.muted} />
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={colors.text.muted}
+            />
           </TouchableOpacity>
         )}
 
@@ -104,19 +145,31 @@ export default function CollectionsScreen() {
                   onPress={() => router.push(`/collections/${collection.id}`)}
                 >
                   <Image
-                    source={{ uri: resolveImageUrl(collection.coverImageUrl ?? collection.coverImage) }}
+                    source={{
+                      uri: resolveImageUrl(
+                        collection.coverImageUrl ?? collection.coverImage,
+                      ),
+                    }}
                     style={styles.collectionImage}
                   />
                   <View style={styles.collectionOverlay}>
                     {!collection.isPublic && (
                       <View style={styles.privateBadge}>
-                        <Ionicons name="lock-closed" size={12} color={colors.white} />
+                        <Ionicons
+                          name="lock-closed"
+                          size={12}
+                          color={colors.white}
+                        />
                       </View>
                     )}
                   </View>
                   <View style={styles.collectionInfo}>
-                    <Text style={styles.collectionName} numberOfLines={1}>{collection.name}</Text>
-                    <Text style={styles.collectionMeta}>{collection.itemCount || 0} araç</Text>
+                    <Text style={styles.collectionName} numberOfLines={1}>
+                      {collection.name}
+                    </Text>
+                    <Text style={styles.collectionMeta}>
+                      {collection.itemCount || 0} araç
+                    </Text>
                   </View>
                 </TouchableOpacity>
               ))}
@@ -125,7 +178,11 @@ export default function CollectionsScreen() {
             {/* Empty State */}
             {collections.length === 0 && (
               <View style={styles.emptyState}>
-                <Ionicons name="albums-outline" size={64} color={colors.text.subtle} />
+                <Ionicons
+                  name="albums-outline"
+                  size={64}
+                  color={colors.text.subtle}
+                />
                 <Text style={styles.emptyTitle}>Henüz koleksiyon yok</Text>
                 <Text style={styles.emptyDesc}>
                   İlk koleksiyonunuzu oluşturmak için + butonuna tıklayın
@@ -169,10 +226,10 @@ const styles = StyleSheet.create({
   },
   infoBanner: {
     backgroundColor: colors.surface.DEFAULT,
-    borderRadius: theme.radius['3xl'],
+    borderRadius: theme.radius["3xl"],
     padding: theme.spacing[5],
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: theme.spacing[5],
     borderLeftWidth: 4,
     borderLeftColor: colors.primary[600]!,
@@ -183,7 +240,7 @@ const styles = StyleSheet.create({
   },
   infoBannerTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: colors.text.heading,
   },
   infoBannerDesc: {
@@ -192,16 +249,16 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing[1],
   },
   collectionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
   },
   collectionCard: {
-    width: '48%',
+    width: "48%",
     backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     marginBottom: theme.spacing[4],
-    overflow: 'hidden',
+    overflow: "hidden",
     elevation: 2,
     shadowColor: colors.black,
     shadowOffset: { width: 0, height: 2 },
@@ -209,12 +266,12 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   collectionImage: {
-    width: '100%',
+    width: "100%",
     height: 120,
     backgroundColor: colors.surface.alt,
   },
   collectionOverlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 8,
     right: 8,
   },
@@ -228,7 +285,7 @@ const styles = StyleSheet.create({
   },
   collectionName: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     color: colors.text.heading,
   },
   collectionMeta: {
@@ -237,19 +294,19 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing[1],
   },
   fab: {
-    position: 'absolute',
+    position: "absolute",
     right: 16,
     bottom: 24,
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingVertical: 60,
   },
   premiumNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: colors.surface.DEFAULT,
     borderRadius: 12,
     padding: theme.spacing[4],
@@ -263,7 +320,7 @@ const styles = StyleSheet.create({
   },
   premiumNoticeTitle: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: "600",
     color: colors.text.heading,
   },
   premiumNoticeDesc: {
@@ -272,13 +329,13 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing[0.5],
   },
   emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 60,
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     color: colors.text.heading,
     marginTop: theme.spacing[4],
   },
@@ -286,6 +343,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.text.muted,
     marginTop: theme.spacing[2],
-    textAlign: 'center',
+    textAlign: "center",
   },
 });

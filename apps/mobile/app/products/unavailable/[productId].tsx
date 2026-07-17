@@ -1,12 +1,15 @@
-import React from 'react';
-import { View, ScrollView, StyleSheet, FlatList } from 'react-native';
-import { Stack, useLocalSearchParams, router } from 'expo-router';
-import { Button, Spinner, Text, theme, ScreenHeader } from '@tarodan/ui-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
-import { ProductCard, type ProductCardProduct } from '@/components/product/ProductCard';
-import { productsApi } from '@/lib/api';
-import { useTranslation } from '@/i18n';
+import React from "react";
+import { View, ScrollView, StyleSheet, FlatList } from "react-native";
+import { Stack, useLocalSearchParams, router } from "expo-router";
+import { Button, Spinner, Text, theme, ScreenHeader } from "@tarodan/ui-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
+import {
+  ProductCard,
+  type ProductCardProduct,
+} from "@/components/product/ProductCard";
+import { productsApi } from "@/lib/api";
+import { useTranslation } from "react-i18next";
 
 const { colors } = theme;
 
@@ -19,10 +22,10 @@ interface Product extends ProductCardProduct {
 export default function ProductUnavailableScreen() {
   const { t } = useTranslation();
   const { productId } = useLocalSearchParams<{ productId: string }>();
-  const id = String(productId ?? '');
+  const id = String(productId ?? "");
 
   const productQuery = useQuery({
-    queryKey: ['product-unavailable', id],
+    queryKey: ["product-unavailable", id],
     queryFn: async () => {
       try {
         const res = await productsApi.getOne(id);
@@ -35,7 +38,7 @@ export default function ProductUnavailableScreen() {
   });
 
   const similarQuery = useQuery({
-    queryKey: ['product-unavailable-similar', id],
+    queryKey: ["product-unavailable-similar", id],
     queryFn: async () => {
       try {
         const res = await productsApi.getSimilar(id, 12);
@@ -53,14 +56,16 @@ export default function ProductUnavailableScreen() {
   const loading = productQuery.isLoading || similarQuery.isLoading;
 
   const isBackInStock =
-    !!product && product.status === 'active' && (product.quantity ?? 0) > 0;
+    !!product && product.status === "active" && (product.quantity ?? 0) > 0;
 
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
       <ScreenHeader
-        title={t('stockout.page.screenTitle')}
-        onBack={() => (router.canGoBack() ? router.back() : router.replace('/' as any))}
+        title={t("stockout.page.screenTitle")}
+        onBack={() =>
+          router.canGoBack() ? router.back() : router.replace("/" as any)
+        }
       />
 
       {loading ? (
@@ -68,24 +73,29 @@ export default function ProductUnavailableScreen() {
           <Spinner size="lg" />
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
           {/* Hero */}
           <View style={styles.hero}>
             {isBackInStock ? (
               <>
                 <Text style={styles.heroEmoji}>🎉</Text>
-                <Text testID="unavailable-hero-title" style={styles.heroTitle}>{t('stockout.page.titleBack')}</Text>
+                <Text testID="unavailable-hero-title" style={styles.heroTitle}>
+                  {t("stockout.page.titleBack")}
+                </Text>
                 <Text style={styles.heroBody}>
                   {product?.title
-                    ? t('stockout.page.bodyBack', { title: product.title })
-                    : t('stockout.page.bodyBackFallback')}
+                    ? t("stockout.page.bodyBack", { title: product.title })
+                    : t("stockout.page.bodyBackFallback")}
                 </Text>
                 <Button
                   variant="primary"
                   style={styles.heroBtn}
                   onPress={() => router.push(`/product/${id}` as any)}
                 >
-                  {t('stockout.page.viewProduct')}
+                  {t("stockout.page.viewProduct")}
                 </Button>
               </>
             ) : (
@@ -96,11 +106,13 @@ export default function ProductUnavailableScreen() {
                   color={colors.danger[600]!}
                   style={{ marginBottom: theme.spacing[2] }}
                 />
-                <Text testID="unavailable-hero-title" style={styles.heroTitle}>{t('stockout.page.title')}</Text>
+                <Text testID="unavailable-hero-title" style={styles.heroTitle}>
+                  {t("stockout.page.title")}
+                </Text>
                 <Text style={styles.heroBody}>
                   {product?.title
-                    ? t('stockout.page.bodyOut', { title: product.title })
-                    : t('stockout.page.bodyOutFallback')}
+                    ? t("stockout.page.bodyOut", { title: product.title })
+                    : t("stockout.page.bodyOutFallback")}
                 </Text>
                 {product?.category?.slug ? (
                   <Button
@@ -111,8 +123,10 @@ export default function ProductUnavailableScreen() {
                     }
                   >
                     {product.category.name
-                      ? t('stockout.page.allCategory', { category: product.category.name })
-                      : t('stockout.page.allCategoryFallback')}
+                      ? t("stockout.page.allCategory", {
+                          category: product.category.name,
+                        })
+                      : t("stockout.page.allCategoryFallback")}
                   </Button>
                 ) : null}
               </>
@@ -120,11 +134,9 @@ export default function ProductUnavailableScreen() {
           </View>
 
           {/* Similar products */}
-          <Text style={styles.sectionTitle}>{t('stockout.page.similar')}</Text>
+          <Text style={styles.sectionTitle}>{t("stockout.page.similar")}</Text>
           {similar.length === 0 ? (
-            <Text style={styles.emptyText}>
-              {t('stockout.page.empty')}
-            </Text>
+            <Text style={styles.emptyText}>{t("stockout.page.empty")}</Text>
           ) : (
             <FlatList
               data={similar}
@@ -153,8 +165,8 @@ const styles = StyleSheet.create({
   },
   loading: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   content: {
     padding: theme.spacing[4],
@@ -162,9 +174,9 @@ const styles = StyleSheet.create({
   },
   hero: {
     backgroundColor: colors.white,
-    borderRadius: theme.radius['3xl'],
+    borderRadius: theme.radius["3xl"],
     padding: theme.spacing[6],
-    alignItems: 'center',
+    alignItems: "center",
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border.DEFAULT,
     marginBottom: theme.spacing[6],
@@ -175,25 +187,25 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     fontSize: 22,
-    fontWeight: '700',
+    fontWeight: "700",
     color: colors.text.heading,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: theme.spacing[2],
   },
   heroBody: {
     fontSize: 14,
     color: colors.text.muted,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 20,
   },
   heroBtn: {
     marginTop: theme.spacing[4],
-    borderRadius: theme.radius['2xl'],
-    alignSelf: 'stretch',
+    borderRadius: theme.radius["2xl"],
+    alignSelf: "stretch",
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     color: colors.text.heading,
     marginBottom: theme.spacing[3],
   },

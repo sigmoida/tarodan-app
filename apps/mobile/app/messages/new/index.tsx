@@ -1,9 +1,9 @@
-import { View, KeyboardAvoidingView, Platform } from 'react-native';
-import { Button, ScreenHeader } from '@tarodan/ui-native';
-import { useTranslation } from '@/i18n';
-import { useNewMessage } from './_hooks/useNewMessage';
-import { styles } from './_lib/styles';
-import { NewMessageBody } from './_components/NewMessageBody';
+import { View, KeyboardAvoidingView, Platform } from "react-native";
+import { Button, ScreenHeader } from "@tarodan/ui-native";
+import { useTranslation } from "react-i18next";
+import { useNewMessage } from "./_hooks/useNewMessage";
+import { styles } from "./_lib/styles";
+import { NewMessageBody } from "./_components/NewMessageBody";
 
 export default function NewMessageScreen() {
   const { t } = useTranslation();
@@ -12,9 +12,9 @@ export default function NewMessageScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <ScreenHeader title={t('mobile.messagesNew')} onBack={f.handleBack} />
+      <ScreenHeader title={t("mobile.messagesNew")} onBack={f.handleBack} />
 
       <NewMessageBody f={f} />
 
@@ -26,7 +26,9 @@ export default function NewMessageScreen() {
           size="lg"
           title="Gönder"
           onPress={f.handleSend}
-          disabled={!f.selectedUser || !f.messageText.trim() || !f.canSend || f.sending}
+          disabled={
+            !f.selectedUser || !f.messageText.trim() || !f.canSend || f.sending
+          }
           isLoading={f.sending}
           style={styles.sendButton}
         />

@@ -1,12 +1,12 @@
-import { useState, useCallback } from 'react';
-import { router, useFocusEffect } from 'expo-router';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { theme, appAlert } from '@tarodan/ui-native';
-import { productsApi } from '@/lib/api';
-import { qk } from '@/lib/query';
-import { useAuthStore } from '@/stores/authStore';
-import { useTranslation } from '@/i18n';
-import type { Listing, FilterType } from '../_lib/types';
+import { useState, useCallback } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { theme, appAlert } from "@tarodan/ui-native";
+import { productsApi } from "@/lib/api";
+import { qk } from "@/lib/query";
+import { useAuthStore } from "@/stores/authStore";
+import { useTranslation } from "react-i18next";
+import type { Listing, FilterType } from "../_lib/types";
 
 const { colors } = theme;
 
@@ -19,22 +19,30 @@ export function useMyListings() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { user, limits, refreshUserData } = useAuthStore();
-  const [filter, setFilter] = useState<FilterType>('all');
+  const [filter, setFilter] = useState<FilterType>("all");
   const [refreshing, setRefreshing] = useState(false);
-  const [actionMenuListing, setActionMenuListing] = useState<Listing | null>(null);
+  const [actionMenuListing, setActionMenuListing] = useState<Listing | null>(
+    null,
+  );
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   const [boostListing, setBoostListing] = useState<Listing | null>(null);
   const isPremiumUser = Boolean(
     (user as any)?.isPremium ||
-      ((user as any)?.membership_type && (user as any)?.membership_type !== 'free'),
+    ((user as any)?.membership_type &&
+      (user as any)?.membership_type !== "free"),
   );
 
-  const { data: listingsData, isLoading, isError, refetch } = useQuery({
+  const {
+    data: listingsData,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: qk.products.myListings(filter),
     queryFn: async () => {
       const params: any = { limit: 100 };
-      if (filter !== 'all') {
+      if (filter !== "all") {
         params.status = filter;
       }
       const response = await productsApi.getMyListings(params);
@@ -71,34 +79,37 @@ export function useMyListings() {
   // Deactivate listing mutation - Web ile aynı: PATCH /products/:id
   const deactivateMutation = useMutation({
     mutationFn: async (listingId: string) => {
-      return productsApi.update(listingId, { status: 'inactive' });
+      return productsApi.update(listingId, { status: "inactive" });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.products.myListingsAll });
       queryClient.invalidateQueries({ queryKey: qk.products.myListingsStats });
       queryClient.invalidateQueries({ queryKey: qk.user.statsAll });
       refreshUserData();
-      appAlert('Başarılı', 'İlan deaktif edildi');
+      appAlert("Başarılı", "İlan deaktif edildi");
     },
     onError: () => {
-      appAlert('Hata', 'İlan deaktif edilemedi');
+      appAlert("Hata", "İlan deaktif edilemedi");
     },
   });
 
   // Reactivate listing mutation - Web ile aynı: PATCH /products/:id
   const reactivateMutation = useMutation({
     mutationFn: async (listingId: string) => {
-      return productsApi.update(listingId, { status: 'active' });
+      return productsApi.update(listingId, { status: "active" });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.products.myListingsAll });
       queryClient.invalidateQueries({ queryKey: qk.products.myListingsStats });
       queryClient.invalidateQueries({ queryKey: qk.user.statsAll });
       refreshUserData();
-      appAlert('Başarılı', 'İlan incelemeye gönderildi. Onaylandığında yeniden yayına girer.');
+      appAlert(
+        "Başarılı",
+        "İlan incelemeye gönderildi. Onaylandığında yeniden yayına girer.",
+      );
     },
     onError: () => {
-      appAlert('Hata', 'İlan aktif edilemedi');
+      appAlert("Hata", "İlan aktif edilemedi");
     },
   });
 
@@ -114,27 +125,33 @@ export function useMyListings() {
       refreshUserData();
       setDeleteDialogVisible(false);
       setSelectedListing(null);
-      appAlert('Başarılı', 'İlan silindi');
+      appAlert("Başarılı", "İlan silindi");
     },
     onError: () => {
-      appAlert('Hata', 'İlan silinemedi');
+      appAlert("Hata", "İlan silinemedi");
     },
   });
 
   // Relist expired listing - Web ile aynı: POST /products/:id/relist
   const relistMutation = useMutation({
     mutationFn: async (listingId: string) => {
-      return productsApi.update(listingId, { status: 'active', relist: true });
+      return productsApi.update(listingId, { status: "active", relist: true });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.products.myListingsAll });
       queryClient.invalidateQueries({ queryKey: qk.products.myListingsStats });
       queryClient.invalidateQueries({ queryKey: qk.user.statsAll });
       refreshUserData();
-      appAlert('Başarılı', 'İlan incelemeye gönderildi. Onaylandığında yeniden yayına girer.');
+      appAlert(
+        "Başarılı",
+        "İlan incelemeye gönderildi. Onaylandığında yeniden yayına girer.",
+      );
     },
     onError: () => {
-      appAlert('Hata', 'İlan yeniden yayınlanamadı. İlan limitinizi kontrol edin.');
+      appAlert(
+        "Hata",
+        "İlan yeniden yayınlanamadı. İlan limitinizi kontrol edin.",
+      );
     },
   });
 
@@ -144,7 +161,7 @@ export function useMyListings() {
       refetch();
       queryClient.invalidateQueries({ queryKey: qk.products.myListingsStats });
       refreshUserData();
-    }, [])
+    }, []),
   );
 
   const onRefresh = async () => {
@@ -155,8 +172,8 @@ export function useMyListings() {
     setRefreshing(false);
   };
 
-  const filteredListings = listings.filter(listing => {
-    if (filter === 'all') return true;
+  const filteredListings = listings.filter((listing) => {
+    if (filter === "all") return true;
     return listing.status === filter;
   });
 
@@ -164,44 +181,47 @@ export function useMyListings() {
     setActionMenuListing(null);
 
     switch (action) {
-      case 'edit':
+      case "edit":
         router.push(`/listing/${listing.id}/edit`);
         break;
-      case 'view':
+      case "view":
         router.push(`/product/${listing.id}`);
         break;
-      case 'deactivate':
+      case "deactivate":
         appAlert(
-          'İlanı Deaktif Et',
-          'Bu ilan pasif hale getirilecek. Devam etmek istiyor musunuz?',
+          "İlanı Deaktif Et",
+          "Bu ilan pasif hale getirilecek. Devam etmek istiyor musunuz?",
           [
-            { text: 'İptal', style: 'cancel' },
-            { text: 'Deaktif Et', onPress: () => deactivateMutation.mutate(listing.id) },
-          ]
+            { text: "İptal", style: "cancel" },
+            {
+              text: "Deaktif Et",
+              onPress: () => deactivateMutation.mutate(listing.id),
+            },
+          ],
         );
         break;
-      case 'activate':
+      case "activate":
         reactivateMutation.mutate(listing.id);
         break;
-      case 'boost':
+      case "boost":
         setBoostListing(listing);
         break;
-      case 'relist':
+      case "relist":
         // Check listing limit before relisting — sunucu kotası (aktif sayım) baz alınır.
         if (quotaSummary?.canCreate === false) {
           appAlert(
-            'İlan Limiti',
-            'İlan limitinize ulaştınız. Yeniden yayınlamak için Premium üyeliğe geçin.',
+            "İlan Limiti",
+            "İlan limitinize ulaştınız. Yeniden yayınlamak için Premium üyeliğe geçin.",
             [
-              { text: 'İptal', style: 'cancel' },
-              { text: 'Premium\'a Geç', onPress: () => router.push('/upgrade') },
-            ]
+              { text: "İptal", style: "cancel" },
+              { text: "Premium'a Geç", onPress: () => router.push("/upgrade") },
+            ],
           );
           return;
         }
         relistMutation.mutate(listing.id);
         break;
-      case 'delete':
+      case "delete":
         setSelectedListing(listing);
         setDeleteDialogVisible(true);
         break;
@@ -211,8 +231,15 @@ export function useMyListings() {
   const listingLimit = quotaSummary?.max ?? (limits?.maxListings || 10);
   const currentCount =
     quotaSummary?.used ??
-    listings.filter((l) => l.status === 'active' || l.status === 'pending' || l.status === 'reserved').length;
-  const canCreateNew = quotaSummary?.canCreate ?? (listingLimit === -1 || currentCount < listingLimit);
+    listings.filter(
+      (l) =>
+        l.status === "active" ||
+        l.status === "pending" ||
+        l.status === "reserved",
+    ).length;
+  const canCreateNew =
+    quotaSummary?.canCreate ??
+    (listingLimit === -1 || currentCount < listingLimit);
 
   const progressColor =
     listingLimit === -1
