@@ -31,14 +31,14 @@ JS — ships as an OTA update.
 
 `eas.json` build profiles → update channels:
 
-| Build profile | `channel`   | Feeds |
-|---------------|-------------|-------|
-| `preview`     | `staging`   | internal staging testers (staging-api) |
-| `production`  | `production`| TestFlight / Play production |
-| `development` | (none)      | dev-client loads from local Metro |
+| Build profile | `channel`    | Feeds                                  |
+| ------------- | ------------ | -------------------------------------- |
+| `preview`     | `staging`    | internal staging testers (staging-api) |
+| `production`  | `production` | TestFlight / Play production           |
+| `development` | (none)       | dev-client loads from local Metro      |
 
 **`runtimeVersion: appVersion`** ties every OTA to the build's `expo.version`.
-An update published for `1.2.0` is delivered *only* to binaries built as `1.2.0`
+An update published for `1.2.0` is delivered _only_ to binaries built as `1.2.0`
 — it can never land on an incompatible native build. When a native change ships,
 bump `expo.version` (that's also the release tag for `mobile-testflight.yml`,
 #228); old binaries stop receiving new JS and, if they fall below the API's
