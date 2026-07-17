@@ -170,4 +170,10 @@ export const qk = {
     business: ['featured-business'] as const,
     collector: ['featured-collector'] as const,
   },
+
+  appConfig: {
+    all: ['app-config'] as const,
+    check: (platform: string, version: string) =>
+      ['app-config', platform, version] as const,
+  },
 } as const;

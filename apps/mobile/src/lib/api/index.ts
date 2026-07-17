@@ -14,6 +14,7 @@ import { pagesApi, supportApi } from './catalog';
 import { mediaApi, uploadApi } from './media';
 
 export * from './client';
+export * from './app-config';
 export * from './auth';
 export * from './products';
 export * from './catalog';
