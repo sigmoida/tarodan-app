@@ -15,7 +15,7 @@ import {
 } from "../product/helpers/product-status.helper";
 import { safeDecrementReserved } from "../product/helpers/product-availability.helper";
 import { CacheService } from "../cache/cache.service";
-import { PayTRService } from "../payment-providers/paytr.service";
+import { PaymentProviderRegistry } from "../payment-providers/payment-provider.registry";
 import { InvoiceService } from "../invoice/invoice.service";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto/notification.dto";
@@ -63,7 +63,7 @@ export class PaymentReconciliationService {
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
     private readonly configService: ConfigService,
-    private readonly paytrService: PayTRService,
+    private readonly paymentProviders: PaymentProviderRegistry,
     private readonly invoiceService: InvoiceService,
     private readonly notificationService: NotificationService,
     private readonly commissionLedger: CommissionLedgerService,
@@ -136,7 +136,7 @@ export class PaymentReconciliationService {
     mandate?: { ip?: string; termsVersion?: string },
   ): Promise<number> {
     if (!utoken) return 0;
-    const cards = await this.paytrService.capiListCards(utoken);
+    const cards = await this.paymentProviders.resolve().capiListCards(utoken);
     let saved = 0;
     for (const c of cards) {
       if (!c.ctoken) continue;
@@ -817,7 +817,9 @@ export class PaymentReconciliationService {
       checked++;
       const oid = row.providerConversationId as string;
       try {
-        const inquiry = await this.paytrService.queryPaymentStatus(oid);
+        const inquiry = await this.paymentProviders
+          .resolve()
+          .queryPaymentStatus(oid);
         if (!inquiry.ok) {
           continue;
         }

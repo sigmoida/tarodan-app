@@ -12,7 +12,7 @@ import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
-import { PayTRService } from "../payment-providers/paytr.service";
+import { PaymentProviderRegistry } from "../payment-providers/payment-provider.registry";
 import { EventService } from "../events";
 import { InvoiceService } from "../invoice/invoice.service";
 import { ElogoInvoicingService } from "../elogo";
@@ -88,7 +88,10 @@ describe("PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
           provide: ConfigService,
           useValue: { get: jest.fn().mockReturnValue(undefined) },
         },
-        { provide: PayTRService, useValue: mockPaytr },
+        {
+          provide: PaymentProviderRegistry,
+          useValue: { resolve: () => mockPaytr },
+        },
         { provide: EventService, useValue: noop },
         { provide: InvoiceService, useValue: noop },
         { provide: ProductLockService, useValue: noop },

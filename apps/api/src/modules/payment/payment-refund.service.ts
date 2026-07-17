@@ -15,7 +15,7 @@ import {
   RefundRequestStatus,
 } from "@prisma/client";
 import { getProductStatusFromQuantity } from "../product/helpers/product-status.helper";
-import { PayTRService } from "../payment-providers/paytr.service";
+import { PaymentProviderRegistry } from "../payment-providers/payment-provider.registry";
 import { PaymentProvider } from "./dto";
 import { EventService } from "../events";
 import { NotificationService } from "../notification/notification.service";
@@ -46,7 +46,7 @@ export class PaymentRefundService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
-    private readonly paytrService: PayTRService,
+    private readonly paymentProviders: PaymentProviderRegistry,
     private readonly eventService: EventService,
     private readonly notificationService: NotificationService,
     private readonly commissionLedger: CommissionLedgerService,
@@ -250,10 +250,9 @@ export class PaymentRefundService {
               payment.providerConversationId?.trim() ||
               orderId.replace(/-/g, "");
             try {
-              refundResult = await this.paytrService.createRefund(
-                paytrOid,
-                amountToRefund,
-              );
+              refundResult = await this.paymentProviders
+                .resolve(payment.provider)
+                .createRefund(paytrOid, amountToRefund);
             } catch (err) {
               // PayTR KESİN başarısız (throw) → marker'ı geri al ki kullanıcı/cron tekrar
               // denediğinde PayTR yeniden çağrılsın (yoksa iade edilmeden refunded işaretlenir;
@@ -761,7 +760,9 @@ export class PaymentRefundService {
         );
       }
       try {
-        const refundResult = await this.paytrService.createRefund(oid, amount);
+        const refundResult = await this.paymentProviders
+          .resolve(payment.provider)
+          .createRefund(oid, amount);
         if (refundResult.status !== "success") {
           throw new BadRequestException(
             refundResult.err_msg ||

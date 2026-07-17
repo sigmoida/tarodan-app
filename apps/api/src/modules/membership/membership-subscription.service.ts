@@ -20,7 +20,7 @@ import { PaymentService } from "../payment/payment.service";
 import { PaymentProvider } from "../payment/dto";
 import { Request } from "express";
 import { MembershipPaymentInitResponseDto } from "./dto/membership-payment.dto";
-import { PayTRService } from "../payment-providers/paytr.service";
+import { PaymentProviderRegistry } from "../payment-providers/payment-provider.registry";
 import { ConfigService } from "@nestjs/config";
 import { MembershipCommonService } from "./membership-common.service";
 import { isPremiumEntitled } from "./membership.util";
@@ -39,7 +39,7 @@ export class MembershipSubscriptionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly paymentService: PaymentService,
-    private readonly paytr: PayTRService,
+    private readonly paymentProviders: PaymentProviderRegistry,
     private readonly configService: ConfigService,
     private readonly common: MembershipCommonService,
   ) {}
@@ -636,7 +636,7 @@ export class MembershipSubscriptionService {
           },
         ];
 
-        const result = await this.paytr.chargeRecurring({
+        const result = await this.paymentProviders.resolve().chargeRecurring({
           utoken: card.utoken,
           ctoken: card.ctoken,
           amount: price,
@@ -793,7 +793,9 @@ export class MembershipSubscriptionService {
     }
     let providerDeleted = false;
     try {
-      const res = await this.paytr.capiDeleteCard(card.utoken, card.ctoken);
+      const res = await this.paymentProviders
+        .resolve()
+        .capiDeleteCard(card.utoken, card.ctoken);
       providerDeleted = res.status === "success";
       if (!providerDeleted) {
         this.logger.warn(

@@ -7,6 +7,8 @@ import {
 import { ConfigService } from "@nestjs/config";
 import * as crypto from "crypto";
 import { i18nMessage } from "../i18n";
+import type { IPaymentProvider } from "./payment-provider.interface";
+import { PAYMENT_PROVIDER_PAYTR } from "./payment-provider.interface";
 
 // =============================================================================
 // PAYTR API TYPES
@@ -113,7 +115,9 @@ export function parsePaytrTestMode(raw: string | undefined): boolean {
 // =============================================================================
 
 @Injectable()
-export class PayTRService {
+export class PayTRService implements IPaymentProvider {
+  /** #89: provider key used by PaymentProviderRegistry (matches Payment.provider). */
+  readonly key = PAYMENT_PROVIDER_PAYTR;
   private readonly logger = new Logger(PayTRService.name);
   private readonly merchantId: string;
   private readonly merchantKey: string;

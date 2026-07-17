@@ -1,24 +1,24 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigService } from '@nestjs/config';
-import { PaymentService } from './payment.service';
-import { PaymentSchedulerService } from './payment-scheduler.service';
-import { PrismaService } from '../../prisma';
-import { CacheService } from '../cache/cache.service';
-import { PayTRService } from '../payment-providers/paytr.service';
-import { EventService } from '../events';
-import { InvoiceService } from '../invoice/invoice.service';
-import { ElogoInvoicingService } from '../elogo';
-import { OrderStatus, PaymentStatus } from '@prisma/client';
+import { Test, TestingModule } from "@nestjs/testing";
+import { ConfigService } from "@nestjs/config";
+import { PaymentService } from "./payment.service";
+import { PaymentSchedulerService } from "./payment-scheduler.service";
+import { PrismaService } from "../../prisma";
+import { CacheService } from "../cache/cache.service";
+import { PaymentProviderRegistry } from "../payment-providers/payment-provider.registry";
+import { EventService } from "../events";
+import { InvoiceService } from "../invoice/invoice.service";
+import { ElogoInvoicingService } from "../elogo";
+import { OrderStatus, PaymentStatus } from "@prisma/client";
 
 // TODO: stale unit test — PaymentService dependencies/types drifted; covered by E2E money-flow suite
-describe.skip('PaymentService reconcilePendingPaytrPayments (1.4)', () => {
+describe.skip("PaymentService reconcilePendingPaytrPayments (1.4)", () => {
   let service: PaymentService;
 
   const mockConfigGet = jest.fn((key: string): string | undefined => {
-    if (key === 'PAYTR_RECONCILIATION_ENABLED') return undefined;
-    if (key === 'PAYTR_RECONCILIATION_MIN_AGE_MINUTES') return '1';
-    if (key === 'PAYTR_RECONCILIATION_BATCH_LIMIT') return '40';
-    if (key === 'PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL') return '0.05';
+    if (key === "PAYTR_RECONCILIATION_ENABLED") return undefined;
+    if (key === "PAYTR_RECONCILIATION_MIN_AGE_MINUTES") return "1";
+    if (key === "PAYTR_RECONCILIATION_BATCH_LIMIT") return "40";
+    if (key === "PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL") return "0.05";
     return undefined;
   });
 
@@ -39,11 +39,29 @@ describe.skip('PaymentService reconcilePendingPaytrPayments (1.4)', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PaymentService,
-        { provide: ElogoInvoicingService, useValue: { issueCommissionInvoice: jest.fn().mockResolvedValue(undefined), issueServiceFeeInvoice: jest.fn().mockResolvedValue(undefined), issueMembershipInvoice: jest.fn().mockResolvedValue(undefined), issueBoostInvoice: jest.fn().mockResolvedValue(undefined), handleOrderRefund: jest.fn().mockResolvedValue(undefined), issuePlatformSaleInvoice: jest.fn().mockResolvedValue(undefined), handleTradeCashRefund: jest.fn().mockResolvedValue(undefined), issueTradeCashCommissionInvoice: jest.fn().mockResolvedValue(undefined), retryPendingInvoices: jest.fn().mockResolvedValue(undefined) } },
+        {
+          provide: ElogoInvoicingService,
+          useValue: {
+            issueCommissionInvoice: jest.fn().mockResolvedValue(undefined),
+            issueServiceFeeInvoice: jest.fn().mockResolvedValue(undefined),
+            issueMembershipInvoice: jest.fn().mockResolvedValue(undefined),
+            issueBoostInvoice: jest.fn().mockResolvedValue(undefined),
+            handleOrderRefund: jest.fn().mockResolvedValue(undefined),
+            issuePlatformSaleInvoice: jest.fn().mockResolvedValue(undefined),
+            handleTradeCashRefund: jest.fn().mockResolvedValue(undefined),
+            issueTradeCashCommissionInvoice: jest
+              .fn()
+              .mockResolvedValue(undefined),
+            retryPendingInvoices: jest.fn().mockResolvedValue(undefined),
+          },
+        },
         { provide: PrismaService, useValue: mockPrisma },
         { provide: CacheService, useValue: { del: jest.fn() } },
         { provide: ConfigService, useValue: { get: mockConfigGet } },
-        { provide: PayTRService, useValue: mockPaytr },
+        {
+          provide: PaymentProviderRegistry,
+          useValue: { resolve: () => mockPaytr },
+        },
         { provide: EventService, useValue: {} },
         { provide: InvoiceService, useValue: {} },
       ],
@@ -52,9 +70,9 @@ describe.skip('PaymentService reconcilePendingPaytrPayments (1.4)', () => {
     service = module.get(PaymentService);
   });
 
-  it('returns zeros when PAYTR_RECONCILIATION_ENABLED is false', async () => {
+  it("returns zeros when PAYTR_RECONCILIATION_ENABLED is false", async () => {
     mockConfigGet.mockImplementation((key: string): string | undefined => {
-      if (key === 'PAYTR_RECONCILIATION_ENABLED') return 'false';
+      if (key === "PAYTR_RECONCILIATION_ENABLED") return "false";
       return undefined;
     });
 
@@ -64,22 +82,26 @@ describe.skip('PaymentService reconcilePendingPaytrPayments (1.4)', () => {
     expect(mockPrisma.payment.findMany).not.toHaveBeenCalled();
 
     mockConfigGet.mockImplementation((key: string): string | undefined => {
-      if (key === 'PAYTR_RECONCILIATION_ENABLED') return undefined;
-      if (key === 'PAYTR_RECONCILIATION_MIN_AGE_MINUTES') return '1';
-      if (key === 'PAYTR_RECONCILIATION_BATCH_LIMIT') return '40';
-      if (key === 'PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL') return '0.05';
+      if (key === "PAYTR_RECONCILIATION_ENABLED") return undefined;
+      if (key === "PAYTR_RECONCILIATION_MIN_AGE_MINUTES") return "1";
+      if (key === "PAYTR_RECONCILIATION_BATCH_LIMIT") return "40";
+      if (key === "PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL") return "0.05";
       return undefined;
     });
   });
 
-  it('calls processSuccessfulPayment when PayTR reports success and amount matches', async () => {
+  it("calls processSuccessfulPayment when PayTR reports success and amount matches", async () => {
     const oldCreated = new Date(Date.now() - 120_000);
     mockPrisma.payment.findMany.mockResolvedValue([
       {
-        id: 'pay-1',
+        id: "pay-1",
         amount: 100,
-        providerConversationId: 'T100',
-        order: { id: 'o1', status: OrderStatus.pending_payment, totalAmount: 100 },
+        providerConversationId: "T100",
+        order: {
+          id: "o1",
+          status: OrderStatus.pending_payment,
+          totalAmount: 100,
+        },
         createdAt: oldCreated,
       },
     ]);
@@ -88,17 +110,17 @@ describe.skip('PaymentService reconcilePendingPaytrPayments (1.4)', () => {
       ok: true,
       paymentTotalTl: 100,
       paymentAmountTl: 100,
-      currency: 'TL',
-      paymentDate: '2024-01-01 12:00:00',
+      currency: "TL",
+      paymentDate: "2024-01-01 12:00:00",
     });
 
     mockPrisma.payment.findUnique.mockResolvedValue({
-      id: 'pay-1',
+      id: "pay-1",
       status: PaymentStatus.pending,
-      providerConversationId: 'T100',
+      providerConversationId: "T100",
       amount: 100,
       order: {
-        id: 'o1',
+        id: "o1",
         status: OrderStatus.pending_payment,
         buyer: {},
         seller: {},
@@ -107,26 +129,28 @@ describe.skip('PaymentService reconcilePendingPaytrPayments (1.4)', () => {
       tradeCashPayment: null,
     });
 
-    const processSpy = jest.spyOn(service as any, 'processSuccessfulPayment').mockResolvedValue(true);
+    const processSpy = jest
+      .spyOn(service as any, "processSuccessfulPayment")
+      .mockResolvedValue(true);
 
     const result = await service.reconcilePendingPaytrPayments();
 
     expect(result).toEqual({ checked: 1, completed: 1 });
-    expect(mockPaytr.queryPaymentStatus).toHaveBeenCalledWith('T100');
+    expect(mockPaytr.queryPaymentStatus).toHaveBeenCalledWith("T100");
     expect(processSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'pay-1' }),
-      'paytr:T100:2024-01-01 12:00:00',
+      expect.objectContaining({ id: "pay-1" }),
+      "paytr:T100:2024-01-01 12:00:00",
     );
   });
 
-  it('does not complete when amount mismatches', async () => {
+  it("does not complete when amount mismatches", async () => {
     const oldCreated = new Date(Date.now() - 120_000);
     mockPrisma.payment.findMany.mockResolvedValue([
       {
-        id: 'pay-2',
+        id: "pay-2",
         amount: 100,
-        providerConversationId: 'T200',
-        order: { id: 'o2', status: OrderStatus.pending_payment },
+        providerConversationId: "T200",
+        order: { id: "o2", status: OrderStatus.pending_payment },
         createdAt: oldCreated,
       },
     ]);
@@ -134,10 +158,12 @@ describe.skip('PaymentService reconcilePendingPaytrPayments (1.4)', () => {
       ok: true,
       paymentTotalTl: 50,
       paymentAmountTl: 50,
-      currency: 'TL',
+      currency: "TL",
     });
 
-    const processSpy = jest.spyOn(service as any, 'processSuccessfulPayment').mockResolvedValue(true);
+    const processSpy = jest
+      .spyOn(service as any, "processSuccessfulPayment")
+      .mockResolvedValue(true);
 
     const result = await service.reconcilePendingPaytrPayments();
 
@@ -145,14 +171,14 @@ describe.skip('PaymentService reconcilePendingPaytrPayments (1.4)', () => {
     expect(processSpy).not.toHaveBeenCalled();
   });
 
-  it('does not increment completed when processSuccessfulPayment returns false (race)', async () => {
+  it("does not increment completed when processSuccessfulPayment returns false (race)", async () => {
     const oldCreated = new Date(Date.now() - 120_000);
     mockPrisma.payment.findMany.mockResolvedValue([
       {
-        id: 'pay-3',
+        id: "pay-3",
         amount: 80,
-        providerConversationId: 'T80',
-        order: { id: 'o3', status: OrderStatus.pending_payment },
+        providerConversationId: "T80",
+        order: { id: "o3", status: OrderStatus.pending_payment },
         createdAt: oldCreated,
       },
     ]);
@@ -160,15 +186,22 @@ describe.skip('PaymentService reconcilePendingPaytrPayments (1.4)', () => {
       ok: true,
       paymentTotalTl: 80,
       paymentAmountTl: 80,
-      currency: 'TL',
+      currency: "TL",
     });
     mockPrisma.payment.findUnique.mockResolvedValue({
-      id: 'pay-3',
+      id: "pay-3",
       status: PaymentStatus.pending,
-      order: { status: OrderStatus.pending_payment, buyer: {}, seller: {}, product: {} },
+      order: {
+        status: OrderStatus.pending_payment,
+        buyer: {},
+        seller: {},
+        product: {},
+      },
     });
 
-    jest.spyOn(service as any, 'processSuccessfulPayment').mockResolvedValue(false);
+    jest
+      .spyOn(service as any, "processSuccessfulPayment")
+      .mockResolvedValue(false);
 
     const result = await service.reconcilePendingPaytrPayments();
 
@@ -177,20 +210,22 @@ describe.skip('PaymentService reconcilePendingPaytrPayments (1.4)', () => {
   });
 });
 
-describe.skip('PaymentSchedulerService handleExpiredPayments order', () => {
-  it('runs reconcile before release and cancel', async () => {
+describe.skip("PaymentSchedulerService handleExpiredPayments order", () => {
+  it("runs reconcile before release and cancel", async () => {
     const order: string[] = [];
     const paymentService = {
       reconcilePendingPaytrPayments: jest.fn().mockImplementation(async () => {
-        order.push('reconcile');
+        order.push("reconcile");
         return { checked: 0, completed: 0 };
       }),
-      releaseExpiredOrderReservations: jest.fn().mockImplementation(async () => {
-        order.push('release');
-        return { count: 0 };
-      }),
+      releaseExpiredOrderReservations: jest
+        .fn()
+        .mockImplementation(async () => {
+          order.push("release");
+          return { count: 0 };
+        }),
       cancelExpiredPayments: jest.fn().mockImplementation(async () => {
-        order.push('cancel');
+        order.push("cancel");
         return { count: 0 };
       }),
     };
@@ -215,6 +250,6 @@ describe.skip('PaymentSchedulerService handleExpiredPayments order', () => {
     );
     await scheduler.handleExpiredPayments();
 
-    expect(order).toEqual(['reconcile', 'release', 'cancel']);
+    expect(order).toEqual(["reconcile", "release", "cancel"]);
   });
 });

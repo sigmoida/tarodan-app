@@ -16,7 +16,8 @@ import {
   SavedCardStatus,
   Prisma,
 } from "@prisma/client";
-import { PayTRService, PayTRBuyer } from "../payment-providers/paytr.service";
+import { PayTRBuyer } from "../payment-providers/paytr.service";
+import { PaymentProviderRegistry } from "../payment-providers/payment-provider.registry";
 import { ProductLockService } from "../product/product-lock.service";
 import { Request } from "express";
 import { PaymentCommonService } from "./payment-common.service";
@@ -31,7 +32,7 @@ export class PaymentInitiationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
-    private readonly paytrService: PayTRService,
+    private readonly paymentProviders: PaymentProviderRegistry,
     private readonly productLockService: ProductLockService,
     private readonly paymentCommon: PaymentCommonService,
     private readonly paymentFulfillment: PaymentFulfillmentService,
@@ -451,7 +452,7 @@ export class PaymentInitiationService {
           i18nMessage("server.payment.cvvRequiredForCard"),
         );
       }
-      const r = await this.paytrService.chargeRecurring({
+      const r = await this.paymentProviders.resolve().chargeRecurring({
         utoken: saved.utoken,
         ctoken: saved.ctoken,
         amount,
@@ -481,7 +482,7 @@ export class PaymentInitiationService {
         i18nMessage("server.payment.cardInfoRequired"),
       );
     const storeCard = !!dto.saveCard && !!userId && recurringEnabled;
-    const result = await this.paytrService.createDirectPayment(
+    const result = await this.paymentProviders.resolve().createDirectPayment(
       merchantOid,
       amount,
       {
