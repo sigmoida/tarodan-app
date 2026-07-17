@@ -1,24 +1,30 @@
-import { View, ScrollView, Clipboard, StyleSheet } from 'react-native';
-import { Spinner, Snackbar, ScreenHeader, EmptyState, theme } from '@tarodan/ui-native';
-import { router, useLocalSearchParams } from 'expo-router';
-import { ThemedRefreshControl } from '@/components/common';
-import { useRefresh } from '@/hooks/useRefresh';
-import { useAuthStore } from '@/stores/authStore';
-import { useTranslation } from '@/i18n';
-import { deriveTradeView } from './_lib/derive';
-import { useTrade } from './_hooks/useTrade';
-import { useCountdown } from './_hooks/useCountdown';
-import { useTradeActions } from './_hooks/useTradeActions';
-import { TradeStatusHeader } from './_components/TradeStatusHeader';
-import { TradeInfoCard } from './_components/TradeInfoCard';
-import { TradeItemsCompare } from './_components/TradeItemsCompare';
-import { TradeCashCard } from './_components/TradeCashCard';
-import { TradeMessages } from './_components/TradeMessages';
-import { TradeShippingSection } from './_components/TradeShippingSection';
-import { TradeProtectionCard } from './_components/TradeProtectionCard';
-import { TradeActions } from './_components/TradeActions';
-import { RejectTradeModal } from './_modals/RejectTradeModal';
-import { DisputeTradeModal } from './_modals/DisputeTradeModal';
+import { View, ScrollView, Clipboard, StyleSheet } from "react-native";
+import {
+  Spinner,
+  Snackbar,
+  ScreenHeader,
+  EmptyState,
+  theme,
+} from "@tarodan/ui-native";
+import { router, useLocalSearchParams } from "expo-router";
+import { ThemedRefreshControl } from "@/components/common";
+import { useRefresh } from "@/hooks/useRefresh";
+import { useAuthStore } from "@/stores/authStore";
+import { useTranslation } from "react-i18next";
+import { deriveTradeView } from "./_lib/derive";
+import { useTrade } from "./_hooks/useTrade";
+import { useCountdown } from "./_hooks/useCountdown";
+import { useTradeActions } from "./_hooks/useTradeActions";
+import { TradeStatusHeader } from "./_components/TradeStatusHeader";
+import { TradeInfoCard } from "./_components/TradeInfoCard";
+import { TradeItemsCompare } from "./_components/TradeItemsCompare";
+import { TradeCashCard } from "./_components/TradeCashCard";
+import { TradeMessages } from "./_components/TradeMessages";
+import { TradeShippingSection } from "./_components/TradeShippingSection";
+import { TradeProtectionCard } from "./_components/TradeProtectionCard";
+import { TradeActions } from "./_components/TradeActions";
+import { RejectTradeModal } from "./_modals/RejectTradeModal";
+import { DisputeTradeModal } from "./_modals/DisputeTradeModal";
 
 const { colors } = theme;
 
@@ -28,14 +34,18 @@ export default function TradeDetailScreen() {
   const { user } = useAuthStore();
   const tradeId = String(id);
 
-  const { data: trade, isLoading, refetch } = useTrade(id as string | undefined);
+  const {
+    data: trade,
+    isLoading,
+    refetch,
+  } = useTrade(id as string | undefined);
   const { refreshing, onRefresh } = useRefresh(refetch);
   const now = useCountdown();
   const actions = useTradeActions(tradeId);
 
   const handleBack = () => {
     if (router.canGoBack()) router.back();
-    else router.replace('/(tabs)' as never);
+    else router.replace("/(tabs)" as never);
   };
 
   if (isLoading) {
@@ -68,7 +78,7 @@ export default function TradeDetailScreen() {
   const copyCode = (code?: string | null) => {
     if (!code) return;
     Clipboard.setString(code);
-    actions.notify('Takip numarası kopyalandı');
+    actions.notify("Takip numarası kopyalandı");
   };
 
   return (
@@ -77,10 +87,16 @@ export default function TradeDetailScreen() {
 
       <ScrollView
         style={styles.content}
-        refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          <ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         <TradeStatusHeader trade={trade} t={t} now={now} />
-        <TradeInfoCard trade={trade} isInitiator={view.isInitiator} otherParty={view.otherParty} />
+        <TradeInfoCard
+          trade={trade}
+          isInitiator={view.isInitiator}
+          otherParty={view.otherParty}
+        />
         <TradeItemsCompare
           myItems={view.myItems}
           theirItems={view.theirItems}
@@ -97,7 +113,12 @@ export default function TradeDetailScreen() {
           cashTotal={view.cashTotal}
         />
         <TradeMessages trade={trade} />
-        <TradeShippingSection trade={trade} view={view} t={t} onCopy={copyCode} />
+        <TradeShippingSection
+          trade={trade}
+          view={view}
+          t={t}
+          onCopy={copyCode}
+        />
         <TradeProtectionCard status={trade.status} />
         <TradeActions
           trade={trade}
@@ -165,6 +186,6 @@ export default function TradeDetailScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface.alt },
   container: { flex: 1, backgroundColor: colors.surface.alt },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   content: { flex: 1 },
 });

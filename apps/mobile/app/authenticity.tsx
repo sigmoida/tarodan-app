@@ -1,7 +1,7 @@
-import { View, ScrollView, StyleSheet } from 'react-native';
-import { router } from 'expo-router';
-import { theme, Text, ScreenHeader } from '@tarodan/ui-native';
-import { useTranslation } from '@/i18n';
+import { View, ScrollView, StyleSheet } from "react-native";
+import { router } from "expo-router";
+import { theme, Text, ScreenHeader } from "@tarodan/ui-native";
+import { useTranslation } from "react-i18next";
 
 const { colors } = theme;
 
@@ -16,21 +16,37 @@ export default function AuthenticityScreen() {
   return (
     <View style={styles.container}>
       <ScreenHeader
-        title={t('information.authenticity.title')}
-        onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
+        title={t("information.authenticity.title")}
+        onBack={() =>
+          router.canGoBack() ? router.back() : router.replace("/(tabs)")
+        }
       />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.subtitle}>{t('information.authenticity.subtitle')}</Text>
+        <Text style={styles.subtitle}>
+          {t("information.authenticity.subtitle")}
+        </Text>
 
-        <Text style={styles.sectionTitle}>{t('information.authenticity.process')}</Text>
-        <Text style={styles.paragraph}>{t('information.authenticity.processDesc')}</Text>
+        <Text style={styles.sectionTitle}>
+          {t("information.authenticity.process")}
+        </Text>
+        <Text style={styles.paragraph}>
+          {t("information.authenticity.processDesc")}
+        </Text>
 
-        <Text style={styles.sectionTitle}>{t('information.authenticity.protection')}</Text>
-        <Text style={styles.paragraph}>{t('information.authenticity.protectionDesc')}</Text>
+        <Text style={styles.sectionTitle}>
+          {t("information.authenticity.protection")}
+        </Text>
+        <Text style={styles.paragraph}>
+          {t("information.authenticity.protectionDesc")}
+        </Text>
 
-        <Text style={styles.sectionTitle}>{t('information.authenticity.badges')}</Text>
-        <Text style={styles.paragraph}>{t('information.authenticity.badgesDesc')}</Text>
+        <Text style={styles.sectionTitle}>
+          {t("information.authenticity.badges")}
+        </Text>
+        <Text style={styles.paragraph}>
+          {t("information.authenticity.badgesDesc")}
+        </Text>
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -54,7 +70,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: colors.text.heading,
     marginTop: theme.spacing[6],
     marginBottom: theme.spacing[3],

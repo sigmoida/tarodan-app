@@ -1,4 +1,4 @@
-import { View, TouchableOpacity, Image } from 'react-native';
+import { View, TouchableOpacity, Image } from "react-native";
 import {
   Avatar,
   Card,
@@ -6,17 +6,17 @@ import {
   Input,
   Text,
   theme,
-} from '@tarodan/ui-native';
-import { router } from 'expo-router';
-import { Controller } from 'react-hook-form';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { MembershipBadgeCard } from '@/components/PremiumBadge';
-import { useTranslation } from '@/i18n';
-import { resolveImageUrl } from '@/utils/imageUrl';
-import { PhoneInput } from '@/components/common';
-import { styles } from '../_lib/styles';
-import { MAX_BIO_LENGTH, minBirthDate } from '../_lib/schema';
-import type { EditProfileController } from '../_hooks/useEditProfile';
+} from "@tarodan/ui-native";
+import { router } from "expo-router";
+import { Controller } from "react-hook-form";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { MembershipBadgeCard } from "@/components/PremiumBadge";
+import { useTranslation } from "react-i18next";
+import { resolveImageUrl } from "@/utils/imageUrl";
+import { PhoneInput } from "@/components/common";
+import { styles } from "../_lib/styles";
+import { MAX_BIO_LENGTH, minBirthDate } from "../_lib/schema";
+import type { EditProfileController } from "../_hooks/useEditProfile";
 
 const { colors } = theme;
 
@@ -27,9 +27,12 @@ export function AvatarSection({ f }: { f: EditProfileController }) {
       <View style={styles.avatarSection}>
         <TouchableOpacity onPress={f.pickAvatar}>
           {f.avatar ? (
-            <Image source={{ uri: resolveImageUrl(f.avatar) }} style={styles.avatar} />
+            <Image
+              source={{ uri: resolveImageUrl(f.avatar) }}
+              style={styles.avatar}
+            />
           ) : (
-            <Avatar size="xl" name={f.user?.displayName || 'U'} />
+            <Avatar size="xl" name={f.user?.displayName || "U"} />
           )}
           <View style={styles.avatarEditBadge}>
             <Ionicons name="camera" size={18} color={colors.white} />
@@ -39,9 +42,9 @@ export function AvatarSection({ f }: { f: EditProfileController }) {
 
       <View style={styles.membershipSection}>
         <MembershipBadgeCard
-          membershipTier={f.user?.membershipTier || 'free'}
+          membershipTier={f.user?.membershipTier || "free"}
           isVerified={f.user?.isVerified}
-          onUpgrade={() => router.push('/upgrade')}
+          onUpgrade={() => router.push("/upgrade")}
         />
       </View>
     </>
@@ -55,7 +58,9 @@ export function PersonalInfoCard({ f }: { f: EditProfileController }) {
 
   return (
     <Card style={styles.card}>
-      <Text variant="h3" style={styles.sectionTitle}>Kişisel Bilgiler</Text>
+      <Text variant="h3" style={styles.sectionTitle}>
+        Kişisel Bilgiler
+      </Text>
 
       <Controller
         control={control}
@@ -74,7 +79,7 @@ export function PersonalInfoCard({ f }: { f: EditProfileController }) {
       {/* E-posta — salt okunur (web ile parite) */}
       <Input
         label="E-posta Adresi"
-        value={f.user?.email || ''}
+        value={f.user?.email || ""}
         editable={false}
         containerStyle={styles.input}
       />
@@ -90,7 +95,7 @@ export function PersonalInfoCard({ f }: { f: EditProfileController }) {
             label="Telefon"
             countryCode={f.phoneCountryCode}
             onCountryCodeChange={f.setPhoneCountryCode}
-            phone={value ?? ''}
+            phone={value ?? ""}
             onPhoneChange={onChange}
             containerStyle={styles.input}
             error={errors.phone?.message}
@@ -126,7 +131,7 @@ export function PersonalInfoCard({ f }: { f: EditProfileController }) {
             numberOfLines={4}
             maxLength={MAX_BIO_LENGTH}
             containerStyle={styles.input}
-            placeholder={t('mobile.bioPlaceholder')}
+            placeholder={t("mobile.bioPlaceholder")}
             error={errors.bio?.message}
           />
         )}
@@ -144,11 +149,19 @@ export function BusinessInfoCard({ f }: { f: EditProfileController }) {
     <Card style={styles.card}>
       <View style={styles.businessHeader}>
         <View style={styles.premiumFeatureHeader}>
-          <MaterialCommunityIcons name="office-building" size={20} color={colors.primary[600]!} />
-          <Text variant="h3" style={styles.premiumFeatureTitle}>İşletme Bilgileri</Text>
+          <MaterialCommunityIcons
+            name="office-building"
+            size={20}
+            color={colors.primary[600]!}
+          />
+          <Text variant="h3" style={styles.premiumFeatureTitle}>
+            İşletme Bilgileri
+          </Text>
         </View>
         <View style={styles.tierBadge}>
-          <Text variant="bodySm" style={styles.tierBadgeText}>İş Üyeliği</Text>
+          <Text variant="bodySm" style={styles.tierBadgeText}>
+            İş Üyeliği
+          </Text>
         </View>
       </View>
 
@@ -179,7 +192,9 @@ export function BusinessInfoCard({ f }: { f: EditProfileController }) {
           <Input
             label="Vergi Kimlik No"
             value={value}
-            onChangeText={(text) => onChange(text.replace(/\D/g, '').slice(0, 11))}
+            onChangeText={(text) =>
+              onChange(text.replace(/\D/g, "").slice(0, 11))
+            }
             keyboardType="number-pad"
             placeholder="1234567890"
             containerStyle={styles.input}
@@ -205,7 +220,8 @@ export function BusinessInfoCard({ f }: { f: EditProfileController }) {
 
       <View style={styles.infoBox}>
         <Text variant="bodySm" style={styles.infoBoxText}>
-          ℹ️ Kurumsal satıcı bilgileri fatura kesiminde kullanılır. Yanlış bilgi girişi yasal sorumluluk doğurabilir.
+          ℹ️ Kurumsal satıcı bilgileri fatura kesiminde kullanılır. Yanlış bilgi
+          girişi yasal sorumluluk doğurabilir.
         </Text>
       </View>
     </Card>

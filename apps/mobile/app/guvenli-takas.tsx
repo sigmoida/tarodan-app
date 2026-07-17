@@ -1,41 +1,46 @@
-import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { theme, Text, ScreenHeader } from '@tarodan/ui-native';
-import { useTranslation } from '@/i18n';
+import { View, ScrollView, StyleSheet, TouchableOpacity } from "react-native";
+import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { theme, Text, ScreenHeader } from "@tarodan/ui-native";
+import { useTranslation } from "react-i18next";
 
 const { colors } = theme;
 
 const STEPS = [
   {
-    icon: 'search-outline' as const,
-    title: 'Ürün Bulun',
+    icon: "search-outline" as const,
+    title: "Ürün Bulun",
     description: '"Takas Açık" etiketli ürünleri arayın veya filtreleyin.',
   },
   {
-    icon: 'swap-horizontal-outline' as const,
-    title: 'Teklif Gönderin',
-    description: 'Kendi koleksiyonunuzdan ürün seçin, gerekirse nakit fark ekleyin ve teklif gönderin.',
+    icon: "swap-horizontal-outline" as const,
+    title: "Teklif Gönderin",
+    description:
+      "Kendi koleksiyonunuzdan ürün seçin, gerekirse nakit fark ekleyin ve teklif gönderin.",
   },
   {
-    icon: 'chatbubbles-outline' as const,
-    title: 'Müzakere Edin',
-    description: 'Karşı taraf kabul edebilir, reddedebilir veya karşı teklif gönderebilir.',
+    icon: "chatbubbles-outline" as const,
+    title: "Müzakere Edin",
+    description:
+      "Karşı taraf kabul edebilir, reddedebilir veya karşı teklif gönderebilir.",
   },
   {
-    icon: 'checkmark-circle-outline' as const,
-    title: 'Onaylayın',
-    description: 'Her iki taraf da takas şartlarını kabul ettiğinde takas resmi olarak başlar.',
+    icon: "checkmark-circle-outline" as const,
+    title: "Onaylayın",
+    description:
+      "Her iki taraf da takas şartlarını kabul ettiğinde takas resmi olarak başlar.",
   },
   {
-    icon: 'cube-outline' as const,
-    title: 'Kargolayın',
-    description: 'Ürünlerinizi güvenli şekilde paketleyerek belirtilen süre içinde kargoya verin.',
+    icon: "cube-outline" as const,
+    title: "Kargolayın",
+    description:
+      "Ürünlerinizi güvenli şekilde paketleyerek belirtilen süre içinde kargoya verin.",
   },
   {
-    icon: 'shield-checkmark-outline' as const,
-    title: 'Teslim Alın ve Onaylayın',
-    description: 'Ürünü kontrol edin ve "Teslim Aldım" ile onaylayın. Takas tamamlanır.',
+    icon: "shield-checkmark-outline" as const,
+    title: "Teslim Alın ve Onaylayın",
+    description:
+      'Ürünü kontrol edin ve "Teslim Aldım" ile onaylayın. Takas tamamlanır.',
   },
 ];
 
@@ -43,14 +48,24 @@ export default function GuvenliTakasScreen() {
   const { t } = useTranslation();
   return (
     <View style={styles.container}>
-      <ScreenHeader title={t('mobile.pageSafeTrade')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
+      <ScreenHeader
+        title={t("mobile.pageSafeTrade")}
+        onBack={() =>
+          router.canGoBack() ? router.back() : router.replace("/(tabs)")
+        }
+      />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
-          <Ionicons name="swap-horizontal" size={56} color={colors.primary[600]!} />
+          <Ionicons
+            name="swap-horizontal"
+            size={56}
+            color={colors.primary[600]!}
+          />
           <Text style={styles.heroTitle}>Güvenli Takas Sistemi</Text>
           <Text style={styles.heroText}>
-            Koleksiyonunuzu büyütmenin en kolay yolu. Platform güvencesi altında diğer koleksiyonerlerle model araçlarınızı takas edin.
+            Koleksiyonunuzu büyütmenin en kolay yolu. Platform güvencesi altında
+            diğer koleksiyonerlerle model araçlarınızı takas edin.
           </Text>
         </View>
 
@@ -65,7 +80,11 @@ export default function GuvenliTakasScreen() {
             </View>
             <View style={styles.stepContent}>
               <View style={styles.stepIconRow}>
-                <Ionicons name={step.icon} size={20} color={colors.primary[600]!} />
+                <Ionicons
+                  name={step.icon}
+                  size={20}
+                  color={colors.primary[600]!}
+                />
                 <Text style={styles.stepTitle}>{step.title}</Text>
               </View>
               <Text style={styles.stepDesc}>{step.description}</Text>
@@ -76,40 +95,74 @@ export default function GuvenliTakasScreen() {
         <Text style={styles.sectionTitle}>Güvenlik Garantileri</Text>
         <View style={styles.guaranteeCard}>
           <View style={styles.guaranteeRow}>
-            <Ionicons name="checkmark-circle" size={20} color={colors.warning[500]!} />
-            <Text style={styles.guaranteeText}>Her iki tarafın ürünleri platform garantisi altındadır</Text>
+            <Ionicons
+              name="checkmark-circle"
+              size={20}
+              color={colors.warning[500]!}
+            />
+            <Text style={styles.guaranteeText}>
+              Her iki tarafın ürünleri platform garantisi altındadır
+            </Text>
           </View>
           <View style={styles.guaranteeRow}>
-            <Ionicons name="checkmark-circle" size={20} color={colors.warning[500]!} />
-            <Text style={styles.guaranteeText}>Nakit fark ödemeleri güvenli emanet hesapta tutulur</Text>
+            <Ionicons
+              name="checkmark-circle"
+              size={20}
+              color={colors.warning[500]!}
+            />
+            <Text style={styles.guaranteeText}>
+              Nakit fark ödemeleri güvenli emanet hesapta tutulur
+            </Text>
           </View>
           <View style={styles.guaranteeRow}>
-            <Ionicons name="checkmark-circle" size={20} color={colors.warning[500]!} />
-            <Text style={styles.guaranteeText}>Anlaşmazlık durumunda platform arabuluculuk yapar</Text>
+            <Ionicons
+              name="checkmark-circle"
+              size={20}
+              color={colors.warning[500]!}
+            />
+            <Text style={styles.guaranteeText}>
+              Anlaşmazlık durumunda platform arabuluculuk yapar
+            </Text>
           </View>
           <View style={styles.guaranteeRow}>
-            <Ionicons name="checkmark-circle" size={20} color={colors.warning[500]!} />
-            <Text style={styles.guaranteeText}>Ürün açıklamaya uymuyorsa takas iptal edilebilir</Text>
+            <Ionicons
+              name="checkmark-circle"
+              size={20}
+              color={colors.warning[500]!}
+            />
+            <Text style={styles.guaranteeText}>
+              Ürün açıklamaya uymuyorsa takas iptal edilebilir
+            </Text>
           </View>
           <View style={styles.guaranteeRow}>
-            <Ionicons name="checkmark-circle" size={20} color={colors.warning[500]!} />
-            <Text style={styles.guaranteeText}>Kargo takibi her iki taraf için de platformda görüntülenir</Text>
+            <Ionicons
+              name="checkmark-circle"
+              size={20}
+              color={colors.warning[500]!}
+            />
+            <Text style={styles.guaranteeText}>
+              Kargo takibi her iki taraf için de platformda görüntülenir
+            </Text>
           </View>
         </View>
 
         <Text style={styles.sectionTitle}>Kimler Takas Yapabilir?</Text>
         <Text style={styles.paragraph}>
-          Takas özelliği Premium ve Pro üyelere açıktır. Takas yapmak için en az bir aktif ilanınızın bulunması ve hesabınızın doğrulanmış olması gerekmektedir.
+          Takas özelliği Premium ve Pro üyelere açıktır. Takas yapmak için en az
+          bir aktif ilanınızın bulunması ve hesabınızın doğrulanmış olması
+          gerekmektedir.
         </Text>
 
         <Text style={styles.sectionTitle}>Fark Ödemeli Takas</Text>
         <Text style={styles.paragraph}>
-          Takas edilen ürünlerin değerleri eşit olmak zorunda değildir. Teklifte nakit fark belirleyebilirsiniz. Fark ödemesi, güvenli ödeme sistemi üzerinden alıcı koruma kapsamında işlenir.
+          Takas edilen ürünlerin değerleri eşit olmak zorunda değildir. Teklifte
+          nakit fark belirleyebilirsiniz. Fark ödemesi, güvenli ödeme sistemi
+          üzerinden alıcı koruma kapsamında işlenir.
         </Text>
 
         <TouchableOpacity
           style={styles.ctaButton}
-          onPress={() => router.push('/trades')}
+          onPress={() => router.push("/trades")}
           activeOpacity={0.8}
         >
           <Ionicons name="swap-horizontal" size={20} color={colors.white} />
@@ -132,13 +185,13 @@ const styles = StyleSheet.create({
     padding: theme.spacing[5],
   },
   hero: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: theme.spacing[6],
     marginBottom: theme.spacing[2],
   },
   heroTitle: {
     fontSize: 22,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: colors.text.heading,
     marginTop: theme.spacing[3],
   },
@@ -146,23 +199,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.text.muted,
     lineHeight: 22,
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: theme.spacing[2],
     paddingHorizontal: theme.spacing[2.5],
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: colors.text.heading,
     marginTop: theme.spacing[6],
     marginBottom: theme.spacing[4],
   },
   stepCard: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: theme.spacing[1],
   },
   stepLeft: {
-    alignItems: 'center',
+    alignItems: "center",
     width: 36,
     marginRight: theme.spacing[3],
   },
@@ -171,12 +224,12 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
     backgroundColor: colors.primary[600]!,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   stepNumber: {
     fontSize: 13,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: colors.white,
   },
   stepLine: {
@@ -190,14 +243,14 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing[5],
   },
   stepIconRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: theme.spacing[2],
     marginBottom: theme.spacing[1],
   },
   stepTitle: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: "600",
     color: colors.text.heading,
   },
   stepDesc: {
@@ -212,8 +265,8 @@ const styles = StyleSheet.create({
     gap: theme.spacing[3],
   },
   guaranteeRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: theme.spacing[2.5],
   },
   guaranteeText: {
@@ -229,9 +282,9 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing[3],
   },
   ctaButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: colors.primary[600]!,
     paddingVertical: theme.spacing[3.5],
     borderRadius: 12,
@@ -240,7 +293,7 @@ const styles = StyleSheet.create({
   },
   ctaText: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: "600",
     color: colors.white,
   },
 });

@@ -1,8 +1,8 @@
-import { View, ScrollView, StyleSheet } from 'react-native';
-import { theme, Text, ScreenHeader } from '@tarodan/ui-native';
-import { router } from 'expo-router';
-import { useTranslation } from '@/i18n';
-import { PRIVACY_EMAIL } from '@/constants/legalFacts';
+import { View, ScrollView, StyleSheet } from "react-native";
+import { theme, Text, ScreenHeader } from "@tarodan/ui-native";
+import { router } from "expo-router";
+import { useTranslation } from "react-i18next";
+import { PRIVACY_EMAIL } from "@/constants/legalFacts";
 
 const { colors } = theme;
 
@@ -10,25 +10,39 @@ export default function PrivacyPolicyScreen() {
   const { t } = useTranslation();
   return (
     <View style={styles.container}>
-      <ScreenHeader title={t('mobile.pagePrivacy')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
+      <ScreenHeader
+        title={t("mobile.pagePrivacy")}
+        onBack={() =>
+          router.canGoBack() ? router.back() : router.replace("/(tabs)")
+        }
+      />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.lastUpdated}>Son güncelleme: 1 Ocak 2026</Text>
 
         <Text style={styles.sectionTitle}>1. Giriş</Text>
         <Text style={styles.paragraph}>
-          Tarodan ("biz", "bizim" veya "Şirket") olarak, gizliliğinize saygı duyuyor ve kişisel verilerinizi korumayı taahhüt ediyoruz. Bu Gizlilik Politikası, hizmetlerimizi kullanırken topladığımız bilgileri ve bu bilgileri nasıl kullandığımızı açıklar.
+          Tarodan ("biz", "bizim" veya "Şirket") olarak, gizliliğinize saygı
+          duyuyor ve kişisel verilerinizi korumayı taahhüt ediyoruz. Bu Gizlilik
+          Politikası, hizmetlerimizi kullanırken topladığımız bilgileri ve bu
+          bilgileri nasıl kullandığımızı açıklar.
         </Text>
 
         <Text style={styles.sectionTitle}>2. Topladığımız Bilgiler</Text>
         <Text style={styles.paragraph}>
           Hizmetlerimizi kullanırken aşağıdaki bilgileri toplayabiliriz:
         </Text>
-        <Text style={styles.listItem}>• Ad, e-posta adresi ve telefon numarası gibi hesap bilgileri</Text>
+        <Text style={styles.listItem}>
+          • Ad, e-posta adresi ve telefon numarası gibi hesap bilgileri
+        </Text>
         <Text style={styles.listItem}>• Teslimat ve fatura adresleri</Text>
-        <Text style={styles.listItem}>• Ödeme bilgileri (güvenli ödeme işlemcileri aracılığıyla işlenir)</Text>
+        <Text style={styles.listItem}>
+          • Ödeme bilgileri (güvenli ödeme işlemcileri aracılığıyla işlenir)
+        </Text>
         <Text style={styles.listItem}>• İlan verdiğiniz ürün bilgileri</Text>
-        <Text style={styles.listItem}>• Platform kullanım verileri ve cihaz bilgileri</Text>
+        <Text style={styles.listItem}>
+          • Platform kullanım verileri ve cihaz bilgileri
+        </Text>
 
         <Text style={styles.sectionTitle}>3. Bilgilerin Kullanımı</Text>
         <Text style={styles.paragraph}>
@@ -39,25 +53,36 @@ export default function PrivacyPolicyScreen() {
         <Text style={styles.listItem}>• Müşteri desteği sağlamak</Text>
         <Text style={styles.listItem}>• Hizmetlerimizi geliştirmek</Text>
         <Text style={styles.listItem}>• Güvenlik ve dolandırıcılık önleme</Text>
-        <Text style={styles.listItem}>• Yasal yükümlülükleri yerine getirmek</Text>
+        <Text style={styles.listItem}>
+          • Yasal yükümlülükleri yerine getirmek
+        </Text>
 
         <Text style={styles.sectionTitle}>4. Bilgi Paylaşımı</Text>
         <Text style={styles.paragraph}>
-          Kişisel bilgilerinizi üçüncü taraflarla yalnızca aşağıdaki durumlarda paylaşırız:
+          Kişisel bilgilerinizi üçüncü taraflarla yalnızca aşağıdaki durumlarda
+          paylaşırız:
         </Text>
-        <Text style={styles.listItem}>• İşlem yapmak için gerekli olduğunda (örn: kargo şirketleri)</Text>
+        <Text style={styles.listItem}>
+          • İşlem yapmak için gerekli olduğunda (örn: kargo şirketleri)
+        </Text>
         <Text style={styles.listItem}>• Yasal zorunluluk olduğunda</Text>
         <Text style={styles.listItem}>• Açık izninizi aldığımızda</Text>
-        <Text style={styles.listItem}>• Hizmet sağlayıcılarımızla (gizlilik sözleşmeleri kapsamında)</Text>
+        <Text style={styles.listItem}>
+          • Hizmet sağlayıcılarımızla (gizlilik sözleşmeleri kapsamında)
+        </Text>
 
         <Text style={styles.sectionTitle}>5. Veri Güvenliği</Text>
         <Text style={styles.paragraph}>
-          Verilerinizi korumak için endüstri standardı güvenlik önlemleri uyguluyoruz. Ancak, internet üzerinden hiçbir iletim yöntemi %100 güvenli değildir.
+          Verilerinizi korumak için endüstri standardı güvenlik önlemleri
+          uyguluyoruz. Ancak, internet üzerinden hiçbir iletim yöntemi %100
+          güvenli değildir.
         </Text>
 
         <Text style={styles.sectionTitle}>6. Çerezler</Text>
         <Text style={styles.paragraph}>
-          Web sitemiz ve uygulamamız, deneyiminizi geliştirmek için çerezler ve benzer teknolojiler kullanır. Çerez tercihlerinizi tarayıcı ayarlarınızdan yönetebilirsiniz.
+          Web sitemiz ve uygulamamız, deneyiminizi geliştirmek için çerezler ve
+          benzer teknolojiler kullanır. Çerez tercihlerinizi tarayıcı
+          ayarlarınızdan yönetebilirsiniz.
         </Text>
 
         <Text style={styles.sectionTitle}>7. Haklarınız</Text>
@@ -65,24 +90,32 @@ export default function PrivacyPolicyScreen() {
           KVKK kapsamında aşağıdaki haklara sahipsiniz:
         </Text>
         <Text style={styles.listItem}>• Verilerinize erişim hakkı</Text>
-        <Text style={styles.listItem}>• Verilerin düzeltilmesini isteme hakkı</Text>
-        <Text style={styles.listItem}>• Verilerin silinmesini isteme hakkı</Text>
+        <Text style={styles.listItem}>
+          • Verilerin düzeltilmesini isteme hakkı
+        </Text>
+        <Text style={styles.listItem}>
+          • Verilerin silinmesini isteme hakkı
+        </Text>
         <Text style={styles.listItem}>• İşlemeye itiraz etme hakkı</Text>
         <Text style={styles.listItem}>• Veri taşınabilirliği hakkı</Text>
 
         <Text style={styles.sectionTitle}>8. Veri Saklama</Text>
         <Text style={styles.paragraph}>
-          Kişisel verilerinizi, hizmetlerimizi sağlamak için gerekli olduğu sürece veya yasal yükümlülüklerimizi yerine getirmek için gereken süre boyunca saklarız.
+          Kişisel verilerinizi, hizmetlerimizi sağlamak için gerekli olduğu
+          sürece veya yasal yükümlülüklerimizi yerine getirmek için gereken süre
+          boyunca saklarız.
         </Text>
 
         <Text style={styles.sectionTitle}>9. Çocukların Gizliliği</Text>
         <Text style={styles.paragraph}>
-          Hizmetlerimiz 18 yaşın altındaki kişilere yönelik değildir. Bilerek 18 yaşından küçük çocuklardan kişisel bilgi toplamıyoruz.
+          Hizmetlerimiz 18 yaşın altındaki kişilere yönelik değildir. Bilerek 18
+          yaşından küçük çocuklardan kişisel bilgi toplamıyoruz.
         </Text>
 
         <Text style={styles.sectionTitle}>10. Politika Değişiklikleri</Text>
         <Text style={styles.paragraph}>
-          Bu Gizlilik Politikası'nı zaman zaman güncelleyebiliriz. Önemli değişiklikler hakkında sizi bilgilendireceğiz.
+          Bu Gizlilik Politikası'nı zaman zaman güncelleyebiliriz. Önemli
+          değişiklikler hakkında sizi bilgilendireceğiz.
         </Text>
 
         <Text style={styles.sectionTitle}>11. İletişim</Text>
@@ -114,7 +147,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: colors.text.heading,
     marginTop: theme.spacing[6],
     marginBottom: theme.spacing[3],

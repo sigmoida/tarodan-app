@@ -1,62 +1,72 @@
-import { View, ScrollView, StyleSheet } from 'react-native';
-import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { theme, Text, ScreenHeader } from '@tarodan/ui-native';
-import { useTranslation } from '@/i18n';
-import { SECURITY_EMAIL } from '@/constants/legalFacts';
+import { View, ScrollView, StyleSheet } from "react-native";
+import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { theme, Text, ScreenHeader } from "@tarodan/ui-native";
+import { useTranslation } from "react-i18next";
+import { SECURITY_EMAIL } from "@/constants/legalFacts";
 
 const { colors } = theme;
 
 const FEATURES = [
   {
-    icon: 'lock-closed-outline' as const,
-    title: 'SSL Şifreleme',
-    description: 'Tüm veri aktarımları 256-bit SSL/TLS şifreleme ile korunur. Kişisel bilgileriniz ve ödeme verileriniz üçüncü taraflarca okunamaz.',
+    icon: "lock-closed-outline" as const,
+    title: "SSL Şifreleme",
+    description:
+      "Tüm veri aktarımları 256-bit SSL/TLS şifreleme ile korunur. Kişisel bilgileriniz ve ödeme verileriniz üçüncü taraflarca okunamaz.",
   },
   {
-    icon: 'shield-checkmark-outline' as const,
-    title: 'Alıcı Koruma Sistemi',
-    description: 'Ödemeniz, ürünü teslim alıp onaylayana kadar güvenli emanet hesapta tutulur. Ürün gelmezse veya açıklamaya uygun değilse paranız iade edilir.',
+    icon: "shield-checkmark-outline" as const,
+    title: "Alıcı Koruma Sistemi",
+    description:
+      "Ödemeniz, ürünü teslim alıp onaylayana kadar güvenli emanet hesapta tutulur. Ürün gelmezse veya açıklamaya uygun değilse paranız iade edilir.",
   },
   {
-    icon: 'card-outline' as const,
-    title: 'Güvenli Ödeme Altyapısı',
-    description: 'Ödemeler, PCI DSS uyumlu ödeme kuruluşları (iyzico/PayTR) üzerinden işlenir. Kart bilgileriniz Tarodan sunucularında saklanmaz.',
+    icon: "card-outline" as const,
+    title: "Güvenli Ödeme Altyapısı",
+    description:
+      "Ödemeler, PCI DSS uyumlu ödeme kuruluşları (iyzico/PayTR) üzerinden işlenir. Kart bilgileriniz Tarodan sunucularında saklanmaz.",
   },
   {
-    icon: 'person-circle-outline' as const,
-    title: 'Kimlik Doğrulama',
-    description: 'Satıcılar e-posta ve telefon doğrulamasından geçer. Premium satıcılar için kimlik ve adres doğrulaması zorunludur.',
+    icon: "person-circle-outline" as const,
+    title: "Kimlik Doğrulama",
+    description:
+      "Satıcılar e-posta ve telefon doğrulamasından geçer. Premium satıcılar için kimlik ve adres doğrulaması zorunludur.",
   },
   {
-    icon: 'eye-off-outline' as const,
-    title: 'Veri Gizliliği',
-    description: 'Kişisel verileriniz KVKK (6698 sayılı Kanun) kapsamında korunur. Verileriniz yalnızca hizmet sağlamak amacıyla işlenir ve izinsiz üçüncü taraflarla paylaşılmaz.',
+    icon: "eye-off-outline" as const,
+    title: "Veri Gizliliği",
+    description:
+      "Kişisel verileriniz KVKK (6698 sayılı Kanun) kapsamında korunur. Verileriniz yalnızca hizmet sağlamak amacıyla işlenir ve izinsiz üçüncü taraflarla paylaşılmaz.",
   },
   {
-    icon: 'chatbubble-ellipses-outline' as const,
-    title: 'Güvenli Mesajlaşma',
-    description: 'Platform içi mesajlaşma sistemi ile iletişim kurun. Kişisel iletişim bilgilerinizi paylaşmak zorunda kalmadan alıcı/satıcılarla güvenle görüşün.',
+    icon: "chatbubble-ellipses-outline" as const,
+    title: "Güvenli Mesajlaşma",
+    description:
+      "Platform içi mesajlaşma sistemi ile iletişim kurun. Kişisel iletişim bilgilerinizi paylaşmak zorunda kalmadan alıcı/satıcılarla güvenle görüşün.",
   },
   {
-    icon: 'swap-horizontal-outline' as const,
-    title: 'Güvenli Takas',
-    description: 'Takas işlemlerinde her iki tarafın ürünleri platform garantisi altında gönderilir. Anlaşmazlık durumunda platform arabuluculuk yapar.',
+    icon: "swap-horizontal-outline" as const,
+    title: "Güvenli Takas",
+    description:
+      "Takas işlemlerinde her iki tarafın ürünleri platform garantisi altında gönderilir. Anlaşmazlık durumunda platform arabuluculuk yapar.",
   },
   {
-    icon: 'alert-circle-outline' as const,
-    title: 'Dolandırıcılık Önleme',
-    description: 'Yapay zeka destekli sistemler şüpheli işlemleri ve sahte ilanları otomatik olarak tespit eder. Riskli işlemler ek doğrulama gerektirir.',
+    icon: "alert-circle-outline" as const,
+    title: "Dolandırıcılık Önleme",
+    description:
+      "Yapay zeka destekli sistemler şüpheli işlemleri ve sahte ilanları otomatik olarak tespit eder. Riskli işlemler ek doğrulama gerektirir.",
   },
   {
-    icon: 'flag-outline' as const,
-    title: 'Raporlama Sistemi',
-    description: 'Şüpheli ilanları, kullanıcıları veya mesajları kolayca raporlayabilirsiniz. Her rapor 24 saat içinde uzman ekibimiz tarafından incelenir.',
+    icon: "flag-outline" as const,
+    title: "Raporlama Sistemi",
+    description:
+      "Şüpheli ilanları, kullanıcıları veya mesajları kolayca raporlayabilirsiniz. Her rapor 24 saat içinde uzman ekibimiz tarafından incelenir.",
   },
   {
-    icon: 'star-outline' as const,
-    title: 'Değerlendirme Sistemi',
-    description: 'Alıcı ve satıcı puanlama sistemi sayesinde güvenilir kullanıcıları kolayca belirleyebilirsiniz. Sahte değerlendirmeler tespit edilip kaldırılır.',
+    icon: "star-outline" as const,
+    title: "Değerlendirme Sistemi",
+    description:
+      "Alıcı ve satıcı puanlama sistemi sayesinde güvenilir kullanıcıları kolayca belirleyebilirsiniz. Sahte değerlendirmeler tespit edilip kaldırılır.",
   },
 ];
 
@@ -64,21 +74,36 @@ export default function SecurityFeaturesScreen() {
   const { t } = useTranslation();
   return (
     <View style={styles.container}>
-      <ScreenHeader title={t('mobile.pageSecurityFeatures')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} />
+      <ScreenHeader
+        title={t("mobile.pageSecurityFeatures")}
+        onBack={() =>
+          router.canGoBack() ? router.back() : router.replace("/(tabs)")
+        }
+      />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.intro}>
-          <Ionicons name="shield-checkmark" size={48} color={colors.primary[600]!} />
+          <Ionicons
+            name="shield-checkmark"
+            size={48}
+            color={colors.primary[600]!}
+          />
           <Text style={styles.introTitle}>Güvenliğiniz Bizim Önceliğimiz</Text>
           <Text style={styles.introText}>
-            Tarodan'da alışveriş ve takas güvenliği en üst düzeyde sağlanır. Aşağıda platformumuzun sunduğu güvenlik özelliklerini inceleyebilirsiniz.
+            Tarodan'da alışveriş ve takas güvenliği en üst düzeyde sağlanır.
+            Aşağıda platformumuzun sunduğu güvenlik özelliklerini
+            inceleyebilirsiniz.
           </Text>
         </View>
 
         {FEATURES.map((feature, index) => (
           <View key={index} style={styles.featureCard}>
             <View style={styles.featureIcon}>
-              <Ionicons name={feature.icon} size={28} color={colors.primary[600]!} />
+              <Ionicons
+                name={feature.icon}
+                size={28}
+                color={colors.primary[600]!}
+              />
             </View>
             <View style={styles.featureContent}>
               <Text style={styles.featureTitle}>{feature.title}</Text>
@@ -89,7 +114,8 @@ export default function SecurityFeaturesScreen() {
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            Güvenlikle ilgili bir sorun fark ederseniz lütfen derhal bize bildirin.
+            Güvenlikle ilgili bir sorun fark ederseniz lütfen derhal bize
+            bildirin.
           </Text>
           <Text style={styles.contactInfo}>E-posta: {SECURITY_EMAIL}</Text>
         </View>
@@ -110,13 +136,13 @@ const styles = StyleSheet.create({
     padding: theme.spacing[5],
   },
   intro: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: theme.spacing[6],
     marginBottom: theme.spacing[2],
   },
   introTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: colors.text.heading,
     marginTop: theme.spacing[3],
     marginBottom: theme.spacing[2],
@@ -125,10 +151,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.text.muted,
     lineHeight: 22,
-    textAlign: 'center',
+    textAlign: "center",
   },
   featureCard: {
-    flexDirection: 'row',
+    flexDirection: "row",
     backgroundColor: colors.surface.alt,
     borderRadius: 12,
     padding: theme.spacing[4],
@@ -139,8 +165,8 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     backgroundColor: colors.primary[50]!,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: theme.spacing[3.5],
   },
   featureContent: {
@@ -148,7 +174,7 @@ const styles = StyleSheet.create({
   },
   featureTitle: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: "600",
     color: colors.text.heading,
     marginBottom: theme.spacing[1],
   },
@@ -162,17 +188,17 @@ const styles = StyleSheet.create({
     padding: theme.spacing[4],
     backgroundColor: colors.surface.alt,
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: "center",
   },
   footerText: {
     fontSize: 14,
     color: colors.text.muted,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: theme.spacing[2],
   },
   contactInfo: {
     fontSize: 14,
     color: colors.primary[600]!,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });
