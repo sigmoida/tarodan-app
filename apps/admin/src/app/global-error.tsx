@@ -1,3 +1,4 @@
+/* eslint-disable @tarodan/no-hardcoded-turkish -- root error boundary renders outside the intl provider; copy stays hardcoded by design (#222) */
 "use client";
 
 import { useEffect } from "react";

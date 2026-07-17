@@ -52,6 +52,7 @@ export function truncate(str: string, length: number): string {
  */
 export function cancelReasonLabel(reason: string | null | undefined, t: T): string | null {
   if (!reason) return null;
+  /* eslint-disable @tarodan/no-hardcoded-turkish -- backend data match patterns (see docblock), not display copy */
   const STOCKOUT = [
     'Stok tükendi',
     'Stok tükendiği için otomatik iptal edildi',
@@ -62,6 +63,7 @@ export function cancelReasonLabel(reason: string | null | undefined, t: T): stri
   if (reason === 'Alıcı tarafından iptal edildi') return t('admin.shared.cancelReason.buyerCancelled');
   if (reason.startsWith('Satıcı belirlenen süre')) return t('admin.shared.cancelReason.sellerMissedShipping');
   if (reason.startsWith('Süre dolumu')) return t('admin.shared.cancelReason.deadlineExpired');
+  /* eslint-enable @tarodan/no-hardcoded-turkish */
   return reason;
 }
 
@@ -94,6 +96,7 @@ export function statusFilterOptions(
   config: Record<string, { label: string }>,
   opts: { keys?: string[]; allLabel?: string } = {},
 ): { value: string; label: string }[] {
+  // eslint-disable-next-line @tarodan/no-hardcoded-turkish -- default for out-of-slice callers (finance/marketing); dönüşecek onlarla birlikte
   const { keys, allLabel = 'Tümü' } = opts;
   const entries = keys
     ? keys.map((k) => [k, config[k]] as const).filter(([, v]) => Boolean(v))

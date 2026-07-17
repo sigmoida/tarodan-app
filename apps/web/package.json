@@ -61,6 +61,7 @@
     "@playwright/test": "^1.61.1",
     "@tarodan/brand": "workspace:*",
     "@tarodan/eslint-config": "workspace:*",
+    "@tarodan/eslint-plugin": "workspace:*",
     "@tarodan/tsconfig": "workspace:*",
     "@types/node": "^20.19.43",
     "@types/react": "^18.2.42",

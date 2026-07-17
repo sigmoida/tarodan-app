@@ -166,6 +166,7 @@ function PromptDialog({
 export function usePrompt(): PromptFn {
   const ctx = useContext(PromptContext);
   if (!ctx) {
+  // eslint-disable-next-line @tarodan/no-hardcoded-turkish -- developer-facing hook-misuse error
     throw new Error("usePrompt, PromptProvider içinde kullanılmalı");
   }
   return ctx;

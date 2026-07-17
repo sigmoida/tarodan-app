@@ -3866,7 +3866,8 @@
       "orderOrigin": {
         "offer": "Teklif",
         "directSale": "Doğrudan Satış"
-      }
+      },
+      "rateRange": "Oran {min} ile {max} arasında olmalı"
     },
     "auth": {
       "common": {

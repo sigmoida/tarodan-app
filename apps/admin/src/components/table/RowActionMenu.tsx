@@ -46,6 +46,7 @@ export function activeToggleAction(
 	onToggle: () => void,
 ): RowAction {
 	return {
+		// eslint-disable-next-line @tarodan/no-hardcoded-turkish -- callers live in unmigrated slices (finance/marketing); localize with them (#208)
 		label: active ? 'Pasifleştir' : 'Aktifleştir',
 		icon: active ? XCircleIcon : CheckCircleIcon,
 		onClick: onToggle,
@@ -62,8 +63,10 @@ export function editDeleteActions<T>(
 	}: { onEdit: (r: T) => void; onDelete: (r: T) => void; deleteDisabled?: boolean },
 ): RowAction[] {
 	return [
+		// eslint-disable-next-line @tarodan/no-hardcoded-turkish -- callers live in unmigrated slices (finance/marketing); localize with them (#208)
 		{ label: 'Düzenle', icon: PencilIcon, onClick: () => onEdit(row) },
 		{
+			// eslint-disable-next-line @tarodan/no-hardcoded-turkish -- callers live in unmigrated slices (finance/marketing); localize with them (#208)
 			label: 'Sil',
 			icon: TrashIcon,
 			onClick: () => onDelete(row),

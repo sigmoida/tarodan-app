@@ -3866,7 +3866,8 @@
       "orderOrigin": {
         "offer": "Offer",
         "directSale": "Direct Sale"
-      }
+      },
+      "rateRange": "The rate must be between {min} and {max}"
     },
     "auth": {
       "common": {

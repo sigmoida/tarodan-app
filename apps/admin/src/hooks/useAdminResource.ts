@@ -166,6 +166,7 @@ export function useAdminResource<T>({
   limit = 20,
   syncUrl = false,
   initialFilters = {},
+  // eslint-disable-next-line @tarodan/no-hardcoded-turkish -- dead default: error display is owned by SuspenseBoundary (#222)
   errorMessage = "Veriler yüklenemedi",
   debounceMs = 300,
   staleTime = 0,

@@ -38,6 +38,7 @@ export interface Product {
   aiCheckStatus?: string | null;
 }
 
+// eslint-disable-next-line @tarodan/no-hardcoded-turkish -- URL query payload, not display copy
 const PLACEHOLDER = "https://placehold.co/100x100/f3f4f6/666?text=Ürün";
 
 /** Normalize the varied product payload (image url shapes, numeric strings). */
