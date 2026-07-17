@@ -25,8 +25,12 @@ RUN pnpm install --frozen-lockfile --shamefully-hoist
 # Copy app source
 COPY apps/api ./apps/api
 
-# Build workspace packages that API imports at compile time
+# Build workspace packages the API imports. Each publishes a built dist/ (their
+# package.json main/types point at ./dist), so neither tsc (build) nor node
+# (runtime require) can resolve them until built.
 RUN pnpm --filter @tarodan/types build
+RUN pnpm --filter @tarodan/i18n build
+RUN pnpm --filter @tarodan/logger build
 
 # Generate Prisma client
 WORKDIR /app/apps/api
