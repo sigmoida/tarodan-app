@@ -24,6 +24,7 @@ import { PayTRService } from '../payment-providers/paytr.service';
 import { ConfigService } from '@nestjs/config';
 import { MembershipCommonService } from './membership-common.service';
 import { isPremiumEntitled } from './membership.util';
+import { i18nMessage } from '../i18n';
 
 /**
  * MembershipSubscriptionService — abonelik yaşam döngüsü + PayTR/ödeme tarafı:
@@ -52,11 +53,13 @@ export class MembershipSubscriptionService {
     });
 
     if (!tier) {
-      throw new NotFoundException(`Üyelik tipi bulunamadı: ${dto.tierType}`);
+      throw new NotFoundException(
+        i18nMessage('server.membership.tierNotFound', { type: dto.tierType }),
+      );
     }
 
     if (!tier.isActive) {
-      throw new BadRequestException('Bu üyelik tipi aktif değil');
+      throw new BadRequestException(i18nMessage('server.membership.tierNotActive'));
     }
 
     // Business tier can only be subscribed by corporate accounts (users with companyName and taxId)
@@ -67,7 +70,7 @@ export class MembershipSubscriptionService {
       });
 
       if (!user || !user.companyName || !user.taxId) {
-        throw new ForbiddenException('Business üyelik sadece şirket hesapları için geçerlidir');
+        throw new ForbiddenException(i18nMessage('server.membership.businessTierRequiresCompany'));
       }
     }
 
@@ -130,7 +133,7 @@ export class MembershipSubscriptionService {
           });
           return this.common.getUserMembership(userId);
         }
-        throw new BadRequestException('Zaten bu plandasınız');
+        throw new BadRequestException(i18nMessage('server.membership.alreadyOnThisPlan'));
       }
 
       if (direction === 'downgrade') {
@@ -253,11 +256,11 @@ export class MembershipSubscriptionService {
     });
 
     if (!membership) {
-      throw new NotFoundException('Üyelik bulunamadı');
+      throw new NotFoundException(i18nMessage('server.membership.notFound'));
     }
 
     if (membership.tier.type === MembershipTierType.free) {
-      throw new BadRequestException('Ücretsiz üyelik için ödeme gerekmez');
+      throw new BadRequestException(i18nMessage('server.membership.freeTierNoPaymentNeeded'));
     }
 
     // Determine billing period from membership period (monthly or yearly)
@@ -271,7 +274,7 @@ export class MembershipSubscriptionService {
       : membership.tier.monthlyPrice.toNumber();
 
     if (price === 0) {
-      throw new BadRequestException('Bu üyelik seviyesi için ödeme gerekmez');
+      throw new BadRequestException(i18nMessage('server.membership.tierNoPaymentNeeded'));
     }
 
     // Find platform seller for membership orders
@@ -283,7 +286,7 @@ export class MembershipSubscriptionService {
     });
 
     if (!platformSeller) {
-      throw new NotFoundException('Platform seller bulunamadı');
+      throw new NotFoundException(i18nMessage('server.membership.platformSellerNotFound'));
     }
 
     // Find or create a virtual product for membership
@@ -293,7 +296,7 @@ export class MembershipSubscriptionService {
     });
 
     if (!defaultCategory) {
-      throw new NotFoundException('Kategori bulunamadı');
+      throw new NotFoundException(i18nMessage('server.membership.categoryNotFound'));
     }
 
     // Create or find virtual product for membership
@@ -392,15 +395,15 @@ export class MembershipSubscriptionService {
     });
 
     if (!membership) {
-      throw new NotFoundException('Üyelik bulunamadı');
+      throw new NotFoundException(i18nMessage('server.membership.notFound'));
     }
 
     if (membership.tier.type === MembershipTierType.free) {
-      throw new BadRequestException('Ücretsiz üyelik iptal edilemez');
+      throw new BadRequestException(i18nMessage('server.membership.freeTierCannotCancel'));
     }
 
     if (membership.status === SubscriptionStatus.cancelled) {
-      throw new BadRequestException('Üyelik zaten iptal edilmiş');
+      throw new BadRequestException(i18nMessage('server.membership.alreadyCancelled'));
     }
 
     await this.prisma.userMembership.update({
@@ -431,10 +434,10 @@ export class MembershipSubscriptionService {
       where: { userId },
     });
     if (!membership) {
-      throw new NotFoundException('Üyelik bulunamadı');
+      throw new NotFoundException(i18nMessage('server.membership.notFound'));
     }
     if (!membership.scheduledTierType && !membership.scheduledBillingPeriod) {
-      throw new BadRequestException('Bekleyen bir üyelik değişikliği yok');
+      throw new BadRequestException(i18nMessage('server.membership.noPendingChange'));
     }
     await this.prisma.userMembership.update({
       where: { userId },
@@ -456,7 +459,7 @@ export class MembershipSubscriptionService {
     });
 
     if (!membership) {
-      throw new NotFoundException('Üyelik bulunamadı');
+      throw new NotFoundException(i18nMessage('server.membership.notFound'));
     }
 
     // Otomatik yenileme yalnızca HATIRLATMA-tabanlıdır: dönem bitişinde bildirim
@@ -711,7 +714,7 @@ export class MembershipSubscriptionService {
       where: { id: cardId, userId },
     });
     if (!card) {
-      throw new NotFoundException('Kayıtlı kart bulunamadı');
+      throw new NotFoundException(i18nMessage('server.membership.savedCardNotFound'));
     }
     if (card.status === SavedCardStatus.revoked) {
       return { deleted: true }; // idempotent

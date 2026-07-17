@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma';
+import { i18nMessage } from '../i18n';
 import { CreateOrderDto, DirectBuyDto, CheckoutDto } from './dto';
 import { OrderStatus, OfferStatus, ProductStatus, Prisma } from '@prisma/client';
 import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
@@ -53,7 +54,7 @@ export class OrderCheckoutDirectService {
     // Validate DTO has necessary address info
     if (!dto.shippingAddressId && !dto.shippingAddress) {
       this.logger.error('[createDirectOrder] No shipping address provided');
-      throw new BadRequestException('Teslimat adresi gereklidir (shippingAddressId veya shippingAddress)');
+      throw new BadRequestException(i18nMessage('server.order.shippingAddressRequiredWithFields'));
     }
     
     // Check if user is banned
@@ -63,7 +64,7 @@ export class OrderCheckoutDirectService {
     });
 
     if (buyer?.isBanned) {
-      throw new ForbiddenException('Hesabınız banlanmış. Yeni sipariş oluşturamazsınız.');
+      throw new ForbiddenException(i18nMessage('server.order.accountBanned'));
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -74,7 +75,7 @@ export class OrderCheckoutDirectService {
         FOR UPDATE
       `;
       if (!lockedRows?.length) {
-        throw new NotFoundException('Ürün bulunamadı');
+        throw new NotFoundException(i18nMessage('server.order.productNotFound'));
       }
 
       const product = await tx.product.findUnique({
@@ -87,7 +88,7 @@ export class OrderCheckoutDirectService {
       });
 
       if (!product) {
-        throw new NotFoundException('Ürün bulunamadı');
+        throw new NotFoundException(i18nMessage('server.order.productNotFound'));
       }
 
       // Aynı alıcının bu ürün için bekleyen (ödeme yapılmamış) siparişi varsa onu döndür, yeni sipariş açma
@@ -119,18 +120,18 @@ export class OrderCheckoutDirectService {
 
       // Ürün satışta değilse (sold, inactive vb.) hata ver
       if (product.status !== ProductStatus.active) {
-        throw new BadRequestException('Bu ürün satışta değil veya başkası tarafından satın alınıyor');
+        throw new BadRequestException(i18nMessage('server.order.productNotActive'));
       }
 
       // Adet bazlı stok kontrolü: müsait adet >= 1 olmalı
       const available = getAvailableQuantity(product);
       if (available !== null && available < 1) {
-        throw new BadRequestException('Bu ürün stokta bulunmamaktadır');
+        throw new BadRequestException(i18nMessage('server.order.productOutOfStock'));
       }
 
       // Cannot buy own product
       if (product.sellerId === buyerId) {
-        throw new ForbiddenException('Kendi ürününüzü satın alamazsınız');
+        throw new ForbiddenException(i18nMessage('server.order.cannotBuyOwnProduct'));
       }
 
       // Resolve shipping address - either from saved address or inline address
@@ -144,26 +145,26 @@ export class OrderCheckoutDirectService {
         });
 
         if (!savedAddress || savedAddress.userId !== buyerId) {
-          throw new BadRequestException('Geçersiz teslimat adresi');
+          throw new BadRequestException(i18nMessage('server.order.invalidShippingAddress'));
         }
         shippingAddress = savedAddress;
         shippingAddressId = savedAddress.id;
       } else if (dto.shippingAddress) {
         // Validate required fields
         if (!dto.shippingAddress.fullName?.trim()) {
-          throw new BadRequestException('Teslimat adresi için ad soyad gereklidir');
+          throw new BadRequestException(i18nMessage('server.order.shippingAddressNameRequired'));
         }
         if (!dto.shippingAddress.phone?.trim()) {
-          throw new BadRequestException('Teslimat adresi için telefon numarası gereklidir');
+          throw new BadRequestException(i18nMessage('server.order.shippingAddressPhoneRequired'));
         }
         if (!dto.shippingAddress.city?.trim()) {
-          throw new BadRequestException('Teslimat adresi için şehir gereklidir');
+          throw new BadRequestException(i18nMessage('server.order.shippingAddressCityRequired'));
         }
         if (!dto.shippingAddress.district?.trim()) {
-          throw new BadRequestException('Teslimat adresi için ilçe gereklidir');
+          throw new BadRequestException(i18nMessage('server.order.shippingAddressDistrictRequired'));
         }
         if (!dto.shippingAddress.address?.trim()) {
-          throw new BadRequestException('Teslimat adresi için açık adres gereklidir');
+          throw new BadRequestException(i18nMessage('server.order.shippingAddressLineRequired'));
         }
         
         // Use inline address object - create a new address for the user
@@ -183,7 +184,7 @@ export class OrderCheckoutDirectService {
         shippingAddress = newAddress;
         shippingAddressId = newAddress.id;
       } else {
-        throw new BadRequestException('Teslimat adresi gereklidir');
+        throw new BadRequestException(i18nMessage('server.order.shippingAddressRequired'));
       }
 
       // Resolve billing address: inline object > saved address ID > same as shipping
@@ -205,7 +206,7 @@ export class OrderCheckoutDirectService {
           where: { id: dto.billingAddressId },
         });
         if (!billing || billing.userId !== buyerId) {
-          throw new BadRequestException('Geçersiz fatura adresi');
+          throw new BadRequestException(i18nMessage('server.order.invalidBillingAddress'));
         }
         billingAddress = billing;
       }
@@ -241,7 +242,7 @@ export class OrderCheckoutDirectService {
           appliedCouponCode = dto.couponCode.toUpperCase();
           appliedDiscountId = validation.discount.id;
         } else if (!validation.isValid) {
-          throw new BadRequestException(validation.error || 'Kupon kodu geçersiz');
+          throw new BadRequestException(validation.error || i18nMessage('server.order.invalidCouponCode'));
         }
       }
       
@@ -461,7 +462,7 @@ export class OrderCheckoutDirectService {
       select: { isBanned: true },
     });
     if (buyer?.isBanned) {
-      throw new ForbiddenException('Hesabınız banlanmış. Yeni sipariş oluşturamazsınız.');
+      throw new ForbiddenException(i18nMessage('server.order.accountBanned'));
     }
 
     return this.group.createCheckoutGroup({ buyerId, dto, isGuest: false });
@@ -484,7 +485,7 @@ export class OrderCheckoutDirectService {
     });
 
     if (buyer?.isBanned) {
-      throw new ForbiddenException('Hesabınız banlanmış. Yeni sipariş oluşturamazsınız.');
+      throw new ForbiddenException(i18nMessage('server.order.accountBanned'));
     }
     let productIdForCache: string | null = null;
     
@@ -502,17 +503,17 @@ export class OrderCheckoutDirectService {
       });
 
       if (!offer) {
-        throw new NotFoundException('Teklif bulunamadı');
+        throw new NotFoundException(i18nMessage('server.order.offerNotFound'));
       }
 
       // Only buyer can create order
       if (offer.buyerId !== buyerId) {
-        throw new ForbiddenException('Bu tekliften sipariş oluşturma yetkiniz yok');
+        throw new ForbiddenException(i18nMessage('server.order.offerOrderForbidden'));
       }
 
       // Offer must be accepted
       if (offer.status !== OfferStatus.accepted) {
-        throw new BadRequestException('Sadece kabul edilmiş tekliflerden sipariş oluşturulabilir');
+        throw new BadRequestException(i18nMessage('server.order.offerNotAccepted'));
       }
 
       // Check if order already exists for this offer
@@ -521,7 +522,7 @@ export class OrderCheckoutDirectService {
       });
 
       if (existingOrder) {
-        throw new BadRequestException('Bu teklif için zaten bir sipariş mevcut');
+        throw new BadRequestException(i18nMessage('server.order.offerAlreadyHasOrder'));
       }
 
       // Validate shipping address belongs to buyer
@@ -530,7 +531,7 @@ export class OrderCheckoutDirectService {
       });
 
       if (!shippingAddress || shippingAddress.userId !== buyerId) {
-        throw new BadRequestException('Geçersiz teslimat adresi');
+        throw new BadRequestException(i18nMessage('server.order.invalidShippingAddress'));
       }
 
       // Validate billing address if provided
@@ -541,7 +542,7 @@ export class OrderCheckoutDirectService {
         });
 
         if (!billingAddress || billingAddress.userId !== buyerId) {
-          throw new BadRequestException('Geçersiz fatura adresi');
+          throw new BadRequestException(i18nMessage('server.order.invalidBillingAddress'));
         }
       }
 

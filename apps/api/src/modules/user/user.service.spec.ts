@@ -65,16 +65,16 @@ describe('UserService deleteAddress (edge case 1.11)', () => {
     mockPrisma.order.count.mockResolvedValue(1);
 
     await expect(service.deleteAddress('user-1', 'addr-1')).rejects.toThrow(BadRequestException);
-    await expect(service.deleteAddress('user-1', 'addr-1')).rejects.toThrow(
-      /devam eden siparişleriniz var/i,
-    );
+    await expect(service.deleteAddress('user-1', 'addr-1')).rejects.toMatchObject({
+      response: { i18nKey: 'server.user.addressHasOpenOrders' },
+    });
     expect(mockPrisma.address.delete).not.toHaveBeenCalled();
   });
 
   it('deletes address when no blocking orders', async () => {
     mockPrisma.order.count.mockResolvedValue(0);
 
-    const result = await service.deleteAddress('user-1', 'addr-1');
+    await service.deleteAddress('user-1', 'addr-1');
 
     expect(mockPrisma.order.count).toHaveBeenCalledWith({
       where: {
@@ -86,7 +86,6 @@ describe('UserService deleteAddress (edge case 1.11)', () => {
       },
     });
     expect(mockPrisma.address.delete).toHaveBeenCalledWith({ where: { id: 'addr-1' } });
-    expect(result.message).toBe('Adres silindi');
   });
 
   it('throws NotFoundException when address not owned by user', async () => {

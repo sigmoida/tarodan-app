@@ -1,4 +1,5 @@
 import { Injectable, Logger, ForbiddenException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { i18nMessage } from '../i18n';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 import { MembershipService } from '../membership/membership.service';
@@ -56,12 +57,12 @@ export class ProductCreateService {
     });
 
     if (!seller) {
-      throw new ForbiddenException('Kullanıcı bulunamadı');
+      throw new ForbiddenException(i18nMessage('server.product.userNotFound'));
     }
 
     // Check if user is banned
     if (seller.isBanned) {
-      throw new ForbiddenException('Hesabınız banlanmış. Yeni ürün ekleyemezsiniz.');
+      throw new ForbiddenException(i18nMessage('server.product.bannedCannotCreate'));
     }
 
     // ========================================================================
@@ -71,9 +72,9 @@ export class ProductCreateService {
     if (!canCreate.allowed) {
       // Get detailed limits for error message
       const limits = await this.membershipService.getUserLimits(sellerId);
+      const maxListings = limits.remainingTotalListings + await this.stats.getActiveListingCount(sellerId);
       throw new ForbiddenException(
-        `İlan limitinize ulaştınız. Mevcut üyeliğiniz (${limits.tierName}) ile maksimum ${limits.remainingTotalListings + await this.stats.getActiveListingCount(sellerId)} ilan oluşturabilirsiniz. ` +
-        `Daha fazla ilan eklemek için üyeliğinizi yükseltin.`
+        i18nMessage('server.product.listingLimitReached', { tierName: limits.tierName, maxListings }),
       );
     }
 
@@ -81,8 +82,11 @@ export class ProductCreateService {
     const limits = await this.membershipService.getUserLimits(sellerId);
     if (dto.images && dto.images.length > limits.maxImages) {
       throw new BadRequestException(
-        `Üyeliğiniz (${limits.tierName}) ile ilan başına maksimum ${limits.maxImages} görsel yükleyebilirsiniz. ` +
-        `${dto.images.length} görsel gönderdiniz.`
+        i18nMessage('server.product.imageLimitExceeded', {
+          tierName: limits.tierName,
+          maxImages: limits.maxImages,
+          sentCount: dto.images.length,
+        }),
       );
     }
 
@@ -95,7 +99,7 @@ export class ProductCreateService {
         const verdict = await this.moderationAi.moderateImage(url);
         if (verdict?.decision === 'flag') {
           throw new BadRequestException(
-            'Yüklediğiniz resim uygun değildir. Lütfen uygun bir ürün görseli yükleyin.',
+            i18nMessage('server.product.imageNotAppropriate'),
           );
         }
       }
@@ -134,7 +138,7 @@ export class ProductCreateService {
     });
 
     if (!category || !category.isActive) {
-      throw new BadRequestException('Geçersiz kategori');
+      throw new BadRequestException(i18nMessage('server.product.invalidCategory'));
     }
 
     // ========================================================================
@@ -156,13 +160,13 @@ export class ProductCreateService {
 
     if (minPrice != null && !isNaN(minPrice) && dto.price < minPrice) {
       throw new BadRequestException(
-        `Ürün fiyatı minimum ${minPrice} TL olmalıdır.`
+        i18nMessage('server.product.priceBelowMinimum', { minPrice }),
       );
     }
 
     if (maxPrice != null && !isNaN(maxPrice) && dto.price > maxPrice) {
       throw new BadRequestException(
-        `Ürün fiyatı maksimum ${maxPrice} TL olabilir.`
+        i18nMessage('server.product.priceAboveMaximum', { maxPrice }),
       );
     }
 
@@ -284,30 +288,30 @@ export class ProductCreateService {
       });
 
       if (!productWithAttrs) {
-        throw new BadRequestException('Ürün oluşturuldu ancak yüklenemedi. Lütfen tekrar deneyin.');
+        throw new BadRequestException(i18nMessage('server.product.createdButLoadFailed'));
       }
       return await this.common.formatProductResponse(productWithAttrs);
     } catch (err: any) {
       const code = err?.code;
       if (code === 'P2003') {
         throw new BadRequestException(
-          'Seçilen marka, model veya üretici geçersiz. Lütfen listeden tekrar seçin.'
+          i18nMessage('server.product.invalidBrandModelManufacturer'),
         );
       }
       if (code === 'P2002') {
-        throw new BadRequestException('Bu ürün zaten mevcut veya benzersiz alan çakışması var.');
+        throw new BadRequestException(i18nMessage('server.product.duplicateProduct'));
       }
       // Zaten HTTP exception ise (400, 403 vb.) aynen fırlat
       if (err?.status && err?.status >= 400 && err?.status < 500) {
         throw err;
       }
-      // Diğer hataları logla ve 500 döndür (mesajda development'ta detay göster)
+      // Diğer hataları logla ve 500 döndür (development'ta ham hata mesajı debug için
+      // korunur — kullanıcıya görünen katalog mesajı DEĞİLDİR, i18n dışı bırakıldı)
       this.logger.error('Product create failed', err?.stack || err?.message || err);
-      const message =
-        process.env.NODE_ENV === 'development' && err?.message
-          ? `İlan oluşturulamadı: ${err.message}`
-          : 'İlan oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.';
-      throw new InternalServerErrorException(message);
+      if (process.env.NODE_ENV === 'development' && err?.message) {
+        throw new InternalServerErrorException(`İlan oluşturulamadı: ${err.message}`);
+      }
+      throw new InternalServerErrorException(i18nMessage('server.product.createFailedGeneric'));
     }
   }
 }

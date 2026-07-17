@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
+import { i18nMessage } from '../i18n';
 
 /**
  * UserBankService — satıcı banka hesabı: getBankAccount, upsertBankAccount
@@ -50,7 +51,7 @@ export class UserBankService {
       where: { userId },
     });
     if (!existing) {
-      throw new NotFoundException('Banka hesabı bulunamadı');
+      throw new NotFoundException(i18nMessage('server.user.bankAccountNotFound'));
     }
     await this.prisma.sellerBankAccount.delete({ where: { userId } });
     return { success: true };

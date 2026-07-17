@@ -15,6 +15,7 @@ import {
   DEFAULT_ROLE_PERMISSIONS,
   migrateLegacyPermissions,
 } from "../../admin/dto/role-permissions.dto";
+import { i18nMessage } from "../../i18n";
 
 // ── URL → izin anahtarı eşleşmesi ──────────────────────────────────────────
 //
@@ -151,7 +152,7 @@ export class RolesGuard implements CanActivate {
     const { user } = req;
 
     if (!user || !user.isAdmin || !user.role) {
-      throw new ForbiddenException("Bu işlem için yetkiniz yok");
+      throw new ForbiddenException(i18nMessage("server.auth.noPermission"));
     }
 
     // ── 1. Rol kontrolü (mevcut davranış, değişmedi) ──────────────────────
@@ -159,7 +160,9 @@ export class RolesGuard implements CanActivate {
       const hasRole = requiredRoles.some((r) => user.role === r);
       if (!hasRole) {
         throw new ForbiddenException(
-          `Bu işlem için ${requiredRoles.join(" veya ")} rolü gerekiyor`,
+          i18nMessage("server.auth.roleRequired", {
+            roles: requiredRoles.join(" veya "),
+          }),
         );
       }
     }
@@ -190,7 +193,7 @@ export class RolesGuard implements CanActivate {
         !ROLE_ONLY_ADMIN_SEGMENTS.has(seg)
       ) {
         throw new ForbiddenException(
-          "Bu admin işlemi için tanımlı bir izin bulunamadı; erişim reddedildi",
+          i18nMessage("server.auth.noPermissionDefined"),
         );
       }
       return true; // Bilinmeyen route — sadece rol yeterli
@@ -201,7 +204,10 @@ export class RolesGuard implements CanActivate {
 
     if (!permKeys.some((k) => rolePerms.includes(k))) {
       throw new ForbiddenException(
-        `Bu işlem için [${permKeys.join(", ")}] izinlerinden biri gerekiyor. Rol: ${user.role}`,
+        i18nMessage("server.auth.permissionRequired", {
+          perms: permKeys.join(", "),
+          role: user.role,
+        }),
       );
     }
 

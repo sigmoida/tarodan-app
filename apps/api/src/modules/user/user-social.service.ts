@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto';
 import { UserCommonService } from './user-common.service';
+import { i18nMessage } from '../i18n';
 
 // In-memory storage for user blocks until schema is updated
 interface UserBlock {
@@ -53,7 +54,7 @@ export class UserSocialService {
    */
   async followUser(currentUserId: string, targetUserId: string) {
     if (currentUserId === targetUserId) {
-      throw new BadRequestException('Kendinizi takip edemezsiniz');
+      throw new BadRequestException(i18nMessage('server.user.cannotFollowSelf'));
     }
 
     // Check if target user exists
@@ -62,7 +63,7 @@ export class UserSocialService {
     });
 
     if (!targetUser) {
-      throw new NotFoundException('Kullanıcı bulunamadı');
+      throw new NotFoundException(i18nMessage('server.user.notFound'));
     }
 
     // Check if already following
@@ -76,7 +77,10 @@ export class UserSocialService {
     });
 
     if (existingFollow) {
-      return { 
+      // #224: bu iki başarı mesajı (satır burada + fonksiyon sonu) durum-bağımlı dal
+      // (zaten takip ediyor vs yeni takip, bildirim yan etkisiyle iç içe) — locale
+      // servise akmıyor, invasive, taşınmadı (rapora bkz).
+      return {
         message: 'Zaten takip ediyorsunuz',
         following: true,
       };
@@ -126,9 +130,9 @@ export class UserSocialService {
   /**
    * Unfollow a user
    */
-  async unfollowUser(currentUserId: string, targetUserId: string) {
+  async unfollowUser(currentUserId: string, targetUserId: string): Promise<{ following: boolean }> {
     if (currentUserId === targetUserId) {
-      throw new BadRequestException('Kendinizi takipten çıkaramazsınız');
+      throw new BadRequestException(i18nMessage('server.user.cannotUnfollowSelf'));
     }
 
     // Delete follow relationship
@@ -145,8 +149,9 @@ export class UserSocialService {
       // Not following, ignore
     }
 
-    return { 
-      message: 'Takip bırakıldı',
+    // #224: mesaj artık UserController.unfollowUser() tarafından locale'e göre
+    // kuruluyor (server.user.unfollowed) — servis burada sabit metin döndürmüyor.
+    return {
       following: false,
     };
   }
@@ -193,10 +198,10 @@ export class UserSocialService {
   /**
    * Block a user
    */
-  async blockUser(blockerId: string, blockedId: string): Promise<{ success: boolean; message: string }> {
+  async blockUser(blockerId: string, blockedId: string): Promise<{ success: boolean; blockedDisplayName: string }> {
     // Cannot block yourself
     if (blockerId === blockedId) {
-      throw new BadRequestException('Kendinizi engelleyemezsiniz');
+      throw new BadRequestException(i18nMessage('server.user.cannotBlockSelf'));
     }
 
     // Check if blocked user exists
@@ -206,7 +211,7 @@ export class UserSocialService {
     });
 
     if (!blockedUser) {
-      throw new NotFoundException('Kullanıcı bulunamadı');
+      throw new NotFoundException(i18nMessage('server.user.notFound'));
     }
 
     // Check if already blocked
@@ -215,7 +220,7 @@ export class UserSocialService {
     );
 
     if (existingBlock) {
-      throw new BadRequestException('Bu kullanıcı zaten engellenmiş');
+      throw new BadRequestException(i18nMessage('server.user.alreadyBlocked'));
     }
 
     // Create block
@@ -230,20 +235,23 @@ export class UserSocialService {
 
     this.logger.log(`User ${blockerId} blocked user ${blockedId}`);
 
-    return { success: true, message: `${blockedUser.displayName} engellendi` };
+    // #224: mesaj artık UserController.blockUser() tarafından locale'e göre
+    // kuruluyor (server.user.userBlocked, {displayName} parametreli) — servis
+    // burada sabit metin döndürmüyor.
+    return { success: true, blockedDisplayName: blockedUser.displayName };
   }
 
   /**
    * Unblock a user
    */
-  async unblockUser(blockerId: string, blockedId: string): Promise<{ success: boolean; message: string }> {
+  async unblockUser(blockerId: string, blockedId: string): Promise<{ success: boolean }> {
     // Find the block
     const block = Array.from(this.userBlocks.values()).find(
       (b) => b.blockerId === blockerId && b.blockedId === blockedId
     );
 
     if (!block) {
-      throw new NotFoundException('Bu kullanıcı engellenmemiş');
+      throw new NotFoundException(i18nMessage('server.user.notBlocked'));
     }
 
     // Remove block
@@ -251,7 +259,9 @@ export class UserSocialService {
 
     this.logger.log(`User ${blockerId} unblocked user ${blockedId}`);
 
-    return { success: true, message: 'Engel kaldırıldı' };
+    // #224: mesaj artık UserController.unblockUser() tarafından locale'e göre
+    // kuruluyor (server.user.userUnblocked) — servis burada sabit metin döndürmüyor.
+    return { success: true };
   }
 
   /**

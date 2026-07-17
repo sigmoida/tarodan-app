@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import appleSignin from 'apple-signin-auth';
+import { i18nMessage } from '../i18n';
 
 export interface AppleProfile {
   sub: string;
@@ -31,14 +32,14 @@ export class AppleAuthService {
       });
     } catch (e) {
       this.logger.warn(`Apple token verify failed: ${e instanceof Error ? e.message : e}`);
-      throw new UnauthorizedException('Apple oturumu doğrulanamadı');
+      throw new UnauthorizedException(i18nMessage('server.auth.appleSessionVerifyFailed'));
     }
     if (!payload?.sub || !payload?.email) {
-      throw new UnauthorizedException('Apple oturumu geçersiz');
+      throw new UnauthorizedException(i18nMessage('server.auth.appleSessionInvalid'));
     }
     const emailVerified = payload.email_verified === true || payload.email_verified === 'true';
     if (!emailVerified) {
-      throw new UnauthorizedException('Apple hesabınızın e-postası doğrulanmamış');
+      throw new UnauthorizedException(i18nMessage('server.auth.appleEmailNotVerified'));
     }
     const isPrivate = payload.is_private_email === true || payload.is_private_email === 'true';
     return {

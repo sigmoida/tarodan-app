@@ -1,5 +1,6 @@
-import { IsString, IsOptional, MinLength, MaxLength, Matches, IsDateString, IsBoolean, ValidateIf } from 'class-validator';
+import { IsString, IsOptional, MinLength, MaxLength, Matches, IsDateString, IsBoolean, IsIn, ValidateIf } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { locales, type Locale } from '@tarodan/i18n';
 
 export class UpdateProfileDto {
   @ApiPropertyOptional({
@@ -93,4 +94,13 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsBoolean()
   showTrustScore?: boolean;
+
+  @ApiPropertyOptional({
+    example: 'tr',
+    enum: locales,
+    description: 'Preferred language for API messages, emails and notifications (#224)',
+  })
+  @IsOptional()
+  @IsIn(locales)
+  preferredLanguage?: Locale;
 }

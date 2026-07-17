@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
+import { i18nMessage } from '../i18n';
 import { OrderQueryDto, GuestOrderTrackDto } from './dto';
 import { OrderStatus, Prisma } from '@prisma/client';
 import { OrderCommonService } from './order-common.service';
@@ -40,7 +41,7 @@ export class OrderQueryService {
     });
 
     if (!order) {
-      throw new NotFoundException('Sipariş bulunamadı');
+      throw new NotFoundException(i18nMessage('server.order.notFound'));
     }
 
     // Verify email matches - check guest email in shippingAddress or buyer email
@@ -48,9 +49,9 @@ export class OrderQueryService {
     const guestEmail = shippingData?.guestEmail?.toLowerCase();
     const buyerEmail = order.buyer.email?.toLowerCase();
     const inputEmail = dto.email.toLowerCase();
-    
+
     if (guestEmail !== inputEmail && buyerEmail !== inputEmail) {
-      throw new NotFoundException('Sipariş bulunamadı');
+      throw new NotFoundException(i18nMessage('server.order.notFound'));
     }
 
     return {
@@ -234,12 +235,12 @@ export class OrderQueryService {
     });
 
     if (!order) {
-      throw new NotFoundException('Sipariş bulunamadı');
+      throw new NotFoundException(i18nMessage('server.order.notFound'));
     }
 
     // Only buyer or seller can view the order
     if (order.buyerId !== userId && order.sellerId !== userId) {
-      throw new ForbiddenException('Bu siparişi görüntüleme yetkiniz yok');
+      throw new ForbiddenException(i18nMessage('server.order.viewForbidden'));
     }
 
     return await this.orderCommon.formatOrderResponse(order, userId);
@@ -348,10 +349,10 @@ export class OrderQueryService {
     });
 
     if (!group) {
-      throw new NotFoundException('Sipariş grubu bulunamadı');
+      throw new NotFoundException(i18nMessage('server.order.groupNotFound'));
     }
     if (group.buyerId !== userId) {
-      throw new ForbiddenException('Bu sipariş grubunu görüntüleme yetkiniz yok');
+      throw new ForbiddenException(i18nMessage('server.order.groupViewForbidden'));
     }
 
     return {

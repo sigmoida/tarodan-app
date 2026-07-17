@@ -3,6 +3,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { IS_ADMIN_ROUTE_KEY } from '../decorators/admin-route.decorator';
+import { i18nMessage } from '../../i18n';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
@@ -63,7 +64,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
     // For protected routes, require authentication
     if (err || !user) {
-      throw err || new UnauthorizedException('Oturum açmanız gerekiyor');
+      throw err || new UnauthorizedException(i18nMessage('server.auth.loginRequired'));
     }
     return user;
   }

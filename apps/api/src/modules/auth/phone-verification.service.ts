@@ -7,6 +7,7 @@ import {
 import * as crypto from 'crypto';
 import { PrismaService } from '../../prisma';
 import { NetGsmProvider } from '../notification/providers/netgsm.provider';
+import { i18nMessage } from '../i18n';
 
 @Injectable()
 export class PhoneVerificationService {
@@ -28,12 +29,12 @@ export class PhoneVerificationService {
     return crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
   }
 
-  async sendCode(userId: string, phone: string): Promise<{ message: string }> {
+  async sendCode(userId: string, phone: string): Promise<void> {
     const normalized = this.netgsm.formatTurkishNumber(phone);
 
     // M5: Geçersiz numarayı erken reddet ('+' veya çöp giriş)
     if (!/^\+905\d{9}$/.test(normalized)) {
-      throw new BadRequestException('Geçersiz telefon numarası');
+      throw new BadRequestException(i18nMessage('server.auth.invalidPhoneNumber'));
     }
 
     // I2: Sadece DOĞRULANMIŞ bir sahip çakışma sayılır; doğrulanmamış holder engel değil.
@@ -41,7 +42,7 @@ export class PhoneVerificationService {
       where: { phone: normalized, isPhoneVerified: true, id: { not: userId } },
     });
     if (taken) {
-      throw new ConflictException('Bu telefon numarası başka bir hesapta kayıtlı');
+      throw new ConflictException(i18nMessage('server.auth.phoneAlreadyRegisteredOtherAccount'));
     }
 
     // I1 + M1: Cooldown, son token'a göre hesaplanır (usedAt'tan bağımsız).
@@ -55,7 +56,7 @@ export class PhoneVerificationService {
       last &&
       Date.now() - new Date(last.createdAt).getTime() < PhoneVerificationService.RESEND_COOLDOWN_MS
     ) {
-      throw new BadRequestException('Çok sık deneme. Lütfen biraz sonra tekrar deneyin.');
+      throw new BadRequestException(i18nMessage('server.auth.phoneVerificationTooFrequent'));
     }
 
     // I2: user.phone burada YAZILMIYOR; telefon yalnızca başarılı verify'da kalıcı hale gelir.
@@ -76,29 +77,32 @@ export class PhoneVerificationService {
     const result = await this.netgsm.sendOtp(normalized, code);
     if (!result.success) {
       await this.prisma.phoneVerificationToken.delete({ where: { id: created.id } });
-      throw new BadRequestException(result.error || 'SMS gönderilemedi');
+      // NetGSM'in kendi hata metni varsa onu koru (harici sağlayıcı detayı, katalogda
+      // karşılığı yok); yoksa genel "SMS gönderilemedi" katalog anahtarına düş.
+      if (result.error) {
+        throw new BadRequestException(result.error);
+      }
+      throw new BadRequestException(i18nMessage('server.auth.smsSendFailed'));
     }
 
-    return { message: 'Doğrulama kodu telefonunuza gönderildi' };
+    // #224: başarı mesajı AuthController.sendPhoneCode() tarafından locale'e göre
+    // kuruluyor (server.auth.phoneVerificationCodeSent).
   }
 
-  async verify(
-    userId: string,
-    code: string,
-  ): Promise<{ message: string; isPhoneVerified: true }> {
+  async verify(userId: string, code: string): Promise<{ isPhoneVerified: true }> {
     const token = await this.prisma.phoneVerificationToken.findFirst({
       where: { userId, usedAt: null },
       orderBy: { createdAt: 'desc' },
     });
 
     if (!token) {
-      throw new BadRequestException('Aktif doğrulama kodu yok. Yeni kod isteyin.');
+      throw new BadRequestException(i18nMessage('server.auth.noActiveVerificationCode'));
     }
     if (new Date(token.expiresAt) < new Date()) {
-      throw new BadRequestException('Kodun süresi doldu. Yeni kod isteyin.');
+      throw new BadRequestException(i18nMessage('server.auth.verificationCodeExpired'));
     }
     if (token.attempts >= PhoneVerificationService.MAX_ATTEMPTS) {
-      throw new BadRequestException('Çok fazla yanlış deneme. Yeni kod isteyin.');
+      throw new BadRequestException(i18nMessage('server.auth.tooManyWrongAttempts'));
     }
 
     if (token.codeHash !== this.hash(code)) {
@@ -106,7 +110,7 @@ export class PhoneVerificationService {
         where: { id: token.id },
         data: { attempts: { increment: 1 } },
       });
-      throw new BadRequestException('Kod hatalı');
+      throw new BadRequestException(i18nMessage('server.auth.wrongVerificationCode'));
     }
 
     // I2: Yarış koruması — başka biri bu numarayı verify etmiş mi?
@@ -114,7 +118,7 @@ export class PhoneVerificationService {
       where: { phone: token.phone, isPhoneVerified: true, id: { not: userId } },
     });
     if (dup) {
-      throw new ConflictException('Bu telefon numarası başka bir hesapta kayıtlı');
+      throw new ConflictException(i18nMessage('server.auth.phoneAlreadyRegisteredOtherAccount'));
     }
 
     // I2: Telefon numarasını ve doğrulama durumunu atomik olarak yaz.
@@ -126,7 +130,7 @@ export class PhoneVerificationService {
     } catch (error: any) {
       // P2002: unique constraint ihlali (nadir yarış durumu) — ek savunma katmanı
       if (error?.code === 'P2002') {
-        throw new ConflictException('Bu telefon numarası başka bir hesapta kayıtlı');
+        throw new ConflictException(i18nMessage('server.auth.phoneAlreadyRegisteredOtherAccount'));
       }
       throw error;
     }
@@ -136,6 +140,8 @@ export class PhoneVerificationService {
       data: { usedAt: new Date() },
     });
 
-    return { message: 'Telefon numaranız doğrulandı', isPhoneVerified: true };
+    // #224: başarı mesajı AuthController.verifyPhone() tarafından locale'e göre
+    // kuruluyor (server.auth.phoneVerificationSuccess).
+    return { isPhoneVerified: true };
   }
 }

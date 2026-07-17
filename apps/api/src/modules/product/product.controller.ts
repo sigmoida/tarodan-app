@@ -27,6 +27,7 @@ import {
   ApiQuery,
 } from "@nestjs/swagger";
 import { Request } from "express";
+import { type Locale } from "@tarodan/i18n";
 import { ProductService } from "./product.service";
 import { ProductBoostService } from "./product-boost.service";
 import {
@@ -39,6 +40,7 @@ import {
 } from "./dto";
 import { PaymentProvider } from "../payment/dto";
 import { JwtAuthGuard, Public, CurrentUser } from "../auth";
+import { I18nService, ReqLocale, i18nMessage } from "../i18n";
 
 @ApiTags("products")
 @Controller("products")
@@ -48,6 +50,7 @@ export class ProductController {
   constructor(
     private readonly productService: ProductService,
     private readonly productBoostService: ProductBoostService,
+    private readonly i18n: I18nService,
   ) {}
 
   /**
@@ -254,7 +257,7 @@ export class ProductController {
   })
   async getMyListingStats(@CurrentUser("id") sellerId: string) {
     if (!sellerId) {
-      throw new BadRequestException("Kullanıcı kimliği bulunamadı");
+      throw new BadRequestException(i18nMessage("server.product.userIdNotFound"));
     }
     try {
       return await this.productService.getSellerListingStats(sellerId);
@@ -270,7 +273,7 @@ export class ProductController {
         "getMyListingStats failed",
         error instanceof Error ? error.stack : String(error),
       );
-      throw new BadRequestException("İlan istatistikleri alınamadı");
+      throw new BadRequestException(i18nMessage("server.product.listingStatsFailed"));
     }
   }
 
@@ -315,7 +318,7 @@ export class ProductController {
         errorHttpStatusCode: 400,
         exceptionFactory: () =>
           new BadRequestException(
-            "Geçersiz ürün ID formatı. UUID formatında olmalıdır (örn: a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11)",
+            i18nMessage("server.product.invalidIdFormatDetailed"),
           ),
       }),
     )
@@ -339,7 +342,7 @@ export class ProductController {
       new ParseUUIDPipe({
         errorHttpStatusCode: 400,
         exceptionFactory: () =>
-          new BadRequestException("Geçersiz ürün ID formatı"),
+          new BadRequestException(i18nMessage("server.product.invalidIdFormat")),
       }),
     )
     id: string,
@@ -395,7 +398,7 @@ export class ProductController {
       new ParseUUIDPipe({
         errorHttpStatusCode: 400,
         exceptionFactory: () =>
-          new BadRequestException("Geçersiz ürün ID formatı"),
+          new BadRequestException(i18nMessage("server.product.invalidIdFormat")),
       }),
     )
     id: string,
@@ -429,7 +432,7 @@ export class ProductController {
       new ParseUUIDPipe({
         errorHttpStatusCode: 400,
         exceptionFactory: () =>
-          new BadRequestException("Geçersiz ürün ID formatı"),
+          new BadRequestException(i18nMessage("server.product.invalidIdFormat")),
       }),
     )
     id: string,
@@ -466,13 +469,15 @@ export class ProductController {
       new ParseUUIDPipe({
         errorHttpStatusCode: 400,
         exceptionFactory: () =>
-          new BadRequestException("Geçersiz ürün ID formatı"),
+          new BadRequestException(i18nMessage("server.product.invalidIdFormat")),
       }),
     )
     id: string,
     @CurrentUser("id") sellerId: string,
+    @ReqLocale() locale: Locale,
   ) {
-    return this.productService.remove(id, sellerId);
+    await this.productService.remove(id, sellerId);
+    return { message: this.i18n.translate("server.product.deleted", locale) };
   }
 
   // ==========================================================================
@@ -507,7 +512,7 @@ export class ProductController {
       new ParseUUIDPipe({
         errorHttpStatusCode: 400,
         exceptionFactory: () =>
-          new BadRequestException("Geçersiz ürün ID formatı"),
+          new BadRequestException(i18nMessage("server.product.invalidIdFormat")),
       }),
     )
     id: string,
@@ -544,7 +549,7 @@ export class ProductController {
       new ParseUUIDPipe({
         errorHttpStatusCode: 400,
         exceptionFactory: () =>
-          new BadRequestException("Geçersiz ürün ID formatı"),
+          new BadRequestException(i18nMessage("server.product.invalidIdFormat")),
       }),
     )
     id: string,
@@ -578,7 +583,7 @@ export class ProductController {
       new ParseUUIDPipe({
         errorHttpStatusCode: 400,
         exceptionFactory: () =>
-          new BadRequestException("Geçersiz ürün ID formatı"),
+          new BadRequestException(i18nMessage("server.product.invalidIdFormat")),
       }),
     )
     id: string,
@@ -633,7 +638,7 @@ export class ProductController {
       new ParseUUIDPipe({
         errorHttpStatusCode: 400,
         exceptionFactory: () =>
-          new BadRequestException("Geçersiz ürün ID formatı"),
+          new BadRequestException(i18nMessage("server.product.invalidIdFormat")),
       }),
     )
     id: string,
@@ -667,7 +672,7 @@ export class ProductController {
       new ParseUUIDPipe({
         errorHttpStatusCode: 400,
         exceptionFactory: () =>
-          new BadRequestException("Geçersiz ürün ID formatı"),
+          new BadRequestException(i18nMessage("server.product.invalidIdFormat")),
       }),
     )
     id: string,

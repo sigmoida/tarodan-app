@@ -2,6 +2,7 @@
 import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OAuth2Client } from 'google-auth-library';
+import { i18nMessage } from '../i18n';
 
 export interface GoogleProfile {
   sub: string;
@@ -35,13 +36,13 @@ export class GoogleAuthService {
       payload = ticket.getPayload();
     } catch (e) {
       this.logger.warn(`Google token verify failed: ${e instanceof Error ? e.message : e}`);
-      throw new UnauthorizedException('Google oturumu doğrulanamadı');
+      throw new UnauthorizedException(i18nMessage('server.auth.googleSessionVerifyFailed'));
     }
     if (!payload?.sub || !payload?.email) {
-      throw new UnauthorizedException('Google oturumu geçersiz');
+      throw new UnauthorizedException(i18nMessage('server.auth.googleSessionInvalid'));
     }
     if (payload.email_verified !== true) {
-      throw new UnauthorizedException('Google hesabınızın e-postası doğrulanmamış');
+      throw new UnauthorizedException(i18nMessage('server.auth.googleEmailNotVerified'));
     }
     return {
       sub: payload.sub,

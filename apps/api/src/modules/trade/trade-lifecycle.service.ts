@@ -38,6 +38,7 @@ import {
   ResolveTradeDisputeDto,
   TradeResponseDto,
 } from './dto';
+import { i18nMessage } from '../i18n';
 
 /**
  * Takas yaşam döngüsü metodları (create/accept/reject/counter/cancel/ship/
@@ -87,7 +88,7 @@ export class TradeLifecycleService {
   ): Promise<TradeResponseDto> {
     // Validate receiver exists and is not self
     if (initiatorId === dto.receiverId) {
-      throw new BadRequestException('Kendinizle takas yapamazsınız');
+      throw new BadRequestException(i18nMessage('server.trade.cannotTradeWithSelf'));
     }
 
     const receiver = await this.prisma.user.findUnique({
@@ -95,7 +96,7 @@ export class TradeLifecycleService {
     });
 
     if (!receiver) {
-      throw new NotFoundException('Alıcı kullanıcı bulunamadı');
+      throw new NotFoundException(i18nMessage('server.trade.receiverNotFound'));
     }
 
     const initiatorCanTrade = await this.membershipService.canCreateTrade(initiatorId);
@@ -115,7 +116,7 @@ export class TradeLifecycleService {
 
     if (initiatorProducts.length !== dto.initiatorItems.length) {
       throw new BadRequestException(
-        'Bazı ürünler size ait değil veya aktif değil',
+        i18nMessage('server.trade.someItemsNotOwnedOrInactive'),
       );
     }
 
@@ -131,7 +132,7 @@ export class TradeLifecycleService {
 
     if (receiverProducts.length !== dto.receiverItems.length) {
       throw new BadRequestException(
-        'Talep edilen bazı ürünler takasa uygun değil',
+        i18nMessage('server.trade.requestedItemsNotEligible'),
       );
     }
 
@@ -148,7 +149,7 @@ export class TradeLifecycleService {
       });
       if (existingTradeItems.length > 0) {
         throw new BadRequestException(
-          'Teklif ettiğiniz ürünlerden biri zaten aktif bir takas teklifinde. Önce mevcut takası iptal edin veya sonuçlanmasını bekleyin.',
+          i18nMessage('server.trade.itemAlreadyInActiveTrade'),
         );
       }
     }
@@ -162,7 +163,11 @@ export class TradeLifecycleService {
         const available = getAvailableQuantity(product);
         if (available !== null && available < item.quantity) {
           throw new BadRequestException(
-            `"${product.title}" için yeterli müsait stok yok (müsait: ${available}, talep: ${item.quantity})`,
+            i18nMessage('server.trade.insufficientStockForItem', {
+              title: product.title,
+              available,
+              requested: item.quantity,
+            }),
           );
         }
       }
@@ -282,7 +287,7 @@ export class TradeLifecycleService {
     const receiverCanTrade = await this.membershipService.canCreateTrade(userId);
     if (!receiverCanTrade.allowed) {
       throw new BadRequestException(
-        'Üyeliğinizin süresi dolmuş görünüyor. Trade kabul etmek için Temel veya üstü üyeliğinizi yenileyin.',
+        i18nMessage('server.trade.membershipExpiredForAccept'),
       );
     }
 
@@ -306,17 +311,17 @@ export class TradeLifecycleService {
       const trade = await this.getTradeWithLock(tradeId, tx);
 
       if (trade.receiverId !== userId) {
-        throw new ForbiddenException('Sadece takas alıcısı kabul edebilir');
+        throw new ForbiddenException(i18nMessage('server.trade.onlyReceiverCanAccept'));
       }
 
       if (!this.canTransition(trade.status, TradeStatus.accepted)) {
         throw new BadRequestException(
-          `Takas durumu '${trade.status}' kabul edilemez`,
+          i18nMessage('server.trade.cannotAcceptInStatus', { status: trade.status }),
         );
       }
 
       if (new Date() > trade.responseDeadline) {
-        throw new BadRequestException('Yanıt süresi dolmuş');
+        throw new BadRequestException(i18nMessage('server.trade.responseDeadlinePassed'));
       }
 
       // Yetki/durum kontrolleri geçti → kabul edenin teslimat adresini ZORUNLU
@@ -501,12 +506,12 @@ export class TradeLifecycleService {
       const trade = await this.getTradeWithLock(tradeId, tx);
 
       if (trade.receiverId !== userId) {
-        throw new ForbiddenException('Sadece takas alıcısı reddedebilir');
+        throw new ForbiddenException(i18nMessage('server.trade.onlyReceiverCanReject'));
       }
 
       if (!this.canTransition(trade.status, TradeStatus.rejected)) {
         throw new BadRequestException(
-          `Takas durumu '${trade.status}' reddedilemez`,
+          i18nMessage('server.trade.cannotRejectInStatus', { status: trade.status }),
         );
       }
 
@@ -580,38 +585,38 @@ export class TradeLifecycleService {
     });
 
     if (!trade) {
-      throw new NotFoundException('Takas bulunamadı');
+      throw new NotFoundException(i18nMessage('server.trade.notFound'));
     }
 
     // Store version for optimistic locking
     const tradeVersion = trade.version;
 
     if (!trade) {
-      throw new NotFoundException('Takas bulunamadı');
+      throw new NotFoundException(i18nMessage('server.trade.notFound'));
     }
 
     // Only receiver can send counter-offer
     if (trade.receiverId !== userId) {
-      throw new ForbiddenException('Sadece takas alıcısı karşı teklif gönderebilir');
+      throw new ForbiddenException(i18nMessage('server.trade.onlyReceiverCanCounter'));
     }
 
     // Trade must be in pending status
     if (trade.status !== TradeStatus.pending) {
       throw new BadRequestException(
-        `Takas durumu '${trade.status}' karşı teklif gönderilemez`,
+        i18nMessage('server.trade.cannotCounterInStatus', { status: trade.status }),
       );
     }
 
     // Check response deadline hasn't expired
     if (new Date() > trade.responseDeadline) {
-      throw new BadRequestException('Yanıt süresi dolmuş');
+      throw new BadRequestException(i18nMessage('server.trade.responseDeadlinePassed'));
     }
 
     // Validate user has premium membership
     const userCanTrade = await this.membershipService.canCreateTrade(userId);
     if (!userCanTrade.allowed) {
       throw new BadRequestException(
-        'Karşı teklif göndermek için Temel veya üstü üyelik gereklidir. Üyeliğinizi yenileyin.',
+        i18nMessage('server.trade.membershipRequiredForCounter'),
       );
     }
 
@@ -644,7 +649,7 @@ export class TradeLifecycleService {
       newCashPayerId === currentCashPayerId;
 
     if (isIdentical) {
-      throw new BadRequestException('Önceki teklif ile aynı. Lütfen değişiklik yapın.');
+      throw new BadRequestException(i18nMessage('server.trade.counterOfferIdenticalToPrevious'));
     }
 
     // Validate counter-offerer owns the products they're offering
@@ -665,7 +670,7 @@ export class TradeLifecycleService {
 
     if (counterOffererProducts.length !== dto.initiatorItems.length) {
       throw new BadRequestException(
-        'Bazı ürünler size ait değil veya aktif değil',
+        i18nMessage('server.trade.someItemsNotOwnedOrInactive'),
       );
     }
 
@@ -690,7 +695,7 @@ export class TradeLifecycleService {
 
     if (originalInitiatorProducts.length !== dto.receiverItems.length) {
       throw new BadRequestException(
-        'Talep edilen bazı ürünler takasa uygun değil',
+        i18nMessage('server.trade.requestedItemsNotEligible'),
       );
     }
 
@@ -701,7 +706,11 @@ export class TradeLifecycleService {
         const available = getAvailableQuantity(product);
         if (available !== null && available < item.quantity) {
           throw new BadRequestException(
-            `"${product.title}" için yeterli müsait stok yok (müsait: ${available}, talep: ${item.quantity})`,
+            i18nMessage('server.trade.insufficientStockForItem', {
+              title: product.title,
+              available,
+              requested: item.quantity,
+            }),
           );
         }
       }
@@ -833,7 +842,7 @@ export class TradeLifecycleService {
       const trade = await this.getTradeWithLock(tradeId, tx);
 
       if (trade.initiatorId !== userId && trade.receiverId !== userId) {
-        throw new ForbiddenException('Bu takası iptal etme yetkiniz yok');
+        throw new ForbiddenException(i18nMessage('server.trade.notAuthorizedToCancel'));
       }
 
       // Idempotent: second cancel after the first already succeeded returns the
@@ -845,7 +854,7 @@ export class TradeLifecycleService {
 
       if (!this.canTransition(trade.status, TradeStatus.cancelled)) {
         throw new BadRequestException(
-          `Takas durumu '${trade.status}' iptal edilemez`,
+          i18nMessage('server.trade.cannotCancelInStatus', { status: trade.status }),
         );
       }
 
@@ -856,7 +865,7 @@ export class TradeLifecycleService {
         trade.status === TradeStatus.receiver_received
       ) {
         throw new BadRequestException(
-          'Her iki taraf da gönderdikten sonra iptal edilemez',
+          i18nMessage('server.trade.cannotCancelAfterBothShipped'),
         );
       }
 
@@ -868,7 +877,7 @@ export class TradeLifecycleService {
         trade.status === TradeStatus.returning
       ) {
         throw new BadRequestException(
-          'Ürünler depoya ulaştıktan sonra sadece admin iptal edebilir',
+          i18nMessage('server.trade.cannotCancelAfterWarehouseArrival'),
         );
       }
 
@@ -884,7 +893,7 @@ export class TradeLifecycleService {
         });
         if (handedToCargo || trade.firstWarehouseArrivalAt !== null) {
           throw new BadRequestException(
-            'Ürün kargoya verildikten sonra takas iptal edilemez. Sorun varsa itiraz açın veya destek ile iletişime geçin.',
+            i18nMessage('server.trade.cannotCancelAfterShippedToCargo'),
           );
         }
       }
@@ -954,7 +963,7 @@ export class TradeLifecycleService {
       where: { id: dto.fromAddressId, userId },
     });
     if (!address) {
-      throw new NotFoundException('Adres bulunamadı');
+      throw new NotFoundException(i18nMessage('server.trade.addressNotFound'));
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -964,7 +973,7 @@ export class TradeLifecycleService {
       const isReceiver = trade.receiverId === userId;
 
       if (!isInitiator && !isReceiver) {
-        throw new ForbiddenException('Bu takas işlemi için yetkiniz yok');
+        throw new ForbiddenException(i18nMessage('server.trade.notAuthorizedForAction'));
       }
 
       const canShipStatuses: TradeStatus[] = [
@@ -975,7 +984,7 @@ export class TradeLifecycleService {
 
       if (!canShipStatuses.includes(trade.status)) {
         throw new BadRequestException(
-          `Takas durumu '${trade.status}' gönderim yapılamaz`,
+          i18nMessage('server.trade.cannotShipInStatus', { status: trade.status }),
         );
       }
 
@@ -983,7 +992,7 @@ export class TradeLifecycleService {
         where: { tradeId, shipperId: userId },
       });
       if (existingShipment) {
-        throw new BadRequestException('Zaten gönderim yaptınız');
+        throw new BadRequestException(i18nMessage('server.trade.alreadyShipped'));
       }
 
       let newStatus: TradeStatus;
@@ -997,7 +1006,7 @@ export class TradeLifecycleService {
       ) {
         newStatus = TradeStatus.both_shipped;
       } else {
-        throw new BadRequestException('Geçersiz gönderim durumu');
+        throw new BadRequestException(i18nMessage('server.trade.invalidShipmentStatus'));
       }
 
       const trackingNumber = `TRK${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
@@ -1057,7 +1066,7 @@ export class TradeLifecycleService {
       `Deprecated shipToWarehouse called by user=${userId} trade=${tradeId}; auto-flow handles inbound shipments now`,
     );
     throw new GoneException(
-      'Bu uç nokta artık kullanılmıyor. Takas kabul edildiğinde sistem her iki taraf için Sürat Kargo takip numaralarını otomatik üretir; en yakın Sürat şubesine size atanan takip numarasıyla teslim edin.',
+      i18nMessage('server.trade.shipToWarehouseDeprecated'),
     );
   }
 
@@ -1076,7 +1085,7 @@ export class TradeLifecycleService {
       const isReceiver = trade.receiverId === userId;
 
       if (!isInitiator && !isReceiver) {
-        throw new ForbiddenException('Bu takas işlemi için yetkiniz yok');
+        throw new ForbiddenException(i18nMessage('server.trade.notAuthorizedForAction'));
       }
 
       const canConfirmStatuses: TradeStatus[] = [
@@ -1090,7 +1099,7 @@ export class TradeLifecycleService {
 
       if (!canConfirmStatuses.includes(trade.status)) {
         throw new BadRequestException(
-          `Takas durumu '${trade.status}' onay yapılamaz`,
+          i18nMessage('server.trade.cannotConfirmInStatus', { status: trade.status }),
         );
       }
 
@@ -1114,14 +1123,14 @@ export class TradeLifecycleService {
       }
 
       if (!shipment) {
-        throw new BadRequestException('Onaylanacak gönderim bulunamadı');
+        throw new BadRequestException(i18nMessage('server.trade.noShipmentToConfirm'));
       }
       if (shipment.confirmedAt) {
-        throw new BadRequestException('Bu gönderim zaten onaylandı');
+        throw new BadRequestException(i18nMessage('server.trade.shipmentAlreadyConfirmed'));
       }
 
       if (trade.confirmationDeadline && new Date() > trade.confirmationDeadline) {
-        throw new BadRequestException('Onay süresi dolmuş');
+        throw new BadRequestException(i18nMessage('server.trade.confirmationDeadlinePassed'));
       }
 
       let newStatus: TradeStatus;
@@ -1148,7 +1157,7 @@ export class TradeLifecycleService {
       ) {
         newStatus = TradeStatus.completed;
       } else {
-        throw new BadRequestException('Geçersiz onay durumu');
+        throw new BadRequestException(i18nMessage('server.trade.invalidConfirmationStatus'));
       }
 
       await tx.tradeShipment.update({
@@ -1244,14 +1253,14 @@ export class TradeLifecycleService {
       const trade = await this.getTradeWithLock(tradeId, tx);
 
       if (trade.initiatorId !== userId && trade.receiverId !== userId) {
-        throw new ForbiddenException('Bu takas işlemi için yetkiniz yok');
+        throw new ForbiddenException(i18nMessage('server.trade.notAuthorizedForAction'));
       }
 
       const existingDispute = await tx.tradeDispute.findUnique({
         where: { tradeId },
       });
       if (existingDispute) {
-        throw new BadRequestException('Bu takas için zaten itiraz açılmış');
+        throw new BadRequestException(i18nMessage('server.trade.disputeAlreadyOpen'));
       }
 
       const canDisputeStatuses: TradeStatus[] = [
@@ -1266,7 +1275,7 @@ export class TradeLifecycleService {
 
       if (!canDisputeStatuses.includes(trade.status)) {
         throw new BadRequestException(
-          `Takas durumu '${trade.status}' itiraz açılamaz`,
+          i18nMessage('server.trade.cannotDisputeInStatus', { status: trade.status }),
         );
       }
 
@@ -1335,14 +1344,14 @@ export class TradeLifecycleService {
       const trade = await this.getTradeWithLock(tradeId, tx);
 
       if (trade.status !== TradeStatus.disputed) {
-        throw new BadRequestException('Takas itiraz durumunda değil');
+        throw new BadRequestException(i18nMessage('server.trade.tradeNotInDisputeStatus'));
       }
 
       const dispute = await tx.tradeDispute.findUnique({
         where: { tradeId },
       });
       if (!dispute) {
-        throw new NotFoundException('İtiraz bulunamadı');
+        throw new NotFoundException(i18nMessage('server.trade.disputeNotFound'));
       }
 
       resolvedTradeInitiatorId = trade.initiatorId;
@@ -1460,7 +1469,7 @@ export class TradeLifecycleService {
     });
 
     if (!trade) {
-      throw new NotFoundException('Takas bulunamadı');
+      throw new NotFoundException(i18nMessage('server.trade.notFound'));
     }
 
     return trade;

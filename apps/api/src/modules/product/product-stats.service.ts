@@ -6,6 +6,7 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
+import { i18nMessage } from "../i18n";
 import { MembershipService } from "../membership/membership.service";
 import { ProductStatus } from "@prisma/client";
 
@@ -60,12 +61,12 @@ export class ProductStatsService {
     });
 
     if (!product) {
-      throw new NotFoundException("Ürün bulunamadı");
+      throw new NotFoundException(i18nMessage("server.product.notFound"));
     }
 
     if (product.sellerId !== sellerId) {
       throw new ForbiddenException(
-        "Bu ürünün istatistiklerini görme yetkiniz yok",
+        i18nMessage("server.product.statsForbidden"),
       );
     }
 
@@ -86,7 +87,7 @@ export class ProductStatsService {
   async getSellerListingStats(sellerId: string) {
     try {
       if (!sellerId) {
-        throw new BadRequestException("Satıcı kimliği bulunamadı");
+        throw new BadRequestException(i18nMessage("server.product.sellerIdNotFound"));
       }
 
       // Get all listing counts by status (exclude inactive, draft, deleted)
@@ -202,7 +203,7 @@ export class ProductStatsService {
       ) {
         throw error;
       }
-      throw new BadRequestException("İlan istatistikleri alınamadı");
+      throw new BadRequestException(i18nMessage("server.product.listingStatsFailed"));
     }
   }
 }

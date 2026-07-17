@@ -33,6 +33,7 @@ import { AdminJwtAuthGuard } from '../auth/guards/admin-jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { AdminRole } from '@prisma/client';
 import { PaymentService } from '../payment/payment.service';
+import { i18nMessage } from '../i18n';
 
 @Controller('trades')
 export class TradeController {
@@ -47,7 +48,7 @@ export class TradeController {
     const userId = req?.user?.id;
     if (!userId) {
       this.logger.warn('trades: req.user.id missing');
-      throw new UnauthorizedException('Oturum gerekli');
+      throw new UnauthorizedException(i18nMessage('server.trade.sessionRequired'));
     }
     return userId;
   }

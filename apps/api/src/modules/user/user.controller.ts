@@ -19,8 +19,10 @@ import {
   ApiBearerAuth,
   ApiQuery,
 } from '@nestjs/swagger';
+import { type Locale } from '@tarodan/i18n';
 import { UserService } from './user.service';
 import { JwtAuthGuard, CurrentUser, Public } from '../auth';
+import { I18nService, ReqLocale } from '../i18n';
 import {
   UpdateProfileDto,
   CreateAddressDto,
@@ -34,7 +36,10 @@ import {
 export class UserController {
   private readonly logger = new Logger(UserController.name);
 
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly i18n: I18nService,
+  ) {}
 
   /**
    * GET /users/me
@@ -134,8 +139,12 @@ export class UserController {
       },
     },
   })
-  async deleteAccount(@CurrentUser('id') userId: string) {
-    return this.userService.deleteAccount(userId);
+  async deleteAccount(
+    @CurrentUser('id') userId: string,
+    @ReqLocale() locale: Locale,
+  ) {
+    await this.userService.deleteAccount(userId);
+    return { message: this.i18n.translate('server.user.accountDeleted', locale) };
   }
 
   /**
@@ -268,8 +277,10 @@ export class UserController {
   async deleteAddress(
     @CurrentUser('id') userId: string,
     @Param('id') addressId: string,
+    @ReqLocale() locale: Locale,
   ) {
-    return this.userService.deleteAddress(userId, addressId);
+    await this.userService.deleteAddress(userId, addressId);
+    return { message: this.i18n.translate('server.user.addressDeleted', locale) };
   }
 
   /**
@@ -369,8 +380,13 @@ export class UserController {
   async unfollowUser(
     @CurrentUser('id') currentUserId: string,
     @Param('id') targetUserId: string,
+    @ReqLocale() locale: Locale,
   ) {
-    return this.userService.unfollowUser(currentUserId, targetUserId);
+    const result = await this.userService.unfollowUser(currentUserId, targetUserId);
+    return {
+      message: this.i18n.translate('server.user.unfollowed', locale),
+      following: result.following,
+    };
   }
 
   // ==========================================================================
@@ -391,8 +407,15 @@ export class UserController {
   async blockUser(
     @CurrentUser('id') currentUserId: string,
     @Param('id') targetUserId: string,
+    @ReqLocale() locale: Locale,
   ) {
-    return this.userService.blockUser(currentUserId, targetUserId);
+    const result = await this.userService.blockUser(currentUserId, targetUserId);
+    return {
+      success: result.success,
+      message: this.i18n.translate('server.user.userBlocked', locale, {
+        displayName: result.blockedDisplayName,
+      }),
+    };
   }
 
   /**
@@ -408,8 +431,13 @@ export class UserController {
   async unblockUser(
     @CurrentUser('id') currentUserId: string,
     @Param('id') targetUserId: string,
+    @ReqLocale() locale: Locale,
   ) {
-    return this.userService.unblockUser(currentUserId, targetUserId);
+    const result = await this.userService.unblockUser(currentUserId, targetUserId);
+    return {
+      success: result.success,
+      message: this.i18n.translate('server.user.userUnblocked', locale),
+    };
   }
 
   /**

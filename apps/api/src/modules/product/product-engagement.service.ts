@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { i18nMessage } from '../i18n';
 import { PrismaService } from '../../prisma';
 import { CacheService } from '../cache/cache.service';
 
@@ -26,12 +27,12 @@ export class ProductEngagementService {
     });
 
     if (!product) {
-      throw new NotFoundException('Ürün bulunamadı');
+      throw new NotFoundException(i18nMessage('server.product.notFound'));
     }
 
     // Cannot like own product
     if (product.sellerId === userId) {
-      throw new BadRequestException('Kendi ürününüzü beğenemezsiniz');
+      throw new BadRequestException(i18nMessage('server.product.cannotLikeOwn'));
     }
 
     // Check if already liked
@@ -45,7 +46,7 @@ export class ProductEngagementService {
     });
 
     if (existingLike) {
-      throw new BadRequestException('Bu ürünü zaten beğendiniz');
+      throw new BadRequestException(i18nMessage('server.product.alreadyLiked'));
     }
 
     // Create like and increment counter in transaction
@@ -84,7 +85,7 @@ export class ProductEngagementService {
     });
 
     if (!product) {
-      throw new NotFoundException('Ürün bulunamadı');
+      throw new NotFoundException(i18nMessage('server.product.notFound'));
     }
 
     // Check if liked
@@ -98,7 +99,7 @@ export class ProductEngagementService {
     });
 
     if (!existingLike) {
-      throw new BadRequestException('Bu ürünü beğenmemişsiniz');
+      throw new BadRequestException(i18nMessage('server.product.notLiked'));
     }
 
     // Delete like and decrement counter in transaction
@@ -159,7 +160,7 @@ export class ProductEngagementService {
     });
 
     if (!product) {
-      throw new NotFoundException('Ürün bulunamadı');
+      throw new NotFoundException(i18nMessage('server.product.notFound'));
     }
 
     if (userId && product.sellerId === userId) {

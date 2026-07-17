@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { randomUUID } from "crypto";
 import { PrismaService } from "../../prisma";
+import { i18nMessage } from "../i18n";
 import { CheckoutDto } from "./dto";
 import { OrderStatus, ProductStatus, Prisma } from "@prisma/client";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
@@ -78,7 +79,7 @@ export class OrderCheckoutGroupService {
     });
     if (!existing) return null;
     if (buyerId && existing.buyerId !== buyerId) {
-      throw new ForbiddenException("Bu işlem size ait değil");
+      throw new ForbiddenException(i18nMessage("server.order.notYourTransaction"));
     }
     return {
       ...this.formatCheckoutGroupCreateResponse(existing),
@@ -104,12 +105,12 @@ export class OrderCheckoutGroupService {
 
     if (!dto.shippingAddressId && !dto.shippingAddress) {
       throw new BadRequestException(
-        "Teslimat adresi gereklidir (shippingAddressId veya shippingAddress)",
+        i18nMessage("server.order.shippingAddressRequiredWithFields"),
       );
     }
     if (isGuest && dto.couponCode) {
       throw new BadRequestException(
-        "Kupon kodu misafir alışverişte desteklenmiyor",
+        i18nMessage("server.order.couponNotSupportedForGuest"),
       );
     }
 
@@ -128,7 +129,7 @@ export class OrderCheckoutGroupService {
           FOR UPDATE
         `;
           if ((lockedRows?.length ?? 0) !== productIds.length) {
-            throw new NotFoundException("Sepetteki ürünlerden biri bulunamadı");
+            throw new NotFoundException(i18nMessage("server.order.cartProductNotFound"));
           }
 
           // Aynı alıcının aynı ürün için eski bekleyen siparişi varsa iptal et ve
@@ -188,7 +189,7 @@ export class OrderCheckoutGroupService {
             const product = productMap.get(productId);
             if (!product) {
               throw new NotFoundException(
-                "Sepetteki ürünlerden biri bulunamadı",
+                i18nMessage("server.order.cartProductNotFound"),
               );
             }
             if (product.status !== ProductStatus.active) {
@@ -206,7 +207,7 @@ export class OrderCheckoutGroupService {
               });
             }
             if (!isGuest && product.sellerId === buyerId) {
-              throw new ForbiddenException("Kendi ürününüzü satın alamazsınız");
+              throw new ForbiddenException(i18nMessage("server.order.cannotBuyOwnProduct"));
             }
           }
 
@@ -219,7 +220,7 @@ export class OrderCheckoutGroupService {
               where: { id: dto.shippingAddressId },
             });
             if (!savedAddress || savedAddress.userId !== buyerId) {
-              throw new BadRequestException("Geçersiz teslimat adresi");
+              throw new BadRequestException(i18nMessage("server.order.invalidShippingAddress"));
             }
             shippingAddress = savedAddress;
             shippingAddressId = savedAddress.id;
@@ -227,27 +228,27 @@ export class OrderCheckoutGroupService {
             const addr = dto.shippingAddress;
             if (!addr.fullName?.trim()) {
               throw new BadRequestException(
-                "Teslimat adresi için ad soyad gereklidir",
+                i18nMessage("server.order.shippingAddressNameRequired"),
               );
             }
             if (!addr.phone?.trim()) {
               throw new BadRequestException(
-                "Teslimat adresi için telefon numarası gereklidir",
+                i18nMessage("server.order.shippingAddressPhoneRequired"),
               );
             }
             if (!addr.city?.trim()) {
               throw new BadRequestException(
-                "Teslimat adresi için şehir gereklidir",
+                i18nMessage("server.order.shippingAddressCityRequired"),
               );
             }
             if (!addr.district?.trim()) {
               throw new BadRequestException(
-                "Teslimat adresi için ilçe gereklidir",
+                i18nMessage("server.order.shippingAddressDistrictRequired"),
               );
             }
             if (!addr.address?.trim()) {
               throw new BadRequestException(
-                "Teslimat adresi için açık adres gereklidir",
+                i18nMessage("server.order.shippingAddressLineRequired"),
               );
             }
             if (isGuest) {
@@ -279,7 +280,7 @@ export class OrderCheckoutGroupService {
               shippingAddressId = newAddress.id;
             }
           } else {
-            throw new BadRequestException("Teslimat adresi gereklidir");
+            throw new BadRequestException(i18nMessage("server.order.shippingAddressRequired"));
           }
 
           // Fatura adresi: inline > kayıtlı ID > teslimatla aynı
@@ -313,7 +314,7 @@ export class OrderCheckoutGroupService {
               where: { id: dto.billingAddressId },
             });
             if (!billing || billing.userId !== buyerId) {
-              throw new BadRequestException("Geçersiz fatura adresi");
+              throw new BadRequestException(i18nMessage("server.order.invalidBillingAddress"));
             }
             billingAddress = billing;
           }
@@ -362,7 +363,7 @@ export class OrderCheckoutGroupService {
             );
             if (!validation.isValid) {
               throw new BadRequestException(
-                validation.error || "Kupon kodu geçersiz",
+                validation.error || i18nMessage("server.order.invalidCouponCode"),
               );
             }
             if (validation.discount) {

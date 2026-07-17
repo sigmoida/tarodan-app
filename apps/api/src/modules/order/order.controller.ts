@@ -19,6 +19,7 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { OrderService } from './order.service';
+import { i18nMessage } from '../i18n';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -75,7 +76,7 @@ export class OrderController {
   ) {
     const amount = parseFloat(amountStr);
     if (Number.isNaN(amount) || amount < 0) {
-      throw new BadRequestException('Geçerli bir tutar girin');
+      throw new BadRequestException(i18nMessage('server.order.invalidAmount'));
     }
     return this.orderService.getCommissionPreview(amount, userId, categoryId || null);
   }

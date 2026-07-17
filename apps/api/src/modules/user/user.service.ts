@@ -83,6 +83,7 @@ export class UserService {
       isCorporateSeller?: boolean;
       avatarUrl?: string;
       showTrustScore?: boolean;
+      preferredLanguage?: string;
     },
   ) {
     return this.profile.updateProfile(userId, data);
@@ -222,14 +223,14 @@ export class UserService {
   /**
    * Block a user
    */
-  async blockUser(blockerId: string, blockedId: string): Promise<{ success: boolean; message: string }> {
+  async blockUser(blockerId: string, blockedId: string): Promise<{ success: boolean; blockedDisplayName: string }> {
     return this.social.blockUser(blockerId, blockedId);
   }
 
   /**
    * Unblock a user
    */
-  async unblockUser(blockerId: string, blockedId: string): Promise<{ success: boolean; message: string }> {
+  async unblockUser(blockerId: string, blockedId: string): Promise<{ success: boolean }> {
     return this.social.unblockUser(blockerId, blockedId);
   }
 

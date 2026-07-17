@@ -29,6 +29,8 @@ import {
 } from './notification-preferences';
 import { NotificationSettings } from '../user/dto/notification-settings.dto';
 import { NOTIFICATION_TEMPLATES } from './notification-templates';
+import { type Locale, type MessageValues, defaultLocale, isLocale } from '@tarodan/i18n';
+import { I18nService } from '../i18n/i18n.service';
 
 @Injectable()
 export class NotificationDispatchService {
@@ -42,18 +44,39 @@ export class NotificationDispatchService {
     private readonly smsProvider: SmsProvider,
     private readonly smtpProvider: SmtpProvider,
     private readonly realtime: RealtimeService,
+    private readonly i18n: I18nService,
   ) {}
 
   /**
    * Kullanıcının bildirim tercihlerini yükle (varsayılanlarla birleştirilmiş).
    * Gönderim yolları bununla tercihe uyup uymadığını kontrol eder (Bulgu #9).
+   * #224: alıcının kayıtlı dil tercihi de aynı sorguyla gelir — şablonlar bu
+   * locale ile render edilir.
    */
-  private async loadNotificationSettings(userId: string): Promise<NotificationSettings> {
+  private async loadRecipientPrefs(
+    userId: string,
+  ): Promise<{ settings: NotificationSettings; locale: Locale }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { notificationSettings: true },
+      select: { notificationSettings: true, preferredLanguage: true },
     });
-    return resolveSettings(user?.notificationSettings);
+    return {
+      settings: resolveSettings(user?.notificationSettings),
+      locale: isLocale(user?.preferredLanguage) ? user.preferredLanguage : defaultLocale,
+    };
+  }
+
+  /** Şablonu alıcının dilinde render et (ICU; eksik değerlerde anahtara düşer). */
+  private renderTemplate(
+    template: { titleKey: string; messageKey: string },
+    locale: Locale,
+    data?: Record<string, any>,
+  ): { title: string; message: string } {
+    const values = data as MessageValues | undefined;
+    return {
+      title: this.i18n.translate(template.titleKey, locale, values),
+      message: this.i18n.translate(template.messageKey, locale, values),
+    };
   }
 
   substituteTemplateVariables(text: string, data: Record<string, any>): string {
@@ -87,15 +110,14 @@ export class NotificationDispatchService {
       return { success: false, error: 'User not found' };
     }
 
-    // Interpolate template with data
-    const title = this.interpolate(template.title, dto.data);
-    const message = this.interpolate(template.message, dto.data);
+    // Kullanıcı bildirim tercihleri (Bulgu #9) + dil tercihi (#224).
+    const { settings, locale } = await this.loadRecipientPrefs(dto.userId);
+
+    // Render the catalog template in the recipient's locale (#224).
+    const { title, message } = this.renderTemplate(template, locale, dto.data);
 
     // Determine channels (default to email + in_app)
     const channels = dto.channels || [NotificationChannel.EMAIL, NotificationChannel.IN_APP];
-
-    // Kullanıcı bildirim tercihleri (Bulgu #9): kapatılan kanal/kategori atlanır.
-    const settings = await this.loadNotificationSettings(dto.userId);
 
     const results: Record<string, boolean> = {};
 
@@ -329,7 +351,7 @@ export class NotificationDispatchService {
 
     // Bildirim tercihleri (Bulgu #9). Kategori kapalıysa zil + push birlikte
     // atlanır; kategori açık ama push master kapalıysa yalnız push atlanır.
-    const settings = await this.loadNotificationSettings(userId);
+    const { settings, locale } = await this.loadRecipientPrefs(userId);
     if (!shouldDeliver(settings, type, 'in_app')) {
       this.logger.log(
         `[createInAppNotification] suppressed by user preference: user=${userId} type=${type}`,
@@ -337,8 +359,8 @@ export class NotificationDispatchService {
       return false;
     }
 
-    const title = this.interpolate(template.title, data);
-    const message = this.interpolate(template.message, data);
+    // Şablonu alıcının dilinde render et (#224).
+    const { title, message } = this.renderTemplate(template, locale, data);
 
     this.logger.log(`[createInAppNotification] Saving notification: title="${title}", message="${message}"`);
 

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { NotificationService } from './notification.service';
 import { NotificationDispatchService } from './notification-dispatch.service';
+import { I18nService } from '../i18n/i18n.service';
 import { NotificationCommerceService } from './notification-commerce.service';
 import { NotificationAccountService } from './notification-account.service';
 import { PrismaService } from '../../prisma';
@@ -53,6 +54,7 @@ describe('NotificationService in-app dedupe', () => {
       providers: [
         NotificationService,
         NotificationDispatchService,
+        I18nService,
         NotificationCommerceService,
         NotificationAccountService,
         { provide: PrismaService, useValue: mockPrisma },
