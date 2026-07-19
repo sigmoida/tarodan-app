@@ -25,7 +25,7 @@
 		"@react-native-community/datetimepicker": "8.6.0",
 		"@types/react": "~19.1.17",
 		"react": "19.1.0",
-		"react-hook-form": "^7.81.0",
+		"react-hook-form": "^7.82.0",
 		"react-native": "0.86.0",
 		"react-native-safe-area-context": "5.8.0",
 		"typescript": "^5.3.2",
