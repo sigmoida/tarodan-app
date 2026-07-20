@@ -17,6 +17,7 @@ export interface ProductRowActions {
   onReject: (p: Product) => void;
   onDelete: (p: Product) => void;
   onRestore: (p: Product) => void;
+  busyId?: string;
 }
 
 /** ⋮ row-menu items for a product — status-gated; destructive ones grouped last. */
@@ -31,17 +32,20 @@ export function productRowMenu(t: T, a: ProductRowActions) {
       label: t("admin.catalog.products.approve"),
       icon: CheckIcon,
       onClick: () => a.onApprove(p),
+      isLoading: a.busyId === p.id,
     },
     p.status === "pending" && {
       label: t("admin.catalog.products.reject"),
       icon: XMarkIcon,
       onClick: () => a.onReject(p),
       destructive: true,
+      isLoading: a.busyId === p.id,
     },
     p.status === "deleted" && {
       label: t("admin.catalog.products.restore"),
       icon: ArrowUturnLeftIcon,
       onClick: () => a.onRestore(p),
+      isLoading: a.busyId === p.id,
     },
     p.status !== "deleted" &&
       p.status !== "sold" &&
@@ -50,6 +54,7 @@ export function productRowMenu(t: T, a: ProductRowActions) {
         icon: TrashIcon,
         onClick: () => a.onDelete(p),
         destructive: true,
+        isLoading: a.busyId === p.id,
       },
   ];
 }

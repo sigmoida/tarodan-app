@@ -13,7 +13,7 @@ import { reviewRowMenu } from "./rowActions";
 
 type Act = (id: string, s: ReviewStatus) => void;
 
-export function productReviewColumns(act: Act) {
+export function productReviewColumns(act: Act, busyId?: string) {
   return [
     col.custom<Review>(
       "Ürün",
@@ -82,11 +82,13 @@ export function productReviewColumns(act: Act) {
       <Badge status={r.status} config={reviewStatusConfig} />
     )),
     col.date<Review>("Tarih", "createdAt"),
-    col.rowMenu<Review>((r) => reviewRowMenu(r.status, (s) => act(r.id, s))),
+    col.rowMenu<Review>((r) =>
+      reviewRowMenu(r.status, (s) => act(r.id, s), busyId === r.id),
+    ),
   ];
 }
 
-export function sellerReviewColumns(act: Act) {
+export function sellerReviewColumns(act: Act, busyId?: string) {
   return [
     col.user<UserRating>("Gönderen", (r) => ({
       name: r.giver?.displayName ?? "—",
@@ -123,7 +125,7 @@ export function sellerReviewColumns(act: Act) {
     ),
     col.date<UserRating>("Tarih", "createdAt"),
     col.rowMenu<UserRating>((r) =>
-      reviewRowMenu(r.status, (s) => act(r.id, s)),
+      reviewRowMenu(r.status, (s) => act(r.id, s), busyId === r.id),
     ),
   ];
 }

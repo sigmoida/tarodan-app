@@ -20,13 +20,11 @@ export function AdsTable({ onEdit }: { onEdit: (ad: Ad) => void }) {
   });
 
   const onDelete = async (ad: Ad) => {
-    if (
-      await confirm({
-        description: 'Bu reklamı silmek istediğinize emin misiniz?',
-        destructive: true,
-      })
-    )
-      del.mutate(ad.id);
+    await confirm({
+      description: 'Bu reklamı silmek istediğinize emin misiniz?',
+      destructive: true,
+      onConfirm: () => del.mutateAsync(ad.id),
+    });
   };
 
   const columns = adColumns({

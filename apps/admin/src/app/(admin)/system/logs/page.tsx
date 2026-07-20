@@ -99,7 +99,10 @@ function LogsTable({ tab }: { tab: LogTab }) {
   if (tab === "security") {
     return (
       <ResourceList.Table<SecurityLog>
-        columns={buildSecurityColumns((id) => resolve.mutate(id))}
+        columns={buildSecurityColumns(
+          (id) => resolve.mutate(id),
+          resolve.isPending ? resolve.variables : undefined,
+        )}
         emptyText={EMPTY_TEXT.security}
       />
     );

@@ -126,6 +126,14 @@ export function ProductReviewsSection({
                     onClick={() =>
                       update.mutate({ id: review.id, status: "approved" })
                     }
+                    isLoading={
+                      update.isPending &&
+                      update.variables?.id === review.id &&
+                      update.variables.status === "approved"
+                    }
+                    disabled={
+                      update.isPending && update.variables?.id === review.id
+                    }
                   >
                     <CheckCircleIcon className="h-5 w-5 text-success-600" />
                   </IconButton>
@@ -137,6 +145,14 @@ export function ProductReviewsSection({
                     title={t("admin.catalog.products.reject")}
                     onClick={() =>
                       update.mutate({ id: review.id, status: "rejected" })
+                    }
+                    isLoading={
+                      update.isPending &&
+                      update.variables?.id === review.id &&
+                      update.variables.status === "rejected"
+                    }
+                    disabled={
+                      update.isPending && update.variables?.id === review.id
                     }
                   >
                     <XCircleIcon className="h-5 w-5 text-danger-600" />

@@ -10,6 +10,7 @@ type T = ReturnType<typeof useTranslations<never>>;
 export function transactionRowMenu(
   onRelease: (orderId: string) => void,
   translate: T,
+  releasingOrderId?: string,
 ) {
   return (t: PayoutTransaction): RowActionItem[] => {
     if (t.status !== "held") return [];
@@ -24,6 +25,7 @@ export function transactionRowMenu(
         icon: CheckCircleIcon,
         onClick: () => onRelease(t.orderId),
         disabled: blocked,
+        isLoading: releasingOrderId === t.orderId,
       },
     ];
   };

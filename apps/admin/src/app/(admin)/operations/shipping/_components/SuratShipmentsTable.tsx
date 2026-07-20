@@ -35,6 +35,7 @@ export function SuratShipmentsTable() {
     suratRowMenu(t, {
       onSync: (id) => syncTracking.mutate(id),
       onViewOrder: (orderId) => router.push(`/operations/orders/${orderId}`),
+      syncingId: syncTracking.isPending ? syncTracking.variables : undefined,
     }),
   );
 

@@ -22,7 +22,11 @@ export function TransactionsTab() {
     },
   );
 
-  const columns = transactionColumns((orderId) => release.mutate(orderId), t);
+  const columns = transactionColumns(
+    (orderId) => release.mutate(orderId),
+    t,
+    release.isPending ? release.variables : undefined,
+  );
 
   return (
     <ResourceList<PayoutTransaction>

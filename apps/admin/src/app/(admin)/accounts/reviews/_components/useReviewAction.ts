@@ -27,10 +27,12 @@ export function useReviewAction(
   );
 
   const act = async (id: string, status: ReviewStatus) => {
-    const ok = await confirm({ ...REVIEW_ACTION_CONFIRM[status], cancelLabel: 'Vazgeç' });
-    if (!ok) return;
-    mut.mutate({ id, status });
+    await confirm({
+      ...REVIEW_ACTION_CONFIRM[status],
+      cancelLabel: 'Vazgeç',
+      onConfirm: () => mut.mutateAsync({ id, status }),
+    });
   };
 
-  return { act, isPending: mut.isPending };
+  return { act, isPending: mut.isPending, variables: mut.variables };
 }

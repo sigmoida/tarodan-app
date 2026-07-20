@@ -28,14 +28,12 @@ export default function CategoriesPage() {
 
   const onDelete = useCallback(
     async (c: Category) => {
-      if (
-        await confirm({
-          title: t("admin.catalog.categories.deleteTitle"),
-          description: t("admin.catalog.categories.deleteDescription"),
-          destructive: true,
-        })
-      )
-        del.mutate(c.id);
+      await confirm({
+        title: t("admin.catalog.categories.deleteTitle"),
+        description: t("admin.catalog.categories.deleteDescription"),
+        destructive: true,
+        onConfirm: () => del.mutateAsync(c.id),
+      });
     },
     [confirm, del, t],
   );

@@ -55,14 +55,11 @@ export default function RefundRequestDetailPage() {
   );
 
   const handleForceFinalize = async () => {
-    if (
-      !(await confirm({
-        description: t("admin.operations.refundRequests.forceFinalizeConfirm"),
-        destructive: true,
-      }))
-    )
-      return;
-    forceFinalize.mutate();
+    await confirm({
+      description: t("admin.operations.refundRequests.forceFinalizeConfirm"),
+      destructive: true,
+      onConfirm: () => forceFinalize.mutateAsync(),
+    });
   };
   const handleSavePolicy = async (
     payload: Parameters<typeof savePolicy.mutateAsync>[0],

@@ -38,14 +38,12 @@ export default function ManufacturersPage() {
 
   const onDelete = useCallback(
     async (m: Manufacturer) => {
-      if (
-        await confirm({
-          title: t("admin.catalog.manufacturers.deleteTitle"),
-          description: t("admin.catalog.manufacturers.deleteDescription"),
-          destructive: true,
-        })
-      )
-        del.mutate(m.id);
+      await confirm({
+        title: t("admin.catalog.manufacturers.deleteTitle"),
+        description: t("admin.catalog.manufacturers.deleteDescription"),
+        destructive: true,
+        onConfirm: () => del.mutateAsync(m.id),
+      });
     },
     [confirm, del, t],
   );

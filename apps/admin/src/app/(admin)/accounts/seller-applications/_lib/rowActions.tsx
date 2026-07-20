@@ -7,6 +7,7 @@ export interface ApplicationRowActions {
   onToggleExpand: (a: Application) => void;
   onApprove: (a: Application) => void;
   onReject: (a: Application) => void;
+  busyId?: string;
 }
 
 export function applicationRowMenu({
@@ -14,6 +15,7 @@ export function applicationRowMenu({
   onToggleExpand,
   onApprove,
   onReject,
+  busyId,
 }: ApplicationRowActions) {
   return (a: Application): RowActionItem[] => [
     {
@@ -25,12 +27,14 @@ export function applicationRowMenu({
       label: 'Onayla',
       icon: CheckCircleIcon,
       onClick: () => onApprove(a),
+      isLoading: busyId === a.id,
     },
     a.businessStatus === 'pending' && {
       label: 'Reddet',
       icon: XCircleIcon,
       onClick: () => onReject(a),
       destructive: true,
+      isLoading: busyId === a.id,
     },
   ];
 }

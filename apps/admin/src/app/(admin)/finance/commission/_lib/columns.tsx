@@ -16,7 +16,7 @@ export interface CommissionColumnProps {
 }
 
 export function commissionColumns(
-  { onEdit, onDelete, onToggle }: CommissionColumnProps,
+  { onEdit, onDelete, onToggle, togglingId }: CommissionColumnProps,
   t: T,
 ) {
   return [
@@ -72,7 +72,7 @@ export function commissionColumns(
       },
     ),
     col.rowMenu<CommissionRule>(
-      commissionRowMenu({ onEdit, onDelete, onToggle }),
+      commissionRowMenu({ onEdit, onDelete, onToggle, togglingId }),
     ),
   ];
 }

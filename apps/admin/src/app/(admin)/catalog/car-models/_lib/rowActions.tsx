@@ -10,9 +10,9 @@ export interface CarModelRowActions {
 }
 
 /** ⋮ row-menu items for a car model. */
-export function carModelRowMenu({ onEdit, onDelete, onToggle }: CarModelRowActions) {
+export function carModelRowMenu({ onEdit, onDelete, onToggle, busyId }: CarModelRowActions) {
   return (m: CarModel): RowActionItem[] => [
-    activeToggleAction(m.isActive, () => onToggle(m)),
+    activeToggleAction(m.isActive, () => onToggle(m), busyId === m.id),
     ...editDeleteActions(m, { onEdit, onDelete }),
   ];
 }

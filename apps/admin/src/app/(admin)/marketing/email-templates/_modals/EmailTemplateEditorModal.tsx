@@ -219,14 +219,14 @@ export function EmailTemplateEditorModal({
   );
 
   const onReset = async () => {
-    const ok = await confirm({
+    await confirm({
       title: "Varsayılana sıfırla",
       description:
         "Özel şablon silinecek ve varsayılan sistem şablonuna dönülecek. Emin misiniz?",
       confirmLabel: "Sıfırla",
       destructive: true,
+      onConfirm: () => reset.mutateAsync(),
     });
-    if (ok) reset.mutate();
   };
 
   const detail = detailQuery.data;

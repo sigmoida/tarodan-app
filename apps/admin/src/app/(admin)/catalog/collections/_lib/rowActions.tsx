@@ -9,12 +9,13 @@ export interface CollectionRowActions {
   onToggleVisibility: (c: Collection) => void;
   onEdit: (c: Collection) => void;
   onDelete: (c: Collection) => void;
+  busyId?: string;
 }
 
 /** ⋮ row-menu items for a collection. Visibility toggle label flips with state. */
 export function collectionRowMenu(
   t: T,
-  { onToggleVisibility, onEdit, onDelete }: CollectionRowActions,
+  { onToggleVisibility, onEdit, onDelete, busyId }: CollectionRowActions,
 ) {
   return (c: Collection): RowActionItem[] => [
     {
@@ -23,6 +24,7 @@ export function collectionRowMenu(
         : t("admin.catalog.collections.makeVisible"),
       icon: c.isPublic ? EyeSlashIcon : EyeIcon,
       onClick: () => onToggleVisibility(c),
+      isLoading: busyId === c.id,
     },
     ...editDeleteActions(c, { onEdit, onDelete }),
   ];

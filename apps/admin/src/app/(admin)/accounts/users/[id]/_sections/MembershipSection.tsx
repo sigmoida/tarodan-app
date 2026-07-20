@@ -47,13 +47,13 @@ export function MembershipSection({
 	);
 
 	const onCancel = async () => {
-		const ok = await confirm({
+		await confirm({
 			title: t('admin.users.detail.cancelMembership'),
 			description: t('admin.users.detail.cancelMembershipConfirm'),
 			confirmLabel: t('admin.users.detail.cancelConfirmLabel'),
 			destructive: true,
+			onConfirm: () => cancel.mutateAsync(),
 		});
-		if (ok) cancel.mutate();
 	};
 
 	return (

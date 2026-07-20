@@ -53,16 +53,14 @@ export default function ProductsPage() {
   );
 
   const onApprove = async (p: Product) => {
-    if (
-      await confirm({
-        title: t("admin.catalog.products.approveTitle"),
-        description: t("admin.catalog.products.approveDescription", {
-          title: p.title,
-        }),
-        confirmLabel: t("admin.catalog.products.approve"),
-      })
-    )
-      approve.mutate(p.id);
+    await confirm({
+      title: t("admin.catalog.products.approveTitle"),
+      description: t("admin.catalog.products.approveDescription", {
+        title: p.title,
+      }),
+      confirmLabel: t("admin.catalog.products.approve"),
+      onConfirm: () => approve.mutateAsync(p.id),
+    });
   };
   const onReject = async (p: Product) => {
     const reason = await prompt({
@@ -77,25 +75,21 @@ export default function ProductsPage() {
     reject.mutate({ id: p.id, reason });
   };
   const onDelete = async (p: Product) => {
-    if (
-      await confirm({
-        title: t("admin.catalog.products.removeTitle"),
-        description: t("admin.catalog.products.removeDescription"),
-        confirmLabel: t("common.remove"),
-        destructive: true,
-      })
-    )
-      del.mutate(p.id);
+    await confirm({
+      title: t("admin.catalog.products.removeTitle"),
+      description: t("admin.catalog.products.removeDescription"),
+      confirmLabel: t("common.remove"),
+      destructive: true,
+      onConfirm: () => del.mutateAsync(p.id),
+    });
   };
   const onRestore = async (p: Product) => {
-    if (
-      await confirm({
-        title: t("admin.catalog.products.restoreTitle"),
-        description: t("admin.catalog.products.restoreDescription"),
-        confirmLabel: t("admin.catalog.products.restore"),
-      })
-    )
-      restore.mutate(p.id);
+    await confirm({
+      title: t("admin.catalog.products.restoreTitle"),
+      description: t("admin.catalog.products.restoreDescription"),
+      confirmLabel: t("admin.catalog.products.restore"),
+      onConfirm: () => restore.mutateAsync(p.id),
+    });
   };
 
   return (
@@ -135,6 +129,17 @@ export default function ProductsPage() {
             onReject={onReject}
             onDelete={onDelete}
             onRestore={onRestore}
+            busyId={
+              approve.isPending
+                ? approve.variables
+                : reject.isPending
+                  ? reject.variables?.id
+                  : del.isPending
+                    ? del.variables
+                    : restore.isPending
+                      ? restore.variables
+                      : undefined
+            }
           />
           <ResourceList.Pagination />
         </ResourceList>

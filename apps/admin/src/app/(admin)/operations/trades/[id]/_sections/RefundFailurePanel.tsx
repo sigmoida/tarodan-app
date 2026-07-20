@@ -35,14 +35,11 @@ export function RefundFailurePanel({ trade }: { trade: TradeDetail }) {
   if (!trade.refundFailureReason) return null;
 
   const handle = async () => {
-    if (
-      !(await confirm({
-        description: t("admin.operations.trades.confirmRetryRefund"),
-        destructive: true,
-      }))
-    )
-      return;
-    retry.mutate();
+    await confirm({
+      description: t("admin.operations.trades.confirmRetryRefund"),
+      destructive: true,
+      onConfirm: () => retry.mutateAsync(),
+    });
   };
 
   return (

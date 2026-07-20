@@ -8,9 +8,10 @@ type T = ReturnType<typeof useTranslations<never>>;
 export interface UserRowActions {
   onView: (u: User) => void;
   onBanToggle: (u: User) => void;
+  busyId?: string;
 }
 
-export function userRowMenu(t: T, { onView, onBanToggle }: UserRowActions) {
+export function userRowMenu(t: T, { onView, onBanToggle, busyId }: UserRowActions) {
   return (u: User): RowActionItem[] => [
     { label: t('admin.operations.common.detail'), icon: EyeIcon, onClick: () => onView(u) },
     {
@@ -18,6 +19,7 @@ export function userRowMenu(t: T, { onView, onBanToggle }: UserRowActions) {
       icon: u.isBanned ? CheckCircleIcon : NoSymbolIcon,
       onClick: () => onBanToggle(u),
       destructive: !u.isBanned,
+      isLoading: busyId === u.id,
     },
   ];
 }

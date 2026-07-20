@@ -79,7 +79,10 @@ export function buildErrorColumns(toggle: Toggle) {
   ];
 }
 
-export function buildSecurityColumns(onResolve: (id: string) => void) {
+export function buildSecurityColumns(
+  onResolve: (id: string) => void,
+  resolvingId?: string,
+) {
   return [
     col.custom<SecurityLog>(
       "Olay",
@@ -118,7 +121,7 @@ export function buildSecurityColumns(onResolve: (id: string) => void) {
       { sortKey: "resolved", sortType: "number" },
     ),
     col.date<SecurityLog>("Tarih", "createdAt"),
-    col.rowMenu<SecurityLog>(securityRowMenu(onResolve)),
+    col.rowMenu<SecurityLog>(securityRowMenu(onResolve, resolvingId)),
   ];
 }
 

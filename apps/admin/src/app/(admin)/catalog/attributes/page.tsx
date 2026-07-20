@@ -58,6 +58,8 @@ function AttributesPageContent() {
     setAttrModal,
     onDeleteGroup,
     onDeleteAttribute,
+    deletingGroupId,
+    deletingAttributeId,
   } = useAttributesPage();
 
   return (
@@ -119,6 +121,7 @@ function AttributesPageContent() {
                     onClick={() => onDeleteGroup(g)}
                     title={t("common.delete")}
                     variant="danger"
+                    isLoading={deletingGroupId === g.id}
                   />
                   <ChevronRightIcon className="h-4 w-4 text-muted" />
                 </div>
@@ -189,6 +192,7 @@ function AttributesPageContent() {
                           onClick={() => onDeleteAttribute(a)}
                           title={t("common.delete")}
                           variant="danger"
+                          isLoading={deletingAttributeId === a.id}
                         />
                       </div>
                     </div>
