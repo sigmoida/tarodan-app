@@ -38,6 +38,7 @@ export interface CartLine {
   originalPrice?: number;
   lineTotal: number;
   isAvailable: boolean;
+  stockWarning?: string;
 }
 
 /** Pull a human message off an axios error (message may be a string or array). */
@@ -130,6 +131,7 @@ export function useCart() {
         originalPrice: item.originalPrice,
         lineTotal: item.lineTotal,
         isAvailable: item.isAvailable,
+        stockWarning: item.stockWarning,
       }));
     }
 
@@ -146,14 +148,23 @@ export function useCart() {
       originalPrice: undefined,
       lineTotal: item.price * item.quantity,
       isAvailable: true,
+      stockWarning: undefined,
     }));
   }, [isAuthenticated, isAuthLoading, query.data, offlineItems]);
 
-  // Counts and prices are derived from the same lines that consumers render.
+  // Keep unavailable lines visible, but derive every payable signal from the
+  // available subset of that same normalized list.
   const view = useMemo(() => {
-    const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
-    const itemCount = lines.reduce((sum, line) => sum + line.quantity, 0);
-    const shippingCost = calculateShipping(subtotal, lines.length);
+    const payableLines = lines.filter((line) => line.isAvailable);
+    const subtotal = payableLines.reduce(
+      (sum, line) => sum + line.lineTotal,
+      0,
+    );
+    const itemCount = payableLines.reduce(
+      (sum, line) => sum + line.quantity,
+      0,
+    );
+    const shippingCost = calculateShipping(subtotal, payableLines.length);
 
     if (isAuthenticated || isAuthLoading) {
       const calc = isAuthenticated ? query.data?.calculation : undefined;

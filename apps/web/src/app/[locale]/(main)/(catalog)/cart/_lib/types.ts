@@ -12,5 +12,7 @@ export interface CartLineItem {
   sellerName: string;
   price: number;
   originalPrice?: number | null;
+  isAvailable: boolean;
+  stockWarning?: string;
   onRemove: () => void;
 }
