@@ -515,7 +515,8 @@ export function routePermission(pathname: string): string | null {
   let best: string | null = null;
   let bestLen = -1;
   for (const [prefix, permission] of Object.entries(ROUTE_PERMISSIONS)) {
-    if (pathname.startsWith(prefix) && prefix.length > bestLen) {
+    const matchesRoute = pathname === prefix || pathname.startsWith(`${prefix}/`);
+    if (matchesRoute && prefix.length > bestLen) {
       best = permission;
       bestLen = prefix.length;
     }

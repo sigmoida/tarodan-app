@@ -3,9 +3,9 @@
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { ResourceList } from "@/components/list";
-import { statusOptions } from "./_shared";
-import { SuratTestConsole } from "./_components/SuratTestConsole";
-import { SuratShipmentsTable } from "./_components/SuratShipmentsTable";
+import { statusOptions } from "../_shared";
+import { SuratTestConsole } from "./SuratTestConsole";
+import { SuratShipmentsTable } from "./SuratShipmentsTable";
 
 export function SuratTrackingTab() {
   const t = useTranslations();

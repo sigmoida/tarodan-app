@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Button } from "@tarodan/ui";
+import { Pagination as UiPagination } from "@tarodan/ui";
 
 interface PaginationProps {
   page: number;
@@ -21,22 +21,12 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
       <p className="text-sm text-muted">
         {t("admin.shared.pagination.pageInfo", { page, totalPages })}
       </p>
-      <div className="flex gap-2">
-        <Button
-          variant="secondary"
-          onClick={() => onPageChange(Math.max(1, page - 1))}
-          disabled={page === 1}
-        >
-          {t("common.previous")}
-        </Button>
-        <Button
-          variant="secondary"
-          onClick={() => onPageChange(page + 1)}
-          disabled={page >= totalPages}
-        >
-          {t("admin.shared.pagination.next")}
-        </Button>
-      </div>
+      <UiPagination
+        page={page}
+        pageSize={1}
+        total={totalPages}
+        onPageChange={onPageChange}
+      />
     </div>
   );
 }

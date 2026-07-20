@@ -16,8 +16,11 @@ export const middleware = createAuthMiddleware(adminAuthConfig, {
   publicPaths: [],
   guestOnlyPaths: ["/login", "/forgot-password", "/reset-password"],
   authedHome: "/dashboard",
+  requestPathHeader: "x-admin-pathname",
 });
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\..*|gateway).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|gateway(?:/|$)|.*\\.(?:ico|png|jpe?g|gif|webp|avif|svg|css|js|mjs|map|woff2?|ttf|eot)$).*)",
+  ],
 };

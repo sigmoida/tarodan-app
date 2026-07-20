@@ -51,9 +51,9 @@ If you're about to copy a block, extract it (component, hook, or constant).
   branch (see `ForgotPasswordForm`: one "back to login" link, not two).
 - Duplicated config/data (status maps, option lists, labels) is the most
   dangerous kind — it drifts silently. Keep one source of truth; prefer the
-  shared `@tarodan/shared` status configs.
-- Before writing a helper, check `@tarodan/ui`, `@tarodan/shared`,
-  `src/lib/`, and `src/hooks/` for an existing one.
+  shared configs exported by `@tarodan/ui`.
+- Before writing a helper, check `@tarodan/ui`, `src/lib/`, and `src/hooks/`
+  for an existing one.
 
 ## 5. Small component APIs
 

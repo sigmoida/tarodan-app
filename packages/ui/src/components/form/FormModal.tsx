@@ -20,6 +20,10 @@ export interface FormModalProps<T extends FieldValues> {
   submitLabel?: string;
   cancelLabel?: string;
   maxWidth?: ModalProps['maxWidth'];
+  /** Optional width/layout override for editor-style split panes. */
+  modalClassName?: string;
+  /** Keep complex editors open when their backdrop is clicked. */
+  closeOnBackdrop?: boolean;
   children: ReactNode;
 }
 
@@ -43,6 +47,8 @@ export function FormModal<T extends FieldValues>({
   submitLabel = 'Kaydet',
   cancelLabel = 'İptal',
   maxWidth = 'max-w-lg',
+  modalClassName,
+  closeOnBackdrop,
   children,
 }: FormModalProps<T>) {
   const pending = isSubmitting ?? form.formState.isSubmitting;
@@ -59,7 +65,14 @@ export function FormModal<T extends FieldValues>({
   };
 
   return (
-    <Modal isOpen={open} onClose={close} title={title} maxWidth={maxWidth}>
+    <Modal
+      isOpen={open}
+      onClose={close}
+      title={title}
+      maxWidth={maxWidth}
+      className={modalClassName}
+      closeOnBackdrop={closeOnBackdrop}
+    >
       <Form form={form} onSubmit={onSubmit} className="space-y-4">
         {children}
         <ModalFooter

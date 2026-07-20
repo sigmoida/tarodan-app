@@ -1,10 +1,8 @@
 /**
  * Query key for the static-pages list. Shared by the list page and the editor
- * modal's invalidate so the two-part key (`['admin', 'pages']`) isn't hand-typed
- * in both places. It predates and doesn't fit the resource-based `adminKeys`
- * registry (custom `admin` namespace), so it lives here.
+ * modal's invalidation so both follow the resource-key convention.
  */
-export const PAGES_QUERY_KEY = ["admin", "pages"] as const;
+export const PAGES_QUERY_KEY = ["pages"] as const;
 
 export const PREDEFINED_PAGES = [
   {
@@ -264,11 +262,14 @@ export interface StaticPage {
   sortOrder: number;
 }
 
-export interface EditorForm {
-  title: string;
-  content: string;
-  metaTitle: string;
-  metaDescription: string;
-  metaKeywords: string;
-  isPublished: boolean;
-}
+export const pageEditorSchema = z.object({
+  title: z.string().trim().min(1, "Sayfa başlığı zorunludur"),
+  content: z.string().trim().min(1, "Sayfa içeriği zorunludur"),
+  metaTitle: z.string(),
+  metaDescription: z.string(),
+  metaKeywords: z.string(),
+  isPublished: z.boolean(),
+});
+
+export type EditorForm = z.infer<typeof pageEditorSchema>;
+import { z } from "zod";

@@ -12,10 +12,10 @@ import {
   ArrowUturnLeftIcon,
   MapPinIcon,
 } from "@heroicons/react/24/outline";
-import { OrderShipmentsTab } from "./OrderShipmentsTab";
-import { TradeShipmentsTab } from "./TradeShipmentsTab";
-import { ReturnShipmentsTab } from "./ReturnShipmentsTab";
-import { SuratTrackingTab } from "./SuratTrackingTab";
+import { OrderShipmentsTab } from "./_components/OrderShipmentsTab";
+import { TradeShipmentsTab } from "./_components/TradeShipmentsTab";
+import { ReturnShipmentsTab } from "./_components/ReturnShipmentsTab";
+import { SuratTrackingTab } from "./_components/SuratTrackingTab";
 
 type TabKey = "siparisler" | "takas" | "iade" | "surat";
 

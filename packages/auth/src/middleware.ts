@@ -19,6 +19,12 @@ export interface AuthMiddlewareOptions {
   guestOnlyPaths?: string[];
   /** Where to send authed users who hit a guest-only path. Default `/`. */
   authedHome?: string;
+  /**
+   * Optional trusted request header populated from `request.nextUrl.pathname`
+   * before the request reaches Server Components. Apps can use this for
+   * server-side route authorization without trusting a browser-supplied value.
+   */
+  requestPathHeader?: string;
 }
 
 /**
@@ -44,9 +50,16 @@ export function createAuthMiddleware(
     request: NextRequest,
   ): Promise<NextResponse> {
     const { pathname } = request.nextUrl;
+    const next = () => {
+      const requestHeaders = new Headers(request.headers);
+      if (options.requestPathHeader) {
+        requestHeaders.set(options.requestPathHeader, pathname);
+      }
+      return NextResponse.next({ request: { headers: requestHeaders } });
+    };
 
     if (options.publicPaths.some((p) => pathname.startsWith(p))) {
-      return NextResponse.next();
+      return next();
     }
 
     const refresh = request.cookies.get(config.cookies.refresh)?.value;
@@ -68,7 +81,7 @@ export function createAuthMiddleware(
           new URL(options.authedHome ?? "/", request.url),
         );
       }
-      return NextResponse.next();
+      return next();
     }
 
     if (!refresh) {
@@ -88,7 +101,7 @@ export function createAuthMiddleware(
       // self-heals sessions created before the indicator existed and keeps it
       // fresh on every authed navigation.
       if (config.indicatorCookie) {
-        const res = NextResponse.next();
+        const res = next();
         res.cookies.set(
           config.indicatorCookie,
           "1",
@@ -96,7 +109,7 @@ export function createAuthMiddleware(
         );
         return res;
       }
-      return NextResponse.next();
+      return next();
     }
 
     // Access token missing/expired but the refresh token is present → refresh.
@@ -124,7 +137,7 @@ export function createAuthMiddleware(
       // (expired) token and retry the refresh on the next navigation. Otherwise
       // a deploy blip would bounce authed users off protected pages to /login.
       const dead = !!refreshRes && !refreshRes.ok && refreshRes.status < 500;
-      if (!dead) return NextResponse.next();
+      if (!dead) return next();
       const redirect = NextResponse.redirect(new URL(loginPath, request.url));
       if (config.indicatorCookie)
         redirect.cookies.set(config.indicatorCookie, "", {
@@ -138,9 +151,7 @@ export function createAuthMiddleware(
     // Propagate to the current request so downstream RSCs read the fresh token…
     request.cookies.set(config.cookies.access, tokens.accessToken);
     request.cookies.set(config.cookies.refresh, newRefresh);
-    const response = NextResponse.next({
-      request: { headers: request.headers },
-    });
+    const response = next();
     // …and persist to the browser.
     response.cookies.set(
       config.cookies.access,
