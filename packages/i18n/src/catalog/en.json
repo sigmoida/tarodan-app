@@ -565,7 +565,8 @@
     "couponApplyError": "Coupon could not be applied",
     "couponLoginRequired": "Please sign in to use a coupon",
     "addedToCart": "Added to cart",
-    "addToCartFailed": "Could not add to cart"
+    "addToCartFailed": "Could not add to cart",
+    "excludedFromTotal": "Not included in the payable total"
   },
   "favorites": {
     "myFavorites": "My Favorites",

@@ -32,7 +32,7 @@ export default function CartClient() {
   } = useCart();
   const t = useTranslations();
 
-  const buyerFee = useBuyerFee(items);
+  const buyerFee = useBuyerFee(items.filter((item) => item.isAvailable));
 
   // `isLoading` starts false in the store, so on a hard reload the very first
   // render has no items AND isn't "loading" yet → the empty state would flash
@@ -82,6 +82,8 @@ export default function CartClient() {
     sellerName: line.sellerName,
     price: line.price,
     originalPrice: line.originalPrice,
+    isAvailable: line.isAvailable,
+    stockWarning: line.stockWarning,
     onRemove: () =>
       line.source === "authenticated"
         ? handleRemove(line.productId)
