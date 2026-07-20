@@ -15,18 +15,21 @@ describe("SupportService.getGuestContacts — #101 faz-2 cache pagination", () =
       name: "Ada Lovelace",
       email: "ada@x.com",
       subject: "Login issue",
+      createdAt: "2026-03-03T00:00:00.000Z",
     },
     R2: {
       referenceNumber: "R2",
       name: "Alan Turing",
       email: "alan@x.com",
       subject: "Payment",
+      createdAt: "2026-02-02T00:00:00.000Z",
     },
     R3: {
       referenceNumber: "R3",
       name: "Grace Hopper",
       email: "grace@y.com",
       subject: "Bug report",
+      createdAt: "2026-01-01T00:00:00.000Z",
     },
   };
   const refs = ["R1", "R2", "R3"];
@@ -72,5 +75,38 @@ describe("SupportService.getGuestContacts — #101 faz-2 cache pagination", () =
     const res = await service.getGuestContacts({ page: 1, limit: 20 });
     expect(res.data).toEqual([]);
     expect(res.meta).toEqual({ total: 0, page: 1, limit: 20, totalPages: 0 });
+  });
+
+  it("#291: sorts by a text field across the full list before paginating", async () => {
+    const res = await service.getGuestContacts({
+      page: 1,
+      limit: 10,
+      sortBy: "name",
+      sortOrder: "desc",
+    });
+    // Grace > Alan > Ada
+    expect(res.data.map((c) => c.referenceNumber)).toEqual(["R3", "R2", "R1"]);
+  });
+
+  it("#291: sorts createdAt chronologically", async () => {
+    const res = await service.getGuestContacts({
+      page: 1,
+      limit: 10,
+      sortBy: "createdAt",
+      sortOrder: "asc",
+    });
+    // Oldest first
+    expect(res.data.map((c) => c.referenceNumber)).toEqual(["R3", "R2", "R1"]);
+  });
+
+  it("#291: an unknown sortBy falls back to the default fast path", async () => {
+    const res = await service.getGuestContacts({
+      page: 1,
+      limit: 2,
+      sortBy: "bogus",
+    });
+    expect(res.data.map((c) => c.referenceNumber)).toEqual(["R1", "R2"]);
+    // Fast path preserved → page 2's object is not hydrated.
+    expect(cache.get).not.toHaveBeenCalledWith("guest_contact:submission:R3");
   });
 });
