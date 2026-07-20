@@ -1,6 +1,5 @@
-import { IsEnum, IsString, IsOptional, IsNumber, Min } from "class-validator";
+import { IsEnum, IsString, IsOptional } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { Type } from "class-transformer";
 import { AdminListQueryDto } from "../../../common/list";
 
 export enum RatingStatus {
@@ -19,7 +18,10 @@ export class UpdateRatingStatusDto {
   status: RatingStatus;
 }
 
-export class RatingQueryDto {
+// Standard list contract (page/limit/sortBy/sortOrder/sortType); `sortBy` accepts
+// both the legacy presets (newest/oldest/highest_score/lowest_score, mapped in the
+// service) and any displayed column key.
+export class RatingQueryDto extends AdminListQueryDto {
   @ApiPropertyOptional({ enum: RatingStatus })
   @IsOptional()
   @IsEnum(RatingStatus)
@@ -34,27 +36,6 @@ export class RatingQueryDto {
   @IsOptional()
   @IsString()
   search?: string;
-
-  @ApiPropertyOptional({ default: 1 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  page?: number = 1;
-
-  @ApiPropertyOptional({ default: 20 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  limit?: number = 20;
-
-  @ApiPropertyOptional({
-    enum: ["newest", "oldest", "highest_score", "lowest_score"],
-  })
-  @IsOptional()
-  @IsString()
-  sortBy?: "newest" | "oldest" | "highest_score" | "lowest_score" = "newest";
 }
 
 export class AdminUserRatingQueryDto extends AdminListQueryDto {

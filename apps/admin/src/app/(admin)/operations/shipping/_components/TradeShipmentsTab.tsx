@@ -16,6 +16,7 @@ export function TradeShipmentsTab() {
         adminApi.getTradeShipments({ ...params, tradeNumber: q || undefined })
       }
       getRowId={(r) => r.id}
+      syncUrl
       initialFilters={{ status: "all", leg: "all" }}
     >
       <ResourceList.Toolbar>

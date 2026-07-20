@@ -113,6 +113,8 @@ export function TaxReportTab() {
       resource="tax-report"
       fetcher={taxReportFetcher}
       getRowId={(row) => row.period}
+      // Full-load with an explicit cap: the aggregated report is small; 1000
+      // rows covers every period. Move server-side if it ever exceeds this (#383).
       limit={1000}
       syncUrl
       initialFilters={INITIAL_FILTERS}

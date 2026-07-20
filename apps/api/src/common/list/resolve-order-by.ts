@@ -111,10 +111,13 @@ function resolveCountKey(
  *   3. a dotted relation path (validated via DMMF),
  *   4. a `<relation>Count` aggregate,
  *   5. otherwise the default sort — an unknown key NEVER throws.
+ *
+ * The `sortType` hint (text/number/date) makes number/date scalar sorts put
+ * empty values last (`nulls: "last"`) so blanks sink regardless of direction.
  */
 export function resolveOrderBy<TOrderBy>(
   modelName: Prisma.ModelName,
-  query: Pick<ListQuery, "sortBy" | "sortOrder">,
+  query: Pick<ListQuery, "sortBy" | "sortOrder" | "sortType">,
   config: ResolveOrderByConfig<TOrderBy>,
 ): TOrderBy {
   if (!query.sortBy) return config.defaultSort;
@@ -125,7 +128,13 @@ export function resolveOrderBy<TOrderBy>(
   if (mappedSort) return mappedSort(direction);
 
   if (getScalarFields(modelName).has(query.sortBy)) {
-    return { [query.sortBy]: direction } as TOrderBy;
+    // number/date → nulls last so empty cells sink under either direction.
+    const nullsLast = query.sortType === "number" || query.sortType === "date";
+    return (
+      nullsLast
+        ? { [query.sortBy]: { sort: direction, nulls: "last" } }
+        : { [query.sortBy]: direction }
+    ) as TOrderBy;
   }
 
   if (query.sortBy.includes(".")) {

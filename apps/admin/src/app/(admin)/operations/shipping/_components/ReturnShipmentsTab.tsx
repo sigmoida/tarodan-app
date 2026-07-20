@@ -16,6 +16,7 @@ export function ReturnShipmentsTab() {
       resource="refund-shipments"
       fetcher={fetchRefundRequests}
       getRowId={(r) => r.id}
+      syncUrl
       initialFilters={{ status: "all", from: "", to: "" }}
     >
       <ResourceList.Toolbar>

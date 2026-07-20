@@ -5,6 +5,7 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import { AdminListQueryDto } from "./admin-list-query.dto";
 import { paginate } from "./paginate";
 import { resolveOrderBy } from "./resolve-order-by";
+import { buildSearchWhere } from "./search-where";
 
 // Keeps the shared delegate contract checked against the generated Prisma API.
 function _paginateProducts(prisma: PrismaClient) {
@@ -147,6 +148,26 @@ describe("admin list primitives", () => {
       ).toBe(fallback);
     });
 
+    it("puts nulls last for a number/date scalar via the sortType hint", () => {
+      expect(
+        resolveOrderBy(
+          "Product",
+          { sortBy: "price", sortOrder: "asc", sortType: "number" },
+          { defaultSort },
+        ),
+      ).toEqual({ price: { sort: "asc", nulls: "last" } });
+    });
+
+    it("keeps a plain scalar sort when sortType is text or absent", () => {
+      expect(
+        resolveOrderBy(
+          "Product",
+          { sortBy: "title", sortOrder: "asc", sortType: "text" },
+          { defaultSort },
+        ),
+      ).toEqual({ title: "asc" });
+    });
+
     it("uses the default for an unknown sort key without throwing", () => {
       expect(
         resolveOrderBy(
@@ -155,6 +176,36 @@ describe("admin list primitives", () => {
           { defaultSort },
         ),
       ).toBe(defaultSort);
+    });
+  });
+
+  describe("buildSearchWhere", () => {
+    it("builds a case-insensitive contains OR across scalar + relation paths", () => {
+      expect(
+        buildSearchWhere("ali", ["orderNumber", "seller.displayName"]),
+      ).toEqual({
+        OR: [
+          { orderNumber: { contains: "ali", mode: "insensitive" } },
+          { seller: { displayName: { contains: "ali", mode: "insensitive" } } },
+        ],
+      });
+    });
+
+    it("nests multi-level relation paths", () => {
+      expect(buildSearchWhere("x", ["order.buyer.displayName"])).toEqual({
+        OR: [
+          {
+            order: {
+              buyer: { displayName: { contains: "x", mode: "insensitive" } },
+            },
+          },
+        ],
+      });
+    });
+
+    it("returns undefined for a blank term or no fields", () => {
+      expect(buildSearchWhere("   ", ["name"])).toBeUndefined();
+      expect(buildSearchWhere("ali", [])).toBeUndefined();
     });
   });
 

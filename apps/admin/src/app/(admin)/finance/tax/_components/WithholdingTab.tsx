@@ -211,6 +211,8 @@ export function WithholdingTab() {
         resource="withholding-report"
         fetcher={withholdingFetcher}
         getRowId={(row) => row.sellerId}
+        // Full-load with an explicit cap: withholding is a bounded per-seller
+        // aggregate; 1000 rows is the documented ceiling. Server-side if larger (#383).
         limit={1000}
         syncUrl
         initialFilters={INITIAL_FILTERS}

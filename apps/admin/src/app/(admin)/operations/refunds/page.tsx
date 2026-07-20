@@ -33,6 +33,7 @@ export default function RefundsPage() {
           })
         }
         getRowId={(r) => r.id}
+        syncUrl
         initialFilters={{ startDate: "", endDate: "" }}
       >
         <ResourceList.Toolbar>
