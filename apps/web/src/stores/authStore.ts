@@ -33,7 +33,16 @@ interface User {
   // Membership
   membershipTier: MembershipTier;
   membership?: {
-    tier: { type: string; name: string } | string;
+    tier:
+      | {
+          type: string;
+          name: string;
+          maxTotalListings?: number;
+          maxImagesPerListing?: number;
+          canTrade?: boolean;
+          canCreateCollections?: boolean;
+        }
+      | string;
     expiresAt?: string;
   };
 
@@ -83,6 +92,28 @@ const TIER_LIMITS: Record<MembershipTier, MembershipLimits> = {
     canTrade: true,
     canCreateCollections: true,
   },
+};
+
+/**
+ * The profile endpoint includes the tier limits used by the API to authorize
+ * uploads and listings. Prefer those values so UI guards never drift from the
+ * backend. A missing membership is treated as the API's free-tier default.
+ */
+const getMembershipLimitsForUser = (
+  user: User | null | undefined,
+): MembershipLimits => {
+  const tier = user?.membership?.tier;
+  const apiTier = typeof tier === "object" ? tier : undefined;
+  const freeTier = TIER_LIMITS.free;
+
+  return {
+    maxListings: apiTier?.maxTotalListings ?? freeTier.maxListings,
+    maxImagesPerListing:
+      apiTier?.maxImagesPerListing ?? freeTier.maxImagesPerListing,
+    canTrade: apiTier?.canTrade ?? freeTier.canTrade,
+    canCreateCollections:
+      apiTier?.canCreateCollections ?? freeTier.canCreateCollections,
+  };
 };
 
 const extractMembershipTier = (user: any): MembershipTier => {
@@ -344,7 +375,7 @@ export const useAuthStore = create<AuthState>()(
             set({
               user: snapshot,
               isAuthenticated: true,
-              limits: TIER_LIMITS[snapshot.membershipTier],
+              limits: getMembershipLimitsForUser(snapshot),
               isLoading: false,
             });
           } else {
@@ -356,7 +387,7 @@ export const useAuthStore = create<AuthState>()(
             const response = await userApi.getProfile();
             const apiUser = response.data.user || response.data;
             const user = mapApiUser(apiUser);
-            const limits = TIER_LIMITS[user.membershipTier];
+            const limits = getMembershipLimitsForUser(user);
             // tarodan_authed cookie'sini server yönetir; client yazmaz.
             writeUserSnapshot(user);
             set({
@@ -397,7 +428,7 @@ export const useAuthStore = create<AuthState>()(
         },
 
         setUser: (user) => {
-          const limits = user ? TIER_LIMITS[user.membershipTier] : null;
+          const limits = user ? getMembershipLimitsForUser(user) : null;
           if (user) writeUserSnapshot(user);
           else clearUserSnapshot();
           set({ user, isAuthenticated: !!user, limits });
@@ -409,7 +440,7 @@ export const useAuthStore = create<AuthState>()(
             const response = await userApi.getProfile();
             const apiUser = response.data.user || response.data;
             const user = mapApiUser(apiUser);
-            const limits = TIER_LIMITS[user.membershipTier];
+            const limits = getMembershipLimitsForUser(user);
             writeUserSnapshot(user);
             set({ user, limits });
           } catch (error) {
@@ -441,7 +472,7 @@ export const useAuthStore = create<AuthState>()(
 
         getMembershipLimits: () => {
           const { user } = get();
-          return TIER_LIMITS[user?.membershipTier || "free"];
+          return getMembershipLimitsForUser(user);
         },
       };
     },
