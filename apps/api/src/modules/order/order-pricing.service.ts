@@ -150,7 +150,6 @@ export class OrderPricingService {
       );
     }
 
-    const now = new Date();
     let itemsSubtotal = 0;
     let totalBuyerFee = 0;
     let totalSellerFee = 0;
@@ -174,9 +173,6 @@ export class OrderPricingService {
           id: true,
           title: true,
           price: true,
-          oldPrice: true,
-          saleStartDate: true,
-          saleEndDate: true,
           sellerId: true,
           categoryId: true,
           status: true,
@@ -198,12 +194,7 @@ export class OrderPricingService {
       }
 
       const productPrice = Number(product.price);
-      const isSaleActive =
-        product.oldPrice != null &&
-        (!product.saleStartDate || now >= new Date(product.saleStartDate)) &&
-        (!product.saleEndDate || now <= new Date(product.saleEndDate));
-      const unitPrice =
-        isSaleActive && product.oldPrice != null ? productPrice : productPrice;
+      const unitPrice = productPrice;
       const lineSubtotal = unitPrice * quantity;
 
       const commissionResult = await this.calculateCommission(
