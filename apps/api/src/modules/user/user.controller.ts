@@ -8,10 +8,13 @@ import {
   Param,
   Query,
   Res,
+  Req,
+  Ip,
+  Headers,
   UseGuards,
   Logger,
 } from "@nestjs/common";
-import type { Response } from "express";
+import type { Request, Response } from "express";
 import {
   ApiTags,
   ApiOperation,
@@ -459,6 +462,51 @@ export class UserController {
       success: result.success,
       message: this.i18n.translate("server.user.userUnblocked", locale),
     };
+  }
+
+  /**
+   * POST /users/:id/view
+   * Increment the seller's storefront view counter. Public; rate-limited per
+   * viewer/IP and self-view / bot filtered inside the service.
+   */
+  @Post(":id/view")
+  @Public()
+  @ApiOperation({ summary: "Satıcı vitrin görüntülenmesini artır" })
+  @ApiResponse({
+    status: 201,
+    description: "Görüntülenme sayısı artırıldı",
+    schema: {
+      type: "object",
+      properties: {
+        storeViewCount: { type: "number", example: 42 },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: "Kullanıcı satıcı değil" })
+  @ApiResponse({ status: 404, description: "Kullanıcı bulunamadı" })
+  async incrementStoreViewCount(
+    @Param("id") sellerId: string,
+    @CurrentUser("id") viewerId?: string,
+    @Ip() ip?: string,
+    @Headers("user-agent") userAgent?: string,
+    @Req() req?: Request,
+  ) {
+    const forwardedFor = req?.headers?.["x-forwarded-for"];
+    const forwarded = Array.isArray(forwardedFor)
+      ? forwardedFor[0]
+      : forwardedFor;
+    const realIp = req?.headers?.["x-real-ip"];
+    const clientIp =
+      forwarded?.split(",")[0]?.trim() ||
+      (Array.isArray(realIp) ? realIp[0] : realIp) ||
+      ip ||
+      "unknown";
+    return this.userService.incrementStoreViewCount(
+      sellerId,
+      viewerId,
+      clientIp,
+      userAgent,
+    );
   }
 
   /**

@@ -38,6 +38,7 @@ model User {
   lastActivityAt          DateTime?                @map("last_activity_at")
   lastLoginAt             DateTime?                @map("last_login_at")
   deletedAt               DateTime?                @map("deleted_at")
+  storeViewCount          Int                      @default(0) @map("store_view_count")
   addresses               Address[]
   adminUser               AdminUser?
   cart                    Cart?
