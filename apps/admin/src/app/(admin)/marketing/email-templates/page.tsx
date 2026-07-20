@@ -9,6 +9,7 @@ import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { DataTable } from "@/components/DataTable";
+import { useClientTableSort } from "@/hooks/useClientTableSort";
 import { templateColumns } from "./_lib/columns";
 import { type TemplateListItem } from "./_lib/types";
 import { EmailTemplateEditorModal } from "./_modals/EmailTemplateEditorModal";
@@ -33,6 +34,7 @@ export default function EmailTemplatesPage() {
         ),
       )
     : list;
+  const sorted = useClientTableSort(visible);
   const groups = Array.from(new Set(visible.map((t) => t.group)));
 
   const columns = templateColumns(setEditKey);
@@ -75,8 +77,10 @@ export default function EmailTemplatesPage() {
             <SectionCard key={group} title={group}>
               <DataTable
                 columns={columns}
-                data={visible.filter((t) => t.group === group)}
+                data={sorted.rows.filter((t) => t.group === group)}
                 getRowId={(t) => t.key}
+                sort={sorted.sort}
+                onSort={sorted.setSort}
               />
             </SectionCard>
           ))}

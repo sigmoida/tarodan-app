@@ -44,28 +44,34 @@ export const catalogApi = {
     api.patch(`/admin/user-ratings/${id}/status`, { status }),
 
   // Categories
-  getCategories: (params?: CatalogListParams & {
-    search?: string;
-  }) => api.get("/admin/categories", { params: params ?? {} }),
+  getCategories: (
+    params?: CatalogListParams & {
+      search?: string;
+    },
+  ) => api.get("/admin/categories", { params: params ?? {} }),
   createCategory: (data: any) => api.post("/admin/categories", data),
   updateCategory: (id: string, data: any) =>
     api.patch(`/admin/categories/${id}`, data),
   deleteCategory: (id: string) => api.delete(`/admin/categories/${id}`),
 
   // Brands
-  getBrands: (params?: CatalogListParams & {
-    search?: string;
-    status?: string;
-  }) => api.get("/admin/brands", { params: params ?? {} }),
+  getBrands: (
+    params?: CatalogListParams & {
+      search?: string;
+      status?: string;
+    },
+  ) => api.get("/admin/brands", { params: params ?? {} }),
   createBrand: (data: any) => api.post("/admin/brands", data),
   updateBrand: (id: string, data: any) =>
     api.patch(`/admin/brands/${id}`, data),
   deleteBrand: (id: string) => api.delete(`/admin/brands/${id}`),
 
   // Manufacturers
-  getManufacturers: (params?: CatalogListParams & {
-    search?: string;
-  }) => api.get("/admin/manufacturers", { params: params ?? {} }),
+  getManufacturers: (
+    params?: CatalogListParams & {
+      search?: string;
+    },
+  ) => api.get("/admin/manufacturers", { params: params ?? {} }),
   createManufacturer: (data: any) => api.post("/admin/manufacturers", data),
   updateManufacturer: (id: string, data: any) =>
     api.patch(`/admin/manufacturers/${id}`, data),
@@ -84,10 +90,12 @@ export const catalogApi = {
   },
 
   // Car Models
-  getCarModels: (params?: CatalogListParams & {
-    brandId?: string;
-    search?: string;
-  }) => api.get("/admin/car-models", { params: params ?? {} }),
+  getCarModels: (
+    params?: CatalogListParams & {
+      brandId?: string;
+      search?: string;
+    },
+  ) => api.get("/admin/car-models", { params: params ?? {} }),
   createCarModel: (data: any) => api.post("/admin/car-models", data),
   updateCarModel: (id: string, data: any) =>
     api.patch(`/admin/car-models/${id}`, data),
@@ -134,10 +142,12 @@ export const catalogApi = {
     api.patch(`/admin/collections/${id}/featured`, { isFeatured }),
 
   // Attribute Groups
-  getAttributeGroups: (params?: CatalogListParams & {
-    search?: string;
-    isActive?: boolean;
-  }) => api.get("/admin/attribute-groups", { params }),
+  getAttributeGroups: (
+    params?: CatalogListParams & {
+      search?: string;
+      isActive?: boolean;
+    },
+  ) => api.get("/admin/attribute-groups", { params }),
   getAttributeGroup: (id: string) => api.get(`/admin/attribute-groups/${id}`),
   createAttributeGroup: (data: {
     name: string;
@@ -160,11 +170,13 @@ export const catalogApi = {
     api.delete(`/admin/attribute-groups/${id}`),
 
   // Attributes
-  getAttributes: (params?: CatalogListParams & {
-    groupId?: string;
-    search?: string;
-    isActive?: boolean;
-  }) => api.get("/admin/attributes", { params }),
+  getAttributes: (
+    params?: CatalogListParams & {
+      groupId?: string;
+      search?: string;
+      isActive?: boolean;
+    },
+  ) => api.get("/admin/attributes", { params }),
   createAttribute: (data: {
     groupId: string;
     value: string;
