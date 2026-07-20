@@ -34,6 +34,12 @@ export class AdminTicketQueryDto extends AdminListQueryDto {
   search?: string;
 }
 
+export class GuestContactQueryDto extends AdminListQueryDto {
+  @IsOptional()
+  @IsString()
+  search?: string;
+}
+
 // DTO for guest contact form (public, no auth required)
 export class GuestContactDto {
   @IsEmail({}, { message: "Geçerli bir e-posta adresi giriniz" })

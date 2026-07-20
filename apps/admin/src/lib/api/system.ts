@@ -43,6 +43,8 @@ export const systemApi = {
     page?: number;
     limit?: number;
     search?: string;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
   }) => api.get("/support/admin/guest-contacts", { params: params ?? {} }),
 
   // User complaints (content reports)

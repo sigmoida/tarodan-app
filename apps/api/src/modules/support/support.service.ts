@@ -23,6 +23,20 @@ import { CacheService } from "../cache/cache.service";
 import { NotificationService } from "../notification/notification.service";
 import { paginate, resolveOrderBy } from "../../common/list";
 
+/**
+ * #291: sortable fields for the cache-backed guest-contacts list and their sort
+ * type. This is the one endpoint without a Prisma model, so the sortable set is
+ * declared here (mirroring the stored object) instead of derived from the DMMF.
+ */
+const GUEST_CONTACT_SORT_FIELDS: Record<string, "text" | "date"> = {
+  referenceNumber: "text",
+  name: "text",
+  email: "text",
+  subject: "text",
+  status: "text",
+  createdAt: "date",
+};
+
 @Injectable()
 export class SupportService {
   private readonly logger = new Logger(SupportService.name);
@@ -148,16 +162,24 @@ export class SupportService {
    * - **Search:** the searchable fields (name/email/subject) live inside the
    *   objects, not the reference key, so we hydrate the list and filter in-memory,
    *   then paginate. Bounded by the guest-contact volume (contact-form submissions).
+   * - **Explicit sort:** #291 — there is no DB `orderBy` to route through
+   *   `resolveOrderBy`, so we sort the hydrated list in-memory before slicing.
+   *   Sorting (like search) forfeits the hydrate-only-current-page win because it
+   *   needs the whole list; the default (unsorted) path keeps that win. The
+   *   reference list is already stored newest-first, so the default order matches
+   *   a `createdAt desc` sort without any hydration.
    */
   async getGuestContacts(params?: {
     page?: number;
     limit?: number;
     search?: string;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
   }): Promise<{
     data: any[];
     meta: { total: number; page: number; limit: number; totalPages: number };
   }> {
-    const { page = 1, limit = 20, search } = params ?? {};
+    const { page = 1, limit = 20, search, sortBy, sortOrder } = params ?? {};
     const listKey = "guest_contacts:list";
     const referenceNumbers =
       (await this.cacheService.get<string[]>(listKey)) || [];
@@ -176,19 +198,29 @@ export class SupportService {
       totalPages: Math.ceil(total / limit),
     });
 
-    if (search) {
-      const q = search.toLowerCase();
+    // A sort is honored only for known fields; an unknown `sortBy` falls back to
+    // the default order (never throws), mirroring the DMMF-backed endpoints.
+    const sortField =
+      sortBy && GUEST_CONTACT_SORT_FIELDS[sortBy] ? sortBy : null;
+
+    if (search || sortField) {
+      const q = search?.toLowerCase();
       const all = await hydrate(referenceNumbers);
-      const filtered = all.filter((c) =>
-        [c?.referenceNumber, c?.name, c?.email, c?.subject].some((f) =>
-          String(f ?? "")
-            .toLowerCase()
-            .includes(q),
-        ),
-      );
+      const filtered = q
+        ? all.filter((c) =>
+            [c?.referenceNumber, c?.name, c?.email, c?.subject].some((f) =>
+              String(f ?? "")
+                .toLowerCase()
+                .includes(q),
+            ),
+          )
+        : all;
+      const ordered = sortField
+        ? this.sortGuestContacts(filtered, sortField, sortOrder ?? "desc")
+        : filtered;
       const start = (page - 1) * limit;
       return {
-        data: filtered.slice(start, start + limit),
+        data: ordered.slice(start, start + limit),
         meta: meta(filtered.length),
       };
     }
@@ -197,6 +229,32 @@ export class SupportService {
     const pageRefs = referenceNumbers.slice(start, start + limit);
     const data = await hydrate(pageRefs);
     return { data, meta: meta(referenceNumbers.length) };
+  }
+
+  /**
+   * #291: type-aware in-memory sort for the cache-backed guest-contacts list.
+   * `createdAt` sorts chronologically; every other field sorts alphabetically
+   * (locale-aware). Nullish values always sink to the bottom regardless of
+   * direction, matching the `nulls: "last"` behavior of the DB-backed tables.
+   */
+  private sortGuestContacts(
+    list: any[],
+    sortBy: string,
+    sortOrder: "asc" | "desc",
+  ): any[] {
+    const dir = sortOrder === "asc" ? 1 : -1;
+    const isDate = GUEST_CONTACT_SORT_FIELDS[sortBy] === "date";
+    return [...list].sort((a, b) => {
+      const av = a?.[sortBy];
+      const bv = b?.[sortBy];
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      const cmp = isDate
+        ? new Date(av).getTime() - new Date(bv).getTime()
+        : String(av).localeCompare(String(bv), "tr", { sensitivity: "base" });
+      return cmp * dir;
+    });
   }
 
   // ==========================================================================

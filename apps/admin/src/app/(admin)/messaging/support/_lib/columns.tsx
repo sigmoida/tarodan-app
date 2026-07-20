@@ -38,16 +38,14 @@ export const ticketColumns = [
 /** Guest contact list columns — the row menu opens the detail modal. */
 export function guestColumns(rowMenu: (g: GuestContact) => RowActionItem[]) {
   return [
-    col.code<GuestContact>("Referans", (g) => g.referenceNumber),
-    col.user<GuestContact>("Ad Soyad", (g) => ({
-      name: g.name,
-      secondary: g.email,
-    })),
-    col.text<GuestContact>("Konu", (g) => g.subject, {
-      grow: 3,
-      minWidth: 200,
-    }),
-    col.date<GuestContact>("Tarih", (g) => g.createdAt),
+    col.code<GuestContact>("Referans", "referenceNumber"),
+    col.user<GuestContact>(
+      "Ad Soyad",
+      (g) => ({ name: g.name, secondary: g.email }),
+      { sortKey: "name", sortType: "text" },
+    ),
+    col.text<GuestContact>("Konu", "subject", { grow: 3, minWidth: 200 }),
+    col.date<GuestContact>("Tarih", "createdAt"),
     col.rowMenu<GuestContact>(rowMenu),
   ];
 }

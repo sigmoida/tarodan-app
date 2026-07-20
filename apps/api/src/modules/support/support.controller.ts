@@ -24,6 +24,7 @@ import {
   GuestContactDto,
   GuestContactResponseDto,
   AdminTicketQueryDto,
+  GuestContactQueryDto,
 } from "./dto";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { AdminRoute } from "../auth/decorators/admin-route.decorator";
@@ -239,15 +240,7 @@ export class SupportController {
   @AdminRoute()
   @UseGuards(AdminJwtAuthGuard, RolesGuard)
   @Roles(AdminRole.admin, AdminRole.super_admin, AdminRole.moderator)
-  async getGuestContacts(
-    @Query("page") page?: string,
-    @Query("limit") limit?: string,
-    @Query("search") search?: string,
-  ) {
-    return this.supportService.getGuestContacts({
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
-      search,
-    });
+  async getGuestContacts(@Query() query: GuestContactQueryDto) {
+    return this.supportService.getGuestContacts(query);
   }
 }
