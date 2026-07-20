@@ -4161,7 +4161,8 @@
       },
       "pagination": {
         "pageInfo": "Page {page} of {totalPages}",
-        "next": "Next"
+        "next": "Next",
+        "rowsPerPage": "Rows per page"
       },
       "cancelReason": {
         "stockout": "Out of stock",

@@ -1,27 +1,54 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Pagination } from "@tarodan/ui";
+import { Pagination, Select } from "@tarodan/ui";
 import { useResourceList } from "@/context/ResourceListContext";
+
+/** Page-size options offered by the "Rows per page" selector. */
+const PAGE_SIZE_OPTIONS = [20, 50, 100, 250];
+const SIZE_OPTIONS = PAGE_SIZE_OPTIONS.map((size) => ({
+  value: String(size),
+  label: String(size),
+}));
 
 /** Page controls wired to the list's page state. */
 export function ResourceListPagination() {
-  const { page, pageSize, total, totalPages, setPage } = useResourceList();
+  const { page, pageSize, setPageSize, total, totalPages, setPage } =
+    useResourceList();
   const t = useTranslations();
 
-  if (totalPages <= 1) return null;
+  // The size selector only matters once there is more than the smallest page
+  // worth of rows; below that the list is always a single page.
+  const showSizeSelector = total > PAGE_SIZE_OPTIONS[0];
+  if (!showSizeSelector && totalPages <= 1) return null;
 
   return (
-    <div className="flex items-center justify-between">
-      <p className="text-sm text-muted">
-        {t("admin.shared.pagination.pageInfo", { page, totalPages })}
-      </p>
-      <Pagination
-        page={page}
-        pageSize={pageSize}
-        total={total}
-        onPageChange={setPage}
-      />
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted">
+          {t("admin.shared.pagination.rowsPerPage")}
+        </span>
+        <Select
+          bare
+          selectSize="sm"
+          value={String(pageSize)}
+          onChange={(e) => setPageSize(Number(e.target.value))}
+          options={SIZE_OPTIONS}
+        />
+      </div>
+      {totalPages > 1 && (
+        <div className="flex items-center gap-4">
+          <p className="text-sm text-muted">
+            {t("admin.shared.pagination.pageInfo", { page, totalPages })}
+          </p>
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={setPage}
+          />
+        </div>
+      )}
     </div>
   );
 }
