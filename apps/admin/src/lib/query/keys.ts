@@ -21,6 +21,8 @@ export const adminKeys = {
   // member of `[resource]`, matching how the count endpoints were keyed.
   options: (resource: string) => [resource, "options"] as const,
   stats: (resource: string) => [resource, "stats"] as const,
+  preview: (resource: string, params?: unknown) =>
+    [resource, "preview", params] as const,
   count: (resource: string, params?: unknown) =>
     [`${resource}-count`, params] as const,
 };
