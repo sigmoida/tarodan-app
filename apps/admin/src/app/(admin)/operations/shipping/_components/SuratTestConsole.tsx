@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import toast from "react-hot-toast";
 import { Button, Input } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
+import { extractErrorMessage } from "@/lib/error";
 import { SectionCard } from "@/components/detail/SectionCard";
 
 /**
@@ -27,12 +28,12 @@ export function SuratTestConsole() {
       const res = await adminApi.suratEndpointTest();
       setTestResult(res.data);
       if (res.data?.ref) setCref(res.data.ref);
-    } catch (e: any) {
+    } catch (error) {
       setTestResult({
-        error:
-          e?.response?.data?.message ||
-          e?.message ||
+        error: extractErrorMessage(
+          error,
           t("admin.operations.shipping.surat.requestFailed"),
+        ),
       });
     } finally {
       setTesting(false);
@@ -53,12 +54,12 @@ export function SuratTestConsole() {
           ? await adminApi.suratTestTrack(r)
           : await adminApi.suratTestCancel(r);
       setOpResult(res.data);
-    } catch (e: any) {
+    } catch (error) {
       setOpResult({
-        error:
-          e?.response?.data?.message ||
-          e?.message ||
+        error: extractErrorMessage(
+          error,
           t("admin.operations.shipping.surat.requestFailed"),
+        ),
       });
     } finally {
       setOpLoading(null);

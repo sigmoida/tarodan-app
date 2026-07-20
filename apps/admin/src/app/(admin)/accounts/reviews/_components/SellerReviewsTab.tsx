@@ -28,7 +28,7 @@ export function SellerReviewsTab() {
 			limit={10}
 			syncUrl
 			initialFilters={{ status: 'all' }}
-			errorMessage='Satıcı yorumları yüklenirken hata oluştu'>
+			>
 			<ResourceList.Toolbar>
 				<ResourceList.Search />
 				<ResourceList.FilterSelect

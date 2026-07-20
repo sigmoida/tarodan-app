@@ -1,25 +1,39 @@
 'use client';
 
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@tarodan/ui';
 import toast from 'react-hot-toast';
 import { adminApi } from '@/lib/api';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { SectionCard } from '@/components/detail/SectionCard';
+import { QueryErrorCard } from '@/components/page/QueryErrorCard';
 import { type CronDef } from '../_lib/types';
 
 /** Manually trigger scheduled jobs (harmless: only runs work that would run anyway). */
 export function CronsCard() {
-  const { data: crons = [] } = useQuery<CronDef[]>({
+  const cronsQuery = useQuery<CronDef[]>({
     queryKey: ['test-tools-crons'],
     queryFn: async () => (await adminApi.get('/admin/test-tools/crons')).data,
   });
+  const crons = cronsQuery.data ?? [];
 
-  const runCronMut = useMutation({
-    mutationFn: (key: string) =>
+  const runCronMut = useAdminMutation(
+    (key: string) =>
       adminApi.post('/admin/test-tools/run-cron', { key }).then((r) => r.data),
-    onSuccess: (data) => toast.success(`Çalıştı: ${JSON.stringify(data.result)}`),
-    onError: (e: any) => toast.error(e?.response?.data?.message || 'Cron çalıştırılamadı'),
-  });
+    {
+      errorMessage: 'Cron çalıştırılamadı',
+      onSuccess: (data) => toast.success(`Çalıştı: ${JSON.stringify(data.result)}`),
+    },
+  );
+
+  if (cronsQuery.isError) {
+    return (
+      <QueryErrorCard
+        onRetry={() => void cronsQuery.refetch()}
+        isRetrying={cronsQuery.isRefetching}
+      />
+    );
+  }
 
   return (
     <SectionCard

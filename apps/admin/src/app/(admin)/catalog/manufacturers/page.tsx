@@ -79,7 +79,6 @@ export default function ManufacturersPage() {
         fetcher={(params) => adminApi.getManufacturers(params)}
         getRowId={(m) => m.id}
         syncUrl
-        errorMessage={t("admin.catalog.manufacturers.loadError")}
       >
         <ResourceList.Toolbar>
           <ResourceList.Search />

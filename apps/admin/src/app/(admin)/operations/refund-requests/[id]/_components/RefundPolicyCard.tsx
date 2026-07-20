@@ -12,6 +12,7 @@ import {
   Label,
   Radio,
 } from "@tarodan/ui";
+import { extractErrorMessage } from "@/lib/error";
 
 /**
  * Phase 4B.2 — Admin RefundRequest policy override card.
@@ -110,11 +111,12 @@ export function RefundPolicyCard({
         refundBuyerFee,
         refundSellerCommission,
       });
-    } catch (e: any) {
+    } catch (error) {
       setError(
-        e?.response?.data?.message ||
-          e?.message ||
+        extractErrorMessage(
+          error,
           t("admin.operations.common.errorOccurred"),
+        ),
       );
     } finally {
       setSavingPolicy(false);
@@ -127,11 +129,12 @@ export function RefundPolicyCard({
     setSavingPayer(true);
     try {
       await onSavePayer(returnShippingPayer);
-    } catch (e: any) {
+    } catch (error) {
       setError(
-        e?.response?.data?.message ||
-          e?.message ||
+        extractErrorMessage(
+          error,
           t("admin.operations.common.errorOccurred"),
+        ),
       );
     } finally {
       setSavingPayer(false);

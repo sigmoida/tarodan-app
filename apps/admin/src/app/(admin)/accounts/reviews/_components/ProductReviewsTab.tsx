@@ -41,7 +41,6 @@ export function ProductReviewsTab() {
       limit={10}
       syncUrl
       initialFilters={{ status: "all" }}
-      errorMessage="Yorumlar yüklenirken hata oluştu"
     >
       <ResourceList.Toolbar>
         <ResourceList.Search />

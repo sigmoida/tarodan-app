@@ -116,7 +116,6 @@ export default function ProductsPage() {
             brandId: "",
             carModelId: "",
           }}
-          errorMessage={t("admin.catalog.products.loadError")}
         >
           <ResourceList.Toolbar>
             <ResourceList.Search

@@ -136,7 +136,7 @@ export function ApplicationsList({ status }: { status: string }) {
 			getRowId={(a) => a.id}
 			syncUrl
 			initialFilters={{ status }}
-			errorMessage='Başvurular yüklenemedi'>
+			>
 			<ResourceList.Toolbar>
 				<ResourceList.Search />
 			</ResourceList.Toolbar>

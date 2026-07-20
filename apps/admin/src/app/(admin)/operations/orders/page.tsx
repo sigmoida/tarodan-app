@@ -18,7 +18,6 @@ export default function OrdersPage() {
       getRowId={(o: any) => o.id}
       syncUrl
       initialFilters={{ status: "all", userId: "", productId: "" }}
-      errorMessage={t("admin.operations.orders.loadError")}
     >
       <ResourceList.Header
         title={t("admin.operations.orders.title")}

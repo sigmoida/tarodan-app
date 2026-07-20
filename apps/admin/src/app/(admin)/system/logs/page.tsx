@@ -165,7 +165,6 @@ export default function LogsPage() {
       limit={20}
       syncUrl
       initialFilters={FILTERS[tab]}
-      errorMessage="Loglar yüklenirken bir hata oluştu"
     >
       <ResourceList.Header
         title="Loglar"

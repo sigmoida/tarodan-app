@@ -46,7 +46,6 @@ export function TransactionsTab() {
       getRowId={(t) => t.id}
       syncUrl
       initialFilters={{ status: "all", dateFrom: "", dateTo: "" }}
-      errorMessage={t("admin.finance.payouts.historyLoadError")}
     >
       <ResourceList.Toolbar>
         <ResourceList.Search />

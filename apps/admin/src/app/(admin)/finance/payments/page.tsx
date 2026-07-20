@@ -59,7 +59,6 @@ export default function PaymentsPage() {
           startDate: "",
           endDate: "",
         }}
-        errorMessage={t("admin.finance.payments.loadError")}
       >
         <ResourceList.Toolbar>
           <ResourceList.Search />

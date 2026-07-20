@@ -22,7 +22,7 @@ export default function SellerPerformancePage() {
 				fetcher={(params) => adminApi.getUsers({ ...params, isSeller: true })}
 				getRowId={(s) => s.id}
 				syncUrl
-				errorMessage='Satıcılar yüklenemedi'>
+				>
 				<SellerPerformanceSummary />
 				<ResourceList.Toolbar>
 					<ResourceList.Search />

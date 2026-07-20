@@ -29,7 +29,6 @@ export function HistoryTab() {
       getRowId={(n) => n.id}
       syncUrl
       initialFilters={{ channel: "all", status: "all" }}
-      errorMessage="Bildirim geçmişi yüklenemedi"
     >
       <ResourceList.Toolbar>
         <ResourceList.Search />

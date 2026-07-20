@@ -26,7 +26,6 @@ export function SuratTrackingTab() {
         fetcher={(p) => adminApi.getShipments({ ...p, carrierId: "surat" })}
         getRowId={(r: any) => r.id}
         initialFilters={{ status: "all" }}
-        errorMessage={t("admin.operations.shipping.surat.loadError")}
       >
         <ResourceList.Toolbar>
           <ResourceList.Search />

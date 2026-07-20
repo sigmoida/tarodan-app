@@ -24,7 +24,6 @@ export default function RefundRequestsPage() {
         fetcher={fetchRefundRequests}
         getRowId={(rr) => rr.id}
         initialFilters={{ status: "all", from: "", to: "" }}
-        errorMessage={t("admin.operations.refundRequests.loadError")}
       >
         <ResourceList.Toolbar>
           <ResourceList.Search />

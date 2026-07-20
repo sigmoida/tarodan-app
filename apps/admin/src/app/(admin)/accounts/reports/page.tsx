@@ -28,7 +28,6 @@ export default function ReportsPage() {
         getRowId={(r) => r.id}
         syncUrl
         initialFilters={{ status: "all", type: "all" }}
-        errorMessage={t("admin.reports.loadError")}
       >
         <ResourceList.Toolbar>
           <ResourceList.Search />

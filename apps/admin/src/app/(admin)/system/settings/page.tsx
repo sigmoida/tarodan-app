@@ -2,8 +2,8 @@
 
 import { Button } from "@tarodan/ui";
 import { Form, FormInput } from "@tarodan/ui/form";
-import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { AdminPage } from "@/components/page/AdminPage";
+import { QueryErrorCard } from "@/components/page/QueryErrorCard";
 import { PageHeader } from "@/components/AdminList";
 import { PageLoading } from "@/components/PageLoading";
 import { AdminTabs } from "@/components/AdminTabs";
@@ -16,22 +16,12 @@ export default function SettingsPage() {
 
   if (query.isError) {
     return (
-      <SectionCard>
-        <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
-          <ExclamationTriangleIcon className="h-12 w-12 shrink-0 text-danger-500" />
-          <div className="min-w-0">
-            <p className="text-lg font-semibold text-heading">
-              {t("admin.settings.error.title")}
-            </p>
-            <p className="mt-1 text-sm text-muted">
-              {t("admin.settings.error.description")}
-            </p>
-          </div>
-          <Button onClick={() => query.refetch()}>
-            {t("common.tryAgain")}
-          </Button>
-        </div>
-      </SectionCard>
+      <QueryErrorCard
+        title={t("admin.settings.error.title")}
+        description={t("admin.settings.error.description")}
+        onRetry={() => void query.refetch()}
+        isRetrying={query.isRefetching}
+      />
     );
   }
 

@@ -45,15 +45,14 @@ export function useAttributesPage() {
     [pathname, router, searchParams],
   );
 
-  const { data: attributes = [], isLoading: loadingAttrs } = useQuery<
-    Attribute[]
-  >({
+  const attributesQuery = useQuery<Attribute[]>({
     queryKey: adminKeys.detail("attributes", selectedId ?? ""),
     enabled: !!selectedId,
     queryFn: async () =>
       (await adminApi.getAttributes({ groupId: selectedId!, limit: 100 })).data
         .data ?? [],
   });
+  const attributes = attributesQuery.data ?? [];
 
   const selectedGroup = groups.find((group) => group.id === selectedId) ?? null;
 
@@ -98,7 +97,10 @@ export function useAttributesPage() {
     groups,
     selectedGroup,
     attributes,
-    loadingAttrs,
+    loadingAttrs: attributesQuery.isLoading,
+    attributesError: attributesQuery.isError,
+    attributesRetrying: attributesQuery.isRefetching,
+    retryAttributes: attributesQuery.refetch,
     groupModal,
     setGroupModal,
     attrModal,

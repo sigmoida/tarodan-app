@@ -84,7 +84,6 @@ export default function BrandsPage() {
         getRowId={(b) => b.id}
         syncUrl
         initialFilters={{ status: "all" }}
-        errorMessage={t("admin.catalog.brands.loadError")}
       >
         <ResourceList.Toolbar>
           <ResourceList.Search />

@@ -118,7 +118,6 @@ export default function CollectionsPage() {
             isPublic: "all",
             isFeatured: "all",
           }}
-          errorMessage={t("admin.catalog.collections.loadError")}
         >
           <ResourceList.Toolbar>
             <ResourceList.Search />

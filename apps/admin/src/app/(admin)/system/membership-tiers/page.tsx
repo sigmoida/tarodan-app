@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { ResourceList } from "@/components/list";
+import { QueryErrorCard } from "@/components/page/QueryErrorCard";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { TierCard } from "./_components/TierCard";
 import { YearlyDiscountForm } from "./_components/YearlyDiscountForm";
@@ -28,15 +29,39 @@ export default function MembershipTiersPage() {
 
 function MembershipTiersContent() {
   const t = useTranslations();
-  const { rows, yearlyDiscount, yearlyDiscountLoading, editing, setEditing } =
-    useMembershipTiersPage();
+  const {
+    rows,
+    yearlyDiscount,
+    yearlyDiscountLoading,
+    yearlyDiscountError,
+    yearlyDiscountRetrying,
+    retryYearlyDiscount,
+    editing,
+    setEditing,
+  } = useMembershipTiersPage();
+
+  const header = (
+    <ResourceList.Header
+      title={t("admin.tiers.page.title")}
+      description={t("admin.tiers.page.description")}
+    />
+  );
+
+  if (yearlyDiscountError) {
+    return (
+      <>
+        {header}
+        <QueryErrorCard
+          onRetry={() => void retryYearlyDiscount()}
+          isRetrying={yearlyDiscountRetrying}
+        />
+      </>
+    );
+  }
 
   return (
     <>
-      <ResourceList.Header
-        title={t("admin.tiers.page.title")}
-        description={t("admin.tiers.page.description")}
-      />
+      {header}
 
       <ResourceList.Toolbar>
         <ResourceList.Search />

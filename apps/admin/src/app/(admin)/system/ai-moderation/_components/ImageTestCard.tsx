@@ -1,11 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { Button, Input } from '@tarodan/ui';
-import toast from 'react-hot-toast';
 import { adminApi } from '@/lib/api';
+import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { SectionCard } from '@/components/detail/SectionCard';
 import { AiBadge } from './AiBadge';
 import { type ImageTestResult, decisionState } from '../_lib/types';
@@ -16,15 +15,17 @@ export function ImageTestCard() {
   const [url, setUrl] = useState('');
   const [result, setResult] = useState<ImageTestResult | null>(null);
 
-  const testMut = useMutation({
-    mutationFn: (target: string) =>
+  const testMut = useAdminMutation(
+    (target: string) =>
       adminApi
         .post('/admin/moderation/test-image', { imageUrl: target })
         .then((r) => r.data as ImageTestResult),
-    onMutate: () => setResult(null),
-    onSuccess: (data) => setResult(data),
-    onError: () => toast.error(t('admin.aiModeration.imageTest.testFailed')),
-  });
+    {
+      errorMessage: t('admin.aiModeration.imageTest.testFailed'),
+      onSuccess: (data) => setResult(data),
+      mutation: { onMutate: () => setResult(null) },
+    },
+  );
   const testing = testMut.isPending;
 
   const runTest = (override?: string) => {

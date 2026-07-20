@@ -47,7 +47,6 @@ export default function DiscountsPage() {
         limit={20}
         syncUrl
         initialFilters={{ scope: 'all', isActive: 'all' }}
-        errorMessage="İndirimler yüklenemedi"
       >
         <ResourceList.Toolbar>
           <ResourceList.Search placeholder="İsim veya kod ile ara..." />

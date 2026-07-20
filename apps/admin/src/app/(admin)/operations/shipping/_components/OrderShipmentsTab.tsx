@@ -15,7 +15,6 @@ export function OrderShipmentsTab() {
       fetcher={(p) => adminApi.getShipments(p)}
       getRowId={(r) => r.id}
       initialFilters={{ status: "all" }}
-      errorMessage={t("admin.operations.shipping.orders.loadError")}
     >
       <ResourceList.Toolbar>
         <ResourceList.Search />

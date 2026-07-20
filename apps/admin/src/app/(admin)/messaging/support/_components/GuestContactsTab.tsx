@@ -21,7 +21,6 @@ export function GuestContactsTab() {
         fetcher={(params) => adminApi.getGuestContacts(params)}
         getRowId={(g) => g.referenceNumber}
         syncUrl
-        errorMessage="Misafir mesajları yüklenemedi"
       >
         <ResourceList.Toolbar>
           <ResourceList.Search />

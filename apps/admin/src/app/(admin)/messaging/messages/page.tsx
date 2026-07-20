@@ -41,7 +41,7 @@ export default function MessagesPage() {
 				getRowId={(m) => m.id}
 				syncUrl
 				initialFilters={{ status: 'pending' }}
-				errorMessage='Mesajlar yüklenemedi'>
+				>
 				<ResourceList.Toolbar>
 					<ResourceList.Search />
 					<ResourceList.FilterSelect

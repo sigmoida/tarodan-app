@@ -17,7 +17,6 @@ export function TradeShipmentsTab() {
       }
       getRowId={(r) => r.id}
       initialFilters={{ status: "all", leg: "all" }}
-      errorMessage={t("admin.operations.shipping.trades.loadError")}
     >
       <ResourceList.Toolbar>
         <ResourceList.Search />

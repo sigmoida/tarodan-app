@@ -6,6 +6,7 @@ import { Input } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { AdminPage } from "@/components/page/AdminPage";
+import { QueryErrorCard } from "@/components/page/QueryErrorCard";
 import { PageHeader } from "@/components/AdminList";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { DataTable } from "@/components/DataTable";
@@ -18,7 +19,13 @@ export default function EmailTemplatesPage() {
   const [search, setSearch] = useState("");
   const [editKey, setEditKey] = useState<string | null>(null);
 
-  const { data: list = [], isLoading } = useQuery({
+  const {
+    data: list = [],
+    isLoading,
+    isError,
+    isRefetching,
+    refetch,
+  } = useQuery({
     queryKey: adminKeys.all("email-templates"),
     queryFn: async () => {
       const res = await adminApi.getEmailTemplates();
@@ -61,7 +68,12 @@ export default function EmailTemplatesPage() {
         className="w-full sm:w-80"
       />
 
-      {isLoading ? (
+      {isError ? (
+        <QueryErrorCard
+          onRetry={() => void refetch()}
+          isRetrying={isRefetching}
+        />
+      ) : isLoading ? (
         <SectionCard>
           <p className="text-center text-muted">Yükleniyor...</p>
         </SectionCard>

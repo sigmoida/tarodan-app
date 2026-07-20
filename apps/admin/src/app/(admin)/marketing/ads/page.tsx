@@ -54,7 +54,7 @@ export default function AdsPage() {
 				getRowId={(a) => a.id}
 				syncUrl
 				initialFilters={{ position: 'all', device: 'all' }}
-				errorMessage='Reklamlar yüklenemedi'>
+				>
 				<ResourceList.Toolbar>
 					<ResourceList.Search />
 					<ResourceList.FilterSelect

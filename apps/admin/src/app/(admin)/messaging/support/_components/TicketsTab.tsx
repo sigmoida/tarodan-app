@@ -21,7 +21,6 @@ export function TicketsTab() {
       getRowId={(t) => t.id}
       syncUrl
       initialFilters={{ status: "all", priority: "all", category: "all" }}
-      errorMessage="Destek talepleri yüklenemedi"
     >
       <ResourceList.Toolbar>
         <ResourceList.Search />
