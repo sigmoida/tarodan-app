@@ -9,6 +9,7 @@ import {
   CLIENT_LIST_STALE_MS,
   type ClientListFetcher,
 } from "@/lib/query/client-list";
+import { type SetSort, type SortState } from "@/components/table/meta";
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -77,6 +78,10 @@ export interface UseAdminResourceResult<T> {
   filters: Record<string, string>;
   /** Updates a single filter key and resets the page */
   setFilter: (key: string, value: string) => void;
+  /** Active sort ({ sortBy?, sortOrder, sortType? }); empty sortBy = unsorted. */
+  sort: SortState;
+  /** Toggle sort on a column (asc → desc → off) and reset the page to 1. */
+  setSort: SetSort;
   /** Data is loading (initial load or refetch) */
   isLoading: boolean;
   /** Raw backend response (not extracted) — for extra fields like meta/stats. */
@@ -199,6 +204,14 @@ export function useAdminResource<T>({
     });
     return merged;
   };
+  // Sort mirrors page/q/filter: read from ?sort=&dir= on load (default = unsorted).
+  // sortType isn't URL-encoded; on restore the client comparator auto-detects it.
+  const getInitialSort = (): SortState => {
+    if (!syncUrl) return { sortOrder: "asc" };
+    const sortBy = searchParams.get("sort") ?? undefined;
+    const dir = searchParams.get("dir") === "desc" ? "desc" : "asc";
+    return sortBy ? { sortBy, sortOrder: dir } : { sortOrder: "asc" };
+  };
 
   // ── State ─────────────────────────────────────────────────────────────────
   const [page, setPageState] = useState<number>(getInitialPage);
@@ -209,6 +222,7 @@ export function useAdminResource<T>({
     useState<string>(getInitialSearch);
   const [filters, setFiltersState] =
     useState<Record<string, string>>(getInitialFilters);
+  const [sort, setSortState] = useState<SortState>(getInitialSort);
 
   // EVERY update that changes the query key (page/committedSearch/filters) runs
   // inside a React transition, so useSuspenseQuery does NOT suspend again after
@@ -220,13 +234,15 @@ export function useAdminResource<T>({
 
   // ── URL sync (write) ──────────────────────────────────────────────────────
   const syncToUrl = useCallback(
-    (p: number, q: string, f: Record<string, string>) => {
+    (p: number, q: string, f: Record<string, string>, s: SortState) => {
       if (!syncUrl) return;
       // Start from the current URL → params the hook doesn't own (like "tab") are preserved.
       const params = new URLSearchParams(searchParamsRef.current.toString());
       // Reset the keys the hook owns, then rewrite them.
       params.delete("page");
       params.delete("q");
+      params.delete("sort");
+      params.delete("dir");
       Object.keys(initialFilters).forEach((key) => params.delete(key));
       if (p > 1) params.set("page", String(p));
       if (q) params.set("q", q);
@@ -234,6 +250,11 @@ export function useAdminResource<T>({
         // Don't write the initialFilters default value to the URL (clean URL)
         if (val && val !== (initialFilters[key] ?? "")) params.set(key, val);
       });
+      // Sort: write the key when active; the default asc direction stays implicit.
+      if (s.sortBy) {
+        params.set("sort", s.sortBy);
+        if (s.sortOrder === "desc") params.set("dir", "desc");
+      }
       const qs = params.toString();
       const newUrl = qs ? `${pathname}?${qs}` : pathname;
       router.replace(newUrl, { scroll: false });
@@ -257,12 +278,20 @@ export function useAdminResource<T>({
       const v = searchParams.get(key);
       if (v !== null) newFilters[key] = v;
     });
+    const urlSortBy = searchParams.get("sort") ?? undefined;
+    const urlSort: SortState = urlSortBy
+      ? {
+          sortBy: urlSortBy,
+          sortOrder: searchParams.get("dir") === "desc" ? "desc" : "asc",
+        }
+      : { sortOrder: "asc" };
 
     setInputSearch(urlQ);
     startTransition(() => {
       setPageState(isNaN(urlPage) || urlPage < 1 ? 1 : urlPage);
       setCommittedSearch(urlQ);
       setFiltersState(newFilters);
+      setSortState(urlSort);
     });
   }, [searchParams, syncUrl, initialFilters]);
 
@@ -270,9 +299,9 @@ export function useAdminResource<T>({
   const setPage = useCallback(
     (p: number) => {
       startTransition(() => setPageState(p));
-      syncToUrl(p, committedSearch, filters);
+      syncToUrl(p, committedSearch, filters, sort);
     },
-    [committedSearch, filters, syncToUrl],
+    [committedSearch, filters, sort, syncToUrl],
   );
 
   const setFilter = useCallback(
@@ -282,9 +311,28 @@ export function useAdminResource<T>({
         setFiltersState(next);
         setPageState(1);
       });
-      syncToUrl(1, committedSearch, next);
+      syncToUrl(1, committedSearch, next, sort);
     },
-    [filters, committedSearch, syncToUrl],
+    [filters, committedSearch, sort, syncToUrl],
+  );
+
+  // ── Sort: single-column toggle asc → desc → off; resets the page to 1 ────────
+  const setSort = useCallback<SetSort>(
+    (sortKey, sortType) => {
+      const next: SortState =
+        sort.sortBy !== sortKey
+          ? { sortBy: sortKey, sortOrder: "asc", sortType }
+          : sort.sortOrder === "asc"
+            ? { sortBy: sortKey, sortOrder: "desc", sortType }
+            : // was desc → clear back to unsorted
+              { sortOrder: "asc" };
+      startTransition(() => {
+        setSortState(next);
+        setPageState(1);
+      });
+      syncToUrl(1, committedSearch, filters, next);
+    },
+    [sort, committedSearch, filters, syncToUrl],
   );
 
   // ── Debounced search: setSearch updates the input instantly; commits after debounce ──
@@ -303,7 +351,7 @@ export function useAdminResource<T>({
           setCommittedSearch(value);
           setPageState(1);
         });
-        syncToUrl(1, value, filters);
+        syncToUrl(1, value, filters, sort);
       };
 
       if (debounceMs === 0) {
@@ -315,7 +363,7 @@ export function useAdminResource<T>({
         }, debounceMs);
       }
     },
-    [debounceMs, filters, syncToUrl],
+    [debounceMs, filters, sort, syncToUrl],
   );
 
   // ── onSearchSubmit: skip the debounce for an instant flush ────────────────
@@ -330,8 +378,8 @@ export function useAdminResource<T>({
       setCommittedSearch(inputSearch);
       setPageState(1);
     });
-    syncToUrl(1, inputSearch, filters);
-  }, [inputSearch, filters, syncToUrl]);
+    syncToUrl(1, inputSearch, filters, sort);
+  }, [inputSearch, filters, sort, syncToUrl]);
 
   // Clear the timer on unmount
   useEffect(() => {
@@ -350,8 +398,15 @@ export function useAdminResource<T>({
     Object.entries(filters).forEach(([key, val]) => {
       if (val && val !== "all") params[key] = val;
     });
+    // Sort: sortBy/sortOrder are the wire contract; sortType is consumed only by
+    // paginateClient (client-list). Server DTOs whitelist-strip the extras.
+    if (sort.sortBy) {
+      params.sortBy = sort.sortBy;
+      params.sortOrder = sort.sortOrder;
+      if (sort.sortType) params.sortType = sort.sortType;
+    }
     return params;
-  }, [page, limit, committedSearch, filters]);
+  }, [page, limit, committedSearch, filters, sort]);
 
   // ── react-query (suspense) ─────────────────────────────────────────────────
   // The initial load suspends (the SuspenseBoundary above shows a spinner; the
@@ -369,6 +424,7 @@ export function useAdminResource<T>({
       page,
       search: committedSearch,
       filters,
+      sort,
     }),
     queryFn: async () => {
       const response = await fetcher(buildParams());
@@ -443,6 +499,8 @@ export function useAdminResource<T>({
     onSearchSubmit,
     filters,
     setFilter,
+    sort,
+    setSort,
     // Dim the table during a transition (filter/search/page) or a background refetch.
     isLoading: isPending || queryResult.isFetching,
     data: queryResult.data,

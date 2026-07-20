@@ -25,7 +25,12 @@ import {
   TableHead,
   TableCell,
 } from "@tarodan/ui";
-import { type CellAlign } from "@/components/table/meta";
+import {
+  type CellAlign,
+  type SetSort,
+  type SortState,
+} from "@/components/table/meta";
+import { SortableHeader } from "@/components/table/SortableHeader";
 
 export type { ColumnDef };
 
@@ -59,6 +64,14 @@ export interface DataTableProps<T> {
   renderExpanded?: (row: T) => ReactNode;
   /** Id of the currently open row (matches getRowId). When set, it opens/closes smoothly. */
   expandedId?: string | null;
+  // ── Sorting (optional) ──
+  /** The active sort; drives header highlight + arrow direction. */
+  sort?: SortState;
+  /**
+   * Toggle handler. Sort controls render ONLY when this is provided AND a column
+   * carries `meta.sortable` — legacy tables (no handler / no meta) are untouched.
+   */
+  onSort?: SetSort;
 }
 
 /**
@@ -82,6 +95,8 @@ export function DataTable<T>({
   onToggleAll,
   renderExpanded,
   expandedId,
+  sort,
+  onSort,
 }: DataTableProps<T>) {
   const t = useTranslations();
   const resolvedEmptyText = emptyText ?? t("admin.shared.table.noRecords");
@@ -151,16 +166,32 @@ export function DataTable<T>({
                     />
                   </TableHead>
                 )}
-                {hg.headers.map((h) => (
-                  <TableHead
-                    key={h.id}
-                    className={alignOf(h.column.columnDef.meta?.align)}
-                  >
-                    {h.isPlaceholder
-                      ? null
-                      : flexRender(h.column.columnDef.header, h.getContext())}
-                  </TableHead>
-                ))}
+                {hg.headers.map((h) => {
+                  const meta = h.column.columnDef.meta;
+                  const canSort = !!onSort && meta?.sortable && !!meta.sortKey;
+                  const isActive = canSort && sort?.sortBy === meta.sortKey;
+                  return (
+                    <TableHead key={h.id} className={alignOf(meta?.align)}>
+                      {h.isPlaceholder ? null : canSort ? (
+                        <SortableHeader
+                          sortKey={meta.sortKey!}
+                          sortType={meta.sortType}
+                          active={!!isActive}
+                          order={sort?.sortOrder}
+                          align={meta?.align}
+                          onSort={onSort!}
+                        >
+                          {flexRender(
+                            h.column.columnDef.header,
+                            h.getContext(),
+                          )}
+                        </SortableHeader>
+                      ) : (
+                        flexRender(h.column.columnDef.header, h.getContext())
+                      )}
+                    </TableHead>
+                  );
+                })}
               </TableRow>
             ))}
           </TableHeader>

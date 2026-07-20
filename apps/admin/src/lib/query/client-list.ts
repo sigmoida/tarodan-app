@@ -1,4 +1,5 @@
 import type { AxiosResponse } from "axios";
+import type { SortType } from "@/components/table/meta";
 
 /**
  * Client-side list adapter.
@@ -17,6 +18,11 @@ export interface ClientListParams {
   page?: number;
   limit?: number;
   search?: string;
+  /** Column `sortKey` to sort by (from `useAdminResource`'s sort state). */
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  /** Comparator family; when absent (e.g. after URL restore) it is auto-detected. */
+  sortType?: SortType;
   [key: string]: any;
 }
 
@@ -35,7 +41,43 @@ export interface PaginateClientOptions<T> {
   filter?: (item: T, params: ClientListParams) => boolean;
 }
 
-/** Filter → search → paginate an in-memory list into a `{ data, meta }` page. */
+/** Read a (possibly dotted) key path off a row — supports `sortKey: 'buyer.name'`. */
+function readPath(obj: unknown, path: string): unknown {
+  return path
+    .split(".")
+    .reduce<unknown>(
+      (o, k) => (o == null ? undefined : (o as Record<string, unknown>)[k]),
+      obj,
+    );
+}
+
+/** Compare two non-empty cell values using the column's comparator family. */
+function compareBy(a: unknown, b: unknown, type?: SortType): number {
+  if (type === "number") return Number(a) - Number(b);
+  if (type === "date")
+    return new Date(a as any).getTime() - new Date(b as any).getTime();
+  // 'text' or unknown → Turkish locale compare; `numeric` keeps "2" < "10" and
+  // makes the type-less URL-restore path behave sensibly for numbers too.
+  return String(a).localeCompare(String(b), "tr", { numeric: true });
+}
+
+/** Sort a copy of `rows` by `sortBy`/`sortOrder`; empty values always sort last. */
+function sortRows<T>(rows: T[], params: ClientListParams): T[] {
+  const { sortBy, sortOrder = "asc", sortType } = params;
+  if (!sortBy) return rows;
+  const dir = sortOrder === "desc" ? -1 : 1;
+  const isEmpty = (v: unknown) => v == null || v === "";
+  return [...rows].sort((ra, rb) => {
+    const a = readPath(ra, sortBy);
+    const b = readPath(rb, sortBy);
+    if (isEmpty(a) && isEmpty(b)) return 0;
+    if (isEmpty(a)) return 1;
+    if (isEmpty(b)) return -1;
+    return compareBy(a, b, sortType) * dir;
+  });
+}
+
+/** Filter → search → sort → paginate an in-memory list into a `{ data, meta }` page. */
 export function paginateClient<T>(
   items: T[],
   params: ClientListParams,
@@ -59,6 +101,8 @@ export function paginateClient<T>(
       ),
     );
   }
+
+  rows = sortRows(rows, params);
 
   const total = rows.length;
   const start = (page - 1) * limit;
