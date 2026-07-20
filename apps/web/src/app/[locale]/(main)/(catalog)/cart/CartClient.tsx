@@ -29,6 +29,7 @@ export default function CartClient() {
     removeFromOfflineCart,
     totalDiscount,
     appliedDiscounts,
+    canCheckout,
   } = useCart();
   const t = useTranslations();
 
@@ -114,6 +115,7 @@ export default function CartClient() {
             buyerFee={buyerFee}
             grandTotal={grandTotal}
             isAuthenticated={isAuthenticated}
+            canCheckout={canCheckout}
           />
         </div>
       </div>

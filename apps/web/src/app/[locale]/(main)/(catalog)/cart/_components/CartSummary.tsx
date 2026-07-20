@@ -3,6 +3,7 @@
 "use client";
 
 import { LockClosedIcon } from "@heroicons/react/24/outline";
+import { Button } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { SectionCard } from "@/components/ui";
 import { useTranslations } from "next-intl";
@@ -26,12 +27,14 @@ export default function CartSummary({
   buyerFee,
   grandTotal,
   isAuthenticated,
+  canCheckout,
 }: {
   subtotal: number;
   appliedDiscounts?: AppliedDiscount[];
   buyerFee: number;
   grandTotal: number;
   isAuthenticated: boolean;
+  canCheckout: boolean;
 }) {
   const t = useTranslations();
 
@@ -82,9 +85,15 @@ export default function CartSummary({
         </div>
       </div>
 
-      <ButtonLink href="/checkout" className="w-full mt-6 flex gap-2">
-        {t("cart.proceedToCheckout")}
-      </ButtonLink>
+      {canCheckout ? (
+        <ButtonLink href="/checkout" className="w-full mt-6 flex gap-2">
+          {t("cart.proceedToCheckout")}
+        </ButtonLink>
+      ) : (
+        <Button disabled className="w-full mt-6 flex gap-2">
+          {t("cart.proceedToCheckout")}
+        </Button>
+      )}
 
       {!isAuthenticated && (
         <div className="mt-3 space-y-2">

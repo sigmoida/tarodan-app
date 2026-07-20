@@ -2,9 +2,7 @@
 
 "use client";
 
-import { TruckIcon } from "@heroicons/react/24/outline";
 import { Spinner, Stepper } from "@tarodan/ui";
-import { ButtonLink } from "@/components/ui/ButtonLink";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Container } from "@/components/layout/Container";
@@ -16,39 +14,15 @@ import OrderSummarySidebar from "./_sections/OrderSummarySidebar";
 import GuestOtpModal from "./_modals/GuestOtpModal";
 
 function CheckoutLayout() {
-  const {
-    t,
-    isMounted,
-    step,
-    goToStep,
-    checkoutItems,
-    directProductId,
-    existingOrderId,
-  } = useCheckout();
+  const { t, isMounted, step, goToStep, checkoutGuardPending } = useCheckout();
 
-  // Wait for client mount before rendering dynamic content
-  if (!isMounted) {
+  // Wait for client mount and for the cart guard to resolve or redirect.
+  if (!isMounted || checkoutGuardPending) {
     return (
       <PageShell className="flex items-center justify-center">
         <div className="text-center">
           <Spinner size="xl" className="mx-auto mb-4" />
           <p className="text-muted">Yükleniyor...</p>
-        </div>
-      </PageShell>
-    );
-  }
-
-  // orderId ile geldiyse boş sepete atma; normal checkout'ta sepet boşsa ilanlara yönlendir
-  if (checkoutItems.length === 0 && !directProductId && !existingOrderId) {
-    return (
-      <PageShell className="flex items-center justify-center">
-        <div className="text-center">
-          <TruckIcon className="w-20 h-20 text-border-strong mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-heading mb-2">
-            {t("cart.empty")}
-          </h2>
-          <p className="text-muted mb-6">{t("cart.emptyDesc")}</p>
-          <ButtonLink href="/listings">{t("cart.browseListings")}</ButtonLink>
         </div>
       </PageShell>
     );

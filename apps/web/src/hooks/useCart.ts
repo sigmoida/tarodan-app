@@ -156,6 +156,7 @@ export function useCart() {
   // available subset of that same normalized list.
   const view = useMemo(() => {
     const payableLines = lines.filter((line) => line.isAvailable);
+    const canCheckout = payableLines.length > 0;
     const subtotal = payableLines.reduce(
       (sum, line) => sum + line.lineTotal,
       0,
@@ -177,6 +178,7 @@ export function useCart() {
         shippingCost,
         grandTotal: Math.max(0, subtotal - totalDiscount + shippingCost),
         itemCount,
+        canCheckout,
         appliedCouponCode: calc?.appliedCouponCode ?? null,
         appliedDiscounts: calc?.appliedDiscounts ?? [],
         warnings: calc?.warnings ?? [],
@@ -191,6 +193,7 @@ export function useCart() {
       shippingCost,
       grandTotal: subtotal + shippingCost,
       itemCount,
+      canCheckout,
       appliedCouponCode: null as string | null,
       appliedDiscounts: [] as AppliedDiscount[],
       warnings: [] as string[],

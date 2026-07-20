@@ -42,6 +42,7 @@ export function useCheckoutSubmit({
   authToken,
   directProductId,
   clearCart,
+  onCheckoutSubmitted,
 }: {
   checkoutItems: CheckoutItem[];
   t: Translate;
@@ -67,6 +68,8 @@ export function useCheckoutSubmit({
   authToken: string | null;
   directProductId: string | null;
   clearCart: () => Promise<void>;
+  /** Marks the checkout as submitted so the cart-empty guard stops redirecting. */
+  onCheckoutSubmitted: () => void;
 }) {
   // Checkout idempotency: retries for the same cart (double click, retry after a
   // network error) return the SAME group server-side. Generated on first submit.
@@ -491,6 +494,8 @@ export function useCheckoutSubmit({
             const hasSession = isAuthenticated || !!authToken;
 
             if (!directProductId) {
+              // Guard against the cart-empty redirect before clearing the cart.
+              onCheckoutSubmitted();
               await clearCart();
             }
 

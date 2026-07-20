@@ -39,8 +39,9 @@ function useCheckoutValue() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const {
-    items: cartItems,
-    offlineItems,
+    lines: cartLines,
+    canCheckout,
+    isLoading: cartIsLoading,
     subtotal: cartSubtotal,
     totalDiscount: cartTotalDiscount,
     clearCart,
@@ -57,6 +58,12 @@ function useCheckoutValue() {
 
   const directProductId = searchParams.get("productId");
   const existingOrderId = searchParams.get("orderId");
+  const isCartCheckout = !directProductId && !existingOrderId;
+
+  // Set once a checkout succeeds and clears the cart. Without this, emptying the
+  // cart flips `canCheckout` to false and the guard below would replace the
+  // in-flight payment navigation with a redirect back to /cart.
+  const checkoutSubmittedRef = useRef(false);
 
   // 0: Address, 1: Payment, 2: Confirm — the clickable Stepper drives this.
   const stepper = useStepper(3, 0);
@@ -106,45 +113,25 @@ function useCheckoutValue() {
     setShowAddressForm,
   });
 
-  // Get checkout items: direct buy > authenticated cart > offline/guest cart
+  // Get checkout items: direct buy > available normalized cart lines. The cart
+  // hook already hides stale guest lines for authenticated users.
   const checkoutItems: CheckoutItem[] = directProduct
     ? [directProduct]
-    : cartItems.length > 0
-      ? cartItems.map(
-          (item: {
-            id: string;
-            productId: string;
-            productTitle: string;
-            effectivePrice: number;
-            originalPrice?: number;
-            productImage: string | null;
-            sellerId: string;
-            sellerName: string;
-          }) => ({
-            id: item.id,
-            productId: item.productId,
-            title: item.productTitle,
-            price: item.effectivePrice,
-            originalPrice:
-              item.originalPrice != null &&
-              item.originalPrice > item.effectivePrice
-                ? item.originalPrice
-                : undefined,
-            imageUrl:
-              item.productImage ||
-              "https://placehold.co/96x96/f3f4f6/9ca3af?text=Ürün",
-            seller: { id: item.sellerId, displayName: item.sellerName },
-          }),
-        )
-      : offlineItems.map((item) => ({
-          id: item.id,
-          productId: item.productId,
-          title: item.title,
-          price: item.price,
+    : cartLines
+        .filter((line) => line.isAvailable)
+        .map((line) => ({
+          id: line.id,
+          productId: line.productId,
+          title: line.title,
+          price: line.price,
+          originalPrice:
+            line.originalPrice != null && line.originalPrice > line.price
+              ? line.originalPrice
+              : undefined,
           imageUrl:
-            item.imageUrl ||
+            line.imageUrl ||
             "https://placehold.co/96x96/f3f4f6/9ca3af?text=Ürün",
-          seller: { id: item.seller.id, displayName: item.seller.displayName },
+          seller: { id: line.sellerId, displayName: line.sellerName },
         }));
   const subtotal = Number(
     (directProduct ? directProduct.price : cartSubtotal) ?? 0,
@@ -219,6 +206,9 @@ function useCheckoutValue() {
     authToken,
     directProductId,
     clearCart,
+    onCheckoutSubmitted: () => {
+      checkoutSubmittedRef.current = true;
+    },
   });
 
   // Direct product failed to load → bounce back to listings.
@@ -256,6 +246,15 @@ function useCheckoutValue() {
       router.replace(`/profile/orders/${existingOrderId}`);
     }
   }, [existingOrderId, isAuthenticated, router]);
+
+  // Plain cart checkout requires at least one available line. Wait for auth and
+  // cart hydration so a cold load cannot redirect a valid cart prematurely, and
+  // skip once a submit has emptied the cart on its way to the payment page.
+  useEffect(() => {
+    if (checkoutSubmittedRef.current) return;
+    if (!isMounted || !isCartCheckout || cartIsLoading || canCheckout) return;
+    router.replace("/cart");
+  }, [canCheckout, cartIsLoading, isCartCheckout, isMounted, router]);
 
   // ---- Step-1 validation (zod) ----
   const authAddressOk =
@@ -329,6 +328,7 @@ function useCheckoutValue() {
     user,
     directProductId,
     existingOrderId,
+    checkoutGuardPending: isCartCheckout && (cartIsLoading || !canCheckout),
     step,
     goToStep,
     nextStep,
