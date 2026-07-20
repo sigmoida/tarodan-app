@@ -142,6 +142,23 @@ export class AdminAnalyticsController {
     return this.adminService.getTopProducts(safeLimit);
   }
 
+  @Get("dashboard/top-sellers")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary: "Get top-N most-viewed sellers by tracked storefront views",
+  })
+  @ApiQuery({
+    name: "limit",
+    required: false,
+    description: "Max number of sellers to return (default 10)",
+  })
+  async getTopSellers(@Query("limit") limit?: string) {
+    const parsed = limit ? parseInt(limit, 10) : 10;
+    const safeLimit =
+      Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 100) : 10;
+    return this.adminService.getTopSellers(safeLimit);
+  }
+
   @Get("dashboard/pending-actions")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: "Get pending actions count for dashboard" })

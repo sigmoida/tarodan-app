@@ -726,6 +726,51 @@ export class AdminAnalyticsDashboardService {
   }
 
   /**
+   * Get top-N most-viewed sellers for the dashboard widget.
+   * Ordered by storeViewCount desc across seller accounts (excluding banned
+   * and deleted); returns display fields the admin table shows: id, name,
+   * avatar, storeViewCount, product count, and active listings count.
+   */
+  async getTopSellers(limit: number = 10) {
+    const sellers = await this.prisma.user.findMany({
+      take: limit,
+      where: { isSeller: true, isBanned: false, deletedAt: null },
+      orderBy: [{ storeViewCount: "desc" }, { createdAt: "asc" }],
+      select: {
+        id: true,
+        displayName: true,
+        avatarUrl: true,
+        storeViewCount: true,
+        _count: { select: { products: true } },
+      },
+    });
+
+    const sellerIds = sellers.map((s) => s.id);
+    const activeCounts = sellerIds.length
+      ? await this.prisma.product.groupBy({
+          by: ["sellerId"],
+          where: {
+            sellerId: { in: sellerIds },
+            status: ProductStatus.active,
+          },
+          _count: { id: true },
+        })
+      : [];
+    const activeMap = new Map(
+      activeCounts.map((row) => [row.sellerId, row._count.id]),
+    );
+
+    return sellers.map((s) => ({
+      id: s.id,
+      displayName: s.displayName,
+      avatarUrl: this.common.resolveProductImageUrl(s.avatarUrl),
+      storeViewCount: s.storeViewCount,
+      productCount: s._count.products,
+      activeListings: activeMap.get(s.id) ?? 0,
+    }));
+  }
+
+  /**
    * Get pending actions for dashboard
    * Requirement: Pending Actions Panel (7.1)
    */

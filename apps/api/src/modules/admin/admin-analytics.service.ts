@@ -51,6 +51,10 @@ export class AdminAnalyticsService {
     return this.dashboard.getTopProducts(limit);
   }
 
+  async getTopSellers(limit: number = 10) {
+    return this.dashboard.getTopSellers(limit);
+  }
+
   async getPendingActions() {
     return this.dashboard.getPendingActions();
   }
