@@ -24,7 +24,7 @@ import { RecentTrades } from "./_components/RecentTrades";
 
 export default function DashboardPage() {
   const t = useTranslations();
-  const { data, loading, stats } = useDashboard();
+  const { data, loading, stats, visitors } = useDashboard();
 
   return (
     <AdminPage>
@@ -37,7 +37,7 @@ export default function DashboardPage() {
         <PageLoading />
       ) : (
         <>
-          <DashboardStats stats={stats} />
+          <DashboardStats stats={stats} visitors={visitors} />
           <QuickActions />
           <PendingActionsPanel pending={data.pendingActions} />
           <DashboardCharts

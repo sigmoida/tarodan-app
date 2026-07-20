@@ -2965,7 +2965,24 @@
         "totalOrders": "Total Sales",
         "commissionRevenue": "Commission Revenue",
         "activeProducts": "Active Products",
-        "totalUsers": "Total Users"
+        "totalUsers": "Total Users",
+        "products": "Products",
+        "users": "Users",
+        "grossSales": "Total Sales Amount",
+        "netCommission": "Net Commission",
+        "liveVisitors": "Live / Daily Active Visitors",
+        "cancellationsRefunds": "Cancellations / Refunds",
+        "active": "Active",
+        "passive": "Passive",
+        "live": "Live",
+        "daily": "Daily",
+        "cancellations": "Cancellations",
+        "refunds": "Refunds"
+      },
+      "period": {
+        "yesterday": "Yesterday",
+        "thisMonth": "This month",
+        "lastMonth": "Last month"
       },
       "quickActions": {
         "products": "Products",
