@@ -2,6 +2,7 @@ import { IsOptional, IsEnum, IsString, IsNumber, Min, Max, IsDateString, IsBoole
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type, Transform } from 'class-transformer';
 import { ProductStatus, OrderStatus } from '@prisma/client';
+import { AdminListQueryDto } from '../../../common/list';
 
 export class AdminUserQueryDto {
   @ApiPropertyOptional({ example: 'john' })
@@ -39,7 +40,7 @@ export class AdminUserQueryDto {
   limit?: number;
 }
 
-export class AdminProductQueryDto {
+export class AdminProductQueryDto extends AdminListQueryDto {
   @ApiPropertyOptional({ example: 'ferrari' })
   @IsOptional()
   @IsString()
@@ -69,21 +70,6 @@ export class AdminProductQueryDto {
   @IsOptional()
   @IsString()
   carModelId?: string;
-
-  @ApiPropertyOptional({ example: 1 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(1)
-  page?: number;
-
-  @ApiPropertyOptional({ example: 20 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(1)
-  @Max(100)
-  limit?: number;
 }
 
 export class AdminOrderQueryDto {

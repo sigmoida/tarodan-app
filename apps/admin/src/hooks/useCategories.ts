@@ -14,6 +14,6 @@ export interface CategoryOption {
 export function useCategories() {
   return useQuery({
     queryKey: ['categories-min'],
-    queryFn: async () => extractList<CategoryOption>(await adminApi.getCategories()),
+    queryFn: async () => extractList<CategoryOption>(await adminApi.getCategories({ limit: 100 })),
   });
 }

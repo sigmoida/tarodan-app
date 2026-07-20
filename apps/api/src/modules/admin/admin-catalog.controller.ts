@@ -101,6 +101,12 @@ import {
   TradeShipmentQueryDto,
   RefundRequestQueryDto,
   AdminChangeMembershipDto,
+  AdminCategoryQueryDto,
+  AdminBrandQueryDto,
+  AdminManufacturerQueryDto,
+  AdminCarModelQueryDto,
+  AdminAttributeGroupQueryDto,
+  AdminAttributeQueryDto,
 } from "./dto";
 
 @ApiTags("admin")
@@ -120,16 +126,8 @@ export class AdminCatalogController {
   @ApiQuery({ name: "limit", required: false })
   @ApiQuery({ name: "search", required: false })
   @ApiResponse({ status: HttpStatus.OK, description: "List of categories" })
-  async getCategories(
-    @Query("page") page?: string,
-    @Query("limit") limit?: string,
-    @Query("search") search?: string,
-  ) {
-    return this.adminService.getCategories({
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
-      search,
-    });
+  async getCategories(@Query() query: AdminCategoryQueryDto) {
+    return this.adminService.getCategories(query);
   }
 
   @Post("categories")
@@ -193,18 +191,8 @@ export class AdminCatalogController {
   @ApiQuery({ name: "search", required: false })
   @ApiQuery({ name: "status", required: false })
   @ApiResponse({ status: HttpStatus.OK, description: "List of brands" })
-  async getBrands(
-    @Query("page") page?: string,
-    @Query("limit") limit?: string,
-    @Query("search") search?: string,
-    @Query("status") status?: string,
-  ) {
-    return this.adminService.getBrands({
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
-      search,
-      status,
-    });
+  async getBrands(@Query() query: AdminBrandQueryDto) {
+    return this.adminService.getBrands(query);
   }
 
   @Post("brands")
@@ -269,16 +257,8 @@ export class AdminCatalogController {
   @ApiQuery({ name: "limit", required: false })
   @ApiQuery({ name: "search", required: false })
   @ApiResponse({ status: HttpStatus.OK, description: "List of manufacturers" })
-  async getManufacturers(
-    @Query("page") page?: string,
-    @Query("limit") limit?: string,
-    @Query("search") search?: string,
-  ) {
-    return this.adminService.getManufacturers({
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
-      search,
-    });
+  async getManufacturers(@Query() query: AdminManufacturerQueryDto) {
+    return this.adminService.getManufacturers(query);
   }
 
   @Post("manufacturers")
@@ -349,18 +329,8 @@ export class AdminCatalogController {
   @ApiQuery({ name: "limit", required: false })
   @ApiQuery({ name: "search", required: false })
   @ApiResponse({ status: HttpStatus.OK, description: "List of car models" })
-  async getCarModels(
-    @Query("brandId") brandId?: string,
-    @Query("page") page?: string,
-    @Query("limit") limit?: string,
-    @Query("search") search?: string,
-  ) {
-    return this.adminService.getCarModels({
-      brandId,
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
-      search,
-    });
+  async getCarModels(@Query() query: AdminCarModelQueryDto) {
+    return this.adminService.getCarModels(query);
   }
 
   @Post("car-models")
@@ -430,19 +400,8 @@ export class AdminCatalogController {
     status: HttpStatus.OK,
     description: "List of attribute groups",
   })
-  async getAttributeGroups(
-    @Query("search") search?: string,
-    @Query("isActive") isActive?: string,
-    @Query("page") page?: string,
-    @Query("limit") limit?: string,
-  ) {
-    return this.adminService.getAttributeGroups({
-      search,
-      isActive:
-        isActive === "true" ? true : isActive === "false" ? false : undefined,
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
-    });
+  async getAttributeGroups(@Query() query: AdminAttributeGroupQueryDto) {
+    return this.adminService.getAttributeGroups(query);
   }
 
   @Get("attribute-groups/:id")
@@ -524,21 +483,8 @@ export class AdminCatalogController {
   @ApiQuery({ name: "page", required: false })
   @ApiQuery({ name: "limit", required: false })
   @ApiResponse({ status: HttpStatus.OK, description: "List of attributes" })
-  async getAttributes(
-    @Query("groupId") groupId?: string,
-    @Query("search") search?: string,
-    @Query("isActive") isActive?: string,
-    @Query("page") page?: string,
-    @Query("limit") limit?: string,
-  ) {
-    return this.adminService.getAttributes({
-      groupId,
-      search,
-      isActive:
-        isActive === "true" ? true : isActive === "false" ? false : undefined,
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
-    });
+  async getAttributes(@Query() query: AdminAttributeQueryDto) {
+    return this.adminService.getAttributes(query);
   }
 
   @Post("attributes")

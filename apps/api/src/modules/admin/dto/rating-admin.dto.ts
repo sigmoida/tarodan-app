@@ -2,6 +2,7 @@
 import { IsEnum, IsString, IsOptional, IsNumber, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import { AdminListQueryDto } from '../../../common/list';
 
 export enum RatingStatus {
     pending = 'pending',
@@ -53,4 +54,16 @@ export class RatingQueryDto {
     @IsOptional()
     @IsString()
     sortBy?: 'newest' | 'oldest' | 'highest_score' | 'lowest_score' = 'newest';
+}
+
+export class AdminUserRatingQueryDto extends AdminListQueryDto {
+    @ApiPropertyOptional({ enum: RatingStatus })
+    @IsOptional()
+    @IsEnum(RatingStatus)
+    status?: RatingStatus;
+
+    @ApiPropertyOptional()
+    @IsOptional()
+    @IsString()
+    search?: string;
 }

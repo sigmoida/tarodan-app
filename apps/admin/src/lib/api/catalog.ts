@@ -1,5 +1,12 @@
 import { api } from "./client";
 
+type CatalogListParams = {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+};
+
 /**
  * Catalog domain: products & their moderation (reviews/ratings), taxonomy
  * (categories, brands, manufacturers, car-models), collections, and attributes.
@@ -37,9 +44,7 @@ export const catalogApi = {
     api.patch(`/admin/user-ratings/${id}/status`, { status }),
 
   // Categories
-  getCategories: (params?: {
-    page?: number;
-    limit?: number;
+  getCategories: (params?: CatalogListParams & {
     search?: string;
   }) => api.get("/admin/categories", { params: params ?? {} }),
   createCategory: (data: any) => api.post("/admin/categories", data),
@@ -48,9 +53,7 @@ export const catalogApi = {
   deleteCategory: (id: string) => api.delete(`/admin/categories/${id}`),
 
   // Brands
-  getBrands: (params?: {
-    page?: number;
-    limit?: number;
+  getBrands: (params?: CatalogListParams & {
     search?: string;
     status?: string;
   }) => api.get("/admin/brands", { params: params ?? {} }),
@@ -60,9 +63,7 @@ export const catalogApi = {
   deleteBrand: (id: string) => api.delete(`/admin/brands/${id}`),
 
   // Manufacturers
-  getManufacturers: (params?: {
-    page?: number;
-    limit?: number;
+  getManufacturers: (params?: CatalogListParams & {
     search?: string;
   }) => api.get("/admin/manufacturers", { params: params ?? {} }),
   createManufacturer: (data: any) => api.post("/admin/manufacturers", data),
@@ -83,10 +84,8 @@ export const catalogApi = {
   },
 
   // Car Models
-  getCarModels: (params?: {
+  getCarModels: (params?: CatalogListParams & {
     brandId?: string;
-    page?: number;
-    limit?: number;
     search?: string;
   }) => api.get("/admin/car-models", { params: params ?? {} }),
   createCarModel: (data: any) => api.post("/admin/car-models", data),
@@ -135,11 +134,9 @@ export const catalogApi = {
     api.patch(`/admin/collections/${id}/featured`, { isFeatured }),
 
   // Attribute Groups
-  getAttributeGroups: (params?: {
+  getAttributeGroups: (params?: CatalogListParams & {
     search?: string;
     isActive?: boolean;
-    page?: number;
-    limit?: number;
   }) => api.get("/admin/attribute-groups", { params }),
   getAttributeGroup: (id: string) => api.get(`/admin/attribute-groups/${id}`),
   createAttributeGroup: (data: {
@@ -163,12 +160,10 @@ export const catalogApi = {
     api.delete(`/admin/attribute-groups/${id}`),
 
   // Attributes
-  getAttributes: (params?: {
+  getAttributes: (params?: CatalogListParams & {
     groupId?: string;
     search?: string;
     isActive?: boolean;
-    page?: number;
-    limit?: number;
   }) => api.get("/admin/attributes", { params }),
   createAttribute: (data: {
     groupId: string;
