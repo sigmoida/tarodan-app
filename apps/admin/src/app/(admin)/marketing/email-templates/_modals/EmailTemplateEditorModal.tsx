@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@tarodan/ui";
 import {
@@ -95,10 +95,16 @@ export function EmailTemplateEditorModal({
     [mutatePreview],
   );
 
+  // Seed the form once per open. `sourceQuery` (the default template) may resolve
+  // after `detailQuery`, so guard against a second reset that would discard edits
+  // typed in the gap between the two loads.
+  const seeded = useRef(false);
   useEffect(() => {
+    if (seeded.current) return;
     const detail = detailQuery.data;
     if (!detail) return;
     if (!detail.bodyHtml && !sourceQuery.data) return;
+    seeded.current = true;
     form.reset({
       name: detail.name || templateKey,
       subject: detail.subject || "",
