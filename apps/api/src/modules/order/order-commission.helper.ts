@@ -1,9 +1,9 @@
-import { Logger } from '@nestjs/common';
+import { Logger } from "@nestjs/common";
 import {
   CommissionSellerType,
   MembershipTierType,
   SellerType,
-} from '@prisma/client';
+} from "@prisma/client";
 
 /**
  * Saf komisyon kuralı eşleştirme/hesap yardımcıları — OrderService.calculateCommission
@@ -24,10 +24,12 @@ export function findMatchingCommissionRule(
   // 1. categoryId + sellerType (most specific)
   if (categoryId) {
     const exact = rules.find(
-      r => r.categoryId === categoryId && r.sellerType === sellerType
+      (r) => r.categoryId === categoryId && r.sellerType === sellerType,
     );
     if (exact) {
-      logger?.debug(`Matched exact rule: category=${categoryId}, sellerType=${sellerType}`);
+      logger?.debug(
+        `Matched exact rule: category=${categoryId}, sellerType=${sellerType}`,
+      );
       return exact;
     }
   }
@@ -37,17 +39,21 @@ export function findMatchingCommissionRule(
   // kuralları sellerType'sız oluşturulur; null'ı ALL gibi ele almazsak hiç eşleşmez.
   if (categoryId) {
     const catAll = rules.find(
-      r => r.categoryId === categoryId && (r.sellerType === CommissionSellerType.ALL || r.sellerType == null)
+      (r) =>
+        r.categoryId === categoryId &&
+        (r.sellerType === CommissionSellerType.ALL || r.sellerType == null),
     );
     if (catAll) {
-      logger?.debug(`Matched category rule: category=${categoryId}, sellerType=ALL`);
+      logger?.debug(
+        `Matched category rule: category=${categoryId}, sellerType=ALL`,
+      );
       return catAll;
     }
   }
 
   // 3. categoryId IS NULL + sellerType
   const typeOnly = rules.find(
-    r => r.categoryId === null && r.sellerType === sellerType
+    (r) => r.categoryId === null && r.sellerType === sellerType,
   );
   if (typeOnly) {
     logger?.debug(`Matched seller type rule: sellerType=${sellerType}`);
@@ -56,11 +62,13 @@ export function findMatchingCommissionRule(
 
   // 4. categoryId IS NULL + ALL (default) — sellerType null da ALL sayılır (alıcı hizmet bedeli)
   const defaultRule = rules.find(
-    r => r.categoryId === null && (r.sellerType === CommissionSellerType.ALL || r.sellerType == null)
+    (r) =>
+      r.categoryId === null &&
+      (r.sellerType === CommissionSellerType.ALL || r.sellerType == null),
   );
 
   if (defaultRule) {
-    logger?.debug('Using default commission rule (ALL+NULL)');
+    logger?.debug("Using default commission rule (ALL+NULL)");
     return defaultRule;
   }
 
@@ -73,7 +81,7 @@ export function findMatchingCommissionRule(
 export function clampCommissionAmount(
   raw: number,
   min: number | null,
-  max: number | null
+  max: number | null,
 ): number {
   let val = raw;
   if (min != null && val < min) val = min;
@@ -82,17 +90,22 @@ export function clampCommissionAmount(
 }
 
 /**
- * Map User.sellerType to CommissionSellerType
- * individual/verified -> FREE
- * platform -> BUSINESS
- * Premium/Business membership -> PREMIUM
+ * Map seller attributes to the commission rule buckets.
+ * Paid membership takes precedence over the account-level seller type:
+ * - business membership -> BUSINESS
+ * - premium membership -> PREMIUM
+ * - platform seller without a paid membership -> BUSINESS
+ * - free/basic membership or individual/verified seller -> FREE
  */
 export function mapSellerTypeForCommission(
   userSellerType: SellerType | null,
-  membershipTier: MembershipTierType | null
+  membershipTier: MembershipTierType | null,
 ): CommissionSellerType {
-  // Premium/Business membership -> PREMIUM
-  if (membershipTier === MembershipTierType.premium || membershipTier === MembershipTierType.business) {
+  if (membershipTier === MembershipTierType.business) {
+    return CommissionSellerType.BUSINESS;
+  }
+
+  if (membershipTier === MembershipTierType.premium) {
     return CommissionSellerType.PREMIUM;
   }
 
