@@ -18,7 +18,8 @@ import { type Order, mapOrders, useOrderGroups } from "../_lib/orders";
 export function OrdersTable() {
   const t = useTranslations();
   const router = useRouter();
-  const { rows, isLoading, search, filters } = useResourceList<any>();
+  const { rows, isLoading, search, filters, sort, setSort } =
+    useResourceList<any>();
 
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [statusOrder, setStatusOrder] = useState<Order | null>(null);
@@ -58,6 +59,8 @@ export function OrdersTable() {
         rowClassName={(o) => rowClassById.get(o.id)}
         emptyText={emptyText}
         getRowId={(o) => o.id}
+        sort={sort}
+        onSort={setSort}
       />
       {statusOrder && (
         <StatusUpdateModal

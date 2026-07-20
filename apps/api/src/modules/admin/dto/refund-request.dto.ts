@@ -1,54 +1,31 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import {
-  IsArray,
-  IsEnum,
-  IsInt,
-  IsOptional,
-  IsString,
-  Max,
-  Min,
-} from 'class-validator';
-import { RefundRequestStatus } from '@prisma/client';
+import { ApiPropertyOptional } from "@nestjs/swagger";
+import { IsArray, IsEnum, IsOptional, IsString } from "class-validator";
+import { RefundRequestStatus } from "@prisma/client";
+import { AdminListQueryDto } from "../../../common/list";
 
-export class RefundRequestQueryDto {
+export class RefundRequestQueryDto extends AdminListQueryDto {
   @ApiPropertyOptional({
     isArray: true,
     enum: RefundRequestStatus,
-    example: ['approved', 'return_in_transit'],
+    example: ["approved", "return_in_transit"],
   })
   @IsOptional()
   @IsArray()
   @IsEnum(RefundRequestStatus, { each: true })
   status?: RefundRequestStatus[];
 
-  @ApiPropertyOptional({ example: 'ahmet@example.com' })
+  @ApiPropertyOptional({ example: "ahmet@example.com" })
   @IsOptional()
   @IsString()
   userSearch?: string;
 
-  @ApiPropertyOptional({ example: '2026-01-01' })
+  @ApiPropertyOptional({ example: "2026-01-01" })
   @IsOptional()
   @IsString()
   from?: string;
 
-  @ApiPropertyOptional({ example: '2026-12-31' })
+  @ApiPropertyOptional({ example: "2026-12-31" })
   @IsOptional()
   @IsString()
   to?: string;
-
-  @ApiPropertyOptional({ example: 1, default: 1 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page?: number;
-
-  @ApiPropertyOptional({ example: 20, default: 20 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  limit?: number;
 }

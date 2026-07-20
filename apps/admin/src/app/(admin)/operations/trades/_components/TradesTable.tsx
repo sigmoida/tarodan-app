@@ -12,7 +12,7 @@ import { type Trade, mapTrades } from "../_lib/trades";
 export function TradesTable() {
   const t = useTranslations();
   const router = useRouter();
-  const { rows, isLoading } = useResourceList<any>();
+  const { rows, isLoading, sort, setSort } = useResourceList<any>();
   const trades = useMemo(() => mapTrades(rows, t), [rows, t]);
 
   const columns = tradeColumns(
@@ -28,6 +28,8 @@ export function TradesTable() {
       emptyText={t("admin.operations.trades.empty")}
       getRowId={(tr) => tr.id}
       rowClassName={(tr) => (tr.hasDispute ? "bg-danger-900/10" : "")}
+      sort={sort}
+      onSort={setSort}
     />
   );
 }
