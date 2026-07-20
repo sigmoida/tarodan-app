@@ -1,12 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable } from "@nestjs/common";
 import {
   ApproveWarehouseTradeDto,
+  AdminTradeQueryDto,
   RejectWarehouseTradeDto,
-} from './dto';
-import { TradeStatus, ShipmentStatus } from '@prisma/client';
-import { AdminTradeQueryService } from './admin-trade-query.service';
-import { AdminTradeWarehouseService } from './admin-trade-warehouse.service';
-import { AdminTradeResolutionService } from './admin-trade-resolution.service';
+  TradeShipmentQueryDto,
+} from "./dto";
+import { AdminTradeQueryService } from "./admin-trade-query.service";
+import { AdminTradeWarehouseService } from "./admin-trade-warehouse.service";
+import { AdminTradeResolutionService } from "./admin-trade-resolution.service";
 
 /**
  * Takas yönetimi (admin liste/detay, resolveTrade, depo teslim alma /
@@ -28,27 +29,11 @@ export class AdminTradeService {
 
   // ==================== TRADE MANAGEMENT ====================
 
-  async getTrades(query: {
-    status?: TradeStatus;
-    initiatorId?: string;
-    receiverId?: string;
-    userId?: string;
-    fromDate?: string;
-    toDate?: string;
-    search?: string;
-    page?: number;
-    limit?: number;
-  }) {
+  async getTrades(query: AdminTradeQueryDto) {
     return this.query.getTrades(query);
   }
 
-  async findTradeShipments(query: {
-    status?: ShipmentStatus;
-    leg?: 'to_warehouse' | 'from_warehouse' | 'return';
-    tradeNumber?: string;
-    page?: number;
-    limit?: number;
-  }) {
+  async findTradeShipments(query: TradeShipmentQueryDto) {
     return this.query.findTradeShipments(query);
   }
 
@@ -56,7 +41,11 @@ export class AdminTradeService {
     return this.query.getTradeById(tradeId);
   }
 
-  async resolveTrade(adminId: string, tradeId: string, dto: { resolution: string; note?: string }) {
+  async resolveTrade(
+    adminId: string,
+    tradeId: string,
+    dto: { resolution: string; note?: string },
+  ) {
     return this.resolution.resolveTrade(adminId, tradeId, dto);
   }
 
@@ -97,7 +86,11 @@ export class AdminTradeService {
     tradeId: string,
     dto: { reason: string; sendArrivedItemBack?: boolean },
   ) {
-    return this.resolution.forceCancelStuckWarehouseTrade(adminId, tradeId, dto);
+    return this.resolution.forceCancelStuckWarehouseTrade(
+      adminId,
+      tradeId,
+      dto,
+    );
   }
 
   async markReturnShipmentLost(

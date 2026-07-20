@@ -28,6 +28,8 @@ export default function RefundsPage() {
             endDate: p.endDate || undefined,
             page: p.page,
             limit: p.limit,
+            sortBy: p.sortBy,
+            sortOrder: p.sortOrder,
           })
         }
         getRowId={(r) => r.id}

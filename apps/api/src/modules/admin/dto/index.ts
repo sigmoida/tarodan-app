@@ -2,6 +2,7 @@ export * from "./commission-rule.dto";
 export * from "./platform-setting.dto";
 export * from "./admin-query.dto";
 export * from "./catalog-query.dto";
+export * from "./operations-query.dto";
 export * from "./admin-action.dto";
 export * from "./admin-staff.dto";
 export * from "./notifications-admin.dto";

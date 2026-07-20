@@ -18,10 +18,10 @@ export interface Refund {
 
 export function refundColumns(t: T, rowMenu: (r: Refund) => RowActionItem[]) {
   return [
-    col.code<Refund>(t("admin.operations.refunds.colId"), (r) => r.id, {
+    col.code<Refund>(t("admin.operations.refunds.colId"), "id", {
       grow: 1,
     }),
-    col.money<Refund>(t("common.amount"), (r) => r.amount, {
+    col.money<Refund>(t("common.amount"), "amount", {
       tone: "negative",
     }),
     col.user<Refund>(t("admin.operations.common.buyer"), (r) =>
@@ -48,6 +48,7 @@ export function refundColumns(t: T, rowMenu: (r: Refund) => RowActionItem[]) {
     col.date<Refund>(
       t("admin.operations.refunds.refundedAt"),
       (r) => r.refundedAt,
+      { sortKey: "updatedAt", sortType: "date" },
     ),
     col.rowMenu<Refund>(rowMenu),
   ];

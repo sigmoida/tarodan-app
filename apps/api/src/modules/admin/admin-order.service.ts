@@ -1,13 +1,10 @@
-import {
-  Injectable,
-  NotFoundException,
-  Optional,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { StorageService } from '../storage/storage.service';
-import { AdminAuditService } from './admin-audit.service';
-import { AdminOrderQueryDto, ResolveDisputeDto } from './dto';
-import { OrderStatus, Prisma } from '@prisma/client';
+import { Injectable, NotFoundException, Optional } from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { StorageService } from "../storage/storage.service";
+import { AdminAuditService } from "./admin-audit.service";
+import { AdminOrderQueryDto, ResolveDisputeDto } from "./dto";
+import { OrderStatus, Prisma } from "@prisma/client";
+import { paginate, resolveOrderBy } from "../../common/list";
 
 /**
  * Sipariş yönetimi (liste, ihtilaflar, ihtilaf çözümü) — AdminService'in
@@ -25,19 +22,30 @@ export class AdminOrderService {
 
   // AdminService'teki leaf yardımcı ile birebir aynı (bilinçli kopya; facade'da
   // başka bölümler de kullandığı için oradan kaldırılamadı).
-  private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
+  private resolveProductImageUrl(
+    imageKeyOrUrl: string | null | undefined,
+  ): string | null {
     if (!imageKeyOrUrl) return null;
     // Strip expired presigned S3 query params to get the clean public URL
-    if ((imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://')) && imageKeyOrUrl.includes('X-Amz-Signature')) {
+    if (
+      (imageKeyOrUrl.startsWith("http://") ||
+        imageKeyOrUrl.startsWith("https://")) &&
+      imageKeyOrUrl.includes("X-Amz-Signature")
+    ) {
       try {
         const parsed = new URL(imageKeyOrUrl);
-        parsed.search = '';
+        parsed.search = "";
         return parsed.toString();
       } catch {
         // fall through
       }
     }
-    if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
+    if (
+      imageKeyOrUrl.startsWith("http://") ||
+      imageKeyOrUrl.startsWith("https://") ||
+      imageKeyOrUrl.startsWith("/")
+    )
+      return imageKeyOrUrl;
     // Try to resolve any non-URL string as an S3 key (covers dev/, prod/, and other prefixes)
     if (this.storageService) {
       return this.storageService.getPublicAssetUrl(imageKeyOrUrl) ?? null;
@@ -51,16 +59,17 @@ export class AdminOrderService {
    * Get orders with filters
    */
   async getOrders(query: AdminOrderQueryDto) {
-    const { search, status, fromDate, toDate, userId, userRole, productId, page = 1, limit = 20 } = query;
+    const { search, status, fromDate, toDate, userId, userRole, productId } =
+      query;
 
     const where: Prisma.OrderWhereInput = {};
 
     if (search) {
       where.OR = [
-        { orderNumber: { contains: search, mode: 'insensitive' } },
-        { buyer: { displayName: { contains: search, mode: 'insensitive' } } },
-        { seller: { displayName: { contains: search, mode: 'insensitive' } } },
-        { product: { title: { contains: search, mode: 'insensitive' } } },
+        { orderNumber: { contains: search, mode: "insensitive" } },
+        { buyer: { displayName: { contains: search, mode: "insensitive" } } },
+        { seller: { displayName: { contains: search, mode: "insensitive" } } },
+        { product: { title: { contains: search, mode: "insensitive" } } },
       ];
     }
 
@@ -69,15 +78,12 @@ export class AdminOrderService {
     }
 
     if (userId) {
-      if (userRole === 'buyer') {
+      if (userRole === "buyer") {
         where.buyerId = userId;
-      } else if (userRole === 'seller') {
+      } else if (userRole === "seller") {
         where.sellerId = userId;
       } else {
-        where.OR = [
-          { buyerId: userId },
-          { sellerId: userId },
-        ];
+        where.OR = [{ buyerId: userId }, { sellerId: userId }];
       }
     }
 
@@ -95,9 +101,25 @@ export class AdminOrderService {
       }
     }
 
-    const [total, orders] = await Promise.all([
-      this.prisma.order.count({ where }),
-      this.prisma.order.findMany({
+    const orderBy = resolveOrderBy<Prisma.OrderOrderByWithRelationInput>(
+      "Order",
+      query,
+      {
+        defaultSort: { createdAt: "desc" },
+        sortMap: {
+          "buyer.displayName": (direction) => ({
+            buyer: { displayName: direction },
+          }),
+          "seller.displayName": (direction) => ({
+            seller: { displayName: direction },
+          }),
+          "product.title": (direction) => ({ product: { title: direction } }),
+        },
+      },
+    );
+    const result = await paginate(
+      this.prisma.order,
+      {
         where,
         include: {
           buyer: { select: { id: true, displayName: true, email: true } },
@@ -108,7 +130,7 @@ export class AdminOrderService {
               title: true,
               images: {
                 take: 1,
-                orderBy: { sortOrder: 'asc' },
+                orderBy: { sortOrder: "asc" },
                 select: { cardKey: true },
               },
             },
@@ -117,28 +139,30 @@ export class AdminOrderService {
           // Açık (aktif) iade talebi — admin listede "İade Sürecinde" rozeti için.
           refundRequests: {
             where: {
-              status: { notIn: ['refunded', 'rejected', 'cancelled'] as any },
+              status: { notIn: ["refunded", "rejected", "cancelled"] as any },
             },
-            orderBy: { createdAt: 'desc' },
+            orderBy: { createdAt: "desc" },
             take: 1,
             select: { id: true, status: true, refundNumber: true },
           },
         },
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
+        orderBy,
+      },
+      query,
+    );
+    const orders = result.data;
 
     // Çoklu-ürün sepetlerini admin listede gruplu gösterebilmek için her siparişin
     // ait olduğu CheckoutGroup'taki TOPLAM sipariş adedini ekle (grubun gerçek
     // boyutu). groupItemCount>1 → "çoklu sipariş" rozeti + görsel gruplama.
     const groupIds = [
-      ...new Set(orders.map((o) => o.checkoutGroupId).filter((x): x is string => !!x)),
+      ...new Set(
+        orders.map((o) => o.checkoutGroupId).filter((x): x is string => !!x),
+      ),
     ];
     const groupCounts = groupIds.length
       ? await this.prisma.order.groupBy({
-          by: ['checkoutGroupId'],
+          by: ["checkoutGroupId"],
           where: { checkoutGroupId: { in: groupIds } },
           _count: { _all: true },
         })
@@ -148,6 +172,7 @@ export class AdminOrderService {
     );
 
     return {
+      ...result,
       data: orders.map((o) => ({
         ...o,
         // Misafir siparişlerinde alıcı, ortak sistem kullanıcısı (GUEST_SYSTEM /
@@ -158,7 +183,7 @@ export class AdminOrderService {
         commissionAmount: Number(o.commissionAmount),
         groupNumber: o.checkoutGroup?.groupNumber ?? null,
         groupItemCount: o.checkoutGroupId
-          ? groupCountMap.get(o.checkoutGroupId) ?? 1
+          ? (groupCountMap.get(o.checkoutGroupId) ?? 1)
           : 1,
         productImageUrl: this.resolveProductImageUrl(
           (o.product as any)?.images?.[0]?.cardKey,
@@ -171,7 +196,6 @@ export class AdminOrderService {
             }
           : null,
       })),
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 
@@ -181,21 +205,25 @@ export class AdminOrderService {
    * misafir ad/e-postasını shippingAddress'ten al. Değilse alıcıyı aynen döndür.
    */
   private resolveGuestBuyerForAdmin(
-    buyer: { id: string; displayName: string | null; email: string | null } | null,
+    buyer: {
+      id: string;
+      displayName: string | null;
+      email: string | null;
+    } | null,
     shippingAddress: unknown,
   ): { id: string; displayName: string | null; email: string | null } | null {
     if (!buyer) return buyer;
     const sa = (shippingAddress as any) || {};
     const isGuest =
-      buyer.email === 'guest@tarodan.system' ||
-      buyer.displayName === 'GUEST_SYSTEM' ||
+      buyer.email === "guest@tarodan.system" ||
+      buyer.displayName === "GUEST_SYSTEM" ||
       sa?.isGuestOrder === true;
     if (!isGuest) return buyer;
     const guestEmail = sa?.guestEmail || sa?.email || null;
     const guestName = sa?.guestName || sa?.fullName || null;
     return {
       id: buyer.id,
-      displayName: guestName || guestEmail || 'Misafir',
+      displayName: guestName || guestEmail || "Misafir",
       email: guestEmail || buyer.email,
     };
   }
@@ -231,7 +259,7 @@ export class AdminOrderService {
           product: { select: { id: true, title: true } },
           payment: { select: { id: true, status: true } },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -251,28 +279,32 @@ export class AdminOrderService {
   /**
    * Resolve order dispute
    */
-  async resolveDispute(adminId: string, orderId: string, dto: ResolveDisputeDto) {
+  async resolveDispute(
+    adminId: string,
+    orderId: string,
+    dto: ResolveDisputeDto,
+  ) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
     });
 
     if (!order) {
-      throw new NotFoundException('Sipariş bulunamadı');
+      throw new NotFoundException("Sipariş bulunamadı");
     }
 
     // Handle resolution based on type
     let newStatus: OrderStatus;
     switch (dto.resolution) {
-      case 'buyer_refund':
+      case "buyer_refund":
         newStatus = OrderStatus.refunded;
         break;
-      case 'seller_favor':
+      case "seller_favor":
         newStatus = OrderStatus.completed;
         break;
-      case 'partial_refund':
+      case "partial_refund":
         newStatus = OrderStatus.refunded;
         break;
-      case 'dismissed':
+      case "dismissed":
         newStatus = order.status; // Keep current status
         break;
       default:
@@ -284,11 +316,18 @@ export class AdminOrderService {
       data: { status: newStatus },
     });
 
-    await this.audit.createAuditLog(adminId, 'dispute_resolve', 'Order', orderId, order, {
-      ...updated,
-      resolution: dto.resolution,
-      note: dto.note,
-    });
+    await this.audit.createAuditLog(
+      adminId,
+      "dispute_resolve",
+      "Order",
+      orderId,
+      order,
+      {
+        ...updated,
+        resolution: dto.resolution,
+        note: dto.note,
+      },
+    );
 
     return { success: true, orderId, resolution: dto.resolution, newStatus };
   }

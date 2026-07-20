@@ -8,10 +8,7 @@ type T = ReturnType<typeof useTranslations<never>>;
 
 export function tradeColumns(t: T, rowMenu: (t: Trade) => RowActionItem[]) {
   return [
-    col.code<Trade>(
-      t("admin.operations.trades.tradeNumber"),
-      (r) => r.tradeNumber,
-    ),
+    col.code<Trade>(t("admin.operations.trades.tradeNumber"), "tradeNumber"),
     col.custom<Trade>(
       t("common.status"),
       (r) =>
@@ -24,14 +21,15 @@ export function tradeColumns(t: T, rowMenu: (t: Trade) => RowActionItem[]) {
         ) : (
           <div className="flex flex-col items-start gap-1">
             <Badge status={r.status} config={tradeStatusConfig} />
-            {r.status === "cancelled" && cancelReasonLabel(r.cancelReason, t) && (
-              <span className="truncate text-xs text-muted">
-                {cancelReasonLabel(r.cancelReason, t)}
-              </span>
-            )}
+            {r.status === "cancelled" &&
+              cancelReasonLabel(r.cancelReason, t) && (
+                <span className="truncate text-xs text-muted">
+                  {cancelReasonLabel(r.cancelReason, t)}
+                </span>
+              )}
           </div>
         ),
-      { grow: 2, minWidth: 150 },
+      { grow: 2, minWidth: 150, sortKey: "status", sortType: "text" },
     ),
     col.user<Trade>(t("admin.operations.trades.initiator"), (r) => ({
       name: r.initiator.displayName,
@@ -46,9 +44,11 @@ export function tradeColumns(t: T, rowMenu: (t: Trade) => RowActionItem[]) {
       (r) => r.cashAmount || null,
       {
         tone: "primary",
+        sortKey: "cashAmount",
+        sortType: "number",
       },
     ),
-    col.date<Trade>(t("common.date"), (r) => r.createdAt),
+    col.date<Trade>(t("common.date"), "createdAt"),
     col.rowMenu<Trade>(rowMenu),
   ];
 }

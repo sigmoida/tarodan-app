@@ -34,6 +34,7 @@ export const refundRequestColumns = (t: T) => [
       href: `/operations/refund-requests/${r.id}`,
       label: r.refundNumber,
     }),
+    { sortKey: "refundNumber", sortType: "text" },
   ),
   col.link<RefundRequestRow>(t("admin.operations.common.order"), (r) => ({
     href: `/operations/orders/${r.order.id}`,
@@ -74,19 +75,23 @@ export const refundRequestColumns = (t: T) => [
     name: r.order?.seller?.displayName,
     secondary: r.order?.seller?.email,
   })),
-  col.money<RefundRequestRow>(t("common.amount"), (r) => r.amount),
+  col.money<RefundRequestRow>(t("common.amount"), "amount"),
   col.text<RefundRequestRow>(
     t("admin.operations.refundRequests.reason"),
     (r) => enumLabel(refundReasonConfig, r.reason, r.reason),
     {
       grow: 2,
+      sortKey: "reason",
+      sortType: "text",
     },
   ),
-  col.badge<RefundRequestRow>(t("common.status"), (r) => (
-    <Badge status={r.status} config={refundRequestStatusConfig} />
-  )),
+  col.badge<RefundRequestRow>(
+    t("common.status"),
+    (r) => <Badge status={r.status} config={refundRequestStatusConfig} />,
+    { sortKey: "status", sortType: "text" },
+  ),
   col.date<RefundRequestRow>(
     t("admin.operations.common.createdAt"),
-    (r) => r.createdAt,
+    "createdAt",
   ),
 ];

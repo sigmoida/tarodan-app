@@ -1,4 +1,4 @@
-import { api } from './client';
+import { api } from "./client";
 
 /**
  * Operations domain: orders, trades (safe-trade/escrow), refund requests,
@@ -6,13 +6,21 @@ import { api } from './client';
  */
 export const operationsApi = {
   // Refunds (payment refund history)
-  getRefundHistory: (params?: { search?: string; startDate?: string; endDate?: string; page?: number; limit?: number }) =>
-    api.get('/admin/payments/refunds', { params }),
+  getRefundHistory: (params?: {
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+  }) => api.get("/admin/payments/refunds", { params }),
 
   // Orders
-  getOrders: (params?: any) => api.get('/admin/orders', { params }),
+  getOrders: (params?: any) => api.get("/admin/orders", { params }),
   getOrder: (id: string) => api.get(`/admin/orders/${id}`),
-  updateOrderStatus: (id: string, status: string) => api.patch(`/admin/orders/${id}`, { status }),
+  updateOrderStatus: (id: string, status: string) =>
+    api.patch(`/admin/orders/${id}`, { status }),
   getOrderInvoice: (id: string) => api.get(`/admin/orders/${id}/invoice`),
   applyOrderCoupon: (id: string, code: string | null) =>
     api.post(`/admin/orders/${id}/apply-coupon`, { code }),
@@ -37,16 +45,19 @@ export const operationsApi = {
 
   setReturnShippingPayer: (
     id: string,
-    payer: 'buyer' | 'seller' | 'platform',
+    payer: "buyer" | "seller" | "platform",
   ) => api.patch(`/admin/refund-requests/${id}/set-shipping-payer`, { payer }),
 
   // Trades
-  getTrades: (params?: any) => api.get('/admin/trades', { params }),
+  getTrades: (params?: any) => api.get("/admin/trades", { params }),
   getTrade: (id: string) => api.get(`/admin/trades/${id}`),
-  resolveTrade: (id: string, resolution: any) => api.post(`/admin/trades/${id}/resolve`, resolution),
+  resolveTrade: (id: string, resolution: any) =>
+    api.post(`/admin/trades/${id}/resolve`, resolution),
   // Safe-trade (escrow) admin actions
   markWarehouseReceived: (tradeId: string, shipmentId: string) =>
-    api.post(`/admin/trades/${tradeId}/mark-warehouse-received`, { shipmentId }),
+    api.post(`/admin/trades/${tradeId}/mark-warehouse-received`, {
+      shipmentId,
+    }),
   approveTrade: (tradeId: string, notes?: string) =>
     api.post(`/admin/trades/${tradeId}/approve`, notes ? { notes } : {}),
   rejectTrade: (tradeId: string, reason: string) =>
@@ -56,11 +67,14 @@ export const operationsApi = {
   retryTradeRefund: (tradeId: string) =>
     api.post(`/admin/trades/${tradeId}/retry-refund`),
   resolveTradeCompensation: (tradeId: string, note?: string) =>
-    api.post(`/admin/trades/${tradeId}/resolve-compensation`, note ? { note } : {}),
+    api.post(
+      `/admin/trades/${tradeId}/resolve-compensation`,
+      note ? { note } : {},
+    ),
 
   // RefundRequest admin
   getRefundRequests: (params?: any) =>
-    api.get('/admin/refund-requests', { params }),
+    api.get("/admin/refund-requests", { params }),
   getRefundRequest: (id: string) => api.get(`/admin/refund-requests/${id}`),
   forceFinalizeRefund: (id: string) =>
     api.post(`/admin/refund-requests/${id}/force-finalize`),
@@ -72,26 +86,26 @@ export const operationsApi = {
     tradeId: string,
     body: { reason: string; sendArrivedItemBack: boolean },
   ) => api.post(`/admin/trades/${tradeId}/force-cancel-stuck`, body),
-  resolveTradeDispute: (
-    tradeId: string,
-    resolution: string,
-    notes: string,
-  ) => api.post(`/trades/${tradeId}/resolve-dispute`, { resolution, notes }),
+  resolveTradeDispute: (tradeId: string, resolution: string, notes: string) =>
+    api.post(`/trades/${tradeId}/resolve-dispute`, { resolution, notes }),
 
   // Trade shipments (cross-trade listing)
-  getTradeShipments: (params?: any) => api.get('/admin/trade-shipments', { params }),
+  getTradeShipments: (params?: any) =>
+    api.get("/admin/trade-shipments", { params }),
 
   // Messages
-  getMessages: (params?: any) => api.get('/admin/messages', { params }),
+  getMessages: (params?: any) => api.get("/admin/messages", { params }),
   getMessage: (id: string) => api.get(`/admin/messages/${id}`),
-  approveMessage: (id: string, notes?: string) => api.post(`/admin/messages/${id}/approve`, notes ? { notes } : {}),
-  rejectMessage: (id: string, reason?: string) => api.post(`/admin/messages/${id}/reject`, { reason }),
+  approveMessage: (id: string, notes?: string) =>
+    api.post(`/admin/messages/${id}/approve`, notes ? { notes } : {}),
+  rejectMessage: (id: string, reason?: string) =>
+    api.post(`/admin/messages/${id}/reject`, { reason }),
   revertMessage: (id: string) => api.post(`/admin/messages/${id}/revert`),
 
   // Shipping (operations) — view/track order shipments (read-only).
   // Config (methods/carriers/zones/rates) and label generation removed; real shipping is the Sürat integration.
   getShipments(params?: any) {
-    return api.get('/admin/shipping/shipments', { params });
+    return api.get("/admin/shipping/shipments", { params });
   },
   // Syncs a Sürat shipment's tracking status instantly, without waiting for the 30-min cron.
   syncShipmentTracking(id: string) {
@@ -99,14 +113,14 @@ export const operationsApi = {
   },
   // Sürat REST endpoint test: create a shipment + query its tracking (returns raw responses).
   suratEndpointTest() {
-    return api.post('/admin/shipping/surat/endpoint-test');
+    return api.post("/admin/shipping/surat/endpoint-test");
   },
   // Test console: Sürat tracking query by reference (KargoTakipHareketDetayi).
   suratTestTrack(ref: string) {
-    return api.post('/admin/shipping/surat/track', { ref });
+    return api.post("/admin/shipping/surat/track", { ref });
   },
   // Test console: Sürat cancel/withdraw by reference (GonderiGeriCek).
   suratTestCancel(ref: string) {
-    return api.post('/admin/shipping/surat/cancel', { ref });
+    return api.post("/admin/shipping/surat/cancel", { ref });
   },
 };
