@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { loginAction } from '@/lib/server/auth-actions';
+import { safeAdminReturnPath } from '@/lib/auth-redirect';
 import type { LoginValues } from '@/lib/schemas/auth';
 
 /**
@@ -13,7 +14,7 @@ import type { LoginValues } from '@/lib/schemas/auth';
  * (pending / field errors) is owned by the form; this hook only tracks the
  * 2FA step and returns a form-level error message.
  */
-export function useLogin() {
+export function useLogin(redirectTo?: string) {
   const router = useRouter();
   const t = useTranslations();
   const [requires2FA, setRequires2FA] = useState(false);
@@ -32,7 +33,7 @@ export function useLogin() {
     // Success: client-navigate (not a hard reload) so the transition shows the
     // root loading spinner while the (admin) layout re-reads the fresh session
     // server-side, instead of a blank screen. refresh() drops any stale RSC cache.
-    router.replace('/dashboard');
+    router.replace(safeAdminReturnPath(redirectTo));
     router.refresh();
     return null;
   };

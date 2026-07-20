@@ -2,18 +2,30 @@
 
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { Button } from '@tarodan/ui';
+import { Alert, Button } from '@tarodan/ui';
 import { Form, FormError, FormInput, useZodForm } from '@tarodan/ui/form';
 import { loginSchema, type LoginValues } from '@/lib/schemas/auth';
 import { useLogin } from '@/hooks/useLogin';
 import { AuthCard } from './AuthCard';
 
-export function LoginForm() {
+export function LoginForm({
+  redirectTo,
+  expiredReason,
+}: {
+  redirectTo?: string;
+  expiredReason?: string;
+}) {
   const t = useTranslations();
-  const { login, requires2FA } = useLogin();
+  const { login, requires2FA } = useLogin(redirectTo);
   const form = useZodForm(loginSchema(t), {
     defaultValues: { email: '', password: '', twoFactorCode: '' },
   });
+  const expiredMessage =
+    expiredReason === 'idle'
+      ? t('admin.auth.login.idleExpired')
+      : expiredReason === 'session'
+        ? t('admin.auth.login.sessionExpired')
+        : null;
 
   const onSubmit = async (values: LoginValues) => {
     const error = await login(values);
@@ -23,6 +35,7 @@ export function LoginForm() {
   return (
     <AuthCard title={t('common.login')}>
       <Form form={form} onSubmit={onSubmit} className="space-y-6">
+        {expiredMessage && <Alert variant="warning">{expiredMessage}</Alert>}
         <FormError />
 
         <FormInput name="email" label={t('common.email')} type="email" placeholder="admin@tarodan.com" />

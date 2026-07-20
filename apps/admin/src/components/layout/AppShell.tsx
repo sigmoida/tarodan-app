@@ -5,6 +5,7 @@
 import { useIdleLogout } from '@/hooks/useIdleLogout';
 import { useRouteGuard } from '@/hooks/useRouteGuard';
 import { useSidebar } from '@/hooks/useSidebar';
+import { ForbiddenScreen } from '@/components/page/ForbiddenScreen';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 
@@ -17,7 +18,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 	// Auto-logout after 1 hour of inactivity (Balanced policy).
 	useIdleLogout();
 	// Route guard (UX) — instant and race-free since permissions come authoritatively from the server.
-	useRouteGuard();
+	const isRouteAllowed = useRouteGuard();
 
 	const { open, openSidebar, closeSidebar } = useSidebar();
 
@@ -38,7 +39,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 			{/* pt-16 clears the fixed h-16 Topbar (which is out of flow). */}
 			<div className='pt-16 lg:pl-64'>
 				<Topbar onOpenSidebar={openSidebar} />
-				<main className='p-6'>{children}</main>
+				<main className='p-6'>
+					{isRouteAllowed ? children : <ForbiddenScreen />}
+				</main>
 			</div>
 		</div>
 	);

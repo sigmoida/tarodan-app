@@ -6,20 +6,23 @@ import { routePermission } from '@/lib/navigation';
 import { usePermissions } from '@/context/PermissionsContext';
 
 /**
- * UX route guard: redirect to /dashboard when the current route requires a
- * permission the admin doesn't hold. Permissions come from the server-resolved
- * context, so this is instant and race-free. It is NOT the security boundary —
- * the NestJS API authorizes every endpoint regardless.
+ * UX route guard: hide unauthorized page content immediately and redirect to the
+ * scoped forbidden route. Permissions come from the server-resolved context, so
+ * soft navigation matches the server layout's hard-navigation behavior. It is
+ * NOT the security boundary — the NestJS API authorizes every endpoint.
  */
 export function useRouteGuard() {
   const pathname = usePathname();
   const router = useRouter();
   const { can } = usePermissions();
+  const required = routePermission(pathname);
+  const isAllowed = !required || can(required);
 
   useEffect(() => {
-    const required = routePermission(pathname);
-    if (required && !can(required)) {
-      router.replace('/dashboard');
+    if (!isAllowed) {
+      router.replace('/forbidden');
     }
-  }, [pathname, can, router]);
+  }, [isAllowed, router]);
+
+  return isAllowed;
 }

@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
+import { expiredLoginHref } from "@/lib/auth-redirect";
 import { getSession } from "@/lib/server/session";
 import { getPermissions } from "@/lib/server/permissions";
 import { routePermission } from "@/lib/navigation";
@@ -20,20 +21,18 @@ export default async function AdminRouteLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = headers().get("x-admin-pathname");
   const user = await getSession();
-  if (!user) redirect("/login");
+  if (!user) redirect(expiredLoginHref("session", pathname ?? "/dashboard"));
 
   const permissions = await getPermissions(user);
-  const pathname = headers().get("x-admin-pathname");
-  if (!pathname) notFound();
-
-  const requiredPermission = routePermission(pathname);
+  const requiredPermission = pathname ? routePermission(pathname) : null;
   if (
     requiredPermission &&
     !permissions.isSuperAdmin &&
     !permissions.keys.includes(requiredPermission)
   ) {
-    notFound();
+    redirect("/forbidden");
   }
 
   return (

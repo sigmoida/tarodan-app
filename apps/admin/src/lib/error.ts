@@ -18,3 +18,9 @@ export function extractErrorMessage(error: unknown, fallback: string): string {
 
   return fallback;
 }
+
+export function isNotFoundError(error: unknown): boolean {
+  return (
+    (error as { response?: { status?: number } })?.response?.status === 404
+  );
+}

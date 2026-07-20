@@ -11,6 +11,22 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function LoginPage() {
-  return <LoginForm />;
+export default function LoginPage({
+  searchParams,
+}: {
+  searchParams?: {
+    redirect?: string | string[];
+    expired?: string | string[];
+  };
+}) {
+  const redirectTo = Array.isArray(searchParams?.redirect)
+    ? searchParams.redirect[0]
+    : searchParams?.redirect;
+  const expiredReason = Array.isArray(searchParams?.expired)
+    ? searchParams.expired[0]
+    : searchParams?.expired;
+
+  return (
+    <LoginForm redirectTo={redirectTo} expiredReason={expiredReason} />
+  );
 }

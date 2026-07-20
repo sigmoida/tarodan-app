@@ -29,7 +29,8 @@ export interface DetailPageProps<T> {
  * Shared shell for admin detail (`[id]`) pages. Same AdminPage + PageHeader shell
  * as the list pages — so the title size/position matches everywhere — with the
  * PageHeader back chevron enabled. The whole page shows one spinner until the
- * item loads (via SuspenseBoundary); on error the boundary shows a retry.
+ * item loads (via SuspenseBoundary). Missing items render the scoped empty state;
+ * transient errors still reach the retry boundary.
  */
 export function DetailPage<T>(props: DetailPageProps<T>) {
   return (

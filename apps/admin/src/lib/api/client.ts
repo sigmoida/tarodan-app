@@ -1,4 +1,7 @@
 import { createApiClient } from "@tarodan/api-client";
+import { expiredLoginHref } from "@/lib/auth-redirect";
+
+let isRedirectingToLogin = false;
 
 /**
  * Client API instance. Every call goes to the same-origin gateway proxy
@@ -9,7 +12,7 @@ import { createApiClient } from "@tarodan/api-client";
 export const api = createApiClient({
   baseURL: "/gateway",
   headers: { "Content-Type": "application/json" },
-  // On 401, retry the request up to TWICE before giving up. A transient 401
+  // On 401, retry the request ONCE before giving up. A transient 401
   // happens when a sibling BFF call is rotating the session cookie.
   onResponseError: async (error, client) => {
     const config = error.config as
@@ -18,17 +21,17 @@ export const api = createApiClient({
 
     if (isAuthError && config) {
       config._retryCount = (config._retryCount ?? 0) + 1;
-      if (config._retryCount <= 2) {
-        if (config._retryCount > 1) {
-          await new Promise((resolve) => setTimeout(resolve, 300));
-        }
+      if (config._retryCount <= 1 && !isRedirectingToLogin) {
         return client(config);
       }
       if (
         typeof window !== "undefined" &&
-        window.location.pathname !== "/login"
+        window.location.pathname !== "/login" &&
+        !isRedirectingToLogin
       ) {
-        window.location.href = "/login?expired=session";
+        isRedirectingToLogin = true;
+        const returnPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        window.location.replace(expiredLoginHref("session", returnPath));
       }
     }
 

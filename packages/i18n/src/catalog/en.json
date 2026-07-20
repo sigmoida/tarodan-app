@@ -4110,6 +4110,10 @@
         "title": "Page not found",
         "description": "The page you're looking for may have been moved, deleted, or never existed."
       },
+      "forbidden": {
+        "title": "Access denied",
+        "description": "You don't have permission to view this page."
+      },
       "prompt": {
         "defaultTitle": "Enter a value",
         "cancel": "Cancel",
@@ -4191,6 +4195,8 @@
         "connectionError": "Could not connect to the server.",
         "invalidCode": "Verification code is incorrect",
         "invalidCredentials": "Incorrect email or password",
+        "sessionExpired": "Your session has expired. Sign in again to continue where you left off.",
+        "idleExpired": "You were signed out after a period of inactivity. Sign in again to continue.",
         "genericFailure": "Sign-in failed"
       },
       "forgotPassword": {

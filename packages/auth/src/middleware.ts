@@ -25,6 +25,8 @@ export interface AuthMiddlewareOptions {
    * server-side route authorization without trusting a browser-supplied value.
    */
   requestPathHeader?: string;
+  /** Optional `expired` query value used when the refresh token is rejected. */
+  expiredSessionReason?: string;
 }
 
 /**
@@ -86,7 +88,10 @@ export function createAuthMiddleware(
 
     if (!refresh) {
       const loginUrl = new URL(loginPath, request.url);
-      loginUrl.searchParams.set("redirect", pathname);
+      loginUrl.searchParams.set(
+        "redirect",
+        `${pathname}${request.nextUrl.search}`,
+      );
       const res = NextResponse.redirect(loginUrl);
       // No session → clear any stale JS-readable indicator so the client can't
       // mistakenly render as authed on the next page.
@@ -138,7 +143,15 @@ export function createAuthMiddleware(
       // a deploy blip would bounce authed users off protected pages to /login.
       const dead = !!refreshRes && !refreshRes.ok && refreshRes.status < 500;
       if (!dead) return next();
-      const redirect = NextResponse.redirect(new URL(loginPath, request.url));
+      const loginUrl = new URL(loginPath, request.url);
+      loginUrl.searchParams.set(
+        "redirect",
+        `${pathname}${request.nextUrl.search}`,
+      );
+      if (options.expiredSessionReason) {
+        loginUrl.searchParams.set("expired", options.expiredSessionReason);
+      }
+      const redirect = NextResponse.redirect(loginUrl);
       if (config.indicatorCookie)
         redirect.cookies.set(config.indicatorCookie, "", {
           path: "/",
