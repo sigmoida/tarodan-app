@@ -76,12 +76,12 @@ export function productReviewColumns(act: Act) {
           )}
         </div>
       ),
-      { grow: 3, minWidth: 240 },
+      { grow: 3, minWidth: 240, sortKey: "score", sortType: "number" },
     ),
     col.badge<Review>("Durum", (r) => (
       <Badge status={r.status} config={reviewStatusConfig} />
     )),
-    col.date<Review>("Tarih", (r) => r.createdAt),
+    col.date<Review>("Tarih", "createdAt"),
     col.rowMenu<Review>((r) => reviewRowMenu(r.status, (s) => act(r.id, s))),
   ];
 }

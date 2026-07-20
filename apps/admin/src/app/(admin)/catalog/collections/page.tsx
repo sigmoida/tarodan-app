@@ -118,8 +118,6 @@ export default function CollectionsPage() {
           initialFilters={{
             isPublic: "all",
             isFeatured: "all",
-            sortBy: "",
-            sortOrder: "",
           }}
           errorMessage={t("admin.catalog.collections.loadError")}
         >
