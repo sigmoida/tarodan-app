@@ -26,6 +26,7 @@ import { AdminReviewService } from "./admin-review.service";
 import { AdminSellerApplicationService } from "./admin-seller-application.service";
 import {
   CreateCommissionRuleDto,
+  PreviewCommissionDto,
   UpdateCommissionRuleDto,
   UpdatePlatformSettingDto,
   AdminUserQueryDto,
@@ -179,6 +180,10 @@ export class AdminService {
 
   async getCommissionRules() {
     return this.commissionService.getCommissionRules();
+  }
+
+  async previewCommission(dto: PreviewCommissionDto) {
+    return this.commissionService.previewCommission(dto);
   }
 
   async createCommissionRule(adminId: string, dto: CreateCommissionRuleDto) {

@@ -1,7 +1,12 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { CommissionRuleType } from '@prisma/client';
 import { PrismaService } from '../../prisma';
+import {
+  calculateCommissionFromRules,
+  CommissionRuleForCalculation,
+} from '../order/order-commission.helper';
 import { AdminAuditService } from './admin-audit.service';
-import { CreateCommissionRuleDto, UpdateCommissionRuleDto } from './dto';
+import { CreateCommissionRuleDto, PreviewCommissionDto, UpdateCommissionRuleDto } from './dto';
 
 /**
  * Komisyon kuralları yönetimi — AdminService'in COMMISSION RULES bölümünden
@@ -44,6 +49,40 @@ export class AdminCommissionService {
       type: r.ruleType,
       minAmount: r.minAmount ? Number(r.minAmount) : null,
     }));
+  }
+
+  /** Quote an unsaved draft with the exact independent matching used at checkout. */
+  async previewCommission(dto: PreviewCommissionDto) {
+    const activeRules = await this.prisma.commissionRule.findMany({
+      where: { isActive: true },
+    });
+    const rules: CommissionRuleForCalculation[] = activeRules.filter(
+      (rule) => rule.id !== dto.ruleId,
+    );
+
+    if (dto.isActive !== false) {
+      rules.unshift({
+        id: dto.ruleId ?? 'commission-preview-draft',
+        name: 'Taslak komisyon kuralı',
+        ruleType: CommissionRuleType.default,
+        categoryId: dto.categoryId?.trim() || null,
+        sellerType: dto.sellerType,
+        appliesTo: dto.appliesTo,
+        sellerRate: dto.sellerRate,
+        buyerRate: dto.buyerRate,
+        sellerMin: dto.sellerMin,
+        sellerMax: dto.sellerMax,
+        buyerMin: dto.buyerMin,
+        buyerMax: dto.buyerMax,
+      });
+    }
+
+    return calculateCommissionFromRules(
+      dto.amount,
+      rules,
+      dto.previewCategoryId?.trim() || null,
+      dto.previewSellerType,
+    );
   }
 
   /**

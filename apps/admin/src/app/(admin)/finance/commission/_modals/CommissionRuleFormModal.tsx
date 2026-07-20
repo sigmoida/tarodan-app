@@ -1,16 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useFormContext } from 'react-hook-form';
-import { Input } from '@tarodan/ui';
+import { useQuery } from '@tanstack/react-query';
+import { Input, Select } from '@tarodan/ui';
 import { FormModal, FormInput, FormSelect, FormCheckbox, useZodForm } from '@tarodan/ui/form';
 import { adminApi } from '@/lib/api';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
 import { useCategories } from '@/hooks/useCategories';
 import { fmtTry } from '@/lib/format';
+import { adminKeys } from '@/lib/query/keys';
 import {
   type CommissionRule,
   type CommissionFormValues,
+  type Category,
+  type SellerType,
   commissionSchema,
   emptyCommissionForm,
   ruleToForm,
@@ -19,37 +23,127 @@ import {
   APPLIES_TO_OPTIONS,
 } from '../_lib/types';
 
-/** Live commission preview for an example price, reading the current form values. */
-function PreviewCalculator() {
+interface CommissionPreview {
+  sellerFeeAmount: number;
+  buyerFeeAmount: number;
+  commissionAmount: number;
+}
+
+/** Live checkout-equivalent preview, including independently matched buyer/seller rules. */
+function PreviewCalculator({
+  ruleId,
+  categories,
+}: {
+  ruleId?: string;
+  categories: Category[];
+}) {
   const { watch } = useFormContext<CommissionFormValues>();
   const [price, setPrice] = useState('');
+  const [debouncedPrice, setDebouncedPrice] = useState(0);
+  const [previewCategoryId, setPreviewCategoryId] = useState('');
+  const [previewSellerType, setPreviewSellerType] =
+    useState<Exclude<SellerType, 'ALL'>>('FREE');
+  const values = watch();
 
-  const p = parseFloat(price);
-  const sellerRate = parseFloat(watch('sellerRate')) || 0;
-  const buyerRate = parseFloat(watch('buyerRate')) || 0;
-  const sellerMin = watch('sellerMin');
-  const sellerMax = watch('sellerMax');
-  const buyerMin = watch('buyerMin');
-  const buyerMax = watch('buyerMax');
-  const appliesTo = watch('appliesTo');
+  useEffect(() => {
+    const parsedPrice = parseFloat(price);
+    const timer = setTimeout(
+      () =>
+        setDebouncedPrice(
+          Number.isNaN(parsedPrice) || parsedPrice <= 0 ? 0 : parsedPrice,
+        ),
+      300,
+    );
+    return () => clearTimeout(timer);
+  }, [price]);
 
-  let preview: { sellerFee: number; buyerFee: number; total: number } | null = null;
-  if (price && !Number.isNaN(p) && p > 0) {
-    let seller = p * (sellerRate / 100);
-    let buyer = p * (buyerRate / 100);
-    if (sellerMin) seller = Math.max(seller, parseFloat(sellerMin));
-    if (sellerMax) seller = Math.min(seller, parseFloat(sellerMax));
-    if (buyerMin) buyer = Math.max(buyer, parseFloat(buyerMin));
-    if (buyerMax) buyer = Math.min(buyer, parseFloat(buyerMax));
-    if (appliesTo === 'SELLER') buyer = 0;
-    if (appliesTo === 'BUYER') seller = 0;
-    const round = (n: number) => Math.round(n * 100) / 100;
-    preview = { sellerFee: round(seller), buyerFee: round(buyer), total: round(seller + buyer) };
-  }
+  const effectiveCategoryId = values.categoryId || previewCategoryId;
+  const effectiveSellerType =
+    values.sellerType === 'ALL' ? previewSellerType : values.sellerType;
+  const hasRequiredRates =
+    !(
+      (values.appliesTo === 'SELLER' || values.appliesTo === 'BOTH') &&
+      !values.sellerRate
+    ) &&
+    !(
+      (values.appliesTo === 'BUYER' || values.appliesTo === 'BOTH') &&
+      !values.buyerRate
+    );
+  const draft = commissionFormToPayload(values);
+
+  const previewQuery = useQuery<CommissionPreview>({
+    queryKey: adminKeys.preview('commission-rules', {
+      ruleId: ruleId ?? 'new',
+      amount: debouncedPrice,
+      categoryId: effectiveCategoryId,
+      sellerType: effectiveSellerType,
+      draft: {
+        categoryId: draft.categoryId,
+        sellerType: draft.sellerType,
+        appliesTo: draft.appliesTo,
+        sellerRate: draft.sellerRate,
+        buyerRate: draft.buyerRate,
+        sellerMin: draft.sellerMin,
+        sellerMax: draft.sellerMax,
+        buyerMin: draft.buyerMin,
+        buyerMax: draft.buyerMax,
+        isActive: draft.isActive,
+      },
+    }),
+    queryFn: async () => {
+      const response = await adminApi.previewCommission({
+        amount: debouncedPrice,
+        ruleId,
+        categoryId: draft.categoryId,
+        sellerType: draft.sellerType,
+        appliesTo: draft.appliesTo,
+        sellerRate: draft.sellerRate,
+        buyerRate: draft.buyerRate,
+        sellerMin: draft.sellerMin,
+        sellerMax: draft.sellerMax,
+        buyerMin: draft.buyerMin,
+        buyerMax: draft.buyerMax,
+        isActive: draft.isActive,
+        previewCategoryId: effectiveCategoryId || null,
+        previewSellerType: effectiveSellerType,
+      });
+      return response.data;
+    },
+    enabled: debouncedPrice > 0 && hasRequiredRates,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const preview = previewQuery.data;
+  const categoryOptions = [
+    { value: '', label: 'Kategori seçilmedi' },
+    ...categories.map((category) => ({ value: category.id, label: category.name })),
+  ];
 
   return (
     <div className="space-y-3 rounded-lg border border-border p-4">
       <h3 className="text-sm font-medium text-muted">Önizleme Hesaplayıcı</h3>
+      <p className="text-xs text-muted">
+        Aktif kurallar, checkout&apos;taki gibi satıcı ve alıcı için ayrı ayrı eşleştirilir.
+      </p>
+      {values.categoryId === '' && (
+        <Select
+          label="Örnek Ürün Kategorisi"
+          value={previewCategoryId}
+          onChange={(event) => setPreviewCategoryId(event.target.value)}
+          options={categoryOptions}
+        />
+      )}
+      {values.sellerType === 'ALL' && (
+        <Select
+          label="Örnek Satıcı Tipi"
+          value={previewSellerType}
+          onChange={(event) =>
+            setPreviewSellerType(event.target.value as Exclude<SellerType, 'ALL'>)
+          }
+          options={SELLER_TYPES.filter((option) => option.value !== 'ALL')}
+        />
+      )}
       <Input
         type="number"
         step="0.01"
@@ -59,19 +153,23 @@ function PreviewCalculator() {
         onChange={(e) => setPrice(e.target.value)}
         placeholder="1000"
       />
+      {previewQuery.isFetching && <p className="text-sm text-muted">Hesaplanıyor...</p>}
+      {previewQuery.isError && (
+        <p className="text-sm text-danger-600">Komisyon önizlemesi hesaplanamadı.</p>
+      )}
       {preview && (
         <div className="space-y-2 rounded-lg bg-surface-alt p-4 text-sm">
           <div className="flex justify-between">
             <span className="text-muted">Satıcı Komisyonu:</span>
-            <span className="font-medium text-heading">{fmtTry(preview.sellerFee)}</span>
+            <span className="font-medium text-heading">{fmtTry(preview.sellerFeeAmount)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted">Alıcı Komisyonu:</span>
-            <span className="font-medium text-heading">{fmtTry(preview.buyerFee)}</span>
+            <span className="font-medium text-heading">{fmtTry(preview.buyerFeeAmount)}</span>
           </div>
           <div className="flex justify-between border-t border-border pt-2">
             <span className="font-medium text-muted">Toplam Komisyon:</span>
-            <span className="font-bold text-primary-700">{fmtTry(preview.total)}</span>
+            <span className="font-bold text-primary-700">{fmtTry(preview.commissionAmount)}</span>
           </div>
         </div>
       )}
@@ -156,7 +254,7 @@ export function CommissionRuleFormModal({
         </div>
       )}
 
-      <PreviewCalculator />
+      <PreviewCalculator ruleId={rule?.id} categories={categories} />
       <FormCheckbox name="isActive" label="Kural aktif" />
     </FormModal>
   );

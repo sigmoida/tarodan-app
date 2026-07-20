@@ -8,7 +8,10 @@ import {
 import { PrismaService } from "../../prisma";
 import { TaxService } from "../tax/tax.service";
 import { OrderPricingService } from "./order-pricing.service";
-import { mapSellerTypeForCommission } from "./order-commission.helper";
+import {
+  calculateCommissionFromRules,
+  mapSellerTypeForCommission,
+} from "./order-commission.helper";
 
 describe("mapSellerTypeForCommission", () => {
   it.each([
@@ -130,4 +133,123 @@ describe("commission rule matching by membership tier", () => {
       });
     },
   );
+});
+
+describe("calculateCommissionFromRules", () => {
+  const rule = (
+    id: string,
+    sellerType: CommissionSellerType,
+    appliesTo: CommissionAppliesTo,
+    rates: { sellerRate?: number; buyerRate?: number },
+    categoryId: string | null = null,
+  ) => ({
+    id,
+    name: id,
+    ruleType: CommissionRuleType.seller_type,
+    categoryId,
+    sellerType,
+    appliesTo,
+    sellerRate: rates.sellerRate ?? null,
+    buyerRate: rates.buyerRate ?? null,
+    sellerMin: null,
+    sellerMax: null,
+    buyerMin: null,
+    buyerMax: null,
+  });
+
+  it("layers the global buyer fee onto a category seller rule", () => {
+    const result = calculateCommissionFromRules(
+      1000,
+      [
+        rule(
+          "category-seller",
+          CommissionSellerType.BUSINESS,
+          CommissionAppliesTo.SELLER,
+          { sellerRate: 8 },
+          "category-1",
+        ),
+        rule(
+          "global-buyer",
+          CommissionSellerType.ALL,
+          CommissionAppliesTo.BUYER,
+          { buyerRate: 3 },
+        ),
+      ],
+      "category-1",
+      CommissionSellerType.BUSINESS,
+    );
+
+    expect(result).toMatchObject({
+      sellerFeeAmount: 80,
+      buyerFeeAmount: 30,
+      commissionAmount: 110,
+      ruleId: "category-seller",
+    });
+  });
+
+  it("uses a more-specific BOTH rule for both sides", () => {
+    const result = calculateCommissionFromRules(
+      1000,
+      [
+        rule(
+          "exact-both",
+          CommissionSellerType.PREMIUM,
+          CommissionAppliesTo.BOTH,
+          { sellerRate: 6, buyerRate: 2 },
+          "category-1",
+        ),
+        rule(
+          "global-seller",
+          CommissionSellerType.ALL,
+          CommissionAppliesTo.SELLER,
+          { sellerRate: 5 },
+        ),
+        rule(
+          "global-buyer",
+          CommissionSellerType.ALL,
+          CommissionAppliesTo.BUYER,
+          { buyerRate: 3 },
+        ),
+      ],
+      "category-1",
+      CommissionSellerType.PREMIUM,
+    );
+
+    expect(result).toMatchObject({
+      sellerFeeAmount: 60,
+      buyerFeeAmount: 20,
+      commissionAmount: 80,
+      ruleId: "exact-both",
+    });
+  });
+
+  it("resolves seller and buyer specificity independently", () => {
+    const result = calculateCommissionFromRules(
+      1000,
+      [
+        rule(
+          "type-seller",
+          CommissionSellerType.FREE,
+          CommissionAppliesTo.SELLER,
+          { sellerRate: 5 },
+        ),
+        rule(
+          "category-buyer",
+          CommissionSellerType.ALL,
+          CommissionAppliesTo.BUYER,
+          { buyerRate: 4 },
+          "category-1",
+        ),
+      ],
+      "category-1",
+      CommissionSellerType.FREE,
+    );
+
+    expect(result).toMatchObject({
+      sellerFeeAmount: 50,
+      buyerFeeAmount: 40,
+      commissionAmount: 90,
+      ruleId: "type-seller",
+    });
+  });
 });

@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsEnum, IsOptional, IsBoolean, Min, Max, ValidateIf, Validate } from 'class-validator';
+import { IsString, IsNumber, IsEnum, IsOptional, IsBoolean, IsIn, Min, Max, ValidateIf } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { CommissionRuleType, CommissionAppliesTo, CommissionSellerType } from '@prisma/client';
@@ -236,6 +236,101 @@ export class UpdateCommissionRuleDto {
   @Type(() => Number)
   @Min(0)
   minAmount?: number;
+}
+
+export class PreviewCommissionDto {
+  @ApiProperty({ example: 1000, description: 'Example product price' })
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0.01)
+  amount: number;
+
+  @ApiPropertyOptional({ description: 'Existing rule being edited' })
+  @IsOptional()
+  @IsString()
+  ruleId?: string;
+
+  @ApiPropertyOptional({ description: 'Draft rule category (null for all)' })
+  @IsOptional()
+  @IsString()
+  categoryId?: string | null;
+
+  @ApiProperty({ enum: CommissionSellerType, description: 'Draft rule seller type' })
+  @IsEnum(CommissionSellerType)
+  sellerType: CommissionSellerType;
+
+  @ApiProperty({ enum: CommissionAppliesTo })
+  @IsEnum(CommissionAppliesTo)
+  appliesTo: CommissionAppliesTo;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  sellerRate?: number | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  buyerRate?: number | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  sellerMin?: number | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  sellerMax?: number | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  buyerMin?: number | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  buyerMax?: number | null;
+
+  @ApiPropertyOptional({ default: true })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @ApiPropertyOptional({ description: 'Example product category (null for no category)' })
+  @IsOptional()
+  @IsString()
+  previewCategoryId?: string | null;
+
+  @ApiProperty({
+    enum: [
+      CommissionSellerType.FREE,
+      CommissionSellerType.PREMIUM,
+      CommissionSellerType.BUSINESS,
+    ],
+    description: 'Example checkout seller type',
+  })
+  @IsIn([
+    CommissionSellerType.FREE,
+    CommissionSellerType.PREMIUM,
+    CommissionSellerType.BUSINESS,
+  ])
+  previewSellerType: CommissionSellerType;
 }
 
 export class CommissionRuleResponseDto {

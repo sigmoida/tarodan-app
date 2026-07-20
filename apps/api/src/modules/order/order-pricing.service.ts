@@ -7,14 +7,10 @@ import {
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
 import { CheckoutQuoteDto } from "./dto";
+import { ProductStatus } from "@prisma/client";
 import {
-  ProductStatus,
-  CommissionRuleType,
-  CommissionAppliesTo,
-} from "@prisma/client";
-import {
-  findMatchingCommissionRule,
-  clampCommissionAmount,
+  calculateCommissionFromRules,
+  CommissionCalculationResult,
   mapSellerTypeForCommission,
 } from "./order-commission.helper";
 import { TaxService } from "../tax/tax.service";
@@ -23,18 +19,7 @@ import { TaxService } from "../tax/tax.service";
  * Commission calculation result interface
  * Contains full details about the applied commission rule
  */
-export interface CommissionResult {
-  buyerFeeAmount: number;
-  sellerFeeAmount: number;
-  commissionAmount: number; // total = buyerFee + sellerFee
-  ruleId: string | null;
-  ruleName: string | null;
-  // Legacy fields for backward compatibility
-  ruleType?: CommissionRuleType;
-  appliedRate?: number;
-  wasMinApplied?: boolean;
-  wasMaxApplied?: boolean;
-}
+export type CommissionResult = CommissionCalculationResult;
 
 /**
  * Fiyatlandırma hesapları (kargo ücreti, komisyon, checkout quote) —
@@ -421,89 +406,25 @@ export class OrderPricingService {
 
     this.logger.debug(`Found ${allActive.length} active commission rules`);
 
-    // SELLER tarafı: appliesTo IN (SELLER, BOTH)
-    const sellerRules = allActive.filter(
-      (r) =>
-        r.appliesTo === CommissionAppliesTo.SELLER ||
-        r.appliesTo === CommissionAppliesTo.BOTH,
-    );
-    const sellerMatch = findMatchingCommissionRule(
-      sellerRules,
+    const result = calculateCommissionFromRules(
+      amount,
+      allActive,
       categoryId,
       commissionSellerType,
       this.logger,
     );
 
-    // BUYER tarafı: appliesTo IN (BUYER, BOTH)
-    const buyerRules = allActive.filter(
-      (r) =>
-        r.appliesTo === CommissionAppliesTo.BUYER ||
-        r.appliesTo === CommissionAppliesTo.BOTH,
-    );
-    const buyerMatch = findMatchingCommissionRule(
-      buyerRules,
-      categoryId,
-      commissionSellerType,
-      this.logger,
-    );
-
-    if (!sellerMatch && !buyerMatch) {
+    if (!result.ruleId) {
       this.logger.warn(
         "No matching commission rule found; applying 0 commission fallback",
       );
-      return {
-        buyerFeeAmount: 0,
-        sellerFeeAmount: 0,
-        commissionAmount: 0,
-        ruleId: null,
-        ruleName: null,
-      };
+      return result;
     }
-
-    const subtotal = amount;
-
-    // Seller fee
-    let sellerFee = 0;
-    if (sellerMatch && sellerMatch.sellerRate) {
-      const raw = subtotal * (Number(sellerMatch.sellerRate) / 100);
-      sellerFee = clampCommissionAmount(
-        raw,
-        sellerMatch.sellerMin ? Number(sellerMatch.sellerMin) : null,
-        sellerMatch.sellerMax ? Number(sellerMatch.sellerMax) : null,
-      );
-    }
-
-    // Buyer fee
-    let buyerFee = 0;
-    if (buyerMatch && buyerMatch.buyerRate) {
-      const raw = subtotal * (Number(buyerMatch.buyerRate) / 100);
-      buyerFee = clampCommissionAmount(
-        raw,
-        buyerMatch.buyerMin ? Number(buyerMatch.buyerMin) : null,
-        buyerMatch.buyerMax ? Number(buyerMatch.buyerMax) : null,
-      );
-    }
-
-    const totalCommission = sellerFee + buyerFee;
 
     this.logger.log(
-      `Commission: amount=${amount} sellerFee=${sellerFee} (rule=${sellerMatch?.id ?? "none"}) buyerFee=${buyerFee} (rule=${buyerMatch?.id ?? "none"})`,
+      `Commission: amount=${amount} sellerFee=${result.sellerFeeAmount} buyerFee=${result.buyerFeeAmount} (primaryRule=${result.ruleId})`,
     );
 
-    // ruleId/ruleName legacy alanları: seller match öncelikli, yoksa buyer
-    const primary = sellerMatch ?? buyerMatch;
-    return {
-      buyerFeeAmount: buyerFee,
-      sellerFeeAmount: sellerFee,
-      commissionAmount: totalCommission,
-      ruleId: primary?.id ?? null,
-      ruleName: primary?.name ?? null,
-      ruleType: primary?.ruleType,
-      appliedRate: sellerMatch?.sellerRate
-        ? Number(sellerMatch.sellerRate)
-        : buyerMatch?.buyerRate
-          ? Number(buyerMatch.buyerRate)
-          : 0,
-    };
+    return result;
   }
 }
