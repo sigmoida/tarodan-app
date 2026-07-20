@@ -35,7 +35,7 @@ export default function EmailTemplatesPage() {
       )
     : list;
   const sorted = useClientTableSort(visible);
-  const groups = Array.from(new Set(sorted.rows.map((t) => t.group)));
+  const groups = Array.from(new Set(visible.map((t) => t.group)));
 
   const columns = templateColumns(setEditKey);
 
