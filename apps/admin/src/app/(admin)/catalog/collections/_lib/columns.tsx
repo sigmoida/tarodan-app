@@ -38,7 +38,12 @@ export function collectionColumns(t: T, actions: CollectionRowActions) {
           </div>
         </div>
       ),
-      { grow: 3, minWidth: 220 },
+      {
+        grow: 3,
+        minWidth: 220,
+        sortKey: "name",
+        sortType: "text",
+      },
     ),
     col.custom<Collection>(t("admin.catalog.collections.owner"), (c) => {
       const tier = c.owner?.membershipTier;
@@ -61,10 +66,11 @@ export function collectionColumns(t: T, actions: CollectionRowActions) {
       t("admin.catalog.common.product"),
       (c) => c.itemCount,
     ),
-    col.number<Collection>(t("admin.catalog.common.views"), (c) => c.viewCount),
+    col.number<Collection>(t("admin.catalog.common.views"), "viewCount"),
     col.number<Collection>(
       t("admin.catalog.collections.likes"),
       (c) => c.likeCount,
+      { sortKey: "likeCount", sortType: "number" },
     ),
     col.badge<Collection>(t("common.status"), (c) => (
       <Badge
