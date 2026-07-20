@@ -33,14 +33,13 @@ const nextConfig = {
   },
   // standalone yalnızca prod build için; dev-server bu monorepo'da standalone ile takılıyor.
   output: env.NODE_ENV === 'production' ? 'standalone' : undefined,
-  // Dev'de StrictMode effect'leri 2× çalıştırıp her yükleme/hata toast'ını ikiye
-  // katlıyordu (örn. "Siparişler/Ayarlar yüklenemedi" 2×). Kapatıyoruz.
-  reactStrictMode: false,
-  // Type-check + lint are gated in CI + locally; running the full type-check
-  // again inside `next build` OOM-killed the memory-constrained deploy server.
-  // Skip the in-build checks (the webpack compile still runs).
-  eslint: { ignoreDuringBuilds: true },
-  typescript: { ignoreBuildErrors: true },
+  // Keep React's development checks enabled so effect and lifecycle issues are
+  // caught before they reach production.
+  reactStrictMode: true,
+  // Build-time checks intentionally stay enabled. CI runs these independently,
+  // but `next build` must also fail rather than emitting an unsafe artifact.
+  eslint: { ignoreDuringBuilds: false },
+  typescript: { ignoreBuildErrors: false },
   transpilePackages: [
     '@tarodan/ui',
     '@tarodan/design-tokens',

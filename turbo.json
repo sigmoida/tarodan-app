@@ -1,19 +1,67 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalDependencies": [".env.*local", "apps/*/.env.*local", "packages/*/.env.*local"],
+  "globalDependencies": [
+    ".env.*local",
+    "apps/*/.env.*local",
+    "packages/*/.env.*local"
+  ],
   "pipeline": {
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
     "lint": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "inputs": [
+        "src/**",
+        "app/**",
+        "apps/**",
+        "libs/**",
+        "rules/**",
+        "scripts/**",
+        "test/**",
+        "tests/**",
+        "e2e/**",
+        "plugins/**",
+        "prisma/**",
+        "*.{js,cjs,mjs,ts,json}",
+        ".eslintrc*"
+      ]
     },
     "typecheck": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "inputs": [
+        "src/**",
+        "app/**",
+        "apps/**",
+        "libs/**",
+        "rules/**",
+        "scripts/**",
+        "test/**",
+        "tests/**",
+        "e2e/**",
+        "plugins/**",
+        "prisma/**",
+        "*.{js,cjs,mjs,ts,json}"
+      ]
     },
     "test": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "inputs": [
+        "src/**",
+        "app/**",
+        "apps/**",
+        "libs/**",
+        "rules/**",
+        "scripts/**",
+        "test/**",
+        "tests/**",
+        "__tests__/**",
+        "e2e/**",
+        "plugins/**",
+        "prisma/**",
+        "*.{js,cjs,mjs,ts,json}"
+      ]
     },
     "dev": {
       "cache": false,

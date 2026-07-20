@@ -1,5 +1,38 @@
 import { api } from "./client";
 
+export interface RichAutocompleteResults {
+  products: Array<{
+    id: string;
+    title: string;
+    imageUrl?: string;
+    price: number;
+    brandName?: string;
+  }>;
+  brands: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    logo?: string | null;
+  }>;
+  categories: Array<{ id: string; name: string; slug: string }>;
+  manufacturers: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    logo?: string | null;
+  }>;
+  carModels?: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    brandId: string;
+  }>;
+  scales?: string[];
+  materials?: Array<{ slug: string; label: string }>;
+  conditions?: Array<{ value: string; label: string }>;
+  suggestions: string[];
+}
+
 // Products (was Listings - endpoint is /products in backend)
 export const listingsApi = {
   getFilters: (params?: { manufacturer?: string }) =>
@@ -33,36 +66,7 @@ export const searchApi = {
   autocomplete: (q: string) =>
     api.get("/search/autocomplete", { params: { q } }),
   autocompleteRich: (q: string) =>
-    api.get<{
-      products: Array<{
-        id: string;
-        title: string;
-        imageUrl?: string;
-        price: number;
-        brandName?: string;
-      }>;
-      brands: Array<{
-        id: string;
-        name: string;
-        slug: string;
-        logo?: string | null;
-      }>;
-      categories: Array<{ id: string; name: string; slug: string }>;
-      manufacturers: Array<{
-        id: string;
-        name: string;
-        slug: string;
-        logo?: string | null;
-      }>;
-      carModels?: Array<{
-        id: string;
-        name: string;
-        slug: string;
-        brandId: string;
-      }>;
-      scales?: string[];
-      materials?: Array<{ slug: string; label: string }>;
-      conditions?: Array<{ value: string; label: string }>;
-      suggestions: string[];
-    }>("/search/autocomplete-rich", { params: { q } }),
+    api.get<RichAutocompleteResults>("/search/autocomplete-rich", {
+      params: { q },
+    }),
 };

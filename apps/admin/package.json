@@ -28,7 +28,7 @@
     "chart.js": "^4.4.1",
     "clsx": "^2.1.0",
     "date-fns": "^3.6.0",
-    "framer-motion": "^10.16.16",
+    "framer-motion": "11.18.2",
     "next": "14.2.35",
     "next-intl": "^3",
     "react": "^18.2.0",
@@ -38,8 +38,8 @@
     "react-hot-toast": "^2.4.1",
     "tailwind-merge": "^2.6.1",
     "tailwindcss-animate": "^1.0.7",
-    "zod": "^3.22.4",
-    "zustand": "^4.4.7"
+    "zod": "3.25.76",
+    "zustand": "4.5.7"
   },
   "devDependencies": {
     "@tarodan/eslint-config": "workspace:*",
