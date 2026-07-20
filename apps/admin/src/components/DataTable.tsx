@@ -17,6 +17,7 @@ const DataTableExpandRow = dynamic(() => import("./DataTableExpandRow"), {
 });
 import {
   Spinner,
+  EmptyState,
   Checkbox,
   Table,
   TableHeader,
@@ -213,14 +214,12 @@ export function DataTable<T>({
               </TableRow>
             ) : data.length === 0 ? (
               <TableRow>
-                <TableCell
-                  colSpan={colSpan}
-                  className="p-8 text-center text-muted"
-                >
-                  <div className="flex flex-col items-center gap-3">
-                    <span>{resolvedEmptyText}</span>
-                    {emptyAction}
-                  </div>
+                <TableCell colSpan={colSpan} className="p-0">
+                  <EmptyState
+                    size="compact"
+                    title={resolvedEmptyText}
+                    action={emptyAction}
+                  />
                 </TableCell>
               </TableRow>
             ) : (

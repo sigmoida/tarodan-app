@@ -9,6 +9,7 @@ import {
 import { useTranslations } from "next-intl";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { DataList, Field } from "@/components/detail/DataList";
+import { fmtTry } from "@/lib/format";
 import type { OrderDetail } from "../types";
 
 export function PaymentSection({
@@ -23,10 +24,7 @@ export function PaymentSection({
         <Field label={t("common.status")}>
           {enumLabel(paymentStatusConfig, payment.status)}
         </Field>
-        <Field label={t("common.amount")}>
-          ₺
-          {payment.amount.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
-        </Field>
+        <Field label={t("common.amount")}>{fmtTry(payment.amount)}</Field>
         <Field label={t("admin.operations.orders.provider")}>
           {enumLabel(paymentProviderConfig, payment.provider)}
         </Field>

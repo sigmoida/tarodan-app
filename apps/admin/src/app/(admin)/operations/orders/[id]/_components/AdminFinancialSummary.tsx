@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { fmtTry } from "@/lib/format";
 
 export interface PricingBreakdown {
   subtotal: number;
@@ -30,12 +31,6 @@ interface AdminFinancialSummaryProps {
   };
   className?: string;
 }
-
-const fmt = (n: number) =>
-  n.toLocaleString("tr-TR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
 
 export function AdminFinancialSummary({
   pricing,
@@ -74,7 +69,7 @@ export function AdminFinancialSummary({
             {t("admin.operations.orders.financial.subtotal")}
           </dt>
           <dd className="font-medium text-heading shrink-0 whitespace-nowrap">
-            ₺{fmt(sub)}
+            {fmtTry(sub)}
           </dd>
         </div>
         {discountAmount > 0 && (
@@ -85,7 +80,7 @@ export function AdminFinancialSummary({
               })}
             </dt>
             <dd className="font-medium text-success-700 shrink-0 whitespace-nowrap">
-              -₺{fmt(discountAmount)}
+              -{fmtTry(discountAmount)}
             </dd>
           </div>
         )}
@@ -94,7 +89,7 @@ export function AdminFinancialSummary({
             {t("admin.operations.orders.financial.shipping")}
           </dt>
           <dd className="font-medium text-heading shrink-0 whitespace-nowrap">
-            ₺{fmt(ship)}
+            {fmtTry(ship)}
           </dd>
         </div>
         <div className="flex justify-between gap-2 min-w-0">
@@ -102,7 +97,7 @@ export function AdminFinancialSummary({
             {t("admin.operations.orders.financial.buyerFee")}
           </dt>
           <dd className="font-medium text-heading shrink-0 whitespace-nowrap">
-            ₺{fmt(buyerFee)}
+            {fmtTry(buyerFee)}
           </dd>
         </div>
         <div className="flex justify-between gap-2 min-w-0">
@@ -110,7 +105,7 @@ export function AdminFinancialSummary({
             {t("admin.operations.orders.financial.sellerFee")}
           </dt>
           <dd className="font-medium text-heading shrink-0 whitespace-nowrap">
-            ₺{fmt(sellerFee)}
+            {fmtTry(sellerFee)}
           </dd>
         </div>
         <div className="flex justify-between gap-2 min-w-0">
@@ -118,7 +113,7 @@ export function AdminFinancialSummary({
             {t("admin.operations.orders.financial.commission")}
           </dt>
           <dd className="font-medium text-heading shrink-0 whitespace-nowrap">
-            ₺{fmt(commission)}
+            {fmtTry(commission)}
           </dd>
         </div>
         <div className="flex justify-between gap-2 min-w-0 border-t pt-2 mt-2">
@@ -126,7 +121,7 @@ export function AdminFinancialSummary({
             {t("admin.operations.orders.financial.buyerTotal")}
           </dt>
           <dd className="font-semibold text-heading shrink-0 whitespace-nowrap">
-            ₺{fmt(total)}
+            {fmtTry(total)}
           </dd>
         </div>
         <div className="flex justify-between gap-2 min-w-0">
@@ -134,7 +129,7 @@ export function AdminFinancialSummary({
             {t("admin.operations.orders.financial.sellerNet")}
           </dt>
           <dd className="font-medium text-success-700 shrink-0 whitespace-nowrap">
-            ₺{fmt(sellerNet)}
+            {fmtTry(sellerNet)}
           </dd>
         </div>
       </dl>

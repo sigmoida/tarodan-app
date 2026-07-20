@@ -1,12 +1,12 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import {
-  EMPTY_PERIODS,
   type DashboardData,
   type DashboardStats,
+  EMPTY_PERIODS,
   type MetricPeriods,
   type PendingActions,
   type TopProduct,
@@ -15,34 +15,6 @@ import {
 } from "./types";
 
 type T = ReturnType<typeof useTranslations<never>>;
-
-const EMPTY_VISITORS: VisitorStats = {
-  liveVisitors: 0,
-  dailyActiveVisitors: 0,
-};
-
-const EMPTY_STATS: DashboardStats = {
-  totalOrders: 0,
-  totalOrdersPeriods: EMPTY_PERIODS,
-  netCommissionTotal: 0,
-  netCommissionPeriods: EMPTY_PERIODS,
-  activeProducts: 0,
-  passiveProducts: 0,
-  activeProductsPeriods: EMPTY_PERIODS,
-  passiveProductsPeriods: EMPTY_PERIODS,
-  activeUsers: 0,
-  passiveUsers: 0,
-  activeUsersPeriods: EMPTY_PERIODS,
-  passiveUsersPeriods: EMPTY_PERIODS,
-  grossSales: 0,
-  grossSalesPeriods: EMPTY_PERIODS,
-  netCommissionRow2: EMPTY_PERIODS,
-  cancellations: 0,
-  refunds: 0,
-  cancellationsPeriods: EMPTY_PERIODS,
-  refundsPeriods: EMPTY_PERIODS,
-  pendingApprovals: 0,
-};
 
 /** Build a 30-entry series (oldest→newest) from a date→value map. */
 function last30Days(dayMap: Map<string, number>) {
@@ -79,11 +51,11 @@ async function fetchDashboard(t: T): Promise<DashboardData> {
     adminApi.getDashboard(),
     adminApi.getRecentOrders(5),
     adminApi.getPendingActions(),
-    adminApi.getSalesAnalytics({ groupBy: "day" }).catch(() => null),
-    adminApi.getTrades({ limit: 5, sort: "createdAt:desc" }).catch(() => null),
-    adminApi.getRealtimeVisitors().catch(() => null),
-    adminApi.getTopProducts(10).catch(() => null),
-    adminApi.getTopSellers(10).catch(() => null),
+    adminApi.getSalesAnalytics({ groupBy: "day" }),
+    adminApi.getTrades({ limit: 5, sort: "createdAt:desc" }),
+    adminApi.getRealtimeVisitors(),
+    adminApi.getTopProducts(10),
+    adminApi.getTopSellers(10),
   ]);
 
   const data = dashboardRes.data.data || dashboardRes.data;
@@ -132,18 +104,16 @@ async function fetchDashboard(t: T): Promise<DashboardData> {
     pendingApprovals: data.products?.pending || 0,
   };
 
-  const visitorsData = visitorsRes?.data?.data || visitorsRes?.data || null;
-  const visitors: VisitorStats = visitorsData
-    ? {
-        liveVisitors: Number(visitorsData.liveVisitors ?? 0),
-        dailyActiveVisitors: Number(visitorsData.dailyActiveVisitors ?? 0),
-      }
-    : EMPTY_VISITORS;
+  const visitorsData = visitorsRes.data?.data || visitorsRes.data;
+  const visitors: VisitorStats = {
+    liveVisitors: Number(visitorsData?.liveVisitors ?? 0),
+    dailyActiveVisitors: Number(visitorsData?.dailyActiveVisitors ?? 0),
+  };
 
   const ordersData = ordersRes.data.data || ordersRes.data || [];
   const recentOrders = Array.isArray(ordersData) ? ordersData : [];
 
-  const tradesData = tradesRes?.data?.data || tradesRes?.data || [];
+  const tradesData = tradesRes.data?.data || tradesRes.data || [];
   const recentTrades = Array.isArray(tradesData) ? tradesData : [];
 
   const pendingData = pendingRes.data.data || pendingRes.data;
@@ -168,7 +138,7 @@ async function fetchDashboard(t: T): Promise<DashboardData> {
   let salesByDay = Array(30).fill(0);
   let ordersByDay = Array(30).fill(0);
 
-  if (salesRes?.data) {
+  if (salesRes.data) {
     const salesData = salesRes.data.data ?? salesRes.data;
     const dailyArray = Array.isArray(salesData)
       ? salesData
@@ -193,12 +163,12 @@ async function fetchDashboard(t: T): Promise<DashboardData> {
   }
 
   const topProductsData =
-    topProductsRes?.data?.data || topProductsRes?.data || [];
+    topProductsRes.data?.data || topProductsRes.data || [];
   const topProducts: TopProduct[] = Array.isArray(topProductsData)
     ? topProductsData
     : [];
 
-  const topSellersData = topSellersRes?.data?.data || topSellersRes?.data || [];
+  const topSellersData = topSellersRes.data?.data || topSellersRes.data || [];
   const topSellers: TopSeller[] = Array.isArray(topSellersData)
     ? topSellersData
     : [];
@@ -218,14 +188,9 @@ async function fetchDashboard(t: T): Promise<DashboardData> {
 /** Loads all dashboard data (stats, recent orders/trades, pending, analytics). */
 export function useDashboard() {
   const t = useTranslations();
-  const query = useQuery({
+  const query = useSuspenseQuery({
     queryKey: ["dashboard"],
     queryFn: () => fetchDashboard(t),
   });
-  return {
-    data: query.data,
-    loading: query.isLoading,
-    stats: query.data?.stats ?? EMPTY_STATS,
-    visitors: query.data?.visitors ?? EMPTY_VISITORS,
-  };
+  return query.data;
 }

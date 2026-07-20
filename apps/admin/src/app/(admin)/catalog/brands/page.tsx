@@ -34,7 +34,14 @@ export default function BrandsPage() {
   });
   const toggle = useAdminMutation(
     (b: Brand) => adminApi.updateBrand(b.id, { isActive: !b.isActive }),
-    { invalidates: ["brands"] },
+    {
+      invalidates: ["brands"],
+      optimistic: {
+        resources: "brands",
+        id: (b) => b.id,
+        patch: (b) => ({ isActive: !b.isActive }),
+      },
+    },
   );
 
   const onDelete = useCallback(

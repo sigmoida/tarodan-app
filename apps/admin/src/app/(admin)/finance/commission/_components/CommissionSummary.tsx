@@ -7,19 +7,26 @@ import {
   BuildingStorefrontIcon,
 } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
+import { adminKeys } from "@/lib/query/keys";
 import { MetricCard } from "@/components/MetricCard";
+import { QueryErrorCard } from "@/components/page/QueryErrorCard";
 import { fmtTry } from "@/lib/format";
 import { type CommissionRevenue } from "../_lib/types";
 import { useTranslations } from "next-intl";
 
 export function CommissionSummary() {
   const t = useTranslations();
-  const { data, isLoading } = useQuery<CommissionRevenue>({
-    queryKey: ["commission-revenue"],
-    queryFn: async () => (await adminApi.getCommissionRevenue()).data,
-  });
+  const { data, isLoading, isError, isFetching, refetch } =
+    useQuery<CommissionRevenue>({
+      queryKey: adminKeys.all("commission-revenue"),
+      queryFn: async () => (await adminApi.getCommissionRevenue()).data,
+    });
 
-  if (!data && !isLoading) return null;
+  if (isError) {
+    return (
+      <QueryErrorCard onRetry={() => void refetch()} isRetrying={isFetching} />
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">

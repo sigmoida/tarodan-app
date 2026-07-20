@@ -10,11 +10,12 @@ import {
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { MetricCard } from "@/components/MetricCard";
+import { QueryErrorCard } from "@/components/page/QueryErrorCard";
 import { type Ad } from "../_lib/types";
 
 /** Summary metrics over ALL ads. Keyed under ['ads'] so ad mutations refresh it. */
 export function AdsStats() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: adminKeys.stats("ads"),
     queryFn: async () => {
       const res = await adminApi.getAds();
@@ -41,6 +42,12 @@ export function AdsStats() {
     impressions: 0,
     ctr: "0",
   };
+
+  if (isError) {
+    return (
+      <QueryErrorCard onRetry={() => void refetch()} isRetrying={isFetching} />
+    );
+  }
 
   return (
     <div className="grid grid-cols-2 gap-4 md:grid-cols-4">

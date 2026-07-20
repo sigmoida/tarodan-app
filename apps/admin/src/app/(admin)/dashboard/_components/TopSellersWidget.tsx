@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
+import { EmptyState } from "@tarodan/ui";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { type TopSeller } from "../_lib/types";
 
@@ -69,9 +70,10 @@ export function TopSellersWidget({ sellers }: { sellers: TopSeller[] }) {
             </Link>
           ))
         ) : (
-          <div className="py-8 text-center text-muted">
-            {t("admin.dashboard.topSellers.empty")}
-          </div>
+          <EmptyState
+            size="compact"
+            title={t("admin.dashboard.topSellers.empty")}
+          />
         )}
       </div>
     </SectionCard>

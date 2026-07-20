@@ -3,8 +3,8 @@
 import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import { AdminPage } from "@/components/page/AdminPage";
-import { PageLoading } from "@/components/PageLoading";
 import { PageHeader } from "@/components/AdminList";
+import { SuspenseBoundary } from "@/components/page/SuspenseBoundary";
 import { useDashboard } from "./_lib/useDashboard";
 import { DashboardStats } from "./_components/DashboardStats";
 import { QuickActions } from "./_components/QuickActions";
@@ -24,9 +24,33 @@ import { RecentTrades } from "./_components/RecentTrades";
 import { TopProductsWidget } from "./_components/TopProductsWidget";
 import { TopSellersWidget } from "./_components/TopSellersWidget";
 
+function DashboardContent() {
+  const data = useDashboard();
+
+  return (
+    <>
+      <DashboardStats stats={data.stats} visitors={data.visitors} />
+      <QuickActions />
+      <PendingActionsPanel pending={data.pendingActions} />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <TopProductsWidget products={data.topProducts} />
+        <TopSellersWidget sellers={data.topSellers} />
+      </div>
+      <DashboardCharts
+        salesByDay={data.analytics.salesByDay}
+        ordersByDay={data.analytics.ordersByDay}
+      />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <CategoryChart categories={data.analytics.categoryDistribution} />
+        <RecentOrders orders={data.recentOrders} />
+      </div>
+      <RecentTrades trades={data.recentTrades} />
+    </>
+  );
+}
+
 export default function DashboardPage() {
   const t = useTranslations();
-  const { data, loading, stats, visitors } = useDashboard();
 
   return (
     <AdminPage>
@@ -34,29 +58,9 @@ export default function DashboardPage() {
         title={t("admin.dashboard.title")}
         description={t("admin.dashboard.description")}
       />
-
-      {loading || !data ? (
-        <PageLoading />
-      ) : (
-        <>
-          <DashboardStats stats={stats} visitors={visitors} />
-          <QuickActions />
-          <PendingActionsPanel pending={data.pendingActions} />
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <TopProductsWidget products={data.topProducts} />
-            <TopSellersWidget sellers={data.topSellers} />
-          </div>
-          <DashboardCharts
-            salesByDay={data.analytics.salesByDay}
-            ordersByDay={data.analytics.ordersByDay}
-          />
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <CategoryChart categories={data.analytics.categoryDistribution} />
-            <RecentOrders orders={data.recentOrders} />
-          </div>
-          <RecentTrades trades={data.recentTrades} />
-        </>
-      )}
+      <SuspenseBoundary>
+        <DashboardContent />
+      </SuspenseBoundary>
     </AdminPage>
   );
 }

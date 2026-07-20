@@ -75,6 +75,11 @@ export default function CommissionPage() {
     {
       invalidates: ["commission-rules"],
       successMessage: t("admin.finance.commission.ruleStatusUpdated"),
+      optimistic: {
+        resources: "commission-rules",
+        id: (rule) => rule.id,
+        patch: (rule) => ({ isActive: !rule.isActive }),
+      },
     },
   );
   const remove = useAdminMutation(

@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { Doughnut } from 'react-chartjs-2';
-import { Chart as ChartJS } from 'chart.js';
-import { useTranslations } from 'next-intl';
-import { SectionCard } from '@/components/detail/SectionCard';
-import { chartPalette, categoryColors } from '../_lib/charts';
+import { Doughnut } from "react-chartjs-2";
+import { useTranslations } from "next-intl";
+import { EmptyState } from "@tarodan/ui";
+import { SectionCard } from "@/components/detail/SectionCard";
+import { categoryColors } from "../_lib/charts";
 
 export function CategoryChart({
   categories,
@@ -13,53 +13,50 @@ export function CategoryChart({
 }) {
   const t = useTranslations();
   const sorted = [...(categories || [])].sort((a, b) => b.count - a.count);
-  const hasData = sorted.length > 0;
+  const hasData = sorted.some((category) => category.count > 0);
 
   const data = {
-    labels: hasData ? sorted.map((c) => c.name) : [t('admin.dashboard.charts.noData')],
+    labels: sorted.map((c) => c.name),
     datasets: [
       {
-        data: hasData ? sorted.map((c) => c.count) : [1],
-        backgroundColor: hasData
-          ? sorted.map((_, i) => categoryColors[i % categoryColors.length])
-          : [chartPalette.subtle],
+        data: sorted.map((c) => c.count),
+        backgroundColor: sorted.map(
+          (_, i) => categoryColors[i % categoryColors.length],
+        ),
         borderWidth: 0,
       },
     ],
   };
 
   return (
-    <SectionCard title={t('admin.dashboard.charts.categoryTitle')} className="overflow-visible">
-      <div className="min-h-[380px] pb-6">
-        <Doughnut
-          data={data}
-          options={{
-            responsive: true,
-            maintainAspectRatio: false,
-            layout: { padding: { bottom: 20 } },
-            plugins: {
-              legend: {
-                position: 'bottom',
-                labels: {
-                  padding: 12,
-                  boxWidth: 14,
-                  font: { size: 12 },
-                  generateLabels: (chart: ChartJS) => {
-                    const ds = chart.data.datasets[0];
-                    const bg = (ds?.backgroundColor ?? []) as string[];
-                    return (chart.data.labels ?? []).map((label, i) => ({
-                      text: String(label ?? ''),
-                      fillStyle: bg[i] ?? chartPalette.subtle,
-                      fontColor: bg[i] ?? chartPalette.subtle,
-                      index: i,
-                    }));
+    <SectionCard
+      title={t("admin.dashboard.charts.categoryTitle")}
+      className="overflow-visible"
+    >
+      {hasData ? (
+        <div className="min-h-[380px] pb-6">
+          <Doughnut
+            data={data}
+            options={{
+              responsive: true,
+              maintainAspectRatio: false,
+              layout: { padding: { bottom: 20 } },
+              plugins: {
+                legend: {
+                  position: "bottom",
+                  labels: {
+                    padding: 12,
+                    boxWidth: 14,
+                    font: { size: 12 },
                   },
                 },
               },
-            },
-          }}
-        />
-      </div>
+            }}
+          />
+        </div>
+      ) : (
+        <EmptyState size="compact" title={t("admin.dashboard.charts.noData")} />
+      )}
     </SectionCard>
   );
 }

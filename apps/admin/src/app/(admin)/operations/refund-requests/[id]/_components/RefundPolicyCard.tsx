@@ -13,6 +13,7 @@ import {
   Radio,
 } from "@tarodan/ui";
 import { extractErrorMessage } from "@/lib/error";
+import { fmtTry } from "@/lib/format";
 
 /**
  * Phase 4B.2 — Admin RefundRequest policy override card.
@@ -42,13 +43,6 @@ export interface RefundPolicyCardProps {
   }) => Promise<void>;
   onSavePayer: (payer: ReturnShippingPayer) => Promise<void>;
   disabled?: boolean;
-}
-
-function fmt(n: number): string {
-  return `${n.toLocaleString("tr-TR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })} TL`;
 }
 
 export function RefundPolicyCard({
@@ -113,10 +107,7 @@ export function RefundPolicyCard({
       });
     } catch (error) {
       setError(
-        extractErrorMessage(
-          error,
-          t("admin.operations.common.errorOccurred"),
-        ),
+        extractErrorMessage(error, t("admin.operations.common.errorOccurred")),
       );
     } finally {
       setSavingPolicy(false);
@@ -131,10 +122,7 @@ export function RefundPolicyCard({
       await onSavePayer(returnShippingPayer);
     } catch (error) {
       setError(
-        extractErrorMessage(
-          error,
-          t("admin.operations.common.errorOccurred"),
-        ),
+        extractErrorMessage(error, t("admin.operations.common.errorOccurred")),
       );
     } finally {
       setSavingPayer(false);
@@ -153,7 +141,7 @@ export function RefundPolicyCard({
         <div className="space-y-2">
           <PolicyRow
             label={t("admin.operations.refundRequests.policy.productAmount", {
-              amount: fmt(Number(order.subtotal ?? 0)),
+              amount: fmtTry(Number(order.subtotal ?? 0)),
             })}
             checked={refundProductAmount}
             onChange={setRefundProductAmount}
@@ -161,7 +149,7 @@ export function RefundPolicyCard({
           />
           <PolicyRow
             label={t("admin.operations.refundRequests.policy.shippingFee", {
-              amount: fmt(Number(order.shippingCost)),
+              amount: fmtTry(Number(order.shippingCost)),
             })}
             checked={refundShippingFee}
             onChange={setRefundShippingFee}
@@ -169,7 +157,7 @@ export function RefundPolicyCard({
           />
           <PolicyRow
             label={t("admin.operations.refundRequests.policy.buyerFee", {
-              amount: fmt(Number(order.buyerFeeAmount)),
+              amount: fmtTry(Number(order.buyerFeeAmount)),
             })}
             checked={refundBuyerFee}
             onChange={setRefundBuyerFee}
@@ -179,7 +167,7 @@ export function RefundPolicyCard({
             label={t(
               "admin.operations.refundRequests.policy.sellerCommission",
               {
-                amount: fmt(Number(order.commissionAmount)),
+                amount: fmtTry(Number(order.commissionAmount)),
               },
             )}
             checked={refundSellerCommission}
@@ -193,7 +181,7 @@ export function RefundPolicyCard({
             {t("admin.operations.refundRequests.policy.refundAmountLabel")}
           </div>
           <div className="text-2xl font-bold text-info-700">
-            {fmt(refundAmount)}
+            {fmtTry(refundAmount)}
           </div>
         </div>
 

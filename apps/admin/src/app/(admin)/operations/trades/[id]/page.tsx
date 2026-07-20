@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { Button, StatusBadge, tradeStatusConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
+import { fmtTry } from "@/lib/format";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { DetailPage } from "@/components/detail/DetailPage";
@@ -148,10 +149,7 @@ export default function TradeDetailPage() {
                   {t("admin.operations.trades.cashDifference")}
                 </span>
                 <span className="text-lg font-semibold text-primary-600">
-                  +₺
-                  {Number(trade.cashAmount).toLocaleString("tr-TR", {
-                    minimumFractionDigits: 2,
-                  })}
+                  +{fmtTry(trade.cashAmount)}
                 </span>
               </div>
             )}

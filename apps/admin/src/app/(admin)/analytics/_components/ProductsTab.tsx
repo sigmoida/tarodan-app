@@ -1,16 +1,17 @@
-'use client';
+"use client";
 
-import { Doughnut } from 'react-chartjs-2';
+import { Doughnut } from "react-chartjs-2";
 import {
   ShoppingBagIcon,
   ChartBarIcon,
   CalendarIcon,
   CurrencyDollarIcon,
-} from '@heroicons/react/24/outline';
-import { useTranslations } from 'next-intl';
-import { MetricCard } from '@/components/MetricCard';
-import { SectionCard } from '@/components/detail/SectionCard';
-import { chartPalette } from '../_lib/charts';
+} from "@heroicons/react/24/outline";
+import { useTranslations } from "next-intl";
+import { MetricCard } from "@/components/MetricCard";
+import { SectionCard } from "@/components/detail/SectionCard";
+import { fmtTry } from "@/lib/format";
+import { chartPalette } from "../_lib/charts";
 
 export function ProductsTab({ report }: { report: any }) {
   const t = useTranslations();
@@ -38,31 +39,33 @@ export function ProductsTab({ report }: { report: any }) {
         <MetricCard
           icon={ShoppingBagIcon}
           tone="info"
-          label={t('admin.analytics.products.totalProducts')}
+          label={t("admin.analytics.products.totalProducts")}
           value={report.totalProducts?.toLocaleString() ?? 0}
         />
         <MetricCard
           icon={ChartBarIcon}
           tone="success"
-          label={t('admin.analytics.products.activeProducts')}
+          label={t("admin.analytics.products.activeProducts")}
           value={report.activeProducts?.toLocaleString() ?? 0}
         />
         <MetricCard
           icon={CalendarIcon}
           tone="warning"
-          label={t('admin.analytics.products.pendingApproval')}
+          label={t("admin.analytics.products.pendingApproval")}
           value={report.pendingProducts?.toLocaleString() ?? 0}
         />
         <MetricCard
           icon={CurrencyDollarIcon}
           tone="primary"
-          label={t('admin.analytics.products.avgPrice')}
-          value={`₺${report.averagePrice?.toFixed(2) ?? 0}`}
+          label={t("admin.analytics.products.avgPrice")}
+          value={fmtTry(report.averagePrice) ?? "—"}
         />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <SectionCard title={t('admin.analytics.products.categoryDistributionTitle')}>
+        <SectionCard
+          title={t("admin.analytics.products.categoryDistributionTitle")}
+        >
           <div className="h-80">
             <Doughnut
               data={categoryChartData}
@@ -71,7 +74,7 @@ export function ProductsTab({ report }: { report: any }) {
                 maintainAspectRatio: false,
                 plugins: {
                   legend: {
-                    position: 'right',
+                    position: "right",
                     labels: { color: chartPalette.subtle },
                   },
                 },
@@ -80,7 +83,7 @@ export function ProductsTab({ report }: { report: any }) {
           </div>
         </SectionCard>
 
-        <SectionCard title={t('admin.analytics.products.byCategoryTitle')}>
+        <SectionCard title={t("admin.analytics.products.byCategoryTitle")}>
           <div className="space-y-4">
             {report.categoryDistribution?.map((cat: any) => (
               <div key={cat.name} className="flex items-center justify-between">
@@ -92,7 +95,9 @@ export function ProductsTab({ report }: { report: any }) {
                       style={{ width: `${cat.percentage}%` }}
                     />
                   </div>
-                  <span className="w-12 text-right text-sm text-muted">{cat.count}</span>
+                  <span className="w-12 text-right text-sm text-muted">
+                    {cat.count}
+                  </span>
                 </div>
               </div>
             ))}
