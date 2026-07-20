@@ -67,7 +67,6 @@ export default function CategoriesPage() {
         fetcher={(params) => adminApi.getCategories(params)}
         getRowId={(c) => c.id}
         syncUrl
-        errorMessage={t("admin.catalog.categories.loadError")}
       >
         <ResourceList.Toolbar>
           <ResourceList.Search />

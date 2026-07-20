@@ -32,7 +32,6 @@ export function ScheduledTab() {
         adminApi.getScheduledNotifications({ ...params, status: "pending" })
       }
       getRowId={(n) => n.id}
-      errorMessage="Zamanlanmış bildirimler yüklenemedi"
     >
       <ResourceList.Table
         columns={scheduledColumns(onCancel)}

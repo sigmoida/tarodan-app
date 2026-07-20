@@ -75,7 +75,6 @@ export default function CarModelsPage() {
         getRowId={(m) => m.id}
         syncUrl
         initialFilters={{ brandId: "" }}
-        errorMessage={t("admin.catalog.carModels.loadError")}
       >
         <ResourceList.Toolbar>
           <ResourceList.Search />

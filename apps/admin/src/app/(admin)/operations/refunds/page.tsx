@@ -34,7 +34,6 @@ export default function RefundsPage() {
         }
         getRowId={(r) => r.id}
         initialFilters={{ startDate: "", endDate: "" }}
-        errorMessage={t("admin.operations.refunds.loadError")}
       >
         <ResourceList.Toolbar>
           <ResourceList.Search />

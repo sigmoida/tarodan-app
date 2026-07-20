@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@tarodan/ui";
 import {
   FormInput,
@@ -17,6 +17,7 @@ import {
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { adminApi } from "@/lib/api";
+import { extractErrorMessage } from "@/lib/error";
 import { adminKeys } from "@/lib/query/keys";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useConfirm } from "@/provider/ConfirmProvider";
@@ -71,8 +72,8 @@ export function EmailTemplateEditorModal({
     staleTime: 5 * 60 * 1000,
   });
 
-  const preview = useMutation({
-    mutationFn: async ({
+  const preview = useAdminMutation(
+    async ({
       html,
       previewSubject,
     }: {
@@ -86,7 +87,8 @@ export function EmailTemplateEditorModal({
           { html, subject: previewSubject },
         )
       ).data as { subject: string; html: string },
-  });
+    { showErrorToast: false },
+  );
   const mutatePreview = preview.mutate;
 
   const loadPreview = useCallback(
@@ -115,9 +117,11 @@ export function EmailTemplateEditorModal({
 
   useEffect(() => {
     if (!detailQuery.isError) return;
-    toast.error("Şablon yüklenemedi");
+    toast.error(
+      extractErrorMessage(detailQuery.error, "Şablon yüklenemedi"),
+    );
     onClose();
-  }, [detailQuery.isError, onClose]);
+  }, [detailQuery.error, detailQuery.isError, onClose]);
 
   useEffect(() => {
     if (!detailQuery.data) return;
@@ -364,7 +368,12 @@ export function EmailTemplateEditorModal({
           {preview.isError ? (
             <div className="flex flex-1 items-center justify-center p-8 text-center">
               <div>
-                <p className="text-sm text-muted">Önizleme yüklenemedi.</p>
+                <p className="text-sm text-muted">
+                  {extractErrorMessage(
+                    preview.error,
+                    "Önizleme yüklenemedi.",
+                  )}
+                </p>
                 <Button
                   variant="secondary"
                   type="button"

@@ -256,7 +256,7 @@ export function ModerationEventsPanel({
 			getRowId={(r) => r.id}
 			syncUrl
 			initialFilters={{ decision: '' }}
-			errorMessage='AI denetim günlüğü yüklenemedi'>
+			>
 			{chrome && (
 				<ResourceList.Header
 					title={title}

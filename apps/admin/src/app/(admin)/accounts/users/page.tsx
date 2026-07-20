@@ -61,7 +61,7 @@ export default function UsersPage() {
 					getRowId={(u) => u.id}
 					syncUrl
 					initialFilters={{ filter: 'all' }}
-					errorMessage={t('admin.users.loadError')}>
+					>
 					<ResourceList.Toolbar>
 						<ResourceList.Search />
 						<ResourceList.FilterSelect

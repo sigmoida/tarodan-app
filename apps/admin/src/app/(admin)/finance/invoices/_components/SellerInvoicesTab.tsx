@@ -27,7 +27,6 @@ export function SellerInvoicesTab() {
       getRowId={(s) => s.id}
       syncUrl
       initialFilters={{ startDate: "", endDate: "" }}
-      errorMessage={t("admin.finance.invoices.loadError")}
     >
       <ResourceList.Toolbar>
         <ResourceList.Search />

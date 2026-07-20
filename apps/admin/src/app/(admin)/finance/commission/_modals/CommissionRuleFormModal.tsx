@@ -16,6 +16,7 @@ import {
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useCategories } from "@/hooks/useCategories";
+import { extractErrorMessage } from "@/lib/error";
 import { fmtTry } from "@/lib/format";
 import { adminKeys } from "@/lib/query/keys";
 import {
@@ -35,21 +36,6 @@ interface CommissionPreview {
   sellerFeeAmount: number;
   buyerFeeAmount: number;
   commissionAmount: number;
-}
-
-function getApiErrorMessage(error: unknown, fallback: string): string {
-  const message = (error as { response?: { data?: { message?: unknown } } })
-    ?.response?.data?.message;
-
-  if (typeof message === "string") return message;
-  if (Array.isArray(message)) {
-    const messages = message.filter(
-      (item): item is string => typeof item === "string",
-    );
-    if (messages.length > 0) return messages.join(" ");
-  }
-
-  return fallback;
 }
 
 /** Live checkout-equivalent preview, including independently matched buyer/seller rules. */
@@ -273,7 +259,7 @@ export function CommissionRuleFormModal({
       onError: (error) => {
         form.setError("root", {
           type: "server",
-          message: getApiErrorMessage(
+          message: extractErrorMessage(
             error,
             t("admin.finance.commission.saveFailed"),
           ),

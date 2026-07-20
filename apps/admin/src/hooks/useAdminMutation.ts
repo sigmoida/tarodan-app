@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import toast from "react-hot-toast";
+import { extractErrorMessage } from "@/lib/error";
 
 export interface UseAdminMutationOptions<TData, TVars> {
   /**
@@ -24,15 +25,6 @@ export interface UseAdminMutationOptions<TData, TVars> {
     UseMutationOptions<TData, unknown, TVars>,
     "mutationFn" | "onSuccess" | "onError"
   >;
-}
-
-function apiErrorMessage(error: unknown): string | undefined {
-  const message = (error as { response?: { data?: { message?: unknown } } })
-    ?.response?.data?.message;
-  if (typeof message === "string") return message;
-  if (Array.isArray(message) && typeof message[0] === "string")
-    return message[0];
-  return undefined;
 }
 
 /**
@@ -65,7 +57,7 @@ export function useAdminMutation<TData, TVars = void>(
       onSuccess?.(data, vars);
     },
     onError: (error) => {
-      if (showErrorToast) toast.error(apiErrorMessage(error) ?? errorMessage);
+      if (showErrorToast) toast.error(extractErrorMessage(error, errorMessage));
     },
   });
 }

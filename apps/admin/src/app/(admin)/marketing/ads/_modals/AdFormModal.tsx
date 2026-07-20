@@ -17,6 +17,7 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { adminApi } from '@/lib/api';
+import { extractErrorMessage } from '@/lib/error';
 import { useAdminMutation } from '@/hooks/useAdminMutation';
 import {
   type Ad,
@@ -76,8 +77,8 @@ function AdImageField() {
         loadDims(url);
         toast.success('Görsel yüklendi');
       }
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message ?? 'Yükleme başarısız');
+    } catch (error) {
+      toast.error(extractErrorMessage(error, 'Yükleme başarısız'));
     } finally {
       setUploading(false);
     }

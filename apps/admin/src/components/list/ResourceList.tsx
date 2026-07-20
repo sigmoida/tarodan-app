@@ -18,7 +18,6 @@ export interface ResourceListProps<T> {
   limit?: number;
   syncUrl?: boolean;
   initialFilters?: Record<string, string>;
-  errorMessage?: string;
   debounceMs?: number;
   /** #101: full-load (client-list) kaynakları için staleTime (ms) — mount'ta tekrar indirmeyi keser. */
   staleTime?: number;
@@ -57,7 +56,6 @@ function ResourceListInner<T>({
   limit,
   syncUrl,
   initialFilters,
-  errorMessage,
   debounceMs,
   staleTime,
   selectable = false,
@@ -70,7 +68,6 @@ function ResourceListInner<T>({
     limit,
     syncUrl,
     initialFilters,
-    errorMessage,
     debounceMs,
   });
   const selection = useSelection(selectable);

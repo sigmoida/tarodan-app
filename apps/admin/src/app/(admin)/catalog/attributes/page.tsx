@@ -12,6 +12,7 @@ import { adminApi } from "@/lib/api";
 import { extractList } from "@/lib/extract";
 import { clientListFetcher } from "@/lib/query/client-list";
 import { ResourceList } from "@/components/list";
+import { QueryErrorCard } from "@/components/page/QueryErrorCard";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { ActiveBadge } from "@/components/ActiveBadge";
 import { ActionIconButton } from "@/components/AdminList";
@@ -52,6 +53,9 @@ function AttributesPageContent() {
     selectedGroup,
     attributes,
     loadingAttrs,
+    attributesError,
+    attributesRetrying,
+    retryAttributes,
     groupModal,
     setGroupModal,
     attrModal,
@@ -132,7 +136,12 @@ function AttributesPageContent() {
 
         {/* Attributes */}
         <div className="md:col-span-2">
-          {!selectedGroup ? (
+          {attributesError ? (
+            <QueryErrorCard
+              onRetry={() => void retryAttributes()}
+              isRetrying={attributesRetrying}
+            />
+          ) : !selectedGroup ? (
             <SectionCard>
               <div className="py-12 text-center text-muted">
                 {t("admin.catalog.attributes.selectGroupHint")}

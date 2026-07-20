@@ -17,7 +17,6 @@ export default function TradesPage() {
       getRowId={(t: any) => t.id}
       syncUrl
       initialFilters={{ status: "all", userId: "" }}
-      errorMessage={t("admin.operations.trades.loadError")}
     >
       <ResourceList.Header
         title={t("admin.operations.trades.title")}

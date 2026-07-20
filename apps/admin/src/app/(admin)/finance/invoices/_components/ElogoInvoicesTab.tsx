@@ -34,7 +34,6 @@ export function ElogoInvoicesTab() {
         startDate: "",
         endDate: "",
       }}
-      errorMessage={t("admin.finance.invoices.loadError")}
     >
       <ResourceList.Toolbar>
         <ResourceList.Search

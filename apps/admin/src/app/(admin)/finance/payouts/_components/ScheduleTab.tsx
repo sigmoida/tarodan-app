@@ -17,7 +17,6 @@ export function ScheduleTab() {
         (raw) => (Array.isArray(raw) ? raw : (raw?.data ?? [])),
       )}
       getRowId={(s) => s.id}
-      errorMessage={t("admin.finance.payouts.scheduleLoadError")}
     >
       <ResourceList.Table
         columns={scheduleColumns(t)}

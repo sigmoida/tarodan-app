@@ -17,7 +17,6 @@ export function ReturnShipmentsTab() {
       fetcher={fetchRefundRequests}
       getRowId={(r) => r.id}
       initialFilters={{ status: "all", from: "", to: "" }}
-      errorMessage={t("admin.operations.shipping.returns.loadError")}
     >
       <ResourceList.Toolbar>
         <ResourceList.Search />

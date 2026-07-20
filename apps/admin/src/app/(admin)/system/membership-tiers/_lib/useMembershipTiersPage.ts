@@ -25,19 +25,21 @@ function parseYearlyDiscount(raw: unknown): number {
 export function useMembershipTiersPage() {
   const { rows } = useResourceList<MembershipTier>();
   const [editing, setEditing] = useState<MembershipTier | null>(null);
-  const { data: yearlyDiscount = 20, isLoading: yearlyDiscountLoading } =
-    useQuery({
-      queryKey: adminKeys.all("membership-yearly-discount"),
-      queryFn: async () => {
-        const response = await adminApi.getSettings();
-        return parseYearlyDiscount(response.data?.data ?? response.data ?? []);
-      },
-    });
+  const yearlyDiscountQuery = useQuery({
+    queryKey: adminKeys.all("membership-yearly-discount"),
+    queryFn: async () => {
+      const response = await adminApi.getSettings();
+      return parseYearlyDiscount(response.data?.data ?? response.data ?? []);
+    },
+  });
 
   return {
     rows,
-    yearlyDiscount,
-    yearlyDiscountLoading,
+    yearlyDiscount: yearlyDiscountQuery.data ?? 20,
+    yearlyDiscountLoading: yearlyDiscountQuery.isLoading,
+    yearlyDiscountError: yearlyDiscountQuery.isError,
+    yearlyDiscountRetrying: yearlyDiscountQuery.isRefetching,
+    retryYearlyDiscount: yearlyDiscountQuery.refetch,
     editing,
     setEditing,
   };

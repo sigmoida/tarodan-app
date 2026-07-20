@@ -31,15 +31,6 @@ export interface UseAdminResourceOptions<T> {
   /** Initial filter values (excluding search). E.g. { status: "all", userId: "" } */
   initialFilters?: Record<string, string>;
   /**
-   * Toast message on error. NOTE (#222): dead prop — never read after being
-   * destructured below; error display is fully owned by SuspenseBoundary's
-   * ErrorBoundary+Alert. Left as a hardcoded default rather than wired to `t`
-   * since translating unused code doesn't fix any real i18n gap. Flagged for
-   * cleanup (either remove the prop or actually wire it to the mutation's
-   * error toast).
-   */
-  errorMessage?: string;
-  /**
    * Search debounce duration (ms). Default: 300.
    * If 0, runs immediately without debounce.
    * On setSearch the input updates INSTANTLY; the query fires after this delay.
@@ -173,8 +164,6 @@ export function useAdminResource<T>({
   limit = 20,
   syncUrl = false,
   initialFilters = {},
-  // eslint-disable-next-line @tarodan/no-hardcoded-turkish -- dead default: error display is owned by SuspenseBoundary (#222)
-  errorMessage = "Veriler yüklenemedi",
   debounceMs = 300,
   staleTime = 0,
 }: UseAdminResourceOptions<T>): UseAdminResourceResult<T> {
