@@ -9,10 +9,14 @@ import { scheduledRowMenu } from "./rowActions";
 import { type NotificationLog, type ScheduledNotification } from "./types";
 
 export const historyColumns = [
-  col.user<NotificationLog>("Kullanıcı", (n) => ({
-    name: n.user?.displayName || n.userId,
-    secondary: n.user?.email,
-  })),
+  col.user<NotificationLog>(
+    "Kullanıcı",
+    (n) => ({
+      name: n.user?.displayName || n.userId,
+      secondary: n.user?.email,
+    }),
+    { sortKey: "user.displayName", sortType: "text" },
+  ),
   col.muted<NotificationLog>(
     "Kanal",
     (n) => enumLabel(notificationChannelConfig, n.channel),
@@ -33,7 +37,11 @@ export function scheduledColumns(onCancel: (id: string) => void) {
       grow: 3,
       minWidth: 200,
     }),
-    col.muted<ScheduledNotification>("Kanallar", (n) => n.channels?.join(", ")),
+    col.muted<ScheduledNotification>(
+      "Kanallar",
+      (n) => n.channels?.join(", "),
+      { sortKey: "channels", sortType: "text" },
+    ),
     col.muted<ScheduledNotification>("Hedef", "targetType"),
     col.date<ScheduledNotification>("Tarih", "scheduledFor"),
     col.badge<ScheduledNotification>(

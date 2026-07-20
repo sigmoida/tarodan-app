@@ -40,7 +40,7 @@ export function adColumns({ onToggle, togglingId, rowMenu }: AdColumnProps) {
         ) : (
           <span className="text-sm text-muted">—</span>
         ),
-      { grow: 1, minWidth: 96 },
+      { grow: 1, minWidth: 96, sortKey: "imageUrl", sortType: "text" },
     ),
     col.custom<Ad>(
       "Başlık",

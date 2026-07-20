@@ -12,17 +12,21 @@ import type {
 type T = ReturnType<typeof useTranslations<never>>;
 
 export const orderShipmentColumns = (t: T) => [
-  col.link<OrderShipmentRow>(t("admin.operations.common.order"), (r) =>
-    r.order
-      ? {
-          href: `/operations/orders/${r.order.id}`,
-          label: `#${r.order.orderNumber}`,
-        }
-      : null,
+  col.link<OrderShipmentRow>(
+    t("admin.operations.common.order"),
+    (r) =>
+      r.order
+        ? {
+            href: `/operations/orders/${r.order.id}`,
+            label: `#${r.order.orderNumber}`,
+          }
+        : null,
+    { sortKey: "order.orderNumber" },
   ),
   col.text<OrderShipmentRow>(
     t("admin.operations.common.buyer"),
     (r) => r.order?.buyer?.displayName,
+    { sortKey: "order.buyer.displayName" },
   ),
   col.muted<OrderShipmentRow>(
     t("admin.operations.shipping.carrier"),
@@ -67,10 +71,16 @@ export const returnShipmentColumns = (t: T) => [
     }),
     { sortKey: "refundNumber", sortType: "text" },
   ),
-  col.link<ReturnShipmentRow>(t("admin.operations.common.order"), (r) =>
-    r.order
-      ? { href: `/operations/orders/${r.order.id}`, label: r.order.orderNumber }
-      : null,
+  col.link<ReturnShipmentRow>(
+    t("admin.operations.common.order"),
+    (r) =>
+      r.order
+        ? {
+            href: `/operations/orders/${r.order.id}`,
+            label: r.order.orderNumber,
+          }
+        : null,
+    { sortKey: "order.orderNumber" },
   ),
   col.text<ReturnShipmentRow>(
     t("admin.operations.shipping.carrier"),
@@ -102,13 +112,16 @@ export const returnShipmentColumns = (t: T) => [
 ];
 
 export const tradeShipmentColumns = (t: T) => [
-  col.link<TradeShipmentRow>(t("admin.operations.shipping.tradeNumber"), (r) =>
-    r.trade
-      ? {
-          href: `/operations/trades/${r.trade.id}`,
-          label: r.trade.tradeNumber || `#${r.trade.id.slice(0, 8)}`,
-        }
-      : null,
+  col.link<TradeShipmentRow>(
+    t("admin.operations.shipping.tradeNumber"),
+    (r) =>
+      r.trade
+        ? {
+            href: `/operations/trades/${r.trade.id}`,
+            label: r.trade.tradeNumber || `#${r.trade.id.slice(0, 8)}`,
+          }
+        : null,
+    { sortKey: "trade.tradeNumber" },
   ),
   col.text<TradeShipmentRow>(
     t("admin.operations.shipping.direction"),
@@ -133,10 +146,16 @@ export const tradeShipmentColumns = (t: T) => [
     (r) => <Badge status={r.status} config={shipmentStatusConfig} />,
     { sortKey: "status", sortType: "text" },
   ),
-  col.user<TradeShipmentRow>(t("admin.operations.shipping.sender"), (r) =>
-    r.shipper
-      ? { name: r.shipper.displayName, href: `/accounts/users/${r.shipper.id}` }
-      : null,
+  col.user<TradeShipmentRow>(
+    t("admin.operations.shipping.sender"),
+    (r) =>
+      r.shipper
+        ? {
+            name: r.shipper.displayName,
+            href: `/accounts/users/${r.shipper.id}`,
+          }
+        : null,
+    { sortKey: "shipper.displayName" },
   ),
   col.muted<TradeShipmentRow>(
     t("admin.operations.shipping.updated"),
@@ -155,17 +174,21 @@ export function suratShipmentColumns(
   rowMenu: (r: SuratShipmentRow) => RowActionItem[],
 ) {
   return [
-    col.link<SuratShipmentRow>(t("admin.operations.common.order"), (r) =>
-      r.order
-        ? {
-            href: `/operations/orders/${r.order.id}`,
-            label: `#${r.order.orderNumber}`,
-          }
-        : null,
+    col.link<SuratShipmentRow>(
+      t("admin.operations.common.order"),
+      (r) =>
+        r.order
+          ? {
+              href: `/operations/orders/${r.order.id}`,
+              label: `#${r.order.orderNumber}`,
+            }
+          : null,
+      { sortKey: "order.orderNumber" },
     ),
     col.text<SuratShipmentRow>(
       t("admin.operations.common.buyer"),
       (r) => r.order?.buyer?.displayName,
+      { sortKey: "order.buyer.displayName" },
     ),
     col.custom<SuratShipmentRow>(
       t("admin.operations.common.trackingNumber"),

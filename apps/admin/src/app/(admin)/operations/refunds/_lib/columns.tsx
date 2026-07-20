@@ -24,26 +24,32 @@ export function refundColumns(t: T, rowMenu: (r: Refund) => RowActionItem[]) {
     col.money<Refund>(t("common.amount"), "amount", {
       tone: "negative",
     }),
-    col.user<Refund>(t("admin.operations.common.buyer"), (r) =>
-      r.order?.buyer
-        ? {
-            name: r.order.buyer.displayName,
-            href: `/accounts/users/${r.order.buyer.id}`,
-          }
-        : null,
+    col.user<Refund>(
+      t("admin.operations.common.buyer"),
+      (r) =>
+        r.order?.buyer
+          ? {
+              name: r.order.buyer.displayName,
+              href: `/accounts/users/${r.order.buyer.id}`,
+            }
+          : null,
+      { sortKey: "order.buyer.displayName" },
     ),
-    col.user<Refund>(t("admin.operations.common.seller"), (r) =>
-      r.order?.seller
-        ? {
-            name: r.order.seller.displayName,
-            href: `/accounts/users/${r.order.seller.id}`,
-          }
-        : null,
+    col.user<Refund>(
+      t("admin.operations.common.seller"),
+      (r) =>
+        r.order?.seller
+          ? {
+              name: r.order.seller.displayName,
+              href: `/accounts/users/${r.order.seller.id}`,
+            }
+          : null,
+      { sortKey: "order.seller.displayName" },
     ),
     col.text<Refund>(
       t("admin.catalog.common.product"),
       (r) => r.order?.product?.title,
-      { grow: 2 },
+      { grow: 2, sortKey: "order.product.title" },
     ),
     col.date<Refund>(
       t("admin.operations.refunds.refundedAt"),

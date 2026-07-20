@@ -36,10 +36,14 @@ export const refundRequestColumns = (t: T) => [
     }),
     { sortKey: "refundNumber", sortType: "text" },
   ),
-  col.link<RefundRequestRow>(t("admin.operations.common.order"), (r) => ({
-    href: `/operations/orders/${r.order.id}`,
-    label: r.order.orderNumber,
-  })),
+  col.link<RefundRequestRow>(
+    t("admin.operations.common.order"),
+    (r) => ({
+      href: `/operations/orders/${r.order.id}`,
+      label: r.order.orderNumber,
+    }),
+    { sortKey: "order.orderNumber" },
+  ),
   col.custom<RefundRequestRow>(
     t("admin.catalog.common.product"),
     (r) => {
@@ -65,16 +69,24 @@ export const refundRequestColumns = (t: T) => [
         </div>
       );
     },
-    { grow: 3, minWidth: 180 },
+    { grow: 3, minWidth: 180, sortKey: "order.product.title" },
   ),
-  col.user<RefundRequestRow>(t("admin.operations.common.buyer"), (r) => ({
-    name: r.requester?.displayName,
-    secondary: r.requester?.email,
-  })),
-  col.user<RefundRequestRow>(t("admin.operations.common.seller"), (r) => ({
-    name: r.order?.seller?.displayName,
-    secondary: r.order?.seller?.email,
-  })),
+  col.user<RefundRequestRow>(
+    t("admin.operations.common.buyer"),
+    (r) => ({
+      name: r.requester?.displayName,
+      secondary: r.requester?.email,
+    }),
+    { sortKey: "requester.displayName" },
+  ),
+  col.user<RefundRequestRow>(
+    t("admin.operations.common.seller"),
+    (r) => ({
+      name: r.order?.seller?.displayName,
+      secondary: r.order?.seller?.email,
+    }),
+    { sortKey: "order.seller.displayName" },
+  ),
   col.money<RefundRequestRow>(t("common.amount"), "amount"),
   col.text<RefundRequestRow>(
     t("admin.operations.refundRequests.reason"),

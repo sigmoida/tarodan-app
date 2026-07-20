@@ -42,7 +42,7 @@ export function productColumns(t: T, actions: ProductRowActions) {
           <span className="truncate font-medium text-heading">{p.title}</span>
         </div>
       ),
-      { grow: 3, minWidth: 220 },
+      { grow: 3, minWidth: 220, sortKey: "title", sortType: "text" },
     ),
     col.custom<Product>(
       t("common.price"),
@@ -68,21 +68,36 @@ export function productColumns(t: T, actions: ProductRowActions) {
       (p) => <Badge status={p.status} config={productStatusConfig} />,
       { sortKey: "status", sortType: "text" },
     ),
-    col.badge<Product>("AI", (p) =>
-      p.aiCheckStatus ? (
-        <Badge status={aiCheckKey(p.aiCheckStatus)} config={aiCheckConfig(t)} />
-      ) : (
-        <Empty />
-      ),
+    col.badge<Product>(
+      "AI",
+      (p) =>
+        p.aiCheckStatus ? (
+          <Badge
+            status={aiCheckKey(p.aiCheckStatus)}
+            config={aiCheckConfig(t)}
+          />
+        ) : (
+          <Empty />
+        ),
+      { sortKey: "aiCheckStatus", sortType: "text" },
     ),
-    col.muted<Product>(t("admin.catalog.products.condition"), (p) =>
-      enumLabel(productConditionConfig, p.condition),
+    col.muted<Product>(
+      t("admin.catalog.products.condition"),
+      (p) => enumLabel(productConditionConfig, p.condition),
+      { sortKey: "condition", sortType: "text" },
     ),
-    col.user<Product>(t("admin.catalog.products.seller"), (p) => ({
-      name: p.seller.displayName,
-      href: `/accounts/users/${p.seller.id}`,
-    })),
-    col.text<Product>(t("common.category"), (p) => p.category.name),
+    col.user<Product>(
+      t("admin.catalog.products.seller"),
+      (p) => ({
+        name: p.seller.displayName,
+        href: `/accounts/users/${p.seller.id}`,
+      }),
+      { sortKey: "seller.displayName", sortType: "text" },
+    ),
+    col.text<Product>(t("common.category"), (p) => p.category.name, {
+      sortKey: "category.name",
+      sortType: "text",
+    }),
     col.date<Product>(t("common.date"), "createdAt"),
     col.rowMenu<Product>(productRowMenu(t, actions)),
   ];

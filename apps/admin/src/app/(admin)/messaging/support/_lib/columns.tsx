@@ -16,7 +16,11 @@ export const ticketColumns = [
     { sortKey: "ticketNumber", sortType: "text" },
   ),
   col.text<SupportTicket>("Konu", "subject", { grow: 3, minWidth: 200 }),
-  col.user<SupportTicket>("Oluşturan", (t) => ({ name: t.creatorName || "—" })),
+  col.user<SupportTicket>(
+    "Oluşturan",
+    (t) => ({ name: t.creatorName || "—" }),
+    { sortKey: "creatorName" },
+  ),
   col.muted<SupportTicket>(
     "Kategori",
     (t) => enumLabel(ticketCategoryConfig, t.category, t.category),

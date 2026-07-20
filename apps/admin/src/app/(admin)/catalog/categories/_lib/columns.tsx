@@ -11,18 +11,25 @@ export function categoryColumns(t: T, actions: CategoryRowActions) {
     col.text<Category>(t("common.category"), "name", { minWidth: 200 }),
     col.muted<Category>(t("common.description"), (c) => c.description, {
       minWidth: 220,
+      sortKey: "description",
     }),
     col.number<Category>(
       t("admin.catalog.common.product"),
       (c) => c.productCount,
+      { sortKey: "productsCount" },
     ),
     col.number<Category>(
       t("admin.catalog.common.collection"),
       (c) => c.collectionCount,
+      { sortKey: "collectionsCount" },
     ),
-    col.badge<Category>(t("common.status"), (c) => (
-      <Badge active={c.isActive} />
-    )),
+    col.badge<Category>(
+      t("common.status"),
+      (c) => <Badge active={c.isActive} />,
+      {
+        sortKey: "isActive",
+      },
+    ),
     col.rowMenu<Category>(categoryRowMenu(actions)),
   ];
 }

@@ -39,26 +39,37 @@ export function manufacturerColumns(t: T, actions: ManufacturerRowActions) {
       ),
       { grow: 3, minWidth: 200, sortKey: "name", sortType: "text" },
     ),
-    col.text<Manufacturer>(t("admin.catalog.common.country"), (m) => m.country),
-    col.custom<Manufacturer>(t("admin.catalog.common.website"), (m) =>
-      m.website ? (
-        <a
-          href={m.website}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          className="inline-flex items-center gap-1 whitespace-nowrap text-sm text-info-600 hover:underline"
-        >
-          <GlobeAltIcon className="h-4 w-4" />
-          {t("admin.catalog.manufacturers.visit")}
-        </a>
-      ) : (
-        <Empty />
-      ),
+    col.text<Manufacturer>(
+      t("admin.catalog.common.country"),
+      (m) => m.country,
+      {
+        sortKey: "country",
+      },
     ),
-    col.badge<Manufacturer>(t("common.status"), (m) => (
-      <Badge active={m.isActive} />
-    )),
+    col.custom<Manufacturer>(
+      t("admin.catalog.common.website"),
+      (m) =>
+        m.website ? (
+          <a
+            href={m.website}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center gap-1 whitespace-nowrap text-sm text-info-600 hover:underline"
+          >
+            <GlobeAltIcon className="h-4 w-4" />
+            {t("admin.catalog.manufacturers.visit")}
+          </a>
+        ) : (
+          <Empty />
+        ),
+      { sortKey: "website" },
+    ),
+    col.badge<Manufacturer>(
+      t("common.status"),
+      (m) => <Badge active={m.isActive} />,
+      { sortKey: "isActive" },
+    ),
     col.rowMenu<Manufacturer>(manufacturerRowMenu(actions)),
   ];
 }

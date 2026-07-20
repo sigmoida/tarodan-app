@@ -67,13 +67,19 @@ export function buildErrorColumns(toggle: Toggle) {
       ),
       { grow: 3, minWidth: 220, sortKey: "message", sortType: "text" },
     ),
-    col.custom<ErrorLog>("Detay", (r) => (
-      <div className="space-y-0.5 text-xs text-muted">
-        {r.metadata?.status && <div>HTTP {r.metadata.status}</div>}
-        {r.metadata?.name && <div className="font-mono">{r.metadata.name}</div>}
-        {r.metadata?.ip && <div>{r.metadata.ip}</div>}
-      </div>
-    )),
+    col.custom<ErrorLog>(
+      "Detay",
+      (r) => (
+        <div className="space-y-0.5 text-xs text-muted">
+          {r.metadata?.status && <div>HTTP {r.metadata.status}</div>}
+          {r.metadata?.name && (
+            <div className="font-mono">{r.metadata.name}</div>
+          )}
+          {r.metadata?.ip && <div>{r.metadata.ip}</div>}
+        </div>
+      ),
+      { sortKey: "metadata.status", sortType: "number" },
+    ),
     col.muted<ErrorLog>("Kaynak", "source"),
     col.date<ErrorLog>("Tarih", "createdAt"),
   ];
@@ -163,14 +169,19 @@ export function buildAuditColumns(toggle: Toggle) {
       ),
       { sortKey: "createdAt", sortType: "date" },
     ),
-    col.custom<AuditLog>("Admin", (r) => (
-      <div className="flex items-center gap-2">
-        <UserIcon className="h-4 w-4 shrink-0 text-muted" />
-        <span className="truncate text-sm">
-          {r.admin?.email ?? (r.adminUserId?.substring(0, 8) ?? "Sistem") + "…"}
-        </span>
-      </div>
-    )),
+    col.custom<AuditLog>(
+      "Admin",
+      (r) => (
+        <div className="flex items-center gap-2">
+          <UserIcon className="h-4 w-4 shrink-0 text-muted" />
+          <span className="truncate text-sm">
+            {r.admin?.email ??
+              (r.adminUserId?.substring(0, 8) ?? "Sistem") + "…"}
+          </span>
+        </div>
+      ),
+      { sortKey: "admin.email", sortType: "text" },
+    ),
     col.custom<AuditLog>(
       "İşlem",
       (r) => (

@@ -39,7 +39,7 @@ export function productReviewColumns(act: Act, busyId?: string) {
           </span>
         </div>
       ),
-      { grow: 3, minWidth: 220 },
+      { grow: 3, minWidth: 220, sortKey: "product.title", sortType: "text" },
     ),
     col.custom<Review>(
       "Kullanıcı",
@@ -61,7 +61,7 @@ export function productReviewColumns(act: Act, busyId?: string) {
           </div>
         </div>
       ),
-      { grow: 2, minWidth: 170 },
+      { grow: 2, minWidth: 170, sortKey: "user.displayName", sortType: "text" },
     ),
     col.custom<Review>(
       "Değerlendirme",
@@ -78,9 +78,11 @@ export function productReviewColumns(act: Act, busyId?: string) {
       ),
       { grow: 3, minWidth: 240, sortKey: "score", sortType: "number" },
     ),
-    col.badge<Review>("Durum", (r) => (
-      <Badge status={r.status} config={reviewStatusConfig} />
-    )),
+    col.badge<Review>(
+      "Durum",
+      (r) => <Badge status={r.status} config={reviewStatusConfig} />,
+      { sortKey: "status", sortType: "text" },
+    ),
     col.date<Review>("Tarih", "createdAt"),
     col.rowMenu<Review>((r) =>
       reviewRowMenu(r.status, (s) => act(r.id, s), busyId === r.id),
@@ -90,14 +92,22 @@ export function productReviewColumns(act: Act, busyId?: string) {
 
 export function sellerReviewColumns(act: Act, busyId?: string) {
   return [
-    col.user<UserRating>("Gönderen", (r) => ({
-      name: r.giver?.displayName ?? "—",
-      secondary: r.giver?.email,
-    })),
-    col.user<UserRating>("Alıcı (Satıcı)", (r) => ({
-      name: r.receiver?.displayName ?? "—",
-      secondary: r.receiver?.email,
-    })),
+    col.user<UserRating>(
+      "Gönderen",
+      (r) => ({
+        name: r.giver?.displayName ?? "—",
+        secondary: r.giver?.email,
+      }),
+      { sortKey: "giver.displayName" },
+    ),
+    col.user<UserRating>(
+      "Alıcı (Satıcı)",
+      (r) => ({
+        name: r.receiver?.displayName ?? "—",
+        secondary: r.receiver?.email,
+      }),
+      { sortKey: "receiver.displayName" },
+    ),
     col.custom<UserRating>("Puan", (r) => <Stars score={r.score} />, {
       grow: 1,
       minWidth: 120,
@@ -107,6 +117,7 @@ export function sellerReviewColumns(act: Act, busyId?: string) {
     col.muted<UserRating>("Yorum", (r) => r.comment || null, {
       grow: 3,
       minWidth: 220,
+      sortKey: "comment",
     }),
     col.badge<UserRating>(
       "Durum",
@@ -121,6 +132,7 @@ export function sellerReviewColumns(act: Act, busyId?: string) {
       {
         grow: 1,
         minWidth: 100,
+        sortKey: "orderId",
       },
     ),
     col.date<UserRating>("Tarih", "createdAt"),
