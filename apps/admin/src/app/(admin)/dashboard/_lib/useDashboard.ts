@@ -9,6 +9,8 @@ import {
   type DashboardStats,
   type MetricPeriods,
   type PendingActions,
+  type TopProduct,
+  type TopSeller,
   type VisitorStats,
 } from "./types";
 
@@ -71,6 +73,8 @@ async function fetchDashboard(t: T): Promise<DashboardData> {
     salesRes,
     tradesRes,
     visitorsRes,
+    topProductsRes,
+    topSellersRes,
   ] = await Promise.all([
     adminApi.getDashboard(),
     adminApi.getRecentOrders(5),
@@ -78,6 +82,8 @@ async function fetchDashboard(t: T): Promise<DashboardData> {
     adminApi.getSalesAnalytics({ groupBy: "day" }).catch(() => null),
     adminApi.getTrades({ limit: 5, sort: "createdAt:desc" }).catch(() => null),
     adminApi.getRealtimeVisitors().catch(() => null),
+    adminApi.getTopProducts(10).catch(() => null),
+    adminApi.getTopSellers(10).catch(() => null),
   ]);
 
   const data = dashboardRes.data.data || dashboardRes.data;
@@ -186,6 +192,17 @@ async function fetchDashboard(t: T): Promise<DashboardData> {
     }
   }
 
+  const topProductsData =
+    topProductsRes?.data?.data || topProductsRes?.data || [];
+  const topProducts: TopProduct[] = Array.isArray(topProductsData)
+    ? topProductsData
+    : [];
+
+  const topSellersData = topSellersRes?.data?.data || topSellersRes?.data || [];
+  const topSellers: TopSeller[] = Array.isArray(topSellersData)
+    ? topSellersData
+    : [];
+
   return {
     stats,
     visitors,
@@ -193,6 +210,8 @@ async function fetchDashboard(t: T): Promise<DashboardData> {
     recentTrades,
     pendingActions,
     analytics: { salesByDay, ordersByDay, categoryDistribution },
+    topProducts,
+    topSellers,
   };
 }
 

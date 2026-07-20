@@ -55,6 +55,26 @@ export interface VisitorStats {
   dailyActiveVisitors: number;
 }
 
+export interface TopProduct {
+  id: string;
+  title: string;
+  thumbnail?: string | null;
+  viewCount: number;
+  sellerId: string;
+  sellerName: string;
+  status: string;
+  price: number;
+}
+
+export interface TopSeller {
+  id: string;
+  displayName: string;
+  avatarUrl?: string | null;
+  storeViewCount: number;
+  productCount: number;
+  activeListings: number;
+}
+
 export interface RecentOrder {
   id: string;
   orderNumber: string;
@@ -102,6 +122,8 @@ export interface DashboardData {
   recentTrades: RecentTrade[];
   pendingActions: PendingActions | null;
   analytics: DashboardAnalytics;
+  topProducts: TopProduct[];
+  topSellers: TopSeller[];
 }
 
 /** Order config + refund_requested (not in the shared config). */

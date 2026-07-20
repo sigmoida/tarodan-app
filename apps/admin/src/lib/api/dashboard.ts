@@ -10,6 +10,10 @@ export const dashboardApi = {
   getIdentityVerificationRequests: () =>
     api.get("/admin/users/verification-requests"),
   getRealtimeVisitors: () => api.get("/reports/access/realtime"),
+  getTopProducts: (limit?: number) =>
+    api.get("/admin/dashboard/top-products", { params: { limit } }),
+  getTopSellers: (limit?: number) =>
+    api.get("/admin/dashboard/top-sellers", { params: { limit } }),
 
   // Analytics
   getSalesAnalytics: (params?: {

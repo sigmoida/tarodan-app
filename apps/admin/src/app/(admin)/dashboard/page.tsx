@@ -21,6 +21,8 @@ const CategoryChart = dynamic(
 );
 import { RecentOrders } from "./_components/RecentOrders";
 import { RecentTrades } from "./_components/RecentTrades";
+import { TopProductsWidget } from "./_components/TopProductsWidget";
+import { TopSellersWidget } from "./_components/TopSellersWidget";
 
 export default function DashboardPage() {
   const t = useTranslations();
@@ -40,6 +42,10 @@ export default function DashboardPage() {
           <DashboardStats stats={stats} visitors={visitors} />
           <QuickActions />
           <PendingActionsPanel pending={data.pendingActions} />
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <TopProductsWidget products={data.topProducts} />
+            <TopSellersWidget sellers={data.topSellers} />
+          </div>
           <DashboardCharts
             salesByDay={data.analytics.salesByDay}
             ordersByDay={data.analytics.ordersByDay}
