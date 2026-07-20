@@ -565,7 +565,8 @@
     "couponApplyError": "Kupon uygulanamadı",
     "couponLoginRequired": "Kupon kullanmak için giriş yapmanız gerekiyor",
     "addedToCart": "Sepete eklendi",
-    "addToCartFailed": "Sepete eklenemedi"
+    "addToCartFailed": "Sepete eklenemedi",
+    "excludedFromTotal": "Ödenecek toplama dahil değildir"
   },
   "favorites": {
     "myFavorites": "Favorilerim",
