@@ -4563,6 +4563,7 @@
       "noFieldsToUpdate": "Güncellenecek alan bulunamadı",
       "notBlocked": "Bu kullanıcı engellenmemiş",
       "notFound": "Kullanıcı bulunamadı",
+      "notSeller": "Bu kullanıcı satıcı hesabı değil",
       "phoneAlreadyInUse": "Bu telefon numarası zaten kullanılıyor",
       "unfollowed": "Takip bırakıldı",
       "userBlocked": "{displayName} engellendi",
