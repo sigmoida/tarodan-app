@@ -82,7 +82,7 @@ export class AdminProductQueryDto extends AdminListQueryDto {
   carModelId?: string;
 }
 
-export class AdminOrderQueryDto {
+export class AdminOrderQueryDto extends AdminListQueryDto {
   @ApiPropertyOptional({ example: "ORD-123" })
   @IsOptional()
   @IsString()
@@ -120,21 +120,6 @@ export class AdminOrderQueryDto {
   @IsOptional()
   @IsString()
   productId?: string;
-
-  @ApiPropertyOptional({ example: 1 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(1)
-  page?: number;
-
-  @ApiPropertyOptional({ example: 20 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(1)
-  @Max(100)
-  limit?: number;
 }
 
 export class AuditLogQueryDto {
@@ -174,7 +159,7 @@ export class AuditLogQueryDto {
   limit?: number;
 }
 
-export class AdminPaymentQueryDto {
+export class AdminPaymentQueryDto extends AdminListQueryDto {
   @ApiPropertyOptional({ example: "completed" })
   @IsOptional()
   @IsString()
@@ -199,21 +184,6 @@ export class AdminPaymentQueryDto {
   @IsOptional()
   @IsString()
   search?: string;
-
-  @ApiPropertyOptional({ example: 1 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(1)
-  page?: number;
-
-  @ApiPropertyOptional({ example: 20 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(1)
-  @Max(100)
-  limit?: number;
 }
 
 export enum PaymentStatisticsPeriod {

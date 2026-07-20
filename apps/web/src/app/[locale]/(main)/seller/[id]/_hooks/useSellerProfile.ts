@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
@@ -35,6 +35,10 @@ export function useSellerProfile() {
   const locale = useLocale();
 
   const [showReportModal, setShowReportModal] = useState(false);
+  const viewCountedRef = useRef(false);
+  useEffect(() => {
+    viewCountedRef.current = false;
+  }, [sellerId]);
 
   const sellerQuery = useQuery({
     queryKey: queryKeys.seller.profile(sellerId),
@@ -88,6 +92,29 @@ export function useSellerProfile() {
     meta: { page: "seller-profile" },
   });
   const seller = sellerQuery.data ?? null;
+
+  // Fire storefront view tracking once per seller visit (backend handles
+  // self-view + bot + rate-limit guards; errors are ignored — non-critical).
+  useEffect(() => {
+    if (!sellerId || !seller || viewCountedRef.current) return;
+    if (user?.id === sellerId) return;
+    viewCountedRef.current = true;
+    (async () => {
+      try {
+        const res = await api.post(`/users/${sellerId}/view`);
+        const newCount = res.data?.storeViewCount;
+        if (newCount !== undefined) {
+          queryClient.setQueryData(
+            queryKeys.seller.profile(sellerId),
+            (old: Seller | undefined) =>
+              old ? { ...old, storeViewCount: newCount } : old,
+          );
+        }
+      } catch {
+        // ignore
+      }
+    })();
+  }, [sellerId, seller, user?.id, queryClient]);
 
   const productsQuery = useQuery({
     queryKey: queryKeys.seller.products(sellerId),

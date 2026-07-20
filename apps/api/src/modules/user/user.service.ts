@@ -8,6 +8,7 @@ import { UserStatsService } from "./user-stats.service";
 import { UserAnalyticsService } from "./user-analytics.service";
 import { UserDiscoveryService } from "./user-discovery.service";
 import { UserBankService } from "./user-bank.service";
+import { UserEngagementService } from "./user-engagement.service";
 
 /**
  * UserService (facade) — her public imza aynen korunur. CORE servis; controller
@@ -29,7 +30,26 @@ export class UserService {
     private readonly analytics: UserAnalyticsService,
     private readonly discovery: UserDiscoveryService,
     private readonly bank: UserBankService,
+    private readonly engagement: UserEngagementService,
   ) {}
+
+  /**
+   * Increment a seller storefront's view counter.
+   * Self-views, bots, and repeat views inside the rate-limit window are no-ops.
+   */
+  async incrementStoreViewCount(
+    sellerId: string,
+    viewerId?: string,
+    clientIp?: string,
+    userAgent?: string,
+  ) {
+    return this.engagement.incrementStoreViewCount(
+      sellerId,
+      viewerId,
+      clientIp,
+      userAgent,
+    );
+  }
 
   /**
    * Stabil avatar endpoint'i (GET /users/:id/avatar) için kullanıcının taze

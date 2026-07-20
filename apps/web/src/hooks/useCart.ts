@@ -17,8 +17,28 @@ import { useCartStore } from "@/stores/cartStore";
 const FREE_SHIPPING_THRESHOLD = 500;
 const FLAT_SHIPPING = 29.99;
 
-const offlineShipping = (subtotal: number, count: number) =>
+const calculateShipping = (subtotal: number, count: number) =>
   count === 0 ? 0 : subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : FLAT_SHIPPING;
+
+// `useCart` is mounted by the header and may also be mounted by the current
+// page. Keep the login merge single-flight so those consumers cannot submit the
+// same persisted guest quantities more than once.
+let offlineCartMergePromise: Promise<void> | null = null;
+
+export interface CartLine {
+  id: string;
+  source: "authenticated" | "offline";
+  productId: string;
+  title: string;
+  imageUrl: string | null;
+  sellerId: string;
+  sellerName: string;
+  quantity: number;
+  price: number;
+  originalPrice?: number;
+  lineTotal: number;
+  isAvailable: boolean;
+}
 
 /** Pull a human message off an axios error (message may be a string or array). */
 function cartErrorMessage(error: unknown, fallback: string): string {
@@ -42,6 +62,7 @@ function cartErrorMessage(error: unknown, fallback: string): string {
 export function useCart() {
   const queryClient = useQueryClient();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isAuthLoading = useAuthStore((s) => s.isLoading);
 
   const offlineItems = useCartStore((s) => s.offlineItems);
   const addToOfflineCart = useCartStore((s) => s.addToOfflineCart);
@@ -60,33 +81,97 @@ export function useCart() {
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: queryKeys.cart.all() });
 
-  // Badge hint: while the authed cart query is still loading on a cold reload,
-  // fall back to the persisted last-known count so the header badge doesn't
-  // flash to 0; guests always have a real (derived) count.
-  const authedLoadingCount =
-    isAuthenticated && !query.data ? itemCountHint : undefined;
+  useEffect(() => {
+    if (!isAuthenticated || offlineItems.length === 0) return;
+    if (offlineCartMergePromise) return;
 
-  // Unified read: authed → the server calculation; guest → derived from the
-  // offline cart (same numbers the store used to compute imperatively).
-  const view = useMemo(() => {
+    const itemsToMerge = offlineItems.map(({ productId, quantity }) => ({
+      productId,
+      quantity,
+    }));
+
+    offlineCartMergePromise = (async () => {
+      // Add sequentially so a brand-new account cannot race multiple attempts
+      // to create its first server cart. A rejected line must not stop the rest.
+      for (const { productId, quantity } of itemsToMerge) {
+        try {
+          await cartApi.addItem(productId, quantity);
+        } catch {
+          // Already-in-cart, unavailable, and other per-line failures are safe
+          // to skip; the authenticated session itself remains successful.
+        }
+      }
+      await queryClient.invalidateQueries({ queryKey: queryKeys.cart.all() });
+    })()
+      // A failed merge or refresh must not interrupt the completed login flow.
+      .catch(() => undefined)
+      .finally(() => {
+        clearOfflineCart();
+        offlineCartMergePromise = null;
+      });
+  }, [clearOfflineCart, isAuthenticated, offlineItems, queryClient]);
+
+  // A single effective list feeds every cart signal. Authenticated users only
+  // see server lines; persisted guest lines are deliberately ignored.
+  const lines = useMemo<CartLine[]>(() => {
+    if (isAuthLoading) return [];
+
     if (isAuthenticated) {
-      const calc = query.data?.calculation;
+      return (query.data?.calculation.items ?? []).map((item) => ({
+        id: item.id,
+        source: "authenticated",
+        productId: item.productId,
+        title: item.productTitle,
+        imageUrl: item.productImage,
+        sellerId: item.sellerId,
+        sellerName: item.sellerName,
+        quantity: item.quantity,
+        price: item.effectivePrice,
+        originalPrice: item.originalPrice,
+        lineTotal: item.lineTotal,
+        isAvailable: item.isAvailable,
+      }));
+    }
+
+    return offlineItems.map((item) => ({
+      id: item.id,
+      source: "offline",
+      productId: item.productId,
+      title: item.title,
+      imageUrl: item.imageUrl,
+      sellerId: item.seller.id,
+      sellerName: item.seller.displayName,
+      quantity: item.quantity,
+      price: item.price,
+      originalPrice: undefined,
+      lineTotal: item.price * item.quantity,
+      isAvailable: true,
+    }));
+  }, [isAuthenticated, isAuthLoading, query.data, offlineItems]);
+
+  // Counts and prices are derived from the same lines that consumers render.
+  const view = useMemo(() => {
+    const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
+    const itemCount = lines.reduce((sum, line) => sum + line.quantity, 0);
+    const shippingCost = calculateShipping(subtotal, lines.length);
+
+    if (isAuthenticated || isAuthLoading) {
+      const calc = isAuthenticated ? query.data?.calculation : undefined;
+      const totalDiscount = calc?.totalDiscount ?? 0;
       return {
         items: calc?.items ?? [],
         offlineItems: [] as OfflineCartItem[],
-        subtotal: calc?.subtotal ?? 0,
-        totalDiscount: calc?.totalDiscount ?? 0,
-        shippingCost: calc?.shippingCost ?? 0,
-        grandTotal: calc?.grandTotal ?? 0,
-        itemCount: calc?.itemCount ?? 0,
+        subtotal,
+        totalDiscount,
+        shippingCost,
+        grandTotal: Math.max(0, subtotal - totalDiscount + shippingCost),
+        itemCount,
         appliedCouponCode: calc?.appliedCouponCode ?? null,
         appliedDiscounts: calc?.appliedDiscounts ?? [],
         warnings: calc?.warnings ?? [],
       };
     }
-    const subtotal = offlineItems.reduce((s, i) => s + i.price * i.quantity, 0);
-    const itemCount = offlineItems.reduce((s, i) => s + i.quantity, 0);
-    const shippingCost = offlineShipping(subtotal, offlineItems.length);
+
     return {
       items: [] as CartItem[],
       offlineItems,
@@ -99,7 +184,7 @@ export function useCart() {
       appliedDiscounts: [] as AppliedDiscount[],
       warnings: [] as string[],
     };
-  }, [isAuthenticated, query.data, offlineItems]);
+  }, [isAuthenticated, isAuthLoading, query.data, offlineItems, lines]);
 
   // ── Writes ── (branch on auth; keep the old throw/return contracts so the
   // cart-page stepper and coupon box behave exactly as before)
@@ -192,7 +277,10 @@ export function useCart() {
     await invalidate();
   };
 
-  const itemCount = authedLoadingCount ?? view.itemCount;
+  // Use the persisted badge hint only during a genuine initial fetch. As soon
+  // as that request settles, expose (and persist) the count derived from lines.
+  const isLoading = isAuthLoading || (isAuthenticated && query.isLoading);
+  const itemCount = isLoading ? itemCountHint : view.itemCount;
 
   // Keep the persisted badge hint in sync with the currently shown count.
   useEffect(() => {
@@ -202,8 +290,10 @@ export function useCart() {
   return {
     isAuthenticated,
     ...view,
+    lines,
+    lineCount: lines.length,
     itemCount,
-    isLoading: isAuthenticated ? query.isLoading : false,
+    isLoading,
     /** Refetch the authed cart (no-op for guests — their cart is local/derived). */
     refetch: async () => {
       if (isAuthenticated) await query.refetch();

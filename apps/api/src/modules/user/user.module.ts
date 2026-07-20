@@ -8,6 +8,7 @@ import { UserStatsService } from "./user-stats.service";
 import { UserAnalyticsService } from "./user-analytics.service";
 import { UserDiscoveryService } from "./user-discovery.service";
 import { UserBankService } from "./user-bank.service";
+import { UserEngagementService } from "./user-engagement.service";
 import { UserController } from "./user.controller";
 import { FeaturedSchedulerService } from "./featured-scheduler.service";
 import { NotificationModule } from "../notification/notification.module";
@@ -28,6 +29,7 @@ import { ModerationModule } from "../moderation/moderation.module";
     UserAnalyticsService,
     UserDiscoveryService,
     UserBankService,
+    UserEngagementService,
     FeaturedSchedulerService,
   ],
   exports: [UserService],

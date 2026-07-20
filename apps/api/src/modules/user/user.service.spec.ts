@@ -9,7 +9,9 @@ import { UserStatsService } from "./user-stats.service";
 import { UserAnalyticsService } from "./user-analytics.service";
 import { UserDiscoveryService } from "./user-discovery.service";
 import { UserBankService } from "./user-bank.service";
+import { UserEngagementService } from "./user-engagement.service";
 import { PrismaService } from "../../prisma";
+import { CacheService } from "../cache/cache.service";
 import { NotificationService } from "../notification/notification.service";
 import { RatingService } from "../rating/rating.service";
 import { ModerationAiClient } from "../moderation/moderation-ai.client";
@@ -51,7 +53,9 @@ describe("UserService deleteAddress (edge case 1.11)", () => {
         UserAnalyticsService,
         UserDiscoveryService,
         UserBankService,
+        UserEngagementService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: CacheService, useValue: { checkRateLimit: jest.fn() } },
         { provide: NotificationService, useValue: {} },
         { provide: RatingService, useValue: {} },
         {

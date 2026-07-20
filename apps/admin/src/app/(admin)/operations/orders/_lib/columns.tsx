@@ -74,7 +74,12 @@ export function orderColumns({
           </Link>
         );
       },
-      { grow: 2, minWidth: 150 },
+      {
+        grow: 2,
+        minWidth: 150,
+        sortKey: "orderNumber",
+        sortType: "text",
+      },
     ),
     col.custom<Order>(
       t("common.status"),
@@ -119,35 +124,43 @@ export function orderColumns({
               )}
           </div>
         ),
-      { grow: 2, minWidth: 170 },
+      { grow: 2, minWidth: 170, sortKey: "status", sortType: "text" },
     ),
-    col.user<Order>(t("admin.operations.orders.buyer"), (o) => ({
-      name: o.buyer.displayName,
-      href: `/accounts/users/${o.buyer.id}`,
-    })),
-    col.custom<Order>(t("admin.operations.orders.seller"), (o) => {
-      if (o.isGroupSummary) {
-        const sellers = o.groupSellers ?? [];
-        const first = sellers[0];
-        const extra = Math.max(0, sellers.length - 1);
+    col.user<Order>(
+      t("admin.operations.orders.buyer"),
+      (o) => ({
+        name: o.buyer.displayName,
+        href: `/accounts/users/${o.buyer.id}`,
+      }),
+      { sortKey: "buyer.displayName", sortType: "text" },
+    ),
+    col.custom<Order>(
+      t("admin.operations.orders.seller"),
+      (o) => {
+        if (o.isGroupSummary) {
+          const sellers = o.groupSellers ?? [];
+          const first = sellers[0];
+          const extra = Math.max(0, sellers.length - 1);
+          return (
+            <span className="flex items-center gap-1 text-sm text-body">
+              <CellText value={first?.displayName} />
+              {extra > 0 && (
+                <span className="rounded bg-surface-alt px-1 text-xs text-muted">
+                  +{extra}
+                </span>
+              )}
+            </span>
+          );
+        }
         return (
-          <span className="flex items-center gap-1 text-sm text-body">
-            <CellText value={first?.displayName} />
-            {extra > 0 && (
-              <span className="rounded bg-surface-alt px-1 text-xs text-muted">
-                +{extra}
-              </span>
-            )}
-          </span>
+          <CellUser
+            name={o.seller.displayName}
+            href={`/accounts/users/${o.seller.id}`}
+          />
         );
-      }
-      return (
-        <CellUser
-          name={o.seller.displayName}
-          href={`/accounts/users/${o.seller.id}`}
-        />
-      );
-    }),
+      },
+      { sortKey: "seller.displayName", sortType: "text" },
+    ),
     col.custom<Order>(
       t("admin.catalog.common.product"),
       (o) => {
@@ -188,19 +201,23 @@ export function orderColumns({
           />
         );
       },
-      { grow: 2 },
+      { grow: 2, sortKey: "product.title", sortType: "text" },
     ),
     col.money<Order>(
       t("common.amount"),
       (o) => (o.isGroupSummary ? (o.groupTotalAmount ?? 0) : o.totalAmount),
-      { tone: "primary" },
+      { tone: "primary", sortKey: "totalAmount", sortType: "number" },
     ),
     col.money<Order>(
       t("admin.operations.orders.commission"),
       (o) => (o.isGroupSummary ? (o.groupCommission ?? 0) : o.commission),
-      { tone: "positive" },
+      {
+        tone: "positive",
+        sortKey: "commissionAmount",
+        sortType: "number",
+      },
     ),
-    col.date<Order>(t("common.date"), (o) => o.createdAt),
+    col.date<Order>(t("common.date"), "createdAt"),
     col.rowMenu<Order>(rowMenu),
   ];
 }

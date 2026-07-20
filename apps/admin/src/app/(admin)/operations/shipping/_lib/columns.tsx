@@ -26,7 +26,7 @@ export const orderShipmentColumns = (t: T) => [
   ),
   col.muted<OrderShipmentRow>(
     t("admin.operations.shipping.carrier"),
-    (r) => r.provider,
+    "provider",
   ),
   col.custom<OrderShipmentRow>(
     t("admin.operations.common.trackingNumber"),
@@ -44,14 +44,18 @@ export const orderShipmentColumns = (t: T) => [
       ) : (
         <CellCode value={r.trackingNumber} />
       ),
-    { grow: 2 },
+    { grow: 2, sortKey: "trackingNumber", sortType: "text" },
   ),
-  col.badge<OrderShipmentRow>(t("common.status"), (r) => (
-    <Badge
-      status={(r.status || "").toLowerCase()}
-      config={shipmentStatusConfig}
-    />
-  )),
+  col.badge<OrderShipmentRow>(
+    t("common.status"),
+    (r) => (
+      <Badge
+        status={(r.status || "").toLowerCase()}
+        config={shipmentStatusConfig}
+      />
+    ),
+    { sortKey: "status", sortType: "text" },
+  ),
 ];
 
 export const returnShipmentColumns = (t: T) => [
@@ -61,6 +65,7 @@ export const returnShipmentColumns = (t: T) => [
       href: `/operations/refund-requests/${r.id}`,
       label: r.refundNumber,
     }),
+    { sortKey: "refundNumber", sortType: "text" },
   ),
   col.link<ReturnShipmentRow>(t("admin.operations.common.order"), (r) =>
     r.order
@@ -69,27 +74,30 @@ export const returnShipmentColumns = (t: T) => [
   ),
   col.text<ReturnShipmentRow>(
     t("admin.operations.shipping.carrier"),
-    (r) => r.returnProvider,
+    "returnProvider",
     { grow: 1 },
   ),
   col.code<ReturnShipmentRow>(
     t("admin.operations.common.trackingNumber"),
-    (r) => r.returnTrackingNumber,
+    "returnTrackingNumber",
   ),
-  col.badge<ReturnShipmentRow>(t("common.status"), (r) =>
-    r.returnStatus ? (
-      <Badge status={r.returnStatus} config={shipmentStatusConfig} />
-    ) : (
-      <Empty />
-    ),
+  col.badge<ReturnShipmentRow>(
+    t("common.status"),
+    (r) =>
+      r.returnStatus ? (
+        <Badge status={r.returnStatus} config={shipmentStatusConfig} />
+      ) : (
+        <Empty />
+      ),
+    { sortKey: "returnStatus", sortType: "text" },
   ),
   col.date<ReturnShipmentRow>(
     t("admin.operations.shipping.shippedAt"),
-    (r) => r.returnShippedAt,
+    "returnShippedAt",
   ),
   col.date<ReturnShipmentRow>(
     t("admin.operations.shipping.delivered"),
-    (r) => r.returnDeliveredAt,
+    "returnDeliveredAt",
   ),
 ];
 
@@ -107,20 +115,24 @@ export const tradeShipmentColumns = (t: T) => [
     (r) => legLabel(t, r.leg),
     {
       grow: 2,
+      sortKey: "leg",
+      sortType: "text",
     },
   ),
   col.text<TradeShipmentRow>(
     t("admin.operations.shipping.carrier"),
-    (r) => r.carrier,
+    "carrier",
     { grow: 1 },
   ),
   col.code<TradeShipmentRow>(
     t("admin.operations.common.trackingNumber"),
-    (r) => r.trackingNumber,
+    "trackingNumber",
   ),
-  col.badge<TradeShipmentRow>(t("common.status"), (r) => (
-    <Badge status={r.status} config={shipmentStatusConfig} />
-  )),
+  col.badge<TradeShipmentRow>(
+    t("common.status"),
+    (r) => <Badge status={r.status} config={shipmentStatusConfig} />,
+    { sortKey: "status", sortType: "text" },
+  ),
   col.user<TradeShipmentRow>(t("admin.operations.shipping.sender"), (r) =>
     r.shipper
       ? { name: r.shipper.displayName, href: `/accounts/users/${r.shipper.id}` }
@@ -132,6 +144,8 @@ export const tradeShipmentColumns = (t: T) => [
     {
       grow: 1,
       minWidth: 130,
+      sortKey: "updatedAt",
+      sortType: "date",
     },
   ),
 ];
@@ -169,7 +183,7 @@ export function suratShipmentColumns(
         ) : (
           <CellCode value={r.trackingNumber} />
         ),
-      { grow: 2 },
+      { grow: 2, sortKey: "trackingNumber", sortType: "text" },
     ),
     col.custom<SuratShipmentRow>(
       t("admin.operations.shipping.suratStatus"),
@@ -187,12 +201,22 @@ export function suratShipmentColumns(
           ) : null}
         </div>
       ),
-      { grow: 2, minWidth: 150 },
+      {
+        grow: 2,
+        minWidth: 150,
+        sortKey: "status",
+        sortType: "text",
+      },
     ),
     col.muted<SuratShipmentRow>(
       t("admin.operations.shipping.lastUpdated"),
       (r) => (r.updatedAt ? formatRelative(t, r.updatedAt) : undefined),
-      { grow: 1, minWidth: 130 },
+      {
+        grow: 1,
+        minWidth: 130,
+        sortKey: "updatedAt",
+        sortType: "date",
+      },
     ),
     col.rowMenu<SuratShipmentRow>(rowMenu),
   ];

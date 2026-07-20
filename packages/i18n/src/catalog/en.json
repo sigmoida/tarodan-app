@@ -4563,6 +4563,7 @@
       "noFieldsToUpdate": "No fields to update were provided",
       "notBlocked": "This user is not blocked",
       "notFound": "User not found",
+      "notSeller": "This user is not a seller account",
       "phoneAlreadyInUse": "This phone number is already in use",
       "unfollowed": "Unfollowed",
       "userBlocked": "{displayName} has been blocked",

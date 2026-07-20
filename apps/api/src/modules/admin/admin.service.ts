@@ -32,6 +32,12 @@ import {
   AdminUserQueryDto,
   AdminProductQueryDto,
   AdminOrderQueryDto,
+  AdminTradeQueryDto,
+  AdminMessageQueryDto,
+  AdminShipmentQueryDto,
+  AdminRefundHistoryQueryDto,
+  TradeShipmentQueryDto,
+  RefundRequestQueryDto,
   AuditLogQueryDto,
   ApproveProductDto,
   RejectProductDto,
@@ -45,6 +51,8 @@ import {
   UpdateOrderStatusDto,
   ReportQueryDto,
   AdminPaymentQueryDto,
+  ElogoInvoiceQueryDto,
+  SellerUploadedInvoiceQueryDto,
   PaymentStatisticsQueryDto,
   PayoutTransactionsQueryDto,
   PayoutExportQueryDto,
@@ -65,9 +73,6 @@ import {
   RejectWarehouseTradeDto,
 } from "./dto";
 import {
-  TradeStatus,
-  ShipmentStatus,
-  MessageStatus,
   TicketStatus,
   TicketPriority,
   TicketCategory,
@@ -621,13 +626,7 @@ export class AdminService {
     );
   }
 
-  async getRefundHistory(query: {
-    search?: string;
-    startDate?: Date;
-    endDate?: Date;
-    page?: number;
-    limit?: number;
-  }) {
+  async getRefundHistory(query: AdminRefundHistoryQueryDto) {
     return this.adminPaymentService.getRefundHistory(query);
   }
 
@@ -677,27 +676,11 @@ export class AdminService {
   // ==================== TRADE MANAGEMENT ====================
   // Taşındı: admin-trade.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getTrades(query: {
-    status?: TradeStatus;
-    initiatorId?: string;
-    receiverId?: string;
-    userId?: string;
-    fromDate?: string;
-    toDate?: string;
-    search?: string;
-    page?: number;
-    limit?: number;
-  }) {
+  async getTrades(query: AdminTradeQueryDto) {
     return this.tradeService.getTrades(query);
   }
 
-  async findTradeShipments(query: {
-    status?: ShipmentStatus;
-    leg?: "to_warehouse" | "from_warehouse" | "return";
-    tradeNumber?: string;
-    page?: number;
-    limit?: number;
-  }) {
+  async findTradeShipments(query: TradeShipmentQueryDto) {
     return this.tradeService.findTradeShipments(query);
   }
 
@@ -772,14 +755,7 @@ export class AdminService {
   // ==================== REFUND REQUEST ADMIN ====================
   // Taşındı: admin-refund.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async listRefundRequests(query: {
-    status?: import("@prisma/client").RefundRequestStatus[];
-    userSearch?: string;
-    from?: string;
-    to?: string;
-    page?: number;
-    limit?: number;
-  }) {
+  async listRefundRequests(query: RefundRequestQueryDto) {
     return this.adminRefundService.listRefundRequests(query);
   }
 
@@ -813,14 +789,7 @@ export class AdminService {
   // ==================== MESSAGE MANAGEMENT ====================
   // Taşındı: admin-messaging.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getMessages(query: {
-    status?: MessageStatus;
-    fromDate?: string;
-    toDate?: string;
-    search?: string;
-    page?: number;
-    limit?: number;
-  }) {
+  async getMessages(query: AdminMessageQueryDto) {
     return this.adminMessagingService.getMessages(query);
   }
 
@@ -1165,26 +1134,11 @@ export class AdminService {
   // ==================== ELOGO FATURA (e-Arşiv/e-Fatura) ====================
   // Taşındı: admin-tax.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getElogoInvoices(query: {
-    type?: string;
-    status?: string;
-    documentType?: string;
-    search?: string;
-    startDate?: string;
-    endDate?: string;
-    page?: number;
-    limit?: number;
-  }) {
+  async getElogoInvoices(query: ElogoInvoiceQueryDto) {
     return this.taxService.getElogoInvoices(query);
   }
 
-  async getSellerUploadedInvoices(query: {
-    search?: string;
-    startDate?: string;
-    endDate?: string;
-    page?: number;
-    limit?: number;
-  }) {
+  async getSellerUploadedInvoices(query: SellerUploadedInvoiceQueryDto) {
     return this.taxService.getSellerUploadedInvoices(query);
   }
 
@@ -1369,12 +1323,7 @@ export class AdminService {
   // ==================== SHIPPING (view-only) ====================
   // Taşındı: admin-shipping.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getShipments(query: {
-    page?: number;
-    limit?: number;
-    status?: string;
-    carrierId?: string;
-  }) {
+  async getShipments(query: AdminShipmentQueryDto) {
     return this.shippingService.getShipments(query);
   }
 

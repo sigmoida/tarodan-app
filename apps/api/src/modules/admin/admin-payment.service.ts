@@ -2,20 +2,22 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { AdminAuditService } from './admin-audit.service';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { AdminAuditService } from "./admin-audit.service";
 import {
   fulltextUserSearch,
   fulltextPaymentSearch,
   fulltextOrderSearch,
-} from '../../common/helpers/fulltext-search';
+} from "../../common/helpers/fulltext-search";
 import {
   AdminPaymentQueryDto,
+  AdminRefundHistoryQueryDto,
   PaymentStatisticsQueryDto,
-} from './dto';
-import { Prisma, PaymentStatus } from '@prisma/client';
-import { PaymentService } from '../payment/payment.service';
+} from "./dto";
+import { Prisma, PaymentStatus } from "@prisma/client";
+import { PaymentService } from "../payment/payment.service";
+import { paginate, resolveOrderBy } from "../../common/list";
 
 /**
  * Ödeme yönetimi (liste, detay, istatistik, manuel iade, zorla iptal) —
@@ -36,10 +38,6 @@ export class AdminPaymentService {
    * Get all payments with filters
    */
   async getPayments(query: AdminPaymentQueryDto) {
-    const page = query.page || 1;
-    const limit = query.limit || 20;
-    const skip = (page - 1) * limit;
-
     const where: Prisma.PaymentWhereInput = {};
 
     if (query.status) {
@@ -69,17 +67,29 @@ export class AdminPaymentService {
       if (paymentIds.length > 0) conditions.push({ id: { in: paymentIds } });
       if (orderIds.length > 0) conditions.push({ orderId: { in: orderIds } });
       if (conditions.length === 0) {
-        return { data: [], total: 0, page, limit, totalPages: 0 };
+        return {
+          data: [],
+          meta: {
+            total: 0,
+            page: query.page ?? 1,
+            limit: query.limit ?? 20,
+            totalPages: 0,
+          },
+        };
       }
       where.OR = conditions;
     }
 
-    const [payments, total] = await Promise.all([
-      this.prisma.payment.findMany({
+    const orderBy = resolveOrderBy<Prisma.PaymentOrderByWithRelationInput>(
+      "Payment",
+      query,
+      { defaultSort: { createdAt: "desc" } },
+    );
+    const result = await paginate(
+      this.prisma.payment,
+      {
         where,
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit,
+        orderBy,
         include: {
           order: {
             include: {
@@ -89,15 +99,16 @@ export class AdminPaymentService {
             },
           },
         },
-      }),
-      this.prisma.payment.count({ where }),
-    ]);
+      },
+      query,
+    );
 
     return {
+      ...result,
       // Payment.order nullable: checkoutGroup / tradeCashPayment tipindeki
       // ödemelerde order=null olabilir. Null-safe erişim — aksi halde TÜM liste
       // TypeError ile 500 döner.
-      data: payments.map((p) => ({
+      data: result.data.map((p) => ({
         id: p.id,
         orderId: p.orderId,
         orderNumber: p.order?.orderNumber ?? null,
@@ -115,12 +126,6 @@ export class AdminPaymentService {
         updatedAt: p.updatedAt,
         paidAt: p.paidAt,
       })),
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
     };
   }
 
@@ -143,7 +148,7 @@ export class AdminPaymentService {
     });
 
     if (!payment) {
-      throw new NotFoundException('Ödeme bulunamadı');
+      throw new NotFoundException("Ödeme bulunamadı");
     }
 
     // Payment.order nullable: checkoutGroup / tradeCashPayment tipindeki
@@ -173,13 +178,15 @@ export class AdminPaymentService {
             shippingAddress: payment.order.shippingAddress,
           }
         : null,
-      paymentHold: payment.paymentHolds[0] ? {
-        id: payment.paymentHolds[0].id,
-        amount: Number(payment.paymentHolds[0].amount),
-        status: payment.paymentHolds[0].status,
-        releaseAt: payment.paymentHolds[0].releaseAt,
-        releasedAt: payment.paymentHolds[0].releasedAt,
-      } : null,
+      paymentHold: payment.paymentHolds[0]
+        ? {
+            id: payment.paymentHolds[0].id,
+            amount: Number(payment.paymentHolds[0].amount),
+            status: payment.paymentHolds[0].status,
+            releaseAt: payment.paymentHolds[0].releaseAt,
+            releasedAt: payment.paymentHolds[0].releasedAt,
+          }
+        : null,
       paymentHolds: payment.paymentHolds.map((hold) => ({
         id: hold.id,
         orderId: hold.orderId,
@@ -203,11 +210,11 @@ export class AdminPaymentService {
     const endDate = query.endDate ? new Date(query.endDate) : new Date();
 
     // Adjust start date based on period
-    if (query.period === 'daily') {
+    if (query.period === "daily") {
       startDate.setDate(startDate.getDate() - 30);
-    } else if (query.period === 'weekly') {
+    } else if (query.period === "weekly") {
       startDate.setDate(startDate.getDate() - 90);
-    } else if (query.period === 'monthly') {
+    } else if (query.period === "monthly") {
       startDate.setMonth(startDate.getMonth() - 12);
     }
 
@@ -239,13 +246,13 @@ export class AdminPaymentService {
         _sum: { amount: true },
       }),
       this.prisma.payment.groupBy({
-        by: ['provider'],
+        by: ["provider"],
         where,
         _count: { id: true },
         _sum: { amount: true },
       }),
       this.prisma.payment.groupBy({
-        by: ['status'],
+        by: ["status"],
         where,
         _count: { id: true },
       }),
@@ -259,7 +266,7 @@ export class AdminPaymentService {
       totalPayments > 0 ? (completedPayments / totalPayments) * 100 : 0;
 
     return {
-      period: query.period || 'monthly',
+      period: query.period || "monthly",
       startDate,
       endDate,
       summary: {
@@ -289,10 +296,6 @@ export class AdminPaymentService {
    * Get failed payments
    */
   async getFailedPayments(query: AdminPaymentQueryDto) {
-    const page = query.page || 1;
-    const limit = query.limit || 20;
-    const skip = (page - 1) * limit;
-
     const where: Prisma.PaymentWhereInput = {
       status: PaymentStatus.failed,
     };
@@ -320,17 +323,29 @@ export class AdminPaymentService {
       if (paymentIds.length > 0) conditions.push({ id: { in: paymentIds } });
       if (orderIds.length > 0) conditions.push({ orderId: { in: orderIds } });
       if (conditions.length === 0) {
-        return { data: [], total: 0, page, limit, totalPages: 0 };
+        return {
+          data: [],
+          meta: {
+            total: 0,
+            page: query.page ?? 1,
+            limit: query.limit ?? 20,
+            totalPages: 0,
+          },
+        };
       }
       where.OR = conditions;
     }
 
-    const [payments, total] = await Promise.all([
-      this.prisma.payment.findMany({
+    const orderBy = resolveOrderBy<Prisma.PaymentOrderByWithRelationInput>(
+      "Payment",
+      query,
+      { defaultSort: { createdAt: "desc" } },
+    );
+    const result = await paginate(
+      this.prisma.payment,
+      {
         where,
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit,
+        orderBy,
         include: {
           order: {
             include: {
@@ -339,12 +354,13 @@ export class AdminPaymentService {
             },
           },
         },
-      }),
-      this.prisma.payment.count({ where }),
-    ]);
+      },
+      query,
+    );
 
     return {
-      data: payments.map((p) => ({
+      ...result,
+      data: result.data.map((p) => ({
         id: p.id,
         orderId: p.orderId,
         orderNumber: p.order.orderNumber,
@@ -355,12 +371,6 @@ export class AdminPaymentService {
         product: p.order.product,
         createdAt: p.createdAt,
       })),
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
     };
   }
 
@@ -379,11 +389,13 @@ export class AdminPaymentService {
     });
 
     if (!payment) {
-      throw new NotFoundException('Ödeme bulunamadı');
+      throw new NotFoundException("Ödeme bulunamadı");
     }
 
     if (payment.status !== PaymentStatus.completed) {
-      throw new BadRequestException('Sadece tamamlanmış ödemeler iade edilebilir');
+      throw new BadRequestException(
+        "Sadece tamamlanmış ödemeler iade edilebilir",
+      );
     }
 
     const refundAmount = amount || Number(payment.amount);
@@ -397,34 +409,30 @@ export class AdminPaymentService {
     // Log admin action
     await this.audit.createAuditLog(
       adminId,
-      'payment_manual_refund',
-      'Payment',
+      "payment_manual_refund",
+      "Payment",
       paymentId,
       { status: payment.status, amount: Number(payment.amount) },
       {
         status: PaymentStatus.refunded,
         refundAmount,
-        reason: reason || 'Admin tarafından manuel iade',
+        reason: reason || "Admin tarafından manuel iade",
       },
     );
 
     return {
       ...refundResult,
-      reason: reason || 'Admin tarafından manuel iade',
+      reason: reason || "Admin tarafından manuel iade",
     };
   }
 
   /**
    * Get refund history (refunded payments with pagination)
    */
-  async getRefundHistory(query: {
-    search?: string;
-    startDate?: Date;
-    endDate?: Date;
-    page?: number;
-    limit?: number;
-  }) {
-    const { search, startDate, endDate, page = 1, limit = 20 } = query;
+  async getRefundHistory(query: AdminRefundHistoryQueryDto) {
+    const { search, startDate: startDateValue, endDate: endDateValue } = query;
+    const startDate = startDateValue ? new Date(startDateValue) : undefined;
+    const endDate = endDateValue ? new Date(endDateValue) : undefined;
 
     const where: Prisma.PaymentWhereInput = {
       status: PaymentStatus.refunded,
@@ -433,10 +441,19 @@ export class AdminPaymentService {
     if (search) {
       const userIds = await fulltextUserSearch(this.prisma, search);
       const conditions: Prisma.PaymentWhereInput[] = [];
-      if (userIds.length > 0) conditions.push({ order: { buyerId: { in: userIds } } });
+      if (userIds.length > 0)
+        conditions.push({ order: { buyerId: { in: userIds } } });
       if (search.length >= 3) conditions.push({ id: { startsWith: search } });
       if (conditions.length === 0) {
-        return { data: [], total: 0, page, limit, totalPages: 0 };
+        return {
+          data: [],
+          meta: {
+            total: 0,
+            page: query.page ?? 1,
+            limit: query.limit ?? 20,
+            totalPages: 0,
+          },
+        };
       }
       where.OR = conditions;
     }
@@ -447,9 +464,14 @@ export class AdminPaymentService {
       if (endDate) where.updatedAt.lte = endDate;
     }
 
-    const [total, payments] = await Promise.all([
-      this.prisma.payment.count({ where }),
-      this.prisma.payment.findMany({
+    const orderBy = resolveOrderBy<Prisma.PaymentOrderByWithRelationInput>(
+      "Payment",
+      query,
+      { defaultSort: { updatedAt: "desc" } },
+    );
+    const result = await paginate(
+      this.prisma.payment,
+      {
         where,
         include: {
           order: {
@@ -460,27 +482,27 @@ export class AdminPaymentService {
             },
           },
         },
-        orderBy: { updatedAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
+        orderBy,
+      },
+      query,
+    );
 
     return {
-      data: payments.map(p => ({
+      ...result,
+      data: result.data.map((p) => ({
         id: p.id,
         amount: Number(p.amount),
         status: p.status,
         refundedAt: p.updatedAt,
-        order: p.order ? {
-
-          id: p.order.id,
-          buyer: p.order.buyer,
-          seller: p.order.seller,
-          product: p.order.product,
-        } : null,
+        order: p.order
+          ? {
+              id: p.order.id,
+              buyer: p.order.buyer,
+              seller: p.order.seller,
+              product: p.order.product,
+            }
+          : null,
       })),
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 
@@ -494,11 +516,13 @@ export class AdminPaymentService {
     });
 
     if (!payment) {
-      throw new NotFoundException('Ödeme bulunamadı');
+      throw new NotFoundException("Ödeme bulunamadı");
     }
 
     if (payment.status === PaymentStatus.completed) {
-      throw new BadRequestException('Tamamlanmış ödemeler iptal edilemez, iade yapın');
+      throw new BadRequestException(
+        "Tamamlanmış ödemeler iptal edilemez, iade yapın",
+      );
     }
 
     const oldStatus = payment.status;
@@ -515,8 +539,8 @@ export class AdminPaymentService {
     // Log admin action
     await this.audit.createAuditLog(
       adminId,
-      'payment_force_cancel',
-      'Payment',
+      "payment_force_cancel",
+      "Payment",
       paymentId,
       { status: oldStatus },
       {
@@ -528,7 +552,7 @@ export class AdminPaymentService {
     return {
       success: true,
       paymentId,
-      message: 'Ödeme zorla iptal edildi',
+      message: "Ödeme zorla iptal edildi",
       reason,
     };
   }
