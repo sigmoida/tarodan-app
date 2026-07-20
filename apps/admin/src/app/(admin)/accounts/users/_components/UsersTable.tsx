@@ -48,7 +48,15 @@ export function UsersTable() {
 
   const columns = userColumns(
     t,
-    userRowMenu(t, { onView: (u) => router.push(`/accounts/users/${u.id}`), onBanToggle }),
+    userRowMenu(t, {
+      onView: (u) => router.push(`/accounts/users/${u.id}`),
+      onBanToggle,
+      busyId: ban.isPending
+        ? ban.variables?.id
+        : unban.isPending
+          ? unban.variables
+          : undefined,
+    }),
   );
 
   return <ResourceList.Table columns={columns} emptyText={t('admin.users.empty')} />;

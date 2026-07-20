@@ -9,13 +9,16 @@ import { productReviewColumns } from "../_lib/columns";
 import { useReviewAction } from "./useReviewAction";
 
 export function ProductReviewsTab() {
-  const { act } = useReviewAction(
+  const { act, isPending, variables } = useReviewAction(
     "reviews",
     (id, status) => adminApi.updateReviewStatus(id, status),
     "Yorum",
   );
 
-  const columns = productReviewColumns(act);
+  const columns = productReviewColumns(
+    act,
+    isPending ? variables?.id : undefined,
+  );
 
   return (
     <ResourceList<Review>

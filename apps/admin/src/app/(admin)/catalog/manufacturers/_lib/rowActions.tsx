@@ -10,9 +10,9 @@ export interface ManufacturerRowActions {
 }
 
 /** ⋮ row-menu items for a manufacturer. */
-export function manufacturerRowMenu({ onEdit, onDelete, onToggle }: ManufacturerRowActions) {
+export function manufacturerRowMenu({ onEdit, onDelete, onToggle, busyId }: ManufacturerRowActions) {
   return (m: Manufacturer): RowActionItem[] => [
-    activeToggleAction(m.isActive, () => onToggle(m)),
+    activeToggleAction(m.isActive, () => onToggle(m), busyId === m.id),
     ...editDeleteActions(m, { onEdit, onDelete }),
   ];
 }

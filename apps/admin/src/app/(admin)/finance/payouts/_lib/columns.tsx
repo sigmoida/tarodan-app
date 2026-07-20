@@ -19,7 +19,11 @@ export const scheduleColumns = (t: T) => [
   )),
 ];
 
-export function transactionColumns(onRelease: (orderId: string) => void, t: T) {
+export function transactionColumns(
+  onRelease: (orderId: string) => void,
+  t: T,
+  releasingOrderId?: string,
+) {
   return [
     col.text<PayoutTransaction>(
       t("admin.finance.common.order"),
@@ -51,6 +55,8 @@ export function transactionColumns(onRelease: (orderId: string) => void, t: T) {
         />
       ),
     ),
-    col.rowMenu<PayoutTransaction>(transactionRowMenu(onRelease, t)),
+    col.rowMenu<PayoutTransaction>(
+      transactionRowMenu(onRelease, t, releasingOrderId),
+    ),
   ];
 }

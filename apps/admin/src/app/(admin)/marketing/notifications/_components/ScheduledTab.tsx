@@ -18,13 +18,11 @@ export function ScheduledTab() {
   );
 
   const onCancel = async (id: string) => {
-    if (
-      await confirm({
-        description: "Bu zamanlanmış bildirimi iptal etmek istiyor musunuz?",
-        destructive: true,
-      })
-    )
-      cancel.mutate(id);
+    await confirm({
+      description: "Bu zamanlanmış bildirimi iptal etmek istiyor musunuz?",
+      destructive: true,
+      onConfirm: () => cancel.mutateAsync(id),
+    });
   };
 
   return (

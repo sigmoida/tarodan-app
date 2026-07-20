@@ -8,14 +8,16 @@ type T = ReturnType<typeof useTranslations<never>>;
 export interface SuratRowActions {
   onSync: (id: string) => void;
   onViewOrder: (orderId: string) => void;
+  syncingId?: string;
 }
 
-export function suratRowMenu(t: T, { onSync, onViewOrder }: SuratRowActions) {
+export function suratRowMenu(t: T, { onSync, onViewOrder, syncingId }: SuratRowActions) {
   return (r: SuratShipmentRow): RowActionItem[] => [
     {
       label: t("admin.operations.shipping.surat.refreshTracking"),
       icon: ArrowPathIcon,
       onClick: () => onSync(r.id),
+      isLoading: syncingId === r.id,
     },
     r.order && {
       label: t("admin.operations.common.orderDetail"),

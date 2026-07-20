@@ -19,20 +19,21 @@ export function MessagesTable() {
   const router = useRouter();
   const prompt = usePrompt();
 
-  const approve = useAdminMutation((id: string) => adminApi.approveMessage(id), {
+  const approve = useAdminMutation((message: Message) => adminApi.approveMessage(message.id), {
     invalidates: ['messages'],
     successMessage: 'Mesaj onaylandı',
   });
-  const reject = useAdminMutation((id: string) => adminApi.rejectMessage(id), {
+  const reject = useAdminMutation((message: Message) => adminApi.rejectMessage(message.id), {
     invalidates: ['messages'],
     successMessage: 'Mesaj reddedildi',
   });
-  const revert = useAdminMutation((id: string) => adminApi.revertMessage(id), {
+  const revert = useAdminMutation((message: Message) => adminApi.revertMessage(message.id), {
     invalidates: ['messages'],
     successMessage: 'Mesaj bekleyene alındı',
   });
   const ban = useAdminMutation(
-    (v: { id: string; reason: string }) => adminApi.banUser(v.id, v.reason),
+    (v: { messageId: string; userId: string; reason: string }) =>
+      adminApi.banUser(v.userId, v.reason),
     { invalidates: ['messages'], successMessage: 'Gönderen kullanıcı engellendi' },
   );
 
@@ -50,16 +51,29 @@ export function MessagesTable() {
       required: false,
     });
     if (reason === null) return;
-    ban.mutate({ id: m.senderId, reason: reason.trim() || 'Mesaj kuralları ihlali' });
+    ban.mutate({
+      messageId: m.id,
+      userId: m.senderId,
+      reason: reason.trim() || 'Mesaj kuralları ihlali',
+    });
   };
 
   const columns = messageColumns(
     messageRowMenu({
       onView: (m) => router.push(`/messaging/messages/${m.id}`),
-      onApprove: (m) => approve.mutate(m.id),
-      onReject: (m) => reject.mutate(m.id),
-      onRevert: (m) => revert.mutate(m.id),
+      onApprove: (m) => approve.mutate(m),
+      onReject: (m) => reject.mutate(m),
+      onRevert: (m) => revert.mutate(m),
       onBan,
+      busyId: approve.isPending
+        ? approve.variables?.id
+        : reject.isPending
+          ? reject.variables?.id
+          : revert.isPending
+            ? revert.variables?.id
+            : ban.isPending
+              ? ban.variables?.messageId
+              : undefined,
     }),
   );
 

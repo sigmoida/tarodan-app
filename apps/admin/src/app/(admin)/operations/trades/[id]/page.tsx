@@ -60,24 +60,18 @@ export default function TradeDetailPage() {
       : null;
 
   const handleMarkWarehouse = async (shipmentId: string) => {
-    if (
-      !(await confirm({
-        description: t("admin.operations.trades.confirmWarehouse"),
-        destructive: true,
-      }))
-    )
-      return;
-    warehouse.mutate(shipmentId);
+    await confirm({
+      description: t("admin.operations.trades.confirmWarehouse"),
+      destructive: true,
+      onConfirm: () => warehouse.mutateAsync(shipmentId),
+    });
   };
   const handleMarkReturnDelivered = async (shipmentId: string) => {
-    if (
-      !(await confirm({
-        description: t("admin.operations.trades.confirmReturnDelivered"),
-        destructive: true,
-      }))
-    )
-      return;
-    returnDelivered.mutate(shipmentId);
+    await confirm({
+      description: t("admin.operations.trades.confirmReturnDelivered"),
+      destructive: true,
+      onConfirm: () => returnDelivered.mutateAsync(shipmentId),
+    });
   };
 
   return (

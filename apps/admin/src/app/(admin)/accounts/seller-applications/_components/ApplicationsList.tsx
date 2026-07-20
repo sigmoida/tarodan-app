@@ -45,10 +45,10 @@ export function ApplicationsList({ status }: { status: string }) {
 	);
 
 	const onApprove = async (app: Application) => {
-		const ok = await confirm({
+		await confirm({
 			description: `"${app.companyName}" başvurusunu onaylamak istediğinize emin misiniz? Hesap aktif satıcı olarak işaretlenecek.`,
+			onConfirm: () => approve.mutateAsync(app.id),
 		});
-		if (ok) approve.mutate(app.id);
 	};
 
 	const onReject = async (app: Application) => {
@@ -68,6 +68,11 @@ export function ApplicationsList({ status }: { status: string }) {
 				setExpandedId((prev) => (prev === a.id ? null : a.id)),
 			onApprove,
 			onReject,
+			busyId: approve.isPending
+				? approve.variables
+				: reject.isPending
+					? reject.variables?.id
+					: undefined,
 		}),
 	);
 

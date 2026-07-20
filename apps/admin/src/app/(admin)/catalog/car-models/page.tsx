@@ -33,14 +33,12 @@ export default function CarModelsPage() {
 
   const onDelete = useCallback(
     async (m: CarModel) => {
-      if (
-        await confirm({
-          title: t("admin.catalog.carModels.deleteTitle"),
-          description: t("admin.catalog.carModels.deleteDescription"),
-          destructive: true,
-        })
-      )
-        del.mutate(m.id);
+      await confirm({
+        title: t("admin.catalog.carModels.deleteTitle"),
+        description: t("admin.catalog.carModels.deleteDescription"),
+        destructive: true,
+        onConfirm: () => del.mutateAsync(m.id),
+      });
     },
     [confirm, del, t],
   );

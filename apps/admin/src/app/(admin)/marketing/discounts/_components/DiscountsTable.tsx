@@ -28,17 +28,22 @@ export function DiscountsTable({ onEdit }: { onEdit: (d: Discount) => void }) {
   });
 
   const onDelete = async (d: Discount) => {
-    const ok = await confirm({
+    await confirm({
       title: 'İndirimi Sil',
       description: 'Bu indirimi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.',
       confirmLabel: 'Sil',
       destructive: true,
+      onConfirm: () => del.mutateAsync(d.id),
     });
-    if (ok) del.mutate(d.id);
   };
 
   const columns = discountColumns(
-    discountRowMenu({ onToggle: (d) => toggle.mutate(d), onEdit, onDelete }),
+    discountRowMenu({
+      onToggle: (d) => toggle.mutate(d),
+      onEdit,
+      onDelete,
+      busyId: toggle.isPending ? toggle.variables?.id : undefined,
+    }),
   );
 
   return <ResourceList.Table columns={columns} emptyText="Henüz indirim tanımlanmamış" />;

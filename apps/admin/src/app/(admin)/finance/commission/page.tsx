@@ -83,13 +83,13 @@ export default function CommissionPage() {
   );
 
   const onDelete = async (rule: CommissionRule) => {
-    const ok = await confirm({
+    await confirm({
       title: t("admin.finance.commission.deleteRule"),
       description: t("admin.finance.commission.deleteRuleDescription"),
       confirmLabel: t("common.delete"),
       destructive: true,
+      onConfirm: () => remove.mutateAsync(rule.id),
     });
-    if (ok) remove.mutate(rule.id);
   };
 
   return (

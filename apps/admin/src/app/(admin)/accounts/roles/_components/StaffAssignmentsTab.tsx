@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PlusIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
-import { Button, Checkbox, Chip, IconButton } from "@tarodan/ui";
+import { Button, Checkbox, Chip, IconButton, Spinner } from "@tarodan/ui";
 import toast from "react-hot-toast";
 import { adminApi } from "@/lib/api";
 import { DataTable } from "@/components/DataTable";
@@ -91,6 +91,7 @@ export function StaffAssignmentsTab({
     },
   );
   const toggleAllowAdmin = () => {
+    if (settingsMut.isPending) return;
     const next = !allowAdminAssign;
     setAllowAdminAssign(next); // optimistic
     settingsMut.mutate(next, { onError: () => setAllowAdminAssign(!next) });
@@ -102,11 +103,11 @@ export function StaffAssignmentsTab({
     errorMessage: t("admin.roles.revokeError"),
   });
   const onRevoke = async (s: StaffItem) => {
-    const ok = await confirm({
+    await confirm({
       description: t("admin.roles.revokeConfirm", { email: s.email }),
       destructive: true,
+      onConfirm: () => revoke.mutateAsync(s.id),
     });
-    if (ok) revoke.mutate(s.id);
   };
 
   const columns = staffColumns(
@@ -170,7 +171,13 @@ export function StaffAssignmentsTab({
             <Checkbox
               checked={allowAdminAssign}
               onChange={toggleAllowAdmin}
-              label={t("admin.roles.allowAdminAssignLabel")}
+              disabled={settingsMut.isPending}
+              label={
+                <span className="inline-flex items-center gap-2">
+                  {t("admin.roles.allowAdminAssignLabel")}
+                  {settingsMut.isPending && <Spinner size="sm" />}
+                </span>
+              }
             />
           )}
           <Button

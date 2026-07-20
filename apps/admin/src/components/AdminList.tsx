@@ -87,6 +87,7 @@ export function ActionIconButton({
   href,
   variant = "default",
   disabled,
+  isLoading,
 }: {
   icon: ComponentType<{ className?: string }>;
   onClick?: () => void;
@@ -94,6 +95,7 @@ export function ActionIconButton({
   href?: string;
   variant?: ActionVariant;
   disabled?: boolean;
+  isLoading?: boolean;
 }) {
   const v = ICON_VARIANT[variant];
   if (href) {
@@ -115,6 +117,7 @@ export function ActionIconButton({
       title={title}
       aria-label={title}
       disabled={disabled}
+      isLoading={isLoading}
     >
       <Icon className="h-5 w-5" />
     </IconButton>

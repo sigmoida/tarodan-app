@@ -14,6 +14,7 @@ export interface MessageRowActions {
   onReject: (m: Message) => void;
   onRevert: (m: Message) => void;
   onBan: (m: Message) => void;
+  busyId?: string;
 }
 
 export function messageRowMenu(a: MessageRowActions) {
@@ -23,15 +24,28 @@ export function messageRowMenu(a: MessageRowActions) {
       label: 'Onayla',
       icon: CheckIcon,
       onClick: () => a.onApprove(m),
+      isLoading: a.busyId === m.id,
     },
     m.status === 'rejected'
-      ? { label: 'Geri Al', icon: ArrowUturnLeftIcon, onClick: () => a.onRevert(m) }
-      : { label: 'Reddet', icon: XMarkIcon, onClick: () => a.onReject(m), destructive: true },
+      ? {
+          label: 'Geri Al',
+          icon: ArrowUturnLeftIcon,
+          onClick: () => a.onRevert(m),
+          isLoading: a.busyId === m.id,
+        }
+      : {
+          label: 'Reddet',
+          icon: XMarkIcon,
+          onClick: () => a.onReject(m),
+          destructive: true,
+          isLoading: a.busyId === m.id,
+        },
     m.senderId && {
       label: 'Göndereni yasakla',
       icon: NoSymbolIcon,
       onClick: () => a.onBan(m),
       destructive: true,
+      isLoading: a.busyId === m.id,
     },
   ];
 }

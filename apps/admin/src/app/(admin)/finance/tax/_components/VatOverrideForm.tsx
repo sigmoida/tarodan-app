@@ -44,17 +44,15 @@ export function VatOverrideForm({ config }: { config?: VatConfig }) {
   );
 
   const onDelete = async (o: VatOverride) => {
-    if (
-      await confirm({
-        title: t("admin.finance.tax.deleteOverrideTitle", {
-          category: o.categoryName,
-        }),
-        description: t("admin.finance.tax.deleteOverrideDescription"),
-        confirmLabel: t("common.delete"),
-        destructive: true,
-      })
-    )
-      removeOverride.mutate(o.ruleId);
+    await confirm({
+      title: t("admin.finance.tax.deleteOverrideTitle", {
+        category: o.categoryName,
+      }),
+      description: t("admin.finance.tax.deleteOverrideDescription"),
+      confirmLabel: t("common.delete"),
+      destructive: true,
+      onConfirm: () => removeOverride.mutateAsync(o.ruleId),
+    });
   };
 
   const columns = vatColumns(onDelete, t);

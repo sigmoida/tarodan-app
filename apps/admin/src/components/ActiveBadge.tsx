@@ -37,7 +37,7 @@ export function StatusToggle({
     <Button
       variant="ghost"
       size="sm"
-      disabled={busy}
+      isLoading={busy}
       onClick={onToggle}
       className={`${pill} ${active ? activeCls : passiveCls}`}
     >

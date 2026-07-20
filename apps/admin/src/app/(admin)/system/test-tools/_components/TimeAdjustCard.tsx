@@ -68,7 +68,7 @@ export function TimeAdjustCard({ isProd }: { isProd: boolean }) {
   const askAdjust = async (item: SearchItem, action: AdjustAction, value: number) => {
     const field = Object.keys(item.dates)[0] ?? 'tarih';
     const after = previewAfter(action, value);
-    const ok = await confirm({
+    await confirm({
       title: 'Onayla',
       confirmLabel: 'Uygula',
       description: (
@@ -88,9 +88,8 @@ export function TimeAdjustCard({ isProd }: { isProd: boolean }) {
           {isProd && <p className="text-xs text-danger-700">⚠ PROD — gerçek veri değişecek.</p>}
         </div>
       ),
+      onConfirm: () => adjustMut.mutateAsync({ item, action, value }),
     });
-    if (!ok) return;
-    adjustMut.mutate({ item, action, value });
   };
 
   const columns = timeAdjustColumns({ minutes, days, onAdjust: askAdjust });

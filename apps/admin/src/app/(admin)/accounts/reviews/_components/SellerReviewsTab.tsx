@@ -9,13 +9,16 @@ import { sellerReviewColumns } from '../_lib/columns';
 import { useReviewAction } from './useReviewAction';
 
 export function SellerReviewsTab() {
-	const { act } = useReviewAction(
+	const { act, isPending, variables } = useReviewAction(
 		'user-ratings',
 		(id, status) => adminApi.updateUserRatingStatus(id, status),
 		'Satıcı yorumu',
 	);
 
-	const columns = sellerReviewColumns(act);
+	const columns = sellerReviewColumns(
+		act,
+		isPending ? variables?.id : undefined,
+	);
 
 	return (
 		<ResourceList<UserRating>

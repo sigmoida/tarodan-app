@@ -45,12 +45,12 @@ export default function UserDetailPage() {
   };
 
   const onUnban = async () => {
-    const ok = await confirm({
+    await confirm({
       title: t('admin.users.detail.unbanTitle'),
       description: t('admin.users.detail.unbanConfirmDesc'),
       confirmLabel: t('admin.users.detail.unbanTitle'),
+      onConfirm: () => unban.mutateAsync(),
     });
-    if (ok) unban.mutate();
   };
 
   return (

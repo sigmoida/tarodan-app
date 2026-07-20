@@ -13,9 +13,9 @@ export interface BrandRowActions {
 }
 
 /** ⋮ row-menu items for a brand. */
-export function brandRowMenu({ onEdit, onDelete, onToggle }: BrandRowActions) {
+export function brandRowMenu({ onEdit, onDelete, onToggle, busyId }: BrandRowActions) {
   return (b: Brand): RowActionItem[] => [
-    activeToggleAction(b.isActive, () => onToggle(b)),
+    activeToggleAction(b.isActive, () => onToggle(b), busyId === b.id),
     ...editDeleteActions(b, { onEdit, onDelete }),
   ];
 }

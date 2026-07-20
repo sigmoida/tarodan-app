@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useState,
+  useRef,
   useCallback,
   type ReactNode,
 } from "react";
@@ -16,6 +17,8 @@ export interface ConfirmOptions {
   cancelLabel?: string;
   /** Red style for destructive actions (delete, etc.). */
   destructive?: boolean;
+  /** Async action to run after confirmation while the dialog stays open. */
+  onConfirm?: () => void | Promise<unknown>;
 }
 
 type ConfirmFn = (options?: ConfirmOptions) => Promise<boolean>;
@@ -28,6 +31,8 @@ const ConfirmContext = createContext<ConfirmFn | null>(null);
  * via `await confirm({...})` (true=confirm, false=cancel).
  */
 export function ConfirmProvider({ children }: { children: ReactNode }) {
+  const [isLoading, setIsLoading] = useState(false);
+  const loadingRef = useRef(false);
   const [state, setState] = useState<{
     options: ConfirmOptions;
     resolve: (v: boolean) => void;
@@ -42,6 +47,31 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   const settle = (val: boolean) => {
     state?.resolve(val);
     setState(null);
+    setIsLoading(false);
+    loadingRef.current = false;
+  };
+
+  const handleConfirm = async () => {
+    if (!state || loadingRef.current) return;
+    if (!state.options.onConfirm) {
+      settle(true);
+      return;
+    }
+
+    loadingRef.current = true;
+    setIsLoading(true);
+    try {
+      await state.options.onConfirm();
+      settle(true);
+    } catch {
+      // The mutation owns error feedback. Keep the dialog open for retry.
+      loadingRef.current = false;
+      setIsLoading(false);
+    }
+  };
+
+  const handleClose = () => {
+    if (!loadingRef.current) settle(false);
   };
 
   return (
@@ -49,13 +79,14 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       {children}
       <ConfirmDialog
         isOpen={!!state}
-        onClose={() => settle(false)}
-        onConfirm={() => settle(true)}
+        onClose={handleClose}
+        onConfirm={handleConfirm}
         title={state?.options.title}
         description={state?.options.description}
         confirmLabel={state?.options.confirmLabel}
         cancelLabel={state?.options.cancelLabel}
         destructive={state?.options.destructive}
+        isLoading={isLoading}
       />
     </ConfirmContext.Provider>
   );

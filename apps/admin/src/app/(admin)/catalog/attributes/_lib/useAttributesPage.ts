@@ -74,21 +74,21 @@ export function useAttributesPage() {
   );
 
   const onDeleteGroup = async (group: AttributeGroup) => {
-    const accepted = await confirm({
+    await confirm({
       title: t("admin.catalog.attributes.deleteGroupTitle"),
       description: t("admin.catalog.attributes.confirmDelete"),
       destructive: true,
+      onConfirm: () => deleteGroup.mutateAsync(group.id),
     });
-    if (accepted) deleteGroup.mutate(group.id);
   };
 
   const onDeleteAttribute = async (attribute: Attribute) => {
-    const accepted = await confirm({
+    await confirm({
       title: t("admin.catalog.attributes.deleteValueTitle"),
       description: t("admin.catalog.attributes.confirmDelete"),
       destructive: true,
+      onConfirm: () => deleteAttribute.mutateAsync(attribute.id),
     });
-    if (accepted) deleteAttribute.mutate(attribute.id);
   };
 
   return {
@@ -105,5 +105,9 @@ export function useAttributesPage() {
     setAttrModal,
     onDeleteGroup,
     onDeleteAttribute,
+    deletingGroupId: deleteGroup.isPending ? deleteGroup.variables : undefined,
+    deletingAttributeId: deleteAttribute.isPending
+      ? deleteAttribute.variables
+      : undefined,
   };
 }

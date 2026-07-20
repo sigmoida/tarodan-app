@@ -39,14 +39,12 @@ export default function BrandsPage() {
 
   const onDelete = useCallback(
     async (b: Brand) => {
-      if (
-        await confirm({
-          title: t("admin.catalog.brands.deleteTitle"),
-          description: t("admin.catalog.brands.deleteDescription"),
-          destructive: true,
-        })
-      )
-        del.mutate(b.id);
+      await confirm({
+        title: t("admin.catalog.brands.deleteTitle"),
+        description: t("admin.catalog.brands.deleteDescription"),
+        destructive: true,
+        onConfirm: () => del.mutateAsync(b.id),
+      });
     },
     [confirm, del, t],
   );

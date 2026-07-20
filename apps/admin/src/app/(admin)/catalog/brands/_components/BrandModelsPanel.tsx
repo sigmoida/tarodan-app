@@ -42,14 +42,12 @@ export function BrandModelsPanel({ brand }: { brand: Brand }) {
   );
 
   const onDelete = async (m: CarModel) => {
-    if (
-      await confirm({
-        title: t("admin.catalog.carModels.deleteTitle"),
-        description: t("admin.catalog.carModels.deleteDescription"),
-        destructive: true,
-      })
-    )
-      del.mutate(m.id);
+    await confirm({
+      title: t("admin.catalog.carModels.deleteTitle"),
+      description: t("admin.catalog.carModels.deleteDescription"),
+      destructive: true,
+      onConfirm: () => del.mutateAsync(m.id),
+    });
   };
 
   return (
@@ -123,6 +121,7 @@ export function BrandModelsPanel({ brand }: { brand: Brand }) {
                       onClick={() => onDelete(m)}
                       title={t("common.delete")}
                       variant="danger"
+                      isLoading={del.isPending && del.variables === m.id}
                     />
                   </div>
                 </div>

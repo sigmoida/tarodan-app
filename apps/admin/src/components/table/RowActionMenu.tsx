@@ -28,6 +28,8 @@ export interface RowAction {
 	/** Red style + automatic separator above the destructive group. */
 	destructive?: boolean;
 	disabled?: boolean;
+	/** Shows a spinner on this row's menu trigger and blocks repeat actions. */
+	isLoading?: boolean;
 }
 
 /** Lets conditional actions be passed as falsy via `cond && {...}`. */
@@ -44,12 +46,14 @@ export type RowActionItem = RowAction | false | null | undefined;
 export function activeToggleAction(
 	active: boolean,
 	onToggle: () => void,
+	isLoading = false,
 ): RowAction {
 	return {
 		// eslint-disable-next-line @tarodan/no-hardcoded-turkish -- callers live in unmigrated slices (finance/marketing); localize with them (#208)
 		label: active ? 'Pasifleştir' : 'Aktifleştir',
 		icon: active ? XCircleIcon : CheckCircleIcon,
 		onClick: onToggle,
+		isLoading,
 	};
 }
 
@@ -60,7 +64,13 @@ export function editDeleteActions<T>(
 		onEdit,
 		onDelete,
 		deleteDisabled,
-	}: { onEdit: (r: T) => void; onDelete: (r: T) => void; deleteDisabled?: boolean },
+		deleteLoading,
+	}: {
+		onEdit: (r: T) => void;
+		onDelete: (r: T) => void;
+		deleteDisabled?: boolean;
+		deleteLoading?: boolean;
+	},
 ): RowAction[] {
 	return [
 		// eslint-disable-next-line @tarodan/no-hardcoded-turkish -- callers live in unmigrated slices (finance/marketing); localize with them (#208)
@@ -72,6 +82,7 @@ export function editDeleteActions<T>(
 			onClick: () => onDelete(row),
 			destructive: true,
 			disabled: deleteDisabled,
+			isLoading: deleteLoading,
 		},
 	];
 }
@@ -87,12 +98,14 @@ export function RowActionMenu({ items }: { items: RowActionItem[] }) {
 	const t = useTranslations();
 	const actions = items.filter(Boolean) as RowAction[];
 	if (actions.length === 0) return <Empty />;
+	const isLoading = actions.some((action) => action.isLoading);
 
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
 				<IconButton
 					aria-label={t('common.actions')}
+					isLoading={isLoading}
 					className='text-muted hover:text-heading'>
 					<EllipsisHorizontalIcon className='h-5 w-5' />
 				</IconButton>
@@ -108,7 +121,7 @@ export function RowActionMenu({ items }: { items: RowActionItem[] }) {
 							{needsSeparator && <DropdownMenuSeparator />}
 							<DropdownMenuItem
 								danger={a.destructive}
-								disabled={a.disabled}
+								disabled={a.disabled || a.isLoading || isLoading}
 								onSelect={a.onClick}>
 								{a.icon && <a.icon className='h-4 w-4 shrink-0' />}
 								{a.label}

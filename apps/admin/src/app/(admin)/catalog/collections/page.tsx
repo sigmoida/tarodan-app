@@ -51,14 +51,12 @@ export default function CollectionsPage() {
 
   const onDelete = useCallback(
     async (c: Collection) => {
-      if (
-        await confirm({
-          title: t("admin.catalog.collections.deleteTitle"),
-          description: t("admin.catalog.collections.deleteDescription"),
-          destructive: true,
-        })
-      )
-        del.mutate(c.id);
+      await confirm({
+        title: t("admin.catalog.collections.deleteTitle"),
+        description: t("admin.catalog.collections.deleteDescription"),
+        destructive: true,
+        onConfirm: () => del.mutateAsync(c.id),
+      });
     },
     [confirm, del, t],
   );
@@ -69,6 +67,7 @@ export default function CollectionsPage() {
         onToggleVisibility: (c) => toggle.mutate(c),
         onEdit: (c) => setModal({ collection: c }),
         onDelete,
+        busyId: toggle.isPending ? toggle.variables?.id : undefined,
       }),
     [t, onDelete, toggle],
   );

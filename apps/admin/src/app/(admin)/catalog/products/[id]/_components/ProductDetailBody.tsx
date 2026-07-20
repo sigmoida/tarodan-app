@@ -48,25 +48,21 @@ export function ProductDetailBody({ product }: { product: ProductDetail }) {
   });
 
   const onDelete = async () => {
-    if (
-      await confirm({
-        title: t("admin.catalog.products.removeTitle"),
-        description: t("admin.catalog.products.removeDescription"),
-        confirmLabel: t("common.remove"),
-        destructive: true,
-      })
-    )
-      del.mutate();
+    await confirm({
+      title: t("admin.catalog.products.removeTitle"),
+      description: t("admin.catalog.products.removeDescription"),
+      confirmLabel: t("common.remove"),
+      destructive: true,
+      onConfirm: () => del.mutateAsync(),
+    });
   };
   const onRestore = async () => {
-    if (
-      await confirm({
-        title: t("admin.catalog.products.restoreTitle"),
-        description: t("admin.catalog.products.restoreDescription"),
-        confirmLabel: t("admin.catalog.products.restore"),
-      })
-    )
-      restore.mutate();
+    await confirm({
+      title: t("admin.catalog.products.restoreTitle"),
+      description: t("admin.catalog.products.restoreDescription"),
+      confirmLabel: t("admin.catalog.products.restore"),
+      onConfirm: () => restore.mutateAsync(),
+    });
   };
 
   return (
