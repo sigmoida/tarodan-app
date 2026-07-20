@@ -34,10 +34,10 @@ export const adminAuthConfig: AuthConfig = {
     refreshMaxAge: 60 * 60 * 24 * 7, // 7 days
   },
   jwtSkewMs: 30_000,
-  // Drives the `Secure` cookie flag. Honor an explicit `COOKIE_SECURE=true` too,
-  // so a prod deploy that forgets NODE_ENV=production still ships Secure cookies.
+  // Secure is mandatory outside local development and cannot be disabled by a
+  // missing/mistyped production env. COOKIE_SECURE enables it for HTTPS dev too.
   isProd:
-    process.env.NODE_ENV === "production" ||
+    process.env.NODE_ENV !== "development" ||
     process.env.COOKIE_SECURE === "true",
 };
 

@@ -3,9 +3,9 @@
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { ResourceList } from "@/components/list";
-import { statusOptions, legOptions } from "./_shared";
-import { tradeShipmentColumns } from "./_lib/columns";
-import type { TradeShipmentRow } from "./_lib/types";
+import { statusOptions, legOptions } from "../_shared";
+import { tradeShipmentColumns } from "../_lib/columns";
+import type { TradeShipmentRow } from "../_lib/types";
 
 export function TradeShipmentsTab() {
   const t = useTranslations();

@@ -1,6 +1,14 @@
 // `Product` is the canonical `@/types/product` shape — the home rails feed it
 // straight into the shared `ProductCard`. Import it from there, not here.
 
+import type { Product } from "@/types/product";
+
+export interface BrandMarqueeItem {
+  name: string;
+  logoUrl: string;
+  desc: string;
+}
+
 export interface FeaturedCollector {
   id: string;
   name: string;
@@ -62,4 +70,15 @@ export interface FeaturedBusiness {
     likeCount: number;
     image?: string;
   }>;
+}
+
+export interface HomePageData {
+  featured: Product[];
+  discounted: Product[];
+  trade: Product[];
+  popular: Product[];
+  topCollections: FeaturedCollector[];
+  featuredCollector: FeaturedCollector | null;
+  featuredBusiness: FeaturedBusiness | null;
+  marqueeItems: BrandMarqueeItem[];
 }

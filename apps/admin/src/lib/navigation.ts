@@ -1,5 +1,5 @@
-import type { ComponentType } from 'react';
-import { useTranslations } from 'next-intl';
+import type { ComponentType } from "react";
+import { useTranslations } from "next-intl";
 import {
   HomeIcon,
   UsersIcon,
@@ -28,7 +28,7 @@ import {
   FlagIcon,
   BeakerIcon,
   TicketIcon,
-} from '@heroicons/react/24/outline';
+} from "@heroicons/react/24/outline";
 
 /**
  * The single source for the admin left menu. The nav data lives here
@@ -80,24 +80,24 @@ export type NavGroup = {
 export function getTopLevelNav(t: T): NavItem[] {
   return [
     {
-      name: t('admin.nav.items.dashboard.name'),
-      href: '/dashboard',
+      name: t("admin.nav.items.dashboard.name"),
+      href: "/dashboard",
       icon: HomeIcon,
-      description: t('admin.nav.items.dashboard.description'),
-      keywords: t('admin.nav.items.dashboard.keywords')
-        .split(',')
+      description: t("admin.nav.items.dashboard.description"),
+      keywords: t("admin.nav.items.dashboard.keywords")
+        .split(",")
         .map((k) => k.trim()),
-      permission: 'dashboard',
+      permission: "dashboard",
     },
     {
-      name: t('admin.nav.items.analytics.name'),
-      href: '/analytics',
+      name: t("admin.nav.items.analytics.name"),
+      href: "/analytics",
       icon: ChartBarIcon,
-      description: t('admin.nav.items.analytics.description'),
-      keywords: t('admin.nav.items.analytics.keywords')
-        .split(',')
+      description: t("admin.nav.items.analytics.description"),
+      keywords: t("admin.nav.items.analytics.keywords")
+        .split(",")
         .map((k) => k.trim()),
-      permission: 'analytics',
+      permission: "analytics",
     },
   ];
 }
@@ -106,321 +106,355 @@ export function getTopLevelNav(t: T): NavItem[] {
 export function getNavGroups(t: T): NavGroup[] {
   return [
     {
-      id: 'operations',
-      name: t('admin.nav.groups.operations'),
+      id: "operations",
+      name: t("admin.nav.groups.operations"),
       icon: ClipboardDocumentIcon,
-      href: '/operations',
+      href: "/operations",
       items: [
         {
-          name: t('admin.nav.items.orders.name'),
-          href: '/operations/orders',
+          name: t("admin.nav.items.orders.name"),
+          href: "/operations/orders",
           icon: ClipboardDocumentListIcon,
-          description: t('admin.nav.items.orders.description'),
-          keywords: t('admin.nav.items.orders.keywords').split(',').map((k) => k.trim()),
-          permission: 'orders',
+          description: t("admin.nav.items.orders.description"),
+          keywords: t("admin.nav.items.orders.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "orders",
         },
         {
-          name: t('admin.nav.items.trades.name'),
-          href: '/operations/trades',
+          name: t("admin.nav.items.trades.name"),
+          href: "/operations/trades",
           icon: ArrowsRightLeftIcon,
-          description: t('admin.nav.items.trades.description'),
-          keywords: t('admin.nav.items.trades.keywords').split(',').map((k) => k.trim()),
-          permission: 'trades',
+          description: t("admin.nav.items.trades.description"),
+          keywords: t("admin.nav.items.trades.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "trades",
         },
         {
-          name: t('admin.nav.items.shipping.name'),
-          href: '/operations/shipping',
+          name: t("admin.nav.items.shipping.name"),
+          href: "/operations/shipping",
           icon: TruckIcon,
-          description: t('admin.nav.items.shipping.description'),
-          keywords: t('admin.nav.items.shipping.keywords').split(',').map((k) => k.trim()),
-          permission: 'shipping',
+          description: t("admin.nav.items.shipping.description"),
+          keywords: t("admin.nav.items.shipping.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "shipping",
         },
         {
-          name: t('admin.nav.items.refundRequests.name'),
-          href: '/operations/refund-requests',
+          name: t("admin.nav.items.refundRequests.name"),
+          href: "/operations/refund-requests",
           icon: BanknotesIcon,
-          description: t('admin.nav.items.refundRequests.description'),
-          keywords: t('admin.nav.items.refundRequests.keywords').split(',').map((k) => k.trim()),
-          permission: 'refund_requests',
+          description: t("admin.nav.items.refundRequests.description"),
+          keywords: t("admin.nav.items.refundRequests.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "refund_requests",
         },
         {
-          name: t('admin.nav.items.refundHistory.name'),
-          href: '/operations/refunds',
+          name: t("admin.nav.items.refundHistory.name"),
+          href: "/operations/refunds",
           icon: BanknotesIcon,
-          description: t('admin.nav.items.refundHistory.description'),
-          keywords: t('admin.nav.items.refundHistory.keywords').split(',').map((k) => k.trim()),
-          permission: 'refund_history',
+          description: t("admin.nav.items.refundHistory.description"),
+          keywords: t("admin.nav.items.refundHistory.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "refund_history",
         },
       ],
     },
     {
-      id: 'catalog',
-      name: t('admin.nav.groups.catalog'),
+      id: "catalog",
+      name: t("admin.nav.groups.catalog"),
       icon: Squares2X2Icon,
-      href: '/catalog',
+      href: "/catalog",
       items: [
         {
-          name: t('admin.nav.items.products.name'),
-          href: '/catalog/products',
+          name: t("admin.nav.items.products.name"),
+          href: "/catalog/products",
           icon: ShoppingBagIcon,
-          description: t('admin.nav.items.products.description'),
-          permission: 'products',
+          description: t("admin.nav.items.products.description"),
+          permission: "products",
         },
         {
-          name: t('admin.nav.items.categories.name'),
-          href: '/catalog/categories',
+          name: t("admin.nav.items.categories.name"),
+          href: "/catalog/categories",
           icon: CubeIcon,
-          description: t('admin.nav.items.categories.description'),
-          permission: 'categories',
+          description: t("admin.nav.items.categories.description"),
+          permission: "categories",
         },
         {
-          name: t('admin.nav.items.brands.name'),
-          href: '/catalog/brands',
+          name: t("admin.nav.items.brands.name"),
+          href: "/catalog/brands",
           icon: SwatchIcon,
-          description: t('admin.nav.items.brands.description'),
-          permission: 'brands',
+          description: t("admin.nav.items.brands.description"),
+          permission: "brands",
         },
         {
-          name: t('admin.nav.items.carModels.name'),
-          href: '/catalog/car-models',
+          name: t("admin.nav.items.carModels.name"),
+          href: "/catalog/car-models",
           icon: TruckIcon,
-          description: t('admin.nav.items.carModels.description'),
-          permission: 'car_models',
+          description: t("admin.nav.items.carModels.description"),
+          permission: "car_models",
         },
         {
-          name: t('admin.nav.items.manufacturers.name'),
-          href: '/catalog/manufacturers',
+          name: t("admin.nav.items.manufacturers.name"),
+          href: "/catalog/manufacturers",
           icon: BuildingOffice2Icon,
-          description: t('admin.nav.items.manufacturers.description'),
-          permission: 'manufacturers',
+          description: t("admin.nav.items.manufacturers.description"),
+          permission: "manufacturers",
         },
         {
-          name: t('admin.nav.items.attributes.name'),
-          href: '/catalog/attributes',
+          name: t("admin.nav.items.attributes.name"),
+          href: "/catalog/attributes",
           icon: ClipboardDocumentListIcon,
-          description: t('admin.nav.items.attributes.description'),
-          keywords: t('admin.nav.items.attributes.keywords').split(',').map((k) => k.trim()),
-          permission: 'attributes',
+          description: t("admin.nav.items.attributes.description"),
+          keywords: t("admin.nav.items.attributes.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "attributes",
         },
         {
-          name: t('admin.nav.items.collections.name'),
-          href: '/catalog/collections',
+          name: t("admin.nav.items.collections.name"),
+          href: "/catalog/collections",
           icon: ClipboardDocumentCheckIcon,
-          description: t('admin.nav.items.collections.description'),
-          permission: 'collections',
+          description: t("admin.nav.items.collections.description"),
+          permission: "collections",
         },
       ],
     },
     {
-      id: 'users',
-      name: t('admin.nav.groups.users'),
+      id: "users",
+      name: t("admin.nav.groups.users"),
       icon: UsersIcon,
-      href: '/accounts',
+      href: "/accounts",
       items: [
         {
-          name: t('admin.nav.items.users.name'),
-          href: '/accounts/users',
+          name: t("admin.nav.items.users.name"),
+          href: "/accounts/users",
           icon: UsersIcon,
-          description: t('admin.nav.items.users.description'),
-          keywords: t('admin.nav.items.users.keywords').split(',').map((k) => k.trim()),
-          permission: 'users',
+          description: t("admin.nav.items.users.description"),
+          keywords: t("admin.nav.items.users.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "users",
         },
         {
-          name: t('admin.nav.items.sellerApplications.name'),
-          href: '/accounts/seller-applications',
+          name: t("admin.nav.items.sellerApplications.name"),
+          href: "/accounts/seller-applications",
           icon: ClipboardDocumentCheckIcon,
-          description: t('admin.nav.items.sellerApplications.description'),
-          permission: 'seller_applications',
+          description: t("admin.nav.items.sellerApplications.description"),
+          permission: "seller_applications",
         },
         {
-          name: t('admin.nav.items.sellerPerformance.name'),
-          href: '/accounts/seller-performance',
+          name: t("admin.nav.items.sellerPerformance.name"),
+          href: "/accounts/seller-performance",
           icon: ChartBarIcon,
-          description: t('admin.nav.items.sellerPerformance.description'),
-          permission: 'seller_performance',
+          description: t("admin.nav.items.sellerPerformance.description"),
+          permission: "seller_performance",
         },
         {
-          name: t('admin.nav.items.reviews.name'),
-          href: '/accounts/reviews',
+          name: t("admin.nav.items.reviews.name"),
+          href: "/accounts/reviews",
           icon: StarIcon,
-          description: t('admin.nav.items.reviews.description'),
-          permission: 'reviews',
+          description: t("admin.nav.items.reviews.description"),
+          permission: "reviews",
         },
         {
-          name: t('admin.nav.items.reports.name'),
-          href: '/accounts/reports',
+          name: t("admin.nav.items.reports.name"),
+          href: "/accounts/reports",
           icon: FlagIcon,
-          description: t('admin.nav.items.reports.description'),
-          keywords: t('admin.nav.items.reports.keywords').split(',').map((k) => k.trim()),
-          permission: 'reports',
+          description: t("admin.nav.items.reports.description"),
+          keywords: t("admin.nav.items.reports.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "reports",
         },
         {
-          name: t('admin.nav.items.staff.name'),
-          href: '/accounts/roles',
+          name: t("admin.nav.items.staff.name"),
+          href: "/accounts/roles",
           icon: UserCircleIcon,
-          description: t('admin.nav.items.staff.description'),
-          permission: 'staff',
+          description: t("admin.nav.items.staff.description"),
+          permission: "staff",
         },
       ],
     },
     {
-      id: 'messaging',
-      name: t('admin.nav.groups.messaging'),
+      id: "messaging",
+      name: t("admin.nav.groups.messaging"),
       icon: ChatBubbleLeftRightIcon,
-      href: '/messaging',
+      href: "/messaging",
       items: [
         {
-          name: t('admin.nav.items.messages.name'),
-          href: '/messaging/messages',
+          name: t("admin.nav.items.messages.name"),
+          href: "/messaging/messages",
           icon: ChatBubbleLeftRightIcon,
-          description: t('admin.nav.items.messages.description'),
-          permission: 'messages',
+          description: t("admin.nav.items.messages.description"),
+          permission: "messages",
         },
         {
-          name: t('admin.nav.items.support.name'),
-          href: '/messaging/support',
+          name: t("admin.nav.items.support.name"),
+          href: "/messaging/support",
           icon: ChatBubbleLeftRightIcon,
-          description: t('admin.nav.items.support.description'),
-          keywords: t('admin.nav.items.support.keywords').split(',').map((k) => k.trim()),
-          permission: 'support',
+          description: t("admin.nav.items.support.description"),
+          keywords: t("admin.nav.items.support.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "support",
         },
       ],
     },
     {
-      id: 'marketing',
-      name: t('admin.nav.groups.marketing'),
+      id: "marketing",
+      name: t("admin.nav.groups.marketing"),
       icon: MegaphoneIcon,
-      href: '/marketing',
+      href: "/marketing",
       items: [
         {
-          name: t('admin.nav.items.ads.name'),
-          href: '/marketing/ads',
+          name: t("admin.nav.items.ads.name"),
+          href: "/marketing/ads",
           icon: MegaphoneIcon,
-          description: t('admin.nav.items.ads.description'),
-          keywords: t('admin.nav.items.ads.keywords').split(',').map((k) => k.trim()),
-          permission: 'ads',
+          description: t("admin.nav.items.ads.description"),
+          keywords: t("admin.nav.items.ads.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "ads",
         },
         {
-          name: t('admin.nav.items.discounts.name'),
-          href: '/marketing/discounts',
+          name: t("admin.nav.items.discounts.name"),
+          href: "/marketing/discounts",
           icon: TicketIcon,
-          description: t('admin.nav.items.discounts.description'),
-          keywords: t('admin.nav.items.discounts.keywords').split(',').map((k) => k.trim()),
-          permission: 'discounts',
+          description: t("admin.nav.items.discounts.description"),
+          keywords: t("admin.nav.items.discounts.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "discounts",
         },
         {
-          name: t('admin.nav.items.notifications.name'),
-          href: '/marketing/notifications',
+          name: t("admin.nav.items.notifications.name"),
+          href: "/marketing/notifications",
           icon: BellAlertIcon,
-          description: t('admin.nav.items.notifications.description'),
-          permission: 'notifications',
+          description: t("admin.nav.items.notifications.description"),
+          permission: "notifications",
         },
         {
-          name: t('admin.nav.items.emailTemplates.name'),
-          href: '/marketing/email-templates',
+          name: t("admin.nav.items.emailTemplates.name"),
+          href: "/marketing/email-templates",
           icon: ChatBubbleLeftRightIcon,
-          description: t('admin.nav.items.emailTemplates.description'),
-          permission: 'email_templates',
+          description: t("admin.nav.items.emailTemplates.description"),
+          permission: "email_templates",
         },
         {
-          name: t('admin.nav.items.pages.name'),
-          href: '/marketing/pages',
+          name: t("admin.nav.items.pages.name"),
+          href: "/marketing/pages",
           icon: DocumentTextIcon,
-          description: t('admin.nav.items.pages.description'),
-          permission: 'pages',
+          description: t("admin.nav.items.pages.description"),
+          permission: "pages",
         },
       ],
     },
     {
-      id: 'finance',
-      name: t('admin.nav.groups.finance'),
+      id: "finance",
+      name: t("admin.nav.groups.finance"),
       icon: CurrencyDollarIcon,
-      href: '/finance',
+      href: "/finance",
       items: [
         {
-          name: t('admin.nav.items.payments.name'),
-          href: '/finance/payments',
+          name: t("admin.nav.items.payments.name"),
+          href: "/finance/payments",
           icon: CreditCardIcon,
-          description: t('admin.nav.items.payments.description'),
-          keywords: t('admin.nav.items.payments.keywords').split(',').map((k) => k.trim()),
-          permission: 'payments',
+          description: t("admin.nav.items.payments.description"),
+          keywords: t("admin.nav.items.payments.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "payments",
         },
         {
-          name: t('admin.nav.items.commission.name'),
-          href: '/finance/commission',
+          name: t("admin.nav.items.commission.name"),
+          href: "/finance/commission",
           icon: CurrencyDollarIcon,
-          description: t('admin.nav.items.commission.description'),
-          permission: 'commission',
+          description: t("admin.nav.items.commission.description"),
+          permission: "commission",
         },
         {
-          name: t('admin.nav.items.payouts.name'),
-          href: '/finance/payouts',
+          name: t("admin.nav.items.payouts.name"),
+          href: "/finance/payouts",
           icon: BanknotesIcon,
-          description: t('admin.nav.items.payouts.description'),
-          permission: 'payouts',
+          description: t("admin.nav.items.payouts.description"),
+          permission: "payouts",
         },
         {
-          name: t('admin.nav.items.invoices.name'),
-          href: '/finance/invoices',
+          name: t("admin.nav.items.invoices.name"),
+          href: "/finance/invoices",
           icon: DocumentTextIcon,
-          description: t('admin.nav.items.invoices.description'),
-          keywords: t('admin.nav.items.invoices.keywords').split(',').map((k) => k.trim()),
-          permission: 'invoices',
+          description: t("admin.nav.items.invoices.description"),
+          keywords: t("admin.nav.items.invoices.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "invoices",
         },
         {
-          name: t('admin.nav.items.tax.name'),
-          href: '/finance/tax',
+          name: t("admin.nav.items.tax.name"),
+          href: "/finance/tax",
           icon: CalculatorIcon,
-          description: t('admin.nav.items.tax.description'),
-          permission: 'tax',
+          description: t("admin.nav.items.tax.description"),
+          permission: "tax",
         },
       ],
     },
     {
-      id: 'system',
-      name: t('admin.nav.groups.system'),
+      id: "system",
+      name: t("admin.nav.groups.system"),
       icon: Cog6ToothIcon,
-      href: '/system',
+      href: "/system",
       items: [
         {
-          name: t('admin.nav.items.aiModeration.name'),
-          href: '/system/ai-moderation',
+          name: t("admin.nav.items.aiModeration.name"),
+          href: "/system/ai-moderation",
           icon: ClipboardDocumentCheckIcon,
-          description: t('admin.nav.items.aiModeration.description'),
-          keywords: t('admin.nav.items.aiModeration.keywords').split(',').map((k) => k.trim()),
-          permission: 'ai_moderation',
+          description: t("admin.nav.items.aiModeration.description"),
+          keywords: t("admin.nav.items.aiModeration.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "ai_moderation",
         },
         {
-          name: t('admin.nav.items.membershipTiers.name'),
-          href: '/system/membership-tiers',
+          name: t("admin.nav.items.membershipTiers.name"),
+          href: "/system/membership-tiers",
           icon: StarIcon,
-          description: t('admin.nav.items.membershipTiers.description'),
-          keywords: t('admin.nav.items.membershipTiers.keywords').split(',').map((k) => k.trim()),
-          permission: 'membership_tiers',
+          description: t("admin.nav.items.membershipTiers.description"),
+          keywords: t("admin.nav.items.membershipTiers.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "membership_tiers",
         },
         {
-          name: t('admin.nav.items.settings.name'),
-          href: '/system/settings',
+          name: t("admin.nav.items.settings.name"),
+          href: "/system/settings",
           icon: Cog6ToothIcon,
-          description: t('admin.nav.items.settings.description'),
-          permission: 'settings',
+          description: t("admin.nav.items.settings.description"),
+          permission: "settings",
         },
         {
-          name: t('admin.nav.items.logs.name'),
-          href: '/system/logs',
+          name: t("admin.nav.items.logs.name"),
+          href: "/system/logs",
           icon: ClipboardDocumentIcon,
-          description: t('admin.nav.items.logs.description'),
-          keywords: t('admin.nav.items.logs.keywords').split(',').map((k) => k.trim()),
-          permission: 'logs',
+          description: t("admin.nav.items.logs.description"),
+          keywords: t("admin.nav.items.logs.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "logs",
         },
         {
-          name: t('admin.nav.items.testTools.name'),
-          href: '/system/test-tools',
+          name: t("admin.nav.items.testTools.name"),
+          href: "/system/test-tools",
           icon: BeakerIcon,
-          description: t('admin.nav.items.testTools.description'),
-          keywords: t('admin.nav.items.testTools.keywords').split(',').map((k) => k.trim()),
-          permission: 'test_tools',
-          roles: ['super_admin'],
+          description: t("admin.nav.items.testTools.description"),
+          keywords: t("admin.nav.items.testTools.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "test_tools",
+          roles: ["super_admin"],
         },
       ],
     },
@@ -428,7 +462,7 @@ export function getNavGroups(t: T): NavGroup[] {
 }
 
 /** Suffix appended to every page title, e.g. "Kullanıcılar - Tarodan Admin". */
-export const APP_NAME = 'Tarodan Admin';
+export const APP_NAME = "Tarodan Admin";
 
 /**
  * Document title + meta description for a path, derived from the nav config
@@ -437,8 +471,11 @@ export const APP_NAME = 'Tarodan Admin';
  * there's no separate title list to drift. Unmatched paths (section redirects,
  * unknown routes) fall back to the app name + default description.
  */
-export function pageMetadataFor(pathname: string, t: T): { title: string; description: string } {
-  const defaultDescription = t('admin.nav.defaultDescription');
+export function pageMetadataFor(
+  pathname: string,
+  t: T,
+): { title: string; description: string } {
+  const defaultDescription = t("admin.nav.defaultDescription");
   const topLevelNav = getTopLevelNav(t);
   const navGroups = getNavGroups(t);
 
@@ -456,7 +493,9 @@ export function pageMetadataFor(pathname: string, t: T): { title: string; descri
   if (!bestItem) return { title: APP_NAME, description: defaultDescription };
 
   const isLeaf = pathname === bestItem.href;
-  const label = isLeaf ? bestItem.name : `${bestItem.name} — ${t('admin.nav.detailSuffix')}`;
+  const label = isLeaf
+    ? bestItem.name
+    : `${bestItem.name} — ${t("admin.nav.detailSuffix")}`;
   return {
     title: `${label} - ${APP_NAME}`,
     description: bestItem.description ?? defaultDescription,
@@ -465,10 +504,12 @@ export function pageMetadataFor(pathname: string, t: T): { title: string; descri
 
 /** Whether a nav item matches a search query (name/href/keywords). */
 export function matchesQuery(item: NavItem, q: string): boolean {
-  const name = item.name.toLocaleLowerCase('tr-TR');
+  const name = item.name.toLocaleLowerCase("tr-TR");
   const href = item.href.toLowerCase();
   if (name.includes(q) || href.includes(q)) return true;
-  return (item.keywords ?? []).some((k) => k.toLocaleLowerCase('tr-TR').includes(q));
+  return (item.keywords ?? []).some((k) =>
+    k.toLocaleLowerCase("tr-TR").includes(q),
+  );
 }
 
 /**
@@ -499,7 +540,8 @@ const ROUTE_PERMISSIONS: Record<string, string> = (() => {
   const map: Record<string, string> = {};
   const add = (items: NavItem[]) => {
     for (const item of items) {
-      if (item.permission && item.href !== '/dashboard') map[item.href] = item.permission;
+      if (item.permission && item.href !== "/dashboard")
+        map[item.href] = item.permission;
     }
   };
   add(getTopLevelNav(identityT));
@@ -515,7 +557,9 @@ export function routePermission(pathname: string): string | null {
   let best: string | null = null;
   let bestLen = -1;
   for (const [prefix, permission] of Object.entries(ROUTE_PERMISSIONS)) {
-    if (pathname.startsWith(prefix) && prefix.length > bestLen) {
+    const matchesRoute =
+      pathname === prefix || pathname.startsWith(`${prefix}/`);
+    if (matchesRoute && prefix.length > bestLen) {
       best = permission;
       bestLen = prefix.length;
     }
@@ -531,12 +575,13 @@ export interface Crumb {
 
 /** Turn a URL segment into a readable leaf label; ids collapse to the "Detail" word. */
 function humanizeSegment(segment: string, t: T): string {
-  if (/^\d+$/.test(segment) || /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(segment)) return t('admin.nav.detailSuffix');
+  if (/^\d+$/.test(segment) || /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(segment))
+    return t("admin.nav.detailSuffix");
   return segment
-    .split('-')
+    .split("-")
     .filter(Boolean)
-    .map((word) => word[0].toLocaleUpperCase('tr-TR') + word.slice(1))
-    .join(' ');
+    .map((word) => word[0].toLocaleUpperCase("tr-TR") + word.slice(1))
+    .join(" ");
 }
 
 /**
@@ -559,7 +604,9 @@ export function breadcrumbsFor(pathname: string, t: T): Crumb[] {
     }
   };
   topLevelNav.forEach((item) => consider(item));
-  navGroups.forEach((group) => group.items.forEach((item) => consider(item, group)));
+  navGroups.forEach((group) =>
+    group.items.forEach((item) => consider(item, group)),
+  );
 
   const item = bestItem;
   if (!item) return [];
@@ -572,7 +619,7 @@ export function breadcrumbsFor(pathname: string, t: T): Crumb[] {
   crumbs.push({ label: item.name, href: isLeaf ? undefined : item.href });
 
   if (!isLeaf) {
-    const tail = pathname.slice(item.href.length).split('/').filter(Boolean);
+    const tail = pathname.slice(item.href.length).split("/").filter(Boolean);
     const last = tail[tail.length - 1];
     if (last) crumbs.push({ label: humanizeSegment(last, t) });
   }

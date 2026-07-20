@@ -119,7 +119,11 @@ export const queryKeys = {
   messages: {
     settings: () => ["message-settings"] as const,
     threads: () => ["message-threads"] as const,
+    unreadCount: () => ["messages-unread-count"] as const,
     thread: (id: string | undefined) => ["messages", id] as const,
+  },
+  offers: {
+    pendingCount: () => ["offers-pending-count"] as const,
   },
   orders: {
     all: () => ["orders"] as const,
@@ -131,6 +135,7 @@ export const queryKeys = {
   trades: {
     all: () => ["trades"] as const,
     detail: (id: string) => ["trade", id] as const,
+    pendingCount: () => ["trades-pending-count"] as const,
   },
   payments: {
     all: () => ["profile-payments"] as const,

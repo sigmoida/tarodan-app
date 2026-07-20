@@ -6,8 +6,8 @@ import {
   fetchRefundRequests,
   REFUND_STATUS_OPTIONS,
 } from "@/lib/refund-request-query";
-import { returnShipmentColumns } from "./_lib/columns";
-import type { ReturnShipmentRow } from "./_lib/types";
+import { returnShipmentColumns } from "../_lib/columns";
+import type { ReturnShipmentRow } from "../_lib/types";
 
 export function ReturnShipmentsTab() {
   const t = useTranslations();

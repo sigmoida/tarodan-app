@@ -1,12 +1,17 @@
 import type { Metadata } from "next";
-import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
-import { getServerQueryClient } from "@/lib/query/server";
-import { queryKeys } from "@/lib/query/keys";
 import { hasRealDiscount } from "@/lib/productPrice";
 import { unwrapList } from "@/lib/unwrapList";
 import { localizedCanonical, localizedPath } from "@/lib/seo";
 import { getServerApiOrigin } from "@/lib/api/origin";
-import HomeClient from "./_home/_components/HomeClient";
+import type { Product } from "@/types/product";
+import HomeContent from "./_home/_components/HomeContent";
+import { BRANDS } from "./_home/lib/constants";
+import type {
+  BrandMarqueeItem,
+  FeaturedBusiness,
+  FeaturedCollector,
+  HomePageData,
+} from "./_home/lib/types";
 
 const API_BASE = getServerApiOrigin();
 
@@ -38,17 +43,13 @@ export function generateMetadata({
 }
 
 /**
- * Server fetch for `/products` (public, no auth). Mirrors the client
- * `listingsApi.getAll` unwrap: raw is either an array or `{ data | products }`.
- * The client axios instance uses a relative `/api` baseURL that doesn't resolve
- * on the server, so we hit the absolute API URL directly. ISR (`revalidate: 60`)
- * lets the CDN serve the home rails from cache and revalidate at most once a
- * minute (#98). Throws on non-OK so the caller skips seeding that key and lets
- * the client fetch it.
+ * Public server fetch for `/products`. The API may return an array or a wrapped
+ * `{ data | products }` payload. ISR keeps the rendered rails fresh without
+ * sending their fetching and transformation code to the browser.
  */
 async function fetchProducts(
   params: Record<string, string | number | boolean>,
-): Promise<unknown[]> {
+): Promise<Product[]> {
   const qs = new URLSearchParams(
     Object.entries(params).map(([k, v]) => [k, String(v)]),
   ).toString();
@@ -56,58 +57,64 @@ async function fetchProducts(
     next: { revalidate: 60 },
   });
   if (!res.ok) throw new Error(`products ${res.status}`);
-  return unwrapList(await res.json());
+  return unwrapList<Product>(await res.json());
 }
 
 /** Discounted rail: same real-discount filter the client applies. */
-async function fetchDiscountedProducts(): Promise<unknown[]> {
+async function fetchDiscountedProducts(): Promise<Product[]> {
   const products = await fetchProducts({
     limit: 24,
     page: 1,
     discountOnly: true,
     status: "active",
   });
-  return products.filter((p) => hasRealDiscount(p as any));
+  return products.filter(hasRealDiscount);
 }
 
-async function fetchManufacturers(): Promise<unknown[]> {
+interface Manufacturer {
+  name: string;
+  logo?: string | null;
+  description?: string | null;
+}
+
+async function fetchManufacturers(): Promise<Manufacturer[]> {
   const res = await fetch(`${API_BASE}/api/manufacturers`, {
     next: { revalidate: 60 },
   });
   if (!res.ok) throw new Error(`manufacturers ${res.status}`);
-  return unwrapList(await res.json());
+  return unwrapList<Manufacturer>(await res.json());
 }
 
-async function fetchTopCollections(): Promise<unknown[]> {
+async function fetchTopCollections(): Promise<FeaturedCollector[]> {
   const res = await fetch(`${API_BASE}/api/users/top-collections?limit=20`, {
     next: { revalidate: 60 },
   });
   if (!res.ok) throw new Error(`top-collections ${res.status}`);
-  return unwrapList(await res.json());
+  return unwrapList<FeaturedCollector>(await res.json());
 }
 
 /** featured-collector / featured-business: mirror the client's `data ?? null`. */
-async function fetchNullable(path: string): Promise<unknown> {
+async function fetchNullable<T>(path: string): Promise<T | null> {
   const res = await fetch(`${API_BASE}${path}`, { next: { revalidate: 60 } });
   if (!res.ok) throw new Error(`${path} ${res.status}`);
   const raw = await res.json();
-  return raw ?? null;
+  return (raw ?? null) as T | null;
 }
 
-export default async function HomePage() {
-  const queryClient = getServerQueryClient();
+function settledValue<T>(result: PromiseSettledResult<T>, fallback: T): T {
+  return result.status === "fulfilled" ? result.value : fallback;
+}
 
-  // Prefetch the FINITE home sections server-side and seed the query cache with
-  // the SAME keys the client `useQuery`s use, so the content ships in the first
-  // HTML and hydrates without a refetch flash. Each fetch is independent; if one
-  // throws/non-OKs we simply don't seed that key and the client fetches it.
-  // NOTE: the infinite `bestSellers` (queryKeys.home.popular) is intentionally
-  // NOT prefetched — infinite-query hydration is out of scope; it stays
-  // client-fetched.
+export default async function HomePage({
+  params: { locale },
+}: {
+  params: { locale: string };
+}) {
   const [
     featured,
     trade,
     discounted,
+    popular,
     manufacturers,
     featuredCollector,
     featuredBusiness,
@@ -116,42 +123,49 @@ export default async function HomePage() {
     fetchProducts({ limit: 20, page: 1, boostedOnly: true, status: "active" }),
     fetchProducts({ limit: 24, page: 1, tradeOnly: true, status: "active" }),
     fetchDiscountedProducts(),
+    fetch(`${API_BASE}/api/products/popular?limit=20&page=1`, {
+      next: { revalidate: 60 },
+    }).then(async (res) => {
+      if (!res.ok) throw new Error(`popular products ${res.status}`);
+      return unwrapList<Product>(await res.json());
+    }),
     fetchManufacturers(),
-    fetchNullable("/api/users/featured-collector"),
-    fetchNullable("/api/users/featured-business"),
+    fetchNullable<FeaturedCollector>("/api/users/featured-collector"),
+    fetchNullable<FeaturedBusiness>("/api/users/featured-business"),
     fetchTopCollections(),
   ]);
 
-  if (featured.status === "fulfilled")
-    queryClient.setQueryData(queryKeys.home.featured(), featured.value);
-  if (trade.status === "fulfilled")
-    queryClient.setQueryData(queryKeys.home.trade(), trade.value);
-  if (discounted.status === "fulfilled")
-    queryClient.setQueryData(queryKeys.home.discounted(), discounted.value);
-  if (manufacturers.status === "fulfilled")
-    queryClient.setQueryData(
-      queryKeys.home.manufacturers(),
-      manufacturers.value,
-    );
-  if (featuredCollector.status === "fulfilled")
-    queryClient.setQueryData(
-      queryKeys.home.featuredCollector(),
-      featuredCollector.value,
-    );
-  if (featuredBusiness.status === "fulfilled")
-    queryClient.setQueryData(
-      queryKeys.home.featuredBusiness(),
-      featuredBusiness.value,
-    );
-  if (topCollections.status === "fulfilled")
-    queryClient.setQueryData(
-      queryKeys.home.topCollections(20),
-      topCollections.value,
-    );
-
-  return (
-    <HydrationBoundary state={dehydrate(queryClient)}>
-      <HomeClient />
-    </HydrationBoundary>
+  const manufacturerItems = settledValue(manufacturers, []);
+  const apiNames = new Set(
+    manufacturerItems.map((item) => item.name?.toLowerCase() ?? ""),
   );
+  const marqueeItems: BrandMarqueeItem[] = [
+    ...manufacturerItems.map((item) => {
+      const fallback = BRANDS.find(
+        (brand) =>
+          brand.name.toLowerCase() === (item.name?.toLowerCase() ?? ""),
+      );
+      return {
+        name: item.name,
+        logoUrl: item.logo || fallback?.logoUrl || "",
+        desc: item.description || fallback?.desc || "",
+      };
+    }),
+    ...BRANDS.filter((brand) => !apiNames.has(brand.name.toLowerCase())).map(
+      ({ name, logoUrl, desc }) => ({ name, logoUrl, desc }),
+    ),
+  ];
+
+  const data: HomePageData = {
+    featured: settledValue(featured, []),
+    discounted: settledValue(discounted, []),
+    trade: settledValue(trade, []),
+    popular: settledValue(popular, []),
+    topCollections: settledValue(topCollections, []),
+    featuredCollector: settledValue(featuredCollector, null),
+    featuredBusiness: settledValue(featuredBusiness, null),
+    marqueeItems: marqueeItems.length > 0 ? marqueeItems : BRANDS,
+  };
+
+  return <HomeContent data={data} locale={locale} />;
 }

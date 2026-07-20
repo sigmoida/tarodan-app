@@ -1,12 +1,9 @@
 /** @format */
 
-"use client";
-
 import type { ReactNode } from "react";
 import { Link } from "@/i18n/navigation";
 import { ChevronRightIcon } from "@heroicons/react/24/outline";
-import { Button } from "@tarodan/ui";
-import { SectionCard } from "@/components/ui";
+import SectionCard from "@/components/ui/SectionCard";
 
 /**
  * The home-page section wrapper: the standard `py-4 px-4` rhythm around a shared
@@ -33,15 +30,13 @@ export default function HomeSection({
         badge={badge}
         action={
           viewAllHref ? (
-            <Button asChild variant="secondary" size="sm">
-              <Link
-                href={viewAllHref}
-                className="inline-flex items-center gap-1"
-              >
-                {viewAllLabel}
-                <ChevronRightIcon className="w-4 h-4" />
-              </Link>
-            </Button>
+            <Link
+              href={viewAllHref}
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-surface-elevated px-3 py-1.5 text-sm font-medium text-body transition-colors hover:bg-surface"
+            >
+              {viewAllLabel}
+              <ChevronRightIcon className="w-4 h-4" />
+            </Link>
           ) : undefined
         }
       >

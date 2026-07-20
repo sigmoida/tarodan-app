@@ -1,8 +1,5 @@
 /** @format */
 
-"use client";
-
-import { useLocale, useTranslations } from "next-intl";
 import {
   ShieldCheckIcon,
   TruckIcon,
@@ -79,8 +76,7 @@ const TRUST_BADGES = {
   ],
 };
 
-export default function TrustBadges() {
-  const locale = useLocale();
+export default function TrustBadges({ locale }: { locale: string }) {
   const badges = TRUST_BADGES[locale as "tr" | "en"];
 
   return (
