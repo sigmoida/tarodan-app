@@ -3015,6 +3015,26 @@
         "title": "Recent Trades",
         "empty": "No trades yet"
       },
+      "topProducts": {
+        "title": "Top Viewed Products",
+        "empty": "No product views yet",
+        "columns": {
+          "product": "Product",
+          "seller": "Seller",
+          "views": "Views",
+          "price": "Price"
+        }
+      },
+      "topSellers": {
+        "title": "Top Viewed Sellers",
+        "empty": "No seller views yet",
+        "columns": {
+          "seller": "Seller",
+          "views": "Views",
+          "products": "Products",
+          "activeListings": "Active"
+        }
+      },
       "status": {
         "refundRequested": "Refund Requested",
         "inProgress": "In Progress"

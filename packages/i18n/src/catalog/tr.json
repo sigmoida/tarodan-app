@@ -3015,6 +3015,26 @@
         "title": "Son Takaslar",
         "empty": "Henüz takas bulunmuyor"
       },
+      "topProducts": {
+        "title": "En Çok Görüntülenen Ürünler",
+        "empty": "Henüz ürün görüntülemesi bulunmuyor",
+        "columns": {
+          "product": "Ürün",
+          "seller": "Satıcı",
+          "views": "Görüntülenme",
+          "price": "Fiyat"
+        }
+      },
+      "topSellers": {
+        "title": "En Çok Görüntülenen Satıcılar",
+        "empty": "Henüz satıcı görüntülemesi bulunmuyor",
+        "columns": {
+          "seller": "Satıcı",
+          "views": "Görüntülenme",
+          "products": "Ürün",
+          "activeListings": "Aktif İlan"
+        }
+      },
       "status": {
         "refundRequested": "İade Talebi",
         "inProgress": "Devam Ediyor"
