@@ -5,7 +5,6 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { useCart } from "@/hooks/useCart";
-import { useAuthStore } from "@/stores/authStore";
 import { useTranslations } from "next-intl";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -19,8 +18,10 @@ import EmptyCart from "./_components/EmptyCart";
 
 export default function CartClient() {
   const {
+    isAuthenticated,
+    lines: cartLines,
+    lineCount,
     items,
-    offlineItems,
     subtotal,
     isLoading,
     refetch: fetchCart,
@@ -29,7 +30,6 @@ export default function CartClient() {
     totalDiscount,
     appliedDiscounts,
   } = useCart();
-  const { isAuthenticated } = useAuthStore();
   const t = useTranslations();
 
   const buyerFee = useBuyerFee(items);
@@ -64,41 +64,29 @@ export default function CartClient() {
     toast.success(t("product.removedFromCart"));
   };
 
-  const hasOnlineItems = items.length > 0;
-  const hasOfflineItems = offlineItems.length > 0;
+  const hasLines = lineCount > 0;
 
   // Show the skeleton while loading OR before the first fetch settles — but never
   // when we already have rows to render (client-side nav with a warm store).
-  if ((isLoading || !fetched) && !hasOnlineItems && !hasOfflineItems)
-    return <CartSkeleton />;
+  if ((isLoading || !fetched) && !hasLines) return <CartSkeleton />;
 
-  if (!hasOnlineItems && !hasOfflineItems) return <EmptyCart />;
+  if (!hasLines) return <EmptyCart />;
 
-  // One normalized list feeds a single CartItemCard for both authed + guest rows.
-  const lines: CartLineItem[] = [
-    ...items.map((item) => ({
-      key: item.id,
-      productId: item.productId,
-      image: item.productImage,
-      title: item.productTitle,
-      sellerName: item.sellerName,
-      price: item.effectivePrice ?? 0,
-      originalPrice: item.originalPrice,
-      onRemove: () => handleRemove(item.productId),
-    })),
-    ...(!isAuthenticated
-      ? offlineItems.map((item) => ({
-          key: item.id,
-          productId: item.productId,
-          image: item.imageUrl,
-          title: item.title,
-          sellerName: item.seller.displayName,
-          price: item.price,
-          originalPrice: undefined,
-          onRemove: () => handleOfflineRemove(item.productId),
-        }))
-      : []),
-  ];
+  // Add UI callbacks to the normalized lines created by useCart. The same list
+  // now controls the empty state, row count, rendered cards, and totals.
+  const lines: CartLineItem[] = cartLines.map((line) => ({
+    key: line.id,
+    productId: line.productId,
+    image: line.imageUrl,
+    title: line.title,
+    sellerName: line.sellerName,
+    price: line.price,
+    originalPrice: line.originalPrice,
+    onRemove: () =>
+      line.source === "authenticated"
+        ? handleRemove(line.productId)
+        : handleOfflineRemove(line.productId),
+  }));
 
   // Shipping is shown at checkout, not here.
   const grandTotal = Math.max(0, subtotal - (totalDiscount ?? 0)) + buyerFee;
@@ -107,7 +95,7 @@ export default function CartClient() {
     <PageShell>
       <PageHeader
         title={t("cart.myCart")}
-        description={`${lines.length} ${t("collection.items")}`}
+        description={`${lineCount} ${t("collection.items")}`}
       />
 
       <div className="grid lg:grid-cols-3 gap-8">
