@@ -53,6 +53,13 @@ import {
   UpdateProductDto,
   RatingQueryDto,
   RatingStatus,
+  AdminUserRatingQueryDto,
+  AdminCategoryQueryDto,
+  AdminBrandQueryDto,
+  AdminManufacturerQueryDto,
+  AdminCarModelQueryDto,
+  AdminAttributeGroupQueryDto,
+  AdminAttributeQueryDto,
   ApproveWarehouseTradeDto,
   RejectWarehouseTradeDto,
 } from "./dto";
@@ -877,12 +884,8 @@ export class AdminService {
   // ==================== CATEGORY MANAGEMENT ====================
   // Taşındı: admin-catalog.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getCategories(params?: {
-    page?: number;
-    limit?: number;
-    search?: string;
-  }) {
-    return this.catalogService.getCategories(params);
+  async getCategories(query: AdminCategoryQueryDto) {
+    return this.catalogService.getCategories(query);
   }
 
   async createCategory(
@@ -1232,13 +1235,8 @@ export class AdminService {
   // ==================== BRAND MANAGEMENT ====================
   // Taşındı: admin-catalog.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getBrands(params?: {
-    page?: number;
-    limit?: number;
-    search?: string;
-    status?: string;
-  }) {
-    return this.catalogService.getBrands(params);
+  async getBrands(query: AdminBrandQueryDto) {
+    return this.catalogService.getBrands(query);
   }
 
   async createBrand(
@@ -1281,12 +1279,8 @@ export class AdminService {
   // ==================== MANUFACTURER MANAGEMENT ====================
   // Taşındı: admin-catalog.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getManufacturers(params?: {
-    page?: number;
-    limit?: number;
-    search?: string;
-  }) {
-    return this.catalogService.getManufacturers(params);
+  async getManufacturers(query: AdminManufacturerQueryDto) {
+    return this.catalogService.getManufacturers(query);
   }
 
   async createManufacturer(
@@ -1329,13 +1323,8 @@ export class AdminService {
   // ==================== CAR MODEL MANAGEMENT ====================
   // Taşındı: admin-catalog.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getCarModels(params?: {
-    brandId?: string;
-    page?: number;
-    limit?: number;
-    search?: string;
-  }) {
-    return this.catalogService.getCarModels(params);
+  async getCarModels(query: AdminCarModelQueryDto) {
+    return this.catalogService.getCarModels(query);
   }
 
   async createCarModel(
@@ -1636,12 +1625,7 @@ export class AdminService {
   // ==================== ATTRIBUTE GROUP MANAGEMENT ====================
   // Taşındı: admin-catalog.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getAttributeGroups(query: {
-    search?: string;
-    isActive?: boolean;
-    page?: number;
-    limit?: number;
-  }) {
+  async getAttributeGroups(query: AdminAttributeGroupQueryDto) {
     return this.catalogService.getAttributeGroups(query);
   }
 
@@ -1683,13 +1667,7 @@ export class AdminService {
   // ==================== ATTRIBUTE VALUE MANAGEMENT ====================
   // Taşındı: admin-catalog.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getAttributes(query: {
-    groupId?: string;
-    search?: string;
-    isActive?: boolean;
-    page?: number;
-    limit?: number;
-  }) {
+  async getAttributes(query: AdminAttributeQueryDto) {
     return this.catalogService.getAttributes(query);
   }
 
@@ -1740,12 +1718,7 @@ export class AdminService {
     return this.reviewService.updateReviewStatus(adminId, reviewId, status);
   }
 
-  async getUserRatings(query: {
-    page?: number;
-    limit?: number;
-    search?: string;
-    status?: string;
-  }) {
+  async getUserRatings(query: AdminUserRatingQueryDto) {
     return this.reviewService.getUserRatings(query);
   }
 

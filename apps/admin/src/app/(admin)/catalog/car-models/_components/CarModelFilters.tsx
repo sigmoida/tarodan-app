@@ -14,7 +14,8 @@ export function CarModelFilters() {
   const [brandId, setBrandId] = useFilter("brandId");
   const { data: brands = [] } = useQuery<Brand[]>({
     queryKey: adminKeys.options("brands"),
-    queryFn: async () => (await adminApi.getBrands()).data?.data ?? [],
+    queryFn: async () =>
+      (await adminApi.getBrands({ limit: 100 })).data?.data ?? [],
   });
 
   return (

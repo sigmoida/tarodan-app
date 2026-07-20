@@ -1,8 +1,37 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { AnalyticsQueryDto } from "./dto";
-import { OrderStatus, ProductStatus } from "@prisma/client";
+import {
+  CommissionLedgerStatus,
+  OrderCancellationType,
+  OrderStatus,
+  ProductStatus,
+  RefundRequestStatus,
+} from "@prisma/client";
 import { AdminAnalyticsCommonService } from "./admin-analytics-common.service";
+
+export interface MetricPeriods {
+  yesterday: number;
+  thisMonth: number;
+  lastMonth: number;
+  changePercent: number;
+}
+
+type MetricPeriodKey = "yesterday" | "thisMonth" | "lastMonth";
+type PeriodRange = { gte: Date; lt?: Date; lte?: Date };
+type PeriodRanges = Record<MetricPeriodKey, PeriodRange>;
+
+const METRIC_PERIOD_KEYS: MetricPeriodKey[] = [
+  "yesterday",
+  "thisMonth",
+  "lastMonth",
+];
+
+const REALIZED_ORDER_STATUSES: OrderStatus[] = [
+  OrderStatus.paid,
+  OrderStatus.delivered,
+  OrderStatus.completed,
+];
 
 /**
  * Analitik & dashboard grubu (dashboard istatistikleri, snapshot, satış/gelir/
@@ -26,10 +55,25 @@ export class AdminAnalyticsDashboardService {
    */
   async getDashboardStats() {
     const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const periods = this.getPeriodRanges(now);
 
     const [
+      users,
+      products,
+      orders,
+      totalSales,
+      commission,
+      activeProductsByPeriod,
+      passiveProducts,
+      activeUsers,
+      passiveUsers,
+      grossSales,
+      netCommission,
+      cancellations,
+      refunds,
+      cancellationsGrouped,
+      refundsGrouped,
       totalUsers,
       newUsers7d,
       totalProducts,
@@ -42,6 +86,126 @@ export class AdminAnalyticsDashboardService {
       revenue7d,
       byCategory,
     ] = await Promise.all([
+      this.getMetricPeriods(periods, (createdAt) =>
+        this.prisma.user.count({ where: { createdAt } }),
+      ),
+      this.getMetricPeriods(periods, (createdAt) =>
+        this.prisma.product.count({ where: { createdAt } }),
+      ),
+      this.getMetricPeriods(periods, (createdAt) =>
+        this.prisma.order.count({ where: { createdAt } }),
+      ),
+      this.getMetricPeriods(periods, (createdAt) =>
+        this.prisma.order.count({
+          where: {
+            createdAt,
+            status: { in: REALIZED_ORDER_STATUSES },
+          },
+        }),
+      ),
+      this.getMetricPeriods(periods, async (createdAt) => {
+        const result = await this.prisma.order.aggregate({
+          _sum: { commissionAmount: true },
+          where: {
+            createdAt,
+            status: { in: REALIZED_ORDER_STATUSES },
+          },
+        });
+        return Number(result._sum.commissionAmount ?? 0);
+      }),
+      // Product/User models do not keep status history. These period values
+      // therefore describe records created in the period that are currently in
+      // the requested account/catalog state.
+      this.getMetricPeriods(periods, (createdAt) =>
+        this.prisma.product.count({
+          where: { createdAt, status: ProductStatus.active },
+        }),
+      ),
+      this.getMetricPeriods(periods, (createdAt) =>
+        this.prisma.product.count({
+          where: {
+            createdAt,
+            status: {
+              in: [ProductStatus.inactive, ProductStatus.suspended],
+            },
+          },
+        }),
+      ),
+      this.getMetricPeriods(periods, (createdAt) =>
+        this.prisma.user.count({
+          where: { createdAt, isBanned: false, deletedAt: null },
+        }),
+      ),
+      this.getMetricPeriods(periods, (createdAt) =>
+        this.prisma.user.count({
+          where: {
+            createdAt,
+            OR: [{ isBanned: true }, { deletedAt: { not: null } }],
+          },
+        }),
+      ),
+      this.getMetricPeriods(periods, async (createdAt) => {
+        const result = await this.prisma.order.aggregate({
+          _sum: { totalAmount: true },
+          where: {
+            createdAt,
+            status: { in: REALIZED_ORDER_STATUSES },
+          },
+        });
+        return Number(result._sum.totalAmount ?? 0);
+      }),
+      this.getMetricPeriods(periods, async (createdAt) => {
+        const result = await this.prisma.commissionLedger.aggregate({
+          _sum: {
+            sellerCommission: true,
+            refundedSellerCommission: true,
+            buyerFee: true,
+            refundedBuyerFee: true,
+          },
+          where: {
+            createdAt,
+            status: { not: CommissionLedgerStatus.waived },
+          },
+        });
+        const sums = result._sum;
+        // Withholding tax belongs to the seller's tax/payout flow and is not
+        // platform revenue, so it does not reduce net commission here.
+        return (
+          Number(sums.sellerCommission ?? 0) -
+          Number(sums.refundedSellerCommission ?? 0) +
+          Number(sums.buyerFee ?? 0) -
+          Number(sums.refundedBuyerFee ?? 0)
+        );
+      }),
+      this.getMetricPeriods(periods, (createdAt) =>
+        this.prisma.order.count({
+          where: { createdAt, status: OrderStatus.cancelled },
+        }),
+      ),
+      this.getMetricPeriods(periods, (createdAt) =>
+        this.prisma.refundRequest.count({ where: { createdAt } }),
+      ),
+      Promise.all(
+        METRIC_PERIOD_KEYS.map((period) =>
+          this.prisma.order.groupBy({
+            by: ["cancellationType"],
+            where: {
+              createdAt: periods[period],
+              status: OrderStatus.cancelled,
+            },
+            _count: { id: true },
+          }),
+        ),
+      ),
+      Promise.all(
+        METRIC_PERIOD_KEYS.map((period) =>
+          this.prisma.refundRequest.groupBy({
+            by: ["status"],
+            where: { createdAt: periods[period] },
+            _count: { id: true },
+          }),
+        ),
+      ),
       this.prisma.user.count(),
       this.prisma.user.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
       this.prisma.product.count(),
@@ -52,15 +216,13 @@ export class AdminAnalyticsDashboardService {
       this.prisma.order.count({ where: { status: OrderStatus.completed } }),
       this.prisma.order.aggregate({
         _sum: { commissionAmount: true },
-        where: {
-          status: { in: [OrderStatus.completed, OrderStatus.delivered] },
-        },
+        where: { status: { in: REALIZED_ORDER_STATUSES } },
       }),
       this.prisma.order.aggregate({
         _sum: { commissionAmount: true },
         where: {
           createdAt: { gte: sevenDaysAgo },
-          status: { in: [OrderStatus.completed, OrderStatus.delivered] },
+          status: { in: REALIZED_ORDER_STATUSES },
         },
       }),
       this.prisma.product.groupBy({
@@ -89,27 +251,127 @@ export class AdminAnalyticsDashboardService {
       }))
       .sort((a, b) => b.count - a.count);
 
+    const cancellationsByType = this.buildPeriodBreakdown(
+      Object.values(OrderCancellationType),
+      cancellationsGrouped,
+      "cancellationType",
+    );
+    const refundsByStatus = this.buildPeriodBreakdown(
+      Object.values(RefundRequestStatus),
+      refundsGrouped,
+      "status",
+    );
+
     return {
       users: {
+        ...users,
         total: totalUsers,
         new7d: newUsers7d,
       },
       products: {
+        ...products,
         total: totalProducts,
         active: activeProducts,
         pending: pendingProducts,
       },
       orders: {
+        ...orders,
         total: totalOrders,
         last7d: orders7d,
         completed: completedOrders,
       },
       revenue: {
+        ...commission,
         total: Number(totalRevenue._sum.commissionAmount || 0),
         last7d: Number(revenue7d._sum.commissionAmount || 0),
       },
+      totalSales,
+      commission,
+      activeProducts: activeProductsByPeriod,
+      passiveProducts,
+      activeUsers,
+      passiveUsers,
+      grossSales,
+      netCommission,
+      cancellations,
+      cancellationsByType,
+      refunds,
+      refundsByStatus,
       categoryDistribution,
     };
+  }
+
+  private getPeriodRanges(now: Date): PeriodRanges {
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+    return {
+      yesterday: { gte: yesterday, lt: today },
+      thisMonth: { gte: thisMonth, lte: now },
+      lastMonth: { gte: lastMonth, lt: thisMonth },
+    };
+  }
+
+  private async getMetricPeriods(
+    periods: PeriodRanges,
+    getValue: (range: PeriodRange) => Promise<number>,
+  ): Promise<MetricPeriods> {
+    const [yesterday, thisMonth, lastMonth] = await Promise.all(
+      METRIC_PERIOD_KEYS.map((period) => getValue(periods[period])),
+    );
+
+    return this.createMetricPeriods(yesterday, thisMonth, lastMonth);
+  }
+
+  private createMetricPeriods(
+    yesterday: number,
+    thisMonth: number,
+    lastMonth: number,
+  ): MetricPeriods {
+    const normalizedYesterday = this.roundMetric(yesterday);
+    const normalizedThisMonth = this.roundMetric(thisMonth);
+    const normalizedLastMonth = this.roundMetric(lastMonth);
+
+    return {
+      yesterday: normalizedYesterday,
+      thisMonth: normalizedThisMonth,
+      lastMonth: normalizedLastMonth,
+      changePercent: this.calculateChangePercent(
+        normalizedThisMonth,
+        normalizedLastMonth,
+      ),
+    };
+  }
+
+  private calculateChangePercent(current: number, previous: number): number {
+    if (previous === 0) return current === 0 ? 0 : 100;
+    return this.roundMetric(((current - previous) / Math.abs(previous)) * 100);
+  }
+
+  private roundMetric(value: number): number {
+    return Math.round(value * 100) / 100;
+  }
+
+  private buildPeriodBreakdown<T extends string>(
+    values: T[],
+    groupedPeriods: Array<
+      Array<Record<string, unknown> & { _count: { id: number } }>
+    >,
+    field: string,
+  ): Record<T, MetricPeriods> {
+    const result = {} as Record<T, MetricPeriods>;
+
+    values.forEach((value) => {
+      const counts = groupedPeriods.map(
+        (rows) => rows.find((row) => row[field] === value)?._count.id ?? 0,
+      );
+      result[value] = this.createMetricPeriods(counts[0], counts[1], counts[2]);
+    });
+
+    return result;
   }
 
   /**
