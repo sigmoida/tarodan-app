@@ -53,8 +53,10 @@ export interface UseAdminResourceResult<T> {
   /** Current page number (1-based) */
   page: number;
   setPage: (p: number) => void;
-  /** Number of records requested per page. */
+  /** Number of records requested per page (stateful — the page-size selector). */
   pageSize: number;
+  /** Change the page size ("Show 20/50/100/250"); resets to page 1 and URL-syncs. */
+  setPageSize: (size: number) => void;
   /** Total page count */
   totalPages: number;
   /** Search box value (for the controlled input) */
@@ -186,6 +188,12 @@ export function useAdminResource<T>({
     if (!syncUrl) return "";
     return searchParams.get("q") ?? "";
   };
+  // Page size mirrors page/q: read from ?size= on load, else the `limit` default.
+  const getInitialLimit = () => {
+    if (!syncUrl) return limit;
+    const s = parseInt(searchParams.get("size") ?? "", 10);
+    return isNaN(s) || s < 1 ? limit : s;
+  };
   const getInitialFilters = () => {
     if (!syncUrl) return { ...initialFilters };
     const merged = { ...initialFilters };
@@ -206,6 +214,7 @@ export function useAdminResource<T>({
 
   // ── State ─────────────────────────────────────────────────────────────────
   const [page, setPageState] = useState<number>(getInitialPage);
+  const [pageSize, setPageSizeState] = useState<number>(getInitialLimit);
   // inputSearch = input value (instant, controlled)
   // committedSearch = committed after debounce/Enter; the query runs against this
   const [inputSearch, setInputSearch] = useState<string>(getInitialSearch);
@@ -225,7 +234,13 @@ export function useAdminResource<T>({
 
   // ── URL sync (write) ──────────────────────────────────────────────────────
   const syncToUrl = useCallback(
-    (p: number, q: string, f: Record<string, string>, s: SortState) => {
+    (
+      p: number,
+      q: string,
+      f: Record<string, string>,
+      s: SortState,
+      size: number,
+    ) => {
       if (!syncUrl) return;
       // Start from the current URL → params the hook doesn't own (like "tab") are preserved.
       const params = new URLSearchParams(searchParamsRef.current.toString());
@@ -234,9 +249,12 @@ export function useAdminResource<T>({
       params.delete("q");
       params.delete("sort");
       params.delete("dir");
+      params.delete("size");
       Object.keys(initialFilters).forEach((key) => params.delete(key));
       if (p > 1) params.set("page", String(p));
       if (q) params.set("q", q);
+      // Only write the size when it differs from the default (clean URL).
+      if (size !== limit) params.set("size", String(size));
       Object.entries(f).forEach(([key, val]) => {
         // Don't write the initialFilters default value to the URL (clean URL)
         if (val && val !== (initialFilters[key] ?? "")) params.set(key, val);
@@ -250,7 +268,7 @@ export function useAdminResource<T>({
       const newUrl = qs ? `${pathname}?${qs}` : pathname;
       router.replace(newUrl, { scroll: false });
     },
-    [syncUrl, pathname, router, initialFilters],
+    [syncUrl, pathname, router, initialFilters, limit],
   );
 
   // Catch external URL changes (e.g. when the user presses the back button).
@@ -263,6 +281,7 @@ export function useAdminResource<T>({
     lastUrlRef.current = current;
 
     const urlPage = parseInt(searchParams.get("page") ?? "1", 10);
+    const urlSize = parseInt(searchParams.get("size") ?? "", 10);
     const urlQ = searchParams.get("q") ?? "";
     const newFilters = { ...initialFilters };
     Object.keys(initialFilters).forEach((key) => {
@@ -280,17 +299,30 @@ export function useAdminResource<T>({
     setInputSearch(urlQ);
     startTransition(() => {
       setPageState(isNaN(urlPage) || urlPage < 1 ? 1 : urlPage);
+      setPageSizeState(isNaN(urlSize) || urlSize < 1 ? limit : urlSize);
       setCommittedSearch(urlQ);
       setFiltersState(newFilters);
       setSortState(urlSort);
     });
-  }, [searchParams, syncUrl, initialFilters]);
+  }, [searchParams, syncUrl, initialFilters, limit]);
 
   // ── Helper setters ──────────────────────────────────────────────────────────
   const setPage = useCallback(
     (p: number) => {
       startTransition(() => setPageState(p));
-      syncToUrl(p, committedSearch, filters, sort);
+      syncToUrl(p, committedSearch, filters, sort, pageSize);
+    },
+    [committedSearch, filters, sort, pageSize, syncToUrl],
+  );
+
+  // ── Page size: "Show 20/50/100/250"; resets the page to 1 ──────────────────
+  const setPageSize = useCallback(
+    (size: number) => {
+      startTransition(() => {
+        setPageSizeState(size);
+        setPageState(1);
+      });
+      syncToUrl(1, committedSearch, filters, sort, size);
     },
     [committedSearch, filters, sort, syncToUrl],
   );
@@ -302,9 +334,9 @@ export function useAdminResource<T>({
         setFiltersState(next);
         setPageState(1);
       });
-      syncToUrl(1, committedSearch, next, sort);
+      syncToUrl(1, committedSearch, next, sort, pageSize);
     },
-    [filters, committedSearch, sort, syncToUrl],
+    [filters, committedSearch, sort, pageSize, syncToUrl],
   );
 
   // ── Sort: single-column toggle asc → desc → off; resets the page to 1 ────────
@@ -321,9 +353,9 @@ export function useAdminResource<T>({
         setSortState(next);
         setPageState(1);
       });
-      syncToUrl(1, committedSearch, filters, next);
+      syncToUrl(1, committedSearch, filters, next, pageSize);
     },
-    [sort, committedSearch, filters, syncToUrl],
+    [sort, committedSearch, filters, pageSize, syncToUrl],
   );
 
   // ── Debounced search: setSearch updates the input instantly; commits after debounce ──
@@ -342,7 +374,7 @@ export function useAdminResource<T>({
           setCommittedSearch(value);
           setPageState(1);
         });
-        syncToUrl(1, value, filters, sort);
+        syncToUrl(1, value, filters, sort, pageSize);
       };
 
       if (debounceMs === 0) {
@@ -354,7 +386,7 @@ export function useAdminResource<T>({
         }, debounceMs);
       }
     },
-    [debounceMs, filters, sort, syncToUrl],
+    [debounceMs, filters, sort, pageSize, syncToUrl],
   );
 
   // ── onSearchSubmit: skip the debounce for an instant flush ────────────────
@@ -369,8 +401,8 @@ export function useAdminResource<T>({
       setCommittedSearch(inputSearch);
       setPageState(1);
     });
-    syncToUrl(1, inputSearch, filters, sort);
-  }, [inputSearch, filters, sort, syncToUrl]);
+    syncToUrl(1, inputSearch, filters, sort, pageSize);
+  }, [inputSearch, filters, sort, pageSize, syncToUrl]);
 
   // Clear the timer on unmount
   useEffect(() => {
@@ -384,7 +416,7 @@ export function useAdminResource<T>({
   // ── Query params (for fetch) ────────────────────────────────────────────────
   // Don't send the "all" value to the backend — pass only real filter values
   const buildParams = useCallback(() => {
-    const params: Record<string, any> = { page, limit };
+    const params: Record<string, any> = { page, limit: pageSize };
     if (committedSearch) params.search = committedSearch;
     Object.entries(filters).forEach(([key, val]) => {
       if (val && val !== "all") params[key] = val;
@@ -397,7 +429,7 @@ export function useAdminResource<T>({
       if (sort.sortType) params.sortType = sort.sortType;
     }
     return params;
-  }, [page, limit, committedSearch, filters, sort]);
+  }, [page, pageSize, committedSearch, filters, sort]);
 
   // ── react-query (suspense) ─────────────────────────────────────────────────
   // The initial load suspends (the SuspenseBoundary above shows a spinner; the
@@ -413,6 +445,7 @@ export function useAdminResource<T>({
     // a mutation's invalidateQueries({ queryKey: [resource] }) refreshes lists too.
     queryKey: adminKeys.list(queryKey, {
       page,
+      pageSize,
       search: committedSearch,
       filters,
       sort,
@@ -477,14 +510,15 @@ export function useAdminResource<T>({
 
   // ── Data extraction (suspense → data is always defined) ────────────────────
   const { rows, total } = extractData<T>(queryResult.data, queryKey);
-  const totalPages = Math.ceil(total / limit) || 1;
+  const totalPages = Math.ceil(total / pageSize) || 1;
 
   return {
     rows,
     total,
     page,
     setPage,
-    pageSize: limit,
+    pageSize,
+    setPageSize,
     totalPages,
     search: inputSearch,
     setSearch,

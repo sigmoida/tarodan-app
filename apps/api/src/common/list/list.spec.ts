@@ -39,7 +39,7 @@ describe("admin list primitives", () => {
     });
 
     it("rejects a limit above the maximum", async () => {
-      const query = plainToInstance(AdminListQueryDto, { limit: "101" });
+      const query = plainToInstance(AdminListQueryDto, { limit: "251" });
 
       const errors = await validate(query);
 
@@ -117,7 +117,7 @@ describe("admin list primitives", () => {
   describe("paginate", () => {
     it("counts, fetches the requested page, and caps the limit", async () => {
       const delegate = {
-        count: jest.fn(async () => 205),
+        count: jest.fn(async () => 505),
         findMany: jest.fn(async () => [{ id: "product-1" }]),
       };
       const options = {
@@ -126,17 +126,18 @@ describe("admin list primitives", () => {
         orderBy: { createdAt: "desc" },
       };
 
-      const result = await paginate(delegate, options, { page: 2, limit: 250 });
+      // Over the 250 cap → clamped to 250.
+      const result = await paginate(delegate, options, { page: 2, limit: 500 });
 
       expect(delegate.count).toHaveBeenCalledWith({ where: options.where });
       expect(delegate.findMany).toHaveBeenCalledWith({
         ...options,
-        skip: 100,
-        take: 100,
+        skip: 250,
+        take: 250,
       });
       expect(result).toEqual({
         data: [{ id: "product-1" }],
-        meta: { total: 205, page: 2, limit: 100, totalPages: 3 },
+        meta: { total: 505, page: 2, limit: 250, totalPages: 3 },
       });
     });
   });

@@ -4165,7 +4165,8 @@
       },
       "pagination": {
         "pageInfo": "Sayfa {page} / {totalPages}",
-        "next": "Sonraki"
+        "next": "Sonraki",
+        "rowsPerPage": "Sayfa başına satır"
       },
       "cancelReason": {
         "stockout": "Stok bitti",
