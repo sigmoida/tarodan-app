@@ -456,9 +456,6 @@ export class CartService {
       const lineTotal = effectivePrice * item.quantity;
       const productDiscount = hasDiscount ? (originalPrice - effectivePrice) * item.quantity : 0;
 
-      subtotal += lineTotal;
-      productDiscountTotal += productDiscount;
-
       const available = getAvailableQuantity(product);
       let isAvailable = product.status === ProductStatus.active;
       let stockWarning: string | undefined;
@@ -476,6 +473,9 @@ export class CartService {
 
       if (!isAvailable) {
         warnings.push(`"${product.title}" artık satışta değil`);
+      } else {
+        subtotal += lineTotal;
+        productDiscountTotal += productDiscount;
       }
 
       // Resolve product image URL (S3 key -> presigned URL)
@@ -511,13 +511,15 @@ export class CartService {
       });
     }
 
+    const availableItems = items.filter((item) => item.isAvailable);
+
     // Apply coupon discount
     let couponDiscountTotal = 0;
     let couponIsStackable = true; // default: allow campaigns when no coupon
     if (cart.couponCode) {
       const couponResult = await this.applyCouponDiscount(
         cart.couponCode,
-        items,
+        availableItems,
         userId,
       );
       couponDiscountTotal = couponResult.discountAmount;
@@ -541,7 +543,7 @@ export class CartService {
     let totalDiscount = couponDiscountTotal + campaignDiscountTotal;
 
     // Apply max discount cap (50% of original subtotal)
-    const originalSubtotal = items.reduce(
+    const originalSubtotal = availableItems.reduce(
       (sum, i) => sum + i.originalPrice * i.quantity,
       0,
     );
@@ -552,9 +554,12 @@ export class CartService {
     }
 
     // Calculate shipping
-    const shippingCost = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : BASE_SHIPPING_COST;
+    const hasAvailableItems = availableItems.length > 0;
+    const qualifiesForFreeShipping = subtotal >= FREE_SHIPPING_THRESHOLD;
+    const shippingCost =
+      !hasAvailableItems || qualifiesForFreeShipping ? 0 : BASE_SHIPPING_COST;
     const amountToFreeShipping =
-      subtotal >= FREE_SHIPPING_THRESHOLD
+      !hasAvailableItems || qualifiesForFreeShipping
         ? 0
         : FREE_SHIPPING_THRESHOLD - subtotal;
 
@@ -563,7 +568,7 @@ export class CartService {
 
     return {
       items,
-      itemCount: items.reduce((sum, i) => sum + i.quantity, 0),
+      itemCount: availableItems.reduce((sum, i) => sum + i.quantity, 0),
       subtotal,
       productDiscountTotal,
       couponDiscountTotal,
