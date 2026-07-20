@@ -1,6 +1,5 @@
 'use server';
 
-import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import {
   forgotPasswordSchema,
@@ -63,10 +62,9 @@ export async function forgotPasswordAction(email: string): Promise<{ ok: true }>
 }
 
 /**
- * Server Action: revoke the session on the API, clear local cookies, and send
- * the user back to the login page.
+ * Server Action: revoke the session on the API and clear local cookies.
+ * The client owns the destination so idle expiry can preserve its return path.
  */
 export async function logoutAction() {
   await authLogic.logout();
-  redirect('/login');
 }

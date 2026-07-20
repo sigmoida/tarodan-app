@@ -8,7 +8,7 @@ interface SessionValue {
   /** Always present — the (admin) layout gates on a valid session server-side. */
   user: AdminUser;
   isAuthenticated: boolean;
-  logout: () => void;
+  logout: (redirectTo?: string) => Promise<void>;
 }
 
 const SessionContext = createContext<SessionValue | null>(null);
@@ -25,8 +25,12 @@ export function SessionProvider({
   user: AdminUser;
   children: React.ReactNode;
 }) {
-  const logout = () => {
-    void logoutAction();
+  const logout = async (redirectTo = '/login') => {
+    try {
+      await logoutAction();
+    } finally {
+      window.location.assign(redirectTo);
+    }
   };
 
   return (

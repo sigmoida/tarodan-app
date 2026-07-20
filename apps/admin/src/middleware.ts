@@ -17,6 +17,7 @@ export const middleware = createAuthMiddleware(adminAuthConfig, {
   guestOnlyPaths: ["/login", "/forgot-password", "/reset-password"],
   authedHome: "/dashboard",
   requestPathHeader: "x-admin-pathname",
+  expiredSessionReason: "session",
 });
 
 export const config = {

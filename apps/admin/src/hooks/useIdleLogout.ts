@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useSession } from '@/context/SessionContext';
+import { expiredLoginHref } from '@/lib/auth-redirect';
 
 /** Idle duration (ms). Balanced policy: 1 hour. */
 const IDLE_TIMEOUT_MS = 60 * 60 * 1000;
@@ -25,11 +26,8 @@ export function useIdleLogout() {
     let timer: ReturnType<typeof setTimeout>;
 
     const triggerLogout = () => {
-      void logout();
-      // logout already redirects to /login; still add the expired marker.
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login?expired=idle';
-      }
+      const returnPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      void logout(expiredLoginHref('idle', returnPath));
     };
 
     const schedule = () => {

@@ -4110,6 +4110,10 @@
         "title": "Sayfa bulunamadı",
         "description": "Aradığınız sayfa taşınmış, silinmiş ya da hiç var olmamış olabilir."
       },
+      "forbidden": {
+        "title": "Erişim reddedildi",
+        "description": "Bu sayfayı görüntüleme yetkiniz bulunmuyor."
+      },
       "prompt": {
         "defaultTitle": "Bir değer girin",
         "cancel": "Vazgeç",
@@ -4190,6 +4194,8 @@
         "connectionError": "Sunucuya bağlanılamadı.",
         "invalidCode": "Doğrulama kodu hatalı",
         "invalidCredentials": "E-posta veya şifre hatalı girildi",
+        "sessionExpired": "Oturumunuzun süresi doldu. Kaldığınız yerden devam etmek için tekrar giriş yapın.",
+        "idleExpired": "Uzun süre işlem yapılmadığı için oturumunuz kapatıldı. Devam etmek için tekrar giriş yapın.",
         "genericFailure": "Giriş başarısız"
       },
       "forgotPassword": {
