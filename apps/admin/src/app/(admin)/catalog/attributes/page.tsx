@@ -25,7 +25,7 @@ const attributeGroupsFetcher = clientListFetcher<AttributeGroup>(
   () => adminApi.getAttributeGroups({ limit: 100 }),
   (raw) => extractList<AttributeGroup>(raw),
   {
-    searchFields: (group) => [group.name, group.slug, group.description],
+    // No searchFields → full-content search across all displayed columns (#378).
     filter: (group) => group.slug !== "vehicle_type",
   },
 );

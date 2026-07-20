@@ -35,10 +35,42 @@ type SearchFields<T> =
   (keyof T)[] | ((item: T) => Array<string | null | undefined>);
 
 export interface PaginateClientOptions<T> {
-  /** Fields (or a selector) matched case-insensitively against `params.search`. */
+  /**
+   * Fields (or a selector) matched case-insensitively against `params.search`.
+   * Omit for FULL-CONTENT search (#378): every string/number value on the row
+   * (incl. nested relations) is scanned, so the search box covers all displayed
+   * columns. Only pass this to intentionally NARROW the searched fields.
+   */
   searchFields?: SearchFields<T>;
   /** Extra predicate applied before search/pagination (e.g. status filter). */
   filter?: (item: T, params: ClientListParams) => boolean;
+}
+
+/**
+ * Collect every string/number leaf value on a row — the default full-content
+ * search set when no `searchFields` is given (#378). Recurses into nested
+ * objects/arrays (relations like `owner.displayName`) up to a small depth so
+ * the whole row is searchable, not just its top-level fields.
+ */
+function collectSearchableValues(
+  value: unknown,
+  depth = 0,
+  acc: string[] = [],
+): string[] {
+  if (value == null) return acc;
+  const type = typeof value;
+  if (type === "string" || type === "number") {
+    acc.push(String(value));
+  } else if (depth < 4 && type === "object" && !(value instanceof Date)) {
+    if (Array.isArray(value)) {
+      for (const v of value) collectSearchableValues(v, depth + 1, acc);
+    } else {
+      for (const v of Object.values(value as Record<string, unknown>)) {
+        collectSearchableValues(v, depth + 1, acc);
+      }
+    }
+  }
+  return acc;
 }
 
 /** Read a (possibly dotted) key path off a row — supports `sortKey: 'buyer.name'`. */
@@ -89,15 +121,16 @@ export function paginateClient<T>(
   if (opts.filter) rows = rows.filter((r) => opts.filter!(r, params));
 
   const q = search?.trim().toLocaleLowerCase("tr");
-  if (q && opts.searchFields) {
-    const getFields =
-      typeof opts.searchFields === "function"
-        ? opts.searchFields
-        : (item: T) =>
-            (opts.searchFields as (keyof T)[]).map((f) => item[f] as any);
+  if (q) {
+    // No searchFields → full-content search across every value on the row.
+    const getFields: (item: T) => unknown[] = opts.searchFields
+      ? typeof opts.searchFields === "function"
+        ? (opts.searchFields as (item: T) => unknown[])
+        : (item) => (opts.searchFields as (keyof T)[]).map((f) => item[f])
+      : (item) => collectSearchableValues(item);
     rows = rows.filter((item) =>
       getFields(item).some((v) =>
-        v ? String(v).toLocaleLowerCase("tr").includes(q) : false,
+        v != null ? String(v).toLocaleLowerCase("tr").includes(q) : false,
       ),
     );
   }
