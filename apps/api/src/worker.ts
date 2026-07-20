@@ -6,6 +6,7 @@ import { NestFactory } from "@nestjs/core";
 import { Logger } from "@nestjs/common";
 import * as Sentry from "@sentry/node";
 import { WorkerModule } from "./workers";
+import { AppNestLogger } from "./common/logging/nest-logger";
 
 /**
  * Initialize Sentry for the worker process (#71). The worker runs as a separate
@@ -51,7 +52,7 @@ async function bootstrap() {
   logger.log("Starting Tarodan Worker...");
 
   const app = await NestFactory.createApplicationContext(WorkerModule, {
-    logger: ["error", "warn", "log"],
+    logger: new AppNestLogger(),
   });
 
   logger.log("Worker started successfully");

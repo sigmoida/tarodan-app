@@ -19,6 +19,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
+    "audit:prod": "pnpm audit --prod --audit-level=high --json 2>/dev/null | node scripts/check-dependency-audit.mjs",
     "clean": "turbo run clean && rm -rf node_modules",
     "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
     "db:generate": "pnpm --filter @tarodan/api run prisma:generate",
@@ -55,10 +56,10 @@
     "turbo": "^1.11.2",
     "typescript": "^5.3.2"
   },
-  "packageManager": "pnpm@8.12.0",
+  "packageManager": "pnpm@10.34.5",
   "engines": {
     "node": ">=20.0.0 <22.0.0",
-    "pnpm": ">=8.0.0"
+    "pnpm": ">=10.0.0"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
@@ -75,6 +76,20 @@
     "openai": "^6.46.0"
   },
   "pnpm": {
+    "onlyBuiltDependencies": [
+      "@apollo/protobufjs",
+      "@nestjs/core",
+      "@prisma/client",
+      "@prisma/engines",
+      "@sentry/cli",
+      "bcrypt",
+      "detox",
+      "dtrace-provider",
+      "esbuild",
+      "msgpackr-extract",
+      "prisma",
+      "unrs-resolver"
+    ],
     "packageExtensions": {
       "react-native-worklets": {
         "dependencies": {
@@ -85,7 +100,12 @@
     "overrides": {
       "fast-xml-parser": ">=5.3.4",
       "handlebars": ">=4.7.9",
-      "shell-quote": ">=1.8.4"
+      "shell-quote": ">=1.8.4",
+      "glob@>=10.2.0 <10.5.0": "10.5.0",
+      "lodash@>=4.0.0 <=4.17.23": "4.18.0",
+      "minimatch@<3.1.4": "3.1.4",
+      "minimatch@>=9.0.0 <9.0.7": "9.0.7",
+      "ws@>=8.0.0 <8.21.0": "8.21.0"
     }
   }
 }

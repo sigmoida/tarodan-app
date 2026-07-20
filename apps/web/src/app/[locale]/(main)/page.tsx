@@ -5,12 +5,10 @@ import { queryKeys } from "@/lib/query/keys";
 import { hasRealDiscount } from "@/lib/productPrice";
 import { unwrapList } from "@/lib/unwrapList";
 import { localizedCanonical, localizedPath } from "@/lib/seo";
+import { getServerApiOrigin } from "@/lib/api/origin";
 import HomeClient from "./_home/_components/HomeClient";
 
-const API_BASE =
-  process.env.API_INTERNAL_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:3001";
+const API_BASE = getServerApiOrigin();
 
 const TITLE = "Tarodan - Diecast Model Araba Pazarı";
 const DESCRIPTION =

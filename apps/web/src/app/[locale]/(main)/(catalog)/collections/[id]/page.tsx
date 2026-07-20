@@ -3,7 +3,9 @@ import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
 import { getServerQueryClient } from "@/lib/query/server";
 import CollectionDetailClient from "./CollectionDetailClient";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+import { getServerApiOrigin } from "@/lib/api/origin";
+
+const API_BASE = getServerApiOrigin();
 
 type Props = { params: Promise<{ id: string }> };
 

@@ -1,5 +1,6 @@
 import { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/seo";
+import { getServerApiOrigin } from "@/lib/api/origin";
 
 /**
  * hreflang alternates for one path, in the sitemap's Google-preferred form.
@@ -20,10 +21,7 @@ function localeAlternates(path: string) {
 }
 
 // Server-side API origin (same resolution the listings route uses).
-const API_BASE =
-  process.env.API_INTERNAL_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:3001";
+const API_BASE = getServerApiOrigin();
 
 // Public, indexable static routes (private/app routes are excluded — see robots.ts).
 const STATIC_PATHS = [

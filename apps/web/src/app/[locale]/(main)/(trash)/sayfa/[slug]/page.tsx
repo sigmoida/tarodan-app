@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { PageContent } from "./PageContent";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+import { getServerApiOrigin } from "@/lib/api/origin";
+
+const API_BASE = getServerApiOrigin();
 
 interface StaticPage {
   id: string;

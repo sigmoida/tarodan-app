@@ -1,8 +1,8 @@
-import axios from 'axios';
-import * as SecureStore from 'expo-secure-store';
-import { router } from 'expo-router';
-import { Platform } from 'react-native';
-import Constants from 'expo-constants';
+import { axios, createApiClient, singleFlight } from "@tarodan/api-client";
+import * as SecureStore from "expo-secure-store";
+import { router } from "expo-router";
+import { Platform } from "react-native";
+import Constants from "expo-constants";
 
 // API URL çözümleme sırası:
 // 1) EXPO_PUBLIC_API_URL (production / preview / staging build'leri için zorunlu)
@@ -11,19 +11,19 @@ import Constants from 'expo-constants';
 const getApiUrl = () => {
   const envUrl = process.env.EXPO_PUBLIC_API_URL;
   if (envUrl && envUrl.length > 0) {
-    return envUrl.replace(/\/$/, '');
+    return envUrl.replace(/\/$/, "");
   }
 
-  const expoHost = Constants.expoConfig?.hostUri?.split(':')[0];
+  const expoHost = Constants.expoConfig?.hostUri?.split(":")[0];
   if (expoHost) {
     return `http://${expoHost}:3001/api`;
   }
 
-  if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:3001/api';
+  if (Platform.OS === "android") {
+    return "http://10.0.2.2:3001/api";
   }
 
-  return 'http://localhost:3001/api';
+  return "http://localhost:3001/api";
 };
 
 const API_URL = getApiUrl();
@@ -43,22 +43,25 @@ export function getApiBaseUrl(): string {
  * türetilen bir `?v` eki eklenir: foto değişince <Image> cache'i busts, aynı
  * dosyada cache hit kalır.
  */
-export const buildAvatarUrl = (userId: string, versionHint?: string | null): string => {
+export const buildAvatarUrl = (
+  userId: string,
+  versionHint?: string | null,
+): string => {
   const base = `${API_URL}/users/${userId}/avatar`;
   if (!versionHint) return base;
-  const filename = versionHint.split('?')[0].split('/').pop() || '';
+  const filename = versionHint.split("?")[0].split("/").pop() || "";
   return filename ? `${base}?v=${encodeURIComponent(filename)}` : base;
 };
 
-console.log('📡 API URL:', API_URL);
-console.log('📱 Platform:', Platform.OS);
-console.log('🌐 Expo Host:', Constants.expoConfig?.hostUri);
+console.log("📡 API URL:", API_URL);
+console.log("📱 Platform:", Platform.OS);
+console.log("🌐 Expo Host:", Constants.expoConfig?.hostUri);
 
-export const api = axios.create({
+export const api = createApiClient({
   baseURL: API_URL,
   timeout: 30000,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
@@ -66,11 +69,11 @@ export const api = axios.create({
  * Guest (unauthenticated) axios instance — token eklemez.
  * Kullanım: guest checkout, guest payment, guest order track, guest contact.
  */
-export const guestApi = axios.create({
+export const guestApi = createApiClient({
   baseURL: API_URL,
   timeout: 30000,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
@@ -78,18 +81,18 @@ export const guestApi = axios.create({
 api.interceptors.request.use(
   async (config) => {
     try {
-      const token = await SecureStore.getItemAsync('accessToken');
+      const token = await SecureStore.getItemAsync("accessToken");
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
     } catch (error) {
-      console.error('Error getting token:', error);
+      console.error("Error getting token:", error);
     }
     return config;
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 // Banlı kullanıcı yönlendirmesi: aynı anda dönen birden çok USER_BANNED 403'ünde
@@ -99,34 +102,38 @@ export const resetBannedRedirect = () => {
   bannedRedirectActive = false;
 };
 
-// Tek-uçuş refresh: eşzamanlı 401'ler tek refresh paylaşır (rotated token + storm önlenir).
-let refreshPromise: Promise<string | null> | null = null;
-
 async function performTokenRefresh(): Promise<string | null> {
-  const refreshToken = await SecureStore.getItemAsync('refreshToken');
+  const refreshToken = await SecureStore.getItemAsync("refreshToken");
   if (!refreshToken) return null;
-  const response = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
+  const response = await axios.post(`${API_URL}/auth/refresh`, {
+    refreshToken,
+  });
   const data: any = response.data;
-  const newAccess: string | undefined = data?.tokens?.accessToken ?? data?.accessToken;
-  const newRefresh: string | undefined = data?.tokens?.refreshToken ?? data?.refreshToken;
+  const newAccess: string | undefined =
+    data?.tokens?.accessToken ?? data?.accessToken;
+  const newRefresh: string | undefined =
+    data?.tokens?.refreshToken ?? data?.refreshToken;
   if (!newAccess) return null;
-  await SecureStore.setItemAsync('accessToken', newAccess);
+  await SecureStore.setItemAsync("accessToken", newAccess);
   // ROTATED refresh token'ı da kaydet (asıl bug buydu).
-  if (newRefresh) await SecureStore.setItemAsync('refreshToken', newRefresh);
+  if (newRefresh) await SecureStore.setItemAsync("refreshToken", newRefresh);
   return newAccess;
 }
+
+// Tek-uçuş refresh: eşzamanlı 401'ler tek refresh paylaşır (rotated token + storm önlenir).
+const refreshAccessToken = singleFlight(performTokenRefresh);
 
 async function handleAuthFailure(): Promise<void> {
   // Merkezi çıkış: SecureStore + Zustand + query cache + socket + push temizlenir.
   // require ile lazy import → api.ts ↔ authStore döngüsü (cycle) önlenir.
   try {
-    const { useAuthStore } = require('../../stores/authStore');
+    const { useAuthStore } = require("../../stores/authStore");
     await useAuthStore.getState().logout();
   } catch {
-    await SecureStore.deleteItemAsync('accessToken');
-    await SecureStore.deleteItemAsync('refreshToken');
+    await SecureStore.deleteItemAsync("accessToken");
+    await SecureStore.deleteItemAsync("refreshToken");
   }
-  router.replace('/(auth)/login');
+  router.replace("/(auth)/login");
 }
 
 // Response interceptor - handle token refresh
@@ -139,12 +146,17 @@ api.interceptors.response.use(
     // ile bloklar (logout ve destek talebi hariç). Kullanıcıyı tam ekran
     // /banned ekranına kilitle.
     const errData = error.response?.data;
-    if (error.response?.status === 403 && errData?.errorCode === 'USER_BANNED') {
+    if (
+      error.response?.status === 403 &&
+      errData?.errorCode === "USER_BANNED"
+    ) {
       if (!bannedRedirectActive) {
         bannedRedirectActive = true;
         router.replace({
-          pathname: '/banned',
-          params: errData.bannedReason ? { reason: errData.bannedReason } : undefined,
+          pathname: "/banned",
+          params: errData.bannedReason
+            ? { reason: errData.bannedReason }
+            : undefined,
         });
       }
       return Promise.reject(error);
@@ -153,10 +165,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       try {
-        if (!refreshPromise) {
-          refreshPromise = performTokenRefresh().finally(() => { refreshPromise = null; });
-        }
-        const newAccess = await refreshPromise;
+        const newAccess = await refreshAccessToken();
         if (newAccess) {
           originalRequest.headers.Authorization = `Bearer ${newAccess}`;
           return api(originalRequest);
@@ -168,7 +177,7 @@ api.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 // Helper: Response parsing (web ile aynı)

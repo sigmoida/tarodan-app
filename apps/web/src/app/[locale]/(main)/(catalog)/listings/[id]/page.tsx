@@ -2,12 +2,10 @@ import type { Metadata } from "next";
 import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
 import { getServerQueryClient } from "@/lib/query/server";
 import { queryKeys } from "@/lib/query/keys";
+import { getServerApiOrigin } from "@/lib/api/origin";
 import ListingDetailClient from "./ListingDetailClient";
 
-const API_BASE =
-  process.env.API_INTERNAL_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:3001";
+const API_BASE = getServerApiOrigin();
 
 type Props = { params: Promise<{ id: string }> };
 

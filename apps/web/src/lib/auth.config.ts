@@ -1,9 +1,7 @@
 import type { AuthConfig } from "@tarodan/auth";
+import { getServerApiOrigin } from "@/lib/api/origin";
 
-const API =
-  process.env.API_INTERNAL_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:3001";
+const API = getServerApiOrigin();
 
 /**
  * The web app's concrete BFF auth config for `@tarodan/auth`. Web owns its OWN
@@ -75,10 +73,7 @@ export function mapWebUser(raw: unknown): WebUser | null {
       (u.company_name as string | undefined),
     taxId: (u.taxId as string | undefined) ?? (u.tax_id as string | undefined),
     businessStatus: (u.businessStatus ?? u.business_status) as
-      | "pending"
-      | "approved"
-      | "rejected"
-      | undefined,
+      "pending" | "approved" | "rejected" | undefined,
     avatarUrl:
       (u.avatarUrl as string | undefined) ??
       (u.avatar_url as string | undefined),
