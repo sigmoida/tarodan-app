@@ -62,6 +62,8 @@ export interface UseAdminResourceResult<T> {
   /** Current page number (1-based) */
   page: number;
   setPage: (p: number) => void;
+  /** Number of records requested per page. */
+  pageSize: number;
   /** Total page count */
   totalPages: number;
   /** Search box value (for the controlled input) */
@@ -493,6 +495,7 @@ export function useAdminResource<T>({
     total,
     page,
     setPage,
+    pageSize: limit,
     totalPages,
     search: inputSearch,
     setSearch,

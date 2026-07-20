@@ -52,8 +52,8 @@ function hasUnsafePathSegment(path: string[]): boolean {
  * same-site subdomain attackers). On a STATE-CHANGING request we require the
  * `Origin` header's host to match the request `Host` header (both are the public
  * host the browser/proxy see, so this survives a reverse proxy that preserves
- * Host — the standard setup). An ABSENT Origin is allowed: non-browser clients
- * hit the API directly, and Lax already blocks cross-site form POSTs.
+ * Host — the standard setup). An ABSENT Origin on a write is rejected: browser
+ * gateway calls always send it, while non-browser clients use the API directly.
  *
  * Ops levers: `ALLOWED_ORIGINS` (comma-separated origins/hosts) whitelists extra
  * origins; `CSRF_ORIGIN_CHECK=off` is an emergency kill-switch if a proxy that
@@ -63,7 +63,7 @@ function isForbiddenCrossOrigin(request: NextRequest): boolean {
   if (SAFE_METHODS.has(request.method)) return false;
   if (process.env.CSRF_ORIGIN_CHECK === "off") return false;
   const origin = request.headers.get("origin");
-  if (!origin) return false;
+  if (!origin) return true;
   let originHost: string;
   try {
     originHost = new URL(origin).host;
