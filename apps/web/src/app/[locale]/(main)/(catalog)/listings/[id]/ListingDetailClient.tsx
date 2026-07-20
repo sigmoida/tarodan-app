@@ -3,6 +3,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import type { ReactNode } from "react";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { withChunkErrorLogging } from "@/lib/withChunkErrorLogging";
@@ -12,13 +13,36 @@ import {
 } from "./_context/ListingDetailContext";
 import ProductBreadcrumbs from "./_sections/ProductBreadcrumbs";
 import ProductGallery from "./_sections/ProductGallery";
-import ProductLightbox from "./_sections/ProductLightbox";
-import Product360Modal from "./_sections/Product360Modal";
 import ProductInfo from "./_sections/ProductInfo";
 import ProductReviews from "./_sections/ProductReviews";
-import OfferModal from "./_modals/OfferModal";
 import CollectionPickerModal from "./_modals/CollectionPickerModal";
 import TradePremiumModal from "./_modals/TradePremiumModal";
+
+const ProductStaticInfoFallback = dynamic(
+  () => import("./_sections/ProductStaticInfoFallback"),
+  { ssr: false },
+);
+
+const ProductLightbox = dynamic(
+  withChunkErrorLogging(
+    () => import("./_sections/ProductLightbox"),
+    "ProductLightbox",
+  ),
+  { ssr: false },
+);
+
+const Product360Modal = dynamic(
+  withChunkErrorLogging(
+    () => import("./_sections/Product360Modal"),
+    "Product360Modal",
+  ),
+  { ssr: false },
+);
+
+const OfferModal = dynamic(
+  withChunkErrorLogging(() => import("./_modals/OfferModal"), "OfferModal"),
+  { ssr: false },
+);
 
 const ReportModal = dynamic(
   withChunkErrorLogging(
@@ -28,7 +52,7 @@ const ReportModal = dynamic(
   { ssr: false },
 );
 
-function ListingDetailLayout() {
+function ListingDetailLayout({ staticInfo }: { staticInfo: ReactNode }) {
   const {
     t,
     locale,
@@ -37,6 +61,9 @@ function ListingDetailLayout() {
     authModal,
     showReportModal,
     setShowReportModal,
+    isLightboxOpen,
+    show360Modal,
+    showOfferModal,
   } = useListingDetail();
 
   if (isLoading) {
@@ -92,34 +119,43 @@ function ListingDetailLayout() {
           <ProductReviews />
         </div>
         {/* Right: info + spec cards (rendered under the seller card in ProductInfo) */}
-        <ProductInfo />
+        <div>
+          {staticInfo ?? <ProductStaticInfoFallback />}
+          <ProductInfo />
+        </div>
       </div>
 
       {/* Overlays & modals */}
-      <ProductLightbox />
-      <Product360Modal />
+      {isLightboxOpen && <ProductLightbox />}
+      {show360Modal && <Product360Modal />}
       <CollectionPickerModal />
-      <OfferModal />
+      {showOfferModal && <OfferModal />}
       <TradePremiumModal />
 
       {authModal}
 
-      <ReportModal
-        isOpen={showReportModal}
-        onClose={() => setShowReportModal(false)}
-        entityType="product"
-        entityId={listing.id}
-        entityName={listing.title}
-        locale={locale}
-      />
+      {showReportModal && (
+        <ReportModal
+          isOpen
+          onClose={() => setShowReportModal(false)}
+          entityType="product"
+          entityId={listing.id}
+          entityName={listing.title}
+          locale={locale}
+        />
+      )}
     </PageShell>
   );
 }
 
-export default function ListingDetailClient() {
+export default function ListingDetailClient({
+  staticInfo,
+}: {
+  staticInfo: ReactNode;
+}) {
   return (
     <ListingDetailProvider>
-      <ListingDetailLayout />
+      <ListingDetailLayout staticInfo={staticInfo} />
     </ListingDetailProvider>
   );
 }

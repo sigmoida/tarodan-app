@@ -1,12 +1,12 @@
 /** @format */
 
-"use client";
-
 import type { ReactNode } from "react";
 import { Link } from "@/i18n/navigation";
-import { SectionCard } from "@/components/ui";
+import SectionCard from "@/components/ui/SectionCard";
 import { formatCondition } from "@/lib/format";
-import { useListingDetail } from "../_context/ListingDetailContext";
+import type { Listing } from "../_lib/types";
+
+type Translator = (key: any) => string;
 
 /**
  * One label→value row inside the Details / Technical-details cards. Rendered as a
@@ -21,15 +21,16 @@ function DetailRow({ label, value }: { label: ReactNode; value: ReactNode }) {
   );
 }
 
-/**
- * Product attribute cards shown UNDER the gallery (left column): the "Details"
- * card (brand / scale / material / …) and, when present, a separate "Technical
- * details" card. Both read the listing from context.
- */
-export default function ProductSpecs() {
-  const { t, locale, listing } = useListingDetail();
-  if (!listing) return null;
-
+/** Server-rendered product attribute and technical-detail cards. */
+export default function ProductSpecs({
+  listing,
+  locale,
+  t,
+}: {
+  listing: Listing;
+  locale: string;
+  t: Translator;
+}) {
   const available =
     listing.availableQuantity !== undefined &&
     listing.availableQuantity !== null

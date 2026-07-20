@@ -1,11 +1,9 @@
-"use client";
-
-import { useLocale, useTranslations } from "next-intl";
+import { getTranslations } from "next-intl/server";
 import { DocPage } from "@/components/layout/DocPage";
 import SectionCard from "@/components/ui/SectionCard";
 
-export default function AuthenticityClient() {
-  const t = useTranslations();
+export default async function AuthenticityClient() {
+  const t = await getTranslations();
 
   return (
     <DocPage

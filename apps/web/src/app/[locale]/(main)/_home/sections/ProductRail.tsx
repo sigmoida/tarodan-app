@@ -1,10 +1,10 @@
 /** @format */
 
-"use client";
-
 import type { ReactNode } from "react";
-import { ProductCard, SkeletonCard } from "@/components/ui";
+import { getTranslations } from "next-intl/server";
+import SkeletonCard from "@/components/ui/SkeletonCard";
 import type { Product } from "@/types/product";
+import HomeProductCard from "./HomeProductCard";
 
 /** The default home grid: 2 rows × 6 columns on desktop (12 cards). */
 export const HOME_GRID_CLASS =
@@ -16,7 +16,7 @@ export const HOME_GRID_CLASS =
  * the cards / skeletons / empty state. Defaults to the shared 2×6 home grid
  * (12 cards), so every section lays out identically.
  */
-export default function ProductRail({
+export default async function ProductRail({
   items,
   isLoading,
   variant = "grid",
@@ -33,6 +33,7 @@ export default function ProductRail({
   limit?: number;
   emptyState?: ReactNode;
 }) {
+  const t = await getTranslations();
   const displayItems = limit != null ? items.slice(0, limit) : items;
 
   if (variant === "scroll") {
@@ -46,12 +47,13 @@ export default function ProductRail({
             ))
           : displayItems.map((product, index) => (
               <div key={product.id} className="flex-shrink-0 w-40 snap-start">
-                <ProductCard
+                <HomeProductCard
                   product={product}
                   index={index}
-                  layout="grid"
                   priority={index < 4}
-                  showMeta={false}
+                  sponsoredLabel={t("product.sponsored")}
+                  tradeLabel={t("faq.trade")}
+                  outOfStockLabel={t("product.stockFinished")}
                 />
               </div>
             ))}
@@ -67,13 +69,14 @@ export default function ProductRail({
         <div className="col-span-full">{emptyState}</div>
       ) : (
         displayItems.map((product, index) => (
-          <ProductCard
+          <HomeProductCard
             key={product.id}
             product={product}
             index={index}
-            layout="grid"
             priority={index < 4}
-            showMeta={false}
+            sponsoredLabel={t("product.sponsored")}
+            tradeLabel={t("faq.trade")}
+            outOfStockLabel={t("product.stockFinished")}
           />
         ))
       )}

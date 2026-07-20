@@ -1,12 +1,10 @@
-"use client";
-
 import { Link } from "@/i18n/navigation";
-import { useLocale, useTranslations } from "next-intl";
+import { getTranslations } from "next-intl/server";
 import { DocPage } from "@/components/layout/DocPage";
 import SectionCard from "@/components/ui/SectionCard";
 
-export default function BuyerProtectionClient() {
-  const t = useTranslations();
+export default async function BuyerProtectionClient() {
+  const t = await getTranslations();
 
   return (
     <DocPage

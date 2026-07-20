@@ -9,6 +9,7 @@ import { Button, Spinner } from "@tarodan/ui";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { useAuthStore } from "@/stores/authStore";
+import { useUnreadNotificationCount } from "@/hooks/useHeaderBadgeCounts";
 import { useTranslations } from "next-intl";
 
 interface Notification {
@@ -31,16 +32,7 @@ export default function NotificationBell() {
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const unreadCountQuery = useQuery({
-    queryKey: queryKeys.notifications.unreadCount(),
-    queryFn: async () => {
-      const response = await api.get("/notifications/unread-count");
-      return response.data.count ?? response.data.unreadCount ?? 0;
-    },
-    enabled: isAuthenticated,
-    refetchInterval: 60_000,
-    meta: { page: "notification-bell-count" },
-  });
+  const unreadCountQuery = useUnreadNotificationCount(isAuthenticated);
   const unreadCount = unreadCountQuery.data ?? 0;
 
   const notificationsQuery = useQuery({
