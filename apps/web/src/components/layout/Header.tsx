@@ -166,7 +166,16 @@ export default function Header() {
         {showCategoryBar && (
           <div className="bg-surface border-b border-primary-200 relative z-40">
             <Container className="px-4">
-              <CategoryNav />
+              {/*
+                On mobile the category bar is wider than the viewport, so it must
+                scroll horizontally within its own container instead of pushing the
+                whole page wide (which made mobile browsers zoom the page out). On
+                md+ it fits, so overflow returns to visible — the mega-menu dropdown
+                panels (absolutely positioned below the bar) must not be clipped.
+              */}
+              <div className="overflow-x-auto md:overflow-visible [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <CategoryNav />
+              </div>
             </Container>
           </div>
         )}
