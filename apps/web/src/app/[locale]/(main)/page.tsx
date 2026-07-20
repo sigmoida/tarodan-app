@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { hasRealDiscount } from "@/lib/productPrice";
 import { unwrapList } from "@/lib/unwrapList";
 import { localizedCanonical, localizedPath } from "@/lib/seo";
+import { getServerApiOrigin } from "@/lib/api/origin";
 import type { Product } from "@/types/product";
 import HomeContent from "./_home/_components/HomeContent";
 import { BRANDS } from "./_home/lib/constants";
@@ -12,10 +13,7 @@ import type {
   HomePageData,
 } from "./_home/lib/types";
 
-const API_BASE =
-  process.env.API_INTERNAL_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:3001";
+const API_BASE = getServerApiOrigin();
 
 const TITLE = "Tarodan - Diecast Model Araba Pazarı";
 const DESCRIPTION =

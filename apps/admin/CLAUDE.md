@@ -117,7 +117,7 @@ The `(auth)` group is the canonical example of these rules:
 - **Hooks** (`hooks/`): `useLogin`, `useForgotPassword`,
   `useRedirectIfAuthenticated` — the pages/forms stay thin.
 - **No raw primitives, no palette colors, no inline spinner** (`Button
-  isLoading` handles it), links are `next/link`.
+isLoading` handles it), links are `next/link`.
 
 ---
 
@@ -127,6 +127,7 @@ Every page is a client component; **all** server data goes through TanStack
 Query. Never `useState` + `useEffect` + `adminApi` by hand.
 
 ### Data layer (`lib/query/`, `hooks/`)
+
 - **Lists** → `useAdminResource<T>({ queryKey, fetcher, … })` (pagination,
   debounced search, filters, URL sync). `queryKey` = the resource name.
 - **Single item** → `useAdminItem<T>({ resource, id, fetcher })`.
@@ -136,6 +137,7 @@ Query. Never `useState` + `useEffect` + `adminApi` by hand.
   `mut.isPending && mut.variables === id`. Keys: `lib/query/keys.ts`.
 
 ### List pages → the `ResourceList` compound (`components/list/`)
+
 No prop-explosion: the root takes only the data config; sub-parts read state from
 context (`useResourceList` / `useFilter`).
 
@@ -152,6 +154,7 @@ context (`useResourceList` / `useFilter`).
   <ResourceList.Pagination />
 </ResourceList>
 ```
+
 - Columns live at **module level** (static). Header bits that need list state
   (total, active-filter notice) are tiny context-reading components rendered
   inside `<ResourceList>` (e.g. `OrdersSummary`).
@@ -160,6 +163,7 @@ context (`useResourceList` / `useFilter`).
   `orders/_components/OrdersTable`).
 
 ### Detail pages → `DetailPage` + section primitives (`components/detail/`)
+
 `DetailPage` = back link + QueryBoundary + header (title/badge/actions) + children.
 Build the body from `SectionCard`, `PartyCard`, `Timeline`, `DataList`/`Field`.
 Pass header props as `item && …` so they only evaluate once loaded.
@@ -175,12 +179,14 @@ return (
 ```
 
 ### Modals & panels are separate components
+
 Every dialog/modal is its **own** component that owns its form + validation +
 `useAdminMutation` (built on the shared `Modal`). The page only holds the
 open/close state. Action panels that trigger a mutation own it too (see
 `trades/[id]/_sections/CompensationPanel`, `_modals/*`).
 
 ### Folder shape per page
+
 ```
 app/(admin)/<resource>/
   page.tsx                 # thin: <ResourceList> composition (~30 lines)
@@ -201,18 +207,25 @@ Apply the same recipe to every new admin section.
 Never write raw `ColumnDef` cell JSX. Columns are built with the typed **column
 factory** so alignment, truncation, font/size, formatting, width and the
 empty-value placeholder are locked **inside the cell type** — cross-table
-inconsistency becomes impossible. The page only declares *which field* it shows.
+inconsistency becomes impossible. The page only declares _which field_ it shows.
 
 ```tsx
-import { col } from '@/components/table';
+import { col } from "@/components/table";
 
 const columns = [
-  col.link('Sipariş', r => ({ href: `/operations/orders/${r.order.id}`, label: `#${r.order.no}` })),
-  col.user('Alıcı',  r => ({ name: r.buyer.name, secondary: r.buyer.email, href: `/users/${r.buyer.id}` })),
-  col.money('Tutar', r => r.amount, { tone: 'negative' }),   // ₺, right, tabular-nums
-  col.date('Tarih',  r => r.createdAt),                       // short date, hover = full timestamp
-  col.badge('Durum', r => <StatusBadge status={r.status} config={cfg} />),  // never wraps
-  col.actions(r => <RowMenu id={r.id} />, { header: 'İşlemler' }),          // right, nowrap
+  col.link("Sipariş", (r) => ({
+    href: `/operations/orders/${r.order.id}`,
+    label: `#${r.order.no}`,
+  })),
+  col.user("Alıcı", (r) => ({
+    name: r.buyer.name,
+    secondary: r.buyer.email,
+    href: `/users/${r.buyer.id}`,
+  })),
+  col.money("Tutar", (r) => r.amount, { tone: "negative" }), // ₺, right, tabular-nums
+  col.date("Tarih", (r) => r.createdAt), // short date, hover = full timestamp
+  col.badge("Durum", (r) => <StatusBadge status={r.status} config={cfg} />), // never wraps
+  col.actions((r) => <RowMenu id={r.id} />, { header: "İşlemler" }), // right, nowrap
 ];
 ```
 
@@ -224,6 +237,7 @@ primitives are in `components/table/cells.tsx`; use them directly only inside
 `col.custom` (e.g. `<CellText>`, `<CellCode>`, `<TruncatedText>`).
 
 ### Behaviour the factory guarantees
+
 - **Text never wraps** — `truncate` + `…`; a native tooltip shows the full value
   **only when actually clipped** (`TruncatedText` measures overflow).
 - **Responsive width** — each column has a `grow` weight + `minWidth`. On wide
@@ -248,6 +262,7 @@ overlays on the page). Delete goes through the shared **`useConfirm`** provider
 (`components/ConfirmProvider`) + a `useAdminMutation` — no bespoke delete modal.
 
 ### Form layer (`@tarodan/ui/form` + `components/form/`)
+
 - **`FormModal`** (`components/form/FormModal.tsx`) = design-system `Modal` + the
   RHF `Form` + a standard Cancel/Submit footer. The resource modal owns the
   `form` (from `useZodForm`) and the `useAdminMutation`; FormModal just frames them.
@@ -277,18 +292,22 @@ return (
   </FormModal>
 );
 ```
+
 Page side stays thin: `const [modal, setModal] = useState<{item?}|null>(null)` and
 mount with `key={item?.id ?? 'new'}` so `useZodForm` defaults seed fresh per open.
 
 ### Lists over full-load APIs
+
 Some catalog APIs return the whole list (no server paging/search). Wrap them with
 **`clientListFetcher`** / `paginateClient` (`lib/query/clientList.ts`) so they run
 through the same `ResourceList` pipeline; server-paginated resources pass their
 `adminApi.getX` fetcher directly.
 
 ### Shared bits
+
 `ActiveBadge` / `StatusToggle` (`components/ActiveBadge.tsx`) for `isActive` display
-+ one-click toggle. Row edit/delete buttons: `ActionIconButton` inside `col.actions`.
+
+- one-click toggle. Row edit/delete buttons: `ActionIconButton` inside `col.actions`.
 
 The `(admin)/catalog/*` pages are the canonical CRUD examples (`categories` = the
 simplest, `products` = list+detail+tabs, `brands` = shared `CarModelFormModal`).

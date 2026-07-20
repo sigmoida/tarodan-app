@@ -96,6 +96,9 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup-workspace
       - name: Build (affected on PR, all on push)
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3001
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             pnpm turbo run build "--filter=...[${{ github.event.pull_request.base.sha }}]"
@@ -493,29 +496,10 @@ jobs:
         with:
           prisma: 'false'
           turbo-cache: 'false'
-      - name: Audit dependencies (critical fails)
-        # Only critical vulnerabilities fail CI. Most current highs are transitive
-        # (NestJS/Apollo/expo/prisma) and require major upgrades; rather than take the
-        # risk we keep the critical gate. Highs are tracked via Dependabot.
-        #
-        # npm retired the legacy quick-audit endpoint that `pnpm audit` (v8) still
-        # POSTs to; it now returns HTTP 410 unconditionally (not vuln data). Treat
-        # that one infra failure as a non-fatal warning so it can't false-red CI,
-        # while still failing on genuine critical advisories whenever the endpoint
-        # answers. Self-heals once pnpm adopts the bulk advisory endpoint.
-        run: |
-          set +e
-          audit_output="$(pnpm audit --audit-level=critical 2>&1)"
-          status=$?
-          echo "$audit_output"
-          if [ "$status" -eq 0 ]; then
-            exit 0
-          fi
-          if printf '%s' "$audit_output" | grep -q 'ERR_PNPM_AUDIT_BAD_RESPONSE'; then
-            echo "::warning::pnpm audit endpoint unavailable (npm returned 410; legacy audit endpoint retired). Critical-vuln gate skipped until pnpm moves to the bulk advisory endpoint."
-            exit 0
-          fi
-          exit "$status"
+      - name: Audit production dependencies (high fails)
+        # The checker fails closed for invalid/registry responses, rejects every
+        # critical and any new high, and permits only documented, non-expired GHSAs.
+        run: pnpm audit:prod
 
   secret-scan:
     name: Secret Scan

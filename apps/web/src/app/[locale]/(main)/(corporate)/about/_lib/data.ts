@@ -1,6 +1,7 @@
 /** @format */
+import { getServerApiOrigin } from "@/lib/api/origin";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_BASE = getServerApiOrigin();
 
 /** Server fetch for the CMS "about" page (revalidated hourly). */
 export async function getAboutPage() {

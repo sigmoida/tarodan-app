@@ -1,6 +1,7 @@
 const { withSentryConfig } = require('@sentry/nextjs');
 const createNextIntlPlugin = require('next-intl/plugin');
 const path = require('path');
+const { env } = require('./env.config');
 
 // next-intl plugin — points at the request config (locale + messages per request).
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
@@ -31,7 +32,7 @@ const nextConfig = {
     return [{ source: '/(.*)', headers: SECURITY_HEADERS }];
   },
   // standalone yalnızca prod build için; dev-server bu monorepo'da standalone ile takılıyor.
-  output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
+  output: env.NODE_ENV === 'production' ? 'standalone' : undefined,
   // Dev'de StrictMode effect'leri 2× çalıştırıp her yükleme/hata toast'ını ikiye
   // katlıyordu (örn. "Siparişler/Ayarlar yüklenemedi" 2×). Kapatıyoruz.
   reactStrictMode: false,
@@ -40,7 +41,11 @@ const nextConfig = {
   // Skip the in-build checks (the webpack compile still runs).
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: true },
-  transpilePackages: ['@tarodan/ui', '@tarodan/design-tokens', '@tarodan/shared'],
+  transpilePackages: [
+    '@tarodan/ui',
+    '@tarodan/design-tokens',
+    '@tarodan/api-client',
+  ],
   experimental: {
     outputFileTracingRoot: path.join(__dirname, '../../'),
     // Tree-shake the 112 barrel imports from @heroicons/react to per-icon
@@ -96,10 +101,10 @@ const nextConfig = {
 // Sentry configuration options
 const sentryWebpackPluginOptions = {
   silent: true,
-  org: process.env.SENTRY_ORG || 'tarodan',
-  project: process.env.SENTRY_PROJECT || 'admin',
-  authToken: process.env.SENTRY_AUTH_TOKEN,
-  dryRun: process.env.NODE_ENV !== 'production',
+  org: env.SENTRY_ORG,
+  project: env.SENTRY_PROJECT,
+  authToken: env.SENTRY_AUTH_TOKEN,
+  dryRun: env.NODE_ENV !== 'production',
   // Kaynak harita yükleme / release HATALARI prod build'ini ASLA düşürmesin.
   // Sentry CLI başarısızlığı (token yok/yanlış, "project not found", ağ) deploy'u
   // patlatmamalı — sadece uyar, build devam etsin.
@@ -114,6 +119,6 @@ const sentryWebpackPluginOptions = {
 const configWithIntl = withNextIntl(nextConfig);
 
 module.exports =
-  process.env.NEXT_PUBLIC_SENTRY_DSN && process.env.SENTRY_AUTH_TOKEN
+  env.NEXT_PUBLIC_SENTRY_DSN && env.SENTRY_AUTH_TOKEN
     ? withSentryConfig(configWithIntl, sentryWebpackPluginOptions)
     : configWithIntl;

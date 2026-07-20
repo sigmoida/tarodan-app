@@ -9,6 +9,7 @@
  */
 
 import { manufacturersApi, listingsApi } from "@/lib/api";
+import { getServerApiOrigin } from "@/lib/api/origin";
 import { countryToFlag } from "./countryFlag";
 import { BRANDS_DATA } from "./brands-data";
 import type {
@@ -17,10 +18,7 @@ import type {
   ManufacturerDetail,
 } from "./types";
 
-export const API_BASE =
-  process.env.API_INTERNAL_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:3001";
+export const API_BASE = getServerApiOrigin();
 
 /** Unwrap a raw `/manufacturers` response into a plain array. */
 export function unwrapManufacturers(raw: any): ManufacturerApi[] {

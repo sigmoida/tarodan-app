@@ -1,9 +1,16 @@
 import type { AuthConfig } from "@tarodan/auth";
 
-const API =
-  process.env.API_INTERNAL_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:3001";
+function resolveApiOrigin(): string {
+  const configured =
+    process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL;
+  if (configured) return configured;
+  if (process.env.NODE_ENV !== "production") return "http://localhost:3001";
+  throw new Error(
+    "API_INTERNAL_URL or NEXT_PUBLIC_API_URL is required in production",
+  );
+}
+
+const API = resolveApiOrigin();
 
 /**
  * The admin app's concrete BFF auth config. The shared `@tarodan/auth` engine is

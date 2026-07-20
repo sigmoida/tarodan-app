@@ -8,11 +8,9 @@
  */
 
 import { collectionsApi, categoriesApi } from "@/lib/api";
+import { getServerApiOrigin } from "@/lib/api/origin";
 
-export const API_BASE =
-  process.env.API_INTERNAL_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:3001";
+export const API_BASE = getServerApiOrigin();
 
 export const PUBLIC_PAGE_SIZE = 24;
 

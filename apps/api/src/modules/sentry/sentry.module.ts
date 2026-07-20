@@ -36,10 +36,8 @@ export class SentryModule implements OnModuleInit {
         environment,
         tracesSampleRate: environment === "production" ? 0.2 : 1.0,
         profilesSampleRate: environment === "production" ? 0.1 : 1.0,
-        integrations: [
-          // HTTP integration for tracking outgoing requests
-          new Sentry.Integrations.Http({ tracing: true }),
-        ],
+        // Sentry v8's default Node integrations include inbound and outbound
+        // HTTP instrumentation; no deprecated @sentry/tracing shim is needed.
         // Filter out health check endpoints
         beforeSend(event, hint) {
           const request = event.request;
@@ -59,11 +57,11 @@ export class SentryModule implements OnModuleInit {
           return breadcrumb;
         },
       });
+      initAppLogger(this.sentryService);
       this.logger.log("Sentry initialized");
     } else {
+      initAppLogger(this.sentryService);
       this.logger.warn("Sentry DSN not configured, error tracking disabled");
     }
-
-    initAppLogger(this.sentryService);
   }
 }

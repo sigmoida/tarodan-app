@@ -14,7 +14,11 @@ interface PaginationProps {
  * Deduplicates the "Page X / Y + Previous/Next" block repeated verbatim across 18 pages.
  * Appearance is identical to the existing pages.
  */
-export function Pagination({ page, totalPages, onPageChange }: PaginationProps) {
+export function Pagination({
+  page,
+  totalPages,
+  onPageChange,
+}: PaginationProps) {
   const t = useTranslations();
   return (
     <div className="flex items-center justify-between">

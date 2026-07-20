@@ -1,22 +1,5 @@
 import { NestFactory } from "@nestjs/core";
-import {
-  ValidationPipe,
-  Logger,
-  ConsoleLogger,
-  RequestMethod,
-} from "@nestjs/common";
-
-/** Her route için RouterExplorer / RoutesResolver satırlarını susturur; `NEST_VERBOSE_ROUTES=true` ile eski davranış. */
-class QuietRouteNestLogger extends ConsoleLogger {
-  private static readonly SKIP = new Set(["RouterExplorer", "RoutesResolver"]);
-
-  log(message: unknown, context?: string) {
-    if (context && QuietRouteNestLogger.SKIP.has(context)) {
-      return;
-    }
-    super.log(message, context);
-  }
-}
+import { ValidationPipe, Logger, RequestMethod } from "@nestjs/common";
 import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 import helmet from "helmet";
 import { AppModule } from "./app.module";
@@ -24,6 +7,7 @@ import { AppModule } from "./app.module";
 import { NestExpressApplication } from "@nestjs/platform-express";
 import { json, urlencoded } from "express";
 import { setupBullBoard } from "./bull-board.setup";
+import { AppNestLogger } from "./common/logging/nest-logger";
 
 /**
  * Hard guard: PAYMENT_BYPASS allows completing payments without going through
@@ -52,10 +36,7 @@ async function bootstrap() {
     // IMPORTANT: Disable default body parser so custom parsers work for payment callbacks
     const app = await NestFactory.create<NestExpressApplication>(AppModule, {
       bodyParser: false, // Disable default parser
-      logger:
-        process.env.NEST_VERBOSE_ROUTES === "true"
-          ? new ConsoleLogger()
-          : new QuietRouteNestLogger(),
+      logger: new AppNestLogger(),
     });
 
     // Reverse proxy (Coolify/nginx) arkasında gerçek istemci IP'sini X-Forwarded-For'dan

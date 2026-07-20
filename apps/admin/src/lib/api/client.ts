@@ -1,4 +1,4 @@
-import axios from "axios";
+import { createApiClient } from "@tarodan/api-client";
 
 /**
  * Client API instance. Every call goes to the same-origin gateway proxy
@@ -6,22 +6,14 @@ import axios from "axios";
  * token server-side and refreshes it on 401. The browser never holds or sees
  * the API tokens — auth lives in src/lib/server/session.ts.
  */
-export const api = axios.create({
+export const api = createApiClient({
   baseURL: "/gateway",
   headers: { "Content-Type": "application/json" },
-});
-
-// On 401, retry the request up to TWICE before giving up. A transient 401 happens
-// when the access token just expired: a sibling call (or middleware) refreshes the
-// session in parallel. A brief pause before later attempts lets that refresh land
-// its rotated cookie, so refresh-token rotation doesn't cause a false logout. Only
-// a 401 that survives the retries means the session is genuinely gone → login.
-api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
+  // On 401, retry the request up to TWICE before giving up. A transient 401
+  // happens when a sibling BFF call is rotating the session cookie.
+  onResponseError: async (error, client) => {
     const config = error.config as
-      | (typeof error.config & { _retryCount?: number })
-      | undefined;
+      (typeof error.config & { _retryCount?: number }) | undefined;
     const isAuthError = error.response?.status === 401;
 
     if (isAuthError && config) {
@@ -30,7 +22,7 @@ api.interceptors.response.use(
         if (config._retryCount > 1) {
           await new Promise((resolve) => setTimeout(resolve, 300));
         }
-        return api(config);
+        return client(config);
       }
       if (
         typeof window !== "undefined" &&
@@ -47,6 +39,6 @@ api.interceptors.response.use(
     }
     return Promise.reject(error);
   },
-);
+});
 
 export default api;

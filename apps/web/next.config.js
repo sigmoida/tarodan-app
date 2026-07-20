@@ -1,6 +1,7 @@
 const { withSentryConfig } = require('@sentry/nextjs');
 const createNextIntlPlugin = require('next-intl/plugin');
 const path = require('path');
+const { env } = require('./env.config');
 
 // next-intl plugin — points at the request config (locale + messages per request).
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
@@ -23,13 +24,36 @@ function getCacheHeaders() {
   return [
     ...(allowIndexing
       ? []
-      : [{ source: '/:path*', headers: [{ key: 'X-Robots-Tag', value: noindex }] }]),
-    { source: '/favicon.ico', headers: [{ key: 'Cache-Control', value: oneDay }] },
-    { source: '/tarodanfavicon.png', headers: [{ key: 'Cache-Control', value: oneWeek }] },
-    { source: '/logo.svg', headers: [{ key: 'Cache-Control', value: oneWeek }] },
-    { source: '/tarodan-logo.jpg', headers: [{ key: 'Cache-Control', value: oneWeek }] },
-    { source: '/images/:path*', headers: [{ key: 'Cache-Control', value: oneWeek }] },
-    { source: '/photos/:path*', headers: [{ key: 'Cache-Control', value: oneWeek }] },
+      : [
+          {
+            source: '/:path*',
+            headers: [{ key: 'X-Robots-Tag', value: noindex }],
+          },
+        ]),
+    {
+      source: '/favicon.ico',
+      headers: [{ key: 'Cache-Control', value: oneDay }],
+    },
+    {
+      source: '/tarodanfavicon.png',
+      headers: [{ key: 'Cache-Control', value: oneWeek }],
+    },
+    {
+      source: '/logo.svg',
+      headers: [{ key: 'Cache-Control', value: oneWeek }],
+    },
+    {
+      source: '/tarodan-logo.jpg',
+      headers: [{ key: 'Cache-Control', value: oneWeek }],
+    },
+    {
+      source: '/images/:path*',
+      headers: [{ key: 'Cache-Control', value: oneWeek }],
+    },
+    {
+      source: '/photos/:path*',
+      headers: [{ key: 'Cache-Control', value: oneWeek }],
+    },
   ];
 }
 
@@ -57,7 +81,7 @@ const SECURITY_HEADERS = [
 const nextConfig = {
   // standalone yalnızca prod build için; Next 14.2 dev-server'ı bu monorepo'da
   // standalone ile "Starting..."da takılıyor → dev'de devre dışı bırak.
-  output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
+  output: env.NODE_ENV === 'production' ? 'standalone' : undefined,
   reactStrictMode: true,
   // Type-check + lint are gated in CI (`pnpm typecheck` / `pnpm lint`) and
   // locally; running the full type-check again inside `next build` OOM-killed the
@@ -65,7 +89,11 @@ const nextConfig = {
   // compile still runs) to keep the Docker build lean.
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: true },
-  transpilePackages: ['@tarodan/ui', '@tarodan/design-tokens', '@tarodan/shared'],
+  transpilePackages: [
+    '@tarodan/ui',
+    '@tarodan/design-tokens',
+    '@tarodan/api-client',
+  ],
   webpack: (config, { isServer }) => {
     // ESM packages için webpack config
     if (!isServer) {
@@ -81,14 +109,21 @@ const nextConfig = {
   },
   experimental: {
     outputFileTracingRoot: path.join(__dirname, '../../'),
-    optimizePackageImports: ['@heroicons/react', '@heroicons/react/24/outline', '@heroicons/react/24/solid'],
+    optimizePackageImports: [
+      '@heroicons/react',
+      '@heroicons/react/24/outline',
+      '@heroicons/react/24/solid',
+    ],
     // Next 14.2 strictly requires Suspense around useSearchParams() during
     // prerender. With output: 'standalone' (server-rendered) this strict
     // bailout adds no real safety. Disable to keep build green.
     missingSuspenseWithCSRBailout: false,
   },
   async headers() {
-    return [{ source: '/(.*)', headers: SECURITY_HEADERS }, ...getCacheHeaders()];
+    return [
+      { source: '/(.*)', headers: SECURITY_HEADERS },
+      ...getCacheHeaders(),
+    ];
   },
   images: {
     remotePatterns: [
@@ -146,11 +181,12 @@ const nextConfig = {
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
-    NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001',
+    NEXT_PUBLIC_API_URL: env.NEXT_PUBLIC_API_URL,
+    NEXT_PUBLIC_WS_URL:
+      env.NEXT_PUBLIC_WS_URL || env.NEXT_PUBLIC_API_URL.replace(/^http/, 'ws'),
   },
   async rewrites() {
-    const apiUrl = process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const apiUrl = env.API_INTERNAL_URL || env.NEXT_PUBLIC_API_URL;
     return {
       beforeFiles: [
         {
@@ -231,11 +267,11 @@ const sentryWebpackPluginOptions = {
   // Suppresses source map uploading logs during build
   silent: true,
   // Organization and project from Sentry
-  org: process.env.SENTRY_ORG || 'tarodan',
-  project: process.env.SENTRY_PROJECT || 'web',
-  authToken: process.env.SENTRY_AUTH_TOKEN,
+  org: env.SENTRY_ORG,
+  project: env.SENTRY_PROJECT,
+  authToken: env.SENTRY_AUTH_TOKEN,
   // Upload source maps only in production
-  dryRun: process.env.NODE_ENV !== 'production',
+  dryRun: env.NODE_ENV !== 'production',
   // Kaynak harita yükleme / release HATALARI prod build'ini ASLA düşürmesin.
   // Sentry CLI başarısızlığı (token yok/yanlış, "project not found", ağ) deploy'u
   // patlatmamalı — sadece uyar, build devam etsin.
@@ -251,6 +287,6 @@ const sentryWebpackPluginOptions = {
 const configWithIntl = withNextIntl(nextConfig);
 
 module.exports =
-  process.env.NEXT_PUBLIC_SENTRY_DSN && process.env.SENTRY_AUTH_TOKEN
+  env.NEXT_PUBLIC_SENTRY_DSN && env.SENTRY_AUTH_TOKEN
     ? withSentryConfig(configWithIntl, sentryWebpackPluginOptions)
     : configWithIntl;

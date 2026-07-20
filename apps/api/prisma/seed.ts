@@ -30,7 +30,7 @@ import {
   ElogoInvoiceType,
   ElogoInvoiceStatus,
 } from "@prisma/client";
-import * as bcrypt from "bcryptjs";
+import * as bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 import { StorageService } from "../src/modules/storage/storage.service";
 import { PrismaService } from "../src/prisma";

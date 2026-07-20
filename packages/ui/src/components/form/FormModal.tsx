@@ -1,10 +1,14 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, type ReactNode } from 'react';
-import type { FieldValues, SubmitHandler, UseFormReturn } from 'react-hook-form';
-import { Modal, type ModalProps } from '../Modal';
-import { ModalFooter } from '../Dialog';
-import { Form } from './Form';
+import { useEffect, useRef, type ReactNode } from "react";
+import type {
+  FieldValues,
+  SubmitHandler,
+  UseFormReturn,
+} from "react-hook-form";
+import { Modal, type ModalProps } from "../Modal";
+import { ModalFooter } from "../Dialog";
+import { Form } from "./Form";
 
 export interface FormModalProps<T extends FieldValues> {
   open: boolean;
@@ -19,7 +23,7 @@ export interface FormModalProps<T extends FieldValues> {
   resetValues?: T;
   submitLabel?: string;
   cancelLabel?: string;
-  maxWidth?: ModalProps['maxWidth'];
+  maxWidth?: ModalProps["maxWidth"];
   /** Optional width/layout override for editor-style split panes. */
   modalClassName?: string;
   /** Keep complex editors open when their backdrop is clicked. */
@@ -44,9 +48,9 @@ export function FormModal<T extends FieldValues>({
   onSubmit,
   isSubmitting,
   resetValues,
-  submitLabel = 'Kaydet',
-  cancelLabel = 'İptal',
-  maxWidth = 'max-w-lg',
+  submitLabel = "Kaydet",
+  cancelLabel = "İptal",
+  maxWidth = "max-w-lg",
   modalClassName,
   closeOnBackdrop,
   children,

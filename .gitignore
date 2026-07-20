@@ -20,6 +20,7 @@ build/
 # Logs
 *.log
 npm-debug.log*
+**/package-lock.json
 
 # Cache
 .cache/

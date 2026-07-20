@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Install OpenSSL and pnpm
 RUN apk add --no-cache openssl
-RUN npm install -g pnpm
+RUN corepack enable && corepack prepare pnpm@10.34.5 --activate
 
 # Copy root package files (monorepo)
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./

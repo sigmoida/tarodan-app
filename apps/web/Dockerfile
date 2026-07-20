@@ -6,8 +6,8 @@ WORKDIR /app
 # Ensure devDependencies are installed during build
 ENV NODE_ENV=development
 
-# Install pnpm
-RUN npm install -g pnpm
+# Keep Docker builds on the repository's audited package-manager line.
+RUN corepack enable && corepack prepare pnpm@10.34.5 --activate
 
 # Copy root package files (monorepo)
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -34,7 +34,11 @@ COPY apps/web ./apps/web
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 # Public env vars are inlined at build time — must be present before `next build`.
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_APP_URL
 ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
 RUN pnpm --filter @tarodan/web... build
 

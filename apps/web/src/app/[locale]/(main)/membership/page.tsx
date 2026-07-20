@@ -5,12 +5,10 @@ import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
 import { getServerQueryClient } from "@/lib/query/server";
 import { queryKeys } from "@/lib/query/keys";
 import { localizedCanonical, localizedPath } from "@/lib/seo";
+import { getServerApiOrigin } from "@/lib/api/origin";
 import MembershipClient from "./MembershipClient";
 
-const API_BASE =
-  process.env.API_INTERNAL_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:3001";
+const API_BASE = getServerApiOrigin();
 
 export function generateMetadata({
   params: { locale },

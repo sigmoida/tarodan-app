@@ -1,4 +1,5 @@
-import { QueryCache, QueryClient } from "@tanstack/react-query";
+import { QueryCache } from "@tanstack/react-query";
+import { createPlatformQueryClient } from "@tarodan/api-client/query";
 import { logger } from "@/lib/logger";
 
 /**
@@ -25,7 +26,7 @@ export function onQueryError(
 }
 
 export function makeQueryClient() {
-  return new QueryClient({
+  return createPlatformQueryClient({
     queryCache: new QueryCache({
       onError: (error, query) =>
         onQueryError(error, {
