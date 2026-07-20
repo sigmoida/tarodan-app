@@ -31,7 +31,6 @@ export default function GuestOtpModal() {
       onClose={() => setGuestOtpModalOpen(false)}
       title={t("checkout.guestEmailVerifyTitle")}
       maxWidth="max-w-md"
-      zIndex="z-[100]"
     >
       <div className="space-y-4">
         <p className="text-sm text-muted">

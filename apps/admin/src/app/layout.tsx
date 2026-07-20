@@ -7,6 +7,7 @@ import { Toaster } from "react-hot-toast";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages, getTranslations } from "next-intl/server";
 import { APP_NAME } from "@/lib/navigation";
+import { zIndex } from "@tarodan/design-tokens";
 
 const notoSans = Noto_Sans({
   subsets: ["latin", "latin-ext"],
@@ -47,6 +48,7 @@ export default async function RootLayout({
         <NextIntlClientProvider locale={locale} messages={messages}>
           <Toaster
             position="bottom-right"
+            containerStyle={{ zIndex: zIndex.toast }}
             toastOptions={{ style: { maxWidth: "360px" } }}
           />
           {children}

@@ -1,45 +1,52 @@
 // Form controls
-export { Button, buttonVariants, type ButtonProps } from './components/Button';
-export { IconButton, iconButtonVariants } from './components/IconButton';
-export type { IconButtonProps } from './components/IconButton';
-export { Input, type InputProps } from './components/Input';
+export { Button, buttonVariants, type ButtonProps } from "./components/Button";
+export { IconButton, iconButtonVariants } from "./components/IconButton";
+export type { IconButtonProps } from "./components/IconButton";
+export { Input, type InputProps } from "./components/Input";
 export {
-	CardNumberInput,
-	type CardNumberInputProps,
-	ExpiryDateInput,
-	type ExpiryDateInputProps,
-	CvvInput,
-	type CvvInputProps,
-	IbanInput,
-	type IbanInputProps,
-	CARD_NUMBER_REGEX,
-	EXPIRY_REGEX,
-	CVV_REGEX,
-	IBAN_TR_REGEX,
-	isValidCardNumber,
-	isExpiryValid,
-	parseExpiry,
-	isValidIban,
-} from './components/PaymentInputs';
-export { Slider, type SliderProps } from './components/Slider';
-export { SearchInput, type SearchInputProps } from './components/SearchInput';
-export { Textarea, type TextareaProps } from './components/Textarea';
-export { Select, type SelectProps, type SelectOption } from './components/Select';
-export { Toggle, type ToggleProps } from './components/Toggle';
-export { Checkbox, type CheckboxProps } from './components/Checkbox';
+  CardNumberInput,
+  type CardNumberInputProps,
+  ExpiryDateInput,
+  type ExpiryDateInputProps,
+  CvvInput,
+  type CvvInputProps,
+  IbanInput,
+  type IbanInputProps,
+  CARD_NUMBER_REGEX,
+  EXPIRY_REGEX,
+  CVV_REGEX,
+  IBAN_TR_REGEX,
+  isValidCardNumber,
+  isExpiryValid,
+  parseExpiry,
+  isValidIban,
+} from "./components/PaymentInputs";
+export { Slider, type SliderProps } from "./components/Slider";
+export { SearchInput, type SearchInputProps } from "./components/SearchInput";
+export { Textarea, type TextareaProps } from "./components/Textarea";
+export {
+  Select,
+  type SelectProps,
+  type SelectOption,
+} from "./components/Select";
+export { Toggle, type ToggleProps } from "./components/Toggle";
+export { Checkbox, type CheckboxProps } from "./components/Checkbox";
 export {
   Radio,
   RadioGroup,
   type RadioProps,
   type RadioGroupProps,
   type RadioGroupOption,
-} from './components/Radio';
-export { Label, type LabelProps } from './components/Label';
-export { FormField, type FormFieldProps } from './components/FormField';
-export { Logo, type LogoProps } from './components/Logo';
-export { Chip, type ChipProps } from './components/Chip';
-export { CheckToggle, type CheckToggleProps } from './components/CheckToggle';
-export { DisclosureButton, type DisclosureButtonProps } from './components/DisclosureButton';
+} from "./components/Radio";
+export { Label, type LabelProps } from "./components/Label";
+export { FormField, type FormFieldProps } from "./components/FormField";
+export { Logo, type LogoProps } from "./components/Logo";
+export { Chip, type ChipProps } from "./components/Chip";
+export { CheckToggle, type CheckToggleProps } from "./components/CheckToggle";
+export {
+  DisclosureButton,
+  type DisclosureButtonProps,
+} from "./components/DisclosureButton";
 // The RHF + zod form layer is exposed via the `@tarodan/ui/form` subpath so it
 // only pulls zod/react-hook-form into bundles that actually build forms.
 
@@ -52,17 +59,41 @@ export {
   CardContent,
   CardFooter,
   type CardProps,
-} from './components/Card';
-export { Badge, badgeVariants, type BadgeProps } from './components/Badge';
-export { StatusBadge, type StatusBadgeProps } from './components/StatusBadge';
-export { ProductBadge, type ProductBadgeProps, type ProductBadgeVariant } from './components/ProductBadge';
-export { Avatar, type AvatarProps } from './components/Avatar';
-export { Alert, type AlertProps } from './components/Alert';
-export { Modal, type ModalProps } from './components/Modal';
-export { Dialog, ConfirmDialog, ModalFooter, type DialogProps, type ConfirmDialogProps, type ModalFooterProps } from './components/Dialog';
-export { EmptyState, type EmptyStateProps } from './components/EmptyState';
-export { ThumbnailStack, type ThumbnailStackProps } from './components/ThumbnailStack';
-export { Breadcrumb, type BreadcrumbProps, type BreadcrumbItem } from './components/Breadcrumb';
+} from "./components/Card";
+export { Badge, badgeVariants, type BadgeProps } from "./components/Badge";
+export { StatusBadge, type StatusBadgeProps } from "./components/StatusBadge";
+export {
+  ProductBadge,
+  type ProductBadgeProps,
+  type ProductBadgeVariant,
+} from "./components/ProductBadge";
+export { Avatar, type AvatarProps } from "./components/Avatar";
+export { Alert, type AlertProps } from "./components/Alert";
+export { Modal, type ModalProps } from "./components/Modal";
+export {
+  Dialog,
+  ConfirmDialog,
+  ModalFooter,
+  type DialogProps,
+  type ConfirmDialogProps,
+  type ModalFooterProps,
+} from "./components/Dialog";
+export {
+  ConfirmProvider,
+  useConfirm,
+  type ConfirmFn,
+  type ConfirmOptions,
+} from "./components/ConfirmProvider";
+export { EmptyState, type EmptyStateProps } from "./components/EmptyState";
+export {
+  ThumbnailStack,
+  type ThumbnailStackProps,
+} from "./components/ThumbnailStack";
+export {
+  Breadcrumb,
+  type BreadcrumbProps,
+  type BreadcrumbItem,
+} from "./components/Breadcrumb";
 
 // Table
 export {
@@ -75,10 +106,10 @@ export {
   TableCell,
   TableCaption,
   type TableProps,
-} from './components/Table';
+} from "./components/Table";
 
 // Navigation / disclosure
-export { Tabs, TabsList, TabsTrigger, TabsContent } from './components/Tabs';
+export { Tabs, TabsList, TabsTrigger, TabsContent } from "./components/Tabs";
 export {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -90,19 +121,19 @@ export {
   DropdownMenuPortal,
   DropdownMenuSub,
   DropdownMenuRadioGroup,
-} from './components/DropdownMenu';
+} from "./components/DropdownMenu";
 export {
   Accordion,
   AccordionItem,
   AccordionTrigger,
   AccordionContent,
-} from './components/Accordion';
+} from "./components/Accordion";
 export {
   Stepper,
   useStepper,
   type StepperProps,
   type StepperStep,
-} from './components/Stepper';
+} from "./components/Stepper";
 export {
   NavigationMenu,
   NavigationMenuList,
@@ -113,7 +144,7 @@ export {
   NavigationMenuViewport,
   NavigationMenuIndicator,
   navigationMenuTriggerStyle,
-} from './components/NavigationMenu';
+} from "./components/NavigationMenu";
 export {
   Tooltip,
   TooltipProvider,
@@ -121,11 +152,11 @@ export {
   TooltipTrigger,
   TooltipContent,
   type TooltipProps,
-} from './components/Tooltip';
-export { Pagination, type PaginationProps } from './components/Pagination';
+} from "./components/Tooltip";
+export { Pagination, type PaginationProps } from "./components/Pagination";
 
 // Loading states
-export { Spinner, type SpinnerProps } from './components/Spinner';
+export { Spinner, type SpinnerProps } from "./components/Spinner";
 export {
   Skeleton,
   AsyncValue,
@@ -134,7 +165,7 @@ export {
   SkeletonAvatar,
   type SkeletonProps,
   type AsyncValueProps,
-} from './components/Skeleton';
+} from "./components/Skeleton";
 
 // Status configs (pre-built status → badge mappings)
 export {
@@ -168,8 +199,8 @@ export {
   enumLabel,
   type StatusConfig,
   type BadgeVariant,
-} from './lib/status-configs';
+} from "./lib/status-configs";
 
 // Utilities
-export { cn } from './lib/utils';
-export { colors } from '@tarodan/design-tokens';
+export { cn } from "./lib/utils";
+export { colors } from "@tarodan/design-tokens";

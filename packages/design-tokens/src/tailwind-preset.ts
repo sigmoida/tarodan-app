@@ -1,5 +1,13 @@
 import type { Config } from "tailwindcss";
-import { colors, radius, spacing, shadows, motion, typography } from "./index";
+import {
+  colors,
+  radius,
+  spacing,
+  shadows,
+  motion,
+  typography,
+  zIndex,
+} from "./index";
 
 /**
  * Tarodan Design System — Shared Tailwind Preset (web adapter)
@@ -86,6 +94,14 @@ const tarodanPreset: Partial<Config> = {
       transitionTimingFunction: motion.easing,
       animation: motion.animation,
       keyframes: motion.keyframes,
+      zIndex: {
+        "navigation-overlay": String(zIndex.navigationOverlay),
+        navigation: String(zIndex.navigation),
+        overlay: String(zIndex.overlay),
+        modal: String(zIndex.modal),
+        popover: String(zIndex.popover),
+        toast: String(zIndex.toast),
+      },
     },
   },
 };
