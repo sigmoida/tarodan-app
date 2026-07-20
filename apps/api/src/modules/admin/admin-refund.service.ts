@@ -96,7 +96,21 @@ export class AdminRefundService {
         {
           order: { seller: { email: { contains: term, mode: "insensitive" } } },
         },
+        {
+          order: {
+            orderNumber: { contains: term, mode: "insensitive" },
+          },
+        },
+        {
+          order: {
+            product: { title: { contains: term, mode: "insensitive" } },
+          },
+        },
         { refundNumber: { contains: term, mode: "insensitive" } },
+        { description: { contains: term, mode: "insensitive" } },
+        {
+          returnTrackingNumber: { contains: term, mode: "insensitive" },
+        },
       ];
     }
 

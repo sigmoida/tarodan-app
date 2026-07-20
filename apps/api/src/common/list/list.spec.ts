@@ -6,6 +6,7 @@ import { AdminListQueryDto } from "./admin-list-query.dto";
 import { paginate } from "./paginate";
 import { resolveOrderBy } from "./resolve-order-by";
 import { buildSearchWhere } from "./search-where";
+import { AdminShipmentQueryDto } from "../../modules/admin/dto/operations-query.dto";
 
 // Keeps the shared delegate contract checked against the generated Prisma API.
 function _paginateProducts(prisma: PrismaClient) {
@@ -52,6 +53,13 @@ describe("admin list primitives", () => {
           }),
         ]),
       );
+    });
+
+    it("accepts the 250-row option for shipment lists", async () => {
+      const query = plainToInstance(AdminShipmentQueryDto, { limit: "250" });
+
+      await expect(validate(query)).resolves.toHaveLength(0);
+      expect(query.limit).toBe(250);
     });
   });
 
@@ -148,14 +156,24 @@ describe("admin list primitives", () => {
       ).toBe(fallback);
     });
 
-    it("puts nulls last for a number/date scalar via the sortType hint", () => {
+    it("puts nulls last for an optional number/date scalar via sortType", () => {
       expect(
         resolveOrderBy(
           "Product",
-          { sortBy: "price", sortOrder: "asc", sortType: "number" },
+          { sortBy: "salePrice", sortOrder: "asc", sortType: "number" },
           { defaultSort },
         ),
-      ).toEqual({ price: { sort: "asc", nulls: "last" } });
+      ).toEqual({ salePrice: { sort: "asc", nulls: "last" } });
+    });
+
+    it("does not add null ordering to a required scalar", () => {
+      expect(
+        resolveOrderBy(
+          "Product",
+          { sortBy: "createdAt", sortOrder: "asc", sortType: "date" },
+          { defaultSort },
+        ),
+      ).toEqual({ createdAt: "asc" });
     });
 
     it("keeps a plain scalar sort when sortType is text or absent", () => {

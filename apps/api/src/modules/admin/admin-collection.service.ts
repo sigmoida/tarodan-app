@@ -69,8 +69,9 @@ export class AdminCollectionService {
     isFeatured?: boolean;
     page?: number;
     limit?: number;
-    sortBy?: "createdAt" | "name" | "likeCount" | "viewCount";
+    sortBy?: string;
     sortOrder?: "asc" | "desc";
+    sortType?: "text" | "number" | "date";
   }) {
     const {
       page = 1,
@@ -83,20 +84,26 @@ export class AdminCollectionService {
       sortOrder = "desc",
     } = query;
 
-    const esSortMap: Record<string, "popular" | "recent" | "name"> = {
-      createdAt: "recent",
-      viewCount: "popular",
-      likeCount: "popular",
-      name: "name",
-    };
+    // Elasticsearch exposes fixed directions for these modes. For every other
+    // column/direction, use the SQL path so search + sort still honors the
+    // selected table header instead of silently reverting to "recent".
+    const esSort =
+      sortBy === "createdAt" && sortOrder === "desc"
+        ? "recent"
+        : (sortBy === "viewCount" || sortBy === "likeCount") &&
+            sortOrder === "desc"
+          ? "popular"
+          : sortBy === "name" && sortOrder === "asc"
+            ? "name"
+            : undefined;
 
-    if (search && this.searchService.isAvailable()) {
+    if (search && esSort && this.searchService.isAvailable()) {
       const esResult = await this.searchService.searchCollections({
         query: search,
         isPublic,
         isFeatured,
         userId,
-        sortBy: esSortMap[sortBy] ?? "recent",
+        sortBy: esSort,
         page,
         pageSize: limit,
       });
@@ -170,7 +177,7 @@ export class AdminCollectionService {
     // 500 (the admin list exposes every column as sortable — see epic #375).
     const orderBy = resolveOrderBy<Prisma.CollectionOrderByWithRelationInput>(
       "Collection",
-      { sortBy, sortOrder },
+      { sortBy, sortOrder, sortType: query.sortType },
       {
         defaultSort: { createdAt: "desc" },
         sortMap: {

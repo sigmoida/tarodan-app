@@ -97,6 +97,35 @@ describe("admin finance list sorting", () => {
     );
   });
 
+  it("sorts seller invoices by the displayed company-name fallback", async () => {
+    const sellerUploadedInvoice = createDelegate();
+    const service = new AdminTaxService(
+      { sellerUploadedInvoice } as any,
+      {} as any,
+      {} as any,
+    );
+
+    await service.getSellerUploadedInvoices({
+      sortBy: "sellerName",
+      sortOrder: "asc",
+    });
+
+    expect(sellerUploadedInvoice.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [
+          {
+            order: {
+              seller: {
+                companyName: { sort: "asc", nulls: "last" },
+              },
+            },
+          },
+          { order: { seller: { displayName: "asc" } } },
+        ],
+      }),
+    );
+  });
+
   it("sorts payout transactions by release date", async () => {
     const paymentHold = createDelegate();
     const service = new AdminPayoutService(
@@ -118,6 +147,31 @@ describe("admin finance list sorting", () => {
         orderBy: { releaseAt: "asc" },
         skip: 0,
         take: 20,
+      }),
+    );
+  });
+
+  it("sorts payout transactions by the displayed order number", async () => {
+    const paymentHold = createDelegate();
+    const service = new AdminPayoutService(
+      {
+        paymentHold,
+        order: { findMany: jest.fn().mockResolvedValue([]) },
+      } as any,
+      {} as any,
+      {} as any,
+    );
+
+    await service.getPayoutsTransactions({
+      sortBy: "orderNumber",
+      sortOrder: "desc",
+    });
+
+    expect(paymentHold.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: {
+          payment: { order: { orderNumber: "desc" } },
+        },
       }),
     );
   });

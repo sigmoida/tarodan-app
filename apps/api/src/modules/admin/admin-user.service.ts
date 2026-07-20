@@ -10,7 +10,13 @@ import { AdminAuditService } from "./admin-audit.service";
 import { fulltextUserSearch } from "../../common/helpers/fulltext-search";
 import { AdminUserQueryDto } from "./dto";
 import { Prisma, MembershipTierType, SubscriptionStatus } from "@prisma/client";
-import { paginate, resolveOrderBy } from "../../common/list";
+import {
+  ADMIN_LIST_DEFAULT_LIMIT,
+  ADMIN_LIST_DEFAULT_PAGE,
+  ADMIN_LIST_MAX_LIMIT,
+  paginate,
+  resolveOrderBy,
+} from "../../common/list";
 
 /**
  * Kullanıcı yönetimi + admin üyelik override'ları — AdminService'in
@@ -97,6 +103,94 @@ export class AdminUserService {
       where.isBanned = true;
     }
 
+    const select = {
+      id: true,
+      email: true,
+      displayName: true,
+      phone: true,
+      isSeller: true,
+      sellerType: true,
+      isVerified: true,
+      isBanned: true,
+      createdAt: true,
+      lastLoginAt: true,
+      lastActivityAt: true,
+      membership: {
+        select: {
+          status: true,
+          currentPeriodEnd: true,
+          tier: {
+            select: {
+              type: true,
+              name: true,
+            },
+          },
+        },
+      },
+      _count: {
+        select: {
+          products: true,
+          buyerOrders: true,
+          sellerOrders: true,
+        },
+      },
+    } satisfies Prisma.UserSelect;
+
+    // `ordersCount` on the general users table is buyerOrders + sellerOrders,
+    // which Prisma cannot express as a relation aggregate orderBy. Resolve that
+    // one computed column against the complete filtered ID/count set, then fetch
+    // only the requested page. Seller performance uses sellerOrders alone.
+    if (query.sortBy === "ordersCount" && isSeller !== true) {
+      const page = Math.max(
+        ADMIN_LIST_DEFAULT_PAGE,
+        Math.floor(query.page ?? ADMIN_LIST_DEFAULT_PAGE),
+      );
+      const limit = Math.min(
+        ADMIN_LIST_MAX_LIMIT,
+        Math.max(1, Math.floor(query.limit ?? ADMIN_LIST_DEFAULT_LIMIT)),
+      );
+      const counts = await this.prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          _count: { select: { buyerOrders: true, sellerOrders: true } },
+        },
+      });
+      const factor = query.sortOrder === "asc" ? 1 : -1;
+      counts.sort((left, right) => {
+        const leftTotal = left._count.buyerOrders + left._count.sellerOrders;
+        const rightTotal = right._count.buyerOrders + right._count.sellerOrders;
+        return (
+          (leftTotal - rightTotal) * factor || left.id.localeCompare(right.id)
+        );
+      });
+
+      const pageIds = counts
+        .slice((page - 1) * limit, page * limit)
+        .map(({ id }) => id);
+      const rows = pageIds.length
+        ? await this.prisma.user.findMany({
+            where: { ...where, id: { in: pageIds } },
+            select,
+          })
+        : [];
+      const position = new Map(pageIds.map((id, index) => [id, index]));
+      rows.sort(
+        (left, right) =>
+          (position.get(left.id) ?? 0) - (position.get(right.id) ?? 0),
+      );
+
+      return {
+        data: rows,
+        meta: {
+          total: counts.length,
+          page,
+          limit,
+          totalPages: Math.ceil(counts.length / limit),
+        },
+      };
+    }
+
     const orderBy = resolveOrderBy<
       | Prisma.UserOrderByWithRelationInput
       | Prisma.UserOrderByWithRelationInput[]
@@ -109,6 +203,9 @@ export class AdminUserService {
         lastLoginAt: (direction) => ({
           lastLoginAt: { sort: direction, nulls: "last" },
         }),
+        ordersCount: (direction) => ({
+          sellerOrders: { _count: direction },
+        }),
       },
     });
 
@@ -116,38 +213,7 @@ export class AdminUserService {
       this.prisma.user,
       {
         where,
-        select: {
-          id: true,
-          email: true,
-          displayName: true,
-          phone: true,
-          isSeller: true,
-          sellerType: true,
-          isVerified: true,
-          isBanned: true,
-          createdAt: true,
-          lastLoginAt: true,
-          lastActivityAt: true,
-          membership: {
-            select: {
-              status: true,
-              currentPeriodEnd: true,
-              tier: {
-                select: {
-                  type: true,
-                  name: true,
-                },
-              },
-            },
-          },
-          _count: {
-            select: {
-              products: true,
-              buyerOrders: true,
-              sellerOrders: true,
-            },
-          },
-        },
+        select,
         orderBy,
       },
       query,

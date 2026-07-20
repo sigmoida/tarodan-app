@@ -1096,25 +1096,32 @@ export class AdminTaxService {
       ];
     }
 
-    const orderBy =
-      resolveOrderBy<Prisma.SellerUploadedInvoiceOrderByWithRelationInput>(
-        "SellerUploadedInvoice",
-        query,
-        {
-          defaultSort: { uploadedAt: "desc" },
-          // The list shows order + party columns pulled from the linked order.
-          sortMap: {
-            orderNumber: (direction) => ({ order: { orderNumber: direction } }),
-            orderTotal: (direction) => ({ order: { totalAmount: direction } }),
-            sellerName: (direction) => ({
-              order: { seller: { displayName: direction } },
-            }),
-            buyerName: (direction) => ({
-              order: { buyer: { displayName: direction } },
-            }),
+    const orderBy = resolveOrderBy<
+      | Prisma.SellerUploadedInvoiceOrderByWithRelationInput
+      | Prisma.SellerUploadedInvoiceOrderByWithRelationInput[]
+    >("SellerUploadedInvoice", query, {
+      defaultSort: { uploadedAt: "desc" },
+      // The list shows order + party columns pulled from the linked order.
+      sortMap: {
+        orderNumber: (direction) => ({ order: { orderNumber: direction } }),
+        orderTotal: (direction) => ({ order: { totalAmount: direction } }),
+        // The cell displays companyName first and falls back to displayName.
+        // Keep null companies last, then use displayName as a stable fallback.
+        sellerName: (direction) => [
+          {
+            order: {
+              seller: {
+                companyName: { sort: direction, nulls: "last" },
+              },
+            },
           },
-        },
-      );
+          { order: { seller: { displayName: direction } } },
+        ],
+        buyerName: (direction) => ({
+          order: { buyer: { displayName: direction } },
+        }),
+      },
+    });
     const result = await paginate(
       this.prisma.sellerUploadedInvoice,
       {

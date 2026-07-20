@@ -97,4 +97,9 @@ export class TradeShipmentQueryDto extends AdminListQueryDto {
   @IsOptional()
   @IsString()
   tradeNumber?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  search?: string;
 }
