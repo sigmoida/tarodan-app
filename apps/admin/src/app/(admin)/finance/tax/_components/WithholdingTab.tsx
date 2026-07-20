@@ -16,7 +16,8 @@ import { MetricCard } from "@/components/MetricCard";
 import { useRateSetting } from "@/hooks/useRateSetting";
 import { fmtTry } from "@/lib/format";
 import { withholdingColumns } from "../_lib/columns";
-import { type WithholdingReport, MONTHS } from "../_lib/types";
+import { type WithholdingReport, months } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 type WithholdingRow = WithholdingReport["rows"][number];
 type WithholdingListData = {
@@ -51,13 +52,13 @@ const withholdingFetcher = async (params: Record<string, any>) => {
 };
 
 function WithholdingControls() {
+  const t = useTranslations();
   const { filters, setFilter, data, rows } = useResourceList<WithholdingRow>();
   const report = data as WithholdingListData;
 
   const exportCsv = () => {
     if (!report?.summary || !report.period) return;
-    const header =
-      "Satıcı;VKN/TCKN;E-posta;Transfer Adedi;Brüt Tutar (TL);Kesilen Stopaj (TL)";
+    const header = t("admin.finance.tax.csvHeader");
     const lines = rows.map((row) =>
       [
         `"${(row.sellerName || "").replace(/"/g, '""')}"`,
@@ -68,11 +69,11 @@ function WithholdingControls() {
         row.withholdingTax.toFixed(2).replace(".", ","),
       ].join(";"),
     );
-    const total = `"TOPLAM";;;${report.summary.transferCount};;${report.summary.totalWithholding
+    const total = `"${t("common.total").toLocaleUpperCase(t("common.dateLocale"))}";;;${report.summary.transferCount};;${report.summary.totalWithholding
       .toFixed(2)
       .replace(".", ",")}`;
     downloadBlob(
-      `stopaj-muhtasar-${report.period}.csv`,
+      t("admin.finance.tax.csvFilename", { period: report.period }),
       "﻿" + [header, ...lines, total].join("\r\n"),
     );
   };
@@ -81,7 +82,7 @@ function WithholdingControls() {
     <SectionCard>
       <div className="flex flex-wrap items-end gap-4">
         <Select
-          label="Yıl"
+          label={t("admin.finance.tax.year")}
           value={filters.year ?? INITIAL_FILTERS.year}
           onChange={(event) => setFilter("year", event.target.value)}
           options={Array.from({ length: 4 }, (_, index) => {
@@ -90,10 +91,10 @@ function WithholdingControls() {
           })}
         />
         <Select
-          label="Ay"
+          label={t("admin.finance.tax.month")}
           value={filters.month ?? INITIAL_FILTERS.month}
           onChange={(event) => setFilter("month", event.target.value)}
-          options={MONTHS.map((name, index) => ({
+          options={months(t("common.dateLocale")).map((name, index) => ({
             value: String(index + 1),
             label: name,
           }))}
@@ -104,7 +105,7 @@ function WithholdingControls() {
           onClick={exportCsv}
           disabled={rows.length === 0}
         >
-          CSV İndir
+          {t("admin.finance.common.downloadCsv")}
         </Button>
       </div>
     </SectionCard>
@@ -112,6 +113,7 @@ function WithholdingControls() {
 }
 
 function WithholdingSummary() {
+  const t = useTranslations();
   const { data } = useResourceList<WithholdingRow>();
   const summary = (data as WithholdingListData)?.summary;
   if (!summary) return null;
@@ -120,25 +122,25 @@ function WithholdingSummary() {
       <MetricCard
         icon={ReceiptPercentIcon}
         tone="primary"
-        label="Dönem Kesilen Stopaj"
+        label={t("admin.finance.tax.periodWithholding")}
         value={fmtTry(summary.totalWithholding)}
       />
       <MetricCard
         icon={UsersIcon}
         tone="info"
-        label="Satıcı Sayısı"
+        label={t("admin.finance.tax.sellerCount")}
         value={summary.sellerCount}
       />
       <MetricCard
         icon={ArrowsRightLeftIcon}
         tone="success"
-        label="Transfer Sayısı"
+        label={t("admin.finance.tax.transferCount")}
         value={summary.transferCount}
       />
       <MetricCard
         icon={ClockIcon}
         tone="warning"
-        label="Bekleyen Stopaj"
+        label={t("admin.finance.tax.pendingWithholding")}
         value={fmtTry(summary.pendingWithholding)}
       />
     </div>
@@ -146,19 +148,25 @@ function WithholdingSummary() {
 }
 
 function WithholdingTable() {
+  const t = useTranslations();
   const { data } = useResourceList<WithholdingRow>();
   const period = (data as WithholdingListData)?.period;
   return (
-    <SectionCard title={`Satıcı Bazlı Stopaj${period ? ` — ${period}` : ""}`}>
+    <SectionCard
+      title={t("admin.finance.tax.withholdingBySeller", {
+        period: period ? ` — ${period}` : "",
+      })}
+    >
       <ResourceList.Table<WithholdingRow>
-        columns={withholdingColumns}
-        emptyText="Bu dönemde stopaj kesilen ödeme yok."
+        columns={withholdingColumns(t)}
+        emptyText={t("admin.finance.tax.noWithholdingForPeriod")}
       />
     </SectionCard>
   );
 }
 
 export function WithholdingTab() {
+  const t = useTranslations();
   const {
     value: whRate,
     setValue: setWhRate,
@@ -169,20 +177,18 @@ export function WithholdingTab() {
     load: async () =>
       (await adminApi.getWithholdingRate()).data?.rate as number | undefined,
     save: (rate) => adminApi.setWithholdingRate(rate),
-    successMessage: "Stopaj oranı güncellendi",
+    successMessage: t("admin.finance.tax.withholdingRateUpdated"),
     fallback: "1",
   });
 
   return (
     <div className="space-y-6">
       <SectionCard
-        title="E-Ticaret Stopajı (Tevkifat)"
+        title={t("admin.finance.tax.ecommerceWithholding")}
         bodyClassName="space-y-4"
       >
         <p className="text-sm text-muted">
-          GVK 94/19 kapsamında, vergi mükellefi (kurumsal onaylı) satıcılara
-          yapılan ödemelerden KDV hariç ürün bedeli üzerinden kesilir ve
-          muhtasar beyanname ile ödenir. Bireysel satıcılar kapsam dışıdır.
+          {t("admin.finance.tax.withholdingDescription")}
         </p>
         <div className="flex flex-wrap items-end gap-3">
           <Input
@@ -190,13 +196,13 @@ export function WithholdingTab() {
             min={0}
             max={100}
             step={0.01}
-            label="Stopaj Oranı (%)"
+            label={t("admin.finance.tax.withholdingRatePercent")}
             value={whRate}
             onChange={(event) => setWhRate(event.target.value)}
             className="w-32"
           />
           <Button onClick={onSaveRate} isLoading={savingRate}>
-            Kaydet
+            {t("common.save")}
           </Button>
         </div>
       </SectionCard>

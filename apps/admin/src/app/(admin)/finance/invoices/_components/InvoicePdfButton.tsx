@@ -1,12 +1,20 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Button } from '@tarodan/ui';
-import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
-import { adminApi } from '@/lib/api';
+import { useState } from "react";
+import { Button } from "@tarodan/ui";
+import { ArrowDownTrayIcon } from "@heroicons/react/24/outline";
+import { adminApi } from "@/lib/api";
+import { useTranslations } from "next-intl";
 
 /** Shared PDF download button for eLogo + seller invoices. */
-export function InvoicePdfButton({ id, seller }: { id: string; seller: boolean }) {
+export function InvoicePdfButton({
+  id,
+  seller,
+}: {
+  id: string;
+  seller: boolean;
+}) {
+  const t = useTranslations();
   const [busy, setBusy] = useState(false);
 
   const onClick = async () => {
@@ -16,7 +24,7 @@ export function InvoicePdfButton({ id, seller }: { id: string; seller: boolean }
         ? await adminApi.getSellerInvoicePdf(id)
         : await adminApi.getInvoicePdf(id);
       const url = (res.data as { url?: string })?.url;
-      if (url) window.open(url, '_blank', 'noopener,noreferrer');
+      if (url) window.open(url, "_blank", "noopener,noreferrer");
     } catch {
       /* api interceptor toasts */
     } finally {
@@ -33,7 +41,7 @@ export function InvoicePdfButton({ id, seller }: { id: string; seller: boolean }
       onClick={onClick}
       className="text-primary-600"
     >
-      İndir
+      {t("admin.finance.common.download")}
     </Button>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useFormContext } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { Input, Select } from "@tarodan/ui";
@@ -26,8 +27,8 @@ import {
   emptyCommissionForm,
   ruleToForm,
   commissionFormToPayload,
-  SELLER_TYPES,
-  APPLIES_TO_OPTIONS,
+  sellerTypes,
+  appliesToOptions,
 } from "../_lib/types";
 
 interface CommissionPreview {
@@ -36,7 +37,7 @@ interface CommissionPreview {
   commissionAmount: number;
 }
 
-function getApiErrorMessage(error: unknown): string {
+function getApiErrorMessage(error: unknown, fallback: string): string {
   const message = (error as { response?: { data?: { message?: unknown } } })
     ?.response?.data?.message;
 
@@ -48,7 +49,7 @@ function getApiErrorMessage(error: unknown): string {
     if (messages.length > 0) return messages.join(" ");
   }
 
-  return "Komisyon kuralı kaydedilemedi. Lütfen alanları kontrol edip tekrar deneyin.";
+  return fallback;
 }
 
 /** Live checkout-equivalent preview, including independently matched buyer/seller rules. */
@@ -59,6 +60,7 @@ function PreviewCalculator({
   ruleId?: string;
   categories: Category[];
 }) {
+  const t = useTranslations();
   const { watch } = useFormContext<CommissionFormValues>();
   const [price, setPrice] = useState("");
   const [debouncedPrice, setDebouncedPrice] = useState(0);
@@ -138,7 +140,7 @@ function PreviewCalculator({
 
   const preview = previewQuery.data;
   const categoryOptions = [
-    { value: "", label: "Kategori seçilmedi" },
+    { value: "", label: t("admin.finance.commission.noCategorySelected") },
     ...categories.map((category) => ({
       value: category.id,
       label: category.name,
@@ -147,14 +149,15 @@ function PreviewCalculator({
 
   return (
     <div className="space-y-3 rounded-lg border border-border p-4">
-      <h3 className="text-sm font-medium text-muted">Önizleme Hesaplayıcı</h3>
+      <h3 className="text-sm font-medium text-muted">
+        {t("admin.finance.commission.previewCalculator")}
+      </h3>
       <p className="text-xs text-muted">
-        Aktif kurallar, checkout&apos;taki gibi satıcı ve alıcı için ayrı ayrı
-        eşleştirilir.
+        {t("admin.finance.commission.previewDescription")}
       </p>
       {values.categoryId === "" && (
         <Select
-          label="Örnek Ürün Kategorisi"
+          label={t("admin.finance.commission.exampleCategory")}
           value={previewCategoryId}
           onChange={(event) => setPreviewCategoryId(event.target.value)}
           options={categoryOptions}
@@ -162,49 +165,57 @@ function PreviewCalculator({
       )}
       {values.sellerType === "ALL" && (
         <Select
-          label="Örnek Satıcı Tipi"
+          label={t("admin.finance.commission.exampleSellerType")}
           value={previewSellerType}
           onChange={(event) =>
             setPreviewSellerType(
               event.target.value as Exclude<SellerType, "ALL">,
             )
           }
-          options={SELLER_TYPES.filter((option) => option.value !== "ALL")}
+          options={sellerTypes(t).filter((option) => option.value !== "ALL")}
         />
       )}
       <Input
         type="number"
         step="0.01"
         min="0"
-        label="Örnek Ürün Fiyatı (₺)"
+        label={t("admin.finance.commission.examplePrice")}
         value={price}
         onChange={(e) => setPrice(e.target.value)}
         placeholder="1000"
       />
       {previewQuery.isFetching && (
-        <p className="text-sm text-muted">Hesaplanıyor...</p>
+        <p className="text-sm text-muted">
+          {t("admin.finance.commission.calculating")}
+        </p>
       )}
       {previewQuery.isError && (
         <p className="text-sm text-danger-600">
-          Komisyon önizlemesi hesaplanamadı.
+          {t("admin.finance.commission.previewFailed")}
         </p>
       )}
       {preview && (
         <div className="space-y-2 rounded-lg bg-surface-alt p-4 text-sm">
           <div className="flex justify-between">
-            <span className="text-muted">Satıcı Komisyonu:</span>
+            <span className="text-muted">
+              {t("admin.finance.commission.sellerCommission")}:
+            </span>
             <span className="font-medium text-heading">
               {fmtTry(preview.sellerFeeAmount)}
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-muted">Alıcı Komisyonu:</span>
+            <span className="text-muted">
+              {t("admin.finance.commission.buyerCommission")}:
+            </span>
             <span className="font-medium text-heading">
               {fmtTry(preview.buyerFeeAmount)}
             </span>
           </div>
           <div className="flex justify-between border-t border-border pt-2">
-            <span className="font-medium text-muted">Toplam Komisyon:</span>
+            <span className="font-medium text-muted">
+              {t("admin.finance.commission.totalCommission")}:
+            </span>
             <span className="font-bold text-primary-700">
               {fmtTry(preview.commissionAmount)}
             </span>
@@ -225,8 +236,9 @@ export function CommissionRuleFormModal({
   onClose: () => void;
   rule?: CommissionRule;
 }) {
+  const t = useTranslations();
   const isEdit = Boolean(rule);
-  const form = useZodForm(commissionSchema, {
+  const form = useZodForm(commissionSchema(t), {
     defaultValues: rule ? ruleToForm(rule) : emptyCommissionForm,
   });
   const appliesTo = form.watch("appliesTo");
@@ -243,15 +255,15 @@ export function CommissionRuleFormModal({
     {
       invalidates: ["commission-rules"],
       successMessage: isEdit
-        ? "Komisyon kuralı güncellendi"
-        : "Komisyon kuralı oluşturuldu",
+        ? t("admin.finance.commission.ruleUpdated")
+        : t("admin.finance.commission.ruleCreated"),
       showErrorToast: false,
       onSuccess: onClose,
     },
   );
 
   const categoryOptions = [
-    { value: "", label: "Tüm Kategoriler" },
+    { value: "", label: t("admin.finance.commission.allCategories") },
     ...categories.map((c) => ({ value: c.id, label: c.name })),
   ];
 
@@ -261,7 +273,10 @@ export function CommissionRuleFormModal({
       onError: (error) => {
         form.setError("root", {
           type: "server",
-          message: getApiErrorMessage(error),
+          message: getApiErrorMessage(
+            error,
+            t("admin.finance.commission.saveFailed"),
+          ),
         });
       },
     });
@@ -271,56 +286,62 @@ export function CommissionRuleFormModal({
     <FormModal
       open={open}
       onClose={onClose}
-      title={isEdit ? "Kuralı Düzenle" : "Yeni Kural Ekle"}
+      title={
+        isEdit
+          ? t("admin.finance.commission.editRule")
+          : t("admin.finance.commission.newRule")
+      }
       form={form}
       onSubmit={submit}
       isSubmitting={save.isPending}
-      submitLabel={isEdit ? "Güncelle" : "Oluştur"}
+      submitLabel={isEdit ? t("common.update") : t("common.create")}
       maxWidth="max-w-2xl"
     >
       <FormError />
-      <FormInput name="name" label="Kural Adı" />
+      <FormInput name="name" label={t("admin.finance.commission.ruleName")} />
       <div className="grid grid-cols-2 gap-4">
         <FormSelect
           name="categoryId"
-          label="Kategori"
+          label={t("common.category")}
           options={categoryOptions}
         />
         <FormSelect
           name="sellerType"
-          label="Satıcı Tipi"
-          options={SELLER_TYPES}
+          label={t("admin.finance.commission.sellerType")}
+          options={sellerTypes(t)}
         />
       </div>
       <FormSelect
         name="appliesTo"
-        label="Komisyon Uygulanan"
-        options={APPLIES_TO_OPTIONS}
+        label={t("admin.finance.commission.appliesTo")}
+        options={appliesToOptions(t)}
       />
 
       {showSeller && (
         <div className="space-y-4 rounded-lg border border-border p-4">
-          <h3 className="text-sm font-medium text-muted">Satıcı Komisyonu</h3>
+          <h3 className="text-sm font-medium text-muted">
+            {t("admin.finance.commission.sellerCommission")}
+          </h3>
           <FormInput
             name="sellerRate"
-            label="Satıcı Oranı (%)"
+            label={t("admin.finance.commission.sellerRatePercent")}
             type="number"
             step="0.01"
           />
           <div className="grid grid-cols-2 gap-4">
             <FormInput
               name="sellerMin"
-              label="Satıcı Minimum (₺)"
+              label={t("admin.finance.commission.sellerMinimum")}
               type="number"
               step="0.01"
-              placeholder="Opsiyonel"
+              placeholder={t("common.optional")}
             />
             <FormInput
               name="sellerMax"
-              label="Satıcı Maksimum (₺)"
+              label={t("admin.finance.commission.sellerMaximum")}
               type="number"
               step="0.01"
-              placeholder="Opsiyonel"
+              placeholder={t("common.optional")}
             />
           </div>
         </div>
@@ -328,34 +349,39 @@ export function CommissionRuleFormModal({
 
       {showBuyer && (
         <div className="space-y-4 rounded-lg border border-border p-4">
-          <h3 className="text-sm font-medium text-muted">Alıcı Komisyonu</h3>
+          <h3 className="text-sm font-medium text-muted">
+            {t("admin.finance.commission.buyerCommission")}
+          </h3>
           <FormInput
             name="buyerRate"
-            label="Alıcı Oranı (%)"
+            label={t("admin.finance.commission.buyerRatePercent")}
             type="number"
             step="0.01"
           />
           <div className="grid grid-cols-2 gap-4">
             <FormInput
               name="buyerMin"
-              label="Alıcı Minimum (₺)"
+              label={t("admin.finance.commission.buyerMinimum")}
               type="number"
               step="0.01"
-              placeholder="Opsiyonel"
+              placeholder={t("common.optional")}
             />
             <FormInput
               name="buyerMax"
-              label="Alıcı Maksimum (₺)"
+              label={t("admin.finance.commission.buyerMaximum")}
               type="number"
               step="0.01"
-              placeholder="Opsiyonel"
+              placeholder={t("common.optional")}
             />
           </div>
         </div>
       )}
 
       <PreviewCalculator ruleId={rule?.id} categories={categories} />
-      <FormCheckbox name="isActive" label="Kural aktif" />
+      <FormCheckbox
+        name="isActive"
+        label={t("admin.finance.commission.ruleActive")}
+      />
     </FormModal>
   );
 }

@@ -3,42 +3,54 @@ import { col } from "@/components/table";
 import { HoldReasonBadge, holdReasonForRow } from "./holds";
 import { transactionRowMenu } from "./rowActions";
 import { type ScheduleItem, type PayoutTransaction } from "./types";
+import type { useTranslations } from "next-intl";
 
-export const scheduleColumns = [
-  col.text<ScheduleItem>("Sipariş", "orderNumber"),
-  col.text<ScheduleItem>("Satıcı", "sellerName"),
-  col.money<ScheduleItem>("Tutar", "amount"),
-  col.date<ScheduleItem>("Serbest Bırakma Tarihi", "releaseAt"),
-  col.badge<ScheduleItem>("Bekleme Nedeni", (s) => (
+type T = ReturnType<typeof useTranslations<never>>;
+
+export const scheduleColumns = (t: T) => [
+  col.text<ScheduleItem>(t("admin.finance.common.order"), "orderNumber"),
+  col.text<ScheduleItem>(t("admin.finance.common.seller"), "sellerName"),
+  col.money<ScheduleItem>(t("common.amount"), "amount"),
+  col.date<ScheduleItem>(t("admin.finance.payouts.releaseDate"), "releaseAt"),
+  col.badge<ScheduleItem>(t("admin.finance.payouts.holdReason"), (s) => (
     <HoldReasonBadge
       reason={holdReasonForRow({ status: "held", releaseAt: s.releaseAt })}
     />
   )),
 ];
 
-export function transactionColumns(onRelease: (orderId: string) => void) {
+export function transactionColumns(onRelease: (orderId: string) => void, t: T) {
   return [
-    col.text<PayoutTransaction>("Sipariş", (t) => t.orderNumber),
-    col.user<PayoutTransaction>("Satıcı", (t) => ({
-      name: t.sellerName,
-      secondary: t.sellerEmail,
+    col.text<PayoutTransaction>(
+      t("admin.finance.common.order"),
+      (row) => row.orderNumber,
+    ),
+    col.user<PayoutTransaction>(t("admin.finance.common.seller"), (row) => ({
+      name: row.sellerName,
+      secondary: row.sellerEmail,
     })),
-    col.money<PayoutTransaction>("Tutar", "amount"),
+    col.money<PayoutTransaction>(t("common.amount"), "amount"),
     col.badge<PayoutTransaction>(
-      "Durum",
-      (t) => <Badge status={t.status} config={paymentHoldStatusConfig} />,
+      t("common.status"),
+      (row) => <Badge status={row.status} config={paymentHoldStatusConfig} />,
       { sortKey: "status", sortType: "text" },
     ),
     col.date<PayoutTransaction>(
-      "Serbest Bırakma",
-      (t) => t.releasedAt || t.releaseAt,
+      t("admin.finance.payouts.release"),
+      (row) => row.releasedAt || row.releaseAt,
       { sortKey: "releaseAt", sortType: "date" },
     ),
-    col.badge<PayoutTransaction>("Bekleme Nedeni", (t) => (
-      <HoldReasonBadge
-        reason={holdReasonForRow({ status: t.status, releaseAt: t.releaseAt })}
-      />
-    )),
-    col.rowMenu<PayoutTransaction>(transactionRowMenu(onRelease)),
+    col.badge<PayoutTransaction>(
+      t("admin.finance.payouts.holdReason"),
+      (row) => (
+        <HoldReasonBadge
+          reason={holdReasonForRow({
+            status: row.status,
+            releaseAt: row.releaseAt,
+          })}
+        />
+      ),
+    ),
+    col.rowMenu<PayoutTransaction>(transactionRowMenu(onRelease, t)),
   ];
 }

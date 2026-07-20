@@ -12,7 +12,6 @@
     },
     {
       "files": [
-        "src/app/(admin)/finance/**",
         "src/app/(admin)/marketing/**",
         "src/app/(admin)/messaging/**",
         "src/app/(admin)/accounts/reviews/**",

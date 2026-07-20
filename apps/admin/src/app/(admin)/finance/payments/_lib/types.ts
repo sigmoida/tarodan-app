@@ -1,4 +1,7 @@
-import type { StatusConfig } from '@tarodan/ui';
+import type { StatusConfig } from "@tarodan/ui";
+import type { useTranslations } from "next-intl";
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 export interface Payment {
   id: string;
@@ -18,26 +21,40 @@ export interface Payment {
   paidAt?: string;
 }
 
-export const paymentStatusConfig: Record<string, StatusConfig> = {
-  pending: { label: 'Bekliyor', variant: 'warning' },
-  processing: { label: 'İşleniyor', variant: 'info' },
-  completed: { label: 'Tamamlandı', variant: 'success' },
-  failed: { label: 'Başarısız', variant: 'danger' },
-  refunded: { label: 'İade Edildi', variant: 'secondary' },
-};
+export const paymentStatusConfig = (t: T): Record<string, StatusConfig> => ({
+  pending: {
+    label: t("admin.finance.payments.status.pending"),
+    variant: "warning",
+  },
+  processing: {
+    label: t("admin.finance.payments.status.processing"),
+    variant: "info",
+  },
+  completed: {
+    label: t("admin.finance.payments.status.completed"),
+    variant: "success",
+  },
+  failed: {
+    label: t("admin.finance.payments.status.failed"),
+    variant: "danger",
+  },
+  refunded: {
+    label: t("admin.finance.payments.status.refunded"),
+    variant: "secondary",
+  },
+});
 
-export const paymentStatusFilterOptions = [
-  { value: 'all', label: 'Tüm Durumlar' },
-  { value: 'pending', label: 'Bekliyor' },
-  { value: 'processing', label: 'İşleniyor' },
-  { value: 'completed', label: 'Tamamlandı' },
-  { value: 'failed', label: 'Başarısız' },
-  { value: 'refunded', label: 'İade Edildi' },
+export const paymentStatusFilterOptions = (t: T) => [
+  { value: "all", label: t("admin.finance.common.allStatuses") },
+  ...Object.entries(paymentStatusConfig(t)).map(([value, config]) => ({
+    value,
+    label: config.label,
+  })),
 ];
 
-export const providerFilterOptions = [
-  { value: 'all', label: 'Tüm Sağlayıcılar' },
-  { value: 'paytr', label: 'PayTR' },
+export const providerFilterOptions = (t: T) => [
+  { value: "all", label: t("admin.finance.payments.allProviders") },
+  { value: "paytr", label: "PayTR" },
 ];
 
 export function mapPayments(raw: any[]): Payment[] {
@@ -51,9 +68,9 @@ export function mapPayments(raw: any[]): Payment[] {
     status: p.status,
     failureReason: p.failureReason,
     providerPaymentId: p.providerPaymentId,
-    buyer: p.buyer || { id: '', displayName: '', email: '' },
-    seller: p.seller || { id: '', displayName: '', email: '' },
-    product: p.product || { id: '', title: '' },
+    buyer: p.buyer || { id: "", displayName: "", email: "" },
+    seller: p.seller || { id: "", displayName: "", email: "" },
+    product: p.product || { id: "", title: "" },
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
     paidAt: p.paidAt,

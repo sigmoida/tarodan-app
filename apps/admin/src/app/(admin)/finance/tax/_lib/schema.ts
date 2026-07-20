@@ -1,22 +1,29 @@
 import { z } from "zod";
+import type { useTranslations } from "next-intl";
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 /** A VAT rate 0..100, kept as a string (native number input); shaped in the mutationFn. */
-const rateField = z
-  .string()
-  .trim()
-  .min(1, "Zorunlu")
-  .refine((v) => {
-    const n = Number(v);
-    return !Number.isNaN(n) && n >= 0 && n <= 100;
-  }, "Oran 0 ile 100 arasında olmalı");
+const rateField = (t: T) =>
+  z
+    .string()
+    .trim()
+    .min(1, t("common.required"))
+    .refine((v) => {
+      const n = Number(v);
+      return !Number.isNaN(n) && n >= 0 && n <= 100;
+    }, t("admin.finance.tax.validation.rateRange"));
 
 /** Default VAT rate form. */
-export const vatDefaultSchema = z.object({ rate: rateField });
-export type VatDefaultValues = z.infer<typeof vatDefaultSchema>;
+export const vatDefaultSchema = (t: T) => z.object({ rate: rateField(t) });
+export type VatDefaultValues = z.infer<ReturnType<typeof vatDefaultSchema>>;
 
 /** Per-category VAT override form. */
-export const vatOverrideSchema = z.object({
-  categoryId: z.string().min(1, "Kategori seçin"),
-  rate: rateField,
-});
-export type VatOverrideValues = z.infer<typeof vatOverrideSchema>;
+export const vatOverrideSchema = (t: T) =>
+  z.object({
+    categoryId: z
+      .string()
+      .min(1, t("admin.finance.tax.validation.selectCategory")),
+    rate: rateField(t),
+  });
+export type VatOverrideValues = z.infer<ReturnType<typeof vatOverrideSchema>>;

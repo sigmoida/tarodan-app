@@ -1,10 +1,11 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Modal, ModalFooter, Input, Textarea } from '@tarodan/ui';
-import { adminApi } from '@/lib/api';
-import { useAdminMutation } from '@/hooks/useAdminMutation';
-import { fmtTry } from '@/lib/format';
+import { useState } from "react";
+import { Modal, ModalFooter, Input, Textarea } from "@tarodan/ui";
+import { adminApi } from "@/lib/api";
+import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { fmtTry } from "@/lib/format";
+import { useTranslations } from "next-intl";
 
 export function RefundPaymentModal({
   paymentId,
@@ -15,8 +16,9 @@ export function RefundPaymentModal({
   amount: number;
   onClose: () => void;
 }) {
-  const [refundAmount, setRefundAmount] = useState('');
-  const [reason, setReason] = useState('');
+  const t = useTranslations();
+  const [refundAmount, setRefundAmount] = useState("");
+  const [reason, setReason] = useState("");
 
   const refund = useAdminMutation(
     () =>
@@ -24,34 +26,45 @@ export function RefundPaymentModal({
         amount: refundAmount ? parseFloat(refundAmount) : undefined,
         reason: reason || undefined,
       }),
-    { invalidates: ['payments'], successMessage: 'İade işlemi başlatıldı', onSuccess: onClose },
+    {
+      invalidates: ["payments"],
+      successMessage: t("admin.finance.payments.refundStarted"),
+      onSuccess: onClose,
+    },
   );
 
   return (
-    <Modal isOpen onClose={onClose} title="Manuel İade" maxWidth="max-w-md">
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={t("admin.finance.payments.manualRefund")}
+      maxWidth="max-w-md"
+    >
       <div className="space-y-4">
-        <p className="text-muted">Toplam ödeme tutarı: {fmtTry(amount)}</p>
+        <p className="text-muted">
+          {t("admin.finance.payments.totalPaymentAmount")}: {fmtTry(amount)}
+        </p>
         <Input
           type="number"
           min="0.01"
           max={amount}
           step="0.01"
-          label="İade Tutarı (boş bırakırsanız tam iade)"
+          label={t("admin.finance.payments.refundAmountLabel")}
           value={refundAmount}
           onChange={(e) => setRefundAmount(e.target.value)}
-          placeholder="İade tutarı (opsiyonel)"
+          placeholder={t("admin.finance.payments.refundAmountPlaceholder")}
         />
         <Textarea
-          label="İade Nedeni (opsiyonel)"
+          label={t("admin.finance.payments.refundReasonLabel")}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           rows={3}
-          placeholder="İade nedeni..."
+          placeholder={t("admin.finance.payments.refundReasonPlaceholder")}
         />
         <ModalFooter
           onCancel={onClose}
           onConfirm={() => refund.mutate()}
-          confirmLabel="İade Et"
+          confirmLabel={t("admin.finance.payments.refundConfirm")}
           destructive
           isLoading={refund.isPending}
         />
