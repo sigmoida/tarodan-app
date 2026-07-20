@@ -33,12 +33,7 @@ export default function AuthRequiredModal({
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      maxWidth="max-w-md"
-      zIndex="z-[200]"
-    >
+    <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-md">
       <div className="pt-2 text-center">
         <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-primary-50">
           {icon || <UserIcon className="h-8 w-8 text-primary-500" />}

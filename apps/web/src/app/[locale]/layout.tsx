@@ -8,6 +8,7 @@ import { getMessages, setRequestLocale } from "next-intl/server";
 import { Toaster } from "react-hot-toast";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { isLocale } from "@tarodan/i18n";
+import { zIndex } from "@tarodan/design-tokens";
 import { routing } from "@/i18n/routing";
 import DynamicCookieConsentBanner from "@/components/DynamicCookieConsentBanner";
 import "../globals.css";
@@ -81,6 +82,7 @@ export default async function LocaleLayout({
             <DynamicCookieConsentBanner />
             <Toaster
               position="bottom-right"
+              containerStyle={{ zIndex: zIndex.toast }}
               toastOptions={{ style: { maxWidth: "360px" } }}
             />
           </GoogleOAuthProvider>
