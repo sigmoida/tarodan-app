@@ -38,10 +38,6 @@ export class AdminPaymentService {
    * Get all payments with filters
    */
   async getPayments(query: AdminPaymentQueryDto) {
-    const page = query.page || 1;
-    const limit = query.limit || 20;
-    const skip = (page - 1) * limit;
-
     const where: Prisma.PaymentWhereInput = {};
 
     if (query.status) {
@@ -71,17 +67,29 @@ export class AdminPaymentService {
       if (paymentIds.length > 0) conditions.push({ id: { in: paymentIds } });
       if (orderIds.length > 0) conditions.push({ orderId: { in: orderIds } });
       if (conditions.length === 0) {
-        return { data: [], total: 0, page, limit, totalPages: 0 };
+        return {
+          data: [],
+          meta: {
+            total: 0,
+            page: query.page ?? 1,
+            limit: query.limit ?? 20,
+            totalPages: 0,
+          },
+        };
       }
       where.OR = conditions;
     }
 
-    const [payments, total] = await Promise.all([
-      this.prisma.payment.findMany({
+    const orderBy = resolveOrderBy<Prisma.PaymentOrderByWithRelationInput>(
+      "Payment",
+      query,
+      { defaultSort: { createdAt: "desc" } },
+    );
+    const result = await paginate(
+      this.prisma.payment,
+      {
         where,
-        orderBy: { createdAt: "desc" },
-        skip,
-        take: limit,
+        orderBy,
         include: {
           order: {
             include: {
@@ -91,15 +99,16 @@ export class AdminPaymentService {
             },
           },
         },
-      }),
-      this.prisma.payment.count({ where }),
-    ]);
+      },
+      query,
+    );
 
     return {
+      ...result,
       // Payment.order nullable: checkoutGroup / tradeCashPayment tipindeki
       // ödemelerde order=null olabilir. Null-safe erişim — aksi halde TÜM liste
       // TypeError ile 500 döner.
-      data: payments.map((p) => ({
+      data: result.data.map((p) => ({
         id: p.id,
         orderId: p.orderId,
         orderNumber: p.order?.orderNumber ?? null,
@@ -117,12 +126,6 @@ export class AdminPaymentService {
         updatedAt: p.updatedAt,
         paidAt: p.paidAt,
       })),
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
     };
   }
 
@@ -293,10 +296,6 @@ export class AdminPaymentService {
    * Get failed payments
    */
   async getFailedPayments(query: AdminPaymentQueryDto) {
-    const page = query.page || 1;
-    const limit = query.limit || 20;
-    const skip = (page - 1) * limit;
-
     const where: Prisma.PaymentWhereInput = {
       status: PaymentStatus.failed,
     };
@@ -324,17 +323,29 @@ export class AdminPaymentService {
       if (paymentIds.length > 0) conditions.push({ id: { in: paymentIds } });
       if (orderIds.length > 0) conditions.push({ orderId: { in: orderIds } });
       if (conditions.length === 0) {
-        return { data: [], total: 0, page, limit, totalPages: 0 };
+        return {
+          data: [],
+          meta: {
+            total: 0,
+            page: query.page ?? 1,
+            limit: query.limit ?? 20,
+            totalPages: 0,
+          },
+        };
       }
       where.OR = conditions;
     }
 
-    const [payments, total] = await Promise.all([
-      this.prisma.payment.findMany({
+    const orderBy = resolveOrderBy<Prisma.PaymentOrderByWithRelationInput>(
+      "Payment",
+      query,
+      { defaultSort: { createdAt: "desc" } },
+    );
+    const result = await paginate(
+      this.prisma.payment,
+      {
         where,
-        orderBy: { createdAt: "desc" },
-        skip,
-        take: limit,
+        orderBy,
         include: {
           order: {
             include: {
@@ -343,12 +354,13 @@ export class AdminPaymentService {
             },
           },
         },
-      }),
-      this.prisma.payment.count({ where }),
-    ]);
+      },
+      query,
+    );
 
     return {
-      data: payments.map((p) => ({
+      ...result,
+      data: result.data.map((p) => ({
         id: p.id,
         orderId: p.orderId,
         orderNumber: p.order.orderNumber,
@@ -359,12 +371,6 @@ export class AdminPaymentService {
         product: p.order.product,
         createdAt: p.createdAt,
       })),
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
     };
   }
 

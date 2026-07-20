@@ -23,13 +23,16 @@ export function transactionColumns(onRelease: (orderId: string) => void) {
       name: t.sellerName,
       secondary: t.sellerEmail,
     })),
-    col.money<PayoutTransaction>("Tutar", (t) => t.amount),
-    col.badge<PayoutTransaction>("Durum", (t) => (
-      <Badge status={t.status} config={paymentHoldStatusConfig} />
-    )),
+    col.money<PayoutTransaction>("Tutar", "amount"),
+    col.badge<PayoutTransaction>(
+      "Durum",
+      (t) => <Badge status={t.status} config={paymentHoldStatusConfig} />,
+      { sortKey: "status", sortType: "text" },
+    ),
     col.date<PayoutTransaction>(
       "Serbest Bırakma",
       (t) => t.releasedAt || t.releaseAt,
+      { sortKey: "releaseAt", sortType: "date" },
     ),
     col.badge<PayoutTransaction>("Bekleme Nedeni", (t) => (
       <HoldReasonBadge
