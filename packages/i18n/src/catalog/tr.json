@@ -2966,7 +2966,24 @@
         "totalOrders": "Toplam Satış",
         "commissionRevenue": "Komisyon Geliri",
         "activeProducts": "Aktif Ürünler",
-        "totalUsers": "Toplam Kullanıcı"
+        "totalUsers": "Toplam Kullanıcı",
+        "products": "Ürünler",
+        "users": "Kullanıcılar",
+        "grossSales": "Toplam Satış Tutarı",
+        "netCommission": "Net Komisyon",
+        "liveVisitors": "Canlı / Günlük Aktif Ziyaretçi",
+        "cancellationsRefunds": "İptal / İade",
+        "active": "Aktif",
+        "passive": "Pasif",
+        "live": "Canlı",
+        "daily": "Günlük",
+        "cancellations": "İptal",
+        "refunds": "İade"
+      },
+      "period": {
+        "yesterday": "Dün",
+        "thisMonth": "Bu Ay",
+        "lastMonth": "Geçen Ay"
       },
       "quickActions": {
         "products": "Ürünler",
