@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { AnalyticsQueryDto } from './dto';
-import { OrderStatus, ProductStatus } from '@prisma/client';
-import { AdminAnalyticsCommonService } from './admin-analytics-common.service';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { AnalyticsQueryDto } from "./dto";
+import { OrderStatus, ProductStatus } from "@prisma/client";
+import { AdminAnalyticsCommonService } from "./admin-analytics-common.service";
 
 /**
  * Analitik & dashboard grubu (dashboard istatistikleri, snapshot, satış/gelir/
@@ -52,7 +52,9 @@ export class AdminAnalyticsDashboardService {
       this.prisma.order.count({ where: { status: OrderStatus.completed } }),
       this.prisma.order.aggregate({
         _sum: { commissionAmount: true },
-        where: { status: { in: [OrderStatus.completed, OrderStatus.delivered] } },
+        where: {
+          status: { in: [OrderStatus.completed, OrderStatus.delivered] },
+        },
       }),
       this.prisma.order.aggregate({
         _sum: { commissionAmount: true },
@@ -62,22 +64,27 @@ export class AdminAnalyticsDashboardService {
         },
       }),
       this.prisma.product.groupBy({
-        by: ['categoryId'],
+        by: ["categoryId"],
         _count: { id: true },
       }),
     ]);
 
-    const categoryIds = [...new Set(byCategory.map((c) => c.categoryId).filter(Boolean))] as string[];
-    const categories = categoryIds.length > 0
-      ? await this.prisma.category.findMany({
-        where: { id: { in: categoryIds } },
-        select: { id: true, name: true },
-      })
-      : [];
+    const categoryIds = [
+      ...new Set(byCategory.map((c) => c.categoryId).filter(Boolean)),
+    ] as string[];
+    const categories =
+      categoryIds.length > 0
+        ? await this.prisma.category.findMany({
+            where: { id: { in: categoryIds } },
+            select: { id: true, name: true },
+          })
+        : [];
     const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
     const categoryDistribution = byCategory
       .map((c) => ({
-        name: c.categoryId ? (categoryMap.get(c.categoryId) || 'Kategorisiz') : 'Kategorisiz',
+        name: c.categoryId
+          ? categoryMap.get(c.categoryId) || "Kategorisiz"
+          : "Kategorisiz",
         count: c._count.id,
       }))
       .sort((a, b) => b.count - a.count);
@@ -113,7 +120,7 @@ export class AdminAnalyticsDashboardService {
 
     const snapshot = await this.prisma.analyticsSnapshot.create({
       data: {
-        snapshotType: 'daily',
+        snapshotType: "daily",
         snapshotDate: new Date(),
         totalUsers: stats.users.total,
         totalProducts: stats.products.total,
@@ -141,7 +148,11 @@ export class AdminAnalyticsDashboardService {
       : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
     startDate.setHours(0, 0, 0, 0);
 
-    const completedStatuses = [OrderStatus.completed, OrderStatus.delivered, OrderStatus.paid] as const;
+    const completedStatuses = [
+      OrderStatus.completed,
+      OrderStatus.delivered,
+      OrderStatus.paid,
+    ] as const;
     const [orders, ordersByStatus] = await Promise.all([
       this.prisma.order.findMany({
         where: {
@@ -152,10 +163,10 @@ export class AdminAnalyticsDashboardService {
           createdAt: true,
           totalAmount: true,
         },
-        orderBy: { createdAt: 'asc' },
+        orderBy: { createdAt: "asc" },
       }),
       this.prisma.order.groupBy({
-        by: ['status'],
+        by: ["status"],
         where: { createdAt: { gte: startDate, lte: endDate } },
         _count: { id: true },
       }),
@@ -167,10 +178,16 @@ export class AdminAnalyticsDashboardService {
     });
 
     // Group by date (period data for charts and summary)
-    const groupedData = new Map<string, { totalSales: number; orderCount: number }>();
+    const groupedData = new Map<
+      string,
+      { totalSales: number; orderCount: number }
+    >();
     orders.forEach((order) => {
       const dateKey = this.common.getDateKey(order.createdAt, query.groupBy);
-      const existing = groupedData.get(dateKey) || { totalSales: 0, orderCount: 0 };
+      const existing = groupedData.get(dateKey) || {
+        totalSales: 0,
+        orderCount: 0,
+      };
       groupedData.set(dateKey, {
         totalSales: existing.totalSales + Number(order.totalAmount),
         orderCount: existing.orderCount + 1,
@@ -181,16 +198,18 @@ export class AdminAnalyticsDashboardService {
       date,
       totalSales: Math.round(data.totalSales * 100) / 100,
       orderCount: data.orderCount,
-      averageOrderValue: data.orderCount > 0
-        ? Math.round((data.totalSales / data.orderCount) * 100) / 100
-        : 0,
+      averageOrderValue:
+        data.orderCount > 0
+          ? Math.round((data.totalSales / data.orderCount) * 100) / 100
+          : 0,
     }));
 
     const periodTotalSales = result.reduce((sum, r) => sum + r.totalSales, 0);
     const periodTotalOrders = result.reduce((sum, r) => sum + r.orderCount, 0);
-    const periodAvgOrderValue = periodTotalOrders > 0
-      ? Math.round((periodTotalSales / periodTotalOrders) * 100) / 100
-      : 0;
+    const periodAvgOrderValue =
+      periodTotalOrders > 0
+        ? Math.round((periodTotalSales / periodTotalOrders) * 100) / 100
+        : 0;
 
     return {
       data: result,
@@ -218,7 +237,11 @@ export class AdminAnalyticsDashboardService {
       : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
     startDate.setHours(0, 0, 0, 0);
 
-    const completedStatuses: OrderStatus[] = [OrderStatus.completed, OrderStatus.delivered, OrderStatus.paid];
+    const completedStatuses: OrderStatus[] = [
+      OrderStatus.completed,
+      OrderStatus.delivered,
+      OrderStatus.paid,
+    ];
     const orders = await this.prisma.order.findMany({
       where: {
         createdAt: { gte: startDate, lte: endDate },
@@ -229,20 +252,30 @@ export class AdminAnalyticsDashboardService {
         commissionAmount: true,
         status: true,
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: "asc" },
     });
 
     // Group by date
-    const groupedData = new Map<string, { gross: number; commission: number; refunded: number }>();
+    const groupedData = new Map<
+      string,
+      { gross: number; commission: number; refunded: number }
+    >();
     orders.forEach((order) => {
       const dateKey = this.common.getDateKey(order.createdAt, query.groupBy);
-      const existing = groupedData.get(dateKey) || { gross: 0, commission: 0, refunded: 0 };
+      const existing = groupedData.get(dateKey) || {
+        gross: 0,
+        commission: 0,
+        refunded: 0,
+      };
       const isRefunded = order.status === OrderStatus.refunded;
       const isCompleted = completedStatuses.includes(order.status);
       groupedData.set(dateKey, {
         gross: existing.gross + (isCompleted ? Number(order.totalAmount) : 0),
-        commission: existing.commission + (isCompleted ? Number(order.commissionAmount) : 0),
-        refunded: existing.refunded + (isRefunded ? Number(order.totalAmount) : 0),
+        commission:
+          existing.commission +
+          (isCompleted ? Number(order.commissionAmount) : 0),
+        refunded:
+          existing.refunded + (isRefunded ? Number(order.totalAmount) : 0),
       });
     });
 
@@ -253,7 +286,10 @@ export class AdminAnalyticsDashboardService {
       netRevenue: Math.round((data.gross - data.refunded) * 100) / 100,
     }));
 
-    const periodCommission = result.reduce((sum, r) => sum + r.commissionRevenue, 0);
+    const periodCommission = result.reduce(
+      (sum, r) => sum + r.commissionRevenue,
+      0,
+    );
 
     return {
       data: result,
@@ -289,7 +325,7 @@ export class AdminAnalyticsDashboardService {
           createdAt: true,
           isSeller: true,
         },
-        orderBy: { createdAt: 'asc' },
+        orderBy: { createdAt: "asc" },
       }),
       this.prisma.user.count(),
       this.prisma.user.count({ where: { isSeller: true } }),
@@ -300,21 +336,28 @@ export class AdminAnalyticsDashboardService {
       this.prisma.order.findMany({
         where: { createdAt: { gte: startDate, lte: endDate } },
         select: { buyerId: true, createdAt: true },
-        distinct: ['buyerId'],
+        distinct: ["buyerId"],
       }),
       this.prisma.product.findMany({
         where: { createdAt: { gte: startDate, lte: endDate } },
         select: { sellerId: true, createdAt: true },
-        distinct: ['sellerId'],
+        distinct: ["sellerId"],
       }),
     ]);
 
     // Group new users by date
-    const groupedData = new Map<string, { newUsers: number; newSellers: number; activeUsers: Set<string> }>();
+    const groupedData = new Map<
+      string,
+      { newUsers: number; newSellers: number; activeUsers: Set<string> }
+    >();
 
     users.forEach((user) => {
       const dateKey = this.common.getDateKey(user.createdAt, query.groupBy);
-      const existing = groupedData.get(dateKey) || { newUsers: 0, newSellers: 0, activeUsers: new Set() };
+      const existing = groupedData.get(dateKey) || {
+        newUsers: 0,
+        newSellers: 0,
+        activeUsers: new Set(),
+      };
       groupedData.set(dateKey, {
         newUsers: existing.newUsers + 1,
         newSellers: existing.newSellers + (user.isSeller ? 1 : 0),
@@ -327,7 +370,7 @@ export class AdminAnalyticsDashboardService {
       const dateKey = this.common.getDateKey(item.createdAt, query.groupBy);
       const existing = groupedData.get(dateKey);
       if (existing) {
-        const userId = 'buyerId' in item ? item.buyerId : item.sellerId;
+        const userId = "buyerId" in item ? item.buyerId : item.sellerId;
         existing.activeUsers.add(userId);
       }
     });
@@ -346,9 +389,13 @@ export class AdminAnalyticsDashboardService {
         totalNewUsers: result.reduce((sum, r) => sum + r.newUsers, 0),
         totalNewSellers: result.reduce((sum, r) => sum + r.newSellers, 0),
         totalSellers,
-        averageDailyActiveUsers: result.length > 0
-          ? Math.round(result.reduce((sum, r) => sum + r.activeUsers, 0) / result.length)
-          : 0,
+        averageDailyActiveUsers:
+          result.length > 0
+            ? Math.round(
+                result.reduce((sum, r) => sum + r.activeUsers, 0) /
+                  result.length,
+              )
+            : 0,
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
       },
@@ -362,7 +409,7 @@ export class AdminAnalyticsDashboardService {
   async getRecentOrders(limit: number = 10) {
     const orders = await this.prisma.order.findMany({
       take: limit,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       include: {
         buyer: { select: { id: true, displayName: true } },
         product: { select: { id: true, title: true } },
@@ -381,19 +428,54 @@ export class AdminAnalyticsDashboardService {
   }
 
   /**
+   * Get top-N most-viewed products for the dashboard widget.
+   * Ordered by viewCount desc; returns display fields consumed by the admin table
+   * (id, title, thumbnail, viewCount, seller name, status, price).
+   */
+  async getTopProducts(limit: number = 10) {
+    const products = await this.prisma.product.findMany({
+      take: limit,
+      orderBy: [{ viewCount: "desc" }, { createdAt: "desc" }],
+      select: {
+        id: true,
+        title: true,
+        viewCount: true,
+        status: true,
+        price: true,
+        seller: { select: { id: true, displayName: true } },
+        images: {
+          orderBy: { sortOrder: "asc" },
+          take: 1,
+          select: { cardKey: true },
+        },
+      },
+    });
+
+    return products.map((p) => ({
+      id: p.id,
+      title: p.title,
+      thumbnail: this.common.resolveProductImageUrl(p.images[0]?.cardKey),
+      viewCount: p.viewCount,
+      sellerId: p.seller.id,
+      sellerName: p.seller.displayName,
+      status: p.status,
+      price: Number(p.price),
+    }));
+  }
+
+  /**
    * Get pending actions for dashboard
    * Requirement: Pending Actions Panel (7.1)
    */
   async getPendingActions() {
-    const [
-      pendingProducts,
-      refundRequests,
-      pendingMessages,
-    ] = await Promise.all([
-      this.prisma.product.count({ where: { status: ProductStatus.pending } }),
-      this.prisma.order.count({ where: { status: OrderStatus.refund_requested } }),
-      this.prisma.message.count({ where: { status: 'pending_approval' } }),
-    ]);
+    const [pendingProducts, refundRequests, pendingMessages] =
+      await Promise.all([
+        this.prisma.product.count({ where: { status: ProductStatus.pending } }),
+        this.prisma.order.count({
+          where: { status: OrderStatus.refund_requested },
+        }),
+        this.prisma.message.count({ where: { status: "pending_approval" } }),
+      ]);
 
     return {
       pendingProducts,
@@ -413,7 +495,12 @@ export class AdminAnalyticsDashboardService {
       ? new Date(query.startDate)
       : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    const [totalCommission, totalFees, commissionByMonth, commissionByCategory] = await Promise.all([
+    const [
+      totalCommission,
+      totalFees,
+      commissionByMonth,
+      commissionByCategory,
+    ] = await Promise.all([
       // Total commission in period
       this.prisma.order.aggregate({
         _sum: { commissionAmount: true },
@@ -459,11 +546,18 @@ export class AdminAnalyticsDashboardService {
     ]);
 
     // Group commission by category
-    const categoryMap = new Map<string, { name: string; commission: number; count: number }>();
+    const categoryMap = new Map<
+      string,
+      { name: string; commission: number; count: number }
+    >();
     commissionByCategory.forEach((order) => {
-      const catId = order.product.category?.id || 'uncategorized';
-      const catName = order.product.category?.name || 'Kategorisiz';
-      const existing = categoryMap.get(catId) || { name: catName, commission: 0, count: 0 };
+      const catId = order.product.category?.id || "uncategorized";
+      const catName = order.product.category?.name || "Kategorisiz";
+      const existing = categoryMap.get(catId) || {
+        name: catName,
+        commission: 0,
+        count: 0,
+      };
       categoryMap.set(catId, {
         name: catName,
         commission: existing.commission + Number(order.commissionAmount),
@@ -479,12 +573,14 @@ export class AdminAnalyticsDashboardService {
         month: m.month,
         total: Number(m.total || 0),
       })),
-      byCategory: Array.from(categoryMap.entries()).map(([id, data]) => ({
-        categoryId: id,
-        categoryName: data.name,
-        commission: Math.round(data.commission * 100) / 100,
-        orderCount: data.count,
-      })).sort((a, b) => b.commission - a.commission),
+      byCategory: Array.from(categoryMap.entries())
+        .map(([id, data]) => ({
+          categoryId: id,
+          categoryName: data.name,
+          commission: Math.round(data.commission * 100) / 100,
+          orderCount: data.count,
+        }))
+        .sort((a, b) => b.commission - a.commission),
       period: {
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
