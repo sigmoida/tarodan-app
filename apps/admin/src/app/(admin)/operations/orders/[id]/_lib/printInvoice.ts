@@ -5,6 +5,21 @@ import { adminApi } from "@/lib/api";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
+const HTML_ESCAPE_CHARACTERS: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;",
+};
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? "").replace(
+    /[&<>"']/g,
+    (character) => HTML_ESCAPE_CHARACTERS[character],
+  );
+}
+
 /** Fetch the order invoice and open a print-ready window. */
 export async function printOrderInvoice(orderId: string, t: T): Promise<void> {
   try {
@@ -25,7 +40,7 @@ export async function printOrderInvoice(orderId: string, t: T): Promise<void> {
       <!DOCTYPE html>
       <html>
       <head>
-        <title>${t("admin.operations.orders.invoice.windowTitle", { number: invoiceData.invoiceNumber })}</title>
+        <title>${escapeHtml(t("admin.operations.orders.invoice.windowTitle", { number: invoiceData.invoiceNumber }))}</title>
         <style>
           body { font-family: Arial, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; }
           .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid ${theme.heading}; padding-bottom: 20px; }
@@ -46,37 +61,37 @@ export async function printOrderInvoice(orderId: string, t: T): Promise<void> {
       </head>
       <body>
         <div class="header">
-          <h1>${t("admin.operations.orders.invoice.heading")}</h1>
-          <p>${t("admin.operations.orders.invoice.number", { number: invoiceData.invoiceNumber })}</p>
-          <p>${t("admin.operations.orders.invoice.date", { date: new Date(invoiceData.orderDate).toLocaleDateString("tr-TR") })}</p>
+          <h1>${escapeHtml(t("admin.operations.orders.invoice.heading"))}</h1>
+          <p>${escapeHtml(t("admin.operations.orders.invoice.number", { number: invoiceData.invoiceNumber }))}</p>
+          <p>${escapeHtml(t("admin.operations.orders.invoice.date", { date: new Date(invoiceData.orderDate).toLocaleDateString("tr-TR") }))}</p>
         </div>
         <div class="info-grid">
           <div class="info-box">
-            <h3>${t("admin.operations.orders.invoice.buyer")}</h3>
-            <p><strong>${invoiceData.buyer.name}</strong></p>
-            <p>${invoiceData.buyer.email}</p>
-            ${invoiceData.buyer.phone ? `<p>${invoiceData.buyer.phone}</p>` : ""}
-            ${invoiceData.buyer.address ? `<p>${invoiceData.buyer.address}</p>` : ""}
+            <h3>${escapeHtml(t("admin.operations.orders.invoice.buyer"))}</h3>
+            <p><strong>${escapeHtml(invoiceData.buyer.name)}</strong></p>
+            <p>${escapeHtml(invoiceData.buyer.email)}</p>
+            ${invoiceData.buyer.phone ? `<p>${escapeHtml(invoiceData.buyer.phone)}</p>` : ""}
+            ${invoiceData.buyer.address ? `<p>${escapeHtml(invoiceData.buyer.address)}</p>` : ""}
           </div>
           <div class="info-box">
-            <h3>${t("admin.operations.orders.invoice.seller")}</h3>
-            <p><strong>${invoiceData.seller.name}</strong></p>
-            <p>${invoiceData.seller.email}</p>
+            <h3>${escapeHtml(t("admin.operations.orders.invoice.seller"))}</h3>
+            <p><strong>${escapeHtml(invoiceData.seller.name)}</strong></p>
+            <p>${escapeHtml(invoiceData.seller.email)}</p>
           </div>
         </div>
         <table>
           <thead>
-            <tr><th>${t("admin.operations.orders.invoice.colProduct")}</th><th>${t("admin.operations.orders.invoice.colQuantity")}</th><th>${t("admin.operations.orders.invoice.colUnitPrice")}</th><th>${t("admin.operations.orders.invoice.colTotal")}</th></tr>
+            <tr><th>${escapeHtml(t("admin.operations.orders.invoice.colProduct"))}</th><th>${escapeHtml(t("admin.operations.orders.invoice.colQuantity"))}</th><th>${escapeHtml(t("admin.operations.orders.invoice.colUnitPrice"))}</th><th>${escapeHtml(t("admin.operations.orders.invoice.colTotal"))}</th></tr>
           </thead>
           <tbody>
             ${invoiceData.items
               .map(
                 (item: any) => `
               <tr>
-                <td>${item.title}</td>
-                <td>${item.quantity}</td>
-                <td>₺${item.unitPrice.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}</td>
-                <td>₺${item.total.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}</td>
+                <td>${escapeHtml(item.title)}</td>
+                <td>${escapeHtml(item.quantity)}</td>
+                <td>₺${escapeHtml(item.unitPrice.toLocaleString("tr-TR", { minimumFractionDigits: 2 }))}</td>
+                <td>₺${escapeHtml(item.total.toLocaleString("tr-TR", { minimumFractionDigits: 2 }))}</td>
               </tr>
             `,
               )
@@ -84,29 +99,29 @@ export async function printOrderInvoice(orderId: string, t: T): Promise<void> {
           </tbody>
         </table>
         <div class="totals">
-          <p>${t("admin.operations.orders.invoice.subtotal", { amount: invoiceData.subtotal.toLocaleString("tr-TR", { minimumFractionDigits: 2 }) })}</p>
+          <p>${escapeHtml(t("admin.operations.orders.invoice.subtotal", { amount: invoiceData.subtotal.toLocaleString("tr-TR", { minimumFractionDigits: 2 }) }))}</p>
           ${
             invoiceData.discountAmount > 0
-              ? `<p style="color: #16a34a;">${t("admin.operations.orders.invoice.discount", { code: invoiceData.discountCode ? ` (${invoiceData.discountCode})` : "", amount: Number(invoiceData.discountAmount).toLocaleString("tr-TR", { minimumFractionDigits: 2 }) })}</p>`
+              ? `<p style="color: #16a34a;">${escapeHtml(t("admin.operations.orders.invoice.discount", { code: invoiceData.discountCode ? ` (${invoiceData.discountCode})` : "", amount: Number(invoiceData.discountAmount).toLocaleString("tr-TR", { minimumFractionDigits: 2 }) }))}</p>`
               : ""
           }
-          <p>${t("admin.operations.orders.invoice.shipping", { amount: invoiceData.shippingCost.toLocaleString("tr-TR", { minimumFractionDigits: 2 }) })}</p>
-          <p class="total-row">${t("admin.operations.orders.invoice.total", { amount: invoiceData.total.toLocaleString("tr-TR", { minimumFractionDigits: 2 }) })}</p>
+          <p>${escapeHtml(t("admin.operations.orders.invoice.shipping", { amount: invoiceData.shippingCost.toLocaleString("tr-TR", { minimumFractionDigits: 2 }) }))}</p>
+          <p class="total-row">${escapeHtml(t("admin.operations.orders.invoice.total", { amount: invoiceData.total.toLocaleString("tr-TR", { minimumFractionDigits: 2 }) }))}</p>
         </div>
         ${
           invoiceData.shipment?.trackingNumber
             ? `
           <div style="margin-top: 20px; padding: 10px; background: ${theme.surface}; border-radius: 4px;">
-            <strong>${t("admin.operations.orders.invoice.tracking")}:</strong> ${invoiceData.shipment.carrier || ""} - ${invoiceData.shipment.trackingNumber}
+            <strong>${escapeHtml(t("admin.operations.orders.invoice.tracking"))}:</strong> ${escapeHtml(invoiceData.shipment.carrier)} - ${escapeHtml(invoiceData.shipment.trackingNumber)}
           </div>
         `
             : ""
         }
-        <script>window.onload = function() { window.print(); }</script>
       </body>
       </html>
     `);
     printWindow.document.close();
+    printWindow.print();
   } catch {
     toast.error(t("admin.operations.orders.invoice.error"));
   }
