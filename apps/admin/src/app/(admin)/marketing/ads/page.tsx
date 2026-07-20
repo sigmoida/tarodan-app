@@ -41,6 +41,8 @@ export default function AdsPage() {
 
       <ResourceList<Ad>
         resource="ads"
+        // Full-load: getAds returns every ad (bounded set) and we sort/search/
+        // paginate client-side. Move to the server contract if ads grow (#383).
         fetcher={clientListFetcher<Ad>(
           () => adminApi.getAds(),
           (raw) => (Array.isArray(raw) ? raw : (raw?.data ?? [])),

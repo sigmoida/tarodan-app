@@ -4,10 +4,11 @@ import {
   ForbiddenException,
   BadRequestException,
   Logger,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { CacheService } from '../cache/cache.service';
-import { fulltextDiscountSearch } from '../../common/helpers/fulltext-search';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { CacheService } from "../cache/cache.service";
+import { fulltextDiscountSearch } from "../../common/helpers/fulltext-search";
+import { resolveOrderBy } from "../../common/list";
 import {
   CreateDiscountDto,
   UpdateDiscountDto,
@@ -17,8 +18,8 @@ import {
   PaginatedDiscountsDto,
   ValidationResultDto,
   ActiveCampaignDto,
-} from './dto';
-import { DiscountScope, Prisma } from '@prisma/client';
+} from "./dto";
+import { DiscountScope, Prisma } from "@prisma/client";
 
 @Injectable()
 export class DiscountService {
@@ -27,22 +28,22 @@ export class DiscountService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
-  ) { }
+  ) {}
 
   /**
    * İndirim değişince ürün listesi/detay cache'lerini temizle (fiyatlar kampanyaya göre hesaplanıyor)
    */
   private async invalidateProductCaches(): Promise<void> {
     try {
-      const listCount = await this.cache.delPattern('products:list:*');
-      const detailCount = await this.cache.delPattern('products:detail:*');
+      const listCount = await this.cache.delPattern("products:list:*");
+      const detailCount = await this.cache.delPattern("products:detail:*");
       if (listCount > 0 || detailCount > 0) {
         this.logger.log(
           `Product cache invalidated: ${listCount} list keys, ${detailCount} detail keys`,
         );
       }
     } catch (e) {
-      this.logger.warn('Product cache invalidation failed', e);
+      this.logger.warn("Product cache invalidation failed", e);
     }
   }
 
@@ -59,11 +60,13 @@ export class DiscountService {
   ): Promise<DiscountResponseDto> {
     // Sellers can only create discounts for their own products
     if (!isAdmin && dto.scope === DiscountScope.global) {
-      throw new ForbiddenException('Satıcılar global indirim oluşturamazlar');
+      throw new ForbiddenException("Satıcılar global indirim oluşturamazlar");
     }
 
     if (!isAdmin && dto.scope === DiscountScope.category) {
-      throw new ForbiddenException('Satıcılar kategori indirimi oluşturamazlar');
+      throw new ForbiddenException(
+        "Satıcılar kategori indirimi oluşturamazlar",
+      );
     }
 
     // Validate category exists if scope is category
@@ -72,7 +75,7 @@ export class DiscountService {
         where: { id: dto.categoryId },
       });
       if (!category) {
-        throw new NotFoundException('Kategori bulunamadı');
+        throw new NotFoundException("Kategori bulunamadı");
       }
     }
 
@@ -80,7 +83,7 @@ export class DiscountService {
     if (dto.scope === DiscountScope.product) {
       if (!dto.targetProductIds?.length) {
         throw new BadRequestException(
-          'Seçili ürünler kapsamı için en az bir ürün seçmelisiniz',
+          "Seçili ürünler kapsamı için en az bir ürün seçmelisiniz",
         );
       }
       const products = await this.prisma.product.findMany({
@@ -92,8 +95,8 @@ export class DiscountService {
       if (products.length !== dto.targetProductIds.length) {
         throw new BadRequestException(
           isAdmin
-            ? 'Bazı ürünler bulunamadı'
-            : 'Sadece kendi ürünleriniz için indirim oluşturabilirsiniz',
+            ? "Bazı ürünler bulunamadı"
+            : "Sadece kendi ürünleriniz için indirim oluşturabilirsiniz",
         );
       }
     }
@@ -109,7 +112,7 @@ export class DiscountService {
         where: { code: dto.code },
       });
       if (existing) {
-        throw new BadRequestException('Bu kupon kodu zaten kullanılıyor');
+        throw new BadRequestException("Bu kupon kodu zaten kullanılıyor");
       }
     }
 
@@ -150,7 +153,7 @@ export class DiscountService {
     });
 
     this.logger.log(
-      `Discount created: ${discount.id} by ${isAdmin ? 'admin' : actorId}`,
+      `Discount created: ${discount.id} by ${isAdmin ? "admin" : actorId}`,
     );
 
     await this.invalidateProductCaches();
@@ -171,12 +174,12 @@ export class DiscountService {
     });
 
     if (!discount) {
-      throw new NotFoundException('İndirim bulunamadı');
+      throw new NotFoundException("İndirim bulunamadı");
     }
 
     // Sellers can only update their own discounts
     if (!isAdmin && discount.sellerId !== actorId) {
-      throw new ForbiddenException('Bu indirimi düzenleme yetkiniz yok');
+      throw new ForbiddenException("Bu indirimi düzenleme yetkiniz yok");
     }
 
     // Check code uniqueness if changing
@@ -185,7 +188,7 @@ export class DiscountService {
         where: { code: dto.code },
       });
       if (existing) {
-        throw new BadRequestException('Bu kupon kodu zaten kullanılıyor');
+        throw new BadRequestException("Bu kupon kodu zaten kullanılıyor");
       }
     }
 
@@ -198,7 +201,7 @@ export class DiscountService {
           : (dto.targetProductIds ?? discount.targetProductIds ?? []);
       if (!newIds.length) {
         throw new BadRequestException(
-          'Seçili ürünler kapsamı için en az bir ürün seçmelisiniz',
+          "Seçili ürünler kapsamı için en az bir ürün seçmelisiniz",
         );
       }
     }
@@ -280,12 +283,12 @@ export class DiscountService {
     });
 
     if (!discount) {
-      throw new NotFoundException('İndirim bulunamadı');
+      throw new NotFoundException("İndirim bulunamadı");
     }
 
     // Sellers can only delete their own discounts
     if (!isAdmin && discount.sellerId !== actorId) {
-      throw new ForbiddenException('Bu indirimi silme yetkiniz yok');
+      throw new ForbiddenException("Bu indirimi silme yetkiniz yok");
     }
 
     await this.prisma.discount.delete({ where: { id } });
@@ -310,12 +313,12 @@ export class DiscountService {
     });
 
     if (!discount) {
-      throw new NotFoundException('İndirim bulunamadı');
+      throw new NotFoundException("İndirim bulunamadı");
     }
 
     // Sellers can only view their own discounts
     if (!isAdmin && discount.sellerId !== actorId) {
-      throw new ForbiddenException('Bu indirimi görüntüleme yetkiniz yok');
+      throw new ForbiddenException("Bu indirimi görüntüleme yetkiniz yok");
     }
 
     return this.mapToResponse(discount);
@@ -353,15 +356,13 @@ export class DiscountService {
       sellerId,
       couponsOnly,
       autoOnly,
-      sortBy = 'created_desc',
+      sortBy = "created_desc",
+      sortOrder,
+      sortType,
     } = query;
 
     const where: Prisma.DiscountWhereInput = {
-      ...(isAdmin
-        ? sellerId
-          ? { sellerId }
-          : {}
-        : { sellerId: actorId }),
+      ...(isAdmin ? (sellerId ? { sellerId } : {}) : { sellerId: actorId }),
       ...(scope && { scope }),
       ...(isActive !== undefined && { isActive }),
       ...(couponsOnly && { code: { not: null } }),
@@ -376,7 +377,22 @@ export class DiscountService {
       where.id = { in: ids };
     }
 
-    const orderBy = this.getOrderBy(sortBy);
+    const orderBy = resolveOrderBy<Prisma.DiscountOrderByWithRelationInput>(
+      "Discount",
+      { sortBy, sortOrder, sortType },
+      {
+        defaultSort: { createdAt: "desc" },
+        // Legacy combined tokens stay supported; standard column keys resolve
+        // via the DMMF (name, code, scope, usedCount, startDate, isActive, …).
+        sortMap: {
+          created_asc: () => ({ createdAt: "asc" }),
+          created_desc: () => ({ createdAt: "desc" }),
+          name_asc: () => ({ name: "asc" }),
+          name_desc: () => ({ name: "desc" }),
+          priority_asc: () => ({ priority: "asc" }),
+        },
+      },
+    );
 
     const [items, total] = await Promise.all([
       this.prisma.discount.findMany({
@@ -417,20 +433,20 @@ export class DiscountService {
     });
 
     if (!discount) {
-      return { isValid: false, error: 'Kupon kodu bulunamadı' };
+      return { isValid: false, error: "Kupon kodu bulunamadı" };
     }
 
     if (!discount.isActive) {
-      return { isValid: false, error: 'Bu kupon artık aktif değil' };
+      return { isValid: false, error: "Bu kupon artık aktif değil" };
     }
 
     const now = new Date();
     if (now < discount.startDate) {
-      return { isValid: false, error: 'Bu kupon henüz başlamadı' };
+      return { isValid: false, error: "Bu kupon henüz başlamadı" };
     }
 
     if (now > discount.endDate) {
-      return { isValid: false, error: 'Bu kuponun süresi doldu' };
+      return { isValid: false, error: "Bu kuponun süresi doldu" };
     }
 
     // Check total usage limit
@@ -438,7 +454,7 @@ export class DiscountService {
       discount.usageLimitTotal &&
       discount.usedCount >= discount.usageLimitTotal
     ) {
-      return { isValid: false, error: 'Bu kupon kullanım limitine ulaştı' };
+      return { isValid: false, error: "Bu kupon kullanım limitine ulaştı" };
     }
 
     // Check per-user usage limit
@@ -449,7 +465,7 @@ export class DiscountService {
       if (userUsageCount >= discount.usageLimitPerUser) {
         return {
           isValid: false,
-          error: 'Bu kuponu zaten kullandınız',
+          error: "Bu kuponu zaten kullandınız",
         };
       }
     }
@@ -475,7 +491,7 @@ export class DiscountService {
             discount,
           );
           if (isEligible) {
-            if (discount.type === 'percentage') {
+            if (discount.type === "percentage") {
               estimatedDiscount += itemPrice * (Number(discount.value) / 100);
             } else {
               estimatedDiscount += Number(discount.value);
@@ -486,10 +502,7 @@ export class DiscountService {
     }
 
     // Check minimum cart value
-    if (
-      discount.minCartValue &&
-      cartTotal < Number(discount.minCartValue)
-    ) {
+    if (discount.minCartValue && cartTotal < Number(discount.minCartValue)) {
       return {
         isValid: false,
         error: `Minimum sepet tutarı: ${Number(discount.minCartValue).toFixed(2)} TL`,
@@ -604,7 +617,9 @@ export class DiscountService {
     if (!items.length) return result;
 
     const now = new Date();
-    const sellerIds = [...new Set(items.map((i) => i.sellerId).filter(Boolean))];
+    const sellerIds = [
+      ...new Set(items.map((i) => i.sellerId).filter(Boolean)),
+    ];
     const categoryIds = [
       ...new Set(items.map((i) => i.categoryId).filter(Boolean)),
     ];
@@ -626,7 +641,7 @@ export class DiscountService {
           },
         ],
       },
-      orderBy: { priority: 'asc' },
+      orderBy: { priority: "asc" },
     });
 
     for (const item of items) {
@@ -637,7 +652,7 @@ export class DiscountService {
         if (!this.isProductEligibleForDiscount(product, d)) continue;
 
         let effectivePrice: number;
-        if (d.type === 'percentage') {
+        if (d.type === "percentage") {
           const discountAmount = currentDisplayPrice * (Number(d.value) / 100);
           const capped =
             d.maxDiscountAmount != null
@@ -697,7 +712,10 @@ export class DiscountService {
         criteria.sellerIds.push(d.sellerId);
       } else if (d.scope === DiscountScope.category && d.categoryId) {
         criteria.categoryIds.push(d.categoryId);
-      } else if (d.scope === DiscountScope.product && d.targetProductIds.length) {
+      } else if (
+        d.scope === DiscountScope.product &&
+        d.targetProductIds.length
+      ) {
         criteria.productIds.push(...d.targetProductIds);
       }
     }
@@ -723,7 +741,7 @@ export class DiscountService {
       include: {
         category: { select: { id: true, name: true } },
       },
-      orderBy: { priority: 'asc' },
+      orderBy: { priority: "asc" },
     });
 
     return campaigns.map((c) => ({
@@ -757,7 +775,10 @@ export class DiscountService {
         endDate: { gte: now },
         OR: [
           { scope: DiscountScope.global, sellerId: null },
-          { scope: DiscountScope.product, targetProductIds: { hasSome: productIds } },
+          {
+            scope: DiscountScope.product,
+            targetProductIds: { hasSome: productIds },
+          },
           ...(sellerId ? [{ scope: DiscountScope.seller, sellerId }] : []),
         ],
       },
@@ -765,7 +786,7 @@ export class DiscountService {
         seller: { select: { id: true, displayName: true } },
         category: { select: { id: true, name: true } },
       },
-      orderBy: { priority: 'asc' },
+      orderBy: { priority: "asc" },
     });
 
     const result = new Map<string, DiscountResponseDto[]>();
@@ -778,7 +799,10 @@ export class DiscountService {
             d.targetProductIds.includes(productId)) ||
           (d.scope === DiscountScope.seller && d.sellerId === sellerId),
       );
-      result.set(productId, applicableDiscounts.map((d) => this.mapToResponse(d)));
+      result.set(
+        productId,
+        applicableDiscounts.map((d) => this.mapToResponse(d)),
+      );
     }
 
     return result;
@@ -797,7 +821,9 @@ export class DiscountService {
   ): boolean {
     switch (discount.scope) {
       case DiscountScope.global:
-        return discount.sellerId === null || discount.sellerId === product.sellerId;
+        return (
+          discount.sellerId === null || discount.sellerId === product.sellerId
+        );
 
       case DiscountScope.category:
         return product.categoryId === discount.categoryId;
@@ -809,28 +835,12 @@ export class DiscountService {
 
       case DiscountScope.seller:
         // Tüm mağaza: sadece bu satıcının ürünleri
-        return discount.sellerId != null && product.sellerId === discount.sellerId;
+        return (
+          discount.sellerId != null && product.sellerId === discount.sellerId
+        );
 
       default:
         return false;
-    }
-  }
-
-  private getOrderBy(
-    sortBy: string,
-  ): Prisma.DiscountOrderByWithRelationInput {
-    switch (sortBy) {
-      case 'created_asc':
-        return { createdAt: 'asc' };
-      case 'name_asc':
-        return { name: 'asc' };
-      case 'name_desc':
-        return { name: 'desc' };
-      case 'priority_asc':
-        return { priority: 'asc' };
-      case 'created_desc':
-      default:
-        return { createdAt: 'desc' };
     }
   }
 

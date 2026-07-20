@@ -5,8 +5,11 @@ import type { SortType } from "@/components/table/meta";
  * Client-side list adapter.
  *
  * Some admin list APIs return the FULL list with no server pagination/search
- * (`getCategories`, `getBrands`, `getManufacturers`, `getCarModels`, attribute
- * APIs), while others (`getProducts`, `getCollections`) are server-paginated.
+ * (attribute groups, `getAds`, `getMembershipTiers`, commission rules, the
+ * payouts schedule), while most others — `getProducts`, `getCollections`,
+ * `getCategories`, `getBrands`, `getManufacturers`, `getCarModels`, orders,
+ * users, … — are server-paginated (their pages pass `adminApi.getX(params)`
+ * directly and the backend honors the page/limit/sortBy/sortOrder contract).
  * To run BOTH through the same `ResourceList` → `useAdminResource` pipeline, wrap
  * a full-load fetcher so it returns the `{ data, meta: { total } }` shape that
  * `useAdminResource.extractData` reads. Search + pagination then work uniformly.

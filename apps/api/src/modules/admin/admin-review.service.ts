@@ -67,7 +67,7 @@ export class AdminReviewService {
    * Get product reviews
    */
   async getReviews(query: RatingQueryDto) {
-    const { page = 1, limit = 20, status, productId, search, sortBy } = query;
+    const { page = 1, limit = 20, status, productId, search } = query;
 
     const where: any = {};
 
@@ -96,12 +96,22 @@ export class AdminReviewService {
       where.OR = conditions;
     }
 
-    const orderBy: any = {};
-    if (sortBy === "newest") orderBy.createdAt = "desc";
-    else if (sortBy === "oldest") orderBy.createdAt = "asc";
-    else if (sortBy === "highest_score") orderBy.score = "desc";
-    else if (sortBy === "lowest_score") orderBy.score = "asc";
-    else orderBy.createdAt = "desc";
+    const orderBy =
+      resolveOrderBy<Prisma.ProductRatingOrderByWithRelationInput>(
+        "ProductRating",
+        query,
+        {
+          defaultSort: { createdAt: "desc" },
+          // Legacy preset keys still work; standard column keys (score, status,
+          // product.title, user.displayName, …) resolve via the DMMF.
+          sortMap: {
+            newest: () => ({ createdAt: "desc" }),
+            oldest: () => ({ createdAt: "asc" }),
+            highest_score: () => ({ score: "desc" }),
+            lowest_score: () => ({ score: "asc" }),
+          },
+        },
+      );
 
     const [total, reviews] = await Promise.all([
       this.prisma.productRating.count({ where }),

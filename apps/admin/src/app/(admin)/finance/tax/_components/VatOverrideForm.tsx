@@ -92,6 +92,8 @@ export function VatOverrideForm({ config }: { config?: VatConfig }) {
           {t("admin.finance.tax.addOrUpdate")}
         </Button>
       </Form>
+      {/* Non-list DataTable (#383): a small inline editor grid for the current
+          config's VAT overrides — not a searchable/sortable resource list. */}
       <DataTable
         columns={columns}
         data={config?.overrides ?? []}

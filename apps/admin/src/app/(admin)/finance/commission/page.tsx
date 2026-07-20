@@ -20,6 +20,9 @@ import { CommissionTable } from "./_components/CommissionTable";
 import { CommissionRuleFormModal } from "./_modals/CommissionRuleFormModal";
 import { type CommissionRule, isDefaultRule } from "./_lib/types";
 
+// Full-load (client-side sort/search/pagination): commission rules are a small,
+// bounded config set, so we fetch all and paginate in memory. Revisit (move to
+// the server contract) only if the ruleset ever grows large (#383).
 const commissionRulesFetcher = clientListFetcher<CommissionRule>(
   () => adminApi.getCommissionRules(),
   (raw) => extractList<CommissionRule>(raw),

@@ -23,6 +23,7 @@ export default function RefundRequestsPage() {
         resource="refund-requests"
         fetcher={fetchRefundRequests}
         getRowId={(rr) => rr.id}
+        syncUrl
         initialFilters={{ status: "all", from: "", to: "" }}
       >
         <ResourceList.Toolbar>

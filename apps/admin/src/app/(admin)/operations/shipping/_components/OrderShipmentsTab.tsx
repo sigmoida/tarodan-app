@@ -14,6 +14,7 @@ export function OrderShipmentsTab() {
       resource="shipping-shipments"
       fetcher={(p) => adminApi.getShipments(p)}
       getRowId={(r) => r.id}
+      syncUrl
       initialFilters={{ status: "all" }}
     >
       <ResourceList.Toolbar>

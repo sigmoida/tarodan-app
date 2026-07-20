@@ -7,7 +7,7 @@ import {
   ADMIN_LIST_DEFAULT_PAGE,
   ADMIN_LIST_MAX_LIMIT,
 } from "./list.constants";
-import type { SortDirection } from "./list.types";
+import type { SortDirection, SortType } from "./list.types";
 
 export class AdminListQueryDto {
   @ApiPropertyOptional({ default: ADMIN_LIST_DEFAULT_PAGE, minimum: 1 })
@@ -38,4 +38,9 @@ export class AdminListQueryDto {
   @IsOptional()
   @IsIn(["asc", "desc"])
   sortOrder?: SortDirection;
+
+  @ApiPropertyOptional({ enum: ["text", "number", "date"] })
+  @IsOptional()
+  @IsIn(["text", "number", "date"])
+  sortType?: SortType;
 }
