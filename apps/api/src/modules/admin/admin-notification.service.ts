@@ -8,6 +8,11 @@ import { PrismaService } from "../../prisma";
 import { EventService } from "../events/event.service";
 import { AdminAuditService } from "./admin-audit.service";
 import { Prisma } from "@prisma/client";
+import {
+  NotificationHistoryQueryDto,
+  ScheduledNotificationQueryDto,
+} from "./dto";
+import { paginate, resolveOrderBy } from "../../common/list";
 
 /**
  * Bildirim admin operasyonları (geçmiş, toplu gönderim, zamanlama) —
@@ -29,18 +34,7 @@ export class AdminNotificationService {
   /**
    * Get notification history
    */
-  async getNotificationHistory(query: {
-    page?: number;
-    limit?: number;
-    channel?: string;
-    status?: string;
-    userId?: string;
-    type?: string;
-    search?: string;
-    startDate?: string;
-    endDate?: string;
-  }) {
-    const { page = 1, limit = 20 } = query;
+  async getNotificationHistory(query: NotificationHistoryQueryDto) {
     const where: Prisma.NotificationLogWhereInput = {};
 
     if (query.channel) where.channel = query.channel;
@@ -77,15 +71,21 @@ export class AdminNotificationService {
       ];
     }
 
-    const [total, logs] = await Promise.all([
-      this.prisma.notificationLog.count({ where }),
-      this.prisma.notificationLog.findMany({
+    const orderBy =
+      resolveOrderBy<Prisma.NotificationLogOrderByWithRelationInput>(
+        "NotificationLog",
+        query,
+        { defaultSort: { createdAt: "desc" } },
+      );
+    const result = await paginate(
+      this.prisma.notificationLog,
+      {
         where,
-        orderBy: { createdAt: "desc" },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
+        orderBy,
+      },
+      query,
+    );
+    const logs = result.data;
 
     // Get user info for logs
     const userIds = [...new Set(logs.map((l) => l.userId))];
@@ -96,11 +96,11 @@ export class AdminNotificationService {
     const userMap = new Map(users.map((u) => [u.id, u]));
 
     return {
+      ...result,
       data: logs.map((l) => ({
         ...l,
         user: userMap.get(l.userId) || null,
       })),
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 
@@ -317,32 +317,24 @@ export class AdminNotificationService {
   /**
    * Get scheduled notifications
    */
-  async getScheduledNotifications(query?: {
-    page?: number;
-    limit?: number;
-    status?: string;
-  }) {
-    const { page = 1, limit = 20 } = query || {};
+  async getScheduledNotifications(query: ScheduledNotificationQueryDto = {}) {
     const where: Prisma.ScheduledNotificationWhereInput = {};
 
     if (query?.status) {
       where.status = query.status;
     }
 
-    const [total, notifications] = await Promise.all([
-      this.prisma.scheduledNotification.count({ where }),
-      this.prisma.scheduledNotification.findMany({
-        where,
-        orderBy: { scheduledFor: "asc" },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
-
-    return {
-      data: notifications,
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
-    };
+    const orderBy =
+      resolveOrderBy<Prisma.ScheduledNotificationOrderByWithRelationInput>(
+        "ScheduledNotification",
+        query,
+        { defaultSort: { scheduledFor: "asc" } },
+      );
+    return paginate(
+      this.prisma.scheduledNotification,
+      { where, orderBy },
+      query,
+    );
   }
 
   /**

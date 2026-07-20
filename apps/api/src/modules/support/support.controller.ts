@@ -23,17 +23,13 @@ import {
   TicketStatsDto,
   GuestContactDto,
   GuestContactResponseDto,
+  AdminTicketQueryDto,
 } from "./dto";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { AdminRoute } from "../auth/decorators/admin-route.decorator";
 import { AdminJwtAuthGuard } from "../auth/guards/admin-jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
-import {
-  AdminRole,
-  TicketCategory,
-  TicketPriority,
-  TicketStatus,
-} from "@prisma/client";
+import { AdminRole, TicketPriority, TicketStatus } from "@prisma/client";
 import { Public } from "../auth/decorators/public.decorator";
 
 @Controller("support")
@@ -138,22 +134,8 @@ export class SupportController {
   @AdminRoute()
   @UseGuards(AdminJwtAuthGuard, RolesGuard)
   @Roles(AdminRole.admin, AdminRole.super_admin, AdminRole.moderator)
-  async getAllTickets(
-    @Query("page") page?: number,
-    @Query("pageSize") pageSize?: number,
-    @Query("status") status?: TicketStatus,
-    @Query("priority") priority?: TicketPriority,
-    @Query("category") category?: TicketCategory,
-    @Query("assigneeId") assigneeId?: string,
-  ): Promise<TicketListResponseDto> {
-    return this.supportService.getAllTickets(
-      page,
-      pageSize,
-      status,
-      priority,
-      category,
-      assigneeId,
-    );
+  async getAllTickets(@Query() query: AdminTicketQueryDto) {
+    return this.supportService.getAllTickets(query);
   }
 
   /**

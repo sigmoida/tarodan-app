@@ -3,13 +3,14 @@ import {
   NotFoundException,
   BadRequestException,
   Optional,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { StorageService } from '../storage/storage.service';
-import { AdminAuditService } from './admin-audit.service';
-import { fulltextUserSearch } from '../../common/helpers/fulltext-search';
-import { AdminUserQueryDto } from './dto';
-import { Prisma, MembershipTierType, SubscriptionStatus } from '@prisma/client';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { StorageService } from "../storage/storage.service";
+import { AdminAuditService } from "./admin-audit.service";
+import { fulltextUserSearch } from "../../common/helpers/fulltext-search";
+import { AdminUserQueryDto } from "./dto";
+import { Prisma, MembershipTierType, SubscriptionStatus } from "@prisma/client";
+import { paginate, resolveOrderBy } from "../../common/list";
 
 /**
  * Kullanıcı yönetimi + admin üyelik override'ları — AdminService'in
@@ -27,19 +28,30 @@ export class AdminUserService {
 
   // AdminService'teki leaf yardımcı ile birebir aynı (bilinçli kopya; facade'da
   // başka bölümler de kullandığı için oradan kaldırılamadı).
-  private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
+  private resolveProductImageUrl(
+    imageKeyOrUrl: string | null | undefined,
+  ): string | null {
     if (!imageKeyOrUrl) return null;
     // Strip expired presigned S3 query params to get the clean public URL
-    if ((imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://')) && imageKeyOrUrl.includes('X-Amz-Signature')) {
+    if (
+      (imageKeyOrUrl.startsWith("http://") ||
+        imageKeyOrUrl.startsWith("https://")) &&
+      imageKeyOrUrl.includes("X-Amz-Signature")
+    ) {
       try {
         const parsed = new URL(imageKeyOrUrl);
-        parsed.search = '';
+        parsed.search = "";
         return parsed.toString();
       } catch {
         // fall through
       }
     }
-    if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
+    if (
+      imageKeyOrUrl.startsWith("http://") ||
+      imageKeyOrUrl.startsWith("https://") ||
+      imageKeyOrUrl.startsWith("/")
+    )
+      return imageKeyOrUrl;
     // Try to resolve any non-URL string as an S3 key (covers dev/, prod/, and other prefixes)
     if (this.storageService) {
       return this.storageService.getPublicAssetUrl(imageKeyOrUrl) ?? null;
@@ -53,14 +65,22 @@ export class AdminUserService {
    * Get users with filters
    */
   async getUsers(query: AdminUserQueryDto) {
-    const { search, isSeller, isVerified, page = 1, limit = 20 } = query;
+    const { search, isSeller, isVerified } = query;
 
     const where: Prisma.UserWhereInput = {};
 
     if (search) {
       const userIds = await fulltextUserSearch(this.prisma, search);
       if (userIds.length === 0) {
-        return { data: [], total: 0, page, limit, totalPages: 0 };
+        return {
+          data: [],
+          meta: {
+            total: 0,
+            page: query.page ?? 1,
+            limit: query.limit ?? 20,
+            totalPages: 0,
+          },
+        };
       }
       where.id = { in: userIds };
     }
@@ -77,9 +97,24 @@ export class AdminUserService {
       where.isBanned = true;
     }
 
-    const [total, users] = await Promise.all([
-      this.prisma.user.count({ where }),
-      this.prisma.user.findMany({
+    const orderBy = resolveOrderBy<
+      | Prisma.UserOrderByWithRelationInput
+      | Prisma.UserOrderByWithRelationInput[]
+    >("User", query, {
+      defaultSort: [
+        { lastLoginAt: { sort: "desc", nulls: "last" } },
+        { createdAt: "desc" },
+      ],
+      sortMap: {
+        lastLoginAt: (direction) => ({
+          lastLoginAt: { sort: direction, nulls: "last" },
+        }),
+      },
+    });
+
+    return paginate(
+      this.prisma.user,
+      {
         where,
         select: {
           id: true,
@@ -113,19 +148,10 @@ export class AdminUserService {
             },
           },
         },
-        orderBy: [
-          { lastLoginAt: { sort: 'desc', nulls: 'last' } },
-          { createdAt: 'desc' },
-        ],
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
-
-    return {
-      data: users,
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
-    };
+        orderBy,
+      },
+      query,
+    );
   }
 
   /**
@@ -139,7 +165,7 @@ export class AdminUserService {
         addresses: true,
         products: {
           take: 10,
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           select: {
             id: true,
             title: true,
@@ -151,7 +177,7 @@ export class AdminUserService {
         },
         buyerOrders: {
           take: 10,
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           include: {
             seller: { select: { id: true, displayName: true } },
             product: { select: { id: true, title: true } },
@@ -159,7 +185,7 @@ export class AdminUserService {
         },
         sellerOrders: {
           take: 10,
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           include: {
             buyer: { select: { id: true, displayName: true } },
             product: { select: { id: true, title: true } },
@@ -167,30 +193,34 @@ export class AdminUserService {
         },
         initiatedTrades: {
           take: 10,
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           include: {
             receiver: { select: { id: true, displayName: true } },
-            items: { include: { product: { select: { id: true, title: true } } } },
+            items: {
+              include: { product: { select: { id: true, title: true } } },
+            },
           },
         },
         receivedTrades: {
           take: 10,
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           include: {
             initiator: { select: { id: true, displayName: true } },
-            items: { include: { product: { select: { id: true, title: true } } } },
+            items: {
+              include: { product: { select: { id: true, title: true } } },
+            },
           },
         },
         givenRatings: {
           take: 5,
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           include: {
             receiver: { select: { id: true, displayName: true } },
           },
         },
         receivedRatings: {
           take: 5,
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           include: {
             giver: { select: { id: true, displayName: true } },
           },
@@ -229,45 +259,75 @@ export class AdminUserService {
     });
 
     if (!user) {
-      throw new NotFoundException('Kullanıcı bulunamadı');
+      throw new NotFoundException("Kullanıcı bulunamadı");
     }
 
     const u = user as typeof user & {
       receivedRatings: Array<{ score: number }>;
       initiatedTrades: Array<{ createdAt: Date }>;
       receivedTrades: Array<{ createdAt: Date }>;
-      buyerOrders: Array<{ totalAmount: unknown; commissionAmount: unknown; seller: unknown }>;
-      sellerOrders: Array<{ totalAmount: unknown; commissionAmount: unknown; buyer: unknown }>;
+      buyerOrders: Array<{
+        totalAmount: unknown;
+        commissionAmount: unknown;
+        seller: unknown;
+      }>;
+      sellerOrders: Array<{
+        totalAmount: unknown;
+        commissionAmount: unknown;
+        buyer: unknown;
+      }>;
       products: Array<{ images?: Array<{ cardKey: string }> }>;
       givenRatings: unknown[];
-      _count: { products: number; buyerOrders: number; sellerOrders: number; givenRatings: number; receivedRatings: number; initiatedTrades: number; receivedTrades: number; sentMessages: number; receivedMessages: number };
+      _count: {
+        products: number;
+        buyerOrders: number;
+        sellerOrders: number;
+        givenRatings: number;
+        receivedRatings: number;
+        initiatedTrades: number;
+        receivedTrades: number;
+        sentMessages: number;
+        receivedMessages: number;
+      };
     };
 
-    const avgRating = u.receivedRatings.length > 0
-      ? u.receivedRatings.reduce((sum, r) => sum + r.score, 0) / u.receivedRatings.length
-      : null;
+    const avgRating =
+      u.receivedRatings.length > 0
+        ? u.receivedRatings.reduce((sum, r) => sum + r.score, 0) /
+          u.receivedRatings.length
+        : null;
 
     const allTrades = [
-      ...u.initiatedTrades.map((t) => ({ ...t, role: 'initiator' as const })),
-      ...u.receivedTrades.map((t) => ({ ...t, role: 'receiver' as const })),
-    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 10);
+      ...u.initiatedTrades.map((t) => ({ ...t, role: "initiator" as const })),
+      ...u.receivedTrades.map((t) => ({ ...t, role: "receiver" as const })),
+    ]
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )
+      .slice(0, 10);
 
     const allOrders = [
       ...u.buyerOrders.map((o) => ({
         ...o,
-        role: 'buyer' as const,
+        role: "buyer" as const,
         totalAmount: Number(o.totalAmount),
         commissionAmount: Number(o.commissionAmount),
         otherParty: o.seller,
       })),
       ...u.sellerOrders.map((o) => ({
         ...o,
-        role: 'seller' as const,
+        role: "seller" as const,
         totalAmount: Number(o.totalAmount),
         commissionAmount: Number(o.commissionAmount),
         otherParty: o.buyer,
       })),
-    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 10);
+    ]
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )
+      .slice(0, 10);
 
     // Üyeliği admin UI'ın beklediği şekle çevir (startDate/endDate alan adları +
     // status/autoRenew/cancelledAt). Aksi halde tarihler boş görünüyordu.
@@ -291,15 +351,19 @@ export class AdminUserService {
       lastLoginAt: u.lastLoginAt ?? null,
       lastActivityAt: u.lastActivityAt ?? null,
       averageRating: avgRating ? Math.round(avgRating * 10) / 10 : null,
-      products: await Promise.all(u.products.map(async (p) => ({
-        ...p,
-        price: Number(p.price),
-        imageUrl: this.resolveProductImageUrl(p.images?.[0]?.cardKey) || null,
-      }))),
+      products: await Promise.all(
+        u.products.map(async (p) => ({
+          ...p,
+          price: Number(p.price),
+          imageUrl: this.resolveProductImageUrl(p.images?.[0]?.cardKey) || null,
+        })),
+      ),
       recentOrders: allOrders,
       recentTrades: allTrades.map((t) => ({
         ...t,
-        cashAmount: (t as any).cashAmount ? Number((t as any).cashAmount) : null,
+        cashAmount: (t as any).cashAmount
+          ? Number((t as any).cashAmount)
+          : null,
       })),
       givenRatings: u.givenRatings,
       receivedRatings: u.receivedRatings,
@@ -333,13 +397,13 @@ export class AdminUserService {
       include: { tier: true },
     });
     if (!membership) {
-      throw new NotFoundException('Üyelik bulunamadı');
+      throw new NotFoundException("Üyelik bulunamadı");
     }
     if (membership.tier.type === MembershipTierType.free) {
-      throw new BadRequestException('Ücretsiz üyelik iptal edilemez');
+      throw new BadRequestException("Ücretsiz üyelik iptal edilemez");
     }
     if (membership.status === SubscriptionStatus.cancelled) {
-      throw new BadRequestException('Üyelik zaten iptal edilmiş');
+      throw new BadRequestException("Üyelik zaten iptal edilmiş");
     }
     const updated = await this.prisma.userMembership.update({
       where: { userId },
@@ -349,7 +413,14 @@ export class AdminUserService {
       },
       include: { tier: true },
     });
-    await this.audit.createAuditLog(adminId, 'admin_membership_cancel', 'UserMembership', membership.id, membership, updated);
+    await this.audit.createAuditLog(
+      adminId,
+      "admin_membership_cancel",
+      "UserMembership",
+      membership.id,
+      membership,
+      updated,
+    );
     return updated;
   }
 
@@ -363,18 +434,23 @@ export class AdminUserService {
     adminId: string,
     userId: string,
     tierType: MembershipTierType,
-    billingPeriod: 'monthly' | 'yearly' = 'monthly',
+    billingPeriod: "monthly" | "yearly" = "monthly",
   ) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
     if (!user) {
-      throw new NotFoundException('Kullanıcı bulunamadı');
+      throw new NotFoundException("Kullanıcı bulunamadı");
     }
-    const tier = await this.prisma.membershipTier.findUnique({ where: { type: tierType } });
+    const tier = await this.prisma.membershipTier.findUnique({
+      where: { type: tierType },
+    });
     if (!tier) {
       throw new NotFoundException(`Üyelik tipi bulunamadı: ${tierType}`);
     }
     if (!tier.isActive) {
-      throw new BadRequestException('Bu üyelik kademesi aktif değil');
+      throw new BadRequestException("Bu üyelik kademesi aktif değil");
     }
 
     const now = new Date();
@@ -382,7 +458,7 @@ export class AdminUserService {
     if (tierType === MembershipTierType.free) {
       // Free: uzak tarih (lazy-create deseniyle aynı mantık).
       periodEnd.setFullYear(periodEnd.getFullYear() + 100);
-    } else if (billingPeriod === 'yearly') {
+    } else if (billingPeriod === "yearly") {
       periodEnd.setFullYear(periodEnd.getFullYear() + 1);
     } else {
       periodEnd.setMonth(periodEnd.getMonth() + 1);
@@ -403,10 +479,24 @@ export class AdminUserService {
     };
 
     const updated = existing
-      ? await this.prisma.userMembership.update({ where: { userId }, data, include: { tier: true } })
-      : await this.prisma.userMembership.create({ data: { userId, ...data }, include: { tier: true } });
+      ? await this.prisma.userMembership.update({
+          where: { userId },
+          data,
+          include: { tier: true },
+        })
+      : await this.prisma.userMembership.create({
+          data: { userId, ...data },
+          include: { tier: true },
+        });
 
-    await this.audit.createAuditLog(adminId, 'admin_membership_change', 'UserMembership', updated.id, existing, updated);
+    await this.audit.createAuditLog(
+      adminId,
+      "admin_membership_change",
+      "UserMembership",
+      updated.id,
+      existing,
+      updated,
+    );
     return updated;
   }
 }

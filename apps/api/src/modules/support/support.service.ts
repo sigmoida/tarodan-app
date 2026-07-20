@@ -6,12 +6,7 @@ import {
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
-import {
-  TicketCategory,
-  TicketPriority,
-  TicketStatus,
-  Prisma,
-} from "@prisma/client";
+import { TicketPriority, TicketStatus, Prisma } from "@prisma/client";
 import {
   CreateTicketDto,
   AddTicketMessageDto,
@@ -22,9 +17,11 @@ import {
   TicketStatsDto,
   GuestContactDto,
   GuestContactResponseDto,
+  AdminTicketQueryDto,
 } from "./dto";
 import { CacheService } from "../cache/cache.service";
 import { NotificationService } from "../notification/notification.service";
+import { paginate, resolveOrderBy } from "../../common/list";
 
 @Injectable()
 export class SupportService {
@@ -373,45 +370,46 @@ export class SupportService {
   // ==========================================================================
   // ADMIN: GET ALL TICKETS
   // ==========================================================================
-  async getAllTickets(
-    page?: number,
-    pageSize?: number,
-    status?: TicketStatus,
-    priority?: TicketPriority,
-    category?: TicketCategory,
-    assigneeId?: string,
-  ): Promise<TicketListResponseDto> {
-    // Ensure valid pagination values
-    const safePage = Math.max(1, Number(page) || 1);
-    const safePageSize = Math.min(100, Math.max(1, Number(pageSize) || 20));
-
+  async getAllTickets(query: AdminTicketQueryDto) {
     const where: Prisma.SupportTicketWhereInput = {
-      ...(status && { status }),
-      ...(priority && { priority }),
-      ...(category && { category }),
-      ...(assigneeId && { assigneeId }),
+      ...(query.status && { status: query.status }),
+      ...(query.priority && { priority: query.priority }),
+      ...(query.category && { category: query.category }),
+      ...(query.assigneeId && { assigneeId: query.assigneeId }),
     };
 
-    const [tickets, total] = await Promise.all([
-      this.prisma.supportTicket.findMany({
+    const search = query.search?.trim();
+    if (search) {
+      where.OR = [
+        { ticketNumber: { contains: search, mode: "insensitive" } },
+        { subject: { contains: search, mode: "insensitive" } },
+        { creator: { displayName: { contains: search, mode: "insensitive" } } },
+      ];
+    }
+
+    const orderBy = resolveOrderBy<
+      | Prisma.SupportTicketOrderByWithRelationInput
+      | Prisma.SupportTicketOrderByWithRelationInput[]
+    >("SupportTicket", query, {
+      defaultSort: [{ createdAt: "desc" }, { priority: "desc" }],
+    });
+    const result = await paginate(
+      this.prisma.supportTicket,
+      {
         where,
         include: {
           creator: { select: { id: true, displayName: true } },
           assignee: { select: { id: true, displayName: true } },
           _count: { select: { messages: true } },
         },
-        orderBy: [{ createdAt: "desc" }, { priority: "desc" }],
-        skip: (safePage - 1) * safePageSize,
-        take: safePageSize,
-      }),
-      this.prisma.supportTicket.count({ where }),
-    ]);
+        orderBy,
+      },
+      query,
+    );
 
     return {
-      tickets: tickets.map((t) => this.mapTicketToDto(t)),
-      total,
-      page: safePage,
-      pageSize: safePageSize,
+      ...result,
+      data: result.data.map((ticket) => this.mapTicketToDto(ticket)),
     };
   }
 

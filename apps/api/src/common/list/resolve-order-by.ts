@@ -37,10 +37,12 @@ export function resolveOrderBy<TOrderBy>(
 
   const direction = query.sortOrder ?? "desc";
 
+  const mappedSort = config.sortMap?.[query.sortBy];
+  if (mappedSort) return mappedSort(direction);
+
   if (getSortableFields(modelName).has(query.sortBy)) {
     return { [query.sortBy]: direction } as TOrderBy;
   }
 
-  const mappedSort = config.sortMap?.[query.sortBy];
-  return mappedSort ? mappedSort(direction) : config.defaultSort;
+  return config.defaultSort;
 }

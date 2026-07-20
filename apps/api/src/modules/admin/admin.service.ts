@@ -71,6 +71,12 @@ import {
   AdminAttributeQueryDto,
   ApproveWarehouseTradeDto,
   RejectWarehouseTradeDto,
+  SellerApplicationQueryDto,
+  NotificationHistoryQueryDto,
+  ScheduledNotificationQueryDto,
+  ErrorLogQueryDto,
+  SecurityLogQueryDto,
+  EmailLogQueryDto,
 } from "./dto";
 import {
   TicketStatus,
@@ -1358,17 +1364,7 @@ export class AdminService {
   // ==================== NOTIFICATION MANAGEMENT ====================
   // Taşındı: admin-notification.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getNotificationHistory(query: {
-    page?: number;
-    limit?: number;
-    channel?: string;
-    status?: string;
-    userId?: string;
-    type?: string;
-    search?: string;
-    startDate?: string;
-    endDate?: string;
-  }) {
+  async getNotificationHistory(query: NotificationHistoryQueryDto) {
     return this.adminNotificationService.getNotificationHistory(query);
   }
 
@@ -1402,11 +1398,7 @@ export class AdminService {
     return this.adminNotificationService.scheduleNotification(adminId, dto);
   }
 
-  async getScheduledNotifications(query?: {
-    page?: number;
-    limit?: number;
-    status?: string;
-  }) {
+  async getScheduledNotifications(query?: ScheduledNotificationQueryDto) {
     return this.adminNotificationService.getScheduledNotifications(query);
   }
 
@@ -1420,34 +1412,14 @@ export class AdminService {
   // ==================== ERROR LOGS ====================
   // Taşındı: admin-logs.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getErrorLogs(query: {
-    page?: number;
-    limit?: number;
-    severity?: string;
-    source?: string;
-    userId?: string;
-    startDate?: string;
-    endDate?: string;
-    search?: string;
-  }) {
+  async getErrorLogs(query: ErrorLogQueryDto) {
     return this.logsService.getErrorLogs(query);
   }
 
   // ==================== SECURITY LOGS ====================
   // Taşındı: admin-logs.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getSecurityLogs(query: {
-    page?: number;
-    limit?: number;
-    eventType?: string;
-    severity?: string;
-    ipAddress?: string;
-    userId?: string;
-    resolved?: boolean;
-    startDate?: string;
-    endDate?: string;
-    search?: string;
-  }) {
+  async getSecurityLogs(query: SecurityLogQueryDto) {
     return this.logsService.getSecurityLogs(query);
   }
 
@@ -1462,17 +1434,7 @@ export class AdminService {
   // ==================== EMAIL LOGS ====================
   // Taşındı: admin-logs.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getEmailLogs(query: {
-    page?: number;
-    limit?: number;
-    status?: string;
-    template?: string;
-    to?: string;
-    userId?: string;
-    startDate?: string;
-    endDate?: string;
-    search?: string;
-  }) {
+  async getEmailLogs(query: EmailLogQueryDto) {
     return this.logsService.getEmailLogs(query);
   }
 
@@ -1685,12 +1647,7 @@ export class AdminService {
   // Not: updateUserRatingStatus ve applyOrderCoupon da bu banner aralığında
   // olduğu için bölümle birlikte taşındı.
 
-  async getSellerApplications(query: {
-    page?: number;
-    limit?: number;
-    search?: string;
-    status?: string;
-  }) {
+  async getSellerApplications(query: SellerApplicationQueryDto) {
     return this.sellerApplicationService.getSellerApplications(query);
   }
 

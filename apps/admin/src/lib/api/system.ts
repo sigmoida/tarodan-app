@@ -50,7 +50,10 @@ export const systemApi = {
     status?: string;
     type?: string;
     page?: number;
-    pageSize?: number;
+    limit?: number;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
   }) => api.get("/user-reports/admin", { params }),
   getUserReportStats: () => api.get("/user-reports/admin/stats"),
   getUserReportById: (id: string) => api.get(`/user-reports/admin/${id}`),
