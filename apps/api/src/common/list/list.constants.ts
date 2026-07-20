@@ -1,0 +1,3 @@
+export const ADMIN_LIST_DEFAULT_PAGE = 1;
+export const ADMIN_LIST_DEFAULT_LIMIT = 20;
+export const ADMIN_LIST_MAX_LIMIT = 100;
