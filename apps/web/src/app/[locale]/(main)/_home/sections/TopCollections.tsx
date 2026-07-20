@@ -1,22 +1,26 @@
 /** @format */
 
-"use client";
-
 import { Link } from "@/i18n/navigation";
 import { formatCount } from "@/lib/format";
 import { CheckBadgeIcon } from "@heroicons/react/24/solid";
-import OptimizedImage from "@/components/OptimizedImage";
-import UserAvatar from "@/components/UserAvatar";
-import { SkeletonCard } from "@/components/ui";
-import { useTranslations } from "next-intl";
-import { useHome } from "../context/HomeDataContext";
+import Image from "next/image";
+import { getTranslations } from "next-intl/server";
+import type { FeaturedCollector } from "../lib/types";
 import { getImageUrl } from "../lib/helpers";
+import HomeAvatar from "./HomeAvatar";
 import HomeSection from "./HomeSection";
 
-type TopCollection = ReturnType<typeof useHome>["topCollections"][number];
-
-function CollectionCard({ collection }: { collection: TopCollection }) {
-  const t = useTranslations();
+function CollectionCard({
+  collection,
+  collectorLabel,
+  itemsLabel,
+  viewsLabel,
+}: {
+  collection: FeaturedCollector;
+  collectorLabel: string;
+  itemsLabel: string;
+  viewsLabel: string;
+}) {
   const items = collection.items?.slice(0, 3) ?? [];
 
   return (
@@ -34,13 +38,13 @@ function CollectionCard({ collection }: { collection: TopCollection }) {
               className="relative aspect-square bg-surface-alt"
             >
               {item && (
-                <OptimizedImage
+                <Image
                   src={getImageUrl(item.productImage)}
                   alt={item.productTitle}
                   fill
                   className="object-cover"
-                  fallbackSrc="https://placehold.co/200x200/f5f5f7/9ca3af?text=+"
-                  logContext={{ itemId: item.id, page: "home-collection-item" }}
+                  sizes="(max-width: 768px) 33vw, 160px"
+                  unoptimized
                 />
               )}
             </div>
@@ -51,13 +55,13 @@ function CollectionCard({ collection }: { collection: TopCollection }) {
       {/* Body */}
       <div className="p-3">
         <div className="flex items-center gap-2 mb-1.5">
-          <UserAvatar
-            displayName={collection.user?.displayName}
+          <HomeAvatar
+            size="sm"
+            name={collection.user?.displayName}
             avatarUrl={collection.user?.avatarUrl}
-            size="xs"
           />
           <span className="flex items-center gap-1 text-xs font-medium text-muted truncate">
-            {collection.user?.displayName || t("home.collector")}
+            {collection.user?.displayName || collectorLabel}
             {collection.user?.isVerified && (
               <CheckBadgeIcon className="w-3.5 h-3.5 text-success-500 flex-shrink-0" />
             )}
@@ -68,10 +72,10 @@ function CollectionCard({ collection }: { collection: TopCollection }) {
         </h3>
         <div className="flex items-center gap-3 mt-1 text-xs text-muted">
           <span>
-            {collection.itemCount || 0} {t("home.items")}
+            {collection.itemCount || 0} {itemsLabel}
           </span>
           <span>
-            {formatCount(collection.viewCount)} {t("home.views")}
+            {formatCount(collection.viewCount)} {viewsLabel}
           </span>
         </div>
       </div>
@@ -79,11 +83,13 @@ function CollectionCard({ collection }: { collection: TopCollection }) {
   );
 }
 
-export default function TopCollections() {
-  const t = useTranslations();
-  const { topCollections, isLoadingCollections } = useHome();
-
-  if (!(topCollections.length > 0 || isLoadingCollections)) return null;
+export default async function TopCollections({
+  items,
+}: {
+  items: FeaturedCollector[];
+}) {
+  const t = await getTranslations();
+  if (items.length === 0) return null;
 
   return (
     <HomeSection
@@ -92,13 +98,15 @@ export default function TopCollections() {
       viewAllLabel={t("home.viewAll")}
     >
       <div className="grid grid-cols-2 gap-4">
-        {isLoadingCollections
-          ? [...Array(6)].map((_, i) => <SkeletonCard key={i} />)
-          : topCollections
-              .slice(0, 6)
-              .map((collection) => (
-                <CollectionCard key={collection.id} collection={collection} />
-              ))}
+        {items.slice(0, 6).map((collection) => (
+          <CollectionCard
+            key={collection.id}
+            collection={collection}
+            collectorLabel={t("home.collector")}
+            itemsLabel={t("home.items")}
+            viewsLabel={t("home.views")}
+          />
+        ))}
       </div>
     </HomeSection>
   );

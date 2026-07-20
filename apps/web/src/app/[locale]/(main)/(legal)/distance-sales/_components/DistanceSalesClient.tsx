@@ -1,12 +1,10 @@
-"use client";
-
 import { Link } from "@/i18n/navigation";
-import { useLocale, useTranslations } from "next-intl";
+import { getTranslations } from "next-intl/server";
 import { DocPage } from "@/components/layout/DocPage";
 import SectionCard from "@/components/ui/SectionCard";
 
-export default function DistanceSalesClient() {
-  const t = useTranslations();
+export default async function DistanceSalesClient() {
+  const t = await getTranslations();
 
   return (
     <DocPage

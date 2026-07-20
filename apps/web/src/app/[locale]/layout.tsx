@@ -9,7 +9,7 @@ import { Toaster } from "react-hot-toast";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { isLocale } from "@tarodan/i18n";
 import { routing } from "@/i18n/routing";
-import CookieConsentBanner from "@/components/CookieConsentBanner";
+import DynamicCookieConsentBanner from "@/components/DynamicCookieConsentBanner";
 import "../globals.css";
 
 const notoSans = Noto_Sans({
@@ -78,7 +78,7 @@ export default async function LocaleLayout({
             clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
           >
             {children}
-            <CookieConsentBanner />
+            <DynamicCookieConsentBanner />
             <Toaster
               position="bottom-right"
               toastOptions={{ style: { maxWidth: "360px" } }}

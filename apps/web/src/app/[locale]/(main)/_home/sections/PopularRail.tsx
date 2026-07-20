@@ -1,14 +1,11 @@
-"use client";
-
-import { ButtonLink, EmptyState } from "@/components/ui";
-import { useTranslations } from "next-intl";
-import { useHome } from "../context/HomeDataContext";
+import { getTranslations } from "next-intl/server";
+import { Link } from "@/i18n/navigation";
+import type { Product } from "@/types/product";
 import HomeSection from "./HomeSection";
 import ProductRail from "./ProductRail";
 
-export default function PopularRail() {
-  const t = useTranslations();
-  const { bestSellers, isLoadingBestSellers } = useHome();
+export default async function PopularRail({ items }: { items: Product[] }) {
+  const t = await getTranslations();
 
   return (
     <HomeSection
@@ -17,18 +14,21 @@ export default function PopularRail() {
       viewAllLabel={t("home.viewAll")}
     >
       <ProductRail
-        items={bestSellers}
-        isLoading={isLoadingBestSellers}
+        items={items}
+        isLoading={false}
         emptyState={
-          <EmptyState
-            title={t("product.noListings")}
-            description={t("home.beTheFirst")}
-            action={
-              <ButtonLink variant="secondary" size="sm" href="/listings/new">
-                {t("product.createListing")}
-              </ButtonLink>
-            }
-          />
+          <div className="py-10 text-center">
+            <h3 className="font-semibold text-heading">
+              {t("product.noListings")}
+            </h3>
+            <p className="mt-1 text-sm text-muted">{t("home.beTheFirst")}</p>
+            <Link
+              href="/listings/new"
+              className="mt-4 inline-flex rounded-md border border-border px-3 py-1.5 text-sm font-medium text-body"
+            >
+              {t("product.createListing")}
+            </Link>
+          </div>
         }
       />
     </HomeSection>

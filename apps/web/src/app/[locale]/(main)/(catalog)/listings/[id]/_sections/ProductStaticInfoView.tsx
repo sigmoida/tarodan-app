@@ -1,0 +1,146 @@
+import {
+  HeartIcon,
+  ExclamationTriangleIcon,
+} from "@heroicons/react/24/outline";
+import SectionCard from "@/components/ui/SectionCard";
+import {
+  getProductEffectivePrice,
+  getProductOriginalPriceForDisplay,
+  isProductOnSaleDisplay,
+} from "@/lib/productPrice";
+import type { Listing } from "../_lib/types";
+import ProductSpecs from "./ProductSpecs";
+
+type Translator = (key: any) => string;
+
+export default function ProductStaticInfoView({
+  listing,
+  locale,
+  t,
+}: {
+  listing: Listing;
+  locale: string;
+  t: Translator;
+}) {
+  const effectivePrice = getProductEffectivePrice(listing);
+
+  return (
+    <>
+      {listing.status === "sold" && (
+        <div className="bg-danger-50 border border-danger-200 rounded p-4 mb-4 flex items-center gap-3">
+          <div className="w-10 h-10 bg-danger-100 rounded-full flex items-center justify-center">
+            <ExclamationTriangleIcon className="w-5 h-5 text-danger-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-danger-800">
+              {t("product.soldOut")}
+            </p>
+            <p className="text-sm text-danger-600">
+              {t("product.productNoLongerAvailable")}
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center gap-3 flex-wrap mb-4">
+        <h1 className="text-2xl lg:text-3xl font-bold text-heading">
+          {listing.title}
+        </h1>
+        {listing.status === "sold" && (
+          <span className="rounded-full bg-danger-100 px-2 py-0.5 text-xs font-semibold text-danger-700">
+            {t("product.sold")}
+          </span>
+        )}
+      </div>
+
+      <div className="mb-4">
+        {isProductOnSaleDisplay(listing) && (
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xl text-subtle line-through">
+              {getProductOriginalPriceForDisplay(listing).toLocaleString(
+                "tr-TR",
+                { minimumFractionDigits: 2, maximumFractionDigits: 2 },
+              )}{" "}
+              TL
+            </span>
+            <span className="rounded-full bg-danger-500 px-2 py-0.5 text-xs font-semibold text-inverted">
+              %
+              {listing.discountPercent ??
+                (listing.oldPrice != null && listing.price
+                  ? Math.round(
+                      (1 - Number(listing.price) / Number(listing.oldPrice)) *
+                        100,
+                    )
+                  : 0)}{" "}
+              indirim
+            </span>
+          </div>
+        )}
+        <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-primary-500">
+          {effectivePrice.toLocaleString("tr-TR", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}{" "}
+          TL
+        </p>
+      </div>
+
+      <div className="flex items-center gap-4 text-sm text-muted mb-6">
+        <span>
+          {listing.viewCount || 0} {t("product.views")}
+        </span>
+        <span className="flex items-center gap-1">
+          <HeartIcon className="w-4 h-4" />
+          {listing.likeCount || 0} {t("product.likes")}
+        </span>
+      </div>
+
+      <SectionCard title={t("product.description")} className="p-6 mb-6">
+        <div className="prose prose-sm max-w-none text-muted whitespace-pre-line leading-relaxed">
+          {listing.description || t("product.noDescription")}
+        </div>
+      </SectionCard>
+
+      <ProductSpecs listing={listing} locale={locale} t={t} />
+
+      {listing.status && listing.status !== "active" && (
+        <div
+          className={`rounded p-4 mb-4 ${
+            listing.status === "reserved"
+              ? "bg-warning-50 border border-warning-200"
+              : listing.status === "sold"
+                ? "bg-danger-50 border border-danger-200"
+                : "bg-surface border border-border"
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <ExclamationTriangleIcon
+              className={`w-6 h-6 ${
+                listing.status === "reserved"
+                  ? "text-warning-600"
+                  : listing.status === "sold"
+                    ? "text-danger-600"
+                    : "text-muted"
+              }`}
+            />
+            <div>
+              <p className="font-semibold text-body">
+                {listing.status === "reserved" && t("product.statusReserved")}
+                {listing.status === "sold" && t("product.statusSold")}
+                {listing.status === "pending" && t("product.statusPending")}
+                {listing.status === "inactive" && t("product.statusInactive")}
+                {listing.status === "rejected" && t("product.statusRejected")}
+                {listing.status === "deleted" && t("common.removed")}
+              </p>
+              <p className="text-sm text-muted">
+                {listing.status === "reserved" &&
+                  t("product.statusReservedDesc")}
+                {listing.status === "sold" && t("product.statusSoldDesc")}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}

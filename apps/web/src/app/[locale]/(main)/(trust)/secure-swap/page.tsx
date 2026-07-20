@@ -17,6 +17,10 @@ export function generateMetadata({
   };
 }
 
-export default function SecureSwapPage() {
-  return <SecureSwapClient />;
+export default function SecureSwapPage({
+  params: { locale },
+}: {
+  params: { locale: string };
+}) {
+  return <SecureSwapClient lang={locale === "en" ? "en" : "tr"} />;
 }

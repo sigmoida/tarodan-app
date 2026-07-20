@@ -1,15 +1,11 @@
-"use client";
-
-import { useTranslations } from "next-intl";
-import { useHome } from "../context/HomeDataContext";
+import { getTranslations } from "next-intl/server";
+import type { Product } from "@/types/product";
 import HomeSection from "./HomeSection";
 import ProductRail from "./ProductRail";
 
-export default function TradeRail() {
-  const t = useTranslations();
-  const { trade, isLoadingTrade } = useHome();
-
-  if (!(isLoadingTrade || trade.length > 0)) return null;
+export default async function TradeRail({ items }: { items: Product[] }) {
+  const t = await getTranslations();
+  if (items.length === 0) return null;
 
   return (
     <HomeSection
@@ -17,7 +13,7 @@ export default function TradeRail() {
       viewAllHref="/takas"
       viewAllLabel={t("home.viewAll")}
     >
-      <ProductRail items={trade} isLoading={isLoadingTrade} />
+      <ProductRail items={items} isLoading={false} />
     </HomeSection>
   );
 }

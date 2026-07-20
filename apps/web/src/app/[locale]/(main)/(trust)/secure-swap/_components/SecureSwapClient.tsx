@@ -1,21 +1,13 @@
-"use client";
-
 import { Link } from "@/i18n/navigation";
 import {
   ArrowsRightLeftIcon,
   CheckCircleIcon,
 } from "@heroicons/react/24/outline";
-import { useLocale, useTranslations } from "next-intl";
-import { useAuthStore } from "@/stores/authStore";
 import { DocPage } from "@/components/layout/DocPage";
 import SectionCard from "@/components/ui/SectionCard";
 import { STEPS, GUARANTEES, FAQ, type Lang } from "../_lib/data";
 
-export default function SecureSwapClient() {
-  const locale = useLocale();
-  const { isAuthenticated } = useAuthStore();
-  const lang = (locale as Lang) || "tr";
-
+export default function SecureSwapClient({ lang }: { lang: Lang }) {
   return (
     <DocPage
       title={lang === "en" ? "Secure Trade System" : "Güvenli Takas Sistemi"}
@@ -104,11 +96,7 @@ export default function SecureSwapClient() {
         </p>
         <div className="flex flex-col gap-3 sm:flex-row">
           <Link
-            href={
-              isAuthenticated
-                ? "/profile/trades"
-                : "/login?redirect=/profile/trades"
-            }
+            href="/profile/trades"
             className="inline-flex items-center justify-center gap-2 rounded bg-primary-500 px-6 py-3 text-sm font-semibold text-inverted transition-colors hover:bg-primary-600"
           >
             <ArrowsRightLeftIcon className="h-5 w-5" />

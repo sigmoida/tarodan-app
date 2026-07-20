@@ -3,13 +3,15 @@ import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
 import { getServerQueryClient } from "@/lib/query/server";
 import { queryKeys } from "@/lib/query/keys";
 import ListingDetailClient from "./ListingDetailClient";
+import ProductStaticInfo from "./_sections/ProductStaticInfo";
+import type { Listing } from "./_lib/types";
 
 const API_BASE =
   process.env.API_INTERNAL_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
   "http://localhost:3001";
 
-type Props = { params: Promise<{ id: string }> };
+type Props = { params: Promise<{ id: string; locale: string }> };
 
 interface ProductForMeta {
   title?: string;
@@ -24,9 +26,7 @@ interface ProductForMeta {
  * product object or null (pending/owner-only products 404 publicly — those fall
  * back to the client fetch, which carries the user's cookies).
  */
-async function fetchProduct(
-  id: string,
-): Promise<Record<string, unknown> | null> {
+async function fetchProduct(id: string): Promise<Listing | null> {
   try {
     const res = await fetch(
       `${API_BASE}/api/products/${encodeURIComponent(id)}`,
@@ -36,7 +36,7 @@ async function fetchProduct(
     );
     if (!res.ok) return null;
     const raw = await res.json();
-    return (raw?.product ?? raw) as Record<string, unknown>;
+    return (raw?.product ?? raw) as Listing;
   } catch {
     return null;
   }
@@ -77,7 +77,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function ListingPage({ params }: Props) {
-  const { id } = await params;
+  const { id, locale } = await params;
 
   // Seed the query cache server-side so the detail ships in the first HTML and
   // the client's `useQuery(['listing', id])` hydrates without a refetch flash.
@@ -91,7 +91,13 @@ export default async function ListingPage({ params }: Props) {
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <ListingDetailClient />
+      <ListingDetailClient
+        staticInfo={
+          product ? (
+            <ProductStaticInfo listing={product} locale={locale} />
+          ) : null
+        }
+      />
     </HydrationBoundary>
   );
 }

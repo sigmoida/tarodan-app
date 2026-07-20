@@ -1,4 +1,3 @@
-import { getOptimizedImageUrl } from "@/components/OptimizedImage";
 import { DEMO_PRODUCT_IMAGES } from "./constants";
 
 /** Stable 32-bit string hash → deterministic demo-placeholder pick (no render-time
@@ -20,5 +19,14 @@ export const getImageUrl = (
   const seed = index ?? hashString(String(image ?? productTitle ?? ""));
   const demoIdx = seed % DEMO_PRODUCT_IMAGES.length;
   const placeholder = DEMO_PRODUCT_IMAGES[demoIdx];
-  return getOptimizedImageUrl(image, placeholder, productTitle, "card");
+  const raw =
+    typeof image === "string"
+      ? image
+      : image?.cardUrl || image?.detailUrl || image?.url;
+
+  if (typeof raw !== "string") return placeholder;
+  if (raw.includes("picsum.photos") && productTitle) {
+    return `https://placehold.co/800x600?text=${encodeURIComponent(productTitle.substring(0, 25).trim())}`;
+  }
+  return /^(https?:\/\/|\/|data:|blob:)/.test(raw) ? raw : placeholder;
 };

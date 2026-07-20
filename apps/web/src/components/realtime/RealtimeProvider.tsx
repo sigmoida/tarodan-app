@@ -48,13 +48,19 @@ export function RealtimeProvider({ children }: { children?: React.ReactNode }) {
         queryClient.invalidateQueries({
           queryKey: queryKeys.notifications.all(),
         });
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.offers.pendingCount(),
+        });
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.trades.pendingCount(),
+        });
       };
       const onThreadUpdated = (_p: ThreadUpdatedEvent) => {
         queryClient.invalidateQueries({
           queryKey: queryKeys.messages.threads(),
         });
         queryClient.invalidateQueries({
-          queryKey: queryKeys.notifications.unreadCount(),
+          queryKey: queryKeys.messages.unreadCount(),
         });
       };
 
