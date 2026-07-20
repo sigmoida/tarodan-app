@@ -12,11 +12,15 @@ export const scheduleColumns = (t: T) => [
   col.text<ScheduleItem>(t("admin.finance.common.seller"), "sellerName"),
   col.money<ScheduleItem>(t("common.amount"), "amount"),
   col.date<ScheduleItem>(t("admin.finance.payouts.releaseDate"), "releaseAt"),
-  col.badge<ScheduleItem>(t("admin.finance.payouts.holdReason"), (s) => (
-    <HoldReasonBadge
-      reason={holdReasonForRow({ status: "held", releaseAt: s.releaseAt })}
-    />
-  )),
+  col.badge<ScheduleItem>(
+    t("admin.finance.payouts.holdReason"),
+    (s) => (
+      <HoldReasonBadge
+        reason={holdReasonForRow({ status: "held", releaseAt: s.releaseAt })}
+      />
+    ),
+    { sortKey: "releaseAt", sortType: "date" },
+  ),
 ];
 
 export function transactionColumns(onRelease: (orderId: string) => void, t: T) {
@@ -24,11 +28,16 @@ export function transactionColumns(onRelease: (orderId: string) => void, t: T) {
     col.text<PayoutTransaction>(
       t("admin.finance.common.order"),
       (row) => row.orderNumber,
+      { sortKey: "orderNumber" },
     ),
-    col.user<PayoutTransaction>(t("admin.finance.common.seller"), (row) => ({
-      name: row.sellerName,
-      secondary: row.sellerEmail,
-    })),
+    col.user<PayoutTransaction>(
+      t("admin.finance.common.seller"),
+      (row) => ({
+        name: row.sellerName,
+        secondary: row.sellerEmail,
+      }),
+      { sortKey: "sellerName" },
+    ),
     col.money<PayoutTransaction>(t("common.amount"), "amount"),
     col.badge<PayoutTransaction>(
       t("common.status"),
@@ -50,6 +59,7 @@ export function transactionColumns(onRelease: (orderId: string) => void, t: T) {
           })}
         />
       ),
+      { sortKey: "status" },
     ),
     col.rowMenu<PayoutTransaction>(transactionRowMenu(onRelease, t)),
   ];

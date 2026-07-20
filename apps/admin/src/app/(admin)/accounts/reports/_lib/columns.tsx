@@ -39,10 +39,13 @@ export function reportColumns({ t }: { t: T }) {
       sortKey: "description",
       sortType: "text",
     }),
-    col.user<Report>(t("admin.reports.columns.reporter"), (r) =>
-      r.reporter
-        ? { name: r.reporter.displayName, secondary: r.reporter.email }
-        : null,
+    col.user<Report>(
+      t("admin.reports.columns.reporter"),
+      (r) =>
+        r.reporter
+          ? { name: r.reporter.displayName, secondary: r.reporter.email }
+          : null,
+      { sortKey: "reporter.displayName" },
     ),
     col.code<Report>(t("admin.reports.columns.targetId"), "targetId"),
     col.date<Report>(t("common.date"), "createdAt"),

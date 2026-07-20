@@ -40,7 +40,9 @@ export function brandColumns(t: T, actions: BrandRowActions) {
       ),
       { grow: 3, minWidth: 200, sortKey: "name", sortType: "text" },
     ),
-    col.badge<Brand>(t("common.status"), (b) => <Badge active={b.isActive} />),
+    col.badge<Brand>(t("common.status"), (b) => <Badge active={b.isActive} />, {
+      sortKey: "isActive",
+    }),
     col.custom<Brand>(
       t("admin.catalog.common.models"),
       (b) => {

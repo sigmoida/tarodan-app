@@ -79,23 +79,31 @@ export const elogoColumns = (t: T) => [
     ),
     { sortKey: "status", sortType: "text" },
   ),
-  col.custom<Invoice>(t("admin.finance.common.mail"), (i) =>
-    i.emailSentAt ? (
-      <span className="text-success-600">{t("admin.finance.common.sent")}</span>
-    ) : (
-      <span className="text-muted">—</span>
-    ),
+  col.custom<Invoice>(
+    t("admin.finance.common.mail"),
+    (i) =>
+      i.emailSentAt ? (
+        <span className="text-success-600">
+          {t("admin.finance.common.sent")}
+        </span>
+      ) : (
+        <span className="text-muted">—</span>
+      ),
+    { sortKey: "emailSentAt", sortType: "date" },
   ),
   col.date<Invoice>(t("common.date"), (i) => i.issuedAt || i.createdAt, {
     sortKey: "issuedAt",
     sortType: "date",
   }),
-  col.custom<Invoice>("PDF", (i) =>
-    i.hasPdf ? (
-      <InvoicePdfButton id={i.id} seller={false} />
-    ) : (
-      <span className="text-xs text-muted">—</span>
-    ),
+  col.custom<Invoice>(
+    "PDF",
+    (i) =>
+      i.hasPdf ? (
+        <InvoicePdfButton id={i.id} seller={false} />
+      ) : (
+        <span className="text-xs text-muted">—</span>
+      ),
+    { sortKey: "hasPdf", sortType: "number" },
   ),
 ];
 
@@ -117,28 +125,39 @@ export const sellerColumns = (t: T) => [
         )}
       </div>
     ),
-    { grow: 2, minWidth: 180 },
+    { grow: 2, minWidth: 180, sortKey: "orderNumber" },
   ),
   col.text<SellerInvoice>(
     t("admin.finance.common.seller"),
     (s) => s.sellerName,
+    {
+      sortKey: "sellerName",
+    },
   ),
-  col.user<SellerInvoice>(t("admin.finance.common.buyer"), (s) => ({
-    name: s.buyerName,
-    secondary: s.buyerEmail,
-  })),
+  col.user<SellerInvoice>(
+    t("admin.finance.common.buyer"),
+    (s) => ({
+      name: s.buyerName,
+      secondary: s.buyerEmail,
+    }),
+    { sortKey: "buyerName" },
+  ),
   col.money<SellerInvoice>(
     t("admin.finance.invoices.orderAmount"),
     (s) => s.orderTotal,
+    { sortKey: "orderTotal" },
   ),
-  col.custom<SellerInvoice>(t("admin.finance.common.mail"), (s) =>
-    s.emailSentAt ? (
-      <span className="text-xs text-success-600">
-        ✓ {t("admin.finance.common.sent")}
-      </span>
-    ) : (
-      <span className="text-xs text-muted">—</span>
-    ),
+  col.custom<SellerInvoice>(
+    t("admin.finance.common.mail"),
+    (s) =>
+      s.emailSentAt ? (
+        <span className="text-xs text-success-600">
+          ✓ {t("admin.finance.common.sent")}
+        </span>
+      ) : (
+        <span className="text-xs text-muted">—</span>
+      ),
+    { sortKey: "emailSentAt", sortType: "date" },
   ),
   col.date<SellerInvoice>(t("admin.finance.invoices.uploadedAt"), "uploadedAt"),
   col.custom<SellerInvoice>("PDF", (s) => (

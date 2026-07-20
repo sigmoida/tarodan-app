@@ -1,28 +1,30 @@
-import { Badge } from '@tarodan/ui';
-import { col, type RowActionItem } from '@/components/table';
-import { fmtDate } from '@/lib/format';
+import { Badge } from "@tarodan/ui";
+import { col, type RowActionItem } from "@/components/table";
+import { fmtDate } from "@/lib/format";
 import {
   type Discount,
   SCOPE_LABELS,
   discountStatusConfig,
   getDiscountStatus,
   discountValueLabel,
-} from './types';
+} from "./types";
 
 export function discountColumns(rowMenu: (d: Discount) => RowActionItem[]) {
   return [
     col.custom<Discount>(
-      'İndirim',
+      "İndirim",
       (d) => (
         <div className="min-w-0">
           <p className="truncate font-medium text-heading">{d.name}</p>
-          {d.description && <p className="truncate text-xs text-muted">{d.description}</p>}
+          {d.description && (
+            <p className="truncate text-xs text-muted">{d.description}</p>
+          )}
         </div>
       ),
-      { grow: 3, minWidth: 200 },
+      { grow: 3, minWidth: 200, sortKey: "name", sortType: "text" },
     ),
     col.custom<Discount>(
-      'Kod',
+      "Kod",
       (d) => (
         <div className="flex items-center gap-2">
           {d.code ? (
@@ -39,32 +41,51 @@ export function discountColumns(rowMenu: (d: Discount) => RowActionItem[]) {
           )}
         </div>
       ),
-      { grow: 1, minWidth: 130 },
+      { grow: 1, minWidth: 130, sortKey: "code", sortType: "text" },
     ),
     col.custom<Discount>(
-      'Değer',
-      (d) => <span className="font-semibold text-primary">{discountValueLabel(d)}</span>,
-      { grow: 1, minWidth: 130 },
+      "Değer",
+      (d) => (
+        <span className="font-semibold text-primary">
+          {discountValueLabel(d)}
+        </span>
+      ),
+      { grow: 1, minWidth: 130, sortKey: "value", sortType: "number" },
     ),
     col.custom<Discount>(
-      'Kapsam',
+      "Kapsam",
       (d) => (
         <div className="min-w-0">
           <Badge variant="info" size="sm">
             {SCOPE_LABELS[d.scope] ?? d.scope}
           </Badge>
-          {d.categoryName && <p className="mt-1 truncate text-xs text-muted">{d.categoryName}</p>}
+          {d.categoryName && (
+            <p className="mt-1 truncate text-xs text-muted">{d.categoryName}</p>
+          )}
         </div>
       ),
-      { grow: 1, minWidth: 110 },
+      { grow: 1, minWidth: 110, sortKey: "scope", sortType: "text" },
     ),
-    col.muted<Discount>('Kullanım', (d) =>
-      d.usageLimitTotal ? `${d.usedCount} / ${d.usageLimitTotal}` : `${d.usedCount}`,
+    col.muted<Discount>(
+      "Kullanım",
+      (d) =>
+        d.usageLimitTotal
+          ? `${d.usedCount} / ${d.usageLimitTotal}`
+          : `${d.usedCount}`,
+      { sortKey: "usedCount", sortType: "number" },
     ),
-    col.muted<Discount>('Tarih', (d) => `${fmtDate(d.startDate)} – ${fmtDate(d.endDate)}`),
-    col.badge<Discount>('Durum', (d) => (
-      <Badge status={getDiscountStatus(d)} config={discountStatusConfig} />
-    )),
+    col.muted<Discount>(
+      "Tarih",
+      (d) => `${fmtDate(d.startDate)} – ${fmtDate(d.endDate)}`,
+      { sortKey: "startDate", sortType: "date" },
+    ),
+    col.badge<Discount>(
+      "Durum",
+      (d) => (
+        <Badge status={getDiscountStatus(d)} config={discountStatusConfig} />
+      ),
+      { sortKey: "isActive", sortType: "number" },
+    ),
     col.rowMenu<Discount>(rowMenu),
   ];
 }

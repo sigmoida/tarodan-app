@@ -45,26 +45,34 @@ export function collectionColumns(t: T, actions: CollectionRowActions) {
         sortType: "text",
       },
     ),
-    col.custom<Collection>(t("admin.catalog.collections.owner"), (c) => {
-      const tier = c.owner?.membershipTier;
-      return (
-        <div className="flex min-w-0 items-center gap-2">
-          <TruncatedText className="text-body">
-            {c.owner?.displayName}
-          </TruncatedText>
-          {(tier === "premium" || tier === "business") && (
-            <Badge size="sm" variant={tier === "business" ? "info" : "warning"}>
-              {tier === "business"
-                ? t("admin.catalog.collections.tierBusiness")
-                : t("admin.catalog.collections.tierPremium")}
-            </Badge>
-          )}
-        </div>
-      );
-    }),
+    col.custom<Collection>(
+      t("admin.catalog.collections.owner"),
+      (c) => {
+        const tier = c.owner?.membershipTier;
+        return (
+          <div className="flex min-w-0 items-center gap-2">
+            <TruncatedText className="text-body">
+              {c.owner?.displayName}
+            </TruncatedText>
+            {(tier === "premium" || tier === "business") && (
+              <Badge
+                size="sm"
+                variant={tier === "business" ? "info" : "warning"}
+              >
+                {tier === "business"
+                  ? t("admin.catalog.collections.tierBusiness")
+                  : t("admin.catalog.collections.tierPremium")}
+              </Badge>
+            )}
+          </div>
+        );
+      },
+      { sortKey: "user.displayName" },
+    ),
     col.number<Collection>(
       t("admin.catalog.common.product"),
       (c) => c.itemCount,
+      { sortKey: "itemsCount" },
     ),
     col.number<Collection>(t("admin.catalog.common.views"), "viewCount"),
     col.number<Collection>(
@@ -72,13 +80,17 @@ export function collectionColumns(t: T, actions: CollectionRowActions) {
       (c) => c.likeCount,
       { sortKey: "likeCount", sortType: "number" },
     ),
-    col.badge<Collection>(t("common.status"), (c) => (
-      <Badge
-        active={c.isPublic}
-        activeLabel={t("admin.catalog.collections.visible")}
-        passiveLabel={t("admin.catalog.collections.hidden")}
-      />
-    )),
+    col.badge<Collection>(
+      t("common.status"),
+      (c) => (
+        <Badge
+          active={c.isPublic}
+          activeLabel={t("admin.catalog.collections.visible")}
+          passiveLabel={t("admin.catalog.collections.hidden")}
+        />
+      ),
+      { sortKey: "isPublic" },
+    ),
     col.rowMenu<Collection>(collectionRowMenu(t, actions)),
   ];
 }

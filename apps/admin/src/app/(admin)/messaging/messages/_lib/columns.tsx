@@ -4,14 +4,22 @@ import { type Message, messageStatusConfig } from "./types";
 
 export function messageColumns(rowMenu: (m: Message) => RowActionItem[]) {
   return [
-    col.user<Message>("Gönderen", (m) => ({
-      name: m.sender.displayName,
-      secondary: m.sender.email,
-    })),
-    col.user<Message>("Alıcı", (m) => ({
-      name: m.receiver.displayName,
-      secondary: m.receiver.email,
-    })),
+    col.user<Message>(
+      "Gönderen",
+      (m) => ({
+        name: m.sender.displayName,
+        secondary: m.sender.email,
+      }),
+      { sortKey: "sender.displayName" },
+    ),
+    col.user<Message>(
+      "Alıcı",
+      (m) => ({
+        name: m.receiver.displayName,
+        secondary: m.receiver.email,
+      }),
+      { sortKey: "receiver.displayName" },
+    ),
     col.text<Message>("Mesaj", (m) => m.originalContent || m.content, {
       grow: 3,
       minWidth: 220,

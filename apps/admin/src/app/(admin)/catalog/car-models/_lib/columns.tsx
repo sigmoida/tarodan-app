@@ -29,11 +29,13 @@ export function carModelColumns(t: T, actions: CarModelRowActions) {
         m.yearStart || m.yearEnd
           ? `${m.yearStart ?? "?"} - ${m.yearEnd ?? "?"}`
           : undefined,
-      { minWidth: 120 },
+      { minWidth: 120, sortKey: "yearStart" },
     ),
-    col.badge<CarModel>(t("common.status"), (m) => (
-      <Badge active={m.isActive} />
-    )),
+    col.badge<CarModel>(
+      t("common.status"),
+      (m) => <Badge active={m.isActive} />,
+      { sortKey: "isActive" },
+    ),
     col.rowMenu<CarModel>(carModelRowMenu(actions)),
   ];
 }

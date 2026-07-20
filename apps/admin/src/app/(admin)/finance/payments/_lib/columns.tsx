@@ -13,7 +13,7 @@ export function paymentColumns(rowMenu: (p: Payment) => RowActionItem[], t: T) {
         href: `/operations/orders/${p.orderId}`,
         label: `#${p.orderNumber}`,
       }),
-      { grow: 1, minWidth: 120 },
+      { grow: 1, minWidth: 120, sortKey: "orderNumber" },
     ),
     col.custom<Payment>(
       t("admin.finance.payments.buyerSeller"),
@@ -29,7 +29,7 @@ export function paymentColumns(rowMenu: (p: Payment) => RowActionItem[], t: T) {
           <p className="text-xs text-muted">{p.seller.email}</p>
         </div>
       ),
-      { grow: 3, minWidth: 200 },
+      { grow: 3, minWidth: 200, sortKey: "buyer.displayName" },
     ),
     col.money<Payment>(t("common.amount"), "amount"),
     col.muted<Payment>(

@@ -44,7 +44,13 @@ export interface ColOpts extends CellColumnMeta {
  * An accessor is either a plain field key (string) or a getter function.
  * The string form auto-builds the getter AND opts the column into sorting:
  * `meta.sortKey`/`sortable`/`sortType` are filled from the producer type.
- * The function form is sortable only when `{ sortKey }` is passed explicitly.
+ *
+ * Sorting is ON BY DEFAULT for every non-action column — the ONLY way a column
+ * ends up non-sortable is `col.actions`/`col.rowMenu` (never sortable) or an
+ * explicit `{ sortable: false }`. Because the function form has no field to
+ * derive from, a function-accessor column MUST carry an explicit `sortKey`
+ * (scalar field → `"createdAt"`; relation/computed → dotted `"seller.displayName"`
+ * matching the backend `sortMap`). Unknown keys fall back safely server-side.
  */
 type Accessor<T, V> = string | ((r: T) => V);
 
@@ -105,9 +111,10 @@ function base<T>(
 ): ColumnDef<T, unknown> {
   const d = DEFAULTS[type];
   const id = opts.id ?? (typeof header === "string" && header ? header : type);
-  // Sort is opt-in: a column is sortable only when it carries a `sortKey`
-  // (string-accessor form auto-adds it; function form needs it explicitly).
-  // `actions`/`rowMenu` are never sortable.
+  // Sort is ON BY DEFAULT: any non-action column that carries a `sortKey`
+  // (string-accessor form auto-adds it; function form passes it explicitly) is
+  // sortable unless the caller opts out with `sortable: false`. `actions`/
+  // `rowMenu` (type "actions") are never sortable.
   const sortKey = opts.sortKey;
   const sortable =
     type !== "actions" && sortKey != null && opts.sortable !== false;

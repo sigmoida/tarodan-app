@@ -28,12 +28,15 @@ export function staffColumns(
       ),
       { sortKey: "role", sortType: "text" },
     ),
-    col.muted<StaffItem>(t("admin.roles.columns.permissionCount"), (s) =>
-      s.role === "super_admin"
-        ? t("admin.roles.allLockedLabel")
-        : t("admin.roles.permissionCountLabel", {
-            count: (permissions[s.role] ?? []).length,
-          }),
+    col.muted<StaffItem>(
+      t("admin.roles.columns.permissionCount"),
+      (s) =>
+        s.role === "super_admin"
+          ? t("admin.roles.allLockedLabel")
+          : t("admin.roles.permissionCountLabel", {
+              count: (permissions[s.role] ?? []).length,
+            }),
+      { sortKey: "role" },
     ),
     col.badge<StaffItem>(
       t("common.status"),

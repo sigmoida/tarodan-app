@@ -40,23 +40,33 @@ export function userColumns(t: T, rowMenu: (u: User) => RowActionItem[]) {
           )}
         </div>
       ),
-      { grow: 1, minWidth: 130 },
+      { grow: 1, minWidth: 130, sortKey: "isVerified", sortType: "number" },
     ),
-    col.badge<User>(t("admin.users.membership"), (u) => {
-      const tier = (u.membershipTier || "").toLowerCase();
-      const label = enumLabel(
-        membershipTierConfig,
-        tier,
-        u.membershipTier || t("admin.users.membershipFree"),
-      );
-      return (
-        <Badge variant={tier === "premium" ? "warning" : "default"}>
-          {label}
-        </Badge>
-      );
+    col.badge<User>(
+      t("admin.users.membership"),
+      (u) => {
+        const tier = (u.membershipTier || "").toLowerCase();
+        const label = enumLabel(
+          membershipTierConfig,
+          tier,
+          u.membershipTier || t("admin.users.membershipFree"),
+        );
+        return (
+          <Badge variant={tier === "premium" ? "warning" : "default"}>
+            {label}
+          </Badge>
+        );
+      },
+      { sortKey: "membership.tier.type", sortType: "text" },
+    ),
+    col.number<User>(t("admin.operations.common.order"), (u) => u.ordersCount, {
+      sortKey: "ordersCount",
     }),
-    col.number<User>(t("admin.operations.common.order"), (u) => u.ordersCount),
-    col.number<User>(t("admin.catalog.common.product"), (u) => u.productsCount),
+    col.number<User>(
+      t("admin.catalog.common.product"),
+      (u) => u.productsCount,
+      { sortKey: "productsCount" },
+    ),
     col.date<User>(t("admin.users.registeredAt"), "createdAt"),
     col.muted<User>(
       t("admin.users.lastLogin"),

@@ -12,7 +12,8 @@ import { productColumns, type ProductRowActions } from "../_lib/columns";
 export function ProductsTable(actions: Omit<ProductRowActions, "onView">) {
   const t = useTranslations();
   const router = useRouter();
-  const { rows, isLoading, filters, search } = useResourceList<any>();
+  const { rows, isLoading, filters, search, sort, setSort } =
+    useResourceList<any>();
   const products = useMemo(() => mapProducts(rows, t), [rows, t]);
   const columns = useMemo(
     () =>
@@ -32,6 +33,8 @@ export function ProductsTable(actions: Omit<ProductRowActions, "onView">) {
       data={products}
       loading={isLoading}
       getRowId={(p) => p.id}
+      sort={sort}
+      onSort={setSort}
       emptyText={
         filtered
           ? t("admin.catalog.products.emptyFiltered")
