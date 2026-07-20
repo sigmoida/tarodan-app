@@ -17,6 +17,42 @@ export const Skeleton = React.forwardRef<HTMLDivElement, SkeletonProps>(
 
 Skeleton.displayName = 'Skeleton';
 
+export interface AsyncValueProps extends React.HTMLAttributes<HTMLSpanElement> {
+  loading?: boolean;
+  /** Width reserved for the value while it loads (defaults to three digits). */
+  width?: React.CSSProperties['width'];
+}
+
+/**
+ * Inline loading placeholder for counts and other short values. The same width
+ * is reserved after loading so surrounding copy does not shift when the value
+ * arrives.
+ */
+export function AsyncValue({
+  loading = false,
+  width = '3ch',
+  children,
+  className,
+  style,
+  ...props
+}: AsyncValueProps) {
+  return (
+    <span
+      aria-busy={loading || undefined}
+      aria-hidden={loading || undefined}
+      className={cn(
+        'inline-block align-[-0.125em]',
+        loading && 'h-[1em] animate-pulse rounded-md bg-border-subtle',
+        className,
+      )}
+      style={{ minWidth: width, ...(loading ? { width } : {}), ...style }}
+      {...props}
+    >
+      {loading ? null : children}
+    </span>
+  );
+}
+
 // Common skeleton patterns
 export const SkeletonText = ({ lines = 3 }: { lines?: number }) => (
   <div className="space-y-2">

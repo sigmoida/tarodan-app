@@ -28,7 +28,7 @@ export default function MembershipTiersPage() {
 
 function MembershipTiersContent() {
   const t = useTranslations();
-  const { rows, yearlyDiscount, editing, setEditing } =
+  const { rows, yearlyDiscount, yearlyDiscountLoading, editing, setEditing } =
     useMembershipTiersPage();
 
   return (
@@ -42,7 +42,10 @@ function MembershipTiersContent() {
         <ResourceList.Search />
       </ResourceList.Toolbar>
 
-      <YearlyDiscountForm value={yearlyDiscount} />
+      <YearlyDiscountForm
+        value={yearlyDiscount}
+        loading={yearlyDiscountLoading}
+      />
 
       {rows.length === 0 ? (
         <SectionCard>
@@ -57,6 +60,7 @@ function MembershipTiersContent() {
               key={tier.id}
               tier={tier}
               yearlyDiscount={yearlyDiscount}
+              yearlyDiscountLoading={yearlyDiscountLoading}
               onEdit={() => setEditing(tier)}
             />
           ))}

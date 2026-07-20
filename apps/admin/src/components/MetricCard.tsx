@@ -3,7 +3,7 @@
 import { type ComponentType, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import { ArrowTrendingUpIcon, ArrowTrendingDownIcon } from '@heroicons/react/24/outline';
-import { cn } from '@tarodan/ui';
+import { cn, Skeleton } from '@tarodan/ui';
 
 export type MetricTone = 'primary' | 'info' | 'success' | 'warning' | 'danger';
 
@@ -32,6 +32,7 @@ export function MetricCard({
   changeLabel,
   footer,
   className,
+  loading = false,
 }: {
   icon: ComponentType<{ className?: string }>;
   label: string;
@@ -46,6 +47,8 @@ export function MetricCard({
   /** Extra content rendered under the value/trend (e.g. a secondary stat). */
   footer?: ReactNode;
   className?: string;
+  /** Replaces async values with fixed-size skeletons until data is available. */
+  loading?: boolean;
 }) {
   const translate = useTranslations();
   const resolvedChangeLabel = changeLabel ?? translate('admin.shared.metricCard.vsYesterday');
@@ -54,6 +57,7 @@ export function MetricCard({
   const hasBottom = change !== undefined || footer != null;
   return (
     <div
+      aria-busy={loading || undefined}
       className={cn(
         'rounded-xl border border-border bg-surface-elevated p-4',
         className,
@@ -66,13 +70,15 @@ export function MetricCard({
         <div className="min-w-0">
           <p className="text-sm text-muted">{label}</p>
           <p className="truncate text-xl font-bold text-heading" title={title}>
-            {value}
+            {loading ? <Skeleton className="h-7 w-20" /> : value}
           </p>
         </div>
       </div>
       {hasBottom && (
         <div className="mt-3 flex flex-wrap items-center justify-end gap-1 text-sm">
-          {change !== undefined && (
+          {loading ? (
+            <Skeleton className="h-5 w-28" />
+          ) : change !== undefined ? (
             <>
               {up ? (
                 <ArrowTrendingUpIcon className="h-4 w-4 shrink-0 text-success-700" />
@@ -84,8 +90,8 @@ export function MetricCard({
               </span>
               <span className="whitespace-nowrap text-muted">{resolvedChangeLabel}</span>
             </>
-          )}
-          {footer}
+          ) : null}
+          {!loading && footer}
         </div>
       )}
     </div>

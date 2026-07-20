@@ -14,7 +14,7 @@ import { type Ad } from "../_lib/types";
 
 /** Summary metrics over ALL ads. Keyed under ['ads'] so ad mutations refresh it. */
 export function AdsStats() {
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: adminKeys.stats("ads"),
     queryFn: async () => {
       const res = await adminApi.getAds();
@@ -50,24 +50,28 @@ export function AdsStats() {
         label="Toplam Reklam"
         value={s.total}
         footer={<span className="text-success-700">{s.active} aktif</span>}
+        loading={isLoading}
       />
       <MetricCard
         icon={CursorArrowRaysIcon}
         tone="primary"
         label="Toplam Tıklama"
         value={s.clicks.toLocaleString()}
+        loading={isLoading}
       />
       <MetricCard
         icon={EyeIcon}
         tone="success"
         label="Görüntülenme"
         value={s.impressions.toLocaleString()}
+        loading={isLoading}
       />
       <MetricCard
         icon={ChartBarIcon}
         tone="primary"
         label="Ortalama CTR"
         value={`${s.ctr}%`}
+        loading={isLoading}
       />
     </div>
   );

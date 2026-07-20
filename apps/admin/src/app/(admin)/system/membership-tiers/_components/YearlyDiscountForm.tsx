@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Button } from "@tarodan/ui";
+import { Button, Skeleton } from "@tarodan/ui";
 import { Form, FormInput, useZodForm } from "@tarodan/ui/form";
 import { adminApi } from "@/lib/api";
 import { SectionCard } from "@/components/detail/SectionCard";
@@ -13,7 +13,13 @@ import { yearlyDiscountSchema } from "../_lib/schema";
  * (reseeds after each save's refetch — no useEffect mirror). Saving also makes
  * the backend recompute every tier's yearly price, so both queries invalidate.
  */
-export function YearlyDiscountForm({ value }: { value: number }) {
+export function YearlyDiscountForm({
+  value,
+  loading = false,
+}: {
+  value: number;
+  loading?: boolean;
+}) {
   const t = useTranslations();
   const form = useZodForm(yearlyDiscountSchema(t), {
     values: { discount: String(value) },
@@ -28,8 +34,29 @@ export function YearlyDiscountForm({ value }: { value: number }) {
     },
   );
 
+  if (loading) {
+    return (
+      <SectionCard
+        title={t("admin.tiers.yearlyDiscount.title")}
+        bodyClassName="space-y-3"
+      >
+        <div className="flex items-end gap-4" aria-busy>
+          <div className="w-48 space-y-1.5">
+            <Skeleton className="h-5 w-24" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+          <Skeleton className="h-10 w-20" />
+        </div>
+        <Skeleton className="h-4 w-full max-w-md" />
+      </SectionCard>
+    );
+  }
+
   return (
-    <SectionCard title={t("admin.tiers.yearlyDiscount.title")} bodyClassName="space-y-3">
+    <SectionCard
+      title={t("admin.tiers.yearlyDiscount.title")}
+      bodyClassName="space-y-3"
+    >
       <Form
         form={form}
         onSubmit={(v) => save.mutate(Number(v.discount))}
@@ -48,7 +75,9 @@ export function YearlyDiscountForm({ value }: { value: number }) {
           {t("common.save")}
         </Button>
       </Form>
-      <p className="text-xs text-muted">{t("admin.tiers.yearlyDiscount.helper")}</p>
+      <p className="text-xs text-muted">
+        {t("admin.tiers.yearlyDiscount.helper")}
+      </p>
     </SectionCard>
   );
 }

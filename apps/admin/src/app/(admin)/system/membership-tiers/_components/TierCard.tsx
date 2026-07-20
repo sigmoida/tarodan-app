@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { Button, enumLabel, membershipTierConfig } from '@tarodan/ui';
+import { AsyncValue, Button, enumLabel, membershipTierConfig } from '@tarodan/ui';
 import { PencilIcon } from '@heroicons/react/24/outline';
 import { SectionCard } from '@/components/detail/SectionCard';
 import { fmtTry } from '@/lib/format';
@@ -21,10 +21,12 @@ const featurePill = 'rounded px-2 py-1 text-xs';
 export function TierCard({
   tier,
   yearlyDiscount,
+  yearlyDiscountLoading = false,
   onEdit,
 }: {
   tier: MembershipTier;
   yearlyDiscount: number;
+  yearlyDiscountLoading?: boolean;
   onEdit: () => void;
 }) {
   const t = useTranslations();
@@ -34,7 +36,13 @@ export function TierCard({
     <SectionCard
       title={tier.name}
       actions={
-        <Button variant="ghost" size="sm" onClick={onEdit} title={t('common.edit')}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onEdit}
+          title={t('common.edit')}
+          disabled={yearlyDiscountLoading}
+        >
           <PencilIcon className="h-5 w-5" />
         </Button>
       }
@@ -50,7 +58,11 @@ export function TierCard({
             <Row label={t('admin.tiers.card.monthly')} value={fmtTry(tier.monthlyPrice)} />
             <Row
               label={t('admin.tiers.card.yearly')}
-              value={fmtTry(computedYearly(tier.monthlyPrice, yearlyDiscount))}
+              value={
+                <AsyncValue loading={yearlyDiscountLoading} width="8ch">
+                  {fmtTry(computedYearly(tier.monthlyPrice, yearlyDiscount))}
+                </AsyncValue>
+              }
             />
           </>
         )}

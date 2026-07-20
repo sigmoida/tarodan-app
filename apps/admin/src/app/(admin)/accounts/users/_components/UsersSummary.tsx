@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { AsyncValue } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { userFilterParams } from "../_lib/types";
@@ -17,7 +18,7 @@ export function UsersSummary() {
   const search = searchParams.get("q") ?? "";
   const filter = searchParams.get("filter") ?? "all";
 
-  const { data: total } = useQuery({
+  const { data: total, isLoading } = useQuery({
     queryKey: adminKeys.count("users", { search, filter }),
     queryFn: async () => {
       const res = await adminApi.getUsers({
@@ -32,5 +33,14 @@ export function UsersSummary() {
     staleTime: 30_000,
   });
 
-  return <>{t('admin.users.totalCount', { count: total ?? 0 })}</>;
+  return (
+    <>
+      {t.rich("admin.users.totalCount", {
+        count: total ?? 0,
+        value: (chunks) => (
+          <AsyncValue loading={isLoading}>{chunks}</AsyncValue>
+        ),
+      })}
+    </>
+  );
 }
