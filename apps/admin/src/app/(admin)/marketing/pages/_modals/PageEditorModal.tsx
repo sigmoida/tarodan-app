@@ -1,32 +1,30 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Button } from "@tarodan/ui";
 import {
-  Modal,
-  Button,
-  Input,
-  Textarea,
-  Checkbox,
-  IconButton,
-} from "@tarodan/ui";
+  FormCheckbox,
+  FormInput,
+  FormModal,
+  FormTextarea,
+  useZodForm,
+} from "@tarodan/ui/form";
 import {
-  XMarkIcon,
-  CheckIcon,
   ArrowPathIcon,
-  DocumentTextIcon,
-  GlobeAltIcon,
   ChevronDownIcon,
+  GlobeAltIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { adminApi } from "@/lib/api";
+import { adminKeys } from "@/lib/query/keys";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import {
   PREDEFINED_PAGES,
   DEFAULT_CONTENT,
-  PAGES_QUERY_KEY,
   buildPreviewDoc,
+  pageEditorSchema,
   type PredefinedSlug,
   type StaticPage,
   type EditorForm,
@@ -41,6 +39,17 @@ const EMPTY: EditorForm = {
   isPublished: true,
 };
 
+function pageToForm(page: StaticPage): EditorForm {
+  return {
+    title: page.title,
+    content: page.content ?? "",
+    metaTitle: page.metaTitle ?? "",
+    metaDescription: page.metaDescription ?? "",
+    metaKeywords: page.metaKeywords ?? "",
+    isPublished: page.isPublished,
+  };
+}
+
 export function PageEditorModal({
   slug,
   existing,
@@ -51,89 +60,74 @@ export function PageEditorModal({
   onClose: () => void;
 }) {
   const confirm = useConfirm();
-  const qc = useQueryClient();
-  const meta = PREDEFINED_PAGES.find((p) => p.slug === slug)!;
-
-  const [form, setForm] = useState<EditorForm>(EMPTY);
+  const meta = PREDEFINED_PAGES.find((page) => page.slug === slug)!;
+  const defaults = existing
+    ? pageToForm(existing)
+    : {
+        ...EMPTY,
+        title: DEFAULT_CONTENT[slug].title,
+        content: DEFAULT_CONTENT[slug].content,
+      };
+  const form = useZodForm(pageEditorSchema, { defaultValues: defaults });
   const [seoOpen, setSeoOpen] = useState(false);
-  const [resetting, setResetting] = useState(false);
-  const [previewHtml, setPreviewHtml] = useState("");
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const [previewHtml, setPreviewHtml] = useState(() =>
+    buildPreviewDoc(defaults.content),
+  );
+  const content = form.watch("content");
 
   const pageQuery = useQuery({
-    queryKey: ["page-detail", existing?.id],
+    queryKey: adminKeys.detail("pages", existing?.id ?? slug),
     queryFn: async () =>
       (await adminApi.getPageById(existing!.id)).data as StaticPage,
-    enabled: !!existing,
+    enabled: Boolean(existing),
   });
 
-  // Fill the form from server data (edit) or defaults (new).
   useEffect(() => {
-    let initial: EditorForm;
-    if (existing) {
-      if (!pageQuery.data) return;
-      const p = pageQuery.data;
-      initial = {
-        title: p.title,
-        content: p.content ?? "",
-        metaTitle: p.metaTitle ?? "",
-        metaDescription: p.metaDescription ?? "",
-        metaKeywords: p.metaKeywords ?? "",
-        isPublished: p.isPublished,
-      };
-    } else {
-      const def = DEFAULT_CONTENT[slug];
-      initial = { ...EMPTY, title: def.title, content: def.content };
-    }
-    setForm(initial);
-    setPreviewHtml(buildPreviewDoc(initial.content));
-  }, [slug, existing, pageQuery.data]);
+    if (!pageQuery.data) return;
+    form.reset(pageToForm(pageQuery.data));
+  }, [pageQuery.data, form]);
 
-  // Close the modal on load error (legacy behavior).
   useEffect(() => {
-    if (pageQuery.isError) {
-      toast.error("Sayfa yüklenemedi");
-      onClose();
-    }
+    if (!pageQuery.isError) return;
+    toast.error("Sayfa yüklenemedi");
+    onClose();
   }, [pageQuery.isError, onClose]);
 
-  // Clear the debounce timer on unmount.
-  useEffect(() => () => clearTimeout(debounceRef.current), []);
-
-  const onContentChange = (v: string) => {
-    setForm((f) => ({ ...f, content: v }));
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(
-      () => setPreviewHtml(buildPreviewDoc(v)),
+  useEffect(() => {
+    const timer = setTimeout(
+      () => setPreviewHtml(buildPreviewDoc(content)),
       600,
     );
-  };
+    return () => clearTimeout(timer);
+  }, [content]);
 
-  const onTabKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key !== "Tab") return;
-    e.preventDefault();
-    const ta = e.currentTarget;
-    const s = ta.selectionStart;
-    const end = ta.selectionEnd;
-    onContentChange(ta.value.substring(0, s) + "  " + ta.value.substring(end));
+  const onTabKey = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== "Tab") return;
+    event.preventDefault();
+    const textarea = event.currentTarget;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    form.setValue(
+      "content",
+      textarea.value.substring(0, start) + "  " + textarea.value.substring(end),
+      { shouldDirty: true, shouldValidate: true },
+    );
     requestAnimationFrame(() => {
-      ta.selectionStart = ta.selectionEnd = s + 2;
+      textarea.selectionStart = textarea.selectionEnd = start + 2;
     });
   };
 
   const save = useAdminMutation(
-    (v: EditorForm) =>
+    (values: EditorForm) =>
       existing
-        ? adminApi.updatePage(existing.id, v)
-        : adminApi.createPage({ slug, ...v }),
+        ? adminApi.updatePage(existing.id, values)
+        : adminApi.createPage({ slug, ...values }),
     {
+      invalidates: ["pages"],
       successMessage: "Sayfa kaydedildi",
       errorMessage: "Kaydetme başarısız",
-      onSuccess: () => qc.invalidateQueries({ queryKey: PAGES_QUERY_KEY }),
     },
   );
-  const saving = save.isPending;
-  const onSave = () => save.mutate(form);
 
   const onReset = async () => {
     const ok = await confirm({
@@ -143,58 +137,42 @@ export function PageEditorModal({
       destructive: true,
     });
     if (!ok) return;
-    setResetting(true);
-    try {
-      const def = DEFAULT_CONTENT[slug];
-      setForm((f) => ({ ...f, title: def.title, content: def.content }));
-      setPreviewHtml(buildPreviewDoc(def.content));
-      toast.success(
-        'Varsayılan içerik yüklendi — kaydetmek için "Kaydet" butonuna tıklayın',
-      );
-    } finally {
-      setResetting(false);
-    }
+    const next = DEFAULT_CONTENT[slug];
+    form.setValue("title", next.title, { shouldDirty: true });
+    form.setValue("content", next.content, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+    toast.success(
+      'Varsayılan içerik yüklendi — kaydetmek için "Kaydet" butonuna tıklayın',
+    );
   };
 
   return (
-    <Modal
-      isOpen
+    <FormModal
+      open
       onClose={onClose}
-      closeOnBackdrop={false}
+      title={meta.title}
+      form={form}
+      onSubmit={(values) => save.mutate(values)}
+      isSubmitting={save.isPending}
+      submitLabel="Kaydet"
       maxWidth="max-w-2xl"
-      className="max-w-6xl"
+      modalClassName="max-w-6xl"
+      closeOnBackdrop={false}
     >
-      {/* Header */}
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <DocumentTextIcon className="h-5 w-5 shrink-0 text-primary-500" />
-          <div className="min-w-0">
-            <h2 className="truncate text-sm font-semibold text-heading">
-              {meta.title}
-            </h2>
-            <p className="font-mono text-xs text-muted">{meta.url}</p>
-          </div>
-          {existing?.isPublished && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-success-500/10 px-2 py-0.5 text-xs font-medium text-success-600">
-              <GlobeAltIcon className="h-3 w-3" /> Yayında
-            </span>
-          )}
-        </div>
-        <IconButton aria-label="Kapat" variant="ghost" onClick={onClose}>
-          <XMarkIcon className="h-5 w-5" />
-        </IconButton>
+      <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+        <span className="font-mono">{meta.url}</span>
+        {existing?.isPublished && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-success-500/10 px-2 py-0.5 font-medium text-success-600">
+            <GlobeAltIcon className="h-3 w-3" /> Yayında
+          </span>
+        )}
       </div>
 
-      {/* Split editor / preview */}
-      <div className="grid h-[72vh] grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* Editor */}
+      <div className="grid h-[68vh] grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-1">
-          <Input
-            label="Sayfa Başlığı"
-            value={form.title}
-            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-            placeholder="Başlık"
-          />
+          <FormInput name="title" label="Sayfa Başlığı" placeholder="Başlık" />
 
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="mb-1 flex items-center justify-between">
@@ -202,16 +180,13 @@ export function PageEditorModal({
                 HTML İçerik
               </span>
               <span className="text-xs text-subtle">
-                {form.content.length > 0
-                  ? `${form.content.length} karakter`
-                  : "Boş"}
+                {content.length > 0 ? `${content.length} karakter` : "Boş"}
               </span>
             </div>
-            <Textarea
+            <FormTextarea
+              name="content"
               bare
               id="page-editor"
-              value={form.content}
-              onChange={(e) => onContentChange(e.target.value)}
               onKeyDown={onTabKey}
               spellCheck={false}
               autoCorrect="off"
@@ -225,12 +200,11 @@ export function PageEditorModal({
             </p>
           </div>
 
-          {/* SEO */}
           <div className="overflow-hidden rounded-lg border border-border">
             <Button
               type="button"
               variant="ghost"
-              onClick={() => setSeoOpen((o) => !o)}
+              onClick={() => setSeoOpen((open) => !open)}
               className="h-auto w-full justify-between px-3 py-2.5 text-xs font-semibold text-muted"
             >
               <span>SEO Ayarları</span>
@@ -240,67 +214,41 @@ export function PageEditorModal({
             </Button>
             {seoOpen && (
               <div className="space-y-3 border-t border-border p-3">
-                <Input
+                <FormInput
+                  name="metaTitle"
                   label="Meta Başlık"
-                  value={form.metaTitle}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, metaTitle: e.target.value }))
-                  }
                   placeholder="Tarayıcı sekme başlığı"
                 />
-                <Textarea
+                <FormTextarea
+                  name="metaDescription"
                   label="Meta Açıklama"
-                  value={form.metaDescription}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, metaDescription: e.target.value }))
-                  }
                   placeholder="Arama sonuçlarında görünen açıklama (150-160 karakter)"
                   rows={2}
                 />
-                <Input
+                <FormInput
+                  name="metaKeywords"
                   label="Anahtar Kelimeler"
-                  value={form.metaKeywords}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, metaKeywords: e.target.value }))
-                  }
                   placeholder="kelime1, kelime2, kelime3"
                 />
               </div>
             )}
           </div>
 
-          <div className="flex flex-col gap-3 border-t border-border pt-2">
-            <Checkbox
-              checked={form.isPublished}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, isPublished: e.target.checked }))
-              }
-              label="Yayında — web sitesinde görünür"
-            />
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                onClick={onSave}
-                isLoading={saving}
-                leftIcon={<CheckIcon className="h-4 w-4" />}
-              >
-                Kaydet
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={onReset}
-                isLoading={resetting}
-                leftIcon={<ArrowPathIcon className="h-4 w-4" />}
-                className="border-danger-300 text-danger-600 hover:bg-danger-50"
-              >
-                Varsayılana sıfırla
-              </Button>
-            </div>
-          </div>
+          <FormCheckbox
+            name="isPublished"
+            label="Yayında — web sitesinde görünür"
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onReset}
+            leftIcon={<ArrowPathIcon className="h-4 w-4" />}
+            className="self-start border-danger-300 text-danger-600 hover:bg-danger-50"
+          >
+            Varsayılana sıfırla
+          </Button>
         </div>
 
-        {/* Preview */}
         <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-surface-alt/20">
           <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface-elevated px-4 py-2.5">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted">
@@ -318,6 +266,6 @@ export function PageEditorModal({
           />
         </div>
       </div>
-    </Modal>
+    </FormModal>
   );
 }

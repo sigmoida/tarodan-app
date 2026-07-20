@@ -21,6 +21,31 @@ type RouteCtx = { params: { path: string[] } };
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 /**
+ * Reject traversal and encoded separators before a route segment is appended
+ * to the fixed API base path. Decode repeatedly to catch double-encoded input.
+ */
+function hasUnsafePathSegment(path: string[]): boolean {
+  return path.some((segment) => {
+    let decoded = segment;
+    for (let pass = 0; pass < 10; pass += 1) {
+      try {
+        const next = decodeURIComponent(decoded);
+        if (next === decoded) break;
+        decoded = next;
+      } catch {
+        return true;
+      }
+    }
+    return (
+      decoded === "." ||
+      decoded === ".." ||
+      /[\\/]/.test(decoded) ||
+      /%(?:25|2e|2f|5c)/i.test(decoded)
+    );
+  });
+}
+
+/**
  * CSRF defense for the gateway. The proxy attaches a server-side Bearer to
  * whatever it forwards and the API also accepts cookie auth, so without this the
  * only barrier is SameSite=Lax — which has gaps (the Lax+POST 2-minute window,
@@ -68,6 +93,10 @@ export function createBffProxy(session: ProxySession) {
     request: NextRequest,
     path: string[],
   ): Promise<NextResponse> {
+    if (hasUnsafePathSegment(path ?? [])) {
+      return new NextResponse("Invalid gateway path", { status: 400 });
+    }
+
     if (isForbiddenCrossOrigin(request)) {
       return new NextResponse("Forbidden: cross-origin request rejected", {
         status: 403,

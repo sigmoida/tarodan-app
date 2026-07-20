@@ -3,9 +3,9 @@
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { ResourceList } from "@/components/list";
-import { statusOptions } from "./_shared";
-import { orderShipmentColumns } from "./_lib/columns";
-import type { OrderShipmentRow } from "./_lib/types";
+import { statusOptions } from "../_shared";
+import { orderShipmentColumns } from "../_lib/columns";
+import type { OrderShipmentRow } from "../_lib/types";
 
 export function OrderShipmentsTab() {
   const t = useTranslations();

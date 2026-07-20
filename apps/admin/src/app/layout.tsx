@@ -17,8 +17,12 @@ const notoSans = Noto_Sans({
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations();
   return {
+    metadataBase: new URL(
+      process.env.NEXT_PUBLIC_APP_URL || "https://admin.tarodan.com",
+    ),
     title: APP_NAME,
     description: t("admin.nav.defaultDescription"),
+    robots: { index: false, follow: false },
   };
 }
 

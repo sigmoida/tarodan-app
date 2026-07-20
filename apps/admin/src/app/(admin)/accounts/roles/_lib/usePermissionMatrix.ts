@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useSession } from "@/context/SessionContext";
@@ -22,6 +23,7 @@ export type GroupCheckedState = "all" | "none" | "partial";
  */
 export function usePermissionMatrix() {
   const t = useTranslations();
+  const router = useRouter();
   const confirm = useConfirm();
   const { user } = useSession();
   const isSuperAdmin = user?.role === "super_admin";
@@ -92,8 +94,9 @@ export function usePermissionMatrix() {
       onSuccess: () => {
         setMatrixDirty(false);
         setEditMode(false);
-        // Reload the page to update the sidebar filtering.
-        setTimeout(() => window.location.reload(), 800);
+        // Re-render the server layout so its request-scoped permission set and
+        // the client navigation context update without a full-page reload.
+        router.refresh();
       },
     },
   );

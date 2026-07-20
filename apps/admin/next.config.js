@@ -13,6 +13,7 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 const SECURITY_HEADERS = [
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   {
     key: 'Strict-Transport-Security',

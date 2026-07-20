@@ -1,6 +1,8 @@
-import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
+import { notFound, redirect } from 'next/navigation';
 import { getSession } from '@/lib/server/session';
 import { getPermissions } from '@/lib/server/permissions';
+import { routePermission } from '@/lib/navigation';
 import { SessionProvider } from '@/context/SessionContext';
 import { PermissionsProvider } from '@/context/PermissionsContext';
 import { AdminProviders } from '@/provider/AdminProviders';
@@ -22,6 +24,17 @@ export default async function AdminRouteLayout({
   if (!user) redirect('/login');
 
   const permissions = await getPermissions(user);
+  const pathname = headers().get('x-admin-pathname');
+  if (!pathname) notFound();
+
+  const requiredPermission = routePermission(pathname);
+  if (
+    requiredPermission &&
+    !permissions.isSuperAdmin &&
+    !permissions.keys.includes(requiredPermission)
+  ) {
+    notFound();
+  }
 
   return (
     <SessionProvider user={user}>
