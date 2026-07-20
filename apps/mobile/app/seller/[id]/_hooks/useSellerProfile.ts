@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useLocalSearchParams, router } from 'expo-router';
-import { userApi, productsApi, ratingsApi, collectionsApi } from '@/lib/api';
-import { qk } from '@/lib/query';
-import { useRefresh } from '@/hooks/useRefresh';
-import { useFollowing } from '@/hooks/useFollowing';
-import { useAuthStore } from '@/stores/authStore';
+import { useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocalSearchParams, router } from "expo-router";
+import { userApi, productsApi, ratingsApi, collectionsApi } from "@/lib/api";
+import { qk } from "@/lib/query";
+import { useRefresh } from "@/hooks/useRefresh";
+import { useFollowing } from "@/hooks/useFollowing";
+import { useAuthStore } from "@/stores/authStore";
 
 /**
  * Seller profile controller — owns the 5 public-profile queries (seller,
@@ -14,13 +14,24 @@ import { useAuthStore } from '@/stores/authStore';
  */
 export function useSellerProfile() {
   const { id } = useLocalSearchParams();
-  const sellerId = String(id ?? '');
-  const { isAuthenticated } = useAuthStore();
+  const sellerId = String(id ?? "");
+  const { isAuthenticated, user } = useAuthStore();
   const { isFollowing, followSeller, unfollowSeller } = useFollowing();
-  const [activeTab, setActiveTab] = useState<'listings' | 'reviews' | 'collections'>('listings');
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<
+    "listings" | "reviews" | "collections"
+  >("listings");
   const [followBusy, setFollowBusy] = useState(false);
+  const viewCountedRef = useRef(false);
+  useEffect(() => {
+    viewCountedRef.current = false;
+  }, [sellerId]);
 
-  const { data: apiSeller, isLoading, refetch: refetchSeller } = useQuery({
+  const {
+    data: apiSeller,
+    isLoading,
+    refetch: refetchSeller,
+  } = useQuery({
     queryKey: qk.seller.detail(sellerId),
     queryFn: async () => {
       try {
@@ -28,7 +39,7 @@ export function useSellerProfile() {
         const response = await userApi.getPublicProfile(String(id));
         return (response.data as any)?.data || response.data;
       } catch (error) {
-        console.log('⚠️ Satıcı bilgisi yüklenemedi, mock data kullanılacak');
+        console.log("⚠️ Satıcı bilgisi yüklenemedi, mock data kullanılacak");
         return null;
       }
     },
@@ -67,11 +78,17 @@ export function useSellerProfile() {
     queryKey: qk.seller.ratings(sellerId),
     queryFn: async () => {
       try {
-        const response = await ratingsApi.getUserRatings(String(id), { limit: 20 });
+        const response = await ratingsApi.getUserRatings(String(id), {
+          limit: 20,
+        });
         const data: any = response.data;
         // API şekli: { ratings, total, page, pageSize } (olası interceptor sarmalını da aç)
         const payload = data?.data ?? data;
-        return payload?.ratings ?? payload?.items ?? (Array.isArray(payload) ? payload : []);
+        return (
+          payload?.ratings ??
+          payload?.items ??
+          (Array.isArray(payload) ? payload : [])
+        );
       } catch {
         return [];
       }
@@ -84,7 +101,9 @@ export function useSellerProfile() {
     queryKey: qk.seller.collections(sellerId),
     queryFn: async () => {
       try {
-        const response = await collectionsApi.getUserCollections(String(id), { pageSize: 50 });
+        const response = await collectionsApi.getUserCollections(String(id), {
+          pageSize: 50,
+        });
         const data: any = response.data;
         const payload = data?.data ?? data;
         return payload?.collections ?? (Array.isArray(payload) ? payload : []);
@@ -94,6 +113,28 @@ export function useSellerProfile() {
     },
     enabled: !!id,
   });
+
+  // Fire storefront view tracking once per visited seller. Backend applies
+  // self-view/bot/rate-limit guards; errors are swallowed (non-critical).
+  useEffect(() => {
+    if (!sellerId || !apiSeller || viewCountedRef.current) return;
+    if (user?.id === sellerId) return;
+    viewCountedRef.current = true;
+    (async () => {
+      try {
+        const resp: any = await userApi.incrementStoreView(sellerId);
+        const newCount =
+          resp?.data?.storeViewCount ?? resp?.data?.data?.storeViewCount;
+        if (newCount !== undefined) {
+          queryClient.setQueryData(qk.seller.detail(sellerId), (old: any) =>
+            old ? { ...old, storeViewCount: newCount } : old,
+          );
+        }
+      } catch {
+        // görüntülenme sayımı kritik değil — yoksay
+      }
+    })();
+  }, [sellerId, apiSeller, user?.id, queryClient]);
 
   const { refreshing, onRefresh } = useRefresh(
     refetchSeller,
@@ -111,7 +152,7 @@ export function useSellerProfile() {
 
   const handleMessage = () => {
     if (!isAuthenticated) {
-      router.push('/(auth)/login');
+      router.push("/(auth)/login");
       return;
     }
     router.push(`/messages/new?sellerId=${id}`);
@@ -121,7 +162,7 @@ export function useSellerProfile() {
 
   const handleToggleFollow = async () => {
     if (!isAuthenticated) {
-      router.push('/(auth)/login');
+      router.push("/(auth)/login");
       return;
     }
     if (followBusy) return;
