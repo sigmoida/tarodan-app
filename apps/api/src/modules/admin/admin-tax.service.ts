@@ -1100,7 +1100,20 @@ export class AdminTaxService {
       resolveOrderBy<Prisma.SellerUploadedInvoiceOrderByWithRelationInput>(
         "SellerUploadedInvoice",
         query,
-        { defaultSort: { uploadedAt: "desc" } },
+        {
+          defaultSort: { uploadedAt: "desc" },
+          // The list shows order + party columns pulled from the linked order.
+          sortMap: {
+            orderNumber: (direction) => ({ order: { orderNumber: direction } }),
+            orderTotal: (direction) => ({ order: { totalAmount: direction } }),
+            sellerName: (direction) => ({
+              order: { seller: { displayName: direction } },
+            }),
+            buyerName: (direction) => ({
+              order: { buyer: { displayName: direction } },
+            }),
+          },
+        },
       );
     const result = await paginate(
       this.prisma.sellerUploadedInvoice,

@@ -103,6 +103,50 @@ describe("admin list primitives", () => {
       ).toEqual({ lastLoginAt: { sort: "asc", nulls: "last" } });
     });
 
+    it("resolves a dotted relation path via the DMMF", () => {
+      expect(
+        resolveOrderBy(
+          "Product",
+          { sortBy: "seller.displayName", sortOrder: "asc" },
+          { defaultSort },
+        ),
+      ).toEqual({ seller: { displayName: "asc" } });
+    });
+
+    it("resolves a multi-level relation path", () => {
+      expect(
+        resolveOrderBy<Prisma.RefundRequestOrderByWithRelationInput>(
+          "RefundRequest",
+          { sortBy: "order.buyer.displayName", sortOrder: "desc" },
+          { defaultSort: { createdAt: "desc" } },
+        ),
+      ).toEqual({ order: { buyer: { displayName: "desc" } } });
+    });
+
+    it("resolves a `<relation>Count` aggregate to an orderBy _count", () => {
+      expect(
+        resolveOrderBy<Prisma.UserOrderByWithRelationInput>(
+          "User",
+          { sortBy: "productsCount", sortOrder: "desc" },
+          { defaultSort: { createdAt: "desc" } },
+        ),
+      ).toEqual({ products: { _count: "desc" } });
+    });
+
+    it("refuses to traverse a to-many relation for a nested scalar", () => {
+      const fallback: Prisma.UserOrderByWithRelationInput = {
+        createdAt: "desc",
+      };
+      // `products` is a to-many relation → cannot orderBy a nested scalar through it.
+      expect(
+        resolveOrderBy<Prisma.UserOrderByWithRelationInput>(
+          "User",
+          { sortBy: "products.title", sortOrder: "asc" },
+          { defaultSort: fallback },
+        ),
+      ).toBe(fallback);
+    });
+
     it("uses the default for an unknown sort key without throwing", () => {
       expect(
         resolveOrderBy(

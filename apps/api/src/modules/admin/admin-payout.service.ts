@@ -114,7 +114,13 @@ export class AdminPayoutService {
     const orderBy = resolveOrderBy<Prisma.PaymentHoldOrderByWithRelationInput>(
       "PaymentHold",
       query,
-      { defaultSort: { createdAt: "desc" } },
+      {
+        defaultSort: { createdAt: "desc" },
+        // The list shows the seller's name; map the alias to the relation.
+        sortMap: {
+          sellerName: (direction) => ({ seller: { displayName: direction } }),
+        },
+      },
     );
     const result = await paginate(
       this.prisma.paymentHold,
