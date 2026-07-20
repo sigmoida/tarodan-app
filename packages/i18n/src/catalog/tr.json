@@ -2871,10 +2871,10 @@
           "colQuantity": "Adet",
           "colUnitPrice": "Birim Fiyat",
           "colTotal": "Toplam",
-          "subtotal": "Ara Toplam: ₺{amount}",
-          "discount": "İndirim{code}: -₺{amount}",
-          "shipping": "Kargo: ₺{amount}",
-          "total": "TOPLAM: ₺{amount}",
+          "subtotal": "Ara Toplam: {amount}",
+          "discount": "İndirim{code}: -{amount}",
+          "shipping": "Kargo: {amount}",
+          "total": "TOPLAM: {amount}",
           "tracking": "Kargo Takip",
           "error": "Fatura oluşturulamadı"
         }
@@ -3316,6 +3316,8 @@
     "analytics": {
       "title": "Analizler",
       "description": "Detaylı satış, kullanıcı ve ürün analizleri",
+      "emptyTitle": "Bu dönem için veri yok",
+      "emptyDescription": "Farklı bir tarih aralığı seçin veya yeni veriler oluştuğunda tekrar kontrol edin.",
       "dateRange": {
         "7d": "7 Gün",
         "30d": "30 Gün",

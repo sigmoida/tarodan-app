@@ -1,7 +1,9 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
+import { EmptyState } from "@tarodan/ui";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { fmtTry } from "@/lib/format";
 import { type TopProduct } from "../_lib/types";
 
 /**
@@ -50,7 +52,7 @@ export function TopProductsWidget({ products }: { products: TopProduct[] }) {
                 <p className="truncate text-xs text-muted">{p.sellerName}</p>
               </div>
               <span className="whitespace-nowrap text-sm font-semibold text-heading tabular-nums">
-                ₺{p.price.toLocaleString("tr-TR")}
+                {fmtTry(p.price)}
               </span>
               <span className="whitespace-nowrap text-xs text-muted tabular-nums">
                 {p.viewCount.toLocaleString("tr-TR")}{" "}
@@ -59,9 +61,10 @@ export function TopProductsWidget({ products }: { products: TopProduct[] }) {
             </Link>
           ))
         ) : (
-          <div className="py-8 text-center text-muted">
-            {t("admin.dashboard.topProducts.empty")}
-          </div>
+          <EmptyState
+            size="compact"
+            title={t("admin.dashboard.topProducts.empty")}
+          />
         )}
       </div>
     </SectionCard>

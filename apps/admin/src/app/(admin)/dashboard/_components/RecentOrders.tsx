@@ -1,22 +1,26 @@
-import Link from 'next/link';
-import { StatusBadge } from '@tarodan/ui';
-import { useTranslations } from 'next-intl';
-import { SectionCard } from '@/components/detail/SectionCard';
+import Link from "next/link";
+import { EmptyState, StatusBadge } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
+import { SectionCard } from "@/components/detail/SectionCard";
+import { fmtTry } from "@/lib/format";
 import {
   type RecentOrder,
   dashboardOrderStatusConfig,
   formatRelativeDate,
-} from '../_lib/types';
+} from "../_lib/types";
 
 export function RecentOrders({ orders }: { orders: RecentOrder[] }) {
   const t = useTranslations();
   return (
     <SectionCard
-      title={t('admin.dashboard.recentOrders.title')}
+      title={t("admin.dashboard.recentOrders.title")}
       className="lg:col-span-2"
       actions={
-        <Link href="/operations/orders" className="text-sm text-primary-600 hover:underline">
-          {t('common.seeAll')} →
+        <Link
+          href="/operations/orders"
+          className="text-sm text-primary-600 hover:underline"
+        >
+          {t("common.seeAll")} →
         </Link>
       }
     >
@@ -30,7 +34,7 @@ export function RecentOrders({ orders }: { orders: RecentOrder[] }) {
               <div className="flex min-w-0 flex-1 items-center">
                 <div className="mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-100">
                   <span className="text-sm font-medium text-primary-600">
-                    {order.buyerName?.charAt(0) || '?'}
+                    {order.buyerName?.charAt(0) || "?"}
                   </span>
                 </div>
                 <div className="min-w-0">
@@ -44,9 +48,12 @@ export function RecentOrders({ orders }: { orders: RecentOrder[] }) {
               </div>
               <div className="ml-3 flex items-center gap-3">
                 <span className="whitespace-nowrap text-sm font-semibold text-heading">
-                  ₺{order.amount.toLocaleString('tr-TR')}
+                  {fmtTry(order.amount)}
                 </span>
-                <StatusBadge status={order.status} config={dashboardOrderStatusConfig(t)} />
+                <StatusBadge
+                  status={order.status}
+                  config={dashboardOrderStatusConfig(t)}
+                />
                 <span className="whitespace-nowrap text-xs text-muted">
                   {formatRelativeDate(order.createdAt, t)}
                 </span>
@@ -54,9 +61,10 @@ export function RecentOrders({ orders }: { orders: RecentOrder[] }) {
             </div>
           ))
         ) : (
-          <div className="py-8 text-center text-muted">
-            {t('admin.dashboard.recentOrders.empty')}
-          </div>
+          <EmptyState
+            size="compact"
+            title={t("admin.dashboard.recentOrders.empty")}
+          />
         )}
       </div>
     </SectionCard>

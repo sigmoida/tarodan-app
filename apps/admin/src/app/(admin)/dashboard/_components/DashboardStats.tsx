@@ -10,11 +10,12 @@ import {
 } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { MetricCard } from "@/components/MetricCard";
+import { fmtNumber, fmtTry } from "@/lib/format";
 import { PeriodBreakdown } from "./PeriodBreakdown";
 import { type DashboardStats as Stats, type VisitorStats } from "../_lib/types";
 
-const fmtCount = (n: number) => n.toLocaleString();
-const fmtTry = (n: number) => `₺${n.toLocaleString()}`;
+const fmtCount = (n: number) => fmtNumber(n) ?? "—";
+const fmtCurrency = (n: number) => fmtTry(n) ?? "—";
 
 function SplitValue({ left, right }: { left: number; right: number }) {
   return (
@@ -56,12 +57,12 @@ export function DashboardStats({
         icon={CurrencyDollarIcon}
         tone="success"
         label={t("admin.dashboard.stats.commissionRevenue")}
-        value={fmtTry(stats.netCommissionTotal)}
+        value={fmtCurrency(stats.netCommissionTotal)}
         change={stats.netCommissionPeriods.changePercent}
         footer={
           <PeriodBreakdown
             periods={stats.netCommissionPeriods}
-            format={fmtTry}
+            format={fmtCurrency}
           />
         }
       />
@@ -96,20 +97,26 @@ export function DashboardStats({
         icon={BanknotesIcon}
         tone="success"
         label={t("admin.dashboard.stats.grossSales")}
-        value={fmtTry(stats.grossSales)}
+        value={fmtCurrency(stats.grossSales)}
         change={stats.grossSalesPeriods.changePercent}
         footer={
-          <PeriodBreakdown periods={stats.grossSalesPeriods} format={fmtTry} />
+          <PeriodBreakdown
+            periods={stats.grossSalesPeriods}
+            format={fmtCurrency}
+          />
         }
       />
       <MetricCard
         icon={ArrowTrendingUpIcon}
         tone="success"
         label={t("admin.dashboard.stats.netCommission")}
-        value={fmtTry(stats.netCommissionRow2.thisMonth)}
+        value={fmtCurrency(stats.netCommissionRow2.thisMonth)}
         change={stats.netCommissionRow2.changePercent}
         footer={
-          <PeriodBreakdown periods={stats.netCommissionRow2} format={fmtTry} />
+          <PeriodBreakdown
+            periods={stats.netCommissionRow2}
+            format={fmtCurrency}
+          />
         }
       />
       <MetricCard

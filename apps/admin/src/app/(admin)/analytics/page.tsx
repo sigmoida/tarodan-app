@@ -3,10 +3,10 @@
 import dynamic from "next/dynamic";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Select } from "@tarodan/ui";
+import { EmptyState, Select } from "@tarodan/ui";
 import { AdminPage } from "@/components/page/AdminPage";
-import { PageLoading } from "@/components/PageLoading";
 import { PageHeader } from "@/components/AdminList";
+import { SuspenseBoundary } from "@/components/page/SuspenseBoundary";
 import { AdminTabs } from "@/components/AdminTabs";
 import {
   type DateRange,
@@ -31,11 +31,40 @@ const ProductsTab = dynamic(
 );
 import { TradesTab } from "./_components/TradesTab";
 
+function AnalyticsContent({
+  dateRange,
+  tab,
+}: {
+  dateRange: DateRange;
+  tab: string;
+}) {
+  const t = useTranslations();
+  const data = useAnalytics(dateRange);
+  const activeTab = tab as keyof typeof data.availability;
+
+  if (!data.availability[activeTab]) {
+    return (
+      <EmptyState
+        title={t("admin.analytics.emptyTitle")}
+        description={t("admin.analytics.emptyDescription")}
+      />
+    );
+  }
+
+  return (
+    <>
+      {tab === "sales" && <SalesTab report={data.salesReport} />}
+      {tab === "users" && <UsersTab report={data.userReport} />}
+      {tab === "products" && <ProductsTab report={data.productReport} />}
+      {tab === "trades" && <TradesTab report={data.tradeReport} />}
+    </>
+  );
+}
+
 export default function AnalyticsPage() {
   const t = useTranslations();
   const [dateRange, setDateRange] = useState<DateRange>("30d");
   const [tab, setTab] = useState("sales");
-  const { data, loading } = useAnalytics(dateRange);
 
   return (
     <AdminPage>
@@ -56,16 +85,9 @@ export default function AnalyticsPage() {
         />
       </div>
 
-      {loading || !data ? (
-        <PageLoading />
-      ) : (
-        <>
-          {tab === "sales" && <SalesTab report={data.salesReport} />}
-          {tab === "users" && <UsersTab report={data.userReport} />}
-          {tab === "products" && <ProductsTab report={data.productReport} />}
-          {tab === "trades" && <TradesTab report={data.tradeReport} />}
-        </>
-      )}
+      <SuspenseBoundary>
+        <AnalyticsContent dateRange={dateRange} tab={tab} />
+      </SuspenseBoundary>
     </AdminPage>
   );
 }

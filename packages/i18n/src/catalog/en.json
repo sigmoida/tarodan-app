@@ -2871,10 +2871,10 @@
           "colQuantity": "Quantity",
           "colUnitPrice": "Unit Price",
           "colTotal": "Total",
-          "subtotal": "Subtotal: ₺{amount}",
-          "discount": "Discount{code}: -₺{amount}",
-          "shipping": "Shipping: ₺{amount}",
-          "total": "TOTAL: ₺{amount}",
+          "subtotal": "Subtotal: {amount}",
+          "discount": "Discount{code}: -{amount}",
+          "shipping": "Shipping: {amount}",
+          "total": "TOTAL: {amount}",
           "tracking": "Shipment Tracking",
           "error": "Failed to generate invoice"
         }
@@ -3316,6 +3316,8 @@
     "analytics": {
       "title": "Analytics",
       "description": "Detailed sales, user, and product analytics",
+      "emptyTitle": "No data for this period",
+      "emptyDescription": "Choose another date range or check again after new data is available.",
       "dateRange": {
         "7d": "7 Days",
         "30d": "30 Days",

@@ -10,6 +10,7 @@ import {
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { MetricCard } from "@/components/MetricCard";
+import { QueryErrorCard } from "@/components/page/QueryErrorCard";
 import { type Discount } from "../_lib/types";
 
 /**
@@ -17,7 +18,7 @@ import { type Discount } from "../_lib/types";
  * discount mutations (`invalidates: ['discounts']`) refresh this too.
  */
 export function DiscountsStats() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: adminKeys.stats("discounts"),
     queryFn: async () => {
       const res = await adminApi.get("/admin/discounts", {
@@ -36,6 +37,12 @@ export function DiscountsStats() {
   });
 
   const s = data ?? { total: 0, active: 0, coupons: 0, auto: 0 };
+
+  if (isError) {
+    return (
+      <QueryErrorCard onRetry={() => void refetch()} isRetrying={isFetching} />
+    );
+  }
 
   return (
     <div className="grid grid-cols-2 gap-4 md:grid-cols-4">

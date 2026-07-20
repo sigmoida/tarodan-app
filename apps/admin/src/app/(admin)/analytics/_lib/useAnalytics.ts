@@ -1,55 +1,20 @@
-'use client';
+"use client";
 
-import { useQuery } from '@tanstack/react-query';
-import { useTranslations } from 'next-intl';
-import { adminApi } from '@/lib/api';
-import { type AnalyticsData, type DateRange, getDateRangeParams } from './types';
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { adminApi } from "@/lib/api";
+import {
+  type AnalyticsData,
+  type DateRange,
+  getDateRangeParams,
+} from "./types";
 
-type T = ReturnType<typeof useTranslations<never>>;
-
-// ─── Mock fallbacks (shown when an endpoint returns nothing) ─────────────────
-
-function generateMockDailyData(dateRange: DateRange) {
-  const days =
-    dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : dateRange === '90d' ? 90 : 365;
-  return Array.from({ length: Math.min(days, 30) }, (_, i) => ({
-    date: new Date(Date.now() - (days - i - 1) * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split('T')[0],
-    orders: Math.floor(Math.random() * 50) + 10,
-    revenue: Math.floor(Math.random() * 20000) + 5000,
-  }));
-}
-
-function generateMockGrowthData() {
-  return Array.from({ length: 12 }, (_, i) => ({
-    month: new Date(Date.now() - (11 - i) * 30 * 24 * 60 * 60 * 1000).toLocaleString(
-      'tr-TR',
-      { month: 'short' },
-    ),
-    users: Math.floor(Math.random() * 500) + 100,
-  }));
-}
-
-function generateMockCategoryData(t: T) {
-  return [
-    { name: 'Hot Wheels', count: 2345, percentage: 35 },
-    { name: 'Matchbox', count: 1567, percentage: 23 },
-    { name: 'Tomica', count: 987, percentage: 15 },
-    { name: 'Majorette', count: 765, percentage: 11 },
-    { name: 'Maisto', count: 543, percentage: 8 },
-    { name: t('admin.analytics.categoryOther'), count: 536, percentage: 8 },
-  ];
-}
-
-function normalizeProductReport(raw: any, t: T) {
+function normalizeProductReport(raw: any) {
   return {
     totalProducts: raw.total ?? raw.totalProducts ?? 0,
     activeProducts: raw.active ?? raw.activeProducts ?? 0,
     pendingProducts: raw.pending ?? raw.pendingProducts ?? 0,
     averagePrice: raw.averagePrice ?? 0,
-    categoryDistribution:
-      raw.categoryDistribution ?? raw.categories ?? generateMockCategoryData(t),
+    categoryDistribution: raw.categoryDistribution ?? raw.categories ?? [],
   };
 }
 
@@ -63,36 +28,50 @@ function normalizeTradeReport(raw: any) {
   };
 }
 
+function hasReportData(value: unknown): boolean {
+  if (Array.isArray(value)) return value.length > 0;
+  return !!value && typeof value === "object" && Object.keys(value).length > 0;
+}
+
 // ─── Fetch + normalize all four reports ──────────────────────────────────────
 
-async function fetchAnalytics(dateRange: DateRange, t: T): Promise<AnalyticsData> {
-  const params = { ...getDateRangeParams(dateRange), groupBy: 'day' as const };
+async function fetchAnalytics(dateRange: DateRange): Promise<AnalyticsData> {
+  const params = { ...getDateRangeParams(dateRange), groupBy: "day" as const };
 
-  const [salesRes, revenueRes, userRes, productRes, tradeRes] = await Promise.all([
-    adminApi.getSalesAnalytics(params).catch(() => ({ data: null })),
-    adminApi.getRevenueAnalytics(params).catch(() => ({ data: null })),
-    adminApi.getUserAnalytics(params).catch(() => ({ data: null })),
-    adminApi.getProductReport(params).catch(() => ({ data: null })),
-    adminApi.getTradeReport(params).catch(() => ({ data: null })),
-  ]);
+  const [salesRes, revenueRes, userRes, productRes, tradeRes] =
+    await Promise.all([
+      adminApi.getSalesAnalytics(params),
+      adminApi.getRevenueAnalytics(params),
+      adminApi.getUserAnalytics(params),
+      adminApi.getProductReport(params),
+      adminApi.getTradeReport(params),
+    ]);
 
   const salesData = salesRes?.data?.data ?? salesRes?.data;
   const salesSummary = salesRes?.data?.summary ?? {};
   const revenueSummary = revenueRes?.data?.summary ?? {};
   const userData = userRes?.data?.data ?? userRes?.data;
   const userSummary = userRes?.data?.summary ?? {};
+  const productData = productRes?.data?.data ?? productRes?.data;
+  const tradeData = tradeRes?.data?.data ?? tradeRes?.data;
 
-  const dailyArray = Array.isArray(salesData) ? salesData : (salesData?.data ?? []);
+  const dailyArray = Array.isArray(salesData)
+    ? salesData
+    : (salesData?.data ?? []);
   const dailyData = dailyArray.map((d: any) => ({
-    date: typeof d.date === 'string' ? d.date : d.date?.slice(0, 10),
+    date: typeof d.date === "string" ? d.date : d.date?.slice(0, 10),
     orders: Number(d.orderCount ?? d.orders ?? 0),
     revenue: Number(d.totalSales ?? d.revenue ?? 0),
   }));
 
-  const userGrowthArray = Array.isArray(userData) ? userData : (userData?.data ?? []);
+  const userGrowthArray = Array.isArray(userData)
+    ? userData
+    : (userData?.data ?? []);
   const userGrowth = userGrowthArray.map((d: any) => ({
     month:
-      typeof d.date === 'string' ? d.date.slice(5) : (d.date?.slice(0, 7) ?? ''),
+      typeof d.date === "string"
+        ? d.date.slice(5)
+        : (d.date?.slice(0, 7) ?? ""),
     users: Number(d.newUsers ?? d.users ?? 0),
   }));
 
@@ -103,26 +82,26 @@ async function fetchAnalytics(dateRange: DateRange, t: T): Promise<AnalyticsData
       totalCommission: revenueSummary.totalCommission ?? 0,
       averageOrderValue: salesSummary.averageOrderValue ?? 0,
       ordersByStatus: salesSummary.ordersByStatus ?? {},
-      dailyData: dailyData.length > 0 ? dailyData : generateMockDailyData(dateRange),
+      dailyData,
     },
     userReport: {
       totalUsers: userSummary.totalUsers ?? 0,
       newUsers: userSummary.totalNewUsers ?? 0,
       activeUsers: userSummary.averageDailyActiveUsers ?? 0,
       sellerCount: userSummary.totalNewSellers ?? 0,
-      userGrowth: userGrowth.length > 0 ? userGrowth : generateMockGrowthData(),
+      userGrowth,
     },
-    productReport: productRes?.data
-      ? normalizeProductReport(productRes.data, t)
+    productReport: productData
+      ? normalizeProductReport(productData)
       : {
           totalProducts: 0,
           activeProducts: 0,
           pendingProducts: 0,
           averagePrice: 0,
-          categoryDistribution: generateMockCategoryData(t),
+          categoryDistribution: [],
         },
-    tradeReport: tradeRes?.data
-      ? normalizeTradeReport(tradeRes.data)
+    tradeReport: tradeData
+      ? normalizeTradeReport(tradeData)
       : {
           totalTrades: 0,
           completedTrades: 0,
@@ -130,15 +109,23 @@ async function fetchAnalytics(dateRange: DateRange, t: T): Promise<AnalyticsData
           disputedTrades: 0,
           averageTradeValue: 0,
         },
+    availability: {
+      sales:
+        dailyData.length > 0 ||
+        Object.keys(salesSummary).length > 0 ||
+        Object.keys(revenueSummary).length > 0,
+      users: userGrowth.length > 0 || Object.keys(userSummary).length > 0,
+      products: hasReportData(productData),
+      trades: hasReportData(tradeData),
+    },
   };
 }
 
 /** Loads + normalizes all analytics reports for the selected range (TanStack Query). */
 export function useAnalytics(dateRange: DateRange) {
-  const t = useTranslations();
-  const query = useQuery({
-    queryKey: ['analytics', dateRange],
-    queryFn: () => fetchAnalytics(dateRange, t),
+  const query = useSuspenseQuery({
+    queryKey: ["analytics", dateRange],
+    queryFn: () => fetchAnalytics(dateRange),
   });
-  return { data: query.data, loading: query.isLoading };
+  return query.data;
 }

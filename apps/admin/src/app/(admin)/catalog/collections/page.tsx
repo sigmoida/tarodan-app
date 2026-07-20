@@ -46,7 +46,14 @@ export default function CollectionsPage() {
   });
   const toggle = useAdminMutation(
     (c: Collection) => adminApi.setCollectionVisibility(c.id, !c.isPublic),
-    { invalidates: ["collections"] },
+    {
+      invalidates: ["collections"],
+      optimistic: {
+        resources: "collections",
+        id: (c) => c.id,
+        patch: (c) => ({ isPublic: !c.isPublic }),
+      },
+    },
   );
 
   const onDelete = useCallback(

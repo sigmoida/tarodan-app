@@ -95,7 +95,7 @@ export function adColumns({ onToggle, togglingId, rowMenu }: AdColumnProps) {
           variant={ad.isActive ? "success" : "secondary"}
           size="sm"
           onClick={() => onToggle(ad)}
-          isLoading={togglingId === ad.id}
+          disabled={togglingId === ad.id}
         >
           {ad.isActive ? "Aktif" : "Pasif"}
         </Button>

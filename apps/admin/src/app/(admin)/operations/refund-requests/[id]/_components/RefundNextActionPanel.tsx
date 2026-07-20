@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { Alert, Button } from "@tarodan/ui";
+import { fmtTry } from "@/lib/format";
 import {
   InformationCircleIcon,
   ExclamationTriangleIcon,
@@ -21,10 +22,6 @@ const VARIANT_ICON: Record<GuidanceVariant, React.ReactNode> = {
   danger: <XCircleIcon className="h-6 w-6" />,
   default: <InformationCircleIcon className="h-6 w-6" />,
 };
-
-function fmtTry(n: number): string {
-  return `₺${n.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}`;
-}
 
 export interface RefundNextActionPanelProps {
   status: string;

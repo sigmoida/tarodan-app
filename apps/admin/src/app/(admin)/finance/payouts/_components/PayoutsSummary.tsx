@@ -3,7 +3,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { BanknotesIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
+import { adminKeys } from "@/lib/query/keys";
 import { MetricCard } from "@/components/MetricCard";
+import { QueryErrorCard } from "@/components/page/QueryErrorCard";
 import { SkeletonText } from "@tarodan/ui";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { fmtTry } from "@/lib/format";
@@ -12,10 +14,17 @@ import { useTranslations } from "next-intl";
 
 export function PayoutsSummary() {
   const t = useTranslations();
-  const { data, isLoading } = useQuery<PayoutSummary>({
-    queryKey: ["payouts-summary"],
-    queryFn: async () => (await adminApi.getPayoutsSummary()).data,
-  });
+  const { data, isLoading, isError, isFetching, refetch } =
+    useQuery<PayoutSummary>({
+      queryKey: adminKeys.all("payouts-summary"),
+      queryFn: async () => (await adminApi.getPayoutsSummary()).data,
+    });
+
+  if (isError) {
+    return (
+      <QueryErrorCard onRetry={() => void refetch()} isRetrying={isFetching} />
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">

@@ -33,7 +33,14 @@ export default function ManufacturersPage() {
   const toggle = useAdminMutation(
     (m: Manufacturer) =>
       adminApi.updateManufacturer(m.id, { isActive: !m.isActive }),
-    { invalidates: ["manufacturers"] },
+    {
+      invalidates: ["manufacturers"],
+      optimistic: {
+        resources: "manufacturers",
+        id: (m) => m.id,
+        patch: (m) => ({ isActive: !m.isActive }),
+      },
+    },
   );
 
   const onDelete = useCallback(

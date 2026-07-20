@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useTranslations } from "next-intl";
+import { fmtTry } from "@/lib/format";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -9,37 +10,34 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('tr-TR', {
-    style: 'currency',
-    currency: 'TRY',
-  }).format(amount);
+  return fmtTry(amount) ?? "—";
 }
 
 export function formatDate(date: string | Date): string {
-  return new Intl.DateTimeFormat('tr-TR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
+  return new Intl.DateTimeFormat("tr-TR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
   }).format(new Date(date));
 }
 
 export function formatDateTime(date: string | Date): string {
-  return new Intl.DateTimeFormat('tr-TR', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+  return new Intl.DateTimeFormat("tr-TR", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   }).format(new Date(date));
 }
 
 export function formatNumber(num: number): string {
-  return new Intl.NumberFormat('tr-TR').format(num);
+  return new Intl.NumberFormat("tr-TR").format(num);
 }
 
 export function truncate(str: string, length: number): string {
   if (str.length <= length) return str;
-  return str.slice(0, length) + '...';
+  return str.slice(0, length) + "...";
 }
 
 /**
@@ -50,19 +48,26 @@ export function truncate(str: string, length: number): string {
  * order / refund flows — and stay as-is regardless of locale; only the
  * returned LABEL is translated via `t`.
  */
-export function cancelReasonLabel(reason: string | null | undefined, t: T): string | null {
+export function cancelReasonLabel(
+  reason: string | null | undefined,
+  t: T,
+): string | null {
   if (!reason) return null;
   /* eslint-disable @tarodan/no-hardcoded-turkish -- backend data match patterns (see docblock), not display copy */
   const STOCKOUT = [
-    'Stok tükendi',
-    'Stok tükendiği için otomatik iptal edildi',
-    'Stok takas icin ayrildi',
+    "Stok tükendi",
+    "Stok tükendiği için otomatik iptal edildi",
+    "Stok takas icin ayrildi",
   ];
-  if (STOCKOUT.includes(reason)) return t('admin.shared.cancelReason.stockout');
-  if (reason.startsWith('Ödeme süresi')) return t('admin.shared.cancelReason.paymentExpired');
-  if (reason === 'Alıcı tarafından iptal edildi') return t('admin.shared.cancelReason.buyerCancelled');
-  if (reason.startsWith('Satıcı belirlenen süre')) return t('admin.shared.cancelReason.sellerMissedShipping');
-  if (reason.startsWith('Süre dolumu')) return t('admin.shared.cancelReason.deadlineExpired');
+  if (STOCKOUT.includes(reason)) return t("admin.shared.cancelReason.stockout");
+  if (reason.startsWith("Ödeme süresi"))
+    return t("admin.shared.cancelReason.paymentExpired");
+  if (reason === "Alıcı tarafından iptal edildi")
+    return t("admin.shared.cancelReason.buyerCancelled");
+  if (reason.startsWith("Satıcı belirlenen süre"))
+    return t("admin.shared.cancelReason.sellerMissedShipping");
+  if (reason.startsWith("Süre dolumu"))
+    return t("admin.shared.cancelReason.deadlineExpired");
   /* eslint-enable @tarodan/no-hardcoded-turkish */
   return reason;
 }
@@ -71,8 +76,13 @@ export function cancelReasonLabel(reason: string | null | undefined, t: T): stri
  * Human label for an order's origin: offer-based orders carry an offerId,
  * everything else is a direct purchase.
  */
-export function orderOriginLabel(offerId: string | null | undefined, t: T): string {
-  return offerId ? t('admin.shared.orderOrigin.offer') : t('admin.shared.orderOrigin.directSale');
+export function orderOriginLabel(
+  offerId: string | null | undefined,
+  t: T,
+): string {
+  return offerId
+    ? t("admin.shared.orderOrigin.offer")
+    : t("admin.shared.orderOrigin.directSale");
 }
 
 /**
@@ -97,12 +107,12 @@ export function statusFilterOptions(
   opts: { keys?: string[]; allLabel?: string } = {},
 ): { value: string; label: string }[] {
   // eslint-disable-next-line @tarodan/no-hardcoded-turkish -- default for out-of-slice callers (finance/marketing); dönüşecek onlarla birlikte
-  const { keys, allLabel = 'Tümü' } = opts;
+  const { keys, allLabel = "Tümü" } = opts;
   const entries = keys
     ? keys.map((k) => [k, config[k]] as const).filter(([, v]) => Boolean(v))
     : (Object.entries(config) as [string, { label: string }][]);
   return [
-    { value: 'all', label: allLabel },
+    { value: "all", label: allLabel },
     ...entries.map(([value, cfg]) => ({ value, label: cfg!.label })),
   ];
 }

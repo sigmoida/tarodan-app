@@ -28,7 +28,14 @@ export default function CarModelsPage() {
   });
   const toggle = useAdminMutation(
     (m: CarModel) => adminApi.updateCarModel(m.id, { isActive: !m.isActive }),
-    { invalidates: ["car-models", "brands"] },
+    {
+      invalidates: ["car-models", "brands"],
+      optimistic: {
+        resources: ["car-models", "brands"],
+        id: (m) => m.id,
+        patch: (m) => ({ isActive: !m.isActive }),
+      },
+    },
   );
 
   const onDelete = useCallback(

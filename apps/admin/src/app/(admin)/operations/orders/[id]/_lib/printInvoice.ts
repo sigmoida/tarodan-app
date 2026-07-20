@@ -2,6 +2,7 @@ import toast from "react-hot-toast";
 import type { useTranslations } from "next-intl";
 import { colors as dsColors } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
+import { fmtTry } from "@/lib/format";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -90,8 +91,8 @@ export async function printOrderInvoice(orderId: string, t: T): Promise<void> {
               <tr>
                 <td>${escapeHtml(item.title)}</td>
                 <td>${escapeHtml(item.quantity)}</td>
-                <td>₺${escapeHtml(item.unitPrice.toLocaleString("tr-TR", { minimumFractionDigits: 2 }))}</td>
-                <td>₺${escapeHtml(item.total.toLocaleString("tr-TR", { minimumFractionDigits: 2 }))}</td>
+                <td>${escapeHtml(fmtTry(item.unitPrice) ?? "—")}</td>
+                <td>${escapeHtml(fmtTry(item.total) ?? "—")}</td>
               </tr>
             `,
               )
@@ -99,14 +100,14 @@ export async function printOrderInvoice(orderId: string, t: T): Promise<void> {
           </tbody>
         </table>
         <div class="totals">
-          <p>${escapeHtml(t("admin.operations.orders.invoice.subtotal", { amount: invoiceData.subtotal.toLocaleString("tr-TR", { minimumFractionDigits: 2 }) }))}</p>
+          <p>${escapeHtml(t("admin.operations.orders.invoice.subtotal", { amount: fmtTry(invoiceData.subtotal) ?? "—" }))}</p>
           ${
             invoiceData.discountAmount > 0
-              ? `<p style="color: #16a34a;">${escapeHtml(t("admin.operations.orders.invoice.discount", { code: invoiceData.discountCode ? ` (${invoiceData.discountCode})` : "", amount: Number(invoiceData.discountAmount).toLocaleString("tr-TR", { minimumFractionDigits: 2 }) }))}</p>`
+              ? `<p style="color: #16a34a;">${escapeHtml(t("admin.operations.orders.invoice.discount", { code: invoiceData.discountCode ? ` (${invoiceData.discountCode})` : "", amount: fmtTry(invoiceData.discountAmount) ?? "—" }))}</p>`
               : ""
           }
-          <p>${escapeHtml(t("admin.operations.orders.invoice.shipping", { amount: invoiceData.shippingCost.toLocaleString("tr-TR", { minimumFractionDigits: 2 }) }))}</p>
-          <p class="total-row">${escapeHtml(t("admin.operations.orders.invoice.total", { amount: invoiceData.total.toLocaleString("tr-TR", { minimumFractionDigits: 2 }) }))}</p>
+          <p>${escapeHtml(t("admin.operations.orders.invoice.shipping", { amount: fmtTry(invoiceData.shippingCost) ?? "—" }))}</p>
+          <p class="total-row">${escapeHtml(t("admin.operations.orders.invoice.total", { amount: fmtTry(invoiceData.total) ?? "—" }))}</p>
         </div>
         ${
           invoiceData.shipment?.trackingNumber

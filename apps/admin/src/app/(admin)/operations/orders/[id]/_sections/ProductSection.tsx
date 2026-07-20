@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { getProductEffectivePrice } from "@/lib/product-price";
+import { fmtTry } from "@/lib/format";
 import { SectionCard } from "@/components/detail/SectionCard";
 import type { OrderDetail } from "../types";
 
@@ -29,10 +30,7 @@ export function ProductSection({ order }: { order: OrderDetail }) {
             {order.product.title}
           </Link>
           <p className="mt-1 text-muted">
-            ₺
-            {getProductEffectivePrice(order.product).toLocaleString("tr-TR", {
-              minimumFractionDigits: 2,
-            })}
+            {fmtTry(getProductEffectivePrice(order.product))}
           </p>
         </div>
       </div>
