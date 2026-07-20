@@ -1,18 +1,18 @@
-'use client';
+"use client";
 
-import { useCallback, useState } from 'react';
-import { Button, cn } from '@tarodan/ui';
-import { ArrowPathIcon } from '@heroicons/react/24/outline';
-import toast from 'react-hot-toast';
-import { adminApi } from '@/lib/api';
-import { AdminPage } from '@/components/page/AdminPage';
-import { PageHeader } from '@/components/AdminList';
-import { AdminTabs } from '@/components/AdminTabs';
-import { FilterToolbar } from '@/components/AdminList';
-import { DataTable, type ColumnDef } from '@/components/DataTable';
-import { Pagination } from '@/components/Pagination';
-import { MetricCard } from '@/components/MetricCard';
-import { useAdminResource } from '@/hooks/useAdminResource';
+import { useCallback, useState } from "react";
+import { Button, cn } from "@tarodan/ui";
+import { ArrowPathIcon } from "@heroicons/react/24/outline";
+import toast from "react-hot-toast";
+import { adminApi } from "@/lib/api";
+import { AdminPage } from "@/components/page/AdminPage";
+import { PageHeader } from "@/components/AdminList";
+import { AdminTabs } from "@/components/AdminTabs";
+import { FilterToolbar } from "@/components/AdminList";
+import { DataTable, type ColumnDef } from "@/components/DataTable";
+import { Pagination } from "@/components/Pagination";
+import { MetricCard } from "@/components/MetricCard";
+import { useAdminResource } from "@/hooks/useAdminResource";
 import {
   type LogTab,
   type AnyLog,
@@ -21,22 +21,27 @@ import {
   LOG_TABS,
   SEARCH_PLACEHOLDERS,
   EMPTY_TEXT,
-} from './_lib/types';
-import { buildErrorColumns, buildSecurityColumns, buildEmailColumns, buildAuditColumns } from './_lib/columns';
-import { statCards } from './_lib/stats';
-import { LogsFilters } from './_components/LogsFilters';
-import { ErrorDetail, AuditDetail } from './_components/LogDetails';
+} from "./_lib/types";
+import {
+  buildErrorColumns,
+  buildSecurityColumns,
+  buildEmailColumns,
+  buildAuditColumns,
+} from "./_lib/columns";
+import { statCards } from "./_lib/stats";
+import { LogsFilters } from "./_components/LogsFilters";
+import { ErrorDetail, AuditDetail } from "./_components/LogDetails";
 
 export default function LogsPage() {
-  const [tab, setTab] = useState<LogTab>('errors');
+  const [tab, setTab] = useState<LogTab>("errors");
   const [expandedErrorId, setExpandedErrorId] = useState<string | null>(null);
   const [expandedAuditId, setExpandedAuditId] = useState<string | null>(null);
 
   const fetcher = useCallback(
     (params: Record<string, any>) => {
-      if (tab === 'errors') return adminApi.getErrorLogs(params);
-      if (tab === 'security') return adminApi.getSecurityLogs(params);
-      if (tab === 'emails') return adminApi.getEmailLogs(params);
+      if (tab === "errors") return adminApi.getErrorLogs(params);
+      if (tab === "security") return adminApi.getSecurityLogs(params);
+      if (tab === "emails") return adminApi.getEmailLogs(params);
       return adminApi.getAuditLogs({
         page: params.page,
         limit: params.limit,
@@ -46,6 +51,8 @@ export default function LogsPage() {
         adminId: params.adminId || undefined,
         fromDate: params.fromDate || undefined,
         toDate: params.toDate || undefined,
+        sortBy: params.sortBy,
+        sortOrder: params.sortOrder,
       });
     },
     [tab],
@@ -56,9 +63,11 @@ export default function LogsPage() {
     fetcher,
     limit: 20,
     syncUrl: true,
-    errorMessage: 'Loglar yüklenirken bir hata oluştu',
+    errorMessage: "Loglar yüklenirken bir hata oluştu",
     initialFilters:
-      tab === 'audit' ? { action: '', entityType: '', adminId: '', fromDate: '', toDate: '' } : {},
+      tab === "audit"
+        ? { action: "", entityType: "", adminId: "", fromDate: "", toDate: "" }
+        : {},
   });
 
   // Stats + total are derived from the raw backend response (no setState during render).
@@ -74,32 +83,43 @@ export default function LogsPage() {
   const handleResolve = async (id: string) => {
     try {
       await adminApi.resolveSecurityIssue(id);
-      toast.success('Sorun çözümlendi');
+      toast.success("Sorun çözümlendi");
       r.refetch();
     } catch {
-      toast.error('İşlem başarısız');
+      toast.error("İşlem başarısız");
     }
   };
 
   const columns =
-    tab === 'errors'
-      ? buildErrorColumns({ expandedId: expandedErrorId, setExpandedId: setExpandedErrorId })
-      : tab === 'security'
+    tab === "errors"
+      ? buildErrorColumns({
+          expandedId: expandedErrorId,
+          setExpandedId: setExpandedErrorId,
+        })
+      : tab === "security"
         ? buildSecurityColumns(handleResolve)
-        : tab === 'emails'
+        : tab === "emails"
           ? buildEmailColumns()
-          : buildAuditColumns({ expandedId: expandedAuditId, setExpandedId: setExpandedAuditId });
+          : buildAuditColumns({
+              expandedId: expandedAuditId,
+              setExpandedId: setExpandedAuditId,
+            });
   const tableColumns = columns as unknown as ColumnDef<AnyLog, any>[];
 
-  const expandedId = tab === 'errors' ? expandedErrorId : tab === 'audit' ? expandedAuditId : null;
+  const expandedId =
+    tab === "errors"
+      ? expandedErrorId
+      : tab === "audit"
+        ? expandedAuditId
+        : null;
   const renderExpanded =
-    tab === 'errors'
+    tab === "errors"
       ? (row: AnyLog) => (
           <div className="px-4 pb-4">
             <ErrorDetail log={row as ErrorLog} />
           </div>
         )
-      : tab === 'audit'
+      : tab === "audit"
         ? (row: AnyLog) => (
             <div className="px-4 pb-4">
               <AuditDetail log={row as AuditLog} />
@@ -112,14 +132,23 @@ export default function LogsPage() {
 
   return (
     <AdminPage>
-      <PageHeader title="Loglar" description="Sistem hataları, güvenlik olayları, e-postalar ve admin işlemleri">
+      <PageHeader
+        title="Loglar"
+        description="Sistem hataları, güvenlik olayları, e-postalar ve admin işlemleri"
+      >
         <Button variant="secondary" onClick={() => r.refetch()} title="Yenile">
-          <ArrowPathIcon className={cn('h-5 w-5', r.isLoading && 'animate-spin')} />
+          <ArrowPathIcon
+            className={cn("h-5 w-5", r.isLoading && "animate-spin")}
+          />
         </Button>
       </PageHeader>
 
       <AdminTabs
-        tabs={LOG_TABS.map((t) => ({ key: t.key, label: t.label, icon: t.icon as any }))}
+        tabs={LOG_TABS.map((t) => ({
+          key: t.key,
+          label: t.label,
+          icon: t.icon as any,
+        }))}
         value={tab}
         onChange={handleTabChange}
       />
@@ -132,7 +161,13 @@ export default function LogsPage() {
       {stats && cards.length > 0 && (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
           {cards.map((c) => (
-            <MetricCard key={c.label} icon={c.icon} tone={c.tone} label={c.label} value={c.value} />
+            <MetricCard
+              key={c.label}
+              icon={c.icon}
+              tone={c.tone}
+              label={c.label}
+              value={c.value}
+            />
           ))}
         </div>
       )}
@@ -154,9 +189,15 @@ export default function LogsPage() {
         getRowId={(row) => row.id}
         expandedId={expandedId}
         renderExpanded={renderExpanded}
+        sort={r.sort}
+        onSort={r.setSort}
       />
 
-      <Pagination page={r.page} totalPages={r.totalPages} onPageChange={r.setPage} />
+      <Pagination
+        page={r.page}
+        totalPages={r.totalPages}
+        onPageChange={r.setPage}
+      />
     </AdminPage>
   );
 }

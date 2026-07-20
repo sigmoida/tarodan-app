@@ -86,6 +86,23 @@ describe("admin list primitives", () => {
       ).toEqual({ category: { name: "asc" } });
     });
 
+    it("allows a sort map to override a scalar field", () => {
+      expect(
+        resolveOrderBy<Prisma.UserOrderByWithRelationInput>(
+          "User",
+          { sortBy: "lastLoginAt", sortOrder: "asc" },
+          {
+            defaultSort: { createdAt: "desc" },
+            sortMap: {
+              lastLoginAt: (direction) => ({
+                lastLoginAt: { sort: direction, nulls: "last" },
+              }),
+            },
+          },
+        ),
+      ).toEqual({ lastLoginAt: { sort: "asc", nulls: "last" } });
+    });
+
     it("uses the default for an unknown sort key without throwing", () => {
       expect(
         resolveOrderBy(

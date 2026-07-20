@@ -14,7 +14,7 @@ import { Type, Transform } from "class-transformer";
 import { ProductStatus, OrderStatus } from "@prisma/client";
 import { AdminListQueryDto } from "../../../common/list";
 
-export class AdminUserQueryDto {
+export class AdminUserQueryDto extends AdminListQueryDto {
   @ApiPropertyOptional({ example: "john" })
   @IsOptional()
   @IsString()
@@ -33,21 +33,18 @@ export class AdminUserQueryDto {
   @Transform(({ value }) => value === "true" || value === true)
   @IsBoolean()
   isBanned?: boolean;
+}
 
-  @ApiPropertyOptional({ example: 1 })
+export class SellerApplicationQueryDto extends AdminListQueryDto {
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(1)
-  page?: number;
+  @IsString()
+  search?: string;
 
-  @ApiPropertyOptional({ example: 20 })
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(1)
-  @Max(100)
-  limit?: number;
+  @IsString()
+  status?: string;
 }
 
 export class AdminProductQueryDto extends AdminListQueryDto {
@@ -122,7 +119,7 @@ export class AdminOrderQueryDto extends AdminListQueryDto {
   productId?: string;
 }
 
-export class AuditLogQueryDto {
+export class AuditLogQueryDto extends AdminListQueryDto {
   @ApiPropertyOptional({ example: "user_update" })
   @IsOptional()
   @IsString()
@@ -143,20 +140,13 @@ export class AuditLogQueryDto {
   @IsDateString()
   toDate?: string;
 
-  @ApiPropertyOptional({ example: 1 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(1)
-  page?: number;
-
   @ApiPropertyOptional({ example: 50 })
   @IsOptional()
   @IsNumber()
   @Type(() => Number)
   @Min(1)
   @Max(100)
-  limit?: number;
+  limit?: number = 50;
 }
 
 export class AdminPaymentQueryDto extends AdminListQueryDto {
