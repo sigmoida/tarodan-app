@@ -120,3 +120,142 @@ describe('CartService.addItem — idempotent re-add', () => {
     expect(mockPrisma.cartItem.update).not.toHaveBeenCalled();
   });
 });
+
+describe('CartService.calculateCart — unavailable items', () => {
+  const mockCartFindUnique = jest.fn();
+  const mockDiscountFindUnique = jest.fn();
+  const mockGetEffectiveDisplayPrice = jest.fn();
+  const mockCheckUsageLimit = jest.fn();
+  const mockPrisma = {
+    cart: {
+      findUnique: mockCartFindUnique,
+    },
+    discount: {
+      findUnique: mockDiscountFindUnique,
+    },
+  } as unknown as PrismaService;
+  const mockDiscountService = {
+    getEffectiveDisplayPrice: mockGetEffectiveDisplayPrice,
+    checkUsageLimit: mockCheckUsageLimit,
+  } as unknown as DiscountService;
+
+  const makeCartItem = (
+    id: string,
+    overrides: Record<string, unknown> = {},
+  ) => ({
+    id: `cart-item-${id}`,
+    quantity: 1,
+    product: {
+      id: `product-${id}`,
+      title: `Ürün ${id}`,
+      price: 100,
+      status: ProductStatus.active,
+      sellerId: 'seller-1',
+      categoryId: 'category-1',
+      quantity: 5,
+      reservedQuantity: 0,
+      maxQuantityPerOrder: null,
+      images: [],
+      seller: { id: 'seller-1', displayName: 'Satıcı' },
+      ...overrides,
+    },
+  });
+
+  const calculateCart = async (
+    items: ReturnType<typeof makeCartItem>[],
+    couponCode: string | null = null,
+  ) => {
+    mockCartFindUnique.mockResolvedValue({
+      id: 'cart-1',
+      userId: 'buyer-1',
+      couponCode,
+      expiresAt: new Date('2100-01-01'),
+      createdAt: new Date('2026-01-01'),
+      updatedAt: new Date('2026-01-01'),
+      items,
+    });
+
+    const service = new CartService(
+      mockPrisma,
+      mockDiscountService,
+      {} as StorageService,
+    );
+
+    const response = await service.getOrCreate('buyer-1');
+    return response.calculation;
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetEffectiveDisplayPrice.mockResolvedValue(null);
+    mockCheckUsageLimit.mockResolvedValue(true);
+  });
+
+  it('keeps a deleted item visible but excludes it from every payable total', async () => {
+    mockGetEffectiveDisplayPrice.mockResolvedValueOnce(100);
+
+    const result = await calculateCart([
+      makeCartItem('deleted', {
+        status: ProductStatus.deleted,
+        price: 125,
+      }),
+    ]);
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toMatchObject({
+      productId: 'product-deleted',
+      isAvailable: false,
+      lineTotal: 100,
+      productDiscount: 25,
+    });
+    expect(result.itemCount).toBe(0);
+    expect(result.subtotal).toBe(0);
+    expect(result.productDiscountTotal).toBe(0);
+    expect(result.shippingCost).toBe(0);
+    expect(result.amountToFreeShipping).toBe(0);
+    expect(result.grandTotal).toBe(0);
+  });
+
+  it('calculates coupon caps and shipping from available items only', async () => {
+    mockDiscountFindUnique.mockResolvedValue({
+      id: 'discount-1',
+      name: 'Sabit indirim',
+      code: 'SAVE500',
+      isActive: true,
+      startDate: new Date('2020-01-01'),
+      endDate: new Date('2100-01-01'),
+      scope: 'global',
+      sellerId: null,
+      targetProductIds: [],
+      minCartValue: null,
+      type: 'fixed',
+      value: 500,
+      maxDiscountAmount: null,
+      isStackable: true,
+    });
+
+    const result = await calculateCart(
+      [
+        makeCartItem('available'),
+        makeCartItem('deleted', {
+          status: ProductStatus.deleted,
+          price: 1000,
+          quantity: 10,
+        }),
+      ],
+      'SAVE500',
+    );
+
+    expect(result.items).toHaveLength(2);
+    expect(result.itemCount).toBe(1);
+    expect(result.subtotal).toBe(100);
+    expect(result.couponDiscountTotal).toBe(100);
+    expect(result.totalDiscount).toBe(50);
+    expect(result.shippingCost).toBe(29.99);
+    expect(result.amountToFreeShipping).toBe(400);
+    expect(result.grandTotal).toBeCloseTo(79.99, 2);
+    expect(result.appliedDiscounts[0].affectedProductIds).toEqual([
+      'product-available',
+    ]);
+  });
+});
