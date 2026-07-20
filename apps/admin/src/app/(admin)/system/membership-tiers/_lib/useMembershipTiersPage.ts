@@ -13,7 +13,7 @@ import { type MembershipTier } from "./types";
 export const membershipTiersFetcher = clientListFetcher<MembershipTier>(
   () => adminApi.getMembershipTiers(),
   (raw) => extractList<MembershipTier>(raw),
-  { searchFields: ["name", "type", "description"] },
+  // No searchFields → full-content search across all displayed columns (#378).
 );
 
 function parseYearlyDiscount(raw: unknown): number {
