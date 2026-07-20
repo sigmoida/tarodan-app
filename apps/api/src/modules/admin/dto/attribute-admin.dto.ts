@@ -1,12 +1,13 @@
 import { IsOptional, IsString, IsNumber, Min, Max, IsBoolean, IsHexColor, MinLength, IsUUID } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type, Transform } from 'class-transformer';
+import { AdminListQueryDto } from '../../../common/list';
 
 // =============================================================================
 // Query DTOs
 // =============================================================================
 
-export class AdminAttributeGroupQueryDto {
+export class AdminAttributeGroupQueryDto extends AdminListQueryDto {
     @ApiPropertyOptional({ example: 'scale' })
     @IsOptional()
     @IsString()
@@ -17,24 +18,9 @@ export class AdminAttributeGroupQueryDto {
     @Transform(({ value }) => value === 'true' || value === true)
     @IsBoolean()
     isActive?: boolean;
-
-    @ApiPropertyOptional({ example: 1 })
-    @IsOptional()
-    @IsNumber()
-    @Type(() => Number)
-    @Min(1)
-    page?: number;
-
-    @ApiPropertyOptional({ example: 20 })
-    @IsOptional()
-    @IsNumber()
-    @Type(() => Number)
-    @Min(1)
-    @Max(100)
-    limit?: number;
 }
 
-export class AdminAttributeQueryDto {
+export class AdminAttributeQueryDto extends AdminListQueryDto {
     @ApiPropertyOptional({ example: 'uuid-group-id' })
     @IsOptional()
     @IsString()
@@ -50,21 +36,6 @@ export class AdminAttributeQueryDto {
     @Transform(({ value }) => value === 'true' || value === true)
     @IsBoolean()
     isActive?: boolean;
-
-    @ApiPropertyOptional({ example: 1 })
-    @IsOptional()
-    @IsNumber()
-    @Type(() => Number)
-    @Min(1)
-    page?: number;
-
-    @ApiPropertyOptional({ example: 50 })
-    @IsOptional()
-    @IsNumber()
-    @Type(() => Number)
-    @Min(1)
-    @Max(100)
-    limit?: number;
 }
 
 // =============================================================================

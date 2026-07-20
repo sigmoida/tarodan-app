@@ -12,7 +12,9 @@ import {
   fulltextUserDisplayNameSearch,
 } from '../../common/helpers/fulltext-search';
 import { fulltextProductSearch } from '../product/helpers/fulltext-search';
-import { RatingQueryDto, RatingStatus } from './dto';
+import { AdminUserRatingQueryDto, RatingQueryDto, RatingStatus } from './dto';
+import { Prisma } from '@prisma/client';
+import { paginate, resolveOrderBy } from '../../common/list';
 
 /**
  * Ürün yorumu ve satıcı puanı admin operasyonları — AdminService'in
@@ -157,12 +159,10 @@ export class AdminReviewService {
   /**
    * Get seller (user) ratings for admin panel
    */
-  async getUserRatings(query: { page?: number; limit?: number; search?: string; status?: string }) {
-    const p = Number(query.page) || 1;
-    const lim = Number(query.limit) || 20;
+  async getUserRatings(query: AdminUserRatingQueryDto) {
     const search = query.search;
     const status = query.status;
-    const where: any = {};
+    const where: Prisma.RatingWhereInput = {};
 
     if (search) {
       where.OR = [
@@ -175,24 +175,23 @@ export class AdminReviewService {
       where.status = status;
     }
 
-    const [total, ratings] = await Promise.all([
-      this.prisma.rating.count({ where }),
-      this.prisma.rating.findMany({
+    const orderBy = resolveOrderBy<Prisma.RatingOrderByWithRelationInput>(
+      'Rating',
+      query,
+      { defaultSort: { createdAt: 'desc' } },
+    );
+
+    return paginate(
+      this.prisma.rating,
+      {
         where,
-        orderBy: { createdAt: 'desc' },
-        skip: (p - 1) * lim,
-        take: lim,
+        orderBy,
         include: {
           giver: { select: { id: true, displayName: true, email: true } },
           receiver: { select: { id: true, displayName: true, email: true } },
         },
-      }),
-    ]);
-
-    return {
-      data: ratings,
-      meta: { total, page: p, limit: lim, totalPages: Math.ceil(total / lim) },
-    };
+      },
+      query,
+    );
   }
-
 }

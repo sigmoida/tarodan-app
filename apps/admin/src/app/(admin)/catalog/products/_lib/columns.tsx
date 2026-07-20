@@ -56,11 +56,18 @@ export function productColumns(t: T, actions: ProductRowActions) {
           {fmtTry(getProductEffectivePrice(p))}
         </span>
       ),
-      { align: "right", minWidth: 120 },
+      {
+        align: "right",
+        minWidth: 120,
+        sortKey: "price",
+        sortType: "number",
+      },
     ),
-    col.badge<Product>(t("common.status"), (p) => (
-      <Badge status={p.status} config={productStatusConfig} />
-    )),
+    col.badge<Product>(
+      t("common.status"),
+      (p) => <Badge status={p.status} config={productStatusConfig} />,
+      { sortKey: "status", sortType: "text" },
+    ),
     col.badge<Product>("AI", (p) =>
       p.aiCheckStatus ? (
         <Badge status={aiCheckKey(p.aiCheckStatus)} config={aiCheckConfig(t)} />
@@ -76,7 +83,7 @@ export function productColumns(t: T, actions: ProductRowActions) {
       href: `/accounts/users/${p.seller.id}`,
     })),
     col.text<Product>(t("common.category"), (p) => p.category.name),
-    col.date<Product>(t("common.date"), (p) => p.createdAt),
+    col.date<Product>(t("common.date"), "createdAt"),
     col.rowMenu<Product>(productRowMenu(t, actions)),
   ];
 }

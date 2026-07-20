@@ -22,6 +22,7 @@ import { SearchService } from '../search/search.service';
 import { CacheService } from '../cache/cache.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto/notification.dto';
+import { paginate, resolveOrderBy } from '../../common/list';
 
 /**
  * Ürün yönetimi + admin ürün silme/geri yükleme — AdminService'in
@@ -71,7 +72,7 @@ export class AdminProductService {
    * Get products with filters
    */
   async getProducts(query: AdminProductQueryDto) {
-    const { search, status, categoryId, sellerId, brandId, carModelId, page = 1, limit = 20 } = query;
+    const { search, status, categoryId, sellerId, brandId, carModelId } = query;
 
     const where: Prisma.ProductWhereInput = {};
 
@@ -106,24 +107,28 @@ export class AdminProductService {
       where.sellerId = sellerId;
     }
 
-    const [total, products] = await Promise.all([
-      this.prisma.product.count({ where }),
-      this.prisma.product.findMany({
+    const orderBy = resolveOrderBy<Prisma.ProductOrderByWithRelationInput>(
+      'Product',
+      query,
+      { defaultSort: { createdAt: 'desc' } },
+    );
+    const result = await paginate(
+      this.prisma.product,
+      {
         where,
         include: {
           seller: { select: { id: true, displayName: true, email: true } },
           category: { select: { id: true, name: true } },
           images: { take: 1, orderBy: { sortOrder: 'asc' } },
         },
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
+        orderBy,
+      },
+      query,
+    );
 
     // Calculate campaign prices for each product
     const productsWithCampaignPrices = await Promise.all(
-      products.map(async (p) => {
+      result.data.map(async (p) => {
         const basePrice = Number(p.price);
 
         // Get campaign discount price from DiscountService
@@ -152,8 +157,8 @@ export class AdminProductService {
     );
 
     return {
+      ...result,
       data: productsWithCampaignPrices,
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 

@@ -16,6 +16,15 @@ import {
   fulltextAttributeSearch,
 } from "../../common/helpers/fulltext-search";
 import { Prisma, Brand } from "@prisma/client";
+import { paginate, resolveOrderBy } from "../../common/list";
+import {
+  AdminAttributeGroupQueryDto,
+  AdminAttributeQueryDto,
+  AdminBrandQueryDto,
+  AdminCarModelQueryDto,
+  AdminCategoryQueryDto,
+  AdminManufacturerQueryDto,
+} from "./dto";
 
 /**
  * Katalog taksonomisi admin operasyonları (kategori, marka, üretici, araç
@@ -73,19 +82,10 @@ export class AdminCatalogService {
   /**
    * Get categories with tree structure
    */
-  async getCategories(params?: {
-    page?: number;
-    limit?: number;
-    search?: string;
-  }) {
-    // #101 faz-2: optional server pagination. Omit page AND limit → full list
-    // (old { data } shape) so dropdown consumers (useCategories/*FormModal) keep
-    // working; pass page/limit → paginated { data, meta }.
-    const { page, limit, search } = params ?? {};
-    const paginated = !(page === undefined && limit === undefined);
-    const p = page ?? 1;
-    const l = limit ?? 20;
-
+  async getCategories(
+    query: AdminCategoryQueryDto = new AdminCategoryQueryDto(),
+  ) {
+    const { search } = query;
     const where: Prisma.CategoryWhereInput = {};
     if (search) {
       where.OR = [
@@ -95,20 +95,28 @@ export class AdminCatalogService {
       ];
     }
 
-    const categories = await this.prisma.category.findMany({
-      where,
-      include: {
-        parent: true,
-        children: { orderBy: { name: "asc" } },
-        _count: {
-          select: { products: true, collections: true },
+    const orderBy = resolveOrderBy<Prisma.CategoryOrderByWithRelationInput>(
+      "Category",
+      query,
+      { defaultSort: { name: "asc" } },
+    );
+    const result = await paginate(
+      this.prisma.category,
+      {
+        where,
+        include: {
+          parent: true,
+          children: { orderBy: { name: "asc" } },
+          _count: {
+            select: { products: true, collections: true },
+          },
         },
+        orderBy,
       },
-      orderBy: { name: "asc" },
-      ...(paginated ? { skip: (p - 1) * l, take: l } : {}),
-    });
+      query,
+    );
 
-    const data = categories.map((c) => ({
+    const data = result.data.map((c) => ({
       id: c.id,
       name: c.name,
       slug: c.slug,
@@ -127,13 +135,7 @@ export class AdminCatalogService {
       createdAt: c.createdAt,
     }));
 
-    if (!paginated) return { data };
-
-    const total = await this.prisma.category.count({ where });
-    return {
-      data,
-      meta: { total, page: p, limit: l, totalPages: Math.ceil(total / l) },
-    };
+    return { ...result, data };
   }
 
   /**
@@ -348,20 +350,8 @@ export class AdminCatalogService {
   /**
    * Get all brands
    */
-  async getBrands(params?: {
-    page?: number;
-    limit?: number;
-    search?: string;
-    status?: string;
-  }) {
-    // #101 faz-2: optional server pagination + server-side active/inactive filter
-    // (was client-side). Omit page AND limit → full list ({ data }) so dropdown
-    // consumers (ProductFilters/CarModelFilters/CarModelFormModal) keep working.
-    const { page, limit, search, status } = params ?? {};
-    const paginated = !(page === undefined && limit === undefined);
-    const p = page ?? 1;
-    const l = limit ?? 20;
-
+  async getBrands(query: AdminBrandQueryDto = new AdminBrandQueryDto()) {
+    const { search, status } = query;
     const where: Prisma.BrandWhereInput = {};
     if (status === "active") where.isActive = true;
     else if (status === "inactive") where.isActive = false;
@@ -373,13 +363,14 @@ export class AdminCatalogService {
       ];
     }
 
-    const brands = await this.prisma.brand.findMany({
-      where,
-      orderBy: { name: "asc" },
-      ...(paginated ? { skip: (p - 1) * l, take: l } : {}),
-    });
+    const orderBy = resolveOrderBy<Prisma.BrandOrderByWithRelationInput>(
+      "Brand",
+      query,
+      { defaultSort: { name: "asc" } },
+    );
+    const result = await paginate(this.prisma.brand, { where, orderBy }, query);
 
-    const data = brands.map((b: Brand) => ({
+    const data = result.data.map((b: Brand) => ({
       id: b.id,
       name: b.name,
       slug: b.slug,
@@ -394,13 +385,7 @@ export class AdminCatalogService {
       updatedAt: b.updatedAt,
     }));
 
-    if (!paginated) return { data };
-
-    const total = await this.prisma.brand.count({ where });
-    return {
-      data,
-      meta: { total, page: p, limit: l, totalPages: Math.ceil(total / l) },
-    };
+    return { ...result, data };
   }
 
   /**
@@ -595,18 +580,10 @@ export class AdminCatalogService {
 
   // ==================== MANUFACTURER MANAGEMENT ====================
 
-  async getManufacturers(params?: {
-    page?: number;
-    limit?: number;
-    search?: string;
-  }) {
-    // #101 faz-2: optional server pagination. Omit page AND limit → full list
-    // ({ data }); pass page/limit → paginated { data, meta }.
-    const { page, limit, search } = params ?? {};
-    const paginated = !(page === undefined && limit === undefined);
-    const p = page ?? 1;
-    const l = limit ?? 20;
-
+  async getManufacturers(
+    query: AdminManufacturerQueryDto = new AdminManufacturerQueryDto(),
+  ) {
+    const { search } = query;
     const where: Prisma.ManufacturerWhereInput = {};
     if (search) {
       where.OR = [
@@ -618,24 +595,23 @@ export class AdminCatalogService {
       ];
     }
 
-    const manufacturers = await this.prisma.manufacturer.findMany({
-      where,
-      orderBy: { name: "asc" },
-      ...(paginated ? { skip: (p - 1) * l, take: l } : {}),
-    });
+    const orderBy = resolveOrderBy<Prisma.ManufacturerOrderByWithRelationInput>(
+      "Manufacturer",
+      query,
+      { defaultSort: { name: "asc" } },
+    );
+    const result = await paginate(
+      this.prisma.manufacturer,
+      { where, orderBy },
+      query,
+    );
 
-    const data = manufacturers.map((m) => ({
+    const data = result.data.map((m) => ({
       ...m,
       logo: this.resolveProductImageUrl(m.logo),
     }));
 
-    if (!paginated) return { data };
-
-    const total = await this.prisma.manufacturer.count({ where });
-    return {
-      data,
-      meta: { total, page: p, limit: l, totalPages: Math.ceil(total / l) },
-    };
+    return { ...result, data };
   }
 
   async createManufacturer(
@@ -771,17 +747,11 @@ export class AdminCatalogService {
 
   // ==================== CAR MODEL MANAGEMENT ====================
 
-  // #101: opsiyonel server-pagination. page/limit VERİLİRSE (admin liste sayfası)
-  // sayfalar; VERİLMEZSE (product/car-model filtre dropdown'ları, BrandModelsPanel)
-  // tüm listeyi döndürür — mevcut tüketiciler kırılmaz.
-  async getCarModels(params?: {
-    brandId?: string;
-    page?: number;
-    limit?: number;
-    search?: string;
-  }) {
-    const { brandId, page, limit, search } = params ?? {};
-    const where: Record<string, unknown> = {};
+  async getCarModels(
+    query: AdminCarModelQueryDto = new AdminCarModelQueryDto(),
+  ) {
+    const { brandId, search } = query;
+    const where: Prisma.CarModelWhereInput = {};
     if (brandId) where.brandId = brandId;
     if (search) {
       where.OR = [
@@ -790,37 +760,18 @@ export class AdminCatalogService {
         { brand: { name: { contains: search, mode: "insensitive" } } },
       ];
     }
-    const orderBy = [
-      { brand: { name: "asc" as const } },
-      { name: "asc" as const },
-    ];
+    const orderBy = resolveOrderBy<
+      | Prisma.CarModelOrderByWithRelationInput
+      | Prisma.CarModelOrderByWithRelationInput[]
+    >("CarModel", query, {
+      defaultSort: [{ brand: { name: "asc" } }, { name: "asc" }],
+      sortMap: {
+        "brand.name": (direction) => ({ brand: { name: direction } }),
+      },
+    });
     const include = { brand: { select: { id: true, name: true, slug: true } } };
 
-    if (page === undefined && limit === undefined) {
-      const models = await this.prisma.carModel.findMany({
-        where,
-        orderBy,
-        include,
-      });
-      return { data: models };
-    }
-
-    const p = page ?? 1;
-    const l = limit ?? 20;
-    const [total, models] = await Promise.all([
-      this.prisma.carModel.count({ where }),
-      this.prisma.carModel.findMany({
-        where,
-        orderBy,
-        include,
-        skip: (p - 1) * l,
-        take: l,
-      }),
-    ]);
-    return {
-      data: models,
-      meta: { total, page: p, limit: l, totalPages: Math.ceil(total / l) },
-    };
+    return paginate(this.prisma.carModel, { where, orderBy, include }, query);
   }
 
   async createCarModel(
@@ -969,27 +920,25 @@ export class AdminCatalogService {
   /**
    * Get attribute groups with their attributes
    */
-  async getAttributeGroups(query: {
-    search?: string;
-    isActive?: boolean;
-    page?: number;
-    limit?: number;
-  }) {
-    const { page = 1, limit = 50, search, isActive } = query;
+  async getAttributeGroups(query: AdminAttributeGroupQueryDto) {
+    const { search, isActive } = query;
     const where: Prisma.AttributeGroupWhereInput = {};
 
     if (search) {
       const ids = await fulltextAttributeGroupSearch(this.prisma, search);
-      if (ids.length === 0) {
-        return { data: [], total: 0, page, limit, totalPages: 0 };
-      }
       where.id = { in: ids };
     }
     if (isActive !== undefined) where.isActive = isActive;
 
-    const [total, groups] = await Promise.all([
-      this.prisma.attributeGroup.count({ where }),
-      this.prisma.attributeGroup.findMany({
+    const orderBy =
+      resolveOrderBy<Prisma.AttributeGroupOrderByWithRelationInput>(
+        "AttributeGroup",
+        query,
+        { defaultSort: { sortOrder: "asc" } },
+      );
+    const result = await paginate(
+      this.prisma.attributeGroup,
+      {
         where,
         include: {
           attributes: {
@@ -997,21 +946,17 @@ export class AdminCatalogService {
           },
           _count: { select: { attributes: true } },
         },
-        orderBy: { sortOrder: "asc" },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
+        orderBy,
+      },
+      query,
+    );
 
     return {
-      data: groups.map((g) => ({
+      ...result,
+      data: result.data.map((g) => ({
         ...g,
         attributeCount: g._count.attributes,
       })),
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
     };
   }
 
@@ -1181,49 +1126,42 @@ export class AdminCatalogService {
   /**
    * Get attributes with filtering
    */
-  async getAttributes(query: {
-    groupId?: string;
-    search?: string;
-    isActive?: boolean;
-    page?: number;
-    limit?: number;
-  }) {
-    const { page = 1, limit = 50, groupId, search, isActive } = query;
+  async getAttributes(query: AdminAttributeQueryDto) {
+    const { groupId, search, isActive } = query;
     const where: Prisma.AttributeWhereInput = {};
 
     if (groupId) where.groupId = groupId;
     if (search) {
       const ids = await fulltextAttributeSearch(this.prisma, search);
-      if (ids.length === 0) {
-        return { data: [], total: 0, page, limit, totalPages: 0 };
-      }
       where.id = { in: ids };
     }
     if (isActive !== undefined) where.isActive = isActive;
 
-    const [total, attributes] = await Promise.all([
-      this.prisma.attribute.count({ where }),
-      this.prisma.attribute.findMany({
+    const orderBy = resolveOrderBy<
+      | Prisma.AttributeOrderByWithRelationInput
+      | Prisma.AttributeOrderByWithRelationInput[]
+    >("Attribute", query, {
+      defaultSort: [{ groupId: "asc" }, { sortOrder: "asc" }],
+    });
+    const result = await paginate(
+      this.prisma.attribute,
+      {
         where,
         include: {
           group: { select: { id: true, name: true } },
           _count: { select: { productAttributes: true } },
         },
-        orderBy: [{ groupId: "asc" }, { sortOrder: "asc" }],
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
+        orderBy,
+      },
+      query,
+    );
 
     return {
-      data: attributes.map((a) => ({
+      ...result,
+      data: result.data.map((a) => ({
         ...a,
         usageCount: a._count.productAttributes,
       })),
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
     };
   }
 

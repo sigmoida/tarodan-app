@@ -81,6 +81,7 @@ import {
   UpdateProductDto,
   SendTestEmailDto,
   RatingQueryDto,
+  AdminUserRatingQueryDto,
   UpdateRatingStatusDto,
   ApproveWarehouseTradeDto,
   RejectWarehouseTradeDto,
@@ -131,7 +132,7 @@ export class AdminReviewController {
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: 'Get all seller/user ratings' })
   @ApiResponse({ status: HttpStatus.OK, description: 'List of user ratings' })
-  async getUserRatings(@Query() query: { page?: number; limit?: number; search?: string; status?: string }) {
+  async getUserRatings(@Query() query: AdminUserRatingQueryDto) {
     return this.adminService.getUserRatings(query);
   }
 
