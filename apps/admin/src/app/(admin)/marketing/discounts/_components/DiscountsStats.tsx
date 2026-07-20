@@ -12,12 +12,14 @@ import { adminKeys } from "@/lib/query/keys";
 import { MetricCard } from "@/components/MetricCard";
 import { QueryErrorCard } from "@/components/page/QueryErrorCard";
 import { type Discount } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 /**
  * Summary metrics across all discounts. Keyed under `['discounts','stats']` —
  * discount mutations (`invalidates: ['discounts']`) refresh this too.
  */
 export function DiscountsStats() {
+  const t = useTranslations();
   const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: adminKeys.stats("discounts"),
     queryFn: async () => {
@@ -49,29 +51,33 @@ export function DiscountsStats() {
       <MetricCard
         icon={TicketIcon}
         tone="info"
-        label="Toplam İndirim"
+        label={t("admin.marketing.discounts.totalDiscounts")}
         value={s.total}
-        footer={<span className="text-success-700">{s.active} aktif</span>}
+        footer={
+          <span className="text-success-700">
+            {t("admin.marketing.discounts.activeCount", { count: s.active })}
+          </span>
+        }
         loading={isLoading}
       />
       <MetricCard
         icon={CheckCircleIcon}
         tone="success"
-        label="Aktif"
+        label={t("common.active")}
         value={s.active}
         loading={isLoading}
       />
       <MetricCard
         icon={TagIcon}
         tone="info"
-        label="Kupon Kodları"
+        label={t("admin.marketing.discounts.couponCodes")}
         value={s.coupons}
         loading={isLoading}
       />
       <MetricCard
         icon={SparklesIcon}
         tone="primary"
-        label="Otomatik Kampanyalar"
+        label={t("admin.marketing.discounts.automaticCampaigns")}
         value={s.auto}
         loading={isLoading}
       />

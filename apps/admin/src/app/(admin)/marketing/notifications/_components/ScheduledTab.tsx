@@ -6,20 +6,22 @@ import { useConfirm } from "@/provider/ConfirmProvider";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { scheduledColumns } from "../_lib/columns";
 import { type ScheduledNotification } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 export function ScheduledTab() {
+  const t = useTranslations();
   const confirm = useConfirm();
   const cancel = useAdminMutation(
     (id: string) => adminApi.cancelScheduledNotification(id),
     {
       invalidates: ["scheduled-notifications"],
-      successMessage: "Bildirim iptal edildi",
+      successMessage: t("admin.marketing.notifications.cancelled"),
     },
   );
 
   const onCancel = async (id: string) => {
     await confirm({
-      description: "Bu zamanlanmış bildirimi iptal etmek istiyor musunuz?",
+      description: t("admin.marketing.notifications.cancelConfirm"),
       destructive: true,
       onConfirm: () => cancel.mutateAsync(id),
     });
@@ -34,8 +36,8 @@ export function ScheduledTab() {
       getRowId={(n) => n.id}
     >
       <ResourceList.Table
-        columns={scheduledColumns(onCancel)}
-        emptyText="Zamanlanmış bildirim yok"
+        columns={scheduledColumns(onCancel, t)}
+        emptyText={t("admin.marketing.notifications.emptyScheduled")}
       />
       <ResourceList.Pagination />
     </ResourceList>

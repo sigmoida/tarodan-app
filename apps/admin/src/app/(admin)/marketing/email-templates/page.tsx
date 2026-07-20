@@ -14,8 +14,10 @@ import { useClientTableSort } from "@/hooks/useClientTableSort";
 import { templateColumns } from "./_lib/columns";
 import { type TemplateListItem } from "./_lib/types";
 import { EmailTemplateEditorModal } from "./_modals/EmailTemplateEditorModal";
+import { useTranslations } from "next-intl";
 
 export default function EmailTemplatesPage() {
+  const t = useTranslations();
   const [search, setSearch] = useState("");
   const [editKey, setEditKey] = useState<string | null>(null);
 
@@ -44,19 +46,19 @@ export default function EmailTemplatesPage() {
   const sorted = useClientTableSort(visible);
   const groups = Array.from(new Set(visible.map((t) => t.group)));
 
-  const columns = templateColumns(setEditKey);
+  const columns = templateColumns(setEditKey, t);
 
   return (
     <AdminPage>
       <PageHeader
-        title="E-posta Şablonları"
+        title={t("admin.marketing.emailTemplates.title")}
         description={
           <>
-            Sistem e-postalarını özelleştirin. Değişkenler için{" "}
+            {t("admin.marketing.emailTemplates.descriptionPrefix")}{" "}
             <code className="rounded bg-surface-alt px-1 font-mono text-xs">
-              {"{{değişkenAdı}}"}
+              {t.raw("admin.marketing.emailTemplates.variableExample")}
             </code>{" "}
-            kullanın.
+            {t("admin.marketing.emailTemplates.descriptionSuffix")}
           </>
         }
       />
@@ -64,7 +66,7 @@ export default function EmailTemplatesPage() {
       <Input
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        placeholder="Şablon ara (anahtar, ad, grup, konu)..."
+        placeholder={t("admin.marketing.emailTemplates.searchPlaceholder")}
         className="w-full sm:w-80"
       />
 
@@ -75,12 +77,14 @@ export default function EmailTemplatesPage() {
         />
       ) : isLoading ? (
         <SectionCard>
-          <p className="text-center text-muted">Yükleniyor...</p>
+          <p className="text-center text-muted">{t("common.loading")}</p>
         </SectionCard>
       ) : visible.length === 0 ? (
         <SectionCard>
           <p className="text-center text-muted">
-            {q ? "Aramayla eşleşen şablon yok" : "Şablon bulunamadı"}
+            {q
+              ? t("admin.marketing.emailTemplates.noSearchResults")
+              : t("admin.marketing.emailTemplates.notFound")}
           </p>
         </SectionCard>
       ) : (

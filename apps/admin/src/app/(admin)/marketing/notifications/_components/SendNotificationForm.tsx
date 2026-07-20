@@ -22,6 +22,7 @@ import {
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { useTranslations } from "next-intl";
 import {
   type SendForm,
   type ScheduleNotificationForm,
@@ -82,12 +83,15 @@ export function SendNotificationForm({
 }: {
   onScheduled: () => void;
 }) {
+  const t = useTranslations();
+  const channels = channelMeta(t);
+  const targets = targetMeta(t);
   const [open, setOpen] = useState(true);
   const [scheduleOpen, setScheduleOpen] = useState(false);
-  const form = useZodForm(sendNotificationSchema, {
+  const form = useZodForm(sendNotificationSchema(t), {
     defaultValues: emptySendForm,
   });
-  const scheduleForm = useZodForm(scheduleNotificationSchema, {
+  const scheduleForm = useZodForm(scheduleNotificationSchema(t), {
     defaultValues: { scheduledFor: "" },
   });
   const values = form.watch();
@@ -96,7 +100,7 @@ export function SendNotificationForm({
     (formValues: SendForm) =>
       adminApi.sendNotification(sendFormToPayload(formValues)),
     {
-      successMessage: "Bildirim gönderildi",
+      successMessage: t("admin.marketing.notifications.sent"),
       onSuccess: () => form.reset(emptySendForm),
     },
   );
@@ -108,7 +112,7 @@ export function SendNotificationForm({
       }),
     {
       invalidates: ["scheduled-notifications"],
-      successMessage: "Bildirim zamanlandı",
+      successMessage: t("admin.marketing.notifications.scheduled"),
       onSuccess: () => {
         setScheduleOpen(false);
         scheduleForm.reset({ scheduledFor: "" });
@@ -140,7 +144,7 @@ export function SendNotificationForm({
             leftIcon={<PaperAirplaneIcon className="h-4 w-4" />}
             onClick={() => setOpen(true)}
           >
-            Yeni bildirim oluştur
+            {t("admin.marketing.notifications.createNew")}
           </Button>
         </div>
       </SectionCard>
@@ -156,21 +160,23 @@ export function SendNotificationForm({
       <FormModal
         open
         onClose={() => setOpen(false)}
-        title="Bildirim Oluştur"
+        title={t("admin.marketing.notifications.create")}
         form={form}
         onSubmit={(formValues) => send.mutate(formValues)}
         isSubmitting={send.isPending}
-        submitLabel="Şimdi Gönder"
+        submitLabel={t("admin.marketing.notifications.sendNow")}
         maxWidth="max-w-2xl"
         modalClassName="max-w-6xl"
         closeOnBackdrop={false}
       >
         <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-5">
           <div className="space-y-5 xl:col-span-3">
-            <SectionCard title="Mesaj" bodyClassName="space-y-5">
+            <SectionCard title={t("common.message")} bodyClassName="space-y-5">
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
-                  <span className="text-sm font-medium text-body">Başlık</span>
+                  <span className="text-sm font-medium text-body">
+                    {t("common.title")}
+                  </span>
                   <span
                     className={clsx(
                       "text-xs",
@@ -182,11 +188,18 @@ export function SendNotificationForm({
                     {values.title.length}/65
                   </span>
                 </div>
-                <FormInput name="title" placeholder="Bildirim başlığı" />
+                <FormInput
+                  name="title"
+                  placeholder={t(
+                    "admin.marketing.notifications.titlePlaceholder",
+                  )}
+                />
               </div>
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
-                  <span className="text-sm font-medium text-body">İçerik</span>
+                  <span className="text-sm font-medium text-body">
+                    {t("admin.marketing.notifications.content")}
+                  </span>
                   <span
                     className={clsx(
                       "text-xs",
@@ -201,14 +214,19 @@ export function SendNotificationForm({
                 <FormTextarea
                   name="body"
                   rows={4}
-                  placeholder="Kullanıcılara gösterilecek bildirim metni"
+                  placeholder={t(
+                    "admin.marketing.notifications.bodyPlaceholder",
+                  )}
                 />
               </div>
             </SectionCard>
 
-            <SectionCard title="Gönderim Kanalı" bodyClassName="space-y-4">
+            <SectionCard
+              title={t("admin.marketing.notifications.deliveryChannel")}
+              bodyClassName="space-y-4"
+            >
               <div className="grid grid-cols-3 gap-3">
-                {channelMeta.map((channel) => (
+                {channels.map((channel) => (
                   <Tile
                     key={channel.key}
                     active={values.channels.includes(channel.key)}
@@ -226,9 +244,12 @@ export function SendNotificationForm({
               )}
             </SectionCard>
 
-            <SectionCard title="Hedef Kitle" bodyClassName="space-y-4">
+            <SectionCard
+              title={t("admin.marketing.notifications.audience")}
+              bodyClassName="space-y-4"
+            >
               <div className="grid grid-cols-3 gap-3">
-                {targetMeta.map((target) => (
+                {targets.map((target) => (
                   <Tile
                     key={target.key}
                     active={values.targetType === target.key}
@@ -252,7 +273,7 @@ export function SendNotificationForm({
               {values.targetType === "user_ids" && (
                 <FormInput
                   name="userIds"
-                  label="Kullanıcı ID'leri (virgülle ayırın)"
+                  label={t("admin.marketing.notifications.userIdsLabel")}
                   placeholder="uuid1, uuid2, uuid3"
                 />
               )}
@@ -261,18 +282,30 @@ export function SendNotificationForm({
                 <div className="grid grid-cols-2 gap-4 rounded-xl border border-border bg-surface-alt p-4">
                   <FormSelect
                     name="isSeller"
-                    label="Satıcı Durumu"
+                    label={t("admin.marketing.notifications.sellerStatus")}
                     options={[
-                      { value: "", label: "Hepsi" },
-                      { value: "true", label: "Sadece Satıcılar" },
-                      { value: "false", label: "Sadece Alıcılar" },
+                      {
+                        value: "",
+                        label: t("admin.marketing.notifications.allOption"),
+                      },
+                      {
+                        value: "true",
+                        label: t("admin.marketing.notifications.onlySellers"),
+                      },
+                      {
+                        value: "false",
+                        label: t("admin.marketing.notifications.onlyBuyers"),
+                      },
                     ]}
                   />
                   <FormSelect
                     name="membershipTier"
-                    label="Üyelik Tipi"
+                    label={t("admin.marketing.notifications.membershipType")}
                     options={[
-                      { value: "", label: "Hepsi" },
+                      {
+                        value: "",
+                        label: t("admin.marketing.notifications.allOption"),
+                      },
                       { value: "free", label: "Free" },
                       { value: "premium", label: "Premium" },
                       { value: "business", label: "Business" },
@@ -290,13 +323,13 @@ export function SendNotificationForm({
               disabled={!canSend}
               className="w-full justify-center"
             >
-              Zamanla
+              {t("admin.marketing.notifications.schedule")}
             </Button>
           </div>
 
           <div className="xl:col-span-2">
             <SectionCard
-              title="Canlı Önizleme"
+              title={t("admin.marketing.notifications.livePreview")}
               className="sticky top-6"
               bodyClassName="space-y-5"
             >
@@ -304,7 +337,7 @@ export function SendNotificationForm({
                 <div>
                   <p className="mb-2 flex items-center gap-1 text-xs text-muted">
                     <DevicePhoneMobileIcon className="h-3.5 w-3.5" /> Push
-                    bildirimi
+                    {t("admin.marketing.notifications.notificationSuffix")}
                   </p>
                   <div className="rounded-2xl bg-heading p-4 shadow-lg">
                     <div className="flex items-start gap-3">
@@ -315,18 +348,20 @@ export function SendNotificationForm({
                         <p className="truncate text-sm font-semibold text-inverted">
                           {values.title || (
                             <span className="font-normal italic text-inverted/50">
-                              Başlık girin…
+                              {t("admin.marketing.notifications.enterTitle")}
                             </span>
                           )}
                         </p>
                         <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-inverted/70">
                           {values.body || (
-                            <span className="italic">İçerik girin…</span>
+                            <span className="italic">
+                              {t("admin.marketing.notifications.enterContent")}
+                            </span>
                           )}
                         </p>
                       </div>
                       <span className="shrink-0 text-xs text-inverted/50">
-                        şimdi
+                        {t("admin.marketing.notifications.now")}
                       </span>
                     </div>
                   </div>
@@ -336,15 +371,18 @@ export function SendNotificationForm({
               {values.channels.includes("email") && (
                 <div>
                   <p className="mb-2 flex items-center gap-1 text-xs text-muted">
-                    <EnvelopeIcon className="h-3.5 w-3.5" /> E-posta
+                    <EnvelopeIcon className="h-3.5 w-3.5" />{" "}
+                    {t("admin.marketing.notifications.channel.email")}
                   </p>
                   <div className="overflow-hidden rounded-xl border border-border bg-surface">
                     <div className="border-b border-border bg-surface-alt px-4 py-2.5">
-                      <p className="text-xs text-muted">Konu:</p>
+                      <p className="text-xs text-muted">
+                        {t("admin.marketing.emailTemplates.subject")}:
+                      </p>
                       <p className="truncate text-sm font-medium text-heading">
                         {values.title || (
                           <span className="italic text-subtle">
-                            Başlık girin…
+                            {t("admin.marketing.notifications.enterTitle")}
                           </span>
                         )}
                       </p>
@@ -353,7 +391,7 @@ export function SendNotificationForm({
                       <p className="line-clamp-3 text-sm leading-relaxed text-body">
                         {values.body || (
                           <span className="italic text-subtle">
-                            İçerik girin…
+                            {t("admin.marketing.notifications.enterContent")}
                           </span>
                         )}
                       </p>
@@ -373,7 +411,7 @@ export function SendNotificationForm({
                         `${values.title}: ${values.body}`
                       ) : (
                         <span className="italic text-muted">
-                          Mesaj önizlemesi…
+                          {t("admin.marketing.notifications.messagePreview")}
                         </span>
                       )}
                     </div>
@@ -384,44 +422,51 @@ export function SendNotificationForm({
               {values.channels.length === 0 && (
                 <div className="py-8 text-center text-muted">
                   <BellIcon className="mx-auto mb-2 h-10 w-10 text-subtle" />
-                  <p className="text-sm">Önizleme için kanal seçin</p>
+                  <p className="text-sm">
+                    {t("admin.marketing.notifications.selectPreviewChannel")}
+                  </p>
                 </div>
               )}
 
               <div className="space-y-2 border-t border-border pt-2">
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted">Hedef</span>
+                  <span className="text-muted">
+                    {t("admin.marketing.notifications.targetLabel")}
+                  </span>
                   <span className="font-medium text-body">
                     {
-                      targetMeta.find(
-                        (target) => target.key === values.targetType,
-                      )?.label
+                      targets.find((target) => target.key === values.targetType)
+                        ?.label
                     }
                   </span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted">Kanallar</span>
+                  <span className="text-muted">
+                    {t("admin.marketing.notifications.channels")}
+                  </span>
                   <span className="font-medium text-body">
                     {values.channels.length === 0
                       ? "—"
                       : values.channels
                           .map(
                             (channel) =>
-                              channelMeta.find((item) => item.key === channel)
+                              channels.find((item) => item.key === channel)
                                 ?.label,
                           )
                           .join(", ")}
                   </span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted">Durum</span>
+                  <span className="text-muted">{t("common.status")}</span>
                   <span
                     className={clsx(
                       "font-medium",
                       canSend ? "text-success-600" : "text-warning-600",
                     )}
                   >
-                    {canSend ? "Gönderime hazır" : "Eksik alanlar var"}
+                    {canSend
+                      ? t("admin.marketing.notifications.ready")
+                      : t("admin.marketing.notifications.missingFields")}
                   </span>
                 </div>
               </div>
@@ -434,16 +479,16 @@ export function SendNotificationForm({
         <FormModal
           open
           onClose={() => setScheduleOpen(false)}
-          title="Bildirimi Zamanla"
+          title={t("admin.marketing.notifications.scheduleTitle")}
           form={scheduleForm}
           onSubmit={(scheduleValues) => schedule.mutate(scheduleValues)}
           isSubmitting={schedule.isPending}
-          submitLabel="Zamanla"
+          submitLabel={t("admin.marketing.notifications.schedule")}
         >
           <FormInput
             name="scheduledFor"
             type="datetime-local"
-            label="Gönderim Tarihi ve Saati"
+            label={t("admin.marketing.notifications.scheduleDateTime")}
             min={new Date().toISOString().slice(0, 16)}
           />
         </FormModal>

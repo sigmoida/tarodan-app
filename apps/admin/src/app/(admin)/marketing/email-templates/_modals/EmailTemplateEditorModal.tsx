@@ -21,13 +21,14 @@ import { extractErrorMessage } from "@/lib/error";
 import { adminKeys } from "@/lib/query/keys";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useConfirm } from "@/provider/ConfirmProvider";
-import { SAMPLE_DATA } from "../_lib/sampleData";
+import { sampleData } from "../_lib/sampleData";
 import {
   emailTemplateEditorSchema,
   makeSourceData,
   type EmailTemplateEditorValues,
   type TemplateDetail,
 } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 const EMPTY_FORM: EmailTemplateEditorValues = {
   name: "",
@@ -43,8 +44,10 @@ export function EmailTemplateEditorModal({
   templateKey: string;
   onClose: () => void;
 }) {
+  const t = useTranslations();
+  const samples = sampleData(t);
   const confirm = useConfirm();
-  const form = useZodForm(emailTemplateEditorSchema, {
+  const form = useZodForm(emailTemplateEditorSchema(t), {
     defaultValues: EMPTY_FORM,
   });
   const bodyHtml = form.watch("bodyHtml");
@@ -60,7 +63,7 @@ export function EmailTemplateEditorModal({
   const sourceQuery = useQuery({
     queryKey: adminKeys.preview("email-template-source", templateKey),
     queryFn: async () => {
-      const sourceData = makeSourceData(SAMPLE_DATA[templateKey] || {});
+      const sourceData = makeSourceData(samples[templateKey] || {});
       return (
         await adminApi.previewEmailTemplate(
           templateKey,
@@ -83,7 +86,7 @@ export function EmailTemplateEditorModal({
       (
         await adminApi.previewEmailTemplate(
           templateKey,
-          SAMPLE_DATA[templateKey] || {},
+          samples[templateKey] || {},
           { html, subject: previewSubject },
         )
       ).data as { subject: string; html: string },
@@ -118,10 +121,13 @@ export function EmailTemplateEditorModal({
   useEffect(() => {
     if (!detailQuery.isError) return;
     toast.error(
-      extractErrorMessage(detailQuery.error, "Şablon yüklenemedi"),
+      extractErrorMessage(
+        detailQuery.error,
+        t("admin.marketing.emailTemplates.loadFailed"),
+      ),
     );
     onClose();
-  }, [detailQuery.error, detailQuery.isError, onClose]);
+  }, [detailQuery.error, detailQuery.isError, onClose, t]);
 
   useEffect(() => {
     if (!detailQuery.data) return;
@@ -177,8 +183,8 @@ export function EmailTemplateEditorModal({
       }),
     {
       invalidates: ["email-templates"],
-      successMessage: "Şablon kaydedildi",
-      errorMessage: "Kaydetme başarısız",
+      successMessage: t("admin.marketing.emailTemplates.saved"),
+      errorMessage: t("admin.marketing.emailTemplates.saveFailed"),
       onSuccess: () => loadPreview(bodyHtml || undefined, subject || undefined),
     },
   );
@@ -187,18 +193,19 @@ export function EmailTemplateEditorModal({
     (to: string) =>
       adminApi.sendTestEmail(templateKey, {
         to,
-        templateData: SAMPLE_DATA[templateKey] || {},
+        templateData: samples[templateKey] || {},
       }),
     {
-      successMessage: "Test e-postası kuyruğa eklendi",
-      errorMessage: "Gönderilemedi",
+      successMessage: t("admin.marketing.emailTemplates.testQueued"),
+      errorMessage: t("admin.marketing.emailTemplates.sendFailed"),
     },
   );
 
   const onSendTest = async () => {
     const valid = await form.trigger("testEmail");
     if (!valid || !testEmail.trim()) {
-      if (!testEmail.trim()) toast.error("E-posta adresi girin");
+      if (!testEmail.trim())
+        toast.error(t("admin.marketing.emailTemplates.enterEmail"));
       return;
     }
     sendTest.mutate(testEmail.trim());
@@ -208,8 +215,8 @@ export function EmailTemplateEditorModal({
     () => adminApi.resetEmailTemplate(templateKey),
     {
       invalidates: ["email-templates"],
-      successMessage: "Varsayılan şablona sıfırlandı",
-      errorMessage: "Sıfırlama başarısız",
+      successMessage: t("admin.marketing.emailTemplates.resetSuccess"),
+      errorMessage: t("admin.marketing.emailTemplates.resetFailed"),
       onSuccess: () => {
         form.reset({
           name: detailQuery.data?.name || templateKey,
@@ -224,10 +231,9 @@ export function EmailTemplateEditorModal({
 
   const onReset = async () => {
     await confirm({
-      title: "Varsayılana sıfırla",
-      description:
-        "Özel şablon silinecek ve varsayılan sistem şablonuna dönülecek. Emin misiniz?",
-      confirmLabel: "Sıfırla",
+      title: t("admin.marketing.emailTemplates.resetTitle"),
+      description: t("admin.marketing.emailTemplates.resetConfirm"),
+      confirmLabel: t("common.reset"),
       destructive: true,
       onConfirm: () => reset.mutateAsync(),
     });
@@ -244,7 +250,7 @@ export function EmailTemplateEditorModal({
         // Fall back to sample-data keys.
       }
     }
-    return Object.keys(SAMPLE_DATA[templateKey] || {});
+    return Object.keys(samples[templateKey] || {});
   })();
 
   return (
@@ -255,7 +261,7 @@ export function EmailTemplateEditorModal({
       form={form}
       onSubmit={(values) => save.mutate(values)}
       isSubmitting={save.isPending}
-      submitLabel="Kaydet"
+      submitLabel={t("common.save")}
       maxWidth="max-w-2xl"
       modalClassName="max-w-6xl"
       closeOnBackdrop={false}
@@ -264,7 +270,8 @@ export function EmailTemplateEditorModal({
         <span className="font-mono">{templateKey}</span>
         {detail?.isCustom && (
           <span className="inline-flex items-center gap-1 rounded-full bg-success-500/10 px-2 py-0.5 font-medium text-success-600">
-            <CheckIcon className="h-3 w-3" /> Özel
+            <CheckIcon className="h-3 w-3" />{" "}
+            {t("admin.marketing.emailTemplates.custom")}
           </span>
         )}
       </div>
@@ -274,7 +281,7 @@ export function EmailTemplateEditorModal({
           {variables.length > 0 && (
             <div className="rounded-lg border border-primary-500/20 bg-primary-500/5 p-3">
               <p className="mb-1.5 text-xs font-medium text-muted">
-                Kullanılabilir değişkenler
+                {t("admin.marketing.emailTemplates.availableVariables")}
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {variables.map((variable) => (
@@ -292,20 +299,29 @@ export function EmailTemplateEditorModal({
             </div>
           )}
 
-          <FormInput name="name" label="Görünen Ad" />
+          <FormInput
+            name="name"
+            label={t("admin.marketing.emailTemplates.displayName")}
+          />
           <FormInput
             name="subject"
-            label="E-posta Konusu"
-            placeholder="Değişken kullanabilirsiniz: {{orderNumber}}"
+            label={t("admin.marketing.emailTemplates.emailSubject")}
+            placeholder={t.raw(
+              "admin.marketing.emailTemplates.subjectPlaceholder",
+            )}
           />
 
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="mb-1 flex items-center justify-between">
-              <span className="text-xs font-medium text-muted">HTML Gövde</span>
+              <span className="text-xs font-medium text-muted">
+                {t("admin.marketing.emailTemplates.htmlBody")}
+              </span>
               <span className="text-xs text-subtle">
                 {bodyHtml.length > 0
-                  ? `${bodyHtml.length} karakter`
-                  : "Boş (varsayılan kullanılır)"}
+                  ? t("admin.marketing.emailTemplates.characterCount", {
+                      count: bodyHtml.length,
+                    })
+                  : t("admin.marketing.emailTemplates.emptyUsesDefault")}
               </span>
             </div>
             <FormTextarea
@@ -324,7 +340,7 @@ export function EmailTemplateEditorModal({
             <FormInput
               name="testEmail"
               type="email"
-              label="Test e-postası"
+              label={t("admin.marketing.emailTemplates.testEmail")}
               placeholder="test@ornek.com"
               className="flex-1"
             />
@@ -336,7 +352,7 @@ export function EmailTemplateEditorModal({
               disabled={!testEmail.trim()}
               leftIcon={<PaperAirplaneIcon className="h-4 w-4" />}
             >
-              Test gönder
+              {t("admin.marketing.emailTemplates.sendTest")}
             </Button>
             {detail?.isCustom && (
               <Button
@@ -347,7 +363,7 @@ export function EmailTemplateEditorModal({
                 leftIcon={<TrashIcon className="h-4 w-4" />}
                 className="border-danger-300 text-danger-600 hover:bg-danger-50"
               >
-                Varsayılana sıfırla
+                {t("admin.marketing.emailTemplates.resetTitle")}
               </Button>
             )}
           </div>
@@ -356,11 +372,12 @@ export function EmailTemplateEditorModal({
         <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-surface-alt/20">
           <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border bg-surface-elevated px-4 py-2.5">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted">
-              Önizleme
+              {t("admin.marketing.emailTemplates.preview")}
             </span>
             {preview.isPending && (
               <span className="flex items-center gap-1 text-xs text-muted">
-                <ArrowPathIcon className="h-3 w-3 animate-spin" /> Güncelleniyor
+                <ArrowPathIcon className="h-3 w-3 animate-spin" />{" "}
+                {t("common.updating")}
               </span>
             )}
           </div>
@@ -371,7 +388,7 @@ export function EmailTemplateEditorModal({
                 <p className="text-sm text-muted">
                   {extractErrorMessage(
                     preview.error,
-                    "Önizleme yüklenemedi.",
+                    t("admin.marketing.emailTemplates.previewFailed"),
                   )}
                 </p>
                 <Button
@@ -382,7 +399,7 @@ export function EmailTemplateEditorModal({
                   }
                   className="mt-3"
                 >
-                  Tekrar dene
+                  {t("common.tryAgain")}
                 </Button>
               </div>
             </div>
@@ -390,9 +407,12 @@ export function EmailTemplateEditorModal({
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
               <div className="shrink-0 border-b border-border bg-surface-elevated px-4 py-2">
                 <p className="text-xs text-muted">
-                  <span className="font-medium">Konu:</span>{" "}
+                  <span className="font-medium">
+                    {t("admin.marketing.emailTemplates.subject")}:
+                  </span>{" "}
                   <span className="text-heading">
-                    {preview.data.subject || "(konu yok)"}
+                    {preview.data.subject ||
+                      t("admin.marketing.emailTemplates.noSubject")}
                   </span>
                 </p>
               </div>
@@ -400,7 +420,7 @@ export function EmailTemplateEditorModal({
                 key={preview.data.html.substring(0, 100)}
                 srcDoc={preview.data.html}
                 className="w-full flex-1 border-0"
-                title="E-posta önizlemesi"
+                title={t("admin.marketing.emailTemplates.emailPreview")}
                 sandbox="allow-same-origin allow-top-navigation-by-user-activation"
               />
             </div>

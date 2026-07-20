@@ -18,22 +18,24 @@ import {
 import { AdsStats } from "./_components/AdsStats";
 import { AdsTable } from "./_components/AdsTable";
 import { AdFormModal } from "./_modals/AdFormModal";
+import { useTranslations } from "next-intl";
 
 export default function AdsPage() {
+  const t = useTranslations();
   const [modal, setModal] = useState<{ ad?: Ad } | null>(null);
 
   return (
     <AdminPage>
       <PageHeader
-        title="Reklam Yönetimi"
-        description="IAB standartlarına uygun reklam yönetimi"
+        title={t("admin.marketing.ads.title")}
+        description={t("admin.marketing.ads.subtitle")}
       >
         <Button
           variant="primary"
           leftIcon={<PlusIcon className="h-5 w-5" />}
           onClick={() => setModal({})}
         >
-          Yeni Reklam
+          {t("admin.marketing.ads.new")}
         </Button>
       </PageHeader>
 
@@ -63,12 +65,12 @@ export default function AdsPage() {
           <ResourceList.Search />
           <ResourceList.FilterSelect
             name="position"
-            options={positionFilterOptions}
+            options={positionFilterOptions(t)}
             className="sm:w-44"
           />
           <ResourceList.FilterSelect
             name="device"
-            options={deviceFilterOptions}
+            options={deviceFilterOptions(t)}
             className="sm:w-40"
           />
         </ResourceList.Toolbar>
