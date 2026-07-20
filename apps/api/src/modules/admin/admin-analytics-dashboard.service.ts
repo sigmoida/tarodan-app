@@ -690,6 +690,42 @@ export class AdminAnalyticsDashboardService {
   }
 
   /**
+   * Get top-N most-viewed products for the dashboard widget.
+   * Ordered by viewCount desc; returns display fields consumed by the admin table
+   * (id, title, thumbnail, viewCount, seller name, status, price).
+   */
+  async getTopProducts(limit: number = 10) {
+    const products = await this.prisma.product.findMany({
+      take: limit,
+      orderBy: [{ viewCount: "desc" }, { createdAt: "desc" }],
+      select: {
+        id: true,
+        title: true,
+        viewCount: true,
+        status: true,
+        price: true,
+        seller: { select: { id: true, displayName: true } },
+        images: {
+          orderBy: { sortOrder: "asc" },
+          take: 1,
+          select: { cardKey: true },
+        },
+      },
+    });
+
+    return products.map((p) => ({
+      id: p.id,
+      title: p.title,
+      thumbnail: this.common.resolveProductImageUrl(p.images[0]?.cardKey),
+      viewCount: p.viewCount,
+      sellerId: p.seller.id,
+      sellerName: p.seller.displayName,
+      status: p.status,
+      price: Number(p.price),
+    }));
+  }
+
+  /**
    * Get pending actions for dashboard
    * Requirement: Pending Actions Panel (7.1)
    */

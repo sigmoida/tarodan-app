@@ -444,6 +444,10 @@ export class AdminService {
     return this.analyticsService.getRecentOrders(limit);
   }
 
+  async getTopProducts(limit: number = 10) {
+    return this.analyticsService.getTopProducts(limit);
+  }
+
   async getPendingActions() {
     return this.analyticsService.getPendingActions();
   }

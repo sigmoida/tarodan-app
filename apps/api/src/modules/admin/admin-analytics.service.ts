@@ -1,12 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import {
-  AnalyticsQueryDto,
-  UpdateOrderStatusDto,
-  ReportQueryDto,
-} from './dto';
-import { AdminAnalyticsDashboardService } from './admin-analytics-dashboard.service';
-import { AdminAnalyticsOrderService } from './admin-analytics-order.service';
-import { AdminAnalyticsReportService } from './admin-analytics-report.service';
+import { Injectable } from "@nestjs/common";
+import { AnalyticsQueryDto, UpdateOrderStatusDto, ReportQueryDto } from "./dto";
+import { AdminAnalyticsDashboardService } from "./admin-analytics-dashboard.service";
+import { AdminAnalyticsOrderService } from "./admin-analytics-order.service";
+import { AdminAnalyticsReportService } from "./admin-analytics-report.service";
 
 /**
  * Analitik & raporlar (+ banner aralığındaki sipariş detay/işlem yardımcıları
@@ -51,6 +47,10 @@ export class AdminAnalyticsService {
     return this.dashboard.getRecentOrders(limit);
   }
 
+  async getTopProducts(limit: number = 10) {
+    return this.dashboard.getTopProducts(limit);
+  }
+
   async getPendingActions() {
     return this.dashboard.getPendingActions();
   }
@@ -63,7 +63,11 @@ export class AdminAnalyticsService {
     return this.order.getOrderById(orderId);
   }
 
-  async updateOrderStatus(adminId: string, orderId: string, dto: UpdateOrderStatusDto) {
+  async updateOrderStatus(
+    adminId: string,
+    orderId: string,
+    dto: UpdateOrderStatusDto,
+  ) {
     return this.order.updateOrderStatus(adminId, orderId, dto);
   }
 
@@ -78,7 +82,10 @@ export class AdminAnalyticsService {
   async sendOrderNotification(
     adminId: string,
     orderId: string,
-    dto: { type: 'status_update' | 'shipped' | 'delivered' | 'custom'; message?: string },
+    dto: {
+      type: "status_update" | "shipped" | "delivered" | "custom";
+      message?: string;
+    },
   ) {
     return this.order.sendOrderNotification(adminId, orderId, dto);
   }
