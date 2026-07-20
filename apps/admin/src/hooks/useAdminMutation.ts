@@ -1,8 +1,12 @@
-'use client';
+"use client";
 
-import { useMutation, useQueryClient, type UseMutationOptions } from '@tanstack/react-query';
-import { useTranslations } from 'next-intl';
-import toast from 'react-hot-toast';
+import {
+  useMutation,
+  useQueryClient,
+  type UseMutationOptions,
+} from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
+import toast from "react-hot-toast";
 
 export interface UseAdminMutationOptions<TData, TVars> {
   /**
@@ -13,18 +17,21 @@ export interface UseAdminMutationOptions<TData, TVars> {
   invalidates?: string[];
   successMessage?: string;
   errorMessage?: string;
+  /** Show the shared error toast on failure. Disable when the caller renders the error inline. */
+  showErrorToast?: boolean;
   onSuccess?: (data: TData, vars: TVars) => void;
   mutation?: Omit<
     UseMutationOptions<TData, unknown, TVars>,
-    'mutationFn' | 'onSuccess' | 'onError'
+    "mutationFn" | "onSuccess" | "onError"
   >;
 }
 
 function apiErrorMessage(error: unknown): string | undefined {
-  const message = (error as { response?: { data?: { message?: unknown } } })?.response?.data
-    ?.message;
-  if (typeof message === 'string') return message;
-  if (Array.isArray(message) && typeof message[0] === 'string') return message[0];
+  const message = (error as { response?: { data?: { message?: unknown } } })
+    ?.response?.data?.message;
+  if (typeof message === "string") return message;
+  if (Array.isArray(message) && typeof message[0] === "string")
+    return message[0];
   return undefined;
 }
 
@@ -40,7 +47,8 @@ export function useAdminMutation<TData, TVars = void>(
   const {
     invalidates = [],
     successMessage,
-    errorMessage = t('common.operationFailed'),
+    errorMessage = t("common.operationFailed"),
+    showErrorToast = true,
     onSuccess,
     mutation,
   } = options;
@@ -57,7 +65,7 @@ export function useAdminMutation<TData, TVars = void>(
       onSuccess?.(data, vars);
     },
     onError: (error) => {
-      toast.error(apiErrorMessage(error) ?? errorMessage);
+      if (showErrorToast) toast.error(apiErrorMessage(error) ?? errorMessage);
     },
   });
 }
