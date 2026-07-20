@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
+import { AsyncValue } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { mapFilterToApiStatus } from "../_lib/types";
@@ -17,7 +18,7 @@ export function MessagesSummary() {
   // Default filter is "pending" (initialFilters) — cleared from the URL when active.
   const status = searchParams.get("status") ?? "pending";
 
-  const { data: total } = useQuery({
+  const { data: total, isLoading } = useQuery({
     queryKey: adminKeys.count("messages", { search, status }),
     queryFn: async () => {
       const res = await adminApi.getMessages({
@@ -32,13 +33,13 @@ export function MessagesSummary() {
     staleTime: 30_000,
   });
 
-  const t = total ?? 0;
-  if (status === "approved") return <>{t} onaylanmış mesaj</>;
-  if (status === "rejected") return <>{t} reddedilen mesaj</>;
-  if (status === "all") return <>Toplam {t} mesaj</>;
+  const count = <AsyncValue loading={isLoading}>{total ?? 0}</AsyncValue>;
+  if (status === "approved") return <>{count} onaylanmış mesaj</>;
+  if (status === "rejected") return <>{count} reddedilen mesaj</>;
+  if (status === "all") return <>Toplam {count} mesaj</>;
   return (
     <>
-      {t} mesaj onay bekliyor — bekleyen mesajları onaylayın, reddedin veya
+      {count} mesaj onay bekliyor — bekleyen mesajları onaylayın, reddedin veya
       göndereni yasaklayın
     </>
   );

@@ -17,7 +17,7 @@ import { type Discount } from "../_lib/types";
  * discount mutations (`invalidates: ['discounts']`) refresh this too.
  */
 export function DiscountsStats() {
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: adminKeys.stats("discounts"),
     queryFn: async () => {
       const res = await adminApi.get("/admin/discounts", {
@@ -45,24 +45,28 @@ export function DiscountsStats() {
         label="Toplam İndirim"
         value={s.total}
         footer={<span className="text-success-700">{s.active} aktif</span>}
+        loading={isLoading}
       />
       <MetricCard
         icon={CheckCircleIcon}
         tone="success"
         label="Aktif"
         value={s.active}
+        loading={isLoading}
       />
       <MetricCard
         icon={TagIcon}
         tone="info"
         label="Kupon Kodları"
         value={s.coupons}
+        loading={isLoading}
       />
       <MetricCard
         icon={SparklesIcon}
         tone="primary"
         label="Otomatik Kampanyalar"
         value={s.auto}
+        loading={isLoading}
       />
     </div>
   );

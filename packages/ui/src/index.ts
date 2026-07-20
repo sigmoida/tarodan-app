@@ -126,7 +126,15 @@ export { Pagination, type PaginationProps } from './components/Pagination';
 
 // Loading states
 export { Spinner, type SpinnerProps } from './components/Spinner';
-export { Skeleton, SkeletonText, SkeletonCard, SkeletonAvatar, type SkeletonProps } from './components/Skeleton';
+export {
+  Skeleton,
+  AsyncValue,
+  SkeletonText,
+  SkeletonCard,
+  SkeletonAvatar,
+  type SkeletonProps,
+  type AsyncValueProps,
+} from './components/Skeleton';
 
 // Status configs (pre-built status → badge mappings)
 export {

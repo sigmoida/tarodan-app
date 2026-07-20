@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { Button } from "@tarodan/ui";
+import { AsyncValue, Button } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 
@@ -25,7 +25,7 @@ export function ProductsCountText() {
   const brandId = searchParams.get("brandId") ?? "";
   const carModelId = searchParams.get("carModelId") ?? "";
 
-  const { data: total } = useQuery({
+  const { data: total, isLoading } = useQuery({
     queryKey: adminKeys.count("products", {
       status,
       search,
@@ -59,7 +59,14 @@ export function ProductsCountText() {
 
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
-      {t("admin.catalog.products.totalCount", { count: total ?? 0 })}
+      <span>
+        {t.rich("admin.catalog.products.totalCount", {
+          count: total ?? 0,
+          value: (chunks) => (
+            <AsyncValue loading={isLoading}>{chunks}</AsyncValue>
+          ),
+        })}
+      </span>
       {sellerId && (
         <span className="inline-flex items-center gap-1">
           {t("admin.catalog.products.filteredBySeller")}

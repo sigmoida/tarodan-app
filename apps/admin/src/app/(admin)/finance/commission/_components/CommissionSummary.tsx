@@ -14,12 +14,12 @@ import { useTranslations } from "next-intl";
 
 export function CommissionSummary() {
   const t = useTranslations();
-  const { data } = useQuery<CommissionRevenue>({
+  const { data, isLoading } = useQuery<CommissionRevenue>({
     queryKey: ["commission-revenue"],
     queryFn: async () => (await adminApi.getCommissionRevenue()).data,
   });
 
-  if (!data) return null;
+  if (!data && !isLoading) return null;
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -27,7 +27,8 @@ export function CommissionSummary() {
         icon={BanknotesIcon}
         tone="success"
         label={t("admin.finance.commission.totalCollected")}
-        value={fmtTry(data.totalCommission)}
+        value={data ? fmtTry(data.totalCommission) : null}
+        loading={isLoading}
         footer={
           <span className="text-muted">
             {t("admin.finance.commission.completedOrders")}
@@ -38,13 +39,15 @@ export function CommissionSummary() {
         icon={UserIcon}
         tone="info"
         label={t("admin.finance.commission.buyerServiceFee")}
-        value={fmtTry(data.totalBuyerFee ?? 0)}
+        value={data ? fmtTry(data.totalBuyerFee ?? 0) : null}
+        loading={isLoading}
       />
       <MetricCard
         icon={BuildingStorefrontIcon}
         tone="primary"
         label={t("admin.finance.commission.sellerCommission")}
-        value={fmtTry(data.totalSellerFee ?? 0)}
+        value={data ? fmtTry(data.totalSellerFee ?? 0) : null}
+        loading={isLoading}
       />
     </div>
   );
