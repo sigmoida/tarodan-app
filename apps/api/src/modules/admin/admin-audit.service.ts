@@ -163,7 +163,15 @@ export class AdminAuditService {
     const orderBy = resolveOrderBy<Prisma.AuditLogOrderByWithRelationInput>(
       "AuditLog",
       query,
-      { defaultSort: { createdAt: "desc" } },
+      {
+        defaultSort: { createdAt: "desc" },
+        // The admin's email lives two relations deep (AuditLog → adminUser → user).
+        sortMap: {
+          "admin.email": (direction) => ({
+            adminUser: { user: { email: direction } },
+          }),
+        },
+      },
     );
     const result = await paginate(
       this.prisma.auditLog,
