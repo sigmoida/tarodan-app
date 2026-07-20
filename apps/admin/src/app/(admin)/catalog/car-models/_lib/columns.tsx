@@ -18,9 +18,11 @@ export function carModelColumns(t: T, actions: CarModelRowActions) {
           <TruncatedText className="text-xs text-muted">{m.slug}</TruncatedText>
         </div>
       ),
-      { grow: 3, minWidth: 180 },
+      { grow: 3, minWidth: 180, sortKey: "name", sortType: "text" },
     ),
-    col.text<CarModel>(t("admin.catalog.common.brand"), (m) => m.brand?.name),
+    col.text<CarModel>(t("admin.catalog.common.brand"), (m) => m.brand?.name, {
+      sortKey: "brand.name",
+    }),
     col.text<CarModel>(
       t("admin.catalog.common.year"),
       (m) =>

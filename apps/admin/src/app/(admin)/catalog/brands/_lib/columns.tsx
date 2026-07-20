@@ -38,7 +38,7 @@ export function brandColumns(t: T, actions: BrandRowActions) {
           </div>
         </div>
       ),
-      { grow: 3, minWidth: 200 },
+      { grow: 3, minWidth: 200, sortKey: "name", sortType: "text" },
     ),
     col.badge<Brand>(t("common.status"), (b) => <Badge active={b.isActive} />),
     col.custom<Brand>(

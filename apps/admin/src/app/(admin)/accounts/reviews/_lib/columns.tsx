@@ -99,14 +99,20 @@ export function sellerReviewColumns(act: Act) {
     col.custom<UserRating>("Puan", (r) => <Stars score={r.score} />, {
       grow: 1,
       minWidth: 120,
+      sortKey: "score",
+      sortType: "number",
     }),
     col.muted<UserRating>("Yorum", (r) => r.comment || null, {
       grow: 3,
       minWidth: 220,
     }),
-    col.badge<UserRating>("Durum", (r) => (
-      <Badge status={r.status || "approved"} config={reviewStatusConfig} />
-    )),
+    col.badge<UserRating>(
+      "Durum",
+      (r) => (
+        <Badge status={r.status || "approved"} config={reviewStatusConfig} />
+      ),
+      { sortKey: "status", sortType: "text" },
+    ),
     col.muted<UserRating>(
       "Kaynak",
       (r) => (r.orderId ? "Sipariş" : r.tradeId ? "Takas" : "—"),
@@ -115,7 +121,7 @@ export function sellerReviewColumns(act: Act) {
         minWidth: 100,
       },
     ),
-    col.date<UserRating>("Tarih", (r) => r.createdAt),
+    col.date<UserRating>("Tarih", "createdAt"),
     col.rowMenu<UserRating>((r) =>
       reviewRowMenu(r.status, (s) => act(r.id, s)),
     ),

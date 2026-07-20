@@ -26,11 +26,13 @@ export function ProductFilters() {
 
   const { data: brands = [] } = useQuery<Brand[]>({
     queryKey: adminKeys.options("brands"),
-    queryFn: async () => (await adminApi.getBrands()).data?.data ?? [],
+    queryFn: async () =>
+      (await adminApi.getBrands({ limit: 100 })).data?.data ?? [],
   });
   const { data: models = [] } = useQuery<CarModel[]>({
     queryKey: adminKeys.options("car-models"),
-    queryFn: async () => (await adminApi.getCarModels()).data?.data ?? [],
+    queryFn: async () =>
+      (await adminApi.getCarModels({ limit: 100 })).data?.data ?? [],
   });
 
   const modelsForBrand = brandId

@@ -37,7 +37,7 @@ export function manufacturerColumns(t: T, actions: ManufacturerRowActions) {
           </div>
         </div>
       ),
-      { grow: 3, minWidth: 200 },
+      { grow: 3, minWidth: 200, sortKey: "name", sortType: "text" },
     ),
     col.text<Manufacturer>(t("admin.catalog.common.country"), (m) => m.country),
     col.custom<Manufacturer>(t("admin.catalog.common.website"), (m) =>
