@@ -45,6 +45,7 @@ export interface Seller {
   trustLevel?: string;
   sellerType?: string;
   followersCount?: number;
+  storeViewCount?: number;
   stats?: SellerStats;
 }
 
