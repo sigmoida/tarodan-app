@@ -20,6 +20,11 @@ const FLAT_SHIPPING = 29.99;
 const calculateShipping = (subtotal: number, count: number) =>
   count === 0 ? 0 : subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : FLAT_SHIPPING;
 
+// `useCart` is mounted by the header and may also be mounted by the current
+// page. Keep the login merge single-flight so those consumers cannot submit the
+// same persisted guest quantities more than once.
+let offlineCartMergePromise: Promise<void> | null = null;
+
 export interface CartLine {
   id: string;
   source: "authenticated" | "offline";
@@ -75,6 +80,36 @@ export function useCart() {
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: queryKeys.cart.all() });
+
+  useEffect(() => {
+    if (!isAuthenticated || offlineItems.length === 0) return;
+    if (offlineCartMergePromise) return;
+
+    const itemsToMerge = offlineItems.map(({ productId, quantity }) => ({
+      productId,
+      quantity,
+    }));
+
+    offlineCartMergePromise = (async () => {
+      // Add sequentially so a brand-new account cannot race multiple attempts
+      // to create its first server cart. A rejected line must not stop the rest.
+      for (const { productId, quantity } of itemsToMerge) {
+        try {
+          await cartApi.addItem(productId, quantity);
+        } catch {
+          // Already-in-cart, unavailable, and other per-line failures are safe
+          // to skip; the authenticated session itself remains successful.
+        }
+      }
+      await queryClient.invalidateQueries({ queryKey: queryKeys.cart.all() });
+    })()
+      // A failed merge or refresh must not interrupt the completed login flow.
+      .catch(() => undefined)
+      .finally(() => {
+        clearOfflineCart();
+        offlineCartMergePromise = null;
+      });
+  }, [clearOfflineCart, isAuthenticated, offlineItems, queryClient]);
 
   // A single effective list feeds every cart signal. Authenticated users only
   // see server lines; persisted guest lines are deliberately ignored.
