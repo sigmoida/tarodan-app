@@ -1,9 +1,10 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Modal, ModalFooter, Textarea } from '@tarodan/ui';
-import { adminApi } from '@/lib/api';
-import { useAdminMutation } from '@/hooks/useAdminMutation';
+import { useState } from "react";
+import { Modal, ModalFooter, Textarea } from "@tarodan/ui";
+import { adminApi } from "@/lib/api";
+import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { useTranslations } from "next-intl";
 
 export function ForceCancelPaymentModal({
   paymentId,
@@ -12,31 +13,40 @@ export function ForceCancelPaymentModal({
   paymentId: string;
   onClose: () => void;
 }) {
-  const [reason, setReason] = useState('');
+  const t = useTranslations();
+  const [reason, setReason] = useState("");
 
-  const cancel = useAdminMutation(() => adminApi.forceCancelPayment(paymentId, reason), {
-    invalidates: ['payments'],
-    successMessage: 'Ödeme zorla iptal edildi',
-    onSuccess: onClose,
-  });
+  const cancel = useAdminMutation(
+    () => adminApi.forceCancelPayment(paymentId, reason),
+    {
+      invalidates: ["payments"],
+      successMessage: t("admin.finance.payments.forceCancelSuccess"),
+      onSuccess: onClose,
+    },
+  );
 
   return (
-    <Modal isOpen onClose={onClose} title="Zorla İptal" maxWidth="max-w-md">
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={t("admin.finance.payments.forceCancel")}
+      maxWidth="max-w-md"
+    >
       <div className="space-y-4">
         <p className="text-muted">
-          Bu ödemeyi zorla iptal etmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+          {t("admin.finance.payments.forceCancelDescription")}
         </p>
         <Textarea
-          label="İptal Nedeni *"
+          label={t("admin.finance.payments.cancelReasonRequired")}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           rows={3}
-          placeholder="İptal nedeni..."
+          placeholder={t("admin.finance.payments.cancelReasonPlaceholder")}
         />
         <ModalFooter
           onCancel={onClose}
           onConfirm={() => cancel.mutate()}
-          confirmLabel="Zorla İptal Et"
+          confirmLabel={t("admin.finance.payments.forceCancelConfirm")}
           isLoading={cancel.isPending}
           disabled={!reason.trim()}
         />

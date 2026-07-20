@@ -1,4 +1,7 @@
-import type { StatusConfig } from '@tarodan/ui';
+import type { StatusConfig } from "@tarodan/ui";
+import type { useTranslations } from "next-intl";
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 export interface Invoice {
   id: string;
@@ -39,43 +42,66 @@ export interface SellerInvoice {
   buyerEmail: string | null;
 }
 
-export const INVOICE_TABS = [
-  { key: 'elogo', label: 'eLogo Faturaları' },
-  { key: 'seller', label: 'Satıcı Faturaları' },
+export const invoiceTabs = (t: T) => [
+  { key: "elogo", label: t("admin.finance.invoices.elogoTab") },
+  { key: "seller", label: t("admin.finance.invoices.sellerTab") },
 ];
 
-export const invoiceStatusConfig: Record<string, StatusConfig> = {
-  pending: { label: 'Bekliyor', variant: 'warning' },
-  sent: { label: 'Kesildi', variant: 'success' },
-  signed: { label: 'İmzalandı', variant: 'info' },
-  failed: { label: 'Başarısız', variant: 'danger' },
-  cancelled: { label: 'İptal', variant: 'secondary' },
-};
+export const invoiceStatusConfig = (t: T): Record<string, StatusConfig> => ({
+  pending: {
+    label: t("admin.finance.invoices.status.pending"),
+    variant: "warning",
+  },
+  sent: { label: t("admin.finance.invoices.status.sent"), variant: "success" },
+  signed: { label: t("admin.finance.invoices.status.signed"), variant: "info" },
+  failed: {
+    label: t("admin.finance.invoices.status.failed"),
+    variant: "danger",
+  },
+  cancelled: {
+    label: t("admin.finance.invoices.status.cancelled"),
+    variant: "secondary",
+  },
+});
 
-export const typeFilterOptions = [
-  { value: 'all', label: 'Tüm Türler' },
-  { value: 'commission', label: 'Komisyon' },
-  { value: 'service_fee', label: 'Hizmet Bedeli' },
-  { value: 'membership', label: 'Üyelik' },
-  { value: 'boost', label: 'Öne Çıkarma' },
-  { value: 'trade_commission', label: 'Takas Komisyonu' },
-  { value: 'platform_sale', label: 'Platform Satışı' },
-  { value: 'return_invoice', label: 'İade Faturası' },
+export const typeFilterOptions = (t: T) => [
+  { value: "all", label: t("admin.finance.invoices.filters.allTypes") },
+  { value: "commission", label: t("admin.finance.invoices.types.commission") },
+  { value: "service_fee", label: t("admin.finance.invoices.types.serviceFee") },
+  { value: "membership", label: t("admin.finance.invoices.types.membership") },
+  { value: "boost", label: t("admin.finance.invoices.types.boost") },
+  {
+    value: "trade_commission",
+    label: t("admin.finance.invoices.types.tradeCommission"),
+  },
+  {
+    value: "platform_sale",
+    label: t("admin.finance.invoices.types.platformSale"),
+  },
+  {
+    value: "return_invoice",
+    label: t("admin.finance.invoices.types.returnInvoice"),
+  },
 ];
 
-export const statusFilterOptions = [
-  { value: 'all', label: 'Tüm Durumlar' },
-  { value: 'sent', label: 'Kesildi' },
-  { value: 'signed', label: 'İmzalandı' },
-  { value: 'pending', label: 'Bekliyor' },
-  { value: 'failed', label: 'Başarısız' },
-  { value: 'cancelled', label: 'İptal' },
+export const statusFilterOptions = (t: T) => [
+  { value: "all", label: t("admin.finance.invoices.filters.allStatuses") },
+  ...Object.entries(invoiceStatusConfig(t)).map(([value, config]) => ({
+    value,
+    label: config.label,
+  })),
 ];
 
-export const documentTypeFilterOptions = [
-  { value: 'all', label: 'Tüm Belgeler' },
-  { value: 'EARCHIVE', label: 'e-Arşiv' },
-  { value: 'EINVOICE', label: 'e-Fatura' },
+export const documentTypeFilterOptions = (t: T) => [
+  { value: "all", label: t("admin.finance.invoices.filters.allDocuments") },
+  {
+    value: "EARCHIVE",
+    label: t("admin.finance.invoices.documentTypes.archive"),
+  },
+  {
+    value: "EINVOICE",
+    label: t("admin.finance.invoices.documentTypes.invoice"),
+  },
 ];
 
 export function mapInvoices(raw: any[]): Invoice[] {

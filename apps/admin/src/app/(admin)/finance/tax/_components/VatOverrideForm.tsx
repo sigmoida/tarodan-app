@@ -11,16 +11,18 @@ import { useCategories } from "@/hooks/useCategories";
 import { vatColumns } from "../_lib/columns";
 import { vatOverrideSchema } from "../_lib/schema";
 import { type VatConfig, type VatOverride } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 /**
  * Per-category VAT override editor + list. The add/update form clears itself on
  * success via `form.reset()`; delete goes through the shared confirm provider.
  */
 export function VatOverrideForm({ config }: { config?: VatConfig }) {
+  const t = useTranslations();
   const confirm = useConfirm();
   const { data: categories = [] } = useCategories();
 
-  const form = useZodForm(vatOverrideSchema, {
+  const form = useZodForm(vatOverrideSchema(t), {
     defaultValues: { categoryId: "", rate: "0" },
   });
 
@@ -29,7 +31,7 @@ export function VatOverrideForm({ config }: { config?: VatConfig }) {
       adminApi.setVatOverride(v.categoryId, v.rate),
     {
       invalidates: ["vat-config"],
-      successMessage: "Kategori istisnası kaydedildi",
+      successMessage: t("admin.finance.tax.overrideSaved"),
       onSuccess: () => form.reset({ categoryId: "", rate: "0" }),
     },
   );
@@ -37,29 +39,33 @@ export function VatOverrideForm({ config }: { config?: VatConfig }) {
     (ruleId: string) => adminApi.deleteVatOverride(ruleId),
     {
       invalidates: ["vat-config"],
-      successMessage: "Silindi",
+      successMessage: t("admin.finance.tax.overrideDeleted"),
     },
   );
 
   const onDelete = async (o: VatOverride) => {
     if (
       await confirm({
-        title: `"${o.categoryName}" KDV istisnası silinsin mi?`,
-        description: "Bu kategori tekrar varsayılan KDV oranına döner.",
-        confirmLabel: "Sil",
+        title: t("admin.finance.tax.deleteOverrideTitle", {
+          category: o.categoryName,
+        }),
+        description: t("admin.finance.tax.deleteOverrideDescription"),
+        confirmLabel: t("common.delete"),
         destructive: true,
       })
     )
       removeOverride.mutate(o.ruleId);
   };
 
-  const columns = vatColumns(onDelete);
+  const columns = vatColumns(onDelete, t);
 
   return (
-    <SectionCard title="Kategori Bazlı İstisnalar" bodyClassName="space-y-4">
+    <SectionCard
+      title={t("admin.finance.tax.categoryOverrides")}
+      bodyClassName="space-y-4"
+    >
       <p className="text-sm text-muted">
-        Belirli kategorilerde farklı KDV oranı gerekiyorsa (örn. kitap %0)
-        buradan tanımlayın. Tanımsız kategoriler varsayılan oranı kullanır.
+        {t("admin.finance.tax.categoryOverridesDescription")}
       </p>
       <Form
         form={form}
@@ -70,8 +76,8 @@ export function VatOverrideForm({ config }: { config?: VatConfig }) {
       >
         <FormSelect
           name="categoryId"
-          label="Kategori"
-          placeholder="Seçin"
+          label={t("common.category")}
+          placeholder={t("common.select")}
           options={categories.map((c) => ({ value: c.id, label: c.name }))}
           className="min-w-48"
         />
@@ -81,18 +87,18 @@ export function VatOverrideForm({ config }: { config?: VatConfig }) {
           min={0}
           max={100}
           step={0.01}
-          label="KDV Oranı (%)"
+          label={t("admin.finance.tax.vatRatePercent")}
           className="w-32"
         />
         <Button type="submit" isLoading={addOverride.isPending}>
-          Ekle / Güncelle
+          {t("admin.finance.tax.addOrUpdate")}
         </Button>
       </Form>
       <DataTable
         columns={columns}
         data={config?.overrides ?? []}
         getRowId={(o) => o.ruleId}
-        emptyText="Kategori istisnası yok — tüm kategoriler varsayılan oranı kullanıyor."
+        emptyText={t("admin.finance.tax.noOverrides")}
       />
     </SectionCard>
   );

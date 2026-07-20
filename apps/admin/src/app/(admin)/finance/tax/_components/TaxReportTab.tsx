@@ -13,6 +13,7 @@ import { MetricCard } from "@/components/MetricCard";
 import { fmtTry } from "@/lib/format";
 import { taxReportColumns } from "../_lib/columns";
 import { type TaxReport, groupByOptions } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 type TaxReportRow = TaxReport["breakdown"][number];
 type TaxReportListData = {
@@ -48,27 +49,28 @@ const taxReportFetcher = async (params: Record<string, any>) => {
 };
 
 function TaxReportControls() {
+  const t = useTranslations();
   const { filters, setFilter } = useResourceList<TaxReportRow>();
   return (
     <SectionCard>
       <div className="flex flex-wrap items-end gap-4">
         <Input
           type="date"
-          label="Başlangıç"
+          label={t("admin.finance.common.start")}
           value={filters.fromDate ?? INITIAL_FILTERS.fromDate}
           onChange={(event) => setFilter("fromDate", event.target.value)}
         />
         <Input
           type="date"
-          label="Bitiş"
+          label={t("admin.finance.common.end")}
           value={filters.toDate ?? INITIAL_FILTERS.toDate}
           onChange={(event) => setFilter("toDate", event.target.value)}
         />
         <Select
-          label="Grupla"
+          label={t("admin.finance.tax.groupByLabel")}
           value={filters.groupBy ?? INITIAL_FILTERS.groupBy}
           onChange={(event) => setFilter("groupBy", event.target.value)}
-          options={groupByOptions}
+          options={groupByOptions(t)}
         />
       </div>
     </SectionCard>
@@ -76,6 +78,7 @@ function TaxReportControls() {
 }
 
 function TaxReportSummary() {
+  const t = useTranslations();
   const { data } = useResourceList<TaxReportRow>();
   const summary = (data as TaxReportListData)?.summary;
   if (!summary) return null;
@@ -84,19 +87,19 @@ function TaxReportSummary() {
       <MetricCard
         icon={CurrencyDollarIcon}
         tone="success"
-        label="Toplam Tahsil Edilen Vergi"
+        label={t("admin.finance.tax.totalTaxCollected")}
         value={fmtTry(summary.totalTaxCollected)}
       />
       <MetricCard
         icon={ChartBarIcon}
         tone="primary"
-        label="Toplam Ciro"
+        label={t("admin.finance.tax.totalRevenue")}
         value={fmtTry(summary.totalRevenue)}
       />
       <MetricCard
         icon={DocumentTextIcon}
         tone="info"
-        label="Fatura Sayısı"
+        label={t("admin.finance.tax.invoiceCount")}
         value={summary.invoiceCount}
       />
     </div>
@@ -104,6 +107,7 @@ function TaxReportSummary() {
 }
 
 export function TaxReportTab() {
+  const t = useTranslations();
   return (
     <ResourceList<TaxReportRow>
       resource="tax-report"
@@ -115,10 +119,10 @@ export function TaxReportTab() {
     >
       <TaxReportControls />
       <TaxReportSummary />
-      <SectionCard title="Dönem Bazlı Vergi">
+      <SectionCard title={t("admin.finance.tax.taxByPeriod")}>
         <ResourceList.Table<TaxReportRow>
-          columns={taxReportColumns}
-          emptyText="Bu dönemde fatura yok."
+          columns={taxReportColumns(t)}
+          emptyText={t("admin.finance.tax.noInvoicesForPeriod")}
         />
       </SectionCard>
     </ResourceList>

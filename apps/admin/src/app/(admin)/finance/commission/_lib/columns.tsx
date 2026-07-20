@@ -2,6 +2,9 @@ import { Badge } from "@tarodan/ui";
 import { col } from "@/components/table";
 import { commissionRowMenu } from "./rowActions";
 import { type CommissionRule, sellerTypeLabel, appliesToLabel } from "./types";
+import type { useTranslations } from "next-intl";
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 const rate = (v: number | null) => (v !== null ? `%${v.toFixed(2)}` : "—");
 
@@ -12,31 +15,38 @@ export interface CommissionColumnProps {
   togglingId?: string;
 }
 
-export function commissionColumns({
-  onEdit,
-  onDelete,
-  onToggle,
-}: CommissionColumnProps) {
+export function commissionColumns(
+  { onEdit, onDelete, onToggle }: CommissionColumnProps,
+  t: T,
+) {
   return [
-    col.text<CommissionRule>("Kural Adı", "name"),
-    col.muted<CommissionRule>("Kategori", (r) => r.categoryName || "Tümü", {
-      sortKey: "categoryName",
-      sortType: "text",
-    }),
+    col.text<CommissionRule>(t("admin.finance.commission.ruleName"), "name"),
     col.muted<CommissionRule>(
-      "Satıcı Tipi",
-      (r) => sellerTypeLabel(r.sellerType),
+      t("common.category"),
+      (r) => r.categoryName || t("common.all"),
+      {
+        sortKey: "categoryName",
+        sortType: "text",
+      },
+    ),
+    col.muted<CommissionRule>(
+      t("admin.finance.commission.sellerType"),
+      (r) => sellerTypeLabel(r.sellerType, t),
       {
         sortKey: "sellerType",
         sortType: "text",
       },
     ),
-    col.muted<CommissionRule>("Uygulanan", (r) => appliesToLabel(r.appliesTo), {
-      sortKey: "appliesTo",
-      sortType: "text",
-    }),
+    col.muted<CommissionRule>(
+      t("admin.finance.commission.appliesTo"),
+      (r) => appliesToLabel(r.appliesTo, t),
+      {
+        sortKey: "appliesTo",
+        sortType: "text",
+      },
+    ),
     col.custom<CommissionRule>(
-      "Satıcı Oranı",
+      t("admin.finance.commission.sellerRate"),
       (r) => (
         <span className="font-semibold text-primary-700">
           {rate(r.sellerRate)}
@@ -45,7 +55,7 @@ export function commissionColumns({
       { sortKey: "sellerRate", sortType: "number" },
     ),
     col.custom<CommissionRule>(
-      "Alıcı Oranı",
+      t("admin.finance.commission.buyerRate"),
       (r) => (
         <span className="font-semibold text-primary-700">
           {rate(r.buyerRate)}
@@ -53,10 +63,14 @@ export function commissionColumns({
       ),
       { sortKey: "buyerRate", sortType: "number" },
     ),
-    col.badge<CommissionRule>("Durum", (r) => <Badge active={r.isActive} />, {
-      sortKey: "isActive",
-      sortType: "number",
-    }),
+    col.badge<CommissionRule>(
+      t("common.status"),
+      (r) => <Badge active={r.isActive} />,
+      {
+        sortKey: "isActive",
+        sortType: "number",
+      },
+    ),
     col.rowMenu<CommissionRule>(
       commissionRowMenu({ onEdit, onDelete, onToggle }),
     ),

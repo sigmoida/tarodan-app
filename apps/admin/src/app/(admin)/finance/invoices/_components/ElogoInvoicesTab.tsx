@@ -1,17 +1,19 @@
-'use client';
+"use client";
 
-import { adminApi } from '@/lib/api';
-import { ResourceList } from '@/components/list';
-import { elogoColumns } from '../_lib/columns';
+import { adminApi } from "@/lib/api";
+import { ResourceList } from "@/components/list";
+import { elogoColumns } from "../_lib/columns";
 import {
   type Invoice,
   mapInvoices,
   typeFilterOptions,
   statusFilterOptions,
   documentTypeFilterOptions,
-} from '../_lib/types';
+} from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 export function ElogoInvoicesTab() {
+  const t = useTranslations();
   return (
     <ResourceList<Invoice>
       resource="invoices"
@@ -26,27 +28,40 @@ export function ElogoInvoicesTab() {
       getRowId={(i) => i.id}
       syncUrl
       initialFilters={{
-        type: 'all',
-        status: 'all',
-        documentType: 'all',
-        startDate: '',
-        endDate: '',
+        type: "all",
+        status: "all",
+        documentType: "all",
+        startDate: "",
+        endDate: "",
       }}
-      errorMessage="Faturalar yüklenemedi"
+      errorMessage={t("admin.finance.invoices.loadError")}
     >
       <ResourceList.Toolbar>
-        <ResourceList.Search placeholder="Fatura no, alıcı, VKN veya ETTN ara..." />
-        <ResourceList.FilterSelect name="type" options={typeFilterOptions} className="sm:w-44" />
-        <ResourceList.FilterSelect name="status" options={statusFilterOptions} className="sm:w-40" />
+        <ResourceList.Search
+          placeholder={t("admin.finance.invoices.searchPlaceholder")}
+        />
+        <ResourceList.FilterSelect
+          name="type"
+          options={typeFilterOptions(t)}
+          className="sm:w-44"
+        />
+        <ResourceList.FilterSelect
+          name="status"
+          options={statusFilterOptions(t)}
+          className="sm:w-40"
+        />
         <ResourceList.FilterSelect
           name="documentType"
-          options={documentTypeFilterOptions}
+          options={documentTypeFilterOptions(t)}
           className="sm:w-36"
         />
         <ResourceList.DateRange />
       </ResourceList.Toolbar>
-      <ResourceList.Total unit="belge" />
-      <ResourceList.Table columns={elogoColumns} emptyText="Fatura bulunamadı" />
+      <ResourceList.Total unit={t("admin.finance.invoices.documentUnit")} />
+      <ResourceList.Table
+        columns={elogoColumns(t)}
+        emptyText={t("admin.finance.invoices.empty")}
+      />
       <ResourceList.Pagination />
     </ResourceList>
   );

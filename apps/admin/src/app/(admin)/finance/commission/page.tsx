@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Alert, Button } from "@tarodan/ui";
 import {
   PlusIcon,
@@ -35,6 +36,7 @@ function CommissionRulesContent({
   onToggle: (rule: CommissionRule) => void;
   togglingId?: string;
 }) {
+  const t = useTranslations();
   const { rows } = useResourceList<CommissionRule>();
   const hasDefaultRule = rows.some(isDefaultRule);
 
@@ -43,13 +45,10 @@ function CommissionRulesContent({
       {!hasDefaultRule && (
         <Alert
           variant="warning"
-          title="Varsayılan komisyon kuralı tanımlı değil"
+          title={t("admin.finance.commission.defaultMissingTitle")}
           icon={<ExclamationTriangleIcon className="h-5 w-5" />}
         >
-          Eşleşen kural olmayan siparişler 0 komisyon ile oluşturulacaktır.
-          Checkout ve ödeme akışı etkilenmez. İsterseniz &quot;Kategori:
-          Tümü&quot; ve &quot;Satıcı Tipi: Tümü&quot; ile bir varsayılan kural
-          ekleyebilirsiniz.
+          {t("admin.finance.commission.defaultMissingDescription")}
         </Alert>
       )}
       <CommissionTable
@@ -63,6 +62,7 @@ function CommissionRulesContent({
 }
 
 export default function CommissionPage() {
+  const t = useTranslations();
   const confirm = useConfirm();
   const [modal, setModal] = useState<{ rule?: CommissionRule } | null>(null);
 
@@ -71,23 +71,22 @@ export default function CommissionPage() {
       adminApi.updateCommissionRule(rule.id, { isActive: !rule.isActive }),
     {
       invalidates: ["commission-rules"],
-      successMessage: "Kural durumu güncellendi",
+      successMessage: t("admin.finance.commission.ruleStatusUpdated"),
     },
   );
   const remove = useAdminMutation(
     (id: string) => adminApi.deleteCommissionRule(id),
     {
       invalidates: ["commission-rules"],
-      successMessage: "Komisyon kuralı silindi",
+      successMessage: t("admin.finance.commission.ruleDeleted"),
     },
   );
 
   const onDelete = async (rule: CommissionRule) => {
     const ok = await confirm({
-      title: "Kuralı Sil",
-      description:
-        "Bu komisyon kuralını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
-      confirmLabel: "Sil",
+      title: t("admin.finance.commission.deleteRule"),
+      description: t("admin.finance.commission.deleteRuleDescription"),
+      confirmLabel: t("common.delete"),
       destructive: true,
     });
     if (ok) remove.mutate(rule.id);
@@ -101,28 +100,24 @@ export default function CommissionPage() {
       limit={1000}
     >
       <ResourceList.Header
-        title="Komisyon Yönetimi"
-        description="Platform komisyon oranlarını yönetin"
+        title={t("admin.finance.commission.title")}
+        description={t("admin.finance.commission.subtitle")}
         actions={
           <Button
             leftIcon={<PlusIcon className="h-5 w-5" />}
             onClick={() => setModal({})}
           >
-            Yeni Kural Ekle
+            {t("admin.finance.commission.newRule")}
           </Button>
         }
       />
       <CommissionSummary />
       <Alert
         variant="info"
-        title="Komisyon Hesaplama"
+        title={t("admin.finance.commission.calculationTitle")}
         icon={<InformationCircleIcon className="h-5 w-5" />}
       >
-        Komisyon kuralları eşleşme sırasına göre değerlendirilir. Bir sipariş
-        için ilk eşleşen kural uygulanır. Eşleşme sırası: Kategori + Satıcı Tipi
-        &gt; Kategori + Tümü &gt; Satıcı Tipi &gt; Varsayılan (Tümü + Tümü).
-        Aynı kombinasyon (kategori + satıcı tipi) için sadece bir kural
-        oluşturulabilir.
+        {t("admin.finance.commission.calculationDescription")}
       </Alert>
       <TradeRateCard />
       <CommissionRulesContent

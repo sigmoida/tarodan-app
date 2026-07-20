@@ -6,6 +6,7 @@ import { adminApi } from "@/lib/api";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { vatDefaultSchema } from "../_lib/schema";
+import { useTranslations } from "next-intl";
 
 /**
  * Default VAT rate editor. Seeded from the server value via RHF's `values`
@@ -13,7 +14,8 @@ import { vatDefaultSchema } from "../_lib/schema";
  * lives in the schema (was a manual toast before).
  */
 export function VatDefaultForm({ defaultRate }: { defaultRate?: number }) {
-  const form = useZodForm(vatDefaultSchema, {
+  const t = useTranslations();
+  const form = useZodForm(vatDefaultSchema(t), {
     values: { rate: String(defaultRate ?? 20) },
   });
 
@@ -21,16 +23,17 @@ export function VatDefaultForm({ defaultRate }: { defaultRate?: number }) {
     (rate: number) => adminApi.setDefaultVat(rate),
     {
       invalidates: ["vat-config"],
-      successMessage: "Varsayılan KDV oranı güncellendi",
+      successMessage: t("admin.finance.tax.defaultVatUpdated"),
     },
   );
 
   return (
-    <SectionCard title="Varsayılan KDV Oranı" bodyClassName="space-y-4">
+    <SectionCard
+      title={t("admin.finance.tax.defaultVatRate")}
+      bodyClassName="space-y-4"
+    >
       <p className="text-sm text-muted">
-        Tarodan&apos;ın kestiği komisyon/hizmet bedeli e-belgeleri ve kurumsal
-        satıcı siparişlerindeki KDV bu oranla hesaplanır. Bireysel satıcı
-        satışlarında KDV uygulanmaz.
+        {t("admin.finance.tax.defaultVatDescription")}
       </p>
       <Form
         form={form}
@@ -43,11 +46,11 @@ export function VatDefaultForm({ defaultRate }: { defaultRate?: number }) {
           min={0}
           max={100}
           step={0.01}
-          label="KDV Oranı (%)"
+          label={t("admin.finance.tax.vatRatePercent")}
           className="w-32"
         />
         <Button type="submit" isLoading={save.isPending}>
-          Kaydet
+          {t("common.save")}
         </Button>
       </Form>
     </SectionCard>

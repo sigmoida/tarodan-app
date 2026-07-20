@@ -1,41 +1,44 @@
 /** @format */
 
-'use client';
+"use client";
 
-import { adminApi } from '@/lib/api';
-import { ResourceList } from '@/components/list';
-import { sellerColumns } from '../_lib/columns';
-import { type SellerInvoice, mapSellerInvoices } from '../_lib/types';
+import { adminApi } from "@/lib/api";
+import { ResourceList } from "@/components/list";
+import { sellerColumns } from "../_lib/columns";
+import { type SellerInvoice, mapSellerInvoices } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 export function SellerInvoicesTab() {
-	return (
-		<ResourceList<SellerInvoice>
-			resource='seller-invoices'
-			fetcher={(p) =>
-				adminApi.getSellerInvoices(p).then((res) => {
-					const root = res.data ?? {};
-					const raw = root.data ?? root.items ?? [];
-					const total = root.meta?.total ?? root.total ?? raw.length;
-					return {
-						...res,
-						data: { data: mapSellerInvoices(raw), meta: { total } },
-					};
-				})
-			}
-			getRowId={(s) => s.id}
-			syncUrl
-			initialFilters={{ startDate: '', endDate: '' }}
-			errorMessage='Faturalar yüklenemedi'>
-			<ResourceList.Toolbar>
-				<ResourceList.Search />
-				<ResourceList.DateRange />
-			</ResourceList.Toolbar>
-			<ResourceList.Total unit='fatura' />
-			<ResourceList.Table
-				columns={sellerColumns}
-				emptyText='Fatura bulunamadı'
-			/>
-			<ResourceList.Pagination />
-		</ResourceList>
-	);
+  const t = useTranslations();
+  return (
+    <ResourceList<SellerInvoice>
+      resource="seller-invoices"
+      fetcher={(p) =>
+        adminApi.getSellerInvoices(p).then((res) => {
+          const root = res.data ?? {};
+          const raw = root.data ?? root.items ?? [];
+          const total = root.meta?.total ?? root.total ?? raw.length;
+          return {
+            ...res,
+            data: { data: mapSellerInvoices(raw), meta: { total } },
+          };
+        })
+      }
+      getRowId={(s) => s.id}
+      syncUrl
+      initialFilters={{ startDate: "", endDate: "" }}
+      errorMessage={t("admin.finance.invoices.loadError")}
+    >
+      <ResourceList.Toolbar>
+        <ResourceList.Search />
+        <ResourceList.DateRange />
+      </ResourceList.Toolbar>
+      <ResourceList.Total unit={t("admin.finance.invoices.invoiceUnit")} />
+      <ResourceList.Table
+        columns={sellerColumns(t)}
+        emptyText={t("admin.finance.invoices.empty")}
+      />
+      <ResourceList.Pagination />
+    </ResourceList>
+  );
 }

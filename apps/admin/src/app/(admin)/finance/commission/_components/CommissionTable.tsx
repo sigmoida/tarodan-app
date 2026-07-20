@@ -4,6 +4,7 @@ import { SectionCard } from "@/components/detail/SectionCard";
 import { ResourceList } from "@/components/list";
 import { commissionColumns } from "../_lib/columns";
 import { type CommissionRule } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 export function CommissionTable({
   onEdit,
@@ -16,13 +17,17 @@ export function CommissionTable({
   onToggle: (rule: CommissionRule) => void;
   togglingId?: string;
 }) {
-  const columns = commissionColumns({ onEdit, onDelete, onToggle, togglingId });
+  const t = useTranslations();
+  const columns = commissionColumns(
+    { onEdit, onDelete, onToggle, togglingId },
+    t,
+  );
 
   return (
-    <SectionCard title="Komisyon Kuralları">
+    <SectionCard title={t("admin.finance.commission.rules")}>
       <ResourceList.Table<CommissionRule>
         columns={columns}
-        emptyText="Henüz komisyon kuralı eklenmemiş"
+        emptyText={t("admin.finance.commission.emptyRules")}
       />
     </SectionCard>
   );
