@@ -3509,6 +3509,8 @@
         "orderNumber": "Order No",
         "buyer": "Buyer",
         "seller": "Seller",
+        "sellerId": "Seller ID",
+        "cargoStatus": "Shipping Status",
         "commission": "Commission",
         "itemCountUnit": "{count} items",
         "cartItems": "{count}-item cart",

@@ -10,7 +10,9 @@ export interface Order {
   orderNumber: string;
   status: string;
   totalAmount: number;
+  subtotal: number;
   commission: number;
+  shipmentStatus?: string | null;
   buyer: { id: string; displayName: string };
   seller: { id: string; displayName: string };
   product?: { id: string; title: string };
@@ -46,7 +48,9 @@ export function mapOrders(raw: any[], t: T): Order[] {
     orderNumber: o.orderNumber || `ORD-${o.id.slice(0, 8)}`,
     status: o.status,
     totalAmount: Number(o.totalAmount || o.total || 0),
+    subtotal: Number(o.subtotal ?? 0),
     commission: Number(o.commissionAmount || 0),
+    shipmentStatus: o.shipmentStatus ?? null,
     buyer: o.buyer || {
       id: "",
       displayName: t("admin.operations.orders.buyer"),

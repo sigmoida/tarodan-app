@@ -3509,6 +3509,8 @@
         "orderNumber": "Sipariş No",
         "buyer": "Alıcı",
         "seller": "Satıcı",
+        "sellerId": "Satıcı ID",
+        "cargoStatus": "Kargo Durumu",
         "commission": "Komisyon",
         "itemCountUnit": "{count} adet",
         "cartItems": "{count} ürünlük sepet",
