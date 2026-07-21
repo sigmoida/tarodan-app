@@ -5,6 +5,7 @@ type CatalogListParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
+  sortType?: "text" | "number" | "date";
 };
 
 /**
@@ -111,6 +112,7 @@ export const catalogApi = {
     limit?: number;
     sortBy?: string;
     sortOrder?: string;
+    sortType?: "text" | "number" | "date";
   }) => api.get("/admin/collections", { params }),
   getCollection: (id: string) => api.get(`/admin/collections/${id}`),
   createCollection: (data: {

@@ -1,31 +1,10 @@
-import {
-  IsOptional,
-  IsString,
-  IsEnum,
-  IsBoolean,
-  IsNumber,
-  IsIn,
-  Min,
-} from "class-validator";
+import { IsOptional, IsString, IsEnum, IsBoolean } from "class-validator";
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { Type, Transform } from "class-transformer";
+import { Transform } from "class-transformer";
 import { DiscountScope } from "@prisma/client";
+import { AdminListQueryDto } from "../../../common/list";
 
-export class DiscountQueryDto {
-  @ApiPropertyOptional({ description: "Sayfa numarası", default: 1 })
-  @IsOptional()
-  @IsNumber()
-  @Min(1)
-  @Type(() => Number)
-  page?: number = 1;
-
-  @ApiPropertyOptional({ description: "Sayfa başına kayıt", default: 20 })
-  @IsOptional()
-  @IsNumber()
-  @Min(1)
-  @Type(() => Number)
-  limit?: number = 20;
-
+export class DiscountQueryDto extends AdminListQueryDto {
   @ApiPropertyOptional({ description: "Arama (isim veya kod)" })
   @IsOptional()
   @IsString()
@@ -61,23 +40,4 @@ export class DiscountQueryDto {
   @Transform(({ value }) => value === "true" || value === true)
   @IsBoolean()
   autoOnly?: boolean;
-
-  @ApiPropertyOptional({
-    description:
-      "Sıralama alanı (kolon adı veya created_desc gibi eski ön-ayar)",
-    default: "created_desc",
-  })
-  @IsOptional()
-  @IsString()
-  sortBy?: string = "created_desc";
-
-  @ApiPropertyOptional({ enum: ["asc", "desc"] })
-  @IsOptional()
-  @IsIn(["asc", "desc"])
-  sortOrder?: "asc" | "desc";
-
-  @ApiPropertyOptional({ enum: ["text", "number", "date"] })
-  @IsOptional()
-  @IsIn(["text", "number", "date"])
-  sortType?: "text" | "number" | "date";
 }

@@ -8,8 +8,13 @@ import { PrismaService } from "../../prisma";
 import { StorageService } from "../storage/storage.service";
 import { ModerationAiClient } from "../moderation/moderation-ai.client";
 import { AdminAuditService } from "./admin-audit.service";
-import { ProductStatus, Prisma } from "@prisma/client";
-import { buildSearchWhere, paginate, resolveOrderBy } from "../../common/list";
+import { ProductStatus, Prisma, type ModerationEvent } from "@prisma/client";
+import {
+  buildSearchWhere,
+  paginate,
+  paginateComputedRows,
+  resolveOrderBy,
+} from "../../common/list";
 
 /**
  * Moderasyon kuyruğu + AI denetim araçları — AdminService'in
@@ -329,29 +334,62 @@ export class AdminModerationService {
       ];
     }
 
-    const orderBy =
-      resolveOrderBy<Prisma.ModerationEventOrderByWithRelationInput>(
-        "ModerationEvent",
-        options,
-        { defaultSort: { createdAt: "desc" } },
+    const listQuery = {
+      ...options,
+      limit: options.limit ?? options.pageSize,
+    };
+    let users: Array<{ id: string; displayName: string; email: string }> = [];
+    let usersLoaded = false;
+    let result;
+    if (options.sortBy === "user.displayName") {
+      const allEvents = await this.prisma.moderationEvent.findMany({ where });
+      const allUserIds = [
+        ...new Set(
+          allEvents
+            .map((event) => event.userId)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      ];
+      users = await this.prisma.user.findMany({
+        where: { id: { in: allUserIds } },
+        select: { id: true, displayName: true, email: true },
+      });
+      usersLoaded = true;
+      const names = new Map(
+        users.map((user) => [user.id, user.displayName || user.email]),
       );
-    const result = await paginate(
-      this.prisma.moderationEvent,
-      { where, orderBy },
-      { page: options.page, limit: options.limit ?? options.pageSize },
-    );
-    const rows = result.data;
+      result = paginateComputedRows(
+        allEvents,
+        (event) => (event.userId ? names.get(event.userId) : undefined),
+        { ...listQuery, sortType: "text" },
+      );
+    } else {
+      const orderBy =
+        resolveOrderBy<Prisma.ModerationEventOrderByWithRelationInput>(
+          "ModerationEvent",
+          options,
+          { defaultSort: { createdAt: "desc" } },
+        );
+      result = await paginate(
+        this.prisma.moderationEvent,
+        { where, orderBy },
+        listQuery,
+      );
+    }
+    const rows = result.data as ModerationEvent[];
 
     // Aktör (içeriği üreten) kullanıcı bilgisini tek sorguda zenginleştir
     const userIds = [
       ...new Set(rows.map((r) => r.userId).filter((x): x is string => !!x)),
     ];
-    const users = userIds.length
-      ? await this.prisma.user.findMany({
-          where: { id: { in: userIds } },
-          select: { id: true, displayName: true, email: true },
-        })
-      : [];
+    if (!usersLoaded) {
+      users = userIds.length
+        ? await this.prisma.user.findMany({
+            where: { id: { in: userIds } },
+            select: { id: true, displayName: true, email: true },
+          })
+        : [];
+    }
     const userMap = new Map(users.map((u) => [u.id, u]));
 
     return {

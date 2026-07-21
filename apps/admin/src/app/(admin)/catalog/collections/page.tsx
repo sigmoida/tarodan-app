@@ -117,6 +117,7 @@ export default function CollectionsPage() {
                   : undefined,
               sortBy: params.sortBy,
               sortOrder: params.sortOrder,
+              sortType: params.sortType,
             })
           }
           getRowId={(c) => c.id}

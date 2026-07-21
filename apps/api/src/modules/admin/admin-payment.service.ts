@@ -59,31 +59,65 @@ export class AdminPaymentService {
     }
 
     if (query.search) {
-      const [paymentIds, orderIds] = await Promise.all([
+      const [paymentIds, orderIds, userIds] = await Promise.all([
         fulltextPaymentSearch(this.prisma, query.search),
         fulltextOrderSearch(this.prisma, query.search),
+        fulltextUserSearch(this.prisma, query.search),
       ]);
-      const conditions: Prisma.PaymentWhereInput[] = [];
+      const search = query.search.trim();
+      const normalized = search.toLowerCase();
+      const numericAmount = Number(search.replace(",", "."));
+      const conditions: Prisma.PaymentWhereInput[] = [
+        { provider: { contains: search, mode: "insensitive" } },
+        { currency: { contains: search, mode: "insensitive" } },
+        { failureReason: { contains: search, mode: "insensitive" } },
+        {
+          order: {
+            OR: [
+              { orderNumber: { contains: search, mode: "insensitive" } },
+              {
+                buyer: {
+                  displayName: { contains: search, mode: "insensitive" },
+                },
+              },
+              { buyer: { email: { contains: search, mode: "insensitive" } } },
+              {
+                seller: {
+                  displayName: { contains: search, mode: "insensitive" },
+                },
+              },
+              { seller: { email: { contains: search, mode: "insensitive" } } },
+            ],
+          },
+        },
+      ];
       if (paymentIds.length > 0) conditions.push({ id: { in: paymentIds } });
       if (orderIds.length > 0) conditions.push({ orderId: { in: orderIds } });
-      if (conditions.length === 0) {
-        return {
-          data: [],
-          meta: {
-            total: 0,
-            page: query.page ?? 1,
-            limit: query.limit ?? 20,
-            totalPages: 0,
+      if (userIds.length > 0)
+        conditions.push({
+          order: {
+            OR: [{ buyerId: { in: userIds } }, { sellerId: { in: userIds } }],
           },
-        };
-      }
+        });
+      if (Number.isFinite(numericAmount))
+        conditions.push({ amount: numericAmount });
+      if (Object.values(PaymentStatus).includes(normalized as PaymentStatus))
+        conditions.push({ status: normalized as PaymentStatus });
       where.OR = conditions;
     }
 
     const orderBy = resolveOrderBy<Prisma.PaymentOrderByWithRelationInput>(
       "Payment",
       query,
-      { defaultSort: { createdAt: "desc" } },
+      {
+        defaultSort: { createdAt: "desc" },
+        sortMap: {
+          orderNumber: (direction) => ({ order: { orderNumber: direction } }),
+          "buyer.displayName": (direction) => ({
+            order: { buyer: { displayName: direction } },
+          }),
+        },
+      },
     );
     const result = await paginate(
       this.prisma.payment,

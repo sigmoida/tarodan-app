@@ -165,7 +165,7 @@ function moderationColumns(
               href: `/accounts/users/${e.user.id}`,
             }
           : null,
-      { sortKey: "userId" },
+      { sortKey: "user.displayName", sortType: "text" },
     ),
     col.date<ModerationEvent>("Tarih", "createdAt"),
   );

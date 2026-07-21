@@ -112,8 +112,15 @@ export const financeApi = {
     sortBy?: string;
     sortOrder?: "asc" | "desc";
   }) => api.get("/admin/payouts/transactions", { params }),
-  getPayoutsSchedule: (params?: { sellerId?: string; limit?: number }) =>
-    api.get("/admin/payouts/schedule", { params }),
+  getPayoutsSchedule: (params?: {
+    sellerId?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+    sortType?: "text" | "number" | "date";
+  }) => api.get("/admin/payouts/schedule", { params }),
   getPayoutsExport: (params?: {
     sellerId?: string;
     status?: string;

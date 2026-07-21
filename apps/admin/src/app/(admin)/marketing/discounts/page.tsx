@@ -55,6 +55,9 @@ export default function DiscountsPage() {
                   : params.isActive === "false"
                     ? false
                     : undefined,
+              sortBy: params.sortBy,
+              sortOrder: params.sortOrder,
+              sortType: params.sortType,
             },
           })
         }

@@ -42,12 +42,15 @@ export class AdminSellerApplicationService {
     };
 
     if (search) {
+      const normalized = search.toLowerCase();
       where.OR = [
         { displayName: { contains: search, mode: "insensitive" } },
         { email: { contains: search, mode: "insensitive" } },
         { companyName: { contains: search, mode: "insensitive" } },
         { taxId: { contains: search, mode: "insensitive" } },
       ];
+      if (Object.values(BusinessStatus).includes(normalized as BusinessStatus))
+        where.OR.push({ businessStatus: normalized as BusinessStatus });
     }
 
     const orderBy = resolveOrderBy<Prisma.UserOrderByWithRelationInput>(

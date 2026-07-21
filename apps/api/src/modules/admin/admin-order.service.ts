@@ -65,12 +65,20 @@ export class AdminOrderService {
     const where: Prisma.OrderWhereInput = {};
 
     if (search) {
+      const normalized = search.trim().toLowerCase();
+      const numeric = Number(search.replace(",", "."));
       where.OR = [
         { orderNumber: { contains: search, mode: "insensitive" } },
         { buyer: { displayName: { contains: search, mode: "insensitive" } } },
+        { buyer: { email: { contains: search, mode: "insensitive" } } },
         { seller: { displayName: { contains: search, mode: "insensitive" } } },
+        { seller: { email: { contains: search, mode: "insensitive" } } },
         { product: { title: { contains: search, mode: "insensitive" } } },
       ];
+      if (Object.values(OrderStatus).includes(normalized as OrderStatus))
+        where.OR.push({ status: normalized as OrderStatus });
+      if (Number.isFinite(numeric))
+        where.OR.push({ totalAmount: numeric }, { commissionAmount: numeric });
     }
 
     if (status) {

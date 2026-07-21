@@ -15,6 +15,7 @@ import { SectionCard } from "@/components/detail/SectionCard";
 import { MetricCard } from "@/components/MetricCard";
 import { useRateSetting } from "@/hooks/useRateSetting";
 import { fmtTry } from "@/lib/format";
+import { paginateClient } from "@/lib/query/client-list";
 import { withholdingColumns } from "../_lib/columns";
 import { type WithholdingReport, months } from "../_lib/types";
 import { useTranslations } from "next-intl";
@@ -25,6 +26,7 @@ type WithholdingListData = {
   meta: { total: number };
   summary: WithholdingReport["summary"];
   period: string;
+  allRows: WithholdingRow[];
 };
 
 const now = new Date();
@@ -40,26 +42,27 @@ const withholdingFetcher = async (params: Record<string, any>) => {
   });
   const report = response.data as WithholdingReport | null;
   const rows = report?.rows ?? [];
+  const page = paginateClient(rows, params);
   return {
     ...response,
     data: {
-      data: rows,
-      meta: { total: rows.length },
+      ...page,
       summary: report?.summary,
       period: report?.period,
+      allRows: rows,
     },
   };
 };
 
 function WithholdingControls() {
   const t = useTranslations();
-  const { filters, setFilter, data, rows } = useResourceList<WithholdingRow>();
+  const { filters, setFilter, data } = useResourceList<WithholdingRow>();
   const report = data as WithholdingListData;
 
   const exportCsv = () => {
     if (!report?.summary || !report.period) return;
     const header = t("admin.finance.tax.csvHeader");
-    const lines = rows.map((row) =>
+    const lines = (report.allRows ?? []).map((row) =>
       [
         `"${(row.sellerName || "").replace(/"/g, '""')}"`,
         row.taxId ?? "",
@@ -103,7 +106,7 @@ function WithholdingControls() {
           variant="secondary"
           leftIcon={<ArrowDownTrayIcon className="h-5 w-5" />}
           onClick={exportCsv}
-          disabled={rows.length === 0}
+          disabled={(report?.allRows?.length ?? 0) === 0}
         >
           {t("admin.finance.common.downloadCsv")}
         </Button>
@@ -211,15 +214,16 @@ export function WithholdingTab() {
         resource="withholding-report"
         fetcher={withholdingFetcher}
         getRowId={(row) => row.sellerId}
-        // Full-load with an explicit cap: withholding is a bounded per-seller
-        // aggregate; 1000 rows is the documented ceiling. Server-side if larger (#383).
-        limit={1000}
         syncUrl
         initialFilters={INITIAL_FILTERS}
       >
         <WithholdingControls />
+        <ResourceList.Toolbar>
+          <ResourceList.Search />
+        </ResourceList.Toolbar>
         <WithholdingSummary />
         <WithholdingTable />
+        <ResourceList.Pagination />
       </ResourceList>
     </div>
   );

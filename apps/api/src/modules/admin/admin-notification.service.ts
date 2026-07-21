@@ -7,12 +7,16 @@ import {
 import { PrismaService } from "../../prisma";
 import { EventService } from "../events/event.service";
 import { AdminAuditService } from "./admin-audit.service";
-import { Prisma } from "@prisma/client";
+import { Prisma, type NotificationLog } from "@prisma/client";
 import {
   NotificationHistoryQueryDto,
   ScheduledNotificationQueryDto,
 } from "./dto";
-import { paginate, resolveOrderBy } from "../../common/list";
+import {
+  paginate,
+  paginateComputedRows,
+  resolveOrderBy,
+} from "../../common/list";
 
 /**
  * Bildirim admin operasyonları (geçmiş, toplu gönderim, zamanlama) —
@@ -65,34 +69,57 @@ export class AdminNotificationService {
       where.OR = [
         { title: { contains: trimmedSearch, mode: "insensitive" } },
         { body: { contains: trimmedSearch, mode: "insensitive" } },
+        { channel: { contains: trimmedSearch, mode: "insensitive" } },
+        { status: { contains: trimmedSearch, mode: "insensitive" } },
+        { type: { contains: trimmedSearch, mode: "insensitive" } },
+        { errorMessage: { contains: trimmedSearch, mode: "insensitive" } },
         ...(matchingUserIds.length > 0
           ? [{ userId: { in: matchingUserIds } }]
           : []),
       ];
     }
 
-    const orderBy =
-      resolveOrderBy<Prisma.NotificationLogOrderByWithRelationInput>(
-        "NotificationLog",
-        query,
-        { defaultSort: { createdAt: "desc" } },
+    let users: Array<{ id: string; displayName: string; email: string }> = [];
+    let usersLoaded = false;
+    let result;
+    if (query.sortBy === "user.displayName") {
+      const allLogs = await this.prisma.notificationLog.findMany({ where });
+      const allUserIds = [...new Set(allLogs.map((log) => log.userId))];
+      users = await this.prisma.user.findMany({
+        where: { id: { in: allUserIds } },
+        select: { id: true, displayName: true, email: true },
+      });
+      usersLoaded = true;
+      const names = new Map(
+        users.map((user) => [user.id, user.displayName || user.email]),
       );
-    const result = await paginate(
-      this.prisma.notificationLog,
-      {
-        where,
-        orderBy,
-      },
-      query,
-    );
-    const logs = result.data;
+      result = paginateComputedRows(allLogs, (log) => names.get(log.userId), {
+        ...query,
+        sortType: "text",
+      });
+    } else {
+      const orderBy =
+        resolveOrderBy<Prisma.NotificationLogOrderByWithRelationInput>(
+          "NotificationLog",
+          query,
+          { defaultSort: { createdAt: "desc" } },
+        );
+      result = await paginate(
+        this.prisma.notificationLog,
+        { where, orderBy },
+        query,
+      );
+    }
+    const logs = result.data as NotificationLog[];
 
     // Get user info for logs
     const userIds = [...new Set(logs.map((l) => l.userId))];
-    const users = await this.prisma.user.findMany({
-      where: { id: { in: userIds } },
-      select: { id: true, displayName: true, email: true },
-    });
+    if (!usersLoaded) {
+      users = await this.prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, displayName: true, email: true },
+      });
+    }
     const userMap = new Map(users.map((u) => [u.id, u]));
 
     return {
@@ -322,6 +349,26 @@ export class AdminNotificationService {
 
     if (query?.status) {
       where.status = query.status;
+    }
+
+    const search = query.search?.trim();
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: "insensitive" } },
+        { body: { contains: search, mode: "insensitive" } },
+        { targetType: { contains: search, mode: "insensitive" } },
+        { status: { contains: search, mode: "insensitive" } },
+        { channels: { has: search.toLowerCase() } },
+      ];
+    }
+
+    if (query.sortBy === "channels") {
+      const rows = await this.prisma.scheduledNotification.findMany({ where });
+      return paginateComputedRows(
+        rows,
+        (notification) => notification.channels.join(", "),
+        { ...query, sortType: "text" },
+      );
     }
 
     const orderBy =

@@ -664,7 +664,15 @@ export class AdminService {
     return this.payoutService.getPayoutsTransactions(query);
   }
 
-  async getPayoutsSchedule(query: { sellerId?: string; limit?: number }) {
+  async getPayoutsSchedule(query: {
+    sellerId?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+    sortType?: "text" | "number" | "date";
+  }) {
     return this.payoutService.getPayoutsSchedule(query);
   }
 
@@ -1453,8 +1461,9 @@ export class AdminService {
     isFeatured?: boolean;
     page?: number;
     limit?: number;
-    sortBy?: "createdAt" | "name" | "likeCount" | "viewCount";
+    sortBy?: string;
     sortOrder?: "asc" | "desc";
+    sortType?: "text" | "number" | "date";
   }) {
     return this.collectionService.getCollections(query);
   }
