@@ -7,7 +7,6 @@ import { PageHeader } from "@/components/AdminList";
 import { SuspenseBoundary } from "@/components/page/SuspenseBoundary";
 import { useDashboard } from "./_lib/useDashboard";
 import { DashboardStats } from "./_components/DashboardStats";
-import { QuickActions } from "./_components/QuickActions";
 import { PendingActionsPanel } from "./_components/PendingActionsPanel";
 // Charts pull in chart.js/react-chartjs-2 (~150KB) and render below the stat
 // cards, so they load lazily off the /dashboard landing bundle (#102).
@@ -30,7 +29,6 @@ function DashboardContent() {
   return (
     <>
       <DashboardStats stats={data.stats} visitors={data.visitors} />
-      <QuickActions />
       <PendingActionsPanel pending={data.pendingActions} />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <TopProductsWidget products={data.topProducts} />

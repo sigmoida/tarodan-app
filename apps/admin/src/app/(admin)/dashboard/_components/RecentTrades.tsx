@@ -1,8 +1,11 @@
 /** @format */
 
 import Link from "next/link";
-import { ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
-import { EmptyState, StatusBadge } from "@tarodan/ui";
+import {
+  ArrowsRightLeftIcon,
+  ChevronRightIcon,
+} from "@heroicons/react/24/outline";
+import { Button, EmptyState, StatusBadge } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { SectionCard } from "@/components/detail/SectionCard";
 import {
@@ -43,12 +46,12 @@ export function RecentTrades({ trades }: { trades: RecentTrade[] }) {
     <SectionCard
       title={t("admin.dashboard.recentTrades.title")}
       actions={
-        <Link
-          href="/operations/trades"
-          className="text-sm text-primary-600 hover:underline"
-        >
-          {t("common.seeAll")} →
-        </Link>
+        <Button asChild variant="ghost" size="sm">
+          <Link href="/operations/trades">
+            {t("common.seeAll")}
+            <ChevronRightIcon className="ml-1 h-4 w-4" />
+          </Link>
+        </Button>
       }
     >
       <div className="space-y-3">

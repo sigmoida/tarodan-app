@@ -1,7 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
-import { EmptyState } from "@tarodan/ui";
+import { ChevronRightIcon } from "@heroicons/react/24/outline";
+import { Button, EmptyState } from "@tarodan/ui";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { type TopSeller } from "../_lib/types";
 
@@ -16,21 +17,21 @@ export function TopSellersWidget({ sellers }: { sellers: TopSeller[] }) {
     <SectionCard
       title={t("admin.dashboard.topSellers.title")}
       actions={
-        <Link
-          href="/accounts/users"
-          className="text-sm text-primary-600 hover:underline"
-        >
-          {t("common.seeAll")} →
-        </Link>
+        <Button asChild variant="ghost" size="sm">
+          <Link href="/accounts/users">
+            {t("common.seeAll")}
+            <ChevronRightIcon className="ml-1 h-4 w-4" />
+          </Link>
+        </Button>
       }
     >
-      <div className="divide-y divide-border">
+      <div className="space-y-0.5">
         {sellers.length > 0 ? (
           sellers.map((s) => (
             <Link
               key={s.id}
               href={`/accounts/users/${s.id}`}
-              className="flex items-center gap-3 py-3 first:pt-0 last:pb-0 hover:bg-surface-alt/60"
+              className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-2.5 hover:bg-surface-alt"
             >
               <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-primary-100">
                 {s.avatarUrl ? (
