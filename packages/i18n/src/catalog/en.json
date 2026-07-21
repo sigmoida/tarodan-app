@@ -2358,9 +2358,12 @@
     "messaging": {
       "unknown": "Unknown",
       "messages": {
-        "title": "Message Moderation",
+        "title": "User Conversations",
         "detailTitle": "Message Details",
         "notFound": "No messages found",
+        "conversationId": "Conversation ID",
+        "senderId": "Sender ID",
+        "receiverId": "Recipient ID",
         "sender": "Sender",
         "receiver": "Recipient",
         "warning": "Warning",

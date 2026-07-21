@@ -2358,9 +2358,12 @@
     "messaging": {
       "unknown": "Bilinmeyen",
       "messages": {
-        "title": "Mesaj Moderasyonu",
+        "title": "Kullanıcı Görüşmeleri",
         "detailTitle": "Mesaj Detayı",
         "notFound": "Mesaj bulunamadı",
+        "conversationId": "Görüşme ID",
+        "senderId": "Gönderen ID",
+        "receiverId": "Alıcı ID",
         "sender": "Gönderen",
         "receiver": "Alıcı",
         "warning": "Uyarı",
