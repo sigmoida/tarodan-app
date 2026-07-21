@@ -69,7 +69,7 @@ export default function Header() {
         {/* Main bar */}
         <div className="bg-primary-500 border-b border-primary-600 shadow-sm">
           <Container>
-            <div className="flex items-center gap-4 h-14 lg:h-16 max-h-14 lg:max-h-16 min-h-0">
+            <div className="flex items-center gap-2 sm:gap-4 h-14 lg:h-16 max-h-14 lg:max-h-16 min-h-0">
               {/* Logo */}
               <Link
                 href="/"
@@ -80,7 +80,7 @@ export default function Header() {
                   alt="Tarodan Logo"
                   width={120}
                   height={38}
-                  className="object-contain max-h-8 w-auto"
+                  className="object-contain max-h-8 w-auto max-w-[104px] sm:max-w-none"
                   priority
                 />
               </Link>
@@ -166,7 +166,16 @@ export default function Header() {
         {showCategoryBar && (
           <div className="bg-surface border-b border-primary-200 relative z-40">
             <Container className="px-4">
-              <CategoryNav />
+              {/*
+                On mobile the category bar is wider than the viewport, so it must
+                scroll horizontally within its own container instead of pushing the
+                whole page wide (which made mobile browsers zoom the page out). On
+                md+ it fits, so overflow returns to visible — the mega-menu dropdown
+                panels (absolutely positioned below the bar) must not be clipped.
+              */}
+              <div className="overflow-x-auto md:overflow-visible [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <CategoryNav />
+              </div>
             </Container>
           </div>
         )}
