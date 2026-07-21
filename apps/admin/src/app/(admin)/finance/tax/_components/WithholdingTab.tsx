@@ -35,6 +35,10 @@ const INITIAL_FILTERS = {
   month: String(now.getMonth() + 1),
 };
 
+// Full-load client-paginated report (#383): getWithholdingReport is a single
+// month-scoped aggregate (bounded by year + month) with no server pagination —
+// the rows fit in memory, so we paginate client-side. Move to the server
+// contract only if a single month's rows ever grow unbounded.
 const withholdingFetcher = async (params: Record<string, any>) => {
   const response = await adminApi.getWithholdingReport({
     year: Number(params.year ?? INITIAL_FILTERS.year),

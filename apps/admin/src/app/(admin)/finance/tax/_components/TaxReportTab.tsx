@@ -31,6 +31,10 @@ const INITIAL_FILTERS = {
   groupBy: "month",
 };
 
+// Full-load client-paginated report (#383): getTaxReport is a period-scoped
+// aggregate (bounded by fromDate/toDate + groupBy) with no server pagination —
+// the breakdown fits in memory, so we paginate client-side. Move to the server
+// contract only if a single period's breakdown ever grows unbounded.
 const taxReportFetcher = async (params: Record<string, any>) => {
   const response = await adminApi.getTaxReport({
     fromDate: params.fromDate ?? INITIAL_FILTERS.fromDate,

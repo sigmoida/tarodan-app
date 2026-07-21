@@ -95,6 +95,7 @@ export class AdminProductService {
         { id: { in: productIds } },
         { seller: { displayName: { contains: search, mode: "insensitive" } } },
         { seller: { email: { contains: search, mode: "insensitive" } } },
+        { category: { name: { contains: search, mode: "insensitive" } } },
       ];
     }
 
