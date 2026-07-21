@@ -73,13 +73,15 @@ export default function RefundRequestBanner({ order }: { order: OrderDetail }) {
           </p>
           <div className="flex items-center justify-between gap-3">
             <span className="font-mono text-lg font-bold text-heading break-all">
-              {rr.returnTrackingNumber}
+              {rr.returnCargoCode ?? rr.returnTrackingNumber}
             </span>
             <Button
               type="button"
               variant="ghost"
               onClick={() => {
-                navigator.clipboard.writeText(rr.returnTrackingNumber!);
+                navigator.clipboard.writeText(
+                  (rr.returnCargoCode ?? rr.returnTrackingNumber)!,
+                );
                 toast.success(t("common.copiedShort"));
               }}
               className="h-auto p-0 text-sm text-primary-600 hover:text-primary-700 font-medium"
@@ -90,9 +92,9 @@ export default function RefundRequestBanner({ order }: { order: OrderDetail }) {
         </div>
       )}
 
-      {rr.returnProvider === "surat" && rr.returnTrackingNumber && (
+      {rr.returnProvider === "surat" && rr.returnCargoCode && (
         <a
-          href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(rr.returnTrackingNumber)}`}
+          href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(rr.returnCargoCode)}`}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-medium mr-4"

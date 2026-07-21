@@ -1501,7 +1501,11 @@ model RefundRequest {
   decidedAt      DateTime? @map("decided_at")
 
   returnProvider       String?         @map("return_provider")
+  // returnTrackingNumber = OzelKargoTakipNo (refundNumber; poller sorgu anahtarı).
   returnTrackingNumber String?         @map("return_tracking_number")
+  // Gerçek Sürat iade kodu (KargoTakipNo) + ZPL etiket (OrtakBarkodOlustur).
+  returnProviderTrackingId String?     @map("return_provider_tracking_id")
+  returnLabelZpl       String?         @map("return_label_zpl")
   returnStatus         ShipmentStatus? @map("return_status")
   returnShippedAt      DateTime?       @map("return_shipped_at")
   returnDeliveredAt    DateTime?       @map("return_delivered_at")

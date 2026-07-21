@@ -83,6 +83,8 @@ export interface OrderDetail {
     status: string;
     reason?: string;
     returnTrackingNumber?: string | null;
+    /** Real Sürat return code (KargoTakipNo) — given at the branch. */
+    returnCargoCode?: string | null;
     returnProvider?: string | null;
     returnStatus?: string | null;
     createdAt: string;
