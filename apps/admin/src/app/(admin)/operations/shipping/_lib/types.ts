@@ -2,6 +2,8 @@ export interface OrderShipmentRow {
   id: string;
   provider: string | null;
   trackingNumber: string | null;
+  /** Real Sürat cargo code (KargoTakipNo). */
+  providerTrackingId: string | null;
   trackingUrl: string | null;
   status: string;
   order?: {
@@ -18,6 +20,8 @@ export interface ReturnShipmentRow {
   status: string;
   returnProvider: string | null;
   returnTrackingNumber: string | null;
+  /** Real Sürat return code (KargoTakipNo). */
+  returnProviderTrackingId: string | null;
   returnStatus: string | null;
   returnShippedAt: string | null;
   returnDeliveredAt: string | null;
@@ -29,6 +33,8 @@ export interface TradeShipmentRow {
   tradeId: string;
   carrier: string;
   trackingNumber: string | null;
+  /** Real Sürat cargo code (KargoTakipNo). */
+  providerTrackingId: string | null;
   status: string;
   leg: string;
   recipientType: string;
@@ -42,6 +48,8 @@ export interface SuratShipmentRow {
   id: string;
   provider: string | null;
   trackingNumber: string | null;
+  /** Real Sürat cargo code (KargoTakipNo). */
+  providerTrackingId: string | null;
   trackingUrl: string | null;
   status: string;
   providerStatusCode: number | null;

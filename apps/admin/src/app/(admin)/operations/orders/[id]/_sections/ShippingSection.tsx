@@ -36,7 +36,7 @@ export function ShippingSection({
       <DataList columns={1}>
         <Field label={t("admin.operations.common.trackingNumber")}>
           <span className="font-mono text-sm">
-            {order.shipment.trackingNumber}
+            {order.shipment.providerTrackingId ?? order.shipment.trackingNumber}
           </span>
         </Field>
         {order.shipment.carrier && (

@@ -58,7 +58,9 @@ export function ReturnShippingSection({ rr }: { rr: RefundRequestDetail }) {
             {providerLabel}
           </Field>
           <Field label={t("admin.operations.common.trackingNumber")}>
-            <span className="font-mono">{rr.returnTrackingNumber}</span>
+            <span className="font-mono">
+              {rr.returnProviderTrackingId ?? rr.returnTrackingNumber}
+            </span>
           </Field>
           <Field label={t("admin.operations.refundRequests.shipmentStatus")}>
             {rr.returnStatus ? (

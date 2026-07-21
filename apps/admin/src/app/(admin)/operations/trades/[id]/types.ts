@@ -1,9 +1,11 @@
 export interface TradeShipment {
   id: string;
-  leg?: 'to_warehouse' | 'from_warehouse' | 'return';
+  leg?: "to_warehouse" | "from_warehouse" | "return";
   recipientUserId?: string;
   recipientType?: string;
   trackingNumber?: string;
+  /** Real Sürat cargo code (KargoTakipNo). */
+  providerTrackingId?: string | null;
   carrier?: string;
   status?: string;
   deliveredAt?: string | null;
@@ -16,7 +18,12 @@ export interface TradeShipment {
 
 export interface TradeItem {
   id: string;
-  product: { id: string; title: string; price: number; images?: Array<{ url: string }> };
+  product: {
+    id: string;
+    title: string;
+    price: number;
+    images?: Array<{ url: string }>;
+  };
 }
 
 export interface TradeDetail {
@@ -29,7 +36,12 @@ export interface TradeDetail {
   initiatorItems: TradeItem[];
   receiverItems: TradeItem[];
   shipments?: TradeShipment[];
-  dispute?: { id: string; reason: string; description?: string; resolution?: string };
+  dispute?: {
+    id: string;
+    reason: string;
+    description?: string;
+    resolution?: string;
+  };
   adminNotes?: string;
   rejectionReason?: string;
   cancellationReason?: string;
@@ -52,5 +64,10 @@ export interface TradeDetail {
 export type RawTradeItem = {
   id: string;
   side?: string;
-  product?: { id: string; title: string; price: number; images?: Array<{ url: string }> };
+  product?: {
+    id: string;
+    title: string;
+    price: number;
+    images?: Array<{ url: string }>;
+  };
 };
