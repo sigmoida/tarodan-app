@@ -274,7 +274,13 @@ export const useAuthStore = create<AuthState>()(
           // cookie'lerine (web_at/web_rt) yazılır — JS token'ı hiç görmez. Zengin
           // kullanıcı objesi ardından checkAuth (proxy üzerinden /users/me) ile dolar.
           const result = await loginAction({ email, password });
-          if (result.status === "error") throw new Error(result.message);
+          if (result.status === "error") {
+            const error = new Error(result.message) as Error & {
+              code: string;
+            };
+            error.code = result.reason;
+            throw error;
+          }
           if (result.status === "2fa")
             throw new Error("İki adımlı doğrulama gerekli");
           // loginAction (server) yazdı: web_at/web_rt + tarodan_authed. Client yazmaz.
@@ -283,7 +289,13 @@ export const useAuthStore = create<AuthState>()(
 
         loginWithGoogle: async (idToken: string) => {
           const result = await googleLoginAction(idToken);
-          if (result.status === "error") throw new Error(result.message);
+          if (result.status === "error") {
+            const error = new Error(result.message) as Error & {
+              code: string;
+            };
+            error.code = result.reason;
+            throw error;
+          }
           if (result.status === "2fa")
             throw new Error("İki adımlı doğrulama gerekli");
           await get().checkAuth();

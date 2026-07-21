@@ -1,18 +1,21 @@
 "use server";
 
+import { type AuthErrorReason } from "@tarodan/auth";
 import { type WebUser } from "@/lib/auth.config";
 import { authLogic, getSession } from "./session";
 
 export type WebLoginResult =
   | { status: "ok"; user: WebUser | null }
   | { status: "2fa" }
-  | { status: "error"; message: string };
+  | { status: "error"; reason: AuthErrorReason; message: string };
 
 function reasonMessage(
-  reason: "invalid" | "connection" | "unknown",
+  reason: AuthErrorReason,
   serverMessage: string | undefined,
 ): string {
   if (reason === "connection") return "Sunucuya bağlanılamadı.";
+  if (reason === "unverified")
+    return serverMessage || "Email verification required";
   if (reason === "invalid") return "E-posta veya şifre hatalı";
   return serverMessage || "Giriş başarısız";
 }
@@ -32,6 +35,7 @@ export async function loginAction(input: {
   if (result.status === "error") {
     return {
       status: "error",
+      reason: result.reason,
       message: reasonMessage(result.reason, result.serverMessage),
     };
   }
@@ -47,6 +51,7 @@ export async function googleLoginAction(
   if (result.status === "error") {
     return {
       status: "error",
+      reason: result.reason,
       message: reasonMessage(result.reason, result.serverMessage),
     };
   }
