@@ -203,6 +203,13 @@ export class AdminUserService {
         lastLoginAt: (direction) => ({
           lastLoginAt: { sort: direction, nulls: "last" },
         }),
+        "_count.products": (direction) => ({
+          products: { _count: direction },
+        }),
+        "_count.sellerOrders": (direction) => ({
+          sellerOrders: { _count: direction },
+        }),
+        // Backward-compatible alias used by the general users table.
         ordersCount: (direction) => ({
           sellerOrders: { _count: direction },
         }),

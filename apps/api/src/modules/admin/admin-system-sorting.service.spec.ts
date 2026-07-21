@@ -92,13 +92,34 @@ describe("admin system and user list sorting", () => {
 
     await service.getUsers({
       isSeller: true,
-      sortBy: "ordersCount",
+      sortBy: "_count.sellerOrders",
       sortOrder: "asc",
     });
 
     expect(user.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         orderBy: { sellerOrders: { _count: "asc" } },
+      }),
+    );
+  });
+
+  it("sorts seller performance by the displayed product count accessor", async () => {
+    const user = createDelegate();
+    const service = new AdminUserService(
+      { user } as any,
+      {} as any,
+      undefined as any,
+    );
+
+    await service.getUsers({
+      isSeller: true,
+      sortBy: "_count.products",
+      sortOrder: "desc",
+    });
+
+    expect(user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: { products: { _count: "desc" } },
       }),
     );
   });

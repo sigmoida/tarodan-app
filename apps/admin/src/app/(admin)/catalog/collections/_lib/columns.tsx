@@ -67,12 +67,12 @@ export function collectionColumns(t: T, actions: CollectionRowActions) {
           </div>
         );
       },
-      { sortKey: "user.displayName" },
+      { sortKey: "owner.displayName" },
     ),
     col.number<Collection>(
       t("admin.catalog.common.product"),
       (c) => c.itemCount,
-      { sortKey: "itemsCount" },
+      { sortKey: "itemCount" },
     ),
     col.number<Collection>(t("admin.catalog.common.views"), "viewCount"),
     col.number<Collection>(

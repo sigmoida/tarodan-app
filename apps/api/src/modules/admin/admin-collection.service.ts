@@ -103,7 +103,8 @@ export class AdminCollectionService {
     if (isFeatured !== undefined) where.isFeatured = isFeatured;
 
     // Standard sort contract: scalar Collection fields sort directly, the
-    // computed/relation columns (item count, owner) go through the sortMap, and
+    // response-level computed/relation columns (item count, owner) go through
+    // the sortMap, and
     // any unknown key falls back to `createdAt` instead of throwing a raw-orderBy
     // 500 (the admin list exposes every column as sortable — see epic #375).
     const orderBy = resolveOrderBy<Prisma.CollectionOrderByWithRelationInput>(
@@ -112,6 +113,11 @@ export class AdminCollectionService {
       {
         defaultSort: { createdAt: "desc" },
         sortMap: {
+          itemCount: (direction) => ({ items: { _count: direction } }),
+          "owner.displayName": (direction) => ({
+            user: { displayName: direction },
+          }),
+          // Backward-compatible aliases used by older admin clients.
           itemsCount: (direction) => ({ items: { _count: direction } }),
           "user.displayName": (direction) => ({
             user: { displayName: direction },

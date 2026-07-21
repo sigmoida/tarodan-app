@@ -98,7 +98,17 @@ export class AdminCatalogService {
     const orderBy = resolveOrderBy<Prisma.CategoryOrderByWithRelationInput>(
       "Category",
       query,
-      { defaultSort: { name: "asc" } },
+      {
+        defaultSort: { name: "asc" },
+        sortMap: {
+          productCount: (direction) => ({
+            products: { _count: direction },
+          }),
+          collectionCount: (direction) => ({
+            collections: { _count: direction },
+          }),
+        },
+      },
     );
     const result = await paginate(
       this.prisma.category,

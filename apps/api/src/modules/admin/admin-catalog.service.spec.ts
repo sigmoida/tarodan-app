@@ -57,6 +57,28 @@ describe("AdminCatalogService list sorting", () => {
     );
   });
 
+  it("maps displayed category count accessors to relation counts", async () => {
+    await service.getCategories({
+      sortBy: "productCount",
+      sortOrder: "desc",
+    });
+    expect(prisma.category.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        orderBy: { products: { _count: "desc" } },
+      }),
+    );
+
+    await service.getCategories({
+      sortBy: "collectionCount",
+      sortOrder: "asc",
+    });
+    expect(prisma.category.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        orderBy: { collections: { _count: "asc" } },
+      }),
+    );
+  });
+
   it("keeps the brand status filter while applying scalar sorting", async () => {
     await service.getBrands({
       status: "active",
