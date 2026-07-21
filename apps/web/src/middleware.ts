@@ -1,9 +1,10 @@
 import createIntlMiddleware from "next-intl/middleware";
-import { type NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { createAuthMiddleware } from "@tarodan/auth/middleware";
 import { defaultLocale, locales } from "@tarodan/i18n";
 import { webAuthConfig } from "@/lib/auth.config";
 import { routing } from "@/i18n/routing";
+import { SITE_UNLOCK_COOKIE, safeEqual, siteUnlockToken } from "@/lib/siteLock";
 
 /**
  * Web middleware = i18n routing (#214) composed with the edge auth gate.
@@ -100,6 +101,30 @@ export async function middleware(request: NextRequest) {
   const original = request.nextUrl.pathname;
   const { locale, rest } = splitLocale(original);
   const prefix = locale === defaultLocale ? "" : `/${locale}`;
+
+  // Pre-launch storefront gate (#398). Runs BEFORE the i18n/auth flow so we
+  // can short-circuit every page for locked deployments. The API/proxy/static
+  // matchers already filter out `/api/unlock` and asset paths, so we only need
+  // to allowlist `/coming-soon` here to avoid a rewrite loop.
+  if (
+    process.env.SITE_LOCKED === "true" &&
+    rest !== "/coming-soon" &&
+    !rest.startsWith("/coming-soon/")
+  ) {
+    const pin = process.env.SITE_UNLOCK_PIN;
+    const cookieToken = request.cookies.get(SITE_UNLOCK_COOKIE)?.value;
+    let unlocked = false;
+    if (pin && cookieToken) {
+      unlocked = safeEqual(cookieToken, await siteUnlockToken(pin));
+    }
+    if (!unlocked) {
+      const destination = request.nextUrl.clone();
+      destination.pathname = `${prefix}/coming-soon`;
+      const response = NextResponse.rewrite(destination);
+      response.headers.set("X-Robots-Tag", "noindex");
+      return response;
+    }
+  }
 
   let authResponse = null;
   if (isAuthRelevant(rest)) {

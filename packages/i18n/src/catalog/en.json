@@ -2045,7 +2045,15 @@
       "emailPlaceholder": "Your email",
       "notifyMe": "Notify Me",
       "countdownLabel": "Time until launch",
-      "socialTitle": "Follow us"
+      "launching": "Launching…",
+      "socialTitle": "Follow us",
+      "pin": {
+        "label": "Have an access code? Enter it below",
+        "placeholder": "Access code",
+        "submit": "Continue",
+        "invalid": "Invalid code. Please try again.",
+        "error": "Something went wrong. Please try again."
+      }
     }
   },
   "marketing": {
