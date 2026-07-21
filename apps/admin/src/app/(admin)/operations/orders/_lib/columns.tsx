@@ -11,6 +11,7 @@ import {
   col,
   CellText,
   CellUser,
+  TruncatedText,
   type RowActionItem,
 } from "@/components/table";
 import { type Order } from "./orders";
@@ -97,7 +98,7 @@ export function orderColumns({
               : t("admin.operations.orders.groupOngoing")}
           </span>
         ) : (
-          <div className="flex flex-col items-start gap-1">
+          <div className="flex min-w-0 max-w-full flex-col items-start gap-1">
             {o.activeRefundRequest ? (
               <Badge
                 status="refund_requested"
@@ -115,12 +116,12 @@ export function orderColumns({
             )}
             {(o.status === "cancelled" || o.cancellationType === "iptal") &&
               cancelReasonLabel(o.cancelReason, t) && (
-                <span className="truncate text-xs text-muted">
-                  {cancelReasonLabel(o.cancelReason, t)} ·{" "}
-                  {t("admin.operations.orders.originCancellation", {
-                    origin: orderOriginLabel(o.offerId, t),
-                  })}
-                </span>
+                <TruncatedText className="max-w-full text-xs text-muted">
+                  {`${cancelReasonLabel(o.cancelReason, t)} · ${t(
+                    "admin.operations.orders.originCancellation",
+                    { origin: orderOriginLabel(o.offerId, t) },
+                  )}`}
+                </TruncatedText>
               )}
           </div>
         ),

@@ -222,7 +222,7 @@ const columns = [
     secondary: r.buyer.email,
     href: `/users/${r.buyer.id}`,
   })),
-  col.money("Tutar", (r) => r.amount, { tone: "negative" }), // ₺, right, tabular-nums
+  col.money("Tutar", (r) => r.amount, { tone: "negative" }), // ₺, left, tabular-nums
   col.date("Tarih", (r) => r.createdAt), // short date, hover = full timestamp
   col.badge("Durum", (r) => <StatusBadge status={r.status} config={cfg} />), // never wraps
   col.actions((r) => <RowMenu id={r.id} />, { header: "İşlemler" }), // right, nowrap
@@ -244,7 +244,8 @@ primitives are in `components/table/cells.tsx`; use them directly only inside
   screens columns expand proportionally; as the viewport shrinks they narrow and
   truncate; below `Σ(minWidth)` the table scrolls horizontally (no scroll before
   that). Tune with `col.x(header, get, { grow, minWidth })`.
-- **Alignment** — header and cell always match (money/number/actions → right),
+- **Alignment** — header and cell always match (all data columns → left,
+  actions → right),
   driven by column `meta`; `DataTable` reads it and renders `<colgroup>` +
   `table-fixed`. This sizing path is **opt-in**: it only activates when columns
   carry meta (i.e. came from `col.*`), so legacy raw-`ColumnDef` tables are

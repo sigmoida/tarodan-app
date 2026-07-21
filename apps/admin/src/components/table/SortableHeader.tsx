@@ -67,9 +67,7 @@ export function SortableHeader({
         aria-hidden="true"
         className={cn(
           "h-3.5 w-3.5 shrink-0 transition-colors",
-          active
-            ? "text-primary-600"
-            : "text-subtle opacity-0 group-hover:opacity-100",
+          active ? "text-primary-600" : "text-subtle",
         )}
       />
     </Button>

@@ -92,8 +92,8 @@ function field<T, V>(
 const DEFAULTS = {
   text: { grow: 3, minWidth: 160, align: "left" },
   muted: { grow: 2, minWidth: 140, align: "left" },
-  money: { grow: 1, minWidth: 120, align: "right" },
-  number: { grow: 1, minWidth: 100, align: "right" },
+  money: { grow: 1, minWidth: 120, align: "left" },
+  number: { grow: 1, minWidth: 100, align: "left" },
   date: { grow: 1, minWidth: 120, align: "left" },
   code: { grow: 2, minWidth: 140, align: "left" },
   link: { grow: 3, minWidth: 150, align: "left" },
@@ -143,7 +143,7 @@ export const col = {
     const [g, o] = field(get, opts);
     return base<T>("muted", header, (r) => <CellMuted value={g(r)} />, o);
   },
-  /** Money (₺, right, tabular-nums). `tone` only changes the color. */
+  /** Money (₺, tabular-nums). `tone` only changes the color. */
   money<T>(
     header: ReactNode,
     get: Accessor<T, number | string | null | undefined>,
@@ -157,7 +157,7 @@ export const col = {
       o,
     );
   },
-  /** Plain number (right, tabular-nums). Pass a field key to make it sortable. */
+  /** Plain number (tabular-nums). Pass a field key to make it sortable. */
   number<T>(
     header: ReactNode,
     get: Accessor<T, number | string | null | undefined>,
