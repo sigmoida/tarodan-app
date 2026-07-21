@@ -1,9 +1,12 @@
-'use client';
+"use client";
 
-import { useController } from 'react-hook-form';
-import { Select, type SelectProps } from '../Select';
+import { useController } from "react-hook-form";
+import { Select, type SelectProps } from "../Select";
 
-export interface FormSelectProps extends Omit<SelectProps, 'name' | 'error' | 'value' | 'onChange'> {
+export interface FormSelectProps extends Omit<
+  SelectProps,
+  "name" | "error" | "value" | "onChange"
+> {
   /** Field name in the form schema. */
   name: string;
 }
@@ -18,7 +21,10 @@ export function FormSelect({ name, ...props }: FormSelectProps) {
   return (
     <Select
       {...props}
-      value={(field.value as string) ?? ''}
+      // Empty → `undefined` (not "") so an unselected field shows its
+      // placeholder: Select maps "" to a real item value, which would suppress
+      // the placeholder.
+      value={(field.value as string) || undefined}
       onChange={(e) => field.onChange(e.target.value)}
       error={fieldState.error?.message as string | undefined}
     />

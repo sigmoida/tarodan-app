@@ -67,6 +67,7 @@ export default function ProductDetailsCard({
         <FormSelect
           name="condition"
           label={t("product.conditionRequired")}
+          placeholder={t("product.selectCondition")}
           options={conditions.map((c) => ({ value: c.value, label: c.label }))}
         />
       </div>
@@ -77,7 +78,7 @@ export default function ProductDetailsCard({
           render={({ field }) => (
             <Select
               label={t("product.brand")}
-              value={field.value ?? ""}
+              value={field.value || undefined}
               onChange={(e) => {
                 field.onChange(e.target.value);
                 setValue("carModelId", "");
@@ -110,6 +111,7 @@ export default function ProductDetailsCard({
         <FormSelect
           name="scale"
           label={t("product.scale")}
+          placeholder={t("product.selectScale")}
           options={scales.map((s) => ({ value: s, label: s }))}
         />
 
