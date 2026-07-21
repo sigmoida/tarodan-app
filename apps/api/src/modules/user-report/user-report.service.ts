@@ -92,21 +92,21 @@ export class UserReportService {
     if (query.type) where.type = query.type;
     const search = query.search?.trim();
     if (search) {
-      const normalized = search.toLowerCase();
+      // Full-content search across every displayed column (#381): the reports
+      // table shows type, reason, description, reporter and status — type/reason/
+      // status are stored as free-text strings, so `contains` matches partials
+      // (not just exact enum values).
       where.OR = [
         { targetId: { contains: search, mode: "insensitive" } },
         { description: { contains: search, mode: "insensitive" } },
+        { type: { contains: search, mode: "insensitive" } },
+        { reason: { contains: search, mode: "insensitive" } },
+        { status: { contains: search, mode: "insensitive" } },
         {
           reporter: { displayName: { contains: search, mode: "insensitive" } },
         },
         { reporter: { email: { contains: search, mode: "insensitive" } } },
       ];
-      if (Object.values(ReportType).includes(normalized as ReportType))
-        where.OR.push({ type: normalized as ReportType });
-      if (Object.values(ReportReason).includes(normalized as ReportReason))
-        where.OR.push({ reason: normalized as ReportReason });
-      if (Object.values(ReportStatus).includes(normalized as ReportStatus))
-        where.OR.push({ status: normalized as ReportStatus });
     }
 
     const orderBy = resolveOrderBy<Prisma.ReportOrderByWithRelationInput>(

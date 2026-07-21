@@ -26,6 +26,7 @@ export function SuratTrackingTab() {
         fetcher={(p) => adminApi.getShipments({ ...p, carrierId: "surat" })}
         getRowId={(r: any) => r.id}
         initialFilters={{ status: "all" }}
+        syncUrl
       >
         <ResourceList.Toolbar>
           <ResourceList.Search />
