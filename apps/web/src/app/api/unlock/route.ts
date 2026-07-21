@@ -13,7 +13,7 @@ import { SITE_UNLOCK_COOKIE, siteUnlockToken } from "@/lib/siteLock";
 export async function POST(request: NextRequest) {
   const expected = process.env.SITE_UNLOCK_PIN;
   if (!expected) {
-    return NextResponse.json({ error: "not_configured" }, { status: 503 });
+    return unlockErrorRedirect(request, "error");
   }
 
   const contentType = request.headers.get("content-type") ?? "";
@@ -30,10 +30,10 @@ export async function POST(request: NextRequest) {
   }
 
   if (!pin || pin !== expected) {
-    return NextResponse.json({ error: "invalid_pin" }, { status: 401 });
+    return unlockErrorRedirect(request, "invalid");
   }
 
-  const response = NextResponse.json({ success: true });
+  const response = NextResponse.redirect(new URL("/", request.url), 303);
   response.cookies.set({
     name: SITE_UNLOCK_COOKIE,
     value: await siteUnlockToken(expected),
@@ -44,4 +44,11 @@ export async function POST(request: NextRequest) {
     maxAge: 60 * 60 * 24 * 30,
   });
   return response;
+}
+
+/** Return a visible form error without exposing the submitted PIN or secret. */
+function unlockErrorRedirect(request: NextRequest, error: "invalid" | "error") {
+  const destination = new URL("/coming-soon", request.url);
+  destination.searchParams.set("unlock", error);
+  return NextResponse.redirect(destination, 303);
 }
