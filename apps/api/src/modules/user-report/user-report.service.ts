@@ -19,7 +19,7 @@ import {
   AdminReportQueryDto,
 } from "./dto";
 import { Prisma } from "@prisma/client";
-import { paginate, resolveOrderBy } from "../../common/list";
+import { dateRangeWhere, paginate, resolveOrderBy } from "../../common/list";
 
 @Injectable()
 export class UserReportService {
@@ -108,6 +108,8 @@ export class UserReportService {
         { reporter: { email: { contains: search, mode: "insensitive" } } },
       ];
     }
+
+    Object.assign(where, dateRangeWhere(query));
 
     const orderBy = resolveOrderBy<Prisma.ReportOrderByWithRelationInput>(
       "Report",
