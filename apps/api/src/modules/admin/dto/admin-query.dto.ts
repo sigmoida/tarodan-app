@@ -2,15 +2,12 @@ import {
   IsOptional,
   IsEnum,
   IsString,
-  IsNumber,
-  Min,
-  Max,
   IsDateString,
   IsBoolean,
   IsIn,
 } from "class-validator";
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { Type, Transform } from "class-transformer";
+import { Transform } from "class-transformer";
 import { ProductStatus, OrderStatus } from "@prisma/client";
 import { AdminListQueryDto } from "../../../common/list";
 
@@ -120,6 +117,11 @@ export class AdminOrderQueryDto extends AdminListQueryDto {
 }
 
 export class AuditLogQueryDto extends AdminListQueryDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  search?: string;
+
   @ApiPropertyOptional({ example: "user_update" })
   @IsOptional()
   @IsString()
@@ -139,14 +141,6 @@ export class AuditLogQueryDto extends AdminListQueryDto {
   @IsOptional()
   @IsDateString()
   toDate?: string;
-
-  @ApiPropertyOptional({ example: 50 })
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(1)
-  @Max(100)
-  limit?: number = 50;
 }
 
 export class AdminPaymentQueryDto extends AdminListQueryDto {

@@ -138,7 +138,7 @@ export class AdminAuditService {
    * Get audit logs
    */
   async getAuditLogs(query: AuditLogQueryDto) {
-    const { action, adminId, fromDate, toDate } = query;
+    const { action, adminId, fromDate, toDate, search } = query;
 
     const where: Prisma.AuditLogWhereInput = {};
 
@@ -148,6 +148,19 @@ export class AdminAuditService {
 
     if (adminId) {
       where.adminUserId = adminId;
+    }
+
+    if (search) {
+      where.OR = [
+        { action: { contains: search, mode: "insensitive" } },
+        { entityType: { contains: search, mode: "insensitive" } },
+        { entityId: { contains: search, mode: "insensitive" } },
+        {
+          adminUser: {
+            user: { email: { contains: search, mode: "insensitive" } },
+          },
+        },
+      ];
     }
 
     if (fromDate || toDate) {
@@ -184,7 +197,7 @@ export class AdminAuditService {
         },
         orderBy,
       },
-      { ...query, limit: query.limit ?? 50 },
+      { ...query, limit: query.limit ?? 20 },
     );
 
     return {

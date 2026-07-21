@@ -41,4 +41,32 @@ describe("AdminModerationService event list", () => {
       }),
     );
   });
+
+  it("sorts events by the displayed user name before pagination", async () => {
+    const moderationEvent = {
+      findMany: jest.fn().mockResolvedValue([
+        { id: "e1", userId: "u1" },
+        { id: "e2", userId: "u2" },
+      ]),
+    };
+    const user = {
+      findMany: jest.fn().mockResolvedValue([
+        { id: "u1", displayName: "Zeynep", email: "z@example.com" },
+        { id: "u2", displayName: "Ali", email: "a@example.com" },
+      ]),
+    };
+    const service = new AdminModerationService(
+      { moderationEvent, user } as any,
+      {} as any,
+      {} as any,
+      undefined as any,
+    );
+
+    const result = await service.getModerationEvents({
+      sortBy: "user.displayName",
+      sortOrder: "asc",
+    });
+
+    expect(result.data.map((row) => row.id)).toEqual(["e2", "e1"]);
+  });
 });

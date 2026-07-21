@@ -128,17 +128,35 @@ describe("admin system and user list sorting", () => {
     );
   });
 
-  it("sorts audit logs and preserves their fifty-row default", async () => {
+  it("sorts and searches audit logs with the standard twenty-row default", async () => {
     const auditLog = createDelegate();
     const service = new AdminAuditService({ auditLog } as any);
 
-    await service.getAuditLogs({ sortBy: "action", sortOrder: "asc" });
+    await service.getAuditLogs({
+      search: "admin@example.com",
+      sortBy: "action",
+      sortOrder: "asc",
+    });
 
     expect(auditLog.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         orderBy: { action: "asc" },
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([
+            {
+              adminUser: {
+                user: {
+                  email: {
+                    contains: "admin@example.com",
+                    mode: "insensitive",
+                  },
+                },
+              },
+            },
+          ]),
+        }),
         skip: 0,
-        take: 50,
+        take: 20,
       }),
     );
   });
@@ -176,6 +194,30 @@ describe("admin system and user list sorting", () => {
     );
   });
 
+  it("sorts the displayed HTTP status stored in error metadata", async () => {
+    const errorLog = createDelegate({
+      findMany: jest.fn().mockResolvedValue([
+        { id: "server", metadata: { status: 500 } },
+        { id: "client", metadata: { status: 400 } },
+        { id: "empty", metadata: null },
+      ]),
+      groupBy: jest.fn().mockResolvedValue([]),
+    });
+    const service = new AdminLogsService({ errorLog } as any, {} as any);
+
+    const result = await service.getErrorLogs({
+      sortBy: "metadata.status",
+      sortOrder: "asc",
+      sortType: "number",
+    });
+
+    expect(result.data.map((row) => row.id)).toEqual([
+      "client",
+      "server",
+      "empty",
+    ]);
+  });
+
   it("sorts notification history and scheduled notifications", async () => {
     const notificationLog = createDelegate();
     const scheduledNotification = createDelegate();
@@ -206,6 +248,60 @@ describe("admin system and user list sorting", () => {
     );
   });
 
+  it("searches and sorts scheduled notification channels before pagination", async () => {
+    const scheduledNotification = createDelegate({
+      findMany: jest.fn().mockResolvedValue([
+        { id: "sms", channels: ["sms"] },
+        { id: "email", channels: ["email"] },
+      ]),
+    });
+    const service = new AdminNotificationService(
+      { scheduledNotification } as any,
+      {} as any,
+      {} as any,
+    );
+
+    const result = await service.getScheduledNotifications({
+      search: "email",
+      sortBy: "channels",
+      sortOrder: "asc",
+    });
+
+    expect(scheduledNotification.findMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        OR: expect.arrayContaining([{ channels: { has: "email" } }]),
+      }),
+    });
+    expect(result.data.map((row) => row.id)).toEqual(["email", "sms"]);
+  });
+
+  it("sorts notification history by the displayed user name", async () => {
+    const notificationLog = createDelegate({
+      findMany: jest.fn().mockResolvedValue([
+        { id: "n1", userId: "u1" },
+        { id: "n2", userId: "u2" },
+      ]),
+    });
+    const user = {
+      findMany: jest.fn().mockResolvedValue([
+        { id: "u1", displayName: "Zeynep", email: "z@example.com" },
+        { id: "u2", displayName: "Ali", email: "a@example.com" },
+      ]),
+    };
+    const service = new AdminNotificationService(
+      { notificationLog, user } as any,
+      {} as any,
+      {} as any,
+    );
+
+    const result = await service.getNotificationHistory({
+      sortBy: "user.displayName",
+      sortOrder: "asc",
+    });
+
+    expect(result.data.map((row) => row.id)).toEqual(["n2", "n1"]);
+  });
+
   it("sorts support tickets while using standardized pagination", async () => {
     const supportTicket = createDelegate();
     const service = new SupportService(
@@ -226,6 +322,26 @@ describe("admin system and user list sorting", () => {
         orderBy: { priority: "asc" },
         skip: 8,
         take: 8,
+      }),
+    );
+  });
+
+  it("sorts support tickets by the displayed creator name", async () => {
+    const supportTicket = createDelegate();
+    const service = new SupportService(
+      { supportTicket } as any,
+      {} as any,
+      {} as any,
+    );
+
+    await service.getAllTickets({
+      sortBy: "creatorName",
+      sortOrder: "asc",
+    });
+
+    expect(supportTicket.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: { creator: { displayName: "asc" } },
       }),
     );
   });

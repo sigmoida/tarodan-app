@@ -105,7 +105,7 @@ export default function CommissionPage() {
       resource="commission-rules"
       fetcher={commissionRulesFetcher}
       getRowId={(rule) => rule.id}
-      limit={1000}
+      syncUrl
     >
       <ResourceList.Header
         title={t("admin.finance.commission.title")}
@@ -128,12 +128,16 @@ export default function CommissionPage() {
         {t("admin.finance.commission.calculationDescription")}
       </Alert>
       <TradeRateCard />
+      <ResourceList.Toolbar>
+        <ResourceList.Search />
+      </ResourceList.Toolbar>
       <CommissionRulesContent
         onEdit={(rule) => setModal({ rule })}
         onDelete={onDelete}
         onToggle={(rule) => toggle.mutate(rule)}
         togglingId={toggle.isPending ? toggle.variables?.id : undefined}
       />
+      <ResourceList.Pagination />
 
       {modal && (
         <CommissionRuleFormModal

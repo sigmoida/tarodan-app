@@ -92,6 +92,7 @@ export class UserReportService {
     if (query.type) where.type = query.type;
     const search = query.search?.trim();
     if (search) {
+      const normalized = search.toLowerCase();
       where.OR = [
         { targetId: { contains: search, mode: "insensitive" } },
         { description: { contains: search, mode: "insensitive" } },
@@ -100,6 +101,12 @@ export class UserReportService {
         },
         { reporter: { email: { contains: search, mode: "insensitive" } } },
       ];
+      if (Object.values(ReportType).includes(normalized as ReportType))
+        where.OR.push({ type: normalized as ReportType });
+      if (Object.values(ReportReason).includes(normalized as ReportReason))
+        where.OR.push({ reason: normalized as ReportReason });
+      if (Object.values(ReportStatus).includes(normalized as ReportStatus))
+        where.OR.push({ status: normalized as ReportStatus });
     }
 
     const orderBy = resolveOrderBy<Prisma.ReportOrderByWithRelationInput>(

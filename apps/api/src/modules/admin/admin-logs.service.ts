@@ -13,7 +13,11 @@ import {
 } from "../../common/helpers/fulltext-search";
 import { Prisma } from "@prisma/client";
 import { EmailLogQueryDto, ErrorLogQueryDto, SecurityLogQueryDto } from "./dto";
-import { paginate, resolveOrderBy } from "../../common/list";
+import {
+  paginate,
+  paginateComputedRows,
+  resolveOrderBy,
+} from "../../common/list";
 
 /**
  * Sistem log görünümleri admin operasyonları — AdminService'in ERROR LOGS /
@@ -50,22 +54,33 @@ export class AdminLogsService {
 
     if (search) {
       const ids = await fulltextErrorLogSearch(this.prisma, search);
-      where.id = { in: ids };
+      where.OR = [
+        { message: { contains: search, mode: "insensitive" } },
+        { source: { contains: search, mode: "insensitive" } },
+        { endpoint: { contains: search, mode: "insensitive" } },
+        { requestId: { contains: search, mode: "insensitive" } },
+        { userId: { contains: search, mode: "insensitive" } },
+      ];
+      if (ids.length > 0) where.OR.push({ id: { in: ids } });
     }
 
-    const orderBy = resolveOrderBy<Prisma.ErrorLogOrderByWithRelationInput>(
-      "ErrorLog",
-      query,
-      { defaultSort: { createdAt: "desc" } },
-    );
-    const result = await paginate(
-      this.prisma.errorLog,
-      {
-        where,
-        orderBy,
-      },
-      query,
-    );
+    let result;
+    if (query.sortBy === "metadata.status") {
+      const allLogs = await this.prisma.errorLog.findMany({ where });
+      result = paginateComputedRows(
+        allLogs,
+        (log) =>
+          (log.metadata as Record<string, unknown> | null)?.status ?? null,
+        { ...query, sortType: "number" },
+      );
+    } else {
+      const orderBy = resolveOrderBy<Prisma.ErrorLogOrderByWithRelationInput>(
+        "ErrorLog",
+        query,
+        { defaultSort: { createdAt: "desc" } },
+      );
+      result = await paginate(this.prisma.errorLog, { where, orderBy }, query);
+    }
 
     // Get severity stats
     const stats = await this.prisma.errorLog.groupBy({
@@ -121,7 +136,21 @@ export class AdminLogsService {
 
     if (search) {
       const ids = await fulltextSecurityLogSearch(this.prisma, search);
-      where.id = { in: ids };
+      const normalized = search.trim().toLowerCase();
+      where.OR = [
+        { eventType: { contains: search, mode: "insensitive" } },
+        { severity: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+        { ipAddress: { contains: search, mode: "insensitive" } },
+        { userAgent: { contains: search, mode: "insensitive" } },
+        { location: { contains: search, mode: "insensitive" } },
+        { userId: { contains: search, mode: "insensitive" } },
+      ];
+      if (ids.length > 0) where.OR.push({ id: { in: ids } });
+      if (["true", "resolved", "çözüldü"].includes(normalized))
+        where.OR.push({ resolved: true });
+      if (["false", "unresolved", "bekliyor"].includes(normalized))
+        where.OR.push({ resolved: false });
     }
 
     const orderBy = resolveOrderBy<Prisma.SecurityLogOrderByWithRelationInput>(
@@ -260,7 +289,14 @@ export class AdminLogsService {
     const searchTerm = search || to;
     if (searchTerm) {
       const ids = await fulltextEmailLogSearch(this.prisma, searchTerm);
-      where.id = { in: ids };
+      where.OR = [
+        { to: { contains: searchTerm, mode: "insensitive" } },
+        { subject: { contains: searchTerm, mode: "insensitive" } },
+        { template: { contains: searchTerm, mode: "insensitive" } },
+        { status: { contains: searchTerm, mode: "insensitive" } },
+        { userId: { contains: searchTerm, mode: "insensitive" } },
+      ];
+      if (ids.length > 0) where.OR.push({ id: { in: ids } });
     }
 
     const orderBy = resolveOrderBy<Prisma.EmailLogOrderByWithRelationInput>(

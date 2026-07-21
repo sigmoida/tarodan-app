@@ -10,7 +10,19 @@ import {
   CLIENT_LIST_STALE_MS,
   type ClientListFetcher,
 } from "@/lib/query/client-list";
-import { type SetSort, type SortState } from "@/components/table/meta";
+import {
+  type SetSort,
+  type SortState,
+  type SortType,
+} from "@/components/table/meta";
+
+const SORT_TYPES: readonly SortType[] = ["text", "number", "date"];
+
+function normalizeSortType(value: string | null): SortType | undefined {
+  return SORT_TYPES.includes(value as SortType)
+    ? (value as SortType)
+    : undefined;
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -204,13 +216,13 @@ export function useAdminResource<T>({
     });
     return merged;
   };
-  // Sort mirrors page/q/filter: read from ?sort=&dir= on load (default = unsorted).
-  // sortType isn't URL-encoded; on restore the client comparator auto-detects it.
+  // Sort mirrors page/q/filter: read from ?sort=&dir=&sortType= on load.
   const getInitialSort = (): SortState => {
     if (!syncUrl) return { sortOrder: "asc" };
     const sortBy = searchParams.get("sort") ?? undefined;
     const dir = searchParams.get("dir") === "desc" ? "desc" : "asc";
-    return sortBy ? { sortBy, sortOrder: dir } : { sortOrder: "asc" };
+    const sortType = normalizeSortType(searchParams.get("sortType"));
+    return sortBy ? { sortBy, sortOrder: dir, sortType } : { sortOrder: "asc" };
   };
 
   // ── State ─────────────────────────────────────────────────────────────────
@@ -250,6 +262,7 @@ export function useAdminResource<T>({
       params.delete("q");
       params.delete("sort");
       params.delete("dir");
+      params.delete("sortType");
       params.delete("size");
       Object.keys(initialFilters).forEach((key) => params.delete(key));
       if (p > 1) params.set("page", String(p));
@@ -264,6 +277,7 @@ export function useAdminResource<T>({
       if (s.sortBy) {
         params.set("sort", s.sortBy);
         if (s.sortOrder === "desc") params.set("dir", "desc");
+        if (s.sortType) params.set("sortType", s.sortType);
       }
       const qs = params.toString();
       const newUrl = qs ? `${pathname}?${qs}` : pathname;
@@ -290,10 +304,12 @@ export function useAdminResource<T>({
       if (v !== null) newFilters[key] = v;
     });
     const urlSortBy = searchParams.get("sort") ?? undefined;
+    const urlSortType = normalizeSortType(searchParams.get("sortType"));
     const urlSort: SortState = urlSortBy
       ? {
           sortBy: urlSortBy,
           sortOrder: searchParams.get("dir") === "desc" ? "desc" : "asc",
+          sortType: urlSortType,
         }
       : { sortOrder: "asc" };
 
@@ -423,8 +439,7 @@ export function useAdminResource<T>({
     Object.entries(filters).forEach(([key, val]) => {
       if (val && val !== "all") params[key] = val;
     });
-    // Sort: sortBy/sortOrder are the wire contract; sortType is consumed only by
-    // paginateClient (client-list). Server DTOs whitelist-strip the extras.
+    // Sort metadata is shared by client comparators and server DTOs.
     if (sort.sortBy) {
       params.sortBy = sort.sortBy;
       params.sortOrder = sort.sortOrder;

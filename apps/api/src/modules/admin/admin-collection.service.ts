@@ -1,11 +1,9 @@
 import { Injectable, NotFoundException, Optional } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { StorageService } from "../storage/storage.service";
-import { SearchService } from "../search/search.service";
 import { CacheService } from "../cache/cache.service";
 import { AdminAuditService } from "./admin-audit.service";
 import { generateSlug } from "./admin-slug.util";
-import { fulltextCollectionSearch } from "../../common/helpers/fulltext-search";
 import { resolveOrderBy } from "../../common/list";
 import { Prisma } from "@prisma/client";
 
@@ -17,7 +15,6 @@ import { Prisma } from "@prisma/client";
 export class AdminCollectionService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly searchService: SearchService,
     private readonly cache: CacheService,
     private readonly audit: AdminAuditService,
     @Optional()
@@ -84,88 +81,22 @@ export class AdminCollectionService {
       sortOrder = "desc",
     } = query;
 
-    // Elasticsearch exposes fixed directions for these modes. For every other
-    // column/direction, use the SQL path so search + sort still honors the
-    // selected table header instead of silently reverting to "recent".
-    const esSort =
-      sortBy === "createdAt" && sortOrder === "desc"
-        ? "recent"
-        : (sortBy === "viewCount" || sortBy === "likeCount") &&
-            sortOrder === "desc"
-          ? "popular"
-          : sortBy === "name" && sortOrder === "asc"
-            ? "name"
-            : undefined;
-
-    if (search && esSort && this.searchService.isAvailable()) {
-      const esResult = await this.searchService.searchCollections({
-        query: search,
-        isPublic,
-        isFeatured,
-        userId,
-        sortBy: esSort,
-        page,
-        pageSize: limit,
-      });
-
-      if (esResult && esResult.ids.length > 0) {
-        const collections = await this.prisma.collection.findMany({
-          where: { id: { in: esResult.ids } },
-          include: {
-            user: {
-              select: {
-                id: true,
-                displayName: true,
-                avatarUrl: true,
-                membership: { select: { tier: { select: { type: true } } } },
-              },
-            },
-            _count: { select: { items: true } },
-          },
-        });
-        const orderMap = new Map(esResult.ids.map((id, i) => [id, i]));
-        collections.sort(
-          (a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0),
-        );
-        return {
-          data: collections.map((c) => ({
-            id: c.id,
-            name: c.name,
-            slug: c.slug,
-            description: c.description,
-            coverImageUrl: c.coverImageKey
-              ? this.storageService.getPublicAssetUrl(c.coverImageKey)
-              : undefined,
-            isPublic: c.isPublic,
-            isFeatured: c.isFeatured,
-            viewCount: c.viewCount,
-            likeCount: c.likeCount,
-            itemCount: c._count.items,
-            owner: {
-              ...c.user,
-              membershipTier: c.user.membership?.tier?.type ?? null,
-            },
-            createdAt: c.createdAt,
-            updatedAt: c.updatedAt,
-          })),
-          total: esResult.total,
-          page,
-          limit,
-          totalPages: Math.ceil(esResult.total / limit),
-        };
-      }
-      if (esResult && esResult.total === 0) {
-        return { data: [], total: 0, page, limit, totalPages: 0 };
-      }
-    }
-
     const where: Prisma.CollectionWhereInput = {};
     if (search) {
-      const ids = await fulltextCollectionSearch(this.prisma, search);
-      if (ids.length === 0) {
-        return { data: [], total: 0, page, limit, totalPages: 0 };
+      const normalized = search.trim().toLocaleLowerCase("tr");
+      const numeric = Number(search.replace(",", "."));
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { description: { contains: search, mode: "insensitive" } },
+        { user: { displayName: { contains: search, mode: "insensitive" } } },
+      ];
+      if (Number.isInteger(numeric) && numeric >= 0) {
+        where.OR.push({ viewCount: numeric }, { likeCount: numeric });
       }
-      where.id = { in: ids };
+      if (["true", "public", "visible", "görünür"].includes(normalized))
+        where.OR.push({ isPublic: true });
+      if (["false", "private", "hidden", "gizli"].includes(normalized))
+        where.OR.push({ isPublic: false });
     }
     if (userId) where.userId = userId;
     if (isPublic !== undefined) where.isPublic = isPublic;

@@ -3,12 +3,16 @@ import {
   NotFoundException,
   BadRequestException,
 } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import { ElogoInvoiceStatus, ElogoInvoiceType, Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { AdminAuditService } from "./admin-audit.service";
 import { StorageService } from "../storage/storage.service";
 import { ElogoInvoiceQueryDto, SellerUploadedInvoiceQueryDto } from "./dto";
-import { paginate, resolveOrderBy } from "../../common/list";
+import {
+  paginate,
+  paginateComputedRows,
+  resolveOrderBy,
+} from "../../common/list";
 
 /**
  * Vergi ayarları admin operasyonları (bölgeler, oranlar, kurallar, raporlama) —
@@ -970,6 +974,8 @@ export class AdminTaxService {
     }
     if (query.search?.trim()) {
       const q = query.search.trim();
+      const normalized = q.toLowerCase();
+      const numeric = Number(q.replace(",", "."));
       where.OR = [
         { invoiceNumber: { contains: q, mode: "insensitive" } },
         { recipientName: { contains: q, mode: "insensitive" } },
@@ -977,48 +983,78 @@ export class AdminTaxService {
         { ettn: { contains: q, mode: "insensitive" } },
         { billingReference: { contains: q, mode: "insensitive" } },
       ];
+      if (
+        Object.values(ElogoInvoiceType).includes(normalized as ElogoInvoiceType)
+      )
+        where.OR.push({ type: normalized as ElogoInvoiceType });
+      if (
+        Object.values(ElogoInvoiceStatus).includes(
+          normalized as ElogoInvoiceStatus,
+        )
+      )
+        where.OR.push({ status: normalized as ElogoInvoiceStatus });
+      if (Number.isFinite(numeric))
+        where.OR.push(
+          { netAmount: numeric },
+          { taxAmount: numeric },
+          { total: numeric },
+        );
     }
 
-    const orderBy = resolveOrderBy<Prisma.ElogoInvoiceOrderByWithRelationInput>(
-      "ElogoInvoice",
-      query,
-      { defaultSort: { createdAt: "desc" } },
-    );
-    const result = await paginate(
-      this.prisma.elogoInvoice,
-      {
+    const select = {
+      id: true,
+      type: true,
+      status: true,
+      documentType: true,
+      invoiceNumber: true,
+      ettn: true,
+      recipientName: true,
+      recipientVknTckn: true,
+      recipientUserId: true,
+      netAmount: true,
+      taxAmount: true,
+      total: true,
+      vatRate: true,
+      billingReference: true,
+      pdfUrl: true,
+      emailSentAt: true,
+      elogoResultMsg: true,
+      issuedAt: true,
+      cancelledAt: true,
+      cancelReason: true,
+      createdAt: true,
+    } satisfies Prisma.ElogoInvoiceSelect;
+    let result;
+    if (query.sortBy === "hasPdf") {
+      const invoices = await this.prisma.elogoInvoice.findMany({
         where,
-        orderBy,
-        select: {
-          id: true,
-          type: true,
-          status: true,
-          documentType: true,
-          invoiceNumber: true,
-          ettn: true,
-          recipientName: true,
-          recipientVknTckn: true,
-          recipientUserId: true,
-          netAmount: true,
-          taxAmount: true,
-          total: true,
-          vatRate: true,
-          billingReference: true,
-          pdfUrl: true,
-          emailSentAt: true,
-          elogoResultMsg: true,
-          issuedAt: true,
-          cancelledAt: true,
-          cancelReason: true,
-          createdAt: true,
-        },
-      },
-      query,
-    );
+        select,
+      });
+      result = paginateComputedRows(
+        invoices,
+        (invoice) => (invoice.pdfUrl ? 1 : 0),
+        { ...query, sortType: "number" },
+      );
+    } else {
+      const orderBy =
+        resolveOrderBy<Prisma.ElogoInvoiceOrderByWithRelationInput>(
+          "ElogoInvoice",
+          query,
+          { defaultSort: { createdAt: "desc" } },
+        );
+      result = await paginate(
+        this.prisma.elogoInvoice,
+        { where, orderBy, select },
+        query,
+      );
+    }
+    const rows = result.data as Prisma.ElogoInvoiceGetPayload<{
+      select: typeof select;
+    }>[];
 
     return {
       ...result,
-      data: result.data.map((r) => ({
+      data: rows.map((r) => ({
         id: r.id,
         type: r.type,
         typeLabel: AdminTaxService.ELOGO_TYPE_LABELS[r.type] || "Fatura",
