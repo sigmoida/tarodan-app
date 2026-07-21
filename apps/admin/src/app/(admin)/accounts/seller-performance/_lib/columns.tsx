@@ -11,6 +11,7 @@ export const sellerColumns = (t: T) => [
     (s) => ({ name: s.displayName, secondary: s.email }),
     { sortKey: "displayName" },
   ),
+  col.code<Seller>(t("admin.operations.common.sellerId"), (s) => s.id),
   col.badge<Seller>(
     t("admin.accounts.sellerPerformance.membership"),
     (s) => (
@@ -34,6 +35,14 @@ export const sellerColumns = (t: T) => [
     {
       sortKey: "_count.sellerOrders",
     },
+  ),
+  col.number<Seller>(
+    t("admin.users.tradesCount"),
+    (s) => (s._count.initiatedTrades ?? 0) + (s._count.receivedTrades ?? 0),
+  ),
+  col.number<Seller>(
+    t("admin.users.refundsCount"),
+    (s) => s._count.refundRequests ?? 0,
   ),
   col.badge<Seller>(
     t("common.status"),

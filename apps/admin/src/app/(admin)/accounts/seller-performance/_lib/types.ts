@@ -15,6 +15,9 @@ export interface Seller {
   _count: {
     products: number;
     sellerOrders: number;
+    initiatedTrades?: number;
+    receivedTrades?: number;
+    refundRequests?: number;
   };
 }
 
