@@ -32,7 +32,6 @@ export function ReturnShipmentsTab() {
         columns={returnShipmentColumns(t)}
         emptyText={t("admin.operations.shipping.returns.empty")}
       />
-      <ResourceList.Total unit={t("admin.operations.shipping.returns.unit")} />
       <ResourceList.Pagination />
     </ResourceList>
   );

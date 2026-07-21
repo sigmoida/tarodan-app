@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import type { AxiosResponse } from "axios";
 import { useAdminResource } from "@/hooks/useAdminResource";
 import { SuspenseBoundary } from "@/components/page/SuspenseBoundary";
@@ -71,9 +71,12 @@ function ResourceListInner<T>({
     debounceMs,
   });
   const selection = useSelection(selectable);
+  const exportRef = useRef<any[]>([]);
 
   return (
-    <ResourceListContext.Provider value={{ ...data, getRowId, selection }}>
+    <ResourceListContext.Provider
+      value={{ ...data, getRowId, selection, exportRef, exportName: resource }}
+    >
       <AdminPage>{children}</AdminPage>
     </ResourceListContext.Provider>
   );

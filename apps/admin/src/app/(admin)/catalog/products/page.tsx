@@ -15,7 +15,6 @@ import { useTabParam } from "@/hooks/useTabParam";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { type Product, getProductTabs } from "./_lib/types";
 import { ProductsCountText } from "./_components/ProductsCountText";
-import { ProductsExport } from "./_components/ProductsExport";
 import { ProductFilters } from "./_components/ProductFilters";
 import { ProductsTable } from "./_components/ProductsTable";
 
@@ -97,9 +96,7 @@ export default function ProductsPage() {
       <PageHeader
         title={t("admin.catalog.products.title")}
         description={<ProductsCountText />}
-      >
-        <ProductsExport />
-      </PageHeader>
+      />
       <AdminTabs tabs={getProductTabs(t)} value={tab} onChange={setTab} />
 
       {tab === "ai" ? (

@@ -34,7 +34,6 @@ export function TradeShipmentsTab() {
         columns={tradeShipmentColumns(t)}
         emptyText={t("admin.operations.shipping.trades.empty")}
       />
-      <ResourceList.Total unit={t("admin.operations.shipping.trades.unit")} />
       <ResourceList.Pagination />
     </ResourceList>
   );

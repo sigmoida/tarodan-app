@@ -106,7 +106,6 @@ export default function BrandsPage() {
           expandedId={expandedId}
           renderExpanded={(b) => <BrandModelsPanel brand={b} />}
         />
-        <ResourceList.Total unit={t("admin.catalog.brands.unit")} />
         <ResourceList.Pagination />
       </ResourceList>
 

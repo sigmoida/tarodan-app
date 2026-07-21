@@ -144,7 +144,6 @@ export default function CollectionsPage() {
             columns={columns}
             emptyText={t("admin.catalog.collections.empty")}
           />
-          <ResourceList.Total unit={t("admin.catalog.collections.unit")} />
           <ResourceList.Pagination />
         </ResourceList>
       )}

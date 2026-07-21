@@ -56,7 +56,6 @@ export function ElogoInvoicesTab() {
         />
         <ResourceList.DateRange />
       </ResourceList.Toolbar>
-      <ResourceList.Total unit={t("admin.finance.invoices.documentUnit")} />
       <ResourceList.Table
         columns={elogoColumns(t)}
         emptyText={t("admin.finance.invoices.empty")}

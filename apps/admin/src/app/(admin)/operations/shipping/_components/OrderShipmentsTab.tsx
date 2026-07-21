@@ -29,7 +29,6 @@ export function OrderShipmentsTab() {
         columns={orderShipmentColumns(t)}
         emptyText={t("admin.operations.shipping.orders.empty")}
       />
-      <ResourceList.Total unit={t("admin.operations.shipping.orders.unit")} />
       <ResourceList.Pagination />
     </ResourceList>
   );

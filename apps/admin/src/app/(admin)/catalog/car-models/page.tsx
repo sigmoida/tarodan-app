@@ -91,7 +91,6 @@ export default function CarModelsPage() {
           columns={columns}
           emptyText={t("admin.catalog.carModels.emptyForBrand")}
         />
-        <ResourceList.Total unit={t("admin.catalog.carModels.unit")} />
         <ResourceList.Pagination />
       </ResourceList>
 

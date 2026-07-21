@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useContext, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import {
@@ -15,11 +15,9 @@ import {
 const DataTableExpandRow = dynamic(() => import("./DataTableExpandRow"), {
   ssr: false,
 });
-import { ArrowDownTrayIcon } from "@heroicons/react/24/outline";
 import {
   Spinner,
   EmptyState,
-  Button,
   Checkbox,
   Table,
   TableHeader,
@@ -34,8 +32,7 @@ import {
   type SortState,
 } from "@/components/table/meta";
 import { SortableHeader } from "@/components/table/SortableHeader";
-import { columnsToCsv, hasExportableColumns } from "@/lib/csv";
-import { downloadBlob } from "@/lib/download";
+import { ResourceListContext } from "@/context/ResourceListContext";
 
 export type { ColumnDef };
 
@@ -77,12 +74,6 @@ export interface DataTableProps<T> {
    * carries `meta.sortable` — legacy tables (no handler / no meta) are untouched.
    */
   onSort?: SetSort;
-  // ── CSV export (optional) ──
-  /** Filename stem for the CSV export (e.g. "orders"). Defaults to "export". */
-  exportName?: string;
-  /** Hide the CSV export button for this table. Defaults to shown when columns
-   * carry export meta and there are rows. */
-  exportable?: boolean;
 }
 
 /**
@@ -108,22 +99,14 @@ export function DataTable<T>({
   expandedId,
   sort,
   onSort,
-  exportName = "export",
-  exportable,
 }: DataTableProps<T>) {
   const t = useTranslations();
   const resolvedEmptyText = emptyText ?? t("admin.shared.table.noRecords");
 
-  const showExport =
-    exportable !== false && data.length > 0 && hasExportableColumns(columns);
-  const onExport = () => {
-    const date = new Date().toISOString().slice(0, 10);
-    downloadBlob(
-      `${exportName}_${date}.csv`,
-      columnsToCsv(columns, data),
-      "text/csv;charset=utf-8;",
-    );
-  };
+  // Register columns with the enclosing ResourceList (if any) so its toolbar can
+  // offer a CSV export. Safe when standalone — the context is simply absent.
+  const resourceList = useContext(ResourceListContext);
+  if (resourceList) resourceList.exportRef.current = columns;
   const table = useReactTable({
     data,
     columns,
@@ -164,18 +147,6 @@ export function DataTable<T>({
 
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-surface-elevated shadow-sm">
-      {showExport && (
-        <div className="flex justify-end border-b border-border px-2 py-1.5">
-          <Button
-            variant="ghost"
-            size="sm"
-            leftIcon={<ArrowDownTrayIcon className="h-4 w-4" />}
-            onClick={onExport}
-          >
-            {t("admin.shared.table.exportCsv")}
-          </Button>
-        </div>
-      )}
       <div className="overflow-x-auto">
         <Table
           scrollable={false}

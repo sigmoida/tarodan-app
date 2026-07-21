@@ -32,7 +32,6 @@ export function SellerInvoicesTab() {
         <ResourceList.Search />
         <ResourceList.DateRange />
       </ResourceList.Toolbar>
-      <ResourceList.Total unit={t("admin.finance.invoices.invoiceUnit")} />
       <ResourceList.Table
         columns={sellerColumns(t)}
         emptyText={t("admin.finance.invoices.empty")}

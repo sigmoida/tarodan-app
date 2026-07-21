@@ -77,7 +77,6 @@ export default function CategoriesPage() {
           columns={columns}
           emptyText={t("admin.catalog.categories.empty")}
         />
-        <ResourceList.Total unit={t("admin.catalog.categories.unit")} />
         <ResourceList.Pagination />
       </ResourceList>
 

@@ -74,7 +74,6 @@ export default function PaymentsPage() {
           />
           <ResourceList.DateRange />
         </ResourceList.Toolbar>
-        <ResourceList.Total unit={t("admin.finance.payments.unit")} />
         <ResourceList.Table
           columns={paymentColumns(
             paymentRowMenu((p) => router.push(`/finance/payments/${p.id}`), t),
