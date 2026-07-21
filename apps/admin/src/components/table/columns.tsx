@@ -41,6 +41,16 @@ export interface ColOpts extends CellColumnMeta {
   id?: string;
 }
 
+/** Coerce a cell value to a CSV-safe scalar; dates → ISO, non-primitives → empty. */
+const toText = (v: unknown): string | number =>
+  v == null
+    ? ""
+    : v instanceof Date
+      ? v.toISOString()
+      : typeof v === "number" || typeof v === "string"
+        ? v
+        : "";
+
 /**
  * An accessor is either a plain field key (string) or a getter function.
  * The string form auto-builds the getter AND opts the column into sorting:
@@ -75,14 +85,18 @@ function field<T, V>(
   accessor: Accessor<T, V>,
   opts: ColOpts = {},
 ): [get: (r: T) => V, opts: ColOpts] {
-  if (typeof accessor === "string") {
-    const key = accessor;
-    return [
-      (r) => (r as Record<string, unknown>)[key] as V,
-      { sortKey: key, ...opts },
-    ];
-  }
-  return [accessor, opts];
+  const get: (r: T) => V =
+    typeof accessor === "string"
+      ? (r) => (r as Record<string, unknown>)[accessor] as V
+      : accessor;
+  // Default CSV export = the scalar value; callers can still override with their
+  // own `exportValue` (it wins via the `...opts` spread).
+  const resolved: ColOpts = {
+    ...(typeof accessor === "string" ? { sortKey: accessor } : {}),
+    exportValue: (r) => toText(get(r as T)),
+    ...opts,
+  };
+  return [get, resolved];
 }
 
 // minWidth = the column's base px width: both its share of the horizontal-scroll
@@ -137,6 +151,8 @@ function base<T>(
       align: opts.align ?? d.align,
       minWidth: Math.max(configuredMin, headerMin),
       grow: opts.grow ?? d.grow,
+      exportHeader: typeof header === "string" ? header : undefined,
+      exportValue: opts.exportValue,
       ...(sortable ? { sortKey, sortable, sortType } : {}),
     },
   };
@@ -218,7 +234,7 @@ export const col = {
         const v = get(r);
         return <CellLink href={v?.href} label={v?.label} />;
       },
-      opts,
+      { exportValue: (r) => toText(get(r as T)?.label), ...opts },
     );
   },
   /** Person/entity (name + optional sub-line). */
@@ -241,7 +257,7 @@ export const col = {
           <CellUser name={v?.name} secondary={v?.secondary} href={v?.href} />
         );
       },
-      opts,
+      { exportValue: (r) => toText(get(r as T)?.name), ...opts },
     );
   },
   /** Badge (no wrap). `render` returns the badge JSX. */

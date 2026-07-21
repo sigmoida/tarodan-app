@@ -4974,7 +4974,8 @@
       "table": {
         "noRecords": "Kayıt bulunamadı",
         "selectAll": "Tümünü seç",
-        "selectRow": "Satırı seç"
+        "selectRow": "Satırı seç",
+        "exportCsv": "CSV İndir"
       },
       "timeline": {
         "title": "Zaman Çizelgesi"

@@ -4974,7 +4974,8 @@
       "table": {
         "noRecords": "No records found",
         "selectAll": "Select all",
-        "selectRow": "Select row"
+        "selectRow": "Select row",
+        "exportCsv": "Download CSV"
       },
       "timeline": {
         "title": "Timeline"
