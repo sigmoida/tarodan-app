@@ -41,6 +41,10 @@ export const sellerColumns = (t: T) => [
     (s) => (s._count.initiatedTrades ?? 0) + (s._count.receivedTrades ?? 0),
   ),
   col.number<Seller>(
+    t("admin.users.cancellationsCount"),
+    (s) => s.cancelledOrdersCount ?? 0,
+  ),
+  col.number<Seller>(
     t("admin.users.refundsCount"),
     (s) => s._count.refundRequests ?? 0,
   ),

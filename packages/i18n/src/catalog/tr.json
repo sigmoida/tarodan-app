@@ -4348,6 +4348,7 @@
       "billingYearly": "Yıllık",
       "userId": "Kullanıcı ID",
       "tradesCount": "Takas",
+      "cancellationsCount": "İptal",
       "refundsCount": "İade",
       "registeredAt": "Kayıt Tarihi",
       "lastLogin": "Son Giriş",

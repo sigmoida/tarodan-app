@@ -69,6 +69,10 @@ export function userColumns(t: T, rowMenu: (u: User) => RowActionItem[]) {
       { sortKey: "productsCount" },
     ),
     col.number<User>(t("admin.users.tradesCount"), (u) => u.tradesCount),
+    col.number<User>(
+      t("admin.users.cancellationsCount"),
+      (u) => u.cancellationsCount,
+    ),
     col.number<User>(t("admin.users.refundsCount"), (u) => u.refundsCount),
     col.date<User>(t("admin.users.registeredAt"), "createdAt"),
     col.muted<User>(

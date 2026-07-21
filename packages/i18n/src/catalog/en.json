@@ -4348,6 +4348,7 @@
       "billingYearly": "Yearly",
       "userId": "User ID",
       "tradesCount": "Trades",
+      "cancellationsCount": "Cancellations",
       "refundsCount": "Refunds",
       "registeredAt": "Registered On",
       "lastLogin": "Last Login",

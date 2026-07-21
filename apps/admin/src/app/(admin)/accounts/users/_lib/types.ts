@@ -16,6 +16,7 @@ export interface User {
   ordersCount: number;
   productsCount: number;
   tradesCount: number;
+  cancellationsCount: number;
   refundsCount: number;
 }
 
@@ -36,6 +37,7 @@ export function mapUsers(raw: any[]): User[] {
     productsCount: u._count?.products ?? 0,
     tradesCount:
       (u._count?.initiatedTrades ?? 0) + (u._count?.receivedTrades ?? 0),
+    cancellationsCount: u.cancelledOrdersCount ?? 0,
     refundsCount: u._count?.refundRequests ?? 0,
   }));
 }
