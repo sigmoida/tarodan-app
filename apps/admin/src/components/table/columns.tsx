@@ -8,6 +8,7 @@ import {
   CellBadge,
   CellCode,
   CellDate,
+  CellId,
   CellLink,
   CellMoney,
   CellMuted,
@@ -39,6 +40,16 @@ export interface ColOpts extends CellColumnMeta {
   /** react-table column id; required when the header isn't a string or is empty. */
   id?: string;
 }
+
+/** Coerce a cell value to a CSV-safe scalar; dates → ISO, non-primitives → empty. */
+const toText = (v: unknown): string | number =>
+  v == null
+    ? ""
+    : v instanceof Date
+      ? v.toISOString()
+      : typeof v === "number" || typeof v === "string"
+        ? v
+        : "";
 
 /**
  * An accessor is either a plain field key (string) or a getter function.
@@ -74,14 +85,18 @@ function field<T, V>(
   accessor: Accessor<T, V>,
   opts: ColOpts = {},
 ): [get: (r: T) => V, opts: ColOpts] {
-  if (typeof accessor === "string") {
-    const key = accessor;
-    return [
-      (r) => (r as Record<string, unknown>)[key] as V,
-      { sortKey: key, ...opts },
-    ];
-  }
-  return [accessor, opts];
+  const get: (r: T) => V =
+    typeof accessor === "string"
+      ? (r) => (r as Record<string, unknown>)[accessor] as V
+      : accessor;
+  // Default CSV export = the scalar value; callers can still override with their
+  // own `exportValue` (it wins via the `...opts` spread).
+  const resolved: ColOpts = {
+    ...(typeof accessor === "string" ? { sortKey: accessor } : {}),
+    exportValue: (r) => toText(get(r as T)),
+    ...opts,
+  };
+  return [get, resolved];
 }
 
 // minWidth = the column's base px width: both its share of the horizontal-scroll
@@ -92,8 +107,8 @@ function field<T, V>(
 const DEFAULTS = {
   text: { grow: 3, minWidth: 160, align: "left" },
   muted: { grow: 2, minWidth: 140, align: "left" },
-  money: { grow: 1, minWidth: 120, align: "right" },
-  number: { grow: 1, minWidth: 100, align: "right" },
+  money: { grow: 1, minWidth: 120, align: "left" },
+  number: { grow: 1, minWidth: 100, align: "left" },
   date: { grow: 1, minWidth: 120, align: "left" },
   code: { grow: 2, minWidth: 140, align: "left" },
   link: { grow: 3, minWidth: 150, align: "left" },
@@ -119,14 +134,25 @@ function base<T>(
   const sortable =
     type !== "actions" && sortKey != null && opts.sortable !== false;
   const sortType = sortable ? (opts.sortType ?? SORT_TYPE[type]) : undefined;
+  // Header-aware min-width: a column is never narrower than its header. When the
+  // header (a string) needs more room than the configured `minWidth`, we widen
+  // to fit it (≈8px/char at text-sm semibold + cell padding + sort-arrow room);
+  // otherwise the configured `minWidth` wins. This keeps headers from clipping.
+  const configuredMin = opts.minWidth ?? d.minWidth;
+  const headerMin =
+    typeof header === "string" && header
+      ? Math.ceil(header.length * 8) + (sortable ? 56 : 40)
+      : 0;
   return {
     id,
     header: () => header,
     cell: ({ row }: { row: Row<T> }) => cell(row.original),
     meta: {
       align: opts.align ?? d.align,
-      minWidth: opts.minWidth ?? d.minWidth,
+      minWidth: Math.max(configuredMin, headerMin),
       grow: opts.grow ?? d.grow,
+      exportHeader: typeof header === "string" ? header : undefined,
+      exportValue: opts.exportValue,
       ...(sortable ? { sortKey, sortable, sortType } : {}),
     },
   };
@@ -143,7 +169,7 @@ export const col = {
     const [g, o] = field(get, opts);
     return base<T>("muted", header, (r) => <CellMuted value={g(r)} />, o);
   },
-  /** Money (₺, right, tabular-nums). `tone` only changes the color. */
+  /** Money (₺, tabular-nums). `tone` only changes the color. */
   money<T>(
     header: ReactNode,
     get: Accessor<T, number | string | null | undefined>,
@@ -157,7 +183,7 @@ export const col = {
       o,
     );
   },
-  /** Plain number (right, tabular-nums). Pass a field key to make it sortable. */
+  /** Plain number (tabular-nums). Pass a field key to make it sortable. */
   number<T>(
     header: ReactNode,
     get: Accessor<T, number | string | null | undefined>,
@@ -180,6 +206,19 @@ export const col = {
     const [g, o] = field(get, opts);
     return base<T>("code", header, (r) => <CellCode value={g(r)} />, o);
   },
+  /** Opaque id (cuid) — compact copyable form. Narrow column; full id on hover/copy. */
+  id<T>(
+    header: ReactNode,
+    get: Accessor<T, string | null | undefined>,
+    opts?: ColOpts,
+  ) {
+    const [g, o] = field(get, opts);
+    return base<T>("code", header, (r) => <CellId value={g(r)} />, {
+      minWidth: 120,
+      sortable: false,
+      ...o,
+    });
+  },
   /** Text link. If it returns `null`, empty placeholder. */
   link<T>(
     header: ReactNode,
@@ -195,7 +234,7 @@ export const col = {
         const v = get(r);
         return <CellLink href={v?.href} label={v?.label} />;
       },
-      opts,
+      { exportValue: (r) => toText(get(r as T)?.label), ...opts },
     );
   },
   /** Person/entity (name + optional sub-line). */
@@ -218,7 +257,7 @@ export const col = {
           <CellUser name={v?.name} secondary={v?.secondary} href={v?.href} />
         );
       },
-      opts,
+      { exportValue: (r) => toText(get(r as T)?.name), ...opts },
     );
   },
   /** Badge (no wrap). `render` returns the badge JSX. */

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useContext, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import {
@@ -32,6 +32,7 @@ import {
   type SortState,
 } from "@/components/table/meta";
 import { SortableHeader } from "@/components/table/SortableHeader";
+import { ResourceListContext } from "@/context/ResourceListContext";
 
 export type { ColumnDef };
 
@@ -101,6 +102,11 @@ export function DataTable<T>({
 }: DataTableProps<T>) {
   const t = useTranslations();
   const resolvedEmptyText = emptyText ?? t("admin.shared.table.noRecords");
+
+  // Register columns with the enclosing ResourceList (if any) so its toolbar can
+  // offer a CSV export. Safe when standalone — the context is simply absent.
+  const resourceList = useContext(ResourceListContext);
+  if (resourceList) resourceList.exportRef.current = columns;
   const table = useReactTable({
     data,
     columns,
@@ -172,7 +178,12 @@ export function DataTable<T>({
                   const canSort = !!onSort && meta?.sortable && !!meta.sortKey;
                   const isActive = canSort && sort?.sortBy === meta.sortKey;
                   return (
-                    <TableHead key={h.id} className={alignOf(meta?.align)}>
+                    <TableHead
+                      key={h.id}
+                      className={["whitespace-nowrap", alignOf(meta?.align)]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
                       {h.isPlaceholder ? null : canSort ? (
                         <SortableHeader
                           sortKey={meta.sortKey!}

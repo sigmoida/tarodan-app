@@ -8,6 +8,7 @@ export interface Message {
   content: string;
   originalContent: string;
   senderId: string;
+  receiverId: string;
   sender: { displayName: string; email: string };
   receiver: { displayName: string; email: string };
   status: "pending" | "approved" | "rejected";
@@ -57,6 +58,7 @@ export function mapMessage(m: any, t: T): Message {
     content: m.content || m.originalContent || "",
     originalContent: m.originalContent || m.content || "",
     senderId: m.senderId || m.sender?.id || "",
+    receiverId: m.receiverId || m.receiver?.id || "",
     sender: {
       displayName:
         m.sender?.displayName || m.senderName || t("admin.messaging.unknown"),

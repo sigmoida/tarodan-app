@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import {
-  ChatBubbleLeftRightIcon,
   ArrowUturnLeftIcon,
   PencilSquareIcon,
 } from "@heroicons/react/24/outline";
@@ -96,7 +95,6 @@ export default function SupportTicketDetailPage() {
             <div className="space-y-6 lg:col-span-2">
               <SectionCard
                 title={translate("admin.messaging.support.messages")}
-                icon={ChatBubbleLeftRightIcon}
               >
                 <div className="space-y-4">
                   {ticket.messages.map((message) => (

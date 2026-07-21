@@ -2,16 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  Button,
-  Checkbox,
-  Label,
-  Radio,
-} from "@tarodan/ui";
+import { Button, Checkbox, Label, Radio } from "@tarodan/ui";
+import { SectionCard } from "@/components/detail/SectionCard";
 import { extractErrorMessage } from "@/lib/error";
 import { fmtTry } from "@/lib/format";
 
@@ -130,124 +122,115 @@ export function RefundPolicyCard({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>
-          {t("admin.operations.refundRequests.policyTitle")}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* 4 booleans */}
-        <div className="space-y-2">
-          <PolicyRow
-            label={t("admin.operations.refundRequests.policy.productAmount", {
-              amount: fmtTry(Number(order.subtotal ?? 0)),
-            })}
-            checked={refundProductAmount}
-            onChange={setRefundProductAmount}
-            disabled={disabled || savingPolicy}
+    <SectionCard
+      title={t("admin.operations.refundRequests.policyTitle")}
+      bodyClassName="space-y-6"
+    >
+      {/* 4 booleans */}
+      <div className="space-y-2">
+        <PolicyRow
+          label={t("admin.operations.refundRequests.policy.productAmount", {
+            amount: fmtTry(Number(order.subtotal ?? 0)),
+          })}
+          checked={refundProductAmount}
+          onChange={setRefundProductAmount}
+          disabled={disabled || savingPolicy}
+        />
+        <PolicyRow
+          label={t("admin.operations.refundRequests.policy.shippingFee", {
+            amount: fmtTry(Number(order.shippingCost)),
+          })}
+          checked={refundShippingFee}
+          onChange={setRefundShippingFee}
+          disabled={disabled || savingPolicy}
+        />
+        <PolicyRow
+          label={t("admin.operations.refundRequests.policy.buyerFee", {
+            amount: fmtTry(Number(order.buyerFeeAmount)),
+          })}
+          checked={refundBuyerFee}
+          onChange={setRefundBuyerFee}
+          disabled={disabled || savingPolicy}
+        />
+        <PolicyRow
+          label={t("admin.operations.refundRequests.policy.sellerCommission", {
+            amount: fmtTry(Number(order.commissionAmount)),
+          })}
+          checked={refundSellerCommission}
+          onChange={setRefundSellerCommission}
+          disabled={disabled || savingPolicy}
+        />
+      </div>
+
+      <div className="rounded-md bg-info-50 p-3 text-sm">
+        <div className="text-muted">
+          {t("admin.operations.refundRequests.policy.refundAmountLabel")}
+        </div>
+        <div className="text-2xl font-bold text-info-700">
+          {fmtTry(refundAmount)}
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <Button
+          onClick={handleSavePolicy}
+          disabled={!dirtyPolicy || savingPolicy || disabled}
+        >
+          {savingPolicy
+            ? t("admin.operations.common.saving")
+            : t("admin.operations.refundRequests.policy.saveButton")}
+        </Button>
+      </div>
+
+      {/* Shipping payer */}
+      <div className="space-y-2 border-t pt-4">
+        <Label>{t("admin.operations.refundRequests.payerQuestion")}</Label>
+        <div className="flex flex-col gap-2">
+          <PayerRadio
+            value="buyer"
+            current={returnShippingPayer}
+            onChange={setReturnShippingPayerState}
+            label={t("admin.operations.common.buyer")}
+            helper={t("admin.operations.refundRequests.payerRadio.buyerHelper")}
+            disabled={disabled || savingPayer}
           />
-          <PolicyRow
-            label={t("admin.operations.refundRequests.policy.shippingFee", {
-              amount: fmtTry(Number(order.shippingCost)),
-            })}
-            checked={refundShippingFee}
-            onChange={setRefundShippingFee}
-            disabled={disabled || savingPolicy}
-          />
-          <PolicyRow
-            label={t("admin.operations.refundRequests.policy.buyerFee", {
-              amount: fmtTry(Number(order.buyerFeeAmount)),
-            })}
-            checked={refundBuyerFee}
-            onChange={setRefundBuyerFee}
-            disabled={disabled || savingPolicy}
-          />
-          <PolicyRow
-            label={t(
-              "admin.operations.refundRequests.policy.sellerCommission",
-              {
-                amount: fmtTry(Number(order.commissionAmount)),
-              },
+          <PayerRadio
+            value="seller"
+            current={returnShippingPayer}
+            onChange={setReturnShippingPayerState}
+            label={t("admin.operations.common.seller")}
+            helper={t(
+              "admin.operations.refundRequests.payerRadio.sellerHelper",
             )}
-            checked={refundSellerCommission}
-            onChange={setRefundSellerCommission}
-            disabled={disabled || savingPolicy}
+            disabled={disabled || savingPayer}
+          />
+          <PayerRadio
+            value="platform"
+            current={returnShippingPayer}
+            onChange={setReturnShippingPayerState}
+            label={t("admin.operations.refundRequests.payerRadio.platform")}
+            helper={t(
+              "admin.operations.refundRequests.payerRadio.platformHelper",
+            )}
+            disabled={disabled || savingPayer}
           />
         </div>
-
-        <div className="rounded-md bg-info-50 p-3 text-sm">
-          <div className="text-muted">
-            {t("admin.operations.refundRequests.policy.refundAmountLabel")}
-          </div>
-          <div className="text-2xl font-bold text-info-700">
-            {fmtTry(refundAmount)}
-          </div>
-        </div>
-
         <div className="flex justify-end">
           <Button
-            onClick={handleSavePolicy}
-            disabled={!dirtyPolicy || savingPolicy || disabled}
+            onClick={handleSavePayer}
+            disabled={
+              !dirtyPayer || !returnShippingPayer || savingPayer || disabled
+            }
           >
-            {savingPolicy
+            {savingPayer
               ? t("admin.operations.common.saving")
-              : t("admin.operations.refundRequests.policy.saveButton")}
+              : t("admin.operations.refundRequests.payerSaveButton")}
           </Button>
         </div>
+      </div>
 
-        {/* Shipping payer */}
-        <div className="space-y-2 border-t pt-4">
-          <Label>{t("admin.operations.refundRequests.payerQuestion")}</Label>
-          <div className="flex flex-col gap-2">
-            <PayerRadio
-              value="buyer"
-              current={returnShippingPayer}
-              onChange={setReturnShippingPayerState}
-              label={t("admin.operations.common.buyer")}
-              helper={t(
-                "admin.operations.refundRequests.payerRadio.buyerHelper",
-              )}
-              disabled={disabled || savingPayer}
-            />
-            <PayerRadio
-              value="seller"
-              current={returnShippingPayer}
-              onChange={setReturnShippingPayerState}
-              label={t("admin.operations.common.seller")}
-              helper={t(
-                "admin.operations.refundRequests.payerRadio.sellerHelper",
-              )}
-              disabled={disabled || savingPayer}
-            />
-            <PayerRadio
-              value="platform"
-              current={returnShippingPayer}
-              onChange={setReturnShippingPayerState}
-              label={t("admin.operations.refundRequests.payerRadio.platform")}
-              helper={t(
-                "admin.operations.refundRequests.payerRadio.platformHelper",
-              )}
-              disabled={disabled || savingPayer}
-            />
-          </div>
-          <div className="flex justify-end">
-            <Button
-              onClick={handleSavePayer}
-              disabled={
-                !dirtyPayer || !returnShippingPayer || savingPayer || disabled
-              }
-            >
-              {savingPayer
-                ? t("admin.operations.common.saving")
-                : t("admin.operations.refundRequests.payerSaveButton")}
-            </Button>
-          </div>
-        </div>
-
-        {error && <div className="text-sm text-danger-600">{error}</div>}
-      </CardContent>
-    </Card>
+      {error && <div className="text-sm text-danger-600">{error}</div>}
+    </SectionCard>
   );
 }
 

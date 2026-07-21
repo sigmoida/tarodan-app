@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { EmptyState, StatusBadge } from "@tarodan/ui";
+import { ChevronRightIcon } from "@heroicons/react/24/outline";
+import { Button, EmptyState, StatusBadge } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { fmtTry } from "@/lib/format";
@@ -16,12 +17,12 @@ export function RecentOrders({ orders }: { orders: RecentOrder[] }) {
       title={t("admin.dashboard.recentOrders.title")}
       className="lg:col-span-2"
       actions={
-        <Link
-          href="/operations/orders"
-          className="text-sm text-primary-600 hover:underline"
-        >
-          {t("common.seeAll")} →
-        </Link>
+        <Button asChild variant="ghost" size="sm">
+          <Link href="/operations/orders">
+            {t("common.seeAll")}
+            <ChevronRightIcon className="ml-1 h-4 w-4" />
+          </Link>
+        </Button>
       }
     >
       <div className="space-y-3">

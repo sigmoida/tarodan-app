@@ -22,7 +22,7 @@ import { SearchService } from "../search/search.service";
 import { CacheService } from "../cache/cache.service";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto/notification.dto";
-import { paginate, resolveOrderBy } from "../../common/list";
+import { dateRangeWhere, paginate, resolveOrderBy } from "../../common/list";
 
 /**
  * Ürün yönetimi + admin ürün silme/geri yükleme — AdminService'in
@@ -119,6 +119,8 @@ export class AdminProductService {
       where.sellerId = sellerId;
     }
 
+    Object.assign(where, dateRangeWhere(query));
+
     const orderBy = resolveOrderBy<Prisma.ProductOrderByWithRelationInput>(
       "Product",
       query,
@@ -131,7 +133,9 @@ export class AdminProductService {
         include: {
           seller: { select: { id: true, displayName: true, email: true } },
           category: { select: { id: true, name: true } },
+          brand: { select: { name: true } },
           images: { take: 1, orderBy: { sortOrder: "asc" } },
+          _count: { select: { images: true } },
         },
         orderBy,
       },

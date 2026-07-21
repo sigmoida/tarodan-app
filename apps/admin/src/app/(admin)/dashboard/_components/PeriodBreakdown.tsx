@@ -25,7 +25,7 @@ export function PeriodBreakdown({
       {rows.map((r) => (
         <div key={r.label} className="flex flex-col">
           <span className="text-muted">{r.label}</span>
-          <span className="font-medium text-heading">{format(r.value)}</span>
+          <span className="font-semibold text-heading">{format(r.value)}</span>
         </div>
       ))}
     </div>

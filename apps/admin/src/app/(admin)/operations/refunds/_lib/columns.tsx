@@ -1,3 +1,4 @@
+import { enumLabel, refundReasonConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { col, type RowActionItem } from "@/components/table";
 
@@ -10,6 +11,9 @@ export interface Refund {
   refundedAt: string;
   order: {
     id: string;
+    orderNumber: string;
+    commissionAmount?: number;
+    reason?: string | null;
     buyer: { id: string; displayName: string; email: string };
     seller: { id: string; displayName: string; email: string };
     product: { id: string; title: string };
@@ -18,12 +22,32 @@ export interface Refund {
 
 export function refundColumns(t: T, rowMenu: (r: Refund) => RowActionItem[]) {
   return [
-    col.code<Refund>(t("admin.operations.refunds.colId"), "id", {
+    col.id<Refund>(t("admin.operations.refunds.colId"), "id", {
       grow: 1,
     }),
+    col.link<Refund>(
+      t("admin.operations.common.order"),
+      (r) =>
+        r.order
+          ? {
+              href: `/operations/orders/${r.order.id}`,
+              label: r.order.orderNumber,
+            }
+          : null,
+      { sortKey: "order.orderNumber" },
+    ),
     col.money<Refund>(t("common.amount"), "amount", {
       tone: "negative",
     }),
+    col.money<Refund>(
+      t("admin.operations.orders.commission"),
+      (r) => r.order?.commissionAmount,
+    ),
+    col.text<Refund>(t("admin.operations.refundRequests.reason"), (r) =>
+      r.order?.reason
+        ? enumLabel(refundReasonConfig, r.order.reason, r.order.reason)
+        : null,
+    ),
     col.user<Refund>(
       t("admin.operations.common.buyer"),
       (r) =>
@@ -35,6 +59,10 @@ export function refundColumns(t: T, rowMenu: (r: Refund) => RowActionItem[]) {
           : null,
       { sortKey: "order.buyer.displayName" },
     ),
+    col.id<Refund>(
+      t("admin.operations.common.buyerId"),
+      (r) => r.order?.buyer?.id,
+    ),
     col.user<Refund>(
       t("admin.operations.common.seller"),
       (r) =>
@@ -45,6 +73,10 @@ export function refundColumns(t: T, rowMenu: (r: Refund) => RowActionItem[]) {
             }
           : null,
       { sortKey: "order.seller.displayName" },
+    ),
+    col.id<Refund>(
+      t("admin.operations.common.sellerId"),
+      (r) => r.order?.seller?.id,
     ),
     col.text<Refund>(
       t("admin.catalog.common.product"),

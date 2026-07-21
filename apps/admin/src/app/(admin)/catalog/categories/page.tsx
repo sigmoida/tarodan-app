@@ -67,15 +67,16 @@ export default function CategoriesPage() {
         fetcher={(params) => adminApi.getCategories(params)}
         getRowId={(c) => c.id}
         syncUrl
+        initialFilters={{ startDate: "", endDate: "" }}
       >
         <ResourceList.Toolbar>
           <ResourceList.Search />
+          <ResourceList.DateRange />
         </ResourceList.Toolbar>
         <ResourceList.Table
           columns={columns}
           emptyText={t("admin.catalog.categories.empty")}
         />
-        <ResourceList.Total unit={t("admin.catalog.categories.unit")} />
         <ResourceList.Pagination />
       </ResourceList>
 

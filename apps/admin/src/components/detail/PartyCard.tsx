@@ -1,6 +1,5 @@
-import { type ComponentType } from 'react';
-import Link from 'next/link';
-import { SectionCard } from './SectionCard';
+import Link from "next/link";
+import { SectionCard } from "./SectionCard";
 
 /**
  * A person card (buyer / seller / initiator / receiver) — the same
@@ -8,14 +7,12 @@ import { SectionCard } from './SectionCard';
  */
 export function PartyCard({
   title,
-  icon,
   name,
   userHref,
   email,
   phone,
 }: {
   title: string;
-  icon?: ComponentType<{ className?: string }>;
   name: string;
   /** When set, the name links to the user detail page. */
   userHref?: string;
@@ -23,7 +20,7 @@ export function PartyCard({
   phone?: string | null;
 }) {
   return (
-    <SectionCard title={title} icon={icon} bodyClassName="space-y-1">
+    <SectionCard title={title} bodyClassName="space-y-1">
       {userHref ? (
         <Link
           href={userHref}

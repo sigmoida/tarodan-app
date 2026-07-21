@@ -94,7 +94,6 @@ export default function ManufacturersPage() {
           columns={columns}
           emptyText={t("admin.catalog.manufacturers.empty")}
         />
-        <ResourceList.Total unit={t("admin.catalog.manufacturers.unit")} />
         <ResourceList.Pagination />
       </ResourceList>
 

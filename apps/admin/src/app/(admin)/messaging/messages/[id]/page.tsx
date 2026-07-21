@@ -2,11 +2,9 @@
 
 import { useParams } from "next/navigation";
 import {
-  ChatBubbleLeftRightIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
   XCircleIcon,
-  UserIcon,
 } from "@heroicons/react/24/outline";
 import { Button, StatusBadge } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
@@ -120,10 +118,7 @@ export default function MessageDetailPage() {
         const threadMessages = m.thread?.messages ?? [];
         return (
           <>
-            <SectionCard
-              title={t("common.message")}
-              icon={ChatBubbleLeftRightIcon}
-            >
+            <SectionCard title={t("common.message")}>
               {m.originalContent && m.originalContent !== m.content && (
                 <div className="mb-3">
                   <p className="mb-1 text-xs text-muted">
@@ -166,7 +161,6 @@ export default function MessageDetailPage() {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <PartyCard
                 title={t("admin.messaging.messages.sender")}
-                icon={UserIcon}
                 name={m.sender.displayName}
                 userHref={`/accounts/users/${m.sender.id}`}
                 email={m.sender.email}
@@ -174,7 +168,6 @@ export default function MessageDetailPage() {
               />
               <PartyCard
                 title={t("admin.messaging.messages.receiver")}
-                icon={UserIcon}
                 name={m.receiver.displayName}
                 userHref={`/accounts/users/${m.receiver.id}`}
                 email={m.receiver.email}
@@ -187,7 +180,6 @@ export default function MessageDetailPage() {
                 title={t("admin.messaging.messages.conversationHistory", {
                   count: threadMessages.length,
                 })}
-                icon={ChatBubbleLeftRightIcon}
               >
                 <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
                   {threadMessages.map((msg) => {

@@ -22,7 +22,13 @@ export function TicketsTab() {
       fetcher={(params) => adminApi.getTickets(params)}
       getRowId={(t) => t.id}
       syncUrl
-      initialFilters={{ status: "all", priority: "all", category: "all" }}
+      initialFilters={{
+        status: "all",
+        priority: "all",
+        category: "all",
+        fromDate: "",
+        toDate: "",
+      }}
     >
       <ResourceList.Toolbar>
         <ResourceList.Search />
@@ -41,6 +47,7 @@ export function TicketsTab() {
           options={ticketCategoryOptions(t)}
           className="sm:w-44"
         />
+        <ResourceList.DateRange fromName="fromDate" toName="toDate" />
       </ResourceList.Toolbar>
       <ResourceList.Table
         columns={ticketColumns(t)}

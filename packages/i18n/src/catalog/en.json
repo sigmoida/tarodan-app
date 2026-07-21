@@ -2280,6 +2280,8 @@
         "receiverSeller": "Recipient (Seller)",
         "score": "Score",
         "comment": "Comment",
+        "reviewId": "Review ID",
+        "orderCode": "Order Code",
         "source": "Source",
         "order": "Order",
         "trade": "Trade",
@@ -2356,9 +2358,12 @@
     "messaging": {
       "unknown": "Unknown",
       "messages": {
-        "title": "Message Moderation",
+        "title": "User Conversations",
         "detailTitle": "Message Details",
         "notFound": "No messages found",
+        "conversationId": "Conversation ID",
+        "senderId": "Sender ID",
+        "receiverId": "Recipient ID",
         "sender": "Sender",
         "receiver": "Recipient",
         "warning": "Warning",
@@ -2665,6 +2670,9 @@
       "categories": {
         "title": "Categories",
         "subtitle": "Category list and management",
+        "activeProducts": "Active",
+        "passiveProducts": "Passive",
+        "pendingProducts": "Pending",
         "new": "New Category",
         "loadError": "Failed to load categories",
         "empty": "No categories yet",
@@ -2820,6 +2828,9 @@
         "exportCsv": "Download CSV",
         "condition": "Condition",
         "seller": "Seller",
+        "sellerId": "Seller ID",
+        "listingScore": "Listing Score",
+        "tradeable": "Tradeable",
         "detail": "Detail",
         "approve": "Approve",
         "reject": "Reject",
@@ -3491,6 +3502,10 @@
         "recipient": "Recipient",
         "buyer": "Buyer",
         "seller": "Seller",
+        "sellerId": "Seller ID",
+        "buyerId": "Buyer ID",
+        "cargoStatus": "Shipping Status",
+        "completedAt": "Completed At",
         "order": "Order",
         "refundNumber": "Refund No",
         "orderDetail": "Order Detail",
@@ -3509,6 +3524,8 @@
         "orderNumber": "Order No",
         "buyer": "Buyer",
         "seller": "Seller",
+        "sellerId": "Seller ID",
+        "cargoStatus": "Shipping Status",
         "commission": "Commission",
         "itemCountUnit": "{count} items",
         "cartItems": "{count}-item cart",
@@ -3619,7 +3636,7 @@
         "filterReviewQueue": "Filter review queue",
         "reviewQueueCount": "<value>{count}</value> trades awaiting review",
         "disputedCount": "{count} disputed trades",
-        "detailTitle": "Trade Details",
+        "detailTitle": "Trade",
         "createdAtLabel": "Created: {date}",
         "resolve": "Resolve",
         "resolveShort": "Resolve",
@@ -4107,7 +4124,7 @@
       }
     },
     "reports": {
-      "title": "Report Requests",
+      "title": "Requests, Suggestions & Complaints",
       "description": "Complaints submitted by users for products, users, collections, and messages",
       "loadError": "Failed to load complaints",
       "empty": "No complaints yet",
@@ -4140,7 +4157,10 @@
         "type": "Type",
         "reason": "Reason",
         "reporter": "Reporter",
-        "targetId": "Target ID"
+        "targetId": "Target ID",
+        "requestId": "Request ID",
+        "userId": "User ID",
+        "resolution": "Response / Resolution"
       }
     },
     "settings": {
@@ -4326,6 +4346,10 @@
       "membershipBasic": "Basic",
       "billingMonthly": "Monthly",
       "billingYearly": "Yearly",
+      "userId": "User ID",
+      "tradesCount": "Trades",
+      "cancellationsCount": "Cancellations",
+      "refundsCount": "Refunds",
       "registeredAt": "Registered On",
       "lastLogin": "Last Login",
       "neverLoggedIn": "Never logged in",
@@ -4954,7 +4978,8 @@
       "table": {
         "noRecords": "No records found",
         "selectAll": "Select all",
-        "selectRow": "Select row"
+        "selectRow": "Select row",
+        "exportCsv": "Download CSV"
       },
       "timeline": {
         "title": "Timeline"

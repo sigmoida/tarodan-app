@@ -2280,6 +2280,8 @@
         "receiverSeller": "Alıcı (Satıcı)",
         "score": "Puan",
         "comment": "Yorum",
+        "reviewId": "Yorum ID",
+        "orderCode": "Sipariş Kodu",
         "source": "Kaynak",
         "order": "Sipariş",
         "trade": "Takas",
@@ -2356,9 +2358,12 @@
     "messaging": {
       "unknown": "Bilinmeyen",
       "messages": {
-        "title": "Mesaj Moderasyonu",
+        "title": "Kullanıcı Görüşmeleri",
         "detailTitle": "Mesaj Detayı",
         "notFound": "Mesaj bulunamadı",
+        "conversationId": "Görüşme ID",
+        "senderId": "Gönderen ID",
+        "receiverId": "Alıcı ID",
         "sender": "Gönderen",
         "receiver": "Alıcı",
         "warning": "Uyarı",
@@ -2665,6 +2670,9 @@
       "categories": {
         "title": "Kategoriler",
         "subtitle": "Kategori listesi ve yönetimi",
+        "activeProducts": "Aktif Ürün",
+        "passiveProducts": "Pasif Ürün",
+        "pendingProducts": "Onay Aşamasında",
         "new": "Yeni Kategori",
         "loadError": "Kategoriler yüklenemedi",
         "empty": "Henüz kategori yok",
@@ -2820,6 +2828,9 @@
         "exportCsv": "CSV İndir",
         "condition": "Kondisyon",
         "seller": "Satıcı",
+        "sellerId": "Satıcı ID",
+        "listingScore": "Listeleme Puanı",
+        "tradeable": "Takasa Dahil",
         "detail": "Detay",
         "approve": "Onayla",
         "reject": "Reddet",
@@ -3491,6 +3502,10 @@
         "recipient": "Alıcı",
         "buyer": "Alıcı",
         "seller": "Satıcı",
+        "sellerId": "Satıcı ID",
+        "buyerId": "Alıcı ID",
+        "cargoStatus": "Kargo Durumu",
+        "completedAt": "Tamamlanma Tarihi",
         "order": "Sipariş",
         "refundNumber": "İade No",
         "orderDetail": "Sipariş Detayı",
@@ -3509,6 +3524,8 @@
         "orderNumber": "Sipariş No",
         "buyer": "Alıcı",
         "seller": "Satıcı",
+        "sellerId": "Satıcı ID",
+        "cargoStatus": "Kargo Durumu",
         "commission": "Komisyon",
         "itemCountUnit": "{count} adet",
         "cartItems": "{count} ürünlük sepet",
@@ -3619,7 +3636,7 @@
         "filterReviewQueue": "İnceleme kuyruğunu filtrele",
         "reviewQueueCount": "<value>{count}</value> takas inceleme bekliyor",
         "disputedCount": "{count} itirazlı takas",
-        "detailTitle": "Takas Detayı",
+        "detailTitle": "Takas",
         "createdAtLabel": "Oluşturulma: {date}",
         "resolve": "Çözümle",
         "resolveShort": "Çöz",
@@ -4107,7 +4124,7 @@
       }
     },
     "reports": {
-      "title": "Rapor Talepleri",
+      "title": "İstek, Öneri ve Şikayet",
       "description": "Kullanıcıların ürün, kullanıcı, koleksiyon ve mesajlar için gönderdiği şikayetler",
       "loadError": "Şikayetler yüklenirken hata oluştu",
       "empty": "Henüz şikayet yok",
@@ -4140,7 +4157,10 @@
         "type": "Tür",
         "reason": "Neden",
         "reporter": "Raporlayan",
-        "targetId": "Hedef ID"
+        "targetId": "Hedef ID",
+        "requestId": "Talep ID",
+        "userId": "Kullanıcı ID",
+        "resolution": "Dönüş/Çözüm"
       }
     },
     "settings": {
@@ -4326,6 +4346,10 @@
       "membershipBasic": "Temel",
       "billingMonthly": "Aylık",
       "billingYearly": "Yıllık",
+      "userId": "Kullanıcı ID",
+      "tradesCount": "Takas",
+      "cancellationsCount": "İptal",
+      "refundsCount": "İade",
       "registeredAt": "Kayıt Tarihi",
       "lastLogin": "Son Giriş",
       "neverLoggedIn": "Hiç giriş yapmadı",
@@ -4954,7 +4978,8 @@
       "table": {
         "noRecords": "Kayıt bulunamadı",
         "selectAll": "Tümünü seç",
-        "selectRow": "Satırı seç"
+        "selectRow": "Satırı seç",
+        "exportCsv": "CSV İndir"
       },
       "timeline": {
         "title": "Zaman Çizelgesi"

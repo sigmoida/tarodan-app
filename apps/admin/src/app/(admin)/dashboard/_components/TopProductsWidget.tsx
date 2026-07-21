@@ -1,7 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
-import { EmptyState } from "@tarodan/ui";
+import { ChevronRightIcon } from "@heroicons/react/24/outline";
+import { Button, EmptyState } from "@tarodan/ui";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { fmtTry } from "@/lib/format";
 import { type TopProduct } from "../_lib/types";
@@ -17,21 +18,21 @@ export function TopProductsWidget({ products }: { products: TopProduct[] }) {
     <SectionCard
       title={t("admin.dashboard.topProducts.title")}
       actions={
-        <Link
-          href="/catalog/products"
-          className="text-sm text-primary-600 hover:underline"
-        >
-          {t("common.seeAll")} →
-        </Link>
+        <Button asChild variant="ghost" size="sm">
+          <Link href="/catalog/products">
+            {t("common.seeAll")}
+            <ChevronRightIcon className="ml-1 h-4 w-4" />
+          </Link>
+        </Button>
       }
     >
-      <div className="divide-y divide-border">
+      <div className="space-y-0.5">
         {products.length > 0 ? (
           products.map((p) => (
             <Link
               key={p.id}
               href={`/catalog/products/${p.id}`}
-              className="flex items-center gap-3 py-3 first:pt-0 last:pb-0 hover:bg-surface-alt/60"
+              className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-2.5 hover:bg-surface-alt"
             >
               <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-surface-alt">
                 {p.thumbnail ? (

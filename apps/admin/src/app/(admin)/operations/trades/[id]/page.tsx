@@ -90,9 +90,7 @@ export default function TradeDetailPage() {
         <>
           {t("admin.operations.trades.detailTitle")}
           {trade.tradeNumber && (
-            <span className="ml-3 font-mono text-base text-muted">
-              {trade.tradeNumber}
-            </span>
+            <span className="ml-2">#{trade.tradeNumber}</span>
           )}
         </>
       )}

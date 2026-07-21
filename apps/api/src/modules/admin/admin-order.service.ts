@@ -144,6 +144,8 @@ export class AdminOrderService {
             },
           },
           checkoutGroup: { select: { groupNumber: true } },
+          // Kargo durumu — admin listede "Kargo Durumu" kolonu için.
+          shipment: { select: { status: true } },
           // Açık (aktif) iade talebi — admin listede "İade Sürecinde" rozeti için.
           refundRequests: {
             where: {
@@ -189,6 +191,7 @@ export class AdminOrderService {
         buyer: this.resolveGuestBuyerForAdmin(o.buyer, o.shippingAddress),
         amount: Number(o.totalAmount),
         commissionAmount: Number(o.commissionAmount),
+        shipmentStatus: (o as any).shipment?.status ?? null,
         groupNumber: o.checkoutGroup?.groupNumber ?? null,
         groupItemCount: o.checkoutGroupId
           ? (groupCountMap.get(o.checkoutGroupId) ?? 1)

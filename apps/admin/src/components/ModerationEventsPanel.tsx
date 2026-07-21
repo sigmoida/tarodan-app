@@ -150,7 +150,6 @@ function moderationColumns(
           <Empty />
         ),
       {
-        align: "right",
         minWidth: 100,
         sortKey: "relevanceScore",
         sortType: "number",
@@ -167,7 +166,6 @@ function moderationColumns(
           <Empty />
         ),
       {
-        align: "right",
         minWidth: 110,
         sortKey: "nsfwScore",
         sortType: "number",

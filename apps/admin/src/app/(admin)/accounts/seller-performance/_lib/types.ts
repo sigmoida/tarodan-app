@@ -12,9 +12,13 @@ export interface Seller {
   isBanned: boolean;
   createdAt: string;
   membership?: { tier?: { type?: string; name?: string } };
+  cancelledOrdersCount?: number;
   _count: {
     products: number;
     sellerOrders: number;
+    initiatedTrades?: number;
+    receivedTrades?: number;
+    refundRequests?: number;
   };
 }
 

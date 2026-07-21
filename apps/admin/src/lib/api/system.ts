@@ -56,6 +56,8 @@ export const systemApi = {
     search?: string;
     sortBy?: string;
     sortOrder?: "asc" | "desc";
+    startDate?: string;
+    endDate?: string;
   }) => api.get("/user-reports/admin", { params }),
   getUserReportStats: () => api.get("/user-reports/admin/stats"),
   getUserReportById: (id: string) => api.get(`/user-reports/admin/${id}`),

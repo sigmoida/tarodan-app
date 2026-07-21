@@ -27,7 +27,12 @@ export default function ReportsPage() {
         fetcher={(params) => adminApi.getUserReports(params)}
         getRowId={(r) => r.id}
         syncUrl
-        initialFilters={{ status: "all", type: "all" }}
+        initialFilters={{
+          status: "all",
+          type: "all",
+          startDate: "",
+          endDate: "",
+        }}
       >
         <ResourceList.Toolbar>
           <ResourceList.Search />
@@ -41,6 +46,7 @@ export default function ReportsPage() {
             options={reportStatusOptions(t)}
             className="sm:w-44"
           />
+          <ResourceList.DateRange />
         </ResourceList.Toolbar>
         <ResourceList.Table
           columns={reportColumns({ t })}

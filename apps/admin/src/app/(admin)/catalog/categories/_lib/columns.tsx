@@ -19,6 +19,18 @@ export function categoryColumns(t: T, actions: CategoryRowActions) {
       { sortKey: "productCount" },
     ),
     col.number<Category>(
+      t("admin.catalog.categories.activeProducts"),
+      (c) => c.activeProducts,
+    ),
+    col.number<Category>(
+      t("admin.catalog.categories.passiveProducts"),
+      (c) => c.passiveProducts,
+    ),
+    col.number<Category>(
+      t("admin.catalog.categories.pendingProducts"),
+      (c) => c.pendingProducts,
+    ),
+    col.number<Category>(
       t("admin.catalog.common.collection"),
       (c) => c.collectionCount,
       { sortKey: "collectionCount" },

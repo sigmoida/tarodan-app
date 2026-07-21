@@ -10,7 +10,7 @@ import {
 import { fulltextProductSearch } from "../product/helpers/fulltext-search";
 import { AdminUserRatingQueryDto, RatingQueryDto, RatingStatus } from "./dto";
 import { Prisma } from "@prisma/client";
-import { paginate, resolveOrderBy } from "../../common/list";
+import { dateRangeWhere, paginate, resolveOrderBy } from "../../common/list";
 
 /**
  * Ürün yorumu ve satıcı puanı admin operasyonları — AdminService'in
@@ -105,6 +105,8 @@ export class AdminReviewService {
       }
       where.OR = conditions;
     }
+
+    Object.assign(where, dateRangeWhere(query));
 
     const orderBy =
       resolveOrderBy<Prisma.ProductRatingOrderByWithRelationInput>(
@@ -237,6 +239,8 @@ export class AdminReviewService {
     if (status && ["pending", "approved", "rejected"].includes(status)) {
       where.status = status;
     }
+
+    Object.assign(where, dateRangeWhere(query));
 
     const orderBy = resolveOrderBy<Prisma.RatingOrderByWithRelationInput>(
       "Rating",

@@ -29,7 +29,7 @@ export function SellerReviewsTab() {
       fetcher={(p) => adminApi.getUserRatings(p)}
       getRowId={(r) => r.id}
       syncUrl
-      initialFilters={{ status: "all" }}
+      initialFilters={{ status: "all", startDate: "", endDate: "" }}
     >
       <ResourceList.Toolbar>
         <ResourceList.Search />
@@ -38,6 +38,7 @@ export function SellerReviewsTab() {
           options={reviewStatusOptions(t)}
           className="sm:w-48"
         />
+        <ResourceList.DateRange />
       </ResourceList.Toolbar>
       <ResourceList.Table
         columns={columns}

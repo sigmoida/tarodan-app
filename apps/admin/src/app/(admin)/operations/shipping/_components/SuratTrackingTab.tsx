@@ -37,7 +37,6 @@ export function SuratTrackingTab() {
           />
         </ResourceList.Toolbar>
         <SuratShipmentsTable />
-        <ResourceList.Total unit={t("admin.operations.shipping.surat.unit")} />
         <ResourceList.Pagination />
       </ResourceList>
     </div>

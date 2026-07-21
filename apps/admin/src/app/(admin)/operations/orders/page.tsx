@@ -17,7 +17,13 @@ export default function OrdersPage() {
       fetcher={(p) => adminApi.getOrders(p)}
       getRowId={(o: any) => o.id}
       syncUrl
-      initialFilters={{ status: "all", userId: "", productId: "" }}
+      initialFilters={{
+        status: "all",
+        userId: "",
+        productId: "",
+        fromDate: "",
+        toDate: "",
+      }}
     >
       <ResourceList.Header
         title={t("admin.operations.orders.title")}
@@ -30,6 +36,7 @@ export default function OrdersPage() {
           options={statusOptions}
           className="sm:w-48"
         />
+        <ResourceList.DateRange fromName="fromDate" toName="toDate" />
       </ResourceList.Toolbar>
       <OrdersTable />
       <ResourceList.Pagination />

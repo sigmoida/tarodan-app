@@ -37,6 +37,11 @@ export interface CellColumnMeta {
   sortable?: boolean;
   /** Comparator family for client-side sorting (see `SortType`). */
   sortType?: SortType;
+  /** CSV export — the column header (when it's a plain string) used as the CSV
+   * header, and a plain-value getter for the cell. The `col.*` factory fills
+   * these for value-based columns; badge/custom columns can pass `exportValue`. */
+  exportHeader?: string;
+  exportValue?: (row: any) => string | number | null | undefined;
 }
 
 // Extend react-table's ColumnMeta with our fields (type-safe meta).

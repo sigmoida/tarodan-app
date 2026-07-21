@@ -5,6 +5,7 @@ import {
   enumLabel,
   refundReasonConfig,
   refundRequestStatusConfig,
+  shipmentStatusConfig,
 } from "@tarodan/ui";
 import { col, TruncatedText } from "@/components/table";
 
@@ -17,6 +18,9 @@ export interface RefundRequestRow {
   amount: number | string;
   reason: string;
   createdAt: string;
+  returnStatus?: string | null;
+  returnTrackingNumber?: string | null;
+  refundedAt?: string | null;
   requester: { id: string; displayName: string; email: string };
   order: {
     id: string;
@@ -79,6 +83,10 @@ export const refundRequestColumns = (t: T) => [
     }),
     { sortKey: "requester.displayName" },
   ),
+  col.id<RefundRequestRow>(
+    t("admin.operations.common.buyerId"),
+    (r) => r.requester?.id,
+  ),
   col.user<RefundRequestRow>(
     t("admin.operations.common.seller"),
     (r) => ({
@@ -86,6 +94,10 @@ export const refundRequestColumns = (t: T) => [
       secondary: r.order?.seller?.email,
     }),
     { sortKey: "order.seller.displayName" },
+  ),
+  col.id<RefundRequestRow>(
+    t("admin.operations.common.sellerId"),
+    (r) => r.order?.seller?.id,
   ),
   col.money<RefundRequestRow>(t("common.amount"), "amount"),
   col.text<RefundRequestRow>(
@@ -102,8 +114,23 @@ export const refundRequestColumns = (t: T) => [
     (r) => <Badge status={r.status} config={refundRequestStatusConfig} />,
     { sortKey: "status", sortType: "text" },
   ),
+  col.badge<RefundRequestRow>(t("admin.operations.common.cargoStatus"), (r) =>
+    r.returnStatus ? (
+      <Badge status={r.returnStatus} config={shipmentStatusConfig} />
+    ) : (
+      <span className="text-subtle">—</span>
+    ),
+  ),
+  col.code<RefundRequestRow>(
+    t("admin.operations.common.trackingNumber"),
+    (r) => r.returnTrackingNumber ?? undefined,
+  ),
   col.date<RefundRequestRow>(
     t("admin.operations.common.createdAt"),
     "createdAt",
+  ),
+  col.date<RefundRequestRow>(
+    t("admin.operations.common.completedAt"),
+    (r) => r.refundedAt,
   ),
 ];

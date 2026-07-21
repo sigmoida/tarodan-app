@@ -38,16 +38,12 @@ function toPeriods(raw: unknown): MetricPeriods {
 }
 
 async function fetchDashboard(t: T): Promise<DashboardData> {
-  const [
-    dashboardRes,
-    ordersRes,
-    pendingRes,
-    salesRes,
-    tradesRes,
-    visitorsRes,
-    topProductsRes,
-    topSellersRes,
-  ] = await Promise.all([
+  // Each widget loads independently: a single missing or failing endpoint (e.g.
+  // a dashboard endpoint not yet deployed to the target API) must not blank the
+  // whole page. Failed calls fall back to an empty response, so that one widget
+  // just renders its empty state while the rest of the dashboard stays up.
+  // (A 401 still redirects to login via the api-client interceptor.)
+  const settled = await Promise.allSettled([
     adminApi.getDashboard(),
     adminApi.getRecentOrders(5),
     adminApi.getPendingActions(),
@@ -57,6 +53,19 @@ async function fetchDashboard(t: T): Promise<DashboardData> {
     adminApi.getTopProducts(10),
     adminApi.getTopSellers(10),
   ]);
+  const at = (i: number, fallback: any) =>
+    settled[i].status === "fulfilled"
+      ? (settled[i] as PromiseFulfilledResult<any>).value
+      : fallback;
+
+  const dashboardRes = at(0, { data: {} });
+  const ordersRes = at(1, { data: [] });
+  const pendingRes = at(2, { data: null });
+  const salesRes = at(3, { data: null });
+  const tradesRes = at(4, { data: [] });
+  const visitorsRes = at(5, { data: {} });
+  const topProductsRes = at(6, { data: [] });
+  const topSellersRes = at(7, { data: [] });
 
   const data = dashboardRes.data.data || dashboardRes.data;
 

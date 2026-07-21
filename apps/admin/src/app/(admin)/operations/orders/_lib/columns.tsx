@@ -1,5 +1,10 @@
 import Link from "next/link";
-import { Button, Badge, orderStatusConfig } from "@tarodan/ui";
+import {
+  Button,
+  Badge,
+  orderStatusConfig,
+  shipmentStatusConfig,
+} from "@tarodan/ui";
 import {
   ShoppingBagIcon,
   ChevronDownIcon,
@@ -7,10 +12,12 @@ import {
 } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { cancelReasonLabel, orderOriginLabel } from "@/lib/utils";
+import { fmtTry } from "@/lib/format";
 import {
   col,
   CellText,
   CellUser,
+  TruncatedText,
   type RowActionItem,
 } from "@/components/table";
 import { type Order } from "./orders";
@@ -97,7 +104,7 @@ export function orderColumns({
               : t("admin.operations.orders.groupOngoing")}
           </span>
         ) : (
-          <div className="flex flex-col items-start gap-1">
+          <div className="flex min-w-0 max-w-full flex-col items-start gap-1">
             {o.activeRefundRequest ? (
               <Badge
                 status="refund_requested"
@@ -115,12 +122,12 @@ export function orderColumns({
             )}
             {(o.status === "cancelled" || o.cancellationType === "iptal") &&
               cancelReasonLabel(o.cancelReason, t) && (
-                <span className="truncate text-xs text-muted">
-                  {cancelReasonLabel(o.cancelReason, t)} ·{" "}
-                  {t("admin.operations.orders.originCancellation", {
-                    origin: orderOriginLabel(o.offerId, t),
-                  })}
-                </span>
+                <TruncatedText className="max-w-full text-xs text-muted">
+                  {`${cancelReasonLabel(o.cancelReason, t)} · ${t(
+                    "admin.operations.orders.originCancellation",
+                    { origin: orderOriginLabel(o.offerId, t) },
+                  )}`}
+                </TruncatedText>
               )}
           </div>
         ),
@@ -160,6 +167,9 @@ export function orderColumns({
         );
       },
       { sortKey: "seller.displayName", sortType: "text" },
+    ),
+    col.id<Order>(t("admin.operations.orders.sellerId"), (o) =>
+      o.isGroupSummary ? undefined : o.seller.id,
     ),
     col.custom<Order>(
       t("admin.catalog.common.product"),
@@ -208,14 +218,33 @@ export function orderColumns({
       (o) => (o.isGroupSummary ? (o.groupTotalAmount ?? 0) : o.totalAmount),
       { tone: "primary", sortKey: "totalAmount", sortType: "number" },
     ),
-    col.money<Order>(
+    col.custom<Order>(
       t("admin.operations.orders.commission"),
-      (o) => (o.isGroupSummary ? (o.groupCommission ?? 0) : o.commission),
-      {
-        tone: "positive",
-        sortKey: "commissionAmount",
-        sortType: "number",
+      (o) => {
+        const amount = o.isGroupSummary
+          ? (o.groupCommission ?? 0)
+          : o.commission;
+        const base = o.isGroupSummary ? 0 : o.subtotal;
+        const rate = base > 0 ? Math.round((amount / base) * 100) : null;
+        return (
+          <span className="whitespace-nowrap tabular-nums">
+            <span className="font-medium text-success-600">
+              {fmtTry(amount)}
+            </span>
+            {rate != null && (
+              <span className="ml-1 text-xs text-muted">%{rate}</span>
+            )}
+          </span>
+        );
       },
+      { sortKey: "commissionAmount", sortType: "number" },
+    ),
+    col.badge<Order>(t("admin.operations.orders.cargoStatus"), (o) =>
+      o.isGroupSummary || !o.shipmentStatus ? (
+        <span className="text-subtle">—</span>
+      ) : (
+        <Badge status={o.shipmentStatus} config={shipmentStatusConfig} />
+      ),
     ),
     col.date<Order>(t("common.date"), "createdAt"),
     col.rowMenu<Order>(rowMenu),

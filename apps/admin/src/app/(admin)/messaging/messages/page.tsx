@@ -45,7 +45,7 @@ export default function MessagesPage() {
         }}
         getRowId={(m) => m.id}
         syncUrl
-        initialFilters={{ status: "pending" }}
+        initialFilters={{ status: "pending", fromDate: "", toDate: "" }}
       >
         <ResourceList.Toolbar>
           <ResourceList.Search />
@@ -54,6 +54,7 @@ export default function MessagesPage() {
             options={messageFilterOptions(t)}
             className="sm:w-48"
           />
+          <ResourceList.DateRange fromName="fromDate" toName="toDate" />
         </ResourceList.Toolbar>
         <MessagesTable />
         <ResourceList.Pagination />

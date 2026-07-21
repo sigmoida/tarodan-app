@@ -132,6 +132,9 @@ export class AdminUserService {
           products: true,
           buyerOrders: true,
           sellerOrders: true,
+          initiatedTrades: true,
+          receivedTrades: true,
+          refundRequests: true,
         },
       },
     } satisfies Prisma.UserSelect;
@@ -181,7 +184,7 @@ export class AdminUserService {
       );
 
       return {
-        data: rows,
+        data: await this.attachCancelledCounts(rows),
         meta: {
           total: counts.length,
           page,
@@ -216,7 +219,7 @@ export class AdminUserService {
       },
     });
 
-    return paginate(
+    const result = await paginate(
       this.prisma.user,
       {
         where,
@@ -225,6 +228,44 @@ export class AdminUserService {
       },
       query,
     );
+    return {
+      ...result,
+      data: await this.attachCancelledCounts(result.data),
+    };
+  }
+
+  /**
+   * Attach a `cancelledOrdersCount` to each user row (cancelled orders where the
+   * user is buyer or seller). Prisma's `_count` can't filter by status alongside
+   * the unfiltered order counts, so this is a separate grouped query per page.
+   */
+  private async attachCancelledCounts<T extends { id: string }>(
+    rows: T[],
+  ): Promise<(T & { cancelledOrdersCount: number })[]> {
+    const ids = rows.map((r) => r.id);
+    if (!ids.length)
+      return rows.map((r) => ({ ...r, cancelledOrdersCount: 0 }));
+    const [asBuyer, asSeller] = await Promise.all([
+      this.prisma.order.groupBy({
+        by: ["buyerId"],
+        where: { status: "cancelled" as any, buyerId: { in: ids } },
+        _count: { _all: true },
+      }),
+      this.prisma.order.groupBy({
+        by: ["sellerId"],
+        where: { status: "cancelled" as any, sellerId: { in: ids } },
+        _count: { _all: true },
+      }),
+    ]);
+    const map = new Map<string, number>();
+    for (const g of asBuyer)
+      map.set(g.buyerId, (map.get(g.buyerId) ?? 0) + g._count._all);
+    for (const g of asSeller)
+      map.set(g.sellerId, (map.get(g.sellerId) ?? 0) + g._count._all);
+    return rows.map((r) => ({
+      ...r,
+      cancelledOrdersCount: map.get(r.id) ?? 0,
+    }));
   }
 
   /**

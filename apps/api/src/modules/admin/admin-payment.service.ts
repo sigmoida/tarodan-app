@@ -513,6 +513,11 @@ export class AdminPaymentService {
               buyer: { select: { id: true, displayName: true, email: true } },
               seller: { select: { id: true, displayName: true, email: true } },
               product: { select: { id: true, title: true } },
+              refundRequests: {
+                orderBy: { createdAt: "desc" },
+                take: 1,
+                select: { reason: true },
+              },
             },
           },
         },
@@ -531,6 +536,9 @@ export class AdminPaymentService {
         order: p.order
           ? {
               id: p.order.id,
+              orderNumber: p.order.orderNumber,
+              commissionAmount: Number(p.order.commissionAmount ?? 0),
+              reason: p.order.refundRequests?.[0]?.reason ?? null,
               buyer: p.order.buyer,
               seller: p.order.seller,
               product: p.order.product,
