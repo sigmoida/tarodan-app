@@ -43,4 +43,16 @@ export class AdminListQueryDto {
   @IsOptional()
   @IsIn(["text", "number", "date"])
   sortType?: SortType;
+
+  /** Inclusive date-range filter (YYYY-MM-DD); applied to a resource's date
+   * field (createdAt by default) via `dateRangeWhere`. */
+  @ApiPropertyOptional({ description: "Date range start (YYYY-MM-DD)" })
+  @IsOptional()
+  @IsString()
+  startDate?: string;
+
+  @ApiPropertyOptional({ description: "Date range end (YYYY-MM-DD)" })
+  @IsOptional()
+  @IsString()
+  endDate?: string;
 }
