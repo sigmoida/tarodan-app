@@ -115,6 +115,8 @@ export default function ProductsPage() {
             sellerId: "",
             brandId: "",
             carModelId: "",
+            startDate: "",
+            endDate: "",
           }}
         >
           <ResourceList.Toolbar>
@@ -122,6 +124,7 @@ export default function ProductsPage() {
               placeholder={t("admin.catalog.products.searchPlaceholder")}
             />
             <ProductFilters />
+            <ResourceList.DateRange />
           </ResourceList.Toolbar>
           <ProductsTable
             onApprove={onApprove}

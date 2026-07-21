@@ -16,7 +16,7 @@ import {
   fulltextAttributeSearch,
 } from "../../common/helpers/fulltext-search";
 import { Prisma, Brand } from "@prisma/client";
-import { paginate, resolveOrderBy } from "../../common/list";
+import { dateRangeWhere, paginate, resolveOrderBy } from "../../common/list";
 import {
   AdminAttributeGroupQueryDto,
   AdminAttributeQueryDto,
@@ -94,6 +94,8 @@ export class AdminCatalogService {
         { description: { contains: search, mode: "insensitive" } },
       ];
     }
+
+    Object.assign(where, dateRangeWhere(query));
 
     const orderBy = resolveOrderBy<Prisma.CategoryOrderByWithRelationInput>(
       "Category",

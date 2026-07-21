@@ -16,7 +16,7 @@ export default function TradesPage() {
       fetcher={(p) => adminApi.getTrades(p)}
       getRowId={(t: any) => t.id}
       syncUrl
-      initialFilters={{ status: "all", userId: "" }}
+      initialFilters={{ status: "all", userId: "", fromDate: "", toDate: "" }}
     >
       <ResourceList.Header
         title={t("admin.operations.trades.title")}
@@ -30,6 +30,7 @@ export default function TradesPage() {
           options={statusOptions}
           className="sm:w-48"
         />
+        <ResourceList.DateRange fromName="fromDate" toName="toDate" />
       </ResourceList.Toolbar>
       <TradesTable />
       <ResourceList.Pagination />
