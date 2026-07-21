@@ -17,18 +17,27 @@ export interface TemplateDetail {
   isCustom: boolean;
 }
 
-export const emailTemplateEditorSchema = z.object({
-  name: z.string().trim().min(1, "Görünen ad zorunludur"),
-  subject: z.string(),
-  bodyHtml: z.string(),
-  testEmail: z
-    .string()
-    .email("Geçerli bir e-posta adresi girin")
-    .or(z.literal("")),
-});
+import { z } from "zod";
+import type { useTranslations } from "next-intl";
+
+type T = ReturnType<typeof useTranslations<never>>;
+
+export const emailTemplateEditorSchema = (t: T) =>
+  z.object({
+    name: z
+      .string()
+      .trim()
+      .min(1, t("admin.marketing.emailTemplates.validation.nameRequired")),
+    subject: z.string(),
+    bodyHtml: z.string(),
+    testEmail: z
+      .string()
+      .email(t("admin.marketing.emailTemplates.validation.validEmail"))
+      .or(z.literal("")),
+  });
 
 export type EmailTemplateEditorValues = z.infer<
-  typeof emailTemplateEditorSchema
+  ReturnType<typeof emailTemplateEditorSchema>
 >;
 
 /** Convert sample data into source data with `{{variable}}` placeholders for the editor. */
@@ -57,4 +66,3 @@ export function makeSourceData(
   }
   return result;
 }
-import { z } from "zod";

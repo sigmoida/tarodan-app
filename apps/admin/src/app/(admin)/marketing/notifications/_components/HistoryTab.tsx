@@ -10,8 +10,10 @@ import {
   channelFilterOptions,
   deliveryFilterOptions,
 } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 export function HistoryTab() {
+  const t = useTranslations();
   return (
     <ResourceList<NotificationLog>
       resource="notification-history"
@@ -34,18 +36,18 @@ export function HistoryTab() {
         <ResourceList.Search />
         <ResourceList.FilterSelect
           name="channel"
-          options={channelFilterOptions}
+          options={channelFilterOptions(t)}
           className="sm:w-44"
         />
         <ResourceList.FilterSelect
           name="status"
-          options={deliveryFilterOptions}
+          options={deliveryFilterOptions(t)}
           className="sm:w-44"
         />
       </ResourceList.Toolbar>
       <ResourceList.Table
-        columns={historyColumns}
-        emptyText="Bildirim geçmişi boş"
+        columns={historyColumns(t)}
+        emptyText={t("admin.marketing.notifications.emptyHistory")}
       />
       <ResourceList.Pagination />
     </ResourceList>

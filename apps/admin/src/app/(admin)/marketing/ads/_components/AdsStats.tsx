@@ -12,9 +12,11 @@ import { adminKeys } from "@/lib/query/keys";
 import { MetricCard } from "@/components/MetricCard";
 import { QueryErrorCard } from "@/components/page/QueryErrorCard";
 import { type Ad } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 /** Summary metrics over ALL ads. Keyed under ['ads'] so ad mutations refresh it. */
 export function AdsStats() {
+  const t = useTranslations();
   const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: adminKeys.stats("ads"),
     queryFn: async () => {
@@ -54,29 +56,33 @@ export function AdsStats() {
       <MetricCard
         icon={MegaphoneIcon}
         tone="info"
-        label="Toplam Reklam"
+        label={t("admin.marketing.ads.totalAds")}
         value={s.total}
-        footer={<span className="text-success-700">{s.active} aktif</span>}
+        footer={
+          <span className="text-success-700">
+            {t("admin.marketing.ads.activeCount", { count: s.active })}
+          </span>
+        }
         loading={isLoading}
       />
       <MetricCard
         icon={CursorArrowRaysIcon}
         tone="primary"
-        label="Toplam Tıklama"
+        label={t("admin.marketing.ads.totalClicks")}
         value={s.clicks.toLocaleString()}
         loading={isLoading}
       />
       <MetricCard
         icon={EyeIcon}
         tone="success"
-        label="Görüntülenme"
+        label={t("admin.marketing.ads.impressions")}
         value={s.impressions.toLocaleString()}
         loading={isLoading}
       />
       <MetricCard
         icon={ChartBarIcon}
         tone="primary"
-        label="Ortalama CTR"
+        label={t("admin.marketing.ads.averageCtr")}
         value={`${s.ctr}%`}
         loading={isLoading}
       />

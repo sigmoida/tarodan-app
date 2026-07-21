@@ -21,14 +21,15 @@ import { adminKeys } from "@/lib/query/keys";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import {
-  PREDEFINED_PAGES,
-  DEFAULT_CONTENT,
+  predefinedPages,
+  defaultContent,
   buildPreviewDoc,
   pageEditorSchema,
   type PredefinedSlug,
   type StaticPage,
   type EditorForm,
 } from "../_lib/content";
+import { useLocale, useTranslations } from "next-intl";
 
 const EMPTY: EditorForm = {
   title: "",
@@ -59,19 +60,27 @@ export function PageEditorModal({
   existing?: StaticPage;
   onClose: () => void;
 }) {
+  const t = useTranslations();
+  const locale = useLocale();
+  const pages = predefinedPages(t);
+  const defaultsBySlug = defaultContent(t);
   const confirm = useConfirm();
-  const meta = PREDEFINED_PAGES.find((page) => page.slug === slug)!;
+  const meta = pages.find((page) => page.slug === slug)!;
   const defaults = existing
     ? pageToForm(existing)
     : {
         ...EMPTY,
-        title: DEFAULT_CONTENT[slug].title,
-        content: DEFAULT_CONTENT[slug].content,
+        title: defaultsBySlug[slug].title,
+        content: defaultsBySlug[slug].content,
       };
-  const form = useZodForm(pageEditorSchema, { defaultValues: defaults });
+  const form = useZodForm(pageEditorSchema(t), { defaultValues: defaults });
   const [seoOpen, setSeoOpen] = useState(false);
   const [previewHtml, setPreviewHtml] = useState(() =>
-    buildPreviewDoc(defaults.content),
+    buildPreviewDoc(
+      defaults.content,
+      t("admin.marketing.pages.emptyContent"),
+      locale,
+    ),
   );
   const content = form.watch("content");
 
@@ -89,17 +98,24 @@ export function PageEditorModal({
 
   useEffect(() => {
     if (!pageQuery.isError) return;
-    toast.error("Sayfa yüklenemedi");
+    toast.error(t("admin.marketing.pages.loadFailed"));
     onClose();
-  }, [pageQuery.isError, onClose]);
+  }, [pageQuery.isError, onClose, t]);
 
   useEffect(() => {
     const timer = setTimeout(
-      () => setPreviewHtml(buildPreviewDoc(content)),
+      () =>
+        setPreviewHtml(
+          buildPreviewDoc(
+            content,
+            t("admin.marketing.pages.emptyContent"),
+            locale,
+          ),
+        ),
       600,
     );
     return () => clearTimeout(timer);
-  }, [content]);
+  }, [content, locale, t]);
 
   const onTabKey = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key !== "Tab") return;
@@ -124,28 +140,28 @@ export function PageEditorModal({
         : adminApi.createPage({ slug, ...values }),
     {
       invalidates: ["pages"],
-      successMessage: "Sayfa kaydedildi",
-      errorMessage: "Kaydetme başarısız",
+      successMessage: t("admin.marketing.pages.saved"),
+      errorMessage: t("admin.marketing.pages.saveFailed"),
     },
   );
 
   const onReset = async () => {
     const ok = await confirm({
-      title: "Varsayılana Sıfırla",
-      description: `"${meta.title}" sayfasının içeriği varsayılan metinle değiştirilecek. Mevcut içerik kaybolacak. Emin misiniz?`,
-      confirmLabel: "Sıfırla",
+      title: t("admin.marketing.pages.resetTitle"),
+      description: t("admin.marketing.pages.resetConfirm", {
+        title: meta.title,
+      }),
+      confirmLabel: t("common.reset"),
       destructive: true,
     });
     if (!ok) return;
-    const next = DEFAULT_CONTENT[slug];
+    const next = defaultsBySlug[slug];
     form.setValue("title", next.title, { shouldDirty: true });
     form.setValue("content", next.content, {
       shouldDirty: true,
       shouldValidate: true,
     });
-    toast.success(
-      'Varsayılan içerik yüklendi — kaydetmek için "Kaydet" butonuna tıklayın',
-    );
+    toast.success(t("admin.marketing.pages.defaultLoaded"));
   };
 
   return (
@@ -156,7 +172,7 @@ export function PageEditorModal({
       form={form}
       onSubmit={(values) => save.mutate(values)}
       isSubmitting={save.isPending}
-      submitLabel="Kaydet"
+      submitLabel={t("common.save")}
       maxWidth="max-w-2xl"
       modalClassName="max-w-6xl"
       closeOnBackdrop={false}
@@ -165,22 +181,31 @@ export function PageEditorModal({
         <span className="font-mono">{meta.url}</span>
         {existing?.isPublished && (
           <span className="inline-flex items-center gap-1 rounded-full bg-success-500/10 px-2 py-0.5 font-medium text-success-600">
-            <GlobeAltIcon className="h-3 w-3" /> Yayında
+            <GlobeAltIcon className="h-3 w-3" />{" "}
+            {t("admin.marketing.pages.published")}
           </span>
         )}
       </div>
 
       <div className="grid h-[68vh] grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-1">
-          <FormInput name="title" label="Sayfa Başlığı" placeholder="Başlık" />
+          <FormInput
+            name="title"
+            label={t("admin.marketing.pages.pageTitle")}
+            placeholder={t("common.title")}
+          />
 
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="mb-1 flex items-center justify-between">
               <span className="text-xs font-medium text-muted">
-                HTML İçerik
+                {t("admin.marketing.pages.htmlContent")}
               </span>
               <span className="text-xs text-subtle">
-                {content.length > 0 ? `${content.length} karakter` : "Boş"}
+                {content.length > 0
+                  ? t("admin.marketing.pages.characterCount", {
+                      count: content.length,
+                    })
+                  : t("admin.marketing.pages.empty")}
               </span>
             </div>
             <FormTextarea
@@ -192,11 +217,10 @@ export function PageEditorModal({
               autoCorrect="off"
               autoCapitalize="off"
               className="min-h-[300px] flex-1 resize-none rounded-lg border border-border bg-heading p-3 font-mono text-xs leading-relaxed text-inverted"
-              placeholder="HTML içerik yazın. Örnek: <h2>Başlık</h2><p>Paragraf.</p>"
+              placeholder={t("admin.marketing.pages.htmlPlaceholder")}
             />
             <p className="mt-1 text-xs text-subtle">
-              Desteklenen etiketler: h1–h4, p, strong, em, a, ul, ol, li,
-              blockquote, code
+              {t("admin.marketing.pages.supportedTags")}
             </p>
           </div>
 
@@ -207,7 +231,7 @@ export function PageEditorModal({
               onClick={() => setSeoOpen((open) => !open)}
               className="h-auto w-full justify-between px-3 py-2.5 text-xs font-semibold text-muted"
             >
-              <span>SEO Ayarları</span>
+              <span>{t("admin.marketing.pages.seoSettings")}</span>
               <ChevronDownIcon
                 className={`h-4 w-4 transition-transform ${seoOpen ? "rotate-180" : ""}`}
               />
@@ -216,18 +240,20 @@ export function PageEditorModal({
               <div className="space-y-3 border-t border-border p-3">
                 <FormInput
                   name="metaTitle"
-                  label="Meta Başlık"
-                  placeholder="Tarayıcı sekme başlığı"
+                  label={t("admin.marketing.pages.metaTitle")}
+                  placeholder={t("admin.marketing.pages.metaTitlePlaceholder")}
                 />
                 <FormTextarea
                   name="metaDescription"
-                  label="Meta Açıklama"
-                  placeholder="Arama sonuçlarında görünen açıklama (150-160 karakter)"
+                  label={t("admin.marketing.pages.metaDescription")}
+                  placeholder={t(
+                    "admin.marketing.pages.metaDescriptionPlaceholder",
+                  )}
                   rows={2}
                 />
                 <FormInput
                   name="metaKeywords"
-                  label="Anahtar Kelimeler"
+                  label={t("admin.marketing.pages.keywords")}
                   placeholder="kelime1, kelime2, kelime3"
                 />
               </div>
@@ -236,7 +262,7 @@ export function PageEditorModal({
 
           <FormCheckbox
             name="isPublished"
-            label="Yayında — web sitesinde görünür"
+            label={t("admin.marketing.pages.publishedLabel")}
           />
           <Button
             type="button"
@@ -245,23 +271,23 @@ export function PageEditorModal({
             leftIcon={<ArrowPathIcon className="h-4 w-4" />}
             className="self-start border-danger-300 text-danger-600 hover:bg-danger-50"
           >
-            Varsayılana sıfırla
+            {t("admin.marketing.pages.resetTitle")}
           </Button>
         </div>
 
         <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-surface-alt/20">
           <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface-elevated px-4 py-2.5">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted">
-              Önizleme
+              {t("admin.marketing.pages.preview")}
             </span>
             <span className="rounded bg-warning-500/10 px-1.5 py-0.5 text-xs text-warning-700">
-              Canlı
+              {t("admin.marketing.pages.live")}
             </span>
           </div>
           <iframe
             srcDoc={previewHtml}
             className="w-full flex-1 border-0 bg-surface-elevated"
-            title="Sayfa önizlemesi"
+            title={t("admin.marketing.pages.pagePreview")}
             sandbox="allow-same-origin"
           />
         </div>

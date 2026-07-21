@@ -3,16 +3,23 @@ import { col, type RowActionItem } from "@/components/table";
 import { fmtDate } from "@/lib/format";
 import {
   type Discount,
-  SCOPE_LABELS,
+  scopeLabels,
   discountStatusConfig,
   getDiscountStatus,
   discountValueLabel,
 } from "./types";
+import type { useTranslations } from "next-intl";
 
-export function discountColumns(rowMenu: (d: Discount) => RowActionItem[]) {
+type T = ReturnType<typeof useTranslations<never>>;
+
+export function discountColumns(
+  rowMenu: (d: Discount) => RowActionItem[],
+  t: T,
+) {
+  const scopes = scopeLabels(t);
   return [
     col.custom<Discount>(
-      "İndirim",
+      t("admin.marketing.discounts.discount"),
       (d) => (
         <div className="min-w-0">
           <p className="truncate font-medium text-heading">{d.name}</p>
@@ -24,7 +31,7 @@ export function discountColumns(rowMenu: (d: Discount) => RowActionItem[]) {
       { grow: 3, minWidth: 200, sortKey: "name", sortType: "text" },
     ),
     col.custom<Discount>(
-      "Kod",
+      t("admin.marketing.discounts.code"),
       (d) => (
         <div className="flex items-center gap-2">
           {d.code ? (
@@ -32,7 +39,9 @@ export function discountColumns(rowMenu: (d: Discount) => RowActionItem[]) {
               {d.code}
             </code>
           ) : (
-            <span className="text-xs italic text-muted">Otomatik</span>
+            <span className="text-xs italic text-muted">
+              {t("admin.marketing.discounts.automatic")}
+            </span>
           )}
           {d.isFlashSale && (
             <Badge variant="primary" size="sm">
@@ -44,20 +53,20 @@ export function discountColumns(rowMenu: (d: Discount) => RowActionItem[]) {
       { grow: 1, minWidth: 130, sortKey: "code", sortType: "text" },
     ),
     col.custom<Discount>(
-      "Değer",
+      t("admin.marketing.discounts.value"),
       (d) => (
         <span className="font-semibold text-primary">
-          {discountValueLabel(d)}
+          {discountValueLabel(d, t)}
         </span>
       ),
       { grow: 1, minWidth: 130, sortKey: "value", sortType: "number" },
     ),
     col.custom<Discount>(
-      "Kapsam",
+      t("admin.marketing.discounts.scopeLabel"),
       (d) => (
         <div className="min-w-0">
           <Badge variant="info" size="sm">
-            {SCOPE_LABELS[d.scope] ?? d.scope}
+            {scopes[d.scope] ?? d.scope}
           </Badge>
           {d.categoryName && (
             <p className="mt-1 truncate text-xs text-muted">{d.categoryName}</p>
@@ -67,7 +76,7 @@ export function discountColumns(rowMenu: (d: Discount) => RowActionItem[]) {
       { grow: 1, minWidth: 110, sortKey: "scope", sortType: "text" },
     ),
     col.muted<Discount>(
-      "Kullanım",
+      t("admin.marketing.discounts.usage"),
       (d) =>
         d.usageLimitTotal
           ? `${d.usedCount} / ${d.usageLimitTotal}`
@@ -75,14 +84,14 @@ export function discountColumns(rowMenu: (d: Discount) => RowActionItem[]) {
       { sortKey: "usedCount", sortType: "number" },
     ),
     col.muted<Discount>(
-      "Tarih",
+      t("common.date"),
       (d) => `${fmtDate(d.startDate)} – ${fmtDate(d.endDate)}`,
       { sortKey: "startDate", sortType: "date" },
     ),
     col.badge<Discount>(
-      "Durum",
+      t("common.status"),
       (d) => (
-        <Badge status={getDiscountStatus(d)} config={discountStatusConfig} />
+        <Badge status={getDiscountStatus(d)} config={discountStatusConfig(t)} />
       ),
       { sortKey: "isActive", sortType: "number" },
     ),
