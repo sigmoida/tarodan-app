@@ -56,13 +56,15 @@ export function SortableHeader({
       onClick={() => onSort(sortKey, sortType)}
       aria-label={typeof children === "string" ? children : undefined}
       className={cn(
-        "group h-auto max-w-full gap-1 rounded bg-transparent px-1 -mx-1 py-0.5 font-semibold hover:bg-transparent",
+        "group h-auto gap-1 rounded bg-transparent px-1 -mx-1 py-0.5 font-semibold hover:bg-transparent",
         // Right-aligned columns keep the arrow visually leading the number block.
         align === "right" && "flex-row-reverse",
         active ? "text-heading" : "text-body hover:text-heading",
       )}
     >
-      <span className="truncate">{children}</span>
+      {/* Headers never truncate — the column's header-aware min-width guarantees
+          room, so we keep them on one line without an ellipsis. */}
+      <span className="whitespace-nowrap">{children}</span>
       <Arrow
         aria-hidden="true"
         className={cn(

@@ -172,7 +172,12 @@ export function DataTable<T>({
                   const canSort = !!onSort && meta?.sortable && !!meta.sortKey;
                   const isActive = canSort && sort?.sortBy === meta.sortKey;
                   return (
-                    <TableHead key={h.id} className={alignOf(meta?.align)}>
+                    <TableHead
+                      key={h.id}
+                      className={["whitespace-nowrap", alignOf(meta?.align)]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
                       {h.isPlaceholder ? null : canSort ? (
                         <SortableHeader
                           sortKey={meta.sortKey!}
