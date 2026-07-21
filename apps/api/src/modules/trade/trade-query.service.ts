@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { TradeStatus, Prisma } from "@prisma/client";
+import { resolveOrderBy } from "../../common/list";
 import { TradeCommonService } from "./trade-common.service";
 import { i18nMessage } from "../i18n";
 import { TradeQueryDto, TradeResponseDto, TradeListResponseDto } from "./dto";
@@ -111,9 +112,17 @@ export class TradeQueryService {
       role,
       page = 1,
       pageSize = 20,
-      sortBy = "createdAt",
-      sortOrder = "desc",
+      sortBy,
+      sortOrder,
     } = query;
+
+    // Validate sortBy/sortOrder against the DMMF so a bad key falls back to the
+    // default sort instead of reaching Prisma as a raw orderBy → 500 (#402).
+    const orderBy = resolveOrderBy<Prisma.TradeOrderByWithRelationInput>(
+      "Trade",
+      { sortBy, sortOrder },
+      { defaultSort: { createdAt: "desc" } },
+    );
 
     const where: Prisma.TradeWhereInput = {};
 
@@ -155,7 +164,7 @@ export class TradeQueryService {
           cashPayment: true,
           dispute: true,
         },
-        orderBy: { [sortBy]: sortOrder },
+        orderBy,
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),

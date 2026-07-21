@@ -56,7 +56,7 @@ export const elogoColumns = (t: T) => [
   col.custom<Invoice>(
     t("common.amount"),
     (i) => (
-      <div className="whitespace-nowrap text-sm">
+      <div className="whitespace-nowrap text-sm tabular-nums">
         <p className="font-medium text-heading">{fmtTry(i.total)}</p>
         <p className="text-xs text-muted">
           {t("admin.finance.common.vat")}: {fmtTry(i.taxAmount)}

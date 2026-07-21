@@ -78,7 +78,9 @@ export function buildErrorColumns(toggle: Toggle) {
           {r.metadata?.ip && <div>{r.metadata.ip}</div>}
         </div>
       ),
-      { sortKey: "metadata.status", sortType: "number" },
+      // `metadata` is a Json column — Prisma can't orderBy a dotted JSON path, so
+      // sorting here is a silent no-op; keep it explicitly non-sortable (#402).
+      { sortable: false },
     ),
     col.muted<ErrorLog>("Kaynak", "source"),
     col.date<ErrorLog>("Tarih", "createdAt"),

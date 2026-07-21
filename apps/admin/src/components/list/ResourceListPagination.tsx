@@ -18,32 +18,35 @@ export function ResourceListPagination() {
   const t = useTranslations();
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-muted">
-          {t("admin.shared.pagination.rowsPerPage")}
-        </span>
-        <Select
-          bare
-          selectSize="sm"
-          value={String(pageSize)}
-          onChange={(e) => setPageSize(Number(e.target.value))}
-          options={SIZE_OPTIONS}
-        />
-      </div>
-      {totalPages > 1 && (
-        <div className="flex items-center gap-4">
-          <p className="text-sm text-muted">
-            {t("admin.shared.pagination.pageInfo", { page, totalPages })}
-          </p>
-          <Pagination
-            page={page}
-            pageSize={pageSize}
-            total={total}
-            onPageChange={setPage}
+    <div className="overflow-x-auto">
+      <div className="flex min-w-max items-center justify-between gap-6">
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="whitespace-nowrap text-sm text-muted">
+            {t("admin.shared.pagination.rowsPerPage")}
+          </span>
+          <Select
+            bare
+            selectSize="sm"
+            className="w-28 shrink-0"
+            value={String(pageSize)}
+            onChange={(e) => setPageSize(Number(e.target.value))}
+            options={SIZE_OPTIONS}
           />
         </div>
-      )}
+        {totalPages > 1 && (
+          <div className="flex shrink-0 items-center gap-4">
+            <p className="whitespace-nowrap text-sm text-muted">
+              {t("admin.shared.pagination.pageInfo", { page, totalPages })}
+            </p>
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={total}
+              onPageChange={setPage}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
