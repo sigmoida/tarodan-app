@@ -120,13 +120,22 @@ function base<T>(
   const sortable =
     type !== "actions" && sortKey != null && opts.sortable !== false;
   const sortType = sortable ? (opts.sortType ?? SORT_TYPE[type]) : undefined;
+  // Header-aware min-width: a column is never narrower than its header. When the
+  // header (a string) needs more room than the configured `minWidth`, we widen
+  // to fit it (≈8px/char at text-sm semibold + cell padding + sort-arrow room);
+  // otherwise the configured `minWidth` wins. This keeps headers from clipping.
+  const configuredMin = opts.minWidth ?? d.minWidth;
+  const headerMin =
+    typeof header === "string" && header
+      ? Math.ceil(header.length * 8) + (sortable ? 56 : 40)
+      : 0;
   return {
     id,
     header: () => header,
     cell: ({ row }: { row: Row<T> }) => cell(row.original),
     meta: {
       align: opts.align ?? d.align,
-      minWidth: opts.minWidth ?? d.minWidth,
+      minWidth: Math.max(configuredMin, headerMin),
       grow: opts.grow ?? d.grow,
       ...(sortable ? { sortKey, sortable, sortType } : {}),
     },
