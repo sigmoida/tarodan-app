@@ -1,26 +1,39 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { RocketLaunchIcon } from "@heroicons/react/24/outline";
-import { Button, Input } from "@tarodan/ui";
-import { useLocale, useTranslations } from "next-intl";
+import { Logo } from "@tarodan/ui/logo";
+import { useTranslations } from "next-intl";
 import StatusScreen from "../_components/StatusScreen";
 import SocialLinks from "../_components/SocialLinks";
+import PinForm from "./_components/PinForm";
+
+/**
+ * Fixed launch target: 2026-08-03 00:00 Europe/Istanbul (UTC+03, no DST since
+ * 2016). Kept as a compile-time constant so both server render and client tick
+ * agree without any Date parsing quirks.
+ */
+const LAUNCH_TARGET_MS = new Date("2026-08-03T00:00:00+03:00").getTime();
 
 function Countdown() {
-  const [diff, setDiff] = useState(() => {
-    const target = new Date();
-    target.setDate(target.getDate() + 30);
-    return Math.max(0, target.getTime() - Date.now());
-  });
+  const [diff, setDiff] = useState(() =>
+    Math.max(0, LAUNCH_TARGET_MS - Date.now()),
+  );
 
   useEffect(() => {
-    const interval = setInterval(
-      () => setDiff((d) => Math.max(0, d - 1000)),
-      1000,
-    );
+    const interval = setInterval(() => {
+      setDiff(Math.max(0, LAUNCH_TARGET_MS - Date.now()));
+    }, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  const t = useTranslations();
+  if (diff <= 0) {
+    return (
+      <p className="text-lg font-semibold text-primary-600">
+        {t("utility.comingSoon.launching")}
+      </p>
+    );
+  }
 
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
@@ -51,18 +64,10 @@ function Countdown() {
 
 export default function ComingSoonPage() {
   const t = useTranslations();
-  const [email, setEmail] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (email.trim()) setSubmitted(true);
-  };
 
   return (
     <StatusScreen
-      icon={RocketLaunchIcon}
-      tone="primary"
+      logo={<Logo className="mx-auto h-16 w-auto" />}
       title={t("utility.comingSoon.title")}
       description={t("utility.comingSoon.subtitle")}
     >
@@ -73,28 +78,7 @@ export default function ComingSoonPage() {
         <Countdown />
       </div>
 
-      {!submitted ? (
-        <form
-          onSubmit={handleSubmit}
-          className="mb-8 flex flex-col gap-2 sm:flex-row"
-        >
-          <Input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder={t("utility.comingSoon.emailPlaceholder")}
-            required
-            className="flex-1"
-          />
-          <Button variant="primary" type="submit">
-            {t("utility.comingSoon.notifyMe")}
-          </Button>
-        </form>
-      ) : (
-        <p className="mb-8 text-success-600">
-          Teşekkürler! Açılışta sizi haberdar edeceğiz.
-        </p>
-      )}
+      <PinForm />
 
       <SocialLinks title={t("utility.comingSoon.socialTitle")} />
     </StatusScreen>
