@@ -25,6 +25,7 @@ import SellerActions from "./_sections/SellerActions";
 import PaymentSection from "./_sections/PaymentSection";
 import EscrowInfoCard from "./_sections/EscrowInfoCard";
 import ReviewCta from "./_sections/ReviewCta";
+import ReviewSummary from "./_sections/ReviewSummary";
 import RefundActions from "./_sections/RefundActions";
 import OrderSummaryCard from "./_sections/OrderSummaryCard";
 import PartyCard from "./_sections/PartyCard";
@@ -132,6 +133,7 @@ export default function OrderDetailPage() {
           <PaymentSection order={order} />
           <EscrowInfoCard order={order} />
           <ReviewCta order={order} onReview={() => setShowReviewModal(true)} />
+          <ReviewSummary order={order} />
           <RefundActions order={order} onRequestRefund={handleRefund} />
         </div>
 

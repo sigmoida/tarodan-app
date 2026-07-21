@@ -22,6 +22,64 @@ export class OrderQueryService {
   ) {}
 
   /**
+   * The buyer's own submitted review for an order — product rating + seller
+   * rating content. Powers the read-only "Değerlendirmeni Gör" view so a
+   * reviewed order shows what was submitted instead of re-opening the form.
+   */
+  async getOrderReview(orderId: string, userId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, buyerId: true, sellerId: true },
+    });
+    if (!order) {
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
+    }
+    if (order.buyerId !== userId) {
+      throw new ForbiddenException(i18nMessage("server.order.viewForbidden"));
+    }
+
+    const [productRating, sellerRating] = await Promise.all([
+      this.prisma.productRating.findFirst({
+        where: { orderId, userId },
+        select: {
+          score: true,
+          title: true,
+          review: true,
+          images: true,
+          createdAt: true,
+        },
+      }),
+      order.sellerId
+        ? this.prisma.rating.findFirst({
+            where: { orderId, giverId: userId, receiverId: order.sellerId },
+            select: { score: true, comment: true, createdAt: true },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    return {
+      product: productRating
+        ? {
+            score: productRating.score,
+            title: productRating.title,
+            review: productRating.review,
+            images: (productRating.images ?? [])
+              .map((img) => this.orderCommon.resolveProductImageUrl(img) ?? img)
+              .filter(Boolean),
+            createdAt: productRating.createdAt,
+          }
+        : null,
+      seller: sellerRating
+        ? {
+            score: sellerRating.score,
+            comment: sellerRating.comment,
+            createdAt: sellerRating.createdAt,
+          }
+        : null,
+    };
+  }
+
+  /**
    * Track guest order by order number and email
    * Requirement: Guest checkout (requirements.txt)
    */

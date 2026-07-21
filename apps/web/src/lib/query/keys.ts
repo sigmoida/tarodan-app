@@ -131,6 +131,7 @@ export const queryKeys = {
     detail: () => ["order"] as const,
     elogoInvoice: (id: string) => ["order", id, "elogo-invoice"] as const,
     sellerInvoice: (id: string) => ["order", id, "seller-invoice"] as const,
+    myReview: (id: string) => ["order", id, "my-review"] as const,
   },
   trades: {
     all: () => ["trades"] as const,

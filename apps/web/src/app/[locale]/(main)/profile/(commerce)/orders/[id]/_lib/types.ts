@@ -183,11 +183,18 @@ export const isMembershipOrder = (o: OrderDetail): boolean =>
 
 export const REVIEWABLE_STATUSES = ["completed", "delivered"];
 
+// Review-once: a delivered order is reviewable until the buyer has rated the
+// product. After that the CTA is replaced by the read-only "Değerlendirmeni Gör"
+// summary (ReviewSummary) — the product is never re-rated.
 export const canReview = (o: OrderDetail): boolean =>
   o.isBuyer &&
   !isMembershipOrder(o) &&
   REVIEWABLE_STATUSES.includes(o.status) &&
-  (o.hasProductRating === false || o.hasSellerRating === false);
+  o.hasProductRating === false;
+
+/** Whether to show the read-only submitted-review summary. */
+export const hasReviewed = (o: OrderDetail): boolean =>
+  o.isBuyer && !isMembershipOrder(o) && o.hasProductRating === true;
 
 // Kargo öncesi = iptal (anında geri ödeme), kargo sonrası = iade akışı.
 // shipment yoksa veya yalnızca pending ise henüz kargolanmamış sayılır.
