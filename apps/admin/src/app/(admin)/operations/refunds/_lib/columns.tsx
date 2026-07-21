@@ -1,3 +1,4 @@
+import { enumLabel, refundReasonConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { col, type RowActionItem } from "@/components/table";
 
@@ -11,6 +12,8 @@ export interface Refund {
   order: {
     id: string;
     orderNumber: string;
+    commissionAmount?: number;
+    reason?: string | null;
     buyer: { id: string; displayName: string; email: string };
     seller: { id: string; displayName: string; email: string };
     product: { id: string; title: string };
@@ -36,6 +39,15 @@ export function refundColumns(t: T, rowMenu: (r: Refund) => RowActionItem[]) {
     col.money<Refund>(t("common.amount"), "amount", {
       tone: "negative",
     }),
+    col.money<Refund>(
+      t("admin.operations.orders.commission"),
+      (r) => r.order?.commissionAmount,
+    ),
+    col.text<Refund>(t("admin.operations.refundRequests.reason"), (r) =>
+      r.order?.reason
+        ? enumLabel(refundReasonConfig, r.order.reason, r.order.reason)
+        : null,
+    ),
     col.user<Refund>(
       t("admin.operations.common.buyer"),
       (r) =>
