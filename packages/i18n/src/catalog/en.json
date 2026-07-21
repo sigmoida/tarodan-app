@@ -2670,6 +2670,9 @@
       "categories": {
         "title": "Categories",
         "subtitle": "Category list and management",
+        "activeProducts": "Active",
+        "passiveProducts": "Passive",
+        "pendingProducts": "Pending",
         "new": "New Category",
         "loadError": "Failed to load categories",
         "empty": "No categories yet",

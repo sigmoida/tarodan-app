@@ -128,6 +128,24 @@ export class AdminCatalogService {
       query,
     );
 
+    // Per-category product counts split by status (active / inactive / pending),
+    // aggregated in one groupBy for the page's categories. Prisma's `_count` is
+    // unfiltered, so status splits need this separate query.
+    const catIds = result.data.map((c) => c.id);
+    const statusCounts = catIds.length
+      ? await this.prisma.product.groupBy({
+          by: ["categoryId", "status"],
+          where: {
+            categoryId: { in: catIds },
+            status: { in: ["active", "inactive", "pending"] as any },
+          },
+          _count: { _all: true },
+        })
+      : [];
+    const countFor = (catId: string, status: string) =>
+      statusCounts.find((g) => g.categoryId === catId && g.status === status)
+        ?._count._all ?? 0;
+
     const data = result.data.map((c) => ({
       id: c.id,
       name: c.name,
@@ -143,6 +161,9 @@ export class AdminCatalogService {
       sortOrder: c.sortOrder,
       isActive: c.isActive,
       productCount: c._count.products,
+      activeProducts: countFor(c.id, "active"),
+      passiveProducts: countFor(c.id, "inactive"),
+      pendingProducts: countFor(c.id, "pending"),
       collectionCount: c._count.collections,
       createdAt: c.createdAt,
     }));

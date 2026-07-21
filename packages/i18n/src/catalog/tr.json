@@ -2670,6 +2670,9 @@
       "categories": {
         "title": "Kategoriler",
         "subtitle": "Kategori listesi ve yönetimi",
+        "activeProducts": "Aktif Ürün",
+        "passiveProducts": "Pasif Ürün",
+        "pendingProducts": "Onay Aşamasında",
         "new": "Yeni Kategori",
         "loadError": "Kategoriler yüklenemedi",
         "empty": "Henüz kategori yok",
