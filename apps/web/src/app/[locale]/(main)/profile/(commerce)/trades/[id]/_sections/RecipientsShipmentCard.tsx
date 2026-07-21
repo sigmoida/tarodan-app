@@ -44,14 +44,15 @@ export default function RecipientsShipmentCard({
             {myFromWarehouseShipment.carrier === "surat"
               ? "Sürat Kargo"
               : myFromWarehouseShipment.carrier || "—"}
-            {myFromWarehouseShipment.trackingNumber
-              ? ` · ${myFromWarehouseShipment.trackingNumber}`
+            {(myFromWarehouseShipment.cargoCode ??
+            myFromWarehouseShipment.trackingNumber)
+              ? ` · ${myFromWarehouseShipment.cargoCode ?? myFromWarehouseShipment.trackingNumber}`
               : ""}
           </p>
           {myFromWarehouseShipment.carrier === "surat" &&
-            myFromWarehouseShipment.trackingNumber && (
+            myFromWarehouseShipment.cargoCode && (
               <a
-                href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(myFromWarehouseShipment.trackingNumber)}`}
+                href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(myFromWarehouseShipment.cargoCode)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 mt-2 text-sm text-primary-600 hover:text-primary-700 font-medium"
@@ -76,8 +77,9 @@ export default function RecipientsShipmentCard({
             {otherFromWarehouseShipment.carrier === "surat"
               ? "Sürat Kargo"
               : otherFromWarehouseShipment.carrier || "—"}
-            {otherFromWarehouseShipment.trackingNumber
-              ? ` · ${otherFromWarehouseShipment.trackingNumber}`
+            {(otherFromWarehouseShipment.cargoCode ??
+            otherFromWarehouseShipment.trackingNumber)
+              ? ` · ${otherFromWarehouseShipment.cargoCode ?? otherFromWarehouseShipment.trackingNumber}`
               : ""}
           </p>
         </div>

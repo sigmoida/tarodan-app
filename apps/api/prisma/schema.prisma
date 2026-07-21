@@ -644,7 +644,12 @@ model TradeShipment {
   // Nullable: kabulde depo etiketi otomatik oluşur (adres henüz yok), kullanıcı kargoya verirken set edilir
   fromAddressId   String?              @map("from_address_id")
   carrier         String
+  // trackingNumber = OzelKargoTakipNo (bizim ref; poller bununla sorgular).
   trackingNumber  String?              @map("tracking_number")
+  // Gerçek Sürat kargo kodu (KargoTakipNo) + ZPL etiket (OrtakBarkodOlustur ile
+  // takas onaylanınca anında oluşur; UI'da providerTrackingId gösterilir).
+  providerTrackingId String?           @map("provider_tracking_id")
+  labelZpl        String?              @map("label_zpl")
   status          ShipmentStatus       @default(pending)
   shippedAt       DateTime?            @map("shipped_at")
   deliveredAt     DateTime?            @map("delivered_at")
