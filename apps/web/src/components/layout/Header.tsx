@@ -69,7 +69,7 @@ export default function Header() {
         {/* Main bar */}
         <div className="bg-primary-500 border-b border-primary-600 shadow-sm">
           <Container>
-            <div className="flex items-center gap-4 h-14 lg:h-16 max-h-14 lg:max-h-16 min-h-0">
+            <div className="flex items-center gap-2 sm:gap-4 h-14 lg:h-16 max-h-14 lg:max-h-16 min-h-0">
               {/* Logo */}
               <Link
                 href="/"
@@ -80,7 +80,7 @@ export default function Header() {
                   alt="Tarodan Logo"
                   width={120}
                   height={38}
-                  className="object-contain max-h-8 w-auto"
+                  className="object-contain max-h-8 w-auto max-w-[104px] sm:max-w-none"
                   priority
                 />
               </Link>
