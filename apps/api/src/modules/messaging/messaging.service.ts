@@ -5,14 +5,14 @@ import {
   ForbiddenException,
   Optional,
   Logger,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { StorageService } from '../storage/storage.service';
-import { ContentFilterService } from './content-filter.service';
-import { NotificationService } from '../notification/notification.service';
-import { NotificationType } from '../notification/dto';
-import { RealtimeService } from '../websocket/realtime.service';
-import { MessageStatus, Prisma } from '@prisma/client';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { StorageService } from "../storage/storage.service";
+import { ContentFilterService } from "./content-filter.service";
+import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto";
+import { RealtimeService } from "../websocket/realtime.service";
+import { MessageStatus, Prisma } from "@prisma/client";
 import {
   CreateThreadDto,
   SendMessageDto,
@@ -24,7 +24,7 @@ import {
   ThreadListResponseDto,
   MessageListResponseDto,
   PendingMessagesResponseDto,
-} from './dto';
+} from "./dto";
 
 // Daily message limit - now read from platform settings (default: 50)
 
@@ -41,17 +41,27 @@ export class MessagingService {
     private readonly realtime: RealtimeService,
   ) {}
 
-  private async resolveAvatarUrl(avatarUrl: string | null | undefined): Promise<string | null> {
+  private async resolveAvatarUrl(
+    avatarUrl: string | null | undefined,
+  ): Promise<string | null> {
     if (!avatarUrl) return null;
-    if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) return avatarUrl;
+    if (avatarUrl.startsWith("http://") || avatarUrl.startsWith("https://"))
+      return avatarUrl;
     // avatars S3'te public-read → cache'lenebilir doğrudan URL (presigned'a gerek yok)
     return this.storageService?.getPublicAssetUrl(avatarUrl) ?? null;
   }
 
-  private resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
+  private resolveProductImageUrl(
+    imageKeyOrUrl: string | null | undefined,
+  ): string | null {
     if (!imageKeyOrUrl) return null;
-    if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
-    if (imageKeyOrUrl.includes('dev/') || imageKeyOrUrl.includes('prod/')) {
+    if (
+      imageKeyOrUrl.startsWith("http://") ||
+      imageKeyOrUrl.startsWith("https://") ||
+      imageKeyOrUrl.startsWith("/")
+    )
+      return imageKeyOrUrl;
+    if (imageKeyOrUrl.includes("dev/") || imageKeyOrUrl.includes("prod/")) {
       return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
     }
     return null;
@@ -68,12 +78,14 @@ export class MessagingService {
     const recipientId = dto.getRecipientId();
 
     if (!recipientId) {
-      throw new BadRequestException('Alıcı kullanıcı ID gereklidir (recipientId veya participantId)');
+      throw new BadRequestException(
+        "Alıcı kullanıcı ID gereklidir (recipientId veya participantId)",
+      );
     }
 
     // Cannot message yourself
     if (senderId === recipientId) {
-      throw new BadRequestException('Kendinize mesaj gönderemezsiniz');
+      throw new BadRequestException("Kendinize mesaj gönderemezsiniz");
     }
 
     // Verify recipient exists
@@ -82,7 +94,7 @@ export class MessagingService {
     });
 
     if (!recipient) {
-      throw new NotFoundException('Alıcı kullanıcı bulunamadı');
+      throw new NotFoundException("Alıcı kullanıcı bulunamadı");
     }
 
     // Verify product if provided
@@ -92,26 +104,32 @@ export class MessagingService {
       });
 
       if (!product) {
-        throw new NotFoundException('Ürün bulunamadı');
+        throw new NotFoundException("Ürün bulunamadı");
       }
     }
 
     // Normalize participant IDs (always store smaller ID first)
     const [participant1Id, participant2Id] = [senderId, recipientId].sort();
 
-    // Check if thread already exists
+    // One thread per participant pair (Scenario B) — the product is only a
+    // per-message / latest-context hint, never part of the thread identity.
     let thread = await this.prisma.messageThread.findFirst({
-      where: {
-        participant1Id,
-        participant2Id,
-        productId: dto.productId || null,
-      },
+      where: { participant1Id, participant2Id },
     });
 
     if (thread) {
-      // Thread exists, send message if provided
+      // Thread exists: send the message (carrying product context) if provided.
       if (dto.message) {
-        await this.sendMessage(thread.id, senderId, { content: dto.message });
+        await this.sendMessage(thread.id, senderId, {
+          content: dto.message,
+          productId: dto.productId,
+        });
+      } else if (dto.productId) {
+        // No message but a product was opened → keep it as the latest context.
+        await this.prisma.messageThread.update({
+          where: { id: thread.id },
+          data: { productId: dto.productId },
+        });
       }
       return this.getThreadById(thread.id, senderId);
     }
@@ -125,9 +143,12 @@ export class MessagingService {
       },
     });
 
-    // Send first message if provided
+    // Send first message if provided (with product context).
     if (dto.message) {
-      await this.sendMessage(thread.id, senderId, { content: dto.message });
+      await this.sendMessage(thread.id, senderId, {
+        content: dto.message,
+        productId: dto.productId,
+      });
     }
 
     return this.getThreadById(thread.id, senderId);
@@ -143,7 +164,7 @@ export class MessagingService {
   ): Promise<MessageResponseDto> {
     // Check message length from platform settings
     const maxLengthSetting = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: 'max_message_length' },
+      where: { settingKey: "max_message_length" },
     });
     const maxLength = maxLengthSetting?.settingValue
       ? parseInt(maxLengthSetting.settingValue, 10)
@@ -151,7 +172,7 @@ export class MessagingService {
 
     if (dto.content.length > maxLength) {
       throw new BadRequestException(
-        `Mesaj uzunluğu maksimum ${maxLength} karakter olabilir. Mevcut uzunluk: ${dto.content.length}`
+        `Mesaj uzunluğu maksimum ${maxLength} karakter olabilir. Mevcut uzunluk: ${dto.content.length}`,
       );
     }
 
@@ -161,26 +182,32 @@ export class MessagingService {
       include: {
         messages: {
           take: 1,
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
         },
       },
     });
 
     if (!thread) {
-      throw new NotFoundException('Mesaj konusu bulunamadı');
+      throw new NotFoundException("Mesaj konusu bulunamadı");
     }
 
-    if (thread.participant1Id !== senderId && thread.participant2Id !== senderId) {
-      throw new ForbiddenException('Bu konuya mesaj gönderme yetkiniz yok');
+    if (
+      thread.participant1Id !== senderId &&
+      thread.participant2Id !== senderId
+    ) {
+      throw new ForbiddenException("Bu konuya mesaj gönderme yetkiniz yok");
     }
 
     // Determine receiver
-    const receiverId = thread.participant1Id === senderId
-      ? thread.participant2Id
-      : thread.participant1Id;
+    const receiverId =
+      thread.participant1Id === senderId
+        ? thread.participant2Id
+        : thread.participant1Id;
 
     // Apply content filtering
-    const filterResult = await this.contentFilterService.moderateWithAI(dto.content);
+    const filterResult = await this.contentFilterService.moderateWithAI(
+      dto.content,
+    );
 
     // Determine message status based on filter result
     let status: MessageStatus;
@@ -199,8 +226,11 @@ export class MessagingService {
         threadId,
         senderId,
         receiverId,
+        productId: dto.productId || null,
         content: dto.content,
-        filteredContent: filterResult.isClean ? null : filterResult.filteredContent,
+        filteredContent: filterResult.isClean
+          ? null
+          : filterResult.filteredContent,
         status,
         flaggedReason: filterResult.flaggedReason,
       },
@@ -210,26 +240,31 @@ export class MessagingService {
       },
     });
 
-    // Update thread last message time
+    // Update thread last message time; when the message carries a product
+    // context, it also becomes the thread's most-recently discussed product.
     await this.prisma.messageThread.update({
       where: { id: threadId },
-      data: { lastMessageAt: new Date() },
+      data: {
+        lastMessageAt: new Date(),
+        ...(dto.productId ? { productId: dto.productId } : {}),
+      },
     });
 
     // Send notification to receiver about new message
     if (status === MessageStatus.sent) {
       try {
         // Get short preview of message (first 50 chars)
-        const messagePreview = dto.content.length > 50
-          ? dto.content.substring(0, 50) + '...'
-          : dto.content;
+        const messagePreview =
+          dto.content.length > 50
+            ? dto.content.substring(0, 50) + "..."
+            : dto.content;
 
         await this.notificationService.createInAppNotification(
           receiverId,
           NotificationType.NEW_MESSAGE,
           {
             threadId,
-            senderName: message.sender?.displayName || 'Bir kullanıcı',
+            senderName: message.sender?.displayName || "Bir kullanıcı",
             messagePreview,
           },
         );
@@ -247,7 +282,7 @@ export class MessagingService {
           },
         );
       } catch (error) {
-        this.logger.error('Failed to send message notification:', error);
+        this.logger.error("Failed to send message notification:", error);
       }
     }
 
@@ -264,10 +299,7 @@ export class MessagingService {
     const { page = 1, pageSize = 20 } = query;
 
     const where: Prisma.MessageThreadWhereInput = {
-      OR: [
-        { participant1Id: userId },
-        { participant2Id: userId },
-      ],
+      OR: [{ participant1Id: userId }, { participant2Id: userId }],
     };
 
     const [threads, total] = await Promise.all([
@@ -276,17 +308,19 @@ export class MessagingService {
         include: {
           messages: {
             take: 1,
-            orderBy: { createdAt: 'desc' },
+            orderBy: { createdAt: "desc" },
             // Reddedilmiş/onay bekleyen mesajları önizlemeye yansıtma — detay
             // ekranı da bunları gizliyor (bkz. getThreadMessages); tutarlı olsun.
-            where: { status: { in: [MessageStatus.sent, MessageStatus.approved] } },
+            where: {
+              status: { in: [MessageStatus.sent, MessageStatus.approved] },
+            },
             include: {
               sender: { select: { id: true, displayName: true } },
               receiver: { select: { id: true, displayName: true } },
             },
           },
         },
-        orderBy: { lastMessageAt: 'desc' },
+        orderBy: { lastMessageAt: "desc" },
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -296,44 +330,51 @@ export class MessagingService {
     // Get participant info and unread counts
     const threadDtos: MessageThreadResponseDto[] = await Promise.all(
       threads.map(async (thread) => {
-        const [participant1, participant2, product, unreadCount] = await Promise.all([
-          this.prisma.user.findUnique({
-            where: { id: thread.participant1Id },
-            select: { id: true, displayName: true, avatarUrl: true },
-          }),
-          this.prisma.user.findUnique({
-            where: { id: thread.participant2Id },
-            select: { id: true, displayName: true, avatarUrl: true },
-          }),
-          thread.productId
-            ? this.prisma.product.findUnique({
-                where: { id: thread.productId },
-                select: { id: true, title: true, images: { take: 1 } },
-              })
-            : null,
-          this.prisma.message.count({
-            where: {
-              threadId: thread.id,
-              receiverId: userId,
-              readAt: null,
-              status: { in: [MessageStatus.sent, MessageStatus.approved] },
-            },
-          }),
-        ]);
+        const [participant1, participant2, product, unreadCount] =
+          await Promise.all([
+            this.prisma.user.findUnique({
+              where: { id: thread.participant1Id },
+              select: { id: true, displayName: true, avatarUrl: true },
+            }),
+            this.prisma.user.findUnique({
+              where: { id: thread.participant2Id },
+              select: { id: true, displayName: true, avatarUrl: true },
+            }),
+            thread.productId
+              ? this.prisma.product.findUnique({
+                  where: { id: thread.productId },
+                  select: { id: true, title: true, images: { take: 1 } },
+                })
+              : null,
+            this.prisma.message.count({
+              where: {
+                threadId: thread.id,
+                receiverId: userId,
+                readAt: null,
+                status: { in: [MessageStatus.sent, MessageStatus.approved] },
+              },
+            }),
+          ]);
 
         const lastMessage = thread.messages[0];
 
         return {
           id: thread.id,
           participant1Id: thread.participant1Id,
-          participant1Name: participant1?.displayName || '',
-          participant1AvatarUrl: await this.resolveAvatarUrl(participant1?.avatarUrl),
+          participant1Name: participant1?.displayName || "",
+          participant1AvatarUrl: await this.resolveAvatarUrl(
+            participant1?.avatarUrl,
+          ),
           participant2Id: thread.participant2Id,
-          participant2Name: participant2?.displayName || '',
-          participant2AvatarUrl: await this.resolveAvatarUrl(participant2?.avatarUrl),
+          participant2Name: participant2?.displayName || "",
+          participant2AvatarUrl: await this.resolveAvatarUrl(
+            participant2?.avatarUrl,
+          ),
           productId: thread.productId || undefined,
           productTitle: product?.title,
-          productImage: this.resolveProductImageUrl(product?.images?.[0]?.cardKey),
+          productImage: this.resolveProductImageUrl(
+            product?.images?.[0]?.cardKey,
+          ),
           lastMessage: lastMessage
             ? this.mapMessageToDto(lastMessage)
             : undefined,
@@ -380,11 +421,11 @@ export class MessagingService {
     });
 
     if (!thread) {
-      throw new NotFoundException('Mesaj konusu bulunamadı');
+      throw new NotFoundException("Mesaj konusu bulunamadı");
     }
 
     if (thread.participant1Id !== userId && thread.participant2Id !== userId) {
-      throw new ForbiddenException('Bu konuyu görüntüleme yetkiniz yok');
+      throw new ForbiddenException("Bu konuyu görüntüleme yetkiniz yok");
     }
 
     const [participant1, participant2, product, lastMessage, unreadCount] =
@@ -405,7 +446,7 @@ export class MessagingService {
           : null,
         this.prisma.message.findFirst({
           where: { threadId },
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           include: {
             sender: { select: { id: true, displayName: true } },
             receiver: { select: { id: true, displayName: true } },
@@ -424,17 +465,19 @@ export class MessagingService {
     return {
       id: thread.id,
       participant1Id: thread.participant1Id,
-      participant1Name: participant1?.displayName || '',
-      participant1AvatarUrl: await this.resolveAvatarUrl(participant1?.avatarUrl),
+      participant1Name: participant1?.displayName || "",
+      participant1AvatarUrl: await this.resolveAvatarUrl(
+        participant1?.avatarUrl,
+      ),
       participant2Id: thread.participant2Id,
-      participant2Name: participant2?.displayName || '',
-      participant2AvatarUrl: await this.resolveAvatarUrl(participant2?.avatarUrl),
+      participant2Name: participant2?.displayName || "",
+      participant2AvatarUrl: await this.resolveAvatarUrl(
+        participant2?.avatarUrl,
+      ),
       productId: thread.productId || undefined,
       productTitle: product?.title,
       productImage: this.resolveProductImageUrl(product?.images?.[0]?.cardKey),
-      lastMessage: lastMessage
-        ? this.mapMessageToDto(lastMessage)
-        : undefined,
+      lastMessage: lastMessage ? this.mapMessageToDto(lastMessage) : undefined,
       unreadCount,
       lastMessageAt: thread.lastMessageAt,
       createdAt: thread.createdAt,
@@ -457,11 +500,11 @@ export class MessagingService {
     });
 
     if (!thread) {
-      throw new NotFoundException('Mesaj konusu bulunamadı');
+      throw new NotFoundException("Mesaj konusu bulunamadı");
     }
 
     if (thread.participant1Id !== userId && thread.participant2Id !== userId) {
-      throw new ForbiddenException('Bu konuyu görüntüleme yetkiniz yok');
+      throw new ForbiddenException("Bu konuyu görüntüleme yetkiniz yok");
     }
 
     const where: Prisma.MessageWhereInput = {
@@ -480,7 +523,7 @@ export class MessagingService {
           sender: { select: { id: true, displayName: true } },
           receiver: { select: { id: true, displayName: true } },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -533,7 +576,7 @@ export class MessagingService {
           sender: { select: { id: true, displayName: true } },
           receiver: { select: { id: true, displayName: true } },
         },
-        orderBy: { createdAt: 'asc' },
+        orderBy: { createdAt: "asc" },
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -545,11 +588,11 @@ export class MessagingService {
         id: m.id,
         threadId: m.threadId,
         senderId: m.senderId,
-        senderName: (m as any).sender?.displayName || '',
+        senderName: (m as any).sender?.displayName || "",
         receiverId: m.receiverId,
-        receiverName: (m as any).receiver?.displayName || '',
+        receiverName: (m as any).receiver?.displayName || "",
         originalContent: m.content,
-        flaggedReason: m.flaggedReason || 'Bilinmeyen',
+        flaggedReason: m.flaggedReason || "Bilinmeyen",
         createdAt: m.createdAt,
       })),
       total,
@@ -564,7 +607,7 @@ export class MessagingService {
   async moderateMessage(
     messageId: string,
     adminId: string,
-    action: 'approve' | 'reject',
+    action: "approve" | "reject",
   ): Promise<MessageResponseDto> {
     const message = await this.prisma.message.findUnique({
       where: { id: messageId },
@@ -575,15 +618,15 @@ export class MessagingService {
     });
 
     if (!message) {
-      throw new NotFoundException('Mesaj bulunamadı');
+      throw new NotFoundException("Mesaj bulunamadı");
     }
 
     if (message.status !== MessageStatus.pending_approval) {
-      throw new BadRequestException('Bu mesaj onay beklemiyordu');
+      throw new BadRequestException("Bu mesaj onay beklemiyordu");
     }
 
     const newStatus =
-      action === 'approve' ? MessageStatus.approved : MessageStatus.rejected;
+      action === "approve" ? MessageStatus.approved : MessageStatus.rejected;
 
     const updatedMessage = await this.prisma.message.update({
       where: { id: messageId },
@@ -608,18 +651,18 @@ export class MessagingService {
     // Show filtered content if exists, otherwise original
     const content =
       message.status === MessageStatus.pending_approval
-        ? '[Onay bekliyor]'
+        ? "[Onay bekliyor]"
         : message.status === MessageStatus.rejected
-          ? '[Mesaj reddedildi]'
+          ? "[Mesaj reddedildi]"
           : message.filteredContent || message.content;
 
     return {
       id: message.id,
       threadId: message.threadId,
       senderId: message.senderId,
-      senderName: message.sender?.displayName || '',
+      senderName: message.sender?.displayName || "",
       receiverId: message.receiverId,
-      receiverName: message.receiver?.displayName || '',
+      receiverName: message.receiver?.displayName || "",
       content,
       status: message.status,
       flaggedReason: message.flaggedReason || undefined,
@@ -634,7 +677,7 @@ export class MessagingService {
   private async checkDailyMessageLimit(userId: string): Promise<void> {
     // Get daily message limit from platform settings
     const dailyLimitSetting = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: 'daily_message_limit' },
+      where: { settingKey: "daily_message_limit" },
     });
     const dailyLimit = dailyLimitSetting?.settingValue
       ? parseInt(dailyLimitSetting.settingValue, 10)
@@ -655,9 +698,11 @@ export class MessagingService {
     });
 
     if (messageCount >= dailyLimit) {
-      this.logger.warn(`User ${userId} exceeded daily message limit (${messageCount}/${dailyLimit})`);
+      this.logger.warn(
+        `User ${userId} exceeded daily message limit (${messageCount}/${dailyLimit})`,
+      );
       throw new BadRequestException(
-        `Günlük mesaj limitinize (${dailyLimit}) ulaştınız. Yarın tekrar deneyin.`
+        `Günlük mesaj limitinize (${dailyLimit}) ulaştınız. Yarın tekrar deneyin.`,
       );
     }
   }
@@ -665,10 +710,12 @@ export class MessagingService {
   // ==========================================================================
   // Get remaining daily messages
   // ==========================================================================
-  async getRemainingDailyMessages(userId: string): Promise<{ remaining: number; limit: number }> {
+  async getRemainingDailyMessages(
+    userId: string,
+  ): Promise<{ remaining: number; limit: number }> {
     // Get daily message limit from platform settings
     const dailyLimitSetting = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: 'daily_message_limit' },
+      where: { settingKey: "daily_message_limit" },
     });
     const dailyLimit = dailyLimitSetting?.settingValue
       ? parseInt(dailyLimitSetting.settingValue, 10)

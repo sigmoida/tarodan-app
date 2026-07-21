@@ -32,7 +32,7 @@ export default function MessagesPage() {
 
   return (
     <div className="min-h-screen bg-surface text-heading flex flex-col">
-      <div className="flex-1 flex min-h-0 mx-auto w-full max-w-full lg:max-w-[90%] xl:max-w-[85%] overflow-hidden bg-surface-elevated border-x border-border sm:mt-0">
+      <div className="flex-1 flex min-h-0 mx-auto w-full max-w-full overflow-hidden bg-surface-elevated rounded-lg sm:my-4 border border-border sm:shadow-sm">
         <ThreadList
           className={`${selectedThread ? "hidden sm:flex" : "flex"} w-full sm:w-80`}
           loading={vm.loading}
@@ -59,7 +59,7 @@ export default function MessagesPage() {
                 ref={vm.messagesScrollRef}
                 className="flex-1 min-h-0 overflow-y-auto"
               >
-                <div className="p-4 space-y-3">
+                <div className="px-6 py-4 space-y-3">
                   {vm.messages.map((message) => (
                     <MessageBubble
                       key={message.id}

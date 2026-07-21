@@ -9,6 +9,6 @@ export const messagesApi = {
     api.get(`/messages/threads/${threadId}/messages`, { params }),
   createThread: (data: { participantId: string; productId?: string }) =>
     api.post("/messages/threads", data),
-  sendMessage: (threadId: string, content: string) =>
-    api.post(`/messages/threads/${threadId}/messages`, { content }),
+  sendMessage: (threadId: string, content: string, productId?: string) =>
+    api.post(`/messages/threads/${threadId}/messages`, { content, productId }),
 };

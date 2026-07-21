@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { XMarkIcon, PhotoIcon } from "@heroicons/react/24/outline";
-import { Button, Input, IconButton } from "@tarodan/ui";
+import { Button, Textarea, IconButton } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 
 export default function MessageComposer({
@@ -30,12 +30,22 @@ export default function MessageComposer({
 }) {
   const t = useTranslations();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-grow the composer with content, up to a max height; resets when the
+  // draft is cleared (e.g. after send).
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+  }, [newMessage]);
 
   return (
-    <div className="flex-shrink-0 p-4 pt-2 bg-surface-elevated border-t border-border">
+    <div className="flex-shrink-0 px-6 py-3 bg-surface-elevated border-t border-border">
       {contentWarning && (
         <div className="mb-3 px-3 py-2 bg-warning-50 border border-warning-200 rounded-lg text-warning-800 text-xs">
-          ⚠️ {contentWarning}
+          {contentWarning}
         </div>
       )}
       {attachedUrls.length > 0 && (
@@ -60,7 +70,7 @@ export default function MessageComposer({
           ))}
         </div>
       )}
-      <div className="flex gap-2">
+      <div className="flex items-end gap-2">
         <input
           type="file"
           ref={fileInputRef}
@@ -78,14 +88,20 @@ export default function MessageComposer({
         >
           <PhotoIcon className="w-5 h-5" />
         </IconButton>
-        <Input
-          type="text"
+        <Textarea
+          ref={textareaRef}
+          rows={1}
           value={newMessage}
           onChange={(e) => onMessageChange(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && onSend()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              onSend();
+            }
+          }}
           placeholder={t("message.typeMessage")}
           maxLength={maxMessageLength}
-          className={`flex-1 rounded-xl ${contentWarning ? "border-warning-400 focus:border-warning-400 focus:ring-warning-400" : ""}`}
+          className={`flex-1 resize-none rounded-xl max-h-32 ${contentWarning ? "border-warning-400 focus:border-warning-400 focus:ring-warning-400" : ""}`}
         />
         <Button
           type="button"
@@ -93,12 +109,13 @@ export default function MessageComposer({
           size="md"
           className="flex-shrink-0 rounded-xl shadow-sm"
           onClick={onSend}
+          isLoading={sending}
           disabled={(!newMessage.trim() && !attachedUrls.length) || sending}
         >
-          {sending ? "..." : t("common.send")}
+          {t("common.send")}
         </Button>
       </div>
-      <p className="text-xs text-border-strong mt-1.5">
+      <p className="text-xs text-muted mt-1.5">
         {newMessage.length}/{maxMessageLength}
       </p>
     </div>
