@@ -72,6 +72,8 @@ export interface OrderDetail {
     id: string;
     provider: string;
     trackingNumber: string | null;
+    /** Real Sürat cargo code (KargoTakipNo) — shown in UI, given at the branch. */
+    cargoCode?: string | null;
     status: string;
     cost?: number;
   };

@@ -1,14 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { createHash } from 'crypto';
-import { PrismaService } from '../../prisma';
-import { generateUniqueReference } from '../../common/helpers/generate-reference';
-import { SuratCargoService } from '../surat-cargo/surat-cargo.service';
-import { normalizeSuratPhone, normalizeSuratLocation } from '../surat-cargo/surat-address.util';
-import { mapSuratFailureToHttpException } from '../surat-cargo/surat-result.mapper';
-import { TaxService } from '../tax/tax.service';
-import type { SuratShipmentFailure } from '../surat-cargo/surat-cargo.types';
-import { SuratKargoTuru, SuratOdemeTipi, SuratTasimaSekli, SuratTeslimSekli, SuratGonderiSekli } from '../surat-cargo/surat-cargo.types';
-import { CommissionResult } from './order-pricing.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { createHash } from "crypto";
+import { PrismaService } from "../../prisma";
+import { generateUniqueReference } from "../../common/helpers/generate-reference";
+import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
+import { TaxService } from "../tax/tax.service";
+import { CommissionResult } from "./order-pricing.service";
 
 /**
  * Sipariş oluşturma primitifleri (Sürat gönderi fail-fast, kurumsal-satıcı KDV,
@@ -28,15 +24,17 @@ export class OrderCheckoutCommonService {
   ) {}
 
   buildSuratIdempotencyKey(parts: string[]): string {
-    return createHash('sha256').update(parts.filter((p) => p.length > 0).join('|')).digest('hex');
+    return createHash("sha256")
+      .update(parts.filter((p) => p.length > 0).join("|"))
+      .digest("hex");
   }
 
   /** E-ticaret stopaj oranı (%) — PlatformSetting 'withholding_tax_rate', varsayılan %1 (9284 sayılı CK). */
   private async getWithholdingTaxRate(): Promise<number> {
     const row = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: 'withholding_tax_rate' },
+      where: { settingKey: "withholding_tax_rate" },
     });
-    const rate = Number(row?.settingValue ?? '1');
+    const rate = Number(row?.settingValue ?? "1");
     return Number.isFinite(rate) && rate >= 0 ? rate : 1;
   }
 
@@ -56,11 +54,17 @@ export class OrderCheckoutCommonService {
       where: { id: sellerId },
       select: { businessStatus: true, taxId: true },
     });
-    if (seller?.businessStatus !== 'approved' || !seller?.taxId) {
+    if (seller?.businessStatus !== "approved" || !seller?.taxId) {
       return { taxAmount: 0, withholdingTaxAmount: 0 };
     }
-    const resolved = await this.taxService.resolveTaxRate('TR', null, categoryId);
-    const taxAmount = resolved ? this.taxService.calculateTaxAmount(subtotal, resolved) : 0;
+    const resolved = await this.taxService.resolveTaxRate(
+      "TR",
+      null,
+      categoryId,
+    );
+    const taxAmount = resolved
+      ? this.taxService.calculateTaxAmount(subtotal, resolved)
+      : 0;
     const withholdingRate = await this.getWithholdingTaxRate();
     const withholdingTaxAmount =
       withholdingRate > 0 ? Math.round(subtotal * withholdingRate) / 100 : 0;
@@ -68,9 +72,14 @@ export class OrderCheckoutCommonService {
   }
 
   /**
-   * Sürat gönderi oluşturma (edge case 1.7): SURAT_CARGO_ENABLED=true iken order.create öncesi fail-fast.
+   * DEPRECATED / no-op. Sürat gönderisi artık ödeme ÖNCESİ ön-kayıt yerine, ödeme
+   * onaylanınca (payment-fulfillment → PaymentCommonService.createSuratBarcodeForOrder)
+   * `OrtakBarkodOlustur` ile GERÇEK kargo kodu döndürerek oluşturuluyor. Ödeme öncesi
+   * fail-fast kaldırıldı: (1) aynı OzelKargoTakipNo ile çift kayıt olmasın, (2) Sürat
+   * anlık hatası alıcının siparişini/checkout'unu düşürmesin (non-blocking). Adres
+   * geçerliliği DTO doğrulamasıyla sağlanır. İmza uyumu için çağıranlar kalır.
    */
-  async assertSuratShipmentSucceeded(ctx: {
+  async assertSuratShipmentSucceeded(_ctx: {
     correlationId: string;
     idempotencyKey: string;
     recipientFullName: string;
@@ -82,51 +91,7 @@ export class OrderCheckoutCommonService {
     productTitle?: string;
     orderNumberPreview: string;
   }): Promise<void> {
-    if (!this.suratCargoService.isIntegrationEnabled()) {
-      return;
-    }
-
-    const result = await this.suratCargoService.submitShipmentWithRetry({
-      idempotencyKey: ctx.idempotencyKey,
-      correlationId: ctx.correlationId,
-      payload: {
-        KisiKurum: ctx.recipientFullName,
-        AliciAdresi: ctx.recipientAddressLine,
-        Il: normalizeSuratLocation(ctx.recipientCity),
-        Ilce: normalizeSuratLocation(ctx.recipientDistrict),
-        TelefonCep: normalizeSuratPhone(ctx.recipientPhone),
-        SahisBirim: ctx.productTitle,
-        KargoTuru: SuratKargoTuru.Koli,
-        OdemeTipi: SuratOdemeTipi.Pesin,
-        OzelKargoTakipNo: ctx.orderNumberPreview,
-        Adet: 1,
-        BirimDesi: 1,
-        BirimKg: 1,
-        KapidanOdemeTahsilatTipi: 1, // Nakit (zorunlu alan)
-        TasimaSekli: SuratTasimaSekli.KaraYolu,
-        TeslimSekli: SuratTeslimSekli.AdreseTeslim,
-        GonderiSekli: SuratGonderiSekli.Standart,
-        Pazaryerimi: 0,
-        Iademi: false,
-      },
-    });
-
-    if (result.ok) {
-      return;
-    }
-    const failure = result as SuratShipmentFailure;
-    this.logger.warn({
-      msg: 'Surat shipment failed before order persist',
-      correlationId: ctx.correlationId,
-      idempotencyKey: ctx.idempotencyKey,
-      failure,
-    });
-    if (failure.kind === 'business') {
-      this.logger.warn(`Surat business message: ${failure.suratMessage}`);
-    } else if (failure.cause?.stack) {
-      this.logger.warn(failure.cause.stack);
-    }
-    mapSuratFailureToHttpException(failure);
+    return;
   }
 
   /**
@@ -137,7 +102,7 @@ export class OrderCheckoutCommonService {
    */
   async generateOrderNumber(): Promise<string> {
     return generateUniqueReference(
-      'ORD',
+      "ORD",
       async (code) =>
         (await this.prisma.order.count({ where: { orderNumber: code } })) > 0,
     );
@@ -162,7 +127,7 @@ export class OrderCheckoutCommonService {
       await this.prisma.analyticsSnapshot.upsert({
         where: {
           snapshotType_snapshotDate: {
-            snapshotType: 'daily_commission',
+            snapshotType: "daily_commission",
             snapshotDate: today,
           },
         },
@@ -184,28 +149,32 @@ export class OrderCheckoutCommonService {
           },
         },
         create: {
-          snapshotType: 'daily_commission',
+          snapshotType: "daily_commission",
           snapshotDate: today,
           totalRevenue: commissionAmount,
           newOrders: 1,
           data: {
-            orders: [{
-              orderId,
-              orderNumber,
-              totalAmount,
-              commissionAmount,
-              ruleId: result.ruleId,
-              ruleName: result.ruleName,
-              appliedRate: result.appliedRate,
-              wasMinApplied: result.wasMinApplied,
-              wasMaxApplied: result.wasMaxApplied,
-              timestamp: new Date().toISOString(),
-            }],
+            orders: [
+              {
+                orderId,
+                orderNumber,
+                totalAmount,
+                commissionAmount,
+                ruleId: result.ruleId,
+                ruleName: result.ruleName,
+                appliedRate: result.appliedRate,
+                wasMinApplied: result.wasMinApplied,
+                wasMaxApplied: result.wasMaxApplied,
+                timestamp: new Date().toISOString(),
+              },
+            ],
           },
         },
       });
 
-      this.logger.debug(`Commission snapshot recorded for order ${orderNumber}`);
+      this.logger.debug(
+        `Commission snapshot recorded for order ${orderNumber}`,
+      );
     } catch (error) {
       // Don't fail the order if snapshot fails
       this.logger.error(`Failed to record commission snapshot: ${error}`);

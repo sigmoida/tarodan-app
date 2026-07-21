@@ -682,6 +682,11 @@ export class PaymentFulfillmentService {
           where: { orderId: resultOrder.id },
         });
         if (!existingShipment) {
+          // Create the REAL Sürat cargo code (KargoTakipNo) + label now, at order
+          // confirmation (non-blocking — null on failure, retried later).
+          const barcode = await this.paymentCommon.createSuratBarcodeForOrder(
+            resultOrder.id,
+          );
           const estimatedDelivery = new Date();
           estimatedDelivery.setDate(estimatedDelivery.getDate() + 3);
 
@@ -690,15 +695,17 @@ export class PaymentFulfillmentService {
               orderId: resultOrder.id,
               provider: "surat",
               status: "pending",
-              // Sürat'a OzelKargoTakipNo olarak sipariş numarası gönderiliyor; aynısını
-              // takip numarası olarak DB'ye de yazıyoruz ki UI'da gösterilsin.
+              // trackingNumber = OzelKargoTakipNo (our order number) — the poller
+              // queries Sürat by this; providerTrackingId holds the real code.
               trackingNumber: resultOrder.orderNumber,
+              providerTrackingId: barcode?.kargoTakipNo ?? null,
+              labelZpl: barcode?.labelZpl ?? null,
               cost: Number(resultOrder.shippingCost),
               estimatedDelivery,
             },
           });
           this.logger.log(
-            `Auto-created shipment for order ${resultOrder.orderNumber} tracking=${resultOrder.orderNumber}`,
+            `Auto-created shipment for order ${resultOrder.orderNumber} kargoTakipNo=${barcode?.kargoTakipNo ?? "PENDING"}`,
           );
         }
       } catch (error) {
@@ -1117,6 +1124,9 @@ export class PaymentFulfillmentService {
           where: { orderId: resultOrder.id },
         });
         if (!existingShipment) {
+          const barcode = await this.paymentCommon.createSuratBarcodeForOrder(
+            resultOrder.id,
+          );
           const estimatedDelivery = new Date();
           estimatedDelivery.setDate(estimatedDelivery.getDate() + 3);
           await this.prisma.shipment.create({
@@ -1125,12 +1135,14 @@ export class PaymentFulfillmentService {
               provider: "surat",
               status: "pending",
               trackingNumber: resultOrder.orderNumber,
+              providerTrackingId: barcode?.kargoTakipNo ?? null,
+              labelZpl: barcode?.labelZpl ?? null,
               cost: Number(resultOrder.shippingCost),
               estimatedDelivery,
             },
           });
           this.logger.log(
-            `Auto-created shipment for group order ${resultOrder.orderNumber} tracking=${resultOrder.orderNumber}`,
+            `Auto-created shipment for group order ${resultOrder.orderNumber} kargoTakipNo=${barcode?.kargoTakipNo ?? "PENDING"}`,
           );
         }
       } catch (error) {
