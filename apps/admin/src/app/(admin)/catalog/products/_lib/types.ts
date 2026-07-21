@@ -33,6 +33,11 @@ export interface Product {
   condition: string;
   seller: { id: string; displayName: string };
   category: { name: string };
+  brand?: { name: string } | null;
+  description?: string | null;
+  relevanceScore?: number | null;
+  isTradeEnabled?: boolean;
+  imageCount?: number;
   imageUrl?: string;
   createdAt: string;
   aiCheckStatus?: string | null;
@@ -57,6 +62,11 @@ export function mapProducts(raw: any[], t: T): Product[] {
       displayName: t("admin.catalog.products.seller"),
     },
     category: p.category || { name: t("common.category") },
+    brand: p.brand ?? null,
+    description: p.description ?? null,
+    relevanceScore: p.relevanceScore ?? null,
+    isTradeEnabled: !!p.isTradeEnabled,
+    imageCount: p._count?.images ?? (p.images?.length || undefined),
     imageUrl: (() => {
       let url = p.imageUrl || p.images?.[0]?.url || p.images?.[0] || "";
       if (url && !url.startsWith("/") && !url.startsWith("http"))

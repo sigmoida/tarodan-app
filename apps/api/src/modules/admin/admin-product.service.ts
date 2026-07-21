@@ -131,7 +131,9 @@ export class AdminProductService {
         include: {
           seller: { select: { id: true, displayName: true, email: true } },
           category: { select: { id: true, name: true } },
+          brand: { select: { name: true } },
           images: { take: 1, orderBy: { sortOrder: "asc" } },
+          _count: { select: { images: true } },
         },
         orderBy,
       },

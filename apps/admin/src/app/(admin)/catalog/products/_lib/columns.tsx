@@ -31,14 +31,21 @@ export function productColumns(t: T, actions: ProductRowActions) {
       t("admin.catalog.common.product"),
       (p) => (
         <div className="flex min-w-0 items-center gap-3">
-          <Image
-            src={p.imageUrl || PLACEHOLDER}
-            alt=""
-            width={40}
-            height={40}
-            unoptimized
-            className="h-10 w-10 flex-shrink-0 rounded-lg bg-surface-alt object-cover"
-          />
+          <div className="relative flex-shrink-0">
+            <Image
+              src={p.imageUrl || PLACEHOLDER}
+              alt=""
+              width={40}
+              height={40}
+              unoptimized
+              className="h-10 w-10 rounded-lg bg-surface-alt object-cover"
+            />
+            {p.imageCount != null && p.imageCount > 1 && (
+              <span className="absolute -bottom-1 -right-1 rounded bg-heading/80 px-1 text-[10px] font-medium text-inverted">
+                {p.imageCount}
+              </span>
+            )}
+          </div>
           <span className="truncate font-medium text-heading">{p.title}</span>
         </div>
       ),
@@ -57,11 +64,27 @@ export function productColumns(t: T, actions: ProductRowActions) {
         </span>
       ),
       {
-        align: "right",
         minWidth: 120,
         sortKey: "price",
         sortType: "number",
       },
+    ),
+    col.muted<Product>(t("common.description"), (p) => p.description, {
+      grow: 2,
+    }),
+    col.text<Product>(t("admin.catalog.common.brand"), (p) => p.brand?.name),
+    col.number<Product>(
+      t("admin.catalog.products.listingScore"),
+      (p) => p.relevanceScore,
+    ),
+    col.custom<Product>(t("admin.catalog.products.tradeable"), (p) =>
+      p.isTradeEnabled ? (
+        <Badge variant="success" size="sm">
+          ✓
+        </Badge>
+      ) : (
+        <Empty />
+      ),
     ),
     col.badge<Product>(
       t("common.status"),
@@ -94,6 +117,7 @@ export function productColumns(t: T, actions: ProductRowActions) {
       }),
       { sortKey: "seller.displayName", sortType: "text" },
     ),
+    col.code<Product>(t("admin.catalog.products.sellerId"), (p) => p.seller.id),
     col.text<Product>(t("common.category"), (p) => p.category.name, {
       sortKey: "category.name",
       sortType: "text",
