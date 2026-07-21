@@ -1092,8 +1092,11 @@ export class AuthService {
    * POST /auth/forgot-password
    */
   async requestPasswordReset(email: string): Promise<void> {
-    const user = await this.prisma.user.findUnique({
-      where: { email },
+    // Silinmiş (anonimleştirilmiş) ya da banlı hesaba reset linki gönderme:
+    // findUnique yerine deletedAt:null + banlı filtresi. Yanıt her durumda aynı
+    // (enumeration'a karşı) — sadece link üretimini/gönderimini atlarız.
+    const user = await this.prisma.user.findFirst({
+      where: { email, deletedAt: null, isBanned: false },
     });
 
     // Don't reveal if user exists for security
@@ -1161,6 +1164,13 @@ export class AuthService {
       );
     }
 
+    // Silinmiş/banlı hesap için token geçerli olsa bile parola set etme.
+    if (resetToken.user.deletedAt || resetToken.user.isBanned) {
+      throw new BadRequestException(
+        i18nMessage("server.auth.resetTokenInvalidOrExpired"),
+      );
+    }
+
     // Hash new password
     const passwordHash = await bcrypt.hash(newPassword, 12);
 
@@ -1174,6 +1184,14 @@ export class AuthService {
     await this.prisma.passwordResetToken.update({
       where: { id: resetToken.id },
       data: { usedAt: new Date() },
+    });
+
+    // Parola değişti → mevcut tüm refresh token'ları (session'ları) iptal et.
+    // Bir hesap kurtarma/ele geçirme savunmasının parçasıysa, eski oturumlar
+    // (ör. saldırgan) anında düşer; kullanıcı yeniden giriş yapar.
+    await this.prisma.refreshToken.updateMany({
+      where: { userId: resetToken.userId, revokedAt: null },
+      data: { revokedAt: new Date() },
     });
 
     // #224: başarı mesajı AuthController.resetPassword() tarafından locale'e göre
@@ -1313,6 +1331,16 @@ export class AuthService {
           userId: byEmail.id,
         },
       });
+      // Google e-postayı zaten doğruladı (email_verified === true zorunlu). Hesap
+      // henüz doğrulanmamışsa artık doğrulanmış say — böylece normal parola girişi
+      // de açılır ve Google-login'in bypass ettiği e-posta doğrulama kapısıyla
+      // tutarlı hale gelir.
+      if (!byEmail.isEmailVerified) {
+        await this.prisma.user.update({
+          where: { id: byEmail.id },
+          data: { isEmailVerified: true },
+        });
+      }
       return this.buildUserAuthResponse(byEmail.id);
     }
 
