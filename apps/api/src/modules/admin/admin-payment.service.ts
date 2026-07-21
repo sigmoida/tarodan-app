@@ -531,6 +531,7 @@ export class AdminPaymentService {
         order: p.order
           ? {
               id: p.order.id,
+              orderNumber: p.order.orderNumber,
               buyer: p.order.buyer,
               seller: p.order.seller,
               product: p.order.product,
