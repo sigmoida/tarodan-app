@@ -20,8 +20,34 @@ const scalarFieldsByModel = new Map<string, ReadonlySet<string>>();
 const nullableScalarFieldsByModel = new Map<string, ReadonlySet<string>>();
 const relationsByModel = new Map<string, ReadonlyMap<string, RelationInfo>>();
 
+/**
+ * Scalar types Prisma cannot `orderBy` directly. `Json`/`Bytes`/`Unsupported`
+ * columns reach Prisma as a raw `{ field: dir }` and throw a validation error,
+ * so they must never be treated as sortable (see #402: a `String[]` column
+ * sorted → HTTP 500 on a header click).
+ */
+const UNSORTABLE_SCALAR_TYPES = new Set(["Json", "Bytes", "Unsupported"]);
+
 function getModel(modelName: string) {
   return Prisma.dmmf.datamodel.models.find(({ name }) => name === modelName);
+}
+
+/**
+ * True for a scalar/enum field Prisma can `orderBy` directly. List scalars
+ * (`String[]`) and `Json`/`Bytes`/`Unsupported` types are excluded — Prisma
+ * rejects an `orderBy` on them, which would surface as a 500 instead of the
+ * "unknown key → default sort" contract this module guarantees.
+ */
+function isSortableScalar(field: {
+  kind: string;
+  type: string;
+  isList: boolean;
+}): boolean {
+  return (
+    (field.kind === "scalar" || field.kind === "enum") &&
+    !field.isList &&
+    !UNSORTABLE_SCALAR_TYPES.has(field.type)
+  );
 }
 
 /** Scalar + enum field names — the columns Prisma can `orderBy` directly. */
@@ -31,9 +57,7 @@ function getScalarFields(modelName: string): ReadonlySet<string> {
 
   const model = getModel(modelName);
   const fields = new Set(
-    model?.fields
-      .filter(({ kind }) => kind === "scalar" || kind === "enum")
-      .map(({ name }) => name) ?? [],
+    model?.fields.filter(isSortableScalar).map(({ name }) => name) ?? [],
   );
 
   scalarFieldsByModel.set(modelName, fields);
@@ -48,10 +72,7 @@ function getNullableScalarFields(modelName: string): ReadonlySet<string> {
   const model = getModel(modelName);
   const fields = new Set(
     model?.fields
-      .filter(
-        ({ kind, isRequired }) =>
-          (kind === "scalar" || kind === "enum") && !isRequired,
-      )
+      .filter((field) => isSortableScalar(field) && !field.isRequired)
       .map(({ name }) => name) ?? [],
   );
 

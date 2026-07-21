@@ -48,20 +48,20 @@ export function commissionColumns(
     col.custom<CommissionRule>(
       t("admin.finance.commission.sellerRate"),
       (r) => (
-        <span className="font-semibold text-primary-700">
+        <span className="font-semibold tabular-nums text-primary-700">
           {rate(r.sellerRate)}
         </span>
       ),
-      { sortKey: "sellerRate", sortType: "number" },
+      { align: "right", sortKey: "sellerRate", sortType: "number" },
     ),
     col.custom<CommissionRule>(
       t("admin.finance.commission.buyerRate"),
       (r) => (
-        <span className="font-semibold text-primary-700">
+        <span className="font-semibold tabular-nums text-primary-700">
           {rate(r.buyerRate)}
         </span>
       ),
-      { sortKey: "buyerRate", sortType: "number" },
+      { align: "right", sortKey: "buyerRate", sortType: "number" },
     ),
     col.badge<CommissionRule>(
       t("common.status"),

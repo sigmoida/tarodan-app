@@ -54,7 +54,7 @@ export function refundColumns(t: T, rowMenu: (r: Refund) => RowActionItem[]) {
     col.date<Refund>(
       t("admin.operations.refunds.refundedAt"),
       (r) => r.refundedAt,
-      { sortKey: "updatedAt", sortType: "date" },
+      { sortKey: "refundedAt", sortType: "date" },
     ),
     col.rowMenu<Refund>(rowMenu),
   ];

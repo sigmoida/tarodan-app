@@ -219,6 +219,35 @@ describe("admin list primitives", () => {
         ),
       ).toBe(defaultSort);
     });
+
+    it("falls back for a list scalar (`String[]`) instead of throwing", () => {
+      const fallback: Prisma.ScheduledNotificationOrderByWithRelationInput = {
+        createdAt: "desc",
+      };
+      // `ScheduledNotification.channels` is `String[]` — Prisma rejects an
+      // orderBy on a list scalar, so it must resolve to the default (#402).
+      expect(
+        resolveOrderBy<Prisma.ScheduledNotificationOrderByWithRelationInput>(
+          "ScheduledNotification",
+          { sortBy: "channels", sortOrder: "asc" },
+          { defaultSort: fallback },
+        ),
+      ).toBe(fallback);
+    });
+
+    it("falls back for a `Json` scalar instead of throwing", () => {
+      const fallback: Prisma.ScheduledNotificationOrderByWithRelationInput = {
+        createdAt: "desc",
+      };
+      // `ScheduledNotification.targetData` is `Json?` — unsortable in Prisma.
+      expect(
+        resolveOrderBy<Prisma.ScheduledNotificationOrderByWithRelationInput>(
+          "ScheduledNotification",
+          { sortBy: "targetData", sortOrder: "asc", sortType: "text" },
+          { defaultSort: fallback },
+        ),
+      ).toBe(fallback);
+    });
   });
 
   describe("buildSearchWhere", () => {
