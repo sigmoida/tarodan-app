@@ -6,7 +6,12 @@ import {
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
-import { TicketPriority, TicketStatus, Prisma } from "@prisma/client";
+import {
+  TicketCategory,
+  TicketPriority,
+  TicketStatus,
+  Prisma,
+} from "@prisma/client";
 import {
   CreateTicketDto,
   AddTicketMessageDto,
@@ -438,11 +443,19 @@ export class SupportService {
 
     const search = query.search?.trim();
     if (search) {
+      const normalized = search.toLowerCase();
       where.OR = [
         { ticketNumber: { contains: search, mode: "insensitive" } },
         { subject: { contains: search, mode: "insensitive" } },
         { creator: { displayName: { contains: search, mode: "insensitive" } } },
+        { creator: { email: { contains: search, mode: "insensitive" } } },
       ];
+      if (Object.values(TicketCategory).includes(normalized as TicketCategory))
+        where.OR.push({ category: normalized as TicketCategory });
+      if (Object.values(TicketPriority).includes(normalized as TicketPriority))
+        where.OR.push({ priority: normalized as TicketPriority });
+      if (Object.values(TicketStatus).includes(normalized as TicketStatus))
+        where.OR.push({ status: normalized as TicketStatus });
     }
 
     const orderBy = resolveOrderBy<
@@ -450,6 +463,9 @@ export class SupportService {
       | Prisma.SupportTicketOrderByWithRelationInput[]
     >("SupportTicket", query, {
       defaultSort: [{ createdAt: "desc" }, { priority: "desc" }],
+      sortMap: {
+        creatorName: (direction) => ({ creator: { displayName: direction } }),
+      },
     });
     const result = await paginate(
       this.prisma.supportTicket,

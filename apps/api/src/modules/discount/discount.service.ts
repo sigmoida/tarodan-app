@@ -371,10 +371,24 @@ export class DiscountService {
 
     if (search) {
       const ids = await fulltextDiscountSearch(this.prisma, search);
-      if (ids.length === 0) {
-        return { items: [], total: 0, page, limit, totalPages: 0 };
-      }
-      where.id = { in: ids };
+      const normalized = search.trim().toLowerCase();
+      const numeric = Number(search.replace(",", "."));
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { code: { contains: search, mode: "insensitive" } },
+        { description: { contains: search, mode: "insensitive" } },
+        { seller: { displayName: { contains: search, mode: "insensitive" } } },
+        { category: { name: { contains: search, mode: "insensitive" } } },
+      ];
+      if (ids.length > 0) where.OR.push({ id: { in: ids } });
+      if (Number.isFinite(numeric))
+        where.OR.push({ value: numeric }, { usedCount: Math.trunc(numeric) });
+      if (Object.values(DiscountScope).includes(normalized as DiscountScope))
+        where.OR.push({ scope: normalized as DiscountScope });
+      if (["true", "active", "aktif"].includes(normalized))
+        where.OR.push({ isActive: true });
+      if (["false", "inactive", "pasif"].includes(normalized))
+        where.OR.push({ isActive: false });
     }
 
     const orderBy = resolveOrderBy<Prisma.DiscountOrderByWithRelationInput>(

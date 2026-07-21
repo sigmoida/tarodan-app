@@ -28,7 +28,6 @@ export function SellerReviewsTab() {
       resource="user-ratings"
       fetcher={(p) => adminApi.getUserRatings(p)}
       getRowId={(r) => r.id}
-      limit={10}
       syncUrl
       initialFilters={{ status: "all" }}
     >

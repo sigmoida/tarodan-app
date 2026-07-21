@@ -395,6 +395,11 @@ export class NotificationHistoryResponseDto {
 // =============================================================================
 
 export class ScheduledNotificationQueryDto extends AdminListQueryDto {
+  @ApiPropertyOptional({ description: "Search displayed notification fields" })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
   @ApiPropertyOptional({
     description: "Filter by status (pending, sent, cancelled)",
   })

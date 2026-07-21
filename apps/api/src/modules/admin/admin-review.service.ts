@@ -5,7 +5,7 @@ import { RatingService } from "../rating/rating.service";
 import { AdminAuditService } from "./admin-audit.service";
 import {
   fulltextProductRatingSearch,
-  fulltextUserDisplayNameSearch,
+  fulltextUserSearch,
 } from "../../common/helpers/fulltext-search";
 import { fulltextProductSearch } from "../product/helpers/fulltext-search";
 import { AdminUserRatingQueryDto, RatingQueryDto, RatingStatus } from "./dto";
@@ -82,7 +82,7 @@ export class AdminReviewService {
     if (search) {
       const [ratingIds, userIds, productIds] = await Promise.all([
         fulltextProductRatingSearch(this.prisma, search),
-        fulltextUserDisplayNameSearch(this.prisma, search),
+        fulltextUserSearch(this.prisma, search),
         fulltextProductSearch(this.prisma, search),
       ]);
       const conditions: any[] = [];
@@ -90,6 +90,16 @@ export class AdminReviewService {
       if (userIds.length > 0) conditions.push({ userId: { in: userIds } });
       if (productIds.length > 0)
         conditions.push({ productId: { in: productIds } });
+      const normalized = search.trim().toLowerCase();
+      const numericScore = Number(search);
+      if (Number.isInteger(numericScore))
+        conditions.push({ score: numericScore });
+      if (Object.values(RatingStatus).includes(normalized as RatingStatus))
+        conditions.push({ status: normalized as RatingStatus });
+      if (["true", "verified", "doğrulanmış", "onaylı"].includes(normalized))
+        conditions.push({ isVerifiedPurchase: true });
+      if (["false", "unverified", "doğrulanmamış"].includes(normalized))
+        conditions.push({ isVerifiedPurchase: false });
       if (conditions.length === 0) {
         return { data: [], total: 0, page, limit, totalPages: 0 };
       }
@@ -206,13 +216,23 @@ export class AdminReviewService {
     const where: Prisma.RatingWhereInput = {};
 
     if (search) {
+      const normalized = search.trim().toLowerCase();
+      const numericScore = Number(search);
       where.OR = [
         { giver: { displayName: { contains: search, mode: "insensitive" } } },
+        { giver: { email: { contains: search, mode: "insensitive" } } },
         {
           receiver: { displayName: { contains: search, mode: "insensitive" } },
         },
+        { receiver: { email: { contains: search, mode: "insensitive" } } },
         { comment: { contains: search, mode: "insensitive" } },
+        { orderId: { contains: search, mode: "insensitive" } },
+        { tradeId: { contains: search, mode: "insensitive" } },
       ];
+      if (Number.isInteger(numericScore))
+        where.OR.push({ score: numericScore });
+      if (Object.values(RatingStatus).includes(normalized as RatingStatus))
+        where.OR.push({ status: normalized as RatingStatus });
     }
     if (status && ["pending", "approved", "rejected"].includes(status)) {
       where.status = status;

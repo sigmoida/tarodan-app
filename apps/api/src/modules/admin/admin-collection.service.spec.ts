@@ -8,17 +8,9 @@ describe("AdminCollectionService list sorting", () => {
       count: jest.fn().mockResolvedValue(0),
       findMany: jest.fn().mockResolvedValue([]),
     };
-    const prisma = {
-      collection,
-      $queryRawUnsafe: jest.fn().mockResolvedValue([{ id: "collection-1" }]),
-    };
-    const searchService = {
-      isAvailable: jest.fn().mockReturnValue(true),
-      searchCollections: jest.fn(),
-    };
+    const prisma = { collection };
     const service = new AdminCollectionService(
       prisma as any,
-      searchService as any,
       {} as any,
       {} as any,
       {} as any,
@@ -30,10 +22,17 @@ describe("AdminCollectionService list sorting", () => {
       sortOrder: "asc",
     });
 
-    expect(searchService.searchCollections).not.toHaveBeenCalled();
     expect(collection.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: { in: ["collection-1"] } },
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([
+            {
+              user: {
+                displayName: { contains: "ali", mode: "insensitive" },
+              },
+            },
+          ]),
+        }),
         orderBy: { user: { displayName: "asc" } },
       }),
     );

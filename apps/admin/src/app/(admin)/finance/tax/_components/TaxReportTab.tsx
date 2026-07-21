@@ -11,6 +11,7 @@ import { ResourceList, useResourceList } from "@/components/list";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { MetricCard } from "@/components/MetricCard";
 import { fmtTry } from "@/lib/format";
+import { paginateClient } from "@/lib/query/client-list";
 import { taxReportColumns } from "../_lib/columns";
 import { type TaxReport, groupByOptions } from "../_lib/types";
 import { useTranslations } from "next-intl";
@@ -38,11 +39,11 @@ const taxReportFetcher = async (params: Record<string, any>) => {
   });
   const report = response.data as TaxReport;
   const rows = report?.breakdown ?? [];
+  const page = paginateClient(rows, params);
   return {
     ...response,
     data: {
-      data: rows,
-      meta: { total: rows.length },
+      ...page,
       summary: report?.summary,
     },
   };
@@ -113,13 +114,13 @@ export function TaxReportTab() {
       resource="tax-report"
       fetcher={taxReportFetcher}
       getRowId={(row) => row.period}
-      // Full-load with an explicit cap: the aggregated report is small; 1000
-      // rows covers every period. Move server-side if it ever exceeds this (#383).
-      limit={1000}
       syncUrl
       initialFilters={INITIAL_FILTERS}
     >
       <TaxReportControls />
+      <ResourceList.Toolbar>
+        <ResourceList.Search />
+      </ResourceList.Toolbar>
       <TaxReportSummary />
       <SectionCard title={t("admin.finance.tax.taxByPeriod")}>
         <ResourceList.Table<TaxReportRow>
@@ -127,6 +128,7 @@ export function TaxReportTab() {
           emptyText={t("admin.finance.tax.noInvoicesForPeriod")}
         />
       </SectionCard>
+      <ResourceList.Pagination />
     </ResourceList>
   );
 }

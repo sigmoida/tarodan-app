@@ -22,7 +22,7 @@ import { AttributeGroupFormModal } from "./_modals/AttributeGroupFormModal";
 import { AttributeFormModal } from "./_modals/AttributeFormModal";
 
 const attributeGroupsFetcher = clientListFetcher<AttributeGroup>(
-  () => adminApi.getAttributeGroups({ limit: 100 }),
+  () => adminApi.getAttributeGroups({ limit: 250 }),
   (raw) => extractList<AttributeGroup>(raw),
   {
     // No searchFields → full-content search across all displayed columns (#378).
@@ -36,7 +36,6 @@ export default function AttributesPage() {
       resource="attribute-groups"
       fetcher={attributeGroupsFetcher}
       getRowId={(group) => group.id}
-      limit={100}
       syncUrl
     >
       <AttributesPageContent />

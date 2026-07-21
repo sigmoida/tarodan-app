@@ -167,33 +167,66 @@ export class AdminPayoutService {
   /**
    * Payout schedule: holds with status=held, ordered by releaseAt (upcoming releases)
    */
-  async getPayoutsSchedule(query: { sellerId?: string; limit?: number }) {
-    const { sellerId, limit = 50 } = query;
+  async getPayoutsSchedule(query: {
+    sellerId?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+    sortType?: "text" | "number" | "date";
+  }) {
+    const { sellerId, search } = query;
     const where: Prisma.PaymentHoldWhereInput = {
       status: PaymentHoldStatus.held,
     };
     if (sellerId) where.sellerId = sellerId;
+    if (search) {
+      where.OR = [
+        { seller: { displayName: { contains: search, mode: "insensitive" } } },
+        { seller: { email: { contains: search, mode: "insensitive" } } },
+        {
+          payment: {
+            order: {
+              orderNumber: { contains: search, mode: "insensitive" },
+            },
+          },
+        },
+      ];
+    }
 
-    const holds = await this.prisma.paymentHold.findMany({
-      where,
-      include: {
-        seller: { select: { id: true, displayName: true, email: true } },
+    const orderBy = resolveOrderBy<Prisma.PaymentHoldOrderByWithRelationInput>(
+      "PaymentHold",
+      query,
+      {
+        defaultSort: { releaseAt: "asc" },
+        sortMap: {
+          orderNumber: (direction) => ({
+            payment: { order: { orderNumber: direction } },
+          }),
+          sellerName: (direction) => ({ seller: { displayName: direction } }),
+        },
       },
-      orderBy: { releaseAt: "asc" },
-      take: limit,
-    });
-
-    const orders = await this.prisma.order.findMany({
-      where: { id: { in: holds.map((h) => h.orderId) } },
-      select: { id: true, orderNumber: true },
-    });
-    const orderMap = new Map(orders.map((o) => [o.id, o]));
+    );
+    const result = await paginate(
+      this.prisma.paymentHold,
+      {
+        where,
+        include: {
+          seller: { select: { id: true, displayName: true, email: true } },
+          payment: { select: { order: { select: { orderNumber: true } } } },
+        },
+        orderBy,
+      },
+      query,
+    );
 
     return {
-      data: holds.map((h) => ({
+      ...result,
+      data: result.data.map((h) => ({
         id: h.id,
         orderId: h.orderId,
-        orderNumber: orderMap.get(h.orderId)?.orderNumber ?? "-",
+        orderNumber: h.payment.order?.orderNumber ?? "-",
         sellerId: h.sellerId,
         sellerName: h.seller.displayName ?? h.seller.email,
         amount: Number(h.amount),

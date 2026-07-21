@@ -31,6 +31,20 @@ export class PayoutTransactionsQueryDto extends AdminListQueryDto {
   dateTo?: string;
 }
 
+export class PayoutScheduleQueryDto extends AdminListQueryDto {
+  @ApiPropertyOptional({
+    description: "Search by seller name, email or order number",
+  })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ description: "Filter by seller ID" })
+  @IsOptional()
+  @IsString()
+  sellerId?: string;
+}
+
 export class PayoutExportQueryDto {
   @ApiPropertyOptional({ description: "Filter by seller ID" })
   @IsOptional()

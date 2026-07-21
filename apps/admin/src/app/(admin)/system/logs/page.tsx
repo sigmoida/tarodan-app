@@ -162,6 +162,7 @@ export default function LogsPage() {
         toDate: params.toDate || undefined,
         sortBy: params.sortBy,
         sortOrder: params.sortOrder,
+        sortType: params.sortType,
       });
     },
     [tab],

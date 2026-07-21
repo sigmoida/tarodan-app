@@ -4,9 +4,13 @@ import { Prisma, PrismaClient } from "@prisma/client";
 
 import { AdminListQueryDto } from "./admin-list-query.dto";
 import { paginate } from "./paginate";
+import { paginateComputedRows } from "./paginate-computed";
 import { resolveOrderBy } from "./resolve-order-by";
 import { buildSearchWhere } from "./search-where";
 import { AdminShipmentQueryDto } from "../../modules/admin/dto/operations-query.dto";
+import { AuditLogQueryDto } from "../../modules/admin/dto/admin-query.dto";
+import { AdminCollectionQueryDto } from "../../modules/admin/dto/collection-admin.dto";
+import { DiscountQueryDto } from "../../modules/discount/dto/discount-query.dto";
 
 // Keeps the shared delegate contract checked against the generated Prisma API.
 function _paginateProducts(prisma: PrismaClient) {
@@ -61,6 +65,26 @@ describe("admin list primitives", () => {
       await expect(validate(query)).resolves.toHaveLength(0);
       expect(query.limit).toBe(250);
     });
+
+    it.each([AuditLogQueryDto, AdminCollectionQueryDto, DiscountQueryDto])(
+      "accepts page-size 250 and sortType through %p",
+      async (Dto) => {
+        const query = plainToInstance(Dto, {
+          limit: "250",
+          sortBy: "createdAt",
+          sortOrder: "asc",
+          sortType: "date",
+        });
+
+        await expect(validate(query)).resolves.toHaveLength(0);
+        expect(query).toMatchObject({
+          limit: 250,
+          sortBy: "createdAt",
+          sortOrder: "asc",
+          sortType: "date",
+        });
+      },
+    );
   });
 
   describe("resolveOrderBy", () => {
@@ -251,6 +275,28 @@ describe("admin list primitives", () => {
       expect(result).toEqual({
         data: [{ id: "product-1" }],
         meta: { total: 505, page: 2, limit: 250, totalPages: 3 },
+      });
+    });
+  });
+
+  describe("paginateComputedRows", () => {
+    it("sorts computed values before applying the standard page contract", () => {
+      const result = paginateComputedRows(
+        [
+          { id: "empty", value: null },
+          { id: "high", value: 500 },
+          { id: "low", value: 200 },
+        ],
+        (row) => row.value,
+        { page: 1, limit: 2, sortOrder: "asc", sortType: "number" },
+      );
+
+      expect(result).toEqual({
+        data: [
+          { id: "low", value: 200 },
+          { id: "high", value: 500 },
+        ],
+        meta: { total: 3, page: 1, limit: 2, totalPages: 2 },
       });
     });
   });

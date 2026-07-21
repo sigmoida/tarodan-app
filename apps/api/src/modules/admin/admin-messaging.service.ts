@@ -45,8 +45,11 @@ export class AdminMessagingService {
     // Mesaj içeriği veya gönderen/alıcı ad/e-posta araması (case-insensitive).
     const trimmedSearch = search?.trim();
     if (trimmedSearch) {
+      const normalized = trimmedSearch.toLowerCase();
       where.OR = [
         { content: { contains: trimmedSearch, mode: "insensitive" } },
+        { filteredContent: { contains: trimmedSearch, mode: "insensitive" } },
+        { flaggedReason: { contains: trimmedSearch, mode: "insensitive" } },
         {
           sender: {
             displayName: { contains: trimmedSearch, mode: "insensitive" },
@@ -62,6 +65,8 @@ export class AdminMessagingService {
           receiver: { email: { contains: trimmedSearch, mode: "insensitive" } },
         },
       ];
+      if (Object.values(MessageStatus).includes(normalized as MessageStatus))
+        where.OR.push({ status: normalized as MessageStatus });
     }
 
     const orderBy = resolveOrderBy<Prisma.MessageOrderByWithRelationInput>(

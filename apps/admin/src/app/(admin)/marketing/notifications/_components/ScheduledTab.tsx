@@ -34,7 +34,11 @@ export function ScheduledTab() {
         adminApi.getScheduledNotifications({ ...params, status: "pending" })
       }
       getRowId={(n) => n.id}
+      syncUrl
     >
+      <ResourceList.Toolbar>
+        <ResourceList.Search />
+      </ResourceList.Toolbar>
       <ResourceList.Table
         columns={scheduledColumns(onCancel, t)}
         emptyText={t("admin.marketing.notifications.emptyScheduled")}
