@@ -30,7 +30,7 @@ export default function ThreadList({
     <div
       className={`${className} flex-col min-h-0 bg-surface-elevated border-r border-border`}
     >
-      <div className="flex-shrink-0 px-4 py-4 border-b border-border bg-surface-elevated">
+      <div className="flex-shrink-0 h-[72px] px-6 flex flex-col justify-center border-b border-border bg-surface-elevated">
         <h1 className="text-lg font-semibold text-heading">
           {t("message.messages")}
         </h1>

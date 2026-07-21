@@ -24,7 +24,7 @@ export default function ThreadListItem({
     <button
       type="button"
       onClick={onSelect}
-      className={`block w-full text-left px-4 py-3 transition-colors border-l-4 border-b border-border-subtle last:border-b-0 ${
+      className={`block w-full text-left px-6 py-3 transition-colors border-l-4 border-b border-border-subtle last:border-b-0 ${
         isSelected
           ? "border-l-primary-500 bg-primary-50/60"
           : "border-l-transparent hover:bg-surface"
@@ -45,7 +45,7 @@ export default function ThreadListItem({
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <span className="font-medium text-heading truncate text-sm">
-              {thread.otherUser?.displayName || "Kullanıcı"}
+              {thread.otherUser?.displayName || t("common.user")}
             </span>
             {thread.unreadCount > 0 && (
               <Badge
@@ -65,7 +65,7 @@ export default function ThreadListItem({
           )}
           {thread.product && (
             <p className="text-xs text-primary-600 truncate mt-0.5">
-              📦 {thread.product.title}
+              {thread.product.title}
             </p>
           )}
         </div>

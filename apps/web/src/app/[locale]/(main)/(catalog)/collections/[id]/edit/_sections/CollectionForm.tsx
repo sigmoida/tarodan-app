@@ -1,159 +1,95 @@
+/** @format */
+
 "use client";
 
 import { TrashIcon } from "@heroicons/react/24/outline";
-import { Button, Checkbox, Input, Select, Textarea } from "@tarodan/ui";
-import OptimizedImage from "@/components/OptimizedImage";
-import { useLocale, useTranslations } from "next-intl";
+import type { UseFormReturn } from "react-hook-form";
+import { Button } from "@tarodan/ui";
+import {
+  Form,
+  FormInput,
+  FormTextarea,
+  FormSelect,
+  FormCheckbox,
+  FormImageUpload,
+} from "@tarodan/ui/form";
+import { useTranslations } from "next-intl";
+import { SectionCard } from "@/components/ui";
+import type { CollectionEditValues } from "../_lib/schema";
 
 interface CollectionFormProps {
-  name: string;
-  setName: (value: string) => void;
-  description: string;
-  setDescription: (value: string) => void;
-  categoryId: string;
-  setCategoryId: (value: string) => void;
-  flatCategories: { id: string; name: string; slug: string }[];
-  coverImagePreview: string;
-  onCoverImageChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  isUploadingCover: boolean;
-  isPublic: boolean;
-  setIsPublic: (value: boolean) => void;
+  form: UseFormReturn<CollectionEditValues>;
+  onSubmit: (values: CollectionEditValues) => void;
   isSaving: boolean;
-  onSubmit: (e: React.FormEvent) => void;
+  uploadCover: (file: File) => Promise<string>;
+  flatCategories: { id: string; name: string; slug: string }[];
   onCancel: () => void;
   onDelete: () => void;
 }
 
 export default function CollectionForm({
-  name,
-  setName,
-  description,
-  setDescription,
-  categoryId,
-  setCategoryId,
-  flatCategories,
-  coverImagePreview,
-  onCoverImageChange,
-  isUploadingCover,
-  isPublic,
-  setIsPublic,
-  isSaving,
+  form,
   onSubmit,
+  isSaving,
+  uploadCover,
+  flatCategories,
   onCancel,
   onDelete,
 }: CollectionFormProps) {
   const t = useTranslations();
+  const name = form.watch("name") ?? "";
+  const description = form.watch("description") ?? "";
+  const isPublic = form.watch("isPublic");
 
   return (
-    <div className="bg-surface-elevated rounded border border-border p-6 md:p-8">
-      <form onSubmit={onSubmit} className="space-y-6">
-        {/* Name */}
+    <SectionCard>
+      <Form form={form} onSubmit={onSubmit} className="space-y-6">
+        <FormInput
+          name="name"
+          label={t("collection.collectionNameLabel")}
+          placeholder={t("collection.namePlaceholder")}
+          maxLength={100}
+          helperText={`${name.length}/100 ${t("collection.characters")}`}
+        />
+        <FormTextarea
+          name="description"
+          label={t("collection.descriptionLabel")}
+          placeholder={t("collection.descriptionPlaceholder")}
+          rows={5}
+          maxLength={500}
+          helperText={`${description.length}/500 ${t("collection.characters")}`}
+        />
+        <FormSelect
+          name="categoryId"
+          label={t("common.category")}
+          placeholder={t("common.none")}
+          options={flatCategories.map((c) => ({ value: c.id, label: c.name }))}
+        />
         <div>
-          <label className="block text-xs font-medium text-muted mb-1 uppercase tracking-wide">
-            {t("collection.collectionNameLabel")}
-          </label>
-          <Input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full px-3 py-2.5 border border-border rounded text-sm text-heading placeholder-subtle bg-surface-elevated focus:outline-none focus:border-primary-400"
-            placeholder={t("collection.namePlaceholder")}
-            required
-            minLength={3}
-            maxLength={100}
+          <FormImageUpload
+            name="coverImageUrl"
+            label={t("collection.coverImage")}
+            upload={uploadCover}
+            accept="image/jpeg,image/png,image/webp"
+            maxSizeMb={10}
           />
-          <p className="mt-1 text-sm text-muted">
-            {name.length}/100 {t("collection.characters")}
+          <p className="mt-2 text-sm text-muted">
+            {t("collection.coverImageHint")}
           </p>
         </div>
-
-        {/* Description */}
         <div>
-          <label className="block text-xs font-medium text-muted mb-1 uppercase tracking-wide">
-            {t("collection.descriptionLabel")}
-          </label>
-          <Textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full px-3 py-2.5 border border-border rounded text-sm text-heading placeholder-subtle bg-surface-elevated focus:outline-none focus:border-primary-400"
-            placeholder={t("collection.descriptionPlaceholder")}
-            rows={5}
-            maxLength={500}
-          />
-          <p className="mt-1 text-sm text-muted">
-            {description.length}/500 {t("collection.characters")}
-          </p>
-        </div>
-
-        {/* Category */}
-        <div>
-          <label className="block text-xs font-medium text-muted mb-1 uppercase tracking-wide">
-            {t("common.category")}
-          </label>
-          <Select
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
-          >
-            <option value="">{t("common.none")}</option>
-            {flatCategories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
-            ))}
-          </Select>
-        </div>
-
-        {/* Cover Image Upload */}
-        <div>
-          <label className="block text-sm font-medium text-body mb-2">
-            Kapak Resmi
-          </label>
-          <div className="space-y-3">
-            {coverImagePreview && (
-              <div className="relative w-full h-48 rounded overflow-hidden border border-border">
-                <OptimizedImage
-                  src={coverImagePreview}
-                  alt="Cover preview"
-                  fill
-                  className="object-cover"
-                  logContext={{ page: "collection-edit-cover" }}
-                />
-              </div>
-            )}
-            <Input
-              type="file"
-              accept="image/*"
-              onChange={onCoverImageChange}
-              disabled={isUploadingCover}
-              className="w-full px-3 py-2.5 border border-border rounded text-sm text-heading bg-surface-elevated focus:outline-none focus:border-primary-400 disabled:opacity-50 disabled:cursor-not-allowed"
-            />
-            {isUploadingCover && (
-              <p className="text-sm text-muted">Yükleniyor...</p>
-            )}
-            <p className="text-sm text-muted">
-              Kapak resmi yükleyin (maksimum 10MB). Kapak resmi yoksa otomatik
-              olarak ilk 4 ürünün resimlerinden oluşturulacaktır.
-            </p>
-          </div>
-        </div>
-
-        {/* Public/Private */}
-        <div className="flex items-center gap-3 p-3 bg-surface rounded border border-border-subtle">
-          <Checkbox
-            id="isPublic"
-            checked={isPublic}
-            onChange={(e) => setIsPublic(e.target.checked)}
+          <FormCheckbox
+            name="isPublic"
             label={t("collection.publicCollection")}
           />
+          <p className="mt-2 text-sm text-muted">
+            {isPublic
+              ? t("collection.publicCollectionDesc")
+              : t("collection.privateCollectionDesc")}
+          </p>
         </div>
-        <p className="text-sm text-muted -mt-4">
-          {isPublic
-            ? t("collection.publicCollectionDesc")
-            : t("collection.privateCollectionDesc")}
-        </p>
 
-        {/* Actions */}
-        <div className="flex flex-col gap-4 pt-4 border-t border-border">
+        <div className="flex flex-col gap-4 border-t border-border pt-4">
           <div className="flex gap-4">
             <Button
               type="button"
@@ -169,13 +105,11 @@ export default function CollectionForm({
               variant="primary"
               size="md"
               className="flex-1"
-              disabled={isSaving || !name.trim()}
+              isLoading={isSaving}
             >
-              {isSaving ? t("collection.saving") : t("collection.saveChanges")}
+              {t("collection.saveChanges")}
             </Button>
           </div>
-
-          {/* Delete Button */}
           <Button
             type="button"
             variant="danger"
@@ -183,11 +117,11 @@ export default function CollectionForm({
             className="flex items-center justify-center gap-2"
             onClick={onDelete}
           >
-            <TrashIcon className="w-5 h-5" />
+            <TrashIcon className="h-5 w-5" />
             {t("collection.deleteCollection")}
           </Button>
         </div>
-      </form>
-    </div>
+      </Form>
+    </SectionCard>
   );
 }

@@ -1,14 +1,25 @@
+/** @format */
+
+"use client";
+
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useParams } from "next/navigation";
-import toast from "react-hot-toast";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useZodForm } from "@tarodan/ui/form";
 import { useAuthStore } from "@/stores/authStore";
 import { collectionsApi } from "@/lib/api";
+import { useWebMutation } from "@/hooks/useWebMutation";
 import { queryKeys } from "@/lib/query/keys";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import type { Collection } from "../_lib/types";
 import { isUUID } from "../_lib/constants";
+import {
+  collectionEditSchema,
+  collectionToForm,
+  emptyCollectionEditValues,
+  type CollectionEditValues,
+} from "../_lib/schema";
 
 export function useEditCollection() {
   const params = useParams();
@@ -20,14 +31,9 @@ export function useEditCollection() {
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  // Form state
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-  const [coverImageUrl, setCoverImageUrl] = useState("");
-  const [isPublic, setIsPublic] = useState(true);
-  const [coverImageFile, setCoverImageFile] = useState<File | null>(null);
-  const [coverImagePreview, setCoverImagePreview] = useState<string>("");
+  const form = useZodForm(collectionEditSchema, {
+    defaultValues: emptyCollectionEditValues,
+  });
 
   // Auth gate.
   useEffect(() => {
@@ -49,19 +55,14 @@ export function useEditCollection() {
   });
   const collection = collectionQuery.data ?? null;
 
-  // Populate the form once, when the collection first arrives.
+  // Seed the form once, when the collection first arrives.
   const populatedRef = useRef(false);
   useEffect(() => {
     const data = collectionQuery.data;
     if (!data || populatedRef.current) return;
     populatedRef.current = true;
-    setName(data.name || "");
-    setDescription(data.description || "");
-    setCategoryId(data.categoryId || "");
-    setCoverImageUrl(data.coverImageUrl || "");
-    setCoverImagePreview(data.coverImageUrl || "");
-    setIsPublic(data.isPublic ?? true);
-  }, [collectionQuery.data]);
+    form.reset(collectionToForm(data));
+  }, [collectionQuery.data, form]);
 
   const error = !collectionIdOrSlug
     ? t("collection.invalidLink")
@@ -76,75 +77,36 @@ export function useEditCollection() {
     ? false
     : authLoading || collectionQuery.isPending;
 
-  const coverMutation = useMutation({
-    mutationFn: (file: File) =>
-      collectionsApi.updateCover(collection!.id, file),
-    onSuccess: (response) => {
-      const newCoverUrl =
-        response.data.collection?.coverImageUrl || response.data.coverImageUrl;
-      if (newCoverUrl) {
-        setCoverImageUrl(newCoverUrl);
-        setCoverImagePreview(newCoverUrl);
-        toast.success("Kapak resmi yüklendi");
-      }
-    },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.message || "Kapak resmi yüklenemedi");
-      setCoverImageFile(null);
-      setCoverImagePreview(coverImageUrl);
-    },
-  });
-
-  const handleCoverImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("Lütfen geçerli bir resim dosyası seçin");
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("Resim boyutu 10MB'dan küçük olmalıdır");
-      return;
-    }
-    setCoverImageFile(file);
-    setCoverImagePreview(URL.createObjectURL(file));
-    coverMutation.mutate(file);
+  /** Immediate cover upload (its own endpoint); resolves the new URL for the
+   *  shared FormImageUpload preview. Not re-sent on save. */
+  const uploadCover = async (file: File): Promise<string> => {
+    const res = await collectionsApi.updateCover(collection!.id, file);
+    return res.data.collection?.coverImageUrl || res.data.coverImageUrl || "";
   };
 
-  const updateMutation = useMutation({
-    mutationFn: () =>
+  const save = useWebMutation(
+    (values: CollectionEditValues) =>
       collectionsApi.update(collection!.id, {
-        name: name.trim(),
-        description: description.trim() || undefined,
-        categoryId: categoryId || null,
-        isPublic,
+        name: values.name.trim(),
+        description: values.description?.trim() || undefined,
+        categoryId: values.categoryId || null,
+        isPublic: values.isPublic,
       }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.collection.all(),
-      });
-      toast.success(t("collection.collectionUpdated"));
-      router.push(`/collections/${collection!.id}`);
+    {
+      successMessage: t("collection.collectionUpdated"),
+      errorMessage: t("collection.loadFailed"),
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.collection.all(),
+        });
+        router.push(`/collections/${collection!.id}`);
+      },
     },
-    onError: (err: any) =>
-      toast.error(err.response?.data?.message || t("collection.loadFailed")),
-  });
+  );
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) {
-      toast.error(t("collection.collectionNameRequired"));
-      return;
-    }
-    if (!collection) {
-      toast.error(t("collection.collectionNotFound"));
-      return;
-    }
-    updateMutation.mutate();
-  };
-
-  const deleteMutation = useMutation({
-    mutationFn: () => collectionsApi.delete(collection!.id),
+  const del = useWebMutation(() => collectionsApi.delete(collection!.id), {
+    successMessage: t("collection.collectionDeleted"),
+    errorMessage: t("collection.loadFailed"),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: queryKeys.collections.mine(),
@@ -155,20 +117,9 @@ export function useEditCollection() {
       queryClient.removeQueries({
         queryKey: queryKeys.collection.detail(collection!.id),
       });
-      toast.success(t("collection.collectionDeleted"));
       router.push("/collections");
     },
-    onError: (err: any) =>
-      toast.error(err.response?.data?.message || t("collection.loadFailed")),
   });
-
-  const handleDelete = () => {
-    if (!collection) {
-      toast.error(t("collection.collectionNotFound"));
-      return;
-    }
-    deleteMutation.mutate();
-  };
 
   return {
     router,
@@ -178,22 +129,14 @@ export function useEditCollection() {
     collection,
     isLoading,
     error,
-    isSaving: updateMutation.isPending,
-    isDeleting: deleteMutation.isPending,
+    form,
+    onSubmit: (values: CollectionEditValues) => save.mutate(values),
+    isSaving: save.isPending,
+    uploadCover,
+    del,
+    handleDelete: () => del.mutate(),
+    isDeleting: del.isPending,
     showDeleteModal,
     setShowDeleteModal,
-    name,
-    setName,
-    description,
-    setDescription,
-    categoryId,
-    setCategoryId,
-    coverImagePreview,
-    isUploadingCover: coverMutation.isPending,
-    isPublic,
-    setIsPublic,
-    handleCoverImageChange,
-    handleSubmit,
-    handleDelete,
   };
 }

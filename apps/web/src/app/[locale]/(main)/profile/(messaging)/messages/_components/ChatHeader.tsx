@@ -18,7 +18,7 @@ export default function ChatHeader({
   const t = useTranslations();
 
   return (
-    <div className="flex-shrink-0 px-4 py-3 bg-surface-elevated border-b border-border flex items-center gap-3 shadow-sm">
+    <div className="flex-shrink-0 h-[72px] px-6 bg-surface-elevated border-b border-border flex items-center gap-3">
       <IconButton
         variant="ghost"
         size="sm"
@@ -36,7 +36,7 @@ export default function ChatHeader({
       />
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-heading text-sm truncate">
-          {thread.otherUser?.displayName || "Kullanıcı"}
+          {thread.otherUser?.displayName || t("common.user")}
         </p>
         {typing ? (
           <p className="text-xs text-primary-600 truncate">
@@ -44,7 +44,7 @@ export default function ChatHeader({
           </p>
         ) : thread.product ? (
           <p className="text-xs text-primary-600 truncate">
-            📦 {thread.product.title}
+            {thread.product.title}
           </p>
         ) : null}
       </div>

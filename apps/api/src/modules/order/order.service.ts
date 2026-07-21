@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable } from "@nestjs/common";
 import {
   CreateOrderDto,
   OrderQueryDto,
@@ -11,13 +11,13 @@ import {
   GuestSendVerificationCodeDto,
   CheckoutDto,
   GuestCheckoutGroupDto,
-} from './dto';
-import { OrderPricingService, CommissionResult } from './order-pricing.service';
-import { OrderCheckoutService } from './order-checkout.service';
-import { OrderQueryService } from './order-query.service';
-import { OrderLifecycleService } from './order-lifecycle.service';
+} from "./dto";
+import { OrderPricingService, CommissionResult } from "./order-pricing.service";
+import { OrderCheckoutService } from "./order-checkout.service";
+import { OrderQueryService } from "./order-query.service";
+import { OrderLifecycleService } from "./order-lifecycle.service";
 
-export { CommissionResult } from './order-pricing.service';
+export { CommissionResult } from "./order-pricing.service";
 
 /**
  * Facade: tüm public imzalar aynen korunur, iş mantığı alt servislerde
@@ -100,8 +100,14 @@ export class OrderService {
   async getCommissionPreviewBatch(
     sellerId: string,
     items: Array<{ amount: number; categoryId?: string | null }>,
-  ): Promise<{ results: Array<{ sellerFeeAmount: number; sellerNetAmount: number }> }> {
+  ): Promise<{
+    results: Array<{ sellerFeeAmount: number; sellerNetAmount: number }>;
+  }> {
     return this.orderPricing.getCommissionPreviewBatch(sellerId, items);
+  }
+
+  async getOrderReview(orderId: string, userId: string) {
+    return this.orderQuery.getOrderReview(orderId, userId);
   }
 
   async calculateCommission(
@@ -141,7 +147,9 @@ export class OrderService {
     return this.orderCheckout.create(buyerId, dto);
   }
 
-  async sendGuestCheckoutVerificationCode(dto: GuestSendVerificationCodeDto): Promise<{
+  async sendGuestCheckoutVerificationCode(
+    dto: GuestSendVerificationCodeDto,
+  ): Promise<{
     success: boolean;
     expiresInSeconds: number;
   }> {
@@ -158,7 +166,9 @@ export class OrderService {
     return this.orderQuery.trackGuestOrder(dto);
   }
 
-  async getSellerEarnings(sellerId: string): Promise<{ totalEarnings: number; pendingEarnings: number }> {
+  async getSellerEarnings(
+    sellerId: string,
+  ): Promise<{ totalEarnings: number; pendingEarnings: number }> {
     return this.orderQuery.getSellerEarnings(sellerId);
   }
 
@@ -183,18 +193,29 @@ export class OrderService {
   async setShippingAddress(
     orderId: string,
     userId: string,
-    dto: { fullName: string; phone: string; city: string; district: string; address: string; zipCode?: string },
+    dto: {
+      fullName: string;
+      phone: string;
+      city: string;
+      district: string;
+      address: string;
+      zipCode?: string;
+    },
   ) {
     return this.orderLifecycle.setShippingAddress(orderId, userId, dto);
   }
 
-  async updateStatus(orderId: string, userId: string, dto: UpdateOrderStatusDto) {
+  async updateStatus(
+    orderId: string,
+    userId: string,
+    dto: UpdateOrderStatusDto,
+  ) {
     return this.orderLifecycle.updateStatus(orderId, userId, dto);
   }
 
   async completeOrder(
     orderId: string,
-    type: 'manual_ok' | 'auto_timeout' | 'admin_force',
+    type: "manual_ok" | "auto_timeout" | "admin_force",
   ): Promise<{ completed: boolean }> {
     return this.orderLifecycle.completeOrder(orderId, type);
   }
@@ -220,7 +241,12 @@ export class OrderService {
     hours: number,
     reason?: string,
   ): Promise<{ newDeadline: Date }> {
-    return this.orderLifecycle.extendConfirmation(orderId, adminId, hours, reason);
+    return this.orderLifecycle.extendConfirmation(
+      orderId,
+      adminId,
+      hours,
+      reason,
+    );
   }
 
   async cancel(orderId: string, userId: string, dto: CancelOrderDto) {
@@ -243,7 +269,9 @@ export class OrderService {
     return this.orderLifecycle.emitDeliveryRevenueInvoices(orderId);
   }
 
-  async autoCompleteDeliveredOrder(orderId: string): Promise<{ completed: boolean }> {
+  async autoCompleteDeliveredOrder(
+    orderId: string,
+  ): Promise<{ completed: boolean }> {
     return this.orderLifecycle.autoCompleteDeliveredOrder(orderId);
   }
 }

@@ -4,6 +4,22 @@ import { api } from "./client";
 export const ordersApi = {
   getAll: (params?: Record<string, any>) => api.get("/orders", { params }),
   getOne: (id: string | number) => api.get(`/orders/${id}`),
+  /** The buyer's own submitted review for an order (read-only view). */
+  getMyReview: (id: string) =>
+    api.get<{
+      product: {
+        score: number;
+        title: string | null;
+        review: string | null;
+        images: string[];
+        createdAt: string;
+      } | null;
+      seller: {
+        score: number;
+        comment: string | null;
+        createdAt: string;
+      } | null;
+    }>(`/orders/${id}/my-review`),
   create: (data: any) => api.post("/orders", data),
   // Direct buy for authenticated users (Buy Now)
   directBuy: (data: {

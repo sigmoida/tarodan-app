@@ -1,6 +1,6 @@
 /** @format */
 
-import type { ReactNode } from 'react';
+import type { ReactNode } from "react";
 
 /**
  * The single max-width boundary for the marketplace shell. Content is full-bleed
@@ -13,16 +13,17 @@ import type { ReactNode } from 'react';
  * into the server module graph.
  */
 export function Container({
-	className,
-	children,
+  className,
+  children,
 }: {
-	className?: string;
-	children: ReactNode;
+  className?: string;
+  children: ReactNode;
 }) {
-	return (
-		<div
-			className={`px-4 mx-auto w-full max-w-screen-xl ${className ? ` ${className}` : ''}`}>
-			{children}
-		</div>
-	);
+  return (
+    <div
+      className={`px-4 mx-auto w-full max-w-screen-2xl ${className ? ` ${className}` : ""}`}
+    >
+      {children}
+    </div>
+  );
 }

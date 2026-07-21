@@ -42,6 +42,11 @@ export function useMessaging(enabled: boolean) {
   const [draftsByThreadId, setDraftsByThreadId] = useState<
     Record<string, Draft>
   >({});
+  // Product context (from `?listing=`) to attach to the NEXT message sent in a
+  // thread, so opening the same seller from a different listing switches context.
+  const [pendingProductByThreadId, setPendingProductByThreadId] = useState<
+    Record<string, string>
+  >({});
   const [sending, setSending] = useState(false);
   const [creatingThread, setCreatingThread] = useState(false);
   const [threadsExpanded, setThreadsExpanded] = useState(false);
@@ -196,15 +201,18 @@ export function useMessaging(enabled: boolean) {
       }
     }
 
-    // Check if a thread already exists with this seller (and optionally product)
-    const existingThread = threads.find(
-      (t) =>
-        t.otherUser?.id === sellerId &&
-        (!productId || t.product?.id === productId),
-    );
+    // Scenario B: one thread per seller — reuse it regardless of which product
+    // the buyer opened it from (the product becomes per-message/latest context).
+    const existingThread = threads.find((t) => t.otherUser?.id === sellerId);
 
     if (existingThread) {
       setSelectedThread(existingThread);
+      if (productId) {
+        setPendingProductByThreadId((prev) => ({
+          ...prev,
+          [existingThread.id]: productId,
+        }));
+      }
       if (productTitle) {
         const prefilled = prefilledFor(productTitle);
         setDraftsByThreadId((prev) => {
@@ -266,6 +274,12 @@ export function useMessaging(enabled: boolean) {
         queryKey: queryKeys.messages.threads(),
       });
       setSelectedThread(transformedThread);
+      if (productId) {
+        setPendingProductByThreadId((prev) => ({
+          ...prev,
+          [transformedThread.id]: productId,
+        }));
+      }
       if (productTitle) {
         const prefilled = prefilledFor(productTitle);
         setDraftsByThreadId((prev) => ({
@@ -408,9 +422,11 @@ export function useMessaging(enabled: boolean) {
 
     setSending(true);
     try {
+      const productContextId = pendingProductByThreadId[selectedThread.id];
       const response = await messagesApi.sendMessage(
         selectedThread.id,
         contentToSend,
+        productContextId,
       );
       const sentMessage = response.data.message || response.data;
 
@@ -420,6 +436,12 @@ export function useMessaging(enabled: boolean) {
       }
 
       setDraftsByThreadId((prev) => {
+        const next = { ...prev };
+        delete next[selectedThread.id];
+        return next;
+      });
+      setPendingProductByThreadId((prev) => {
+        if (!(selectedThread.id in prev)) return prev;
         const next = { ...prev };
         delete next[selectedThread.id];
         return next;

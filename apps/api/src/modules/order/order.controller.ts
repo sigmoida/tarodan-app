@@ -107,6 +107,21 @@ export class OrderController {
   }
 
   /**
+   * GET /orders/:id/my-review — the buyer's own submitted review for an order
+   * (product + seller). Powers the read-only "Değerlendirmeni Gör" view.
+   */
+  @Get(":id/my-review")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Get the buyer's own review for an order" })
+  async getOrderReview(
+    @Param("id") id: string,
+    @CurrentUser("id") userId: string,
+  ) {
+    return this.orderService.getOrderReview(id, userId);
+  }
+
+  /**
    * POST /orders/guest/send-verification-code — misafir checkout e-posta OTP (her seferinde)
    */
   @Post("guest/send-verification-code")

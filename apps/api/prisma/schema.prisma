@@ -741,12 +741,15 @@ model MessageThread {
   id             String    @id @default(uuid())
   participant1Id String    @map("participant1_id")
   participant2Id String    @map("participant2_id")
+  // One thread per participant pair. `productId` is the most-recently discussed
+  // product (for list/header context) — product context per message lives on
+  // Message.productId, not in the thread key.
   productId      String?   @map("product_id")
   lastMessageAt  DateTime  @default(now()) @map("last_message_at")
   createdAt      DateTime  @default(now()) @map("created_at")
   messages       Message[]
 
-  @@unique([participant1Id, participant2Id, productId])
+  @@unique([participant1Id, participant2Id])
   @@index([participant1Id])
   @@index([participant2Id])
   @@map("message_threads")
@@ -757,6 +760,9 @@ model Message {
   threadId        String        @map("thread_id")
   senderId        String        @map("sender_id")
   receiverId      String        @map("receiver_id")
+  // Optional product this message is about (per-message context). Set when the
+  // buyer opens the chat from a listing; also updates the thread's latest product.
+  productId       String?       @map("product_id")
   content         String
   filteredContent String?       @map("filtered_content")
   status          MessageStatus @default(sent)
@@ -773,6 +779,7 @@ model Message {
   @@index([threadId])
   @@index([senderId])
   @@index([receiverId])
+  @@index([productId])
   @@index([status])
   @@map("messages")
 }
