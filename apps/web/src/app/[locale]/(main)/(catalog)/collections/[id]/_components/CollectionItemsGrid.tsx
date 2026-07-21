@@ -25,11 +25,13 @@ function ItemOverlay({ item }: { item: CollectionItem }) {
       )}
       {isOwner && (
         <Button
-          variant="secondary"
+          variant="danger"
+          size="sm"
           onClick={() => handleRemoveItem(item.id)}
-          className="rounded bg-danger-500/80 p-1.5 opacity-0 transition-colors hover:bg-danger-600 group-hover:opacity-100"
+          aria-label={t("collection.removeItem")}
+          className="opacity-0 transition-opacity group-hover:opacity-100"
         >
-          <TrashIcon className="h-3.5 w-3.5 text-inverted" />
+          <TrashIcon className="h-3.5 w-3.5" />
         </Button>
       )}
     </div>

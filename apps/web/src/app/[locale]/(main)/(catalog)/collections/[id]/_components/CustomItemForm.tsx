@@ -2,185 +2,185 @@
 
 "use client";
 
-import { Button, Input, Select, Textarea } from "@tarodan/ui";
-import type { UseAddItem } from "../_hooks/useAddItem";
+import { useMemo } from "react";
+import { Controller } from "react-hook-form";
+import { Button, Select } from "@tarodan/ui";
+import {
+  Form,
+  FormInput,
+  FormSelect,
+  FormTextarea,
+  FormImageUpload,
+  useZodForm,
+} from "@tarodan/ui/form";
+import { useTranslations } from "next-intl";
+import { collectionsApi, mediaApi } from "@/lib/api";
+import { useWebMutation } from "@/hooks/useWebMutation";
+import { useCollectionDetail } from "../_context/CollectionDetailContext";
+import { useCollectionFilters } from "../_hooks/useCollectionFilters";
+import { useCarModels } from "../_hooks/useCarModels";
+import {
+  customItemSchema,
+  EMPTY_CUSTOM_ITEM,
+  type CustomItemForm as CustomItemValues,
+} from "../_lib/add-item";
 
-export default function CustomItemForm({ s }: { s: UseAddItem }) {
-  const {
-    t,
-    custom,
-    patchCustom,
-    imagePreview,
-    handleImageChange,
-    filters,
-    models,
-    modelsLoading,
-    handleAddCustom,
-    adding,
-    close,
-  } = s;
+/** Custom (non-listing) collection item — its own RHF+zod form + add mutation,
+ *  the web modal recipe. Brand uses a Controller so changing it clears the model;
+ *  the image goes through the shared FormImageUpload (uploads → URL). */
+export default function CustomItemForm({ onClose }: { onClose: () => void }) {
+  const t = useTranslations();
+  const { collection, invalidateCollection } = useCollectionDetail();
+  const filters = useCollectionFilters(true);
 
-  const labelClass = "mb-1 block text-xs font-medium text-muted";
+  const form = useZodForm(customItemSchema, {
+    defaultValues: EMPTY_CUSTOM_ITEM,
+  });
+  const brand = form.watch("brand");
+  const selectedBrandSlug = useMemo(
+    () => filters.brands.find((b) => b.name === brand)?.slug,
+    [filters.brands, brand],
+  );
+  const { models, isLoading: modelsLoading } = useCarModels(selectedBrandSlug);
+
+  const add = useWebMutation(
+    (values: CustomItemValues) =>
+      collectionsApi.addItem(collection!.id, {
+        customTitle: values.title.trim(),
+        customDescription: values.description?.trim() || undefined,
+        customBrand: values.brand?.trim() || undefined,
+        customModel: values.model?.trim() || undefined,
+        customYear: values.year ? Number(values.year) : undefined,
+        customScale: values.scale || undefined,
+        customManufacturer: values.manufacturer?.trim() || undefined,
+        customMaterial: values.material || undefined,
+        customImageUrl: values.imageUrl || undefined,
+      }),
+    {
+      successMessage: t("collection.productsAddedToCollection"),
+      errorMessage: t("collection.productsAddFailed"),
+      onSuccess: async () => {
+        await invalidateCollection();
+        onClose();
+      },
+    },
+  );
+
+  if (!collection) return null;
 
   return (
-    <div className="max-h-[55vh] overflow-y-auto">
-      <div className="space-y-3">
-        <div>
-          <label className={labelClass}>
-            İsim <span className="text-danger-500">*</span>
-          </label>
-          <Input
-            type="text"
-            value={custom.title}
-            onChange={(e) => patchCustom({ title: e.target.value })}
-            placeholder="Ürün ismi"
-          />
-        </div>
-        <div>
-          <label className={labelClass}>Resim</label>
-          <Input type="file" accept="image/*" onChange={handleImageChange} />
-          {imagePreview && (
-            <div className="mt-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={imagePreview}
-                alt="Preview"
-                className="h-24 w-24 rounded object-cover"
-              />
-            </div>
-          )}
-        </div>
-        <div>
-          <label className={labelClass}>Açıklama</label>
-          <Textarea
-            value={custom.description}
-            onChange={(e) => patchCustom({ description: e.target.value })}
-            rows={2}
-            placeholder="Açıklama"
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={labelClass}>Marka</label>
+    <Form
+      form={form}
+      onSubmit={(values) => add.mutate(values)}
+      className="max-h-[60vh] space-y-3 overflow-y-auto"
+    >
+      <FormInput
+        name="title"
+        label={t("collection.customProductName")}
+        placeholder={t("collection.customProductNamePlaceholder")}
+      />
+      <FormImageUpload
+        name="imageUrl"
+        label={t("collection.image")}
+        upload={(file) =>
+          mediaApi.uploadCollectionImage(file).then((res) => res.data.url)
+        }
+      />
+      <FormTextarea
+        name="description"
+        label={t("product.description")}
+        rows={2}
+      />
+      <div className="grid grid-cols-2 gap-3">
+        <Controller
+          name="brand"
+          control={form.control}
+          render={({ field }) => (
             <Select
-              value={custom.brand}
-              onChange={(e) =>
-                patchCustom({ brand: e.target.value, model: "" })
-              }
-              selectSize="sm"
-            >
-              <option value="">Marka seçin</option>
-              {filters.brands.map((b) => (
-                <option key={b.id} value={b.name}>
-                  {b.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div>
-            <label className={labelClass}>Model</label>
-            <Select
-              value={custom.model}
-              onChange={(e) => patchCustom({ model: e.target.value })}
-              disabled={!custom.brand || modelsLoading}
-              selectSize="sm"
-            >
-              <option value="">
-                {modelsLoading ? "Yükleniyor..." : "Model seçin"}
-              </option>
-              {models.map((m) => (
-                <option key={m.id} value={m.name}>
-                  {m.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={labelClass}>Yıl</label>
-            <Input
-              type="number"
-              value={custom.year}
-              onChange={(e) =>
-                patchCustom({
-                  year: e.target.value ? parseInt(e.target.value) : "",
-                })
-              }
-              min="1900"
-              max="2100"
-              placeholder="Yıl"
+              label={t("product.brand")}
+              value={field.value || undefined}
+              onChange={(e) => {
+                field.onChange(e.target.value);
+                form.setValue("model", "");
+              }}
+              placeholder={t("product.selectBrand")}
+              options={filters.brands.map((b) => ({
+                value: b.name,
+                label: b.name,
+              }))}
             />
-          </div>
-          <div>
-            <label className={labelClass}>Ölçek</label>
-            <Select
-              value={custom.scale}
-              onChange={(e) => patchCustom({ scale: e.target.value })}
-              selectSize="sm"
-            >
-              <option value="">Seçiniz</option>
-              {filters.scales.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </Select>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={labelClass}>Üretici</label>
-            <Select
-              value={custom.manufacturer}
-              onChange={(e) => patchCustom({ manufacturer: e.target.value })}
-              selectSize="sm"
-            >
-              <option value="">Üretici seçin</option>
-              {filters.manufacturers.map((m) => (
-                <option key={m.id} value={m.name}>
-                  {m.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div>
-            <label className={labelClass}>Malzeme</label>
-            <Select
-              value={custom.material}
-              onChange={(e) => patchCustom({ material: e.target.value })}
-              selectSize="sm"
-            >
-              <option value="">Malzeme seçin</option>
-              {filters.materials.map((m) => (
-                <option key={m.slug} value={m.slug}>
-                  {m.label}
-                </option>
-              ))}
-            </Select>
-          </div>
-        </div>
+          )}
+        />
+        <FormSelect
+          name="model"
+          label={t("product.model")}
+          placeholder={
+            !brand
+              ? t("product.selectBrandFirst")
+              : modelsLoading
+                ? t("common.loading")
+                : t("product.selectModel")
+          }
+          disabled={!brand || modelsLoading}
+          options={models.map((m) => ({ value: m.name, label: m.name }))}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <FormInput
+          name="year"
+          type="number"
+          label={t("product.releaseYear")}
+          min={1900}
+          max={2100}
+        />
+        <FormSelect
+          name="scale"
+          label={t("product.scale")}
+          placeholder={t("product.selectScale")}
+          options={filters.scales.map((s) => ({ value: s, label: s }))}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <FormSelect
+          name="manufacturer"
+          label={t("product.manufacturer")}
+          placeholder={t("product.selectManufacturer")}
+          options={filters.manufacturers.map((m) => ({
+            value: m.name,
+            label: m.name,
+          }))}
+        />
+        <FormSelect
+          name="material"
+          label={t("product.material")}
+          placeholder={t("product.selectMaterial")}
+          options={filters.materials.map((m) => ({
+            value: m.slug,
+            label: m.label,
+          }))}
+        />
       </div>
 
-      <div className="mt-4 flex gap-3 border-t border-border pt-4">
+      <div className="flex gap-3 border-t border-border pt-4">
         <Button
+          type="button"
           variant="secondary"
           size="sm"
           className="flex-1"
-          onClick={close}
+          onClick={onClose}
         >
           {t("common.cancel")}
         </Button>
         <Button
+          type="submit"
           variant="primary"
           size="sm"
           className="flex-1"
-          onClick={handleAddCustom}
-          disabled={!custom.title.trim() || adding}
+          isLoading={add.isPending}
         >
-          {adding ? t("common.adding") : t("common.add")}
+          {t("common.add")}
         </Button>
       </div>
-    </div>
+    </Form>
   );
 }

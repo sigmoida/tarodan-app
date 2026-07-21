@@ -1,12 +1,15 @@
+/** @format */
+
 "use client";
 
 import { Button, Spinner } from "@tarodan/ui";
+import { useTranslations } from "next-intl";
 import { useAuthStore } from "@/stores/authStore";
 import AuthLoadingScreen from "@/components/AuthLoadingScreen";
-import { useLocale, useTranslations } from "next-intl";
+import { PageShell } from "@/components/layout/PageShell";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { useEditCollection } from "./_hooks/useEditCollection";
 import { useCategoryOptions } from "./_hooks/useCategoryOptions";
-import EditPageHeader from "./_sections/EditPageHeader";
 import CollectionForm from "./_sections/CollectionForm";
 import DeleteCollectionModal from "./_sections/DeleteCollectionModal";
 
@@ -20,47 +23,32 @@ export default function EditCollectionClient() {
     collection,
     isLoading,
     error,
+    form,
+    onSubmit,
     isSaving,
+    uploadCover,
     isDeleting,
     showDeleteModal,
     setShowDeleteModal,
-    name,
-    setName,
-    description,
-    setDescription,
-    categoryId,
-    setCategoryId,
-    coverImagePreview,
-    isUploadingCover,
-    isPublic,
-    setIsPublic,
-    handleCoverImageChange,
-    handleSubmit,
     handleDelete,
   } = useEditCollection();
 
   if (authLoading) return <AuthLoadingScreen />;
   if (!authLoading && (!isAuthenticated || !user)) return null;
+
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-surface flex items-center justify-center">
-        <div className="text-center">
-          <Spinner
-            size="lg"
-            color="border-primary-500 border-t-transparent"
-            className="mx-auto mb-4"
-          />
-          <p className="text-muted">{t("collection.loading")}</p>
-        </div>
-      </div>
+      <PageShell className="flex items-center justify-center">
+        <Spinner size="lg" color="border-primary-500 border-t-transparent" />
+      </PageShell>
     );
   }
 
   if (error || !collection) {
     return (
-      <div className="min-h-screen bg-surface flex items-center justify-center">
+      <PageShell className="flex items-center justify-center">
         <div className="text-center">
-          <p className="text-danger-600 mb-4">
+          <p className="mb-4 text-danger-600">
             {error || t("collection.collectionNotFound")}
           </p>
           <Button
@@ -71,33 +59,25 @@ export default function EditCollectionClient() {
             {t("collection.backToCollections")}
           </Button>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-surface">
-      <EditPageHeader onBack={() => router.back()} />
-      <div className="max-w-3xl mx-auto px-6 sm:px-8 py-6">
-        <CollectionForm
-          name={name}
-          setName={setName}
-          description={description}
-          setDescription={setDescription}
-          categoryId={categoryId}
-          setCategoryId={setCategoryId}
-          flatCategories={flatCategories}
-          coverImagePreview={coverImagePreview}
-          onCoverImageChange={handleCoverImageChange}
-          isUploadingCover={isUploadingCover}
-          isPublic={isPublic}
-          setIsPublic={setIsPublic}
-          isSaving={isSaving}
-          onSubmit={handleSubmit}
-          onCancel={() => router.back()}
-          onDelete={() => setShowDeleteModal(true)}
-        />
-      </div>
+    <PageShell>
+      <PageHeader
+        title={t("collection.editCollectionTitle")}
+        onBack={() => router.back()}
+      />
+      <CollectionForm
+        form={form}
+        onSubmit={onSubmit}
+        isSaving={isSaving}
+        uploadCover={uploadCover}
+        flatCategories={flatCategories}
+        onCancel={() => router.back()}
+        onDelete={() => setShowDeleteModal(true)}
+      />
 
       <DeleteCollectionModal
         show={showDeleteModal}
@@ -105,6 +85,6 @@ export default function EditCollectionClient() {
         onCancel={() => setShowDeleteModal(false)}
         onConfirm={handleDelete}
       />
-    </div>
+    </PageShell>
   );
 }

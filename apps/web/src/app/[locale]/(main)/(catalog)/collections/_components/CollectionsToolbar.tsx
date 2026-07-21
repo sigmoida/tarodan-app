@@ -4,7 +4,7 @@
 
 import { MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
-import { Button, Input, Select } from "@tarodan/ui";
+import { Button, Input, Select, IconButton } from "@tarodan/ui";
 import { useCollections } from "../_context/CollectionsContext";
 import { type SortOption } from "../_lib/data";
 
@@ -63,31 +63,33 @@ export default function CollectionsToolbar() {
 
       {/* Search & Sort Bar */}
       <div className="flex flex-col sm:flex-row gap-3 mb-5">
-        <div className="relative flex-1">
-          <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-subtle" />
+        <div className="flex-1">
           <Input
             type="text"
             placeholder={t("collection.searchCollections")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-8 border border-border rounded-lg bg-surface-elevated text-heading placeholder-subtle focus:outline-none focus:border-primary-400"
+            leftAdornment={<MagnifyingGlassIcon className="h-4 w-4" />}
+            rightAdornment={
+              searchQuery ? (
+                <IconButton
+                  size="xs"
+                  variant="ghost"
+                  aria-label={t("common.clear")}
+                  onClick={() => setSearchQuery("")}
+                >
+                  <XMarkIcon className="h-4 w-4" />
+                </IconButton>
+              ) : undefined
+            }
           />
-          {searchQuery && (
-            <Button
-              variant="secondary"
-              onClick={() => setSearchQuery("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-subtle hover:text-muted"
-            >
-              <XMarkIcon className="w-4 h-4" />
-            </Button>
-          )}
         </div>
         <div className="flex items-center gap-2">
           {activeTab === "public" && (
             <Select
               value={categoryId}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-auto min-w-[140px]"
+              className="w-auto min-w-[140px] whitespace-nowrap"
             >
               <option value="">{t("product.allCategories")}</option>
               {flatCategories.map((cat) => (
@@ -100,7 +102,7 @@ export default function CollectionsToolbar() {
           <Select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortOption)}
-            className="w-auto"
+            className="w-auto min-w-[140px] whitespace-nowrap"
           >
             <option value="popular">{t("common.popular")}</option>
             <option value="recent">{t("common.newest")}</option>

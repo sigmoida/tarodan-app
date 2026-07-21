@@ -48,6 +48,19 @@ export const mediaApi = {
       },
     );
   },
+  uploadCollectionImage: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post<{ url: string; key?: string }>(
+      "/media/upload?folder=collections",
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      },
+    );
+  },
   // Public asset (ürün/koleksiyon/avatar) için doğrudan görüntüleme URL'i.
   // key tam yol olmalı: {env}/{bucket}/... — bucket key'den türetilir.
   getPublicUrl: (key: string) =>
