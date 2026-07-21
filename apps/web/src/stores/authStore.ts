@@ -209,7 +209,7 @@ interface AuthState {
   limits: MembershipLimits | null;
 
   login: (email: string, password: string) => Promise<void>;
-  loginWithGoogle: (idToken: string) => Promise<void>;
+  loginWithGoogle: (code: string) => Promise<void>;
   loginWithApple: (idToken: string, fullName?: string) => Promise<void>;
   register: (
     username: string,
@@ -287,8 +287,8 @@ export const useAuthStore = create<AuthState>()(
           await get().checkAuth();
         },
 
-        loginWithGoogle: async (idToken: string) => {
-          const result = await googleLoginAction(idToken);
+        loginWithGoogle: async (code: string) => {
+          const result = await googleLoginAction(code);
           if (result.status === "error") {
             const error = new Error(result.message) as Error & {
               code: string;

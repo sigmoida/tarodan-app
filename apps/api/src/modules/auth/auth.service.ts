@@ -1246,10 +1246,42 @@ export class AuthService {
   }
 
   /**
+   * Identifier-first login: bir e-postanın aktif bir hesaba ait olup olmadığını
+   * ve o hesabın parolası olup olmadığını (OAuth-only mu) döndürür.
+   *   - exists=false            → kayıtlı değil (UI: "kayıt olun")
+   *   - exists, hasPassword     → normal parola girişi (UI: parola iste)
+   *   - exists, !hasPassword    → Google-only hesap (UI: Google / şifre belirle)
+   * Not: identifier-first akışı doğası gereği hesap varlığını ifşa eder
+   * (user enumeration). Uç @Throttle ile sınırlıdır; bilinçli bir tercihtir.
+   */
+  async checkEmail(
+    email: string,
+  ): Promise<{ exists: boolean; hasPassword: boolean }> {
+    const user = await this.prisma.user.findFirst({
+      where: { email, deletedAt: null },
+      select: { passwordHash: true },
+    });
+    return { exists: !!user, hasPassword: !!user?.passwordHash };
+  }
+
+  /**
    * Google id_token ile giriş: doğrula → OAuthAccount bul → email ile oto-bağla
    * → yoksa yeni kullanıcı. Mevcut JWT akışını kullanır.
    */
-  async loginWithGoogle(idToken: string): Promise<AuthResponseDto> {
+  async loginWithGoogle(
+    input: string | { idToken?: string; code?: string },
+  ): Promise<AuthResponseDto> {
+    // Geriye uyumlu: mobil/native doğrudan id_token string'i gönderir; web
+    // { code } gönderir (backend Google ile takas eder → id_token).
+    const opts = typeof input === "string" ? { idToken: input } : input;
+    const idToken = opts.code
+      ? await this.googleAuthService.exchangeCodeForIdToken(opts.code)
+      : opts.idToken;
+    if (!idToken) {
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.googleSessionInvalid"),
+      );
+    }
     const profile = await this.googleAuthService.verifyIdToken(idToken);
 
     // 1) Mevcut OAuthAccount?

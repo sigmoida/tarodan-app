@@ -31,6 +31,7 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
   GoogleAuthDto,
+  CheckEmailDto,
   AppleAuthDto,
   SendPhoneCodeDto,
   VerifyPhoneDto,
@@ -142,14 +143,31 @@ export class AuthController {
   /**
    * POST /auth/google — Google id_token ile giriş/kayıt
    */
+  /**
+   * POST /auth/check-email — identifier-first: e-posta sistemde var mı?
+   */
+  @Post("check-email")
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @HttpCode(HttpStatus.OK)
+  async checkEmail(
+    @Body() dto: CheckEmailDto,
+  ): Promise<{ exists: boolean; hasPassword: boolean }> {
+    return this.authService.checkEmail(dto.email);
+  }
+
   @Post("google")
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   async google(
     @Body() dto: GoogleAuthDto,
     @Res({ passthrough: true }) res: Response,
   ): Promise<AuthResponseDto> {
-    const result = await this.authService.loginWithGoogle(dto.idToken);
+    const result = await this.authService.loginWithGoogle({
+      idToken: dto.idToken,
+      code: dto.code,
+    });
     // Tarayıcı için httpOnly cookie; mobil yine body'deki token'ı kullanır.
     if (result?.tokens) {
       setAuthCookies(res, result.tokens, { admin: false });
@@ -162,6 +180,7 @@ export class AuthController {
    */
   @Post("apple")
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   async apple(
     @Body() dto: AppleAuthDto,

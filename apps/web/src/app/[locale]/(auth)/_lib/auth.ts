@@ -31,6 +31,27 @@ export const loginSchema = (locale: Locale) => {
 };
 export type LoginValues = z.infer<ReturnType<typeof loginSchema>>;
 
+/** Identifier-first step 1: just the e-mail. */
+export const emailStepSchema = (locale: Locale) => {
+  const t = translator(locale);
+  return z.object({
+    email: z
+      .string()
+      .min(1, t("validation.emailRequired"))
+      .email(t("validation.invalidEmail")),
+  });
+};
+export type EmailStepValues = z.infer<ReturnType<typeof emailStepSchema>>;
+
+/** Identifier-first step 2: just the password (e-mail already resolved). */
+export const passwordStepSchema = (locale: Locale) => {
+  const t = translator(locale);
+  return z.object({
+    password: z.string().min(1, t("validation.passwordRequired")),
+  });
+};
+export type PasswordStepValues = z.infer<ReturnType<typeof passwordStepSchema>>;
+
 /** Just an e-mail — the verify-email "resend" mini-form. */
 export const resendEmailSchema = (locale: Locale) => {
   const t = translator(locale);

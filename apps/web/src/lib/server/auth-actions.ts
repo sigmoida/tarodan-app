@@ -44,10 +44,8 @@ export async function loginAction(input: {
   return { status: "ok", user };
 }
 
-export async function googleLoginAction(
-  idToken: string,
-): Promise<WebLoginResult> {
-  const result = await authLogic.googleLogin(idToken);
+export async function googleLoginAction(code: string): Promise<WebLoginResult> {
+  const result = await authLogic.googleLogin({ code });
   if (result.status === "error") {
     return {
       status: "error",
