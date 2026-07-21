@@ -2280,6 +2280,8 @@
         "receiverSeller": "Alıcı (Satıcı)",
         "score": "Puan",
         "comment": "Yorum",
+        "reviewId": "Yorum ID",
+        "orderCode": "Sipariş Kodu",
         "source": "Kaynak",
         "order": "Sipariş",
         "trade": "Takas",

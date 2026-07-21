@@ -2280,6 +2280,8 @@
         "receiverSeller": "Recipient (Seller)",
         "score": "Score",
         "comment": "Comment",
+        "reviewId": "Review ID",
+        "orderCode": "Order Code",
         "source": "Source",
         "order": "Order",
         "trade": "Trade",

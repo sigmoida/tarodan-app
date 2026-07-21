@@ -18,6 +18,7 @@ type Act = (id: string, s: ReviewStatus) => void;
 
 export function productReviewColumns(act: Act, t: T, busyId?: string) {
   return [
+    col.code<Review>(t("admin.accounts.reviews.reviewId"), (r) => r.id),
     col.custom<Review>(
       t("admin.accounts.reviews.product"),
       (r) => (
@@ -95,6 +96,7 @@ export function productReviewColumns(act: Act, t: T, busyId?: string) {
 
 export function sellerReviewColumns(act: Act, t: T, busyId?: string) {
   return [
+    col.code<UserRating>(t("admin.accounts.reviews.reviewId"), (r) => r.id),
     col.user<UserRating>(
       t("admin.accounts.reviews.sender"),
       (r) => ({
@@ -110,6 +112,10 @@ export function sellerReviewColumns(act: Act, t: T, busyId?: string) {
         secondary: r.receiver?.email,
       }),
       { sortKey: "receiver.displayName" },
+    ),
+    col.code<UserRating>(
+      t("admin.operations.common.sellerId"),
+      (r) => r.receiver?.id,
     ),
     col.custom<UserRating>(
       t("admin.accounts.reviews.score"),
@@ -150,6 +156,10 @@ export function sellerReviewColumns(act: Act, t: T, busyId?: string) {
         minWidth: 100,
         sortKey: "orderId",
       },
+    ),
+    col.code<UserRating>(
+      t("admin.accounts.reviews.orderCode"),
+      (r) => r.orderId ?? r.tradeId,
     ),
     col.date<UserRating>(t("common.date"), "createdAt"),
     col.rowMenu<UserRating>((r) =>
