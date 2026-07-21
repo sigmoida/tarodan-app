@@ -15,6 +15,8 @@ export interface User {
   membershipTier?: string;
   ordersCount: number;
   productsCount: number;
+  tradesCount: number;
+  refundsCount: number;
 }
 
 /** Normalize the varied user payload into the User shape. */
@@ -32,6 +34,9 @@ export function mapUsers(raw: any[]): User[] {
     membershipTier: u.membership?.tier?.type ?? "free",
     ordersCount: (u._count?.buyerOrders ?? 0) + (u._count?.sellerOrders ?? 0),
     productsCount: u._count?.products ?? 0,
+    tradesCount:
+      (u._count?.initiatedTrades ?? 0) + (u._count?.receivedTrades ?? 0),
+    refundsCount: u._count?.refundRequests ?? 0,
   }));
 }
 

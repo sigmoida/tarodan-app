@@ -132,6 +132,9 @@ export class AdminUserService {
           products: true,
           buyerOrders: true,
           sellerOrders: true,
+          initiatedTrades: true,
+          receivedTrades: true,
+          refundRequests: true,
         },
       },
     } satisfies Prisma.UserSelect;

@@ -22,6 +22,7 @@ export function userColumns(t: T, rowMenu: (u: User) => RowActionItem[]) {
       ),
       { grow: 3, minWidth: 220, sortKey: "displayName", sortType: "text" },
     ),
+    col.code<User>(t("admin.users.userId"), (u) => u.id),
     col.custom<User>(
       t("common.status"),
       (u) => (
@@ -67,6 +68,8 @@ export function userColumns(t: T, rowMenu: (u: User) => RowActionItem[]) {
       (u) => u.productsCount,
       { sortKey: "productsCount" },
     ),
+    col.number<User>(t("admin.users.tradesCount"), (u) => u.tradesCount),
+    col.number<User>(t("admin.users.refundsCount"), (u) => u.refundsCount),
     col.date<User>(t("admin.users.registeredAt"), "createdAt"),
     col.muted<User>(
       t("admin.users.lastLogin"),
