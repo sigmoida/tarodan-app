@@ -16,12 +16,12 @@ export function categoryColumns(t: T, actions: CategoryRowActions) {
     col.number<Category>(
       t("admin.catalog.common.product"),
       (c) => c.productCount,
-      { sortKey: "productsCount" },
+      { sortKey: "productCount" },
     ),
     col.number<Category>(
       t("admin.catalog.common.collection"),
       (c) => c.collectionCount,
-      { sortKey: "collectionsCount" },
+      { sortKey: "collectionCount" },
     ),
     col.badge<Category>(
       t("common.status"),

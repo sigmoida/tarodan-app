@@ -25,14 +25,14 @@ export const sellerColumns = (t: T) => [
     t("admin.accounts.sellerPerformance.products"),
     (s) => s._count.products,
     {
-      sortKey: "productsCount",
+      sortKey: "_count.products",
     },
   ),
   col.number<Seller>(
     t("admin.accounts.sellerPerformance.orders"),
     (s) => s._count.sellerOrders,
     {
-      sortKey: "ordersCount",
+      sortKey: "_count.sellerOrders",
     },
   ),
   col.badge<Seller>(
