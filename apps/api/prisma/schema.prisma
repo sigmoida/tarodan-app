@@ -1453,6 +1453,8 @@ model Shipment {
   providerTrackingId String?         @map("provider_tracking_id")
   providerStatusCode Int?            @map("provider_status_code")
   providerRawStatus  String?         @map("provider_raw_status")
+  // Raw ZPL label from OrtakBarkodOlustur (stored for future printing; not shown in UI).
+  labelZpl           String?         @map("label_zpl")
   receivedBy         String?         @map("received_by")
   returnReason       String?         @map("return_reason")
   createdAt          DateTime        @default(now()) @map("created_at")

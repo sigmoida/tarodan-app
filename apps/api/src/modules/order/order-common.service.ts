@@ -1,9 +1,9 @@
-import { Injectable, Optional, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { CacheService } from '../cache/cache.service';
-import { StorageService } from '../storage/storage.service';
-import { OrderStatus, OfferStatus } from '@prisma/client';
-import { getAvailableQuantity } from '../product/helpers/product-availability.helper';
+import { Injectable, Optional, Logger } from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { CacheService } from "../cache/cache.service";
+import { StorageService } from "../storage/storage.service";
+import { OrderStatus, OfferStatus } from "@prisma/client";
+import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 
 /**
  * Sipariş modülü ortak yardımcıları (sipariş yanıtı formatlama + ürün cache
@@ -28,7 +28,7 @@ export class OrderCommonService {
   async invalidateProductCaches(productId: string): Promise<void> {
     try {
       await this.cache.del(`products:detail:${productId}`);
-      await this.cache.delPattern('products:list:*');
+      await this.cache.delPattern("products:list:*");
       this.logger.log(`Product cache invalidated for ${productId}`);
     } catch (error) {
       this.logger.error(`Failed to invalidate product cache: ${error}`);
@@ -38,17 +38,27 @@ export class OrderCommonService {
   /**
    * Resolve product image URL (S3 key -> presigned URL)
    */
-  private async resolveAvatarUrl(avatarUrl: string | null | undefined): Promise<string | null> {
+  private async resolveAvatarUrl(
+    avatarUrl: string | null | undefined,
+  ): Promise<string | null> {
     if (!avatarUrl) return null;
-    if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) return avatarUrl;
+    if (avatarUrl.startsWith("http://") || avatarUrl.startsWith("https://"))
+      return avatarUrl;
     // avatars S3'te public-read → cache'lenebilir doğrudan URL (presigned'a gerek yok)
     return this.storageService?.getPublicAssetUrl(avatarUrl) ?? null;
   }
 
-  resolveProductImageUrl(imageKeyOrUrl: string | null | undefined): string | null {
+  resolveProductImageUrl(
+    imageKeyOrUrl: string | null | undefined,
+  ): string | null {
     if (!imageKeyOrUrl) return null;
-    if (imageKeyOrUrl.startsWith('http://') || imageKeyOrUrl.startsWith('https://') || imageKeyOrUrl.startsWith('/')) return imageKeyOrUrl;
-    if (imageKeyOrUrl.includes('dev/') || imageKeyOrUrl.includes('prod/')) {
+    if (
+      imageKeyOrUrl.startsWith("http://") ||
+      imageKeyOrUrl.startsWith("https://") ||
+      imageKeyOrUrl.startsWith("/")
+    )
+      return imageKeyOrUrl;
+    if (imageKeyOrUrl.includes("dev/") || imageKeyOrUrl.includes("prod/")) {
       return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
     }
     return null;
@@ -57,14 +67,25 @@ export class OrderCommonService {
   /**
    * Get hasProductRating and hasSellerRating for buyer (used in formatOrderResponse)
    */
-  private async getOrderRatingFlags(order: any, userId: string): Promise<{ hasProductRating?: boolean; hasSellerRating?: boolean }> {
+  private async getOrderRatingFlags(
+    order: any,
+    userId: string,
+  ): Promise<{ hasProductRating?: boolean; hasSellerRating?: boolean }> {
     const isBuyer = order.buyerId === userId;
     if (!isBuyer || !order.productId || !order.sellerId) {
       return {};
     }
     const [productRating, userRating] = await Promise.all([
-      this.prisma.productRating.findFirst({ where: { orderId: order.id, userId } }),
-      this.prisma.rating.findFirst({ where: { orderId: order.id, giverId: userId, receiverId: order.sellerId } }),
+      this.prisma.productRating.findFirst({
+        where: { orderId: order.id, userId },
+      }),
+      this.prisma.rating.findFirst({
+        where: {
+          orderId: order.id,
+          giverId: userId,
+          receiverId: order.sellerId,
+        },
+      }),
     ]);
     return {
       hasProductRating: !!productRating,
@@ -97,37 +118,52 @@ export class OrderCommonService {
    */
   private deriveCancelCategory(order: any): string | null {
     if (order.status !== OrderStatus.cancelled) return null;
-    const reason = (order.cancelReason ?? '').trim();
-    if (!reason) return 'buyer_cancelled';
-    if (reason === 'Ödeme süresi (24 saat) doldu') return 'payment_timeout';
-    if (reason.startsWith('Satıcı belirlenen süre')) return 'seller_no_ship';
-    if (reason.includes('Stok tüken')) return 'stockout';
-    if (reason.includes('takas')) return 'trade_reserved';
-    if (reason === 'Yeni toplu sipariş ile değiştirildi') return 'bulk_replaced';
-    if (reason === 'Alıcı lehine iptal edildi') return 'admin_buyer_favor';
-    if (reason === 'Admin tarafından iptal edildi' || reason.startsWith('Admin force-cancel')) return 'admin';
-    return 'other';
+    const reason = (order.cancelReason ?? "").trim();
+    if (!reason) return "buyer_cancelled";
+    if (reason === "Ödeme süresi (24 saat) doldu") return "payment_timeout";
+    if (reason.startsWith("Satıcı belirlenen süre")) return "seller_no_ship";
+    if (reason.includes("Stok tüken")) return "stockout";
+    if (reason.includes("takas")) return "trade_reserved";
+    if (reason === "Yeni toplu sipariş ile değiştirildi")
+      return "bulk_replaced";
+    if (reason === "Alıcı lehine iptal edildi") return "admin_buyer_favor";
+    if (
+      reason === "Admin tarafından iptal edildi" ||
+      reason.startsWith("Admin force-cancel")
+    )
+      return "admin";
+    return "other";
   }
 
   /**
    * Format order response
    */
   async formatOrderResponse(order: any, userId: string) {
-    const resolvedImageUrl = this.resolveProductImageUrl(order.product?.images?.[0]?.cardKey);
-    const product = order.product ? {
-      id: order.product.id,
-      title: order.product.title,
-      imageUrl: resolvedImageUrl,
-      status: order.product.status,
-      price: order.product.price != null ? Number(order.product.price) : undefined,
-      condition: order.product.condition,
-    } : null;
+    const resolvedImageUrl = this.resolveProductImageUrl(
+      order.product?.images?.[0]?.cardKey,
+    );
+    const product = order.product
+      ? {
+          id: order.product.id,
+          title: order.product.title,
+          imageUrl: resolvedImageUrl,
+          status: order.product.status,
+          price:
+            order.product.price != null
+              ? Number(order.product.price)
+              : undefined,
+          condition: order.product.condition,
+        }
+      : null;
 
-    // Tracking URL: Sürat gönderilerinde takip numarasından türetilir
+    // trackingNumber = OzelKargoTakipNo (bizim ref); cargoCode = gerçek Sürat
+    // KargoTakipNo (providerTrackingId). UI ve Sürat takip sayfası GERÇEK kodu
+    // ister — sipariş numarası orada çözülmez.
     const trackingNumber = order.shipment?.trackingNumber ?? null;
+    const cargoCode = order.shipment?.providerTrackingId ?? null;
     const trackingUrl =
-      trackingNumber && order.shipment?.provider === 'surat'
-        ? `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(trackingNumber)}`
+      cargoCode && order.shipment?.provider === "surat"
+        ? `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(cargoCode)}`
         : null;
 
     const totalAmount = Number(order.totalAmount ?? 0);
@@ -144,7 +180,10 @@ export class OrderCommonService {
     const subtotal = totalAmount - shippingCost - buyerFeeAmount - taxAmount;
     // Net kazanç davranışı korunur: KDV gerçekte satıcı payout'una (escrow hold)
     // dahil edildiğinden net kazanca da dahildir → subtotal + KDV − sellerFee − stopaj.
-    const sellerNetAmount = Math.max(0, subtotal + taxAmount - sellerFeeAmount - withholdingTaxAmount);
+    const sellerNetAmount = Math.max(
+      0,
+      subtotal + taxAmount - sellerFeeAmount - withholdingTaxAmount,
+    );
 
     const pricing = {
       subtotal,
@@ -157,7 +196,7 @@ export class OrderCommonService {
       totalAmount,
       sellerNetAmount,
     };
-    
+
     return {
       id: order.id,
       orderNumber: order.orderNumber,
@@ -165,9 +204,9 @@ export class OrderCommonService {
       // (orderNumber "MEM-" öneki, shippingAddress { type: 'membership' }). Bu siparişlerde
       // yorum/iade/teslimat adresi gibi fiziksel-ürün aksiyonları geçerli değildir.
       isMembership:
-        (order.orderNumber?.startsWith('MEM-') ?? false) ||
-        (typeof order.shippingAddress === 'object' &&
-          (order.shippingAddress as any)?.type === 'membership'),
+        (order.orderNumber?.startsWith("MEM-") ?? false) ||
+        (typeof order.shippingAddress === "object" &&
+          (order.shippingAddress as any)?.type === "membership"),
       checkoutGroupId: order.checkoutGroupId ?? null,
       amount: totalAmount,
       totalAmount,
@@ -179,12 +218,16 @@ export class OrderCommonService {
       status: order.status,
       product,
       // Frontend items array bekliyor - tek ürünü items formatında da döndür
-      items: product ? [{
-        id: order.id,
-        product,
-        quantity: order.quantity ?? 1,
-        price: Number(order.totalAmount),
-      }] : [],
+      items: product
+        ? [
+            {
+              id: order.id,
+              product,
+              quantity: order.quantity ?? 1,
+              price: Number(order.totalAmount),
+            },
+          ]
+        : [],
       buyer: {
         ...order.buyer,
         avatarUrl: await this.resolveAvatarUrl(order.buyer?.avatarUrl),
@@ -193,27 +236,45 @@ export class OrderCommonService {
         ...order.seller,
         avatarUrl: await this.resolveAvatarUrl(order.seller?.avatarUrl),
       },
-      shippingAddress: order.shippingAddress && typeof order.shippingAddress === 'object'
-        ? {
-            id: (order.shippingAddress as any).id || order.shippingAddressId || '',
-            title: (order.shippingAddress as any).title || '',
-            fullName: (order.shippingAddress as any).fullName || '',
-            phone: (order.shippingAddress as any).phone || '',
-            address: (order.shippingAddress as any).address || (order.shippingAddress as any).addressLine1 || '',
-            addressLine1: (order.shippingAddress as any).address || (order.shippingAddress as any).addressLine1 || '',
-            addressLine2: (order.shippingAddress as any).addressLine2 || '',
-            district: (order.shippingAddress as any).district || '',
-            city: (order.shippingAddress as any).city || '',
-            zipCode: (order.shippingAddress as any).zipCode || (order.shippingAddress as any).postalCode || '',
-            postalCode: (order.shippingAddress as any).zipCode || (order.shippingAddress as any).postalCode || '',
-          }
-        : null,
+      shippingAddress:
+        order.shippingAddress && typeof order.shippingAddress === "object"
+          ? {
+              id:
+                (order.shippingAddress as any).id ||
+                order.shippingAddressId ||
+                "",
+              title: (order.shippingAddress as any).title || "",
+              fullName: (order.shippingAddress as any).fullName || "",
+              phone: (order.shippingAddress as any).phone || "",
+              address:
+                (order.shippingAddress as any).address ||
+                (order.shippingAddress as any).addressLine1 ||
+                "",
+              addressLine1:
+                (order.shippingAddress as any).address ||
+                (order.shippingAddress as any).addressLine1 ||
+                "",
+              addressLine2: (order.shippingAddress as any).addressLine2 || "",
+              district: (order.shippingAddress as any).district || "",
+              city: (order.shippingAddress as any).city || "",
+              zipCode:
+                (order.shippingAddress as any).zipCode ||
+                (order.shippingAddress as any).postalCode ||
+                "",
+              postalCode:
+                (order.shippingAddress as any).zipCode ||
+                (order.shippingAddress as any).postalCode ||
+                "",
+            }
+          : null,
       billingAddress: null, // Billing address not stored separately
       shipment: order.shipment
         ? {
             id: order.shipment.id,
             provider: order.shipment.provider,
             trackingNumber: order.shipment.trackingNumber,
+            // Gerçek Sürat kargo kodu (KargoTakipNo) — UI'da gösterilir, şubede verilir.
+            cargoCode,
             trackingUrl,
             status: order.shipment.status,
             cost: order.shipment.cost ? Number(order.shipment.cost) : null,
@@ -223,6 +284,7 @@ export class OrderCommonService {
         : null,
       // Mobil sipariş detayı bu alanları üst seviyede okur (kargo kartı + zaman çizelgesi)
       trackingNumber,
+      cargoCode,
       trackingUrl,
       // Ödeme tek üründe bile checkout group üzerinden bağlanır (order.payment genelde
       // null) → group payment'a düş; yoksa "Ödeme Yapıldı" zaman çizelgesi pasif kalır.
@@ -255,7 +317,9 @@ export class OrderCommonService {
             }
           : undefined;
       })(),
-      activeRefundRequest: this.pickActiveRefundRequest(order.refundRequests ?? []),
+      activeRefundRequest: this.pickActiveRefundRequest(
+        order.refundRequests ?? [],
+      ),
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
     };
@@ -263,17 +327,19 @@ export class OrderCommonService {
 
   private pickActiveRefundRequest(refundRequests: any[]): any | null {
     const activeStatuses = [
-      'pending_review',
-      'approved',
-      'wait_for_delivery',
-      'return_shipment_open',
-      'return_in_transit',
-      'return_delivered',
-      'disputed',
+      "pending_review",
+      "approved",
+      "wait_for_delivery",
+      "return_shipment_open",
+      "return_in_transit",
+      "return_delivered",
+      "disputed",
     ];
-    const active = refundRequests.find((r) => activeStatuses.includes(r.status));
+    const active = refundRequests.find((r) =>
+      activeStatuses.includes(r.status),
+    );
     if (!active) {
-      const refunded = refundRequests.find((r) => r.status === 'refunded');
+      const refunded = refundRequests.find((r) => r.status === "refunded");
       if (refunded) {
         return {
           id: refunded.id,

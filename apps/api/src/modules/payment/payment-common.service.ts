@@ -2,6 +2,20 @@ import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { PaymentStatus } from "@prisma/client";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
+import {
+  normalizeSuratPhone,
+  normalizeSuratLocation,
+} from "../surat-cargo/surat-address.util";
+import {
+  SuratKargoTuru,
+  SuratOdemeTipi,
+  SuratTasimaSekli,
+  SuratTeslimSekli,
+  SuratGonderiSekli,
+  SuratKapidanOdemeTahsilatTipi,
+  type SuratGonderiPayload,
+  type SuratShipmentFailure,
+} from "../surat-cargo/surat-cargo.types";
 
 /**
  * Ödeme grupları arasında paylaşılan yardımcılar (order/trade split'lerindeki
@@ -72,6 +86,86 @@ export class PaymentCommonService {
       this.logger.error(
         `Surat cancel failed for order ${orderNumber}: ${error.message}. Continuing anyway.`,
       );
+    }
+  }
+
+  /**
+   * Create a REAL Sürat cargo code (KargoTakipNo) + ZPL label for an order via
+   * OrtakBarkodOlustur — immediately at payment/order confirmation. NON-BLOCKING:
+   * returns null on any failure (missing address, disabled, Sürat error) so the
+   * caller leaves the shipment `pending` with no code, to be retried later.
+   */
+  async createSuratBarcodeForOrder(
+    orderId: string,
+  ): Promise<{ kargoTakipNo: string; labelZpl: string | null } | null> {
+    if (!this.suratCargoService.isIntegrationEnabled()) return null;
+
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        orderNumber: true,
+        shippingAddress: true,
+        product: { select: { title: true } },
+      },
+    });
+    const addr = order?.shippingAddress as {
+      fullName?: string;
+      phone?: string;
+      city?: string;
+      district?: string;
+      address?: string;
+    } | null;
+    if (!order || !addr?.address || !addr.city || !addr.district) {
+      this.logger.warn(
+        `Surat barcode skipped: missing shipping address order=${orderId}`,
+      );
+      return null;
+    }
+
+    const payload: SuratGonderiPayload = {
+      KisiKurum: String(addr.fullName ?? "").trim() || "Alıcı",
+      AliciAdresi: String(addr.address).trim(),
+      Il: normalizeSuratLocation(String(addr.city)),
+      Ilce: normalizeSuratLocation(String(addr.district)),
+      TelefonCep: normalizeSuratPhone(String(addr.phone ?? "")),
+      SahisBirim: order.product?.title ?? undefined,
+      KargoTuru: SuratKargoTuru.Koli,
+      OdemeTipi: SuratOdemeTipi.Pesin,
+      OzelKargoTakipNo: order.orderNumber,
+      Adet: 1,
+      BirimDesi: 1,
+      BirimKg: 1,
+      KapidanOdemeTahsilatTipi: SuratKapidanOdemeTahsilatTipi.Nakit,
+      TasimaSekli: SuratTasimaSekli.KaraYolu,
+      TeslimSekli: SuratTeslimSekli.AdreseTeslim,
+      GonderiSekli: SuratGonderiSekli.Standart,
+      Pazaryerimi: 0,
+      Iademi: false,
+    };
+
+    try {
+      const result = await this.suratCargoService.createShipmentWithBarcode({
+        idempotencyKey: `surat:order:${order.orderNumber}`,
+        correlationId: order.orderNumber,
+        payload,
+      });
+      if (!result.ok) {
+        const fail = result as SuratShipmentFailure;
+        const reason = fail.kind === "business" ? fail.suratMessage : fail.code;
+        this.logger.warn(
+          `Surat barcode create failed order=${order.orderNumber}: ${reason}`,
+        );
+        return null;
+      }
+      this.logger.log(
+        `Surat barcode created order=${order.orderNumber} kargoTakipNo=${result.kargoTakipNo}`,
+      );
+      return { kargoTakipNo: result.kargoTakipNo, labelZpl: result.labelZpl };
+    } catch (error: any) {
+      this.logger.error(
+        `Surat barcode threw order=${order.orderNumber}: ${error?.message}`,
+      );
+      return null;
     }
   }
 

@@ -6,26 +6,26 @@
 // ─── Technical error classification ───────────────────────────────────────────
 
 export type SuratTechnicalCode =
-  | 'TIMEOUT'
-  | 'NETWORK'
-  | 'HTTP_5XX'
-  | 'PARSE_ERROR'
-  | 'EMPTY_RESPONSE'
-  | 'SOAP_FAULT'
-  | 'UNKNOWN';
+  | "TIMEOUT"
+  | "NETWORK"
+  | "HTTP_5XX"
+  | "PARSE_ERROR"
+  | "EMPTY_RESPONSE"
+  | "SOAP_FAULT"
+  | "UNKNOWN";
 
 // ─── Shipment result types ────────────────────────────────────────────────────
 
 export type SuratShipmentSuccess = {
   ok: true;
-  suratMessage: 'Tamam';
+  suratMessage: "Tamam";
   correlationId: string;
   idempotencyKey: string;
 };
 
 export type SuratTechnicalFailure = {
   ok: false;
-  kind: 'technical';
+  kind: "technical";
   code: SuratTechnicalCode;
   cause: Error | undefined;
   rawBodySnippet?: string;
@@ -35,18 +35,44 @@ export type SuratTechnicalFailure = {
 
 export type SuratBusinessFailure = {
   ok: false;
-  kind: 'business';
+  kind: "business";
   suratMessage: string;
   correlationId: string;
   idempotencyKey: string;
 };
 
 export type SuratShipmentResult =
-  | SuratShipmentSuccess
-  | SuratTechnicalFailure
-  | SuratBusinessFailure;
+  SuratShipmentSuccess | SuratTechnicalFailure | SuratBusinessFailure;
 
 export type SuratShipmentFailure = SuratTechnicalFailure | SuratBusinessFailure;
+
+// ─── Barcode create result (OrtakBarkodOlustur) ───────────────────────────────
+// Unlike the plain create ("Tamam", no code), OrtakBarkodOlustur creates the
+// shipment AND returns the real Sürat KargoTakipNo + a ZPL label immediately.
+
+/** Raw client-layer response from OrtakBarkodOlustur. */
+export interface SuratBarcodeRaw {
+  isError: boolean;
+  message: string;
+  /** Real Sürat cargo code (KargoTakipNo). */
+  kargoTakipNo: string | null;
+  /** First parcel's ZPL label content (full, not truncated). */
+  labelZpl: string | null;
+}
+
+export type SuratBarcodeSuccess = {
+  ok: true;
+  /** Real Sürat cargo code (KargoTakipNo) — shown in UI, given at the branch. */
+  kargoTakipNo: string;
+  /** ZPL label (stored for future printing; not surfaced today). */
+  labelZpl: string | null;
+  suratMessage: string;
+  correlationId: string;
+  idempotencyKey: string;
+};
+
+export type SuratBarcodeResult =
+  SuratBarcodeSuccess | SuratTechnicalFailure | SuratBusinessFailure;
 
 // ─── Gonderi (Shipment) payload — matches WSDL Gonderi class ──────────────────
 

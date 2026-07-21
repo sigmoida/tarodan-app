@@ -32,6 +32,7 @@ export default function SellerActions({ order }: { order: OrderDetail }) {
   }
 
   if (order.status === "preparing") {
+    const cargoCode = order.shipment?.cargoCode ?? null;
     return (
       <SectionCard
         title={
@@ -41,25 +42,30 @@ export default function SellerActions({ order }: { order: OrderDetail }) {
           </span>
         }
       >
-        <p className="text-muted mb-4">{t("order.cargoRefInstructions")}</p>
-        <div className="flex items-center gap-2 mb-4">
-          <code className="flex-1 font-mono text-lg bg-surface-alt px-4 py-3 rounded-lg border border-border-default text-center font-semibold tracking-wider">
-            {order.orderNumber}
-          </code>
-          <Button
-            variant="secondary"
-            size="md"
-            onClick={() => {
-              navigator.clipboard.writeText(order.orderNumber);
-              toast.success(t("order.orderNumberCopied"));
-            }}
-          >
-            {t("common.copy")}
-          </Button>
-        </div>
-        <p className="text-sm text-muted">
-          {t("order.trackingAppearsAfterDropoff")}
-        </p>
+        {cargoCode ? (
+          <>
+            <p className="text-muted mb-4">
+              {t("order.cargoCodeInstructions")}
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 font-mono text-lg bg-surface-alt px-4 py-3 rounded-lg border border-border text-center font-semibold tracking-wider">
+                {cargoCode}
+              </code>
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={() => {
+                  navigator.clipboard.writeText(cargoCode);
+                  toast.success(t("order.cargoCodeCopied"));
+                }}
+              >
+                {t("common.copy")}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-muted">{t("order.cargoCodePending")}</p>
+        )}
       </SectionCard>
     );
   }
