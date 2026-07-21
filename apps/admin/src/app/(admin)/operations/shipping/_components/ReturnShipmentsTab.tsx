@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { ResourceList } from "@/components/list";
 import {
   fetchRefundRequests,
-  REFUND_STATUS_OPTIONS,
+  refundStatusOptions,
 } from "@/lib/refund-request-query";
 import { returnShipmentColumns } from "../_lib/columns";
 import type { ReturnShipmentRow } from "../_lib/types";
@@ -23,7 +23,7 @@ export function ReturnShipmentsTab() {
         <ResourceList.Search />
         <ResourceList.FilterSelect
           name="status"
-          options={REFUND_STATUS_OPTIONS}
+          options={refundStatusOptions(t)}
           className="sm:w-56"
         />
         <ResourceList.DateRange fromName="from" toName="to" />

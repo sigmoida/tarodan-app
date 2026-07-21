@@ -14,10 +14,13 @@ export function transactionRowMenu(
 ) {
   return (t: PayoutTransaction): RowActionItem[] => {
     if (t.status !== "held") return [];
-    const reason = holdReasonForRow({
-      status: t.status,
-      releaseAt: t.releaseAt,
-    });
+    const reason = holdReasonForRow(
+      {
+        status: t.status,
+        releaseAt: t.releaseAt,
+      },
+      translate,
+    );
     const blocked = reason?.code === "frozen" || reason?.code === "open_refund";
     return [
       {

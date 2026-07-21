@@ -6,15 +6,17 @@ import { PageHeader } from "@/components/AdminList";
 import { CronsCard } from "./_components/CronsCard";
 import { TimeAdjustCard } from "./_components/TimeAdjustCard";
 import { useTestToolsPage } from "./_lib/useTestToolsPage";
+import { useTranslations } from "next-intl";
 
 export default function TestToolsPage() {
+  const t = useTranslations();
   const { data: env } = useTestToolsPage();
 
   return (
     <AdminPage>
       <PageHeader
-        title="Test Araçları — Zaman Makinesi"
-        description="Süre bağımlı akışları manuel test et"
+        title={t("admin.system.testTools.title")}
+        description={t("admin.system.testTools.description")}
       >
         {env && (
           <Badge variant={env.isProd ? "danger" : "secondary"}>
@@ -25,8 +27,9 @@ export default function TestToolsPage() {
 
       {env?.isProd && (
         <Alert variant="danger">
-          PROD ortamındasın. Süre değişiklikleri <b>gerçek müşteri verisini</b>{" "}
-          etkiler. Her işlem audit log&apos;a yazılır. Dikkatli ol.
+          {t("admin.system.testTools.prodWarningBefore")}{" "}
+          <b>{t("admin.system.testTools.realCustomerData")}</b>{" "}
+          {t("admin.system.testTools.prodWarningAfter")}
         </Alert>
       )}
 

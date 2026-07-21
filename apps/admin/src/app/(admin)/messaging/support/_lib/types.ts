@@ -2,8 +2,12 @@ import {
   ticketStatusConfig,
   ticketPriorityConfig,
   ticketCategoryConfig,
-} from '@tarodan/ui';
-import { statusFilterOptions } from '@/lib/utils';
+} from "@tarodan/ui";
+import { statusFilterOptions } from "@/lib/utils";
+import type { StatusConfig } from "@tarodan/ui";
+import type { useTranslations } from "next-intl";
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 export interface SupportTicket {
   id: string;
@@ -28,23 +32,107 @@ export interface GuestContact {
   status: string;
 }
 
-export const SUPPORT_TABS = [
-  { key: 'tickets', label: 'Talepler' },
-  { key: 'guest', label: 'Misafir Mesajları' },
+export const supportTabs = (t: T) => [
+  { key: "tickets", label: t("admin.messaging.support.tabs.tickets") },
+  { key: "guest", label: t("admin.messaging.support.tabs.guest") },
 ];
 
-/** Toolbar filter options, derived from the shared ticket status configs. */
-export const ticketStatusOptions = statusFilterOptions(ticketStatusConfig, {
-  allLabel: 'Tüm Durumlar',
-});
-export const ticketPriorityOptions = statusFilterOptions(ticketPriorityConfig, {
-  allLabel: 'Tüm Öncelikler',
-});
-export const ticketCategoryOptions = statusFilterOptions(ticketCategoryConfig, {
-  allLabel: 'Tüm Kategoriler',
+export const supportTicketStatusConfig = (
+  t: T,
+): Record<string, StatusConfig> => ({
+  open: {
+    ...ticketStatusConfig.open,
+    label: t("admin.messaging.support.status.open"),
+  },
+  in_progress: {
+    ...ticketStatusConfig.in_progress,
+    label: t("admin.messaging.support.status.inProgress"),
+  },
+  waiting_customer: {
+    ...ticketStatusConfig.waiting_customer,
+    label: t("admin.messaging.support.status.waitingCustomer"),
+  },
+  resolved: {
+    ...ticketStatusConfig.resolved,
+    label: t("admin.messaging.support.status.resolved"),
+  },
+  closed: {
+    ...ticketStatusConfig.closed,
+    label: t("admin.messaging.support.status.closed"),
+  },
 });
 
+export const supportTicketPriorityConfig = (
+  t: T,
+): Record<string, StatusConfig> => ({
+  low: {
+    ...ticketPriorityConfig.low,
+    label: t("admin.messaging.support.priority.low"),
+  },
+  medium: {
+    ...ticketPriorityConfig.medium,
+    label: t("admin.messaging.support.priority.medium"),
+  },
+  high: {
+    ...ticketPriorityConfig.high,
+    label: t("admin.messaging.support.priority.high"),
+  },
+  urgent: {
+    ...ticketPriorityConfig.urgent,
+    label: t("admin.messaging.support.priority.urgent"),
+  },
+});
+
+export const supportTicketCategoryConfig = (
+  t: T,
+): Record<string, StatusConfig> => ({
+  payment: {
+    ...ticketCategoryConfig.payment,
+    label: t("admin.messaging.support.category.payment"),
+  },
+  shipping: {
+    ...ticketCategoryConfig.shipping,
+    label: t("admin.messaging.support.category.shipping"),
+  },
+  trade: {
+    ...ticketCategoryConfig.trade,
+    label: t("admin.messaging.support.category.trade"),
+  },
+  account: {
+    ...ticketCategoryConfig.account,
+    label: t("admin.messaging.support.category.account"),
+  },
+  product: {
+    ...ticketCategoryConfig.product,
+    label: t("admin.messaging.support.category.product"),
+  },
+  technical: {
+    ...ticketCategoryConfig.technical,
+    label: t("admin.messaging.support.category.technical"),
+  },
+  other: {
+    ...ticketCategoryConfig.other,
+    label: t("admin.messaging.support.category.other"),
+  },
+});
+
+/** Toolbar filter options, derived from the shared ticket status configs. */
+export const ticketStatusOptions = (t: T) =>
+  statusFilterOptions(supportTicketStatusConfig(t), {
+    allLabel: t("admin.messaging.support.allStatuses"),
+  });
+export const ticketPriorityOptions = (t: T) =>
+  statusFilterOptions(supportTicketPriorityConfig(t), {
+    allLabel: t("admin.messaging.support.allPriorities"),
+  });
+export const ticketCategoryOptions = (t: T) =>
+  statusFilterOptions(supportTicketCategoryConfig(t), {
+    allLabel: t("admin.messaging.support.allCategories"),
+  });
+
 /** Status choices for the detail status-change modal (no "all" option). */
-export const TICKET_STATUS_CHOICES = Object.entries(ticketStatusConfig).map(
-  ([value, cfg]) => ({ value, label: cfg.label }),
-);
+export const ticketStatusChoices = (t: T) =>
+  Object.entries(supportTicketStatusConfig(t)).map(([value, cfg]) => ({
+    value,
+    label: cfg.label,
+  }));

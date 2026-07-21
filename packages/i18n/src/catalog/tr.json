@@ -20,6 +20,7 @@
     "yes": "Evet",
     "no": "Hayır",
     "all": "Tümü",
+    "allStatuses": "Tüm Durumlar",
     "none": "Hiçbiri",
     "more": "Daha Fazla",
     "shopping": "Alışveriş",
@@ -57,6 +58,8 @@
     "pending": "Beklemede",
     "approved": "Onaylandı",
     "rejected": "Reddedildi",
+    "completed": "Tamamlandı",
+    "cancelled": "İptal Edildi",
     "view": "Görüntüle",
     "details": "Detaylar",
     "actions": "İşlemler",
@@ -2259,6 +2262,386 @@
     "reasonOther": "Diğer"
   },
   "admin": {
+    "accounts": {
+      "reviews": {
+        "title": "Yorumlar",
+        "description": "Ürün ve satıcı yorumlarını yönetin",
+        "tabs": { "product": "Ürün Yorumları", "seller": "Satıcı Yorumları" },
+        "allStatuses": "Tüm Durumlar",
+        "filters": {
+          "pending": "Bekleyenler",
+          "approved": "Onaylananlar",
+          "rejected": "Reddedilenler"
+        },
+        "product": "Ürün",
+        "review": "Yorum",
+        "verifiedBuyer": "Doğrulanmış alıcı",
+        "sender": "Gönderen",
+        "receiverSeller": "Alıcı (Satıcı)",
+        "score": "Puan",
+        "comment": "Yorum",
+        "source": "Kaynak",
+        "order": "Sipariş",
+        "trade": "Takas",
+        "productReview": "Yorum",
+        "sellerReview": "Satıcı yorumu",
+        "productEmpty": "Yorum bulunamadı",
+        "sellerEmpty": "Satıcı yorumu bulunamadı",
+        "updateFailed": "Yorum durumu güncellenemedi",
+        "reject": "Reddet",
+        "revert": "Geri Al",
+        "actionResult": {
+          "approved": "onaylandı",
+          "pending": "beklemeye alındı",
+          "rejected": "reddedildi"
+        },
+        "confirm": {
+          "approveTitle": "Yorumu Onayla",
+          "approveDescription": "Bu yorumu yayınlamak istediğinize emin misiniz?",
+          "rejectTitle": "Yorumu Reddet",
+          "rejectDescription": "Bu yorumu reddetmek istediğinize emin misiniz?",
+          "revertTitle": "Yorumu Beklemeye Al",
+          "revertDescription": "Bu yorumu yeniden inceleme kuyruğuna almak istediğinize emin misiniz?"
+        }
+      },
+      "sellerApplications": {
+        "title": "Kurumsal Satıcı Başvuruları",
+        "description": "Kurumsal hesap açma taleplerini inceleyin ve onaylayın",
+        "tabs": {
+          "pending": "Bekleyenler",
+          "approved": "Onaylananlar",
+          "rejected": "Reddedilenler"
+        },
+        "company": "Firma",
+        "contact": "Yetkili",
+        "applicationDate": "Başvuru Tarihi",
+        "showDetails": "Detayı Göster",
+        "hideDetails": "Detayı Gizle",
+        "reject": "Reddet",
+        "approveSuccess": "Başvuru onaylandı",
+        "approveError": "Onaylama sırasında hata oluştu",
+        "rejectSuccess": "Başvuru reddedildi",
+        "rejectError": "Red işlemi sırasında hata oluştu",
+        "approveConfirm": "\"{company}\" başvurusunu onaylamak istediğinize emin misiniz? Hesap aktif satıcı olarak işaretlenecek.",
+        "rejectTitle": "Başvuruyu Reddet",
+        "rejectPrompt": "Red nedeni (kullanıcıya gönderilecek):",
+        "rejectPlaceholder": "Lütfen red nedenini açıklayın...",
+        "companyInformation": "Firma Bilgileri",
+        "companyName": "Firma Adı",
+        "taxNumber": "Vergi No",
+        "communication": "İletişim",
+        "empty": "Başvuru bulunamadı"
+      },
+      "sellerPerformance": {
+        "title": "Satıcı Performansı",
+        "description": "Satıcıların sipariş ve ürün metrikleri",
+        "seller": "Satıcı",
+        "membership": "Üyelik",
+        "products": "Ürün",
+        "orders": "Sipariş",
+        "banned": "Yasaklı",
+        "unverified": "Doğrulanmamış",
+        "empty": "Satıcı bulunamadı",
+        "totalSellers": "Toplam Satıcı",
+        "mostOrders": "En Çok Siparişli",
+        "productsOnPage": "Bu Sayfada Toplam Ürün",
+        "memberships": {
+          "business": "Kurumsal",
+          "premium": "Premium",
+          "basic": "Temel",
+          "free": "Ücretsiz"
+        }
+      }
+    },
+    "messaging": {
+      "unknown": "Bilinmeyen",
+      "messages": {
+        "title": "Mesaj Moderasyonu",
+        "detailTitle": "Mesaj Detayı",
+        "notFound": "Mesaj bulunamadı",
+        "sender": "Gönderen",
+        "receiver": "Alıcı",
+        "warning": "Uyarı",
+        "approved": "Mesaj onaylandı",
+        "rejected": "Mesaj reddedildi",
+        "reverted": "Mesaj bekleyene alındı",
+        "senderBanned": "Gönderen kullanıcı engellendi",
+        "senderNotFound": "Gönderen bilgisi bulunamadı",
+        "reject": "Reddet",
+        "revert": "Geri Al",
+        "ban": "Yasakla",
+        "banSender": "Göndereni yasakla",
+        "banSenderTitle": "Göndereni Yasakla",
+        "banReason": "Yasaklama sebebi (mesaj ihlali)",
+        "defaultBanReason": "Mesaj kuralları ihlali",
+        "rejectTitle": "Mesajı Reddet",
+        "rejectionReason": "Red nedeni",
+        "rejectionPlaceholder": "Mesajın neden reddedildiğini yaz...",
+        "rejectionRequired": "Red nedeni gereklidir",
+        "originalContent": "Orijinal içerik",
+        "content": "İçerik",
+        "flaggedReason": "İşaretlenme Nedeni",
+        "threadId": "Konu ID",
+        "conversationHistory": "Konuşma Geçmişi ({count} mesaj)",
+        "filters": {
+          "pending": "Bekleyenler",
+          "approved": "Onaylananlar",
+          "rejected": "Reddedilenler"
+        },
+        "status": { "sent": "Gönderildi", "pending": "Onay Bekliyor" },
+        "summary": {
+          "approved": "onaylanmış mesaj",
+          "rejected": "reddedilen mesaj",
+          "message": "mesaj",
+          "pending": "mesaj onay bekliyor — bekleyen mesajları onaylayın, reddedin veya göndereni yasaklayın"
+        }
+      },
+      "support": {
+        "title": "Destek Merkezi",
+        "subtitle": "Destek taleplerini ve misafir mesajlarını yönetin",
+        "tabs": { "tickets": "Destek Talepleri", "guest": "Misafir Mesajları" },
+        "notFound": "Destek talebi bulunamadı",
+        "guestNotFound": "Misafir mesajı bulunamadı",
+        "ticketNumber": "Talep No",
+        "subject": "Konu",
+        "creator": "Oluşturan",
+        "priorityLabel": "Öncelik",
+        "createdAt": "Oluşturulma",
+        "reference": "Referans",
+        "fullName": "Ad Soyad",
+        "allStatuses": "Tüm Durumlar",
+        "allPriorities": "Tüm Öncelikler",
+        "allCategories": "Tüm Kategoriler",
+        "status": {
+          "open": "Açık",
+          "inProgress": "İşlemde",
+          "waitingCustomer": "Müşteri Bekleniyor",
+          "resolved": "Çözüldü",
+          "closed": "Kapalı"
+        },
+        "priority": {
+          "low": "Düşük",
+          "medium": "Orta",
+          "high": "Yüksek",
+          "urgent": "Acil"
+        },
+        "category": {
+          "account": "Hesap",
+          "payment": "Ödeme",
+          "product": "Ürün",
+          "shipping": "Kargo",
+          "trade": "Takas",
+          "technical": "Teknik",
+          "other": "Diğer"
+        },
+        "reply": "Yanıtla",
+        "replyPlaceholder": "Yanıtınızı yazın...",
+        "replySent": "Yanıt gönderildi",
+        "internalNote": "İç Not",
+        "internalNoteHelper": "Bu not yalnızca yöneticiler tarafından görülebilir",
+        "updateStatus": "Durum Güncelle",
+        "newStatus": "Yeni Durum",
+        "statusUpdated": "Durum güncellendi",
+        "messages": "Mesajlar",
+        "noMessages": "Henüz mesaj yok.",
+        "ticketInfo": "Talep Bilgileri",
+        "assignee": "Atanan",
+        "lastUpdated": "Son Güncelleme",
+        "resolvedAt": "Çözülme"
+      }
+    },
+    "system": {
+      "logs": {
+        "title": "Loglar",
+        "description": "Sistem hataları, güvenlik olayları, e-postalar ve admin işlemleri",
+        "tabs": {
+          "errors": {
+            "label": "Hata Logları",
+            "description": "API isteklerinde oluşan HTTP 4xx/5xx hataları, stack trace ve request detayları"
+          },
+          "security": {
+            "label": "Güvenlik Logları",
+            "description": "Başarısız girişler, IP engellemeleri ve şüpheli aktivite gibi güvenlik olayları"
+          },
+          "emails": {
+            "label": "E-posta Logları",
+            "description": "Sistem tarafından gönderilen tüm e-postaların gönderim durumu ve teslim bilgileri"
+          },
+          "audit": {
+            "label": "Denetim Logları",
+            "description": "Admin kullanıcıların yaptığı işlemler — kim, ne zaman, hangi kaydı değiştirdi"
+          }
+        },
+        "level": "Seviye",
+        "source": "Kaynak",
+        "event": "Olay",
+        "ipOrEmail": "IP / E-posta",
+        "resolved": "Çözüldü",
+        "resolve": "Çöz",
+        "resolveSuccess": "Sorun çözümlendi",
+        "recipient": "Alıcı",
+        "subject": "Konu",
+        "template": "Şablon",
+        "admin": "Admin",
+        "system": "Sistem",
+        "action": "İşlem",
+        "entityType": "Kayıt Tipi",
+        "levels": {
+          "critical": "Kritik",
+          "error": "Hata",
+          "warning": "Uyarı",
+          "high": "Yüksek",
+          "medium": "Orta",
+          "low": "Düşük"
+        },
+        "events": {
+          "failedLogin": "Başarısız Giriş",
+          "ipBlock": "IP Engelleme",
+          "suspiciousActivity": "Şüpheli Aktivite",
+          "passwordReset": "Şifre Sıfırlama",
+          "twoFactorEnabled": "2FA Aktif",
+          "accountLocked": "Hesap Kilitlendi"
+        },
+        "emailStatuses": {
+          "sent": "Gönderildi",
+          "delivered": "Teslim Edildi",
+          "queued": "Kuyrukta",
+          "bounced": "Geri Döndü",
+          "failed": "Başarısız"
+        },
+        "templates": {
+          "welcome": "Hoş Geldiniz",
+          "passwordReset": "Şifre Sıfırlama",
+          "orderConfirmation": "Sipariş Onayı",
+          "shippingUpdate": "Kargo Güncelleme"
+        },
+        "actions": {
+          "userBan": "Kullanıcı Banlandı",
+          "userUnban": "Ban Kaldırıldı",
+          "productApprove": "Ürün Onaylandı",
+          "productReject": "Ürün Reddedildi",
+          "productDelete": "Ürün Silindi",
+          "orderUpdate": "Sipariş Güncellendi",
+          "paymentRefund": "Ödeme İadesi",
+          "categoryCreate": "Kategori Oluşturuldu",
+          "categoryUpdate": "Kategori Güncellendi",
+          "categoryDelete": "Kategori Silindi",
+          "commissionRuleCreate": "Komisyon Kuralı Oluşturuldu",
+          "commissionRuleUpdate": "Komisyon Kuralı Güncellendi",
+          "commissionRuleDelete": "Komisyon Kuralı Silindi",
+          "tradeResolve": "Takas Çözümlendi",
+          "messageApprove": "Mesaj Onaylandı",
+          "messageReject": "Mesaj Reddedildi"
+        },
+        "entities": {
+          "user": "Kullanıcı",
+          "product": "Ürün",
+          "order": "Sipariş",
+          "payment": "Ödeme",
+          "category": "Kategori",
+          "commissionRule": "Komisyon Kuralı",
+          "trade": "Takas",
+          "message": "Mesaj",
+          "supportTicket": "Destek Talebi"
+        },
+        "filters": {
+          "allLevels": "Tüm Seviyeler",
+          "pending": "Bekleyenler",
+          "resolved": "Çözülenler",
+          "allTemplates": "Tüm Şablonlar",
+          "allActions": "Tüm İşlemler",
+          "allEntityTypes": "Tüm Kayıt Tipleri"
+        },
+        "search": {
+          "errors": "Hata mesajı ara...",
+          "security": "Olay / IP / e-posta ara...",
+          "emails": "Alıcı / konu ara...",
+          "audit": "İşlem / admin ara..."
+        },
+        "empty": {
+          "errors": "Hata logu bulunamadı",
+          "security": "Güvenlik logu bulunamadı",
+          "emails": "E-posta logu bulunamadı",
+          "audit": "Denetim logu bulunamadı"
+        },
+        "stats": {
+          "unresolvedCritical": "Çözülmemiş Kritik",
+          "deliveryRate": "Teslim Oranı",
+          "bounceRate": "Bounce Oranı"
+        },
+        "details": {
+          "httpStatus": "HTTP Durumu",
+          "errorType": "Hata Tipi",
+          "userId": "Kullanıcı ID",
+          "ipAddress": "IP Adresi",
+          "errorChain": "Hata Zinciri",
+          "response": "Yanıt Detayı",
+          "requestBody": "İstek Gövdesi",
+          "redacted": "[GİZLİ]",
+          "sensitiveHidden": "(hassas alanlar gizlenmiştir)",
+          "entityId": "Kayıt ID",
+          "oldValues": "Eski Değerler",
+          "newValues": "Yeni Değerler"
+        }
+      },
+      "testTools": {
+        "title": "Test Araçları — Zaman Makinesi",
+        "description": "Süre bağımlı akışları manuel test et",
+        "prodWarningBefore": "PROD ortamındasın. Süre değişiklikleri",
+        "realCustomerData": "gerçek müşteri verisini",
+        "prodWarningAfter": "etkiler. Her işlem audit log'a yazılır. Dikkatli ol.",
+        "cronsTitle": "Cron'lar",
+        "cronsDescription": "Zamanlanmış işleri manuel tetikle (zararsız: yalnız zaten olacak işi erken yapar).",
+        "cronError": "Cron çalıştırılamadı",
+        "cronSuccess": "Çalıştı: {result}",
+        "run": "Çalıştır",
+        "timeAdjustTitle": "Süre Ayarlama",
+        "timeAdjustDescription": "Tek bir kaydı ara, ilgili tarih alanını geri/ileri al. Sonra ilgili cron'u tetikleyip davranışı doğrula.",
+        "type": "Tip",
+        "searchLabel": "Ara ({placeholder})",
+        "searchFailed": "Arama başarısız",
+        "noResults": "Sonuç yok",
+        "minimumCharacters": "En az 2 karakter girin",
+        "adjustFailed": "Değişiklik başarısız",
+        "apply": "Uygula",
+        "adjustRecordBefore": "Seçilen",
+        "adjustRecordMiddle": "kaydının",
+        "adjustRecordAfter": "alanı değişecek:",
+        "oldValue": "Eski",
+        "newValue": "Yeni",
+        "prodDataWarning": "⚠ PROD — gerçek veri değişecek.",
+        "record": "Kayıt",
+        "dates": "Tarihler",
+        "action": "Aksiyon",
+        "expireNow": "Şimdi bitir",
+        "now": "şimdi",
+        "minutesAfter": "~{count} dk sonra",
+        "minutesBefore": "~{count} dk önce",
+        "daysBack": "{count} gün geri",
+        "minutesAfterInput": "X dk sonra",
+        "daysBackInput": "N gün geri",
+        "types": {
+          "boost": "Öne Çıkarma",
+          "membership": "Üyelik",
+          "refund": "İade",
+          "order": "Sipariş",
+          "offer": "Teklif",
+          "trade": "Takas",
+          "hold": "Escrow Hold",
+          "emailVerification": "E-posta Doğrulama",
+          "passwordReset": "Şifre Sıfırlama"
+        },
+        "placeholders": {
+          "product": "ürün başlığı veya slug",
+          "user": "kullanıcı e-posta veya ad",
+          "refund": "sipariş no veya iade id",
+          "order": "sipariş no",
+          "offer": "teklif id veya ürün başlığı",
+          "trade": "takas id",
+          "userEmail": "kullanıcı e-posta"
+        }
+      }
+    },
     "catalog": {
       "common": {
         "maxChars": "En fazla {max} karakter",
@@ -4442,6 +4825,91 @@
       }
     },
     "shared": {
+      "moderation": {
+        "title": "AI Denetim",
+        "count": "{count} AI denetim kaydı",
+        "empty": "AI denetim kaydı yok",
+        "entity": "Varlık",
+        "type": "Tür",
+        "text": "Metin",
+        "image": "Görsel",
+        "result": "Sonuç",
+        "relevance": "İlgililik",
+        "nsfw": "Uygunsuzluk",
+        "reason": "Sebep",
+        "labels": "Etiketler",
+        "entities": {
+          "product": "Ürün",
+          "user": "Kullanıcı",
+          "collection": "Koleksiyon",
+          "upload": "Yükleme",
+          "message": "Mesaj"
+        },
+        "fields": {
+          "avatar": "Avatar",
+          "bio": "Biyografi",
+          "displayName": "Görünen ad",
+          "cover": "Kapak görseli",
+          "item": "Koleksiyon öğesi",
+          "productImage": "Ürün görseli",
+          "messageImage": "Mesaj görseli",
+          "upload": "Yükleme",
+          "name": "Ad",
+          "description": "Açıklama",
+          "title": "Başlık",
+          "comment": "Yorum"
+        },
+        "decisions": {
+          "all": "Tüm sonuçlar",
+          "blocked": "Engellendi",
+          "blockedFilter": "Engellenen",
+          "flag": "Uygunsuz",
+          "review": "İnceleme",
+          "pass": "Temiz"
+        }
+      },
+      "escrow": {
+        "reasons": {
+          "frozen": {
+            "label": "Donduruldu",
+            "detail": "Hold açık bir iade talebi nedeniyle kilitli (frozen) — iade sonuçlanana kadar serbest bırakılamaz."
+          },
+          "openRefund": {
+            "label": "Açık iade var",
+            "detail": "Bu sipariş için açık bir iade talebi var — talep sonuçlanana kadar ödeme bekletiliyor."
+          },
+          "notDelivered": {
+            "label": "Teslim bekleniyor",
+            "detail": "Ürün henüz teslim edilmedi — escrow saati teslimle başlar."
+          },
+          "windowNotElapsed": {
+            "label": "Teslim+{days} dolmadı",
+            "detail": "İade penceresi + grace henüz dolmadı — {date} tarihinde serbest bırakılabilir."
+          },
+          "ready": {
+            "label": "Serbest bırakılabilir",
+            "detail": "İade penceresi doldu ve açık iade yok — ödeme satıcıya aktarılabilir."
+          }
+        },
+        "cancellation": {
+          "beforeShipping": {
+            "label": "İptal (kargo öncesi)",
+            "detail": "Kargo öncesi iptal — ödeme alıcıya tam iade edilir."
+          },
+          "afterShipping": {
+            "label": "İade (kargo sonrası)",
+            "detail": "Kargo sonrası iade — ürün geri gönderilir, iade talebi akışı işler."
+          }
+        }
+      },
+      "refunds": {
+        "status": {
+          "waitForDelivery": "Ürün Teslimi Bekleniyor",
+          "returnShipmentOpen": "İade Kargosu Hazır",
+          "returnInTransit": "İade Yolda",
+          "returnDelivered": "İade Ulaştı (Para Bekleniyor)"
+        }
+      },
       "errors": {
         "title": "Bir şeyler ters gitti",
         "description": "Beklenmeyen bir hata oluştu. Tekrar deneyebilir ya da panele dönebilirsiniz.",

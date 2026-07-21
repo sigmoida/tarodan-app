@@ -1,4 +1,7 @@
-import type { StatusConfig } from '@tarodan/ui';
+import type { StatusConfig } from "@tarodan/ui";
+import type { useTranslations } from "next-intl";
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 export interface Seller {
   id: string;
@@ -15,9 +18,21 @@ export interface Seller {
   };
 }
 
-export const membershipConfig: Record<string, StatusConfig> = {
-  business: { label: 'Kurumsal', variant: 'primary' },
-  premium: { label: 'Premium', variant: 'success' },
-  basic: { label: 'Temel', variant: 'info' },
-  free: { label: 'Ücretsiz', variant: 'secondary' },
-};
+export const membershipConfig = (t: T): Record<string, StatusConfig> => ({
+  business: {
+    label: t("admin.accounts.sellerPerformance.memberships.business"),
+    variant: "primary",
+  },
+  premium: {
+    label: t("admin.accounts.sellerPerformance.memberships.premium"),
+    variant: "success",
+  },
+  basic: {
+    label: t("admin.accounts.sellerPerformance.memberships.basic"),
+    variant: "info",
+  },
+  free: {
+    label: t("admin.accounts.sellerPerformance.memberships.free"),
+    variant: "secondary",
+  },
+});

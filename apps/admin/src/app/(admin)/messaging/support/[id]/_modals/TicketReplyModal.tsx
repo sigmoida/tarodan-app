@@ -1,9 +1,10 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Modal, ModalFooter, Checkbox, Textarea } from '@tarodan/ui';
-import { adminApi } from '@/lib/api';
-import { useAdminMutation } from '@/hooks/useAdminMutation';
+import { useState } from "react";
+import { Modal, ModalFooter, Checkbox, Textarea } from "@tarodan/ui";
+import { adminApi } from "@/lib/api";
+import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { useTranslations } from "next-intl";
 
 /** Reply to a ticket (optionally as an internal note). Owns its own mutation. */
 export function TicketReplyModal({
@@ -13,37 +14,43 @@ export function TicketReplyModal({
   ticketId: string;
   onClose: () => void;
 }) {
-  const [content, setContent] = useState('');
+  const t = useTranslations();
+  const [content, setContent] = useState("");
   const [isInternal, setIsInternal] = useState(false);
 
   const reply = useAdminMutation(
     () => adminApi.replyToTicket(ticketId, content, isInternal),
     {
-      invalidates: ['tickets'],
-      successMessage: 'Yanıt gönderildi',
+      invalidates: ["tickets"],
+      successMessage: t("admin.messaging.support.replySent"),
       onSuccess: onClose,
     },
   );
 
   return (
-    <Modal isOpen onClose={onClose} title="Yanıt Ver" maxWidth="max-w-lg">
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={t("admin.messaging.support.reply")}
+      maxWidth="max-w-lg"
+    >
       <div className="space-y-4">
         <Textarea
-          label="Mesaj"
+          label={t("common.message")}
           value={content}
           onChange={(e) => setContent(e.target.value)}
           rows={6}
-          placeholder="Yanıtınızı yazın..."
+          placeholder={t("admin.messaging.support.replyPlaceholder")}
         />
         <Checkbox
           checked={isInternal}
           onChange={(e) => setIsInternal(e.target.checked)}
-          label="İç not olarak ekle (kullanıcı göremez)"
+          label={t("admin.messaging.support.internalNoteHelper")}
         />
         <ModalFooter
           onCancel={onClose}
           onConfirm={() => reply.mutate()}
-          confirmLabel="Gönder"
+          confirmLabel={t("common.send")}
           isLoading={reply.isPending}
           disabled={!content.trim()}
         />

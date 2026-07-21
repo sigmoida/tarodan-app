@@ -6,6 +6,7 @@ import { AsyncValue } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { mapFilterToApiStatus } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 /**
  * Page-level header subtitle — live total (respecting the active status filter),
@@ -13,6 +14,7 @@ import { mapFilterToApiStatus } from "../_lib/types";
  * PageHeader, outside the ResourceList/SuspenseBoundary.
  */
 export function MessagesSummary() {
+  const t = useTranslations();
   const searchParams = useSearchParams();
   const search = searchParams.get("q") ?? "";
   // Default filter is "pending" (initialFilters) — cleared from the URL when active.
@@ -34,13 +36,28 @@ export function MessagesSummary() {
   });
 
   const count = <AsyncValue loading={isLoading}>{total ?? 0}</AsyncValue>;
-  if (status === "approved") return <>{count} onaylanmış mesaj</>;
-  if (status === "rejected") return <>{count} reddedilen mesaj</>;
-  if (status === "all") return <>Toplam {count} mesaj</>;
+  if (status === "approved")
+    return (
+      <>
+        {count} {t("admin.messaging.messages.summary.approved")}
+      </>
+    );
+  if (status === "rejected")
+    return (
+      <>
+        {count} {t("admin.messaging.messages.summary.rejected")}
+      </>
+    );
+  if (status === "all")
+    return (
+      <>
+        {t("common.total")} {count}{" "}
+        {t("admin.messaging.messages.summary.message")}
+      </>
+    );
   return (
     <>
-      {count} mesaj onay bekliyor — bekleyen mesajları onaylayın, reddedin veya
-      göndereni yasaklayın
+      {count} {t("admin.messaging.messages.summary.pending")}
     </>
   );
 }
