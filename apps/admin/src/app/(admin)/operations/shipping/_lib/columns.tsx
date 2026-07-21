@@ -43,20 +43,20 @@ export const orderShipmentColumns = (t: T) => [
   col.custom<OrderShipmentRow>(
     t("admin.operations.common.trackingNumber"),
     (r) =>
-      r.trackingNumber && r.trackingUrl ? (
+      r.providerTrackingId ? (
         <a
-          href={r.trackingUrl}
+          href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(r.providerTrackingId)}`}
           target="_blank"
           rel="noreferrer"
           className="block truncate font-mono text-xs text-primary-600 hover:underline"
-          title={r.trackingNumber}
+          title={r.providerTrackingId}
         >
-          {r.trackingNumber}
+          {r.providerTrackingId}
         </a>
       ) : (
         <CellCode value={r.trackingNumber} />
       ),
-    { grow: 2, sortKey: "trackingNumber", sortType: "text" },
+    { grow: 2, sortKey: "providerTrackingId", sortType: "text" },
   ),
   col.badge<OrderShipmentRow>(
     t("common.status"),
@@ -97,7 +97,7 @@ export const returnShipmentColumns = (t: T) => [
   ),
   col.code<ReturnShipmentRow>(
     t("admin.operations.common.trackingNumber"),
-    "returnTrackingNumber",
+    (r) => r.returnProviderTrackingId ?? r.returnTrackingNumber,
   ),
   col.badge<ReturnShipmentRow>(
     t("common.status"),
@@ -147,7 +147,7 @@ export const tradeShipmentColumns = (t: T) => [
   ),
   col.code<TradeShipmentRow>(
     t("admin.operations.common.trackingNumber"),
-    "trackingNumber",
+    (r) => r.providerTrackingId ?? r.trackingNumber,
   ),
   col.badge<TradeShipmentRow>(
     t("common.status"),

@@ -25,22 +25,21 @@ export default function ReturnShipmentCard({
         {myReturnShipment.carrier === "surat"
           ? "Sürat Kargo"
           : myReturnShipment.carrier || "—"}
-        {myReturnShipment.trackingNumber
-          ? ` · ${myReturnShipment.trackingNumber}`
+        {(myReturnShipment.cargoCode ?? myReturnShipment.trackingNumber)
+          ? ` · ${myReturnShipment.cargoCode ?? myReturnShipment.trackingNumber}`
           : ""}
       </p>
-      {myReturnShipment.carrier === "surat" &&
-        myReturnShipment.trackingNumber && (
-          <a
-            href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(myReturnShipment.trackingNumber)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 mt-2 text-sm text-primary-600 hover:text-primary-700 font-medium"
-          >
-            <TruckIcon className="w-4 h-4" />
-            {t("order.trackOnSurat")}
-          </a>
-        )}
+      {myReturnShipment.carrier === "surat" && myReturnShipment.cargoCode && (
+        <a
+          href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(myReturnShipment.cargoCode)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 mt-2 text-sm text-primary-600 hover:text-primary-700 font-medium"
+        >
+          <TruckIcon className="w-4 h-4" />
+          {t("order.trackOnSurat")}
+        </a>
+      )}
     </div>
   );
 }

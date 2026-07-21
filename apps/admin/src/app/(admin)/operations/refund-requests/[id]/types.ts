@@ -19,6 +19,8 @@ export interface RefundRequestDetail {
   decidedAt?: string | null;
   returnProvider?: string | null;
   returnTrackingNumber?: string | null;
+  /** Real Sürat return code (KargoTakipNo). */
+  returnProviderTrackingId?: string | null;
   returnStatus?: string | null;
   returnShippedAt?: string | null;
   returnDeliveredAt?: string | null;
@@ -30,10 +32,15 @@ export interface RefundRequestDetail {
   refundShippingFee?: boolean;
   refundBuyerFee?: boolean;
   refundSellerCommission?: boolean;
-  returnShippingPayer?: 'buyer' | 'seller' | 'platform' | null;
+  returnShippingPayer?: "buyer" | "seller" | "platform" | null;
   buyerInitiatedAmicable?: boolean;
   createdAt: string;
-  requester: { id: string; displayName: string; email: string; phone?: string | null };
+  requester: {
+    id: string;
+    displayName: string;
+    email: string;
+    phone?: string | null;
+  };
   order: {
     id: string;
     orderNumber: string;
@@ -45,7 +52,12 @@ export interface RefundRequestDetail {
     quantity?: number | null;
     unitPrice?: number | string | null;
     status: string;
-    seller: { id: string; displayName: string; email: string; phone?: string | null };
+    seller: {
+      id: string;
+      displayName: string;
+      email: string;
+      phone?: string | null;
+    };
     product: { id: string; title: string; images?: { url: string }[] };
     payment?: { id: string; status: string; amount: number | string } | null;
     shipment?: { status: string; deliveredAt?: string | null } | null;

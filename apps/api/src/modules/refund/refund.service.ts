@@ -465,7 +465,7 @@ export class RefundService {
       return updated;
     }
 
-    const result = await this.suratCargoService.submitShipmentWithRetry({
+    const result = await this.suratCargoService.createShipmentWithBarcode({
       idempotencyKey: `surat:refund-return:${rr.refundNumber}`,
       correlationId: `refund-${rr.id}`,
       payload: {
@@ -503,6 +503,9 @@ export class RefundService {
         status: RefundRequestStatus.return_shipment_open,
         returnProvider: "surat",
         returnTrackingNumber: rr.refundNumber,
+        // Real Sürat return code (KargoTakipNo) + label, created immediately.
+        returnProviderTrackingId: result.kargoTakipNo,
+        returnLabelZpl: result.labelZpl,
         returnStatus: ShipmentStatus.label_created,
         returnCreatedAt: new Date(),
       },

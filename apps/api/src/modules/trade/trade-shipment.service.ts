@@ -336,11 +336,29 @@ export class TradeShipmentService {
       for (const item of dispatched) {
         if (!item.payload) continue;
         try {
-          const result = await this.suratCargoService.submitShipmentWithRetry({
-            idempotencyKey: `surat:trade-inbound:${item.ozelKargoTakipNo}`,
-            correlationId: `trade-inbound-${tradeId}`,
-            payload: item.payload,
-          });
+          const result = await this.suratCargoService.createShipmentWithBarcode(
+            {
+              idempotencyKey: `surat:trade-inbound:${item.ozelKargoTakipNo}`,
+              correlationId: `trade-inbound-${tradeId}`,
+              payload: item.payload,
+            },
+          );
+          if (result.ok) {
+            // Persist the REAL Sürat cargo code + label (KargoTakipNo).
+            await this.prisma.tradeShipment
+              .update({
+                where: { id: item.shipmentId },
+                data: {
+                  providerTrackingId: result.kargoTakipNo,
+                  labelZpl: result.labelZpl,
+                },
+              })
+              .catch((e) =>
+                this.logger.error(
+                  `Failed to persist barcode for trade shipment ${item.shipmentId}: ${e.message}`,
+                ),
+              );
+          }
           if (!result.ok) {
             const r = result as any;
             const errMsg =

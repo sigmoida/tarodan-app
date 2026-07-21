@@ -748,9 +748,11 @@ export class SuratTrackingService {
       status: newStatus,
     };
 
-    // Trust Sürat-issued tracking number if we don't yet have one (label just opened)
-    if (!tradeShipment.trackingNumber && gonderi.KargoTakipNo) {
-      updateData.trackingNumber = gonderi.KargoTakipNo;
+    // Backfill the real Sürat code into providerTrackingId if it's not set yet
+    // (created before this change, or barcode-create failed). trackingNumber
+    // stays our OzelKargoTakipNo — the query ref must not change.
+    if (!tradeShipment.providerTrackingId && gonderi.KargoTakipNo) {
+      updateData.providerTrackingId = gonderi.KargoTakipNo;
     }
 
     if (isDelivered && !tradeShipment.deliveredAt) {

@@ -95,12 +95,14 @@ export function ShipmentLegCard({
                       )}
                     </p>
                   )}
-                  {s.trackingNumber && (
+                  {(s.providerTrackingId ?? s.trackingNumber) && (
                     <p>
                       <span className="font-medium text-body">
                         {t("admin.operations.common.trackingNumber")}:
                       </span>{" "}
-                      <span className="font-mono">{s.trackingNumber}</span>
+                      <span className="font-mono">
+                        {s.providerTrackingId ?? s.trackingNumber}
+                      </span>
                     </p>
                   )}
                   {s.carrier && (

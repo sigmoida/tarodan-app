@@ -40,7 +40,9 @@ export default function WarehouseShipmentCard({
           {t("trade.warehouseShipping.yourShipment")}
         </p>
         <p className="font-mono text-base font-bold text-heading break-all">
-          {myToWarehouseShipment?.trackingNumber ?? "—"}
+          {myToWarehouseShipment?.cargoCode ??
+            myToWarehouseShipment?.trackingNumber ??
+            "—"}
         </p>
         <p className="text-xs text-muted mt-2">
           {t("trade.warehouseShipping.handIn")}

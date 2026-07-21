@@ -357,6 +357,8 @@ export class OrderCommonService {
       status: active.status,
       reason: active.reason,
       returnTrackingNumber: active.returnTrackingNumber,
+      // Real Sürat return code (KargoTakipNo) — shown in UI, given at the branch.
+      returnCargoCode: active.returnProviderTrackingId,
       returnProvider: active.returnProvider,
       returnStatus: active.returnStatus,
       createdAt: active.createdAt,
