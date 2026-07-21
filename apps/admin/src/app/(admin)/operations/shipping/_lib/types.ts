@@ -8,6 +8,7 @@ export interface OrderShipmentRow {
     id: string;
     orderNumber: string;
     buyer?: { id: string; displayName: string } | null;
+    seller?: { id: string; displayName: string } | null;
   } | null;
 }
 
@@ -50,5 +51,6 @@ export interface SuratShipmentRow {
     id: string;
     orderNumber: string;
     buyer?: { id: string; displayName: string } | null;
+    seller?: { id: string; displayName: string } | null;
   } | null;
 }

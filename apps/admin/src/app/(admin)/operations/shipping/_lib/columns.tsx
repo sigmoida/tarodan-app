@@ -28,6 +28,14 @@ export const orderShipmentColumns = (t: T) => [
     (r) => r.order?.buyer?.displayName,
     { sortKey: "order.buyer.displayName" },
   ),
+  col.code<OrderShipmentRow>(
+    t("admin.operations.common.buyerId"),
+    (r) => r.order?.buyer?.id,
+  ),
+  col.code<OrderShipmentRow>(
+    t("admin.operations.common.sellerId"),
+    (r) => r.order?.seller?.id,
+  ),
   col.muted<OrderShipmentRow>(
     t("admin.operations.shipping.carrier"),
     "provider",
@@ -157,6 +165,10 @@ export const tradeShipmentColumns = (t: T) => [
         : null,
     { sortKey: "shipper.displayName" },
   ),
+  col.code<TradeShipmentRow>(
+    t("admin.operations.common.buyerId"),
+    (r) => r.recipientUser?.id,
+  ),
   col.muted<TradeShipmentRow>(
     t("admin.operations.shipping.updated"),
     (r) => formatRelative(t, r.updatedAt),
@@ -189,6 +201,10 @@ export function suratShipmentColumns(
       t("admin.operations.common.buyer"),
       (r) => r.order?.buyer?.displayName,
       { sortKey: "order.buyer.displayName" },
+    ),
+    col.code<SuratShipmentRow>(
+      t("admin.operations.common.buyerId"),
+      (r) => r.order?.buyer?.id,
     ),
     col.custom<SuratShipmentRow>(
       t("admin.operations.common.trackingNumber"),
