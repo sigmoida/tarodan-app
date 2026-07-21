@@ -131,6 +131,8 @@ export function useCommissionPreview(
   const enabled = !!price && !Number.isNaN(amount) && amount > 0;
   const query = useWebList<{
     sellerFeeAmount: number;
+    withholdingTaxAmount: number;
+    shippingAmount: number;
     sellerNetAmount: number;
   }>({
     resource: "listing-form-commission",
@@ -141,6 +143,8 @@ export function useCommissionPreview(
       });
       return {
         sellerFeeAmount: Number(res.data?.sellerFeeAmount ?? 0),
+        withholdingTaxAmount: Number(res.data?.withholdingTaxAmount ?? 0),
+        shippingAmount: Number(res.data?.shippingAmount ?? 0),
         sellerNetAmount: Number(res.data?.sellerNetAmount ?? 0),
       };
     },

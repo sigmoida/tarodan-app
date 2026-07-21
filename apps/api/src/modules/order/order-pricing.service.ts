@@ -294,14 +294,18 @@ export class OrderPricingService {
     buyerFeeAmount: number;
     commissionAmount: number;
     withholdingTaxAmount: number;
+    shippingAmount: number;
     sellerNetAmount: number;
   }> {
-    const [result, seller] = await Promise.all([
+    const [result, seller, shippingAmount] = await Promise.all([
       this.calculateCommission(amount, sellerId, categoryId),
       this.prisma.user.findUnique({
         where: { id: sellerId },
         select: { businessStatus: true, taxId: true },
       }),
+      // Buyer-paid, informational only: shown on the seller listing form so they
+      // see the shipping the buyer covers. Does NOT reduce sellerNetAmount.
+      this.calculateShippingCost(amount),
     ]);
     // Kurumsal satıcıda stopaj da kesileceğinden önizleme neti gerçek payout ile eşleşsin.
     let withholdingTaxAmount = 0;
@@ -318,6 +322,7 @@ export class OrderPricingService {
       buyerFeeAmount: result.buyerFeeAmount,
       commissionAmount: result.commissionAmount,
       withholdingTaxAmount,
+      shippingAmount,
       sellerNetAmount,
     };
   }
