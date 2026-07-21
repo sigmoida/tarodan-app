@@ -1,6 +1,5 @@
 "use client";
 
-import { CubeIcon } from "@heroicons/react/24/outline";
 import { Badge, productConditionConfig, enumLabel } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { SectionCard } from "@/components/detail/SectionCard";
@@ -33,7 +32,6 @@ export function ProductInfoSection({ product }: { product: ProductDetail }) {
   return (
     <SectionCard
       title={t("admin.catalog.products.infoTab")}
-      icon={CubeIcon}
       bodyClassName="space-y-3"
     >
       <Row label={t("common.title")}>{product.title}</Row>

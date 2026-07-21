@@ -3619,7 +3619,7 @@
         "filterReviewQueue": "Filter review queue",
         "reviewQueueCount": "<value>{count}</value> trades awaiting review",
         "disputedCount": "{count} disputed trades",
-        "detailTitle": "Trade Details",
+        "detailTitle": "Trade",
         "createdAtLabel": "Created: {date}",
         "resolve": "Resolve",
         "resolveShort": "Resolve",

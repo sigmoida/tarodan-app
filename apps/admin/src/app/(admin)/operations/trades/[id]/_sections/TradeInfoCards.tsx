@@ -1,6 +1,5 @@
 "use client";
 
-import { XCircleIcon } from "@heroicons/react/24/outline";
 import { enumLabel, refundReasonConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { cancelReasonLabel } from "@/lib/utils";
@@ -19,9 +18,8 @@ export function TradeInfoCards({ trade }: { trade: TradeDetail }) {
   return (
     <>
       {rawReason && (
-        <div className="rounded-xl border border-danger-200 bg-danger-50 p-6">
-          <h2 className="mb-2 flex items-center gap-2 text-lg font-semibold text-danger-900">
-            <XCircleIcon className="h-5 w-5" />
+        <div className="rounded-lg border border-danger-200 bg-danger-50 p-6 shadow-sm">
+          <h2 className="mb-2 text-lg font-semibold text-danger-900">
             {trade.rejectionReason
               ? t("admin.operations.trades.rejectReason")
               : t("admin.operations.trades.cancelReason")}
@@ -38,7 +36,7 @@ export function TradeInfoCards({ trade }: { trade: TradeDetail }) {
       )}
 
       {trade.adminNotes && (
-        <div className="rounded-xl border border-info-200 bg-info-50 p-6">
+        <div className="rounded-lg border border-info-200 bg-info-50 p-6 shadow-sm">
           <h2 className="mb-2 text-lg font-semibold text-info-900">
             {t("admin.operations.trades.adminNotes")}
           </h2>

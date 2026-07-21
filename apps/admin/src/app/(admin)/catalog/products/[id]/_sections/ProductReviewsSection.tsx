@@ -68,7 +68,6 @@ export function ProductReviewsSection({
   return (
     <SectionCard
       title={t("admin.catalog.products.reviewsTitle")}
-      icon={StarIcon}
       bodyClassName="space-y-4"
     >
       {reviews.length === 0 ? (

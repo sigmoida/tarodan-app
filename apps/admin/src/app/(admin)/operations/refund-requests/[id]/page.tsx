@@ -90,9 +90,7 @@ export default function RefundRequestDetailPage() {
       title={(rr) => (
         <>
           {t("admin.operations.refundRequests.detailTitle")}
-          <span className="ml-2 font-mono text-base text-muted">
-            {rr.refundNumber}
-          </span>
+          {rr.refundNumber && <span className="ml-2">#{rr.refundNumber}</span>}
         </>
       )}
       subtitle={(rr) =>

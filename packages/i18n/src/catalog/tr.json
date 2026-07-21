@@ -3619,7 +3619,7 @@
         "filterReviewQueue": "İnceleme kuyruğunu filtrele",
         "reviewQueueCount": "<value>{count}</value> takas inceleme bekliyor",
         "disputedCount": "{count} itirazlı takas",
-        "detailTitle": "Takas Detayı",
+        "detailTitle": "Takas",
         "createdAtLabel": "Oluşturulma: {date}",
         "resolve": "Çözümle",
         "resolveShort": "Çöz",
