@@ -4121,7 +4121,7 @@
       }
     },
     "reports": {
-      "title": "Rapor Talepleri",
+      "title": "İstek, Öneri ve Şikayet",
       "description": "Kullanıcıların ürün, kullanıcı, koleksiyon ve mesajlar için gönderdiği şikayetler",
       "loadError": "Şikayetler yüklenirken hata oluştu",
       "empty": "Henüz şikayet yok",
@@ -4154,7 +4154,10 @@
         "type": "Tür",
         "reason": "Neden",
         "reporter": "Raporlayan",
-        "targetId": "Hedef ID"
+        "targetId": "Hedef ID",
+        "requestId": "Talep ID",
+        "userId": "Kullanıcı ID",
+        "resolution": "Dönüş/Çözüm"
       }
     },
     "settings": {

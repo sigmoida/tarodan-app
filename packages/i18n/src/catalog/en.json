@@ -4121,7 +4121,7 @@
       }
     },
     "reports": {
-      "title": "Report Requests",
+      "title": "Requests, Suggestions & Complaints",
       "description": "Complaints submitted by users for products, users, collections, and messages",
       "loadError": "Failed to load complaints",
       "empty": "No complaints yet",
@@ -4154,7 +4154,10 @@
         "type": "Type",
         "reason": "Reason",
         "reporter": "Reporter",
-        "targetId": "Target ID"
+        "targetId": "Target ID",
+        "requestId": "Request ID",
+        "userId": "User ID",
+        "resolution": "Response / Resolution"
       }
     },
     "settings": {
