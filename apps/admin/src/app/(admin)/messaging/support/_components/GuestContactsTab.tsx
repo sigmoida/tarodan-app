@@ -9,9 +9,11 @@ import { guestColumns } from "../_lib/columns";
 import { guestRowMenu } from "../_lib/rowActions";
 import { type GuestContact } from "../_lib/types";
 import { GuestContactModal } from "./GuestContactModal";
+import { useTranslations } from "next-intl";
 
 /** Guest contact messages — server-paginated (cache-backed); row opens modal. */
 export function GuestContactsTab() {
+  const t = useTranslations();
   const [selected, setSelected] = useState<GuestContact | null>(null);
 
   return (
@@ -26,8 +28,8 @@ export function GuestContactsTab() {
           <ResourceList.Search />
         </ResourceList.Toolbar>
         <ResourceList.Table
-          columns={guestColumns(guestRowMenu(setSelected))}
-          emptyText="Misafir mesajı bulunamadı"
+          columns={guestColumns(guestRowMenu(setSelected, t), t)}
+          emptyText={t("admin.messaging.support.guestNotFound")}
         />
         <ResourceList.Pagination />
       </ResourceList>

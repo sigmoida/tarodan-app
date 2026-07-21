@@ -64,12 +64,15 @@ export function EscrowStatusCard({
 
   const releaseAt = computeEstimatedReleaseAt(deliveredAt);
   const windowEnd = computeRefundWindowEnd(deliveredAt);
-  const cancelType = cancellationTypeLabel(cancellationType);
+  const cancelType = cancellationTypeLabel(cancellationType, t);
 
-  const reason = describeHoldReason({
-    hasOpenRefund: openRefund,
-    deliveredAt: deliveredAt ?? null,
-  });
+  const reason = describeHoldReason(
+    {
+      hasOpenRefund: openRefund,
+      deliveredAt: deliveredAt ?? null,
+    },
+    t,
+  );
   const tone = toneStyles[reason.tone] ?? toneStyles.info;
 
   return (

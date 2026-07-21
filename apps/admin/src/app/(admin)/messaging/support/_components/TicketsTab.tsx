@@ -11,9 +11,11 @@ import {
   ticketPriorityOptions,
   ticketCategoryOptions,
 } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 /** Support tickets — server-paginated list (getTickets uses `pageSize`). */
 export function TicketsTab() {
+  const t = useTranslations();
   return (
     <ResourceList<SupportTicket>
       resource="tickets"
@@ -26,23 +28,23 @@ export function TicketsTab() {
         <ResourceList.Search />
         <ResourceList.FilterSelect
           name="status"
-          options={ticketStatusOptions}
+          options={ticketStatusOptions(t)}
           className="sm:w-44"
         />
         <ResourceList.FilterSelect
           name="priority"
-          options={ticketPriorityOptions}
+          options={ticketPriorityOptions(t)}
           className="sm:w-44"
         />
         <ResourceList.FilterSelect
           name="category"
-          options={ticketCategoryOptions}
+          options={ticketCategoryOptions(t)}
           className="sm:w-44"
         />
       </ResourceList.Toolbar>
       <ResourceList.Table
-        columns={ticketColumns}
-        emptyText="Destek talebi bulunamadı"
+        columns={ticketColumns(t)}
+        emptyText={t("admin.messaging.support.notFound")}
       />
       <ResourceList.Pagination />
     </ResourceList>

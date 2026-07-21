@@ -10,6 +10,9 @@ import { ResourceList, useResourceList } from "@/components/list";
 import { col, Empty } from "@/components/table";
 import { type ColumnDef } from "@/components/DataTable";
 import { type AdminTab } from "@/components/AdminTabs";
+import { useTranslations } from "next-intl";
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 // ─── Type ────────────────────────────────────────────────────────────────────
 
@@ -31,44 +34,59 @@ export interface ModerationEvent {
 
 // ─── Label dictionaries ──────────────────────────────────────────────────────
 
-const ENTITY_LABELS: Record<string, string> = {
-  product: "Ürün",
-  user: "Kullanıcı",
-  collection: "Koleksiyon",
-  upload: "Yükleme",
-  message: "Mesaj",
-};
+const entityLabels = (t: T): Record<string, string> => ({
+  product: t("admin.shared.moderation.entities.product"),
+  user: t("admin.shared.moderation.entities.user"),
+  collection: t("admin.shared.moderation.entities.collection"),
+  upload: t("admin.shared.moderation.entities.upload"),
+  message: t("admin.shared.moderation.entities.message"),
+});
 
-const FIELD_LABELS: Record<string, string> = {
-  avatar: "Avatar",
-  bio: "Biyografi",
-  display_name: "Görünen ad",
-  cover: "Kapak görseli",
-  item: "Koleksiyon öğesi",
-  product_image: "Ürün görseli",
-  message_image: "Mesaj görseli",
-  upload: "Yükleme",
-  name: "Ad",
-  description: "Açıklama",
-  title: "Başlık",
-  comment: "Yorum",
-};
+const fieldLabels = (t: T): Record<string, string> => ({
+  avatar: t("admin.shared.moderation.fields.avatar"),
+  bio: t("admin.shared.moderation.fields.bio"),
+  display_name: t("admin.shared.moderation.fields.displayName"),
+  cover: t("admin.shared.moderation.fields.cover"),
+  item: t("admin.shared.moderation.fields.item"),
+  product_image: t("admin.shared.moderation.fields.productImage"),
+  message_image: t("admin.shared.moderation.fields.messageImage"),
+  upload: t("admin.shared.moderation.fields.upload"),
+  name: t("admin.shared.moderation.fields.name"),
+  description: t("admin.shared.moderation.fields.description"),
+  title: t("admin.shared.moderation.fields.title"),
+  comment: t("admin.shared.moderation.fields.comment"),
+});
 
-const DECISION_OPTIONS = [
-  { value: "", label: "Tüm sonuçlar" },
-  { value: "blocked", label: "Engellenen" },
-  { value: "flag", label: "Uygunsuz" },
-  { value: "review", label: "İnceleme" },
-  { value: "pass", label: "Temiz" },
+const decisionOptions = (t: T) => [
+  { value: "", label: t("admin.shared.moderation.decisions.all") },
+  {
+    value: "blocked",
+    label: t("admin.shared.moderation.decisions.blockedFilter"),
+  },
+  { value: "flag", label: t("admin.shared.moderation.decisions.flag") },
+  { value: "review", label: t("admin.shared.moderation.decisions.review") },
+  { value: "pass", label: t("admin.shared.moderation.decisions.pass") },
 ];
 
 /** AI moderation decision → badge. Anything outside the known values counts as "pass". */
-const decisionConfig: Record<string, StatusConfig> = {
-  blocked: { label: "Engellendi", variant: "danger" },
-  flag: { label: "Uygunsuz", variant: "danger" },
-  review: { label: "İnceleme", variant: "warning" },
-  pass: { label: "Temiz", variant: "success" },
-};
+const decisionConfig = (t: T): Record<string, StatusConfig> => ({
+  blocked: {
+    label: t("admin.shared.moderation.decisions.blocked"),
+    variant: "danger",
+  },
+  flag: {
+    label: t("admin.shared.moderation.decisions.flag"),
+    variant: "danger",
+  },
+  review: {
+    label: t("admin.shared.moderation.decisions.review"),
+    variant: "warning",
+  },
+  pass: {
+    label: t("admin.shared.moderation.decisions.pass"),
+    variant: "success",
+  },
+});
 
 const decisionKey = (d: string) =>
   d === "blocked" || d === "flag" || d === "review" ? d : "pass";
@@ -83,14 +101,15 @@ function entityHref(e: ModerationEvent): string | null {
 
 function moderationColumns(
   withEntityCol: boolean,
+  t: T,
 ): ColumnDef<ModerationEvent, unknown>[] {
   const cols: ColumnDef<ModerationEvent, unknown>[] = [];
   if (withEntityCol) {
     cols.push(
       col.custom<ModerationEvent>(
-        "Varlık",
+        t("admin.shared.moderation.entity"),
         (e) => {
-          const label = ENTITY_LABELS[e.entityType] ?? e.entityType;
+          const label = entityLabels(t)[e.entityType] ?? e.entityType;
           const href = entityHref(e);
           return href ? (
             <Link href={href} className="text-primary-600 hover:underline">
@@ -106,20 +125,22 @@ function moderationColumns(
   }
   cols.push(
     col.text<ModerationEvent>(
-      "Tür",
+      t("admin.shared.moderation.type"),
       (e) =>
-        `${e.kind === "text" ? "Metin" : "Görsel"}${
-          e.field ? ` · ${FIELD_LABELS[e.field] ?? e.field}` : ""
+        `${e.kind === "text" ? t("admin.shared.moderation.text") : t("admin.shared.moderation.image")}${
+          e.field ? ` · ${fieldLabels(t)[e.field] ?? e.field}` : ""
         }`,
       { minWidth: 140, sortKey: "kind", sortType: "text" },
     ),
     col.badge<ModerationEvent>(
-      "Sonuç",
-      (e) => <Badge status={decisionKey(e.decision)} config={decisionConfig} />,
+      t("admin.shared.moderation.result"),
+      (e) => (
+        <Badge status={decisionKey(e.decision)} config={decisionConfig(t)} />
+      ),
       { sortKey: "decision", sortType: "text" },
     ),
     col.custom<ModerationEvent>(
-      "İlgililik",
+      t("admin.shared.moderation.relevance"),
       (e) =>
         e.relevanceScore != null ? (
           <span className="whitespace-nowrap tabular-nums text-body">
@@ -136,7 +157,7 @@ function moderationColumns(
       },
     ),
     col.custom<ModerationEvent>(
-      "Uygunsuzluk",
+      t("admin.shared.moderation.nsfw"),
       (e) =>
         e.nsfwScore != null ? (
           <span className="whitespace-nowrap tabular-nums text-body">
@@ -152,12 +173,13 @@ function moderationColumns(
         sortType: "number",
       },
     ),
-    col.text<ModerationEvent>("Sebep", (e) => e.reason, {
-      grow: 2,
-      sortKey: "reason",
-    }),
+    col.text<ModerationEvent>(
+      t("admin.shared.moderation.reason"),
+      (e) => e.reason,
+      { grow: 2, sortKey: "reason" },
+    ),
     col.user<ModerationEvent>(
-      "Kullanıcı",
+      t("common.user"),
       (e) =>
         e.user
           ? {
@@ -167,32 +189,40 @@ function moderationColumns(
           : null,
       { sortKey: "userId" },
     ),
-    col.date<ModerationEvent>("Tarih", "createdAt"),
+    col.date<ModerationEvent>(t("common.date"), "createdAt"),
   );
   return cols;
 }
 
 function ModerationCount() {
+  const t = useTranslations();
   const { total } = useResourceList<ModerationEvent>();
-  return <>{`${total} AI denetim kaydı`}</>;
+  return <>{t("admin.shared.moderation.count", { count: total })}</>;
 }
 
 function ExpandedRow({ e }: { e: ModerationEvent }) {
+  const t = useTranslations();
   return (
     <div className="space-y-2 bg-surface-alt px-4 py-3 text-sm">
       {e.reason && (
         <div>
-          <span className="font-medium text-heading">Sebep: </span>
+          <span className="font-medium text-heading">
+            {t("admin.shared.moderation.reason")}:{" "}
+          </span>
           <span className="text-muted">{e.reason}</span>
         </div>
       )}
       {e.relevanceScore != null && (
         <div>
-          <span className="font-medium text-heading">İlgililik: </span>
+          <span className="font-medium text-heading">
+            {t("admin.shared.moderation.relevance")}:{" "}
+          </span>
           <span className="text-muted">
             %{Math.round(e.relevanceScore * 100)}
           </span>
-          <span className="ml-4 font-medium text-heading">Uygunsuzluk: </span>
+          <span className="ml-4 font-medium text-heading">
+            {t("admin.shared.moderation.nsfw")}:{" "}
+          </span>
           <span className="text-muted">
             %{((e.nsfwScore ?? 0) * 100).toFixed(2)}
           </span>
@@ -200,7 +230,9 @@ function ExpandedRow({ e }: { e: ModerationEvent }) {
       )}
       {e.labels && e.labels.length > 0 && (
         <div>
-          <span className="font-medium text-heading">Etiketler: </span>
+          <span className="font-medium text-heading">
+            {t("admin.shared.moderation.labels")}:{" "}
+          </span>
           <span className="text-muted">
             {e.labels
               .map((l) => `${l.label} (%${Math.round(l.score * 100)})`)
@@ -248,7 +280,7 @@ export function ModerationEventsPanel({
   entityType,
   entityId,
   userId,
-  title = "AI Denetim",
+  title,
   description,
   showEntityColumn,
   tabs,
@@ -256,9 +288,10 @@ export function ModerationEventsPanel({
   onTabChange,
   chrome = true,
 }: ModerationEventsPanelProps) {
+  const t = useTranslations();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const withEntityCol = showEntityColumn ?? !entityType;
-  const columns = moderationColumns(withEntityCol);
+  const columns = moderationColumns(withEntityCol, t);
 
   return (
     <ResourceList<ModerationEvent>
@@ -274,7 +307,7 @@ export function ModerationEventsPanel({
     >
       {chrome && (
         <ResourceList.Header
-          title={title}
+          title={title ?? t("admin.shared.moderation.title")}
           description={description ?? <ModerationCount />}
           tabs={tabs}
           activeTab={activeTab}
@@ -285,13 +318,13 @@ export function ModerationEventsPanel({
         <ResourceList.Search />
         <ResourceList.FilterSelect
           name="decision"
-          options={DECISION_OPTIONS}
+          options={decisionOptions(t)}
           className="sm:w-56"
         />
       </ResourceList.Toolbar>
       <ResourceList.Table
         columns={columns}
-        emptyText="AI denetim kaydı yok"
+        emptyText={t("admin.shared.moderation.empty")}
         expandedId={expandedId}
         renderExpanded={(r) => <ExpandedRow e={r} />}
         onRowClick={(r) => setExpandedId(expandedId === r.id ? null : r.id)}

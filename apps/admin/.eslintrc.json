@@ -9,20 +9,6 @@
     {
       "files": ["**/*.spec.*", "**/*.test.*"],
       "rules": { "@tarodan/no-hardcoded-turkish": "off" }
-    },
-    {
-      "files": [
-        "src/app/(admin)/messaging/**",
-        "src/app/(admin)/accounts/reviews/**",
-        "src/app/(admin)/accounts/seller-applications/**",
-        "src/app/(admin)/accounts/seller-performance/**",
-        "src/app/(admin)/system/logs/**",
-        "src/app/(admin)/system/test-tools/**",
-        "src/components/ModerationEventsPanel.tsx",
-        "src/lib/escrow.ts",
-        "src/lib/refund-request-query.ts"
-      ],
-      "rules": { "@tarodan/no-hardcoded-turkish": "off" }
     }
   ]
 }

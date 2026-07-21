@@ -12,13 +12,15 @@ import { timeAdjustColumns } from "../_lib/columns";
 import {
   type AdjustAction,
   type SearchItem,
-  TYPES,
+  testToolTypes,
   typeOptions,
   fmt,
   previewAfter,
 } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 export function TimeAdjustCard({ isProd }: { isProd: boolean }) {
+  const t = useTranslations();
   const confirm = useConfirm();
   const [type, setType] = useState("boost");
   const [q, setQ] = useState("");
@@ -27,8 +29,9 @@ export function TimeAdjustCard({ isProd }: { isProd: boolean }) {
   const [days, setDays] = useState(1);
 
   const placeholder = useMemo(
-    () => TYPES.find((t) => t.value === type)?.placeholder ?? "",
-    [type],
+    () =>
+      testToolTypes(t).find((item) => item.value === type)?.placeholder ?? "",
+    [t, type],
   );
 
   const searchMut = useAdminMutation(
@@ -36,10 +39,11 @@ export function TimeAdjustCard({ isProd }: { isProd: boolean }) {
       (await adminApi.get("/admin/test-tools/search", { params: { type, q } }))
         .data as SearchItem[],
     {
-      errorMessage: "Arama başarısız",
+      errorMessage: t("admin.system.testTools.searchFailed"),
       onSuccess: (data) => {
         setResults(data);
-        if (!data.length) toast("Sonuç yok", { icon: "🔍" });
+        if (!data.length)
+          toast(t("admin.system.testTools.noResults"), { icon: "🔍" });
       },
     },
   );
@@ -47,7 +51,7 @@ export function TimeAdjustCard({ isProd }: { isProd: boolean }) {
 
   const doSearch = () => {
     if (q.trim().length < 2) {
-      toast.error("En az 2 karakter girin");
+      toast.error(t("admin.system.testTools.minimumCharacters"));
       return;
     }
     setResults([]);
@@ -65,9 +69,9 @@ export function TimeAdjustCard({ isProd }: { isProd: boolean }) {
         })
         .then((r) => r.data),
     {
-      errorMessage: "Değişiklik başarısız",
+      errorMessage: t("admin.system.testTools.adjustFailed"),
       onSuccess: (data) => {
-        toast.success(`${data.field}: ${fmt(data.after)}`);
+        toast.success(`${data.field}: ${fmt(data.after, t)}`);
         doSearch();
       },
     },
@@ -78,29 +82,36 @@ export function TimeAdjustCard({ isProd }: { isProd: boolean }) {
     action: AdjustAction,
     value: number,
   ) => {
-    const field = Object.keys(item.dates)[0] ?? "tarih";
+    const field = Object.keys(item.dates)[0] ?? t("common.date");
     const after = previewAfter(action, value);
     await confirm({
-      title: "Onayla",
-      confirmLabel: "Uygula",
+      title: t("common.confirm"),
+      confirmLabel: t("admin.system.testTools.apply"),
       description: (
         <div className="space-y-3 text-sm">
           <p className="text-muted">
-            <b className="text-heading">{item.label}</b> kaydının{" "}
-            <code>{field}</code> alanı değişecek:
+            {t("admin.system.testTools.adjustRecordBefore")}{" "}
+            <b className="text-heading">{item.label}</b>{" "}
+            {t("admin.system.testTools.adjustRecordMiddle")}{" "}
+            <code>{field}</code> {t("admin.system.testTools.adjustRecordAfter")}
           </p>
           <div className="space-y-1 rounded-lg bg-surface-alt p-3">
             <div>
-              <span className="text-muted">Eski:</span>{" "}
-              {fmt(item.dates[field] ?? null)}
+              <span className="text-muted">
+                {t("admin.system.testTools.oldValue")}:
+              </span>{" "}
+              {fmt(item.dates[field] ?? null, t)}
             </div>
             <div>
-              <span className="text-muted">Yeni:</span> <b>{fmt(after)}</b>
+              <span className="text-muted">
+                {t("admin.system.testTools.newValue")}:
+              </span>{" "}
+              <b>{fmt(after, t)}</b>
             </div>
           </div>
           {isProd && (
             <p className="text-xs text-danger-700">
-              ⚠ PROD — gerçek veri değişecek.
+              {t("admin.system.testTools.prodDataWarning")}
             </p>
           )}
         </div>
@@ -109,28 +120,30 @@ export function TimeAdjustCard({ isProd }: { isProd: boolean }) {
     });
   };
 
-  const columns = timeAdjustColumns({ minutes, days, onAdjust: askAdjust });
+  const columns = timeAdjustColumns({ minutes, days, onAdjust: askAdjust }, t);
 
   return (
-    <SectionCard title="Süre Ayarlama" bodyClassName="space-y-4">
+    <SectionCard
+      title={t("admin.system.testTools.timeAdjustTitle")}
+      bodyClassName="space-y-4"
+    >
       <p className="-mt-2 text-sm text-muted">
-        Tek bir kaydı ara, ilgili tarih alanını geri/ileri al. Sonra ilgili
-        cron'u tetikleyip davranışı doğrula.
+        {t("admin.system.testTools.timeAdjustDescription")}
       </p>
 
       <div className="flex flex-wrap items-end gap-3">
         <Select
-          label="Tip"
+          label={t("admin.system.testTools.type")}
           value={type}
           onChange={(e) => {
             setType(e.target.value);
             setResults([]);
           }}
-          options={typeOptions}
+          options={typeOptions(t)}
           className="w-48"
         />
         <Input
-          label={`Ara (${placeholder})`}
+          label={t("admin.system.testTools.searchLabel", { placeholder })}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={placeholder}
@@ -138,7 +151,7 @@ export function TimeAdjustCard({ isProd }: { isProd: boolean }) {
           className="min-w-[220px] flex-1"
         />
         <Button onClick={doSearch} isLoading={searching}>
-          Ara
+          {t("common.search")}
         </Button>
       </div>
 
@@ -146,7 +159,7 @@ export function TimeAdjustCard({ isProd }: { isProd: boolean }) {
         <Input
           type="number"
           min={0}
-          label="X dk sonra"
+          label={t("admin.system.testTools.minutesAfterInput")}
           value={minutes}
           onChange={(e) => setMinutes(Number(e.target.value))}
           className="w-28"
@@ -154,7 +167,7 @@ export function TimeAdjustCard({ isProd }: { isProd: boolean }) {
         <Input
           type="number"
           min={0}
-          label="N gün geri"
+          label={t("admin.system.testTools.daysBackInput")}
           value={days}
           onChange={(e) => setDays(Number(e.target.value))}
           className="w-28"

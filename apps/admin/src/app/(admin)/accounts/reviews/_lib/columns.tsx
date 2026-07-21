@@ -10,13 +10,16 @@ import {
 } from "./types";
 import { Stars } from "../_components/Stars";
 import { reviewRowMenu } from "./rowActions";
+import type { useTranslations } from "next-intl";
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 type Act = (id: string, s: ReviewStatus) => void;
 
-export function productReviewColumns(act: Act, busyId?: string) {
+export function productReviewColumns(act: Act, t: T, busyId?: string) {
   return [
     col.custom<Review>(
-      "Ürün",
+      t("admin.accounts.reviews.product"),
       (r) => (
         <div className="flex items-center gap-3">
           {r.product.images?.[0] ? (
@@ -42,7 +45,7 @@ export function productReviewColumns(act: Act, busyId?: string) {
       { grow: 3, minWidth: 220, sortKey: "product.title", sortType: "text" },
     ),
     col.custom<Review>(
-      "Kullanıcı",
+      t("common.user"),
       (r) => (
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-100 text-xs font-bold text-primary-600">
@@ -55,7 +58,7 @@ export function productReviewColumns(act: Act, busyId?: string) {
             {r.isVerifiedPurchase && (
               <span className="flex items-center gap-1 text-[10px] text-success-700">
                 <CheckCircleIcon className="h-3 w-3" />
-                Onaylı Alıcı
+                {t("admin.accounts.reviews.verifiedBuyer")}
               </span>
             )}
           </div>
@@ -64,7 +67,7 @@ export function productReviewColumns(act: Act, busyId?: string) {
       { grow: 2, minWidth: 170, sortKey: "user.displayName", sortType: "text" },
     ),
     col.custom<Review>(
-      "Değerlendirme",
+      t("admin.accounts.reviews.review"),
       (r) => (
         <div className="space-y-1">
           <Stars score={r.score} />
@@ -79,21 +82,21 @@ export function productReviewColumns(act: Act, busyId?: string) {
       { grow: 3, minWidth: 240, sortKey: "score", sortType: "number" },
     ),
     col.badge<Review>(
-      "Durum",
-      (r) => <Badge status={r.status} config={reviewStatusConfig} />,
+      t("common.status"),
+      (r) => <Badge status={r.status} config={reviewStatusConfig(t)} />,
       { sortKey: "status", sortType: "text" },
     ),
-    col.date<Review>("Tarih", "createdAt"),
+    col.date<Review>(t("common.date"), "createdAt"),
     col.rowMenu<Review>((r) =>
-      reviewRowMenu(r.status, (s) => act(r.id, s), busyId === r.id),
+      reviewRowMenu(r.status, (s) => act(r.id, s), t, busyId === r.id),
     ),
   ];
 }
 
-export function sellerReviewColumns(act: Act, busyId?: string) {
+export function sellerReviewColumns(act: Act, t: T, busyId?: string) {
   return [
     col.user<UserRating>(
-      "Gönderen",
+      t("admin.accounts.reviews.sender"),
       (r) => ({
         name: r.giver?.displayName ?? "—",
         secondary: r.giver?.email,
@@ -101,43 +104,56 @@ export function sellerReviewColumns(act: Act, busyId?: string) {
       { sortKey: "giver.displayName" },
     ),
     col.user<UserRating>(
-      "Alıcı (Satıcı)",
+      t("admin.accounts.reviews.receiverSeller"),
       (r) => ({
         name: r.receiver?.displayName ?? "—",
         secondary: r.receiver?.email,
       }),
       { sortKey: "receiver.displayName" },
     ),
-    col.custom<UserRating>("Puan", (r) => <Stars score={r.score} />, {
-      grow: 1,
-      minWidth: 120,
-      sortKey: "score",
-      sortType: "number",
-    }),
-    col.muted<UserRating>("Yorum", (r) => r.comment || null, {
-      grow: 3,
-      minWidth: 220,
-      sortKey: "comment",
-    }),
+    col.custom<UserRating>(
+      t("admin.accounts.reviews.score"),
+      (r) => <Stars score={r.score} />,
+      {
+        grow: 1,
+        minWidth: 120,
+        sortKey: "score",
+        sortType: "number",
+      },
+    ),
+    col.muted<UserRating>(
+      t("admin.accounts.reviews.comment"),
+      (r) => r.comment || null,
+      {
+        grow: 3,
+        minWidth: 220,
+        sortKey: "comment",
+      },
+    ),
     col.badge<UserRating>(
-      "Durum",
+      t("common.status"),
       (r) => (
-        <Badge status={r.status || "approved"} config={reviewStatusConfig} />
+        <Badge status={r.status || "approved"} config={reviewStatusConfig(t)} />
       ),
       { sortKey: "status", sortType: "text" },
     ),
     col.muted<UserRating>(
-      "Kaynak",
-      (r) => (r.orderId ? "Sipariş" : r.tradeId ? "Takas" : "—"),
+      t("admin.accounts.reviews.source"),
+      (r) =>
+        r.orderId
+          ? t("admin.accounts.reviews.order")
+          : r.tradeId
+            ? t("admin.accounts.reviews.trade")
+            : "—",
       {
         grow: 1,
         minWidth: 100,
         sortKey: "orderId",
       },
     ),
-    col.date<UserRating>("Tarih", "createdAt"),
+    col.date<UserRating>(t("common.date"), "createdAt"),
     col.rowMenu<UserRating>((r) =>
-      reviewRowMenu(r.status, (s) => act(r.id, s), busyId === r.id),
+      reviewRowMenu(r.status, (s) => act(r.id, s), t, busyId === r.id),
     ),
   ];
 }

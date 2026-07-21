@@ -14,10 +14,13 @@ import {
   type AuditLog,
   statusColors,
   eventTypeLabels,
-  ACTION_LABELS,
-  ENTITY_LABELS,
+  actionLabels,
+  entityLabels,
   formatDate,
 } from "./types";
+import type { useTranslations } from "next-intl";
+
+type T = ReturnType<typeof useTranslations<never>>;
 
 const severityPill = (s: string) => (
   <Badge status={s} config={severityConfig} />
@@ -28,31 +31,37 @@ type Toggle = {
   setExpandedId: (id: string | null) => void;
 };
 
-const expandCol = <T extends { id: string }>({
-  expandedId,
-  setExpandedId,
-}: Toggle) =>
+const expandCol = <T extends { id: string }>(
+  { expandedId, setExpandedId }: Toggle,
+  t: ReturnType<typeof useTranslations<never>>,
+) =>
   col.custom<T>(
     "",
     (r) => (
       <ExpandButton
         isOpen={expandedId === r.id}
         onToggle={() => setExpandedId(expandedId === r.id ? null : r.id)}
+        openTitle={t("common.details")}
+        closeTitle={t("common.close")}
       />
     ),
     { grow: 0, minWidth: 44 },
   );
 
-export function buildErrorColumns(toggle: Toggle) {
+export function buildErrorColumns(toggle: Toggle, t: T) {
   return [
-    expandCol<ErrorLog>(toggle),
-    col.custom<ErrorLog>("Seviye", (r) => severityPill(r.severity), {
-      minWidth: 90,
-      sortKey: "severity",
-      sortType: "text",
-    }),
+    expandCol<ErrorLog>(toggle, t),
     col.custom<ErrorLog>(
-      "Mesaj",
+      t("admin.system.logs.level"),
+      (r) => severityPill(r.severity),
+      {
+        minWidth: 90,
+        sortKey: "severity",
+        sortType: "text",
+      },
+    ),
+    col.custom<ErrorLog>(
+      t("common.message"),
       (r) => (
         <div className="min-w-0">
           <span className="block truncate text-sm text-heading">
@@ -68,7 +77,7 @@ export function buildErrorColumns(toggle: Toggle) {
       { grow: 3, minWidth: 220, sortKey: "message", sortType: "text" },
     ),
     col.custom<ErrorLog>(
-      "Detay",
+      t("common.details"),
       (r) => (
         <div className="space-y-0.5 text-xs text-muted">
           {r.metadata?.status && <div>HTTP {r.metadata.status}</div>}
@@ -80,32 +89,37 @@ export function buildErrorColumns(toggle: Toggle) {
       ),
       { sortKey: "metadata.status", sortType: "number" },
     ),
-    col.muted<ErrorLog>("Kaynak", "source"),
-    col.date<ErrorLog>("Tarih", "createdAt"),
+    col.muted<ErrorLog>(t("admin.system.logs.source"), "source"),
+    col.date<ErrorLog>(t("common.date"), "createdAt"),
   ];
 }
 
 export function buildSecurityColumns(
   onResolve: (id: string) => void,
+  t: T,
   resolvingId?: string,
 ) {
   return [
     col.custom<SecurityLog>(
-      "Olay",
+      t("admin.system.logs.event"),
       (r) => (
         <span className="text-sm text-heading">
-          {eventTypeLabels[r.eventType] ?? r.eventType}
+          {eventTypeLabels(t)[r.eventType] ?? r.eventType}
         </span>
       ),
       { sortKey: "eventType", sortType: "text" },
     ),
-    col.custom<SecurityLog>("Seviye", (r) => severityPill(r.severity), {
-      minWidth: 90,
-      sortKey: "severity",
-      sortType: "text",
-    }),
+    col.custom<SecurityLog>(
+      t("admin.system.logs.level"),
+      (r) => severityPill(r.severity),
+      {
+        minWidth: 90,
+        sortKey: "severity",
+        sortType: "text",
+      },
+    ),
     col.muted<SecurityLog>(
-      "IP / E-posta",
+      t("admin.system.logs.ipOrEmail"),
       (r) => r.ipAddress ?? r.email ?? "-",
       {
         sortKey: "ipAddress",
@@ -113,34 +127,46 @@ export function buildSecurityColumns(
       },
     ),
     col.custom<SecurityLog>(
-      "Durum",
+      t("common.status"),
       (r) =>
         r.resolved ? (
           <span className="flex items-center gap-1 text-sm text-success-700">
-            <CheckCircleIcon className="h-4 w-4" /> Çözüldü
+            <CheckCircleIcon className="h-4 w-4" />{" "}
+            {t("admin.system.logs.resolved")}
           </span>
         ) : (
           <span className="flex items-center gap-1 text-sm text-warning-700">
-            <ClockIcon className="h-4 w-4" /> Bekliyor
+            <ClockIcon className="h-4 w-4" /> {t("common.pending")}
           </span>
         ),
       { sortKey: "resolved", sortType: "number" },
     ),
-    col.date<SecurityLog>("Tarih", "createdAt"),
-    col.rowMenu<SecurityLog>(securityRowMenu(onResolve, resolvingId)),
+    col.date<SecurityLog>(t("common.date"), "createdAt"),
+    col.rowMenu<SecurityLog>(securityRowMenu(onResolve, t, resolvingId)),
   ];
 }
 
-export function buildEmailColumns() {
+export function buildEmailColumns(t: T) {
+  const emailStatuses: Record<string, string> = {
+    sent: t("admin.system.logs.emailStatuses.sent"),
+    delivered: t("admin.system.logs.emailStatuses.delivered"),
+    queued: t("admin.system.logs.emailStatuses.queued"),
+    bounced: t("admin.system.logs.emailStatuses.bounced"),
+    failed: t("admin.system.logs.emailStatuses.failed"),
+  };
   return [
-    col.text<EmailLog>("Alıcı", "to"),
-    col.muted<EmailLog>("Konu", "subject"),
-    col.muted<EmailLog>("Şablon", (r) => r.template ?? "-", {
-      sortKey: "template",
-      sortType: "text",
-    }),
+    col.text<EmailLog>(t("admin.system.logs.recipient"), "to"),
+    col.muted<EmailLog>(t("admin.system.logs.subject"), "subject"),
+    col.muted<EmailLog>(
+      t("admin.system.logs.template"),
+      (r) => r.template ?? "-",
+      {
+        sortKey: "template",
+        sortType: "text",
+      },
+    ),
     col.custom<EmailLog>(
-      "Durum",
+      t("common.status"),
       (r) => (
         <span
           className={cn(
@@ -148,52 +174,53 @@ export function buildEmailColumns() {
             statusColors[r.status],
           )}
         >
-          {r.status.toUpperCase()}
+          {emailStatuses[r.status] ?? r.status}
         </span>
       ),
       { minWidth: 100, sortKey: "status", sortType: "text" },
     ),
-    col.date<EmailLog>("Tarih", "createdAt"),
+    col.date<EmailLog>(t("common.date"), "createdAt"),
   ];
 }
 
-export function buildAuditColumns(toggle: Toggle) {
+export function buildAuditColumns(toggle: Toggle, t: T) {
   return [
-    expandCol<AuditLog>(toggle),
+    expandCol<AuditLog>(toggle, t),
     col.custom<AuditLog>(
-      "Tarih",
+      t("common.date"),
       (r) => (
         <span className="whitespace-nowrap text-sm text-muted">
-          {formatDate(r.createdAt)}
+          {formatDate(r.createdAt, t("common.dateLocale"))}
         </span>
       ),
       { sortKey: "createdAt", sortType: "date" },
     ),
     col.custom<AuditLog>(
-      "Admin",
+      t("admin.system.logs.admin"),
       (r) => (
         <div className="flex items-center gap-2">
           <UserIcon className="h-4 w-4 shrink-0 text-muted" />
           <span className="truncate text-sm">
             {r.admin?.email ??
-              (r.adminUserId?.substring(0, 8) ?? "Sistem") + "…"}
+              (r.adminUserId?.substring(0, 8) ??
+                t("admin.system.logs.system")) + "…"}
           </span>
         </div>
       ),
       { sortKey: "admin.email", sortType: "text" },
     ),
     col.custom<AuditLog>(
-      "İşlem",
+      t("admin.system.logs.action"),
       (r) => (
         <span className="rounded-full bg-info-100 px-2 py-0.5 text-xs text-info-800">
-          {ACTION_LABELS[r.action] ?? r.action}
+          {actionLabels(t)[r.action] ?? r.action}
         </span>
       ),
       { sortKey: "action", sortType: "text" },
     ),
     col.muted<AuditLog>(
-      "Kayıt Tipi",
-      (r) => ENTITY_LABELS[r.entityType] ?? r.entityType,
+      t("admin.system.logs.entityType"),
+      (r) => entityLabels(t)[r.entityType] ?? r.entityType,
       {
         sortKey: "entityType",
         sortType: "text",

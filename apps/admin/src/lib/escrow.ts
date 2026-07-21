@@ -44,11 +44,7 @@ export function computeRefundWindowEnd(
 }
 
 export type EscrowHoldReasonCode =
-  | 'frozen'
-  | 'open_refund'
-  | 'window_not_elapsed'
-  | 'not_delivered'
-  | 'ready';
+  "frozen" | "open_refund" | "window_not_elapsed" | "not_delivered" | "ready";
 
 export interface EscrowHoldReason {
   code: EscrowHoldReasonCode;
@@ -57,7 +53,7 @@ export interface EscrowHoldReason {
   /** One-sentence description. */
   detail: string;
   /** Badge tone (for picking the tailwind class group). */
-  tone: 'danger' | 'warning' | 'info' | 'success';
+  tone: "danger" | "warning" | "info" | "success";
 }
 
 export interface EscrowHoldReasonInput {
@@ -77,24 +73,27 @@ export interface EscrowHoldReasonInput {
  * Why is a hold waiting? Priority order:
  *   frozen > open refund > delivery+14 not elapsed > not delivered > ready.
  */
-export function describeHoldReason(input: EscrowHoldReasonInput): EscrowHoldReason {
+export function describeHoldReason(
+  input: EscrowHoldReasonInput,
+  t: T,
+): EscrowHoldReason {
   const now = input.now ?? new Date();
 
   if (input.frozen) {
     return {
-      code: 'frozen',
-      label: 'Donduruldu',
-      detail: 'Hold açık bir iade talebi nedeniyle kilitli (frozen) — iade sonuçlanana kadar serbest bırakılamaz.',
-      tone: 'danger',
+      code: "frozen",
+      label: t("admin.shared.escrow.reasons.frozen.label"),
+      detail: t("admin.shared.escrow.reasons.frozen.detail"),
+      tone: "danger",
     };
   }
 
   if (input.hasOpenRefund) {
     return {
-      code: 'open_refund',
-      label: 'Açık iade var',
-      detail: 'Bu sipariş için açık bir iade talebi var — talep sonuçlanana kadar ödeme bekletiliyor.',
-      tone: 'danger',
+      code: "open_refund",
+      label: t("admin.shared.escrow.reasons.openRefund.label"),
+      detail: t("admin.shared.escrow.reasons.openRefund.detail"),
+      tone: "danger",
     };
   }
 
@@ -104,48 +103,56 @@ export function describeHoldReason(input: EscrowHoldReasonInput): EscrowHoldReas
 
   if (!input.deliveredAt && !input.releaseAt) {
     return {
-      code: 'not_delivered',
-      label: 'Teslim bekleniyor',
-      detail: 'Ürün henüz teslim edilmedi — escrow saati teslimle başlar.',
-      tone: 'warning',
+      code: "not_delivered",
+      label: t("admin.shared.escrow.reasons.notDelivered.label"),
+      detail: t("admin.shared.escrow.reasons.notDelivered.detail"),
+      tone: "warning",
     };
   }
 
   if (release && release.getTime() > now.getTime()) {
     return {
-      code: 'window_not_elapsed',
-      label: 'Teslim+14 dolmadı',
-      detail: `İade penceresi + grace henüz dolmadı — ${release.toLocaleDateString('tr-TR', {
-        dateStyle: 'medium',
-      })} tarihinde serbest bırakılabilir.`,
-      tone: 'info',
+      code: "window_not_elapsed",
+      label: t("admin.shared.escrow.reasons.windowNotElapsed.label", {
+        days: REFUND_WINDOW_DAYS,
+      }),
+      detail: t("admin.shared.escrow.reasons.windowNotElapsed.detail", {
+        date: release.toLocaleDateString(t("common.dateLocale"), {
+          dateStyle: "medium",
+        }),
+      }),
+      tone: "info",
     };
   }
 
   return {
-    code: 'ready',
-    label: 'Serbest bırakılabilir',
-    detail: 'İade penceresi doldu ve açık iade yok — ödeme satıcıya aktarılabilir.',
-    tone: 'success',
+    code: "ready",
+    label: t("admin.shared.escrow.reasons.ready.label"),
+    detail: t("admin.shared.escrow.reasons.ready.detail"),
+    tone: "success",
   };
 }
 
 /** Turkish badge label for Order.cancellationType (iptal | iade). */
 export function cancellationTypeLabel(
-  type?: string | null,
+  type: string | null | undefined,
+  t: T,
 ): { label: string; detail: string } | null {
   if (!type) return null;
-  if (type === 'iptal') {
+  if (type === "iptal") {
     return {
-      label: 'İptal (kargo öncesi)',
-      detail: 'Kargo öncesi iptal — ödeme alıcıya tam iade edilir.',
+      label: t("admin.shared.escrow.cancellation.beforeShipping.label"),
+      detail: t("admin.shared.escrow.cancellation.beforeShipping.detail"),
     };
   }
-  if (type === 'iade') {
+  if (type === "iade") {
     return {
-      label: 'İade (kargo sonrası)',
-      detail: 'Kargo sonrası iade — ürün geri gönderilir, iade talebi akışı işler.',
+      label: t("admin.shared.escrow.cancellation.afterShipping.label"),
+      detail: t("admin.shared.escrow.cancellation.afterShipping.detail"),
     };
   }
-  return { label: type, detail: '' };
+  return { label: type, detail: "" };
 }
+import type { useTranslations } from "next-intl";
+
+type T = ReturnType<typeof useTranslations<never>>;

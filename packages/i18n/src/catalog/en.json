@@ -20,6 +20,7 @@
     "yes": "Yes",
     "no": "No",
     "all": "All",
+    "allStatuses": "All Statuses",
     "none": "None",
     "more": "More",
     "shopping": "Shopping",
@@ -57,6 +58,8 @@
     "pending": "Pending",
     "approved": "Approved",
     "rejected": "Rejected",
+    "completed": "Completed",
+    "cancelled": "Cancelled",
     "view": "View",
     "details": "Details",
     "actions": "Actions",
@@ -2259,6 +2262,386 @@
     "reasonOther": "Other"
   },
   "admin": {
+    "accounts": {
+      "reviews": {
+        "title": "Reviews",
+        "description": "Manage product and seller reviews",
+        "tabs": { "product": "Product Reviews", "seller": "Seller Reviews" },
+        "allStatuses": "All Statuses",
+        "filters": {
+          "pending": "Pending",
+          "approved": "Approved",
+          "rejected": "Rejected"
+        },
+        "product": "Product",
+        "review": "Review",
+        "verifiedBuyer": "Verified buyer",
+        "sender": "Sender",
+        "receiverSeller": "Recipient (Seller)",
+        "score": "Score",
+        "comment": "Comment",
+        "source": "Source",
+        "order": "Order",
+        "trade": "Trade",
+        "productReview": "Review",
+        "sellerReview": "Seller review",
+        "productEmpty": "No reviews found",
+        "sellerEmpty": "No seller reviews found",
+        "updateFailed": "Review status could not be updated",
+        "reject": "Reject",
+        "revert": "Revert",
+        "actionResult": {
+          "approved": "approved",
+          "pending": "moved to pending",
+          "rejected": "rejected"
+        },
+        "confirm": {
+          "approveTitle": "Approve Review",
+          "approveDescription": "Are you sure you want to publish this review?",
+          "rejectTitle": "Reject Review",
+          "rejectDescription": "Are you sure you want to reject this review?",
+          "revertTitle": "Move Review to Pending",
+          "revertDescription": "Are you sure you want to return this review to the review queue?"
+        }
+      },
+      "sellerApplications": {
+        "title": "Business Seller Applications",
+        "description": "Review and approve business account requests",
+        "tabs": {
+          "pending": "Pending",
+          "approved": "Approved",
+          "rejected": "Rejected"
+        },
+        "company": "Company",
+        "contact": "Contact",
+        "applicationDate": "Application Date",
+        "showDetails": "Show Details",
+        "hideDetails": "Hide Details",
+        "reject": "Reject",
+        "approveSuccess": "Application approved",
+        "approveError": "An error occurred while approving",
+        "rejectSuccess": "Application rejected",
+        "rejectError": "An error occurred while rejecting",
+        "approveConfirm": "Are you sure you want to approve the application from \"{company}\"? The account will be marked as an active seller.",
+        "rejectTitle": "Reject Application",
+        "rejectPrompt": "Rejection reason (sent to the user):",
+        "rejectPlaceholder": "Please explain the rejection reason...",
+        "companyInformation": "Company Information",
+        "companyName": "Company Name",
+        "taxNumber": "Tax Number",
+        "communication": "Contact Information",
+        "empty": "No applications found"
+      },
+      "sellerPerformance": {
+        "title": "Seller Performance",
+        "description": "Seller order and product metrics",
+        "seller": "Seller",
+        "membership": "Membership",
+        "products": "Products",
+        "orders": "Orders",
+        "banned": "Banned",
+        "unverified": "Unverified",
+        "empty": "No sellers found",
+        "totalSellers": "Total Sellers",
+        "mostOrders": "Most Orders",
+        "productsOnPage": "Products on This Page",
+        "memberships": {
+          "business": "Business",
+          "premium": "Premium",
+          "basic": "Basic",
+          "free": "Free"
+        }
+      }
+    },
+    "messaging": {
+      "unknown": "Unknown",
+      "messages": {
+        "title": "Message Moderation",
+        "detailTitle": "Message Details",
+        "notFound": "No messages found",
+        "sender": "Sender",
+        "receiver": "Recipient",
+        "warning": "Warning",
+        "approved": "Message approved",
+        "rejected": "Message rejected",
+        "reverted": "Message moved to pending",
+        "senderBanned": "Sender has been banned",
+        "senderNotFound": "Sender information was not found",
+        "reject": "Reject",
+        "revert": "Revert",
+        "ban": "Ban",
+        "banSender": "Ban sender",
+        "banSenderTitle": "Ban Sender",
+        "banReason": "Ban reason (message violation)",
+        "defaultBanReason": "Message policy violation",
+        "rejectTitle": "Reject Message",
+        "rejectionReason": "Rejection reason",
+        "rejectionPlaceholder": "Explain why the message is being rejected...",
+        "rejectionRequired": "A rejection reason is required",
+        "originalContent": "Original content",
+        "content": "Content",
+        "flaggedReason": "Flag Reason",
+        "threadId": "Thread ID",
+        "conversationHistory": "Conversation History ({count} messages)",
+        "filters": {
+          "pending": "Pending",
+          "approved": "Approved",
+          "rejected": "Rejected"
+        },
+        "status": { "sent": "Sent", "pending": "Pending Approval" },
+        "summary": {
+          "approved": "approved messages",
+          "rejected": "rejected messages",
+          "message": "messages",
+          "pending": "messages await approval — approve or reject pending messages, or ban the sender"
+        }
+      },
+      "support": {
+        "title": "Support Center",
+        "subtitle": "Manage support tickets and guest messages",
+        "tabs": { "tickets": "Support Tickets", "guest": "Guest Messages" },
+        "notFound": "No support tickets found",
+        "guestNotFound": "No guest messages found",
+        "ticketNumber": "Ticket No.",
+        "subject": "Subject",
+        "creator": "Created By",
+        "priorityLabel": "Priority",
+        "createdAt": "Created",
+        "reference": "Reference",
+        "fullName": "Full Name",
+        "allStatuses": "All Statuses",
+        "allPriorities": "All Priorities",
+        "allCategories": "All Categories",
+        "status": {
+          "open": "Open",
+          "inProgress": "In Progress",
+          "waitingCustomer": "Waiting for Customer",
+          "resolved": "Resolved",
+          "closed": "Closed"
+        },
+        "priority": {
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High",
+          "urgent": "Urgent"
+        },
+        "category": {
+          "account": "Account",
+          "payment": "Payment",
+          "product": "Product",
+          "shipping": "Shipping",
+          "trade": "Trade",
+          "technical": "Technical",
+          "other": "Other"
+        },
+        "reply": "Reply",
+        "replyPlaceholder": "Write your reply...",
+        "replySent": "Reply sent",
+        "internalNote": "Internal Note",
+        "internalNoteHelper": "This note is visible only to administrators",
+        "updateStatus": "Update Status",
+        "newStatus": "New Status",
+        "statusUpdated": "Status updated",
+        "messages": "Messages",
+        "noMessages": "No messages yet.",
+        "ticketInfo": "Ticket Information",
+        "assignee": "Assignee",
+        "lastUpdated": "Last Updated",
+        "resolvedAt": "Resolved"
+      }
+    },
+    "system": {
+      "logs": {
+        "title": "Logs",
+        "description": "System errors, security events, emails, and admin actions",
+        "tabs": {
+          "errors": {
+            "label": "Error Logs",
+            "description": "HTTP 4xx/5xx errors from API requests, stack traces, and request details"
+          },
+          "security": {
+            "label": "Security Logs",
+            "description": "Security events such as failed logins, IP blocks, and suspicious activity"
+          },
+          "emails": {
+            "label": "Email Logs",
+            "description": "Delivery status and details for all emails sent by the system"
+          },
+          "audit": {
+            "label": "Audit Logs",
+            "description": "Actions performed by admins — who changed which record and when"
+          }
+        },
+        "level": "Level",
+        "source": "Source",
+        "event": "Event",
+        "ipOrEmail": "IP / Email",
+        "resolved": "Resolved",
+        "resolve": "Resolve",
+        "resolveSuccess": "Issue resolved",
+        "recipient": "Recipient",
+        "subject": "Subject",
+        "template": "Template",
+        "admin": "Admin",
+        "system": "System",
+        "action": "Action",
+        "entityType": "Record Type",
+        "levels": {
+          "critical": "Critical",
+          "error": "Error",
+          "warning": "Warning",
+          "high": "High",
+          "medium": "Medium",
+          "low": "Low"
+        },
+        "events": {
+          "failedLogin": "Failed Login",
+          "ipBlock": "IP Block",
+          "suspiciousActivity": "Suspicious Activity",
+          "passwordReset": "Password Reset",
+          "twoFactorEnabled": "2FA Enabled",
+          "accountLocked": "Account Locked"
+        },
+        "emailStatuses": {
+          "sent": "Sent",
+          "delivered": "Delivered",
+          "queued": "Queued",
+          "bounced": "Bounced",
+          "failed": "Failed"
+        },
+        "templates": {
+          "welcome": "Welcome",
+          "passwordReset": "Password Reset",
+          "orderConfirmation": "Order Confirmation",
+          "shippingUpdate": "Shipping Update"
+        },
+        "actions": {
+          "userBan": "User Banned",
+          "userUnban": "User Unbanned",
+          "productApprove": "Product Approved",
+          "productReject": "Product Rejected",
+          "productDelete": "Product Deleted",
+          "orderUpdate": "Order Updated",
+          "paymentRefund": "Payment Refunded",
+          "categoryCreate": "Category Created",
+          "categoryUpdate": "Category Updated",
+          "categoryDelete": "Category Deleted",
+          "commissionRuleCreate": "Commission Rule Created",
+          "commissionRuleUpdate": "Commission Rule Updated",
+          "commissionRuleDelete": "Commission Rule Deleted",
+          "tradeResolve": "Trade Resolved",
+          "messageApprove": "Message Approved",
+          "messageReject": "Message Rejected"
+        },
+        "entities": {
+          "user": "User",
+          "product": "Product",
+          "order": "Order",
+          "payment": "Payment",
+          "category": "Category",
+          "commissionRule": "Commission Rule",
+          "trade": "Trade",
+          "message": "Message",
+          "supportTicket": "Support Ticket"
+        },
+        "filters": {
+          "allLevels": "All Levels",
+          "pending": "Pending",
+          "resolved": "Resolved",
+          "allTemplates": "All Templates",
+          "allActions": "All Actions",
+          "allEntityTypes": "All Record Types"
+        },
+        "search": {
+          "errors": "Search error messages...",
+          "security": "Search event / IP / email...",
+          "emails": "Search recipient / subject...",
+          "audit": "Search action / admin..."
+        },
+        "empty": {
+          "errors": "No error logs found",
+          "security": "No security logs found",
+          "emails": "No email logs found",
+          "audit": "No audit logs found"
+        },
+        "stats": {
+          "unresolvedCritical": "Unresolved Critical",
+          "deliveryRate": "Delivery Rate",
+          "bounceRate": "Bounce Rate"
+        },
+        "details": {
+          "httpStatus": "HTTP Status",
+          "errorType": "Error Type",
+          "userId": "User ID",
+          "ipAddress": "IP Address",
+          "errorChain": "Error Chain",
+          "response": "Response Details",
+          "requestBody": "Request Body",
+          "redacted": "[REDACTED]",
+          "sensitiveHidden": "(sensitive fields are hidden)",
+          "entityId": "Record ID",
+          "oldValues": "Previous Values",
+          "newValues": "New Values"
+        }
+      },
+      "testTools": {
+        "title": "Test Tools — Time Machine",
+        "description": "Manually test time-dependent flows",
+        "prodWarningBefore": "You are in PROD. Time changes affect",
+        "realCustomerData": "real customer data",
+        "prodWarningAfter": "Every action is written to the audit log. Proceed carefully.",
+        "cronsTitle": "Cron Jobs",
+        "cronsDescription": "Manually trigger scheduled jobs (safe: this only runs work earlier than scheduled).",
+        "cronError": "Cron job could not be run",
+        "cronSuccess": "Completed: {result}",
+        "run": "Run",
+        "timeAdjustTitle": "Time Adjustment",
+        "timeAdjustDescription": "Find one record and move its relevant date backward or forward. Then trigger the related cron job to verify the behavior.",
+        "type": "Type",
+        "searchLabel": "Search ({placeholder})",
+        "searchFailed": "Search failed",
+        "noResults": "No results",
+        "minimumCharacters": "Enter at least 2 characters",
+        "adjustFailed": "Change failed",
+        "apply": "Apply",
+        "adjustRecordBefore": "The selected",
+        "adjustRecordMiddle": "record's",
+        "adjustRecordAfter": "field will change:",
+        "oldValue": "Old",
+        "newValue": "New",
+        "prodDataWarning": "⚠ PROD — real data will change.",
+        "record": "Record",
+        "dates": "Dates",
+        "action": "Action",
+        "expireNow": "Expire now",
+        "now": "now",
+        "minutesAfter": "~{count} min later",
+        "minutesBefore": "~{count} min ago",
+        "daysBack": "{count} days back",
+        "minutesAfterInput": "X min later",
+        "daysBackInput": "N days back",
+        "types": {
+          "boost": "Boost",
+          "membership": "Membership",
+          "refund": "Refund",
+          "order": "Order",
+          "offer": "Offer",
+          "trade": "Trade",
+          "hold": "Escrow Hold",
+          "emailVerification": "Email Verification",
+          "passwordReset": "Password Reset"
+        },
+        "placeholders": {
+          "product": "product title or slug",
+          "user": "user email or name",
+          "refund": "order no. or refund ID",
+          "order": "order no.",
+          "offer": "offer ID or product title",
+          "trade": "trade ID",
+          "userEmail": "user email"
+        }
+      }
+    },
     "catalog": {
       "common": {
         "maxChars": "Maximum {max} characters",
@@ -4442,6 +4825,91 @@
       }
     },
     "shared": {
+      "moderation": {
+        "title": "AI Moderation",
+        "count": "{count} AI moderation records",
+        "empty": "No AI moderation records",
+        "entity": "Entity",
+        "type": "Type",
+        "text": "Text",
+        "image": "Image",
+        "result": "Result",
+        "relevance": "Relevance",
+        "nsfw": "Inappropriateness",
+        "reason": "Reason",
+        "labels": "Labels",
+        "entities": {
+          "product": "Product",
+          "user": "User",
+          "collection": "Collection",
+          "upload": "Upload",
+          "message": "Message"
+        },
+        "fields": {
+          "avatar": "Avatar",
+          "bio": "Bio",
+          "displayName": "Display name",
+          "cover": "Cover image",
+          "item": "Collection item",
+          "productImage": "Product image",
+          "messageImage": "Message image",
+          "upload": "Upload",
+          "name": "Name",
+          "description": "Description",
+          "title": "Title",
+          "comment": "Comment"
+        },
+        "decisions": {
+          "all": "All results",
+          "blocked": "Blocked",
+          "blockedFilter": "Blocked",
+          "flag": "Inappropriate",
+          "review": "Review",
+          "pass": "Clean"
+        }
+      },
+      "escrow": {
+        "reasons": {
+          "frozen": {
+            "label": "Frozen",
+            "detail": "The hold is locked by an open refund request and cannot be released until the refund is resolved."
+          },
+          "openRefund": {
+            "label": "Open refund",
+            "detail": "This order has an open refund request; payment is held until the request is resolved."
+          },
+          "notDelivered": {
+            "label": "Awaiting delivery",
+            "detail": "The product has not been delivered; the escrow clock starts at delivery."
+          },
+          "windowNotElapsed": {
+            "label": "Delivery+{days} not elapsed",
+            "detail": "The refund window and grace period have not elapsed; funds can be released on {date}."
+          },
+          "ready": {
+            "label": "Ready for release",
+            "detail": "The refund window has elapsed and there is no open refund; payment can be transferred to the seller."
+          }
+        },
+        "cancellation": {
+          "beforeShipping": {
+            "label": "Cancellation (before shipping)",
+            "detail": "Cancelled before shipping; the buyer receives a full refund."
+          },
+          "afterShipping": {
+            "label": "Refund (after shipping)",
+            "detail": "Returned after shipping; the product is sent back through the refund-request flow."
+          }
+        }
+      },
+      "refunds": {
+        "status": {
+          "waitForDelivery": "Awaiting Product Delivery",
+          "returnShipmentOpen": "Return Shipment Ready",
+          "returnInTransit": "Return in Transit",
+          "returnDelivered": "Return Delivered (Refund Pending)"
+        }
+      },
       "errors": {
         "title": "Something went wrong",
         "description": "An unexpected error occurred. You can try again or return to the panel.",

@@ -12,9 +12,9 @@ import {
   type SecurityLog,
   type EmailLog,
   type AuditLog,
-  LOG_TABS,
-  SEARCH_PLACEHOLDERS,
-  EMPTY_TEXT,
+  logTabs,
+  searchPlaceholders,
+  emptyText,
 } from "./_lib/types";
 import {
   buildErrorColumns,
@@ -25,6 +25,7 @@ import {
 import { statCards } from "./_lib/stats";
 import { LogsFilters } from "./_components/LogsFilters";
 import { ErrorDetail, AuditDetail } from "./_components/LogDetails";
+import { useTranslations } from "next-intl";
 
 const FILTERS: Record<LogTab, Record<string, string>> = {
   errors: { severity: "all" },
@@ -40,8 +41,9 @@ const FILTERS: Record<LogTab, Record<string, string>> = {
 };
 
 function LogsStats({ tab }: { tab: LogTab }) {
+  const t = useTranslations();
   const { data, total } = useResourceList();
-  const cards = statCards(tab, data?.stats ?? null, total);
+  const cards = statCards(tab, data?.stats ?? null, total, t);
   if (cards.length === 0) return null;
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
@@ -59,34 +61,39 @@ function LogsStats({ tab }: { tab: LogTab }) {
 }
 
 function LogsToolbar({ tab }: { tab: LogTab }) {
+  const t = useTranslations();
   const { filters, setFilter } = useResourceList();
   return (
     <ResourceList.Toolbar>
-      <ResourceList.Search placeholder={SEARCH_PLACEHOLDERS[tab]} />
+      <ResourceList.Search placeholder={searchPlaceholders(t)[tab]} />
       <LogsFilters tab={tab} filters={filters} setFilter={setFilter} />
     </ResourceList.Toolbar>
   );
 }
 
 function LogsTable({ tab }: { tab: LogTab }) {
+  const t = useTranslations();
   const [expandedErrorId, setExpandedErrorId] = useState<string | null>(null);
   const [expandedAuditId, setExpandedAuditId] = useState<string | null>(null);
   const resolve = useAdminMutation(
     (id: string) => adminApi.resolveSecurityIssue(id),
     {
       invalidates: ["logs:security"],
-      successMessage: "Sorun çözümlendi",
+      successMessage: t("admin.system.logs.resolveSuccess"),
     },
   );
 
   if (tab === "errors") {
     return (
       <ResourceList.Table<ErrorLog>
-        columns={buildErrorColumns({
-          expandedId: expandedErrorId,
-          setExpandedId: setExpandedErrorId,
-        })}
-        emptyText={EMPTY_TEXT.errors}
+        columns={buildErrorColumns(
+          {
+            expandedId: expandedErrorId,
+            setExpandedId: setExpandedErrorId,
+          },
+          t,
+        )}
+        emptyText={emptyText(t).errors}
         expandedId={expandedErrorId}
         renderExpanded={(row) => (
           <div className="px-4 pb-4">
@@ -101,27 +108,31 @@ function LogsTable({ tab }: { tab: LogTab }) {
       <ResourceList.Table<SecurityLog>
         columns={buildSecurityColumns(
           (id) => resolve.mutate(id),
+          t,
           resolve.isPending ? resolve.variables : undefined,
         )}
-        emptyText={EMPTY_TEXT.security}
+        emptyText={emptyText(t).security}
       />
     );
   }
   if (tab === "emails") {
     return (
       <ResourceList.Table<EmailLog>
-        columns={buildEmailColumns()}
-        emptyText={EMPTY_TEXT.emails}
+        columns={buildEmailColumns(t)}
+        emptyText={emptyText(t).emails}
       />
     );
   }
   return (
     <ResourceList.Table<AuditLog>
-      columns={buildAuditColumns({
-        expandedId: expandedAuditId,
-        setExpandedId: setExpandedAuditId,
-      })}
-      emptyText={EMPTY_TEXT.audit}
+      columns={buildAuditColumns(
+        {
+          expandedId: expandedAuditId,
+          setExpandedId: setExpandedAuditId,
+        },
+        t,
+      )}
+      emptyText={emptyText(t).audit}
       expandedId={expandedAuditId}
       renderExpanded={(row) => (
         <div className="px-4 pb-4">
@@ -133,6 +144,7 @@ function LogsTable({ tab }: { tab: LogTab }) {
 }
 
 export default function LogsPage() {
+  const t = useTranslations();
   const [tab, setTab] = useState<LogTab>("errors");
   const fetcher = useCallback(
     (params: Record<string, any>) => {
@@ -154,7 +166,8 @@ export default function LogsPage() {
     },
     [tab],
   );
-  const tabMeta = LOG_TABS.find((item) => item.key === tab)!;
+  const tabs = logTabs(t);
+  const tabMeta = tabs.find((item) => item.key === tab)!;
 
   return (
     <ResourceList<AnyLog>
@@ -167,9 +180,9 @@ export default function LogsPage() {
       initialFilters={FILTERS[tab]}
     >
       <ResourceList.Header
-        title="Loglar"
-        description="Sistem hataları, güvenlik olayları, e-postalar ve admin işlemleri"
-        tabs={LOG_TABS}
+        title={t("admin.system.logs.title")}
+        description={t("admin.system.logs.description")}
+        tabs={tabs}
         activeTab={tab}
         onTabChange={(key) => setTab(key as LogTab)}
       />

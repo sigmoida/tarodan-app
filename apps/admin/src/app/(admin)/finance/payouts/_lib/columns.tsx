@@ -16,7 +16,7 @@ export const scheduleColumns = (t: T) => [
     t("admin.finance.payouts.holdReason"),
     (s) => (
       <HoldReasonBadge
-        reason={holdReasonForRow({ status: "held", releaseAt: s.releaseAt })}
+        reason={holdReasonForRow({ status: "held", releaseAt: s.releaseAt }, t)}
       />
     ),
     { sortKey: "releaseAt", sortType: "date" },
@@ -57,10 +57,13 @@ export function transactionColumns(
       t("admin.finance.payouts.holdReason"),
       (row) => (
         <HoldReasonBadge
-          reason={holdReasonForRow({
-            status: row.status,
-            releaseAt: row.releaseAt,
-          })}
+          reason={holdReasonForRow(
+            {
+              status: row.status,
+              releaseAt: row.releaseAt,
+            },
+            t,
+          )}
         />
       ),
       { sortKey: "status" },

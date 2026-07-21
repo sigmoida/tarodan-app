@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/AdminList";
 import { ResourceList } from "@/components/list";
 import {
   fetchRefundRequests,
-  REFUND_STATUS_OPTIONS,
+  refundStatusOptions,
 } from "@/lib/refund-request-query";
 import { type RefundRequestRow, refundRequestColumns } from "./_lib/columns";
 
@@ -30,7 +30,7 @@ export default function RefundRequestsPage() {
           <ResourceList.Search />
           <ResourceList.FilterSelect
             name="status"
-            options={REFUND_STATUS_OPTIONS}
+            options={refundStatusOptions(t)}
             className="sm:w-56"
           />
           <ResourceList.DateRange fromName="from" toName="to" />
