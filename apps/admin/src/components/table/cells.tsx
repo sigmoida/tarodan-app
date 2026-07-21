@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { ClipboardIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { cn } from "@/lib/utils";
 import { fmtDate, fmtDateTime, fmtNumber, fmtTry } from "@/lib/format";
 import { TruncatedText } from "./TruncatedText";
@@ -95,6 +96,42 @@ export function CellDate({ value }: { value?: string | number | Date | null }) {
 export function CellCode({ value }: { value?: ReactNode }) {
   if (value == null || value === "") return <Empty />;
   return <TruncatedText className="font-mono text-body">{value}</TruncatedText>;
+}
+
+/**
+ * Opaque id (cuid) — shown compact (short mono form) with a copy button; the full
+ * id is in the tooltip and copied on click. Keeps id columns narrow and readable
+ * instead of spilling a 25-char cuid across the row.
+ */
+export function CellId({ value }: { value?: string | null }) {
+  const [copied, setCopied] = useState(false);
+  if (!value) return <Empty />;
+  const short =
+    value.length > 12 ? `${value.slice(0, 6)}…${value.slice(-4)}` : value;
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className="font-mono text-xs text-muted" title={value}>
+        {short}
+      </span>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          navigator.clipboard?.writeText(value);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1200);
+        }}
+        aria-label="Copy id"
+        className="shrink-0 text-subtle transition-colors hover:text-body"
+      >
+        {copied ? (
+          <CheckIcon className="h-3.5 w-3.5 text-success-600" />
+        ) : (
+          <ClipboardIcon className="h-3.5 w-3.5" />
+        )}
+      </button>
+    </span>
+  );
 }
 
 /** Text link — single standard link style, clipped. */

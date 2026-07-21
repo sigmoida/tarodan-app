@@ -28,11 +28,11 @@ export const orderShipmentColumns = (t: T) => [
     (r) => r.order?.buyer?.displayName,
     { sortKey: "order.buyer.displayName" },
   ),
-  col.code<OrderShipmentRow>(
+  col.id<OrderShipmentRow>(
     t("admin.operations.common.buyerId"),
     (r) => r.order?.buyer?.id,
   ),
-  col.code<OrderShipmentRow>(
+  col.id<OrderShipmentRow>(
     t("admin.operations.common.sellerId"),
     (r) => r.order?.seller?.id,
   ),
@@ -165,7 +165,7 @@ export const tradeShipmentColumns = (t: T) => [
         : null,
     { sortKey: "shipper.displayName" },
   ),
-  col.code<TradeShipmentRow>(
+  col.id<TradeShipmentRow>(
     t("admin.operations.common.buyerId"),
     (r) => r.recipientUser?.id,
   ),
@@ -202,7 +202,7 @@ export function suratShipmentColumns(
       (r) => r.order?.buyer?.displayName,
       { sortKey: "order.buyer.displayName" },
     ),
-    col.code<SuratShipmentRow>(
+    col.id<SuratShipmentRow>(
       t("admin.operations.common.buyerId"),
       (r) => r.order?.buyer?.id,
     ),

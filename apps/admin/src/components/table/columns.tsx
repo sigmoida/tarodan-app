@@ -8,6 +8,7 @@ import {
   CellBadge,
   CellCode,
   CellDate,
+  CellId,
   CellLink,
   CellMoney,
   CellMuted,
@@ -179,6 +180,19 @@ export const col = {
   code<T>(header: ReactNode, get: Accessor<T, ReactNode>, opts?: ColOpts) {
     const [g, o] = field(get, opts);
     return base<T>("code", header, (r) => <CellCode value={g(r)} />, o);
+  },
+  /** Opaque id (cuid) — compact copyable form. Narrow column; full id on hover/copy. */
+  id<T>(
+    header: ReactNode,
+    get: Accessor<T, string | null | undefined>,
+    opts?: ColOpts,
+  ) {
+    const [g, o] = field(get, opts);
+    return base<T>("code", header, (r) => <CellId value={g(r)} />, {
+      minWidth: 120,
+      sortable: false,
+      ...o,
+    });
   },
   /** Text link. If it returns `null`, empty placeholder. */
   link<T>(

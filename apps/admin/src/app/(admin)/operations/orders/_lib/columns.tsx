@@ -168,7 +168,7 @@ export function orderColumns({
       },
       { sortKey: "seller.displayName", sortType: "text" },
     ),
-    col.code<Order>(t("admin.operations.orders.sellerId"), (o) =>
+    col.id<Order>(t("admin.operations.orders.sellerId"), (o) =>
       o.isGroupSummary ? undefined : o.seller.id,
     ),
     col.custom<Order>(

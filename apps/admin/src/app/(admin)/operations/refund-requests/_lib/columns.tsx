@@ -83,7 +83,7 @@ export const refundRequestColumns = (t: T) => [
     }),
     { sortKey: "requester.displayName" },
   ),
-  col.code<RefundRequestRow>(
+  col.id<RefundRequestRow>(
     t("admin.operations.common.buyerId"),
     (r) => r.requester?.id,
   ),
@@ -95,7 +95,7 @@ export const refundRequestColumns = (t: T) => [
     }),
     { sortKey: "order.seller.displayName" },
   ),
-  col.code<RefundRequestRow>(
+  col.id<RefundRequestRow>(
     t("admin.operations.common.sellerId"),
     (r) => r.order?.seller?.id,
   ),

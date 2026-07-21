@@ -117,7 +117,7 @@ export function productColumns(t: T, actions: ProductRowActions) {
       }),
       { sortKey: "seller.displayName", sortType: "text" },
     ),
-    col.code<Product>(t("admin.catalog.products.sellerId"), (p) => p.seller.id),
+    col.id<Product>(t("admin.catalog.products.sellerId"), (p) => p.seller.id),
     col.text<Product>(t("common.category"), (p) => p.category.name, {
       sortKey: "category.name",
       sortType: "text",

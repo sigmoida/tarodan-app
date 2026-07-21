@@ -27,10 +27,7 @@ export const ticketColumns = (t: T) => [
     (t) => ({ name: t.creatorName || "—" }),
     { sortKey: "creatorName" },
   ),
-  col.code<SupportTicket>(
-    t("admin.users.userId"),
-    (ticket) => ticket.creatorId,
-  ),
+  col.id<SupportTicket>(t("admin.users.userId"), (ticket) => ticket.creatorId),
   col.muted<SupportTicket>(
     t("common.category"),
     (ticket) =>

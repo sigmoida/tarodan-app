@@ -22,7 +22,7 @@ export function userColumns(t: T, rowMenu: (u: User) => RowActionItem[]) {
       ),
       { grow: 3, minWidth: 220, sortKey: "displayName", sortType: "text" },
     ),
-    col.code<User>(t("admin.users.userId"), (u) => u.id),
+    col.id<User>(t("admin.users.userId"), (u) => u.id),
     col.custom<User>(
       t("common.status"),
       (u) => (

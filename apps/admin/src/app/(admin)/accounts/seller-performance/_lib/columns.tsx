@@ -11,7 +11,7 @@ export const sellerColumns = (t: T) => [
     (s) => ({ name: s.displayName, secondary: s.email }),
     { sortKey: "displayName" },
   ),
-  col.code<Seller>(t("admin.operations.common.sellerId"), (s) => s.id),
+  col.id<Seller>(t("admin.operations.common.sellerId"), (s) => s.id),
   col.badge<Seller>(
     t("admin.accounts.sellerPerformance.membership"),
     (s) => (

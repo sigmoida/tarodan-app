@@ -15,7 +15,7 @@ export function reportColumns({ t }: { t: T }) {
   const reasonLabels = reportReasonLabels(t);
   const statusConfig = reportStatusConfig(t);
   return [
-    col.code<Report>(t("admin.reports.columns.requestId"), (r) => r.id),
+    col.id<Report>(t("admin.reports.columns.requestId"), (r) => r.id),
     col.text<Report>(
       t("admin.reports.columns.type"),
       (r) => typeLabels[r.type] ?? r.type,
@@ -48,8 +48,8 @@ export function reportColumns({ t }: { t: T }) {
           : null,
       { sortKey: "reporter.displayName" },
     ),
-    col.code<Report>(t("admin.reports.columns.userId"), (r) => r.reporter?.id),
-    col.code<Report>(t("admin.reports.columns.targetId"), "targetId"),
+    col.id<Report>(t("admin.reports.columns.userId"), (r) => r.reporter?.id),
+    col.id<Report>(t("admin.reports.columns.targetId"), "targetId"),
     col.date<Report>(t("common.date"), "createdAt"),
     col.badge<Report>(
       t("common.status"),

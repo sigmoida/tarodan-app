@@ -19,7 +19,7 @@ export interface Refund {
 
 export function refundColumns(t: T, rowMenu: (r: Refund) => RowActionItem[]) {
   return [
-    col.code<Refund>(t("admin.operations.refunds.colId"), "id", {
+    col.id<Refund>(t("admin.operations.refunds.colId"), "id", {
       grow: 1,
     }),
     col.link<Refund>(
@@ -47,7 +47,7 @@ export function refundColumns(t: T, rowMenu: (r: Refund) => RowActionItem[]) {
           : null,
       { sortKey: "order.buyer.displayName" },
     ),
-    col.code<Refund>(
+    col.id<Refund>(
       t("admin.operations.common.buyerId"),
       (r) => r.order?.buyer?.id,
     ),
@@ -62,7 +62,7 @@ export function refundColumns(t: T, rowMenu: (r: Refund) => RowActionItem[]) {
           : null,
       { sortKey: "order.seller.displayName" },
     ),
-    col.code<Refund>(
+    col.id<Refund>(
       t("admin.operations.common.sellerId"),
       (r) => r.order?.seller?.id,
     ),

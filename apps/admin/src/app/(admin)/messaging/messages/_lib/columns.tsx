@@ -7,7 +7,7 @@ type T = ReturnType<typeof useTranslations<never>>;
 
 export function messageColumns(rowMenu: (m: Message) => RowActionItem[], t: T) {
   return [
-    col.code<Message>(
+    col.id<Message>(
       t("admin.messaging.messages.conversationId"),
       (m) => m.threadId,
     ),
@@ -19,10 +19,7 @@ export function messageColumns(rowMenu: (m: Message) => RowActionItem[], t: T) {
       }),
       { sortKey: "sender.displayName" },
     ),
-    col.code<Message>(
-      t("admin.messaging.messages.senderId"),
-      (m) => m.senderId,
-    ),
+    col.id<Message>(t("admin.messaging.messages.senderId"), (m) => m.senderId),
     col.user<Message>(
       t("admin.messaging.messages.receiver"),
       (m) => ({
@@ -31,7 +28,7 @@ export function messageColumns(rowMenu: (m: Message) => RowActionItem[], t: T) {
       }),
       { sortKey: "receiver.displayName" },
     ),
-    col.code<Message>(
+    col.id<Message>(
       t("admin.messaging.messages.receiverId"),
       (m) => m.receiverId,
     ),

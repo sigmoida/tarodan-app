@@ -17,6 +17,7 @@ export {
   CellNumber,
   CellDate,
   CellCode,
+  CellId,
   CellLink,
   CellUser,
   CellBadge,
