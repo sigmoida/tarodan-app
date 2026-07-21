@@ -25,7 +25,7 @@ export default function CategoriesPanel({
 
   return (
     <NavPanel>
-      <div className="grid grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
         {/* Vehicle types */}
         <div>
           <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">

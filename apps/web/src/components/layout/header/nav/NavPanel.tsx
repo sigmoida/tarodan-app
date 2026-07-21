@@ -9,7 +9,7 @@ import type { ReactNode } from 'react';
  */
 export default function NavPanel({ children }: { children: ReactNode }) {
 	return (
-		<div className='w-full p-4 bg-surface-elevated border border-border rounded-lg shadow-elevated'>
+		<div className='w-full p-4 bg-surface-elevated border border-border rounded-lg shadow-elevated max-h-[70vh] overflow-y-auto md:max-h-none md:overflow-visible'>
 			{children}
 		</div>
 	);

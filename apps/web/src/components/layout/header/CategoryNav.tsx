@@ -48,7 +48,7 @@ export default function CategoryNav() {
                 <NavigationMenuTrigger className={NAV_TRIGGER_CLASS}>
                   {item.label}
                 </NavigationMenuTrigger>
-                <NavigationMenuContent className="absolute left-0 top-full mt-1.5 z-50 w-full md:w-full data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0">
+                <NavigationMenuContent className="fixed inset-x-0 top-[104px] z-50 w-screen md:absolute md:inset-x-auto md:left-0 md:top-full md:mt-1.5 md:w-full data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0">
                   {item.dropdown === "categories" ? (
                     <CategoriesPanel
                       vehicleTypes={vehicleTypes}
