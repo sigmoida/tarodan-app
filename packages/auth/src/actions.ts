@@ -9,10 +9,25 @@ export interface LoginInput {
 	twoFactorCode?: string;
 }
 
+export type AuthErrorReason = 'invalid' | 'unverified' | 'connection' | 'unknown';
+
 export type AuthLoginResult =
 	| { status: 'ok' }
 	| { status: '2fa' }
-	| { status: 'error'; reason: 'invalid' | 'connection' | 'unknown'; serverMessage?: string };
+	| { status: 'error'; reason: AuthErrorReason; serverMessage?: string };
+
+interface AuthErrorResponse {
+	errorCode?: string;
+	i18nKey?: string;
+	message?: string;
+}
+
+function isEmailNotVerified(data: AuthErrorResponse | null): boolean {
+	return (
+		data?.errorCode === 'EMAIL_NOT_VERIFIED' ||
+		data?.i18nKey === 'server.auth.emailNotVerifiedLogin'
+	);
+}
 
 /**
  * The auth flow LOGIC (login / google-login / logout / forgot-password),
@@ -41,12 +56,18 @@ export function createAuthLogic<TUser>(config: AuthConfig, session: SessionToolk
 			return { status: 'error', reason: 'connection' };
 		}
 
-		const data = await res.json().catch(() => null);
+		const data = (await res.json().catch(() => null)) as AuthErrorResponse & {
+			requires2FA?: boolean;
+			tokens?: { accessToken?: string; refreshToken?: string };
+		};
 
 		if (res.ok && data?.requires2FA) return { status: '2fa' };
-		if (res.ok && data?.tokens?.accessToken) {
+		if (res.ok && data?.tokens?.accessToken && data.tokens.refreshToken) {
 			session.writeTokens(data.tokens.accessToken, data.tokens.refreshToken);
 			return { status: 'ok' };
+		}
+		if ((res.status === 401 || res.status === 400) && isEmailNotVerified(data)) {
+			return { status: 'error', reason: 'unverified', serverMessage: data?.message };
 		}
 		if (res.status === 401 || res.status === 400) {
 			return { status: 'error', reason: 'invalid' };

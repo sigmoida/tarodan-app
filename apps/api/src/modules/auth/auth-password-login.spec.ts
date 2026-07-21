@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UnauthorizedException } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { GoogleAuthService } from './google-auth.service';
 import { AppleAuthService } from './apple-auth.service';
@@ -63,5 +64,38 @@ describe('AuthService.login - password login edge cases', () => {
         data: expect.objectContaining({ eventType: 'failed_login', details: expect.objectContaining({ reason: 'oauth_only_account' }) }),
       }),
     );
+  });
+
+  it('should expose EMAIL_NOT_VERIFIED for a valid password on an unverified account', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'u2',
+      email: 'unverified@example.com',
+      passwordHash: await bcrypt.hash('CorrectPass123!', 4),
+      isEmailVerified: false,
+      isSeller: false,
+      sellerType: null,
+      displayName: 'Unverified User',
+      avatarUrl: null,
+      phone: null,
+      isVerified: false,
+      createdAt: new Date(),
+      membership: null,
+    });
+
+    try {
+      await service.login({
+        email: 'unverified@example.com',
+        password: 'CorrectPass123!',
+      });
+      throw new Error('Expected login to fail');
+    } catch (error) {
+      expect(error).toBeInstanceOf(UnauthorizedException);
+      expect((error as UnauthorizedException).getResponse()).toEqual(
+        expect.objectContaining({
+          errorCode: 'EMAIL_NOT_VERIFIED',
+          i18nKey: 'server.auth.emailNotVerifiedLogin',
+        }),
+      );
+    }
   });
 });

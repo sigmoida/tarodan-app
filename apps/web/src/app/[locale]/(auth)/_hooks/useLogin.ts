@@ -84,21 +84,21 @@ export function useLogin() {
         // eslint-disable-next-line no-console
         console.error("[Login] Login error:", error);
       }
+      const errorCode = (error as { code?: string })?.code;
+      const apiMessage = (
+        error as {
+          response?: { data?: { message?: string } };
+          message?: string;
+        }
+      )?.response?.data?.message;
       const message =
-        (
-          error as {
-            response?: { data?: { message?: string } };
-            message?: string;
-          }
-        )?.response?.data?.message ||
-        (error as { message?: string })?.message ||
-        t("auth.invalidCredentials");
+        errorCode === "unverified"
+          ? t("auth.emailNotVerifiedBanner")
+          : apiMessage ||
+            (error as { message?: string })?.message ||
+            t("auth.invalidCredentials");
 
-      if (
-        message.includes("doğrula") ||
-        message.includes("verify") ||
-        message.includes("verification")
-      ) {
+      if (errorCode === "unverified") {
         setShowVerificationBanner(true);
       }
       toast.error(message);

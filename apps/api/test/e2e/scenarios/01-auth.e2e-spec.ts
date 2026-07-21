@@ -264,7 +264,9 @@ describe('01 — Kimlik Doğrulama & Hesap Güvenliği (AUTH)', () => {
         password: 'Demo123!',
         isEmailVerified: false,
       });
-      await login('unverified@test.com', 'Demo123!').expect(401);
+      const res = await login('unverified@test.com', 'Demo123!').expect(401);
+      expect(res.body.errorCode).toBe('EMAIL_NOT_VERIFIED');
+      expect(res.body.i18nKey).toBe('server.auth.emailNotVerifiedLogin');
     });
 
     scenario('AUTH-023', async () => {

@@ -586,9 +586,10 @@ export class AuthService {
 
       // Check if email is verified - require email verification before login
       if (!user.isEmailVerified) {
-        throw new UnauthorizedException(
-          i18nMessage("server.auth.emailNotVerifiedLogin"),
-        );
+        throw new UnauthorizedException({
+          ...i18nMessage("server.auth.emailNotVerifiedLogin"),
+          errorCode: "EMAIL_NOT_VERIFIED",
+        });
       }
 
       // Update lastLoginAt immediately so it's persisted before any other async work

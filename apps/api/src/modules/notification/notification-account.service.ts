@@ -162,9 +162,19 @@ export class NotificationAccountService {
 
     const frontendUrl = this.configService.get('FRONTEND_URL') || 'http://localhost:3000';
     const verifyUrl = `${frontendUrl}/verify-email?token=${verificationToken}`;
-    const templateData = { name: user.displayName || '', verificationUrl: verifyUrl, expiresIn: '24 saat' };
+    const displayName = user.displayName || '';
+    const templateData = {
+      name: displayName,
+      displayName,
+      verificationUrl: verifyUrl,
+      expiresIn: '24 saat',
+    };
 
-    const dbTemplate = await this.prisma.emailTemplate.findUnique({ where: { key: 'email-verification' } });
+    // Legacy seed data used an underscore while the renderer uses kebab-case.
+    // Accept both so production databases keep using their managed template.
+    const dbTemplate = await this.prisma.emailTemplate.findFirst({
+      where: { key: { in: ['email-verification', 'email_verification'] } },
+    });
     let html: string;
     let subject: string;
     if (dbTemplate?.bodyHtml) {
@@ -188,6 +198,14 @@ export class NotificationAccountService {
     }
 
     await this.dispatch.logNotification(userId, 'email', 'email_verification', 'E-posta Doğrulama', '', result.success);
+
+    if (result.success) {
+      this.logger.log(`Email verification sent to ${user.email}`);
+    } else {
+      this.logger.error(
+        `Failed to send email verification to ${user.email}: ${result.error}`,
+      );
+    }
 
     return result;
   }
