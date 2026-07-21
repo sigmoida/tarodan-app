@@ -3,7 +3,7 @@ import { PrismaService } from "../../prisma";
 import { StorageService } from "../storage/storage.service";
 import { Prisma } from "@prisma/client";
 import { AdminTradeQueryDto, TradeShipmentQueryDto } from "./dto";
-import { paginate, resolveOrderBy } from "../../common/list";
+import { buildSearchWhere, paginate, resolveOrderBy } from "../../common/list";
 
 /**
  * Takas yönetimi salt-okunur sorguları (admin liste/detay) — AdminTradeService'ten
@@ -162,7 +162,31 @@ export class AdminTradeQueryService {
    * TradeShipment does not have direct relations to User.
    */
   async findTradeShipments(query: TradeShipmentQueryDto) {
-    const { status, leg, tradeNumber } = query;
+    const { status, leg, tradeNumber, search } = query;
+
+    const matchingUsers = search?.trim()
+      ? await this.prisma.user.findMany({
+          where: {
+            OR: [
+              {
+                displayName: {
+                  contains: search.trim(),
+                  mode: "insensitive",
+                },
+              },
+              { email: { contains: search.trim(), mode: "insensitive" } },
+            ],
+          },
+          select: { id: true },
+        })
+      : [];
+    const textSearch = buildSearchWhere(search, [
+      "trade.tradeNumber",
+      "carrier",
+      "trackingNumber",
+      "lostReason",
+      "recipientType",
+    ]);
 
     const where: Prisma.TradeShipmentWhereInput = {
       ...(status && { status }),
@@ -172,6 +196,23 @@ export class AdminTradeQueryService {
           tradeNumber: { contains: tradeNumber, mode: "insensitive" },
         },
       }),
+      ...(search?.trim()
+        ? {
+            OR: [
+              ...((textSearch?.OR ?? []) as Prisma.TradeShipmentWhereInput[]),
+              ...(matchingUsers.length
+                ? [
+                    { shipperId: { in: matchingUsers.map(({ id }) => id) } },
+                    {
+                      recipientUserId: {
+                        in: matchingUsers.map(({ id }) => id),
+                      },
+                    },
+                  ]
+                : []),
+            ],
+          }
+        : {}),
     };
 
     const orderBy =

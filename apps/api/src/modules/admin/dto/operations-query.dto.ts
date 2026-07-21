@@ -11,7 +11,7 @@ import {
 } from "class-validator";
 import { Type } from "class-transformer";
 
-import { AdminListQueryDto } from "../../../common/list";
+import { ADMIN_LIST_MAX_LIMIT, AdminListQueryDto } from "../../../common/list";
 
 export class AdminTradeQueryDto extends AdminListQueryDto {
   @ApiPropertyOptional({ enum: TradeStatus })
@@ -73,18 +73,17 @@ export class AdminMessageQueryDto extends AdminListQueryDto {
 }
 
 export class AdminShipmentQueryDto extends AdminListQueryDto {
-  @ApiPropertyOptional({ default: 10, minimum: 1, maximum: 100 })
+  @ApiPropertyOptional({
+    default: 20,
+    minimum: 1,
+    maximum: ADMIN_LIST_MAX_LIMIT,
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(ADMIN_LIST_MAX_LIMIT)
   declare limit?: number;
-
-  constructor() {
-    super();
-    this.limit = 10;
-  }
 
   @ApiPropertyOptional({ enum: ShipmentStatus })
   @IsOptional()
@@ -95,6 +94,11 @@ export class AdminShipmentQueryDto extends AdminListQueryDto {
   @IsOptional()
   @IsString()
   carrierId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  search?: string;
 }
 
 export class AdminRefundHistoryQueryDto extends AdminListQueryDto {

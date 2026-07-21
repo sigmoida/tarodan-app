@@ -538,6 +538,11 @@ export class AdminService {
     kind?: string;
     page?: number;
     pageSize?: number;
+    limit?: number;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+    sortType?: "text" | "number" | "date";
   }) {
     return this.moderationService.getModerationEvents(options);
   }

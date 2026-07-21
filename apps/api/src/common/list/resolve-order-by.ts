@@ -17,6 +17,7 @@ interface RelationInfo {
 }
 
 const scalarFieldsByModel = new Map<string, ReadonlySet<string>>();
+const nullableScalarFieldsByModel = new Map<string, ReadonlySet<string>>();
 const relationsByModel = new Map<string, ReadonlyMap<string, RelationInfo>>();
 
 function getModel(modelName: string) {
@@ -36,6 +37,25 @@ function getScalarFields(modelName: string): ReadonlySet<string> {
   );
 
   scalarFieldsByModel.set(modelName, fields);
+  return fields;
+}
+
+/** Optional scalar + enum fields — only these support Prisma's `nulls` option. */
+function getNullableScalarFields(modelName: string): ReadonlySet<string> {
+  const cached = nullableScalarFieldsByModel.get(modelName);
+  if (cached) return cached;
+
+  const model = getModel(modelName);
+  const fields = new Set(
+    model?.fields
+      .filter(
+        ({ kind, isRequired }) =>
+          (kind === "scalar" || kind === "enum") && !isRequired,
+      )
+      .map(({ name }) => name) ?? [],
+  );
+
+  nullableScalarFieldsByModel.set(modelName, fields);
   return fields;
 }
 
@@ -129,7 +149,9 @@ export function resolveOrderBy<TOrderBy>(
 
   if (getScalarFields(modelName).has(query.sortBy)) {
     // number/date → nulls last so empty cells sink under either direction.
-    const nullsLast = query.sortType === "number" || query.sortType === "date";
+    const nullsLast =
+      getNullableScalarFields(modelName).has(query.sortBy) &&
+      (query.sortType === "number" || query.sortType === "date");
     return (
       nullsLast
         ? { [query.sortBy]: { sort: direction, nulls: "last" } }

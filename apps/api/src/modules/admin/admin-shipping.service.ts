@@ -2,7 +2,7 @@ import { Injectable, Optional } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { Prisma } from "@prisma/client";
 import { AdminShipmentQueryDto } from "./dto";
-import { paginate, resolveOrderBy } from "../../common/list";
+import { buildSearchWhere, paginate, resolveOrderBy } from "../../common/list";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { SuratTrackingService } from "../surat-cargo/surat-tracking.service";
 import {
@@ -35,9 +35,23 @@ export class AdminShippingService {
    * Get list of shipments
    */
   async getShipments(query: AdminShipmentQueryDto) {
-    const { status, carrierId } = query;
-    const where: Prisma.ShipmentWhereInput = {};
-    const pagination = { ...query, limit: query.limit ?? 10 };
+    const { status, carrierId, search } = query;
+    const where: Prisma.ShipmentWhereInput = {
+      ...(buildSearchWhere(search, [
+        "order.orderNumber",
+        "order.buyer.displayName",
+        "order.buyer.email",
+        "order.seller.displayName",
+        "order.seller.email",
+        "provider",
+        "trackingNumber",
+        "providerTrackingId",
+        "providerRawStatus",
+        "receivedBy",
+        "returnReason",
+      ]) as Prisma.ShipmentWhereInput | undefined),
+    };
+    const pagination = { ...query, limit: query.limit ?? 20 };
 
     if (status) where.status = status as any;
     if (carrierId) where.provider = carrierId;

@@ -23,22 +23,8 @@ export function ProductReviewsTab() {
   return (
     <ResourceList<Review>
       resource="reviews"
-      fetcher={(params) => {
-        const { sortBy, sortOrder, ...rest } = params;
-        const preset =
-          sortBy === "createdAt"
-            ? sortOrder === "desc"
-              ? "newest"
-              : "oldest"
-            : sortBy === "score"
-              ? sortOrder === "desc"
-                ? "highest_score"
-                : "lowest_score"
-              : undefined;
-        return adminApi.getReviews({ ...rest, sortBy: preset });
-      }}
+      fetcher={(params) => adminApi.getReviews(params)}
       getRowId={(r) => r.id}
-      limit={10}
       syncUrl
       initialFilters={{ status: "all" }}
     >

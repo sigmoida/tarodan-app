@@ -5,6 +5,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import type { AxiosResponse } from "axios";
 import { adminKeys } from "@/lib/query/keys";
+import { normalizePageSize } from "@/components/list/page-size";
 import {
   CLIENT_LIST_STALE_MS,
   type ClientListFetcher,
@@ -192,7 +193,7 @@ export function useAdminResource<T>({
   const getInitialLimit = () => {
     if (!syncUrl) return limit;
     const s = parseInt(searchParams.get("size") ?? "", 10);
-    return isNaN(s) || s < 1 ? limit : s;
+    return normalizePageSize(s, limit);
   };
   const getInitialFilters = () => {
     if (!syncUrl) return { ...initialFilters };
@@ -299,7 +300,7 @@ export function useAdminResource<T>({
     setInputSearch(urlQ);
     startTransition(() => {
       setPageState(isNaN(urlPage) || urlPage < 1 ? 1 : urlPage);
-      setPageSizeState(isNaN(urlSize) || urlSize < 1 ? limit : urlSize);
+      setPageSizeState(normalizePageSize(urlSize, limit));
       setCommittedSearch(urlQ);
       setFiltersState(newFilters);
       setSortState(urlSort);
@@ -318,13 +319,14 @@ export function useAdminResource<T>({
   // ── Page size: "Show 20/50/100/250"; resets the page to 1 ──────────────────
   const setPageSize = useCallback(
     (size: number) => {
+      const normalizedSize = normalizePageSize(size, limit);
       startTransition(() => {
-        setPageSizeState(size);
+        setPageSizeState(normalizedSize);
         setPageState(1);
       });
-      syncToUrl(1, committedSearch, filters, sort, size);
+      syncToUrl(1, committedSearch, filters, sort, normalizedSize);
     },
-    [committedSearch, filters, sort, syncToUrl],
+    [committedSearch, filters, sort, limit, syncToUrl],
   );
 
   const setFilter = useCallback(

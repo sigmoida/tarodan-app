@@ -118,6 +118,9 @@ export class AdminPayoutService {
         defaultSort: { createdAt: "desc" },
         // The list shows the seller's name; map the alias to the relation.
         sortMap: {
+          orderNumber: (direction) => ({
+            payment: { order: { orderNumber: direction } },
+          }),
           sellerName: (direction) => ({ seller: { displayName: direction } }),
         },
       },

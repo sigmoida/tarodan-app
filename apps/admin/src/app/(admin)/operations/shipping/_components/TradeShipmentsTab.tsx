@@ -12,9 +12,7 @@ export function TradeShipmentsTab() {
   return (
     <ResourceList<TradeShipmentRow>
       resource="trade-shipments"
-      fetcher={({ search: q, ...params }) =>
-        adminApi.getTradeShipments({ ...params, tradeNumber: q || undefined })
-      }
+      fetcher={(params) => adminApi.getTradeShipments(params)}
       getRowId={(r) => r.id}
       syncUrl
       initialFilters={{ status: "all", leg: "all" }}

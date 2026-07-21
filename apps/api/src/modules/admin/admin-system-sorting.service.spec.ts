@@ -45,6 +45,64 @@ describe("admin system and user list sorting", () => {
     );
   });
 
+  it("sorts the general user list by total buyer and seller orders", async () => {
+    const user = createDelegate({
+      findMany: jest
+        .fn()
+        .mockResolvedValueOnce([
+          { id: "user-a", _count: { buyerOrders: 1, sellerOrders: 1 } },
+          { id: "user-b", _count: { buyerOrders: 0, sellerOrders: 5 } },
+        ])
+        .mockResolvedValueOnce([{ id: "user-b" }, { id: "user-a" }]),
+    });
+    const service = new AdminUserService(
+      { user } as any,
+      {} as any,
+      undefined as any,
+    );
+
+    const result = await service.getUsers({
+      sortBy: "ordersCount",
+      sortOrder: "desc",
+      page: 1,
+      limit: 20,
+    });
+
+    expect(user.findMany).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: { id: { in: ["user-b", "user-a"] } },
+      }),
+    );
+    expect(result.meta).toEqual({
+      total: 2,
+      page: 1,
+      limit: 20,
+      totalPages: 1,
+    });
+  });
+
+  it("sorts seller performance by seller order count", async () => {
+    const user = createDelegate();
+    const service = new AdminUserService(
+      { user } as any,
+      {} as any,
+      undefined as any,
+    );
+
+    await service.getUsers({
+      isSeller: true,
+      sortBy: "ordersCount",
+      sortOrder: "asc",
+    });
+
+    expect(user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: { sellerOrders: { _count: "asc" } },
+      }),
+    );
+  });
+
   it("sorts seller applications by a user scalar", async () => {
     const user = createDelegate();
     const service = new AdminSellerApplicationService(

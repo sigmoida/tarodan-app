@@ -15,9 +15,9 @@ import {
   UploadedFile,
   BadRequestException,
   Res,
-} from '@nestjs/common';
+} from "@nestjs/common";
 
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor } from "@nestjs/platform-express";
 import {
   ApiTags,
   ApiOperation,
@@ -25,24 +25,35 @@ import {
   ApiBearerAuth,
   ApiParam,
   ApiQuery,
-} from '@nestjs/swagger';
-import { AdminService } from './admin.service';
-import { AdvertisementService } from '../advertisement/advertisement.service';
-import { MediaService } from '../media/media.service';
-import { CreateAdvertisementDto, UpdateAdvertisementDto, ReorderAdsDto } from '../advertisement/dto';
-import { DiscountService } from '../discount/discount.service';
-import { CreateDiscountDto, UpdateDiscountDto, DiscountQueryDto } from '../discount/dto';
-import { AdminJwtAuthGuard } from '../auth/guards/admin-jwt-auth.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { RequirePermission } from '../auth/decorators/require-permission.decorator';
-import { BypassPermissionMatrix } from '../auth/decorators/bypass-permission-matrix.decorator';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { AdminRoute } from '../auth/decorators/admin-route.decorator';
-import { Public } from '../auth/decorators/public.decorator';
-import { AdminRole } from '@prisma/client';
-import { ForceCompleteOrderDto, ExtendConfirmationDto } from '../order/dto';
-import { OverrideRefundPolicyDto, SetReturnShippingPayerDto } from '../refund/dto';
+} from "@nestjs/swagger";
+import { AdminService } from "./admin.service";
+import { AdvertisementService } from "../advertisement/advertisement.service";
+import { MediaService } from "../media/media.service";
+import {
+  CreateAdvertisementDto,
+  UpdateAdvertisementDto,
+  ReorderAdsDto,
+} from "../advertisement/dto";
+import { DiscountService } from "../discount/discount.service";
+import {
+  CreateDiscountDto,
+  UpdateDiscountDto,
+  DiscountQueryDto,
+} from "../discount/dto";
+import { AdminJwtAuthGuard } from "../auth/guards/admin-jwt-auth.guard";
+import { Roles } from "../auth/decorators/roles.decorator";
+import { RequirePermission } from "../auth/decorators/require-permission.decorator";
+import { BypassPermissionMatrix } from "../auth/decorators/bypass-permission-matrix.decorator";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { AdminRoute } from "../auth/decorators/admin-route.decorator";
+import { Public } from "../auth/decorators/public.decorator";
+import { AdminRole } from "@prisma/client";
+import { ForceCompleteOrderDto, ExtendConfirmationDto } from "../order/dto";
+import {
+  OverrideRefundPolicyDto,
+  SetReturnShippingPayerDto,
+} from "../refund/dto";
 import {
   CreateCommissionRuleDto,
   UpdateCommissionRuleDto,
@@ -90,28 +101,30 @@ import {
   TradeShipmentQueryDto,
   RefundRequestQueryDto,
   AdminChangeMembershipDto,
-} from './dto';
+  ModerationEventsQueryDto,
+} from "./dto";
 
-@ApiTags('admin')
-@Controller('admin')
+@ApiTags("admin")
+@Controller("admin")
 @AdminRoute() // Mark as admin route to skip global JwtAuthGuard
 @UseGuards(AdminJwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class AdminModerationController {
-  constructor(
-    private readonly adminService: AdminService,
-  ) { }
+  constructor(private readonly adminService: AdminService) {}
 
   // ==================== MODERATION QUEUE ====================
 
-  @Get('moderation/queue')
+  @Get("moderation/queue")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Get moderation queue items' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'List of items pending moderation' })
+  @ApiOperation({ summary: "Get moderation queue items" })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "List of items pending moderation",
+  })
   async getModerationQueue(
-    @Query('type') type?: string,
-    @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string,
+    @Query("type") type?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
   ) {
     return this.adminService.getModerationQueue({
       type,
@@ -120,21 +133,21 @@ export class AdminModerationController {
     });
   }
 
-  @Get('moderation/stats')
+  @Get("moderation/stats")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Get moderation statistics' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Moderation statistics' })
+  @ApiOperation({ summary: "Get moderation statistics" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Moderation statistics" })
   async getModerationStats() {
     return this.adminService.getModerationStats();
   }
 
-  @Get('moderation/ai-checks')
+  @Get("moderation/ai-checks")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'AI ile denetlenmiş tüm ürünler + skorları' })
+  @ApiOperation({ summary: "AI ile denetlenmiş tüm ürünler + skorları" })
   async getAiModerationList(
-    @Query('status') status?: string,
-    @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string,
+    @Query("status") status?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
   ) {
     return this.adminService.getAiModerationList({
       status,
@@ -143,50 +156,34 @@ export class AdminModerationController {
     });
   }
 
-  @Get('moderation/events')
+  @Get("moderation/events")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({
     summary:
-      'Birleşik AI moderasyon günlüğü (tüm varlıklar; entityType/entityId ile süzülebilir)',
+      "Birleşik AI moderasyon günlüğü (tüm varlıklar; entityType/entityId ile süzülebilir)",
   })
-  async getModerationEvents(
-    @Query('entityType') entityType?: string,
-    @Query('entityId') entityId?: string,
-    @Query('userId') userId?: string,
-    @Query('decision') decision?: string,
-    @Query('kind') kind?: string,
-    @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string,
-  ) {
-    return this.adminService.getModerationEvents({
-      entityType,
-      entityId,
-      userId,
-      decision,
-      kind,
-      page: page ? parseInt(page, 10) : 1,
-      pageSize: pageSize ? parseInt(pageSize, 10) : 20,
-    });
+  async getModerationEvents(@Query() query: ModerationEventsQueryDto) {
+    return this.adminService.getModerationEvents(query);
   }
 
-  @Post('moderation/test-image')
+  @Post("moderation/test-image")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'Tek görseli AI ile test et (skor gör)' })
-  async testImageModeration(@Body('imageUrl') imageUrl: string) {
+  @ApiOperation({ summary: "Tek görseli AI ile test et (skor gör)" })
+  async testImageModeration(@Body("imageUrl") imageUrl: string) {
     return this.adminService.testImageModeration(imageUrl);
   }
 
-  @Get('moderation/ai-config')
+  @Get("moderation/ai-config")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: 'AI eşiklerini oku (kabul/uygunsuzluk %)' })
+  @ApiOperation({ summary: "AI eşiklerini oku (kabul/uygunsuzluk %)" })
   async getAiConfig() {
     return this.adminService.getAiConfig();
   }
 
-  @Post('moderation/ai-config')
+  @Post("moderation/ai-config")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @RequirePermission('ai_moderation')
-  @ApiOperation({ summary: 'AI eşiklerini ayarla (canlı + kalıcı)' })
+  @RequirePermission("ai_moderation")
+  @ApiOperation({ summary: "AI eşiklerini ayarla (canlı + kalıcı)" })
   async setAiConfig(
     @Body() body: { relevanceThreshold?: number; nsfwThreshold?: number },
   ) {
@@ -196,49 +193,74 @@ export class AdminModerationController {
     );
   }
 
-  @Post('moderation/:type/:id/approve')
+  @Post("moderation/:type/:id/approve")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Approve moderation item' })
-  @ApiParam({ name: 'type', description: 'Item type (product, message, user, review)' })
-  @ApiParam({ name: 'id', description: 'Item ID' })
+  @ApiOperation({ summary: "Approve moderation item" })
+  @ApiParam({
+    name: "type",
+    description: "Item type (product, message, user, review)",
+  })
+  @ApiParam({ name: "id", description: "Item ID" })
   async approveModerationItem(
-    @Param('type') type: string,
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
+    @Param("type") type: string,
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
     @Body() body: { notes?: string },
   ) {
-    return this.adminService.approveModerationItem(adminId, type, id, body.notes);
+    return this.adminService.approveModerationItem(
+      adminId,
+      type,
+      id,
+      body.notes,
+    );
   }
 
-  @Post('moderation/:type/:id/reject')
+  @Post("moderation/:type/:id/reject")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Reject moderation item' })
-  @ApiParam({ name: 'type', description: 'Item type (product, message, user, review)' })
-  @ApiParam({ name: 'id', description: 'Item ID' })
+  @ApiOperation({ summary: "Reject moderation item" })
+  @ApiParam({
+    name: "type",
+    description: "Item type (product, message, user, review)",
+  })
+  @ApiParam({ name: "id", description: "Item ID" })
   async rejectModerationItem(
-    @Param('type') type: string,
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
+    @Param("type") type: string,
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
     @Body() body: { reason: string; notes?: string },
   ) {
-    return this.adminService.rejectModerationItem(adminId, type, id, body.reason, body.notes);
+    return this.adminService.rejectModerationItem(
+      adminId,
+      type,
+      id,
+      body.reason,
+      body.notes,
+    );
   }
 
-  @Post('moderation/:type/:id/flag')
+  @Post("moderation/:type/:id/flag")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Flag moderation item for review' })
-  @ApiParam({ name: 'type', description: 'Item type (product, message, user, review)' })
-  @ApiParam({ name: 'id', description: 'Item ID' })
+  @ApiOperation({ summary: "Flag moderation item for review" })
+  @ApiParam({
+    name: "type",
+    description: "Item type (product, message, user, review)",
+  })
+  @ApiParam({ name: "id", description: "Item ID" })
   async flagModerationItem(
-    @Param('type') type: string,
-    @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
+    @Param("type") type: string,
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
     @Body() body: { reason: string; priority?: string },
   ) {
-    return this.adminService.flagModerationItem(adminId, type, id, body.reason, body.priority);
+    return this.adminService.flagModerationItem(
+      adminId,
+      type,
+      id,
+      body.reason,
+      body.priority,
+    );
   }
-
 }

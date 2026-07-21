@@ -100,7 +100,7 @@ describe("admin operations list sorting", () => {
     );
   });
 
-  it("preserves the shipment endpoint's ten-row default", async () => {
+  it("uses the standard twenty-row default for shipments", async () => {
     const shipment = createDelegate();
     const service = new AdminShippingService({ shipment } as any);
 
@@ -110,7 +110,33 @@ describe("admin operations list sorting", () => {
       expect.objectContaining({
         orderBy: { trackingNumber: "asc" },
         skip: 0,
-        take: 10,
+        take: 20,
+      }),
+    );
+  });
+
+  it("searches shipment content across order, party, carrier, and tracking fields", async () => {
+    const shipment = createDelegate();
+    const service = new AdminShippingService({ shipment } as any);
+
+    await service.getShipments({ search: "kaan" });
+
+    expect(shipment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([
+            {
+              order: {
+                buyer: {
+                  displayName: { contains: "kaan", mode: "insensitive" },
+                },
+              },
+            },
+            {
+              trackingNumber: { contains: "kaan", mode: "insensitive" },
+            },
+          ]),
+        }),
       }),
     );
   });
@@ -129,6 +155,35 @@ describe("admin operations list sorting", () => {
         orderBy: { updatedAt: "desc" },
         skip: 0,
         take: 20,
+      }),
+    );
+  });
+
+  it("searches trade shipments across trade, carrier, tracking, and users", async () => {
+    const tradeShipment = createDelegate();
+    const userFindMany = jest
+      .fn()
+      .mockResolvedValueOnce([{ id: "user-1" }])
+      .mockResolvedValueOnce([]);
+    const service = new AdminTradeQueryService(
+      { tradeShipment, user: { findMany: userFindMany } } as any,
+      undefined as any,
+    );
+
+    await service.findTradeShipments({ search: "kaan" });
+
+    expect(tradeShipment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([
+            {
+              trade: {
+                tradeNumber: { contains: "kaan", mode: "insensitive" },
+              },
+            },
+            { shipperId: { in: ["user-1"] } },
+          ]),
+        }),
       }),
     );
   });
