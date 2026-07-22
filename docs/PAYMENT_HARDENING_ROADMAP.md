@@ -166,9 +166,20 @@
 
 ## Faz 3 — Güvenlik · `fix/payment-hardening-security`
 
-- [ ] **3.1 — `bypass-complete` kilitle (SEC-H1)** `payment.controller.ts:383-392`. Auth + ownership + servis içinde `NODE_ENV!=="production"` guard; `GET /payments/config` `bypassEnabled` sızdırmasın.
-- [ ] **3.2 — `confirm-failed` ownership (SEC-M1)** `payment.controller.ts:345-360`. Sahiplik kontrolü ekle (griefing/fon-sıkıştırma).
-- [ ] **3.3 — Düşük (SEC-L1/L2/L3):** kimliksiz pending-fiyat ifşası (auth iste), guest e-posta enumerasyonu (uniform yanıt), oid entropi notu.
+- [x] **3.1 — `bypass-complete` kilitle (SEC-H1)** ✓ Üç katman: (1) servis içi SERT
+      `NODE_ENV==="production"` reddi (PAYMENT_BYPASS yanlışlıkla açık olsa bile prod'da
+      bedava ödeme YOK), (2) endpoint `@Public()` → `@UseGuards(JwtAuthGuard)` + ownership
+      (order/grup/trade payer), (3) `GET /payments/config` `bypassEnabled`'ı yalnız non-prod'da
+      `true` raporluyor. **Spec:** 4 SEC-H1 testi.
+- [x] **3.2 — `confirm-failed` ownership (SEC-M1)** ✓ Endpoint public + guest checkout
+      kullandığından JWT ownership uygulanamaz; en kritik kötüye kullanım kapatıldı: CANLI
+      3DS çekimi (`isChargeLikelyLive`) varken ödeme fail EDİLMİYOR → payment-id enumerasyonuyla
+      başkasının canlı ödemesini fail edip orphan capture tetikleme engellendi. `isChargeLikelyLive`
+      PaymentCommonService'e taşındı (DRY; FLOW-H2/H3 ile ortak). **Spec:** 3 SEC-M1 testi.
+      (Tam ownership için optional-auth guard gerekir → Faz 10.)
+- [ ] **3.3 — Düşük (SEC-L1/L2/L3):** kimliksiz pending-fiyat ifşası (auth iste), guest e-posta
+      enumerasyonu (uniform yanıt), oid entropi notu. → **Faz 10'a ertelendi** (düşük öncelik,
+      Faz 10 zaten düşükleri topluyor).
 
 ---
 

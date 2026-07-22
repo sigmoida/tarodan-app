@@ -19,6 +19,17 @@ describe("PaymentReconciliationService.cancelExpiredPayments — FLOW-H2 live 3D
         k === "PAYMENT_FAIL_TIMEOUT_MINUTES" ? "35" : undefined,
       ),
     };
+    // isChargeLikelyLive artık PaymentCommonService'te (DRY); gerçek zaman-penceresi
+    // mantığıyla mock'la ki cancelExpiredPayments'in canlı-3DS guard'ı test edilebilsin.
+    const paymentCommon = {
+      isChargeLikelyLive: (metadata: any, windowMin: number) => {
+        const raw = metadata?.lastChargeStartedAt;
+        if (typeof raw !== "string") return false;
+        const startedAt = new Date(raw).getTime();
+        if (Number.isNaN(startedAt)) return false;
+        return Date.now() - startedAt < windowMin * 60 * 1000;
+      },
+    };
     const service = new PaymentReconciliationService(
       prisma as any, // prisma
       {} as any, // cache
@@ -29,7 +40,7 @@ describe("PaymentReconciliationService.cancelExpiredPayments — FLOW-H2 live 3D
       {} as any, // commissionLedger
       {} as any, // paymentRefund
       {} as any, // eventService
-      {} as any, // paymentCommon
+      paymentCommon as any, // paymentCommon
       {} as any, // paymentFulfillment
     );
     return { service, prisma };

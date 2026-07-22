@@ -332,6 +332,23 @@ export class PaymentLifecycleService {
     if (!payment || payment.status !== PaymentStatus.pending) {
       return { released: false };
     }
+    // SEC-M1: Bu uç PUBLIC ve idempotent (guest checkout fail sayfası da çağırır) —
+    // sahiplik JWT ile doğrulanamaz. En kritik kötüye kullanımı kapat: CANLI bir 3DS
+    // çekimi varken ödemeyi fail ETME. Aksi halde (a) kullanıcı erken "başarısız"
+    // derse ya da (b) saldırgan payment-id enumerasyonuyla başkasının canlı ödemesini
+    // fail ederse, PayTR çekimi tamamlanıp callback geldiğinde satır failed olur →
+    // orphan capture (para çekildi, sipariş yok). Charge penceresi kapanınca (ya da
+    // gerçek fail callback'iyle) normal akış devreye girer.
+    const windowMin = parseInt(
+      this.configService.get("PAYMENT_FAIL_TIMEOUT_MINUTES") || "35",
+      10,
+    );
+    if (this.paymentCommon.isChargeLikelyLive(payment.metadata, windowMin)) {
+      this.logger.warn(
+        `confirmFailedFromClient: canlı 3DS çekimi var — fail atlandı payment=${paymentId}`,
+      );
+      return { released: false };
+    }
     await this.paymentFulfillment.processFailedPayment(
       payment,
       "Fail sayfasından onay - rezervasyon serbest bırakıldı",

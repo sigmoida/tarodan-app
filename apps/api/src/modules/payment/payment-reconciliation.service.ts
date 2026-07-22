@@ -528,12 +528,7 @@ export class PaymentReconciliationService {
       this.configService.get("PAYMENT_FAIL_TIMEOUT_MINUTES") || "35",
       10,
     );
-    const meta = (metadata as Record<string, unknown>) || {};
-    const raw = meta.lastChargeStartedAt;
-    if (typeof raw !== "string") return false;
-    const startedAt = new Date(raw).getTime();
-    if (Number.isNaN(startedAt)) return false;
-    return Date.now() - startedAt < windowMin * 60 * 1000;
+    return this.paymentCommon.isChargeLikelyLive(metadata, windowMin);
   }
 
   async expireUnpaidOrders(): Promise<{ count: number }> {

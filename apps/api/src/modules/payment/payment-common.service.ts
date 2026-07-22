@@ -365,6 +365,23 @@ export class PaymentCommonService {
     return oids;
   }
 
+  /**
+   * FLOW-H2/H3 + SEC-M1: Ödemenin son 3DS çekimi hâlâ "canlı" olabilir mi?
+   * metadata.lastChargeStartedAt (charge-claim anında damgalanır) windowMinutes
+   * içindeyse EVET → bu payment `failed` yapılmamalı (cancelExpiredPayments,
+   * expireUnpaidOrders, confirmFailedFromClient hepsi bunu kontrol eder), aksi halde
+   * kullanıcı OTP ekranındayken PayTR çeker ve callback geldiğinde satır failed olur
+   * → orphan capture. Saf fonksiyon; config'i çağıran okur.
+   */
+  isChargeLikelyLive(metadata: unknown, windowMinutes: number): boolean {
+    const meta = (metadata as Record<string, unknown>) || {};
+    const raw = meta.lastChargeStartedAt;
+    if (typeof raw !== "string") return false;
+    const startedAt = new Date(raw).getTime();
+    if (Number.isNaN(startedAt)) return false;
+    return Date.now() - startedAt < windowMinutes * 60 * 1000;
+  }
+
   async assignMerchantOid(
     paymentId: string,
     baseOidRaw: string,

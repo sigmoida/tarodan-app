@@ -69,8 +69,9 @@ export class PaymentService {
 
   async bypassCompletePayment(
     paymentId: string,
+    userId?: string,
   ): Promise<{ success: boolean }> {
-    return this.paymentInitiation.bypassCompletePayment(paymentId);
+    return this.paymentInitiation.bypassCompletePayment(paymentId, userId);
   }
 
   async handlePayTRCallback(dto: PayTRCallbackDto) {
