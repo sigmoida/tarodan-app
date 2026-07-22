@@ -244,6 +244,13 @@ export class PaymentService {
     return this.paymentReconciliation.detectOrphanCapturedFailedPayments();
   }
 
+  async reconcileStuckRefundMarkers(): Promise<{
+    checked: number;
+    recovered: number;
+  }> {
+    return this.paymentReconciliation.reconcileStuckRefundMarkers();
+  }
+
   // Taşındı: payment-reconciliation.service.ts — facade delege (imza aynı).
   async releaseExpiredOrderReservations(): Promise<{ count: number }> {
     return this.paymentReconciliation.releaseExpiredOrderReservations();

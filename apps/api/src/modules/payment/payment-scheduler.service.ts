@@ -150,6 +150,17 @@ export class PaymentSchedulerService implements OnModuleInit {
       }
     });
 
+    // MONEY-M4: PayTR iadesi yapılıp DB finalize'ı patlayan (refundInProgress marker'ı
+    // takılı) siparişleri finalize et — yoksa payment completed kalır, payout çift-kayıp.
+    await this.runStep("reconcileStuckRefundMarkers", async () => {
+      const stuck = await this.paymentService.reconcileStuckRefundMarkers();
+      if (stuck.recovered > 0) {
+        this.logger.warn(
+          `Stuck refund markers finalized: ${stuck.recovered} of ${stuck.checked}`,
+        );
+      }
+    });
+
     // K3: Alıcının iptal ettiği (status=refunded) ama henüz iade edilmemiş siparişleri
     // bul ve iadeyi tetikle. OrderService.cancel yalnız status'u refunded yapıyordu;
     // bu adım gerçek PayTR iadesini + hold iptalini güvenilir şekilde tamamlar.

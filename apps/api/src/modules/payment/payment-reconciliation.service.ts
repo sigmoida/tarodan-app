@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
+import { Prisma } from "@prisma/client";
 import {
   PaymentStatus,
   PaymentHoldStatus,
@@ -1192,6 +1193,72 @@ export class PaymentReconciliationService {
       );
     }
     return { checked, recovered, alarms };
+  }
+
+  /**
+   * MONEY-M4: `refundInProgressOrders` marker'ı yazılıp PayTR iadesi YAPILDIKTAN sonra
+   * DB tx'i (finalize) hiç çalışmayan siparişleri toparlar. Böyle bir sipariş için para
+   * PayTR'de iade edildi ama payment `completed` kaldı → payout cron satıcıya ödeyebilir
+   * (çift kayıp). Marker başarılı finalize'da temizlendiğinden (undefined), marker HÂLÂ
+   * duran orderId'ler gerçekten takılıdır. processRefund'ı marker'daki TUTAR ile çağırırız:
+   * PayTR atlanır (marker recovered) ve tx bu sefer finalize eder. İdempotent.
+   */
+  async reconcileStuckRefundMarkers(): Promise<{
+    checked: number;
+    recovered: number;
+  }> {
+    const candidates = await this.prisma.payment.findMany({
+      where: {
+        provider: "paytr",
+        metadata: {
+          path: ["refundInProgressOrders"],
+          not: Prisma.DbNull,
+        },
+      },
+      select: { id: true, metadata: true },
+      take: 50,
+    });
+
+    let checked = 0;
+    let recovered = 0;
+    for (const p of candidates) {
+      const meta = (p.metadata as Record<string, any>) || {};
+      const inProgress =
+        (meta.refundInProgressOrders as Record<string, unknown>) || {};
+      const refunded = (meta.refundedOrders as Record<string, number>) || {};
+      // Gerçekten takılı = marker'da var ama refundedOrders'ta yok (tx finalize etmedi).
+      const stuckOrderIds = Object.keys(inProgress).filter(
+        (oid) => !(oid in refunded),
+      );
+      for (const orderId of stuckOrderIds) {
+        checked++;
+        try {
+          // Marker'daki tutar (yeni format {amount,at}); eski/timestamp formatında
+          // undefined → processRefund tam iade varsayar (eski davranış).
+          const stored = inProgress[orderId];
+          const amount =
+            stored && typeof stored === "object" && "amount" in stored
+              ? Number((stored as { amount: number }).amount)
+              : undefined;
+          await this.paymentRefund.processRefund(orderId, amount);
+          recovered++;
+          this.logger.warn(
+            `STUCK_REFUND_RECOVERED: refundInProgress marker finalize edildi ` +
+              `order=${orderId} payment=${p.id} amount=${amount ?? "full"}`,
+          );
+        } catch (e: any) {
+          this.logger.error(
+            `reconcileStuckRefundMarkers: order ${orderId} recovery başarısız (payment=${p.id}): ${e?.message}`,
+          );
+        }
+      }
+    }
+    if (recovered > 0) {
+      this.logger.warn(
+        `Stuck refund marker taraması: ${recovered}/${checked} finalize edildi`,
+      );
+    }
+    return { checked, recovered };
   }
 
   /**

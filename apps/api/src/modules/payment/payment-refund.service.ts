@@ -256,7 +256,14 @@ export class PaymentRefundService {
                     ...existingMeta,
                     refundInProgressOrders: {
                       ...inProgressOrders,
-                      [orderId]: new Date().toISOString(),
+                      // MONEY-M4: tutarı da sakla — PayTR sonrası tx patlarsa
+                      // reconcileStuckRefundMarkers doğru tutarla finalize edebilsin
+                      // (yalnız timestamp'ten tam/kısmi ayırt edilemezdi). Truthiness
+                      // guard'ı (obje truthy) ve clearRefundInProgress etkilenmez.
+                      [orderId]: {
+                        amount: amountToRefund,
+                        at: new Date().toISOString(),
+                      },
                     },
                   },
                 },
@@ -366,6 +373,18 @@ export class PaymentRefundService {
           const isOrderFullyRefunded =
             Number(refundedOrders[orderId] || 0) >= orderRefundThreshold - 0.01;
 
+          // MONEY-M4: bu sipariş finalize edildi → refundInProgressOrders marker'ından
+          // sil. Böylece reconcileStuckRefundMarkers sweep'i yalnız GERÇEKTEN takılı
+          // (PayTR yapıldı ama tx hiç finalize etmedi) marker'ları görür; başarılı
+          // iadelerin marker'ı birikmez.
+          const refundInProgressAfter = {
+            ...((existingMetadata.refundInProgressOrders as Record<
+              string,
+              unknown
+            >) || {}),
+          };
+          delete refundInProgressAfter[orderId];
+
           await tx.payment.update({
             where: { id: payment.id },
             data: {
@@ -375,6 +394,12 @@ export class PaymentRefundService {
                 refundAmount: totalRefunded,
                 refundedAt: new Date().toISOString(),
                 refundResult,
+                // Boşsa key'i DÜŞÜR (undefined → JSON'da yok) ki sweep sorgusu
+                // başarılı iadelerin boş marker'larıyla şişmesin.
+                refundInProgressOrders:
+                  Object.keys(refundInProgressAfter).length > 0
+                    ? refundInProgressAfter
+                    : undefined,
                 // MONEY-H4: tekilde de persist et — kümülatif iade takibi ve tavan
                 // kontrolü buna dayanır (yoksa art arda kısmi iadeler biriktirilemez).
                 refundedOrders,
