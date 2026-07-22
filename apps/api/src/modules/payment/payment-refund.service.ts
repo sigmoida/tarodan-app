@@ -149,6 +149,27 @@ export class PaymentRefundService {
       );
     }
 
+    // MONEY-H4: Tekil ödemede KÜMÜLATİF iade tavanı. Kısmi iadelere izin verdiğimiz
+    // için (payment `completed` kalır) art arda iadelerin TOPLAMI işlem tutarını
+    // aşamaz. PayTR'den ÖNCE kontrol et ki PayTR'da fazladan para iade edilmesin.
+    // (NOT: aynı sipariş üzerinde EŞZAMANLI kısmi iadeler tx-öncesi bu okumada
+    // yarışabilir — nadir, admin manuel akış; kalıcı çözüm sabit idempotency +
+    // reconciliation, Faz 2.)
+    if (!isGroupPayment) {
+      const priorRefunded = Number(previouslyRefundedOrders[orderId] || 0);
+      if (priorRefunded + amountToRefund > refundCap + 0.01) {
+        throw new BadRequestException(
+          i18nMessage("server.payment.refundAmountExceedsLimit", {
+            amountToRefund,
+            refundCap: Math.max(
+              Math.round((refundCap - priorRefunded) * 100) / 100,
+              0,
+            ),
+          }),
+        );
+      }
+    }
+
     // Çift-ödeme koruması (K1). Bunu PayTR/Sürat'a dokunmadan ÖNCE yap.
     // 1) Henüz icra edilmemiş payout'ları (pending/retry_pending) atomik olarak
     //    geçersiz kıl ki payout cron'u alıcıya iade yaparken satıcıya da ödeme yapmasın.
@@ -311,18 +332,32 @@ export class PaymentRefundService {
           const currentRefundedOrders: Record<string, number> =
             (existingMetadata.refundedOrders as Record<string, number>) || {};
 
-          // Grup ödemesi: sipariş başına iade biriktirilir; Payment yalnızca grubun
-          // TAMAMI iade edildiğinde refunded olur (kardeş siparişler ödenmiş kalır)
+          // Kısmi iade birikimi: sipariş başına iade TOPLANIR. Grup zaten order
+          // başına biriktiriyordu; MONEY-H4: tekil ödemede de biriktir — aksi halde
+          // tek bir kısmi iade `fullyRefunded=!isGroupPayment` yüzünden payment'ı
+          // tümden `refunded` yapıp sonraki kısmi iadeleri (top query `completed`
+          // arar) İMKÂNSIZLAŞTIRIYORDU. Aynı orderId'ye art arda kısmi iadeler
+          // ÜST ÜSTE yazılmayıp toplanır (grup'ta order-başına çift-iade zaten engelli).
+          const priorForOrder = Number(currentRefundedOrders[orderId] || 0);
           const refundedOrders = {
             ...currentRefundedOrders,
-            [orderId]: amountToRefund,
+            [orderId]: priorForOrder + amountToRefund,
           };
           const totalRefunded = Object.values(refundedOrders).reduce(
             (sum, v) => sum + Number(v || 0),
             0,
           );
-          const fullyRefunded =
-            !isGroupPayment || totalRefunded >= Number(payment.amount) - 0.01;
+          // Payment yalnız KÜMÜLATİF toplam işlem tutarına ulaşınca `refunded` olur.
+          const fullyRefunded = totalRefunded >= Number(payment.amount) - 0.01;
+          // Bu SİPARİŞİN kümülatif iadesi tamamlandı mı → order cancel + stok geri-yükle
+          // + e-Arşiv reverse tek buradan karar verir (tekilde çoklu kısmi iade toplanır,
+          // grupta order başına tek iade). Grup eşiği siparişin tutarı, tekil eşiği
+          // payment tutarı (= o siparişin tutarı).
+          const orderRefundThreshold = isGroupPayment
+            ? Number(refundTargetOrder!.totalAmount)
+            : Number(payment.amount);
+          const isOrderFullyRefunded =
+            Number(refundedOrders[orderId] || 0) >= orderRefundThreshold - 0.01;
 
           await tx.payment.update({
             where: { id: payment.id },
@@ -333,16 +368,17 @@ export class PaymentRefundService {
                 refundAmount: totalRefunded,
                 refundedAt: new Date().toISOString(),
                 refundResult,
-                ...(isGroupPayment ? { refundedOrders } : {}),
+                // MONEY-H4: tekilde de persist et — kümülatif iade takibi ve tavan
+                // kontrolü buna dayanır (yoksa art arda kısmi iadeler biriktirilemez).
+                refundedOrders,
                 auditHistory: auditHistory.concat({
                   action: "payment.refunded",
                   timestamp: new Date().toISOString(),
                   oldStatus,
                   newStatus: fullyRefunded ? PaymentStatus.refunded : oldStatus,
                   refundAmount: amountToRefund,
-                  ...(isGroupPayment
-                    ? { orderId, partial: !fullyRefunded }
-                    : {}),
+                  orderId,
+                  partial: !isOrderFullyRefunded,
                 }),
               },
             },
@@ -373,25 +409,19 @@ export class PaymentRefundService {
                 i18nMessage("server.payment.transferAlreadyStarted"),
               );
             }
-            // Adet bazlı kısmi iade: hold'un yalnız iade edilen satıcı-payı kadarı
-            // tüketilir (refundedAmount += amount*adet/siparişAdedi). Tam iadede hold
-            // tamamen cancelled; kısmi iadede held/released kalır ve payout sırasında
-            // netAmount = amount - refundedAmount olarak ödenir. Tek otorite buradadır.
-            // GRUP (sepet) ödemesinde payment.order NULL'dur (payment.orderId yok);
-            // bu yüzden iade edilen siparişin adedini doğrudan sorgula — aksi halde
-            // orderQtyForHold=1 olur ve coklu-adet grup siparisinde 1 adet kismi iade
-            // tüm hold'u tüketip satıcıyı 0 öderdi.
-            const orderRowForHold = await tx.order.findUnique({
-              where: { id: orderId },
-              select: { quantity: true },
-            });
-            const orderQtyForHold =
-              orderRowForHold?.quantity ?? payment.order?.quantity ?? 1;
-            const refundQty = opts?.refundQuantity ?? orderQtyForHold;
+            // Hold tüketimi TUTAR oranına göre (MONEY-H3). Adet-bazlı iade akışları
+            // amount = total*adet/siparişAdedi gönderdiğinden bu oran adet oranıyla
+            // BİREBİR örtüşür; tutar-bazlı admin/jest iadesinde ise yalnız iade edilen
+            // TUTAR kadarı tüketilir. Eskiden refundQuantity yoksa portion=1 olup TÜM
+            // hold tüketiliyor, 1000 TL siparişte 50 TL jest satıcı payout'unu 0'a
+            // düşürüyordu. Ledger portion ile AYNI formül (tek otorite). Tam iadede hold
+            // cancelled; kısmi iadede held/released kalır, payout'ta netAmount =
+            // amount - refundedAmount ödenir. orderRefundThreshold = siparişin tutarı
+            // (grup'ta order.totalAmount, tekilde payment.amount) — tx başında hesaplandı.
             const sellerAmount = Number(activeHold.amount);
             const portion =
-              orderQtyForHold > 0
-                ? Math.min(refundQty / orderQtyForHold, 1)
+              orderRefundThreshold > 0
+                ? Math.min(amountToRefund / orderRefundThreshold, 1)
                 : 1;
             const refundedSeller =
               Math.round(sellerAmount * portion * 100) / 100;
@@ -418,29 +448,25 @@ export class PaymentRefundService {
           // korunur; refunded* kümülatif artar → net komisyon = original - refunded
           // (elogo net faturalar). Kümülatif tam iadeye ulaşınca status=refunded olur ve
           // e-Arşiv reverse tetiklenir (eski davranış: yalnız tam iadede reverse — korunur).
-          const ledgerFullThreshold = isGroupPayment
-            ? Number(refundTargetOrder!.totalAmount)
-            : Number(payment.amount);
+          // ledger threshold = siparişin tutarı (orderRefundThreshold, tx başında).
           const ledgerPortion =
-            ledgerFullThreshold > 0
-              ? Math.min(amountToRefund / ledgerFullThreshold, 1)
+            orderRefundThreshold > 0
+              ? Math.min(amountToRefund / orderRefundThreshold, 1)
               : 1;
           await this.commissionLedger.applyRefund(orderId, ledgerPortion, tx);
-          // e-Arşiv reverse tetiği ESKİ davranışla AYNI: tam iade tutarında tetiklenir —
-          // ledger'a BAĞLAMA. handleOrderRefund siparişin kesilmiş TÜM faturalarını geri
-          // alır (platform_sale gibi ledger'sız ama faturalı siparişlerde de gerekir);
-          // ledger.fullyRefunded'a bağlarsak ledger'sız tam iadede reverse atlanırdı.
-          if (amountToRefund >= ledgerFullThreshold) {
+          // e-Arşiv reverse: siparişin KÜMÜLATİF iadesi tamamlanınca tetiklenir
+          // (MONEY-H4: art arda kısmi iadelerin sonuncusunda da; eskiden tek seferde
+          // tam tutar iade edilmezse hiç tetiklenmiyordu). Ledger'a BAĞLI DEĞİL
+          // (platform_sale gibi ledger'sız ama faturalı siparişlerde de gerekir);
+          // yalnız siparişin iade toplamına bakar. handleOrderRefund kesilmiş TÜM
+          // faturaları geri alır.
+          if (isOrderFullyRefunded) {
             einvoiceReverse = true;
           }
 
           // Update order status + restore stock on full refund.
           // Idempotent: skip stock restore if order is already cancelled (e.g.
           // handleExpiredPreparingOrders already restocked before calling us).
-          // Grup ödemesinde "tam iade" eşiği SİPARİŞİN tutarıdır.
-          const fullOrderRefundThreshold = isGroupPayment
-            ? Number(refundTargetOrder!.totalAmount)
-            : Number(payment.amount);
           {
             const orderRow = await tx.order.findUnique({
               where: { id: orderId },
@@ -452,9 +478,17 @@ export class PaymentRefundService {
               },
             });
             const alreadyCancelled = orderRow?.status === OrderStatus.cancelled;
-            const isFullRefund = amountToRefund >= fullOrderRefundThreshold;
-            // İade edilen adet kadar stok geri yüklenir (kısmi adet iadesinde de).
-            const restoreQty = opts?.refundQuantity ?? orderRow?.quantity ?? 1;
+            // MONEY-H4: sipariş cancel + stok geri-yükleme siparişin KÜMÜLATİF iadesine
+            // göre (isOrderFullyRefunded, tx başında hesaplandı). Tek bir kısmi iade
+            // artık "tam iade" sanılmaz; art arda kısmi iadeler tamı bulunca kapanır.
+            const isFullRefund = isOrderFullyRefunded;
+            // Stok: adet-bazlı iadede o kadar adet; TAM iadede tüm adet; tutar-bazlı
+            // KISMİ iadede (admin jest/telafi) stok geri YÜKLENMEZ — alıcı malı elinde
+            // tutar. Aksi halde 50 TL jest 1000 TL siparişin TÜM stoğunu geri yükler +
+            // her kısmi iadede tekrarlardı (MONEY-H3 ile aynı kök).
+            const restoreQty =
+              opts?.refundQuantity ??
+              (isFullRefund ? (orderRow?.quantity ?? 1) : 0);
 
             // Tam iade → sipariş cancelled. Kısmi adet iadesinde sipariş açık kalır
             // (kalan adetler hâlâ alıcıda); yalnız stok ve para kısmen geri döner.

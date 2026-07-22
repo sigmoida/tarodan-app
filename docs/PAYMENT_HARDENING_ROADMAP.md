@@ -67,15 +67,17 @@
       `metadata.refundedOrders`'tan elenerek gürültüsüz idempotency. **Spec:** 3 yeni testi
       (group-refund.spec).
 
-- [ ] **1.4 — Kısmi iade tek boyut + hold kısmi tüketim (MONEY-H3 + H4)**
-      `payment-refund.service.ts:324-325` (`fullyRefunded = !isGroupPayment`) +
-      `:384-414` (hold `portion` default'u tam miktar). **Çözüm:** (a) `fullyRefunded`
-      gerçek kümülatif tutara göre hesaplansın (tekil de kısmi kalabilsin); (b) admin
-      `manualRefund` tutar-bazlı iadede hold'u tutar oranında tüketsin (`portion =
-amount/totalRefundable`), tümünü değil. Tek `computePartialRefund` yolu — ledger + hold
-      tek kaynaktan.
-      **Kabul:** 1000 TL siparişte 50 TL jest → hold ~950 kalıyor; 3 kalemin 1'i iade →
-      ikinci iade hâlâ açılabiliyor; spec.
+- [x] **1.4 — Kısmi iade tek boyut + hold kısmi tüketim (MONEY-H3 + H4)** ✓
+      `payment-refund.service.ts:processRefund`. **Çözüm:** (a) H4 — kümülatif iade
+      takibi tekilde de (`refundedOrders[orderId]` toplanır, her zaman persist);
+      `fullyRefunded = totalRefunded >= payment.amount` → tek kısmi iade artık payment'ı
+      tümden `refunded` yapmıyor, art arda kısmi iade açılabiliyor; PayTR-öncesi kümülatif
+      TAVAN eklendi (fazladan iade engeli). (b) H3 — hold portion `amountToRefund/orderRefundThreshold`
+      (ledger portion ile aynı formül, tek otorite) → tutar-bazlı jest hold'un tümünü değil
+      oranını tüketiyor. Ek tutarlılık: sipariş cancel + stok geri-yükleme + e-Arşiv reverse
+      artık siparişin KÜMÜLATİF tam iadesine bağlı (`isOrderFullyRefunded`); tutar-bazlı kısmi
+      iade stok geri yüklemiyor (alıcı malı elinde tutar). **Spec:** 4 yeni testi (refund-partial.spec).
+      (NOT: `manualRefund` grup/trade null-orderId ayrı bulgu → MONEY-L1/Faz 4.6.)
 
 - [ ] **1.5 — `seller_no_ship` kargo durumuna baksın (SEAM-B1)**
       `payment-reconciliation.service.ts:654-731`. Cron yalnız `preparing + deadline`
