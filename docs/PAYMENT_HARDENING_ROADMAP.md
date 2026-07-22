@@ -211,7 +211,13 @@
       finalize eder (PayTR marker sayesinde atlanır). Marker artık `{amount,at}` saklıyor (doğru
       tutar) ve başarılı finalize'da temizleniyor (undefined → sweep sorgusu şişmez). **Spec:**
       3 MONEY-M4 testi (eski timestamp formatı da destekleniyor).
-- [ ] **4.5 — Trade dispute/release sıralaması (MONEY-M5/M6/M8)** `resolveDispute` doğrulamadan önce iade etmesin; release öncesi statü re-check; admin `releaseTradePaymentHold` trade-status guard'ı.
+- [x] **4.5 — Trade dispute/release sıralaması (MONEY-M5/M6/M8)** ✓ (M5) `resolveDispute`
+      iade + Sürat iptalinden ÖNCE trade'in `disputed` olduğunu doğruluyor (eskiden tx guard'ı
+      sonradan patlıyor ama para çoktan iade ediliyordu). (M8) admin `releaseTradePaymentHold`
+      yalnız `completed` takasta serbest bırakıyor (disputed/returning'de recipient'e ödeyip
+      sonra iade → çift kayıp). (M6) release öncesi statü re-check: releaseHoldsDue cron
+      (order + trade) ve `releasePayment` (held+frozenByRefundId:null) zaten guard'lı — admin
+      manuel trade yolu M8 ile kapatıldı. **Spec:** 3 MONEY-M8 testi.
 - [ ] **4.6 — Düşük (MONEY-L1/L3/L4/L7):** `manualRefund` grup/trade null-orderId; ledger `waived` drift; stopaj kısmi; birleşik gelir defteri notu (Faz 6'ya bağlanır).
 
 ---

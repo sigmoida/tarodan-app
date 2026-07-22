@@ -1459,9 +1459,22 @@ export class TradeLifecycleService {
     let resolvedTradeInitiatorId: string;
 
     if (newStatus === TradeStatus.cancelled) {
-      // MONEY-H2: dispute çözümü iptalle sonuçlandıysa iade FAILURE-TRACKING ile.
-      // (Ödemenin TX doğrulamasından ÖNCE yapılması ayrı bir sıralama bulgusudur —
-      // MONEY-M5/Faz 4.5; burada yalnız marker boşluğu kapatılır.)
+      // MONEY-M5: İade + Sürat iptalinden ÖNCE trade'in GERÇEKTEN `disputed` olduğunu
+      // doğrula. Eskiden iade/iptal tx doğrulamasından ÖNCE yapılıyordu → trade disputed
+      // DEĞİLSE (zaten çözülmüş / yanlış statü) tx guard'ı sonradan patlıyor ama PARA
+      // ÇOKTAN İADE edilmiş oluyordu. Bu pre-check read-only; aşağıdaki tx'in kilitli
+      // guard'ı atomik garantiyi korumaya devam eder (refundTradeCashTracked'in kendi
+      // completed/released/refunded guard'ları da ikinci katman).
+      const current = await this.prisma.trade.findUnique({
+        where: { id: tradeId },
+        select: { status: true },
+      });
+      if (!current || current.status !== TradeStatus.disputed) {
+        throw new BadRequestException(
+          i18nMessage("server.trade.tradeNotInDisputeStatus"),
+        );
+      }
+      // MONEY-H2: iade FAILURE-TRACKING ile (marker + retry cron).
       await this.paymentService.refundTradeCashTracked(tradeId);
       // Cancel any active Sürat shipments (from_warehouse legs after admin approval)
       await this.tradeShipment.cancelSuratShipmentsForTrade(tradeId);

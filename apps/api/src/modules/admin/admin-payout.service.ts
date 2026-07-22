@@ -6,7 +6,7 @@ import {
 import { PrismaService } from "../../prisma";
 import { AdminAuditService } from "./admin-audit.service";
 import { PayoutTransactionsQueryDto, PayoutExportQueryDto } from "./dto";
-import { Prisma, PaymentHoldStatus } from "@prisma/client";
+import { Prisma, PaymentHoldStatus, TradeStatus } from "@prisma/client";
 import { PaymentService } from "../payment/payment.service";
 import { paginate, resolveOrderBy } from "../../common/list";
 
@@ -345,6 +345,20 @@ export class AdminPayoutService {
       return { success: true, message: "Zaten serbest bırakılmış" };
     if (tcp.refundedAt)
       throw new BadRequestException("İade edilmiş ödeme serbest bırakılamaz");
+
+    // MONEY-M8: Yalnız `completed` takasta nakit hold serbest bırakılabilir. Aksi halde
+    // (disputed/returning/admin_reviewing/cancelled) recipient'e ödeme yapılır ve takas
+    // sonradan iade/iptal olursa çift kayıp olur (releaseHoldsDue cron'u da aynı guard'ı
+    // uygular; manuel admin yolu da uymalı).
+    const trade = await this.prisma.trade.findUnique({
+      where: { id: tradeId },
+      select: { status: true },
+    });
+    if (!trade || trade.status !== TradeStatus.completed) {
+      throw new BadRequestException(
+        `Takas durumu '${trade?.status ?? "bulunamadı"}' — yalnız 'completed' takasta nakit hold serbest bırakılabilir`,
+      );
+    }
 
     await this.prisma.tradeCashPayment.update({
       where: { tradeId },
