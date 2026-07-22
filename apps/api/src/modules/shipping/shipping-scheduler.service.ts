@@ -110,6 +110,14 @@ export class ShippingSchedulerService implements OnModuleInit {
       log(`İade kargo senkron HATASI: ${error.message}`);
     }
 
+    // İnsani senaryolar (A9 ghost-pickup, B15/D27 kayıp şüphesi): bayat kargo
+    // alarmları — kayıt başına haftada bir, log-tabanlı uyarı kanalına.
+    try {
+      await this.suratTracking.alertStaleCargo();
+    } catch (error: any) {
+      this.logger.error(`Stale cargo alert error: ${error.message}`);
+    }
+
     const totalSynced = stats.shipmentSynced + stats.tradeSynced + stats.refundSynced;
     const retrySummary =
       stats.barcodeRetried > 0 ? ` · ${stats.barcodeRetried} kod tamamlandı` : '';

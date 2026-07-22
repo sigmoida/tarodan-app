@@ -568,6 +568,23 @@ export class TradeShipmentService {
       this.logger.log(
         `Retry OK: trade inbound barcode filled ${tradeShipmentId} oid=${ship.trackingNumber} code=${result.kargoTakipNo}`,
       );
+      // A2/C24: kod gecikmeli oluştu — gönderen "hazırlanıyor" görüp bekliyordu;
+      // artık şubeye gidebilir, haber ver.
+      try {
+        await this.notificationService.createInAppNotification(
+          ship.shipperId,
+          NotificationType.CARGO_CODE_READY,
+          {
+            reference: ship.trade.tradeNumber,
+            tradeId: ship.tradeId,
+            link: `/trades/${ship.tradeId}`,
+          },
+        );
+      } catch (err: any) {
+        this.logger.warn(
+          `CARGO_CODE_READY notify failed trade-shipment=${tradeShipmentId}: ${err?.message}`,
+        );
+      }
       return true;
     } catch (e: any) {
       this.logger.error(

@@ -52,6 +52,12 @@ export enum NotificationType {
   // Takas kargosu başlatılamadı: tarafın kayıtlı adresi yok — kullanıcı adres eklemeli
   // (adres eklenince reconciliation cron kargoyu otomatik oluşturur).
   TRADE_ADDRESS_REQUIRED = 'trade_address_required',
+  // Kargo kodu gecikmeli oluştuğunda (retry job doldurunca) gönderene haber ver —
+  // şubeye boşa gitmesin (insani senaryo A2/C24).
+  CARGO_CODE_READY = 'cargo_code_ready',
+  // Satıcı "kargoya verdim" işaretledi ama Sürat'ta kayıt yok (insani senaryo A9) —
+  // hatırlatma; deadline atlatma girişimlerini de görünür kılar.
+  CARGO_MOVEMENT_MISSING = 'cargo_movement_missing',
 
   // RefundRequest notifications (sipariş iadesi akışı)
   REFUND_CANCELLED = 'refund_cancelled',

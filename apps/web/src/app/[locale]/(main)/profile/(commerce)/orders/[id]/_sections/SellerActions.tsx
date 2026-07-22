@@ -62,6 +62,15 @@ export default function SellerActions({ order }: { order: OrderDetail }) {
                 {t("common.copy")}
               </Button>
             </div>
+            {/* İnsani senaryolar A5/A6: tek koli-tek sipariş uyarısı + ücret bilgisi. */}
+            <div className="mt-4 space-y-2">
+              <p className="text-xs text-warning-700 bg-warning-50 border border-warning-200 rounded-lg px-3 py-2">
+                {t("order.cargoOneParcelPerOrder")}
+              </p>
+              <p className="text-xs text-muted">
+                {t("order.cargoFeeCoveredNotice")}
+              </p>
+            </div>
           </>
         ) : (
           <p className="text-sm text-muted">{t("order.cargoCodePending")}</p>

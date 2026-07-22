@@ -846,7 +846,9 @@
     "trackingAppearsAfterDropoff": "Şube paketinizi aldığında Sürat takip numarası burada otomatik olarak görünecektir (30 dakika içinde).",
     "cargoCodeInstructions": "Bu kargo numarasını Sürat Kargo şubesine teslim ederken veriniz. Gönderiniz Sürat sisteminde bu numarayla kayıtlıdır.",
     "cargoCodeCopied": "Kargo numarası kopyalandı",
-    "cargoCodePending": "Kargo numarası oluşturuluyor. Birkaç dakika içinde burada görünecektir.",
+    "cargoCodePending": "Kargo numarası oluşturuluyor. Birkaç dakika içinde burada görünecektir. Hazır olduğunda size bildirim göndereceğiz.",
+    "cargoOneParcelPerOrder": "Birden fazla siparişiniz mi var? Her sipariş için AYRI koli hazırlayın ve her koliyi kendi kargo koduyla teslim edin — tek koliye birden çok sipariş koymayın; aksi hâlde diğer siparişleriniz kargolanmamış görünür.",
+    "cargoFeeCoveredNotice": "Kargo ücreti Tarodan tarafından karşılanır; şubede sizden ücret talep edilmez. Şube, paketi teslim alırken ölçüm yapabilir.",
     "refundWindowPassed": "14 günlük iade süresi doldu; bu sipariş için artık iade talebi oluşturulamaz.",
     "cancelOrderConfirm": "Bu siparişi iptal etmek istediğinize emin misiniz? Ödemeniz iade edilecektir.",
     "refundTitle": "İade İşlemi",
@@ -5325,6 +5327,14 @@
       "tradeAddressRequired": {
         "title": "Adres Gerekli — Takas Kargosu",
         "message": "{tradeNumber} takasınız için kargo başlatılamadı: kayıtlı adresiniz yok. Profilinizden adres ekleyin; kargo otomatik oluşturulacaktır."
+      },
+      "cargoCodeReady": {
+        "title": "Kargo Kodunuz Hazır",
+        "message": "{reference} için kargo kodunuz oluşturuldu. Kodu görüntüleyip paketi Sürat Kargo şubesine teslim edebilirsiniz."
+      },
+      "cargoMovementMissing": {
+        "title": "Kargonuzda Hareket Görünmüyor",
+        "message": "{reference} siparişi için kargoyu verdiğinizi işaretlediniz ancak Sürat kayıtlarında paket görünmüyor. Paketi henüz teslim etmediyseniz lütfen en kısa sürede şubeye götürün; aksi hâlde sipariş iptal edilebilir."
       },
       "offerAutoRejected": {
         "title": "Teklifiniz Kapatıldı",

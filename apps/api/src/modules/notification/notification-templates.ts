@@ -377,6 +377,18 @@ export const NOTIFICATION_TEMPLATES: Record<
     icon: "📍",
     link: "/trades",
   },
+  [NotificationType.CARGO_CODE_READY]: {
+    titleKey: "server.notification.cargoCodeReady.title",
+    messageKey: "server.notification.cargoCodeReady.message",
+    icon: "📦",
+    link: "{{link}}",
+  },
+  [NotificationType.CARGO_MOVEMENT_MISSING]: {
+    titleKey: "server.notification.cargoMovementMissing.title",
+    messageKey: "server.notification.cargoMovementMissing.message",
+    icon: "🚚",
+    link: "/orders/{{orderId}}",
+  },
   [NotificationType.OFFER_AUTO_REJECTED]: {
     titleKey: "server.notification.offerAutoRejected.title",
     messageKey: "server.notification.offerAutoRejected.message",
