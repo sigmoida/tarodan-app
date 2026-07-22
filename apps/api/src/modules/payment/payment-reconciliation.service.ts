@@ -10,21 +10,6 @@ import {
   OfferStatus,
   ShipmentStatus,
 } from "@prisma/client";
-
-// SEAM-B1: Paket Sürat'ta HAREKET ettiyse "satıcı göndermedi" DEĞİLDİR. Bu
-// statüler poller tarafından gerçek kargo hareketiyle set edilir — böyle bir
-// siparişi süre-doldu diye iptal+iade edersek alıcı hem malı hem parayı alır.
-// `pending`/`label_created` HARİÇ: yalnız barkod/etiket var ama kargoya verilmemiş
-// olabilir (immediate-barcode her ödemede etiket üretir) — onlar gerçek "göndermedi".
-const SHIPMENT_IN_MOTION_STATUSES: ShipmentStatus[] = [
-  ShipmentStatus.picked_up,
-  ShipmentStatus.in_transit,
-  ShipmentStatus.at_delivery_branch,
-  ShipmentStatus.out_for_delivery,
-  ShipmentStatus.delivered,
-  ShipmentStatus.return_in_progress,
-  ShipmentStatus.returned,
-];
 import {
   getProductStatusFromQuantity,
   getReservedAwareStatus,
@@ -63,6 +48,21 @@ const TRADE_RESERVATION_HOLDING_STATUSES: TradeStatus[] = [
   TradeStatus.shipping_to_recipients,
   TradeStatus.returning,
   TradeStatus.disputed,
+];
+
+// SEAM-B1: Paket Sürat'ta HAREKET ettiyse "satıcı göndermedi" DEĞİLDİR. Bu
+// statüler poller tarafından gerçek kargo hareketiyle set edilir — böyle bir
+// siparişi süre-doldu diye iptal+iade edersek alıcı hem malı hem parayı alır.
+// `pending`/`label_created` HARİÇ: yalnız barkod/etiket var ama kargoya verilmemiş
+// olabilir (immediate-barcode her ödemede etiket üretir) — onlar gerçek "göndermedi".
+const SHIPMENT_IN_MOTION_STATUSES: ShipmentStatus[] = [
+  ShipmentStatus.picked_up,
+  ShipmentStatus.in_transit,
+  ShipmentStatus.at_delivery_branch,
+  ShipmentStatus.out_for_delivery,
+  ShipmentStatus.delivered,
+  ShipmentStatus.return_in_progress,
+  ShipmentStatus.returned,
 ];
 
 /**
