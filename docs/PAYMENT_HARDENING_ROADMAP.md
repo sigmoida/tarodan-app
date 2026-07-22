@@ -39,12 +39,13 @@
 
 > Bugün gerçek para kaybettirebilen/çiftleyebilen bulgular. Her biri spec ister.
 
-- [ ] **1.1 — Takas-nakit iade marker rollback (MONEY-H1)**
-      `payment-refund.service.ts:740-788`. `refundInProgressAt` PayTR'dan önce yazılıp
-      geçici hatada (`"ödeme henüz bildirilmemiş"`) temizlenmiyor → sonraki deneme PayTR'ı
-      atlayıp sahte-iade yapıyor. **Çözüm:** order yolundaki `clearRefundInProgress`
-      desenini trade yoluna taşı — geçici hatada marker temizlensin; kalıcı hatada dursun.
-      **Kabul:** taze takas iadesi "not yet notified" alırsa 1-2 dk sonra gerçekten PayTR'a gidiyor; spec.
+- [x] **1.1 — Takas-nakit iade marker rollback (MONEY-H1)** ✓
+      `payment-refund.service.ts`. `refundInProgressAt` PayTR'dan önce yazılıp
+      geçici hatada (`"ödeme henüz bildirilmemiş"`) temizlenmiyordu → sonraki deneme PayTR'ı
+      atlayıp sahte-iade yapıyordu. **Çözüm:** `clearTradeRefundInProgress` helper'ı eklendi;
+      catch bloğu (throw + non-success) marker'ı geri alıyor → PayTR başaramadıysa retry onu
+      yeniden çağırıyor, PayTR başardıysa (persist-fail) marker kalıyor. Order yolundaki
+      `clearRefundInProgress` ile aynı invaryant. **Spec:** 2 yeni MONEY-H1 testi (b3.spec).
 
 - [ ] **1.2 — `cancelTrade` iade retry yolu (MONEY-H2)**
       `trade-lifecycle.service.ts:906-921,1016-1023`. Refund try/catch'siz + `refundFailureReason`

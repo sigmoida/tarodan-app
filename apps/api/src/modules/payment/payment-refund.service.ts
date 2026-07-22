@@ -654,6 +654,27 @@ export class PaymentRefundService {
   }
 
   /**
+   * MONEY-H1 marker geri-alma (takas-nakit yolu). PayTR başarılı DÖNMEDİĞİNDE
+   * refundInProgressAt scalar marker'ını siler ki retry PayTR'yi yeniden çağırabilsin.
+   * Fresh metadata okur (kaybolan-güncelleme guard'ı). clearRefundInProgress'in
+   * (order yolu, sipariş-bazlı map) takas eşleniğidir. Best-effort: hatası iade
+   * akışını bozmaz (çağıran .catch'ler).
+   */
+  private async clearTradeRefundInProgress(paymentId: string): Promise<void> {
+    const p = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      select: { metadata: true },
+    });
+    const meta = (p?.metadata as Record<string, any>) || {};
+    if (!("refundInProgressAt" in meta)) return;
+    delete meta.refundInProgressAt;
+    await this.prisma.payment.update({
+      where: { id: paymentId },
+      data: { metadata: meta },
+    });
+  }
+
+  /**
    * Takas nakit ödemesi PayTR ile tamamlanmışken iptal: PayTR iade API + payment / trade_cash_payment güncelleme.
    * Tamamlanmış PayTR trade ödemesi yoksa no-op (refunded: false).
    */
@@ -770,6 +791,15 @@ export class PaymentRefundService {
           );
         }
       } catch (e: any) {
+        // MONEY-H1: PayTR başarılı DÖNMEDİ (throw YA DA non-success status → bu
+        // catch'e düşer). refundInProgressAt marker'ını GERİ AL. Aksi halde marker
+        // kalıcı yazılı kalır; bir sonraki deneme refundAlreadyInitiated=true görüp
+        // PayTR çağrısını ATLAR ve parayı iade ETMEDEN payment'ı refunded işaretler
+        // (sahte iade). Order yolundaki clearRefundInProgress ile AYNI invaryant:
+        // marker yalnız "PayTR gerçekten çağrıldı ve muhtemelen başardı ama persist
+        // edilemedi" durumunda kalmalı — PayTR başaramadıysa retry onu YENİDEN
+        // çağırabilmeli. "ödeme henüz bildirilmemiş" gibi GEÇİCİ hatada bu şarttır.
+        await this.clearTradeRefundInProgress(payment.id).catch(() => {});
         const msg = (e as Error).message || "";
         if (
           /odeme henuz siteye bildirilmemis|henuz siteye bildirilmemi/i.test(
