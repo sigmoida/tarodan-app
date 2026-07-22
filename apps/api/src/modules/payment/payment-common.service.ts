@@ -170,6 +170,84 @@ export class PaymentCommonService {
   }
 
   /**
+   * Sipariş için Sürat kargo kaydını garanti eder — fulfillment ve retry job'un
+   * ORTAK yolu:
+   * - kayıt yoksa oluşturur (M1: barkod Sürat'ta oluşup lokal create patladıysa
+   *   ödeme idempotent olduğundan fulfillment bir daha denemez; retry buradan
+   *   tamamlar — idempotency cache aynı OzelKargoTakipNo'ya aynı kodu döndürür,
+   *   çift kayıt oluşmaz),
+   * - kayıt `cancelled` ise (H4: iptal edilip yeniden ödenen sipariş; orderId
+   *   @unique olduğundan yeni satır açılamaz) pending'e revive edip YENİ gerçek
+   *   kod üretir — iptal, Sürat kaydını GonderiSil ile silmiş ve idempotency
+   *   cache'ini temizlemişti, dolayısıyla taze çağrı gerçekten yeni gönderi açar,
+   * - sağlıklı kayıt varsa dokunmaz.
+   * Non-blocking: barkod üretilemezse kayıt kodsuz `pending` kalır (retry tamamlar).
+   */
+  async ensureSuratShipmentForOrder(
+    orderId: string,
+  ): Promise<"created" | "revived" | "exists" | "skipped"> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, orderNumber: true, shippingCost: true },
+    });
+    if (!order) return "skipped";
+
+    const existing = await this.prisma.shipment.findFirst({
+      where: { orderId },
+    });
+    if (existing && existing.status !== "cancelled") return "exists";
+
+    // Gerçek Sürat kodu (KargoTakipNo) + ZPL etiket — non-blocking, hata → null.
+    const barcode = await this.createSuratBarcodeForOrder(orderId);
+    const estimatedDelivery = new Date();
+    estimatedDelivery.setDate(estimatedDelivery.getDate() + 3);
+
+    if (!existing) {
+      await this.prisma.shipment.create({
+        data: {
+          orderId,
+          provider: "surat",
+          status: "pending",
+          // trackingNumber = OzelKargoTakipNo (sipariş no) — poller bununla
+          // sorgular; gerçek kod providerTrackingId'de.
+          trackingNumber: order.orderNumber,
+          providerTrackingId: barcode?.kargoTakipNo ?? null,
+          labelZpl: barcode?.labelZpl ?? null,
+          cost: Number(order.shippingCost),
+          estimatedDelivery,
+        },
+      });
+      this.logger.log(
+        `Auto-created shipment for order ${order.orderNumber} kargoTakipNo=${barcode?.kargoTakipNo ?? "PENDING"}`,
+      );
+      return "created";
+    }
+
+    // H4 revive: eski `cancelled` satırı sıfırla — takip alanları temizlenir,
+    // trackingNumber sipariş no olarak kalır (sorgu referansı değişmez).
+    await this.prisma.shipment.update({
+      where: { id: existing.id },
+      data: {
+        status: "pending" as any,
+        trackingNumber: order.orderNumber,
+        providerTrackingId: barcode?.kargoTakipNo ?? null,
+        labelZpl: barcode?.labelZpl ?? null,
+        estimatedDelivery,
+        trackingUrl: null,
+        deliveredAt: null,
+        receivedBy: null,
+        providerStatusCode: null,
+        providerRawStatus: null,
+        returnReason: null,
+      },
+    });
+    this.logger.log(
+      `Revived cancelled shipment for re-paid order ${order.orderNumber} kargoTakipNo=${barcode?.kargoTakipNo ?? "PENDING"}`,
+    );
+    return "revived";
+  }
+
+  /**
    * Log payment action to audit log
    * Note: AuditLog requires adminUserId, so we only log admin actions
    * For user actions, we store in payment metadata

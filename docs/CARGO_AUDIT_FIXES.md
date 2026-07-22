@@ -28,7 +28,7 @@
   **Çözüm:** retry job'a trade-return yüzeyi ekle (DRAFT'ı da submit edebilen), reject
   guard'ı kodsuz leg'de re-submit'e izin verecek şekilde düzelt.
 
-- [ ] **H4 — İptal edilip yeniden ödenen sipariş kargoya bir daha kaydolmuyor**
+- [x] **H4 — İptal edilip yeniden ödenen sipariş kargoya bir daha kaydolmuyor**
   İptalde shipment `cancelled`; reaktivasyon+yeniden ödemede fulfillment yalnız
   "hiç shipment yoksa" create ediyor (`orderId @unique` → eski satır blokluyor) →
   ödenmiş sipariş kodsuz/takipsiz kalıyor; poller `cancelled`'ı, retry `pending`'i istiyor.
@@ -36,7 +36,7 @@
 
 ## 🟠 Orta
 
-- [ ] **M1 — Sürat'ta barkod oluştu ama lokal `shipment.create` patladı → kurtarılamaz orphan**
+- [x] **M1 — Sürat'ta barkod oluştu ama lokal `shipment.create` patladı → kurtarılamaz orphan**
   Ödeme idempotent olduğu için tekrar denenmiyor; retry Shipment tablosunu taradığından
   satır yokken göremiyor.
   **Çözüm:** retry job'a "paid/preparing + shipment satırı YOK" adayı ekle → satırı oluştur

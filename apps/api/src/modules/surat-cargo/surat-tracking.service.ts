@@ -479,7 +479,10 @@ export class SuratTrackingService {
   }
 
   /** Order Shipment kodsuzları — mevcut createSuratBarcodeForOrder'ı yeniden
-   * kullanır (payload/idempotency birebir aynı). */
+   * kullanır (payload/idempotency birebir aynı). Ayrıca M1/H4: shipment satırı
+   * hiç oluşmamış (Sürat OK ama lokal create patladı) veya iptal sonrası yeniden
+   * ödemede `cancelled` kalmış CANLI siparişleri ensureSuratShipmentForOrder ile
+   * onarır. */
   private async retryPendingOrderBarcodes(
     createdAfter: Date,
     createdBefore: Date,
@@ -500,7 +503,31 @@ export class SuratTrackingService {
       select: { id: true, orderId: true, trackingNumber: true },
       take: SuratTrackingService.RETRY_BATCH,
     });
-    if (candidates.length === 0) return { retried: 0, failed: 0 };
+
+    // M1/H4: satırsız veya `cancelled` satırlı canlı siparişler. Yaş penceresi
+    // updatedAt üzerinden: yeniden ödeme updatedAt'i taşıdığı için deploy öncesi
+    // takılmış siparişler de pencereye girer. Sanal siparişler (membership/boost)
+    // kargo taşımaz — dışla.
+    const orphanOrders = await this.prisma.order.findMany({
+      where: {
+        status: { in: [OrderStatus.paid, OrderStatus.preparing] },
+        updatedAt: { gte: createdAfter, lte: createdBefore },
+        OR: [
+          { shipment: null },
+          { shipment: { status: ShipmentStatus.cancelled } },
+        ],
+        NOT: [
+          { productId: { startsWith: "membership-" } },
+          { productId: { startsWith: "boost-" } },
+        ],
+      },
+      select: { id: true, orderNumber: true },
+      take: SuratTrackingService.RETRY_BATCH,
+    });
+
+    if (candidates.length === 0 && orphanOrders.length === 0) {
+      return { retried: 0, failed: 0 };
+    }
 
     const { PaymentCommonService } =
       await import("../payment/payment-common.service");
@@ -509,13 +536,36 @@ export class SuratTrackingService {
     });
     if (!paymentCommon) {
       this.logger.warn(
-        `PaymentCommonService not resolvable; skipping ${candidates.length} order barcode retries`,
+        `PaymentCommonService not resolvable; skipping ${candidates.length + orphanOrders.length} order barcode retries`,
       );
-      return { retried: 0, failed: candidates.length };
+      return { retried: 0, failed: candidates.length + orphanOrders.length };
     }
 
     let retried = 0;
     let failed = 0;
+
+    // Önce onarım: satırı oluştur/revive et (kod da mümkünse hemen dolar; barkod
+    // yine üretilemezse satır `pending`+kodsuz kalır ve aşağıdaki yüzey sonraki
+    // tick'te tamamlar).
+    for (const o of orphanOrders) {
+      try {
+        const res = await paymentCommon.ensureSuratShipmentForOrder(o.id);
+        if (res === "created" || res === "revived") {
+          retried++;
+          this.logger.log(
+            `Retry OK: shipment ${res} for order ${o.orderNumber}`,
+          );
+        } else if (res === "skipped") {
+          failed++;
+        }
+        // "exists": eşzamanlı onarımla yarıştık — no-op, sayma.
+      } catch (e: any) {
+        failed++;
+        this.logger.error(
+          `Retry ensure-shipment threw order=${o.orderNumber}: ${e?.message}`,
+        );
+      }
+    }
     for (const s of candidates) {
       try {
         const barcode = await paymentCommon.createSuratBarcodeForOrder(
