@@ -218,7 +218,11 @@
       sonra iade → çift kayıp). (M6) release öncesi statü re-check: releaseHoldsDue cron
       (order + trade) ve `releasePayment` (held+frozenByRefundId:null) zaten guard'lı — admin
       manuel trade yolu M8 ile kapatıldı. **Spec:** 3 MONEY-M8 testi.
-- [ ] **4.6 — Düşük (MONEY-L1/L3/L4/L7):** `manualRefund` grup/trade null-orderId; ledger `waived` drift; stopaj kısmi; birleşik gelir defteri notu (Faz 6'ya bağlanır).
+- [x] **4.6 — Düşük (MONEY-L1) ✓ + L3/L4/L7 ertelendi** `manualRefund` artık orderId NULL
+      grup/trade ödemelerini doğru yönlendiriyor (trade → refundTradeCashTracked; grup → net
+      hata; tekil → processRefund) — eskiden `processRefund(null)` karışıktı. **Spec:** 3 L1
+      testi. **Ertelenen:** L3 (ledger `waived` drift) + L4 (stopaj kısmi) → Faz 10; L7 (birleşik
+      gelir defteri) → Faz 6 (ledger).
 
 ---
 
