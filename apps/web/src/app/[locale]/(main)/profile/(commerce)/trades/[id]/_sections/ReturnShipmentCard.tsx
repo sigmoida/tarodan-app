@@ -25,10 +25,21 @@ export default function ReturnShipmentCard({
         {myReturnShipment.carrier === "surat"
           ? "Sürat Kargo"
           : myReturnShipment.carrier || "—"}
-        {(myReturnShipment.cargoCode ?? myReturnShipment.trackingNumber)
-          ? ` · ${myReturnShipment.cargoCode ?? myReturnShipment.trackingNumber}`
-          : ""}
+        {/* L1: Sürat'ta yalnız GERÇEK kod; iç ref şubede geçersiz. */}
+        {(() => {
+          const code =
+            myReturnShipment.cargoCode ??
+            (myReturnShipment.carrier !== "surat"
+              ? myReturnShipment.trackingNumber
+              : null);
+          return code ? ` · ${code}` : "";
+        })()}
       </p>
+      {myReturnShipment.carrier === "surat" && !myReturnShipment.cargoCode && (
+        <p className="text-xs text-muted italic mt-1">
+          {t("order.cargoCodePending")}
+        </p>
+      )}
       {myReturnShipment.carrier === "surat" && myReturnShipment.cargoCode && (
         <a
           href={`https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(myReturnShipment.cargoCode)}`}

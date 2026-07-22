@@ -856,9 +856,16 @@ export class SuratTrackingService {
     shipment: any,
     gonderi: SuratTakipGonderi,
   ): Promise<boolean> {
-    const newStatus = mapSuratStatusToShipmentStatus(
+    const mappedStatus = mapSuratStatusToShipmentStatus(
       gonderi.KargonunDurumuSayi,
     );
+    // L2: bilinmeyen kod statüyü değiştirmez; ham kod yine kaydedilir.
+    if (mappedStatus === null) {
+      this.logger.warn(
+        `Unknown Surat status code ${gonderi.KargonunDurumuSayi} ("${gonderi.KargonunDurumu}") for shipment ${shipment.id}; keeping status ${shipment.status}`,
+      );
+    }
+    const newStatus = mappedStatus ?? shipment.status;
     const isDelivered = isSuratDelivered(gonderi.KargonunDurumuSayi);
     const isReturnCompleted = isSuratReturnCompleted(
       gonderi.KargonunDurumuSayi,
@@ -1154,12 +1161,36 @@ export class SuratTrackingService {
     const gonderi = data.Gonderiler[0];
     const suratCode = gonderi.KargonunDurumuSayi;
     const newStatus = mapSuratStatusToShipmentStatus(suratCode);
+    // L2: bilinmeyen kodda iade durumunu değiştirme — güncellenecek şey yok.
+    if (newStatus === null) {
+      this.logger.warn(
+        `Unknown Surat status code ${suratCode} for refund return ${refundRequestId}; skipping update`,
+      );
+      return false;
+    }
     // İade gönderisinin "geri teslim edildi" durumu, Sürat dokümanına (KargoTakip
     // HareketDetayi) göre KargonunDurumuSayi = 12 (İade Teslim Edildi). İleri
     // gönderinin 6/7 kodları bu akışta geçerli değil; yine de tolerans için
     // ikisini de kabul ediyoruz.
     const isReturnDelivered =
       isSuratReturnCompleted(suratCode) || isSuratDelivered(suratCode);
+
+    // Backfill: gerçek Sürat kodu (KargoTakipNo) kayıtlı değilse poll cevabından
+    // doldur — order/trade path'lerindeki backfill'in paritesi. Barkod-rework
+    // öncesi açılan legacy iadeler kodu ancak buradan alır (UI kod gelene dek
+    // "hazırlanıyor" gösterir).
+    if (!rr.returnProviderTrackingId && gonderi.KargoTakipNo) {
+      await this.prisma.refundRequest
+        .update({
+          where: { id: rr.id },
+          data: { returnProviderTrackingId: gonderi.KargoTakipNo },
+        })
+        .catch((e: any) =>
+          this.logger.warn(
+            `Failed to backfill return code for refund ${rr.id}: ${e?.message}`,
+          ),
+        );
+    }
 
     const { RefundService } = await import("../refund/refund.service");
     const refundService = this.moduleRef.get(RefundService, { strict: false });
@@ -1223,9 +1254,16 @@ export class SuratTrackingService {
     }
 
     const gonderi = data.Gonderiler[0];
-    const newStatus = mapSuratStatusToShipmentStatus(
+    const mappedStatus = mapSuratStatusToShipmentStatus(
       gonderi.KargonunDurumuSayi,
     );
+    // L2: bilinmeyen kod statüyü değiştirmez; backfill/shippedAt yine işlenir.
+    if (mappedStatus === null) {
+      this.logger.warn(
+        `Unknown Surat status code ${gonderi.KargonunDurumuSayi} for trade-shipment ${tradeShipment.id}; keeping status ${tradeShipment.status}`,
+      );
+    }
+    const newStatus = mappedStatus ?? tradeShipment.status;
     const isDelivered = isSuratDelivered(gonderi.KargonunDurumuSayi);
 
     // #86: same terminal-regression guard for the trade-shipment poll path.

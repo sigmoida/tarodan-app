@@ -64,33 +64,47 @@ export default function RefundRequestBanner({ order }: { order: OrderDetail }) {
         </span>
       </div>
 
-      {isReturnReady && (
-        <div className="bg-surface-elevated rounded-lg p-4 mb-3">
-          <p className="text-sm text-body mb-2">
-            {order.isBuyer
-              ? t("refund.dropOffAtSurat")
-              : t("refund.buyerGivenReturnLabel")}
-          </p>
-          <div className="flex items-center justify-between gap-3">
-            <span className="font-mono text-lg font-bold text-heading break-all">
-              {rr.returnCargoCode ?? rr.returnTrackingNumber}
-            </span>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                navigator.clipboard.writeText(
-                  (rr.returnCargoCode ?? rr.returnTrackingNumber)!,
-                );
-                toast.success(t("common.copiedShort"));
-              }}
-              className="h-auto p-0 text-sm text-primary-600 hover:text-primary-700 font-medium"
-            >
-              {t("common.copy")}
-            </Button>
-          </div>
-        </div>
-      )}
+      {isReturnReady &&
+        (() => {
+          // L1: Sürat iadesinde yalnız GERÇEK kodu göster — returnTrackingNumber
+          // iç referanstır (refundNumber), şubede geçersiz. Manuel iade akışında
+          // ise trackingNumber referansın kendisidir.
+          const returnRef =
+            rr.returnProvider === "surat"
+              ? rr.returnCargoCode
+              : (rr.returnCargoCode ?? rr.returnTrackingNumber);
+          return (
+            <div className="bg-surface-elevated rounded-lg p-4 mb-3">
+              <p className="text-sm text-body mb-2">
+                {order.isBuyer
+                  ? t("refund.dropOffAtSurat")
+                  : t("refund.buyerGivenReturnLabel")}
+              </p>
+              {returnRef ? (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-mono text-lg font-bold text-heading break-all">
+                    {returnRef}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      navigator.clipboard.writeText(returnRef);
+                      toast.success(t("common.copiedShort"));
+                    }}
+                    className="h-auto p-0 text-sm text-primary-600 hover:text-primary-700 font-medium"
+                  >
+                    {t("common.copy")}
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-sm text-muted italic">
+                  {t("order.cargoCodePending")}
+                </p>
+              )}
+            </div>
+          );
+        })()}
 
       {rr.returnProvider === "surat" && rr.returnCargoCode && (
         <a

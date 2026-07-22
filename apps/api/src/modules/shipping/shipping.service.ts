@@ -150,7 +150,17 @@ export class ShippingService {
     const baseSetting = await this.prisma.platformSetting.findUnique({
       where: { settingKey: "shipping_base_cost" },
     });
-    const baseRate = baseSetting ? parseFloat(baseSetting.settingValue) : 29.99;
+    // L5: bozuk PlatformSetting ("abc" vb.) NaN üretip checkout'a {rate: NaN}
+    // sızdırıyordu — finite değilse default'a düş + warn.
+    const parsedBase = baseSetting
+      ? Number.parseFloat(baseSetting.settingValue)
+      : NaN;
+    const baseRate = Number.isFinite(parsedBase) ? parsedBase : 29.99;
+    if (baseSetting && !Number.isFinite(parsedBase)) {
+      this.logger.warn(
+        `Invalid shipping_base_cost setting "${baseSetting.settingValue}"; falling back to 29.99`,
+      );
+    }
 
     const baseRates: Record<ShippingProvider, number> = {
       [ShippingProvider.surat]: baseRate,

@@ -76,23 +76,23 @@
 
 ## 🟡 Düşük
 
-- [ ] **L1 — Web UI placeholder'ı gerçek kod gibi gösteriyor**
+- [x] **L1 — Web UI placeholder'ı gerçek kod gibi gösteriyor**
   Takas kartları + RefundRequestBanner `cargoCode ?? trackingNumber` render ediyor →
   kod yokken kullanıcı şubede geçersiz iç ref sunar.
   **Çözüm:** kod yoksa "kargo kodu hazırlanıyor" göster (manual iade hariç).
 
-- [ ] **L2 — Bilinmeyen Sürat durum kodu sessizce `in_transit`**
+- [x] **L2 — Bilinmeyen Sürat durum kodu sessizce `in_transit`**
   `?? in_transit` default'u; yanlış aksiyon durumu, alert yok.
   **Çözüm:** bilinmeyen kod → statüyü değiştirme + warn (raw kod yine kaydedilir).
 
-- [ ] **L3 — Sürat payload alanlarında uzunluk/format sınırı yok**
+- [x] **L3 — Sürat payload alanlarında uzunluk/format sınırı yok**
   Aşırı uzun adres/ad → Sürat reject/truncate → sessiz kodsuzluk.
   **Çözüm:** `buildRestGonderi`'de merkezi trim+cap.
 
-- [ ] **L4 — `applyReturnTrackingUpdate`'te terminal-regression guard yok**
+- [x] **L4 — `applyReturnTrackingUpdate`'te terminal-regression guard yok**
   Diğer iki poll path'inde var; parite için ekle.
 
-- [ ] **L5 — Kargo maliyetinde NaN riski**
+- [x] **L5 — Kargo maliyetinde NaN riski**
   `parseFloat(PlatformSetting)` NaN olabilir → checkout'a `{rate: NaN}` sızar.
   **Çözüm:** `Number.isFinite` guard + default fallback.
 
@@ -101,9 +101,9 @@
 
 ## 📋 Kayda geçen / bilinçli bırakılan
 
-- [ ] **L6 — Webhook yalnız order Shipment'ı çözüyor** (trade/refund `ignored`) —
+- [x] **L6 — Webhook yalnız order Shipment'ı çözüyor** (trade/refund `ignored`) —
   Sürat push etmiyor, tüm akış polling; by-design. Şimdilik değişiklik yok, not düşüldü.
-- [ ] **L7 — `TRD-TRD-` çift önek** — kozmetik; mevcut OID'ler stabil/idempotency anahtarı
+- [x] **L7 — `TRD-TRD-` çift önek** — kozmetik; mevcut OID'ler stabil/idempotency anahtarı
   olduğu için format değişikliği riskli → wontfix, belgelendi.
 - [x] **N3 — Poller `trackingNumber || orderId` fallback'i** UUID ile boş sorgu atıyor —
   zararsız ama israf; `trackingNumber` yoksa erken çık.

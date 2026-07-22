@@ -18,6 +18,7 @@ import { PrismaService } from "../../prisma";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
 import { PaymentService } from "../payment/payment.service";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
+import { canTransitionShipmentStatus } from "../shipping/shipment-state-machine";
 import {
   normalizeSuratPhone,
   normalizeSuratLocation,
@@ -624,6 +625,26 @@ export class RefundService {
     refundRequestId: string,
     update: { status: ShipmentStatus; deliveredAt?: Date; shippedAt?: Date },
   ) {
+    // L4: diğer iki poll path'indeki (shipment/trade) terminal-regresyon
+    // guard'ının paritesi — bayat/eski bir Sürat cevabı returnStatus'u geriye
+    // sarmasın (ör. returned → in_transit).
+    const current = await this.prisma.refundRequest.findUnique({
+      where: { id: refundRequestId },
+      select: { returnStatus: true },
+    });
+    if (
+      current?.returnStatus &&
+      !canTransitionShipmentStatus(
+        current.returnStatus as ShipmentStatus,
+        update.status,
+      )
+    ) {
+      this.logger.warn(
+        `Skipping illegal return-status transition ${current.returnStatus} → ${update.status} for refund ${refundRequestId}`,
+      );
+      return null;
+    }
+
     const updated = await this.prisma.refundRequest.update({
       where: { id: refundRequestId },
       data: {
