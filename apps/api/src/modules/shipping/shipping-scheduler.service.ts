@@ -50,19 +50,20 @@ export class ShippingSchedulerService implements OnModuleInit {
 
     // Önce kodsuz kalmış kayıtlar için barkodu yeniden dene (yaş-filtreli), sonra
     // durum senkronu — böylece yeni üretilen kodların durumu aynı tick'te çekilir.
+    // (Refund iade barkodunun retry'ı burada DEĞİL: openReturnShipment blocking
+    // olduğundan kodsuz "surat" kaydı oluşamaz; refund-scheduler 10 dk'da bir tam
+    // açılışı yeniden dener.)
     try {
       const retry = await this.suratTracking.retryPendingBarcodes();
-      stats.barcodeRetried =
-        retry.order.retried + retry.trade.retried + retry.refund.retried;
-      stats.barcodeRetryFailed =
-        retry.order.failed + retry.trade.failed + retry.refund.failed;
+      stats.barcodeRetried = retry.order.retried + retry.trade.retried;
+      stats.barcodeRetryFailed = retry.order.failed + retry.trade.failed;
       if (stats.barcodeRetried > 0 || stats.barcodeRetryFailed > 0) {
         log(
           `Kargo kodu retry: ${stats.barcodeRetried} tamamlandı, ${stats.barcodeRetryFailed} başarısız`,
         );
         this.logger.log(
           `Surat barcode retry: ${stats.barcodeRetried} filled, ${stats.barcodeRetryFailed} failed ` +
-            `(order ${retry.order.retried}/${retry.order.failed}, trade ${retry.trade.retried}/${retry.trade.failed}, refund ${retry.refund.retried}/${retry.refund.failed})`,
+            `(order ${retry.order.retried}/${retry.order.failed}, trade ${retry.trade.retried}/${retry.trade.failed})`,
         );
       }
     } catch (error: any) {

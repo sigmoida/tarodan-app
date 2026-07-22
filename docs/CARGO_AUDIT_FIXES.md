@@ -52,11 +52,13 @@
   `handedToCargo` cancel-lock hep false; `bothToWarehouseShipped` reveal hiç ateşlenmiyor.
   **Çözüm:** poll'da ilk hareket (picked_up/in_transit/...) görüldüğünde `shippedAt` set et.
 
-- [ ] **M4 — Refund retry yüzeyi ölü kod (blocking `openReturnShipment`)**
+- [x] **M4 — Refund retry yüzeyi ölü kod (blocking `openReturnShipment`)**
   Aday durumu (`surat + kod null + return_shipment_open`) hiç oluşmuyor çünkü open
   başarısızsa throw edip hiçbir şey yazmıyor; kurtarma zaten 10-dk `refund-scheduler`'da.
-  **Karar/Çözüm:** ölü refund yüzeyini retry'dan çıkar, kurtarma yolunu (scheduler)
-  yorumla belgele.
+  **Karar/Çözüm:** ölü refund yüzeyi retry'dan çıkarıldı, kurtarma yolu (scheduler)
+  yorumla belgelendi. Bonus: cooling-off akışındaki inline `openReturnShipment`
+  non-fatal yapıldı — Sürat çökükken talep oluştuktan sonra alıcıya 500 dönmüyor,
+  scheduler 10 dk'da açıyor.
 
 - [ ] **M5 — Takas no-address tarafı sessiz skip → takas askıda, bildirim yok**
   Yalnız `logger.warn`; event/bildirim yok, takas deadline'a kadar asılı.

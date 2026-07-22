@@ -947,7 +947,17 @@ export class RefundService {
       order.status === OrderStatus.awaiting_buyer_confirmation ||
       order.status === OrderStatus.completed
     ) {
-      await this.openReturnShipment(created.id);
+      // Non-fatal: talep bu noktada zaten oluştu (hold frozen + bildirim gitti).
+      // Sürat çökükse hatayı alıcıya 500 olarak yansıtma — kayıt
+      // wait_for_delivery'de kalır ve refund-scheduler (10 dk) tam açılışı
+      // yeniden dener (findPendingDeliveryToOpenReturn bu durumu kapsar).
+      try {
+        await this.openReturnShipment(created.id);
+      } catch (e: any) {
+        this.logger.error(
+          `openReturnShipment failed inline for ${created.id} (${refundNumber}): ${e?.message}. Scheduler will retry.`,
+        );
+      }
       return this.prisma.refundRequest.findUnique({
         where: { id: created.id },
       });
@@ -987,96 +997,11 @@ export class RefundService {
     };
   }
 
-  /**
-   * Kargo kodu retry job: iade dönüş kargosu açık ama gerçek Sürat kodu
-   * (returnProviderTrackingId) üretilememiş bir RefundRequest için barkodu yeniden
-   * dener. openReturnShipment ile AYNI payload + idempotency anahtarını kullanır →
-   * Sürat'ta mükerrer gönderi oluşmaz. Yalnız kodu+etiketi doldurur; iade akışını
-   * yeniden AÇMAZ ve bildirim GÖNDERMEZ (statü/bildirim ilk açılışta zaten yapıldı).
-   * SuratTrackingService orchestrator'ı çağırır; throw etmez, boolean döner.
-   */
-  async retryReturnBarcode(refundRequestId: string): Promise<boolean> {
-    if (!this.suratCargoService.isIntegrationEnabled()) return false;
-
-    const rr = await this.prisma.refundRequest.findUnique({
-      where: { id: refundRequestId },
-      include: {
-        order: {
-          include: {
-            seller: {
-              include: {
-                addresses: { orderBy: { isDefault: "desc" }, take: 1 },
-              },
-            },
-          },
-        },
-      },
-    });
-    // Guard: yalnız Sürat'lı, kodsuz, dönüş kargosu açık kayıt.
-    if (
-      !rr ||
-      rr.returnProvider !== "surat" ||
-      rr.returnProviderTrackingId ||
-      rr.status !== RefundRequestStatus.return_shipment_open
-    ) {
-      return false;
-    }
-
-    // İade teslim noktası (satıcı): kayıtlı adresi, yoksa Tarodan deposu.
-    const sellerAddr =
-      rr.order.seller.addresses[0] ?? this.warehouseReturnAddress();
-
-    try {
-      const result = await this.suratCargoService.createShipmentWithBarcode({
-        idempotencyKey: `surat:refund-return:${rr.refundNumber}`,
-        correlationId: `refund-retry-${rr.id}`,
-        payload: {
-          KisiKurum: sellerAddr.fullName || rr.order.seller.displayName,
-          SahisBirim: `İade: ${rr.order.orderNumber}`,
-          AliciAdresi: sellerAddr.address,
-          Il: normalizeSuratLocation(sellerAddr.city),
-          Ilce: normalizeSuratLocation(sellerAddr.district),
-          TelefonCep: normalizeSuratPhone(sellerAddr.phone),
-          KargoTuru: SuratKargoTuru.Koli,
-          OdemeTipi: SuratOdemeTipi.Pesin,
-          OzelKargoTakipNo: rr.refundNumber,
-          Adet: 1,
-          BirimDesi: 1,
-          BirimKg: 1,
-          KapidanOdemeTahsilatTipi: 1,
-          TasimaSekli: SuratTasimaSekli.KaraYolu,
-          TeslimSekli: SuratTeslimSekli.AdreseTeslim,
-          GonderiSekli: SuratGonderiSekli.Standart,
-          Pazaryerimi: 0,
-          Iademi: true,
-        },
-      });
-      if (!result.ok) {
-        const r = result as any;
-        this.logger.warn(
-          `Retry return barcode non-ok refund=${rr.refundNumber}: ${r.kind === "business" ? r.suratMessage : `technical:${r.code}`}`,
-        );
-        return false;
-      }
-      await this.prisma.refundRequest.update({
-        where: { id: rr.id },
-        data: {
-          returnProviderTrackingId: result.kargoTakipNo,
-          returnLabelZpl: result.labelZpl,
-          returnStatus: ShipmentStatus.label_created,
-        },
-      });
-      this.logger.log(
-        `Retry OK: refund return barcode filled ${rr.refundNumber} code=${result.kargoTakipNo}`,
-      );
-      return true;
-    } catch (e: any) {
-      this.logger.error(
-        `Retry return barcode threw refund=${rr.refundNumber}: ${e?.message}`,
-      );
-      return false;
-    }
-  }
+  // NOT (M4): iade barkodu için ayrı bir retry yüzeyi YOK — bilinçli.
+  // openReturnShipment BLOCKING'tir: Sürat başarısızsa throw eder ve hiçbir şey
+  // yazmaz (returnProvider="surat" + kodsuz durum oluşamaz). Kurtarma yolu
+  // refund-scheduler'dır: kayıt wait_for_delivery'de kalır ve
+  // openReturnShipmentsForDeliveredOrders (10 dk) tam açılışı yeniden dener.
 
   /**
    * Admin: RefundRequest policy override (Faz 4B.1 + 4F).
