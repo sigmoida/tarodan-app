@@ -13,6 +13,7 @@ import toast from "react-hot-toast";
 import { paymentsApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { useLocale, useTranslations } from "next-intl";
+import { useRouter } from "@/i18n/navigation";
 import {
   EMPTY_FILTERS,
   type PaymentFilterState,
@@ -70,6 +71,7 @@ export type PaymentActionType = "cancel" | "retry";
 export function usePaymentAction() {
   const queryClient = useQueryClient();
   const t = useTranslations();
+  const router = useRouter();
 
   return useMutation({
     mutationFn: async ({
@@ -81,17 +83,23 @@ export function usePaymentAction() {
     }) => {
       if (type === "cancel") {
         await paymentsApi.cancel(paymentId);
-        return { redirectUrl: null as string | null };
+        return { retryToPaymentId: null as string | null };
       }
+      // Retry: backend `failed` satırı `pending`'e resetler (aynı satır reuse) + taze
+      // merchant_oid atar. iframe kaldırıldığından ödeme URL'i dönmez → akışı, kullanıcıyı
+      // /payment/[id] sayfasına (kart formu) yönlendirerek tamamlarız. newPaymentId ==
+      // paymentId (satır reuse); yine de yanıttan alıyoruz.
       const res = await paymentsApi.retry(paymentId);
-      return { redirectUrl: (res.data?.paymentUrl as string) ?? null };
+      return {
+        retryToPaymentId: res.data?.newPaymentId ?? paymentId,
+      };
     },
-    onSuccess: ({ redirectUrl }, { type }) => {
+    onSuccess: ({ retryToPaymentId }, { type }) => {
       toast.success(
         type === "cancel" ? t("payment.cancelled") : t("payment.retried"),
       );
-      if (redirectUrl) {
-        window.location.href = redirectUrl;
+      if (retryToPaymentId) {
+        router.push(`/payment/${retryToPaymentId}`);
         return;
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.payments.all() });

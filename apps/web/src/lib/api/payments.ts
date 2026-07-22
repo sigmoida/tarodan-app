@@ -42,7 +42,21 @@ export const paymentsApi = {
     api.post<{ completed: boolean; status: string }>(
       `/payments/${paymentId}/verify`,
     ),
-  retry: (paymentId: string) => api.post(`/payments/${paymentId}/retry`),
+  /**
+   * Başarısız ödemeyi yeniden başlatır: backend mevcut `failed` satırı `pending`'e
+   * resetler (aynı satır reuse) ve taze merchant_oid atar. iframe kaldırıldığından
+   * yanıt bir ödeme URL'i DÖNDÜRMEZ; akış /payment/[id] sayfasında karta girilerek tamamlanır.
+   */
+  retry: (paymentId: string) =>
+    api.post<{
+      success: boolean;
+      paymentId: string;
+      newPaymentId: string;
+      orderId: string | null;
+      amount: number;
+      provider: string;
+      expiresIn: number;
+    }>(`/payments/${paymentId}/retry`),
   /** Dev/test: PayTR olmadan ödemeyi tamamla */
   bypassComplete: (paymentId: string, _card?: string) =>
     api.post<{ success: boolean }>(`/payments/${paymentId}/bypass-complete`),
