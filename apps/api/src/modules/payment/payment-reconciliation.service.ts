@@ -148,7 +148,28 @@ export class PaymentReconciliationService {
       })
       .map((o) => o.id);
 
-    const allOrderIds = [...orders.map((o) => o.id), ...pendingGroupOrderIds];
+    // 3) SEAM-B3 recovery: outbound paket göndericiye İADE DÖNMÜŞ (shipment.status=returned)
+    // ama processRefund başarısız olduğu için `refund_requested`'da TAKILI siparişler.
+    // surat-tracking `applyTrackingUpdate` bunları refund_requested yapıp processRefund'ı
+    // dener; başarısız olursa poller terminal (returned) shipment'ı ARTIK POLLAMADIĞINDAN
+    // kendi retry EDEMEZ → burada güvenilir retry. `shipment.status=returned` bunları
+    // normal-akış refund_requested siparişlerinden (outbound `delivered`, iade RefundRequest'te
+    // ayrı izlenir) ayıran güvenli ayraçtır. processRefund başarınca order=cancelled → bir
+    // daha eşleşmez (idempotent).
+    const returnedStuckOrders = await this.prisma.order.findMany({
+      where: {
+        status: OrderStatus.refund_requested,
+        shipment: { is: { status: ShipmentStatus.returned } },
+      },
+      select: { id: true },
+      take: 50,
+    });
+
+    const allOrderIds = [
+      ...orders.map((o) => o.id),
+      ...pendingGroupOrderIds,
+      ...returnedStuckOrders.map((o) => o.id),
+    ];
 
     let refunded = 0;
     let failed = 0;

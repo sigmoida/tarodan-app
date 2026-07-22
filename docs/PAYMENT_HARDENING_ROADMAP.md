@@ -90,13 +90,16 @@
       satıcı yine ödeniyor. Bonus: restock `increment:1` → `order.quantity`. **Spec:** 4 yeni
       testi. (Ayrı "kargoladım işaretle" bildirim tipi → Faz 10 UX.)
 
-- [ ] **1.6 — Sürat iade oto-refund'u pipeline'a soksun (SEAM-B3)**
-      `surat-tracking.service.ts:532-556`. Koşulsuz `refund_requested` + doğrudan
-      `processRefund` (RefundRequest yok, hatada askıda). **Çözüm:** ya mevcut RefundRequest'i
-      `return_delivered`'a taşıyıp finalize sweep'ine bırak, ya da hatada `refund_requested`'ı
-      kurtaran bir retry sweep ekle. Mevcut-statü guard'ı ekle.
-      **Kabul:** iade tamamlandı kodu geldiğinde finalize başarısız olsa bile bir sonraki
-      turda toparlanıyor; askıda kalmıyor; spec.
+- [x] **1.6 — Sürat iade oto-refund'u pipeline'a soksun (SEAM-B3)** ✓
+      `surat-tracking.service.ts:applyTrackingUpdate`. Koşulsuz `refund_requested` +
+      doğrudan `processRefund`, hatada yalnız log → askıda (poller terminal `returned`
+      shipment'ı artık pollamadığından kendi retry edemiyordu). **Not:** bu, buyer'ın
+      RefundRequest'inden AYRI bir senaryo — outbound paketin göndericiye iade dönmesi
+      (RefundRequest yok). **Çözüm:** (a) statü guard — order'ı ATOMİK `updateMany`
+      ile refund_requested'a geçir, zaten cancelled/refunded ise dokunma (re-poll idempotency);
+      (b) `processRefundedOrders`'a **returned-arm** eklendi (`status=refund_requested` +
+      `shipment.status=returned`) → başarısız iade bir sonraki turda güvenilir retry ediliyor,
+      askıda kalmıyor. **Spec:** returned-arm testi (group-refund.spec).
 
 - [ ] **1.7 — `retryPayment` düzelt (FLOW-H4 / SEAM-B5)**
       `payment-lifecycle.service.ts:114-135`. `payment.create({orderId})` +

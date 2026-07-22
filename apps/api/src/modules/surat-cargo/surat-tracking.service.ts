@@ -529,9 +529,8 @@ export class SuratTrackingService {
     data: Record<string, any>,
   ): Promise<void> {
     try {
-      const { NotificationService } = await import(
-        "../notification/notification.service"
-      );
+      const { NotificationService } =
+        await import("../notification/notification.service");
       const { NotificationType } = await import("../notification/dto");
       const svc = this.moduleRef.get(NotificationService, { strict: false });
       await svc?.createInAppNotification(
@@ -1174,28 +1173,44 @@ export class SuratTrackingService {
     }
 
     if (isReturnCompleted && shipment.order) {
-      await this.prisma.order.update({
-        where: { id: shipment.orderId },
+      // SEAM-B3: Outbound paket göndericiye İADE döndü (Sürat kod 12). Bu, buyer'ın
+      // açtığı RefundRequest pipeline'ından AYRI bir senaryodur (alıcı teslim almadı/
+      // reddetti → paket geri geldi; RefundRequest yok). Order'ı ATOMİK olarak
+      // refund_requested'a geçir — ama zaten cancelled/refunded ise DOKUNMA (başarılı
+      // bir önceki iadeyi geri sarmayalım; re-poll idempotency). Sonra processRefund'ı
+      // dene. Başarısız olursa order refund_requested + shipment=returned'da kalır;
+      // poller terminal (returned) shipment'ı ARTIK POLLAMADIĞINDAN kendi kendine
+      // retry edemez → processRefundedOrders sweep'inin returned-arm'ı bunu bulup
+      // RETRY eder (askıda kalmaz). processRefund başarınca order=cancelled → bir daha
+      // eşleşmez (idempotent).
+      const claimed = await this.prisma.order.updateMany({
+        where: {
+          id: shipment.orderId,
+          status: {
+            notIn: [OrderStatus.cancelled, OrderStatus.refunded],
+          },
+        },
         data: { status: OrderStatus.refund_requested },
       });
-
-      // Auto-trigger refund when Sürat reports return delivery (status 12).
-      // PaymentService is resolved lazily via ModuleRef to avoid circular import.
-      try {
-        const { PaymentService } = await import("../payment/payment.service");
-        const paymentService = this.moduleRef.get(PaymentService, {
-          strict: false,
-        });
-        if (paymentService) {
-          await paymentService.processRefund(shipment.orderId);
-          this.logger.log(
-            `Auto-refunded order ${shipment.orderId} after Sürat return completion (suratCode=${gonderi.KargonunDurumuSayi})`,
+      if (claimed.count > 0) {
+        // PaymentService is resolved lazily via ModuleRef to avoid circular import.
+        try {
+          const { PaymentService } = await import("../payment/payment.service");
+          const paymentService = this.moduleRef.get(PaymentService, {
+            strict: false,
+          });
+          if (paymentService) {
+            await paymentService.processRefund(shipment.orderId);
+            this.logger.log(
+              `Auto-refunded order ${shipment.orderId} after Sürat return completion (suratCode=${gonderi.KargonunDurumuSayi})`,
+            );
+          }
+        } catch (error: any) {
+          this.logger.error(
+            `Failed to auto-refund order ${shipment.orderId} after return: ${error.message}. ` +
+              `processRefundedOrders sweep (returned-arm) will retry.`,
           );
         }
-      } catch (error: any) {
-        this.logger.error(
-          `Failed to auto-refund order ${shipment.orderId} after return: ${error.message}. Manual intervention may be needed.`,
-        );
       }
     }
 

@@ -6,8 +6,10 @@ import { PaymentReconciliationService } from "./payment-reconciliation.service";
  * (`payment.is.status=completed`) sepet siparişlerini hiç görmez ve iptal edilen
  * sepet siparişi hiç iade edilmezdi. Zaten iade edilmişler (metadata.refundedOrders)
  * elenir → çift-iade denemesi + gürültülü REFUND_MANUAL_REVIEW olmaz.
+ * SEAM-B3: outbound paket göndericiye iade dönmüş (shipment=returned) ama
+ * refund_requested'da takılı siparişler de returned-arm ile retry edilir.
  */
-describe("PaymentReconciliationService.processRefundedOrders — MONEY-H5 group orders", () => {
+describe("PaymentReconciliationService.processRefundedOrders — MONEY-H5 group + SEAM-B3 returned", () => {
   const makeService = () => {
     const prisma = {
       order: { findMany: jest.fn() },
@@ -48,7 +50,9 @@ describe("PaymentReconciliationService.processRefundedOrders — MONEY-H5 group 
             payment: { metadata: { refundedOrders: { "group-2": 250 } } },
           },
         },
-      ]);
+      ])
+      // 3) SEAM-B3 returned-arm sorgusu
+      .mockResolvedValueOnce([]);
 
     const res = await service.processRefundedOrders();
 
@@ -61,7 +65,10 @@ describe("PaymentReconciliationService.processRefundedOrders — MONEY-H5 group 
 
   it("grup sorgusu doğru filtreyi kullanır (Order.payment null + checkoutGroup.payment completed)", async () => {
     const { service, prisma } = makeService();
-    prisma.order.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    prisma.order.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
 
     await service.processRefundedOrders();
 
@@ -79,7 +86,8 @@ describe("PaymentReconciliationService.processRefundedOrders — MONEY-H5 group 
       .mockResolvedValueOnce([{ id: "single-1" }])
       .mockResolvedValueOnce([
         { id: "group-1", checkoutGroup: { payment: { metadata: {} } } },
-      ]);
+      ])
+      .mockResolvedValueOnce([]);
     paymentRefund.processRefund
       .mockRejectedValueOnce(new Error("PayTR down")) // single-1 patlar
       .mockResolvedValueOnce({ success: true }); // group-1 başarılı
@@ -87,5 +95,25 @@ describe("PaymentReconciliationService.processRefundedOrders — MONEY-H5 group 
     const res = await service.processRefundedOrders();
 
     expect(res).toEqual({ refunded: 1, failed: 1 });
+  });
+
+  // SEAM-B3: outbound paket göndericiye iade dönmüş (shipment=returned) ama
+  // refund_requested'da takılı siparişler de retry edilir.
+  it("SEAM-B3: returned-arm refund_requested + shipment=returned siparişini iade eder", async () => {
+    const { service, prisma, paymentRefund } = makeService();
+    prisma.order.findMany
+      .mockResolvedValueOnce([]) // tekil
+      .mockResolvedValueOnce([]) // grup
+      .mockResolvedValueOnce([{ id: "returned-1" }]); // returned-arm
+
+    const res = await service.processRefundedOrders();
+
+    expect(paymentRefund.processRefund).toHaveBeenCalledWith("returned-1");
+    expect(res).toEqual({ refunded: 1, failed: 0 });
+
+    // returned-arm doğru filtreyi kullanmalı
+    const returnedWhere = prisma.order.findMany.mock.calls[2][0].where;
+    expect(returnedWhere.status).toBe("refund_requested");
+    expect(returnedWhere.shipment).toEqual({ is: { status: "returned" } });
   });
 });
