@@ -4,12 +4,19 @@ import { v4 as uuidv4 } from 'uuid';
 import { MembershipService } from '../membership/membership.service';
 import { StorageService, UploadOptions as StorageUploadOptions } from '../storage/storage.service';
 
-// Sharp is optional - image resizing will be skipped if not available
+// Sharp is optional - image resizing will be skipped if not available.
+// Yükleme hatası SESSİZCE yutulmasın: staging'de imaj sharp'sız çıktığında tek
+// gördüğümüz 400 cevabıydı, neden bilgisi yoktu — nedeni sakla ve logla.
 let sharp: any;
+let sharpLoadError: string | null = null;
 try {
   sharp = require('sharp');
-} catch {
+} catch (e: any) {
   sharp = null;
+  sharpLoadError = e?.message ?? String(e);
+  // Logger burada (module scope) yok; boot log'unda görünsün.
+  // eslint-disable-next-line no-console
+  console.error(`[MediaService] sharp failed to load: ${sharpLoadError}`);
 }
 
 export interface UploadOptions {
@@ -292,6 +299,9 @@ export class MediaService {
     productId?: string,
   ): Promise<{ cardKey: string; detailKey: string }> {
     if (!sharp) {
+      this.logger.error(
+        `sharp unavailable (load error: ${sharpLoadError ?? 'unknown'}) — image upload rejected`,
+      );
       throw new BadRequestException('Image processing (sharp) is not available');
     }
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
@@ -344,6 +354,9 @@ export class MediaService {
    */
   async uploadCollectionCover(file: Express.Multer.File): Promise<{ key: string }> {
     if (!sharp) {
+      this.logger.error(
+        `sharp unavailable (load error: ${sharpLoadError ?? 'unknown'}) — image upload rejected`,
+      );
       throw new BadRequestException('Image processing (sharp) is not available');
     }
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];

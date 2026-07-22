@@ -21,6 +21,13 @@ COPY apps/api/prisma ./apps/api/prisma/
 # Install dependencies (shamefully-hoist: flat node_modules, no symlinks)
 RUN pnpm install --frozen-lockfile --shamefully-hoist
 
+# GUARD: sharp'ın platform binary'si (@img/sharp-linuxmusl-*) OPTIONAL dependency
+# olarak iner ve pnpm, optional fetch başarısız olursa build'i DÜŞÜRMEZ — yalnız
+# warn basıp devam eder. Böyle bir imaj "başarıyla" deploy olup runtime'da
+# "Image processing (sharp) is not available" (400) üretti. Sharp'sız imaj asla
+# çıkmasın: burada require ile doğrula, inmemişse build burada patlasın.
+RUN node -e "const s = require('sharp'); console.log('sharp OK, libvips', s.versions.vips)"
+
 
 # Copy app source
 COPY apps/api ./apps/api
@@ -75,6 +82,10 @@ COPY --from=builder --chown=nestjs:nodejs /app/packages/logger ./node_modules/@t
 COPY --from=builder --chown=nestjs:nodejs /app/packages/types ./node_modules/@tarodan/types
 COPY --from=builder --chown=nestjs:nodejs /app/apps/api/package.json ./package.json
 COPY --from=builder --chown=nestjs:nodejs /app/apps/api/prisma ./prisma
+
+# GUARD (runner): node_modules kopyası sonrası sharp hâlâ yükleniyor olmalı —
+# builder'daki doğrulamanın kopya katmanında da geçerli olduğunu garantiler.
+RUN node -e "require('sharp')"
 
 # Copy entrypoint script (runs migrations before starting)
 COPY --chown=nestjs:nodejs apps/api/entrypoint.sh ./entrypoint.sh

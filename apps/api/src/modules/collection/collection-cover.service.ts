@@ -12,12 +12,17 @@ import { CollectionCommonService } from './collection-common.service';
 import * as https from 'https';
 import * as http from 'http';
 
-// Sharp is optional
+// Sharp is optional. Yükleme hatası sessizce yutulmasın (bkz. media.service —
+// staging'de sharp'sız imaj tek 400 ile teşhis edilemiyordu).
 let sharp: any;
 try {
   sharp = require('sharp');
-} catch {
+} catch (e: any) {
   sharp = null;
+  // eslint-disable-next-line no-console
+  console.error(
+    `[CollectionCoverService] sharp failed to load: ${e?.message ?? e}`,
+  );
 }
 
 /**
