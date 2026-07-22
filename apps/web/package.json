@@ -36,7 +36,7 @@
     "@radix-ui/react-tooltip": "^1.2.12",
     "@react-oauth/google": "^0.13.5",
     "@sentry/nextjs": "^8.55.2",
-    "@tanstack/react-query": "^5.101.2",
+    "@tanstack/react-query": "^5.101.4",
     "@tarodan/api-client": "workspace:*",
     "@tarodan/auth": "workspace:*",
     "@tarodan/design-tokens": "workspace:*",
@@ -72,7 +72,7 @@
     "autoprefixer": "^10.5.2",
     "eslint": "^8.55.0",
     "eslint-config-next": "14.2.35",
-    "postcss": "^8.5.19",
+    "postcss": "^8.5.22",
     "tailwindcss": "^3.3.6",
     "typescript": "^5.3.2"
   }
