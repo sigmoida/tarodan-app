@@ -42,7 +42,7 @@
   **Çözüm:** retry job'a "paid/preparing + shipment satırı YOK" adayı ekle → satırı oluştur
   + barkodu (idem cache sayesinde çift kayıt olmadan) doldur. MEM-/dijital siparişleri dışla.
 
-- [ ] **M2 — Retry job: kalıcı hataya backoff yok, 48s sonrası sessiz terk**
+- [x] **M2 — Retry job: kalıcı hataya backoff yok, 48s sonrası sessiz terk**
   Bozuk adresli kayıt ~96 kez boşa denenir, sonra pencereden sessizce düşer; kimseye
   haber gitmez.
   **Çözüm:** cache-tabanlı per-kayıt backoff (migration'sız) + 48s ageout'ta tek seferlik
@@ -96,7 +96,7 @@
   `parseFloat(PlatformSetting)` NaN olabilir → checkout'a `{rate: NaN}` sızar.
   **Çözüm:** `Number.isFinite` guard + default fallback.
 
-- [ ] **L8 — Retry backlog görünürlüğü yok (25/tick cap)**
+- [x] **L8 — Retry backlog görünürlüğü yok (25/tick cap)**
   Büyük yığın ~2400'ü aşana dek görünmez. **Çözüm:** toplam aday sayısını say + logla.
 
 ## 📋 Kayda geçen / bilinçli bırakılan

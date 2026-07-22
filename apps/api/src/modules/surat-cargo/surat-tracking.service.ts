@@ -1,8 +1,10 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
 import { ConfigService } from "@nestjs/config";
+import { CacheService } from "../cache/cache.service";
 import { PrismaService } from "../../prisma";
 import {
+  Prisma,
   ShipmentStatus,
   OrderStatus,
   TradeStatus,
@@ -52,6 +54,7 @@ export class SuratTrackingService {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly moduleRef: ModuleRef,
+    private readonly cache: CacheService,
   ) {}
 
   /**
@@ -432,6 +435,49 @@ export class SuratTrackingService {
   private static readonly RETRY_MAX_AGE_MS = 48 * 60 * 60 * 1000; // 48 s
   /** API'yi boğmamak için tick başına yüzey başına üst sınır; kalanı sonraki tick. */
   private static readonly RETRY_BATCH = 25;
+  /** M2: başarısız denemede üstel geri çekilme — taban bir tick (30 dk), tavan 8 s.
+   * Kalıcı hatalı kayıt (bozuk adres vb.) böylece 48 saatte ~96 değil ~8-10 kez
+   * denenir. Sayaç cache'te tutulur (migration yok); cache uçarsa backoff sıfırlanır
+   * — kabul edilebilir, yalnız birkaç fazladan deneme demek. */
+  private static readonly RETRY_BACKOFF_BASE_MS = 30 * 60 * 1000;
+  private static readonly RETRY_BACKOFF_MAX_MS = 8 * 60 * 60 * 1000;
+
+  private backoffKey(surface: string, id: string): string {
+    return `surat:retry:backoff:${surface}:${id}`;
+  }
+
+  private attemptsKey(surface: string, id: string): string {
+    return `surat:retry:attempts:${surface}:${id}`;
+  }
+
+  /** true → kayıt backoff penceresinde, bu tick atla (failed SAYILMAZ). */
+  private async inRetryBackoff(surface: string, id: string): Promise<boolean> {
+    return (await this.cache.get(this.backoffKey(surface, id))) != null;
+  }
+
+  /** Başarısız denemede sayacı artırıp üstel TTL'li backoff penceresi açar.
+   * Sayaç pencereden UZUN yaşar (3 gün) ki pencere kapanınca üstel büyüme
+   * sıfırlanmasın. */
+  private async recordRetryFailure(surface: string, id: string): Promise<void> {
+    const attempts =
+      ((await this.cache.get<number>(this.attemptsKey(surface, id))) ?? 0) + 1;
+    await this.cache.set(this.attemptsKey(surface, id), attempts, {
+      ttl: 3 * 24 * 3600,
+    });
+    const delayMs = Math.min(
+      SuratTrackingService.RETRY_BACKOFF_BASE_MS * 2 ** (attempts - 1),
+      SuratTrackingService.RETRY_BACKOFF_MAX_MS,
+    );
+    await this.cache.set(this.backoffKey(surface, id), attempts, {
+      ttl: Math.max(60, Math.floor(delayMs / 1000)),
+    });
+  }
+
+  /** Başarıda backoff izlerini temizle. */
+  private async clearRetryBackoff(surface: string, id: string): Promise<void> {
+    await this.cache.del(this.backoffKey(surface, id));
+    await this.cache.del(this.attemptsKey(surface, id));
+  }
 
   /**
    * Kodsuz kalmış (providerTrackingId NULL) order/trade kayıtları için barkod
@@ -466,7 +512,63 @@ export class SuratTrackingService {
       this.logger.error(`Trade barcode retry failed: ${e?.message}`);
     }
 
+    // M2: pencereden kodsuz düşen kayıtlar sessizce kaybolmasın.
+    try {
+      await this.alertAgedOutBarcodes(createdAfter);
+    } catch (e: any) {
+      this.logger.error(`Barcode age-out alert failed: ${e?.message}`);
+    }
+
     return { order, trade };
+  }
+
+  /**
+   * M2: 48 saat penceresinden hâlâ kodsuz düşen kayıtlar için kayıt başına BİR
+   * kez (cache dedupe, 7 gün) ERROR seviyesinde alarm logla — log-tabanlı uyarı
+   * altyapısı bu satırı yakalar; bu noktadan sonrası manuel müdahaledir.
+   */
+  private async alertAgedOutBarcodes(createdAfter: Date): Promise<void> {
+    // Tarama alt sınırı: 7 günden eski kayıtlar zaten alarmlandı/koptu.
+    const oldest = new Date(Date.now() - 7 * 24 * 3600 * 1000);
+
+    const agedShipments = await this.prisma.shipment.findMany({
+      where: {
+        provider: "surat",
+        providerTrackingId: null,
+        status: { in: [ShipmentStatus.pending, ShipmentStatus.label_created] },
+        createdAt: { lt: createdAfter, gte: oldest },
+        order: { status: { in: [OrderStatus.paid, OrderStatus.preparing] } },
+      },
+      select: { id: true, trackingNumber: true },
+      take: 50,
+    });
+    for (const s of agedShipments) {
+      const key = `surat:retry:ageout:shipment:${s.id}`;
+      if (await this.cache.get(key)) continue;
+      await this.cache.set(key, 1, { ttl: 7 * 24 * 3600 });
+      this.logger.error(
+        `BARCODE AGE-OUT: order shipment ${s.id} (oid=${s.trackingNumber}) left the 48h retry window with NO cargo code — manual intervention required`,
+      );
+    }
+
+    const agedTradeLegs = await this.prisma.tradeShipment.findMany({
+      where: {
+        providerTrackingId: null,
+        status: { in: [ShipmentStatus.pending, ShipmentStatus.label_created] },
+        createdAt: { lt: createdAfter, gte: oldest },
+        OR: [{ carrier: "surat" }, { leg: "return", carrier: "pending" }],
+      },
+      select: { id: true, leg: true, trackingNumber: true, tradeId: true },
+      take: 50,
+    });
+    for (const t of agedTradeLegs) {
+      const key = `surat:retry:ageout:trade:${t.id}`;
+      if (await this.cache.get(key)) continue;
+      await this.cache.set(key, 1, { ttl: 7 * 24 * 3600 });
+      this.logger.error(
+        `BARCODE AGE-OUT: trade ${t.leg} shipment ${t.id} (trade=${t.tradeId}, oid=${t.trackingNumber ?? "DRAFT"}) left the 48h retry window with NO cargo code — manual intervention required`,
+      );
+    }
   }
 
   /** Order Shipment kodsuzları — mevcut createSuratBarcodeForOrder'ı yeniden
@@ -478,19 +580,20 @@ export class SuratTrackingService {
     createdAfter: Date,
     createdBefore: Date,
   ): Promise<BarcodeRetryStat> {
-    const candidates = await this.prisma.shipment.findMany({
-      where: {
-        provider: "surat",
-        providerTrackingId: null,
-        status: {
-          in: [ShipmentStatus.pending, ShipmentStatus.label_created],
-        },
-        trackingNumber: { not: null },
-        createdAt: { gte: createdAfter, lte: createdBefore },
-        // Siparişi hâlâ canlı olanlar; iptal/teslim/iade akışına düşmüş sipariş
-        // için kod üretmenin anlamı yok.
-        order: { status: { in: [OrderStatus.paid, OrderStatus.preparing] } },
+    const codelessWhere: Prisma.ShipmentWhereInput = {
+      provider: "surat",
+      providerTrackingId: null,
+      status: {
+        in: [ShipmentStatus.pending, ShipmentStatus.label_created],
       },
+      trackingNumber: { not: null },
+      createdAt: { gte: createdAfter, lte: createdBefore },
+      // Siparişi hâlâ canlı olanlar; iptal/teslim/iade akışına düşmüş sipariş
+      // için kod üretmenin anlamı yok.
+      order: { status: { in: [OrderStatus.paid, OrderStatus.preparing] } },
+    };
+    const candidates = await this.prisma.shipment.findMany({
+      where: codelessWhere,
       select: { id: true, orderId: true, trackingNumber: true },
       take: SuratTrackingService.RETRY_BATCH,
     });
@@ -499,22 +602,41 @@ export class SuratTrackingService {
     // updatedAt üzerinden: yeniden ödeme updatedAt'i taşıdığı için deploy öncesi
     // takılmış siparişler de pencereye girer. Sanal siparişler (membership/boost)
     // kargo taşımaz — dışla.
+    const orphanWhere: Prisma.OrderWhereInput = {
+      status: { in: [OrderStatus.paid, OrderStatus.preparing] },
+      updatedAt: { gte: createdAfter, lte: createdBefore },
+      OR: [
+        { shipment: null },
+        { shipment: { status: ShipmentStatus.cancelled } },
+      ],
+      NOT: [
+        { productId: { startsWith: "membership-" } },
+        { productId: { startsWith: "boost-" } },
+      ],
+    };
     const orphanOrders = await this.prisma.order.findMany({
-      where: {
-        status: { in: [OrderStatus.paid, OrderStatus.preparing] },
-        updatedAt: { gte: createdAfter, lte: createdBefore },
-        OR: [
-          { shipment: null },
-          { shipment: { status: ShipmentStatus.cancelled } },
-        ],
-        NOT: [
-          { productId: { startsWith: "membership-" } },
-          { productId: { startsWith: "boost-" } },
-        ],
-      },
+      where: orphanWhere,
       select: { id: true, orderNumber: true },
       take: SuratTrackingService.RETRY_BATCH,
     });
+
+    // L8: batch dolduysa toplamı say — büyük yığın sessizce görünmez kalmasın.
+    if (candidates.length === SuratTrackingService.RETRY_BATCH) {
+      const total = await this.prisma.shipment.count({ where: codelessWhere });
+      if (total > SuratTrackingService.RETRY_BATCH) {
+        this.logger.warn(
+          `Barcode retry backlog: ${total} code-less order shipments in window (processing ${SuratTrackingService.RETRY_BATCH}/tick)`,
+        );
+      }
+    }
+    if (orphanOrders.length === SuratTrackingService.RETRY_BATCH) {
+      const total = await this.prisma.order.count({ where: orphanWhere });
+      if (total > SuratTrackingService.RETRY_BATCH) {
+        this.logger.warn(
+          `Barcode retry backlog: ${total} orphan orders (no/cancelled shipment) in window (processing ${SuratTrackingService.RETRY_BATCH}/tick)`,
+        );
+      }
+    }
 
     if (candidates.length === 0 && orphanOrders.length === 0) {
       return { retried: 0, failed: 0 };
@@ -539,25 +661,30 @@ export class SuratTrackingService {
     // yine üretilemezse satır `pending`+kodsuz kalır ve aşağıdaki yüzey sonraki
     // tick'te tamamlar).
     for (const o of orphanOrders) {
+      if (await this.inRetryBackoff("order-orphan", o.id)) continue;
       try {
         const res = await paymentCommon.ensureSuratShipmentForOrder(o.id);
         if (res === "created" || res === "revived") {
           retried++;
+          await this.clearRetryBackoff("order-orphan", o.id);
           this.logger.log(
             `Retry OK: shipment ${res} for order ${o.orderNumber}`,
           );
         } else if (res === "skipped") {
           failed++;
+          await this.recordRetryFailure("order-orphan", o.id);
         }
         // "exists": eşzamanlı onarımla yarıştık — no-op, sayma.
       } catch (e: any) {
         failed++;
+        await this.recordRetryFailure("order-orphan", o.id);
         this.logger.error(
           `Retry ensure-shipment threw order=${o.orderNumber}: ${e?.message}`,
         );
       }
     }
     for (const s of candidates) {
+      if (await this.inRetryBackoff("order", s.id)) continue;
       try {
         const barcode = await paymentCommon.createSuratBarcodeForOrder(
           s.orderId,
@@ -571,14 +698,17 @@ export class SuratTrackingService {
             },
           });
           retried++;
+          await this.clearRetryBackoff("order", s.id);
           this.logger.log(
             `Retry OK: order barcode filled shipment=${s.id} oid=${s.trackingNumber} code=${barcode.kargoTakipNo}`,
           );
         } else {
           failed++;
+          await this.recordRetryFailure("order", s.id);
         }
       } catch (e: any) {
         failed++;
+        await this.recordRetryFailure("order", s.id);
         this.logger.error(
           `Retry order barcode threw shipment=${s.id}: ${e?.message}`,
         );
@@ -596,18 +726,19 @@ export class SuratTrackingService {
     createdAfter: Date,
     createdBefore: Date,
   ): Promise<BarcodeRetryStat> {
-    const inbound = await this.prisma.tradeShipment.findMany({
-      where: {
-        carrier: "surat",
-        providerTrackingId: null,
-        leg: "to_warehouse",
-        status: {
-          in: [ShipmentStatus.pending, ShipmentStatus.label_created],
-        },
-        trackingNumber: { not: null },
-        fromAddressId: { not: null },
-        createdAt: { gte: createdAfter, lte: createdBefore },
+    const inboundWhere: Prisma.TradeShipmentWhereInput = {
+      carrier: "surat",
+      providerTrackingId: null,
+      leg: "to_warehouse",
+      status: {
+        in: [ShipmentStatus.pending, ShipmentStatus.label_created],
       },
+      trackingNumber: { not: null },
+      fromAddressId: { not: null },
+      createdAt: { gte: createdAfter, lte: createdBefore },
+    };
+    const inbound = await this.prisma.tradeShipment.findMany({
+      where: inboundWhere,
       select: { id: true },
       take: SuratTrackingService.RETRY_BATCH,
     });
@@ -615,19 +746,35 @@ export class SuratTrackingService {
     // Return DRAFT'ları: carrier "pending" (hiç submit olmamış) veya "surat" +
     // kodsuz (submit sonrası persist patlamış). Manuel fallback ("Tarodan
     // Warehouse") bilinçli — sorguya girmez.
-    const returns = await this.prisma.tradeShipment.findMany({
-      where: {
-        leg: "return",
-        providerTrackingId: null,
-        carrier: { in: ["pending", "surat"] },
-        status: {
-          in: [ShipmentStatus.pending, ShipmentStatus.label_created],
-        },
-        createdAt: { gte: createdAfter, lte: createdBefore },
+    const returnWhere: Prisma.TradeShipmentWhereInput = {
+      leg: "return",
+      providerTrackingId: null,
+      carrier: { in: ["pending", "surat"] },
+      status: {
+        in: [ShipmentStatus.pending, ShipmentStatus.label_created],
       },
+      createdAt: { gte: createdAfter, lte: createdBefore },
+    };
+    const returns = await this.prisma.tradeShipment.findMany({
+      where: returnWhere,
       select: { id: true },
       take: SuratTrackingService.RETRY_BATCH,
     });
+
+    // L8: batch dolduysa toplamı say — yığın görünür olsun.
+    for (const [label, where, fetched] of [
+      ["inbound", inboundWhere, inbound.length],
+      ["return", returnWhere, returns.length],
+    ] as const) {
+      if (fetched === SuratTrackingService.RETRY_BATCH) {
+        const total = await this.prisma.tradeShipment.count({ where });
+        if (total > SuratTrackingService.RETRY_BATCH) {
+          this.logger.warn(
+            `Barcode retry backlog: ${total} code-less trade ${label} legs in window (processing ${SuratTrackingService.RETRY_BATCH}/tick)`,
+          );
+        }
+      }
+    }
 
     if (inbound.length === 0 && returns.length === 0) {
       return { retried: 0, failed: 0 };
@@ -647,12 +794,19 @@ export class SuratTrackingService {
         failed += inbound.length;
       } else {
         for (const ts of inbound) {
+          if (await this.inRetryBackoff("trade-inbound", ts.id)) continue;
           try {
             const ok = await svc.retryInboundBarcode(ts.id);
-            if (ok) retried++;
-            else failed++;
+            if (ok) {
+              retried++;
+              await this.clearRetryBackoff("trade-inbound", ts.id);
+            } else {
+              failed++;
+              await this.recordRetryFailure("trade-inbound", ts.id);
+            }
           } catch (e: any) {
             failed++;
+            await this.recordRetryFailure("trade-inbound", ts.id);
             this.logger.error(
               `Retry trade barcode threw trade-shipment=${ts.id}: ${e?.message}`,
             );
@@ -674,12 +828,19 @@ export class SuratTrackingService {
         failed += returns.length;
       } else {
         for (const ts of returns) {
+          if (await this.inRetryBackoff("trade-return", ts.id)) continue;
           try {
             const ok = await warehouseSvc.retryReturnBarcode(ts.id);
-            if (ok) retried++;
-            else failed++;
+            if (ok) {
+              retried++;
+              await this.clearRetryBackoff("trade-return", ts.id);
+            } else {
+              failed++;
+              await this.recordRetryFailure("trade-return", ts.id);
+            }
           } catch (e: any) {
             failed++;
+            await this.recordRetryFailure("trade-return", ts.id);
             this.logger.error(
               `Retry trade return barcode threw trade-shipment=${ts.id}: ${e?.message}`,
             );
