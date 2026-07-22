@@ -23,6 +23,7 @@ import { NotificationType } from "../notification/dto/notification.dto";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
 import { ElogoInvoicingService } from "../elogo";
 import { PaymentCommonService } from "./payment-common.service";
+import { MONEY_EPSILON } from "./payment.constants";
 import { i18nMessage } from "../i18n";
 
 /**
@@ -157,7 +158,7 @@ export class PaymentRefundService {
     // reconciliation, Faz 2.)
     if (!isGroupPayment) {
       const priorRefunded = Number(previouslyRefundedOrders[orderId] || 0);
-      if (priorRefunded + amountToRefund > refundCap + 0.01) {
+      if (priorRefunded + amountToRefund > refundCap + MONEY_EPSILON) {
         throw new BadRequestException(
           i18nMessage("server.payment.refundAmountExceedsLimit", {
             amountToRefund,
@@ -362,7 +363,8 @@ export class PaymentRefundService {
             0,
           );
           // Payment yalnız KÜMÜLATİF toplam işlem tutarına ulaşınca `refunded` olur.
-          const fullyRefunded = totalRefunded >= Number(payment.amount) - 0.01;
+          const fullyRefunded =
+            totalRefunded >= Number(payment.amount) - MONEY_EPSILON;
           // Bu SİPARİŞİN kümülatif iadesi tamamlandı mı → order cancel + stok geri-yükle
           // + e-Arşiv reverse tek buradan karar verir (tekilde çoklu kısmi iade toplanır,
           // grupta order başına tek iade). Grup eşiği siparişin tutarı, tekil eşiği
@@ -371,7 +373,8 @@ export class PaymentRefundService {
             ? Number(refundTargetOrder!.totalAmount)
             : Number(payment.amount);
           const isOrderFullyRefunded =
-            Number(refundedOrders[orderId] || 0) >= orderRefundThreshold - 0.01;
+            Number(refundedOrders[orderId] || 0) >=
+            orderRefundThreshold - MONEY_EPSILON;
 
           // MONEY-M4: bu sipariş finalize edildi → refundInProgressOrders marker'ından
           // sil. Böylece reconcileStuckRefundMarkers sweep'i yalnız GERÇEKTEN takılı

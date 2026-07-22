@@ -26,6 +26,7 @@ import { PaymentRefundService } from "./payment-refund.service";
 import { EventService } from "../events";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
+import { asPaymentMetadata } from "./payment-metadata.types";
 
 // Takasta reservedQuantity, takas KABUL edildiğinde (checkAndReserve) artar ve
 // ancak tamamlanma / iptal / red / iade-teslim adımlarında geri verilir. Bu
@@ -1222,10 +1223,9 @@ export class PaymentReconciliationService {
     let checked = 0;
     let recovered = 0;
     for (const p of candidates) {
-      const meta = (p.metadata as Record<string, any>) || {};
-      const inProgress =
-        (meta.refundInProgressOrders as Record<string, unknown>) || {};
-      const refunded = (meta.refundedOrders as Record<string, number>) || {};
+      const meta = asPaymentMetadata(p.metadata);
+      const inProgress = meta.refundInProgressOrders || {};
+      const refunded = meta.refundedOrders || {};
       // Gerçekten takılı = marker'da var ama refundedOrders'ta yok (tx finalize etmedi).
       const stuckOrderIds = Object.keys(inProgress).filter(
         (oid) => !(oid in refunded),

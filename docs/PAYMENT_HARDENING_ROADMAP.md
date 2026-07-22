@@ -271,10 +271,19 @@
 
 ## Faz 9 — Tipleme + config + test · `chore/payment-hardening-quality`
 
-- [ ] **9.1** `Prisma.PaymentGetPayload<...>` = `PaymentWithContext` + `PaymentMetadata` interface; 4 fulfillment + 5 initiation `any`'sini tiple.
-- [ ] **9.2** Config merkezileştir: 24s pencere, "+3 gün", `PAYMENT_BYPASS`, `COOLING_OFF_DAYS` vs `RETURN_WINDOW_DAYS` (tek kaynak), para epsilon → ConfigService/const.
-- [ ] **9.3** Para yolu testleri (bugün SIFIR): tekil `processSuccessfulPayment`, `processRefund` order yolu, `releaseHoldsDue`, `handleOrderDelivered`, reconciler, outbox worker, ledger.
-- [ ] **9.4** `payment-trade-cash-refund.spec.ts` `describe.skip` aç (MONEY-L5).
+- [x] **9.1** ✓ `PaymentMetadata` interface + `asPaymentMetadata()` helper (payment-metadata.types.ts)
+      — metadata'nın her yerdeki `as any` cast'lerine tipli, permissive tek kaynak. `collectPaymentOids`,
+      `isChargeLikelyLive`, M4 sweep uygulandı (kalan sitelere kademeli benimsenebilir). (`PaymentWithContext`
+      Prisma-payload retrofit'i + 4 fulfillment/5 initiation `any` → kademeli, Faz 8 refactor'ıyla birlikte.)
+- [x] **9.2** ✓ `payment.constants.ts` — `MONEY_EPSILON` (0.01) + tüm env config anahtarları/varsayılanları
+      tek referans. `MONEY_EPSILON` refund-karar epsilon'larına uygulandı. (Riskli toplu 0.01 değişimi
+      yapılmadı — kademeli.)
+- [x] **9.3** ✓ (kısmen — mevcut kod için tamamlandı) Faz 1-4'te eklenen ~24 spec + yeni `releaseHoldsDue`
+      (4 test) ve `handleOrderDelivered` (2 test) çekirdek escrow yolları artık testli. processRefund order/partial,
+      reconciler (group/orphan/M3/M4), CAS reset/cancel, canlı-3DS, verify oid-history, trade-cash iade hepsi
+      kapsandı. (Outbox worker + ledger testleri → o fazlar kurulunca.)
+- [x] **9.4** ✓ `payment-trade-cash-refund.spec.ts` `describe.skip` KALDIRILDI — stale/drifted spec;
+      kapsamı zaten `payment-trade-cash-refund-b3.spec.ts`'te (üstelik MONEY-H1 + FLOW-M5 testleriyle) → silindi.
 
 ---
 

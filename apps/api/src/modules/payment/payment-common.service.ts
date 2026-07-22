@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { PaymentStatus } from "@prisma/client";
+import { asPaymentMetadata } from "./payment-metadata.types";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import {
   normalizeSuratPhone,
@@ -354,7 +355,7 @@ export class PaymentCommonService {
     const oids: string[] = [];
     const current = (payment.providerConversationId || "").trim();
     if (current) oids.push(current);
-    const meta = (payment.metadata as Record<string, unknown>) || {};
+    const meta = asPaymentMetadata(payment.metadata);
     const history = meta.merchantOidHistory;
     if (Array.isArray(history)) {
       for (const h of history) {
@@ -374,7 +375,7 @@ export class PaymentCommonService {
    * → orphan capture. Saf fonksiyon; config'i çağıran okur.
    */
   isChargeLikelyLive(metadata: unknown, windowMinutes: number): boolean {
-    const meta = (metadata as Record<string, unknown>) || {};
+    const meta = asPaymentMetadata(metadata);
     const raw = meta.lastChargeStartedAt;
     if (typeof raw !== "string") return false;
     const startedAt = new Date(raw).getTime();
