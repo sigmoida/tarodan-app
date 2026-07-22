@@ -232,8 +232,15 @@ export class PaymentInitiationService {
           i18nMessage("server.payment.orderGroupAlreadyPaid"),
         );
       }
-      payment = await this.prisma.payment.update({
-        where: { id: existingPayment.id },
+      // FLOW-M1: CAS reset. findUnique ile bu güncelleme arasında bir başarı
+      // callback'i ödemeyi `completed` yapmış olabilir; KOŞULSUZ update bunu
+      // `pending`'e EZER (ödenmiş grup bozulur, çekilen para sipariş'e bağlı kalmaz).
+      // Yalnız completed OLMAYAN satırı resetle; count===0 → arada tamamlandı.
+      const reset = await this.prisma.payment.updateMany({
+        where: {
+          id: existingPayment.id,
+          status: { not: PaymentStatus.completed },
+        },
         data: {
           status: PaymentStatus.pending,
           failureReason: null,
@@ -241,6 +248,14 @@ export class PaymentInitiationService {
           amount: totalAmount,
           provider: PaymentProvider.paytr,
         },
+      });
+      if (reset.count === 0) {
+        throw new BadRequestException(
+          i18nMessage("server.payment.orderGroupAlreadyPaid"),
+        );
+      }
+      payment = await this.prisma.payment.findUniqueOrThrow({
+        where: { id: existingPayment.id },
       });
     } else {
       payment = await this.prisma.payment.create({
@@ -1012,14 +1027,24 @@ export class PaymentInitiationService {
     // because PayTR iframe tokens are single-use. Returning the old providerPaymentId
     // leads to "Bu ödeme sayfası artık geçersiz" on the PayTR iframe.
     if (existingPayment) {
-      await this.prisma.payment.update({
-        where: { id: existingPayment.id },
+      // FLOW-M1: CAS reset (bkz. grup/tekil yolu) — koşulsuz update, arada tamamlanan
+      // bir trade-cash ödemesini `pending`'e ezmesin. count===0 → zaten ödendi.
+      const reset = await this.prisma.payment.updateMany({
+        where: {
+          id: existingPayment.id,
+          status: { not: PaymentStatus.completed },
+        },
         data: {
           status: PaymentStatus.pending,
           failureReason: null,
           providerPaymentId: null,
         },
       });
+      if (reset.count === 0) {
+        throw new BadRequestException(
+          i18nMessage("server.payment.tradeCashPaymentAlreadyCompleted"),
+        );
+      }
 
       // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin), kart /payments/process-direct ile.
       await this.paymentCommon.assignMerchantOid(
@@ -1111,14 +1136,25 @@ export class PaymentInitiationService {
       // Reset row before reuse: PayTR iframe tokens are single-use, so we must
       // mint a fresh one on every retry (otherwise iframe shows
       // "Bu ödeme sayfası artık geçersiz").
-      await this.prisma.payment.update({
-        where: { id: existingPayment.id },
+      // FLOW-M1: CAS reset — findFirst(status:pending) ile bu update arasında bir
+      // başarı callback'i ödemeyi `completed` yapmış olabilir; KOŞULSUZ update ödenmiş
+      // siparişi `pending`'e EZERDİ. count===0 → arada ödendi → "zaten ödendi".
+      const reset = await this.prisma.payment.updateMany({
+        where: {
+          id: existingPayment.id,
+          status: { not: PaymentStatus.completed },
+        },
         data: {
           status: PaymentStatus.pending,
           failureReason: null,
           providerPaymentId: null,
         },
       });
+      if (reset.count === 0) {
+        throw new BadRequestException(
+          i18nMessage("server.payment.orderAlreadyPaid"),
+        );
+      }
 
       // 30-min cron released the reservation; re-acquire it before letting
       // the buyer retry. CAS-gate on reservationReleasedAt: only the request

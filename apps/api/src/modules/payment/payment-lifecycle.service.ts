@@ -253,14 +253,22 @@ export class PaymentLifecycleService {
 
     const oldStatus = payment.status;
 
-    // Update payment status to failed
-    await this.prisma.payment.update({
-      where: { id: paymentId },
+    // FLOW-M2: CAS — findUnique ile bu update arasında bir başarı callback'i ödemeyi
+    // `completed` yapmış olabilir; KOŞULSUZ update bunu `failed`'a EZER (ödenmiş sipariş
+    // iptal edilir, para askıda kalır). Yalnız hâlâ `pending` olanı `failed` yap;
+    // count===0 → arada tamamlandı/değişti → iptal etme, ürünü serbest bırakma.
+    const cancelled = await this.prisma.payment.updateMany({
+      where: { id: paymentId, status: PaymentStatus.pending },
       data: {
         status: PaymentStatus.failed,
         failureReason: "Kullanıcı tarafından iptal edildi",
       },
     });
+    if (cancelled.count === 0) {
+      throw new BadRequestException(
+        i18nMessage("server.payment.onlyPendingPaymentsCancelable"),
+      );
+    }
 
     // Siparişi iptal et ve ürünü tekrar satışa aç
     await this.paymentFulfillment.releaseProductForFailedPayment(

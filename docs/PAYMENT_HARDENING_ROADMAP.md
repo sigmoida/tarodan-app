@@ -142,9 +142,13 @@
       `payment-refund.service.ts:249-255`. Güncel `providerConversationId` yerine gerçekten
       çekilen oid (`providerPaymentId`). Trade fallback `tradeId.replace` düzelt.
 
-- [ ] **2.6 — CAS'siz reset/cancel yollarını kapat (FLOW-M1, FLOW-M2)**
-      Initiation'daki koşulsuz `completed→pending` reset'leri + `cancelPayment` tekil yolu
-      CAS'e (`updateMany where status=...`) çevir.
+- [x] **2.6 — CAS'siz reset/cancel yollarını kapat (FLOW-M1, FLOW-M2)** ✓
+      Initiation'daki 3 koşulsuz `completed→pending` reset'i (grup + tekil + trade-cash)
+      `updateMany where status:{not:completed}` + count===0 → "zaten ödendi" CAS'ine çevrildi.
+      `cancelPayment` tekil yolu `updateMany where status:pending` CAS'ine (count===0 →
+      iptal etme, ürünü serbest bırakma). Böylece findUnique↔update arası bir başarı
+      callback'i ödenmiş ödemeyi `pending`/`failed`'a ezemez. **Spec:** 2 yeni FLOW-M2 testi
+      (cancel-cas.spec).
 
 ---
 
