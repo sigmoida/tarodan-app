@@ -13,7 +13,7 @@
   **Çözüm:** güvenli parse (`Date | null`), teslimde `?? new Date()` fallback, geçersiz
   `estimatedDelivery`/`IslemTarihi` satırlarını atla + warn.
 
-- [ ] **H2 — Poller depoya varışta cancel-lock koymuyor (takas escrow açığı)**
+- [x] **H2 — Poller depoya varışta cancel-lock koymuyor (takas escrow açığı)**
   `maybeTransitionTradeToAtWarehouse` / `syncTradeShipmentTracking` `deliveredAt` yazıyor ama
   `firstWarehouseArrivalAt`'i yalnız admin-manuel `markWarehouseReceived` set ediyor →
   A'nın kolisi depodayken taraflar takası hâlâ iptal edebiliyor.
@@ -48,7 +48,7 @@
   **Çözüm:** cache-tabanlı per-kayıt backoff (migration'sız) + 48s ageout'ta tek seferlik
   ERROR log/uyarı.
 
-- [ ] **M3 — Takas `to_warehouse` bacakları hiç `shippedAt` almıyor**
+- [x] **M3 — Takas `to_warehouse` bacakları hiç `shippedAt` almıyor**
   `handedToCargo` cancel-lock hep false; `bothToWarehouseShipped` reveal hiç ateşlenmiyor.
   **Çözüm:** poll'da ilk hareket (picked_up/in_transit/...) görüldüğünde `shippedAt` set et.
 

@@ -1129,6 +1129,20 @@ export class SuratTrackingService {
       updateData.providerTrackingId = gonderi.KargoTakipNo;
     }
 
+    // M3: escrow bacağında kargoya veriliş anı hiçbir yerde yazılmıyordu →
+    // handedToCargo cancel-lock'u ve "both shipped" reveal gate'i hep ölüydü.
+    // Sürat ilk hareketi raporladığında shippedAt'i mühürle.
+    const movementStatuses: ShipmentStatus[] = [
+      ShipmentStatus.picked_up,
+      ShipmentStatus.in_transit,
+      ShipmentStatus.at_delivery_branch,
+      ShipmentStatus.out_for_delivery,
+      ShipmentStatus.delivered,
+    ];
+    if (!tradeShipment.shippedAt && movementStatuses.includes(newStatus)) {
+      updateData.shippedAt = new Date();
+    }
+
     if (isDelivered && !tradeShipment.deliveredAt) {
       // H1: parse edilemeyen tarihte teslim bilgisi kaybolmasın — şimdi'ye düş.
       updateData.deliveredAt =
@@ -1152,6 +1166,9 @@ export class SuratTrackingService {
       tradeShipment.leg === "to_warehouse" &&
       tradeShipment.recipientType === "warehouse"
     ) {
+      // H2: depoya İLK varışta kullanıcı iptalini kilitle (admin path ile aynı
+      // semantik) — sonra iki bacak da teslimse at_warehouse'a geçir.
+      await this.maybeLockTradeCancelOnArrival(tradeShipment.tradeId);
       await this.maybeTransitionTradeToAtWarehouse(tradeShipment.tradeId);
     }
 
@@ -1255,6 +1272,58 @@ export class SuratTrackingService {
   }
 
   /**
+   * H2: Poll yolunda depoya İLK varışta kullanıcı iptalini kilitle — admin-manuel
+   * markWarehouseReceived ile aynı semantik (firstWarehouseArrivalAt +
+   * cancelLockedAt + trade.cancel-locked event'i). Eskiden bu alanları yalnız
+   * admin path set ediyordu; poller teslimi işlediğinde koli fiziksel olarak
+   * depodayken taraflar takası hâlâ iptal edebiliyordu. FOR UPDATE + null-check
+   * ile idempotent; admin path'le yarışta biri kazanır, diğeri no-op.
+   */
+  private async maybeLockTradeCancelOnArrival(tradeId: string): Promise<void> {
+    const locked = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tradeId} FOR UPDATE`;
+      const trade = await tx.trade.findUnique({
+        where: { id: tradeId },
+        select: {
+          firstWarehouseArrivalAt: true,
+          initiatorId: true,
+          receiverId: true,
+        },
+      });
+      if (!trade || trade.firstWarehouseArrivalAt) return null;
+      const now = new Date();
+      await tx.trade.update({
+        where: { id: tradeId },
+        data: {
+          firstWarehouseArrivalAt: now,
+          cancelLockedAt: now,
+          updatedAt: now,
+        },
+      });
+      return { initiatorId: trade.initiatorId, receiverId: trade.receiverId };
+    });
+    if (!locked) return;
+
+    this.logger.log(
+      `Trade ${tradeId} cancel locked on first warehouse arrival (Sürat poll)`,
+    );
+    // Bildirim admin path'iyle aynı event üzerinden; lazy (circular import yok).
+    try {
+      const { EventService } = await import("../events/event.service");
+      const eventService = this.moduleRef.get(EventService, { strict: false });
+      await eventService?.emitTradeCancelLocked({
+        tradeId,
+        initiatorId: locked.initiatorId,
+        receiverId: locked.receiverId,
+      });
+    } catch (e: any) {
+      this.logger.warn(
+        `emit trade.cancel-locked failed (poll) for ${tradeId}: ${e?.message}`,
+      );
+    }
+  }
+
+  /**
    * If both to_warehouse legs of the trade are delivered and the trade is
    * still pre-warehouse, atomically flip Trade.status -> at_warehouse and
    * write a TradeShipmentEvent on each leg recording the auto-transition.
@@ -1268,7 +1337,7 @@ export class SuratTrackingService {
 
       const trade = await tx.trade.findUnique({
         where: { id: tradeId },
-        select: { id: true, status: true },
+        select: { id: true, status: true, firstWarehouseArrivalAt: true },
       });
       if (!trade) return false;
       if (trade.status === TradeStatus.at_warehouse) return false;
@@ -1290,7 +1359,15 @@ export class SuratTrackingService {
       const now = new Date();
       await tx.trade.update({
         where: { id: tradeId },
-        data: { status: TradeStatus.at_warehouse, updatedAt: now },
+        data: {
+          status: TradeStatus.at_warehouse,
+          updatedAt: now,
+          // H2 savunması: ilk-varış kilidi bir şekilde atlanmışsa (fix öncesi
+          // teslim edilen bacak) en geç burada mühürle — admin path ile aynı.
+          ...(trade.firstWarehouseArrivalAt
+            ? {}
+            : { firstWarehouseArrivalAt: now, cancelLockedAt: now }),
+        },
       });
 
       // Log the transition on each to_warehouse shipment so it surfaces in
