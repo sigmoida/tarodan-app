@@ -470,4 +470,81 @@ export class TradeShipmentService {
       Iademi: false,
     };
   }
+
+  /**
+   * Kargo kodu retry job: kodsuz (providerTrackingId NULL) kalmış tek bir
+   * depoya-giriş (to_warehouse) takas gönderisi için OrtakBarkodOlustur'u yeniden
+   * dener. İlk oluşturmadaki payload builder'ı + idempotency anahtarını AYNEN
+   * kullanır → Sürat'ta mükerrer gönderi oluşmaz. Başarılıysa kodu+etiketi yazar
+   * ve gönderiyi (pending'e düşmüşse) label_created'a çeker. SuratTrackingService
+   * orchestrator'ı çağırır; hiçbir zaman throw etmez, boolean döner.
+   */
+  async retryInboundBarcode(tradeShipmentId: string): Promise<boolean> {
+    if (!this.suratCargoService?.isIntegrationEnabled()) return false;
+
+    const ship = await this.prisma.tradeShipment.findUnique({
+      where: { id: tradeShipmentId },
+      include: {
+        trade: { select: { tradeNumber: true } },
+        fromAddress: true,
+      },
+    });
+    // Guard: yalnız kodsuz, adresli, Sürat'lı depoya-giriş bacağı.
+    if (
+      !ship ||
+      ship.carrier !== "surat" ||
+      ship.providerTrackingId ||
+      ship.leg !== "to_warehouse" ||
+      !ship.trackingNumber ||
+      !ship.fromAddress
+    ) {
+      return false;
+    }
+
+    // shipper bir relation değil (yalnız shipperId scalar) → kullanıcıyı ayrı yükle.
+    const shipper = await this.prisma.user.findUnique({
+      where: { id: ship.shipperId },
+      select: { displayName: true, email: true },
+    });
+
+    const payload = this.buildSuratPayloadForInboundLeg(
+      shipper ?? { displayName: null, email: "" },
+      ship.fromAddress,
+      ship.trackingNumber,
+      ship.trade.tradeNumber,
+    );
+    if (!payload) return false;
+
+    try {
+      const result = await this.suratCargoService.createShipmentWithBarcode({
+        idempotencyKey: `surat:trade-inbound:${ship.trackingNumber}`,
+        correlationId: `trade-inbound-retry-${ship.tradeId}`,
+        payload,
+      });
+      if (!result.ok) {
+        const r = result as any;
+        this.logger.warn(
+          `Retry inbound barcode non-ok trade-shipment=${tradeShipmentId} oid=${ship.trackingNumber}: ${r.kind === "business" ? r.suratMessage : `technical:${r.code}`}`,
+        );
+        return false;
+      }
+      await this.prisma.tradeShipment.update({
+        where: { id: tradeShipmentId },
+        data: {
+          providerTrackingId: result.kargoTakipNo,
+          labelZpl: result.labelZpl,
+          status: ShipmentStatus.label_created,
+        },
+      });
+      this.logger.log(
+        `Retry OK: trade inbound barcode filled ${tradeShipmentId} oid=${ship.trackingNumber} code=${result.kargoTakipNo}`,
+      );
+      return true;
+    } catch (e: any) {
+      this.logger.error(
+        `Retry inbound barcode threw ${tradeShipmentId}: ${e?.message}`,
+      );
+      return false;
+    }
+  }
 }

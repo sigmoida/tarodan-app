@@ -23,6 +23,14 @@ import {
 } from "./surat-status.mapper";
 import { canTransitionShipmentStatus } from "../shipping/shipment-state-machine";
 
+/** Kargo kodu (barkod) retry job istatistiği — yüzey başına. */
+export interface BarcodeRetryStat {
+  /** Bu tick'te kodu başarıyla tamamlanan kayıt sayısı. */
+  retried: number;
+  /** Denenip yine kod alamayan kayıt sayısı (geçici/kalıcı hata). */
+  failed: number;
+}
+
 const SURAT_API_LIVE =
   "https://api01.suratkargo.com.tr/api/KargoTakipHareketDetayi";
 const SURAT_API_TEST =
@@ -400,6 +408,236 @@ export class SuratTrackingService {
       `Surat tracking sync: ${synced} synced, ${failed} failed out of ${activeShipments.length}`,
     );
     return { synced, failed };
+  }
+
+  // ─── Kargo kodu (barkod) retry job ────────────────────────────────────────
+  // İlk barkod oluşturma (OrtakBarkodOlustur) NON-BLOCKING'tir: Sürat timeout'u,
+  // entegrasyonun o an kapalı olması ya da geçici hata yüzünden kayıt kodsuz
+  // (providerTrackingId NULL) kalabilir. Poller yalnız DURUM çeker, kod üretmez —
+  // ve Sürat'ta hiç oluşmamış bir gönderiyi backfill de edemez. Bu iş o boşluğu
+  // kapatır: kodsuz kalmış kayıtlar için oluşturmayı güvenle yeniden dener.
+  //
+  // Idempotency anahtarı ilk oluşturmayla AYNI (OzelKargoTakipNo bazlı) → retry
+  // Sürat'ta mükerrer gönderi oluşturmaz; ilk başarıdan sonra cache'ten döner.
+  // Aday şartı hep providerTrackingId IS NULL olduğundan kodu olan kayıt hiç
+  // aday olmaz (başarılı kayda ikinci kez dokunulmaz).
+
+  /** Çok yeni kaydı deneme: ilk senkron denemesi henüz bitti, anlık yarış/timeout
+   * kendiliğinden düzelebilir. */
+  private static readonly RETRY_MIN_AGE_MS = 5 * 60 * 1000; // 5 dk
+  /** Bu kadar süredir kod alamayan kayıt geçici değil yapısal hatalıdır (bozuk
+   * adres vb.). Sonsuz denemeyi bırak → admin müdahalesine düş. */
+  private static readonly RETRY_MAX_AGE_MS = 48 * 60 * 60 * 1000; // 48 s
+  /** API'yi boğmamak için tick başına yüzey başına üst sınır; kalanı sonraki tick. */
+  private static readonly RETRY_BATCH = 25;
+
+  /**
+   * Kodsuz kalmış (providerTrackingId NULL) order/trade/refund kayıtları için
+   * barkod oluşturmayı yaş-filtreli olarak yeniden dener. Scheduler'dan periyodik
+   * çağrılır. Her yüzey bağımsız — biri patlarsa diğerleri devam eder.
+   */
+  async retryPendingBarcodes(): Promise<{
+    order: BarcodeRetryStat;
+    trade: BarcodeRetryStat;
+    refund: BarcodeRetryStat;
+  }> {
+    const now = Date.now();
+    // Aday penceresi:  (now - MAX)  <  createdAt  <  (now - MIN)
+    const createdBefore = new Date(now - SuratTrackingService.RETRY_MIN_AGE_MS);
+    const createdAfter = new Date(now - SuratTrackingService.RETRY_MAX_AGE_MS);
+
+    const empty: BarcodeRetryStat = { retried: 0, failed: 0 };
+    let order = empty;
+    let trade = empty;
+    let refund = empty;
+
+    try {
+      order = await this.retryPendingOrderBarcodes(createdAfter, createdBefore);
+    } catch (e: any) {
+      this.logger.error(`Order barcode retry failed: ${e?.message}`);
+    }
+    try {
+      trade = await this.retryPendingTradeInboundBarcodes(
+        createdAfter,
+        createdBefore,
+      );
+    } catch (e: any) {
+      this.logger.error(`Trade barcode retry failed: ${e?.message}`);
+    }
+    try {
+      refund = await this.retryPendingRefundReturnBarcodes(
+        createdAfter,
+        createdBefore,
+      );
+    } catch (e: any) {
+      this.logger.error(`Refund barcode retry failed: ${e?.message}`);
+    }
+
+    return { order, trade, refund };
+  }
+
+  /** Order Shipment kodsuzları — mevcut createSuratBarcodeForOrder'ı yeniden
+   * kullanır (payload/idempotency birebir aynı). */
+  private async retryPendingOrderBarcodes(
+    createdAfter: Date,
+    createdBefore: Date,
+  ): Promise<BarcodeRetryStat> {
+    const candidates = await this.prisma.shipment.findMany({
+      where: {
+        provider: "surat",
+        providerTrackingId: null,
+        status: {
+          in: [ShipmentStatus.pending, ShipmentStatus.label_created],
+        },
+        trackingNumber: { not: null },
+        createdAt: { gte: createdAfter, lte: createdBefore },
+        // Siparişi hâlâ canlı olanlar; iptal/teslim/iade akışına düşmüş sipariş
+        // için kod üretmenin anlamı yok.
+        order: { status: { in: [OrderStatus.paid, OrderStatus.preparing] } },
+      },
+      select: { id: true, orderId: true, trackingNumber: true },
+      take: SuratTrackingService.RETRY_BATCH,
+    });
+    if (candidates.length === 0) return { retried: 0, failed: 0 };
+
+    const { PaymentCommonService } =
+      await import("../payment/payment-common.service");
+    const paymentCommon = this.moduleRef.get(PaymentCommonService, {
+      strict: false,
+    });
+    if (!paymentCommon) {
+      this.logger.warn(
+        `PaymentCommonService not resolvable; skipping ${candidates.length} order barcode retries`,
+      );
+      return { retried: 0, failed: candidates.length };
+    }
+
+    let retried = 0;
+    let failed = 0;
+    for (const s of candidates) {
+      try {
+        const barcode = await paymentCommon.createSuratBarcodeForOrder(
+          s.orderId,
+        );
+        if (barcode?.kargoTakipNo) {
+          await this.prisma.shipment.update({
+            where: { id: s.id },
+            data: {
+              providerTrackingId: barcode.kargoTakipNo,
+              labelZpl: barcode.labelZpl ?? null,
+            },
+          });
+          retried++;
+          this.logger.log(
+            `Retry OK: order barcode filled shipment=${s.id} oid=${s.trackingNumber} code=${barcode.kargoTakipNo}`,
+          );
+        } else {
+          failed++;
+        }
+      } catch (e: any) {
+        failed++;
+        this.logger.error(
+          `Retry order barcode threw shipment=${s.id}: ${e?.message}`,
+        );
+      }
+    }
+    return { retried, failed };
+  }
+
+  /** Takas depoya-giriş (to_warehouse) bacakları kodsuzları — TradeShipmentService
+   * kendi payload builder'ıyla tek kaydı yeniden dener. */
+  private async retryPendingTradeInboundBarcodes(
+    createdAfter: Date,
+    createdBefore: Date,
+  ): Promise<BarcodeRetryStat> {
+    const candidates = await this.prisma.tradeShipment.findMany({
+      where: {
+        carrier: "surat",
+        providerTrackingId: null,
+        leg: "to_warehouse",
+        status: {
+          in: [ShipmentStatus.pending, ShipmentStatus.label_created],
+        },
+        trackingNumber: { not: null },
+        fromAddressId: { not: null },
+        createdAt: { gte: createdAfter, lte: createdBefore },
+      },
+      select: { id: true },
+      take: SuratTrackingService.RETRY_BATCH,
+    });
+    if (candidates.length === 0) return { retried: 0, failed: 0 };
+
+    const { TradeShipmentService } =
+      await import("../trade/trade-shipment.service");
+    const svc = this.moduleRef.get(TradeShipmentService, { strict: false });
+    if (!svc) {
+      this.logger.warn(
+        `TradeShipmentService not resolvable; skipping ${candidates.length} trade barcode retries`,
+      );
+      return { retried: 0, failed: candidates.length };
+    }
+
+    let retried = 0;
+    let failed = 0;
+    for (const ts of candidates) {
+      try {
+        const ok = await svc.retryInboundBarcode(ts.id);
+        if (ok) retried++;
+        else failed++;
+      } catch (e: any) {
+        failed++;
+        this.logger.error(
+          `Retry trade barcode threw trade-shipment=${ts.id}: ${e?.message}`,
+        );
+      }
+    }
+    return { retried, failed };
+  }
+
+  /** İade dönüş (return) kargosu kodsuzları — RefundService kendi payload'ıyla
+   * tek kaydı yeniden dener. Yaş, kodun oluşması gereken an olan returnCreatedAt'e
+   * göre ölçülür. */
+  private async retryPendingRefundReturnBarcodes(
+    createdAfter: Date,
+    createdBefore: Date,
+  ): Promise<BarcodeRetryStat> {
+    const candidates = await this.prisma.refundRequest.findMany({
+      where: {
+        returnProvider: "surat",
+        returnProviderTrackingId: null,
+        status: "return_shipment_open",
+        returnTrackingNumber: { not: null },
+        returnCreatedAt: { gte: createdAfter, lte: createdBefore },
+      },
+      select: { id: true },
+      take: SuratTrackingService.RETRY_BATCH,
+    });
+    if (candidates.length === 0) return { retried: 0, failed: 0 };
+
+    const { RefundService } = await import("../refund/refund.service");
+    const svc = this.moduleRef.get(RefundService, { strict: false });
+    if (!svc) {
+      this.logger.warn(
+        `RefundService not resolvable; skipping ${candidates.length} refund barcode retries`,
+      );
+      return { retried: 0, failed: candidates.length };
+    }
+
+    let retried = 0;
+    let failed = 0;
+    for (const rr of candidates) {
+      try {
+        const ok = await svc.retryReturnBarcode(rr.id);
+        if (ok) retried++;
+        else failed++;
+      } catch (e: any) {
+        failed++;
+        this.logger.error(
+          `Retry refund barcode threw refund-request=${rr.id}: ${e?.message}`,
+        );
+      }
+    }
+    return { retried, failed };
   }
 
   private async applyTrackingUpdate(
