@@ -1014,7 +1014,12 @@ export class TradeLifecycleService {
     });
 
     if (!alreadyCancelled) {
-      await this.paymentService.refundTradeCashPaymentIfCompleted(tradeId);
+      // MONEY-H2: iade FAILURE-TRACKING ile yapılır. Takas TX içinde zaten cancelled
+      // commit edildi; iade PayTR'da patlarsa iptali geri alamayız — bunun yerine
+      // refundTradeCashTracked, trade.refundFailureReason marker'ını yazar ki admin
+      // retryTradeRefund + retryFailedTradeRefunds cron'u parayı toparlasın (yoksa
+      // eski davranışta throw kullanıcıya 500 döner ve iade sessizce takılırdı).
+      await this.paymentService.refundTradeCashTracked(tradeId);
 
       // Cancel Sürat shipments if any (e.g. trades cancelled after admin approval)
       await this.tradeShipment.cancelSuratShipmentsForTrade(tradeId);
@@ -1454,7 +1459,10 @@ export class TradeLifecycleService {
     let resolvedTradeInitiatorId: string;
 
     if (newStatus === TradeStatus.cancelled) {
-      await this.paymentService.refundTradeCashPaymentIfCompleted(tradeId);
+      // MONEY-H2: dispute çözümü iptalle sonuçlandıysa iade FAILURE-TRACKING ile.
+      // (Ödemenin TX doğrulamasından ÖNCE yapılması ayrı bir sıralama bulgusudur —
+      // MONEY-M5/Faz 4.5; burada yalnız marker boşluğu kapatılır.)
+      await this.paymentService.refundTradeCashTracked(tradeId);
       // Cancel any active Sürat shipments (from_warehouse legs after admin approval)
       await this.tradeShipment.cancelSuratShipmentsForTrade(tradeId);
     }

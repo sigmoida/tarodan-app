@@ -874,6 +874,93 @@ export class PaymentRefundService {
   }
 
   /**
+   * MONEY-H2: Takas nakit iadesini FAILURE-TRACKING ile yapar. `cancelTrade` /
+   * `resolveDispute` gibi kullanıcı/admin akışlarında iade PayTR'da patlarsa
+   * `trade.refundFailureReason` marker'ı yazılır → admin `retryTradeRefund` ve
+   * `retryFailedTradeRefunds` süpürme cron'u devreye girip parayı toparlar.
+   * Başarıda marker temizlenir + `trade.refund-completed` yayınlanır.
+   *
+   * ASLA throw ETMEZ: takas bu noktada zaten iptal/çözüm ile terminal duruma
+   * commit edilmiştir; iade hatası iptali geri almaz (`rejectWarehouseTrade` ile
+   * aynı felsefe). Çağıran, kullanıcıya sahte bir 500 döndürmek yerine sonucu okur.
+   */
+  async refundTradeCashTracked(tradeId: string): Promise<{
+    refunded: boolean;
+    failed: boolean;
+    skippedReason?: string;
+    reason?: string;
+  }> {
+    try {
+      const result = await this.refundTradeCashPaymentIfCompleted(tradeId);
+      // Başarı (veya "iade edilecek tamamlanmış ödeme yok" no-op) → varsa eski
+      // hata marker'ını temizle. Best-effort; iade zaten yapıldı.
+      await this.prisma.trade
+        .update({
+          where: { id: tradeId },
+          data: { refundFailureReason: null, refundFailureAt: null },
+        })
+        .catch(() => {});
+      if (result.refunded) {
+        try {
+          const cashPayment = await this.prisma.tradeCashPayment.findUnique({
+            where: { tradeId },
+            select: { payerId: true },
+          });
+          await this.eventService.emitTradeRefundCompleted({
+            tradeId,
+            cashPayerId: cashPayment?.payerId ?? null,
+          });
+        } catch (emitErr) {
+          this.logger.error(
+            `Failed to emit trade.refund-completed for trade ${tradeId}: ${emitErr}`,
+          );
+        }
+      }
+      return {
+        refunded: result.refunded,
+        failed: false,
+        skippedReason: result.skippedReason,
+      };
+    } catch (err: any) {
+      const reason = err?.message ?? "Bilinmeyen hata (PayTR iade başarısız)";
+      this.logger.error(
+        `refundTradeCashTracked failed for trade ${tradeId}: ${reason}`,
+      );
+      // Marker'ı yaz ki admin retryTradeRefund + retryFailedTradeRefunds cron'u
+      // bu takası bulup yeniden denesin (yoksa para alıcıda sessizce kalır).
+      await this.prisma.trade
+        .update({
+          where: { id: tradeId },
+          data: {
+            refundFailureReason: reason.slice(0, 500),
+            refundFailureAt: new Date(),
+          },
+        })
+        .catch((persistErr: any) =>
+          this.logger.error(
+            `Failed to persist refund failure for trade ${tradeId}: ${persistErr?.message}`,
+          ),
+        );
+      try {
+        const cashPayment = await this.prisma.tradeCashPayment.findUnique({
+          where: { tradeId },
+          select: { payerId: true },
+        });
+        await this.eventService.emitTradeRefundFailed({
+          tradeId,
+          cashPayerId: cashPayment?.payerId ?? null,
+          reason,
+        });
+      } catch (emitErr) {
+        this.logger.error(
+          `Failed to emit trade.refund-failed for trade ${tradeId}: ${emitErr}`,
+        );
+      }
+      return { refunded: false, failed: true, reason };
+    }
+  }
+
+  /**
    * Release held payment to seller
    * Called when order is completed
    */

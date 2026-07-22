@@ -115,6 +115,15 @@ export class PaymentService {
     return this.paymentRefund.refundTradeCashPaymentIfCompleted(tradeId);
   }
 
+  async refundTradeCashTracked(tradeId: string): Promise<{
+    refunded: boolean;
+    failed: boolean;
+    skippedReason?: string;
+    reason?: string;
+  }> {
+    return this.paymentRefund.refundTradeCashTracked(tradeId);
+  }
+
   async releasePayment(orderId: string) {
     return this.paymentRefund.releasePayment(orderId);
   }

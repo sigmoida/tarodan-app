@@ -1,9 +1,12 @@
-import { Injectable } from '@nestjs/common';
-import { TRADE_VALID_TRANSITIONS, computeTradeCanCancel } from './trade.state-machine';
-import { TradeShipmentService } from './trade-shipment.service';
-import { TradeQueryService } from './trade-query.service';
-import { TradeLifecycleService } from './trade-lifecycle.service';
-import { TradeReconciliationService } from './trade-reconciliation.service';
+import { Injectable } from "@nestjs/common";
+import {
+  TRADE_VALID_TRANSITIONS,
+  computeTradeCanCancel,
+} from "./trade.state-machine";
+import { TradeShipmentService } from "./trade-shipment.service";
+import { TradeQueryService } from "./trade-query.service";
+import { TradeLifecycleService } from "./trade-lifecycle.service";
+import { TradeReconciliationService } from "./trade-reconciliation.service";
 import {
   CreateTradeDto,
   TradeQueryDto,
@@ -17,7 +20,7 @@ import {
   ResolveTradeDisputeDto,
   TradeResponseDto,
   TradeListResponseDto,
-} from './dto';
+} from "./dto";
 
 /**
  * Facade: tüm public imzalar aynen korunur, iş mantığı alt servislerde
@@ -56,7 +59,10 @@ export class TradeService {
   // Taşındı: trade-query.service.ts — sorgu/listeleme metodları
   // (facade delege; imzalar aynen korunuyor).
 
-  async getTradeById(tradeId: string, userId: string): Promise<TradeResponseDto> {
+  async getTradeById(
+    tradeId: string,
+    userId: string,
+  ): Promise<TradeResponseDto> {
     return this.tradeQuery.getTradeById(tradeId, userId);
   }
 
@@ -73,7 +79,12 @@ export class TradeService {
 
   async getTradeStatusCounts(
     userId: string,
-  ): Promise<{ all: number; pending: number; shipping: number; completed: number }> {
+  ): Promise<{
+    all: number;
+    pending: number;
+    shipping: number;
+    completed: number;
+  }> {
     return this.tradeQuery.getTradeStatusCounts(userId);
   }
 
@@ -164,6 +175,13 @@ export class TradeService {
 
   async reconcileMissingInboundShipments(): Promise<{ fixed: number }> {
     return this.tradeReconciliation.reconcileMissingInboundShipments();
+  }
+
+  async retryFailedTradeRefunds(): Promise<{
+    retried: number;
+    recovered: number;
+  }> {
+    return this.tradeReconciliation.retryFailedTradeRefunds();
   }
 
   async autoConfirmExpiredReceipts(): Promise<number> {

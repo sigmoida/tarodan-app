@@ -47,11 +47,16 @@
       yeniden çağırıyor, PayTR başardıysa (persist-fail) marker kalıyor. Order yolundaki
       `clearRefundInProgress` ile aynı invaryant. **Spec:** 2 yeni MONEY-H1 testi (b3.spec).
 
-- [ ] **1.2 — `cancelTrade` iade retry yolu (MONEY-H2)**
-      `trade-lifecycle.service.ts:906-921,1016-1023`. Refund try/catch'siz + `refundFailureReason`
-      marker'sız → hata sonrası yeniden-iptal iadeyi atlıyor, admin retry reddediyor.
-      **Çözüm:** `rejectWarehouseTrade` deseni gibi failure marker yaz + admin
-      `retryTradeRefund` çalışsın + bir cron cancelled-unrefunded trade'leri süpürsün.
+- [x] **1.2 — `cancelTrade` iade retry yolu (MONEY-H2)** ✓
+      `trade-lifecycle.service.ts:1016-1023,1456-1460`. Refund try/catch'siz + `refundFailureReason`
+      marker'sız → hata sonrası yeniden-iptal iadeyi atlıyor, admin retry reddediyordu.
+      **Çözüm:** DRY `refundTradeCashTracked` helper'ı (PaymentRefundService) — başarıda
+      marker temizle + `refund-completed`, başarısızda `refundFailureReason` marker +
+      `refund-failed`, throw etmez (iptal zaten commit'li). `cancelTrade` + `resolveDispute`
+      onu kullanıyor. Yeni `retryFailedTradeRefunds` cron'u (trade-expired 5dk step 4)
+      marker'lı takasları süpürüyor; admin `retryTradeRefund` zaten çalışıyor.
+      **Spec:** 3 yeni MONEY-H2 testi (tracked.spec). (resolveDispute'un ödeme-öncesi
+      sıralaması ayrı bulgu → MONEY-M5/Faz 4.5.)
 
 - [ ] **1.3 — İptal edilen SEPET (grup) siparişi oto-iade (MONEY-H5)**
       `payment-reconciliation.service.ts:89-97`. Sweep `payment.is.status=completed`
