@@ -1225,11 +1225,13 @@ export class PaymentReconciliationService {
     for (const p of candidates) {
       const meta = asPaymentMetadata(p.metadata);
       const inProgress = meta.refundInProgressOrders || {};
-      const refunded = meta.refundedOrders || {};
-      // Gerçekten takılı = marker'da var ama refundedOrders'ta yok (tx finalize etmedi).
-      const stuckOrderIds = Object.keys(inProgress).filter(
-        (oid) => !(oid in refunded),
-      );
+      // Finding 1: Takılı = marker VAR (finalize başarıda marker'ı siler → hâlâ duruyorsa
+      // PayTR yapıldı ama tx finalize etmedi). Eski `!(oid in refundedOrders)` guard'ı
+      // YANLIŞTI: MONEY-H4 tek ödemede çoklu kısmi iadeye izin verdiğinden, önceki bir
+      // kısmi iade refundedOrders'a yazılınca sonraki takılı marker'ı elerdi (sessizce
+      // toparlanmazdı). processRefund'ın marker-skip'i (Fix 1a) order başına ≤1 marker
+      // garantiler → her marker tek bir takılı iadedir; hepsini finalize et.
+      const stuckOrderIds = Object.keys(inProgress);
       for (const orderId of stuckOrderIds) {
         checked++;
         try {

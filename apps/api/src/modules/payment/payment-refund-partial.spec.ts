@@ -26,7 +26,15 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
     const mockTx = {
       $queryRaw: jest.fn().mockResolvedValue([]),
       payment: {
-        findUnique: jest.fn().mockResolvedValue({ metadata }),
+        // Finding 2: prod'da marker PayTR'den ÖNCE yazılır → tx'in FOR UPDATE okuması
+        // marker'ı GÖRÜR. Idempotency guard'ı (marker yoksa no-op) taze iadede tetiklenmesin
+        // diye tx-metadata'sına marker'ı ekliyoruz (tutar önemsiz — yalnız varlık kontrol edilir).
+        findUnique: jest.fn().mockResolvedValue({
+          metadata: {
+            ...metadata,
+            refundInProgressOrders: { [ORDER_ID]: { amount: 1, at: "x" } },
+          },
+        }),
         update: jest.fn().mockImplementation((arg: any) => {
           captured.paymentUpdate = arg;
           return Promise.resolve({});
@@ -94,6 +102,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
         }),
       },
       payoutTransfer: {
+        findMany: jest.fn().mockResolvedValue([]),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         findFirst: jest.fn().mockResolvedValue(null),
       },
@@ -175,5 +184,38 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
     });
     // PayTR'a hiç gidilmemeli (fazladan para iade edilmesin).
     expect(paytr.createRefund).not.toHaveBeenCalled();
+  });
+
+  // Finding 1: order'da FARKLI tutarlı takılı marker varken yeni (farklı) iade sahte-iade
+  // olarak geçmemeli — reddedilmeli. Aksi halde PayTR atlanır ama DB'ye yazılır (alıcı eksik alır).
+  it("Finding 1: farklı tutarlı takılı marker → yeni iade REDDEDİLİR (PayTR yok, sahte iade yok)", async () => {
+    const { service, paytr } = makeService({
+      paymentAmount: 1000,
+      metadata: {
+        refundInProgressOrders: { [ORDER_ID]: { amount: 200, at: "x" } },
+      },
+    });
+
+    // Marker 200; yeni iade 100 (farklı) → reddedilmeli.
+    await expect(service.processRefund(ORDER_ID, 100)).rejects.toThrow();
+    expect(paytr.createRefund).not.toHaveBeenCalled();
+  });
+
+  // Finding 1: AYNI tutarlı marker → gerçek retry (recovery): PayTR ATLANIR (marker eşleşti),
+  // tx finalize eder — sahte değil, çünkü bu gerçekten PayTR'ı yapılmış olan iadenin kurtarması.
+  it("Finding 1: aynı tutarlı marker → recovery (PayTR atlanır, finalize edilir)", async () => {
+    const { service, captured, paytr } = makeService({
+      paymentAmount: 1000,
+      metadata: {
+        refundInProgressOrders: { [ORDER_ID]: { amount: 300, at: "x" } },
+      },
+    });
+
+    await service.processRefund(ORDER_ID, 300);
+
+    expect(paytr.createRefund).not.toHaveBeenCalled(); // recovery → PayTR atlanır
+    expect(captured.paymentUpdate.data.metadata.refundedOrders[ORDER_ID]).toBe(
+      300,
+    );
   });
 });

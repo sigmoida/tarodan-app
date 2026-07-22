@@ -174,15 +174,27 @@ export class PaymentRefundService {
     // Çift-ödeme koruması (K1). Bunu PayTR/Sürat'a dokunmadan ÖNCE yap.
     // 1) Henüz icra edilmemiş payout'ları (pending/retry_pending) atomik olarak
     //    geçersiz kıl ki payout cron'u alıcıya iade yaparken satıcıya da ödeme yapmasın.
-    //    Atomik updateMany sayesinde payout cron'unun pending→processing claim'iyle
-    //    yarışırsa satır başına yalnızca biri kazanır (diğeri count=0 görür).
-    await this.prisma.payoutTransfer.updateMany({
+    //    Finding 3: void ettiğimiz payout ID'lerini SAKLA — catch'teki geri-alma yalnız
+    //    BU çağrının void'lediklerini restore etsin (önceki bir başarılı iadenin void'lediği
+    //    bayat/tam-net payout'u diriltip satıcıyı çift ödemeyelim). ID + status guard atomikliği
+    //    korur (select↔void arası statü değişen satır void'lenmez, catch'te de restore edilmez).
+    const payoutsToVoid = await this.prisma.payoutTransfer.findMany({
       where: {
         paymentHold: { orderId },
         status: { in: ["pending", "retry_pending"] },
       },
-      data: { status: "failed", failureReason: "order_refunded" },
+      select: { id: true },
     });
+    const voidedPayoutIds = payoutsToVoid.map((p) => p.id);
+    if (voidedPayoutIds.length > 0) {
+      await this.prisma.payoutTransfer.updateMany({
+        where: {
+          id: { in: voidedPayoutIds },
+          status: { in: ["pending", "retry_pending"] },
+        },
+        data: { status: "failed", failureReason: "order_refunded" },
+      });
+    }
     // 2) Payout zaten icra edildi (completed) veya icra ediliyor (processing) ise para
     //    satıcıya gitti/gidiyor → iade çift-ödeme olur. Engelle (manuel clawback gerekir).
     const inFlightPayout = await this.prisma.payoutTransfer.findFirst({
@@ -232,10 +244,39 @@ export class PaymentRefundService {
           // kardeş siparişin markerı bu siparişin PayTR çağrısını engellemesin.
           const existingMeta = (payment.metadata as Record<string, any>) || {};
           const inProgressOrders =
-            (existingMeta.refundInProgressOrders as Record<string, string>) ||
-            {};
+            (existingMeta.refundInProgressOrders as Record<
+              string,
+              { amount?: number; at?: string } | string
+            >) || {};
 
-          if (inProgressOrders[orderId]) {
+          const existingMarker = inProgressOrders[orderId];
+          if (existingMarker) {
+            // Finding 1: marker order-BAŞINA tutulur ama MONEY-H4 tek ödemede ÇOKLU kısmi
+            // iadeye izin verir. Marker'daki tutar YENİ iade tutarından FARKLIYSA, bu marker
+            // kurtarma bekleyen BAŞKA (takılı) bir iadeye aittir; onu "recovered" sanıp PayTR'ı
+            // atlarsak SAHTE iade olur (para dönmez ama DB'ye yazılır). O yüzden:
+            //  - tutar EŞİTSE → gerçek retry → kurtarma yolu (PayTR atla),
+            //  - tutar FARKLIYSA → REDDET; reconcileStuckRefundMarkers takılıyı finalize edince
+            //    çağıran tekrar dener. Böylece order başına her an ≤1 in-flight marker olur.
+            const markerAmount =
+              existingMarker &&
+              typeof existingMarker === "object" &&
+              typeof existingMarker.amount === "number"
+                ? existingMarker.amount
+                : undefined;
+            if (
+              markerAmount !== undefined &&
+              Math.abs(markerAmount - amountToRefund) > MONEY_EPSILON
+            ) {
+              this.logger.warn(
+                `processRefund: order ${orderId} için farklı tutarlı iade kurtarma bekliyor ` +
+                  `(marker=${markerAmount}, istenen=${amountToRefund}) — yeni iade REDDEDİLDİ; ` +
+                  `süpürme finalize edince tekrar deneyin (payment=${payment.id}).`,
+              );
+              throw new BadRequestException(
+                i18nMessage("server.payment.refundInitiationFailed"),
+              );
+            }
             this.logger.warn(
               `processRefund: refundInProgressOrders[${orderId}] zaten set — PayTR ` +
                 `çağrısı atlanıyor, yalnız persist-recovery denenecek (payment=${payment.id}).`,
@@ -346,6 +387,26 @@ export class PaymentRefundService {
           const auditHistory = existingMetadata.auditHistory || [];
           const currentRefundedOrders: Record<string, number> =
             (existingMetadata.refundedOrders as Record<string, number>) || {};
+
+          // Finding 2: MARKER-tabanlı iade idempotency. PayTR (non-bypass) yolunda marker
+          // PayTR'den ÖNCE yazılır ve finalize'da bu tx içinde silinir. Bu FOR UPDATE
+          // okumasında marker ARTIK YOKSA, EŞZAMANLI başka bir çağrı (recovery/finalize)
+          // bu iadeyi zaten finalize etmiştir → tekrar birikim (hold/ledger/refundedOrders
+          // ÇİFT tüketimi) YAPMA, idempotent no-op dön. Hem recovery-recovery hem taze-refund
+          // ⇄ recovery yarışını kapatır. (Bypass'ta marker yok → bu dal çalışmaz.)
+          if (!refundResult?.bypass) {
+            const stillMarked = (
+              existingMetadata.refundInProgressOrders as
+                Record<string, unknown> | undefined
+            )?.[orderId];
+            if (!stillMarked) {
+              this.logger.warn(
+                `processRefund: order ${orderId} iadesi eşzamanlı olarak zaten finalize ` +
+                  `edilmiş (marker yok) — idempotent no-op (payment=${payment.id}).`,
+              );
+              return null;
+            }
+          }
 
           // Kısmi iade birikimi: sipariş başına iade TOPLANIR. Grup zaten order
           // başına biriktiriyordu; MONEY-H4: tekil ödemede de biriktir — aksi halde
@@ -659,6 +720,9 @@ export class PaymentRefundService {
           return refundResponse;
         })
         .then(async (response) => {
+          // Finding 2: tx idempotent no-op döndüyse (eşzamanlı kurtarma zaten finalize
+          // etti) Sürat iptalini TEKRAR yapma — onu kazanan çağrı zaten yaptı.
+          if (!response) return response;
           // After PayTR refund + DB updates succeed, cancel the Sürat shipment.
           // Best-effort: a failure here doesn't undo the refund (money is already back).
           try {
@@ -695,11 +759,13 @@ export class PaymentRefundService {
       // MONEY-M3: PayTR iadeyi YAPMADAN patladıysak, PayTR'den önce void ettiğimiz
       // payout'ları GERİ AL (order_refunded → pending) ki satıcı ödenebilsin. PayTR
       // başardıysa (paytrRefunded=true) void kalır — para iade edildi, satıcı ödenmemeli.
-      if (!paytrRefunded) {
+      // Finding 3: yalnız BU çağrının void'lediği ID'leri restore et — önceki bir başarılı
+      // iadenin void'lediği bayat payout'u diriltip satıcıyı çift ödemeyelim.
+      if (!paytrRefunded && voidedPayoutIds.length > 0) {
         await this.prisma.payoutTransfer
           .updateMany({
             where: {
-              paymentHold: { orderId },
+              id: { in: voidedPayoutIds },
               status: "failed",
               failureReason: "order_refunded",
             },

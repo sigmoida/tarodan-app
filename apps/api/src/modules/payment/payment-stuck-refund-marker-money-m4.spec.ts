@@ -46,12 +46,16 @@ describe("PaymentReconciliationService.reconcileStuckRefundMarkers — MONEY-M4"
     expect(res).toEqual({ checked: 1, recovered: 1 });
   });
 
-  it("zaten finalize edilmiş (refundedOrders'ta var): atlanır", async () => {
+  it("Finding 1: marker VAR + refundedOrders'ta ÖNCEKİ kısmi iade var → yine de recover eder", async () => {
+    // Çoklu kısmi iade: partial#1 (50) finalize oldu (refundedOrders={o1:50}, marker silindi),
+    // partial#2 (200) PayTR yapıldı ama tx patladı → marker={o1:{200}} DURUYOR. Eski buggy
+    // filtre `o1 in refundedOrders` yüzünden bunu ATLIYORDU (200 havada kalırdı). Artık marker
+    // varlığı = takılı → recover eder (marker'daki 200 tutarıyla).
     const { service, paymentRefund } = makeService([
       {
         id: "pay-1",
         metadata: {
-          refundInProgressOrders: { o1: { amount: 50 } },
+          refundInProgressOrders: { o1: { amount: 200, at: "x" } },
           refundedOrders: { o1: 50 },
         },
       },
@@ -59,8 +63,8 @@ describe("PaymentReconciliationService.reconcileStuckRefundMarkers — MONEY-M4"
 
     const res = await service.reconcileStuckRefundMarkers();
 
-    expect(paymentRefund.processRefund).not.toHaveBeenCalled();
-    expect(res).toEqual({ checked: 0, recovered: 0 });
+    expect(paymentRefund.processRefund).toHaveBeenCalledWith("o1", 200);
+    expect(res).toEqual({ checked: 1, recovered: 1 });
   });
 
   it("eski (timestamp) marker formatı: tutar undefined ile (tam iade) çağırır", async () => {
