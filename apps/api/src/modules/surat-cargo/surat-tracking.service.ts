@@ -459,10 +459,7 @@ export class SuratTrackingService {
       this.logger.error(`Order barcode retry failed: ${e?.message}`);
     }
     try {
-      trade = await this.retryPendingTradeInboundBarcodes(
-        createdAfter,
-        createdBefore,
-      );
+      trade = await this.retryPendingTradeBarcodes(createdAfter, createdBefore);
     } catch (e: any) {
       this.logger.error(`Trade barcode retry failed: ${e?.message}`);
     }
@@ -596,13 +593,16 @@ export class SuratTrackingService {
     return { retried, failed };
   }
 
-  /** Takas depoya-giriş (to_warehouse) bacakları kodsuzları — TradeShipmentService
-   * kendi payload builder'ıyla tek kaydı yeniden dener. */
-  private async retryPendingTradeInboundBarcodes(
+  /** Takas bacakları kodsuzları: depoya-giriş (to_warehouse) bacaklarını
+   * TradeShipmentService, iade (return: reject RET-INI/REC + stuck RET-STK
+   * DRAFT'ları) bacaklarını AdminTradeWarehouseService kendi payload
+   * builder'larıyla yeniden dener. (H3: return DRAFT'ları önceden hiçbir
+   * otomatik mekanizmanın kapsamında değildi.) */
+  private async retryPendingTradeBarcodes(
     createdAfter: Date,
     createdBefore: Date,
   ): Promise<BarcodeRetryStat> {
-    const candidates = await this.prisma.tradeShipment.findMany({
+    const inbound = await this.prisma.tradeShipment.findMany({
       where: {
         carrier: "surat",
         providerTrackingId: null,
@@ -617,32 +617,83 @@ export class SuratTrackingService {
       select: { id: true },
       take: SuratTrackingService.RETRY_BATCH,
     });
-    if (candidates.length === 0) return { retried: 0, failed: 0 };
 
-    const { TradeShipmentService } =
-      await import("../trade/trade-shipment.service");
-    const svc = this.moduleRef.get(TradeShipmentService, { strict: false });
-    if (!svc) {
-      this.logger.warn(
-        `TradeShipmentService not resolvable; skipping ${candidates.length} trade barcode retries`,
-      );
-      return { retried: 0, failed: candidates.length };
+    // Return DRAFT'ları: carrier "pending" (hiç submit olmamış) veya "surat" +
+    // kodsuz (submit sonrası persist patlamış). Manuel fallback ("Tarodan
+    // Warehouse") bilinçli — sorguya girmez.
+    const returns = await this.prisma.tradeShipment.findMany({
+      where: {
+        leg: "return",
+        providerTrackingId: null,
+        carrier: { in: ["pending", "surat"] },
+        status: {
+          in: [ShipmentStatus.pending, ShipmentStatus.label_created],
+        },
+        createdAt: { gte: createdAfter, lte: createdBefore },
+      },
+      select: { id: true },
+      take: SuratTrackingService.RETRY_BATCH,
+    });
+
+    if (inbound.length === 0 && returns.length === 0) {
+      return { retried: 0, failed: 0 };
     }
 
     let retried = 0;
     let failed = 0;
-    for (const ts of candidates) {
-      try {
-        const ok = await svc.retryInboundBarcode(ts.id);
-        if (ok) retried++;
-        else failed++;
-      } catch (e: any) {
-        failed++;
-        this.logger.error(
-          `Retry trade barcode threw trade-shipment=${ts.id}: ${e?.message}`,
+
+    if (inbound.length > 0) {
+      const { TradeShipmentService } =
+        await import("../trade/trade-shipment.service");
+      const svc = this.moduleRef.get(TradeShipmentService, { strict: false });
+      if (!svc) {
+        this.logger.warn(
+          `TradeShipmentService not resolvable; skipping ${inbound.length} trade inbound barcode retries`,
         );
+        failed += inbound.length;
+      } else {
+        for (const ts of inbound) {
+          try {
+            const ok = await svc.retryInboundBarcode(ts.id);
+            if (ok) retried++;
+            else failed++;
+          } catch (e: any) {
+            failed++;
+            this.logger.error(
+              `Retry trade barcode threw trade-shipment=${ts.id}: ${e?.message}`,
+            );
+          }
+        }
       }
     }
+
+    if (returns.length > 0) {
+      const { AdminTradeWarehouseService } =
+        await import("../admin/admin-trade-warehouse.service");
+      const warehouseSvc = this.moduleRef.get(AdminTradeWarehouseService, {
+        strict: false,
+      });
+      if (!warehouseSvc) {
+        this.logger.warn(
+          `AdminTradeWarehouseService not resolvable; skipping ${returns.length} trade return barcode retries`,
+        );
+        failed += returns.length;
+      } else {
+        for (const ts of returns) {
+          try {
+            const ok = await warehouseSvc.retryReturnBarcode(ts.id);
+            if (ok) retried++;
+            else failed++;
+          } catch (e: any) {
+            failed++;
+            this.logger.error(
+              `Retry trade return barcode threw trade-shipment=${ts.id}: ${e?.message}`,
+            );
+          }
+        }
+      }
+    }
+
     return { retried, failed };
   }
 

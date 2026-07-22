@@ -20,7 +20,7 @@
   **Çözüm:** poll path'te ilk `to_warehouse` teslimatında `firstWarehouseArrivalAt` set et
   (admin path ile aynı semantik).
 
-- [ ] **H3 — Takas return bacakları Sürat timeout'unda kalıcı takılıyor**
+- [x] **H3 — Takas return bacakları Sürat timeout'unda kalıcı takılıyor**
   Reject DRAFT return satırı kurup Sürat'a tx dışında submit ediyor; timeout →
   idempotency guard (`returning && shipments>=2`) sonraki reject'i kısa devre yapıyor,
   retry job yalnız `to_warehouse` topluyor, poller `trackingNumber:null`'ı atlıyor →
