@@ -69,7 +69,7 @@
   ikinci Shipment yaratabilir (`orderId @unique` çakışması).
   **Çözüm:** processor'ı sil (kuyruk kaydı DI için gerekiyorsa kalabilir).
 
-- [ ] **M7 — TOCTOU stale-snapshot penceresi (terminal-dışı statüler)**
+- [x] **M7 — TOCTOU stale-snapshot penceresi (terminal-dışı statüler)**
   Poller/webhook baştaki snapshot'a göre guard'layıp blind write yapıyor →
   yarışta `delivered` üzerine `in_transit` yazılabilir.
   **Çözüm:** compare-and-swap: `updateMany({ id, status: eskiStatus })`, count 0 → skip.

@@ -920,11 +920,21 @@ export class SuratTrackingService {
       }
     }
 
-    // Update shipment
-    await this.prisma.shipment.update({
-      where: { id: shipment.id },
+    // Update shipment — M7 CAS: canTransition guard'ı baştaki snapshot'a göre
+    // çalışıyor; arada başka bir yazar (webhook, admin) statüyü değiştirdiyse bu
+    // güncelleme stale'dir. Snapshot'ı where'e koy: count 0 → hiçbir alanı yazma,
+    // sonraki tick taze snapshot'la işler. (delivered→in_transit regresyonu gibi
+    // terminal-dışı yarış pencerelerini kapatır.)
+    const cas = await this.prisma.shipment.updateMany({
+      where: { id: shipment.id, status: shipment.status },
       data: updateData,
     });
+    if (cas.count === 0) {
+      this.logger.warn(
+        `Skipping stale shipment update for ${shipment.id}: status changed concurrently (snapshot=${shipment.status})`,
+      );
+      return false;
+    }
 
     // Sync movement events (Hareketler)
     await this.syncShipmentEvents(shipment.id, gonderi);
@@ -1260,10 +1270,17 @@ export class SuratTrackingService {
           : null) ?? new Date();
     }
 
-    await this.prisma.tradeShipment.update({
-      where: { id: tradeShipment.id },
+    // M7 CAS: order path ile aynı — stale snapshot'la yazma.
+    const cas = await this.prisma.tradeShipment.updateMany({
+      where: { id: tradeShipment.id, status: tradeShipment.status },
       data: updateData,
     });
+    if (cas.count === 0) {
+      this.logger.warn(
+        `Skipping stale trade-shipment update for ${tradeShipment.id}: status changed concurrently (snapshot=${tradeShipment.status})`,
+      );
+      return false;
+    }
 
     await this.syncTradeShipmentEvents(tradeShipment.id, gonderi);
 

@@ -299,14 +299,23 @@ export class ShippingService {
         this.trackingUrls[ShippingProvider.surat]) + dto.trackingNumber;
 
     const result = await this.prisma.$transaction(async (tx) => {
-      // Update shipment
-      const updatedShipment = await tx.shipment.update({
-        where: { id: shipmentId },
+      // Update shipment — M7 CAS: #86 guard'ı yukarıda snapshot'a göre bakıldı;
+      // arada webhook/poller delivered yazdıysa picked_up'a geri sarmayalım.
+      const cas = await tx.shipment.updateMany({
+        where: { id: shipmentId, status: shipment.status },
         data: {
           trackingNumber: dto.trackingNumber,
           trackingUrl,
           status: ShipmentStatus.picked_up,
         },
+      });
+      if (cas.count === 0) {
+        throw new BadRequestException(
+          "Kargo durumu az önce güncellendi; sayfayı yenileyip tekrar deneyin.",
+        );
+      }
+      const updatedShipment = await tx.shipment.findUniqueOrThrow({
+        where: { id: shipmentId },
         include: { events: true },
       });
 
@@ -397,11 +406,18 @@ export class ShippingService {
     // artık tek kanonik handler'da (paymentService.handleOrderDelivered) — geldiği yola göre
     // farklı sonuç veren eski kopya mantık kaldırıldı.
     const result = await this.prisma.$transaction(async (tx) => {
-      // Update shipment status
-      await tx.shipment.update({
-        where: { id: shipment.id },
+      // Update shipment status — M7 CAS: canTransition yukarıda snapshot'a göre
+      // bakıldı; arada poller/admin statüyü değiştirdiyse yazma, ignore dön.
+      const cas = await tx.shipment.updateMany({
+        where: { id: shipment.id, status: shipment.status },
         data: { status: newStatus },
       });
+      if (cas.count === 0) {
+        this.logger.warn(
+          `Ignoring stale provider webhook for ${shipment.id}: status changed concurrently (snapshot=${shipment.status})`,
+        );
+        return { status: "ignored" };
+      }
 
       // Create event
       await tx.shipmentEvent.create({
