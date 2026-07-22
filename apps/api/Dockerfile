@@ -21,11 +21,13 @@ COPY apps/api/prisma ./apps/api/prisma/
 # Install dependencies (shamefully-hoist: flat node_modules, no symlinks)
 RUN pnpm install --frozen-lockfile --shamefully-hoist
 
-# GUARD: sharp'ın platform binary'si (@img/sharp-linuxmusl-*) OPTIONAL dependency
-# olarak iner ve pnpm, optional fetch başarısız olursa build'i DÜŞÜRMEZ — yalnız
-# warn basıp devam eder. Böyle bir imaj "başarıyla" deploy olup runtime'da
-# "Image processing (sharp) is not available" (400) üretti. Sharp'sız imaj asla
-# çıkmasın: burada require ile doğrula, inmemişse build burada patlasın.
+# GUARD: sharp çalışmıyorsa imaj ÇIKMASIN — require ile burada doğrula.
+# Yaşanan vaka: sharp 0.35.x'in hazır binary'leri x86-64-v2 mikro-mimarisi
+# istiyor, Coolify host CPU'su v1 → binary indi ama yüklenirken "Unsupported
+# CPU" ile öldü; imaj yine de "başarıyla" deploy olup her görsel yüklemede 400
+# üretti (sharp bu yüzden 0.34.5'e sabit — bkz. dependabot.yml ignore).
+# Bu guard hem CPU uyumsuzluğunu hem de pnpm'in sessizce atladığı başarısız
+# optional-dependency indirmesini build aşamasında yakalar.
 RUN node -e "const s = require('sharp'); console.log('sharp OK, libvips', s.versions.vips)"
 
 
