@@ -192,7 +192,12 @@
       timeout: `expireStaleWaitForDelivery` sweep (REFUND_WAIT_DELIVERY_MAX_DAYS=30) refund-scheduler'a
       eklendi → sipariş hiç teslim olmayınca donuk kalan hold çözülür. (3) `return_shipment_open`
       zaten D25 (`expireStaleOpenReturns`) ile unfreeze ediyor — doğrulandı. **Spec:** 5 MONEY-H6 testi.
-- [ ] **4.2 — `finalizeRefundForReturnedShipment` concurrency-safe (MONEY-M1)** atomik marker/CAS (3 çağıran: cron + Sürat sync + admin).
+- [x] **4.2 — `finalizeRefundForReturnedShipment` concurrency-safe (MONEY-M1)** ✓ Atomik
+      CLAIM: `updateMany where status=return_delivered → refunded` (count===0 → başka çağıran
+      aldı, tekrarlama). Yalnız kazanan processRefund + finalize yan-etkilerini (order-update,
+      history, çift bildirim/mail) yapar. processRefund patlarsa claim `return_delivered`'a geri
+      alınır → cron retry eder. (Money-safety zaten processRefund'ın refundInProgress marker'ında.)
+      **Spec:** 2 MONEY-M1 testi.
 - [ ] **4.3 — Payout void yarışları (MONEY-M2/M3)** iade sırasında oluşan `pending` payout void; PayTR fail'de payout geri-al; `createPayoutsForReleasedHolds` açık-iade/frozen kontrol etsin.
 - [ ] **4.4 — PayTR-iade/DB-fail reconciliation (MONEY-M4)** `refundInProgressOrders` marker'ını tarayan bir sweep (bugün hiçbir job taramıyor).
 - [ ] **4.5 — Trade dispute/release sıralaması (MONEY-M5/M6/M8)** `resolveDispute` doğrulamadan önce iade etmesin; release öncesi statü re-check; admin `releaseTradePaymentHold` trade-status guard'ı.

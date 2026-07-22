@@ -590,17 +590,57 @@ export class RefundService {
     if (!rr) throw new NotFoundException(i18nMessage("server.refund.notFound"));
     if (rr.status === RefundRequestStatus.refunded) return rr;
 
-    const refundResult = await this.paymentService.processRefund(
-      rr.orderId,
-      Number(rr.amount),
-      { skipRefundEvent: true, refundQuantity: rr.refundQuantity }, // REFUND_COMPLETED'ı aşağıda kendimiz gönderiyoruz
-    );
+    // MONEY-M1: Atomik CLAIM. Bu metod 3 yoldan EŞZAMANLI çağrılabilir
+    // (finalizeReturnedShipments cron + Sürat sync + admin forceFinalize). Eski
+    // `status===refunded` guard'ı TOCTOU'ya açıktı: ikisi de `return_delivered` okuyup
+    // processRefund + finalize yan-etkilerini (order-update, history, ÇİFT bildirim/mail)
+    // tekrarlardı. Yalnız BİR çağıran `return_delivered→refunded` geçişini kazanır;
+    // count===0 → başka biri aldı → tekrarlama. (processRefund'ın kendi refundInProgress
+    // marker'ı PayTR çift-çağrısını zaten engelliyor; bu CAS finalize yan-etkilerini tekilleştirir.)
+    const claimed = await this.prisma.refundRequest.updateMany({
+      where: {
+        id: refundRequestId,
+        status: RefundRequestStatus.return_delivered,
+      },
+      data: { status: RefundRequestStatus.refunded, refundedAt: new Date() },
+    });
+    if (claimed.count === 0) {
+      return (
+        (await this.prisma.refundRequest.findUnique({
+          where: { id: refundRequestId },
+        })) ?? rr
+      );
+    }
 
+    let refundResult: { providerRefundId: string };
+    try {
+      refundResult = await this.paymentService.processRefund(
+        rr.orderId,
+        Number(rr.amount),
+        { skipRefundEvent: true, refundQuantity: rr.refundQuantity }, // REFUND_COMPLETED'ı aşağıda kendimiz gönderiyoruz
+      );
+    } catch (err) {
+      // processRefund BAŞARISIZ → claim'i GERİ AL (return_delivered) ki cron retry etsin.
+      // (Money iade edilmedi; yalnız claim kilidini bıraktık.)
+      await this.prisma.refundRequest
+        .updateMany({
+          where: {
+            id: refundRequestId,
+            status: RefundRequestStatus.refunded,
+          },
+          data: {
+            status: RefundRequestStatus.return_delivered,
+            refundedAt: null,
+          },
+        })
+        .catch(() => undefined);
+      throw err;
+    }
+
+    // Money iade EDİLDİ — buradan sonrası best-effort (claim geri ALINMAZ).
     const updated = await this.prisma.refundRequest.update({
       where: { id: rr.id },
       data: {
-        status: RefundRequestStatus.refunded,
-        refundedAt: new Date(),
         providerRefundId: refundResult.providerRefundId,
         returnDeliveredAt: rr.returnDeliveredAt ?? new Date(),
       },
