@@ -198,7 +198,13 @@
       history, çift bildirim/mail) yapar. processRefund patlarsa claim `return_delivered`'a geri
       alınır → cron retry eder. (Money-safety zaten processRefund'ın refundInProgress marker'ında.)
       **Spec:** 2 MONEY-M1 testi.
-- [ ] **4.3 — Payout void yarışları (MONEY-M2/M3)** iade sırasında oluşan `pending` payout void; PayTR fail'de payout geri-al; `createPayoutsForReleasedHolds` açık-iade/frozen kontrol etsin.
+- [x] **4.3 — Payout void yarışları (MONEY-M2/M3)** ✓ (A) `createPayoutsForReleasedHolds`
+      artık `frozenByRefundId: null` + siparişte AÇIK iade talebi varsa payout OLUŞTURMUYOR
+      (yarış: hold release edilip hemen sonra iade açılırsa freeze `held` hedeflediğinden
+      `released` hold'u kaçırıp çift-kayıp yaratıyordu). (B) processRefund `paytrRefunded`
+      flag'i: PayTR iadeyi YAPMADAN patlarsa PayTR-öncesi void'lenen payout'lar
+      (`order_refunded`) `pending`'e GERİ ALINIYOR (satıcı ödenebilsin); PayTR başardıysa
+      void kalıyor. **Spec:** 2 MONEY-M3 testi.
 - [ ] **4.4 — PayTR-iade/DB-fail reconciliation (MONEY-M4)** `refundInProgressOrders` marker'ını tarayan bir sweep (bugün hiçbir job taramıyor).
 - [ ] **4.5 — Trade dispute/release sıralaması (MONEY-M5/M6/M8)** `resolveDispute` doğrulamadan önce iade etmesin; release öncesi statü re-check; admin `releaseTradePaymentHold` trade-status guard'ı.
 - [ ] **4.6 — Düşük (MONEY-L1/L3/L4/L7):** `manualRefund` grup/trade null-orderId; ledger `waived` drift; stopaj kısmi; birleşik gelir defteri notu (Faz 6'ya bağlanır).

@@ -196,6 +196,10 @@ export class PaymentRefundService {
       );
     }
 
+    // MONEY-M3: PayTR gerçekten iade etti mi? Payout'ları PayTR'den ÖNCE void ettik
+    // (order_refunded). Refund PayTR'de PATLARSA (para çıkmadı) catch'te void'i geri
+    // alırız ki satıcı ödenebilsin. PayTR başardıysa (bypass dahil) geri ALMAYIZ.
+    let paytrRefunded = false;
     try {
       // Call provider refund API
       let refundResult: any;
@@ -313,6 +317,9 @@ export class PaymentRefundService {
           }),
         );
       }
+
+      // PayTR (veya bypass) iade BAŞARILI — bu noktadan sonra void'i geri ALMA.
+      paytrRefunded = true;
 
       // Update payment status after successful refund
       let einvoiceReverse = false; // tam iade → e-Arşiv iptal/iade tetiği (post-commit)
@@ -657,6 +664,21 @@ export class PaymentRefundService {
       this.logger.error(
         `Refund error for payment ${payment.id}: ${error.message}`,
       );
+      // MONEY-M3: PayTR iadeyi YAPMADAN patladıysak, PayTR'den önce void ettiğimiz
+      // payout'ları GERİ AL (order_refunded → pending) ki satıcı ödenebilsin. PayTR
+      // başardıysa (paytrRefunded=true) void kalır — para iade edildi, satıcı ödenmemeli.
+      if (!paytrRefunded) {
+        await this.prisma.payoutTransfer
+          .updateMany({
+            where: {
+              paymentHold: { orderId },
+              status: "failed",
+              failureReason: "order_refunded",
+            },
+            data: { status: "pending", failureReason: null },
+          })
+          .catch(() => undefined);
+      }
       throw error;
     }
   }
