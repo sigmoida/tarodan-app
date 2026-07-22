@@ -348,11 +348,13 @@ export class SuratTrackingService {
     // Sürat sorgusu OzelKargoTakipNo ile yapılır = shipment.trackingNumber
     // (oto-oluşturmada order.orderNumber olarak yazılır). providerTrackingId Sürat'ın
     // KargoTakipNo'sudur (WebSiparisKodu DEĞİL), orderId ise iç UUID — ikisi de yanlış
-    // referans olup "Gonderiler boş" döndürür. Return/trade poll'larıyla tutarlı: her
-    // zaman trackingNumber ile sorgula. (trackingNumber yoksa hiç Sürat'a düşmemiş
-    // manuel kayıt; orderId fallback'i yalnız boş sonuç verir, zarar vermez.) (#84)
-    const webSiparisKodu = shipment.trackingNumber || shipment.orderId;
-    const data = await this.fetchTrackingInfo(webSiparisKodu);
+    // referans olup "Gonderiler boş" döndürür. (#84)
+    // trackingNumber yoksa hiç Sürat'a düşmemiş manuel kayıt — eski orderId
+    // fallback'i her zaman boş sonuç veriyordu; hiç sorma. (N3)
+    if (!shipment.trackingNumber) {
+      return false;
+    }
+    const data = await this.fetchTrackingInfo(shipment.trackingNumber);
 
     if (!data || data.Gonderiler.length === 0) {
       return false;
@@ -682,17 +684,22 @@ export class SuratTrackingService {
       updateData.providerTrackingId = gonderi.KargoTakipNo;
     }
 
-    // Delivery info
+    // Delivery info. H1: tarih parse edilemezse teslim gerçeği kaybolmasın —
+    // yaklaşık zaman olarak şimdi'yi yaz (Invalid Date update'i patlatıyordu).
     if (isDelivered && gonderi.TeslimTarihi) {
-      updateData.deliveredAt = this.parseSuratDate(gonderi.TeslimTarihi);
+      updateData.deliveredAt =
+        this.parseSuratDate(gonderi.TeslimTarihi) ?? new Date();
     }
     if (gonderi.TeslimAlan) {
       updateData.receivedBy = gonderi.TeslimAlan;
     }
 
-    // Estimated delivery
+    // Estimated delivery — parse edilemiyorsa hiç yazma (kritik olmayan alan).
     if (gonderi.PlanlananTeslimTarihi && !shipment.estimatedDelivery) {
-      updateData.estimatedDelivery = new Date(gonderi.PlanlananTeslimTarihi);
+      const estimated = this.parseSuratDate(gonderi.PlanlananTeslimTarihi);
+      if (estimated) {
+        updateData.estimatedDelivery = estimated;
+      }
     }
 
     // Return info
@@ -819,36 +826,63 @@ export class SuratTrackingService {
       existingEvents.map((e) => `${e.occurredAt.toISOString()}|${e.status}`),
     );
 
-    const newEvents = gonderi.Hareketler.filter((h) => {
-      const key = `${new Date(h.IslemTarihi).toISOString()}|${h.Islem}`;
-      return !existingSet.has(key);
+    // H1: geçersiz IslemTarihi'nde .toISOString() RangeError fırlatıp senkronu
+    // düşürüyordu — parse edilemeyen hareket satırını atla, kalanlar işlensin.
+    const parsedEvents = gonderi.Hareketler.flatMap((h) => {
+      const occurredAt = this.parseSuratDate(h.IslemTarihi);
+      if (!occurredAt) {
+        this.logger.warn(
+          `Skipping shipment event with unparseable IslemTarihi "${h.IslemTarihi}" for ${shipmentId}`,
+        );
+        return [];
+      }
+      return [{ h, occurredAt }];
     });
+
+    const newEvents = parsedEvents.filter(
+      ({ h, occurredAt }) =>
+        !existingSet.has(`${occurredAt.toISOString()}|${h.Islem}`),
+    );
 
     if (newEvents.length === 0) return;
 
     await this.prisma.shipmentEvent.createMany({
-      data: newEvents.map((h) => ({
+      data: newEvents.map(({ h, occurredAt }) => ({
         shipmentId,
         status: h.Islem,
         description: h.Aciklama,
         location: h.HareketYeri,
-        occurredAt: new Date(h.IslemTarihi),
+        occurredAt,
       })),
     });
   }
 
   /**
-   * Parse Sürat date format: "25/07/2024" or ISO format.
+   * Parse Sürat date format: "25/07/2024", "25.07.2024" (opsiyonel saat) veya ISO.
+   * H1: ASLA Invalid Date döndürmez — tanınmayan format `null` döner. Eskiden
+   * Invalid Date, prisma update'ine sızıp senkronu patlatıyor ve teslim edilen
+   * siparişte `handleOrderDelivered` (escrow) hiç çalışmadan her poll'da yeniden
+   * throw ediyordu. Çağıran taraf null'da güvenli fallback'e düşer.
    */
-  private parseSuratDate(dateStr: string): Date {
-    // Try DD/MM/YYYY format
-    const ddmmyyyy = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-    if (ddmmyyyy) {
-      return new Date(
-        `${ddmmyyyy[3]}-${ddmmyyyy[2]}-${ddmmyyyy[1]}T00:00:00.000Z`,
+  private parseSuratDate(dateStr: string): Date | null {
+    // DD/MM/YYYY veya DD.MM.YYYY (+ opsiyonel HH:mm[:ss])
+    const ddmmyyyy = dateStr
+      .trim()
+      .match(
+        /^(\d{1,2})[./](\d{1,2})[./](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/,
       );
+    if (ddmmyyyy) {
+      const [, d, m, y, hh, mm, ss] = ddmmyyyy;
+      const iso = `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}T${(hh ?? "0").padStart(2, "0")}:${mm ?? "00"}:${ss ?? "00"}.000Z`;
+      const parsed = new Date(iso);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
     }
-    return new Date(dateStr);
+    const parsed = new Date(dateStr);
+    if (Number.isNaN(parsed.getTime())) {
+      this.logger.warn(`Unparseable Surat date: "${dateStr}"`);
+      return null;
+    }
+    return parsed;
   }
 
   /**
@@ -918,10 +952,11 @@ export class SuratTrackingService {
 
     await refundService.applyReturnTrackingUpdate(refundRequestId, {
       status: newStatus,
+      // H1: parse edilemeyen tarihte teslim gerçeği kaybolmasın — şimdi'ye düş.
       deliveredAt: isReturnDelivered
-        ? gonderi.TeslimTarihi
-          ? this.parseSuratDate(gonderi.TeslimTarihi)
-          : new Date()
+        ? ((gonderi.TeslimTarihi
+            ? this.parseSuratDate(gonderi.TeslimTarihi)
+            : null) ?? new Date())
         : undefined,
     });
 
@@ -994,9 +1029,11 @@ export class SuratTrackingService {
     }
 
     if (isDelivered && !tradeShipment.deliveredAt) {
-      updateData.deliveredAt = gonderi.TeslimTarihi
-        ? this.parseSuratDate(gonderi.TeslimTarihi)
-        : new Date();
+      // H1: parse edilemeyen tarihte teslim bilgisi kaybolmasın — şimdi'ye düş.
+      updateData.deliveredAt =
+        (gonderi.TeslimTarihi
+          ? this.parseSuratDate(gonderi.TeslimTarihi)
+          : null) ?? new Date();
     }
 
     await this.prisma.tradeShipment.update({
@@ -1086,20 +1123,32 @@ export class SuratTrackingService {
       existingEvents.map((e) => `${e.eventTime.toISOString()}|${e.status}`),
     );
 
-    const newEvents = gonderi.Hareketler.filter((h) => {
-      const key = `${new Date(h.IslemTarihi).toISOString()}|${h.Islem}`;
-      return !existingSet.has(key);
+    // H1: geçersiz IslemTarihi → RangeError → senkron düşer; satırı atla.
+    const parsedEvents = gonderi.Hareketler.flatMap((h) => {
+      const eventTime = this.parseSuratDate(h.IslemTarihi);
+      if (!eventTime) {
+        this.logger.warn(
+          `Skipping trade-shipment event with unparseable IslemTarihi "${h.IslemTarihi}" for ${tradeShipmentId}`,
+        );
+        return [];
+      }
+      return [{ h, eventTime }];
     });
+
+    const newEvents = parsedEvents.filter(
+      ({ h, eventTime }) =>
+        !existingSet.has(`${eventTime.toISOString()}|${h.Islem}`),
+    );
 
     if (newEvents.length === 0) return;
 
     await this.prisma.tradeShipmentEvent.createMany({
-      data: newEvents.map((h) => ({
+      data: newEvents.map(({ h, eventTime }) => ({
         tradeShipmentId,
         status: h.Islem,
         description: h.Aciklama,
         location: h.HareketYeri,
-        eventTime: new Date(h.IslemTarihi),
+        eventTime,
       })),
     });
   }
