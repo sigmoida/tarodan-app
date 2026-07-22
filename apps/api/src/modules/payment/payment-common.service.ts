@@ -340,6 +340,31 @@ export class PaymentCommonService {
    * taşır (kullanıcı eski oid'le öderse callback yine eşleşir). process-direct daha sonra
    * kendi oid'iyle bunu tazeler (aynı history mantığı).
    */
+  /**
+   * FLOW-H1/M3: Bir ödemenin PayTR durum-sorgusuyla denenecek TÜM oid'lerini döndürür:
+   * güncel `providerConversationId` + `metadata.merchantOidHistory`'deki rotate edilmiş
+   * eski oid'ler (dedup, trimli). Re-init oid'i döndürdüğünden capture ESKİ bir oid'de
+   * olmuş olabilir; tek oid sorgusu bunu kaçırır (çift-çekim / sahipsiz capture). Çift-çekim
+   * guard'ı (verifyPaymentFromClient) ve reconciler bu listeyi tarar.
+   */
+  collectPaymentOids(payment: {
+    providerConversationId: string | null;
+    metadata: unknown;
+  }): string[] {
+    const oids: string[] = [];
+    const current = (payment.providerConversationId || "").trim();
+    if (current) oids.push(current);
+    const meta = (payment.metadata as Record<string, unknown>) || {};
+    const history = meta.merchantOidHistory;
+    if (Array.isArray(history)) {
+      for (const h of history) {
+        const t = String(h ?? "").trim();
+        if (t && !oids.includes(t)) oids.push(t);
+      }
+    }
+    return oids;
+  }
+
   async assignMerchantOid(
     paymentId: string,
     baseOidRaw: string,

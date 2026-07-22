@@ -371,47 +371,72 @@ export class PaymentLifecycleService {
       return { completed: false, status: "unsupported_provider" };
     }
 
-    const oid = (payment.providerConversationId || "").trim();
-    if (!oid) {
+    // FLOW-H1: Çift-çekim guard'ı TÜM oid'leri tarar (güncel + merchantOidHistory).
+    // Re-init sonrası providerConversationId yeni oid'e döner ama capture ESKİ oid'de
+    // olmuş olabilir; yalnız güncel oid'i sormak bunu kaçırır → çağıran ikinci kez çeker
+    // (çift çekim). Herhangi bir oid'de çekilmiş capture bulursak ödemeyi tamamlayıp
+    // "zaten ödendi" döneriz → ikinci çekim engellenir.
+    const oids = this.paymentCommon.collectPaymentOids(payment);
+    if (oids.length === 0) {
       return { completed: false, status: "no_provider_oid" };
     }
 
-    let inquiry = await this.paymentProviders.resolve().queryPaymentStatus(oid);
-    if (!inquiry.ok && oid.includes("-")) {
-      inquiry = await this.paymentProviders
-        .resolve()
-        .queryPaymentStatus(oid.replace(/-/g, ""));
-    }
-
-    if (!inquiry.ok) {
-      return { completed: false, status: "paytr_not_found" };
-    }
-
-    // O16: Tolerans eşiğini tüm yollarda BİRLEŞTİR (eskiden burada 0.01, reconcile/mismatch'te
-    // 0.05 idi → aynı ödeme için tutarsız kabul/ret). Tek config: PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL.
+    // O16: Tolerans eşiğini tüm yollarda BİRLEŞTİR (tek config).
     const tolerance = parseFloat(
       this.configService.get("PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL") || "0.05",
     );
     const ourAmount = Number(payment.amount);
-    if (Math.abs(inquiry.paymentTotalTl - ourAmount) > tolerance) {
-      this.logger.warn(
-        `verifyPaymentFromClient amount mismatch payment=${payment.id} oid=${oid} paytr=${inquiry.paymentTotalTl} ours=${ourAmount}`,
-      );
-      return { completed: false, status: "amount_mismatch" };
+
+    let capturedOid: string | null = null;
+    let capturedInquiry: {
+      paymentTotalTl: number;
+      paymentDate?: string | null;
+    } | null = null;
+    let sawMismatch = false;
+    for (const candidateOid of oids) {
+      let inquiry = await this.paymentProviders
+        .resolve()
+        .queryPaymentStatus(candidateOid);
+      if (!inquiry.ok && candidateOid.includes("-")) {
+        inquiry = await this.paymentProviders
+          .resolve()
+          .queryPaymentStatus(candidateOid.replace(/-/g, ""));
+      }
+      if (!inquiry.ok) continue;
+      // Bu oid PayTR'da çekilmiş. Tutar toleransı tutmuyorsa bu oid'i sayma ama
+      // diğer oid'leri taramaya devam et (mismatch'i işaretle).
+      if (Math.abs(inquiry.paymentTotalTl - ourAmount) > tolerance) {
+        this.logger.warn(
+          `verifyPaymentFromClient amount mismatch payment=${payment.id} oid=${candidateOid} paytr=${inquiry.paymentTotalTl} ours=${ourAmount}`,
+        );
+        sawMismatch = true;
+        continue;
+      }
+      capturedOid = candidateOid;
+      capturedInquiry = inquiry;
+      break;
+    }
+
+    if (!capturedOid || !capturedInquiry) {
+      return {
+        completed: false,
+        status: sawMismatch ? "amount_mismatch" : "paytr_not_found",
+      };
     }
 
     const txnRef =
-      inquiry.paymentDate != null && inquiry.paymentDate !== ""
-        ? `paytr:${oid}:${inquiry.paymentDate}`
-        : `paytr:${oid}`;
+      capturedInquiry.paymentDate != null && capturedInquiry.paymentDate !== ""
+        ? `paytr:${capturedOid}:${capturedInquiry.paymentDate}`
+        : `paytr:${capturedOid}`;
 
     const did = await this.paymentFulfillment.processSuccessfulPayment(
       payment,
       txnRef,
+      capturedOid, // FLOW-M5: çekilen oid'e senkronla
     );
     if (did) {
       this.logger.log(
-        `verifyPaymentFromClient completed payment=${payment.id} oid=${oid}`,
+        `verifyPaymentFromClient completed payment=${payment.id} oid=${capturedOid}`,
       );
       return { completed: true, status: "completed_now" };
     }

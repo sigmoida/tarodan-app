@@ -965,23 +965,35 @@ export class PaymentReconciliationService {
 
     for (const row of candidates) {
       checked++;
-      const oid = row.providerConversationId as string;
+      const ourAmount = Number(row.amount);
       try {
-        const inquiry = await this.paymentProviders
-          .resolve()
-          .queryPaymentStatus(oid);
-        if (!inquiry.ok) {
-          continue;
+        // FLOW-M3: TÜM oid'leri tara (güncel providerConversationId + merchantOidHistory).
+        // Capture rotate edilmiş ESKİ bir oid'de olmuş olabilir; yalnız güncel oid'i
+        // sormak sahipsiz capture'ı kaçırırdı. İlk çekilmiş + tutar-tutan oid capture'dır.
+        const oids = this.paymentCommon.collectPaymentOids(row);
+        let capturedOid: string | null = null;
+        let capturedInquiry: {
+          paymentTotalTl: number;
+          paymentDate?: string | null;
+        } | null = null;
+        for (const candidateOid of oids) {
+          const inquiry = await this.paymentProviders
+            .resolve()
+            .queryPaymentStatus(candidateOid);
+          if (!inquiry.ok) continue;
+          if (Math.abs(inquiry.paymentTotalTl - ourAmount) > tolerance) {
+            // O10: tutar uyuşmazlığı → ALARM (yüksek öncelik), completed YAPMA.
+            this.logger.error(
+              `ALARM: PayTR reconcile tutar uyuşmazlığı — payment=${row.id} oid=${candidateOid} ` +
+                `paytr=${inquiry.paymentTotalTl} ours=${ourAmount}. Ödeme tamamlanmadı, manuel inceleme gerekir.`,
+            );
+            continue;
+          }
+          capturedOid = candidateOid;
+          capturedInquiry = inquiry;
+          break;
         }
-
-        const ourAmount = Number(row.amount);
-        if (Math.abs(inquiry.paymentTotalTl - ourAmount) > tolerance) {
-          // O10: tutar uyuşmazlığını ALARM (error) olarak logla — sessizce atlamak yerine
-          // operasyon ekibinin görmesi için yüksek-öncelik. Ödeme completed yapılmaz.
-          this.logger.error(
-            `ALARM: PayTR reconcile tutar uyuşmazlığı — payment=${row.id} oid=${oid} ` +
-              `paytr=${inquiry.paymentTotalTl} ours=${ourAmount}. Ödeme tamamlanmadı, manuel inceleme gerekir.`,
-          );
+        if (!capturedOid || !capturedInquiry) {
           continue;
         }
 
@@ -1011,19 +1023,20 @@ export class PaymentReconciliationService {
         }
 
         const txnRef =
-          inquiry.paymentDate != null && inquiry.paymentDate !== ""
-            ? `paytr:${oid}:${inquiry.paymentDate}`
-            : `paytr:${oid}`;
+          capturedInquiry.paymentDate != null &&
+          capturedInquiry.paymentDate !== ""
+            ? `paytr:${capturedOid}:${capturedInquiry.paymentDate}`
+            : `paytr:${capturedOid}`;
 
         const did = await this.paymentFulfillment.processSuccessfulPayment(
           full,
           txnRef,
-          oid, // FLOW-M5: çekilen oid'i providerConversationId'ye senkronla
+          capturedOid, // FLOW-M5: çekilen oid'i providerConversationId'ye senkronla
         );
         if (did) {
           completed++;
           this.logger.log(
-            `PayTR reconcile completed payment ${row.id} oid=${oid}`,
+            `PayTR reconcile completed payment ${row.id} oid=${capturedOid}`,
           );
         }
       } catch (error: any) {
@@ -1034,6 +1047,156 @@ export class PaymentReconciliationService {
     }
 
     return { checked, completed };
+  }
+
+  /**
+   * FLOW-M3 (2.1): `failed` işaretli ama PayTR'da GERÇEKTEN çekilmiş ödemeleri (orphan
+   * capture) yakalar. Bir ödeme 3DS/callback yarışında `failed` olabilir ama para çekilmiş
+   * olabilir → sipariş fulfil edilmez, iade edilmez, para havada kalır. TÜM oid'leri tarar;
+   * capture bulursa:
+   *  - sipariş hâlâ ödenebilir (pending_payment) → CAS ile failed→pending resetleyip TAMAMLA (telafi),
+   *  - değilse (iptal/gitmiş) → yüksek-öncelik ALARM (ORPHAN_CAPTURE_REVIEW). Sipariş fulfil
+   *    edilemeyen capture'ın OTO-İADESİ bilerek Faz 4'e bırakıldı (cron-tetikli para iadesi riski).
+   * Cache dedup: aynı failed ödemeyi her turda PayTR'ye sormamak için 6s. Trade-cash orphan'ı
+   * ayrı ele alınır (bu tarama order/grup ile sınırlı).
+   */
+  async detectOrphanCapturedFailedPayments(): Promise<{
+    checked: number;
+    recovered: number;
+    alarms: number;
+  }> {
+    const enabled = this.configService.get("PAYTR_RECONCILIATION_ENABLED");
+    if (enabled === "false" || enabled === "0") {
+      return { checked: 0, recovered: 0, alarms: 0 };
+    }
+    const lookbackH = parseInt(
+      this.configService.get("PAYTR_ORPHAN_LOOKBACK_HOURS") || "72",
+      10,
+    );
+    const batch = parseInt(
+      this.configService.get("PAYTR_RECONCILIATION_BATCH_LIMIT") || "40",
+      10,
+    );
+    const tolerance = parseFloat(
+      this.configService.get("PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL") || "0.05",
+    );
+    const since = new Date();
+    since.setHours(since.getHours() - lookbackH);
+
+    const candidates = await this.prisma.payment.findMany({
+      where: {
+        provider: "paytr",
+        status: PaymentStatus.failed,
+        providerConversationId: { not: null },
+        updatedAt: { gt: since },
+        OR: [{ orderId: { not: null } }, { checkoutGroupId: { not: null } }],
+      },
+      take: batch,
+      orderBy: { updatedAt: "desc" },
+    });
+
+    let checked = 0;
+    let recovered = 0;
+    let alarms = 0;
+    for (const row of candidates) {
+      const dedupKey = `orphan-checked:${row.id}`;
+      if (await this.cache.get<boolean>(dedupKey)) continue;
+      checked++;
+      const ourAmount = Number(row.amount);
+      try {
+        const oids = this.paymentCommon.collectPaymentOids(row);
+        let capturedOid: string | null = null;
+        let capturedInquiry: {
+          paymentTotalTl: number;
+          paymentDate?: string | null;
+        } | null = null;
+        for (const oid of oids) {
+          const inquiry = await this.paymentProviders
+            .resolve()
+            .queryPaymentStatus(oid);
+          if (!inquiry.ok) continue;
+          if (Math.abs(inquiry.paymentTotalTl - ourAmount) > tolerance)
+            continue;
+          capturedOid = oid;
+          capturedInquiry = inquiry;
+          break;
+        }
+        // Her sonuçta dedup yaz (captured değilse 6s tekrar sorma; captured+alarm ise
+        // 6s'de bir tekrar-alarm makul; captured+telafi ise satır completed olur zaten).
+        await this.cache.set(dedupKey, true, { ttl: 6 * 60 * 60 });
+
+        if (!capturedOid || !capturedInquiry) continue;
+
+        const full = await this.prisma.payment.findUnique({
+          where: { id: row.id },
+          include: {
+            order: { include: { buyer: true, seller: true, product: true } },
+            checkoutGroup: {
+              include: { orders: { select: { status: true } } },
+            },
+            tradeCashPayment: true,
+          },
+        });
+        const orderStillPayable = full?.orderId
+          ? full.order?.status === OrderStatus.pending_payment
+          : (full?.checkoutGroup?.orders.some(
+              (o) => o.status === OrderStatus.pending_payment,
+            ) ?? false);
+
+        if (orderStillPayable) {
+          // TELAFİ: CAS ile failed→pending resetle, sonra tamamla (capture doğrulandı).
+          const reset = await this.prisma.payment.updateMany({
+            where: { id: row.id, status: PaymentStatus.failed },
+            data: { status: PaymentStatus.pending },
+          });
+          if (reset.count === 0) continue; // arada değişti
+          const fresh = await this.prisma.payment.findUnique({
+            where: { id: row.id },
+            include: {
+              order: { include: { buyer: true, seller: true, product: true } },
+              checkoutGroup: {
+                include: { orders: { select: { status: true } } },
+              },
+              tradeCashPayment: true,
+            },
+          });
+          const txnRef =
+            capturedInquiry.paymentDate != null &&
+            capturedInquiry.paymentDate !== ""
+              ? `paytr:${capturedOid}:${capturedInquiry.paymentDate}`
+              : `paytr:${capturedOid}`;
+          const did = await this.paymentFulfillment.processSuccessfulPayment(
+            fresh,
+            txnRef,
+            capturedOid,
+          );
+          if (did) {
+            recovered++;
+            this.logger.warn(
+              `ORPHAN_CAPTURE_RECOVERED: failed işaretli ama PayTR'da çekilmiş ödeme telafi edildi ` +
+                `payment=${row.id} oid=${capturedOid}`,
+            );
+          }
+        } else {
+          // Sipariş gitmiş → fulfil edilemez. Oto-iade RİSKLİ (Faz 4). Yüksek öncelik ALARM.
+          alarms++;
+          this.logger.error(
+            `ORPHAN_CAPTURE_REVIEW: PayTR'da ÇEKİLMİŞ ama sipariş fulfil EDİLEMEZ (iptal/gitmiş) — ` +
+              `payment=${row.id} oid=${capturedOid} tutar=${ourAmount}. MANUEL İADE gerekir.`,
+          );
+        }
+      } catch (error: any) {
+        this.logger.error(
+          `detectOrphanCapturedFailedPayments payment ${row.id}: ${error?.message}`,
+        );
+      }
+    }
+    if (recovered > 0 || alarms > 0) {
+      this.logger.warn(
+        `Orphan capture taraması: ${recovered} telafi, ${alarms} manuel-inceleme (checked=${checked})`,
+      );
+    }
+    return { checked, recovered, alarms };
   }
 
   /**

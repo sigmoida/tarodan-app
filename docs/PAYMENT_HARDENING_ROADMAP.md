@@ -116,12 +116,15 @@
 
 > PSP'yi tek kaynak yapan mekanizma. FLOW-H1/H2/H3 + M1/M2/M3/M5'i kapatır.
 
-- [ ] **2.1 — Reconciler'ı genişlet (FLOW-M3, kök çözüm)**
-      `payment-reconciliation.service.ts`. Bugün yalnız `pending` + güncel oid soruluyor.
-      **Çözüm:** durum-sorgu kapsamı → `failed` ödemeler + `merchantOidHistory`'deki TÜM
-      oid'ler + trade-cash ödemeleri. Callback claim edilemediğinde (count=0) durum-sorgu
-      tetikle → PSP "captured" derse force-complete ya da oto-iade+**alarm**.
-      **Kabul:** `failed`-ama-çekilmiş ödeme bir sonraki reconcile turunda tespit + telafi.
+- [x] **2.1 — Reconciler'ı genişlet (FLOW-M3, kök çözüm)** ✓ (kısmi — aşağıdaki not)
+      **Çözüm:** (A) `reconcilePendingPaytrPayments` artık `collectPaymentOids` ile TÜM
+      oid'leri (güncel + `merchantOidHistory`) tarıyor → rotate edilmiş eski oid'deki capture
+      yakalanıyor. (C) Yeni `detectOrphanCapturedFailedPayments` (scheduler step): `failed`
+      işaretli ama PayTR'da çekilmiş ödemeleri tüm oid'lerde tarar → sipariş ödenebilirse
+      CAS ile failed→pending resetleyip TAMAMLAR (telafi), gitmişse yüksek-öncelik ALARM
+      (`ORPHAN_CAPTURE_REVIEW`). Cache dedup (6s) PayTR spam'ini engeller. **Spec:** FLOW-H1 +
+      FLOW-M3 (7 test). **DEFER:** (B) trade-cash reconciliation ve fulfil-EDİLEMEZ capture'ın
+      OTO-İADESİ bilerek Faz 4'e bırakıldı (cron-tetikli para iadesi riski; şimdilik ALARM).
 
 - [x] **2.2 — Expiry fitilini charge-start'tan say (FLOW-H2)** ✓
       Charge-claim anında `metadata.lastChargeStartedAt` damgalanıyor (MIGRATION YOK).
@@ -134,11 +137,12 @@
       yükleyip `isChargeLikelyLive` ise o turu ATLIYOR → canlı 3DS oturumundaki sipariş 24s
       kill-switch'i tarafından iptal edilmiyor (orphan capture yok). Aynı helper (FLOW-H2 ile ortak).
 
-- [ ] **2.4 — Stabil idempotency / oid history taraması (FLOW-H1)**
-      Çift-çekim guard'ı (`verifyPaymentFromClient`) tekrar çekmeden önce
-      `merchantOidHistory`'deki tüm oid'leri durum-sorgu ile taram. **Kabul:** B ile
-      çekilmişken C sorulup ikinci çekim yapılmıyor; spec. (İdeal: dönen oid yerine sabit
-      idempotency key — bu Faz 3-8 arası mimari kararla değerlendirilir.)
+- [x] **2.4 — Stabil idempotency / oid history taraması (FLOW-H1)** ✓
+      `verifyPaymentFromClient` artık `collectPaymentOids` ile güncel + `merchantOidHistory`'deki
+      TÜM oid'leri durum-sorgu ile tarıyor; herhangi birinde capture bulursa ödemeyi tamamlayıp
+      "zaten ödendi" dönüyor → initiation ikinci çekimi yapmıyor. Tutar uyuşmazlığı ayrı
+      `amount_mismatch` sinyali korunuyor. **Spec:** 3 FLOW-H1 testi. (İdeal sabit idempotency
+      key mimari kararı hâlâ açık — Faz 3-8.)
 
 - [x] **2.5 — Refund çekilen oid'i kullansın (FLOW-M5)** ✓
       **Düzeltme (roadmap notundan daha temiz):** `providerPaymentId` PayTR token'ıdır,
