@@ -49,6 +49,9 @@ export enum NotificationType {
   TRADE_AUTO_CANCELLED = 'trade_auto_cancelled',
   // Admin uyarısı: takas depoya ulaştı ama süresi doldu — elle force-cancel-stuck gerekiyor.
   TRADE_STUCK_AT_WAREHOUSE = 'trade_stuck_at_warehouse',
+  // Takas kargosu başlatılamadı: tarafın kayıtlı adresi yok — kullanıcı adres eklemeli
+  // (adres eklenince reconciliation cron kargoyu otomatik oluşturur).
+  TRADE_ADDRESS_REQUIRED = 'trade_address_required',
 
   // RefundRequest notifications (sipariş iadesi akışı)
   REFUND_CANCELLED = 'refund_cancelled',

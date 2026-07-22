@@ -5322,6 +5322,10 @@
         "title": "Stuck Trade — Admin Action Required",
         "message": "Trade {tradeNumber} reached the warehouse but timed out; a manual force-cancel-stuck is required."
       },
+      "tradeAddressRequired": {
+        "title": "Address Needed — Trade Shipping",
+        "message": "Shipping for your trade {tradeNumber} could not start: you have no saved address. Add an address in your profile and the shipment will be created automatically."
+      },
       "offerAutoRejected": {
         "title": "Your Offer Was Closed",
         "message": "{cancelReason}"

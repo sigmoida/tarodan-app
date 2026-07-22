@@ -20,6 +20,9 @@ import {
   SuratGonderiPayload,
 } from "../surat-cargo/surat-cargo.types";
 import { i18nMessage } from "../i18n";
+import { CacheService } from "../cache/cache.service";
+import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto";
 
 /**
  * Takas Sürat Kargo orkestrasyonu — TradeService'ten birebir taşındı
@@ -33,6 +36,8 @@ export class TradeShipmentService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly cache: CacheService,
+    private readonly notificationService: NotificationService,
     @Optional()
     private readonly suratCargoService?: SuratCargoService,
   ) {}
@@ -260,8 +265,9 @@ export class TradeShipmentService {
 
         for (const side of sides) {
           if (!side.address) {
+            // M5: bildirim tx DIŞINDA atılır (aşağıda) — burada yalnız logla+atla.
             this.logger.warn(
-              `Trade ${trade.tradeNumber} side ${side.suffix} (user=${side.shipperId}) has no address; inbound shipment NOT created — admin must intervene`,
+              `Trade ${trade.tradeNumber} side ${side.suffix} (user=${side.shipperId}) has no address; inbound shipment NOT created — user notified to add one`,
             );
             continue;
           }
@@ -320,6 +326,29 @@ export class TradeShipmentService {
           });
         }
       });
+
+      // M5: adressiz taraf sessizce atlanıyordu — takas deadline'a kadar askıda
+      // kalıyor, kimseye haber gitmiyordu. Kullanıcıya "adres ekle" bildirimi at
+      // (in_app + push, şablon TRADE_ADDRESS_REQUIRED). Reconciliation cron bu
+      // fonksiyonu periyodik yeniden çağırdığından cache ile günde bire dedupe
+      // edilir; adres eklenince kargo otomatik oluşur ve bildirim kesilir.
+      for (const side of sides) {
+        if (side.address) continue;
+        const dedupeKey = `trade:addr-missing-notified:${trade.id}:${side.shipperId}`;
+        try {
+          if (await this.cache.get(dedupeKey)) continue;
+          await this.cache.set(dedupeKey, 1, { ttl: 24 * 3600 });
+          await this.notificationService.createInAppNotification(
+            side.shipperId,
+            NotificationType.TRADE_ADDRESS_REQUIRED,
+            { tradeId: trade.id, tradeNumber: trade.tradeNumber },
+          );
+        } catch (err: any) {
+          this.logger.warn(
+            `TRADE_ADDRESS_REQUIRED notify failed trade=${trade.id} user=${side.shipperId}: ${err?.message}`,
+          );
+        }
+      }
 
       // Now, OUTSIDE the tx, fire the Sürat SOAP calls. Each is wrapped in
       // try/catch so one failure doesn't block the other side.

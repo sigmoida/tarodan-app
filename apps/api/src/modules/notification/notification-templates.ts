@@ -371,6 +371,12 @@ export const NOTIFICATION_TEMPLATES: Record<
     icon: "⚠️",
     link: "/trades",
   },
+  [NotificationType.TRADE_ADDRESS_REQUIRED]: {
+    titleKey: "server.notification.tradeAddressRequired.title",
+    messageKey: "server.notification.tradeAddressRequired.message",
+    icon: "📍",
+    link: "/trades",
+  },
   [NotificationType.OFFER_AUTO_REJECTED]: {
     titleKey: "server.notification.offerAutoRejected.title",
     messageKey: "server.notification.offerAutoRejected.message",

@@ -60,7 +60,7 @@
   non-fatal yapıldı — Sürat çökükken talep oluştuktan sonra alıcıya 500 dönmüyor,
   scheduler 10 dk'da açıyor.
 
-- [ ] **M5 — Takas no-address tarafı sessiz skip → takas askıda, bildirim yok**
+- [x] **M5 — Takas no-address tarafı sessiz skip → takas askıda, bildirim yok**
   Yalnız `logger.warn`; event/bildirim yok, takas deadline'a kadar asılı.
   **Çözüm:** kullanıcıya "adres ekle" bildirimi + iz bırakan kayıt (event) + belirgin log.
 

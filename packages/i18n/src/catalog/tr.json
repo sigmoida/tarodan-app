@@ -5322,6 +5322,10 @@
         "title": "Sıkışmış Takas — Yönetim Gerekli",
         "message": "{tradeNumber} takası depoya ulaştı fakat süresi doldu; elle force-cancel-stuck gerekiyor."
       },
+      "tradeAddressRequired": {
+        "title": "Adres Gerekli — Takas Kargosu",
+        "message": "{tradeNumber} takasınız için kargo başlatılamadı: kayıtlı adresiniz yok. Profilinizden adres ekleyin; kargo otomatik oluşturulacaktır."
+      },
       "offerAutoRejected": {
         "title": "Teklifiniz Kapatıldı",
         "message": "{cancelReason}"
