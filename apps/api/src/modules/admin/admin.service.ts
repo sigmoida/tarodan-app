@@ -793,6 +793,18 @@ export class AdminService {
     );
   }
 
+  async closeStuckRefund(
+    adminId: string,
+    refundRequestId: string,
+    reason?: string,
+  ) {
+    return this.adminRefundService.closeStuckRefund(
+      adminId,
+      refundRequestId,
+      reason,
+    );
+  }
+
   async resolveTradeCompensation(
     adminId: string,
     tradeId: string,

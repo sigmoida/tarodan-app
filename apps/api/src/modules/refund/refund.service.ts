@@ -327,6 +327,54 @@ export class RefundService {
     return updated;
   }
 
+  /**
+   * MONEY-H6: Admin, TAKILI bir iade talebini para iade ETMEDEN force-KAPATIR →
+   * hold kilidi (frozenByRefundId) kalkar, satıcıya normal escrow akışında ödeme
+   * gider. Teslim SONRASI açılıp alıcının hiç tamamlamadığı (`return_in_transit`/
+   * `disputed`/`approved`/`wait_for_delivery`/`return_shipment_open`) iadelerde hold
+   * `releaseAt`'i geçse bile donuk kaldığından satıcı hiç ödenmiyordu — terminal kaçış.
+   * Zaten refunded ise reddedilir; zaten cancelled ise idempotent no-op.
+   */
+  async adminCloseRefundRequest(
+    refundRequestId: string,
+    adminId: string,
+    reason?: string,
+  ) {
+    const rr = await this.prisma.refundRequest.findUnique({
+      where: { id: refundRequestId },
+      include: { order: { select: { id: true, sellerId: true } } },
+    });
+    if (!rr) throw new NotFoundException(i18nMessage("server.refund.notFound"));
+    if (rr.status === RefundRequestStatus.refunded) {
+      throw new BadRequestException(
+        i18nMessage("server.refund.cannotCancelAnymore"),
+      );
+    }
+    if (rr.status === RefundRequestStatus.cancelled) {
+      return rr; // idempotent
+    }
+    const updated = await this.prisma.refundRequest.update({
+      where: { id: refundRequestId },
+      data: {
+        status: RefundRequestStatus.cancelled,
+        decidedAt: new Date(),
+        decidedBy: adminId,
+      },
+    });
+    // Hold kilidini kaldır → satıcıya normal escrow akışında ödeme.
+    await this.unfreezeHoldForRefund(rr.order.id);
+    await this.appendHistory(refundRequestId, {
+      action: "closed_by_admin",
+      by: adminId,
+      details: { previousStatus: rr.status, reason: reason ?? null },
+    });
+    await this.safeNotify(rr.requesterId, NotificationType.REFUND_CANCELLED, {
+      refundNumber: rr.refundNumber,
+      orderId: rr.order.id,
+    });
+    return updated;
+  }
+
   async getById(refundRequestId: string, userId: string, isAdmin = false) {
     const rr = await this.prisma.refundRequest.findUnique({
       where: { id: refundRequestId },
@@ -707,6 +755,82 @@ export class RefundService {
       } catch (e: any) {
         this.logger.error(
           `Failed to expire stale refund ${rr.id}: ${e?.message}`,
+        );
+      }
+    }
+    return expired;
+  }
+
+  /**
+   * MONEY-H6: `wait_for_delivery`'de N günden (REFUND_WAIT_DELIVERY_MAX_DAYS, vars. 30)
+   * uzun TAKILI iadeler — orijinal sipariş hiç teslim edilmediğinden return HİÇ açılmadı,
+   * hold süresiz donuk kaldı. İptal et + hold kilidini kaldır (satıcı normal escrow akışına
+   * döner; sipariş sonradan teslim olursa alıcı yeni talep açabilir). return_shipment_open
+   * ayrı bir sweep'le (D25) ele alınır; bu yalnız wait_for_delivery'yi hedefler.
+   */
+  async expireStaleWaitForDelivery(): Promise<number> {
+    const days = Number(process.env.REFUND_WAIT_DELIVERY_MAX_DAYS) || 30;
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    let stale: Array<{
+      id: string;
+      refundNumber: string;
+      requesterId: string;
+      order: { id: string; sellerId: string };
+    }>;
+    try {
+      stale = await this.prisma.refundRequest.findMany({
+        where: {
+          status: RefundRequestStatus.wait_for_delivery,
+          createdAt: { lt: cutoff },
+        },
+        select: {
+          id: true,
+          refundNumber: true,
+          requesterId: true,
+          order: { select: { id: true, sellerId: true } },
+        },
+        take: 25,
+      });
+    } catch (e: any) {
+      this.logger.error(
+        `expireStaleWaitForDelivery query failed: ${e?.message}`,
+      );
+      return 0;
+    }
+
+    let expired = 0;
+    for (const rr of stale) {
+      try {
+        await this.prisma.refundRequest.update({
+          where: { id: rr.id },
+          data: {
+            status: RefundRequestStatus.cancelled,
+            decidedAt: new Date(),
+            decidedBy: "system",
+          },
+        });
+        await this.unfreezeHoldForRefund(rr.order.id);
+        await this.appendHistory(rr.id, {
+          action: "wait_for_delivery_expired",
+          by: "system",
+          details: { days },
+        });
+        await this.safeNotify(
+          rr.requesterId,
+          NotificationType.REFUND_CANCELLED,
+          {
+            refundNumber: rr.refundNumber,
+            orderId: rr.order.id,
+          },
+        );
+        expired++;
+        this.logger.log(
+          `Refund ${rr.refundNumber} expired: order not delivered within ${days}d (wait_for_delivery)`,
+        );
+      } catch (e: any) {
+        this.logger.error(
+          `Failed to expire stale wait_for_delivery refund ${rr.id}: ${e?.message}`,
         );
       }
     }

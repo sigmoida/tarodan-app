@@ -151,6 +151,23 @@ export class AdminRefundController {
     return this.adminService.forceFinalizeRefund(adminId, id);
   }
 
+  @Post("refund-requests/:id/close")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      "MONEY-H6: Force-close a stuck refund WITHOUT refunding (unfreezes hold → seller paid)",
+  })
+  @ApiParam({ name: "id", description: "RefundRequest ID" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Refund closed" })
+  async closeStuckRefund(
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
+    @Body("reason") reason?: string,
+  ) {
+    return this.adminService.closeStuckRefund(adminId, id, reason);
+  }
+
   // ---------- RefundRequest policy override (Faz 4B.1) ----------
 
   @Patch("refund-requests/:id/override-policy")

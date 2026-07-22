@@ -227,6 +227,37 @@ export class AdminRefundService {
   }
 
   /**
+   * MONEY-H6: Admin, TAKILI bir iade talebini para iade ETMEDEN force-KAPATIR →
+   * donuk hold çözülür, satıcıya normal escrow akışında ödeme gider. Alıcının hiç
+   * tamamlamadığı (return_in_transit/disputed/approved/wait_for_delivery/...) iadeler
+   * için terminal kaçış. finalize (para iade) için forceFinalizeRefund kullanılır.
+   */
+  async closeStuckRefund(
+    adminId: string,
+    refundRequestId: string,
+    reason?: string,
+  ) {
+    const before = await this.prisma.refundRequest.findUnique({
+      where: { id: refundRequestId },
+      select: { status: true },
+    });
+    const result = await this.refundService.adminCloseRefundRequest(
+      refundRequestId,
+      adminId,
+      reason,
+    );
+    await this.audit.createAuditLog(
+      adminId,
+      "refund_admin_close",
+      "RefundRequest",
+      refundRequestId,
+      { previousStatus: before?.status ?? null, reason: reason ?? null },
+      { newStatus: result.status },
+    );
+    return { success: true, refundRequestId, status: result.status };
+  }
+
+  /**
    * Admin closes a pending compensation flag after settling the user out of
    * band. Sets `compensationResolvedAt` so the banner disappears in the UI.
    */

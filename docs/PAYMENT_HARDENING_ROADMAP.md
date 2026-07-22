@@ -185,7 +185,13 @@
 
 ## Faz 4 — İade/hold yapısal doğruluk + terminal kaçış · `fix/payment-hardening-refund-holds`
 
-- [ ] **4.1 — Donuk hold terminal kaçışı (MONEY-H6)** admin "iadeyi reddet/kapat" aracı + `wait_for_delivery` timeout + `unfreezeHoldForRefund` her iade-terminal yolunda. (`return_shipment_open` kısmı retry-branch D25'te; doğrula.)
+- [x] **4.1 — Donuk hold terminal kaçışı (MONEY-H6)** ✓ (1) Admin force-close aracı:
+      `adminCloseRefundRequest` → takılı iadeyi para iade ETMEDEN cancelled yapıp
+      `unfreezeHoldForRefund` çağırır (satıcı normal escrow'da ödenir); admin-refund.service
+      `closeStuckRefund` + audit + `POST admin/refund-requests/:id/close`. (2) `wait_for_delivery`
+      timeout: `expireStaleWaitForDelivery` sweep (REFUND_WAIT_DELIVERY_MAX_DAYS=30) refund-scheduler'a
+      eklendi → sipariş hiç teslim olmayınca donuk kalan hold çözülür. (3) `return_shipment_open`
+      zaten D25 (`expireStaleOpenReturns`) ile unfreeze ediyor — doğrulandı. **Spec:** 5 MONEY-H6 testi.
 - [ ] **4.2 — `finalizeRefundForReturnedShipment` concurrency-safe (MONEY-M1)** atomik marker/CAS (3 çağıran: cron + Sürat sync + admin).
 - [ ] **4.3 — Payout void yarışları (MONEY-M2/M3)** iade sırasında oluşan `pending` payout void; PayTR fail'de payout geri-al; `createPayoutsForReleasedHolds` açık-iade/frozen kontrol etsin.
 - [ ] **4.4 — PayTR-iade/DB-fail reconciliation (MONEY-M4)** `refundInProgressOrders` marker'ını tarayan bir sweep (bugün hiçbir job taramıyor).

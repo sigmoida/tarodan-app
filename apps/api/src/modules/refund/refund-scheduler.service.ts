@@ -1,11 +1,14 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { CronExpression } from '@nestjs/schedule';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
-import { TrackedCron } from '../../monitoring/tracked-cron.decorator';
-import { moneyCronsViaBull, registerRepeatableCron } from '../../monitoring/bull-cron.helper';
-import { QUEUE_NAMES } from '../../workers/constants';
-import { RefundService } from './refund.service';
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { CronExpression } from "@nestjs/schedule";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
+import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
+import {
+  moneyCronsViaBull,
+  registerRepeatableCron,
+} from "../../monitoring/bull-cron.helper";
+import { QUEUE_NAMES } from "../../workers/constants";
+import { RefundService } from "./refund.service";
 
 @Injectable()
 export class RefundSchedulerService implements OnModuleInit {
@@ -17,7 +20,13 @@ export class RefundSchedulerService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    await registerRepeatableCron(this.scheduledQueue, 'refund-crons', '0 */10 * * * *', moneyCronsViaBull(), this.logger);
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "refund-crons",
+      "0 */10 * * * *",
+      moneyCronsViaBull(),
+      this.logger,
+    );
   }
 
   @TrackedCron(CronExpression.EVERY_10_MINUTES)
@@ -36,36 +45,53 @@ export class RefundSchedulerService implements OnModuleInit {
     log(`${finalized} iade finalize edildi (kargo döndü)`);
     // D25: şubeye hiç götürülmeyen iadeleri süre dolunca iptal et (hold çözülür).
     const expired = await this.refundService.expireStaleOpenReturns();
-    if (expired > 0) log(`${expired} iade drop-off süresi dolduğu için iptal edildi`);
+    if (expired > 0)
+      log(`${expired} iade drop-off süresi dolduğu için iptal edildi`);
+    // MONEY-H6: sipariş hiç teslim edilmediği için wait_for_delivery'de takılan
+    // iadeleri süre dolunca iptal et (donuk hold çözülür).
+    const waitExpired = await this.refundService.expireStaleWaitForDelivery();
+    if (waitExpired > 0)
+      log(
+        `${waitExpired} iade teslim-bekleme süresi dolduğu için iptal edildi`,
+      );
     return {
-      summary: `${opened} açıldı · ${finalized} finalize · ${expired} süre doldu`,
-      stats: { opened, finalized, expired },
+      summary: `${opened} açıldı · ${finalized} finalize · ${expired} süre doldu · ${waitExpired} teslim-bekleme doldu`,
+      stats: { opened, finalized, expired, waitExpired },
     };
   }
 
   private async openReturnShipmentsForDeliveredOrders(): Promise<number> {
     const pending = await this.refundService.findPendingDeliveryToOpenReturn();
     if (pending.length === 0) return 0;
-    this.logger.log(`Opening return shipments for ${pending.length} delivered refund request(s)`);
+    this.logger.log(
+      `Opening return shipments for ${pending.length} delivered refund request(s)`,
+    );
     for (const id of pending) {
       try {
         await this.refundService.openReturnShipment(id);
       } catch (e) {
-        this.logger.error(`Failed to open return shipment for ${id}: ${(e as Error).message}`);
+        this.logger.error(
+          `Failed to open return shipment for ${id}: ${(e as Error).message}`,
+        );
       }
     }
     return pending.length;
   }
 
   private async finalizeReturnedShipments(): Promise<number> {
-    const pending = await this.refundService.findReturnDeliveredPendingFinalize();
+    const pending =
+      await this.refundService.findReturnDeliveredPendingFinalize();
     if (pending.length === 0) return 0;
-    this.logger.log(`Finalizing refund for ${pending.length} returned shipment(s)`);
+    this.logger.log(
+      `Finalizing refund for ${pending.length} returned shipment(s)`,
+    );
     for (const id of pending) {
       try {
         await this.refundService.finalizeRefundForReturnedShipment(id);
       } catch (e) {
-        this.logger.error(`Failed to finalize refund ${id}: ${(e as Error).message}`);
+        this.logger.error(
+          `Failed to finalize refund ${id}: ${(e as Error).message}`,
+        );
       }
     }
     return pending.length;
