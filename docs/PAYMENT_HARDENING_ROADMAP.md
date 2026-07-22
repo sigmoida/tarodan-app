@@ -58,12 +58,14 @@
       **Spec:** 3 yeni MONEY-H2 testi (tracked.spec). (resolveDispute'un ödeme-öncesi
       sıralaması ayrı bulgu → MONEY-M5/Faz 4.5.)
 
-- [ ] **1.3 — İptal edilen SEPET (grup) siparişi oto-iade (MONEY-H5)**
-      `payment-reconciliation.service.ts:89-97`. Sweep `payment.is.status=completed`
-      (sipariş-bazlı ilişki) filtreliyor; grup ödemesinde null → hiç iade edilmiyor.
-      **Çözüm:** sweep grup siparişlerini `checkoutGroup.payment` üzerinden yakalasın ve
-      `processRefund`'a sipariş-tutarı kadar kısmi iade olarak yönlendirsin.
-      **Kabul:** sepet siparişi iptali X dk içinde iade + log; spec.
+- [x] **1.3 — İptal edilen SEPET (grup) siparişi oto-iade (MONEY-H5)** ✓
+      `payment-reconciliation.service.ts:processRefundedOrders`. Sweep `payment.is.status=completed`
+      (sipariş-bazlı ilişki) filtreliyordu; grup ödemesinde null → hiç iade edilmiyordu.
+      **Çözüm:** sweep'e ikinci kol eklendi — `payment: {is:null} + checkoutGroupId + checkoutGroup.payment.status=completed`
+      ile grup siparişleri yakalanıp `processRefund(orderId)`'e (zaten grup-farkında,
+      sipariş-tutarı kadar kısmi iade) yönlendiriliyor. Zaten iade edilmişler grup payment
+      `metadata.refundedOrders`'tan elenerek gürültüsüz idempotency. **Spec:** 3 yeni testi
+      (group-refund.spec).
 
 - [ ] **1.4 — Kısmi iade tek boyut + hold kısmi tüketim (MONEY-H3 + H4)**
       `payment-refund.service.ts:324-325` (`fullyRefunded = !isGroupPayment`) +

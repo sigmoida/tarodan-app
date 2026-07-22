@@ -87,6 +87,7 @@ export class PaymentReconciliationService {
    * Yani bu sweep aynı zamanda tx-dışı iadeler için bir retry/outbox görevi görür.
    */
   async processRefundedOrders(): Promise<{ refunded: number; failed: number }> {
+    // 1) Tekil (order-bazlı) ödemeler — Order.payment doğrudan siparişe bağlı.
     const orders = await this.prisma.order.findMany({
       where: {
         status: { in: [OrderStatus.refunded, OrderStatus.cancelled] },
@@ -96,18 +97,55 @@ export class PaymentReconciliationService {
       take: 50,
     });
 
+    // 2) MONEY-H5: GRUP (sepet) siparişleri. Grup ödemesinde Order.payment NULL'dur —
+    // ödeme CheckoutGroup'a bağlıdır — bu yüzden yukarıdaki `payment.is.status`
+    // filtresi sepet siparişlerini HİÇ görmez ve iptal edilen sepet siparişi asla
+    // iade edilmezdi. Grup ödemesi ancak grubun TÜM siparişleri iade edilince
+    // `refunded` olduğundan, hâlâ `completed` olan gruptaki iptal/iade siparişleri
+    // henüz iade edilmemiş adaylardır. Zaten iade edilmişleri (grup payment
+    // metadata.refundedOrders) app tarafında eleriz — aksi halde processRefund
+    // `orderAlreadyRefunded` fırlatıp her turda gürültülü REFUND_MANUAL_REVIEW üretir.
+    const groupOrders = await this.prisma.order.findMany({
+      where: {
+        status: { in: [OrderStatus.refunded, OrderStatus.cancelled] },
+        payment: { is: null },
+        checkoutGroupId: { not: null },
+        checkoutGroup: {
+          is: { payment: { is: { status: PaymentStatus.completed } } },
+        },
+      },
+      select: {
+        id: true,
+        checkoutGroup: {
+          select: { payment: { select: { metadata: true } } },
+        },
+      },
+      take: 50,
+    });
+    const pendingGroupOrderIds = groupOrders
+      .filter((o) => {
+        const meta =
+          (o.checkoutGroup?.payment?.metadata as Record<string, unknown>) || {};
+        const refundedOrders =
+          (meta.refundedOrders as Record<string, number>) || {};
+        return !refundedOrders[o.id];
+      })
+      .map((o) => o.id);
+
+    const allOrderIds = [...orders.map((o) => o.id), ...pendingGroupOrderIds];
+
     let refunded = 0;
     let failed = 0;
     const failedIds: string[] = [];
-    for (const order of orders) {
+    for (const orderId of allOrderIds) {
       try {
-        await this.paymentRefund.processRefund(order.id);
+        await this.paymentRefund.processRefund(orderId);
         refunded++;
       } catch (error: any) {
         failed++;
-        failedIds.push(order.id);
+        failedIds.push(orderId);
         this.logger.error(
-          `Auto-refund (iptal edilen sipariş ${order.id}) başarısız: ${error.message}`,
+          `Auto-refund (iptal edilen sipariş ${orderId}) başarısız: ${error.message}`,
         );
       }
     }
