@@ -23,6 +23,7 @@ describe('RefundService.computePartialRefundAmount', () => {
     {} as any,
     {} as any,
     {} as any,
+    {} as any,
   );
 
   const compute = (policy: any, order: any): number =>

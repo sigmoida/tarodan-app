@@ -34,9 +34,12 @@ export class RefundSchedulerService implements OnModuleInit {
     log(`${opened} iade kargosu açıldı (teslim edilmiş siparişler)`);
     const finalized = await this.finalizeReturnedShipments();
     log(`${finalized} iade finalize edildi (kargo döndü)`);
+    // D25: şubeye hiç götürülmeyen iadeleri süre dolunca iptal et (hold çözülür).
+    const expired = await this.refundService.expireStaleOpenReturns();
+    if (expired > 0) log(`${expired} iade drop-off süresi dolduğu için iptal edildi`);
     return {
-      summary: `${opened} açıldı · ${finalized} finalize`,
-      stats: { opened, finalized },
+      summary: `${opened} açıldı · ${finalized} finalize · ${expired} süre doldu`,
+      stats: { opened, finalized, expired },
     };
   }
 

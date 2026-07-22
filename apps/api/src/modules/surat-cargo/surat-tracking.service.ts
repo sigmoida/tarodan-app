@@ -1211,17 +1211,14 @@ export class SuratTrackingService {
         : undefined,
     });
 
+    // D26: teslimde ANINDA finalize YOK — satıcıya kontrol penceresi
+    // (REFUND_RETURN_INSPECTION_HOURS, vars. 24s) tanınır; pencere dolunca
+    // refund-scheduler'ın finalize sweep'i otomatik işler. Sorun varsa admin
+    // kaydı `disputed` yapar ve sweep onu atlar.
     if (isReturnDelivered) {
-      try {
-        await refundService.finalizeRefundForReturnedShipment(refundRequestId);
-        this.logger.log(
-          `Auto-refunded RefundRequest ${refundRequestId} after Sürat return delivery (suratCode=${suratCode})`,
-        );
-      } catch (error: any) {
-        this.logger.error(
-          `Failed to finalize refund ${refundRequestId}: ${error.message}`,
-        );
-      }
+      this.logger.log(
+        `RefundRequest ${refundRequestId} return delivered (suratCode=${suratCode}); finalize deferred to inspection window`,
+      );
     }
 
     return true;

@@ -18,6 +18,7 @@ import { PrismaService } from "../../prisma";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
 import { PaymentService } from "../payment/payment.service";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
+import { SuratTrackingService } from "../surat-cargo/surat-tracking.service";
 import { canTransitionShipmentStatus } from "../shipping/shipment-state-machine";
 import {
   normalizeSuratPhone,
@@ -53,6 +54,7 @@ export class RefundService {
     private readonly prisma: PrismaService,
     private readonly paymentService: PaymentService,
     private readonly suratCargoService: SuratCargoService,
+    private readonly suratTrackingService: SuratTrackingService,
     private readonly notificationService: NotificationService,
     private readonly storageService: StorageService,
   ) {}
@@ -607,10 +609,119 @@ export class RefundService {
     return candidates.map((c) => c.id);
   }
 
-  // return_delivered'dan 30 dk sonra Sürat takibi hâlâ refund başlatmadıysa
-  // (entegrasyon kapalı veya callback eksik) cron fallback olarak işler.
+  /**
+   * D25 (insani senaryo): alıcı iadeyi açtı ama paketi hiç şubeye götürmedi —
+   * satıcının hold'u süresiz donuk kalıyordu. `return_shipment_open` + N gün
+   * (env REFUND_RETURN_DROPOFF_DAYS, vars. 7) hareketsiz kalan Sürat iadelerini
+   * iptal eder: hold çözülür, Sürat kaydı silinir (kod artık şubede
+   * kullanılamaz), alıcıya bildirim gider.
+   *
+   * Güvenlik: iptal ETMEDEN önce Sürat'tan CANLI takip çekilir — pakette
+   * hareket varsa (alıcı son anda götürdü, poll henüz görmedi) iptal atlanır ve
+   * normal poll akışına bırakılır. Sorgu başarısızsa da (belirsizlik) iptal
+   * edilmez, sonraki tick tekrar dener. Yalnız `surat` iadeler: manuel iade
+   * poll'lanamadığından yanlış iptal riski var → ops takibi.
+   */
+  async expireStaleOpenReturns(): Promise<number> {
+    const days = Number(process.env.REFUND_RETURN_DROPOFF_DAYS) || 7;
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    let stale: Array<{
+      id: string;
+      refundNumber: string;
+      requesterId: string;
+      order: { id: string; sellerId: string };
+    }>;
+    try {
+      stale = await this.prisma.refundRequest.findMany({
+        where: {
+          status: RefundRequestStatus.return_shipment_open,
+          returnProvider: "surat",
+          returnCreatedAt: { lt: cutoff },
+        },
+        select: {
+          id: true,
+          refundNumber: true,
+          requesterId: true,
+          order: { select: { id: true, sellerId: true } },
+        },
+        take: 25,
+      });
+    } catch (e: any) {
+      this.logger.error(`expireStaleOpenReturns query failed: ${e?.message}`);
+      return 0;
+    }
+
+    let expired = 0;
+    for (const rr of stale) {
+      try {
+        // Canlı doğrulama: pakette hareket varsa iptal etme.
+        const live = await this.suratTrackingService.fetchTrackingInfo(
+          rr.refundNumber,
+        );
+        if (!live) continue; // belirsizlik → bu tick atla
+        const gonderi = live.Gonderiler?.[0];
+        const hasMovement =
+          !!gonderi &&
+          ((gonderi.Hareketler?.length ?? 0) > 0 ||
+            (gonderi.KargonunDurumuSayi ?? 1) >= 2);
+        if (hasMovement) {
+          this.logger.log(
+            `Skip expiry for ${rr.refundNumber}: live Surat data shows movement; poll will pick it up`,
+          );
+          continue;
+        }
+
+        await this.prisma.refundRequest.update({
+          where: { id: rr.id },
+          data: {
+            status: RefundRequestStatus.cancelled,
+            decidedAt: new Date(),
+            decidedBy: "system",
+          },
+        });
+        // Hold kilidini kaldır → normal escrow akışına dönsün.
+        await this.unfreezeHoldForRefund(rr.order.id);
+        // Sürat'taki iade gönderisini sil — süresi dolmuş kod şubede kullanılamasın
+        // (best-effort; idempotency cache'i de temizlenir).
+        await this.suratCargoService
+          .cancelShipmentByOrderNumber(rr.refundNumber)
+          .catch(() => undefined);
+        await this.appendHistory(rr.id, {
+          action: "return_dropoff_expired",
+          by: "system",
+          details: { days },
+        });
+        await this.safeNotify(
+          rr.requesterId,
+          NotificationType.REFUND_CANCELLED,
+          {
+            refundNumber: rr.refundNumber,
+            orderId: rr.order.id,
+          },
+        );
+        expired++;
+        this.logger.log(
+          `Refund ${rr.refundNumber} expired: return not dropped off within ${days}d`,
+        );
+      } catch (e: any) {
+        this.logger.error(
+          `Failed to expire stale refund ${rr.id}: ${e?.message}`,
+        );
+      }
+    }
+    return expired;
+  }
+
+  // D26 (insani senaryo): iade satıcıya teslim edildikten sonra parayı ANINDA
+  // iade etme — satıcıya kutuyu açıp kontrol etmesi için bir pencere tanı
+  // (REFUND_RETURN_INSPECTION_HOURS, vars. 24 saat). Sorun varsa admin kaydı
+  // `disputed` yapar; bu sorgu yalnız `return_delivered` seçtiğinden disputed
+  // kayıt finalize edilmez. Pencere dolunca cron otomatik finalize eder.
+  // (Poller'daki anlık finalize kaldırıldı — tek finalize yolu bu cron.)
   async findReturnDeliveredPendingFinalize(): Promise<string[]> {
-    const cutoff = new Date(Date.now() - 30 * 60 * 1000);
+    const hours = Number(process.env.REFUND_RETURN_INSPECTION_HOURS) || 24;
+    const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
     const rows = await this.prisma.refundRequest.findMany({
       where: {
         status: RefundRequestStatus.return_delivered,

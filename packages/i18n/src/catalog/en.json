@@ -5368,7 +5368,7 @@
       },
       "refundReturnDeliveredSeller": {
         "title": "The Returned Product Reached You",
-        "message": "The returned product for refund {refundNumber} has been delivered to you."
+        "message": "The returned product for refund {refundNumber} has been delivered to you. Please inspect the package within 24 hours; contact support if there is a problem — otherwise the refund completes automatically."
       },
       "refundCompletedSeller": {
         "title": "Refund Completed",

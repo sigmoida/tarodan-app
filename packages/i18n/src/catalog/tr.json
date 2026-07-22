@@ -5368,7 +5368,7 @@
       },
       "refundReturnDeliveredSeller": {
         "title": "İade Ürünü Size Ulaştı",
-        "message": "{refundNumber} numaralı iade ürünü size teslim edildi."
+        "message": "{refundNumber} numaralı iade ürünü size teslim edildi. Lütfen paketi 24 saat içinde kontrol edin; bir sorun varsa destek ekibiyle iletişime geçin — aksi hâlde iade otomatik tamamlanır."
       },
       "refundCompletedSeller": {
         "title": "İade Tamamlandı",
