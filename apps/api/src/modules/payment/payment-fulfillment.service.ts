@@ -54,15 +54,28 @@ export class PaymentFulfillmentService {
   async processSuccessfulPayment(
     payment: any,
     transactionId?: string,
+    // FLOW-M5: PayTR'da GERÇEKTEN çekilen merchant_oid. Re-init sonrası
+    // providerConversationId yeni oid'e dönmüş ama capture ESKİ oid'de olmuş
+    // olabilir (callback history-match ile tamamlar). İade doğru oid'i kullansın
+    // diye capture anında providerConversationId'yi çekilen oid'e senkronlarız.
+    capturedMerchantOid?: string,
   ): Promise<boolean> {
     // Trade cash payment: different flow from order payments
     if (payment.tradeCashPaymentId && !payment.orderId) {
-      return this.processSuccessfulTradeCashPayment(payment, transactionId);
+      return this.processSuccessfulTradeCashPayment(
+        payment,
+        transactionId,
+        capturedMerchantOid,
+      );
     }
 
     // Grup ödemesi: tüm grup siparişleri tek transaction'da işlenir
     if (payment.checkoutGroupId && !payment.orderId) {
-      return this.processSuccessfulGroupPayment(payment, transactionId);
+      return this.processSuccessfulGroupPayment(
+        payment,
+        transactionId,
+        capturedMerchantOid,
+      );
     }
 
     const cancelledOrders: {
@@ -107,6 +120,11 @@ export class PaymentFulfillmentService {
           status: PaymentStatus.completed,
           paidAt: new Date(),
           providerPaymentId: transactionId || payment.providerPaymentId,
+          // FLOW-M5: çekilen oid'e senkronla (yoksa mevcut değeri koru) → iade
+          // providerConversationId üzerinden doğru oid'i çağırır.
+          ...(capturedMerchantOid
+            ? { providerConversationId: capturedMerchantOid }
+            : {}),
           metadata: newMetadata as object,
         },
       });
@@ -700,6 +718,7 @@ export class PaymentFulfillmentService {
   private async processSuccessfulGroupPayment(
     payment: any,
     transactionId?: string,
+    capturedMerchantOid?: string,
   ): Promise<boolean> {
     const cancelledOrders: {
       orderId: string;
@@ -735,6 +754,10 @@ export class PaymentFulfillmentService {
             status: PaymentStatus.completed,
             paidAt: new Date(),
             providerPaymentId: transactionId || payment.providerPaymentId,
+            // FLOW-M5: çekilen oid'e senkronla (iade doğru oid'i kullansın).
+            ...(capturedMerchantOid
+              ? { providerConversationId: capturedMerchantOid }
+              : {}),
             metadata: {
               ...((payment.metadata as any) || {}),
               auditHistory,
@@ -1117,6 +1140,7 @@ export class PaymentFulfillmentService {
   private async processSuccessfulTradeCashPayment(
     payment: any,
     transactionId?: string,
+    capturedMerchantOid?: string,
   ): Promise<boolean> {
     // Platform ayarı: takas kargo süresi (gün). Varsayılan 7 gün.
     const shippingDaysSetting = await this.prisma.platformSetting.findUnique({
@@ -1131,6 +1155,10 @@ export class PaymentFulfillmentService {
         data: {
           status: PaymentStatus.completed,
           providerPaymentId: transactionId || payment.providerPaymentId,
+          // FLOW-M5: çekilen oid'e senkronla (takas iadesi doğru oid'i kullansın).
+          ...(capturedMerchantOid
+            ? { providerConversationId: capturedMerchantOid }
+            : {}),
           paidAt: new Date(),
         },
       });

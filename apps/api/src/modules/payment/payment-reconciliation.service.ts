@@ -978,6 +978,7 @@ export class PaymentReconciliationService {
         const did = await this.paymentFulfillment.processSuccessfulPayment(
           full,
           txnRef,
+          oid, // FLOW-M5: çekilen oid'i providerConversationId'ye senkronla
         );
         if (did) {
           completed++;

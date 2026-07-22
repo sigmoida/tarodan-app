@@ -232,6 +232,21 @@ describe("PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
     expect(clearCall).toBeDefined();
   });
 
+  // FLOW-M5: iade GERÇEKTEN çekilen oid = providerConversationId ile yapılır. Bu yoksa
+  // gerçek yolda (bypass değil) eski kod UUID'yi oid sanıp yanlış çağrı yapıyordu; artık
+  // createRefund'a hiç gidilmeden reddedilir.
+  it("FLOW-M5: providerConversationId yoksa (gerçek yol) createRefund çağrılmadan reddedilir", async () => {
+    mockPrisma.payment.findFirst.mockResolvedValue({
+      ...basePayment({ foo: 1 }),
+      providerConversationId: null,
+    });
+
+    await expect(
+      service.refundTradeCashPaymentIfCompleted(TRADE_ID),
+    ).rejects.toThrow();
+    expect(mockPaytr.createRefund).not.toHaveBeenCalled();
+  });
+
   // MONEY-H1: PayTR non-success status DÖNERSE de (throw değil) marker geri alınmalı.
   it("MONEY-H1: PayTR non-success status'ta da marker geri alınır", async () => {
     mockPrisma.payment.findFirst.mockResolvedValue(basePayment({ foo: 1 }));

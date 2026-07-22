@@ -138,9 +138,15 @@
       çekilmişken C sorulup ikinci çekim yapılmıyor; spec. (İdeal: dönen oid yerine sabit
       idempotency key — bu Faz 3-8 arası mimari kararla değerlendirilir.)
 
-- [ ] **2.5 — Refund çekilen oid'i kullansın (FLOW-M5)**
-      `payment-refund.service.ts:249-255`. Güncel `providerConversationId` yerine gerçekten
-      çekilen oid (`providerPaymentId`). Trade fallback `tradeId.replace` düzelt.
+- [x] **2.5 — Refund çekilen oid'i kullansın (FLOW-M5)** ✓
+      **Düzeltme (roadmap notundan daha temiz):** `providerPaymentId` PayTR token'ıdır,
+      merchant_oid DEĞİL (callback yorumu doğruladı). Bunun yerine **capture anında**
+      `providerConversationId` gerçekten çekilen oid'e SENKRONLANIR: `processSuccessfulPayment`
+      (+ group/trade variant) opsiyonel `capturedMerchantOid` alıp completion CAS'inde
+      `providerConversationId`'yi set ediyor; callback `dto.merchant_oid`, reconcile/hash-mismatch
+      queried `oid` geçiyor. Böylece re-init sonrası bile iade (providerConversationId kullanır)
+      doğru oid'e gider. Trade fallback `tradeId.replace(...)` kaldırıldı → gerçek yolda oid
+      yoksa reddedilir. **Spec:** FLOW-M5 guard testi (b3.spec).
 
 - [x] **2.6 — CAS'siz reset/cancel yollarını kapat (FLOW-M1, FLOW-M2)** ✓
       Initiation'daki 3 koşulsuz `completed→pending` reset'i (grup + tekil + trade-cash)

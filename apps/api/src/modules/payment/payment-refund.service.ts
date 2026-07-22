@@ -762,8 +762,12 @@ export class PaymentRefundService {
       };
     }
 
-    const oid =
-      payment.providerConversationId?.trim() || tradeId.replace(/-/g, "");
+    // FLOW-M5: iade GERÇEKTEN çekilen merchant_oid ile yapılmalı = tamamlanan
+    // ödemenin providerConversationId'si (capture anında çekilen oid'e senkronlanır).
+    // Eski `tradeId.replace(/-/g,"")` fallback'i UUID'yi oid sanıyordu (gerçek oid
+    // `TRADE{no}T{...}`) → yanlış/eşleşmeyen oid'le PayTR çağrısı. Kaldırıldı; gerçek
+    // yolda (bypass değil) oid yoksa reddedilir (aşağıda).
+    const oid = payment.providerConversationId?.trim() ?? "";
     // Always refund the full charged amount (product + commission). PayTR was
     // charged the totalAmount at capture time; partial commission retention
     // would leave the payer short when the admin reject is no-fault.
@@ -792,6 +796,16 @@ export class PaymentRefundService {
         `PAYMENT_BYPASS: PayTR trade refund atlandı tradeId=${tradeId} amount=${amount}`,
       );
     } else {
+      // FLOW-M5: gerçek PayTR yolunda oid ZORUNLU — yanlış/boş oid'le çekim yapma.
+      if (!oid) {
+        this.logger.error(
+          `refundTradeCashPaymentIfCompleted: providerConversationId yok — iade oid'i ` +
+            `belirlenemiyor (tradeId=${tradeId}, paymentId=${payment.id}). Manuel inceleme gerekir.`,
+        );
+        throw new BadRequestException(
+          i18nMessage("server.payment.paytrRefundFailed"),
+        );
+      }
       // Marker'ı PayTR'den ÖNCE kalıcı yaz. Bu yazım başarısızsa para hareketi
       // olmadan abort et — çağıran güvenle tekrar deneyebilir.
       try {
