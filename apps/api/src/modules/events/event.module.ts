@@ -10,7 +10,6 @@ import { PrismaModule } from '../../prisma';
     BullModule.registerQueue(
       { name: QUEUE_NAMES.EMAIL },
       { name: QUEUE_NAMES.PUSH },
-      { name: QUEUE_NAMES.SHIPPING },
       { name: QUEUE_NAMES.ANALYTICS },
     ),
   ],

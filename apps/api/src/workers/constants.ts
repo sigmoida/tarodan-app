@@ -6,7 +6,6 @@ export const QUEUE_NAMES = {
     PUSH: 'push',
     IMAGE: 'image',
     PAYMENT: 'payment',
-    SHIPPING: 'shipping',
     SEARCH: 'search',
     ANALYTICS: 'analytics',
     MODERATION: 'moderation',

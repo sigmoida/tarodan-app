@@ -64,7 +64,7 @@
   Yalnız `logger.warn`; event/bildirim yok, takas deadline'a kadar asılı.
   **Çözüm:** kullanıcıya "adres ekle" bildirimi + iz bırakan kayıt (event) + belirgin log.
 
-- [ ] **M6 — `ShippingWorker` ölü kod + latent çift-yazma tehlikesi**
+- [x] **M6 — `ShippingWorker` ölü kod + latent çift-yazma tehlikesi**
   Kuyruğa hiçbir yer enqueue etmiyor; ama `handleCreateShipment` sahte tracking üretip
   ikinci Shipment yaratabilir (`orderId @unique` çakışması).
   **Çözüm:** processor'ı sil (kuyruk kaydı DI için gerekiyorsa kalabilir).

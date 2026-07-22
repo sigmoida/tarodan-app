@@ -11,7 +11,6 @@ import { EmailWorker } from './email.worker';
 import { PushWorker } from './push.worker';
 import { ImageWorker } from './image.worker';
 import { PaymentWorker } from './payment.worker';
-import { ShippingWorker } from './shipping.worker';
 import { SearchWorker } from './search.worker';
 import { AnalyticsWorker } from './analytics.worker';
 import { ModerationWorker } from './moderation.worker';
@@ -63,7 +62,6 @@ import { QUEUE_NAMES } from './constants';
       { name: QUEUE_NAMES.PUSH },
       { name: QUEUE_NAMES.IMAGE },
       { name: QUEUE_NAMES.PAYMENT },
-      { name: QUEUE_NAMES.SHIPPING },
       { name: QUEUE_NAMES.SEARCH },
       { name: QUEUE_NAMES.ANALYTICS },
       { name: QUEUE_NAMES.MODERATION },
@@ -74,7 +72,6 @@ import { QUEUE_NAMES } from './constants';
     PushWorker,
     ImageWorker,
     PaymentWorker,
-    ShippingWorker,
     SearchWorker,
     AnalyticsWorker,
     ModerationWorker,

@@ -189,7 +189,6 @@ export class EventService {
   constructor(
     @InjectQueue(QUEUE_NAMES.EMAIL) private readonly emailQueue: Queue,
     @InjectQueue(QUEUE_NAMES.PUSH) private readonly pushQueue: Queue,
-    @InjectQueue(QUEUE_NAMES.SHIPPING) private readonly shippingQueue: Queue,
     @InjectQueue(QUEUE_NAMES.ANALYTICS) private readonly analyticsQueue: Queue,
     private readonly prisma: PrismaService,
   ) { }
