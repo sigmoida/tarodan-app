@@ -79,13 +79,16 @@
       iade stok geri yüklemiyor (alıcı malı elinde tutar). **Spec:** 4 yeni testi (refund-partial.spec).
       (NOT: `manualRefund` grup/trade null-orderId ayrı bulgu → MONEY-L1/Faz 4.6.)
 
-- [ ] **1.5 — `seller_no_ship` kargo durumuna baksın (SEAM-B1)**
-      `payment-reconciliation.service.ts:654-731`. Cron yalnız `preparing + deadline`
-      bakıyor; paket Sürat'ta hareket ederken bile iptal+iade ediyor. **Çözüm:** iptal
-      kararından önce shipment yükle — `label_created/in_transit/...` veya Sürat'ta hareket
-      varsa "no ship" değildir → iptal etme (satıcıya "kargoladım işaretle" hatırlat).
-      Bonus: restock `increment:1` → `order.quantity`.
-      **Kabul:** yolda paketi olan sipariş iptal edilmiyor; spec.
+- [x] **1.5 — `seller_no_ship` kargo durumuna baksın (SEAM-B1)** ✓
+      `payment-reconciliation.service.ts:handleExpiredPreparingOrders`. Cron yalnız
+      `preparing + deadline` bakıyordu; paket Sürat'ta hareket ederken bile iptal+iade
+      ediyordu. **Çözüm:** tx içinde shipment yüklenip `SHIPMENT_IN_MOTION_STATUSES`
+      (`picked_up/in_transit/at_delivery_branch/out_for_delivery/delivered/return_*`) veya
+      `shippedAt` varsa iptal ATLANIYOR (greplenebilir `SELLER_NO_SHIP_SKIPPED_MOVING`
+      log). `pending/label_created` gerçek "göndermedi" sayılıyor (immediate-barcode her
+      ödemede etiket üretir). Teslimde `handleOrderDelivered` `preparing`'i ilerlettiği için
+      satıcı yine ödeniyor. Bonus: restock `increment:1` → `order.quantity`. **Spec:** 4 yeni
+      testi. (Ayrı "kargoladım işaretle" bildirim tipi → Faz 10 UX.)
 
 - [ ] **1.6 — Sürat iade oto-refund'u pipeline'a soksun (SEAM-B3)**
       `surat-tracking.service.ts:532-556`. Koşulsuz `refund_requested` + doğrudan

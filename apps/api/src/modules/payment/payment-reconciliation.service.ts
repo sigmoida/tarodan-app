@@ -8,7 +8,23 @@ import {
   ProductStatus,
   TradeStatus,
   OfferStatus,
+  ShipmentStatus,
 } from "@prisma/client";
+
+// SEAM-B1: Paket Sürat'ta HAREKET ettiyse "satıcı göndermedi" DEĞİLDİR. Bu
+// statüler poller tarafından gerçek kargo hareketiyle set edilir — böyle bir
+// siparişi süre-doldu diye iptal+iade edersek alıcı hem malı hem parayı alır.
+// `pending`/`label_created` HARİÇ: yalnız barkod/etiket var ama kargoya verilmemiş
+// olabilir (immediate-barcode her ödemede etiket üretir) — onlar gerçek "göndermedi".
+const SHIPMENT_IN_MOTION_STATUSES: ShipmentStatus[] = [
+  ShipmentStatus.picked_up,
+  ShipmentStatus.in_transit,
+  ShipmentStatus.at_delivery_branch,
+  ShipmentStatus.out_for_delivery,
+  ShipmentStatus.delivered,
+  ShipmentStatus.return_in_progress,
+  ShipmentStatus.returned,
+];
 import {
   getProductStatusFromQuantity,
   getReservedAwareStatus,
@@ -705,6 +721,7 @@ export class PaymentReconciliationService {
     let cancelled = 0;
     for (const order of expiredOrders) {
       try {
+        let skippedInMotion = false;
         await this.prisma.$transaction(async (tx) => {
           // Lock the order row to prevent concurrent modifications (e.g., seller shipping at the same time)
           await tx.$queryRaw`SELECT id FROM orders WHERE id = ${order.id} FOR UPDATE`;
@@ -715,6 +732,24 @@ export class PaymentReconciliationService {
           });
           if (!freshOrder || freshOrder.status !== OrderStatus.preparing) {
             return; // Already shipped or handled by another process
+          }
+
+          // SEAM-B1: Satıcı "kargoladım" tıklamamış olsa bile paket Sürat'ta HAREKET
+          // ediyorsa (poller shipment.status'ü ilerletmiş ya da shippedAt set) bu bir
+          // "göndermedi" değildir → iptal+iade edersek alıcı hem malı hem parayı alır
+          // (çift kayıp). İptal ETME; atla. Sipariş `preparing`'de kalsa bile teslimde
+          // handleOrderDelivered onu ilerletip escrow'u başlatır, satıcı yine ödenir.
+          const shipment = await tx.shipment.findUnique({
+            where: { orderId: order.id },
+            select: { status: true, shippedAt: true },
+          });
+          if (
+            shipment &&
+            (SHIPMENT_IN_MOTION_STATUSES.includes(shipment.status) ||
+              shipment.shippedAt !== null)
+          ) {
+            skippedInMotion = true;
+            return;
           }
 
           // Cancel order
@@ -743,18 +778,34 @@ export class PaymentReconciliationService {
             tx,
           );
 
-          // Re-stock: increment quantity and recalculate status
+          // Re-stock: iade edilen TÜM adet geri yüklenir (eskiden sabit +1 →
+          // çok-adetli siparişte stok eksik kalıyordu). order.quantity kadar artır.
+          const restoreQty = order.quantity ?? 1;
           const newQuantity =
-            order.product.quantity !== null ? order.product.quantity + 1 : null;
+            order.product.quantity !== null
+              ? order.product.quantity + restoreQty
+              : null;
           await tx.product.update({
             where: { id: order.product.id },
             data: {
               quantity:
-                order.product.quantity !== null ? { increment: 1 } : undefined,
+                order.product.quantity !== null
+                  ? { increment: restoreQty }
+                  : undefined,
               status: getProductStatusFromQuantity(newQuantity),
             },
           });
         });
+
+        // SEAM-B1: hareket eden paket yüzünden atlandıysa iade/restock/bildirim YOK.
+        // Ops görünürlüğü için greplenebilir tek satır uyarı.
+        if (skippedInMotion) {
+          this.logger.warn(
+            `SELLER_NO_SHIP_SKIPPED_MOVING: sipariş ${order.orderNumber} süre doldu ama ` +
+              `paket Sürat'ta hareket ediyor — iptal/iade EDİLMEDİ (satıcı 'kargoladım' işaretlememiş olabilir).`,
+          );
+          continue;
+        }
 
         // Process refund via PayTR (outside transaction — calls external API)
         try {
