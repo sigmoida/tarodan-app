@@ -123,14 +123,16 @@
       tetikle → PSP "captured" derse force-complete ya da oto-iade+**alarm**.
       **Kabul:** `failed`-ama-çekilmiş ödeme bir sonraki reconcile turunda tespit + telafi.
 
-- [ ] **2.2 — Expiry fitilini charge-start'tan say (FLOW-H2)**
-      `payment-reconciliation.service.ts:902-931`. `createdAt` yerine son 3DS başlatım
-      zamanı (`chargeStartedAt` alanı veya `updatedAt` mantığı). **Kabul:** canlı 3DS
-      oturumundaki ödeme cron tarafından `failed` yapılmıyor; spec.
+- [x] **2.2 — Expiry fitilini charge-start'tan say (FLOW-H2)** ✓
+      Charge-claim anında `metadata.lastChargeStartedAt` damgalanıyor (MIGRATION YOK).
+      `isChargeLikelyLive` helper'ı: charge-start `PAYMENT_FAIL_TIMEOUT_MINUTES` (35dk)
+      içindeyse ödeme `cancelExpiredPayments` tarafından `failed` YAPILMIYOR (`createdAt`
+      eski olsa bile). **Spec:** 3 yeni FLOW-H2 testi (live-charge.spec).
 
-- [ ] **2.3 — 24s expiry canlı 3DS'i öldürmesin (FLOW-H3)**
-      `payment-reconciliation.service.ts:444-554`. `expireUnpaidOrders` aktif charge'lı
-      ödemeyi grace ile korusun (charge-start + 3DS penceresi).
+- [x] **2.3 — 24s expiry canlı 3DS'i öldürmesin (FLOW-H3)** ✓
+      `expireUnpaidOrders` tx içinde siparişin (veya grubunun) pending/processing ödemesini
+      yükleyip `isChargeLikelyLive` ise o turu ATLIYOR → canlı 3DS oturumundaki sipariş 24s
+      kill-switch'i tarafından iptal edilmiyor (orphan capture yok). Aynı helper (FLOW-H2 ile ortak).
 
 - [ ] **2.4 — Stabil idempotency / oid history taraması (FLOW-H1)**
       Çift-çekim guard'ı (`verifyPaymentFromClient`) tekrar çekmeden önce

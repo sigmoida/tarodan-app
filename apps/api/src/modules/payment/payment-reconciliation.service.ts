@@ -516,6 +516,26 @@ export class PaymentReconciliationService {
    * iptal eder. Eğer rezerv hâlâ tutuluyorsa (cron 30dk pas'ı kaçırdıysa) önce
    * onu serbest bırakır. Bağlı offer payment_expired olur.
    */
+  /**
+   * FLOW-H2/H3: Ödemenin son 3DS çekimi hâlâ "canlı" olabilir mi? metadata.lastChargeStartedAt
+   * (charge-claim anında damgalanır) PAYMENT_FAIL_TIMEOUT_MINUTES (vars. 35dk, PayTR 3DS
+   * penceresi + grace) içindeyse EVET. Bu payment `failed` yapılmamalı / siparişi 24s
+   * kill-switch'i öldürmemeli — aksi halde kullanıcı OTP ekranındayken PayTR parayı çeker
+   * ve callback geldiğinde satır çoktan failed olur → orphan capture.
+   */
+  private isChargeLikelyLive(metadata: unknown): boolean {
+    const windowMin = parseInt(
+      this.configService.get("PAYMENT_FAIL_TIMEOUT_MINUTES") || "35",
+      10,
+    );
+    const meta = (metadata as Record<string, unknown>) || {};
+    const raw = meta.lastChargeStartedAt;
+    if (typeof raw !== "string") return false;
+    const startedAt = new Date(raw).getTime();
+    if (Number.isNaN(startedAt)) return false;
+    return Date.now() - startedAt < windowMin * 60 * 1000;
+  }
+
   async expireUnpaidOrders(): Promise<{ count: number }> {
     const now = new Date();
     const expired = await this.prisma.order.findMany({
@@ -549,6 +569,26 @@ export class PaymentReconciliationService {
             select: { status: true, quantity: true },
           });
           if (!fresh || fresh.status !== OrderStatus.pending_payment) return;
+
+          // FLOW-H3: Canlı bir 3DS çekimi varsa 24s kill-switch'i siparişi ÖLDÜRMESİN
+          // (orphan capture). Siparişin (veya grubunun) pending/processing ödemesinin
+          // son charge-start'ı pencere içindeyse bu tur atla; bir sonraki turda tekrar
+          // bakılır (charge penceresi kapanınca iptal edilir).
+          const livePayment = await tx.payment.findFirst({
+            where: {
+              OR: [
+                { orderId: order.id },
+                { checkoutGroup: { orders: { some: { id: order.id } } } },
+              ],
+              status: {
+                in: [PaymentStatus.pending, PaymentStatus.processing],
+              },
+            },
+            select: { metadata: true },
+          });
+          if (livePayment && this.isChargeLikelyLive(livePayment.metadata)) {
+            return;
+          }
 
           // Rezerv hâlâ canlıysa serbest bırak (rare: 30dk cron'u kaçırdı)
           if (!order.reservationReleasedAt && order.productId) {
@@ -1066,6 +1106,14 @@ export class PaymentReconciliationService {
       try {
         // Trade cash vb. siparişsiz/grupsuz ödemeleri bu cron'da atlama (eski davranış order'a bağlıydı)
         if (!payment.order && !payment.checkoutGroup) {
+          continue;
+        }
+
+        // FLOW-H2: Fail penceresini `createdAt` yerine son 3DS charge-start'ından say.
+        // Kullanıcı initiate'ten çok sonra 3DS'e girdiyse (createdAt eski, charge yeni)
+        // canlı oturum hâlâ açıktır → bu payment'ı `failed` YAPMA (orphan capture).
+        // Bir sonraki turda charge penceresi kapanınca failed edilir.
+        if (this.isChargeLikelyLive(payment.metadata)) {
           continue;
         }
 

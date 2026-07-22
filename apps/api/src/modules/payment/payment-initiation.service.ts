@@ -903,7 +903,15 @@ export class PaymentInitiationService {
         providerPaymentId: null,
         status: PaymentStatus.processing,
         failureReason: null,
-        metadata: { ...prevMeta, merchantOidHistory: oidHistory },
+        // FLOW-H2: 3DS çekiminin BAŞLADIĞI an. Ödeme-satırını-failed-yapma penceresi
+        // (cancelExpiredPayments) ve 24s sipariş kill-switch'i (expireUnpaidOrders)
+        // bunu `createdAt` yerine kullanır: kullanıcı initiate'ten çok sonra 3DS'e
+        // girse bile (createdAt eski, charge yeni) canlı 3DS oturumu iptal EDİLMEZ.
+        metadata: {
+          ...prevMeta,
+          merchantOidHistory: oidHistory,
+          lastChargeStartedAt: new Date().toISOString(),
+        },
       },
     });
     if (claimed.count === 0) {
