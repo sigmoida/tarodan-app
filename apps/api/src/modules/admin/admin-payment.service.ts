@@ -419,7 +419,10 @@ export class AdminPaymentService {
   ) {
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
-      include: { order: true },
+      include: {
+        order: true,
+        tradeCashPayment: { select: { tradeId: true } },
+      },
     });
 
     if (!payment) {
@@ -429,6 +432,44 @@ export class AdminPaymentService {
     if (payment.status !== PaymentStatus.completed) {
       throw new BadRequestException(
         "Sadece tamamlanmış ödemeler iade edilebilir",
+      );
+    }
+
+    // MONEY-L1: Grup (checkoutGroupId, orderId NULL) ve trade (tradeCashPaymentId)
+    // ödemelerinde payment.orderId NULL'dur → eski kod processRefund(null) çağırıp
+    // yanlış/karışık davranıyordu. Ödeme tipini ayır:
+    if (!payment.orderId) {
+      // Trade nakit ödemesi → takas iade yolu (tam tutar; kısmi trade iadesi yok).
+      if (payment.tradeCashPayment?.tradeId) {
+        const tradeId = payment.tradeCashPayment.tradeId;
+        const res = await this.paymentService.refundTradeCashTracked(tradeId);
+        await this.audit.createAuditLog(
+          adminId,
+          "payment_manual_refund",
+          "Payment",
+          paymentId,
+          { status: payment.status, amount: Number(payment.amount) },
+          {
+            tradeCashRefund: true,
+            tradeId,
+            reason: reason || "Admin tarafından manuel iade",
+          },
+        );
+        if (res.failed) {
+          throw new BadRequestException(
+            `Takas iadesi başarısız: ${res.reason ?? "bilinmeyen hata"} (retry cron devreye girer)`,
+          );
+        }
+        return {
+          success: res.refunded,
+          tradeId,
+          reason: reason || "Admin tarafından manuel iade",
+        };
+      }
+      // Grup (sepet) ödemesi: manuel tam-iade buradan yapılamaz (hangi sipariş
+      // belirsiz) — admin ilgili siparişleri sipariş bazında iade etmeli.
+      throw new BadRequestException(
+        "Grup (sepet) ödemesi manuel iadesi buradan yapılamaz — ilgili siparişleri sipariş bazında iade edin.",
       );
     }
 

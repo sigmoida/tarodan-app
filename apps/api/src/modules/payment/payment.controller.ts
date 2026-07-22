@@ -88,7 +88,11 @@ export class PaymentController {
   @Public()
   getPublicConfig(): { bypassEnabled: boolean; recurringEnabled: boolean } {
     return {
-      bypassEnabled: this.configService.get("PAYMENT_BYPASS") === "true",
+      // SEC-H1: bypass yalnız non-production'da GERÇEKTEN çalışır; prod'da her zaman
+      // false raporla — hem yanıltıcı bir "true" sızdırma hem de UI'ı yanlış yönlendirme.
+      bypassEnabled:
+        this.configService.get("PAYMENT_BYPASS") === "true" &&
+        process.env.NODE_ENV !== "production",
       // Kayıtlı kart + oto-yenileme (Non3D) PayTR yetkisine bağlı; kapalıyken frontend
       // kayıtlı-kart UI'ını ve "kartı kaydet" seçeneğini gizler.
       recurringEnabled:
@@ -381,14 +385,18 @@ export class PaymentController {
    * POST /payments/:id/bypass-complete - Dev/test only: complete payment without PayTR
    */
   @Post(":id/bypass-complete")
-  @Public()
+  // SEC-H1: dev/test-only bir uç NEDEN public olmamalı — auth + ownership + servis
+  // içinde production sert-reddi ile üç katmanlı kilit.
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: "Bypass payment (dev/test only)" })
   @ApiParam({ name: "id", description: "Payment ID" })
   @ApiResponse({ status: HttpStatus.OK, description: "Payment bypassed" })
   async bypassComplete(
     @Param("id") paymentId: string,
+    @CurrentUser("id") userId: string,
   ): Promise<{ success: boolean }> {
-    return this.paymentService.bypassCompletePayment(paymentId);
+    return this.paymentService.bypassCompletePayment(paymentId, userId);
   }
 
   /**

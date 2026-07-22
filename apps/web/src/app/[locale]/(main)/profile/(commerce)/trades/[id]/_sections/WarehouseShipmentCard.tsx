@@ -39,11 +39,17 @@ export default function WarehouseShipmentCard({
         <p className="text-xs uppercase text-subtle mb-1">
           {t("trade.warehouseShipping.yourShipment")}
         </p>
-        <p className="font-mono text-base font-bold text-heading break-all">
-          {myToWarehouseShipment?.cargoCode ??
-            myToWarehouseShipment?.trackingNumber ??
-            "—"}
-        </p>
+        {/* L1: gerçek Sürat kodu yoksa iç referansı (trackingNumber) KOD GİBİ
+           gösterme — şubede geçersiz. Kod gelene dek bekleme mesajı. */}
+        {myToWarehouseShipment?.cargoCode ? (
+          <p className="font-mono text-base font-bold text-heading break-all">
+            {myToWarehouseShipment.cargoCode}
+          </p>
+        ) : (
+          <p className="text-sm text-muted italic">
+            {t("order.cargoCodePending")}
+          </p>
+        )}
         <p className="text-xs text-muted mt-2">
           {t("trade.warehouseShipping.handIn")}
         </p>

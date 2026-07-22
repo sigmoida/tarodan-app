@@ -69,8 +69,9 @@ export class PaymentService {
 
   async bypassCompletePayment(
     paymentId: string,
+    userId?: string,
   ): Promise<{ success: boolean }> {
-    return this.paymentInitiation.bypassCompletePayment(paymentId);
+    return this.paymentInitiation.bypassCompletePayment(paymentId, userId);
   }
 
   async handlePayTRCallback(dto: PayTRCallbackDto) {
@@ -113,6 +114,15 @@ export class PaymentService {
     skippedReason?: string;
   }> {
     return this.paymentRefund.refundTradeCashPaymentIfCompleted(tradeId);
+  }
+
+  async refundTradeCashTracked(tradeId: string): Promise<{
+    refunded: boolean;
+    failed: boolean;
+    skippedReason?: string;
+    reason?: string;
+  }> {
+    return this.paymentRefund.refundTradeCashTracked(tradeId);
   }
 
   async releasePayment(orderId: string) {
@@ -224,6 +234,21 @@ export class PaymentService {
     completed: number;
   }> {
     return this.paymentReconciliation.reconcilePendingPaytrPayments();
+  }
+
+  async detectOrphanCapturedFailedPayments(): Promise<{
+    checked: number;
+    recovered: number;
+    alarms: number;
+  }> {
+    return this.paymentReconciliation.detectOrphanCapturedFailedPayments();
+  }
+
+  async reconcileStuckRefundMarkers(): Promise<{
+    checked: number;
+    recovered: number;
+  }> {
+    return this.paymentReconciliation.reconcileStuckRefundMarkers();
   }
 
   // Taşındı: payment-reconciliation.service.ts — facade delege (imza aynı).

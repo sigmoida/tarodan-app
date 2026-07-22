@@ -1014,7 +1014,12 @@ export class TradeLifecycleService {
     });
 
     if (!alreadyCancelled) {
-      await this.paymentService.refundTradeCashPaymentIfCompleted(tradeId);
+      // MONEY-H2: iade FAILURE-TRACKING ile yapılır. Takas TX içinde zaten cancelled
+      // commit edildi; iade PayTR'da patlarsa iptali geri alamayız — bunun yerine
+      // refundTradeCashTracked, trade.refundFailureReason marker'ını yazar ki admin
+      // retryTradeRefund + retryFailedTradeRefunds cron'u parayı toparlasın (yoksa
+      // eski davranışta throw kullanıcıya 500 döner ve iade sessizce takılırdı).
+      await this.paymentService.refundTradeCashTracked(tradeId);
 
       // Cancel Sürat shipments if any (e.g. trades cancelled after admin approval)
       await this.tradeShipment.cancelSuratShipmentsForTrade(tradeId);
@@ -1454,7 +1459,23 @@ export class TradeLifecycleService {
     let resolvedTradeInitiatorId: string;
 
     if (newStatus === TradeStatus.cancelled) {
-      await this.paymentService.refundTradeCashPaymentIfCompleted(tradeId);
+      // MONEY-M5: İade + Sürat iptalinden ÖNCE trade'in GERÇEKTEN `disputed` olduğunu
+      // doğrula. Eskiden iade/iptal tx doğrulamasından ÖNCE yapılıyordu → trade disputed
+      // DEĞİLSE (zaten çözülmüş / yanlış statü) tx guard'ı sonradan patlıyor ama PARA
+      // ÇOKTAN İADE edilmiş oluyordu. Bu pre-check read-only; aşağıdaki tx'in kilitli
+      // guard'ı atomik garantiyi korumaya devam eder (refundTradeCashTracked'in kendi
+      // completed/released/refunded guard'ları da ikinci katman).
+      const current = await this.prisma.trade.findUnique({
+        where: { id: tradeId },
+        select: { status: true },
+      });
+      if (!current || current.status !== TradeStatus.disputed) {
+        throw new BadRequestException(
+          i18nMessage("server.trade.tradeNotInDisputeStatus"),
+        );
+      }
+      // MONEY-H2: iade FAILURE-TRACKING ile (marker + retry cron).
+      await this.paymentService.refundTradeCashTracked(tradeId);
       // Cancel any active Sürat shipments (from_warehouse legs after admin approval)
       await this.tradeShipment.cancelSuratShipmentsForTrade(tradeId);
     }

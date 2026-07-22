@@ -39,7 +39,37 @@ export class ShippingSchedulerService implements OnModuleInit {
 
   /** Gerçek iş — hem in-process cron hem Bull processor buradan çağırır. */
   async runSyncSuratTracking(log: (msg: string) => void = () => {}) {
-    const stats = { shipmentSynced: 0, tradeSynced: 0, refundSynced: 0, failed: 0 };
+    const stats = {
+      barcodeRetried: 0,
+      barcodeRetryFailed: 0,
+      shipmentSynced: 0,
+      tradeSynced: 0,
+      refundSynced: 0,
+      failed: 0,
+    };
+
+    // Önce kodsuz kalmış kayıtlar için barkodu yeniden dene (yaş-filtreli), sonra
+    // durum senkronu — böylece yeni üretilen kodların durumu aynı tick'te çekilir.
+    // (Refund iade barkodunun retry'ı burada DEĞİL: openReturnShipment blocking
+    // olduğundan kodsuz "surat" kaydı oluşamaz; refund-scheduler 10 dk'da bir tam
+    // açılışı yeniden dener.)
+    try {
+      const retry = await this.suratTracking.retryPendingBarcodes();
+      stats.barcodeRetried = retry.order.retried + retry.trade.retried;
+      stats.barcodeRetryFailed = retry.order.failed + retry.trade.failed;
+      if (stats.barcodeRetried > 0 || stats.barcodeRetryFailed > 0) {
+        log(
+          `Kargo kodu retry: ${stats.barcodeRetried} tamamlandı, ${stats.barcodeRetryFailed} başarısız`,
+        );
+        this.logger.log(
+          `Surat barcode retry: ${stats.barcodeRetried} filled, ${stats.barcodeRetryFailed} failed ` +
+            `(order ${retry.order.retried}/${retry.order.failed}, trade ${retry.trade.retried}/${retry.trade.failed})`,
+        );
+      }
+    } catch (error: any) {
+      this.logger.error(`Surat barcode retry error: ${error.message}`);
+      log(`Kargo kodu retry HATASI: ${error.message}`);
+    }
 
     try {
       const result = await this.suratTracking.syncAllActiveShipments();
@@ -80,7 +110,20 @@ export class ShippingSchedulerService implements OnModuleInit {
       log(`İade kargo senkron HATASI: ${error.message}`);
     }
 
+    // İnsani senaryolar (A9 ghost-pickup, B15/D27 kayıp şüphesi): bayat kargo
+    // alarmları — kayıt başına haftada bir, log-tabanlı uyarı kanalına.
+    try {
+      await this.suratTracking.alertStaleCargo();
+    } catch (error: any) {
+      this.logger.error(`Stale cargo alert error: ${error.message}`);
+    }
+
     const totalSynced = stats.shipmentSynced + stats.tradeSynced + stats.refundSynced;
-    return { summary: `${totalSynced} kargo güncellendi · ${stats.failed} başarısız`, stats };
+    const retrySummary =
+      stats.barcodeRetried > 0 ? ` · ${stats.barcodeRetried} kod tamamlandı` : '';
+    return {
+      summary: `${totalSynced} kargo güncellendi · ${stats.failed} başarısız${retrySummary}`,
+      stats,
+    };
   }
 }

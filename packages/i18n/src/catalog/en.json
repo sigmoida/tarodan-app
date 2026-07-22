@@ -846,7 +846,9 @@
     "trackingAppearsAfterDropoff": "Once the branch receives your package, the Sürat tracking number will appear here automatically (within 30 minutes).",
     "cargoCodeInstructions": "Hand this cargo number to the Sürat Kargo branch when dropping off your package. Your shipment is registered in Sürat's system under this number.",
     "cargoCodeCopied": "Cargo number copied",
-    "cargoCodePending": "Your cargo number is being generated. It will appear here in a few minutes.",
+    "cargoCodePending": "Your cargo number is being generated. It will appear here in a few minutes. We will notify you when it is ready.",
+    "cargoOneParcelPerOrder": "Have more than one order? Prepare a SEPARATE parcel for each order and hand each one in with its own cargo code — do not combine multiple orders into one parcel; otherwise your other orders will appear unshipped.",
+    "cargoFeeCoveredNotice": "Shipping is paid by Tarodan; the branch will not charge you. The branch may measure the package on drop-off.",
     "refundWindowPassed": "The 14-day refund window has passed; a refund can no longer be requested for this order.",
     "cancelOrderConfirm": "Cancel this order? Your payment will be refunded.",
     "refundTitle": "Refund",
@@ -5322,6 +5324,18 @@
         "title": "Stuck Trade — Admin Action Required",
         "message": "Trade {tradeNumber} reached the warehouse but timed out; a manual force-cancel-stuck is required."
       },
+      "tradeAddressRequired": {
+        "title": "Address Needed — Trade Shipping",
+        "message": "Shipping for your trade {tradeNumber} could not start: you have no saved address. Add an address in your profile and the shipment will be created automatically."
+      },
+      "cargoCodeReady": {
+        "title": "Your Cargo Code Is Ready",
+        "message": "The cargo code for {reference} has been created. View the code and drop the package off at a Sürat Kargo branch."
+      },
+      "cargoMovementMissing": {
+        "title": "No Movement On Your Shipment",
+        "message": "You marked the package for order {reference} as handed to cargo, but Sürat has no record of it. If you have not dropped it off yet, please take it to a branch soon — otherwise the order may be cancelled."
+      },
       "offerAutoRejected": {
         "title": "Your Offer Was Closed",
         "message": "{cancelReason}"
@@ -5364,7 +5378,7 @@
       },
       "refundReturnDeliveredSeller": {
         "title": "The Returned Product Reached You",
-        "message": "The returned product for refund {refundNumber} has been delivered to you."
+        "message": "The returned product for refund {refundNumber} has been delivered to you. Please inspect the package within 24 hours; contact support if there is a problem — otherwise the refund completes automatically."
       },
       "refundCompletedSeller": {
         "title": "Refund Completed",

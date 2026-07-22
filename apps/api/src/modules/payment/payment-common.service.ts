@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { PaymentStatus } from "@prisma/client";
+import { asPaymentMetadata } from "./payment-metadata.types";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import {
   normalizeSuratPhone,
@@ -170,6 +171,84 @@ export class PaymentCommonService {
   }
 
   /**
+   * Sipariş için Sürat kargo kaydını garanti eder — fulfillment ve retry job'un
+   * ORTAK yolu:
+   * - kayıt yoksa oluşturur (M1: barkod Sürat'ta oluşup lokal create patladıysa
+   *   ödeme idempotent olduğundan fulfillment bir daha denemez; retry buradan
+   *   tamamlar — idempotency cache aynı OzelKargoTakipNo'ya aynı kodu döndürür,
+   *   çift kayıt oluşmaz),
+   * - kayıt `cancelled` ise (H4: iptal edilip yeniden ödenen sipariş; orderId
+   *   @unique olduğundan yeni satır açılamaz) pending'e revive edip YENİ gerçek
+   *   kod üretir — iptal, Sürat kaydını GonderiSil ile silmiş ve idempotency
+   *   cache'ini temizlemişti, dolayısıyla taze çağrı gerçekten yeni gönderi açar,
+   * - sağlıklı kayıt varsa dokunmaz.
+   * Non-blocking: barkod üretilemezse kayıt kodsuz `pending` kalır (retry tamamlar).
+   */
+  async ensureSuratShipmentForOrder(
+    orderId: string,
+  ): Promise<"created" | "revived" | "exists" | "skipped"> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, orderNumber: true, shippingCost: true },
+    });
+    if (!order) return "skipped";
+
+    const existing = await this.prisma.shipment.findFirst({
+      where: { orderId },
+    });
+    if (existing && existing.status !== "cancelled") return "exists";
+
+    // Gerçek Sürat kodu (KargoTakipNo) + ZPL etiket — non-blocking, hata → null.
+    const barcode = await this.createSuratBarcodeForOrder(orderId);
+    const estimatedDelivery = new Date();
+    estimatedDelivery.setDate(estimatedDelivery.getDate() + 3);
+
+    if (!existing) {
+      await this.prisma.shipment.create({
+        data: {
+          orderId,
+          provider: "surat",
+          status: "pending",
+          // trackingNumber = OzelKargoTakipNo (sipariş no) — poller bununla
+          // sorgular; gerçek kod providerTrackingId'de.
+          trackingNumber: order.orderNumber,
+          providerTrackingId: barcode?.kargoTakipNo ?? null,
+          labelZpl: barcode?.labelZpl ?? null,
+          cost: Number(order.shippingCost),
+          estimatedDelivery,
+        },
+      });
+      this.logger.log(
+        `Auto-created shipment for order ${order.orderNumber} kargoTakipNo=${barcode?.kargoTakipNo ?? "PENDING"}`,
+      );
+      return "created";
+    }
+
+    // H4 revive: eski `cancelled` satırı sıfırla — takip alanları temizlenir,
+    // trackingNumber sipariş no olarak kalır (sorgu referansı değişmez).
+    await this.prisma.shipment.update({
+      where: { id: existing.id },
+      data: {
+        status: "pending" as any,
+        trackingNumber: order.orderNumber,
+        providerTrackingId: barcode?.kargoTakipNo ?? null,
+        labelZpl: barcode?.labelZpl ?? null,
+        estimatedDelivery,
+        trackingUrl: null,
+        deliveredAt: null,
+        receivedBy: null,
+        providerStatusCode: null,
+        providerRawStatus: null,
+        returnReason: null,
+      },
+    });
+    this.logger.log(
+      `Revived cancelled shipment for re-paid order ${order.orderNumber} kargoTakipNo=${barcode?.kargoTakipNo ?? "PENDING"}`,
+    );
+    return "revived";
+  }
+
+  /**
    * Log payment action to audit log
    * Note: AuditLog requires adminUserId, so we only log admin actions
    * For user actions, we store in payment metadata
@@ -262,6 +341,48 @@ export class PaymentCommonService {
    * taşır (kullanıcı eski oid'le öderse callback yine eşleşir). process-direct daha sonra
    * kendi oid'iyle bunu tazeler (aynı history mantığı).
    */
+  /**
+   * FLOW-H1/M3: Bir ödemenin PayTR durum-sorgusuyla denenecek TÜM oid'lerini döndürür:
+   * güncel `providerConversationId` + `metadata.merchantOidHistory`'deki rotate edilmiş
+   * eski oid'ler (dedup, trimli). Re-init oid'i döndürdüğünden capture ESKİ bir oid'de
+   * olmuş olabilir; tek oid sorgusu bunu kaçırır (çift-çekim / sahipsiz capture). Çift-çekim
+   * guard'ı (verifyPaymentFromClient) ve reconciler bu listeyi tarar.
+   */
+  collectPaymentOids(payment: {
+    providerConversationId: string | null;
+    metadata: unknown;
+  }): string[] {
+    const oids: string[] = [];
+    const current = (payment.providerConversationId || "").trim();
+    if (current) oids.push(current);
+    const meta = asPaymentMetadata(payment.metadata);
+    const history = meta.merchantOidHistory;
+    if (Array.isArray(history)) {
+      for (const h of history) {
+        const t = String(h ?? "").trim();
+        if (t && !oids.includes(t)) oids.push(t);
+      }
+    }
+    return oids;
+  }
+
+  /**
+   * FLOW-H2/H3 + SEC-M1: Ödemenin son 3DS çekimi hâlâ "canlı" olabilir mi?
+   * metadata.lastChargeStartedAt (charge-claim anında damgalanır) windowMinutes
+   * içindeyse EVET → bu payment `failed` yapılmamalı (cancelExpiredPayments,
+   * expireUnpaidOrders, confirmFailedFromClient hepsi bunu kontrol eder), aksi halde
+   * kullanıcı OTP ekranındayken PayTR çeker ve callback geldiğinde satır failed olur
+   * → orphan capture. Saf fonksiyon; config'i çağıran okur.
+   */
+  isChargeLikelyLive(metadata: unknown, windowMinutes: number): boolean {
+    const meta = asPaymentMetadata(metadata);
+    const raw = meta.lastChargeStartedAt;
+    if (typeof raw !== "string") return false;
+    const startedAt = new Date(raw).getTime();
+    if (Number.isNaN(startedAt)) return false;
+    return Date.now() - startedAt < windowMinutes * 60 * 1000;
+  }
+
   async assignMerchantOid(
     paymentId: string,
     baseOidRaw: string,

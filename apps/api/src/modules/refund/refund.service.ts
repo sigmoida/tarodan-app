@@ -18,6 +18,8 @@ import { PrismaService } from "../../prisma";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
 import { PaymentService } from "../payment/payment.service";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
+import { SuratTrackingService } from "../surat-cargo/surat-tracking.service";
+import { canTransitionShipmentStatus } from "../shipping/shipment-state-machine";
 import {
   normalizeSuratPhone,
   normalizeSuratLocation,
@@ -52,6 +54,7 @@ export class RefundService {
     private readonly prisma: PrismaService,
     private readonly paymentService: PaymentService,
     private readonly suratCargoService: SuratCargoService,
+    private readonly suratTrackingService: SuratTrackingService,
     private readonly notificationService: NotificationService,
     private readonly storageService: StorageService,
   ) {}
@@ -324,6 +327,54 @@ export class RefundService {
     return updated;
   }
 
+  /**
+   * MONEY-H6: Admin, TAKILI bir iade talebini para iade ETMEDEN force-KAPATIR →
+   * hold kilidi (frozenByRefundId) kalkar, satıcıya normal escrow akışında ödeme
+   * gider. Teslim SONRASI açılıp alıcının hiç tamamlamadığı (`return_in_transit`/
+   * `disputed`/`approved`/`wait_for_delivery`/`return_shipment_open`) iadelerde hold
+   * `releaseAt`'i geçse bile donuk kaldığından satıcı hiç ödenmiyordu — terminal kaçış.
+   * Zaten refunded ise reddedilir; zaten cancelled ise idempotent no-op.
+   */
+  async adminCloseRefundRequest(
+    refundRequestId: string,
+    adminId: string,
+    reason?: string,
+  ) {
+    const rr = await this.prisma.refundRequest.findUnique({
+      where: { id: refundRequestId },
+      include: { order: { select: { id: true, sellerId: true } } },
+    });
+    if (!rr) throw new NotFoundException(i18nMessage("server.refund.notFound"));
+    if (rr.status === RefundRequestStatus.refunded) {
+      throw new BadRequestException(
+        i18nMessage("server.refund.cannotCancelAnymore"),
+      );
+    }
+    if (rr.status === RefundRequestStatus.cancelled) {
+      return rr; // idempotent
+    }
+    const updated = await this.prisma.refundRequest.update({
+      where: { id: refundRequestId },
+      data: {
+        status: RefundRequestStatus.cancelled,
+        decidedAt: new Date(),
+        decidedBy: adminId,
+      },
+    });
+    // Hold kilidini kaldır → satıcıya normal escrow akışında ödeme.
+    await this.unfreezeHoldForRefund(rr.order.id);
+    await this.appendHistory(refundRequestId, {
+      action: "closed_by_admin",
+      by: adminId,
+      details: { previousStatus: rr.status, reason: reason ?? null },
+    });
+    await this.safeNotify(rr.requesterId, NotificationType.REFUND_CANCELLED, {
+      refundNumber: rr.refundNumber,
+      orderId: rr.order.id,
+    });
+    return updated;
+  }
+
   async getById(refundRequestId: string, userId: string, isAdmin = false) {
     const rr = await this.prisma.refundRequest.findUnique({
       where: { id: refundRequestId },
@@ -539,17 +590,57 @@ export class RefundService {
     if (!rr) throw new NotFoundException(i18nMessage("server.refund.notFound"));
     if (rr.status === RefundRequestStatus.refunded) return rr;
 
-    const refundResult = await this.paymentService.processRefund(
-      rr.orderId,
-      Number(rr.amount),
-      { skipRefundEvent: true, refundQuantity: rr.refundQuantity }, // REFUND_COMPLETED'ı aşağıda kendimiz gönderiyoruz
-    );
+    // MONEY-M1: Atomik CLAIM. Bu metod 3 yoldan EŞZAMANLI çağrılabilir
+    // (finalizeReturnedShipments cron + Sürat sync + admin forceFinalize). Eski
+    // `status===refunded` guard'ı TOCTOU'ya açıktı: ikisi de `return_delivered` okuyup
+    // processRefund + finalize yan-etkilerini (order-update, history, ÇİFT bildirim/mail)
+    // tekrarlardı. Yalnız BİR çağıran `return_delivered→refunded` geçişini kazanır;
+    // count===0 → başka biri aldı → tekrarlama. (processRefund'ın kendi refundInProgress
+    // marker'ı PayTR çift-çağrısını zaten engelliyor; bu CAS finalize yan-etkilerini tekilleştirir.)
+    const claimed = await this.prisma.refundRequest.updateMany({
+      where: {
+        id: refundRequestId,
+        status: RefundRequestStatus.return_delivered,
+      },
+      data: { status: RefundRequestStatus.refunded, refundedAt: new Date() },
+    });
+    if (claimed.count === 0) {
+      return (
+        (await this.prisma.refundRequest.findUnique({
+          where: { id: refundRequestId },
+        })) ?? rr
+      );
+    }
 
+    let refundResult: { providerRefundId: string };
+    try {
+      refundResult = await this.paymentService.processRefund(
+        rr.orderId,
+        Number(rr.amount),
+        { skipRefundEvent: true, refundQuantity: rr.refundQuantity }, // REFUND_COMPLETED'ı aşağıda kendimiz gönderiyoruz
+      );
+    } catch (err) {
+      // processRefund BAŞARISIZ → claim'i GERİ AL (return_delivered) ki cron retry etsin.
+      // (Money iade edilmedi; yalnız claim kilidini bıraktık.)
+      await this.prisma.refundRequest
+        .updateMany({
+          where: {
+            id: refundRequestId,
+            status: RefundRequestStatus.refunded,
+          },
+          data: {
+            status: RefundRequestStatus.return_delivered,
+            refundedAt: null,
+          },
+        })
+        .catch(() => undefined);
+      throw err;
+    }
+
+    // Money iade EDİLDİ — buradan sonrası best-effort (claim geri ALINMAZ).
     const updated = await this.prisma.refundRequest.update({
       where: { id: rr.id },
       data: {
-        status: RefundRequestStatus.refunded,
-        refundedAt: new Date(),
         providerRefundId: refundResult.providerRefundId,
         returnDeliveredAt: rr.returnDeliveredAt ?? new Date(),
       },
@@ -606,10 +697,195 @@ export class RefundService {
     return candidates.map((c) => c.id);
   }
 
-  // return_delivered'dan 30 dk sonra Sürat takibi hâlâ refund başlatmadıysa
-  // (entegrasyon kapalı veya callback eksik) cron fallback olarak işler.
+  /**
+   * D25 (insani senaryo): alıcı iadeyi açtı ama paketi hiç şubeye götürmedi —
+   * satıcının hold'u süresiz donuk kalıyordu. `return_shipment_open` + N gün
+   * (env REFUND_RETURN_DROPOFF_DAYS, vars. 7) hareketsiz kalan Sürat iadelerini
+   * iptal eder: hold çözülür, Sürat kaydı silinir (kod artık şubede
+   * kullanılamaz), alıcıya bildirim gider.
+   *
+   * Güvenlik: iptal ETMEDEN önce Sürat'tan CANLI takip çekilir — pakette
+   * hareket varsa (alıcı son anda götürdü, poll henüz görmedi) iptal atlanır ve
+   * normal poll akışına bırakılır. Sorgu başarısızsa da (belirsizlik) iptal
+   * edilmez, sonraki tick tekrar dener. Yalnız `surat` iadeler: manuel iade
+   * poll'lanamadığından yanlış iptal riski var → ops takibi.
+   */
+  async expireStaleOpenReturns(): Promise<number> {
+    const days = Number(process.env.REFUND_RETURN_DROPOFF_DAYS) || 7;
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    let stale: Array<{
+      id: string;
+      refundNumber: string;
+      requesterId: string;
+      order: { id: string; sellerId: string };
+    }>;
+    try {
+      stale = await this.prisma.refundRequest.findMany({
+        where: {
+          status: RefundRequestStatus.return_shipment_open,
+          returnProvider: "surat",
+          returnCreatedAt: { lt: cutoff },
+        },
+        select: {
+          id: true,
+          refundNumber: true,
+          requesterId: true,
+          order: { select: { id: true, sellerId: true } },
+        },
+        take: 25,
+      });
+    } catch (e: any) {
+      this.logger.error(`expireStaleOpenReturns query failed: ${e?.message}`);
+      return 0;
+    }
+
+    let expired = 0;
+    for (const rr of stale) {
+      try {
+        // Canlı doğrulama: pakette hareket varsa iptal etme.
+        const live = await this.suratTrackingService.fetchTrackingInfo(
+          rr.refundNumber,
+        );
+        if (!live) continue; // belirsizlik → bu tick atla
+        const gonderi = live.Gonderiler?.[0];
+        const hasMovement =
+          !!gonderi &&
+          ((gonderi.Hareketler?.length ?? 0) > 0 ||
+            (gonderi.KargonunDurumuSayi ?? 1) >= 2);
+        if (hasMovement) {
+          this.logger.log(
+            `Skip expiry for ${rr.refundNumber}: live Surat data shows movement; poll will pick it up`,
+          );
+          continue;
+        }
+
+        await this.prisma.refundRequest.update({
+          where: { id: rr.id },
+          data: {
+            status: RefundRequestStatus.cancelled,
+            decidedAt: new Date(),
+            decidedBy: "system",
+          },
+        });
+        // Hold kilidini kaldır → normal escrow akışına dönsün.
+        await this.unfreezeHoldForRefund(rr.order.id);
+        // Sürat'taki iade gönderisini sil — süresi dolmuş kod şubede kullanılamasın
+        // (best-effort; idempotency cache'i de temizlenir).
+        await this.suratCargoService
+          .cancelShipmentByOrderNumber(rr.refundNumber)
+          .catch(() => undefined);
+        await this.appendHistory(rr.id, {
+          action: "return_dropoff_expired",
+          by: "system",
+          details: { days },
+        });
+        await this.safeNotify(
+          rr.requesterId,
+          NotificationType.REFUND_CANCELLED,
+          {
+            refundNumber: rr.refundNumber,
+            orderId: rr.order.id,
+          },
+        );
+        expired++;
+        this.logger.log(
+          `Refund ${rr.refundNumber} expired: return not dropped off within ${days}d`,
+        );
+      } catch (e: any) {
+        this.logger.error(
+          `Failed to expire stale refund ${rr.id}: ${e?.message}`,
+        );
+      }
+    }
+    return expired;
+  }
+
+  /**
+   * MONEY-H6: `wait_for_delivery`'de N günden (REFUND_WAIT_DELIVERY_MAX_DAYS, vars. 30)
+   * uzun TAKILI iadeler — orijinal sipariş hiç teslim edilmediğinden return HİÇ açılmadı,
+   * hold süresiz donuk kaldı. İptal et + hold kilidini kaldır (satıcı normal escrow akışına
+   * döner; sipariş sonradan teslim olursa alıcı yeni talep açabilir). return_shipment_open
+   * ayrı bir sweep'le (D25) ele alınır; bu yalnız wait_for_delivery'yi hedefler.
+   */
+  async expireStaleWaitForDelivery(): Promise<number> {
+    const days = Number(process.env.REFUND_WAIT_DELIVERY_MAX_DAYS) || 30;
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    let stale: Array<{
+      id: string;
+      refundNumber: string;
+      requesterId: string;
+      order: { id: string; sellerId: string };
+    }>;
+    try {
+      stale = await this.prisma.refundRequest.findMany({
+        where: {
+          status: RefundRequestStatus.wait_for_delivery,
+          createdAt: { lt: cutoff },
+        },
+        select: {
+          id: true,
+          refundNumber: true,
+          requesterId: true,
+          order: { select: { id: true, sellerId: true } },
+        },
+        take: 25,
+      });
+    } catch (e: any) {
+      this.logger.error(
+        `expireStaleWaitForDelivery query failed: ${e?.message}`,
+      );
+      return 0;
+    }
+
+    let expired = 0;
+    for (const rr of stale) {
+      try {
+        await this.prisma.refundRequest.update({
+          where: { id: rr.id },
+          data: {
+            status: RefundRequestStatus.cancelled,
+            decidedAt: new Date(),
+            decidedBy: "system",
+          },
+        });
+        await this.unfreezeHoldForRefund(rr.order.id);
+        await this.appendHistory(rr.id, {
+          action: "wait_for_delivery_expired",
+          by: "system",
+          details: { days },
+        });
+        await this.safeNotify(
+          rr.requesterId,
+          NotificationType.REFUND_CANCELLED,
+          {
+            refundNumber: rr.refundNumber,
+            orderId: rr.order.id,
+          },
+        );
+        expired++;
+        this.logger.log(
+          `Refund ${rr.refundNumber} expired: order not delivered within ${days}d (wait_for_delivery)`,
+        );
+      } catch (e: any) {
+        this.logger.error(
+          `Failed to expire stale wait_for_delivery refund ${rr.id}: ${e?.message}`,
+        );
+      }
+    }
+    return expired;
+  }
+
+  // D26 (insani senaryo): iade satıcıya teslim edildikten sonra parayı ANINDA
+  // iade etme — satıcıya kutuyu açıp kontrol etmesi için bir pencere tanı
+  // (REFUND_RETURN_INSPECTION_HOURS, vars. 24 saat). Sorun varsa admin kaydı
+  // `disputed` yapar; bu sorgu yalnız `return_delivered` seçtiğinden disputed
+  // kayıt finalize edilmez. Pencere dolunca cron otomatik finalize eder.
+  // (Poller'daki anlık finalize kaldırıldı — tek finalize yolu bu cron.)
   async findReturnDeliveredPendingFinalize(): Promise<string[]> {
-    const cutoff = new Date(Date.now() - 30 * 60 * 1000);
+    const hours = Number(process.env.REFUND_RETURN_INSPECTION_HOURS) || 24;
+    const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
     const rows = await this.prisma.refundRequest.findMany({
       where: {
         status: RefundRequestStatus.return_delivered,
@@ -624,6 +900,26 @@ export class RefundService {
     refundRequestId: string,
     update: { status: ShipmentStatus; deliveredAt?: Date; shippedAt?: Date },
   ) {
+    // L4: diğer iki poll path'indeki (shipment/trade) terminal-regresyon
+    // guard'ının paritesi — bayat/eski bir Sürat cevabı returnStatus'u geriye
+    // sarmasın (ör. returned → in_transit).
+    const current = await this.prisma.refundRequest.findUnique({
+      where: { id: refundRequestId },
+      select: { returnStatus: true },
+    });
+    if (
+      current?.returnStatus &&
+      !canTransitionShipmentStatus(
+        current.returnStatus as ShipmentStatus,
+        update.status,
+      )
+    ) {
+      this.logger.warn(
+        `Skipping illegal return-status transition ${current.returnStatus} → ${update.status} for refund ${refundRequestId}`,
+      );
+      return null;
+    }
+
     const updated = await this.prisma.refundRequest.update({
       where: { id: refundRequestId },
       data: {
@@ -947,7 +1243,17 @@ export class RefundService {
       order.status === OrderStatus.awaiting_buyer_confirmation ||
       order.status === OrderStatus.completed
     ) {
-      await this.openReturnShipment(created.id);
+      // Non-fatal: talep bu noktada zaten oluştu (hold frozen + bildirim gitti).
+      // Sürat çökükse hatayı alıcıya 500 olarak yansıtma — kayıt
+      // wait_for_delivery'de kalır ve refund-scheduler (10 dk) tam açılışı
+      // yeniden dener (findPendingDeliveryToOpenReturn bu durumu kapsar).
+      try {
+        await this.openReturnShipment(created.id);
+      } catch (e: any) {
+        this.logger.error(
+          `openReturnShipment failed inline for ${created.id} (${refundNumber}): ${e?.message}. Scheduler will retry.`,
+        );
+      }
       return this.prisma.refundRequest.findUnique({
         where: { id: created.id },
       });
@@ -986,6 +1292,12 @@ export class RefundService {
       phone: process.env.TARODAN_WAREHOUSE_PHONE?.trim() || "05000000000",
     };
   }
+
+  // NOT (M4): iade barkodu için ayrı bir retry yüzeyi YOK — bilinçli.
+  // openReturnShipment BLOCKING'tir: Sürat başarısızsa throw eder ve hiçbir şey
+  // yazmaz (returnProvider="surat" + kodsuz durum oluşamaz). Kurtarma yolu
+  // refund-scheduler'dır: kayıt wait_for_delivery'de kalır ve
+  // openReturnShipmentsForDeliveredOrders (10 dk) tam açılışı yeniden dener.
 
   /**
    * Admin: RefundRequest policy override (Faz 4B.1 + 4F).

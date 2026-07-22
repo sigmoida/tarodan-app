@@ -38,7 +38,7 @@ describe("PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
   };
 
   const mockPrisma = {
-    payment: { findFirst: jest.fn(), update: jest.fn() },
+    payment: { findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
     payoutTransfer: { findFirst: jest.fn() },
     $transaction: jest.fn(async (fn: (tx: typeof mockTx) => Promise<void>) => {
       await fn(mockTx);
@@ -201,5 +201,72 @@ describe("PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
     ).rejects.toMatchObject({
       response: { i18nKey: "server.payment.paymentNotYetSynced" },
     });
+  });
+
+  // MONEY-H1: Geçici PayTR hatasında (throw) refundInProgressAt marker'ı GERİ ALINMALI.
+  // Aksi halde marker kalır, sonraki deneme refundAlreadyInitiated=true görüp PayTR'yi
+  // ATLAR ve parayı iade ETMEDEN refunded işaretler (sahte iade).
+  it("MONEY-H1: geçici PayTR hatasında marker geri alınır (retry PayTR'yi tekrar çağırabilsin)", async () => {
+    mockPrisma.payment.findFirst.mockResolvedValue(basePayment({ foo: 1 }));
+    // clearTradeRefundInProgress fresh metadata okur → marker set edilmiş hâli döner
+    mockPrisma.payment.findUnique.mockResolvedValue({
+      metadata: { foo: 1, refundInProgressAt: "2026-07-22T00:00:00.000Z" },
+    });
+    mockPaytr.createRefund.mockRejectedValue(
+      new Error("odeme henuz siteye bildirilmemis"),
+    );
+
+    await expect(
+      service.refundTradeCashPaymentIfCompleted(TRADE_ID),
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.payment.paymentNotYetSynced" },
+    });
+
+    // Bir payment.update çağrısı, refundInProgressAt İÇERMEYEN metadata ile yapılmalı
+    // (marker temizleme). İlk update marker'ı YAZAR (içerir); temizleme onu SİLER.
+    const clearCall = mockPrisma.payment.update.mock.calls.find(
+      ([arg]: [{ data?: { metadata?: Record<string, unknown> } }]) =>
+        arg?.data?.metadata !== undefined &&
+        !("refundInProgressAt" in arg.data.metadata),
+    );
+    expect(clearCall).toBeDefined();
+  });
+
+  // FLOW-M5: iade GERÇEKTEN çekilen oid = providerConversationId ile yapılır. Bu yoksa
+  // gerçek yolda (bypass değil) eski kod UUID'yi oid sanıp yanlış çağrı yapıyordu; artık
+  // createRefund'a hiç gidilmeden reddedilir.
+  it("FLOW-M5: providerConversationId yoksa (gerçek yol) createRefund çağrılmadan reddedilir", async () => {
+    mockPrisma.payment.findFirst.mockResolvedValue({
+      ...basePayment({ foo: 1 }),
+      providerConversationId: null,
+    });
+
+    await expect(
+      service.refundTradeCashPaymentIfCompleted(TRADE_ID),
+    ).rejects.toThrow();
+    expect(mockPaytr.createRefund).not.toHaveBeenCalled();
+  });
+
+  // MONEY-H1: PayTR non-success status DÖNERSE de (throw değil) marker geri alınmalı.
+  it("MONEY-H1: PayTR non-success status'ta da marker geri alınır", async () => {
+    mockPrisma.payment.findFirst.mockResolvedValue(basePayment({ foo: 1 }));
+    mockPrisma.payment.findUnique.mockResolvedValue({
+      metadata: { foo: 1, refundInProgressAt: "2026-07-22T00:00:00.000Z" },
+    });
+    mockPaytr.createRefund.mockResolvedValue({
+      status: "failed",
+      err_msg: "insufficient balance",
+    });
+
+    await expect(
+      service.refundTradeCashPaymentIfCompleted(TRADE_ID),
+    ).rejects.toThrow();
+
+    const clearCall = mockPrisma.payment.update.mock.calls.find(
+      ([arg]: [{ data?: { metadata?: Record<string, unknown> } }]) =>
+        arg?.data?.metadata !== undefined &&
+        !("refundInProgressAt" in arg.data.metadata),
+    );
+    expect(clearCall).toBeDefined();
   });
 });

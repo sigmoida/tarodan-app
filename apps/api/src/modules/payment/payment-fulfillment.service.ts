@@ -54,15 +54,28 @@ export class PaymentFulfillmentService {
   async processSuccessfulPayment(
     payment: any,
     transactionId?: string,
+    // FLOW-M5: PayTR'da GERÇEKTEN çekilen merchant_oid. Re-init sonrası
+    // providerConversationId yeni oid'e dönmüş ama capture ESKİ oid'de olmuş
+    // olabilir (callback history-match ile tamamlar). İade doğru oid'i kullansın
+    // diye capture anında providerConversationId'yi çekilen oid'e senkronlarız.
+    capturedMerchantOid?: string,
   ): Promise<boolean> {
     // Trade cash payment: different flow from order payments
     if (payment.tradeCashPaymentId && !payment.orderId) {
-      return this.processSuccessfulTradeCashPayment(payment, transactionId);
+      return this.processSuccessfulTradeCashPayment(
+        payment,
+        transactionId,
+        capturedMerchantOid,
+      );
     }
 
     // Grup ödemesi: tüm grup siparişleri tek transaction'da işlenir
     if (payment.checkoutGroupId && !payment.orderId) {
-      return this.processSuccessfulGroupPayment(payment, transactionId);
+      return this.processSuccessfulGroupPayment(
+        payment,
+        transactionId,
+        capturedMerchantOid,
+      );
     }
 
     const cancelledOrders: {
@@ -107,6 +120,11 @@ export class PaymentFulfillmentService {
           status: PaymentStatus.completed,
           paidAt: new Date(),
           providerPaymentId: transactionId || payment.providerPaymentId,
+          // FLOW-M5: çekilen oid'e senkronla (yoksa mevcut değeri koru) → iade
+          // providerConversationId üzerinden doğru oid'i çağırır.
+          ...(capturedMerchantOid
+            ? { providerConversationId: capturedMerchantOid }
+            : {}),
           metadata: newMetadata as object,
         },
       });
@@ -676,38 +694,10 @@ export class PaymentFulfillmentService {
 
     // Auto-create Shipment record (Sürat Kargo gönderi kaydı oluşturuldu at order creation)
     // Membership/boost sanal sipariştir → kargo kaydı oluşturma.
+    // Ortak yol (create + H4 cancelled-revive + gerçek kod): PaymentCommonService.
     if (!isMembershipOrder && !isBoostOrder) {
       try {
-        const existingShipment = await this.prisma.shipment.findFirst({
-          where: { orderId: resultOrder.id },
-        });
-        if (!existingShipment) {
-          // Create the REAL Sürat cargo code (KargoTakipNo) + label now, at order
-          // confirmation (non-blocking — null on failure, retried later).
-          const barcode = await this.paymentCommon.createSuratBarcodeForOrder(
-            resultOrder.id,
-          );
-          const estimatedDelivery = new Date();
-          estimatedDelivery.setDate(estimatedDelivery.getDate() + 3);
-
-          await this.prisma.shipment.create({
-            data: {
-              orderId: resultOrder.id,
-              provider: "surat",
-              status: "pending",
-              // trackingNumber = OzelKargoTakipNo (our order number) — the poller
-              // queries Sürat by this; providerTrackingId holds the real code.
-              trackingNumber: resultOrder.orderNumber,
-              providerTrackingId: barcode?.kargoTakipNo ?? null,
-              labelZpl: barcode?.labelZpl ?? null,
-              cost: Number(resultOrder.shippingCost),
-              estimatedDelivery,
-            },
-          });
-          this.logger.log(
-            `Auto-created shipment for order ${resultOrder.orderNumber} kargoTakipNo=${barcode?.kargoTakipNo ?? "PENDING"}`,
-          );
-        }
+        await this.paymentCommon.ensureSuratShipmentForOrder(resultOrder.id);
       } catch (error) {
         this.logger.error(
           `Failed to auto-create shipment for order ${resultOrder.orderNumber}: ${error}`,
@@ -728,6 +718,7 @@ export class PaymentFulfillmentService {
   private async processSuccessfulGroupPayment(
     payment: any,
     transactionId?: string,
+    capturedMerchantOid?: string,
   ): Promise<boolean> {
     const cancelledOrders: {
       orderId: string;
@@ -763,6 +754,10 @@ export class PaymentFulfillmentService {
             status: PaymentStatus.completed,
             paidAt: new Date(),
             providerPaymentId: transactionId || payment.providerPaymentId,
+            // FLOW-M5: çekilen oid'e senkronla (iade doğru oid'i kullansın).
+            ...(capturedMerchantOid
+              ? { providerConversationId: capturedMerchantOid }
+              : {}),
             metadata: {
               ...((payment.metadata as any) || {}),
               auditHistory,
@@ -1119,32 +1114,9 @@ export class PaymentFulfillmentService {
       // ESKİ PDFKit makbuzu KALDIRILDI (grup akışı) — yasal değil; eLogo e-Arşiv tek belge.
       // await this.invoiceService.generateAndSendInvoice(resultOrder.id);
 
+      // Ortak yol (create + H4 cancelled-revive + gerçek kod): PaymentCommonService.
       try {
-        const existingShipment = await this.prisma.shipment.findFirst({
-          where: { orderId: resultOrder.id },
-        });
-        if (!existingShipment) {
-          const barcode = await this.paymentCommon.createSuratBarcodeForOrder(
-            resultOrder.id,
-          );
-          const estimatedDelivery = new Date();
-          estimatedDelivery.setDate(estimatedDelivery.getDate() + 3);
-          await this.prisma.shipment.create({
-            data: {
-              orderId: resultOrder.id,
-              provider: "surat",
-              status: "pending",
-              trackingNumber: resultOrder.orderNumber,
-              providerTrackingId: barcode?.kargoTakipNo ?? null,
-              labelZpl: barcode?.labelZpl ?? null,
-              cost: Number(resultOrder.shippingCost),
-              estimatedDelivery,
-            },
-          });
-          this.logger.log(
-            `Auto-created shipment for group order ${resultOrder.orderNumber} kargoTakipNo=${barcode?.kargoTakipNo ?? "PENDING"}`,
-          );
-        }
+        await this.paymentCommon.ensureSuratShipmentForOrder(resultOrder.id);
       } catch (error) {
         this.logger.error(
           `Failed to auto-create shipment for order ${resultOrder.orderNumber}: ${error}`,
@@ -1168,6 +1140,7 @@ export class PaymentFulfillmentService {
   private async processSuccessfulTradeCashPayment(
     payment: any,
     transactionId?: string,
+    capturedMerchantOid?: string,
   ): Promise<boolean> {
     // Platform ayarı: takas kargo süresi (gün). Varsayılan 7 gün.
     const shippingDaysSetting = await this.prisma.platformSetting.findUnique({
@@ -1182,6 +1155,10 @@ export class PaymentFulfillmentService {
         data: {
           status: PaymentStatus.completed,
           providerPaymentId: transactionId || payment.providerPaymentId,
+          // FLOW-M5: çekilen oid'e senkronla (takas iadesi doğru oid'i kullansın).
+          ...(capturedMerchantOid
+            ? { providerConversationId: capturedMerchantOid }
+            : {}),
           paidAt: new Date(),
         },
       });

@@ -51,19 +51,28 @@ interface SuratRestResult {
  * WSDL/JSON `Gonderi` modelini eksiksiz kurar — her string alan mevcut ve non-null.
  * Enum/numerik alanlar dokümandaki tiplere göre gönderilir; `Iademi` byte (1/0).
  */
+// L3: Sürat alan sınırı — aşırı uzun serbest-metin değeri (adres, ad) Sürat
+// tarafında sessiz truncate/reject yerine bizde kırpılır. Resmi dokümanda kesin
+// limit yok; makul üst sınırlar. Tek merkez: tüm create/barkod çağrıları buradan
+// geçer.
+const cap = (v: string | undefined | null, max: number): string =>
+  String(v ?? "")
+    .trim()
+    .slice(0, max);
+
 export function buildRestGonderi(
   p: SuratGonderiPayload,
 ): Record<string, unknown> {
   return {
-    KisiKurum: p.KisiKurum ?? "",
-    SahisBirim: p.SahisBirim ?? "",
-    AliciAdresi: p.AliciAdresi ?? "",
-    Il: p.Il ?? "",
-    Ilce: p.Ilce ?? "",
-    TelefonEv: p.TelefonEv ?? "",
-    TelefonIs: p.TelefonIs ?? "",
-    TelefonCep: p.TelefonCep ?? "",
-    Email: p.Email ?? "",
+    KisiKurum: cap(p.KisiKurum, 100),
+    SahisBirim: cap(p.SahisBirim, 100),
+    AliciAdresi: cap(p.AliciAdresi, 250),
+    Il: cap(p.Il, 50),
+    Ilce: cap(p.Ilce, 50),
+    TelefonEv: cap(p.TelefonEv, 20),
+    TelefonIs: cap(p.TelefonIs, 20),
+    TelefonCep: cap(p.TelefonCep, 20),
+    Email: cap(p.Email, 100),
     AliciKodu: p.AliciKodu ?? "",
     KargoTuru: p.KargoTuru,
     OdemeTipi: p.OdemeTipi,
@@ -75,7 +84,7 @@ export function buildRestGonderi(
     // Doküman örneği desi/kg'yi string gönderiyor ("1"); doğrulanmış davranışla aynı.
     BirimDesi: String(p.BirimDesi ?? 0),
     BirimKg: String(p.BirimKg ?? 0),
-    KargoIcerigi: p.KargoIcerigi ?? "",
+    KargoIcerigi: cap(p.KargoIcerigi, 100),
     KapidanOdemeTahsilatTipi: p.KapidanOdemeTahsilatTipi ?? 0,
     KapidanOdemeTutari: p.KapidanOdemeTutari ?? 0,
     EkHizmetler: p.EkHizmetler ?? "",

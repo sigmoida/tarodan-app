@@ -111,57 +111,75 @@ export class PaymentLifecycleService {
       );
     }
 
-    // Create new payment record
-    const newPayment = await this.prisma.payment.create({
+    // FLOW-H4: Payment.orderId @unique olduğundan aynı sipariş için YENİ payment.create
+    // P2002 (unique violation) → 500 verir; retry HİÇ çalışmazdı. Bunun yerine mevcut
+    // `failed` payment satırını CAS ile `pending`'e resetleyip YENİDEN KULLAN (initiation
+    // reuse deseni). CAS (updateMany + status guard) eşzamanlı bir başka retry/callback
+    // yarışını kapatır: yalnız bir çağıran failed→pending geçişini kazanır.
+    const reclaimed = await this.prisma.payment.updateMany({
+      where: { id: paymentId, status: PaymentStatus.failed },
+      data: { status: PaymentStatus.pending, providerPaymentId: null },
+    });
+    if (reclaimed.count === 0) {
+      // Yarış: başka bir işlem bu ödemeyi zaten resetledi/tamamladı → tekrar deneme.
+      throw new BadRequestException(
+        i18nMessage("server.payment.onlyFailedPaymentsRetryable"),
+      );
+    }
+
+    // Retry denetim izini metadata'ya ekle (mevcut metadata KORUNUR; updateMany JSON
+    // merge edemediğinden ayrı bir read-modify-write). assignMerchantOid bundan sonra
+    // bu taze metadata'yı okuyup merchantOidHistory'i üstüne merge eder.
+    const prevMeta = (payment.metadata as Record<string, any>) || {};
+    const auditHistory = Array.isArray(prevMeta.auditHistory)
+      ? prevMeta.auditHistory
+      : [];
+    await this.prisma.payment.update({
+      where: { id: paymentId },
       data: {
-        orderId: payment.orderId,
-        amount: payment.amount,
-        currency: payment.currency,
-        provider: payment.provider,
-        status: PaymentStatus.pending,
         metadata: {
-          retriedFrom: paymentId,
+          ...prevMeta,
           retriedAt: new Date().toISOString(),
-          auditHistory: [
-            {
-              action: "payment.retried",
-              timestamp: new Date().toISOString(),
-              originalPaymentId: paymentId,
-              userId,
-            },
-          ],
+          auditHistory: auditHistory.concat({
+            action: "payment.retried",
+            timestamp: new Date().toISOString(),
+            originalPaymentId: paymentId,
+            userId,
+          }),
         },
       },
     });
 
-    // Log retry action on original payment
+    // Log retry action on the (reused) payment
     await this.paymentCommon.logPaymentAction(
       "retried",
       paymentId,
       payment.orderId,
       undefined,
       PaymentStatus.failed,
-      undefined,
+      PaymentStatus.pending,
       {
-        newPaymentId: newPayment.id,
+        reused: true,
         userId,
       },
     );
 
-    // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin), kart /payments/process-direct ile.
+    // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin, eski oid history'e
+    // taşınır), kart /payments/process-direct ile. providerPaymentId de sıfırlanır.
     await this.paymentCommon.assignMerchantOid(
-      newPayment.id,
+      paymentId,
       String(order.orderNumber || order.id),
     );
 
     this.logger.log(
-      `Payment ${paymentId} retried, new payment ${newPayment.id} created`,
+      `Payment ${paymentId} retried (row reused, reset failed→pending)`,
     );
 
     return {
       success: true,
       paymentId: payment.id,
-      newPaymentId: newPayment.id,
+      // Geriye dönük uyumluluk: satır yeniden kullanıldığından newPaymentId == paymentId.
+      newPaymentId: payment.id,
       orderId: payment.orderId,
       amount: Number(payment.amount),
       provider: payment.provider,
@@ -235,14 +253,22 @@ export class PaymentLifecycleService {
 
     const oldStatus = payment.status;
 
-    // Update payment status to failed
-    await this.prisma.payment.update({
-      where: { id: paymentId },
+    // FLOW-M2: CAS — findUnique ile bu update arasında bir başarı callback'i ödemeyi
+    // `completed` yapmış olabilir; KOŞULSUZ update bunu `failed`'a EZER (ödenmiş sipariş
+    // iptal edilir, para askıda kalır). Yalnız hâlâ `pending` olanı `failed` yap;
+    // count===0 → arada tamamlandı/değişti → iptal etme, ürünü serbest bırakma.
+    const cancelled = await this.prisma.payment.updateMany({
+      where: { id: paymentId, status: PaymentStatus.pending },
       data: {
         status: PaymentStatus.failed,
         failureReason: "Kullanıcı tarafından iptal edildi",
       },
     });
+    if (cancelled.count === 0) {
+      throw new BadRequestException(
+        i18nMessage("server.payment.onlyPendingPaymentsCancelable"),
+      );
+    }
 
     // Siparişi iptal et ve ürünü tekrar satışa aç
     await this.paymentFulfillment.releaseProductForFailedPayment(
@@ -306,6 +332,23 @@ export class PaymentLifecycleService {
     if (!payment || payment.status !== PaymentStatus.pending) {
       return { released: false };
     }
+    // SEC-M1: Bu uç PUBLIC ve idempotent (guest checkout fail sayfası da çağırır) —
+    // sahiplik JWT ile doğrulanamaz. En kritik kötüye kullanımı kapat: CANLI bir 3DS
+    // çekimi varken ödemeyi fail ETME. Aksi halde (a) kullanıcı erken "başarısız"
+    // derse ya da (b) saldırgan payment-id enumerasyonuyla başkasının canlı ödemesini
+    // fail ederse, PayTR çekimi tamamlanıp callback geldiğinde satır failed olur →
+    // orphan capture (para çekildi, sipariş yok). Charge penceresi kapanınca (ya da
+    // gerçek fail callback'iyle) normal akış devreye girer.
+    const windowMin = parseInt(
+      this.configService.get("PAYMENT_FAIL_TIMEOUT_MINUTES") || "35",
+      10,
+    );
+    if (this.paymentCommon.isChargeLikelyLive(payment.metadata, windowMin)) {
+      this.logger.warn(
+        `confirmFailedFromClient: canlı 3DS çekimi var — fail atlandı payment=${paymentId}`,
+      );
+      return { released: false };
+    }
     await this.paymentFulfillment.processFailedPayment(
       payment,
       "Fail sayfasından onay - rezervasyon serbest bırakıldı",
@@ -345,47 +388,72 @@ export class PaymentLifecycleService {
       return { completed: false, status: "unsupported_provider" };
     }
 
-    const oid = (payment.providerConversationId || "").trim();
-    if (!oid) {
+    // FLOW-H1: Çift-çekim guard'ı TÜM oid'leri tarar (güncel + merchantOidHistory).
+    // Re-init sonrası providerConversationId yeni oid'e döner ama capture ESKİ oid'de
+    // olmuş olabilir; yalnız güncel oid'i sormak bunu kaçırır → çağıran ikinci kez çeker
+    // (çift çekim). Herhangi bir oid'de çekilmiş capture bulursak ödemeyi tamamlayıp
+    // "zaten ödendi" döneriz → ikinci çekim engellenir.
+    const oids = this.paymentCommon.collectPaymentOids(payment);
+    if (oids.length === 0) {
       return { completed: false, status: "no_provider_oid" };
     }
 
-    let inquiry = await this.paymentProviders.resolve().queryPaymentStatus(oid);
-    if (!inquiry.ok && oid.includes("-")) {
-      inquiry = await this.paymentProviders
-        .resolve()
-        .queryPaymentStatus(oid.replace(/-/g, ""));
-    }
-
-    if (!inquiry.ok) {
-      return { completed: false, status: "paytr_not_found" };
-    }
-
-    // O16: Tolerans eşiğini tüm yollarda BİRLEŞTİR (eskiden burada 0.01, reconcile/mismatch'te
-    // 0.05 idi → aynı ödeme için tutarsız kabul/ret). Tek config: PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL.
+    // O16: Tolerans eşiğini tüm yollarda BİRLEŞTİR (tek config).
     const tolerance = parseFloat(
       this.configService.get("PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL") || "0.05",
     );
     const ourAmount = Number(payment.amount);
-    if (Math.abs(inquiry.paymentTotalTl - ourAmount) > tolerance) {
-      this.logger.warn(
-        `verifyPaymentFromClient amount mismatch payment=${payment.id} oid=${oid} paytr=${inquiry.paymentTotalTl} ours=${ourAmount}`,
-      );
-      return { completed: false, status: "amount_mismatch" };
+
+    let capturedOid: string | null = null;
+    let capturedInquiry: {
+      paymentTotalTl: number;
+      paymentDate?: string | null;
+    } | null = null;
+    let sawMismatch = false;
+    for (const candidateOid of oids) {
+      let inquiry = await this.paymentProviders
+        .resolve()
+        .queryPaymentStatus(candidateOid);
+      if (!inquiry.ok && candidateOid.includes("-")) {
+        inquiry = await this.paymentProviders
+          .resolve()
+          .queryPaymentStatus(candidateOid.replace(/-/g, ""));
+      }
+      if (!inquiry.ok) continue;
+      // Bu oid PayTR'da çekilmiş. Tutar toleransı tutmuyorsa bu oid'i sayma ama
+      // diğer oid'leri taramaya devam et (mismatch'i işaretle).
+      if (Math.abs(inquiry.paymentTotalTl - ourAmount) > tolerance) {
+        this.logger.warn(
+          `verifyPaymentFromClient amount mismatch payment=${payment.id} oid=${candidateOid} paytr=${inquiry.paymentTotalTl} ours=${ourAmount}`,
+        );
+        sawMismatch = true;
+        continue;
+      }
+      capturedOid = candidateOid;
+      capturedInquiry = inquiry;
+      break;
+    }
+
+    if (!capturedOid || !capturedInquiry) {
+      return {
+        completed: false,
+        status: sawMismatch ? "amount_mismatch" : "paytr_not_found",
+      };
     }
 
     const txnRef =
-      inquiry.paymentDate != null && inquiry.paymentDate !== ""
-        ? `paytr:${oid}:${inquiry.paymentDate}`
-        : `paytr:${oid}`;
+      capturedInquiry.paymentDate != null && capturedInquiry.paymentDate !== ""
+        ? `paytr:${capturedOid}:${capturedInquiry.paymentDate}`
+        : `paytr:${capturedOid}`;
 
     const did = await this.paymentFulfillment.processSuccessfulPayment(
       payment,
       txnRef,
+      capturedOid, // FLOW-M5: çekilen oid'e senkronla
     );
     if (did) {
       this.logger.log(
-        `verifyPaymentFromClient completed payment=${payment.id} oid=${oid}`,
+        `verifyPaymentFromClient completed payment=${payment.id} oid=${capturedOid}`,
       );
       return { completed: true, status: "completed_now" };
     }

@@ -139,6 +139,119 @@ export class AdminTradeWarehouseService {
   }
 
   /**
+   * H3 — Kargo kodu retry: kodsuz kalmış tek bir `return` bacağı (reject'in
+   * RET-INI/RET-REC DRAFT'ları veya force-cancel'ın RET-STK DRAFT'ı) için Sürat
+   * submit'ini yeniden dener. Sürat timeout'unda DRAFT satır korunuyor ama ne
+   * poller (trackingNumber null) ne inbound-retry (yalnız to_warehouse) ona
+   * dokunuyordu; reject'in idempotency guard'ı da re-submit etmeden erken
+   * dönüyordu → kullanıcı iade etiketini hiç alamıyordu.
+   *
+   * OID deterministik yeniden türetilir (orijinal formatla BİREBİR — idempotency
+   * OzelKargoTakipNo üzerinden): trackingNumber varsa o; yoksa trade'in return
+   * bacağı sayısına göre reject (2 bacak → RET-INI/REC, recipient'a göre) veya
+   * stuck (1 bacak → RET-STK). Manuel fallback satırları ("Tarodan Warehouse")
+   * bilinçli — dokunulmaz. Throw etmez, boolean döner.
+   */
+  async retryReturnBarcode(tradeShipmentId: string): Promise<boolean> {
+    if (
+      !this.suratCargoService ||
+      !this.suratCargoService.isIntegrationEnabled()
+    ) {
+      return false;
+    }
+
+    const ship = await this.prisma.tradeShipment.findUnique({
+      where: { id: tradeShipmentId },
+      include: {
+        trade: {
+          select: {
+            tradeNumber: true,
+            initiatorId: true,
+            receiverId: true,
+            initiatorAddressId: true,
+            receiverAddressId: true,
+          },
+        },
+      },
+    });
+    if (
+      !ship ||
+      ship.leg !== "return" ||
+      ship.providerTrackingId ||
+      !ship.recipientUserId ||
+      !["pending", "surat"].includes(ship.carrier) ||
+      ship.status === ShipmentStatus.cancelled
+    ) {
+      return false;
+    }
+
+    // OID: orijinal formatla birebir aynı türetim (TRD- çift öneki DAHİL —
+    // format değişirse idempotency anahtarı kayar, mükerrer gönderi riski doğar).
+    let oid = ship.trackingNumber;
+    if (!oid) {
+      const returnLegCount = await this.prisma.tradeShipment.count({
+        where: { tradeId: ship.tradeId, leg: "return" },
+      });
+      const suffix =
+        returnLegCount >= 2
+          ? ship.recipientUserId === ship.trade.initiatorId
+            ? "RET-INI"
+            : "RET-REC"
+          : "RET-STK";
+      oid = `TRD-${ship.trade.tradeNumber}-${suffix}`
+        .replace(/[^a-zA-Z0-9-]/g, "")
+        .slice(0, 50);
+    }
+
+    const isInitiator = ship.recipientUserId === ship.trade.initiatorId;
+    const [user, address] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: ship.recipientUserId } }),
+      this.pickTradeSideAddress(
+        this.prisma,
+        isInitiator
+          ? ship.trade.initiatorAddressId
+          : ship.trade.receiverAddressId,
+        ship.recipientUserId,
+      ),
+    ]);
+    if (!address) {
+      this.logger.warn(
+        `Retry return barcode: recipient ${ship.recipientUserId} has no address (trade-shipment=${tradeShipmentId})`,
+      );
+      return false;
+    }
+
+    try {
+      const submitted = await this.submitReturnToSuratForReject(
+        ship.tradeId,
+        oid,
+        address,
+        user,
+      );
+      await this.prisma.tradeShipment.update({
+        where: { id: tradeShipmentId },
+        data: {
+          carrier: submitted.carrier,
+          trackingNumber: submitted.trackingNumber,
+          providerTrackingId: submitted.providerTrackingId,
+          labelZpl: submitted.labelZpl,
+          status: ShipmentStatus.label_created,
+          shippedAt: ship.shippedAt ?? new Date(),
+        },
+      });
+      this.logger.log(
+        `Retry OK: trade return barcode filled ${tradeShipmentId} oid=${oid} code=${submitted.providerTrackingId}`,
+      );
+      return true;
+    } catch (e: any) {
+      this.logger.warn(
+        `Retry return barcode failed ${tradeShipmentId} oid=${oid}: ${e?.message}`,
+      );
+      return false;
+    }
+  }
+
+  /**
    * Admin marks one of the two to_warehouse shipments as delivered to the
    * Tarodan warehouse. When both to_warehouse shipments are delivered, the
    * trade transitions to `at_warehouse` so admin review can begin.
@@ -558,7 +671,10 @@ export class AdminTradeWarehouseService {
         id: true,
         status: true,
         refundFailureReason: true,
-        shipments: { where: { leg: "return" }, select: { id: true } },
+        shipments: {
+          where: { leg: "return" },
+          select: { id: true, carrier: true, providerTrackingId: true },
+        },
       },
     });
     if (!existing) {
@@ -568,12 +684,29 @@ export class AdminTradeWarehouseService {
       existing.status === TradeStatus.returning &&
       existing.shipments.length >= 2
     ) {
+      // H3: erken dönüş, Sürat submit'i timeout'ta kalmış kodsuz DRAFT'ları
+      // sonsuza dek kilitliyordu ("returning && >=2" hep doğru, ama bacaklar
+      // kodsuz). Kodsuz Sürat bacaklarını burada yeniden submit et; manuel
+      // fallback ("Tarodan Warehouse") bacakları bilinçli, dokunma.
+      const incomplete = existing.shipments.filter(
+        (s) =>
+          s.carrier === "pending" ||
+          (s.carrier === "surat" && !s.providerTrackingId),
+      );
+      let resubmitted = 0;
+      for (const s of incomplete) {
+        if (await this.retryReturnBarcode(s.id)) resubmitted++;
+      }
       return {
         success: true,
         tradeId,
         status: existing.status,
         refundFailure: existing.refundFailureReason,
         idempotent: true,
+        ...(incomplete.length > 0 && {
+          returnResubmitted: resubmitted,
+          returnStillPending: incomplete.length - resubmitted,
+        }),
       };
     }
 

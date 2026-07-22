@@ -41,10 +41,15 @@ const SURAT_STATUS_MAP: Record<number, ShipmentStatus> = {
   16: ShipmentStatus.return_in_progress,
 };
 
+/**
+ * L2: bilinmeyen kod `null` döner — eskiden körlemesine `in_transit`'e düşüyordu
+ * ve yanlış aksiyon durumu üretiyordu. Çağıran taraf null'da statüyü DEĞİŞTİRMEZ
+ * (ham kod yine providerStatusCode/providerRawStatus'a kaydedilir) ve warn loglar.
+ */
 export function mapSuratStatusToShipmentStatus(
   kargonunDurumuSayi: number,
-): ShipmentStatus {
-  return SURAT_STATUS_MAP[kargonunDurumuSayi] ?? ShipmentStatus.in_transit;
+): ShipmentStatus | null {
+  return SURAT_STATUS_MAP[kargonunDurumuSayi] ?? null;
 }
 
 /**

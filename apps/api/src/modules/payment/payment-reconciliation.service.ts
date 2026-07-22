@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
+import { Prisma } from "@prisma/client";
 import {
   PaymentStatus,
   PaymentHoldStatus,
@@ -8,6 +9,7 @@ import {
   ProductStatus,
   TradeStatus,
   OfferStatus,
+  ShipmentStatus,
 } from "@prisma/client";
 import {
   getProductStatusFromQuantity,
@@ -24,6 +26,7 @@ import { PaymentRefundService } from "./payment-refund.service";
 import { EventService } from "../events";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
+import { asPaymentMetadata } from "./payment-metadata.types";
 
 // Takasta reservedQuantity, takas KABUL edildiğinde (checkAndReserve) artar ve
 // ancak tamamlanma / iptal / red / iade-teslim adımlarında geri verilir. Bu
@@ -47,6 +50,21 @@ const TRADE_RESERVATION_HOLDING_STATUSES: TradeStatus[] = [
   TradeStatus.shipping_to_recipients,
   TradeStatus.returning,
   TradeStatus.disputed,
+];
+
+// SEAM-B1: Paket Sürat'ta HAREKET ettiyse "satıcı göndermedi" DEĞİLDİR. Bu
+// statüler poller tarafından gerçek kargo hareketiyle set edilir — böyle bir
+// siparişi süre-doldu diye iptal+iade edersek alıcı hem malı hem parayı alır.
+// `pending`/`label_created` HARİÇ: yalnız barkod/etiket var ama kargoya verilmemiş
+// olabilir (immediate-barcode her ödemede etiket üretir) — onlar gerçek "göndermedi".
+const SHIPMENT_IN_MOTION_STATUSES: ShipmentStatus[] = [
+  ShipmentStatus.picked_up,
+  ShipmentStatus.in_transit,
+  ShipmentStatus.at_delivery_branch,
+  ShipmentStatus.out_for_delivery,
+  ShipmentStatus.delivered,
+  ShipmentStatus.return_in_progress,
+  ShipmentStatus.returned,
 ];
 
 /**
@@ -87,6 +105,7 @@ export class PaymentReconciliationService {
    * Yani bu sweep aynı zamanda tx-dışı iadeler için bir retry/outbox görevi görür.
    */
   async processRefundedOrders(): Promise<{ refunded: number; failed: number }> {
+    // 1) Tekil (order-bazlı) ödemeler — Order.payment doğrudan siparişe bağlı.
     const orders = await this.prisma.order.findMany({
       where: {
         status: { in: [OrderStatus.refunded, OrderStatus.cancelled] },
@@ -96,18 +115,76 @@ export class PaymentReconciliationService {
       take: 50,
     });
 
+    // 2) MONEY-H5: GRUP (sepet) siparişleri. Grup ödemesinde Order.payment NULL'dur —
+    // ödeme CheckoutGroup'a bağlıdır — bu yüzden yukarıdaki `payment.is.status`
+    // filtresi sepet siparişlerini HİÇ görmez ve iptal edilen sepet siparişi asla
+    // iade edilmezdi. Grup ödemesi ancak grubun TÜM siparişleri iade edilince
+    // `refunded` olduğundan, hâlâ `completed` olan gruptaki iptal/iade siparişleri
+    // henüz iade edilmemiş adaylardır. Zaten iade edilmişleri (grup payment
+    // metadata.refundedOrders) app tarafında eleriz — aksi halde processRefund
+    // `orderAlreadyRefunded` fırlatıp her turda gürültülü REFUND_MANUAL_REVIEW üretir.
+    const groupOrders = await this.prisma.order.findMany({
+      where: {
+        status: { in: [OrderStatus.refunded, OrderStatus.cancelled] },
+        payment: { is: null },
+        checkoutGroupId: { not: null },
+        checkoutGroup: {
+          is: { payment: { is: { status: PaymentStatus.completed } } },
+        },
+      },
+      select: {
+        id: true,
+        checkoutGroup: {
+          select: { payment: { select: { metadata: true } } },
+        },
+      },
+      take: 50,
+    });
+    const pendingGroupOrderIds = groupOrders
+      .filter((o) => {
+        const meta =
+          (o.checkoutGroup?.payment?.metadata as Record<string, unknown>) || {};
+        const refundedOrders =
+          (meta.refundedOrders as Record<string, number>) || {};
+        return !refundedOrders[o.id];
+      })
+      .map((o) => o.id);
+
+    // 3) SEAM-B3 recovery: outbound paket göndericiye İADE DÖNMÜŞ (shipment.status=returned)
+    // ama processRefund başarısız olduğu için `refund_requested`'da TAKILI siparişler.
+    // surat-tracking `applyTrackingUpdate` bunları refund_requested yapıp processRefund'ı
+    // dener; başarısız olursa poller terminal (returned) shipment'ı ARTIK POLLAMADIĞINDAN
+    // kendi retry EDEMEZ → burada güvenilir retry. `shipment.status=returned` bunları
+    // normal-akış refund_requested siparişlerinden (outbound `delivered`, iade RefundRequest'te
+    // ayrı izlenir) ayıran güvenli ayraçtır. processRefund başarınca order=cancelled → bir
+    // daha eşleşmez (idempotent).
+    const returnedStuckOrders = await this.prisma.order.findMany({
+      where: {
+        status: OrderStatus.refund_requested,
+        shipment: { is: { status: ShipmentStatus.returned } },
+      },
+      select: { id: true },
+      take: 50,
+    });
+
+    const allOrderIds = [
+      ...orders.map((o) => o.id),
+      ...pendingGroupOrderIds,
+      ...returnedStuckOrders.map((o) => o.id),
+    ];
+
     let refunded = 0;
     let failed = 0;
     const failedIds: string[] = [];
-    for (const order of orders) {
+    for (const orderId of allOrderIds) {
       try {
-        await this.paymentRefund.processRefund(order.id);
+        await this.paymentRefund.processRefund(orderId);
         refunded++;
       } catch (error: any) {
         failed++;
-        failedIds.push(order.id);
+        failedIds.push(orderId);
         this.logger.error(
-          `Auto-refund (iptal edilen sipariş ${order.id}) başarısız: ${error.message}`,
+          `Auto-refund (iptal edilen sipariş ${orderId}) başarısız: ${error.message}`,
         );
       }
     }
@@ -441,6 +518,21 @@ export class PaymentReconciliationService {
    * iptal eder. Eğer rezerv hâlâ tutuluyorsa (cron 30dk pas'ı kaçırdıysa) önce
    * onu serbest bırakır. Bağlı offer payment_expired olur.
    */
+  /**
+   * FLOW-H2/H3: Ödemenin son 3DS çekimi hâlâ "canlı" olabilir mi? metadata.lastChargeStartedAt
+   * (charge-claim anında damgalanır) PAYMENT_FAIL_TIMEOUT_MINUTES (vars. 35dk, PayTR 3DS
+   * penceresi + grace) içindeyse EVET. Bu payment `failed` yapılmamalı / siparişi 24s
+   * kill-switch'i öldürmemeli — aksi halde kullanıcı OTP ekranındayken PayTR parayı çeker
+   * ve callback geldiğinde satır çoktan failed olur → orphan capture.
+   */
+  private isChargeLikelyLive(metadata: unknown): boolean {
+    const windowMin = parseInt(
+      this.configService.get("PAYMENT_FAIL_TIMEOUT_MINUTES") || "35",
+      10,
+    );
+    return this.paymentCommon.isChargeLikelyLive(metadata, windowMin);
+  }
+
   async expireUnpaidOrders(): Promise<{ count: number }> {
     const now = new Date();
     const expired = await this.prisma.order.findMany({
@@ -474,6 +566,26 @@ export class PaymentReconciliationService {
             select: { status: true, quantity: true },
           });
           if (!fresh || fresh.status !== OrderStatus.pending_payment) return;
+
+          // FLOW-H3: Canlı bir 3DS çekimi varsa 24s kill-switch'i siparişi ÖLDÜRMESİN
+          // (orphan capture). Siparişin (veya grubunun) pending/processing ödemesinin
+          // son charge-start'ı pencere içindeyse bu tur atla; bir sonraki turda tekrar
+          // bakılır (charge penceresi kapanınca iptal edilir).
+          const livePayment = await tx.payment.findFirst({
+            where: {
+              OR: [
+                { orderId: order.id },
+                { checkoutGroup: { orders: { some: { id: order.id } } } },
+              ],
+              status: {
+                in: [PaymentStatus.pending, PaymentStatus.processing],
+              },
+            },
+            select: { metadata: true },
+          });
+          if (livePayment && this.isChargeLikelyLive(livePayment.metadata)) {
+            return;
+          }
 
           // Rezerv hâlâ canlıysa serbest bırak (rare: 30dk cron'u kaçırdı)
           if (!order.reservationReleasedAt && order.productId) {
@@ -667,6 +779,7 @@ export class PaymentReconciliationService {
     let cancelled = 0;
     for (const order of expiredOrders) {
       try {
+        let skippedInMotion = false;
         await this.prisma.$transaction(async (tx) => {
           // Lock the order row to prevent concurrent modifications (e.g., seller shipping at the same time)
           await tx.$queryRaw`SELECT id FROM orders WHERE id = ${order.id} FOR UPDATE`;
@@ -677,6 +790,24 @@ export class PaymentReconciliationService {
           });
           if (!freshOrder || freshOrder.status !== OrderStatus.preparing) {
             return; // Already shipped or handled by another process
+          }
+
+          // SEAM-B1: Satıcı "kargoladım" tıklamamış olsa bile paket Sürat'ta HAREKET
+          // ediyorsa (poller shipment.status'ü ilerletmiş ya da shippedAt set) bu bir
+          // "göndermedi" değildir → iptal+iade edersek alıcı hem malı hem parayı alır
+          // (çift kayıp). İptal ETME; atla. Sipariş `preparing`'de kalsa bile teslimde
+          // handleOrderDelivered onu ilerletip escrow'u başlatır, satıcı yine ödenir.
+          const shipment = await tx.shipment.findUnique({
+            where: { orderId: order.id },
+            select: { status: true, shippedAt: true },
+          });
+          if (
+            shipment &&
+            (SHIPMENT_IN_MOTION_STATUSES.includes(shipment.status) ||
+              shipment.shippedAt !== null)
+          ) {
+            skippedInMotion = true;
+            return;
           }
 
           // Cancel order
@@ -705,18 +836,34 @@ export class PaymentReconciliationService {
             tx,
           );
 
-          // Re-stock: increment quantity and recalculate status
+          // Re-stock: iade edilen TÜM adet geri yüklenir (eskiden sabit +1 →
+          // çok-adetli siparişte stok eksik kalıyordu). order.quantity kadar artır.
+          const restoreQty = order.quantity ?? 1;
           const newQuantity =
-            order.product.quantity !== null ? order.product.quantity + 1 : null;
+            order.product.quantity !== null
+              ? order.product.quantity + restoreQty
+              : null;
           await tx.product.update({
             where: { id: order.product.id },
             data: {
               quantity:
-                order.product.quantity !== null ? { increment: 1 } : undefined,
+                order.product.quantity !== null
+                  ? { increment: restoreQty }
+                  : undefined,
               status: getProductStatusFromQuantity(newQuantity),
             },
           });
         });
+
+        // SEAM-B1: hareket eden paket yüzünden atlandıysa iade/restock/bildirim YOK.
+        // Ops görünürlüğü için greplenebilir tek satır uyarı.
+        if (skippedInMotion) {
+          this.logger.warn(
+            `SELLER_NO_SHIP_SKIPPED_MOVING: sipariş ${order.orderNumber} süre doldu ama ` +
+              `paket Sürat'ta hareket ediyor — iptal/iade EDİLMEDİ (satıcı 'kargoladım' işaretlememiş olabilir).`,
+          );
+          continue;
+        }
 
         // Process refund via PayTR (outside transaction — calls external API)
         try {
@@ -815,23 +962,35 @@ export class PaymentReconciliationService {
 
     for (const row of candidates) {
       checked++;
-      const oid = row.providerConversationId as string;
+      const ourAmount = Number(row.amount);
       try {
-        const inquiry = await this.paymentProviders
-          .resolve()
-          .queryPaymentStatus(oid);
-        if (!inquiry.ok) {
-          continue;
+        // FLOW-M3: TÜM oid'leri tara (güncel providerConversationId + merchantOidHistory).
+        // Capture rotate edilmiş ESKİ bir oid'de olmuş olabilir; yalnız güncel oid'i
+        // sormak sahipsiz capture'ı kaçırırdı. İlk çekilmiş + tutar-tutan oid capture'dır.
+        const oids = this.paymentCommon.collectPaymentOids(row);
+        let capturedOid: string | null = null;
+        let capturedInquiry: {
+          paymentTotalTl: number;
+          paymentDate?: string | null;
+        } | null = null;
+        for (const candidateOid of oids) {
+          const inquiry = await this.paymentProviders
+            .resolve()
+            .queryPaymentStatus(candidateOid);
+          if (!inquiry.ok) continue;
+          if (Math.abs(inquiry.paymentTotalTl - ourAmount) > tolerance) {
+            // O10: tutar uyuşmazlığı → ALARM (yüksek öncelik), completed YAPMA.
+            this.logger.error(
+              `ALARM: PayTR reconcile tutar uyuşmazlığı — payment=${row.id} oid=${candidateOid} ` +
+                `paytr=${inquiry.paymentTotalTl} ours=${ourAmount}. Ödeme tamamlanmadı, manuel inceleme gerekir.`,
+            );
+            continue;
+          }
+          capturedOid = candidateOid;
+          capturedInquiry = inquiry;
+          break;
         }
-
-        const ourAmount = Number(row.amount);
-        if (Math.abs(inquiry.paymentTotalTl - ourAmount) > tolerance) {
-          // O10: tutar uyuşmazlığını ALARM (error) olarak logla — sessizce atlamak yerine
-          // operasyon ekibinin görmesi için yüksek-öncelik. Ödeme completed yapılmaz.
-          this.logger.error(
-            `ALARM: PayTR reconcile tutar uyuşmazlığı — payment=${row.id} oid=${oid} ` +
-              `paytr=${inquiry.paymentTotalTl} ours=${ourAmount}. Ödeme tamamlanmadı, manuel inceleme gerekir.`,
-          );
+        if (!capturedOid || !capturedInquiry) {
           continue;
         }
 
@@ -861,18 +1020,20 @@ export class PaymentReconciliationService {
         }
 
         const txnRef =
-          inquiry.paymentDate != null && inquiry.paymentDate !== ""
-            ? `paytr:${oid}:${inquiry.paymentDate}`
-            : `paytr:${oid}`;
+          capturedInquiry.paymentDate != null &&
+          capturedInquiry.paymentDate !== ""
+            ? `paytr:${capturedOid}:${capturedInquiry.paymentDate}`
+            : `paytr:${capturedOid}`;
 
         const did = await this.paymentFulfillment.processSuccessfulPayment(
           full,
           txnRef,
+          capturedOid, // FLOW-M5: çekilen oid'i providerConversationId'ye senkronla
         );
         if (did) {
           completed++;
           this.logger.log(
-            `PayTR reconcile completed payment ${row.id} oid=${oid}`,
+            `PayTR reconcile completed payment ${row.id} oid=${capturedOid}`,
           );
         }
       } catch (error: any) {
@@ -883,6 +1044,221 @@ export class PaymentReconciliationService {
     }
 
     return { checked, completed };
+  }
+
+  /**
+   * FLOW-M3 (2.1): `failed` işaretli ama PayTR'da GERÇEKTEN çekilmiş ödemeleri (orphan
+   * capture) yakalar. Bir ödeme 3DS/callback yarışında `failed` olabilir ama para çekilmiş
+   * olabilir → sipariş fulfil edilmez, iade edilmez, para havada kalır. TÜM oid'leri tarar;
+   * capture bulursa:
+   *  - sipariş hâlâ ödenebilir (pending_payment) → CAS ile failed→pending resetleyip TAMAMLA (telafi),
+   *  - değilse (iptal/gitmiş) → yüksek-öncelik ALARM (ORPHAN_CAPTURE_REVIEW). Sipariş fulfil
+   *    edilemeyen capture'ın OTO-İADESİ bilerek Faz 4'e bırakıldı (cron-tetikli para iadesi riski).
+   * Cache dedup: aynı failed ödemeyi her turda PayTR'ye sormamak için 6s. Trade-cash orphan'ı
+   * ayrı ele alınır (bu tarama order/grup ile sınırlı).
+   */
+  async detectOrphanCapturedFailedPayments(): Promise<{
+    checked: number;
+    recovered: number;
+    alarms: number;
+  }> {
+    const enabled = this.configService.get("PAYTR_RECONCILIATION_ENABLED");
+    if (enabled === "false" || enabled === "0") {
+      return { checked: 0, recovered: 0, alarms: 0 };
+    }
+    const lookbackH = parseInt(
+      this.configService.get("PAYTR_ORPHAN_LOOKBACK_HOURS") || "72",
+      10,
+    );
+    const batch = parseInt(
+      this.configService.get("PAYTR_RECONCILIATION_BATCH_LIMIT") || "40",
+      10,
+    );
+    const tolerance = parseFloat(
+      this.configService.get("PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL") || "0.05",
+    );
+    const since = new Date();
+    since.setHours(since.getHours() - lookbackH);
+
+    const candidates = await this.prisma.payment.findMany({
+      where: {
+        provider: "paytr",
+        status: PaymentStatus.failed,
+        providerConversationId: { not: null },
+        updatedAt: { gt: since },
+        OR: [{ orderId: { not: null } }, { checkoutGroupId: { not: null } }],
+      },
+      take: batch,
+      orderBy: { updatedAt: "desc" },
+    });
+
+    let checked = 0;
+    let recovered = 0;
+    let alarms = 0;
+    for (const row of candidates) {
+      const dedupKey = `orphan-checked:${row.id}`;
+      if (await this.cache.get<boolean>(dedupKey)) continue;
+      checked++;
+      const ourAmount = Number(row.amount);
+      try {
+        const oids = this.paymentCommon.collectPaymentOids(row);
+        let capturedOid: string | null = null;
+        let capturedInquiry: {
+          paymentTotalTl: number;
+          paymentDate?: string | null;
+        } | null = null;
+        for (const oid of oids) {
+          const inquiry = await this.paymentProviders
+            .resolve()
+            .queryPaymentStatus(oid);
+          if (!inquiry.ok) continue;
+          if (Math.abs(inquiry.paymentTotalTl - ourAmount) > tolerance)
+            continue;
+          capturedOid = oid;
+          capturedInquiry = inquiry;
+          break;
+        }
+        // Her sonuçta dedup yaz (captured değilse 6s tekrar sorma; captured+alarm ise
+        // 6s'de bir tekrar-alarm makul; captured+telafi ise satır completed olur zaten).
+        await this.cache.set(dedupKey, true, { ttl: 6 * 60 * 60 });
+
+        if (!capturedOid || !capturedInquiry) continue;
+
+        const full = await this.prisma.payment.findUnique({
+          where: { id: row.id },
+          include: {
+            order: { include: { buyer: true, seller: true, product: true } },
+            checkoutGroup: {
+              include: { orders: { select: { status: true } } },
+            },
+            tradeCashPayment: true,
+          },
+        });
+        const orderStillPayable = full?.orderId
+          ? full.order?.status === OrderStatus.pending_payment
+          : (full?.checkoutGroup?.orders.some(
+              (o) => o.status === OrderStatus.pending_payment,
+            ) ?? false);
+
+        if (orderStillPayable) {
+          // TELAFİ: CAS ile failed→pending resetle, sonra tamamla (capture doğrulandı).
+          const reset = await this.prisma.payment.updateMany({
+            where: { id: row.id, status: PaymentStatus.failed },
+            data: { status: PaymentStatus.pending },
+          });
+          if (reset.count === 0) continue; // arada değişti
+          const fresh = await this.prisma.payment.findUnique({
+            where: { id: row.id },
+            include: {
+              order: { include: { buyer: true, seller: true, product: true } },
+              checkoutGroup: {
+                include: { orders: { select: { status: true } } },
+              },
+              tradeCashPayment: true,
+            },
+          });
+          const txnRef =
+            capturedInquiry.paymentDate != null &&
+            capturedInquiry.paymentDate !== ""
+              ? `paytr:${capturedOid}:${capturedInquiry.paymentDate}`
+              : `paytr:${capturedOid}`;
+          const did = await this.paymentFulfillment.processSuccessfulPayment(
+            fresh,
+            txnRef,
+            capturedOid,
+          );
+          if (did) {
+            recovered++;
+            this.logger.warn(
+              `ORPHAN_CAPTURE_RECOVERED: failed işaretli ama PayTR'da çekilmiş ödeme telafi edildi ` +
+                `payment=${row.id} oid=${capturedOid}`,
+            );
+          }
+        } else {
+          // Sipariş gitmiş → fulfil edilemez. Oto-iade RİSKLİ (Faz 4). Yüksek öncelik ALARM.
+          alarms++;
+          this.logger.error(
+            `ORPHAN_CAPTURE_REVIEW: PayTR'da ÇEKİLMİŞ ama sipariş fulfil EDİLEMEZ (iptal/gitmiş) — ` +
+              `payment=${row.id} oid=${capturedOid} tutar=${ourAmount}. MANUEL İADE gerekir.`,
+          );
+        }
+      } catch (error: any) {
+        this.logger.error(
+          `detectOrphanCapturedFailedPayments payment ${row.id}: ${error?.message}`,
+        );
+      }
+    }
+    if (recovered > 0 || alarms > 0) {
+      this.logger.warn(
+        `Orphan capture taraması: ${recovered} telafi, ${alarms} manuel-inceleme (checked=${checked})`,
+      );
+    }
+    return { checked, recovered, alarms };
+  }
+
+  /**
+   * MONEY-M4: `refundInProgressOrders` marker'ı yazılıp PayTR iadesi YAPILDIKTAN sonra
+   * DB tx'i (finalize) hiç çalışmayan siparişleri toparlar. Böyle bir sipariş için para
+   * PayTR'de iade edildi ama payment `completed` kaldı → payout cron satıcıya ödeyebilir
+   * (çift kayıp). Marker başarılı finalize'da temizlendiğinden (undefined), marker HÂLÂ
+   * duran orderId'ler gerçekten takılıdır. processRefund'ı marker'daki TUTAR ile çağırırız:
+   * PayTR atlanır (marker recovered) ve tx bu sefer finalize eder. İdempotent.
+   */
+  async reconcileStuckRefundMarkers(): Promise<{
+    checked: number;
+    recovered: number;
+  }> {
+    const candidates = await this.prisma.payment.findMany({
+      where: {
+        provider: "paytr",
+        metadata: {
+          path: ["refundInProgressOrders"],
+          not: Prisma.DbNull,
+        },
+      },
+      select: { id: true, metadata: true },
+      take: 50,
+    });
+
+    let checked = 0;
+    let recovered = 0;
+    for (const p of candidates) {
+      const meta = asPaymentMetadata(p.metadata);
+      const inProgress = meta.refundInProgressOrders || {};
+      const refunded = meta.refundedOrders || {};
+      // Gerçekten takılı = marker'da var ama refundedOrders'ta yok (tx finalize etmedi).
+      const stuckOrderIds = Object.keys(inProgress).filter(
+        (oid) => !(oid in refunded),
+      );
+      for (const orderId of stuckOrderIds) {
+        checked++;
+        try {
+          // Marker'daki tutar (yeni format {amount,at}); eski/timestamp formatında
+          // undefined → processRefund tam iade varsayar (eski davranış).
+          const stored = inProgress[orderId];
+          const amount =
+            stored && typeof stored === "object" && "amount" in stored
+              ? Number((stored as { amount: number }).amount)
+              : undefined;
+          await this.paymentRefund.processRefund(orderId, amount);
+          recovered++;
+          this.logger.warn(
+            `STUCK_REFUND_RECOVERED: refundInProgress marker finalize edildi ` +
+              `order=${orderId} payment=${p.id} amount=${amount ?? "full"}`,
+          );
+        } catch (e: any) {
+          this.logger.error(
+            `reconcileStuckRefundMarkers: order ${orderId} recovery başarısız (payment=${p.id}): ${e?.message}`,
+          );
+        }
+      }
+    }
+    if (recovered > 0) {
+      this.logger.warn(
+        `Stuck refund marker taraması: ${recovered}/${checked} finalize edildi`,
+      );
+    }
+    return { checked, recovered };
   }
 
   /**
@@ -955,6 +1331,14 @@ export class PaymentReconciliationService {
       try {
         // Trade cash vb. siparişsiz/grupsuz ödemeleri bu cron'da atlama (eski davranış order'a bağlıydı)
         if (!payment.order && !payment.checkoutGroup) {
+          continue;
+        }
+
+        // FLOW-H2: Fail penceresini `createdAt` yerine son 3DS charge-start'ından say.
+        // Kullanıcı initiate'ten çok sonra 3DS'e girdiyse (createdAt eski, charge yeni)
+        // canlı oturum hâlâ açıktır → bu payment'ı `failed` YAPMA (orphan capture).
+        // Bir sonraki turda charge penceresi kapanınca failed edilir.
+        if (this.isChargeLikelyLive(payment.metadata)) {
           continue;
         }
 

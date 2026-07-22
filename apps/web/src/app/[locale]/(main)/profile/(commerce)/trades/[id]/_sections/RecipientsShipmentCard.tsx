@@ -44,11 +44,23 @@ export default function RecipientsShipmentCard({
             {myFromWarehouseShipment.carrier === "surat"
               ? "Sürat Kargo"
               : myFromWarehouseShipment.carrier || "—"}
-            {(myFromWarehouseShipment.cargoCode ??
-            myFromWarehouseShipment.trackingNumber)
-              ? ` · ${myFromWarehouseShipment.cargoCode ?? myFromWarehouseShipment.trackingNumber}`
-              : ""}
+            {/* L1: Sürat'ta yalnız GERÇEK kod göster (iç ref şubede geçersiz);
+               manuel taşıyıcıda trackingNumber referanstır. */}
+            {(() => {
+              const code =
+                myFromWarehouseShipment.cargoCode ??
+                (myFromWarehouseShipment.carrier !== "surat"
+                  ? myFromWarehouseShipment.trackingNumber
+                  : null);
+              return code ? ` · ${code}` : "";
+            })()}
           </p>
+          {myFromWarehouseShipment.carrier === "surat" &&
+            !myFromWarehouseShipment.cargoCode && (
+              <p className="text-xs text-muted italic mt-1">
+                {t("order.cargoCodePending")}
+              </p>
+            )}
           {myFromWarehouseShipment.carrier === "surat" &&
             myFromWarehouseShipment.cargoCode && (
               <a
@@ -77,10 +89,14 @@ export default function RecipientsShipmentCard({
             {otherFromWarehouseShipment.carrier === "surat"
               ? "Sürat Kargo"
               : otherFromWarehouseShipment.carrier || "—"}
-            {(otherFromWarehouseShipment.cargoCode ??
-            otherFromWarehouseShipment.trackingNumber)
-              ? ` · ${otherFromWarehouseShipment.cargoCode ?? otherFromWarehouseShipment.trackingNumber}`
-              : ""}
+            {(() => {
+              const code =
+                otherFromWarehouseShipment.cargoCode ??
+                (otherFromWarehouseShipment.carrier !== "surat"
+                  ? otherFromWarehouseShipment.trackingNumber
+                  : null);
+              return code ? ` · ${code}` : "";
+            })()}
           </p>
         </div>
       )}

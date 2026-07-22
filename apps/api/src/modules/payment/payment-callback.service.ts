@@ -184,6 +184,7 @@ export class PaymentCallbackService {
     const did = await this.paymentFulfillment.processSuccessfulPayment(
       payment,
       txnRef,
+      oid, // FLOW-M5: çekilen oid'i providerConversationId'ye senkronla
     );
     if (did) {
       this.logger.log(
@@ -252,6 +253,7 @@ export class PaymentCallbackService {
       await this.paymentFulfillment.processSuccessfulPayment(
         payment,
         dto.merchant_oid,
+        dto.merchant_oid, // FLOW-M5: çekilen oid'i providerConversationId'ye senkronla
       );
       // CAPI (Faz 3): store_card ödemesinde PayTR bildirimle utoken döndürür → kullanıcının
       // kayıtlı kartlarını SavedCard'a senkronla (recurring için). Best-effort, ödemeyi etkilemez.

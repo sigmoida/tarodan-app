@@ -232,8 +232,15 @@ export class PaymentInitiationService {
           i18nMessage("server.payment.orderGroupAlreadyPaid"),
         );
       }
-      payment = await this.prisma.payment.update({
-        where: { id: existingPayment.id },
+      // FLOW-M1: CAS reset. findUnique ile bu güncelleme arasında bir başarı
+      // callback'i ödemeyi `completed` yapmış olabilir; KOŞULSUZ update bunu
+      // `pending`'e EZER (ödenmiş grup bozulur, çekilen para sipariş'e bağlı kalmaz).
+      // Yalnız completed OLMAYAN satırı resetle; count===0 → arada tamamlandı.
+      const reset = await this.prisma.payment.updateMany({
+        where: {
+          id: existingPayment.id,
+          status: { not: PaymentStatus.completed },
+        },
         data: {
           status: PaymentStatus.pending,
           failureReason: null,
@@ -241,6 +248,14 @@ export class PaymentInitiationService {
           amount: totalAmount,
           provider: PaymentProvider.paytr,
         },
+      });
+      if (reset.count === 0) {
+        throw new BadRequestException(
+          i18nMessage("server.payment.orderGroupAlreadyPaid"),
+        );
+      }
+      payment = await this.prisma.payment.findUniqueOrThrow({
+        where: { id: existingPayment.id },
       });
     } else {
       payment = await this.prisma.payment.create({
@@ -888,7 +903,15 @@ export class PaymentInitiationService {
         providerPaymentId: null,
         status: PaymentStatus.processing,
         failureReason: null,
-        metadata: { ...prevMeta, merchantOidHistory: oidHistory },
+        // FLOW-H2: 3DS çekiminin BAŞLADIĞI an. Ödeme-satırını-failed-yapma penceresi
+        // (cancelExpiredPayments) ve 24s sipariş kill-switch'i (expireUnpaidOrders)
+        // bunu `createdAt` yerine kullanır: kullanıcı initiate'ten çok sonra 3DS'e
+        // girse bile (createdAt eski, charge yeni) canlı 3DS oturumu iptal EDİLMEZ.
+        metadata: {
+          ...prevMeta,
+          merchantOidHistory: oidHistory,
+          lastChargeStartedAt: new Date().toISOString(),
+        },
       },
     });
     if (claimed.count === 0) {
@@ -1012,14 +1035,24 @@ export class PaymentInitiationService {
     // because PayTR iframe tokens are single-use. Returning the old providerPaymentId
     // leads to "Bu ödeme sayfası artık geçersiz" on the PayTR iframe.
     if (existingPayment) {
-      await this.prisma.payment.update({
-        where: { id: existingPayment.id },
+      // FLOW-M1: CAS reset (bkz. grup/tekil yolu) — koşulsuz update, arada tamamlanan
+      // bir trade-cash ödemesini `pending`'e ezmesin. count===0 → zaten ödendi.
+      const reset = await this.prisma.payment.updateMany({
+        where: {
+          id: existingPayment.id,
+          status: { not: PaymentStatus.completed },
+        },
         data: {
           status: PaymentStatus.pending,
           failureReason: null,
           providerPaymentId: null,
         },
       });
+      if (reset.count === 0) {
+        throw new BadRequestException(
+          i18nMessage("server.payment.tradeCashPaymentAlreadyCompleted"),
+        );
+      }
 
       // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin), kart /payments/process-direct ile.
       await this.paymentCommon.assignMerchantOid(
@@ -1111,14 +1144,25 @@ export class PaymentInitiationService {
       // Reset row before reuse: PayTR iframe tokens are single-use, so we must
       // mint a fresh one on every retry (otherwise iframe shows
       // "Bu ödeme sayfası artık geçersiz").
-      await this.prisma.payment.update({
-        where: { id: existingPayment.id },
+      // FLOW-M1: CAS reset — findFirst(status:pending) ile bu update arasında bir
+      // başarı callback'i ödemeyi `completed` yapmış olabilir; KOŞULSUZ update ödenmiş
+      // siparişi `pending`'e EZERDİ. count===0 → arada ödendi → "zaten ödendi".
+      const reset = await this.prisma.payment.updateMany({
+        where: {
+          id: existingPayment.id,
+          status: { not: PaymentStatus.completed },
+        },
         data: {
           status: PaymentStatus.pending,
           failureReason: null,
           providerPaymentId: null,
         },
       });
+      if (reset.count === 0) {
+        throw new BadRequestException(
+          i18nMessage("server.payment.orderAlreadyPaid"),
+        );
+      }
 
       // 30-min cron released the reservation; re-acquire it before letting
       // the buyer retry. CAS-gate on reservationReleasedAt: only the request
@@ -1275,7 +1319,14 @@ export class PaymentInitiationService {
    */
   async bypassCompletePayment(
     paymentId: string,
+    userId?: string,
   ): Promise<{ success: boolean }> {
+    // SEC-H1: Bypass ASLA production'da çalışmaz — PAYMENT_BYPASS yanlışlıkla "true"
+    // olsa bile. Bir config hatasının prod'da PARASIZ ödeme tamamlamasını engelleyen
+    // SERT güvenlik ağı (endpoint ayrıca JWT auth + ownership ister).
+    if (process.env.NODE_ENV === "production") {
+      throw new ForbiddenException("Payment bypass is disabled in production");
+    }
     const bypassEnabled = this.configService.get("PAYMENT_BYPASS") === "true";
     if (!bypassEnabled) {
       throw new BadRequestException("Payment bypass is not enabled");
@@ -1291,12 +1342,24 @@ export class PaymentInitiationService {
             product: true,
           },
         },
+        checkoutGroup: { select: { buyerId: true } },
         tradeCashPayment: true,
       },
     });
 
     if (!payment) {
       throw new NotFoundException("Payment not found");
+    }
+
+    // SEC-H1: sahiplik — çağıran bu ödemenin sahibi olmalı (order/grup/trade payer).
+    // Bypass dev/test'te bile başkasının ödemesini tamamlayamaz.
+    const ownerId =
+      payment.order?.buyerId ??
+      payment.checkoutGroup?.buyerId ??
+      payment.tradeCashPayment?.payerId ??
+      null;
+    if (!userId || !ownerId || ownerId !== userId) {
+      throw new ForbiddenException("Not authorized to bypass this payment");
     }
 
     if (payment.status !== PaymentStatus.pending) {

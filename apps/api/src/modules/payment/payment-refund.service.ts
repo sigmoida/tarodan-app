@@ -23,6 +23,7 @@ import { NotificationType } from "../notification/dto/notification.dto";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
 import { ElogoInvoicingService } from "../elogo";
 import { PaymentCommonService } from "./payment-common.service";
+import { MONEY_EPSILON } from "./payment.constants";
 import { i18nMessage } from "../i18n";
 
 /**
@@ -149,6 +150,27 @@ export class PaymentRefundService {
       );
     }
 
+    // MONEY-H4: Tekil ödemede KÜMÜLATİF iade tavanı. Kısmi iadelere izin verdiğimiz
+    // için (payment `completed` kalır) art arda iadelerin TOPLAMI işlem tutarını
+    // aşamaz. PayTR'den ÖNCE kontrol et ki PayTR'da fazladan para iade edilmesin.
+    // (NOT: aynı sipariş üzerinde EŞZAMANLI kısmi iadeler tx-öncesi bu okumada
+    // yarışabilir — nadir, admin manuel akış; kalıcı çözüm sabit idempotency +
+    // reconciliation, Faz 2.)
+    if (!isGroupPayment) {
+      const priorRefunded = Number(previouslyRefundedOrders[orderId] || 0);
+      if (priorRefunded + amountToRefund > refundCap + MONEY_EPSILON) {
+        throw new BadRequestException(
+          i18nMessage("server.payment.refundAmountExceedsLimit", {
+            amountToRefund,
+            refundCap: Math.max(
+              Math.round((refundCap - priorRefunded) * 100) / 100,
+              0,
+            ),
+          }),
+        );
+      }
+    }
+
     // Çift-ödeme koruması (K1). Bunu PayTR/Sürat'a dokunmadan ÖNCE yap.
     // 1) Henüz icra edilmemiş payout'ları (pending/retry_pending) atomik olarak
     //    geçersiz kıl ki payout cron'u alıcıya iade yaparken satıcıya da ödeme yapmasın.
@@ -175,6 +197,10 @@ export class PaymentRefundService {
       );
     }
 
+    // MONEY-M3: PayTR gerçekten iade etti mi? Payout'ları PayTR'den ÖNCE void ettik
+    // (order_refunded). Refund PayTR'de PATLARSA (para çıkmadı) catch'te void'i geri
+    // alırız ki satıcı ödenebilsin. PayTR başardıysa (bypass dahil) geri ALMAYIZ.
+    let paytrRefunded = false;
     try {
       // Call provider refund API
       let refundResult: any;
@@ -231,7 +257,14 @@ export class PaymentRefundService {
                     ...existingMeta,
                     refundInProgressOrders: {
                       ...inProgressOrders,
-                      [orderId]: new Date().toISOString(),
+                      // MONEY-M4: tutarı da sakla — PayTR sonrası tx patlarsa
+                      // reconcileStuckRefundMarkers doğru tutarla finalize edebilsin
+                      // (yalnız timestamp'ten tam/kısmi ayırt edilemezdi). Truthiness
+                      // guard'ı (obje truthy) ve clearRefundInProgress etkilenmez.
+                      [orderId]: {
+                        amount: amountToRefund,
+                        at: new Date().toISOString(),
+                      },
                     },
                   },
                 },
@@ -293,6 +326,9 @@ export class PaymentRefundService {
         );
       }
 
+      // PayTR (veya bypass) iade BAŞARILI — bu noktadan sonra void'i geri ALMA.
+      paytrRefunded = true;
+
       // Update payment status after successful refund
       let einvoiceReverse = false; // tam iade → e-Arşiv iptal/iade tetiği (post-commit)
       const refundCommitResult = await this.prisma
@@ -311,18 +347,46 @@ export class PaymentRefundService {
           const currentRefundedOrders: Record<string, number> =
             (existingMetadata.refundedOrders as Record<string, number>) || {};
 
-          // Grup ödemesi: sipariş başına iade biriktirilir; Payment yalnızca grubun
-          // TAMAMI iade edildiğinde refunded olur (kardeş siparişler ödenmiş kalır)
+          // Kısmi iade birikimi: sipariş başına iade TOPLANIR. Grup zaten order
+          // başına biriktiriyordu; MONEY-H4: tekil ödemede de biriktir — aksi halde
+          // tek bir kısmi iade `fullyRefunded=!isGroupPayment` yüzünden payment'ı
+          // tümden `refunded` yapıp sonraki kısmi iadeleri (top query `completed`
+          // arar) İMKÂNSIZLAŞTIRIYORDU. Aynı orderId'ye art arda kısmi iadeler
+          // ÜST ÜSTE yazılmayıp toplanır (grup'ta order-başına çift-iade zaten engelli).
+          const priorForOrder = Number(currentRefundedOrders[orderId] || 0);
           const refundedOrders = {
             ...currentRefundedOrders,
-            [orderId]: amountToRefund,
+            [orderId]: priorForOrder + amountToRefund,
           };
           const totalRefunded = Object.values(refundedOrders).reduce(
             (sum, v) => sum + Number(v || 0),
             0,
           );
+          // Payment yalnız KÜMÜLATİF toplam işlem tutarına ulaşınca `refunded` olur.
           const fullyRefunded =
-            !isGroupPayment || totalRefunded >= Number(payment.amount) - 0.01;
+            totalRefunded >= Number(payment.amount) - MONEY_EPSILON;
+          // Bu SİPARİŞİN kümülatif iadesi tamamlandı mı → order cancel + stok geri-yükle
+          // + e-Arşiv reverse tek buradan karar verir (tekilde çoklu kısmi iade toplanır,
+          // grupta order başına tek iade). Grup eşiği siparişin tutarı, tekil eşiği
+          // payment tutarı (= o siparişin tutarı).
+          const orderRefundThreshold = isGroupPayment
+            ? Number(refundTargetOrder!.totalAmount)
+            : Number(payment.amount);
+          const isOrderFullyRefunded =
+            Number(refundedOrders[orderId] || 0) >=
+            orderRefundThreshold - MONEY_EPSILON;
+
+          // MONEY-M4: bu sipariş finalize edildi → refundInProgressOrders marker'ından
+          // sil. Böylece reconcileStuckRefundMarkers sweep'i yalnız GERÇEKTEN takılı
+          // (PayTR yapıldı ama tx hiç finalize etmedi) marker'ları görür; başarılı
+          // iadelerin marker'ı birikmez.
+          const refundInProgressAfter = {
+            ...((existingMetadata.refundInProgressOrders as Record<
+              string,
+              unknown
+            >) || {}),
+          };
+          delete refundInProgressAfter[orderId];
 
           await tx.payment.update({
             where: { id: payment.id },
@@ -333,16 +397,23 @@ export class PaymentRefundService {
                 refundAmount: totalRefunded,
                 refundedAt: new Date().toISOString(),
                 refundResult,
-                ...(isGroupPayment ? { refundedOrders } : {}),
+                // Boşsa key'i DÜŞÜR (undefined → JSON'da yok) ki sweep sorgusu
+                // başarılı iadelerin boş marker'larıyla şişmesin.
+                refundInProgressOrders:
+                  Object.keys(refundInProgressAfter).length > 0
+                    ? refundInProgressAfter
+                    : undefined,
+                // MONEY-H4: tekilde de persist et — kümülatif iade takibi ve tavan
+                // kontrolü buna dayanır (yoksa art arda kısmi iadeler biriktirilemez).
+                refundedOrders,
                 auditHistory: auditHistory.concat({
                   action: "payment.refunded",
                   timestamp: new Date().toISOString(),
                   oldStatus,
                   newStatus: fullyRefunded ? PaymentStatus.refunded : oldStatus,
                   refundAmount: amountToRefund,
-                  ...(isGroupPayment
-                    ? { orderId, partial: !fullyRefunded }
-                    : {}),
+                  orderId,
+                  partial: !isOrderFullyRefunded,
                 }),
               },
             },
@@ -373,25 +444,19 @@ export class PaymentRefundService {
                 i18nMessage("server.payment.transferAlreadyStarted"),
               );
             }
-            // Adet bazlı kısmi iade: hold'un yalnız iade edilen satıcı-payı kadarı
-            // tüketilir (refundedAmount += amount*adet/siparişAdedi). Tam iadede hold
-            // tamamen cancelled; kısmi iadede held/released kalır ve payout sırasında
-            // netAmount = amount - refundedAmount olarak ödenir. Tek otorite buradadır.
-            // GRUP (sepet) ödemesinde payment.order NULL'dur (payment.orderId yok);
-            // bu yüzden iade edilen siparişin adedini doğrudan sorgula — aksi halde
-            // orderQtyForHold=1 olur ve coklu-adet grup siparisinde 1 adet kismi iade
-            // tüm hold'u tüketip satıcıyı 0 öderdi.
-            const orderRowForHold = await tx.order.findUnique({
-              where: { id: orderId },
-              select: { quantity: true },
-            });
-            const orderQtyForHold =
-              orderRowForHold?.quantity ?? payment.order?.quantity ?? 1;
-            const refundQty = opts?.refundQuantity ?? orderQtyForHold;
+            // Hold tüketimi TUTAR oranına göre (MONEY-H3). Adet-bazlı iade akışları
+            // amount = total*adet/siparişAdedi gönderdiğinden bu oran adet oranıyla
+            // BİREBİR örtüşür; tutar-bazlı admin/jest iadesinde ise yalnız iade edilen
+            // TUTAR kadarı tüketilir. Eskiden refundQuantity yoksa portion=1 olup TÜM
+            // hold tüketiliyor, 1000 TL siparişte 50 TL jest satıcı payout'unu 0'a
+            // düşürüyordu. Ledger portion ile AYNI formül (tek otorite). Tam iadede hold
+            // cancelled; kısmi iadede held/released kalır, payout'ta netAmount =
+            // amount - refundedAmount ödenir. orderRefundThreshold = siparişin tutarı
+            // (grup'ta order.totalAmount, tekilde payment.amount) — tx başında hesaplandı.
             const sellerAmount = Number(activeHold.amount);
             const portion =
-              orderQtyForHold > 0
-                ? Math.min(refundQty / orderQtyForHold, 1)
+              orderRefundThreshold > 0
+                ? Math.min(amountToRefund / orderRefundThreshold, 1)
                 : 1;
             const refundedSeller =
               Math.round(sellerAmount * portion * 100) / 100;
@@ -418,29 +483,25 @@ export class PaymentRefundService {
           // korunur; refunded* kümülatif artar → net komisyon = original - refunded
           // (elogo net faturalar). Kümülatif tam iadeye ulaşınca status=refunded olur ve
           // e-Arşiv reverse tetiklenir (eski davranış: yalnız tam iadede reverse — korunur).
-          const ledgerFullThreshold = isGroupPayment
-            ? Number(refundTargetOrder!.totalAmount)
-            : Number(payment.amount);
+          // ledger threshold = siparişin tutarı (orderRefundThreshold, tx başında).
           const ledgerPortion =
-            ledgerFullThreshold > 0
-              ? Math.min(amountToRefund / ledgerFullThreshold, 1)
+            orderRefundThreshold > 0
+              ? Math.min(amountToRefund / orderRefundThreshold, 1)
               : 1;
           await this.commissionLedger.applyRefund(orderId, ledgerPortion, tx);
-          // e-Arşiv reverse tetiği ESKİ davranışla AYNI: tam iade tutarında tetiklenir —
-          // ledger'a BAĞLAMA. handleOrderRefund siparişin kesilmiş TÜM faturalarını geri
-          // alır (platform_sale gibi ledger'sız ama faturalı siparişlerde de gerekir);
-          // ledger.fullyRefunded'a bağlarsak ledger'sız tam iadede reverse atlanırdı.
-          if (amountToRefund >= ledgerFullThreshold) {
+          // e-Arşiv reverse: siparişin KÜMÜLATİF iadesi tamamlanınca tetiklenir
+          // (MONEY-H4: art arda kısmi iadelerin sonuncusunda da; eskiden tek seferde
+          // tam tutar iade edilmezse hiç tetiklenmiyordu). Ledger'a BAĞLI DEĞİL
+          // (platform_sale gibi ledger'sız ama faturalı siparişlerde de gerekir);
+          // yalnız siparişin iade toplamına bakar. handleOrderRefund kesilmiş TÜM
+          // faturaları geri alır.
+          if (isOrderFullyRefunded) {
             einvoiceReverse = true;
           }
 
           // Update order status + restore stock on full refund.
           // Idempotent: skip stock restore if order is already cancelled (e.g.
           // handleExpiredPreparingOrders already restocked before calling us).
-          // Grup ödemesinde "tam iade" eşiği SİPARİŞİN tutarıdır.
-          const fullOrderRefundThreshold = isGroupPayment
-            ? Number(refundTargetOrder!.totalAmount)
-            : Number(payment.amount);
           {
             const orderRow = await tx.order.findUnique({
               where: { id: orderId },
@@ -452,9 +513,17 @@ export class PaymentRefundService {
               },
             });
             const alreadyCancelled = orderRow?.status === OrderStatus.cancelled;
-            const isFullRefund = amountToRefund >= fullOrderRefundThreshold;
-            // İade edilen adet kadar stok geri yüklenir (kısmi adet iadesinde de).
-            const restoreQty = opts?.refundQuantity ?? orderRow?.quantity ?? 1;
+            // MONEY-H4: sipariş cancel + stok geri-yükleme siparişin KÜMÜLATİF iadesine
+            // göre (isOrderFullyRefunded, tx başında hesaplandı). Tek bir kısmi iade
+            // artık "tam iade" sanılmaz; art arda kısmi iadeler tamı bulunca kapanır.
+            const isFullRefund = isOrderFullyRefunded;
+            // Stok: adet-bazlı iadede o kadar adet; TAM iadede tüm adet; tutar-bazlı
+            // KISMİ iadede (admin jest/telafi) stok geri YÜKLENMEZ — alıcı malı elinde
+            // tutar. Aksi halde 50 TL jest 1000 TL siparişin TÜM stoğunu geri yükler +
+            // her kısmi iadede tekrarlardı (MONEY-H3 ile aynı kök).
+            const restoreQty =
+              opts?.refundQuantity ??
+              (isFullRefund ? (orderRow?.quantity ?? 1) : 0);
 
             // Tam iade → sipariş cancelled. Kısmi adet iadesinde sipariş açık kalır
             // (kalan adetler hâlâ alıcıda); yalnız stok ve para kısmen geri döner.
@@ -623,6 +692,21 @@ export class PaymentRefundService {
       this.logger.error(
         `Refund error for payment ${payment.id}: ${error.message}`,
       );
+      // MONEY-M3: PayTR iadeyi YAPMADAN patladıysak, PayTR'den önce void ettiğimiz
+      // payout'ları GERİ AL (order_refunded → pending) ki satıcı ödenebilsin. PayTR
+      // başardıysa (paytrRefunded=true) void kalır — para iade edildi, satıcı ödenmemeli.
+      if (!paytrRefunded) {
+        await this.prisma.payoutTransfer
+          .updateMany({
+            where: {
+              paymentHold: { orderId },
+              status: "failed",
+              failureReason: "order_refunded",
+            },
+            data: { status: "pending", failureReason: null },
+          })
+          .catch(() => undefined);
+      }
       throw error;
     }
   }
@@ -650,6 +734,27 @@ export class PaymentRefundService {
     await this.prisma.payment.update({
       where: { id: paymentId },
       data: { metadata: { ...meta, refundInProgressOrders: inProgressOrders } },
+    });
+  }
+
+  /**
+   * MONEY-H1 marker geri-alma (takas-nakit yolu). PayTR başarılı DÖNMEDİĞİNDE
+   * refundInProgressAt scalar marker'ını siler ki retry PayTR'yi yeniden çağırabilsin.
+   * Fresh metadata okur (kaybolan-güncelleme guard'ı). clearRefundInProgress'in
+   * (order yolu, sipariş-bazlı map) takas eşleniğidir. Best-effort: hatası iade
+   * akışını bozmaz (çağıran .catch'ler).
+   */
+  private async clearTradeRefundInProgress(paymentId: string): Promise<void> {
+    const p = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      select: { metadata: true },
+    });
+    const meta = (p?.metadata as Record<string, any>) || {};
+    if (!("refundInProgressAt" in meta)) return;
+    delete meta.refundInProgressAt;
+    await this.prisma.payment.update({
+      where: { id: paymentId },
+      data: { metadata: meta },
     });
   }
 
@@ -707,8 +812,12 @@ export class PaymentRefundService {
       };
     }
 
-    const oid =
-      payment.providerConversationId?.trim() || tradeId.replace(/-/g, "");
+    // FLOW-M5: iade GERÇEKTEN çekilen merchant_oid ile yapılmalı = tamamlanan
+    // ödemenin providerConversationId'si (capture anında çekilen oid'e senkronlanır).
+    // Eski `tradeId.replace(/-/g,"")` fallback'i UUID'yi oid sanıyordu (gerçek oid
+    // `TRADE{no}T{...}`) → yanlış/eşleşmeyen oid'le PayTR çağrısı. Kaldırıldı; gerçek
+    // yolda (bypass değil) oid yoksa reddedilir (aşağıda).
+    const oid = payment.providerConversationId?.trim() ?? "";
     // Always refund the full charged amount (product + commission). PayTR was
     // charged the totalAmount at capture time; partial commission retention
     // would leave the payer short when the admin reject is no-fault.
@@ -737,6 +846,16 @@ export class PaymentRefundService {
         `PAYMENT_BYPASS: PayTR trade refund atlandı tradeId=${tradeId} amount=${amount}`,
       );
     } else {
+      // FLOW-M5: gerçek PayTR yolunda oid ZORUNLU — yanlış/boş oid'le çekim yapma.
+      if (!oid) {
+        this.logger.error(
+          `refundTradeCashPaymentIfCompleted: providerConversationId yok — iade oid'i ` +
+            `belirlenemiyor (tradeId=${tradeId}, paymentId=${payment.id}). Manuel inceleme gerekir.`,
+        );
+        throw new BadRequestException(
+          i18nMessage("server.payment.paytrRefundFailed"),
+        );
+      }
       // Marker'ı PayTR'den ÖNCE kalıcı yaz. Bu yazım başarısızsa para hareketi
       // olmadan abort et — çağıran güvenle tekrar deneyebilir.
       try {
@@ -770,6 +889,15 @@ export class PaymentRefundService {
           );
         }
       } catch (e: any) {
+        // MONEY-H1: PayTR başarılı DÖNMEDİ (throw YA DA non-success status → bu
+        // catch'e düşer). refundInProgressAt marker'ını GERİ AL. Aksi halde marker
+        // kalıcı yazılı kalır; bir sonraki deneme refundAlreadyInitiated=true görüp
+        // PayTR çağrısını ATLAR ve parayı iade ETMEDEN payment'ı refunded işaretler
+        // (sahte iade). Order yolundaki clearRefundInProgress ile AYNI invaryant:
+        // marker yalnız "PayTR gerçekten çağrıldı ve muhtemelen başardı ama persist
+        // edilemedi" durumunda kalmalı — PayTR başaramadıysa retry onu YENİDEN
+        // çağırabilmeli. "ödeme henüz bildirilmemiş" gibi GEÇİCİ hatada bu şarttır.
+        await this.clearTradeRefundInProgress(payment.id).catch(() => {});
         const msg = (e as Error).message || "";
         if (
           /odeme henuz siteye bildirilmemis|henuz siteye bildirilmemi/i.test(
@@ -841,6 +969,93 @@ export class PaymentRefundService {
         );
     }
     return { refunded: true, paymentId: payment.id };
+  }
+
+  /**
+   * MONEY-H2: Takas nakit iadesini FAILURE-TRACKING ile yapar. `cancelTrade` /
+   * `resolveDispute` gibi kullanıcı/admin akışlarında iade PayTR'da patlarsa
+   * `trade.refundFailureReason` marker'ı yazılır → admin `retryTradeRefund` ve
+   * `retryFailedTradeRefunds` süpürme cron'u devreye girip parayı toparlar.
+   * Başarıda marker temizlenir + `trade.refund-completed` yayınlanır.
+   *
+   * ASLA throw ETMEZ: takas bu noktada zaten iptal/çözüm ile terminal duruma
+   * commit edilmiştir; iade hatası iptali geri almaz (`rejectWarehouseTrade` ile
+   * aynı felsefe). Çağıran, kullanıcıya sahte bir 500 döndürmek yerine sonucu okur.
+   */
+  async refundTradeCashTracked(tradeId: string): Promise<{
+    refunded: boolean;
+    failed: boolean;
+    skippedReason?: string;
+    reason?: string;
+  }> {
+    try {
+      const result = await this.refundTradeCashPaymentIfCompleted(tradeId);
+      // Başarı (veya "iade edilecek tamamlanmış ödeme yok" no-op) → varsa eski
+      // hata marker'ını temizle. Best-effort; iade zaten yapıldı.
+      await this.prisma.trade
+        .update({
+          where: { id: tradeId },
+          data: { refundFailureReason: null, refundFailureAt: null },
+        })
+        .catch(() => {});
+      if (result.refunded) {
+        try {
+          const cashPayment = await this.prisma.tradeCashPayment.findUnique({
+            where: { tradeId },
+            select: { payerId: true },
+          });
+          await this.eventService.emitTradeRefundCompleted({
+            tradeId,
+            cashPayerId: cashPayment?.payerId ?? null,
+          });
+        } catch (emitErr) {
+          this.logger.error(
+            `Failed to emit trade.refund-completed for trade ${tradeId}: ${emitErr}`,
+          );
+        }
+      }
+      return {
+        refunded: result.refunded,
+        failed: false,
+        skippedReason: result.skippedReason,
+      };
+    } catch (err: any) {
+      const reason = err?.message ?? "Bilinmeyen hata (PayTR iade başarısız)";
+      this.logger.error(
+        `refundTradeCashTracked failed for trade ${tradeId}: ${reason}`,
+      );
+      // Marker'ı yaz ki admin retryTradeRefund + retryFailedTradeRefunds cron'u
+      // bu takası bulup yeniden denesin (yoksa para alıcıda sessizce kalır).
+      await this.prisma.trade
+        .update({
+          where: { id: tradeId },
+          data: {
+            refundFailureReason: reason.slice(0, 500),
+            refundFailureAt: new Date(),
+          },
+        })
+        .catch((persistErr: any) =>
+          this.logger.error(
+            `Failed to persist refund failure for trade ${tradeId}: ${persistErr?.message}`,
+          ),
+        );
+      try {
+        const cashPayment = await this.prisma.tradeCashPayment.findUnique({
+          where: { tradeId },
+          select: { payerId: true },
+        });
+        await this.eventService.emitTradeRefundFailed({
+          tradeId,
+          cashPayerId: cashPayment?.payerId ?? null,
+          reason,
+        });
+      } catch (emitErr) {
+        this.logger.error(
+          `Failed to emit trade.refund-failed for trade ${tradeId}: ${emitErr}`,
+        );
+      }
+      return { refunded: false, failed: true, reason };
+    }
   }
 
   /**

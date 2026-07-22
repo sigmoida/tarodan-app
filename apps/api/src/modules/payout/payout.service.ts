@@ -2,7 +2,12 @@ import { Injectable, Logger, BadRequestException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { PaymentProviderRegistry } from "../payment-providers/payment-provider.registry";
-import { PayoutStatus, PaymentHoldStatus, PaymentStatus } from "@prisma/client";
+import {
+  PayoutStatus,
+  PaymentHoldStatus,
+  PaymentStatus,
+  RefundRequestStatus,
+} from "@prisma/client";
 import { NotificationService } from "../notification/notification.service";
 
 @Injectable()
@@ -75,6 +80,9 @@ export class PayoutService {
       where: {
         status: PaymentHoldStatus.released,
         payoutTransfer: null,
+        // MONEY-M3: donuk (açık iade ile kilitli) hold'a payout OLUŞTURMA — defansif;
+        // releaseHoldsDue zaten frozen'ı release etmez ama katmanlı guard.
+        frozenByRefundId: null,
       },
       include: {
         payment: { include: { order: true } },
@@ -87,6 +95,35 @@ export class PayoutService {
     for (const hold of releasedHolds) {
       const payment = hold.payment;
       if (!payment?.order) continue;
+
+      // MONEY-M3: Bu siparişte AÇIK bir iade talebi varsa payout OLUŞTURMA. Yarış:
+      // hold releaseAt'i geçip release edildikten HEMEN SONRA bir iade açılırsa,
+      // freeze `held` hedeflediğinden `released` hold'u kaçırır → payout cron satıcıya
+      // öder + alıcıya iade edilir → ÇİFT KAYIP. Açık iade varken bekle (iade terminal
+      // olunca hold ya cancelled olur ya da unfreeze ile normal akışa döner).
+      const openRefund = await this.prisma.refundRequest.findFirst({
+        where: {
+          orderId: hold.orderId,
+          status: {
+            in: [
+              RefundRequestStatus.pending_review,
+              RefundRequestStatus.approved,
+              RefundRequestStatus.wait_for_delivery,
+              RefundRequestStatus.return_shipment_open,
+              RefundRequestStatus.return_in_transit,
+              RefundRequestStatus.return_delivered,
+              RefundRequestStatus.disputed,
+            ],
+          },
+        },
+        select: { id: true },
+      });
+      if (openRefund) {
+        this.logger.warn(
+          `Payout skipped: order ${hold.orderId} has an open refund (released hold not frozen in time). Waiting for refund to terminalize.`,
+        );
+        continue;
+      }
 
       // Adet bazlı kısmi iade: satıcıya yalnız iade EDİLMEYEN kısım ödenir.
       const netPayout = Number(hold.amount) - Number(hold.refundedAmount ?? 0);
