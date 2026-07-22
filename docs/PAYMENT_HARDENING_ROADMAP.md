@@ -1,0 +1,235 @@
+# Ödeme Sağlamlaştırma — Yol Haritası
+
+> Amaç: Ödeme altyapısını **doğru** (para asla kaybolmaz/çiftlenmez), **çökmeye
+> dayanıklı** (Bull + ayrı worker + dayanıklı Redis + idempotent), **doğru mimari**
+> (PSP kaynak + reconciliation + idempotency + state machine + outbox + ledger),
+> **bakılabilir** ve **güvenli** bir hale getirmek.
+>
+> Kaynak denetim: [PAYMENT_AUDIT_FINDINGS.md](./PAYMENT_AUDIT_FINDINGS.md) (bulgu ID'leri oradan).
+> İlerleme: çözüldükçe `[x]`. Her faz ayrı branch + kendi commit'leri.
+>
+> **Öncelik:** Faz 1 (para kaybı) önce. Ama kapsam TAM — 10 fazın hepsi hedeftir.
+>
+> **Branch stratejisi:** Bu iş `feat/surat-barcode-retry` merge edildikten SONRA
+> (veya onun üstüne rebase ile) yürür; aksi halde aşağıdaki "zaten çözülü"
+> maddeler çakışır. Her faz `fix/payment-hardening-fazN` gibi kendi branch'inde.
+
+## Önce: `feat/surat-barcode-retry`'de ZATEN çözülü (bu roadmap'te TEKRAR YAPMA)
+
+- **SEAM-B4** (revive/yeniden-ödenen sipariş kargosu) → `ensureSuratShipmentForOrder` + revive (H4 fix).
+- **SEAM-B10** (`shipping.worker` ölü kod) → silindi (M6).
+- **MONEY-H6 kısmen** (`return_shipment_open` süresiz donuk hold) → D25 drop-off deadline (7 gün) `return_shipment_open` kısmını kapattı. Kalan: `wait_for_delivery` + admin "iadeyi reddet/kapat" aracı.
+- Referans için: bu roadmap merge sonrası çalışırsa bu satırlar doğrulanıp kapatılır.
+
+---
+
+## Faz 0 — Altyapı önkoşulları (Redis dayanıklılığı) · INFRA
+
+> Kod değil; Faz 7 (Bull cutover) için önkoşul. Erken yapılabilir, paralel.
+
+- [ ] Bull için **cache'ten AYRI** bir Redis instance (job key'leri cache eviction'ıyla karışmasın).
+- [ ] `maxmemory-policy noeviction` (Bull ZORUNLU ister — yoksa bellek baskısında job kaybı).
+- [ ] AOF açık (`appendonly yes`) + kalıcı volume (RDB tek başına yetersiz).
+- [ ] Redis health + memory alarmı (dolunca `noeviction` job ekleme reddeder → görünür olmalı).
+- [ ] Coolify checklist olarak belgele (kod tarafı `REDIS_HOST/PORT/PASSWORD` zaten var).
+
+---
+
+## Faz 1 — Para kaybı bug'ları (ACİL) · `fix/payment-hardening-money`
+
+> Bugün gerçek para kaybettirebilen/çiftleyebilen bulgular. Her biri spec ister.
+
+- [ ] **1.1 — Takas-nakit iade marker rollback (MONEY-H1)**
+      `payment-refund.service.ts:740-788`. `refundInProgressAt` PayTR'dan önce yazılıp
+      geçici hatada (`"ödeme henüz bildirilmemiş"`) temizlenmiyor → sonraki deneme PayTR'ı
+      atlayıp sahte-iade yapıyor. **Çözüm:** order yolundaki `clearRefundInProgress`
+      desenini trade yoluna taşı — geçici hatada marker temizlensin; kalıcı hatada dursun.
+      **Kabul:** taze takas iadesi "not yet notified" alırsa 1-2 dk sonra gerçekten PayTR'a gidiyor; spec.
+
+- [ ] **1.2 — `cancelTrade` iade retry yolu (MONEY-H2)**
+      `trade-lifecycle.service.ts:906-921,1016-1023`. Refund try/catch'siz + `refundFailureReason`
+      marker'sız → hata sonrası yeniden-iptal iadeyi atlıyor, admin retry reddediyor.
+      **Çözüm:** `rejectWarehouseTrade` deseni gibi failure marker yaz + admin
+      `retryTradeRefund` çalışsın + bir cron cancelled-unrefunded trade'leri süpürsün.
+
+- [ ] **1.3 — İptal edilen SEPET (grup) siparişi oto-iade (MONEY-H5)**
+      `payment-reconciliation.service.ts:89-97`. Sweep `payment.is.status=completed`
+      (sipariş-bazlı ilişki) filtreliyor; grup ödemesinde null → hiç iade edilmiyor.
+      **Çözüm:** sweep grup siparişlerini `checkoutGroup.payment` üzerinden yakalasın ve
+      `processRefund`'a sipariş-tutarı kadar kısmi iade olarak yönlendirsin.
+      **Kabul:** sepet siparişi iptali X dk içinde iade + log; spec.
+
+- [ ] **1.4 — Kısmi iade tek boyut + hold kısmi tüketim (MONEY-H3 + H4)**
+      `payment-refund.service.ts:324-325` (`fullyRefunded = !isGroupPayment`) +
+      `:384-414` (hold `portion` default'u tam miktar). **Çözüm:** (a) `fullyRefunded`
+      gerçek kümülatif tutara göre hesaplansın (tekil de kısmi kalabilsin); (b) admin
+      `manualRefund` tutar-bazlı iadede hold'u tutar oranında tüketsin (`portion =
+amount/totalRefundable`), tümünü değil. Tek `computePartialRefund` yolu — ledger + hold
+      tek kaynaktan.
+      **Kabul:** 1000 TL siparişte 50 TL jest → hold ~950 kalıyor; 3 kalemin 1'i iade →
+      ikinci iade hâlâ açılabiliyor; spec.
+
+- [ ] **1.5 — `seller_no_ship` kargo durumuna baksın (SEAM-B1)**
+      `payment-reconciliation.service.ts:654-731`. Cron yalnız `preparing + deadline`
+      bakıyor; paket Sürat'ta hareket ederken bile iptal+iade ediyor. **Çözüm:** iptal
+      kararından önce shipment yükle — `label_created/in_transit/...` veya Sürat'ta hareket
+      varsa "no ship" değildir → iptal etme (satıcıya "kargoladım işaretle" hatırlat).
+      Bonus: restock `increment:1` → `order.quantity`.
+      **Kabul:** yolda paketi olan sipariş iptal edilmiyor; spec.
+
+- [ ] **1.6 — Sürat iade oto-refund'u pipeline'a soksun (SEAM-B3)**
+      `surat-tracking.service.ts:532-556`. Koşulsuz `refund_requested` + doğrudan
+      `processRefund` (RefundRequest yok, hatada askıda). **Çözüm:** ya mevcut RefundRequest'i
+      `return_delivered`'a taşıyıp finalize sweep'ine bırak, ya da hatada `refund_requested`'ı
+      kurtaran bir retry sweep ekle. Mevcut-statü guard'ı ekle.
+      **Kabul:** iade tamamlandı kodu geldiğinde finalize başarısız olsa bile bir sonraki
+      turda toparlanıyor; askıda kalmıyor; spec.
+
+- [ ] **1.7 — `retryPayment` düzelt (FLOW-H4 / SEAM-B5)**
+      `payment-lifecycle.service.ts:114-135`. `payment.create({orderId})` +
+      `orderId @unique` → her çağrı P2002/500; iptal-revive yarım. **Çözüm:** yeni satır
+      yerine mevcut `failed` ödemeyi CAS ile `pending`'e resetle (initiation'daki reuse
+      deseni) + qty-farkında `reacquireReservation` helper'ı. (Faz 8'deki helper'la ortak.)
+      **Kabul:** reddedilen ödeme retry ediliyor, 500 yok; spec.
+
+---
+
+## Faz 2 — Sahipsiz yakalama & çifte çekim (PSP reconciliation çekirdeği) · `fix/payment-hardening-reconcile`
+
+> PSP'yi tek kaynak yapan mekanizma. FLOW-H1/H2/H3 + M1/M2/M3/M5'i kapatır.
+
+- [ ] **2.1 — Reconciler'ı genişlet (FLOW-M3, kök çözüm)**
+      `payment-reconciliation.service.ts`. Bugün yalnız `pending` + güncel oid soruluyor.
+      **Çözüm:** durum-sorgu kapsamı → `failed` ödemeler + `merchantOidHistory`'deki TÜM
+      oid'ler + trade-cash ödemeleri. Callback claim edilemediğinde (count=0) durum-sorgu
+      tetikle → PSP "captured" derse force-complete ya da oto-iade+**alarm**.
+      **Kabul:** `failed`-ama-çekilmiş ödeme bir sonraki reconcile turunda tespit + telafi.
+
+- [ ] **2.2 — Expiry fitilini charge-start'tan say (FLOW-H2)**
+      `payment-reconciliation.service.ts:902-931`. `createdAt` yerine son 3DS başlatım
+      zamanı (`chargeStartedAt` alanı veya `updatedAt` mantığı). **Kabul:** canlı 3DS
+      oturumundaki ödeme cron tarafından `failed` yapılmıyor; spec.
+
+- [ ] **2.3 — 24s expiry canlı 3DS'i öldürmesin (FLOW-H3)**
+      `payment-reconciliation.service.ts:444-554`. `expireUnpaidOrders` aktif charge'lı
+      ödemeyi grace ile korusun (charge-start + 3DS penceresi).
+
+- [ ] **2.4 — Stabil idempotency / oid history taraması (FLOW-H1)**
+      Çift-çekim guard'ı (`verifyPaymentFromClient`) tekrar çekmeden önce
+      `merchantOidHistory`'deki tüm oid'leri durum-sorgu ile taram. **Kabul:** B ile
+      çekilmişken C sorulup ikinci çekim yapılmıyor; spec. (İdeal: dönen oid yerine sabit
+      idempotency key — bu Faz 3-8 arası mimari kararla değerlendirilir.)
+
+- [ ] **2.5 — Refund çekilen oid'i kullansın (FLOW-M5)**
+      `payment-refund.service.ts:249-255`. Güncel `providerConversationId` yerine gerçekten
+      çekilen oid (`providerPaymentId`). Trade fallback `tradeId.replace` düzelt.
+
+- [ ] **2.6 — CAS'siz reset/cancel yollarını kapat (FLOW-M1, FLOW-M2)**
+      Initiation'daki koşulsuz `completed→pending` reset'leri + `cancelPayment` tekil yolu
+      CAS'e (`updateMany where status=...`) çevir.
+
+---
+
+## Faz 3 — Güvenlik · `fix/payment-hardening-security`
+
+- [ ] **3.1 — `bypass-complete` kilitle (SEC-H1)** `payment.controller.ts:383-392`. Auth + ownership + servis içinde `NODE_ENV!=="production"` guard; `GET /payments/config` `bypassEnabled` sızdırmasın.
+- [ ] **3.2 — `confirm-failed` ownership (SEC-M1)** `payment.controller.ts:345-360`. Sahiplik kontrolü ekle (griefing/fon-sıkıştırma).
+- [ ] **3.3 — Düşük (SEC-L1/L2/L3):** kimliksiz pending-fiyat ifşası (auth iste), guest e-posta enumerasyonu (uniform yanıt), oid entropi notu.
+
+---
+
+## Faz 4 — İade/hold yapısal doğruluk + terminal kaçış · `fix/payment-hardening-refund-holds`
+
+- [ ] **4.1 — Donuk hold terminal kaçışı (MONEY-H6)** admin "iadeyi reddet/kapat" aracı + `wait_for_delivery` timeout + `unfreezeHoldForRefund` her iade-terminal yolunda. (`return_shipment_open` kısmı retry-branch D25'te; doğrula.)
+- [ ] **4.2 — `finalizeRefundForReturnedShipment` concurrency-safe (MONEY-M1)** atomik marker/CAS (3 çağıran: cron + Sürat sync + admin).
+- [ ] **4.3 — Payout void yarışları (MONEY-M2/M3)** iade sırasında oluşan `pending` payout void; PayTR fail'de payout geri-al; `createPayoutsForReleasedHolds` açık-iade/frozen kontrol etsin.
+- [ ] **4.4 — PayTR-iade/DB-fail reconciliation (MONEY-M4)** `refundInProgressOrders` marker'ını tarayan bir sweep (bugün hiçbir job taramıyor).
+- [ ] **4.5 — Trade dispute/release sıralaması (MONEY-M5/M6/M8)** `resolveDispute` doğrulamadan önce iade etmesin; release öncesi statü re-check; admin `releaseTradePaymentHold` trade-status guard'ı.
+- [ ] **4.6 — Düşük (MONEY-L1/L3/L4/L7):** `manualRefund` grup/trade null-orderId; ledger `waived` drift; stopaj kısmi; birleşik gelir defteri notu (Faz 6'ya bağlanır).
+
+---
+
+## Faz 5 — Outbox pattern (para yan-etkileri) · `fix/payment-hardening-outbox`
+
+> "post-commit best-effort .catch(log)" para yan-etkilerini güvenilir kılar.
+
+- [ ] **5.1** `outbox` tablosu (event tipi, payload, status, attempts, nextAttemptAt).
+- [ ] **5.2** Para mutasyonuyla AYNI tx'te outbox satırı; ayrı worker retry+backoff+DLQ ile boşaltır.
+- [ ] **5.3** Taşınacak yan-etkiler: PayTR iade çağrısı, Sürat gönderi iptali, takas nakit iadesi, fatura üretimi, bildirim fan-out. (SEAM-B2, MONEY-H1/H2 ile kesişir — outbox onların kalıcı çözümü.)
+
+---
+
+## Faz 6 — Birleşik ledger (double-entry) · `fix/payment-hardening-ledger`
+
+> Bakiye/tutar tutarlılığının tek kaynağı; kısmi iade doğruluğunun yapısal temeli.
+
+- [ ] **6.1** Değişmez `ledger_entry` (debit/credit, hesap, tutar, para olayı ref).
+- [ ] **6.2** Her para olayı (ödeme, komisyon, hold, release, payout, iade, takas komisyonu) bir entry; bakiyeler türetilir.
+- [ ] **6.3** Hold tüketimi/kısmi iade ledger'dan okusun (Faz 1.4'ün yapısal hâli).
+- [ ] **6.4** Sipariş + takas komisyonlarını tek deftere birleştir (MONEY-L7).
+- [ ] **6.5** Günlük reconciliation: ledger vs Payment/Hold/Payout vs PSP raporu; drift alarmı.
+
+---
+
+## Faz 7 — Dayanıklılık: Bull migrasyonu + ayrı worker · `fix/payment-hardening-resilience`
+
+> "Sistem çökse bile çalışsın" isteğinin gerçek karşılığı. Faz 0 önkoşul.
+
+- [ ] **7.1** Kalan saf-`@Cron`'ları Bull desenine getir: `elogo-scheduler` (EVERY_30_MIN), `featured-scheduler` (`15 3 * * *`), `search-sync:82` (EVERY_HOUR).
+- [ ] **7.2** Worker'ı ayrı process olarak deploy et (`worker.ts` → `node dist/worker`, ayrı Coolify servisi) + `AppModule`'den `WorkerModule`'ü çıkar (API çift-işlemesin). → API çökse kuyruk donmaz; worker replike edilebilir (HA).
+- [ ] **7.3** Her job'ın idempotentliğini doğrula (Bull at-least-once). Faz 1-2'deki CAS işi para job'larını hazırlar; tek tek onayla.
+- [ ] **7.4** Bull `settings` (lockDuration/stalledInterval/maxStalledCount) + DLQ; her job "vadesi gelmiş HER ŞEYİ bul" deseninde (backfill yok kuralı).
+- [ ] **7.5** Bayrakları aç (önce `CRONS_VIA_BULL`, sonra `MONEY_CRONS_VIA_BULL`), in-process `@Cron` ikizlerini kaldır → **tek mekanizma**.
+
+---
+
+## Faz 8 — Event-driven fulfillment + god-service parçalama · `refactor/payment-fulfillment-decompose`
+
+- [ ] **8.1** Ödeme `paid`'e geçip **event yaysın**; fulfillment tüketsin (fulfillment hatası ödeme durumunu bozmasın).
+- [ ] **8.2** Ekstraksiyon: `VirtualOrderFulfillment` (membership/boost), `OrderStock` (decrement+cascade), `FulfillmentNotifier`, `ShipmentProvisioning`, `TradeCashFulfillment`.
+- [ ] **8.3** Tekil fulfillment'ı "group-of-one"a indir → ~450-500 satır kopya silinir (QUAL).
+- [ ] **8.4** `ModuleRef`/`require()` lazy-resolve hack'lerini event bus ile erit.
+
+---
+
+## Faz 9 — Tipleme + config + test · `chore/payment-hardening-quality`
+
+- [ ] **9.1** `Prisma.PaymentGetPayload<...>` = `PaymentWithContext` + `PaymentMetadata` interface; 4 fulfillment + 5 initiation `any`'sini tiple.
+- [ ] **9.2** Config merkezileştir: 24s pencere, "+3 gün", `PAYMENT_BYPASS`, `COOLING_OFF_DAYS` vs `RETURN_WINDOW_DAYS` (tek kaynak), para epsilon → ConfigService/const.
+- [ ] **9.3** Para yolu testleri (bugün SIFIR): tekil `processSuccessfulPayment`, `processRefund` order yolu, `releaseHoldsDue`, `handleOrderDelivered`, reconciler, outbox worker, ledger.
+- [ ] **9.4** `payment-trade-cash-refund.spec.ts` `describe.skip` aç (MONEY-L5).
+
+---
+
+## Faz 10 — Kalan düşük-önem temizlik
+
+- [ ] FLOW-L1 (SavedCard grup/trade), FLOW-L2/MONEY-L2 (restock miktar), FLOW-L3 (üyelik sibling), FLOW-L4 (boost debris), SEAM-B6 (kargo ücreti tek-kaynak: üye-offer kargo, quote≠checkout, kısmi-iade kargo kuralı), SEAM-B7 (admin 4. teslim yolu → `handleOrderDelivered`'a bağla), SEAM-B8/B9.
+
+---
+
+## Bağımlılık haritası (neden bu sıra)
+
+```
+Faz 0 (Redis) ───────────────┐
+Faz 1 (para bug) ── acil       ├─▶ Faz 7 (Bull/worker) idempotency'ye bağlı
+Faz 2 (reconcile) ── PSP kaynak │
+Faz 3 (güvenlik) ── bağımsız    │
+Faz 4 (hold/refund) ◀── Faz 1   │
+Faz 5 (outbox) ◀── Faz 1/2      │
+Faz 6 (ledger) ◀── Faz 1.4/4    │
+Faz 8 (event/refactor) ◀── Faz 2/5
+Faz 9 (test/tip) ── her fazla birlikte artımlı
+```
+
+- **Faz 1 önce** (kullanıcı önceliği: para kaybı).
+- **Faz 2** hemen ardından (H1/H2/H3 aynı kök, PSP reconciliation).
+- **Faz 3** paralel gidebilir (güvenlik, bağımsız).
+- **Faz 5/6** yapısal temel; Faz 1'deki yamaları kalıcılaştırır.
+- **Faz 7** en son "çökme dayanıklılığı" — Faz 0 + idempotency (Faz 1/2) tamamlanmadan bayrak açılmaz.
+
+## Çalışma kuralı
+
+- Her faz ayrı branch, anlamlı commit'ler, İngilizce mesaj (Co-Authored yok), her adımda typecheck + ilgili testler yeşil.
+- Her madde çözülünce burada `[x]` + ilgili commit.
+- Faz bitince kısa özet + "nerede olduğumuzu" bildir; sıradaki faza geçmeden önaylat.
+</content>
