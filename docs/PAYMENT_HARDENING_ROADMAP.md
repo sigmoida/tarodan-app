@@ -101,12 +101,14 @@
       `shipment.status=returned`) → başarısız iade bir sonraki turda güvenilir retry ediliyor,
       askıda kalmıyor. **Spec:** returned-arm testi (group-refund.spec).
 
-- [ ] **1.7 — `retryPayment` düzelt (FLOW-H4 / SEAM-B5)**
-      `payment-lifecycle.service.ts:114-135`. `payment.create({orderId})` +
-      `orderId @unique` → her çağrı P2002/500; iptal-revive yarım. **Çözüm:** yeni satır
-      yerine mevcut `failed` ödemeyi CAS ile `pending`'e resetle (initiation'daki reuse
-      deseni) + qty-farkında `reacquireReservation` helper'ı. (Faz 8'deki helper'la ortak.)
-      **Kabul:** reddedilen ödeme retry ediliyor, 500 yok; spec.
+- [x] **1.7 — `retryPayment` düzelt (FLOW-H4 / SEAM-B5)** ✓
+      `payment-lifecycle.service.ts:retryPayment`. `payment.create({orderId})` +
+      `orderId @unique` → her çağrı P2002/500; retry HİÇ çalışmıyordu. **Çözüm:** yeni
+      satır yerine mevcut `failed` ödeme CAS ile (`updateMany` + status guard) `pending`'e
+      resetlenip yeniden kullanılıyor; retry audit metadata korunuyor; `assignMerchantOid`
+      oid'i rotate ediyor (eski oid history'e). `newPaymentId == paymentId` (hiçbir client
+      kullanmıyordu). **Spec:** 3 yeni testi (retry-flow-h4.spec). (qty-farkında
+      `reacquireReservation` helper'ı Faz 8'e bırakıldı — mevcut revive korundu.)
 
 ---
 

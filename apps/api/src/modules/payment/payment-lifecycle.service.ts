@@ -111,57 +111,75 @@ export class PaymentLifecycleService {
       );
     }
 
-    // Create new payment record
-    const newPayment = await this.prisma.payment.create({
+    // FLOW-H4: Payment.orderId @unique olduğundan aynı sipariş için YENİ payment.create
+    // P2002 (unique violation) → 500 verir; retry HİÇ çalışmazdı. Bunun yerine mevcut
+    // `failed` payment satırını CAS ile `pending`'e resetleyip YENİDEN KULLAN (initiation
+    // reuse deseni). CAS (updateMany + status guard) eşzamanlı bir başka retry/callback
+    // yarışını kapatır: yalnız bir çağıran failed→pending geçişini kazanır.
+    const reclaimed = await this.prisma.payment.updateMany({
+      where: { id: paymentId, status: PaymentStatus.failed },
+      data: { status: PaymentStatus.pending, providerPaymentId: null },
+    });
+    if (reclaimed.count === 0) {
+      // Yarış: başka bir işlem bu ödemeyi zaten resetledi/tamamladı → tekrar deneme.
+      throw new BadRequestException(
+        i18nMessage("server.payment.onlyFailedPaymentsRetryable"),
+      );
+    }
+
+    // Retry denetim izini metadata'ya ekle (mevcut metadata KORUNUR; updateMany JSON
+    // merge edemediğinden ayrı bir read-modify-write). assignMerchantOid bundan sonra
+    // bu taze metadata'yı okuyup merchantOidHistory'i üstüne merge eder.
+    const prevMeta = (payment.metadata as Record<string, any>) || {};
+    const auditHistory = Array.isArray(prevMeta.auditHistory)
+      ? prevMeta.auditHistory
+      : [];
+    await this.prisma.payment.update({
+      where: { id: paymentId },
       data: {
-        orderId: payment.orderId,
-        amount: payment.amount,
-        currency: payment.currency,
-        provider: payment.provider,
-        status: PaymentStatus.pending,
         metadata: {
-          retriedFrom: paymentId,
+          ...prevMeta,
           retriedAt: new Date().toISOString(),
-          auditHistory: [
-            {
-              action: "payment.retried",
-              timestamp: new Date().toISOString(),
-              originalPaymentId: paymentId,
-              userId,
-            },
-          ],
+          auditHistory: auditHistory.concat({
+            action: "payment.retried",
+            timestamp: new Date().toISOString(),
+            originalPaymentId: paymentId,
+            userId,
+          }),
         },
       },
     });
 
-    // Log retry action on original payment
+    // Log retry action on the (reused) payment
     await this.paymentCommon.logPaymentAction(
       "retried",
       paymentId,
       payment.orderId,
       undefined,
       PaymentStatus.failed,
-      undefined,
+      PaymentStatus.pending,
       {
-        newPaymentId: newPayment.id,
+        reused: true,
         userId,
       },
     );
 
-    // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin), kart /payments/process-direct ile.
+    // Ödeme niyeti (intent): merchant_oid ata (callback eşleşsin, eski oid history'e
+    // taşınır), kart /payments/process-direct ile. providerPaymentId de sıfırlanır.
     await this.paymentCommon.assignMerchantOid(
-      newPayment.id,
+      paymentId,
       String(order.orderNumber || order.id),
     );
 
     this.logger.log(
-      `Payment ${paymentId} retried, new payment ${newPayment.id} created`,
+      `Payment ${paymentId} retried (row reused, reset failed→pending)`,
     );
 
     return {
       success: true,
       paymentId: payment.id,
-      newPaymentId: newPayment.id,
+      // Geriye dönük uyumluluk: satır yeniden kullanıldığından newPaymentId == paymentId.
+      newPaymentId: payment.id,
       orderId: payment.orderId,
       amount: Number(payment.amount),
       provider: payment.provider,
