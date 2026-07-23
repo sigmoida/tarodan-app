@@ -46,6 +46,26 @@ const SURAT_BARKOD_TEST =
 const SURAT_SIL_LIVE = "https://api01.suratkargo.com.tr/api/GonderiSil";
 const SURAT_SIL_TEST = "https://api02.suratkargo.com.tr/api/GonderiSil";
 
+/**
+ * 11.1a (G1): Sürat takip/sil URL'i — kimlik (CariKodu/Sifre) query auth ile taşınır
+ * (Sürat sözleşmesi; bu uçlar body/header auth kabul etmez). TEK chokepoint: kimlik
+ * içeren URL yalnız buradan üretilir. INVARYANT: bu URL HİÇBİR log/hata/breadcrumb'a
+ * verbatim GİRMEMELİ (Sifre sızar); loglanacaksa önce `redactSuratUrl` ile maskele.
+ */
+function buildAuthedSuratUrl(
+  baseUrl: string,
+  cariKodu: string,
+  sifre: string,
+  webSiparisKodu: string,
+): string {
+  return `${baseUrl}?CariKodu=${encodeURIComponent(cariKodu)}&Sifre=${encodeURIComponent(sifre)}&WebSiparisKodu=${encodeURIComponent(webSiparisKodu)}`;
+}
+
+/** Kimlik içeren Sürat URL'ini log-güvenli hale getir (Sifre maskelenir). */
+function redactSuratUrl(url: string): string {
+  return url.replace(/([?&]Sifre=)[^&]*/gi, "$1***");
+}
+
 @Injectable()
 export class SuratTrackingService {
   private readonly logger = new Logger(SuratTrackingService.name);
@@ -83,7 +103,7 @@ export class SuratTrackingService {
         ?.trim() === "true";
     const baseUrl = isTestMode ? SURAT_API_TEST : SURAT_API_LIVE;
 
-    const url = `${baseUrl}?CariKodu=${encodeURIComponent(cariKodu)}&Sifre=${encodeURIComponent(sifre)}&WebSiparisKodu=${encodeURIComponent(webSiparisKodu)}`;
+    const url = buildAuthedSuratUrl(baseUrl, cariKodu, sifre, webSiparisKodu);
 
     try {
       const controller = new AbortController();
@@ -116,7 +136,7 @@ export class SuratTrackingService {
       return data;
     } catch (error: any) {
       this.logger.error(
-        `Surat tracking API request failed for ${webSiparisKodu}: ${error.message}`,
+        `Surat tracking API request failed for ${webSiparisKodu}: ${redactSuratUrl(String(error?.message ?? error))}`,
       );
       return null;
     }
@@ -153,7 +173,7 @@ export class SuratTrackingService {
         .get<string>("SURAT_KARGO_TEST_MODE", "true")
         ?.trim() !== "false";
     const baseUrl = isTestMode ? SURAT_API_TEST : SURAT_API_LIVE;
-    const url = `${baseUrl}?CariKodu=${encodeURIComponent(cariKodu)}&Sifre=${encodeURIComponent(sifre)}&WebSiparisKodu=${encodeURIComponent(webSiparisKodu)}`;
+    const url = buildAuthedSuratUrl(baseUrl, cariKodu, sifre, webSiparisKodu);
 
     try {
       const controller = new AbortController();
@@ -188,7 +208,10 @@ export class SuratTrackingService {
         durum: body?.Gonderiler?.[0]?.KargonunDurumu ?? null,
       };
     } catch (error: any) {
-      return { ok: false, error: error?.message || String(error) };
+      return {
+        ok: false,
+        error: redactSuratUrl(error?.message || String(error)),
+      };
     }
   }
 
@@ -266,7 +289,10 @@ export class SuratTrackingService {
         barcodeSample: barcode.length ? String(barcode[0]).slice(0, 200) : null,
       };
     } catch (error: any) {
-      return { ok: false, error: error?.message || String(error) };
+      return {
+        ok: false,
+        error: redactSuratUrl(error?.message || String(error)),
+      };
     }
   }
 
@@ -297,7 +323,7 @@ export class SuratTrackingService {
         .get<string>("SURAT_KARGO_TEST_MODE", "true")
         ?.trim() !== "false";
     const baseUrl = isTestMode ? SURAT_SIL_TEST : SURAT_SIL_LIVE;
-    const url = `${baseUrl}?CariKodu=${encodeURIComponent(cariKodu)}&Sifre=${encodeURIComponent(sifre)}&WebSiparisKodu=${encodeURIComponent(webSiparisKodu)}`;
+    const url = buildAuthedSuratUrl(baseUrl, cariKodu, sifre, webSiparisKodu);
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 15000);
@@ -330,7 +356,10 @@ export class SuratTrackingService {
         message: data?.Message ?? data?.GonderiSilResult ?? null,
       };
     } catch (error: any) {
-      return { ok: false, error: error?.message || String(error) };
+      return {
+        ok: false,
+        error: redactSuratUrl(error?.message || String(error)),
+      };
     }
   }
 

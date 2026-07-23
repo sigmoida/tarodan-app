@@ -241,7 +241,12 @@ export class PaymentRefundService {
         // PAYMENT_BYPASS: dev/test modunda PayTR callback olmadan ödeme tamamlandığı
         // için PayTR tarafında oid kaydı yok. Refund'ı da bypass'la — DB'de payment
         // direkt refunded olarak işaretlenir; provider çağrısı atlanır.
+        // 11.1b (G3/SEC-H1): PROD'da bypass ASLA aktif değil — completion'daki SEC-H1 ile
+        // simetrik ikinci savunma hattı. main.ts boot-guard'ı yalnız API process'inde koşar;
+        // refund cron'ları WORKER process'inde çalışır (o guard'ı çağırmaz). Yanlış env'de
+        // flag "true" olsa bile gerçek PayTR iadesi yapılır → "iade edildi" ama para gitmedi olmaz.
         const bypassEnabled =
+          process.env.NODE_ENV !== "production" &&
           this.configService.get("PAYMENT_BYPASS") === "true";
         if (bypassEnabled) {
           this.logger.warn(
@@ -989,7 +994,11 @@ export class PaymentRefundService {
     const refundAlreadyInitiated = Boolean(existingMeta.refundInProgressAt);
 
     // PAYMENT_BYPASS: dev/test modunda PayTR'a refund çağrısı yapma.
-    const bypassEnabled = this.configService.get("PAYMENT_BYPASS") === "true";
+    // 11.1b (G3/SEC-H1): PROD'da ASLA aktif değil (worker refund cron'ları için ikinci
+    // savunma hattı) — yanlış env'de gerçek PayTR trade iadesi çalışır.
+    const bypassEnabled =
+      process.env.NODE_ENV !== "production" &&
+      this.configService.get("PAYMENT_BYPASS") === "true";
     if (refundAlreadyInitiated) {
       this.logger.warn(
         `refundTradeCashPaymentIfCompleted: refundInProgressAt zaten set — PayTR çağrısı atlanıyor, ` +

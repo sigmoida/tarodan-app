@@ -19,6 +19,12 @@ import {
 import { NotificationService } from "../notification/notification.service";
 import { LedgerService } from "../ledger/ledger.service";
 
+/** IBAN'ı log-güvenli hale getir (KVKK): yalnız son 4 hane. */
+function maskIban(iban: string | null | undefined): string {
+  const clean = (iban || "").replace(/\s/g, "");
+  return clean ? `***${clean.slice(-4)}` : "(yok)";
+}
+
 @Injectable()
 export class PayoutService {
   private readonly logger = new Logger(PayoutService.name);
@@ -345,8 +351,9 @@ export class PayoutService {
             payout.transferIban,
           );
           processed++;
+          // 11.1c (G4/KVKK): tam IBAN loglanmaz — yalnız son 4 hane (email'le simetrik).
           this.logger.log(
-            `Payout ${payout.transId} completed: ${payout.netAmount} TL → ${payout.transferIban}`,
+            `Payout ${payout.transId} completed: ${payout.netAmount} TL → ${maskIban(payout.transferIban)}`,
           );
           // Faz 6.2 (ledger): escrow → satıcıya ödendi. seller_escrow (borç) kapanır,
           // payout (dış çıkış) borçlanır. capture'daki seller_escrow debit'ini dengeler

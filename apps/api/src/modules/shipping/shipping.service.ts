@@ -373,7 +373,11 @@ export class ShippingService {
    * POST /shipping/webhook/:provider
    */
   async handleProviderWebhook(provider: string, payload: any) {
-    this.logger.log(`Received webhook from ${provider}:`, payload);
+    // 11.1d (G5/KVKK): ham payload'ı verbatim loglama (PII + log-injection riski) —
+    // yalnız whitelist alanlar (izlenebilirlik için yeterli, kişisel veri içermez).
+    this.logger.log(
+      `Received webhook from ${provider}: tracking=${payload?.trackingNumber ?? payload?.tracking_no ?? "?"} status=${payload?.status ?? "?"}`,
+    );
 
     // Find shipment by tracking number
     const shipment = await this.prisma.shipment.findFirst({

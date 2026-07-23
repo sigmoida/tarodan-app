@@ -446,14 +446,18 @@
 
 ### 11.1 — Hızlı güvenlik kazanımları (düşük risk, küçük edit)
 
-- [ ] **11.1a (G1)** Sürat şifresi (`Sifre`) URL query string'inden çıkar → body/header. URL'ler proxy/APM/
-      error-tracker loglarına sızar. `surat-cargo/surat-tracking.service.ts:86,156,300` (+ probe 300). Orta.
-- [ ] **11.1b (G3)** Refund bypass'a prod hard-block ekle (`NODE_ENV==='production'` → reddet), completion'daki
-      SEC-H1 guard'ıyla simetrik. Yoksa yanlış env'de "iade edildi" ama para gitmez. `payment/payment-refund.service.ts:245` (order) + ~992 (trade-cash). Orta.
-- [ ] **11.1c (G4)** Tam IBAN cleartext log → last-4 maskele (aynı dosya email'de zaten maskeliyor). KVKK.
-      `payout/payout.service.ts:349`. Orta.
-- [ ] **11.1d (G5)** Webhook payload verbatim log → yalnız whitelist alanlar. PII + log-injection.
-      `shipping/shipping.service.ts:376`. Düşük-orta.
+- [~] **11.1a (G1)** ✓ (kısmi) Kimlik içeren Sürat takip/sil URL'i TEK chokepoint'e alındı
+  (`buildAuthedSuratUrl`, 3× kopya birleşti) + `redactSuratUrl` ile tüm hata log'ları maskeleniyor
+  (Sifre asla loglanmaz/breadcrumb'a girmez). **Ertelendi:** kimliği query'den body/header'a taşımak
+  Sürat API sözleşmesi doğrulaması gerektiriyor (bu uçlar query-auth; canlı test edilemedi → wire
+  formatı korundu). `surat-cargo/surat-tracking.service.ts:46-67,106,176,320`.
+- [x] **11.1b (G3)** ✓ Refund bypass PROD'da ASLA aktif değil (`NODE_ENV!=='production'` konjunksiyonu) —
+      completion SEC-H1 ile simetrik ikinci savunma hattı (worker refund cron'ları main.ts boot-guard'ını
+      çağırmaz). Yanlış env → gerçek PayTR iadesi çalışır. `payment/payment-refund.service.ts:244,997` (order+trade).
+- [x] **11.1c (G4)** ✓ Tam IBAN log'u last-4 maskeye indi (`maskIban` helper; email'le simetrik). KVKK.
+      `payout/payout.service.ts:350`.
+- [x] **11.1d (G5)** ✓ Webhook ham payload verbatim log kaldırıldı → yalnız `tracking`+`status` whitelist.
+      `shipping/shipping.service.ts:376`.
 
 ### 11.2 — Güvenlik/doğruluk (dikkat isteyen)
 
