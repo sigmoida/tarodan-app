@@ -45,10 +45,9 @@ export function GoogleSignInButton({ onSuccess }: { onSuccess?: () => void }) {
     <Button
       type="button"
       variant="outline"
-      size="lg"
       className="w-full"
       isLoading={isLoading}
-      leftIcon={<GoogleIcon className="h-5 w-5" />}
+      leftIcon={<GoogleIcon className="h-4 w-4" />}
       onClick={() => {
         setIsLoading(true);
         login();
