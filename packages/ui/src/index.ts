@@ -22,6 +22,10 @@ export {
   isValidIban,
 } from "./components/PaymentInputs";
 export { Slider, type SliderProps } from "./components/Slider";
+export {
+  QuantityStepper,
+  type QuantityStepperProps,
+} from "./components/QuantityStepper";
 export { SearchInput, type SearchInputProps } from "./components/SearchInput";
 export { Textarea, type TextareaProps } from "./components/Textarea";
 export {
