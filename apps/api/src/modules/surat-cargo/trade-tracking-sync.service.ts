@@ -9,6 +9,7 @@ import {
   isSuratDelivered,
 } from "./surat-status.mapper";
 import { canTransitionShipmentStatus } from "../shipping/shipment-state-machine";
+import { TRADE_VALID_TRANSITIONS } from "../trade/trade.state-machine";
 import { SuratTrackingClient } from "./surat-tracking.client";
 
 /**
@@ -150,14 +151,20 @@ export class TradeTrackingSyncService {
     synced: number;
     failed: number;
   }> {
+    // #2: order sync ile AYNI filtre — terminal-OLMAYAN her bacağı pollala.
+    // Eski `in: [label_created, pending, in_transit]` beyaz-listesi, ara durumlara
+    // (at_delivery_branch, out_for_delivery, picked_up, return_in_progress) geçen
+    // bacakları sorgu dışı bırakıyordu → takip orada DONUYOR, delivered'a hiç ulaşmıyor
+    // ve iki-bacak-teslim at_warehouse geçişi tetiklenmiyordu. Terminal durumları hariç tut.
     const activeTradeShipments = await this.prisma.tradeShipment.findMany({
       where: {
         carrier: "surat",
         status: {
-          in: [
-            ShipmentStatus.label_created,
-            ShipmentStatus.pending,
-            ShipmentStatus.in_transit,
+          notIn: [
+            ShipmentStatus.delivered,
+            ShipmentStatus.returned,
+            ShipmentStatus.cancelled,
+            ShipmentStatus.failed,
           ],
         },
         trackingNumber: { not: null },
@@ -303,7 +310,18 @@ export class TradeTrackingSyncService {
         select: { id: true, status: true, firstWarehouseArrivalAt: true },
       });
       if (!trade) return false;
-      if (trade.status === TradeStatus.at_warehouse) return false;
+      // #3: yalnız state-machine'in at_warehouse'a geçişe İZİN VERDİĞİ kaynak
+      // durumdan (yalnız shipping_to_warehouse) devam et. Eski kod sadece "zaten
+      // at_warehouse değil" bakıyordu → cancelled/completed/disputed/returning bir
+      // takas, geç gelen bir teslim poll'uyla at_warehouse'a GERİ SARILABİLİYORDU.
+      // FOR UPDATE (yukarıda) durum okumasını kilitler → whitelist kontrolü CAS'tır.
+      if (
+        !TRADE_VALID_TRANSITIONS[trade.status]?.includes(
+          TradeStatus.at_warehouse,
+        )
+      ) {
+        return false;
+      }
 
       const toWarehouseShipments = await tx.tradeShipment.findMany({
         where: { tradeId, leg: "to_warehouse" },

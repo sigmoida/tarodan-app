@@ -213,10 +213,14 @@ export class PaymentInitiationService {
             data: { reservationReleasedAt: null },
           });
           if (claimed.count === 0) return; // eşzamanlı retry kazandı
-          await this.productLockService.checkAndReserve(tx, order.productId, 1);
+          await this.productLockService.checkAndReserve(
+            tx,
+            order.productId,
+            order.quantity ?? 1,
+          );
         });
         this.logger.log(
-          `Re-reserved 1 unit for group order ${order.id} after release (retry)`,
+          `Re-reserved ${order.quantity ?? 1} unit(s) for group order ${order.id} after release (retry)`,
         );
       }
     }
@@ -662,10 +666,14 @@ export class PaymentInitiationService {
             data: { reservationReleasedAt: null },
           });
           if (claimed.count === 0) return; // eşzamanlı retry kazandı
-          await this.productLockService.checkAndReserve(tx, order.productId, 1);
+          await this.productLockService.checkAndReserve(
+            tx,
+            order.productId,
+            order.quantity ?? 1,
+          );
         });
         this.logger.log(
-          `Re-reserved 1 unit for order ${order.id} after release (direct)`,
+          `Re-reserved ${order.quantity ?? 1} unit(s) for order ${order.id} after release (direct)`,
         );
       }
       amount = Number(order.totalAmount);
@@ -773,10 +781,14 @@ export class PaymentInitiationService {
               data: { reservationReleasedAt: null },
             });
             if (claimed.count === 0) return;
-            await this.productLockService.checkAndReserve(tx, o.productId, 1);
+            await this.productLockService.checkAndReserve(
+              tx,
+              o.productId,
+              o.quantity ?? 1,
+            );
           });
           this.logger.log(
-            `Re-reserved 1 unit for group order ${o.id} after release (direct)`,
+            `Re-reserved ${o.quantity ?? 1} unit(s) for group order ${o.id} after release (direct)`,
           );
         }
       }
@@ -1213,10 +1225,14 @@ export class PaymentInitiationService {
             data: { reservationReleasedAt: null },
           });
           if (claimed.count === 0) return; // another concurrent retry already won
-          await this.productLockService.checkAndReserve(tx, order.productId, 1);
+          await this.productLockService.checkAndReserve(
+            tx,
+            order.productId,
+            order.quantity ?? 1,
+          );
         });
         this.logger.log(
-          `Re-reserved 1 unit for order ${order.id} after 30-min release (retry)`,
+          `Re-reserved ${order.quantity ?? 1} unit(s) for order ${order.id} after 30-min release (retry)`,
         );
       }
 
@@ -1251,10 +1267,14 @@ export class PaymentInitiationService {
     if (order.offerId && !order.reservationReleasedAt) {
       // First-time payment for an offer-flow order — straightforward reserve.
       await this.prisma.$transaction(async (tx) => {
-        await this.productLockService.checkAndReserve(tx, order.productId, 1);
+        await this.productLockService.checkAndReserve(
+          tx,
+          order.productId,
+          order.quantity ?? 1,
+        );
       });
       this.logger.log(
-        `Reserved 1 unit for offer-based order ${order.id} (product ${order.productId})`,
+        `Reserved ${order.quantity ?? 1} unit(s) for offer-based order ${order.id} (product ${order.productId})`,
       );
     } else if (order.reservationReleasedAt) {
       // Retry after 30-min release. CAS-gate on the flag so concurrent
@@ -1265,9 +1285,15 @@ export class PaymentInitiationService {
           data: { reservationReleasedAt: null },
         });
         if (claimed.count === 0) return;
-        await this.productLockService.checkAndReserve(tx, order.productId, 1);
+        await this.productLockService.checkAndReserve(
+          tx,
+          order.productId,
+          order.quantity ?? 1,
+        );
       });
-      this.logger.log(`Re-reserved 1 unit for order ${order.id} after release`);
+      this.logger.log(
+        `Re-reserved ${order.quantity ?? 1} unit(s) for order ${order.id} after release`,
+      );
     }
 
     // Create payment record.

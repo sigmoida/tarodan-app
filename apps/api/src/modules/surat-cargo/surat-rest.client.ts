@@ -157,8 +157,12 @@ export class RestSuratClient extends SuratCarrierClient {
         signal: controller.signal,
       });
 
-      // 5xx → teknik hata (retry edilir)
-      if (response.status >= 500) {
+      // Non-2xx → ASLA başarı sayma. 5xx VE 4xx teknik hata olarak fırlatılır
+      // (retry; kalıcı 4xx — 400/401/404 — retry'lar tükenince 'failed' işaretlenir).
+      // Eski kod yalnız 5xx'i yakalıyordu: bir 4xx yanıtın gövdesi IsError içermezse
+      // aşağıdaki `data.IsError !== true` dalı yanlışlıkla "Tamam" (false success)
+      // dönebiliyordu → gönderi Sürat'ta oluşmadığı halde başarı sanılırdı.
+      if (response.status >= 400) {
         const err = new Error(`HTTP ${response.status}`);
         (err as any).statusCode = response.status;
         throw err;
@@ -264,7 +268,7 @@ export class RestSuratClient extends SuratCarrierClient {
         signal: controller.signal,
       });
 
-      if (response.status >= 500) {
+      if (response.status >= 400) {
         const err = new Error(`HTTP ${response.status}`);
         (err as any).statusCode = response.status;
         throw err;
@@ -359,7 +363,7 @@ export class RestSuratClient extends SuratCarrierClient {
         signal: controller.signal,
       });
 
-      if (response.status >= 500) {
+      if (response.status >= 400) {
         const err = new Error(`HTTP ${response.status}`);
         (err as any).statusCode = response.status;
         throw err;

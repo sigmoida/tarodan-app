@@ -68,9 +68,10 @@ export class PaymentFulfillmentService {
   }
 
   /**
-   * Faz 8.3: Ödemeyi CAS ile `pending → completed` claim eder — tekil / grup / takas
-   * ortak boilerplate'i (audit trail + provider verisi + FLOW-M5 oid senkronu). CAS
-   * guard'ı (`status: pending`) mükerrer başarı callback'ini idempotent kılar.
+   * Faz 8.3: Ödemeyi CAS ile `{pending|processing} → completed` claim eder — tekil /
+   * grup / takas ortak boilerplate'i (audit trail + provider verisi + FLOW-M5 oid
+   * senkronu). CAS guard'ı (`status in [pending, processing]`) mükerrer başarı
+   * callback'ini idempotent kılar (tek-claim) ve hızlı-callback yarışını (#4) kapsar.
    * @returns bu çağrı ödemeyi tamamladı mı (count > 0; false → zaten completed).
    */
   private async claimPaymentCompleted(
@@ -94,8 +95,19 @@ export class PaymentFulfillmentService {
     const { columns: providerColumns, metaPatch } = this.buildProviderPatch(
       opts.providerData,
     );
+    // FLOW #4 (hızlı-callback yarışı): CAS `pending` VE `processing` kabul eder.
+    // Direct ödeme akışı `pending→processing→(PayTR çekim)→finally: processing→pending`
+    // yapar. PayTR success callback'i, çekim bitip finally henüz `pending`'e döndürmeden
+    // ("processing" penceresinde) gelirse, eski `status: pending`-only CAS onu kaçırır
+    // (count=0) → fulfillment ATLANIR ama PayTR'ye OK döner → alıcı öder, sipariş
+    // hazırlanmaz (yalnız reconciliation gecikmeyle yakalar). `processing`'i de kabul
+    // etmek tamamlamayı hemen claim ettirir. updateMany tek-claim garantisini korur
+    // (yalnız bir çağrı completed'a çevirebilir); çift-çekim ayrı bir gate ile önlenir.
     const claimed = await tx.payment.updateMany({
-      where: { id: payment.id, status: PaymentStatus.pending },
+      where: {
+        id: payment.id,
+        status: { in: [PaymentStatus.pending, PaymentStatus.processing] },
+      },
       data: {
         status: PaymentStatus.completed,
         paidAt: new Date(),

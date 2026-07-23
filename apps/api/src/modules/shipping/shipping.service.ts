@@ -308,16 +308,32 @@ export class ShippingService {
       (this.trackingUrls[shipment.provider as ShippingProvider] ??
         this.trackingUrls[ShippingProvider.surat]) + dto.trackingNumber;
 
+    // #5: trackingNumber = Sürat sorgu anahtarı (OzelKargoTakipNo). Sürat-yönetimli
+    // bir gönderide barkod akışı bunu ATAR ve poller bu anahtarla sorgular. Manuel
+    // satıcı girişi bunu EZERSE poll yanlış anahtarla sorgular → takip KOPAR. Bu yüzden
+    // satıcının girdiği taşıyıcı kodu providerTrackingId'ye (görsel/taşıyıcı referansı)
+    // yazılır; trackingNumber YALNIZCA hâlâ boşsa (Sürat-yönetimli olmayan manuel
+    // gönderi) doldurulur — mevcut bir Sürat anahtarı asla ezilmez.
+    const trackingData: {
+      providerTrackingId: string;
+      trackingUrl: string;
+      status: ShipmentStatus;
+      trackingNumber?: string;
+    } = {
+      providerTrackingId: dto.trackingNumber,
+      trackingUrl,
+      status: ShipmentStatus.picked_up,
+    };
+    if (!shipment.trackingNumber) {
+      trackingData.trackingNumber = dto.trackingNumber;
+    }
+
     const result = await this.prisma.$transaction(async (tx) => {
       // Update shipment — M7 CAS: #86 guard'ı yukarıda snapshot'a göre bakıldı;
       // arada webhook/poller delivered yazdıysa picked_up'a geri sarmayalım.
       const cas = await tx.shipment.updateMany({
         where: { id: shipmentId, status: shipment.status },
-        data: {
-          trackingNumber: dto.trackingNumber,
-          trackingUrl,
-          status: ShipmentStatus.picked_up,
-        },
+        data: trackingData,
       });
       if (cas.count === 0) {
         throw new BadRequestException(

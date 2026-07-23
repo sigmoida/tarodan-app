@@ -16,17 +16,19 @@ describe("PayoutService.createPayoutsForReleasedHolds — MONEY-M3 open-refund g
       sellerId: "s1",
       payment: {
         providerConversationId: "OID",
-        order: {
-          orderNumber: "ORD1",
-          totalAmount: 100,
-          commissionAmount: 10,
-          withholdingTaxAmount: 0,
-        },
       },
       seller: { bankAccount: { iban: "TR..", accountHolder: "S" } },
     };
+    const order = {
+      id: "o1",
+      orderNumber: "ORD1",
+      totalAmount: 100,
+      commissionAmount: 10,
+      withholdingTaxAmount: 0,
+    };
     const prisma = {
       paymentHold: { findMany: jest.fn().mockResolvedValue([hold]) },
+      order: { findMany: jest.fn().mockResolvedValue([order]) },
       refundRequest: { findFirst: jest.fn().mockResolvedValue(openRefund) },
       tradeCashPayment: { findMany: jest.fn().mockResolvedValue([]) },
       payoutTransfer: { create: jest.fn().mockResolvedValue({}) },

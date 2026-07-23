@@ -104,16 +104,28 @@ export class PayoutService {
         frozenByRefundId: null,
       },
       include: {
-        payment: { include: { order: true } },
+        payment: true,
         seller: { include: { bankAccount: true } },
       },
     });
+
+    // KRİTİK: Sipariş, payment.order üzerinden DEĞİL hold.orderId üzerinden yüklenir.
+    // Grup/sepet ödemelerinde Payment.orderId=null (checkoutGroupId'ye bağlı) olduğundan
+    // payment.order da null'dır; eski kod `if (!payment?.order) continue` ile bu hold'ları
+    // ATLIYORDU → grup siparişlerinin satıcıları HİÇ payout almıyordu (para kaybı).
+    // hold.orderId her hold için HER ZAMAN doludur (per-order hold).
+    const orderIds = [...new Set(releasedHolds.map((h) => h.orderId))];
+    const orders = orderIds.length
+      ? await this.prisma.order.findMany({ where: { id: { in: orderIds } } })
+      : [];
+    const orderById = new Map(orders.map((o) => [o.id, o]));
 
     let created = 0;
 
     for (const hold of releasedHolds) {
       const payment = hold.payment;
-      if (!payment?.order) continue;
+      const order = orderById.get(hold.orderId);
+      if (!payment || !order) continue;
 
       // MONEY-M3: Bu siparişte AÇIK bir iade talebi varsa payout OLUŞTURMA. Yarış:
       // hold releaseAt'i geçip release edildikten HEMEN SONRA bir iade açılırsa,
@@ -153,7 +165,7 @@ export class PayoutService {
 
       const merchantOid =
         payment.providerConversationId?.trim() ||
-        payment.order.orderNumber.replace(/-/g, "");
+        order.orderNumber.replace(/-/g, "");
 
       const bankAccount = hold.seller.bankAccount;
       const transId = `ORD${hold.orderId.replace(/-/g, "").slice(0, 20)}${Date.now()}`;
@@ -162,12 +174,12 @@ export class PayoutService {
         data: {
           paymentHoldId: hold.id,
           sellerId: hold.sellerId,
-          amount: payment.order.totalAmount,
-          commission: payment.order.commissionAmount,
+          amount: order.totalAmount,
+          commission: order.commissionAmount,
           // Sipariş anında kesilen stopaj snapshot'ı (hold.amount zaten stopaj düşülmüş).
           // Muhtasar raporu completed transferlerin bu alanından beslenir. Kısmi iadede
           // stopaj yeniden hesaplanmaz (bilinen kenar durum — satıcı beyannamede mahsup eder).
-          withholdingTax: payment.order.withholdingTaxAmount ?? 0,
+          withholdingTax: order.withholdingTaxAmount ?? 0,
           netAmount: netPayout,
           merchantOid,
           transId,

@@ -45,9 +45,13 @@ async function bootstrap() {
     // toplayıp birbirini kilitler. İlk hop'a güven.
     app.set("trust proxy", 1);
 
-    // Custom Body Parsers (e.g. PayTR form-urlencoded callbacks)
-    app.use(json({ limit: "50mb" }));
-    app.use(urlencoded({ extended: true, limit: "50mb" }));
+    // Custom Body Parsers (e.g. PayTR form-urlencoded callbacks).
+    // Limit 50mb → 1mb: JSON/urlencoded gövdeler (API çağrıları + PayTR callback)
+    // hiçbir zaman büyük değildir; 50mb'lık tavan public/unauth uçlarda (callback,
+    // confirm-failed) bellek-DoS yüzeyiydi. DOSYA yüklemeleri bu parser'lardan GEÇMEZ
+    // — multer (FileInterceptor + fileSize limiti) ayrı ele alır, o yüzden etkilenmez.
+    app.use(json({ limit: "1mb" }));
+    app.use(urlencoded({ extended: true, limit: "1mb" }));
 
     // Bull Board — kuyruk izleme dashboard'u. helmet'TEN ÖNCE mount edilir
     // ki CSP UI'ı bozmasın; istek burada yanıtlanıp helmet'e düşmez.
