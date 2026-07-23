@@ -25,6 +25,7 @@ import { ElogoInvoicingService } from "../elogo";
 import { ProductLockService } from "../product/product-lock.service";
 import { NotificationService } from "../notification/notification.service";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
+import { CARGO_PROVIDER } from "../surat-cargo/cargo-provider";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
 import { StorageService } from "../storage/storage.service";
 import { I18nService } from "../i18n";
@@ -114,6 +115,8 @@ describe("PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
         { provide: ProductLockService, useValue: noop },
         { provide: NotificationService, useValue: noop },
         { provide: SuratCargoService, useValue: noop },
+        // Faz 11.5a: PaymentCommonService artık CARGO_PROVIDER token'ına bağlı.
+        { provide: CARGO_PROVIDER, useValue: noop },
         { provide: CommissionLedgerService, useValue: noop },
         { provide: StorageService, useValue: noop },
         { provide: ModuleRef, useValue: noop },

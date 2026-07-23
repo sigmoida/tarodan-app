@@ -1,8 +1,11 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { PaymentStatus } from "@prisma/client";
 import { asPaymentMetadata } from "./payment-metadata.types";
-import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
+import {
+  CARGO_PROVIDER,
+  type CargoProvider,
+} from "../surat-cargo/cargo-provider";
 import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
 import { type SuratShipmentFailure } from "../surat-cargo/surat-cargo.types";
 
@@ -17,7 +20,7 @@ export class PaymentCommonService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly suratCargoService: SuratCargoService,
+    @Inject(CARGO_PROVIDER) private readonly cargo: CargoProvider,
   ) {}
 
   /**
@@ -58,8 +61,7 @@ export class PaymentCommonService {
         return;
       }
 
-      const result =
-        await this.suratCargoService.cancelShipmentByOrderNumber(orderNumber);
+      const result = await this.cargo.cancelShipmentByOrderNumber(orderNumber);
       if (result.ok) {
         await this.prisma.shipment.update({
           where: { id: shipment.id },
@@ -87,7 +89,7 @@ export class PaymentCommonService {
   async createSuratBarcodeForOrder(
     orderId: string,
   ): Promise<{ kargoTakipNo: string; labelZpl: string | null } | null> {
-    if (!this.suratCargoService.isIntegrationEnabled()) return null;
+    if (!this.cargo.isIntegrationEnabled()) return null;
 
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -123,7 +125,7 @@ export class PaymentCommonService {
     });
 
     try {
-      const result = await this.suratCargoService.createShipmentWithBarcode({
+      const result = await this.cargo.createShipmentWithBarcode({
         idempotencyKey: `surat:order:${order.orderNumber}`,
         correlationId: order.orderNumber,
         payload,

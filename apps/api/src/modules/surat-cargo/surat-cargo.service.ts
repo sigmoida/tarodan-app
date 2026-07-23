@@ -11,6 +11,7 @@ import type {
 } from "./surat-cargo.types";
 import { SuratSoapClient } from "./surat-soap.client";
 import { withSuratTechnicalRetries } from "./surat-technical-retry";
+import type { CargoProvider } from "./cargo-provider";
 
 export const SURAT_SOAP_CLIENT = Symbol("SURAT_SOAP_CLIENT");
 
@@ -48,7 +49,7 @@ function classifyCaughtError(e: unknown): SuratTechnicalCode {
 }
 
 @Injectable()
-export class SuratCargoService {
+export class SuratCargoService implements CargoProvider {
   private readonly logger = new Logger(SuratCargoService.name);
 
   constructor(

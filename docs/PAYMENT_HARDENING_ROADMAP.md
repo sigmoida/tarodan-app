@@ -501,9 +501,10 @@
 
 ### 11.5 — DIP / abstraction
 
-- [ ] **11.5a** Payment, Sürat concretion'ına bağlı: `PaymentCommonService` `SuratCargoService`'i enjekte edip
-      payload'ı inline kuruyor (`payment-common.service.ts:126`). `CargoProvider` arayüzü (create/cancel/label) token
-      ile enjekte et; payload inşasını surat modülüne al. Orta.
+- [x] **11.5a** ✓ Payment→Sürat DIP: yeni `CargoProvider` arayüzü + `CARGO_PROVIDER` token (`surat-cargo/cargo-provider.ts`);
+      `SuratCargoService implements CargoProvider`; modül `{provide:CARGO_PROVIDER, useExisting:SuratCargoService}` export ediyor.
+      `PaymentCommonService` artık somut servise değil `@Inject(CARGO_PROVIDER)` ile arayüze bağlı (payload inşası zaten 11.4a
+      ile surat modülünde). 2 spec'e token provider eklendi. tsc temiz; 192 test yeşil (yalnız pre-existing tracking-url hatası).
 - [ ] **11.5b** `IPaymentProvider` PayTR-shaped (ISP/LSP: `RestSuratClient extends SoapClient` "not supported" throw'lar;
       capi/transfer generic para-yolundan ayrık değil). Generic para metotlarını sağlayıcı-özel yeteneklerden ayır. Düşük-orta.
 
