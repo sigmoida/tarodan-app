@@ -1265,17 +1265,52 @@ export class PaymentInitiationService {
     // Direct buy'da reserve zaten createDirectBuyOrder'da yapıldı, AMA cron
     // 30-dk sonunda serbest bıraktıysa retry'da yeniden almak gerekir.
     if (order.offerId && !order.reservationReleasedAt) {
-      // First-time payment for an offer-flow order — straightforward reserve.
-      await this.prisma.$transaction(async (tx) => {
-        await this.productLockService.checkAndReserve(
-          tx,
-          order.productId,
-          order.quantity ?? 1,
+      // #3 (atomiklik): Teklif siparişinde İLK ödeme başlatmada stok rezervasyonu ile
+      // Payment INTENT'i AYNI transaction'da oluşturulur. Payment.orderId UNIQUE olduğundan
+      // iki eşzamanlı ilk-ödeme isteğinden yalnız BİRİ commit eder; diğeri P2002 alıp
+      // rollback olur (rezervasyonu da geri sarılır) → çift-reserve YOK. Ayrıca reserve ↔
+      // Payment atomik commit edildiği için, reconciliation'ın "Payment yoksa teklif
+      // rezervini sayma" penceresi kapanır (eskiden bu boşlukta rezervasyon yanlışlıkla
+      // release ediliyordu). Kaybeden istek aşağıda kazananın Payment'ını reuse eder.
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          await this.productLockService.checkAndReserve(
+            tx,
+            order.productId,
+            order.quantity ?? 1,
+          );
+          const existing = await tx.payment.findUnique({
+            where: { orderId: dto.orderId },
+          });
+          if (!existing) {
+            await tx.payment.create({
+              data: {
+                orderId: dto.orderId,
+                amount: order.totalAmount,
+                currency: "TRY",
+                provider: PaymentProvider.paytr,
+                status: PaymentStatus.pending,
+              },
+            });
+          }
+        });
+        this.logger.log(
+          `Reserved ${order.quantity ?? 1} unit(s) for offer-based order ${order.id} (product ${order.productId})`,
         );
-      });
-      this.logger.log(
-        `Reserved ${order.quantity ?? 1} unit(s) for offer-based order ${order.id} (product ${order.productId})`,
-      );
+      } catch (e: any) {
+        if (
+          e instanceof Prisma.PrismaClientKnownRequestError &&
+          e.code === "P2002"
+        ) {
+          // Eşzamanlı ilk-ödeme yarıştı: kazanan Payment'ı (ve rezervasyonu) oluşturdu;
+          // bu istek aşağıdaki existingOrderPayment dalında onu yeniden kullanır.
+          this.logger.warn(
+            `Concurrent first-payment race for offer order ${order.id}; reusing winner's payment`,
+          );
+        } else {
+          throw e;
+        }
+      }
     } else if (order.reservationReleasedAt) {
       // Retry after 30-min release. CAS-gate on the flag so concurrent
       // initiate calls can't both increment reservedQuantity.

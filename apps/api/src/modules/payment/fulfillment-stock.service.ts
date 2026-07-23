@@ -13,6 +13,11 @@ export interface StockoutResult {
   cancelledOffers: StockoutCancelledOffer[];
   /** undefined = stok TÜKENMEDİ (categoryId'yi güncelleme). null/string = tükendi. */
   stockoutCategoryId?: string | null;
+  /**
+   * #5: Yakalama anında FİZİKSEL stok ödenen adetten AZSA (rezervasyon drift etti) set
+   * edilir → çağıran otomatik iade / manuel inceleme başlatabilir. undefined = oversell yok.
+   */
+  oversold?: { productId: string; paidQty: number; physicalQty: number };
 }
 
 /**
@@ -45,6 +50,23 @@ export class FulfillmentStockService {
       throw new Error(`Product not found for order (productId=${productId})`);
     }
 
+    // #5: FİZİKSEL stok ödenen adetten AZSA bu bir OVERSELL'dir (rezervasyon drift etti).
+    // Math.max(0,...) negatifi engeller ama eskiden bunu SESSİZCE 0'a sıkıştırıp ödenmiş
+    // siparişi fulfillment'a sokuyordu (tespit yok). Artık yüksek-öncelikli alarm ver +
+    // result'a işaretle → çağıran/ops oto-iade/manuel-inceleme başlatır (capture geri
+    // alınamaz; tespit + telafi şart).
+    const oversoldBy =
+      product.quantity !== null && product.quantity < orderQty
+        ? orderQty - product.quantity
+        : 0;
+    if (oversoldBy > 0) {
+      this.logger.error(
+        `OVERSELL_AT_CAPTURE (oto/manuel iade gerekir): productId=${productId} ` +
+          `ödenen=${orderQty} fiziksel=${product.quantity} (eksik=${oversoldBy}). ` +
+          `Rezervasyon drift etmiş; sipariş ödendi ama stok yetersiz.`,
+      );
+    }
+
     const newQuantity =
       product.quantity !== null
         ? Math.max(0, product.quantity - orderQty)
@@ -66,6 +88,14 @@ export class FulfillmentStockService {
       cancelledOrders: [],
       cancelledOffers: [],
       stockoutCategoryId: undefined,
+      oversold:
+        oversoldBy > 0
+          ? {
+              productId,
+              paidQty: orderQty,
+              physicalQty: product.quantity ?? 0,
+            }
+          : undefined,
     };
 
     // Stockout kaskadı: yalnız FİZİKSEL stok bitince (quantity <= 0).

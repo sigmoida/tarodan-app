@@ -89,8 +89,23 @@ describe("FulfillmentStockService.decrementForOrder", () => {
     );
     const svc = new FulfillmentStockService(productLock);
 
-    await svc.decrementForOrder(tx, "p1", 3);
+    const r = await svc.decrementForOrder(tx, "p1", 3);
 
     expect(update.mock.calls[0][0].data.quantity).toBe(0);
+    // #5: sessiz clamp DEĞİL — oversell tespit edilip result'a işaretlenir (oto/manuel iade).
+    expect(r.oversold).toEqual({ productId: "p1", paidQty: 3, physicalQty: 1 });
+  });
+
+  it("stok yeterliyse oversold undefined (yanlış-pozitif yok)", async () => {
+    const productLock = lock() as any;
+    const { tx } = makeTx(
+      { quantity: 5, reservedQuantity: 2 },
+      { quantity: 3, reservedQuantity: 1, categoryId: null },
+    );
+    const svc = new FulfillmentStockService(productLock);
+
+    const r = await svc.decrementForOrder(tx, "p1", 2);
+
+    expect(r.oversold).toBeUndefined();
   });
 });
