@@ -341,14 +341,16 @@
 - [ ] **8.1** Ödeme `paid`'e geçip **event yaysın**; fulfillment tüketsin (fulfillment hatası ödeme durumunu bozmasın).
       NOT: mevcut yapı ödeme-tamamlama + escrow-hold'u TEK tx'te atomik tutuyor (bu escrow için DAHA güvenli;
       ayırmak "ödeme tamam ama hold yok" penceresi açar) → düşünülerek yapılmalı, aceleye gelmez.
-- [~] **8.2** God-service parçalama (POST-COMMIT, düşük-risk kısımlar TAMAM): - [x] `FulfillmentNotifier` — stokout kaskad bildirim üçlemesi (tekil=grup birebir kopya) + back-in-stock. - [x] `FulfillmentFinalizer` — fiziksel sipariş POST-COMMIT sonlandırması (ledger capture + order.paid +
-  Sürat gönderi), tekil=grup birebir. Ölü `invoiceService` + kullanılmayan ledger dep temizlendi. - Fulfillment **1643 → 1352 satır** (−291), her ikisi de tam test kapsamında.
-  **Kalan (IN-TX, para-kritik — ÖNCE karakterizasyon testi gerekir):** `VirtualOrderFulfillment`
-  (üyelik/boost aktivasyonu, tx içi — birim testi ZAYIF), `EscrowHoldService` (hold+komisyon, tx içi —
-  yalnız grup spec'te), `FulfillmentStockService` (stok düşüm+kaskad, tx içi). Bunlar zayıf test kapsamlı
-  para akışları; körlemesine çıkarmak yakalanmayan para bug'ı riski → disiplinli yol: önce test yaz, sonra çıkar.
-- [ ] **8.3** Tekil fulfillment'ı "group-of-one"a indir → ~450-500 satır kopya silinir (QUAL). Steps 5-6
-      (escrow+stock) çıkarıldıktan SONRA anlamlı; büyük yeniden-yazım.
+- [x] **8.2** ✓ God-service parçalama TAMAMLANDI — 5 cohesive, tek-sorumluluklu servis çıkarıldı
+      (her biri kendi odaklı karakterizasyon testiyle): - `FulfillmentNotifier` — stokout kaskad bildirimi (tekil=grup birebir kopya) + back-in-stock. - `FulfillmentFinalizer` — fiziksel sipariş POST-COMMIT sonlandırması (ledger capture + order.paid + Sürat). - `EscrowHoldService` — escrow hold + pending komisyon (in-tx; tekil=grup). - `FulfillmentStockService` — stok düşümü + stockout kaskadı (in-tx; FOR UPDATE + fiziksel-quantity-gate). - `VirtualOrderFulfillmentService` — üyelik/boost aktivasyonu (in-tx) + eLogo fatura (post-commit).
+      Yöntem: disiplinli "önce test, sonra çıkar" — her in-tx çıkarımı odaklı unit testle kilitlendi + grup
+      entegrasyon spec'i yeşil. Ölü `invoiceService` + kullanılmayan `ledger`/`commissionLedger`/`productLock`
+      deps temizlendi. **PaymentFulfillmentService: 1643 → 984 satır (−659, %40, artık <1000).**
+- [~] **8.3** 8.2'nin paylaşılan servisleri (stock/escrow/notifier/finalizer) tekil↔grup kopyasının BÜYÜK
+  kısmını zaten sildi. Kalan tekil-vs-grup farkı KÜÇÜK ve GERÇEK (tekil: sanal sipariş + doğrudan alıcı
+  bildirimi; grup: gruplu alıcı e-postası) → tam "group-of-one" collapse artık düşük-değerli + bu farklar
+  yüzünden birebir birleşmiyor. Kalan boilerplate (claim + preparing) küçük; istenirse ortak bir
+  `claimAndPromote(tx, payment)` helper'ı ile eritilebilir.
 - [x] **8.4** ✓ Fulfillment'taki `ModuleRef` + runtime `require("../trade/trade.service")` lazy-resolve
       hack'i (Trade↔Payment döngüsünü aşmak için) KALDIRILDI. Nakit takas ödemesi temizlenince Payment
       in-process event yayınlar (`EventService.emitTradeCashCleared` → EventEmitter2 `payment.trade-cash-cleared`);
