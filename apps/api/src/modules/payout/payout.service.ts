@@ -1,4 +1,9 @@
-import { Injectable, Logger, BadRequestException } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  Optional,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { PaymentProviderRegistry } from "../payment-providers/payment-provider.registry";
@@ -7,8 +12,12 @@ import {
   PaymentHoldStatus,
   PaymentStatus,
   RefundRequestStatus,
+  LedgerAccount,
+  LedgerDirection,
+  LedgerEventType,
 } from "@prisma/client";
 import { NotificationService } from "../notification/notification.service";
+import { LedgerService } from "../ledger/ledger.service";
 
 @Injectable()
 export class PayoutService {
@@ -19,6 +28,10 @@ export class PayoutService {
     private readonly paymentProviders: PaymentProviderRegistry,
     private readonly configService: ConfigService,
     private readonly notificationService: NotificationService,
+    // Faz 6.2: payout tamamlanınca çift-taraflı defter kaydı (escrow settle).
+    // @Optional + best-effort — defter hatası payout'u BOZMAZ; reconciliation yakalar.
+    @Optional()
+    private readonly ledger?: LedgerService,
   ) {}
 
   /**
@@ -335,6 +348,36 @@ export class PayoutService {
           this.logger.log(
             `Payout ${payout.transId} completed: ${payout.netAmount} TL → ${payout.transferIban}`,
           );
+          // Faz 6.2 (ledger): escrow → satıcıya ödendi. seller_escrow (borç) kapanır,
+          // payout (dış çıkış) borçlanır. capture'daki seller_escrow debit'ini dengeler
+          // → sipariş bazında escrow net 0'a iner. Best-effort (payout'u bozmaz).
+          try {
+            const net = Number(payout.netAmount);
+            if (net > 0)
+              await this.ledger?.record(this.prisma, {
+                eventType: LedgerEventType.payout_completed,
+                entries: [
+                  {
+                    account: LedgerAccount.seller_escrow,
+                    direction: LedgerDirection.credit,
+                    amount: net,
+                  },
+                  {
+                    account: LedgerAccount.payout,
+                    direction: LedgerDirection.debit,
+                    amount: net,
+                  },
+                ],
+                refs: {
+                  payoutId: payout.id,
+                  sellerId: payout.sellerId,
+                },
+              });
+          } catch (e: any) {
+            this.logger.warn(
+              `Ledger payout kaydı başarısız (payout ${payout.id}): ${e?.message}`,
+            );
+          }
         } else {
           await this.handlePayoutFailure(
             payout.id,
