@@ -215,6 +215,74 @@ export class PaymentRefundService {
   }
 
   /**
+   * 11.2d — İade sonucu bildirimleri (POST-COMMIT best-effort). Eskiden finalize tx'i
+   * İÇİNDE koşuyordu → FOR UPDATE kilidini uzatıyor + bir bildirim hatası para-tx'ini
+   * abort edebiliyordu. Artık tx commit'inden SONRA çağrılır (para zaten geri döndü;
+   * bildirim hatası iadeyi bozmaz). Guard/iptal-vs-refunded dallanması birebir korundu.
+   * (Recovery no-op'ta çağrılmaz — finalize tx null döner, .then erken çıkar.)
+   */
+  private async notifyRefundOutcome(
+    orderId: string,
+    amountToRefund: number,
+    payment: any,
+    providerRefundId: string | undefined,
+    skipRefundEvent: boolean | undefined,
+  ): Promise<void> {
+    try {
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+          buyer: { select: { id: true, email: true, displayName: true } },
+          seller: { select: { id: true, email: true, displayName: true } },
+        },
+      });
+      // refund.service akışı kendi REFUND_COMPLETED (push+mail) bildirimini gönderiyor;
+      // oradan çağrıldığında payment_refunded'ı atla ki alıcı çift push almasın.
+      if (order && !skipRefundEvent) {
+        if (order.cancellationType === "iptal") {
+          // Kargo öncesi İPTAL: para iade ediliyor ama kullanıcıya "iade" değil "iptal"
+          // denmeli. Alıcı + satıcıya iptal bildirimi + order-cancelled maili; refunded ATLA.
+          await this.notificationService.createInAppNotification(
+            order.buyerId,
+            NotificationType.ORDER_CANCELLED,
+            { orderId, orderNumber: order.orderNumber, amount: amountToRefund },
+          );
+          await this.notificationService.createInAppNotification(
+            order.sellerId,
+            NotificationType.ORDER_CANCELLED_SELLER,
+            { orderId, orderNumber: order.orderNumber },
+          );
+          await this.notificationService.sendOrderCancelledEmails(orderId);
+          this.logger.log(
+            `order_cancelled notification sent for order ${orderId} (cancellationType=iptal)`,
+          );
+        } else {
+          await this.eventService.emitPaymentRefunded({
+            paymentId: payment.id,
+            orderId,
+            orderNumber: order.orderNumber,
+            buyerId: order.buyerId,
+            buyerEmail: order.buyer.email,
+            buyerName: order.buyer.displayName || order.buyer.email,
+            sellerId: order.sellerId,
+            sellerEmail: order.seller.email,
+            sellerName: order.seller.displayName || order.seller.email,
+            refundAmount: amountToRefund,
+            totalAmount: Number(payment.amount),
+            provider: payment.provider,
+            providerRefundId,
+          });
+          this.logger.log(
+            `payment.refunded event emitted for payment ${payment.id}`,
+          );
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Failed to emit payment.refunded event: ${error}`);
+    }
+  }
+
+  /**
    * Process refund
    * Requirement: Refund handling (project.md)
    */
@@ -785,74 +853,9 @@ export class PaymentRefundService {
               refundResult.paymentId || refundResult.merchant_oid,
           };
 
-          // Emit payment.refunded event
-          try {
-            const order = await tx.order.findUnique({
-              where: { id: orderId },
-              include: {
-                buyer: { select: { id: true, email: true, displayName: true } },
-                seller: {
-                  select: { id: true, email: true, displayName: true },
-                },
-              },
-            });
-
-            // refund.service akışı kendi REFUND_COMPLETED (push+mail) bildirimini
-            // gönderiyor; oradan çağrıldığında payment_refunded'ı atla ki alıcı
-            // çift push almasın. Diğer caller'lar (admin/direct/surat) için aynen gider.
-            if (order && !opts?.skipRefundEvent) {
-              if (order.cancellationType === "iptal") {
-                // Kargo öncesi İPTAL: para iade ediliyor ama kullanıcıya "iade" değil
-                // "iptal" denmeli. Alıcı + satıcıya iptal bildirimi (zil+push) ve
-                // order-cancelled mailleri gönder; payment_refunded'ı ATLA.
-                await this.notificationService.createInAppNotification(
-                  order.buyerId,
-                  NotificationType.ORDER_CANCELLED,
-                  {
-                    orderId,
-                    orderNumber: order.orderNumber,
-                    amount: amountToRefund,
-                  },
-                );
-                await this.notificationService.createInAppNotification(
-                  order.sellerId,
-                  NotificationType.ORDER_CANCELLED_SELLER,
-                  { orderId, orderNumber: order.orderNumber },
-                );
-                await this.notificationService.sendOrderCancelledEmails(
-                  orderId,
-                );
-                this.logger.log(
-                  `order_cancelled notification sent for order ${orderId} (cancellationType=iptal)`,
-                );
-              } else {
-                await this.eventService.emitPaymentRefunded({
-                  paymentId: payment.id,
-                  orderId: orderId,
-                  orderNumber: order.orderNumber,
-                  buyerId: order.buyerId,
-                  buyerEmail: order.buyer.email,
-                  buyerName: order.buyer.displayName || order.buyer.email,
-                  sellerId: order.sellerId,
-                  sellerEmail: order.seller.email,
-                  sellerName: order.seller.displayName || order.seller.email,
-                  refundAmount: amountToRefund,
-                  totalAmount: Number(payment.amount),
-                  provider: payment.provider,
-                  providerRefundId: refundResponse.providerRefundId,
-                });
-
-                this.logger.log(
-                  `payment.refunded event emitted for payment ${payment.id}`,
-                );
-              }
-            }
-          } catch (error) {
-            // Log but don't fail - refund was already processed
-            this.logger.error(
-              `Failed to emit payment.refunded event: ${error}`,
-            );
-          }
+          // 11.2d: iade sonucu bildirimleri (payment.refunded / order_cancelled) artık
+          // finalize tx'inde DEĞİL, POST-COMMIT çağrılır (notifyRefundOutcome, aşağıdaki
+          // .then) → FOR UPDATE kilidi kısalır + bir bildirim hatası para-tx'ini abort etmez.
 
           // Faz 5 (outbox): iade commit'iyle ATOMİK olarak "Sürat iptali" satırını yaz.
           // Böylece post-commit anlık iptal (aşağıda) çökme/hata ile kaçsa bile drainer
@@ -885,6 +888,14 @@ export class PaymentRefundService {
           // Finding 2: tx idempotent no-op döndüyse (eşzamanlı kurtarma zaten finalize
           // etti) Sürat iptalini TEKRAR yapma — onu kazanan çağrı zaten yaptı.
           if (!response) return response;
+          // 11.2d: iade bildirimleri POST-COMMIT (tx dışında, best-effort — para geri döndü).
+          await this.notifyRefundOutcome(
+            orderId,
+            amountToRefund,
+            payment,
+            response.providerRefundId,
+            opts?.skipRefundEvent,
+          );
           // After PayTR refund + DB updates succeed, cancel the Sürat shipment.
           // Best-effort: a failure here doesn't undo the refund (money is already back).
           try {

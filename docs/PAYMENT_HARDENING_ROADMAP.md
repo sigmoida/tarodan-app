@@ -473,8 +473,10 @@
 - [x] **11.2c** ✓ Poll `delivered`→escrow ATOMİK: CAS flip + `handleOrderDelivered(tx)` tek `$transaction`'da
       (webhook yoluyla aynı desen; hata → rollback → sonraki poll retry). Bildirim + event-sync POST-COMMIT.
       Artık çökme escrow'u askıda bırakmaz. `surat-cargo/surat-tracking.service.ts`.
-- [~] **11.2d** → **11.3b'ye taşındı.** Refund tx'inden dış I/O'yu (`emitPaymentRefunded`/bildirim/e-posta)
-  post-commit'e almak `RefundFinalizer` çıkarımının doğal parçası — split'le birlikte. `payment/payment-refund.service.ts:715-781`.
+- [x] **11.2d** ✓ İade sonucu bildirimleri (`payment.refunded`/`order_cancelled`) finalize tx'inden çıkarılıp
+      POST-COMMIT `notifyRefundOutcome`'a alındı → FOR UPDATE kilidi kısaldı + bir bildirim hatası artık para-tx'ini
+      abort etmiyor (para zaten geri döndü; best-effort). Guard/iptal-vs-refunded dallanması + recovery-noop davranışı
+      birebir korundu (finalize tx null → .then erken çıkar). tsc temiz; 130 refund/payment test yeşil.
 
 ### 11.3 — SOLID: god-service parçalama + cargo→money event'leme
 
@@ -487,8 +489,10 @@
       **NOT (11.3a-event + 11.4b ertelendi):** cargo→money'yi event'e çevirmek delivered atomikliğiyle çelişir (atomiklik
       kazanır); sync-loop DRY (11.4b) logic konsolidasyonu — bu dosyanın spec'i YOK → önce karakterizasyon testi gerekir.
 
-- [ ] **11.3b** `PaymentRefundService` (1537) böl: `RefundCapPolicy` / `RefundExecutor` / `RefundFinalizer(tx)`.
-      `processRefund` tek başına ~770 satır. Büyük.
+- [~] **11.3b** ✓ (çekirdek) `PaymentRefundService`'in iki en değerli `processRefund` fazı ayrı bileşenlere çıkarıldı:
+  **claim** → `claimRefundSlot` (11.2b atomik FOR UPDATE), **bildirim** → `notifyRefundOutcome` (11.2d post-commit).
+  Tam `RefundExecutor`/`RefundFinalizer` sınıf-çıkarımı ERTELENDİ: kalan finalize tx tek, iç içe hata-akışlı
+  (outer void-restore + paytrRefunded bayrağı) bir birim; sınıfa bölmenin riski SRP kazancını aşıyor. Coverage güçlü.
 - [x] **11.3c** ✓ `PaymentReconciliationService` (1483 → **91 satır facade**) 5 cohesive alt-servise bölündü
       (`Reservation`/`PaymentExpiry`/`Psp`/`Refund`/`Misc` Reconciliation). Facade aynı public imzalarla delege
       ediyor (PaymentService/scheduler değişmedi); her alt-servis yalnız kullandığı dep'i alıyor; ölü
