@@ -10,6 +10,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { formatTradeStatus } from "@/lib/format";
 import {
   calculateTotalValue,
+  cashPayerName,
   getItemImage,
   type Trade,
   type TradeItem,
@@ -143,6 +144,12 @@ export default function TradeCard({
               {fmt(Number(trade.cashAmount))} TL
             </span>
           </p>
+          {/* Farkı kim öder — cashPayerId'den çözülen taraf adı. */}
+          {cashPayerName(trade) ? (
+            <p className="mt-1 text-sm text-muted">
+              {t("trade.willPayBy", { name: cashPayerName(trade)! })}
+            </p>
+          ) : null}
         </div>
       ) : null}
 

@@ -24,9 +24,19 @@ export interface Trade {
   initiatorItems: TradeItem[];
   receiverItems: TradeItem[];
   cashAmount?: number;
+  /** Nakit farkı ödeyecek taraf (initiatorId | receiverId). null/absent = eşit takas. */
+  cashPayerId?: string | null;
   createdAt: string;
   responseDeadline: string;
 }
+
+/** Nakit farkını ödeyen tarafın görünen adı (cashPayerId → initiator/receiver eşlemesi). */
+export const cashPayerName = (trade: Trade): string | null => {
+  if (!trade.cashPayerId) return null;
+  return trade.cashPayerId === trade.initiatorId
+    ? (trade.initiatorName ?? trade.initiator?.displayName ?? null)
+    : (trade.receiverName ?? trade.receiver?.displayName ?? null);
+};
 
 const PLACEHOLDER = "https://placehold.co/120x120/f3f4f6/9ca3af?text=Ürün";
 
