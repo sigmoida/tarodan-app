@@ -9,6 +9,7 @@ import { PaymentRefundService } from "./payment-refund.service";
 import { PaymentReconciliationService } from "./payment-reconciliation.service";
 import { PaymentInitiationService } from "./payment-initiation.service";
 import { PaymentCallbackService } from "./payment-callback.service";
+import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
 import { PrismaService } from "../../prisma";
@@ -208,6 +209,10 @@ describe("PaymentService group payment (checkout group)", () => {
           useValue: { getPublicAssetUrl: jest.fn().mockReturnValue("") },
         },
         { provide: ModuleRef, useValue: {} },
+        {
+          provide: PaymentProviderEventService,
+          useValue: { record: jest.fn().mockResolvedValue(undefined) },
+        },
       ],
     }).compile();
 

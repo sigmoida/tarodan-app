@@ -23,6 +23,7 @@ import { Request } from "express";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
+import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { i18nMessage } from "../i18n";
 
 @Injectable()
@@ -37,6 +38,7 @@ export class PaymentInitiationService {
     private readonly paymentCommon: PaymentCommonService,
     private readonly paymentFulfillment: PaymentFulfillmentService,
     private readonly paymentLifecycle: PaymentLifecycleService,
+    private readonly providerEvents: PaymentProviderEventService,
   ) {}
 
   /**
@@ -344,7 +346,8 @@ export class PaymentInitiationService {
    *
    * Hedef: orderId (satın alma/üyelik/tekliften order) | checkoutGroupId (sepet) | tradeId (takas
    * nakit farkı). Kart: (a) yeni kart → 3D/CIT (createDirectPayment, storeCard ile saklanabilir)
-   * VEYA (b) kayıtlı kart → Non3D recurring servisi (chargeRecurring; require_cvv ise CVV ile).
+   * VEYA (b) kayıtlı kart → kayıtlı-karttan-ödeme servisi (capiPaymentByRegisteredCard, Non3D;
+   * require_cvv ise CVV ile). Recurring servisi yalnız kullanıcısız oto-yenilemede kullanılır.
    *
    * Kayıtlı kart (Flow B) + kart saklama, PayTR'nin Non3D/Tekrarlayan Ödeme yetkisine bağlıdır;
    * PAYTR_RECURRING_ENABLED arkasındadır. Yetki gelene kadar yalnız yeni-kart 3D yolu canlıdır.
@@ -447,8 +450,11 @@ export class PaymentInitiationService {
     const recurringEnabled =
       this.configService.get("PAYTR_RECURRING_ENABLED") === "true";
 
-    // Flow B — KAYITLI KARTLA ÖDEME: PayTR'da kayıtlı kartla ödeme Non3D recurring servisiyle
-    // yapılır (chargeRecurring). Kart sahibi kullanıcı olmalı; require_cvv ise CVV zorunlu.
+    // Flow B — KAYITLI KARTLA ÖDEME: kullanıcı MEVCUT (CIT) olduğundan PayTR'nin "kayıtlı
+    // karttan ödeme" servisiyle (capiPaymentByRegisteredCard) yapılır — recurring_payment
+    // GÖNDERİLMEZ (o merchant-initiated tekrarlayan çekim içindir; kullanıcı-mevcut bir
+    // ödemede yanlış işaretlemek 3DS muafiyeti/itiraz sorumluluğu açısından hatalıdır).
+    // non3d=true → mevcut senkron Non3D UX'i korunur; require_cvv ise CVV zorunlu.
     // Sonuç callback ile kesinleşir (success/wait_callback) — sipariş/escrow ortak yoldan akar.
     if (dto.savedCardId) {
       const saved = await this.prisma.savedCard.findFirst({
@@ -467,24 +473,43 @@ export class PaymentInitiationService {
           i18nMessage("server.payment.cvvRequiredForCard"),
         );
       }
-      const r = await this.paymentProviders.resolve().chargeRecurring({
-        utoken: saved.utoken,
-        ctoken: saved.ctoken,
-        amount,
-        merchantOid,
-        buyer,
-        basketItems,
-        cvv: dto.cvv,
-      });
+      const r = await this.paymentProviders
+        .resolve()
+        .capiPaymentByRegisteredCard({
+          utoken: saved.utoken,
+          ctoken: saved.ctoken,
+          amount,
+          merchantOid,
+          buyer,
+          basketItems,
+          requireCvv: saved.requireCvv,
+          cvv: dto.cvv,
+          non3d: true,
+          successQueryParams,
+        });
       if (r.status === "failed") {
         await this.prisma.payment.update({
           where: { id: payment.id },
           data: { failureReason: r.reason || "Kayıtlı kartla ödeme başarısız" },
         });
       }
+      // Gözlemlenebilirlik: kayıtlı-kart (CIT) çekiminin SENKRON yanıtını kaydet.
+      // KRİTİK: senkron `failed` (ör. kart kapalı) HİÇBİR callback üretmez — bu olay
+      // yalnızca burada yakalanır; aksi halde denetim izinde görünmez olurdu.
+      await this.providerEvents.record({
+        eventType: "direct_payment",
+        merchantOid,
+        paymentId: payment.id,
+        status: r.status,
+        paymentType: "card",
+        amount,
+        totalAmount: amount,
+        failedReasonMsg: r.status === "failed" ? (r.reason ?? null) : null,
+        raw: { savedCard: true, ...(r.raw ?? {}) },
+      });
       return {
         paymentId: payment.id,
-        threeDSHtml: null,
+        threeDSHtml: r.threeDSHtml ?? null,
         status: r.status,
         reason: r.reason ?? null,
       };
@@ -511,6 +536,19 @@ export class PaymentInitiationService {
       basketItems,
       { non3d: false, storeCard, successQueryParams },
     );
+
+    // Gözlemlenebilirlik: Direkt API (CIT yeni kart) başlatıldı → 3DS'e yönlendirilecek.
+    // Nihai sonuç callback ile kesinleşir (orada ayrıca kaydedilir). 3DS HTML SAKLANMAZ.
+    await this.providerEvents.record({
+      eventType: "direct_payment",
+      merchantOid,
+      paymentId: payment.id,
+      status: "pending",
+      paymentType: "card",
+      amount,
+      totalAmount: amount,
+      raw: { threeDS: !!(result as any).threeDSHtml, storeCard },
+    });
 
     return {
       paymentId: payment.id,

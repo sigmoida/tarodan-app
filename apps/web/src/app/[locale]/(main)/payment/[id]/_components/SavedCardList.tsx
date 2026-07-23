@@ -63,6 +63,11 @@ export default function SavedCardList({
                 {c.expMonth}/{c.expYear}
               </span>
             )}
+            {c.bank && (
+              <span className="hidden truncate text-xs text-subtle sm:inline">
+                {c.bank}
+              </span>
+            )}
             {active && c.requireCvv ? (
               <div className="ml-auto w-24">
                 <CvvInput

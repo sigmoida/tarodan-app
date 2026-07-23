@@ -288,7 +288,7 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       expect(JSON.stringify(res.body)).toContain(
         "Kayıtlı kartla ödeme şu an kullanılamıyor",
       );
-      expect(ctx.paytr.recurringCalls.length).toBe(0);
+      expect(ctx.paytr.registeredCardCalls.length).toBe(0);
     });
 
     scenario("PAY-012", async () => {
@@ -302,7 +302,7 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       expect(JSON.stringify(res.body)).toContain(
         "Kayıtlı kartla ödeme için giriş yapmanız gerekiyor",
       );
-      expect(ctx.paytr.recurringCalls.length).toBe(0);
+      expect(ctx.paytr.registeredCardCalls.length).toBe(0);
     });
 
     scenario.skip(

@@ -1,7 +1,9 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { Prisma } from "@prisma/client";
+import type { PayTRStatusInquirySuccess } from "../payment-providers/paytr.service";
+import { PaymentProviderEventService } from "./payment-provider-event.service";
 import {
   PaymentStatus,
   PaymentHoldStatus,
@@ -89,6 +91,10 @@ export class PaymentReconciliationService {
     private readonly eventService: EventService,
     private readonly paymentCommon: PaymentCommonService,
     private readonly paymentFulfillment: PaymentFulfillmentService,
+    // Gözlemlenebilirlik (best-effort). @Optional: durum-sorgu ile telafi eden
+    // testler bu recorder'ı sağlamak zorunda kalmasın — record() zaten hiç fırlatmaz.
+    @Optional()
+    private readonly providerEvents?: PaymentProviderEventService,
   ) {}
 
   /**
@@ -226,6 +232,11 @@ export class PaymentReconciliationService {
           ctoken: c.ctoken,
           last4: c.last4 || "____",
           brand: c.brand,
+          // PayTR CAPI liste meta (gözlemlenebilirlik/UX) — PAN/CVV DEĞİL.
+          bank: c.bank,
+          cardType: c.type,
+          cardScheme: c.schema,
+          businessCard: c.businessCard,
           expMonth: c.month,
           expYear: c.year,
           requireCvv: c.requireCvv ?? false,
@@ -238,6 +249,10 @@ export class PaymentReconciliationService {
           utoken,
           last4: c.last4 || undefined,
           brand: c.brand,
+          bank: c.bank,
+          cardType: c.type,
+          cardScheme: c.schema,
+          businessCard: c.businessCard,
           expMonth: c.month,
           expYear: c.year,
           requireCvv: c.requireCvv ?? false,
@@ -969,10 +984,7 @@ export class PaymentReconciliationService {
         // sormak sahipsiz capture'ı kaçırırdı. İlk çekilmiş + tutar-tutan oid capture'dır.
         const oids = this.paymentCommon.collectPaymentOids(row);
         let capturedOid: string | null = null;
-        let capturedInquiry: {
-          paymentTotalTl: number;
-          paymentDate?: string | null;
-        } | null = null;
+        let capturedInquiry: PayTRStatusInquirySuccess | null = null;
         for (const candidateOid of oids) {
           const inquiry = await this.paymentProviders
             .resolve()
@@ -1036,6 +1048,24 @@ export class PaymentReconciliationService {
             `PayTR reconcile completed payment ${row.id} oid=${capturedOid}`,
           );
         }
+        // Gözlemlenebilirlik: callback kaçırılmış ama durum-sorgu ile TELAFİ edilmiş
+        // ödeme. Yalnız BULUNAN (ok) sorgular kaydedilir — başarısız pollingler değil.
+        await this.providerEvents?.record({
+          eventType: "status_inquiry",
+          merchantOid: capturedOid,
+          paymentId: row.id,
+          status: "success",
+          paymentType: capturedInquiry.paymentType ?? null,
+          installmentCount: capturedInquiry.installmentCount ?? null,
+          currency: capturedInquiry.currency ?? null,
+          amount: ourAmount,
+          totalAmount: capturedInquiry.paymentTotalTl,
+          raw: {
+            source: "reconcile",
+            completed: did,
+            paymentDate: capturedInquiry.paymentDate ?? null,
+          },
+        });
       } catch (error: any) {
         this.logger.error(
           `PayTR reconcile failed payment ${row.id}: ${error?.message}`,
@@ -1103,10 +1133,7 @@ export class PaymentReconciliationService {
       try {
         const oids = this.paymentCommon.collectPaymentOids(row);
         let capturedOid: string | null = null;
-        let capturedInquiry: {
-          paymentTotalTl: number;
-          paymentDate?: string | null;
-        } | null = null;
+        let capturedInquiry: PayTRStatusInquirySuccess | null = null;
         for (const oid of oids) {
           const inquiry = await this.paymentProviders
             .resolve()
@@ -1123,6 +1150,24 @@ export class PaymentReconciliationService {
         await this.cache.set(dedupKey, true, { ttl: 6 * 60 * 60 });
 
         if (!capturedOid || !capturedInquiry) continue;
+
+        // Gözlemlenebilirlik: `failed` işaretli ama PayTR'da GERÇEKTEN çekilmiş ödeme
+        // (orphan capture) durum-sorgu ile tespit edildi — telafi/alarm ayrı loglanır.
+        await this.providerEvents?.record({
+          eventType: "status_inquiry",
+          merchantOid: capturedOid,
+          paymentId: row.id,
+          status: "success",
+          paymentType: capturedInquiry.paymentType ?? null,
+          installmentCount: capturedInquiry.installmentCount ?? null,
+          currency: capturedInquiry.currency ?? null,
+          amount: ourAmount,
+          totalAmount: capturedInquiry.paymentTotalTl,
+          raw: {
+            source: "orphan_detect",
+            paymentDate: capturedInquiry.paymentDate ?? null,
+          },
+        });
 
         const full = await this.prisma.payment.findUnique({
           where: { id: row.id },

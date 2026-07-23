@@ -25,6 +25,7 @@ import { ConfigService } from "@nestjs/config";
 import { MembershipCommonService } from "./membership-common.service";
 import { isPremiumEntitled } from "./membership.util";
 import { i18nMessage } from "../i18n";
+import { PaymentProviderEventService } from "../payment/payment-provider-event.service";
 
 /**
  * MembershipSubscriptionService — abonelik yaşam döngüsü + PayTR/ödeme tarafı:
@@ -42,6 +43,7 @@ export class MembershipSubscriptionService {
     private readonly paymentProviders: PaymentProviderRegistry,
     private readonly configService: ConfigService,
     private readonly common: MembershipCommonService,
+    private readonly providerEvents: PaymentProviderEventService,
   ) {}
 
   // ==========================================================================
@@ -645,8 +647,16 @@ export class MembershipSubscriptionService {
           basketItems: basket,
         });
 
+        // Oto-yenileme ödeme yöntemi her zaman kayıtlı kart (recurring). Gözlemlenebilirlik:
+        // merchant_oid + payment_type + ham PayTR yanıtı MembershipPayment'a yazılır.
+        const renewMeta = {
+          recurring: true,
+          savedCardId: card.id,
+          ctokenLast4: card.last4,
+          providerResponse: result.raw ?? null,
+        } as const;
         if (result.status === "success") {
-          await this.prisma.$transaction(async (tx) => {
+          const mpId = await this.prisma.$transaction(async (tx) => {
             await tx.userMembership.update({
               where: { id: m.id },
               data: {
@@ -661,50 +671,94 @@ export class MembershipSubscriptionService {
                   : {}),
               },
             });
-            await tx.membershipPayment.create({
+            const mp = await tx.membershipPayment.create({
               data: {
                 membershipId: m.id,
                 amount: price,
                 provider: "paytr",
                 providerPaymentId: merchantOid,
+                merchantOid,
+                paymentType: "card",
+                metadata: renewMeta as object,
                 status: PaymentStatus.completed,
                 periodStart: newStart,
                 periodEnd: newEnd,
               },
             });
+            return mp.id;
           });
           renewed++;
+          await this.providerEvents.record({
+            eventType: "recurring_charge",
+            merchantOid,
+            membershipPaymentId: mpId,
+            status: "success",
+            paymentType: "card",
+            amount: price,
+            totalAmount: price,
+            raw: result.raw ?? null,
+          });
           this.logger.log(
             `Oto-yenileme OK: membership=${m.id} oid=${merchantOid} tutar=${price}`,
           );
         } else if (result.status === "wait_callback") {
           // Sonuç Bildirim URL'ine düşecek; takip için pending kayıt (tam callback tamamlaması Faz 4b).
-          await this.prisma.membershipPayment.create({
+          const mp = await this.prisma.membershipPayment.create({
             data: {
               membershipId: m.id,
               amount: price,
               provider: "paytr",
               providerPaymentId: merchantOid,
+              merchantOid,
+              paymentType: "card",
+              metadata: renewMeta as object,
               status: PaymentStatus.pending,
               periodStart: newStart,
               periodEnd: newEnd,
             },
+          });
+          await this.providerEvents.record({
+            eventType: "recurring_charge",
+            merchantOid,
+            membershipPaymentId: mp.id,
+            status: "wait_callback",
+            paymentType: "card",
+            amount: price,
+            totalAmount: price,
+            raw: result.raw ?? null,
           });
           this.logger.warn(
             `Oto-yenileme wait_callback: membership=${m.id} oid=${merchantOid}`,
           );
         } else {
           failed++;
-          await this.prisma.membershipPayment.create({
+          const mp = await this.prisma.membershipPayment.create({
             data: {
               membershipId: m.id,
               amount: price,
               provider: "paytr",
               providerPaymentId: merchantOid,
+              merchantOid,
+              paymentType: "card",
+              metadata: {
+                ...renewMeta,
+                failureReason: result.reason,
+              } as object,
               status: PaymentStatus.failed,
               periodStart: newStart,
               periodEnd: newEnd,
             },
+          });
+          await this.providerEvents.record({
+            eventType: "recurring_charge",
+            merchantOid,
+            membershipPaymentId: mp.id,
+            status: "failed",
+            paymentType: "card",
+            amount: price,
+            totalAmount: price,
+            failedReasonMsg: result.reason ?? null,
+            raw: result.raw ?? null,
           });
           if (result.tryAgain === false) {
             await this.prisma.savedCard.update({
@@ -745,6 +799,10 @@ export class MembershipSubscriptionService {
       id: string;
       last4: string;
       brand: string | null;
+      bank: string | null;
+      cardType: string | null;
+      cardScheme: string | null;
+      businessCard: boolean | null;
       expMonth: string | null;
       expYear: string | null;
       requireCvv: boolean;
@@ -761,6 +819,11 @@ export class MembershipSubscriptionService {
       id: c.id,
       last4: c.last4,
       brand: c.brand,
+      // PayTR CAPI meta (gözlemlenebilirlik/UX): banka + şema + credit/debit + kurumsal.
+      bank: c.bank,
+      cardType: c.cardType,
+      cardScheme: c.cardScheme,
+      businessCard: c.businessCard,
       expMonth: c.expMonth,
       expYear: c.expYear,
       requireCvv: c.requireCvv,

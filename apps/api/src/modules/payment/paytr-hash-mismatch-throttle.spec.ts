@@ -23,6 +23,7 @@ describe("PaymentCallbackService.allowHashMismatchInquiry", () => {
       anyDep(),
       anyDep(),
       anyDep(),
+      anyDep(), // providerEvents (PaymentProviderEventService)
       cache,
     );
     return { svc, cache };

@@ -226,6 +226,44 @@
 
 ---
 
+## Faz 4c — PayTR gözlemlenebilirlik / veri yakalama · `feat/paytr-provider-observability`
+
+> PayTR zaten zengin işlem verisi döndürüyordu (payment_type, taksit, currency, kart
+> banka/şema, ham zarf) ama BÜYÜK ÇOĞUNLUĞU ATILIYORDU. Bu, muhasebe/mutabakat, müşteri
+> desteği ("hangi kart/taksit"), chargeback savunması ve raporlama için gerçek bir eksikti.
+> Direkt API dokümanları (1./2. adım, kart-saklama, taksit/BIN sorgu) esas alınarak yakalandı.
+> Bu faz, Faz 5.3 (outbox) ve Faz 6.5 (ledger vs PSP raporu mutabakatı) için VERİ TEMELİDİR.
+
+- [x] **4c.1** `payment_provider_events` append-only PSP denetim günlüğü (yapısal alanlar + ham zarf).
+      Her PayTR yanıtı yazılır: callback (hashValid dahil), Direkt API, recurring çekim, iade.
+      GÜVENLİK: PAN/CVV asla saklanmaz (PayTR yanıtları içermez; 3DS HTML de saklanmaz).
+- [x] **4c.2** Callback DTO + parseCallback zenginleştirme: PayTR'nin POST'ladığı `payment_type`,
+      `installment_count`, `currency`, `payment_amount`, `test_mode` artık kabul + kayıt (whitelist
+      bunları siliyordu). Payment.installmentCount + currency GERÇEK değerle güncelleniyor
+      (önceden istekteki default 1'de takılıydı); metadata.paymentMethod'a da yazılıyor.
+- [x] **4c.3** durum-sorgu (`queryPaymentStatus`) artık payment_type/taksit + ham zarfı döndürür.
+- [x] **4c.4** Kart saklama (CAPI): `capiListCards` + SavedCard artık banka (c_bank), şema (schema),
+      credit/debit (c_type), kurumsal (businessCard) meta'sını tutar; listSavedCards bunları döndürür.
+- [x] **4c.5** Aylık üyelik (recurring): MembershipPayment'a merchant_oid + payment_type + ham yanıt;
+      senkron `failed` (kart kapalı — callback ÜRETMEZ) artık recurring_charge olayı ile yakalanır.
+- [x] **4c.6** Kayıtlı kartla ödeme (CIT) artık doküman-doğru servisle yapılır:
+      `capiPaymentByRegisteredCard` (recurring_payment GÖNDERİLMEZ, require_cvv/cvv, hash Direkt API
+      ile birebir). Önceden interaktif kayıtlı-kart ödemesi recurring servisine (recurring_payment=1)
+      düşüyordu — bu merchant-initiated bir işlem değil; 3DS muafiyeti/itiraz sorumluluğu açısından
+      yanlıştı. Oto-yenileme yalnız `chargeRecurring` kullanır. Olay `direct_payment` (savedCard:true).
+- [x] **4c.7** `status_inquiry` olayı: durum-sorgu ile TELAFİ edilen (callback kaçırılmış) ödemeler
+      artık kaydedilir — reconcile cron, orphan-capture taraması ve istemci-tetikli verify. Yalnız
+      BULUNAN sorgu yazılır (başarısız pollingler değil → tablo gürültüsü yok).
+- [x] **4c.8** BIN/taksit doküman düzeltmesi: eski `getInstallmentOptions` bin-detail'i YANLIŞ hash
+      sırası + YANLIŞ yanıt şemasıyla çağırıyordu. Ayrıştırıldı: `lookupBin` (bin-detail, hash =
+      bin+mid+salt) ve `getInstallmentRates` (taksit-oranlari, hash = mid+request_id+salt).
+- [x] **4c.9** Frontend: kayıtlı kart listesi (web profil + checkout, mobil) artık banka + şema
+      (VISA/MASTERCARD…) + kredi/banka kartı + kurumsal rozetini gösterir.
+- [ ] **4c.10** (Faz 5/6'ya devir) Admin/BI: olay günlüğünden ödeme-yöntemi/taksit raporları;
+      ledger entry'leri bu olayları kaynak alır.
+
+---
+
 ## Faz 5 — Outbox pattern (para yan-etkileri) · `fix/payment-hardening-outbox`
 
 > "post-commit best-effort .catch(log)" para yan-etkilerini güvenilir kılar.
@@ -245,6 +283,7 @@
 - [ ] **6.3** Hold tüketimi/kısmi iade ledger'dan okusun (Faz 1.4'ün yapısal hâli).
 - [ ] **6.4** Sipariş + takas komisyonlarını tek deftere birleştir (MONEY-L7).
 - [ ] **6.5** Günlük reconciliation: ledger vs Payment/Hold/Payout vs PSP raporu; drift alarmı.
+      (Kaynak: Faz 4c `payment_provider_events` — PayTR'nin bildirdiği tutar/yöntem/taksit orada.)
 
 ---
 

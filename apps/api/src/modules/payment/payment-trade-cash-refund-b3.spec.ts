@@ -9,6 +9,7 @@ import { PaymentReconciliationService } from "./payment-reconciliation.service";
 import { PaymentInitiationService } from "./payment-initiation.service";
 import { PaymentCallbackService } from "./payment-callback.service";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
+import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
@@ -100,6 +101,10 @@ describe("PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
         { provide: CommissionLedgerService, useValue: noop },
         { provide: StorageService, useValue: noop },
         { provide: ModuleRef, useValue: noop },
+        {
+          provide: PaymentProviderEventService,
+          useValue: { record: jest.fn().mockResolvedValue(undefined) },
+        },
       ],
     }).compile();
 

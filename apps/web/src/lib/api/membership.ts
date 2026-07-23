@@ -5,6 +5,14 @@ export type SavedCard = {
   id: string;
   last4: string;
   brand: string | null;
+  /** PayTR CAPI meta (gözlemlenebilirlik/UX) — kartı çıkaran banka. */
+  bank: string | null;
+  /** "credit" | "debit". */
+  cardType: string | null;
+  /** "VISA" | "MASTERCARD" | "TROY" | "AMEX" | ... */
+  cardScheme: string | null;
+  /** Kurumsal/ticari kart mı. */
+  businessCard: boolean | null;
   expMonth: string | null;
   expYear: string | null;
   requireCvv: boolean;

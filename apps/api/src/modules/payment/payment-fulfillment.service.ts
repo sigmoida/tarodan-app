@@ -27,9 +27,51 @@ import { ModuleRef } from "@nestjs/core";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentRefundService } from "./payment-refund.service";
 
+/**
+ * PayTR bildiriminden/durum-sorgudan çıkarılan ödeme-yöntemi verisi. Gözlemlenebilirlik:
+ * Payment.installmentCount + currency kolonlarını GERÇEK değerle günceller ve
+ * metadata.paymentMethod'a (denetim) yazar. (İstek anında installmentCount=1 default'tu.)
+ */
+export interface ProviderPaymentData {
+  paymentType?: string;
+  installmentCount?: number;
+  currency?: string;
+}
+
 @Injectable()
 export class PaymentFulfillmentService {
   private readonly logger = new Logger(PaymentFulfillmentService.name);
+
+  /**
+   * PayTR ödeme-yöntemi verisinden Payment.updateMany data yaması üretir:
+   *  - kolonlar: installmentCount (≥1; PayTR 0/1 → tek çekim = 1), currency
+   *  - metadata: paymentMethod alt-nesnesi (ham taksit dahil, denetim)
+   * providerData yoksa boş yama döner (mevcut davranış korunur).
+   */
+  private buildProviderPatch(providerData?: ProviderPaymentData): {
+    columns: { installmentCount?: number };
+    metaPatch: Record<string, unknown> | null;
+  } {
+    if (!providerData) return { columns: {}, metaPatch: null };
+    const columns: { installmentCount?: number } = {};
+    const inst = providerData.installmentCount;
+    if (inst != null && Number.isFinite(inst)) {
+      // Kolon semantiği: 1 = tek çekim, N = N taksit. PayTR tek çekimi 0/1 bildirir.
+      columns.installmentCount = inst > 1 ? inst : 1;
+    }
+    // NOT: Payment.currency kolonuna DOKUNMUYORUZ. Ödeme "TRY" (ISO) olarak oluşturulur;
+    // PayTR currency'yi "TL" olarak bildirir (ISO değil) → kolonu ezmek "TRY" bekleyen
+    // tüketicileri bozar. Ham "TL" değeri yalnızca denetim için metadata + event log'a yazılır.
+    const metaPatch = {
+      paymentMethod: {
+        paymentType: providerData.paymentType ?? null,
+        installmentCount: inst ?? null,
+        currency: providerData.currency ?? null, // ham PayTR değeri ("TL"), denetim
+        capturedAt: new Date().toISOString(),
+      },
+    };
+    return { columns, metaPatch };
+  }
 
   constructor(
     private readonly prisma: PrismaService,
@@ -59,6 +101,9 @@ export class PaymentFulfillmentService {
     // olabilir (callback history-match ile tamamlar). İade doğru oid'i kullansın
     // diye capture anında providerConversationId'yi çekilen oid'e senkronlarız.
     capturedMerchantOid?: string,
+    // Gözlemlenebilirlik: PayTR bildiriminden/durum-sorgudan çıkan ödeme-yöntemi
+    // (taksit/currency/tip) — Payment kolonları + metadata.paymentMethod'a yazılır.
+    providerData?: ProviderPaymentData,
   ): Promise<boolean> {
     // Trade cash payment: different flow from order payments
     if (payment.tradeCashPaymentId && !payment.orderId) {
@@ -66,6 +111,7 @@ export class PaymentFulfillmentService {
         payment,
         transactionId,
         capturedMerchantOid,
+        providerData,
       );
     }
 
@@ -75,6 +121,7 @@ export class PaymentFulfillmentService {
         payment,
         transactionId,
         capturedMerchantOid,
+        providerData,
       );
     }
 
@@ -106,9 +153,12 @@ export class PaymentFulfillmentService {
         transactionId: transactionId || payment.providerPaymentId,
       });
 
+      const { columns: providerColumns, metaPatch } =
+        this.buildProviderPatch(providerData);
       const newMetadata = {
         ...((payment.metadata as any) || {}),
         auditHistory,
+        ...(metaPatch || {}),
       };
 
       const claimed = await tx.payment.updateMany({
@@ -125,6 +175,8 @@ export class PaymentFulfillmentService {
           ...(capturedMerchantOid
             ? { providerConversationId: capturedMerchantOid }
             : {}),
+          // Gözlemlenebilirlik: PayTR'nin bildirdiği gerçek taksit/currency (varsa).
+          ...providerColumns,
           metadata: newMetadata as object,
         },
       });
@@ -719,6 +771,7 @@ export class PaymentFulfillmentService {
     payment: any,
     transactionId?: string,
     capturedMerchantOid?: string,
+    providerData?: ProviderPaymentData,
   ): Promise<boolean> {
     const cancelledOrders: {
       orderId: string;
@@ -748,6 +801,8 @@ export class PaymentFulfillmentService {
           transactionId: transactionId || payment.providerPaymentId,
         });
 
+        const { columns: providerColumns, metaPatch } =
+          this.buildProviderPatch(providerData);
         const claimed = await tx.payment.updateMany({
           where: { id: payment.id, status: PaymentStatus.pending },
           data: {
@@ -758,9 +813,11 @@ export class PaymentFulfillmentService {
             ...(capturedMerchantOid
               ? { providerConversationId: capturedMerchantOid }
               : {}),
+            ...providerColumns,
             metadata: {
               ...((payment.metadata as any) || {}),
               auditHistory,
+              ...(metaPatch || {}),
             } as object,
           },
         });
@@ -1141,6 +1198,7 @@ export class PaymentFulfillmentService {
     payment: any,
     transactionId?: string,
     capturedMerchantOid?: string,
+    providerData?: ProviderPaymentData,
   ): Promise<boolean> {
     // Platform ayarı: takas kargo süresi (gün). Varsayılan 7 gün.
     const shippingDaysSetting = await this.prisma.platformSetting.findUnique({
@@ -1150,6 +1208,8 @@ export class PaymentFulfillmentService {
       parseInt(shippingDaysSetting?.settingValue ?? "7", 10) || 7;
 
     const result = await this.prisma.$transaction(async (tx) => {
+      const { columns: providerColumns, metaPatch } =
+        this.buildProviderPatch(providerData);
       const claimed = await tx.payment.updateMany({
         where: { id: payment.id, status: PaymentStatus.pending },
         data: {
@@ -1158,6 +1218,15 @@ export class PaymentFulfillmentService {
           // FLOW-M5: çekilen oid'e senkronla (takas iadesi doğru oid'i kullansın).
           ...(capturedMerchantOid
             ? { providerConversationId: capturedMerchantOid }
+            : {}),
+          ...providerColumns,
+          ...(metaPatch
+            ? {
+                metadata: {
+                  ...((payment.metadata as any) || {}),
+                  ...metaPatch,
+                } as object,
+              }
             : {}),
           paidAt: new Date(),
         },
