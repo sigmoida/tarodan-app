@@ -276,11 +276,14 @@
       handler'a verir: başarı→completed, hata→exp-backoff retry, maxAttempts→`dead` (DLQ + alarm).
       `OutboxHandlerRegistry` (type→idempotent handler, domain servisleri onModuleInit'te kaydeder).
       `@Global OutboxModule`. **Spec:** enqueue (dedupe/tx-güvenli) + drainer (retry/backoff/dead/CAS).
-- [~] **5.3** Taşınan yan-etki: **Sürat gönderi iptali (iade)** → iade commit'iyle ATOMİK `shipment.cancel`
-  outbox satırı (`PaymentOutboxHandlers`, idempotent handler); anlık post-commit iptal hızlı-yol kalır,
-  outbox çökmeye dayanıklı backstop. Enjeksiyon `@Optional` → para testlerinde sıfır churn. **Devam
-  (aynı desen):** PayTR iade çağrısı (zaten marker+sweep korumalı — Faz 1/4), takas nakit iadesi,
-  eLogo fatura (zaten retry cron'lu), bildirim fan-out.
+- [~] **5.3** Taşınan yan-etkiler (hepsi iade commit'iyle ATOMİK outbox satırı; anlık post-commit
+  tetik hızlı-yol kalır, outbox çökmeye dayanıklı backstop; handler'lar idempotent; enjeksiyon
+  `@Optional` → para testlerinde sıfır churn):
+  - **Sürat gönderi iptali (iade)** → `shipment.cancel` (`PaymentOutboxHandlers`).
+  - **eLogo e-Arşiv ters kaydı (tam iade)** → `invoice.refund_reverse`.
+    **Devam:** PayTR iade çağrısı (zaten marker+sweep korumalı — Faz 1/4), takas nakit iadesi;
+    fulfillment yan-etkileri (eLogo fatura, bildirim fan-out, Sürat oluşturma) → **Faz 8** ile
+    event-driven olarak outbox'a taşınacak (doğru sıralama: fulfillment event yayınlayınca).
 
 ---
 

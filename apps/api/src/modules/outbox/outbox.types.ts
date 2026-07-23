@@ -10,3 +10,10 @@ export interface ShipmentCancelPayload {
   orderId: string;
   orderNumber: string;
 }
+
+/** Tam iade sonrası eLogo e-Arşiv ters kaydı (iptal/iade faturası). İdempotent. */
+export const OUTBOX_INVOICE_REFUND_REVERSE = "invoice.refund_reverse";
+
+export interface InvoiceRefundReversePayload {
+  orderId: string;
+}

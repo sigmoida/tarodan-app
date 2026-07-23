@@ -2,17 +2,20 @@ import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { OutboxHandlerRegistry } from "../outbox/outbox-handler.registry";
 import {
   OUTBOX_SHIPMENT_CANCEL,
+  OUTBOX_INVOICE_REFUND_REVERSE,
   ShipmentCancelPayload,
+  InvoiceRefundReversePayload,
 } from "../outbox/outbox.types";
 import { PaymentCommonService } from "./payment-common.service";
+import { ElogoInvoicingService } from "../elogo";
 
 /**
  * Ödeme/iade yan-etkilerinin outbox handler'ları. onModuleInit'te
  * OutboxHandlerRegistry'ye kaydolur; drainer bunları dispatch eder.
  *
  * KRİTİK: handler'lar İDEMPOTENT olmalı (drainer at-least-once). cancelSuratShipmentIfExists
- * zaten no-op'tur (gönderi yoksa / terminal statüdeyse), bu yüzden anlık iptal + outbox
- * backstop birlikte güvenle çalışır (çift iptal zararsız).
+ * ve eLogo handleOrderRefund zaten no-op/idempotenttir, bu yüzden anlık yol + outbox
+ * backstop birlikte güvenle çalışır (çift çalıştırma zararsız).
  */
 @Injectable()
 export class PaymentOutboxHandlers implements OnModuleInit {
@@ -21,6 +24,7 @@ export class PaymentOutboxHandlers implements OnModuleInit {
   constructor(
     private readonly registry: OutboxHandlerRegistry,
     private readonly paymentCommon: PaymentCommonService,
+    private readonly elogoInvoicing: ElogoInvoicingService,
   ) {}
 
   onModuleInit(): void {
@@ -30,6 +34,11 @@ export class PaymentOutboxHandlers implements OnModuleInit {
         orderId,
         orderNumber ?? orderId,
       );
+    });
+
+    this.registry.register(OUTBOX_INVOICE_REFUND_REVERSE, async (payload) => {
+      const { orderId } = payload as InvoiceRefundReversePayload;
+      await this.elogoInvoicing.handleOrderRefund(orderId);
     });
   }
 }

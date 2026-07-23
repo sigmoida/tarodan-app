@@ -26,7 +26,10 @@ import { ElogoInvoicingService } from "../elogo";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { OutboxService } from "../outbox/outbox.service";
-import { OUTBOX_SHIPMENT_CANCEL } from "../outbox/outbox.types";
+import {
+  OUTBOX_SHIPMENT_CANCEL,
+  OUTBOX_INVOICE_REFUND_REVERSE,
+} from "../outbox/outbox.types";
 import { MONEY_EPSILON } from "./payment.constants";
 import { i18nMessage } from "../i18n";
 
@@ -753,6 +756,16 @@ export class PaymentRefundService {
             },
             dedupeKey: `${OUTBOX_SHIPMENT_CANCEL}:${orderId}`,
           });
+
+          // Faz 5 (outbox): tam iade → eLogo e-Arşiv ters kaydını da iade commit'iyle
+          // ATOMİK sıraya al (post-commit anlık tetik hızlı-yol kalır; handler idempotent).
+          if (einvoiceReverse) {
+            await this.outbox?.enqueue(tx, {
+              type: OUTBOX_INVOICE_REFUND_REVERSE,
+              payload: { orderId },
+              dedupeKey: `${OUTBOX_INVOICE_REFUND_REVERSE}:${orderId}`,
+            });
+          }
 
           return refundResponse;
         })
