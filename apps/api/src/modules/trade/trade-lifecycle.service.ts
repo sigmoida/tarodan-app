@@ -388,9 +388,16 @@ export class TradeLifecycleService {
         );
       }
 
-      // Takas kabul: her iki taraf için reservedQuantity++ (FOR UPDATE pessimistic lock)
-      for (const [productId, qty] of byProduct) {
-        await this.productLockService.checkAndReserve(tx, productId, qty);
+      // Takas kabul: her iki taraf için reservedQuantity++ (FOR UPDATE pessimistic lock).
+      // #3 (DEADLOCK FIX): ürünleri id-SIRALI kilitle → iki takas ortak ürünleri farklı
+      // sırada kilitleyip birbirini bekleyemez (tutarlı kilit sırası; grup-checkout deseni).
+      const sortedProductIds = [...byProduct.keys()].sort();
+      for (const productId of sortedProductIds) {
+        await this.productLockService.checkAndReserve(
+          tx,
+          productId,
+          byProduct.get(productId)!,
+        );
       }
 
       // Safe-trade stock cascade: if this trade depleted the last available
