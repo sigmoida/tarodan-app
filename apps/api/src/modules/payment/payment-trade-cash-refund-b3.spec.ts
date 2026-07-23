@@ -6,6 +6,11 @@ import { PaymentQueryService } from "./payment-query.service";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentRefundService } from "./payment-refund.service";
 import { PaymentReconciliationService } from "./payment-reconciliation.service";
+import { ReservationReconciliationService } from "./reservation-reconciliation.service";
+import { PaymentExpiryReconciliationService } from "./payment-expiry-reconciliation.service";
+import { PspReconciliationService } from "./psp-reconciliation.service";
+import { RefundReconciliationService } from "./refund-reconciliation.service";
+import { MiscReconciliationService } from "./misc-reconciliation.service";
 import { PaymentInitiationService } from "./payment-initiation.service";
 import { PaymentCallbackService } from "./payment-callback.service";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
@@ -68,6 +73,11 @@ describe("PaymentService refundTradeCashPaymentIfCompleted — B3 çift-iade kor
         PaymentCommonService,
         PaymentRefundService,
         PaymentReconciliationService,
+        ReservationReconciliationService,
+        PaymentExpiryReconciliationService,
+        PspReconciliationService,
+        RefundReconciliationService,
+        MiscReconciliationService,
         PaymentInitiationService,
         PaymentCallbackService,
         PaymentFulfillmentService,

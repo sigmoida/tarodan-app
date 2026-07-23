@@ -1,4 +1,4 @@
-import { PaymentReconciliationService } from "./payment-reconciliation.service";
+import { PspReconciliationService } from "./psp-reconciliation.service";
 import { PaymentStatus } from "@prisma/client";
 
 /**
@@ -6,7 +6,7 @@ import { PaymentStatus } from "@prisma/client";
  * GERÇEKTEN çekilmiş ödemeleri yakalar. Sipariş hâlâ ödenebilirse CAS ile failed→pending
  * resetleyip tamamlar (telafi); değilse yüksek-öncelik ALARM (oto-iade Faz 4).
  */
-describe("PaymentReconciliationService.detectOrphanCapturedFailedPayments — FLOW-M3", () => {
+describe("PspReconciliationService.detectOrphanCapturedFailedPayments — FLOW-M3", () => {
   const makeService = (opts: {
     candidate: any;
     query: (oid: string) => any;
@@ -37,18 +37,13 @@ describe("PaymentReconciliationService.detectOrphanCapturedFailedPayments — FL
     };
     const processSuccessfulPayment = jest.fn().mockResolvedValue(true);
     const paymentFulfillment = { processSuccessfulPayment };
-    const service = new PaymentReconciliationService(
-      prisma as any,
-      cache as any,
-      configService as any,
-      paymentProviders as any,
-      {} as any, // invoiceService
-      {} as any, // notificationService
-      {} as any, // commissionLedger
-      {} as any, // paymentRefund
-      {} as any, // eventService
-      paymentCommon as any,
-      paymentFulfillment as any,
+    const service = new PspReconciliationService(
+      prisma as any, // prisma
+      cache as any, // cache
+      configService as any, // configService
+      paymentProviders as any, // paymentProviders
+      paymentCommon as any, // paymentCommon
+      paymentFulfillment as any, // paymentFulfillment
     );
     return { service, prisma, processSuccessfulPayment };
   };

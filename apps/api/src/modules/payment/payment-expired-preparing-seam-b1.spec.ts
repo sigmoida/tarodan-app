@@ -1,4 +1,4 @@
-import { PaymentReconciliationService } from "./payment-reconciliation.service";
+import { PaymentExpiryReconciliationService } from "./payment-expiry-reconciliation.service";
 
 /**
  * SEAM-B1: handleExpiredPreparingOrders süre-doldu iptalinde artık KARGO DURUMUNA bakar.
@@ -6,7 +6,7 @@ import { PaymentReconciliationService } from "./payment-reconciliation.service";
  * bile iptal+iade EDİLMEZ (yoksa alıcı hem malı hem parayı alır). Ayrıca restock artık
  * order.quantity kadar (eskiden sabit +1).
  */
-describe("PaymentReconciliationService.handleExpiredPreparingOrders — SEAM-B1", () => {
+describe("PaymentExpiryReconciliationService.handleExpiredPreparingOrders — SEAM-B1", () => {
   const makeService = (expiredOrder: any, shipment: any) => {
     const mockTx = {
       $queryRaw: jest.fn().mockResolvedValue([]),
@@ -38,12 +38,10 @@ describe("PaymentReconciliationService.handleExpiredPreparingOrders — SEAM-B1"
       notifySellerDidNotShipRefunded: jest.fn().mockResolvedValue(undefined),
     };
     const cache = { del: jest.fn().mockResolvedValue(undefined) };
-    const service = new PaymentReconciliationService(
+    const service = new PaymentExpiryReconciliationService(
       prisma as any, // prisma
       cache as any, // cache
       {} as any, // configService
-      {} as any, // paymentProviders
-      {} as any, // invoiceService
       notificationService as any, // notificationService
       commissionLedger as any, // commissionLedger
       paymentRefund as any, // paymentRefund
