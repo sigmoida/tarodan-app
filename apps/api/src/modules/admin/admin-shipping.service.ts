@@ -61,9 +61,16 @@ export class AdminShippingService {
         where,
         include: {
           order: {
+            // `include` returns every Order scalar, so `packageId` (the per-seller
+            // OrderPackage) and `quantity` come along for free. Same-seller orders
+            // in a checkout group share ONE physical Sürat gönderi but keep a
+            // Shipment row each; the admin list groups siblings that share a
+            // `packageId` into a single physical-parcel row and shows the package's
+            // order line-items (product below), so a 2-seller cart = 2 rows, not 3.
             include: {
               buyer: { select: { id: true, displayName: true, email: true } },
               seller: { select: { id: true, displayName: true, email: true } },
+              product: { select: { id: true, title: true } },
             },
           },
         },

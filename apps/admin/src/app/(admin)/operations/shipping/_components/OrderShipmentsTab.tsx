@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { ResourceList } from "@/components/list";
 import { statusOptions } from "../_shared";
-import { orderShipmentColumns } from "../_lib/columns";
+import { OrderShipmentsTable } from "./OrderShipmentsTable";
 import type { OrderShipmentRow } from "../_lib/types";
 
 export function OrderShipmentsTab() {
@@ -25,10 +25,7 @@ export function OrderShipmentsTab() {
           className="sm:w-56"
         />
       </ResourceList.Toolbar>
-      <ResourceList.Table
-        columns={orderShipmentColumns(t)}
-        emptyText={t("admin.operations.shipping.orders.empty")}
-      />
+      <OrderShipmentsTable />
       <ResourceList.Pagination />
     </ResourceList>
   );

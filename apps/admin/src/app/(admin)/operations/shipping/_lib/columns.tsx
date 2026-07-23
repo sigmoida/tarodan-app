@@ -1,9 +1,16 @@
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Badge, shipmentStatusConfig } from "@tarodan/ui";
-import { col, CellCode, Empty, type RowActionItem } from "@/components/table";
+import {
+  col,
+  CellCode,
+  Empty,
+  TruncatedText,
+  type RowActionItem,
+} from "@/components/table";
 import { legLabel, formatRelative } from "../_shared";
 import type {
-  OrderShipmentRow,
+  PhysicalShipmentRow,
   ReturnShipmentRow,
   TradeShipmentRow,
   SuratShipmentRow,
@@ -11,36 +18,56 @@ import type {
 
 type T = ReturnType<typeof useTranslations<never>>;
 
-export const orderShipmentColumns = (t: T) => [
-  col.link<OrderShipmentRow>(
+/**
+ * Columns for the PHYSICAL shipment list: one row per parcel (sibling orders
+ * that share a package are already merged upstream — see `toPhysicalShipments`).
+ * The order column stacks the parcel's line-items so per-order navigation is
+ * preserved even though the rows are consolidated.
+ */
+export const physicalShipmentColumns = (t: T) => [
+  col.custom<PhysicalShipmentRow>(
     t("admin.operations.common.order"),
-    (r) =>
-      r.order
-        ? {
-            href: `/operations/orders/${r.order.id}`,
-            label: `#${r.order.orderNumber}`,
-          }
-        : null,
-    { sortKey: "order.orderNumber" },
+    (r) => (
+      <div className="flex min-w-0 flex-col gap-1.5">
+        {r.items.map((it) => (
+          <div key={it.orderId} className="min-w-0">
+            <Link
+              href={`/operations/orders/${it.orderId}`}
+              className="block text-primary-600 hover:underline"
+            >
+              <TruncatedText>
+                {`#${it.orderNumber}${it.quantity > 1 ? ` ×${it.quantity}` : ""}`}
+              </TruncatedText>
+            </Link>
+            {it.productTitle ? (
+              <TruncatedText className="text-xs text-muted">
+                {it.productTitle}
+              </TruncatedText>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    ),
+    { grow: 3, minWidth: 220, sortKey: "order.orderNumber", sortType: "text" },
   ),
-  col.text<OrderShipmentRow>(
+  col.text<PhysicalShipmentRow>(
     t("admin.operations.common.buyer"),
-    (r) => r.order?.buyer?.displayName,
+    (r) => r.buyer?.displayName,
     { sortKey: "order.buyer.displayName" },
   ),
-  col.id<OrderShipmentRow>(
+  col.id<PhysicalShipmentRow>(
     t("admin.operations.common.buyerId"),
-    (r) => r.order?.buyer?.id,
+    (r) => r.buyer?.id,
   ),
-  col.id<OrderShipmentRow>(
+  col.id<PhysicalShipmentRow>(
     t("admin.operations.common.sellerId"),
-    (r) => r.order?.seller?.id,
+    (r) => r.seller?.id,
   ),
-  col.muted<OrderShipmentRow>(
+  col.muted<PhysicalShipmentRow>(
     t("admin.operations.shipping.carrier"),
     "provider",
   ),
-  col.custom<OrderShipmentRow>(
+  col.custom<PhysicalShipmentRow>(
     t("admin.operations.common.trackingNumber"),
     (r) =>
       r.providerTrackingId ? (
@@ -58,7 +85,7 @@ export const orderShipmentColumns = (t: T) => [
       ),
     { grow: 2, sortKey: "providerTrackingId", sortType: "text" },
   ),
-  col.badge<OrderShipmentRow>(
+  col.badge<PhysicalShipmentRow>(
     t("common.status"),
     (r) => (
       <Badge
