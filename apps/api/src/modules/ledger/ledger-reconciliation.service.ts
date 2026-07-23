@@ -1,9 +1,15 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
 import { PrismaService } from "../../prisma";
 import { PaymentStatus, LedgerDirection } from "@prisma/client";
 import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
-import { moneyCronsViaBull } from "../../monitoring/bull-cron.helper";
+import {
+  moneyCronsViaBull,
+  registerRepeatableCron,
+} from "../../monitoring/bull-cron.helper";
+import { QUEUE_NAMES } from "../../workers/constants";
 
 const EPSILON = 0.01;
 
@@ -26,13 +32,25 @@ export interface ReconciliationReport {
  * TAŞININCA (6.3) sertleşir; bu pass sert-hesaplanabilir invaryantlarla başlar.
  */
 @Injectable()
-export class LedgerReconciliationService {
+export class LedgerReconciliationService implements OnModuleInit {
   private readonly logger = new Logger(LedgerReconciliationService.name);
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    // Faz 7: MONEY_CRONS_VIA_BULL=true iken Bull repeatable 'ledger-reconcile' çalışır.
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "ledger-reconcile",
+      "0 4 * * *",
+      moneyCronsViaBull(),
+      this.logger,
+    );
+  }
 
   private get windowDays(): number {
     return parseInt(this.config.get("LEDGER_RECONCILE_WINDOW_DAYS") || "2", 10);

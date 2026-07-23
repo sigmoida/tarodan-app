@@ -306,15 +306,29 @@
 
 ---
 
-## Faz 7 — Dayanıklılık: Bull migrasyonu + ayrı worker · `fix/payment-hardening-resilience`
+## Faz 7 — Dayanıklılık: Bull migrasyonu + ayrı worker · `fix/payment-hardening-outbox-ledger-bull`
 
 > "Sistem çökse bile çalışsın" isteğinin gerçek karşılığı. Faz 0 önkoşul.
 
-- [ ] **7.1** Kalan saf-`@Cron`'ları Bull desenine getir: `elogo-scheduler` (EVERY_30_MIN), `featured-scheduler` (`15 3 * * *`), `search-sync:82` (EVERY_HOUR).
-- [ ] **7.2** Worker'ı ayrı process olarak deploy et (`worker.ts` → `node dist/worker`, ayrı Coolify servisi) + `AppModule`'den `WorkerModule`'ü çıkar (API çift-işlemesin). → API çökse kuyruk donmaz; worker replike edilebilir (HA).
-- [ ] **7.3** Her job'ın idempotentliğini doğrula (Bull at-least-once). Faz 1-2'deki CAS işi para job'larını hazırlar; tek tek onayla.
-- [ ] **7.4** Bull `settings` (lockDuration/stalledInterval/maxStalledCount) + DLQ; her job "vadesi gelmiş HER ŞEYİ bul" deseninde (backfill yok kuralı).
-- [ ] **7.5** Bayrakları aç (önce `CRONS_VIA_BULL`, sonra `MONEY_CRONS_VIA_BULL`), in-process `@Cron` ikizlerini kaldır → **tek mekanizma**.
+- [x] **Yeni PARA cron'ları Bull-hazır (KRİTİK):** Faz 5 `outbox-drain` (`*/1`) ve Faz 6
+      `ledger-reconcile` (`0 4`) artık `scheduled` kuyruğuna repeatable kayıt + `@Process`
+      handler'a sahip (OutboxScheduledProcessor / LedgerScheduledProcessor). Aksi halde
+      `MONEY_CRONS_VIA_BULL=true` flag'i bu crons'ları SESSİZCE durduracaktı (gate var, Bull
+      yok). Artık payout/payment/refund ile aynı desen — tek mekanizma flag'iyle tutarlı.
+- [~] **7.1** `elogo-scheduler` (EVERY_30_MIN) dual Bull desenine taşındı (ElogoScheduledProcessor,
+  `cronsViaBull` gate — PARA cron'u değil). **Kalan (mekanik, aynı desen):** `featured-scheduler`
+  (`15 3 * * *`), `search-sync:82` (EVERY_HOUR).
+- [ ] **7.2** (OPS) Worker'ı ayrı process olarak deploy et (`worker.ts` → `node dist/worker`, ayrı
+      Coolify servisi) + `AppModule`'den `WorkerModule`'ü çıkar. Not: `scheduled` kuyruğu processor'ları
+      şu an ANA API process'inde koşar; ayrı worker'a taşımak worker.ts'in ilgili modülleri
+      yüklemesini gerektirir (deploy + Coolify işi).
+- [x] **7.3** Idempotency: para job'ları Faz 1-2 CAS ile idempotent; yeni outbox (CAS claim +
+      dedupeKey + idempotent handler) ve ledger (dengeli record + best-effort capture) tasarımca
+      idempotent — Bull at-least-once güvenli.
+- [~] **7.4** DLQ: outbox `dead` statüsü + alarm (maxAttempts). Bull kök `defaultJobOptions`
+  (attempts:3 + exp backoff) mevcut. `lockDuration/stalledInterval` ince ayarı → ops.
+- [ ] **7.5** (OPS) Bayrakları aç (önce `CRONS_VIA_BULL`, sonra `MONEY_CRONS_VIA_BULL`), in-process
+      `@Cron` ikizlerini kaldır → tek mekanizma. Faz 0 (ayrı Redis + `noeviction` + AOF) önkoşul.
 
 ---
 

@@ -1,9 +1,15 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
 import { PrismaService } from "../../prisma";
 import { OutboxStatus } from "@prisma/client";
 import { TrackedCron } from "../../monitoring/tracked-cron.decorator";
-import { moneyCronsViaBull } from "../../monitoring/bull-cron.helper";
+import {
+  moneyCronsViaBull,
+  registerRepeatableCron,
+} from "../../monitoring/bull-cron.helper";
+import { QUEUE_NAMES } from "../../workers/constants";
 import { OutboxHandlerRegistry } from "./outbox-handler.registry";
 
 /**
@@ -15,14 +21,28 @@ import { OutboxHandlerRegistry } from "./outbox-handler.registry";
  * `runDrain()` Bull processor'dan çağrılır (tek-sefer garantisi + ayrı worker).
  */
 @Injectable()
-export class OutboxDrainerService {
+export class OutboxDrainerService implements OnModuleInit {
   private readonly logger = new Logger(OutboxDrainerService.name);
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly registry: OutboxHandlerRegistry,
     private readonly config: ConfigService,
+    @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    // Faz 7: MONEY_CRONS_VIA_BULL=true iken in-process @TrackedCron erken döner ve bu
+    // Bull repeatable job (OutboxScheduledProcessor 'outbox-drain') çalışır. false iken
+    // registerRepeatableCron kaydı temizler → çift-işleme yok, tek mekanizma.
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "outbox-drain",
+      "*/1 * * * *",
+      moneyCronsViaBull(),
+      this.logger,
+    );
+  }
 
   private get batchLimit(): number {
     return parseInt(this.config.get("OUTBOX_DRAIN_BATCH_LIMIT") || "50", 10);

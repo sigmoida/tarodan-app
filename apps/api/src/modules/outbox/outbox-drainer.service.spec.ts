@@ -25,7 +25,7 @@ describe("OutboxDrainerService.runDrain", () => {
     const handler = jest.fn().mockResolvedValue(undefined);
     registry.register("t", handler);
 
-    const svc = new OutboxDrainerService(prisma, registry, config);
+    const svc = new OutboxDrainerService(prisma, registry, config, {} as any);
     const r = await svc.runDrain();
 
     expect(handler).toHaveBeenCalledTimes(1);
@@ -45,7 +45,7 @@ describe("OutboxDrainerService.runDrain", () => {
     const registry = new OutboxHandlerRegistry();
     registry.register("t", jest.fn().mockRejectedValue(new Error("boom")));
 
-    const svc = new OutboxDrainerService(prisma, registry, config);
+    const svc = new OutboxDrainerService(prisma, registry, config, {} as any);
     const r = await svc.runDrain();
 
     const call = prisma.outboxEvent.update.mock.calls[0][0];
@@ -63,7 +63,7 @@ describe("OutboxDrainerService.runDrain", () => {
     const registry = new OutboxHandlerRegistry();
     registry.register("t", jest.fn().mockRejectedValue(new Error("boom")));
 
-    const svc = new OutboxDrainerService(prisma, registry, config);
+    const svc = new OutboxDrainerService(prisma, registry, config, {} as any);
     const r = await svc.runDrain();
 
     const call = prisma.outboxEvent.update.mock.calls[0][0];
@@ -81,7 +81,7 @@ describe("OutboxDrainerService.runDrain", () => {
     const handler = jest.fn();
     registry.register("t", handler);
 
-    const svc = new OutboxDrainerService(prisma, registry, config);
+    const svc = new OutboxDrainerService(prisma, registry, config, {} as any);
     const r = await svc.runDrain();
 
     expect(handler).not.toHaveBeenCalled();
@@ -95,7 +95,7 @@ describe("OutboxDrainerService.runDrain", () => {
     ]);
     const registry = new OutboxHandlerRegistry();
 
-    const svc = new OutboxDrainerService(prisma, registry, config);
+    const svc = new OutboxDrainerService(prisma, registry, config, {} as any);
     const r = await svc.runDrain();
 
     const call = prisma.outboxEvent.update.mock.calls[0][0];

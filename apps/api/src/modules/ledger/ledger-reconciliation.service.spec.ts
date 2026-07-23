@@ -19,7 +19,7 @@ describe("LedgerReconciliationService.reconcile", () => {
       ],
       [{ id: "p1", amount: 100, metadata: { refundedOrders: { o1: 40 } } }],
     );
-    const svc = new LedgerReconciliationService(prisma, config);
+    const svc = new LedgerReconciliationService(prisma, config, {} as any);
     const r = await svc.reconcile();
     expect(r.unbalancedGroups).toBe(0);
     expect(r.overRefundedPayments).toBe(0);
@@ -35,7 +35,7 @@ describe("LedgerReconciliationService.reconcile", () => {
       ],
       [],
     );
-    const svc = new LedgerReconciliationService(prisma, config);
+    const svc = new LedgerReconciliationService(prisma, config, {} as any);
     const r = await svc.reconcile();
     expect(r.unbalancedGroups).toBe(1);
     expect(r.driftAlarms.some((a) => a.includes("LEDGER_UNBALANCED"))).toBe(
@@ -54,7 +54,7 @@ describe("LedgerReconciliationService.reconcile", () => {
         },
       ],
     );
-    const svc = new LedgerReconciliationService(prisma, config);
+    const svc = new LedgerReconciliationService(prisma, config, {} as any);
     const r = await svc.reconcile();
     expect(r.overRefundedPayments).toBe(1);
     expect(r.driftAlarms.some((a) => a.includes("OVER_REFUND"))).toBe(true);
