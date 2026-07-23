@@ -339,8 +339,16 @@
 ## Faz 8 — Event-driven fulfillment + god-service parçalama · `refactor/payment-fulfillment-decompose`
 
 - [ ] **8.1** Ödeme `paid`'e geçip **event yaysın**; fulfillment tüketsin (fulfillment hatası ödeme durumunu bozmasın).
-- [ ] **8.2** Ekstraksiyon: `VirtualOrderFulfillment` (membership/boost), `OrderStock` (decrement+cascade), `FulfillmentNotifier`, `ShipmentProvisioning`, `TradeCashFulfillment`.
-- [ ] **8.3** Tekil fulfillment'ı "group-of-one"a indir → ~450-500 satır kopya silinir (QUAL).
+      NOT: mevcut yapı ödeme-tamamlama + escrow-hold'u TEK tx'te atomik tutuyor (bu escrow için DAHA güvenli;
+      ayırmak "ödeme tamam ama hold yok" penceresi açar) → düşünülerek yapılmalı, aceleye gelmez.
+- [~] **8.2** God-service parçalama (POST-COMMIT, düşük-risk kısımlar TAMAM): - [x] `FulfillmentNotifier` — stokout kaskad bildirim üçlemesi (tekil=grup birebir kopya) + back-in-stock. - [x] `FulfillmentFinalizer` — fiziksel sipariş POST-COMMIT sonlandırması (ledger capture + order.paid +
+  Sürat gönderi), tekil=grup birebir. Ölü `invoiceService` + kullanılmayan ledger dep temizlendi. - Fulfillment **1643 → 1352 satır** (−291), her ikisi de tam test kapsamında.
+  **Kalan (IN-TX, para-kritik — ÖNCE karakterizasyon testi gerekir):** `VirtualOrderFulfillment`
+  (üyelik/boost aktivasyonu, tx içi — birim testi ZAYIF), `EscrowHoldService` (hold+komisyon, tx içi —
+  yalnız grup spec'te), `FulfillmentStockService` (stok düşüm+kaskad, tx içi). Bunlar zayıf test kapsamlı
+  para akışları; körlemesine çıkarmak yakalanmayan para bug'ı riski → disiplinli yol: önce test yaz, sonra çıkar.
+- [ ] **8.3** Tekil fulfillment'ı "group-of-one"a indir → ~450-500 satır kopya silinir (QUAL). Steps 5-6
+      (escrow+stock) çıkarıldıktan SONRA anlamlı; büyük yeniden-yazım.
 - [x] **8.4** ✓ Fulfillment'taki `ModuleRef` + runtime `require("../trade/trade.service")` lazy-resolve
       hack'i (Trade↔Payment döngüsünü aşmak için) KALDIRILDI. Nakit takas ödemesi temizlenince Payment
       in-process event yayınlar (`EventService.emitTradeCashCleared` → EventEmitter2 `payment.trade-cash-cleared`);
