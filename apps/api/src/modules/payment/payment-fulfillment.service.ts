@@ -666,6 +666,14 @@ export class PaymentFulfillmentService {
       `Trade cash payment ${payment.id} completed (tradeCashPaymentId=${payment.tradeCashPaymentId})`,
     );
 
+    // Faz 6.4: takas nakit yakalamasını birleşik gelir defterine yaz (takas komisyonu
+    // da platform_commission'a düşer; escrow trade payout'unda kapanır). Best-effort.
+    if (payment.tradeCashPaymentId) {
+      await this.fulfillmentFinalizer.recordTradeCashCapture(
+        payment.tradeCashPaymentId,
+      );
+    }
+
     // NOT: Takas nakit komisyonu e-Arşivi ARTIK BURADA (ödeme anında) DEĞİL, ürünler DEPOYA VARINCA
     // (at_warehouse) kesilir — surat-tracking.maybeTransitionTradeToAtWarehouse. İptal penceresi
     // ödeme sonrası/depo öncesi olduğundan, iptalde henüz fatura kesilmemiş olur (iade faturası gerekmez).

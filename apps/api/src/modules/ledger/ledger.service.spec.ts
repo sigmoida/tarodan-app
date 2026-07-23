@@ -182,4 +182,50 @@ describe("LedgerService", () => {
       expect(tx.ledgerEntry.createMany).not.toHaveBeenCalled();
     });
   });
+
+  describe("recordTradeCashCapture", () => {
+    it("takas komisyonu platform_commission'a düşer; total = net + komisyon DENGELİ", async () => {
+      const svc = new LedgerService({} as any);
+      const tx = makeTx();
+      // payer 90 öder → recipient net 78 + platform komisyon 12
+      await svc.recordTradeCashCapture(tx, {
+        tradeId: "t1",
+        payerId: "payer-1",
+        recipientId: "rcp-1",
+        totalAmount: 90,
+        netAmount: 78,
+        commission: 12,
+      });
+      const rows = tx.ledgerEntry.createMany.mock.calls[0][0].data;
+      const byAcc = Object.fromEntries(
+        rows.map((r: any) => [r.account, [r.direction, Number(r.amount)]]),
+      );
+      expect(byAcc[LedgerAccount.buyer_payment]).toEqual([
+        LedgerDirection.credit,
+        90,
+      ]);
+      expect(byAcc[LedgerAccount.seller_escrow]).toEqual([
+        LedgerDirection.debit,
+        78,
+      ]);
+      expect(byAcc[LedgerAccount.platform_commission]).toEqual([
+        LedgerDirection.debit,
+        12,
+      ]);
+      // tradeId ref yazıldı
+      expect(rows[0].tradeId).toBe("t1");
+    });
+
+    it("total/net <= 0 → null", async () => {
+      const svc = new LedgerService({} as any);
+      const tx = makeTx();
+      expect(
+        await svc.recordTradeCashCapture(tx, {
+          totalAmount: 0,
+          netAmount: 0,
+          commission: 0,
+        }),
+      ).toBeNull();
+    });
+  });
 });

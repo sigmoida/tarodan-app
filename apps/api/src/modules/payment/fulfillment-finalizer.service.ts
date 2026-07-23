@@ -110,4 +110,40 @@ export class FulfillmentFinalizer {
       );
     }
   }
+
+  /**
+   * Faz 6.4: Takas nakit-farkı yakalamasını birleşik gelir defterine yaz (takas komisyonu
+   * da `platform_commission` hesabına düşsün). POST-COMMIT best-effort — defter hatası
+   * ödemeyi bozmaz; reconciliation açığı yakalar.
+   */
+  async recordTradeCashCapture(tradeCashPaymentId: string): Promise<void> {
+    if (!this.ledger) return;
+    try {
+      const tcp = await this.prisma.tradeCashPayment.findUnique({
+        where: { id: tradeCashPaymentId },
+        select: {
+          tradeId: true,
+          payerId: true,
+          recipientId: true,
+          amount: true,
+          commission: true,
+          totalAmount: true,
+        },
+      });
+      if (!tcp) return;
+      await this.ledger.recordTradeCashCapture(this.prisma, {
+        tradeId: tcp.tradeId,
+        tradeCashPaymentId,
+        payerId: tcp.payerId,
+        recipientId: tcp.recipientId,
+        totalAmount: Number(tcp.totalAmount),
+        netAmount: Number(tcp.amount),
+        commission: Number(tcp.commission),
+      });
+    } catch (e: any) {
+      this.logger.warn(
+        `Ledger trade-cash capture kaydı başarısız (tcp ${tradeCashPaymentId}): ${e?.message}`,
+      );
+    }
+  }
 }

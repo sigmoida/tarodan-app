@@ -312,7 +312,13 @@
     takas capture ledger'ı henüz yok) → tam per-hesap bakiye türetimiyle birlikte.
 - [ ] **6.3** Hold tüketimi/kısmi iade ledger'dan okusun (Faz 1.4'ün yapısal hâli). → para akışları
       deftere taşınınca (büyük, riskli geçiş); şimdilik defter denetim/reconciliation için popüle edilir.
-- [ ] **6.4** Sipariş + takas komisyonlarını tek deftere birleştir (MONEY-L7).
+- [x] **6.4** ✓ Sipariş + takas komisyonları TEK deftere birleşti (MONEY-L7). Eski `commission_ledger`
+      yalnız SİPARİŞ komisyonuydu (`orderId @unique`); takas komisyonu takas alt-sisteminde ayrıydı.
+      `LedgerService.recordTradeCashCapture` takas nakit yakalamasını (payer totalAmount = recipient net +
+      platform komisyon) çift-taraflı deftere yazıyor → takas komisyonu da sipariş komisyonuyla AYNI
+      `platform_commission` hesabına düşer; gelir tek yerden (Σ platform_commission) sorgulanır. Takas
+      escrow'u trade `payout_completed` ile kapanır → sipariş akışıyla aynı yaşam döngüsü. Fulfillment
+      trade-cash yolunda POST-COMMIT best-effort (@Optional). **Spec:** takas capture denge + tradeId ref.
 - [x] **6.5** ✓ `LedgerReconciliationService` GÜNLÜK drift denetimi (`@TrackedCron 0 4 * * *`,
       moneyCronsViaBull-gate → Faz 7 Bull). Yalnız OKUR; sert invaryant ihlalinde greplenebilir ALARM:
       (1) defter dengesi (her grup Σ=0), (2) fazla-iade (ΣrefundedOrders > payment.amount). **Spec:**

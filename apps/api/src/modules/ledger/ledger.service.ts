@@ -167,6 +167,60 @@ export class LedgerService {
   }
 
   /**
+   * Takas nakit-farkı yakalaması (Faz 6.4 — birleşik gelir defteri): ödeyenin (payer)
+   * ödediği totalAmount = alıcının (recipient) net'i + platform komisyonu. Böylece TAKAS
+   * komisyonu da sipariş komisyonuyla AYNI `platform_commission` hesabına düşer → gelir
+   * tek yerden sorgulanır. Escrow (seller_escrow) trade payout'unda (payout_completed)
+   * kapanır → sipariş akışıyla aynı escrow yaşam döngüsü.
+   */
+  async recordTradeCashCapture(
+    tx: Prisma.TransactionClient,
+    input: {
+      tradeId?: string | null;
+      tradeCashPaymentId?: string | null;
+      payerId?: string | null;
+      recipientId?: string | null;
+      totalAmount: number;
+      netAmount: number;
+      commission: number;
+      currency?: string;
+    },
+  ): Promise<string | null> {
+    if (!(input.totalAmount > 0) || !(input.netAmount > 0)) return null;
+    const entries: LedgerEntryInput[] = [
+      {
+        account: LedgerAccount.buyer_payment,
+        direction: LedgerDirection.credit,
+        amount: input.totalAmount,
+        buyerId: input.payerId,
+      },
+      {
+        account: LedgerAccount.seller_escrow,
+        direction: LedgerDirection.debit,
+        amount: input.netAmount,
+        sellerId: input.recipientId,
+      },
+    ];
+    if (input.commission > 0) {
+      entries.push({
+        account: LedgerAccount.platform_commission,
+        direction: LedgerDirection.debit,
+        amount: input.commission,
+      });
+    }
+    return this.record(tx, {
+      eventType: LedgerEventType.payment_captured,
+      currency: input.currency,
+      entries,
+      refs: {
+        tradeId: input.tradeId,
+        sellerId: input.recipientId,
+        buyerId: input.payerId,
+      },
+    });
+  }
+
+  /**
    * İade (tam/kısmi): dış çıkış (refund) = capture'daki escrow + komisyon + stopajın
    * ORANSAL ters kaydı. ratio = refundAmount / orderTotal. Komisyon/stopaj oranları
    * yuvarlanır; seller_escrow kalanı EMER (grup tam olarak dengelensin, epsilon aşımı yok).
