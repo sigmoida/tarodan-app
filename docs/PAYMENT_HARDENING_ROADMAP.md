@@ -358,8 +358,10 @@
   `worker.ts` artık `WorkerModule` yerine `AppModule`'ü BAŞSIZ application-context olarak yüklüyor →
   ayrı worker hem klasik kuyrukları hem de feature modüllerine gömülü `scheduled` processor'ları
   (outbox-drain, ledger-reconcile, payout, membership, boost, …) koşturur ("worker.ts ilgili modülleri
-  yüklesin" karşılandı). **KALAN (OPS):** ayrı Coolify servisi `node dist/worker` + API'ye
-  `PROCESS_ROLE=web`, worker'a `PROCESS_ROLE=worker` env'i + Faz 0 (ayrı Redis) — deploy adımı.
+  yüklesin" karşılandı). `entrypoint.sh` artık ROL-FARKINDA: `PROCESS_ROLE=worker`'da migration'ı atlayıp
+  `node dist/worker`, aksi halde migrate + `node dist/main` başlatır (varsayılan davranış aynı) → TEK imaj
+  iki Coolify servisi olarak boot edebilir. **KALAN (OPS):** 2. Coolify servisi (aynı imaj, env
+  `PROCESS_ROLE=worker`) + API servisine `PROCESS_ROLE=web` + Faz 0 (ayrı Redis) — saf deploy adımı.
 - [x] **7.3** Idempotency: para job'ları Faz 1-2 CAS ile idempotent; yeni outbox (CAS claim +
       dedupeKey + idempotent handler) ve ledger (dengeli record + best-effort capture) tasarımca
       idempotent — Bull at-least-once güvenli.
